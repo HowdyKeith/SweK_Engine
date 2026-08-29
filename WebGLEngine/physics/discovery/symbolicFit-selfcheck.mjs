@@ -12,7 +12,7 @@
 // ways -- the logistic map framed as x(n+1) vs x(n), where an exact law exists and must be found, and framed as
 // x(n) vs n, where none exists and NOTHING must be returned. Same numbers, opposite required answers.
 import {
-    fit, powerLaw, polyLibrary, multiLibrary, TERM, designMatrix, lstsq, stlsq, solveSquare, rSquared, formatEquation, VERDICT,
+    fit, powerLaw, polyLibrary, multiLibrary, TERM, designMatrix, lstsq, stlsq, solveSquare, rSquared, predict, formatEquation, VERDICT,
     rollingFit, ROLLING,
 } from "./symbolicFit.js";
 import { period, visViva } from "../orbits/kepler.js";
@@ -34,6 +34,19 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const c = lstsq(Th, [3, 5, 7, 9]);
     ok("least squares recovers a known line exactly", Math.abs(c[0] - 1) < 1e-9 && Math.abs(c[1] - 2) < 1e-9, "y = 1 + 2x");
     ok("R2 of a perfect fit is 1", Math.abs(rSquared([1, 2, 3], [1, 2, 3]) - 1) < 1e-15);
+    // predict() is the dot product of each design-matrix row with the coefficient vector -- checked by hand.
+    const Th2 = [[1, 2, 4], [1, 3, 9], [1, -1, 1]];
+    const yhat = predict(Th2, [1, -2, 0.5]);
+    ok("!! predict() is exactly Theta . coeffs, row by row, checked by hand",
+       yhat.length === 3 &&
+       Math.abs(yhat[0] - (1 * 1 + 2 * -2 + 4 * 0.5)) < 1e-12 &&
+       Math.abs(yhat[1] - (1 * 1 + 3 * -2 + 9 * 0.5)) < 1e-12 &&
+       Math.abs(yhat[2] - (1 * 1 + -1 * -2 + 1 * 0.5)) < 1e-12,
+       "rows [1,2,4],[1,3,9],[1,-1,1] against coeffs [1,-2,0.5] give -1, -0.5, 3.5 by hand and by the function");
+    ok("...and it reproduces y EXACTLY on the same data used to fit a known line (predict is what rSquared grades)",
+       (() => { const cc = lstsq(Th, [3, 5, 7, 9]); const p = predict(Th, cc);
+                return Th.every((_, i) => Math.abs(p[i] - [3, 5, 7, 9][i]) < 1e-9); })(),
+       "Th = [[1,1],[1,2],[1,3],[1,4]] fit exactly by y=1+2x, so predict(Th, coeffs) must reproduce 3,5,7,9");
 }
 
 // ---- 2. TYPED ARRAYS. This engine hands them out everywhere and Float64Array.map returns a Float64Array ----------

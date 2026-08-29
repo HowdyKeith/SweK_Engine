@@ -246,6 +246,11 @@ export function macPages() {
     return [
         { file: "external-linalg.html", why: "needs clang and -framework Accelerate; Mac-only by construction" },
         { file: "raycast.html",        why: "drives a Mac peer -- /raycast/launch, /raycast/ext/dev, /install/exec" },
+        // v4109 -- Keith: "pairlane would show in the Mac System panel on Server.html." pairlane's CLI supports
+        // Linux and macOS only (its own README), so on Keith's Windows rig the ONLY way to send/receive is
+        // through /pairlane/relay -> a Mac peer's /pairlane/peer-exec -- the exact "drives a Mac peer" shape
+        // raycast.html is already listed here for, one line above.
+        { file: "pairlane.html",       why: "drives a Mac peer -- /pairlane/relay, /pairlane/peer-exec" },
         { file: "hosting.html",        why: "calls /hosting/tunnel/status, the tunnel the Mac fronts" },
         { file: "settings.html",       why: "same tunnel status route" },
         { file: "phone.html",        why: "launches a .command from its own script" },

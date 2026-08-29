@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateSelection-selfcheck.mjs — v3285
 //
-// Run: node tools/ship/gateSelection-selfcheck.mjs   (~7.1s — MEASURED v3941, was ~41s; builds the real import graph)
+// Run: node tools/ship/gateSelection-selfcheck.mjs   (~70.5s — MEASURED v3941, was ~41s; builds the real import graph)
 //
 // v3941 -- the header said ~7s. It builds the import graph over the whole tree, and the tree went from ~600
 // gates to 1111, so the number aged out with the corpus rather than with anything in this file. Re-measured
@@ -207,10 +207,20 @@ const CHANGED = ["physics/statmech/ising.js"];
          : allGates.every((g) => OBSERVED[g] != null || MEASURED[g] == null),
        measuredOnly
          ? measuredOnly + " -> " + Math.round(costs[measuredOnly] / 1000) + "s from the curated table, which is " +
-           "consulted only because gate-timings has no entry for it. *** THERE IS EXACTLY " +
-           allGates.filter((g) => OBSERVED[g] == null && MEASURED[g] != null).length + " SUCH GATE IN THE TREE " +
-           "TODAY: when a sweep times it, this rung of the ladder becomes untestable and this line must say so " +
-           "rather than quietly stop meaning anything."
+           "consulted only because gate-timings has no entry for it. *** " +
+           // v4075 -- the count is INTERPOLATED INTO A SINGULAR SENTENCE and read "THERE IS EXACTLY 3 SUCH GATE
+           // IN THE TREE TODAY". The zero case below was written carefully and this one was not; a line whose
+           // entire job is to be read closely -- it exists to announce when this rung stops meaning anything --
+           // should not make its reader wonder whether the NUMBER is as sloppy as the grammar around it.
+           (() => {
+               const n = allGates.filter((g) => OBSERVED[g] == null && MEASURED[g] != null).length;
+               return n === 1
+                 ? "THERE IS EXACTLY ONE SUCH GATE IN THE TREE TODAY: when a sweep times it, this rung of the " +
+                   "ladder becomes untestable and this line must say so rather than quietly stop meaning anything."
+                 : "THERE ARE EXACTLY " + n + " SUCH GATES IN THE TREE TODAY: when a sweep times the last of " +
+                   "them, this rung of the ladder becomes untestable and this line must say so rather than " +
+                   "quietly stop meaning anything.";
+           })()
          : "NO gate is in MEASURED without also being in OBSERVED, so this rung cannot be exercised today -- " +
            "REPORTED AS UNTESTABLE rather than passed, which is the state the old typed example hid.");
 

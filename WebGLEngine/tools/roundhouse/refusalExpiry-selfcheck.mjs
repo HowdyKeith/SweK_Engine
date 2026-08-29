@@ -1,6 +1,6 @@
 // tools/roundhouse/refusalExpiry-selfcheck.mjs
 //
-// Run: node tools/roundhouse/refusalExpiry-selfcheck.mjs   (~15s MEASURED -- it builds every refusing device)
+// Run: node tools/roundhouse/refusalExpiry-selfcheck.mjs   (~0.34s MEASURED -- it builds every refusing device)
 //
 // *** THE DANGEROUS OBJECT HERE IS THE WATCHER, NOT THE REFUSALS. *** A watcher that reported "stands" when its
 // predicate threw, or when no predicate existed at all, would be worse than no watcher: it would put a green

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/updateIntegrity-selfcheck.mjs
 //
-// Run: node tools/ship/updateIntegrity-selfcheck.mjs   (~0.14s — MEASURED v3941, was ~3s)
+// Run: node tools/ship/updateIntegrity-selfcheck.mjs   (~0.57s — MEASURED v3941, was ~3s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3248 -- A TRUNCATED UPDATE DOWNLOAD AND A COMPLETE ONE RETURNED THE SAME THING.

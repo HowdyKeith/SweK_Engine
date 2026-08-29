@@ -68,11 +68,19 @@ function buildBec({ mode = "condensation", config = {} } = {}) {
     };
 }
 
+const BEC_MODES = ["condensation"];   // v4074 -- the single source `modes` and `defaults()` both read
+
 export const becDevice = {
     plantKind: "method",
-    modes: ["condensation"],
+    modes: BEC_MODES,
     name: "bose-einstein-condensation-and-the-2d-divergence",
     observables: BEC_OBSERVABLES,
     build: buildBec,
-    defaults: ({ mode } = {}) => ({ mode: mode || "condensation", config: { ...DEF } }),
+    // v4074 -- ONE DECLARATION, HONOURED BY BOTH FIELDS. `defaults()` used to return `mode || "condensation"`,
+    // which ECHOES ANY STRING BACK, so checkMode asked for a nonsense mode, got it back, and concluded the
+    // device declared it. A mode selects WHICH PHYSICS RUNS, so a device that accepts a name it does not
+    // declare runs something else and says nothing. The list was never unknown -- it is the `modes` array
+    // directly above -- and build() never reads `mode` at all, so there was no second mode to protect.
+    // Both fields read MODES so a future mode cannot be added to one and missed by the other.
+    defaults: ({ mode } = {}) => ({ mode: BEC_MODES.includes(mode) ? mode : BEC_MODES[0], config: { ...DEF } }),
 };

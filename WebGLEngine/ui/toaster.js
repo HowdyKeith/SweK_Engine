@@ -1,3 +1,4 @@
+import { makeSpring, step as springStep } from "./springMotion.js";
 // FILE: ui/toaster.js
 // Round 47 — in-engine toast notification system.
 //
@@ -24,6 +25,11 @@ const COLORS = {
 
 const DEFAULT_DURATION = 4500;
 const MAX_VISIBLE = 5;
+
+// v4114 -- the SAME spring ui/toast.js uses. Two toast surfaces, one integrator: writing the physics into
+// whichever file was upgraded first and then again into the second is the second-copy defect this session has
+// watched land repeatedly.
+const SLIDE_PX = 380;
 
 export class Toaster {
 
@@ -81,9 +87,11 @@ export class Toaster {
             fontFamily: "ui-monospace, Consolas, monospace",
             fontSize: "12px",
             boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
-            transform: "translateX(380px)",
+            transform: `translateX(${SLIDE_PX}px)`,
             opacity: "0",
-            transition: "transform 0.28s ease-out, opacity 0.28s",
+            // NO `transition`: a transition cannot overshoot, and it would also interpolate BETWEEN the
+            // spring's own frames and smear the overshoot back out. The rAF loop below writes every frame.
+            willChange: "transform, opacity",
             pointerEvents: "auto",
             cursor: "pointer",
         });
@@ -125,11 +133,28 @@ export class Toaster {
         el.addEventListener("click", () => this._dismissEl(el, entry.timer));
 
         this._container.appendChild(el);
-        // Trigger slide-in on next frame
-        requestAnimationFrame(() => {
-            el.style.transform = "translateX(0)";
-            el.style.opacity = "1";
-        });
+        // *** ONE SPRING PER TOAST, RETARGETED RATHER THAN REPLACED. *** _dismissEl flips this spring's target
+        // instead of starting a second animation, so a toast clicked mid-entrance reverses FROM WHERE IT
+        // ACTUALLY IS and carries its velocity out with it. Two separate animations would fight over one
+        // transform, and the old CSS pair genuinely did: clicking during the 0.28s slide-in restarted from the
+        // element's committed style, not its rendered position, and the toast jumped.
+        el._spring = makeSpring(SLIDE_PX, 0, "snappy");
+        el._springLast = performance.now();
+        const frame = (t) => {
+            if (!el.parentNode) return;                     // removed: stop, do not resurrect
+            const dt = (t - el._springLast) / 1000; el._springLast = t;
+            el._spring = springStep(el._spring, dt);
+            el.style.transform = `translateX(${el._spring.x.toFixed(2)}px)`;
+            el.style.opacity = String(Math.max(0, Math.min(1, 1 - el._spring.x / SLIDE_PX)));
+            if (el._leaving && el._spring.done) {
+                if (el.parentNode) el.parentNode.removeChild(el);
+                const i = this._stack.findIndex((e) => e.el === el);
+                if (i >= 0) this._stack.splice(i, 1);
+                return;
+            }
+            el._raf = requestAnimationFrame(frame);
+        };
+        el._raf = requestAnimationFrame(frame);
 
         const timer = setTimeout(() => this._dismissEl(el, timer), duration);
         const entry = { el, timer };
@@ -141,13 +166,11 @@ export class Toaster {
     _dismissEl(el, timer) {
         if (timer) clearTimeout(timer);
         if (!el.parentNode) return;
-        el.style.transform = "translateX(380px)";
-        el.style.opacity = "0";
-        setTimeout(() => {
-            if (el.parentNode) el.parentNode.removeChild(el);
-            const idx = this._stack.findIndex(e => e.el === el);
-            if (idx >= 0) this._stack.splice(idx, 1);
-        }, 320);
+        // Retarget, do not re-animate. Removal happens in the frame loop when the spring actually rests, so
+        // there is no fixed 320ms timer that can fire while the element is still visibly moving.
+        el._leaving = true;
+        if (el._spring) el._spring = { ...el._spring, target: SLIDE_PX };
+        else { if (el.parentNode) el.parentNode.removeChild(el); }
     }
 
     dismissAll() {

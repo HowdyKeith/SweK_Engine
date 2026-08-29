@@ -109,7 +109,13 @@ async function go(finalState) {
        ? Object.entries(f.adapterInfo).filter(([, v]) => v).map(([k, v]) => k + ": " + v).join(", ") || "(empty)"
        : mark(null));
   t += row("<b>VRAM</b>", '<span class="unk">not exposed</span> <span class="note">&mdash; ' + f.vramNote + "</span>");
-  t += row("storage quota", gb(f.quotaBytes) || mark(null));
+  // v4113 -- THE QUOTA GETS ITS CAVEAT ON SCREEN, exactly as VRAM does two rows down. Measured on this tree:
+  // a persistent profile reported 162.33 GB against 28.73 GB really free, and an incognito context reported
+  // 0.90 GB on that same disk. A reader who sees only the number reads a promise; the note is what makes it a
+  // ceiling. Same reasoning as the vramNote row -- an absent number is NAMED rather than substituted.
+  t += row("storage quota", (gb(f.quotaBytes) || mark(null)) +
+       (f.quotaNote ? ' <span class="note">&mdash; ' + f.quotaNote + "</span>" : ""));
+  if (f.quotaContextNote) t += row("<i>...and the context matters</i>", '<span class="note">' + f.quotaContextNote + "</span>");
   t += row("storage in use", gb(f.usageBytes) || mark(null));
   t += row("model already cached", mark(f.modelCached) +
        (f.cacheNames ? ' <span class="note">&mdash; caches: ' + (f.cacheNames.join(", ") || "none") + "</span>" : ""));
@@ -257,28 +263,63 @@ function renderRun(f) {
       '<div class="note" style="margin-top:4px">' + c.note + "</div>" +
       '<button data-cand="' + i + '" style="margin-top:6px">Use this repo</button></div>'
     ).join("") + '<p class="note" style="margin-top:6px">' + CONFIDENCE_NOTE + "</p>";
+    // v4105 -- Keith: "i click on the first repo to download. the page should send us to the download link at
+    // the bottom of the page or we wont know why nothing is happening... after we click [Use this repo] then
+    // should fill and start downloading without another download click." Before this, "Use this repo" filled
+    // #repoId/#dtype and stopped -- both fields sit BELOW the candidate list, so on a box with more than one or
+    // two candidates the fields a click just filled are off-screen, and nothing on screen said so. Filling a
+    // field the reader cannot see is the same defect class as v4016's clobbered status text: a real effect
+    // with no visible evidence that it happened.
     cbox.querySelectorAll("button[data-cand]").forEach((b) => {
       b.onclick = () => {
         const c = MODEL_REPO_CANDIDATES[+b.dataset.cand];
         $("repoId").value = c.repo;
         $("dtype").value = c.recommendedDtype;
+        $("dl").scrollIntoView({ behavior: "smooth", block: "center" });
+        // Auto-starts the download this click was clearly asking for -- but only once the fields have actually
+        // landed on screen, so the reader sees the id fill in before the button they can now see triggers.
+        setTimeout(() => { $("dl").click(); }, 350);
       };
     });
   }
   const st = (msg, cls) => { const e = $("runState"); if (e) e.innerHTML = cls ? '<span class="' + cls + '">' + msg + "</span>" : msg; };
+  // v4105 -- Keith: "it then says done, but i think it is actually installing? ... after the install it shows
+  // ready ... so we need a 'now installing...' before that starts installing so we know that done refers only
+  // to downloading." He was right about the mechanism: transformers.js's progress_callback only fires DURING
+  // file downloads. Once the last byte of the last file lands, runner.load() is still awaiting mod.pipeline() --
+  // ONNX Runtime is building the session and (on WebGPU) compiling shaders, and NOTHING reports progress for
+  // that step. The old code just left the last progress line on screen for however long that silently took,
+  // which reads exactly like Keith described: it looks finished while real work is still running.
+  //
+  // *** WHAT THIS DOES NOT CLAIM: a fabricated "compiling: 40%". *** There is no event to build that number
+  // from -- inventing one would be exactly the lying-progress-bar v2579 already forbids, one layer up. What IS
+  // knowable without guessing at the library's internals is OUR OWN observation: no progress event has arrived
+  // for a while and the state has not moved to ready/failed. That is reported as what it is -- an inference,
+  // not a certainty -- rather than a percentage nobody measured.
+  let idleTimer = null;
+  const clearIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } };
+  const armIdle = () => {
+    clearIdle();
+    idleTimer = setTimeout(() => {
+      st("no download activity for a few seconds \u2014 likely now installing: building the model runtime " +
+         "and compiling WebGPU shaders. This step reports no progress and can take a while, especially the " +
+         "first time.");
+    }, 2500);
+  };
   $("dl").onclick = async () => {
     const repo = ($("repoId").value || "").trim();
     const dtype = ($("dtype").value || "").trim();
     if (!runner) {
       runner = createRunner({});
       runner.on((ev) => {
-        if (ev.type === "progress") st(ev.text);
-        else if (ev.type === "state" && ev.state === "preflight") st("checking that " + repo + " exists\u2026");
-        else if (ev.type === "state" && ev.state === "loading") st("id resolves. Loading the library and the weights\u2026");
+        if (ev.type === "progress") { st(ev.text); armIdle(); }
+        else if (ev.type === "state" && ev.state === "preflight") { clearIdle(); st("checking that " + repo + " exists\u2026"); }
+        else if (ev.type === "state" && ev.state === "loading") { st("id resolves. Loading the library and the weights\u2026"); armIdle(); }
       });
     }
     $("dl").disabled = true;
     const r = await runner.load(repo, dtype ? { dtype } : {});
+    clearIdle();
     $("dl").disabled = false;
     if (!r.ok) {
       // THE OOM SUSPICION IS SAID OUT LOUD, because the probe already showed the gap that predicts it.

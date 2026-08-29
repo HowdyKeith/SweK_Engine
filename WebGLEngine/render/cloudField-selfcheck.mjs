@@ -1,6 +1,6 @@
 // WebGLEngine/render/cloudField-selfcheck.mjs — v4055
 //
-// Run: node render/cloudField-selfcheck.mjs   (~0.2s; no browser, no GPU)
+// Run: node render/cloudField-selfcheck.mjs   (~42.5s; no browser, no GPU)
 //
 // Keith: "we also have great clouds we made to pass through." They were great and they were UNREACHABLE: the
 // puffs were generated inline inside render/cloudLayer.js's WebGL2 renderer, so a Three.js page could not have
@@ -154,7 +154,7 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
         /function clearCloudDeck\(\)/.test(page) && /cloudTypeIdx === CLOUD_ORDER\.length/.test(page),
         "a control that cannot reach its own off state is also the only way to tell what it is responsible for on screen");
 
-    const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
+    const pw = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs")).href);
     const { createRequire } = await import("node:module");
     const rr = pw.resolvePlaywright(createRequire(import.meta.url));
     const skip = pw.browserSkipReason(rr.chromium, rr.from, pw.HEADLESS_SHELL);
@@ -209,6 +209,22 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
             ok("!! ...with zero page errors", errs.length === 0, errs[0] || "clean");
         } finally { await b.close(); await new Promise((x) => srv.close(x)); }
     }
+}
+
+console.log("\n6. *** offsetDir/norm -- EXPORTED AT v4076 FOR render/mossField.js, AND PROVEN HERE DIRECTLY ***");
+{
+    // v4076 -- these two were PRIVATE to this file until moss needed the same tangent-offset arithmetic clouds
+    // scatter with. Both cluster placements above already exercise them indirectly through buildPuffsShell();
+    // this proves the two functions on their own terms, which is what definitionGates-selfcheck's tree-wide
+    // ratchet asks of an export -- "closed by ASSERTION, not by mention" -- now that exporting them made them
+    // visible to a check outside this file for the first time.
+    ok("!! offsetDir(dir, 0, 0) returns dir unchanged -- no offset is no offset",
+        JSON.stringify(CF.offsetDir([0, 1, 0], 0, 0)) === JSON.stringify([0, 1, 0]));
+    ok("!! offsetDir ALWAYS returns a unit vector, whatever the offset",
+        Math.abs(Math.hypot(...CF.offsetDir([0, 0, 1], 0.3, -0.2)) - 1) < 1e-12);
+    ok("!! ...even at the pole, where the eastward tangent degenerates and falls back to +x",
+        Math.abs(Math.hypot(...CF.offsetDir([0, 1, 0], 0.4, 0.15)) - 1) < 1e-12);
+    ok("!! norm() actually normalizes", JSON.stringify(CF.norm([3, 4, 0])) === JSON.stringify([0.6, 0.8, 0]));
 }
 
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));

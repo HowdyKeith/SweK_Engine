@@ -21,7 +21,7 @@
 import {
     EPS0, MU0, C_DEFINED, lightSpeed, impedanceFreeSpace,
     refractiveIndex, waveImpedance, phaseSpeed, fresnelNormal, snellRefract, criticalAngle,
-    cflLimit, peakField, gaussianPulse,
+    cflLimit, peakField, gaussianPulse, yee1D,
 } from "./maxwell.mjs";
 import { reflectionCoef } from "../seismic/rays.mjs";
 
@@ -78,6 +78,48 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
         `critical angle ${(tc * 180 / Math.PI).toFixed(3)} degrees for glass to air. Returning NaN is the honest ` +
         "answer -- total internal reflection means the refracted ray does not exist, and clamping the arcsine " +
         "would have manufactured one");
+}
+
+// ---- 3b. yee1D() CALLED DIRECTLY: A HAND-TRACED STEP, AND A REDUCTION TO THE SCALAR WAVE RECURSION -------------------
+{
+    // Hand-computed: N=4, C=0.5, shape = [1,2,4,8]. Worked out by hand (not run) before this check existed:
+    //   step 1: H[i] += C(E[i+1]-E[i]) on i=0..2 -> H = [0.5, 1, 2, 0(unset)]
+    //           E[i] += C(H[i]-H[i-1]) on i=1..2 -> E = [1, 2.25, 4.5, 8]
+    //   step 2, from that E,H: H = [1.125, 2.125, 3.75, 0], E = [1, 2.75, 5.3125, 8]
+    const shapeArr = [1, 2, 4, 8];
+    const shape4 = (i) => shapeArr[i];
+    const one = yee1D(shape4, 4, 0.5, 1);
+    ok("!! yee1D matches a hand-traced single leapfrog step exactly",
+        JSON.stringify(Array.from(one.E)) === JSON.stringify([1, 2.25, 4.5, 8]) &&
+        JSON.stringify(Array.from(one.H)) === JSON.stringify([0.5, 1, 2, 0]),
+        "E " + Array.from(one.E) + ", H " + Array.from(one.H) + " -- worked out term by term from " +
+        "H[i]+=C(E[i+1]-E[i]) then E[i]+=C(H[i]-H[i-1]) on shape=[1,2,4,8], C=0.5, entirely by hand");
+    const two = yee1D(shape4, 4, 0.5, 2);
+    ok("!! ...and a second hand-traced step, continuing from the first",
+        JSON.stringify(Array.from(two.E)) === JSON.stringify([1, 2.75, 5.3125, 8]) &&
+        JSON.stringify(Array.from(two.H)) === JSON.stringify([1.125, 2.125, 3.75, 0]),
+        "E " + Array.from(two.E) + ", H " + Array.from(two.H));
+
+    // Algebraic reduction: eliminating H from the two Yee updates gives the SAME central-difference recursion as
+    // the scalar wave equation (u_tt = c^2 u_xx), started from an AT-REST E field (H=0 <=> zero initial d/dt).
+    // Reimplemented here independently -- not imported from acoustics/waves.mjs -- so this is a real cross-check.
+    const N = 200, C = 0.8, steps = 40, shape = gaussianPulse(90, 12);
+    let prev = new Float64Array(N), cur = new Float64Array(N);
+    for (let i = 0; i < N; i++) { prev[i] = shape(i); cur[i] = shape(i); }   // at rest: prev = cur
+    for (let n = 0; n < steps; n++) {
+        const nx = new Float64Array(N);
+        for (let i = 1; i < N - 1; i++) nx[i] = 2 * cur[i] - prev[i] + C * C * (cur[i + 1] - 2 * cur[i] + cur[i - 1]);
+        prev = cur; cur = nx;
+    }
+    const { E } = yee1D(shape, N, C, steps);
+    let worst = 0;
+    for (let i = 1; i < N - 1; i++) worst = Math.max(worst, Math.abs(E[i] - cur[i]));
+    ok("!! yee1D's E field is EXACTLY the scalar wave equation's central-difference recursion, started at rest",
+        worst < 1e-12,
+        "worst |yee1D.E - independent scalar-wave recursion| = " + worst.toExponential(2) + " over " + steps +
+        " steps. Eliminating H algebraically from the two Yee updates gives 2*cur-prev+C^2*(laplacian), the same " +
+        "recursion acoustics/waves.mjs uses -- confirming the 1D Maxwell curl equations and the scalar wave " +
+        "equation are the same discretisation, independently coded here");
 }
 
 // ---- 4. THE YEE SCHEME SHARES ACOUSTICS' COURANT STRUCTURE --------------------------------------------------------------

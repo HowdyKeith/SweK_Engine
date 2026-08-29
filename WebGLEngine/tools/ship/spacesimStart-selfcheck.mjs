@@ -1,6 +1,6 @@
 // tools/ship/spacesimStart-selfcheck.mjs
 //
-// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~0.10s — MEASURED v3941, was ~1s)
+// Run: node tools/ship/spacesimStart-selfcheck.mjs   (~0.29s — MEASURED v3941, was ~1s)
 //
 // v3165 -- THE PANEL COULD DRIVE A SIMULATOR IT COULD NOT LAUNCH.
 //

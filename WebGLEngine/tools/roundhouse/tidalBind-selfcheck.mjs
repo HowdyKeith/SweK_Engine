@@ -1,6 +1,6 @@
 // tools/roundhouse/tidalBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/tidalBind-selfcheck.mjs   (~6s MEASURED -- four modes, each integrating geodesics)
+// Run: node tools/roundhouse/tidalBind-selfcheck.mjs   (~0.85s MEASURED -- four modes, each integrating geodesics)
 //
 // *** THIS DEVICE HAD NO GATE AT ALL. *** tidalBind.mjs has existed since v2894, carries a declared plant since
 // v3686, exports seventeen observables across four modes -- and nothing ran it. It was found by knobLiveness

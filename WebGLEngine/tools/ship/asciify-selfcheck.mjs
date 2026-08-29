@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/asciify-selfcheck.mjs
 //
-// Run: node tools/ship/asciify-selfcheck.mjs   (~0.1s -- MEASURED)
+// Run: node tools/ship/asciify-selfcheck.mjs   (~3.7s -- MEASURED)
 //
 // v3322 -- ASCII RENDERING, TAKEN AS A TECHNIQUE RATHER THAN AS A DEPENDENCY.
 //
@@ -264,7 +264,7 @@ const solid = (w, h, r, g, b, a = 255) => {
 
     let chromium = null;
     try {
-        const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
+        const pw = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs")).href);
         const { createRequire } = await import("node:module");
         const req2 = createRequire(import.meta.url);
         const rr = pw.resolvePlaywright(req2);

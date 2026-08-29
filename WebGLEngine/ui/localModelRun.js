@@ -192,14 +192,66 @@ export function createRunner({ importer, fetchImpl, cdn = TRANSFORMERS_CDN, base
         }
     };
 
-    const generate = async (prompt, { max_new_tokens = 64 } = {}) => {
+    // v4108 -- *** v4105 TREATED THE SYMPTOM AND THE REAL CAUSE WAS ONE LAYER UP: AN INSTRUCT MODEL WAS BEING
+    // FED A RAW STRING, SO IT NEVER SAW A CHAT TEMPLATE AND WAS NEVER ANSWERING A QUESTION AT ALL. ***
+    //
+    // Keith, on the real page, on `onnx-community/Qwen2.5-0.5B-Instruct`: "what is 4+2?" came back as
+    // 'And the answer to question: " How Would Someone Do To The Question?" ... REREPTREATEREPTETERTERT...'.
+    // v4105 read the earlier "And And And / The The The" version of this as a repetition loop and added
+    // repetition_penalty + no_repeat_ngram_size. THOSE ARE REAL KNOBS FOR A REAL FAILURE MODE, AND THEY WERE
+    // AIMED AT THE WRONG ONE. An -Instruct model is trained to answer inside its own chat template
+    // (<|im_start|>user ... <|im_end|><|im_start|>assistant for Qwen); handed a bare string it does what a
+    // language model does with a bare string -- it CONTINUES THE TEXT. "what is 4+2?" continuing into more
+    // question-shaped rambling is not a broken model, it is a model doing text completion because nobody told
+    // it a conversation was happening. Then v4105's aggressive penalties (1.3, and no 3-token phrase ever
+    // repeated) forbade the ordinary continuations too, and what is left when a small model may not repeat
+    // itself and has no instruction to follow is exactly that character-level wreckage.
+    //
+    // THE FIX IS THE TEMPLATE, and transformers.js already applies it -- documented behaviour, checked rather
+    // than assumed: passing an ARRAY OF {role, content} MESSAGES makes the pipeline run the tokenizer's own
+    // chat template, and the reply comes back as generated_text's LAST message rather than as a string.
+    // With the template doing the real work, the penalties come back to ordinary values (1.1, no n-gram ban):
+    // v4105's numbers were compensating for a problem that no longer exists, and leaving them would keep
+    // distorting output that is now correctly conditioned.
+    //
+    // *** AND THE RAW-STRING PATH IS KEPT AS A FALLBACK, BECAUSE THIS PAGE TAKES ANY REPO THE READER TYPES. ***
+    // A BASE model (gpt2, SmolLM2 base) ships no chat template and transformers.js throws when asked to apply
+    // one. That is not hypothetical here -- the repo id is a free-text field by deliberate design (see this
+    // file's header), so a base model is a thing a reader WILL paste. It falls back to the old plain-prompt
+    // call and says so, rather than failing on a model that works fine without a template.
+    const _replyFrom = (out) => {
+        const g = Array.isArray(out) ? (out[0] && (out[0].generated_text ?? out[0].summary_text)) : (out && out.generated_text);
+        // Messages in -> messages out: the assistant's turn is the LAST entry, not the whole transcript. A
+        // caller that printed the array would show the user their own prompt back with the answer glued on.
+        if (Array.isArray(g)) {
+            const last = g[g.length - 1];
+            return last && typeof last === "object" ? String(last.content ?? "") : String(last ?? "");
+        }
+        return g == null ? null : String(g);
+    };
+
+    const generate = async (prompt, { max_new_tokens = 256, system } = {}) => {
         if (state !== "ready") return { ok: false, error: "not ready (state: " + state + ")" };
         to("generating");
+        const text = String(prompt == null ? "" : prompt);
+        // 1.1 is the ordinary nudge against looping; the template, not the penalty, is what makes it answer.
+        const opts = { max_new_tokens, temperature: 0.7, do_sample: true, repetition_penalty: 1.1 };
         try {
-            const out = await pipe(String(prompt == null ? "" : prompt), { max_new_tokens });
+            const messages = [];
+            if (system) messages.push({ role: "system", content: String(system) });
+            messages.push({ role: "user", content: text });
+            let out, templated = true;
+            try {
+                out = await pipe(messages, opts);
+            } catch (e) {
+                // No chat template on this model -> it is a base model, which is a legitimate thing to load.
+                if (!/chat.?template|template/i.test(String((e && e.message) || e))) throw e;
+                templated = false;
+                out = await pipe(text, opts);
+            }
             to("ready");
-            const text = Array.isArray(out) ? (out[0] && (out[0].generated_text ?? out[0].summary_text)) : (out && out.generated_text);
-            return { ok: true, text: text == null ? JSON.stringify(out).slice(0, 2000) : String(text) };
+            const reply = _replyFrom(out);
+            return { ok: true, templated, text: reply == null ? JSON.stringify(out).slice(0, 2000) : reply };
         } catch (e) {
             lastError = String((e && e.message) || e).slice(0, 300);
             to("failed", { error: lastError });

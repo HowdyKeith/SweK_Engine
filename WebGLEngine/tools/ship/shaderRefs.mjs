@@ -70,7 +70,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { referenceGraph, SOURCE_EXT, SHADER_EXT } from "./moduleRefs.mjs";
-import { noComments, codeOnly } from "./sourceScan.mjs";
+import { noComments } from "./sourceScan.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -152,19 +152,30 @@ export function shaderRefs({ root = ENG } = {}) {
 /**
  * How many callers still spell the corpus filter by hand. A CENSUS WITH AN ANTIDOTE, not a sweep.
  *
- * *** SCANNED WITH codeOnly, AND THE FIRST VERSION WAS NOT. *** Reading raw text, this counted its own gate --
- * whose header EXPLAINS the regex in a comment and quotes it inside a message string -- and the number went
- * 9 -> 10 the moment I documented the finding. FIFTH TIME THIS ROUND'S OWN SHAPE LANDED ON THIS ROUND'S OWN
- * FILES. A hand-spelled corpus filter is a REGEX LITERAL IN CODE, which is neither a comment nor a string, so
- * codeOnly is the correct stripper here -- the opposite call from the mention scan above, and for the opposite
- * reason. (v3558: codeOnly for an IDIOM, noComments for TEXT THE CODE CONTAINS.)
+ * *** SCANNED WITH codeOnly ONCE, AND codeOnly WAS THE WRONG CALL -- SIXTH TIME THIS ROUND'S OWN SHAPE LANDED
+ * ON THIS ROUND'S OWN FILES, AND THE WORST ONE, BECAUSE IT WENT UNNOTICED FOR A WHOLE ROUND. *** codeOnly()
+ * BLANKS REGEX LITERAL BODIES BY DESIGN (sourceScan.mjs's own docstring: "a regex pattern MENTIONING os.homedir
+ * is not a USE of it") -- so a real, live `/\.(js|mjs|html)$/` sitting in someone else's code, exactly the
+ * thing this function exists to find, comes out of codeOnly() as bare `//` every single time. MEASURED:
+ * codeOnly(readFile("tools/ship/orphanTriage.mjs")) turns its own line 165 --
+ * `const all = walk(ENG, (e) => /\.(js|mjs|html)$/.test(e));` -- into `... => //.test(e));`, erasing the exact
+ * substring being searched for. This function has therefore returned an empty list since it was written,
+ * REGARDLESS of how many callers actually spell the pattern -- a structurally vacuous check that read as "the
+ * antidote is winning" while proving nothing. noComments() is the correct stripper: it keeps a regex literal
+ * VERBATIM (the same reasoning that keeps string content, v3052) while still dropping the comment that quotes
+ * the pattern in prose -- verified directly: noComments() on this file's OWN header line explaining the pattern
+ * returns empty (the whole line is a `//` comment), while noComments() on orphanTriage.mjs's real regex
+ * literal preserves it exactly. (v3558's rule stands for the MENTION scan above, which is asking "does this
+ * file NAME a shader" -- text a shader path lives in as a string. This is a different question -- "does this
+ * exact regex literal exist in real code" -- and the regex literal IS the text being searched for, not an
+ * idiom being classified, so noComments is what does not erase the evidence.)
  */
 export function handSpelledCorpusFilters({ root = ENG } = {}) {
     const out = [];
     const self = new Set(selfExclusions());
     for (const f of walkTree(root)) {
         if (!/\.mjs$/.test(f) || /moduleRefs\.mjs$/.test(f) || self.has(f)) continue;
-        let t; try { t = codeOnly(fs.readFileSync(f, "utf8")); } catch { continue; }
+        let t; try { t = noComments(fs.readFileSync(f, "utf8")); } catch { continue; }
         if (/\/\\\.\(js\|mjs\|html\)\$\//.test(t)) out.push(rel(root, f));
     }
     return out.sort();

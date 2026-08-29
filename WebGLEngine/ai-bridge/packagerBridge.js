@@ -81,6 +81,50 @@ function _renameBlocked(dir) {
     return n;
 }
 
+// *** v4071 -- EVERY ZIP THIS BRIDGE HAS EVER MADE ON WINDOWS WAS NON-CONFORMANT, AND NOTHING NOTICED FOR AS
+// LONG AS CI GRADED ITS OWN COPY. *** PowerShell's Compress-Archive (the win32 branch of _zip below) writes
+// BACKSLASH path separators into the archive. The ZIP spec is explicit -- APPNOTE 4.4.17.1: "All slashes MUST
+// be forward slashes '/' as opposed to backwards slashes" -- so the rig's releases have been technically
+// broken since the first one. MEASURED on the published SweK_Engine_v4070.zip: 4910 entries, 4910 containing a
+// backslash, ZERO containing a forward slash.
+//
+// IT WENT UNSEEN BECAUSE THE TOLERANT READER IS THE COMMON ONE. Info-ZIP's `unzip` prints "appears to use
+// backslashes as path separators" and then repairs them, so Keith's own round trips always looked fine.
+// Python's zipfile does NOT repair: `SweK_Engine_v4070/WebGLEngine/main.js` simply is not in namelist(), which
+// is exactly how v4070's CI change -- the first thing ever to read the PUBLISHED archive rather than a
+// locally-packed one -- found it on its very first run, through verify_zip.py.
+//
+// THE REPAIR IS A BYTE SWAP AND THAT IS WHY IT IS SAFE. '\\' and '/' are both one byte, so rewriting names in
+// place changes no length, no local-header offset, no compressed size and no CRC -- the archive is structurally
+// identical afterwards. Both copies of each name are fixed (the central directory's and the local file
+// header's), because a reader may consult either. VERIFIED against the real published v4070 artifact: 34,734
+// bytes swapped across 4910 entries, testzip() reports OK on every one, main.js is findable by its real path,
+// and `unzip` stops warning.
+//
+// Fixed HERE rather than by swapping Compress-Archive for tar.exe: this repairs the archive whatever produced
+// it, needs nothing installed, and could be verified end to end from a Linux box, which a Windows-only
+// packer change could not have been.
+function normalizeZipSeparators(zipPath) {
+    const b = fs.readFileSync(zipPath);
+    let eocd = -1;
+    for (let i = b.length - 22; i >= 0 && i > b.length - 66000; i--) if (b.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) return { ok: false, error: "no end-of-central-directory record -- not a zip" };
+    const count = b.readUInt16LE(eocd + 10);
+    let off = b.readUInt32LE(eocd + 16), fixed = 0, seen = 0;
+    const swap = (start, len) => { let n = 0; for (let i = start; i < start + len; i++) if (b[i] === 0x5c) { b[i] = 0x2f; n++; } return n; };
+    for (let k = 0; k < count; k++) {
+        if (b.readUInt32LE(off) !== 0x02014b50) return { ok: false, error: "central directory entry " + k + " has a bad signature" };
+        const nLen = b.readUInt16LE(off + 28), eLen = b.readUInt16LE(off + 30), cLen = b.readUInt16LE(off + 32);
+        const lho = b.readUInt32LE(off + 42);
+        seen++;
+        fixed += swap(off + 46, nLen);
+        if (lho + 30 <= b.length && b.readUInt32LE(lho) === 0x04034b50) fixed += swap(lho + 30, b.readUInt16LE(lho + 26));
+        off += 46 + nLen + eLen + cLen;
+    }
+    if (fixed) fs.writeFileSync(zipPath, b);
+    return { ok: true, entries: seen, bytesFixed: fixed };
+}
+
 function _zip(srcFolder, outZip) {
     return new Promise((resolve) => {
         let cmd, args, opts;
@@ -95,7 +139,15 @@ function _zip(srcFolder, outZip) {
         try { ch = spawn(cmd, args, opts); } catch (e) { return resolve({ ok: false, error: String(e && e.message) }); }
         ch.stderr.on("data", d => se += d);
         ch.on("error", e => resolve({ ok: false, error: String(e && e.message) }));
-        ch.on("close", code => resolve(code === 0 ? { ok: true } : { ok: false, error: (se.slice(0, 200) || ("zip exit " + code)) }));
+        ch.on("close", code => {
+            if (code !== 0) return resolve({ ok: false, error: (se.slice(0, 200) || ("zip exit " + code)) });
+            // EVERY archive is normalised, not just Compress-Archive's: `zip -rq` already writes forward
+            // slashes so this is a no-op there (0 bytes swapped), and a future change of packer cannot
+            // silently reintroduce the defect.
+            const norm = normalizeZipSeparators(outZip);
+            if (!norm.ok) return resolve({ ok: false, error: "packed, but the archive could not be normalised: " + norm.error });
+            resolve({ ok: true, entries: norm.entries, separatorsFixed: norm.bytesFixed });
+        });
     });
 }
 
@@ -276,13 +328,37 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
     const home = os.homedir();
     const dir = dlDir || (home ? path.join(home, "Downloads") : null);
     let best = null;
+    const seen = [];   // v4073 -- what WAS in the folder, so a miss can say more than "not found"
     if (dir) {
         let files = []; try { files = fs.readdirSync(dir); } catch {}
-        for (const f of files) { const p2 = buildName.parseBuildZip(f); if (p2 && p2.version === liveNum) best = { path: path.join(dir, f), name: f, version: p2.version }; }
+        for (const f of files) {
+            const p2 = buildName.parseBuildZip(f);
+            if (!p2) continue;
+            seen.push(f);
+            if (p2.version === liveNum) best = { path: path.join(dir, f), name: f, version: p2.version };
+        }
     }
     if (best) return { ok: true, path: best.path, name: best.name, version: best.version, built: false };
     const built = await makeInstallable({});
-    if (!built.ok) return { ok: false, error: "no Downloads zip matches the running build (v" + liveNum + ") and building one fresh failed: " + built.error };
+    // v4073 -- *** THE ERROR SAID WHAT IT WANTED AND NEVER WHAT IT LOOKED AT. *** buildName-selfcheck asserted
+    // that this 404 "names BOTH patterns", with the reason "'no zip found' without saying what it looked for is
+    // how this went unnoticed for 143 versions" -- and it asserted it against server.js, where the message used
+    // to live. v4012 moved the whole decision here and the check kept reading the old address, so it went red
+    // on a refactor rather than on a regression. Re-pointed at this file in the same commit.
+    //
+    // AND THE LETTER OF IT WAS THE WRONG FIX ANYWAY. Since v4012 the FILENAME PATTERN IS NO LONGER THE
+    // DISCRIMINATOR -- parseBuildZip accepts both spellings and the filter is on VERSION -- so naming the two
+    // patterns would imply the patterns were why nothing matched when the reason is the number. What the
+    // check's stated reason actually asks for is WHERE it looked and WHAT IT SAW, so that is what this says:
+    // the directory, the accepted spellings (SweK_Engine_vNNNN.zip and legacy EngineProject_vNNN.zip), and the
+    // build zips that were really sitting there. "I wanted v4073 and Downloads holds v4070" is a diagnosis; "no
+    // zip found" is a shrug.
+    const looked = "looked in " + (dir || "(no home directory)") + " for SweK_Engine_vNNNN.zip or legacy " +
+        "EngineProject_vNNN.zip at v" + liveNum + "; " +
+        (seen.length ? "found " + seen.length + " build zip(s) there, none at that version: " + seen.slice(0, 8).join(", ") +
+            (seen.length > 8 ? ", ..." : "")
+         : "no build zip of either name was there at all");
+    if (!built.ok) return { ok: false, error: "no Downloads zip matches the running build (v" + liveNum + ") and building one fresh failed: " + built.error + " -- " + looked };
     return { ok: true, path: built.path, name: path.basename(built.path), version: built.version, built: true };
 }
 
@@ -293,4 +369,4 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
 // half is the five PATTERN skips in _skipFile (*.zip, petfbi-*.json, *-seen.json, ha-*.json), which a caller
 // cannot see and would have to re-type -- and a re-typed rule is the second copy that never gets updated.
 // Exporting the PREDICATE means there is one answer to "does this file ship", not two that agree today.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile };
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile, normalizeZipSeparators };

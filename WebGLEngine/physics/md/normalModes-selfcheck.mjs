@@ -20,10 +20,13 @@
 import { readFileSync } from "node:fs";
 import { bondForces } from "./bonds.js";
 import { angleForces } from "./angles.js";
+import { dihedralForces } from "./dihedrals.js";
+import { improperForces } from "./improper.js";
 import { symEigenvalues } from "../quantum/rmt.js";
 import {
     hessian, massWeight, splitSpectrum, frequencies,
-    diatomic, bentTriatomic, linearTriatomic, expectedZeros, expectedVibrations,
+    diatomic, bentTriatomic, linearTriatomic, torsionalChain, planarCentre,
+    expectedZeros, expectedVibrations,
 } from "./normalModes.mjs";
 
 let fails = 0;
@@ -174,6 +177,63 @@ const analyse = (m, pos) => {
     say("   modes onto the rigid-body basis would show it, and needs an eigenvector routine this tree lacks.");
     say("   NOT CLAIMED: any real molecule's frequencies. The force constants here are round numbers, not");
     say("   spectroscopy, and nothing above compares to a measured wavenumber.");
+}
+
+// --- 7. torsionalChain and planarCentre -- the two fixtures that carry dihedrals and impropers ----------------
+{
+    say("7. TORSIONALCHAIN AND PLANARCENTRE: the fixtures that bring dihedrals.js and improper.js into the same");
+    say("   counting law. 3N-6 = SIX vibrations and SIX zeros for a non-linear tetratomic.");
+    const withFour = (m, { noDih = false, noImp = false } = {}) => (pos) => {
+        const parts = [bondForces(pos, m.N, m.bonds), angleForces(pos, m.N, m.angles)];
+        if (!noDih && m.dihedrals.length) parts.push(dihedralForces(pos, m.N, m.dihedrals));
+        if (!noImp && m.impropers.length) parts.push(improperForces(pos, m.N, m.impropers));
+        const f = new Float64Array(3 * m.N); let pe = 0;
+        for (const p of parts) { for (let i = 0; i < f.length; i++) f[i] += p.forces[i]; pe += p.pe; }
+        return { forces: f, pe };
+    };
+    const analyseFour = (m, o) => {
+        const F = withFour(m, o);
+        let maxF = 0; for (const v of F(m.pos).forces) maxF = Math.max(maxF, Math.abs(v));
+        const { H, n, relAsymmetry } = hessian(F, m.pos, m.N, {});
+        const eigs = symEigenvalues(massWeight(H, n, m.masses), n);
+        const sp = splitSpectrum(eigs);
+        return { maxF, sp, relAsymmetry };
+    };
+    const chain = torsionalChain({}), planar = planarCentre({});
+    const chainR = analyseFour(chain, {}), planarR = analyseFour(planar, {});
+    say("     torsional chain  |F| " + chainR.maxF.toExponential(2) + "   zeros " + chainR.sp.zeros +
+        "   vibrations " + chainR.sp.vibrations);
+    say("     planar centre    |F| " + planarR.maxF.toExponential(2) + "   zeros " + planarR.sp.zeros +
+        "   vibrations " + planarR.sp.vibrations);
+    ok("!! torsionalChain sits at machine-zero force with all four force terms summed", chainR.maxF < 1e-13,
+        chainR.maxF.toExponential(2) + " -- bonds, angles, and the dihedral each at their own minimum by " +
+        "construction, so N=" + chain.N + " atoms and " + chain.dihedrals.length + " dihedral(s) give an exact " +
+        "stationary point with no optimiser tolerance anywhere");
+    ok("!! planarCentre sits at machine-zero force with all four force terms summed", planarR.maxF < 1e-13,
+        planarR.maxF.toExponential(2) + " -- the signed volume V6 is exactly zero by construction, which is the " +
+        "improper's own target v0=0");
+    ok("!! torsionalChain gives exactly six zeros and six vibrations for its 4 atoms", (() => {
+        return chainR.sp.zeros === expectedZeros(chain.N, chain.linear) &&
+            chainR.sp.vibrations === expectedVibrations(chain.N, chain.linear) &&
+            chainR.sp.zeros === 6 && chainR.sp.vibrations === 6;
+    })(), "3N-6 = 6 vibrations, 6 zeros for a non-linear tetratomic -- dihedrals.js is inside a counted molecule");
+    ok("!! planarCentre gives exactly six zeros and six vibrations for its 4 atoms", (() => {
+        return planarR.sp.zeros === expectedZeros(planar.N, planar.linear) &&
+            planarR.sp.vibrations === expectedVibrations(planar.N, planar.linear) &&
+            planarR.sp.zeros === 6 && planarR.sp.vibrations === 6;
+    })(), "improper.js is inside a counted molecule the same way");
+    const chainNoDih = analyseFour(chain, { noDih: true }), planarNoImp = analyseFour(planar, { noImp: true });
+    say("     chain WITHOUT torsion  zeros " + chainNoDih.sp.zeros + "   (rotation about j-k becomes free)");
+    say("     planar WITHOUT improper zeros " + planarNoImp.sp.zeros + "   (the umbrella motion becomes free)");
+    ok("!! dropping the torsion term from torsionalChain adds exactly one zero mode (6 -> 7)",
+        chainR.sp.zeros === 6 && chainNoDih.sp.zeros === 7,
+        "a free internal rotation about the j-k bond IS an extra zero mode -- the count detects the term being " +
+        "ABSENT from the molecule, which dihedrals-selfcheck's own finite-difference check cannot, because there " +
+        "is no molecule in it");
+    ok("!! dropping the improper term from planarCentre adds exactly one zero mode (6 -> 7)",
+        planarR.sp.zeros === 6 && planarNoImp.sp.zeros === 7,
+        "without the signed-volume restraint the three in-plane angles do not resist pyramidalisation to second " +
+        "order, so the out-of-plane umbrella motion costs nothing and becomes a seventh zero mode");
 }
 
 console.log("normalModes-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { strictLog } from "../tools/strictLog.mjs";
-import { zetaMag, refineZero } from "./zetaCritical.js";
+import { zetaMag, refineZero, etaCritical } from "./zetaCritical.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -40,6 +40,35 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const m17 = zetaMag(17), m18 = zetaMag(18);
     ok("!! away from a zero the magnitude is order one -- the dips are specific", m17 > 1.5 && m18 > 1.5,
        "at t = 17 and 18, between zeros, |zeta| is " + m17.toFixed(2) + " and " + m18.toFixed(2) + " -- the function is not small everywhere; it dips to zero only at the zeros.");
+}
+
+// ---- 3b. etaCritical DIRECTLY: eta(1/2) against the known closed-form constant, and its OWN zero at t0 ---
+//
+// t=0 is a real-axis point where the Dirichlet eta function has a known reference value, and it isolates
+// etaCritical's real-arithmetic core alone: t*ln(j) = 0 for every j, so strictSin(0)=0 and strictCos(0)=1
+// exactly, and the imaginary part must vanish exactly too, no tolerance needed for it.
+{
+    const e0 = etaCritical(0);
+    const KNOWN_ETA_HALF = 0.6048986434216303702099;   // eta(1/2), Cohen-Villegas-Zagier / Abel-summed reference
+    ok("!! etaCritical(0) is eta(1/2), the known closed-form constant, to double precision", Math.abs(e0.re - KNOWN_ETA_HALF) < 1e-13 && e0.im === 0,
+       "etaCritical(0) = " + e0.re.toFixed(16) + " against the published eta(1/2) = 0.6048986434216304 -- and " +
+       "the imaginary part is exactly 0, not merely small, because every phase t*ln(j) is exactly 0 at t=0.");
+
+    // The zeta-side gate (checks 1-2, above) already trusts refineZero to land on zeta's first nontrivial zero.
+    // The eta-zeta prefactor (1 - 2^(1-s)) is finite and nonzero there (it only vanishes at s=1), so eta itself
+    // must ALSO be essentially zero at that t -- a fact about etaCritical alone, checked without going through
+    // the zeta division that most of this file already exercises.
+    const t0 = refineZero(13.5, 15);
+    const eZero = etaCritical(t0), magEta = Math.sqrt(eZero.re * eZero.re + eZero.im * eZero.im);
+    ok("!! etaCritical is itself essentially zero at zeta's first nontrivial zero (t=" + t0.toFixed(6) + ")", magEta < 1e-9,
+       "|eta(1/2+it)| = " + magEta.toExponential(1) + " at the t where |zeta| already bottoms out -- the eta-zeta " +
+       "prefactor (1 - 2^(1-s)) is finite and nonzero at this t, so eta having a zero here is a fact about the " +
+       "alternating series and its CVZ acceleration directly, not an artifact of the later division into zeta.");
+
+    // Off that zero, eta is order one (mirroring the zeta off-zero check), so the dip above is specific.
+    ok("!! and away from a zero, etaCritical is order one, not small", Math.sqrt(etaCritical(17).re ** 2 + etaCritical(17).im ** 2) > 1.5,
+       "|eta(1/2+17i)| = " + Math.sqrt(etaCritical(17).re ** 2 + etaCritical(17).im ** 2).toFixed(3) + " -- the near-zero " +
+       "value at t0 above is a located zero, not a series that has simply gone small everywhere.");
 }
 
 // ---- 4. STRICT LOG: the enabling piece agrees with the true logarithm -----------------------------------

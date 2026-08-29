@@ -87,11 +87,19 @@ function buildFermi({ mode = "degenerate", config = {} } = {}) {
     };
 }
 
+const FERMI_MODES = ["degenerate"];   // v4074 -- the single source `modes` and `defaults()` both read
+
 export const fermiDevice = {
     plantKind: "method",
-    modes: ["degenerate"],
+    modes: FERMI_MODES,
     name: "degenerate-fermi-gas-vs-equipartition",
     observables: FERMI_OBSERVABLES,
     build: buildFermi,
-    defaults: ({ mode } = {}) => ({ mode: mode || "degenerate", config: { ...DEF } }),
+    // v4074 -- ONE DECLARATION, HONOURED BY BOTH FIELDS. `defaults()` used to return `mode || "degenerate"`,
+    // which ECHOES ANY STRING BACK, so checkMode asked for a nonsense mode, got it back, and concluded the
+    // device declared it. A mode selects WHICH PHYSICS RUNS, so a device that accepts a name it does not
+    // declare runs something else and says nothing. The list was never unknown -- it is the `modes` array
+    // directly above -- and build() never reads `mode` at all, so there was no second mode to protect.
+    // Both fields read MODES so a future mode cannot be added to one and missed by the other.
+    defaults: ({ mode } = {}) => ({ mode: FERMI_MODES.includes(mode) ? mode : FERMI_MODES[0], config: { ...DEF } }),
 };

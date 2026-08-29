@@ -2,7 +2,9 @@
 //
 // v3542 -- GRADES THE ENERGY FINDING, AND EVERY ASSERTION IS A RELATION OR A PHYSICAL BOUNDARY.
 //
-// STATED RUNTIME: ~200s, MEASURED. The cost is bisections; the gate uses FEWER bisection steps than the
+// STATED RUNTIME: ~406s, MEASURED at v4099 (was ~200s, before section 7b's T=4 refinement axis added a
+// second, longer-horizon bisection on top of the ones this figure originally covered). The cost is
+// bisections; the gate uses FEWER bisection steps than the
 // register because what it needs are ORDERINGS (this threshold exceeds that one, this one did not move under
 // refinement) and not a precise value. A gate re-deriving the register's digits would be pinning an
 // arrangement.
@@ -16,8 +18,8 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 import { codeOnly } from "../../tools/ship/sourceScan.mjs";
-import { energyBudget, energyRatio, viscosityThreshold, lidBudget, settledSurface,
-         MEASURED_V3542, STILL_BLOCKED, TALL_LID } from "./stability.mjs";
+import { energyBudget, energyRatio, viscosityThreshold, lidBudget, settledSurface, mechanicalEnergy,
+         MEASURED_V3542, STILL_BLOCKED, TALL_LID, G } from "./stability.mjs";
 import { SHIPPED_LID, FREE_LID } from "./materialKnobs.mjs";
 import { reportLines } from "./stability.mjs";
 
@@ -225,6 +227,32 @@ console.log("\n8. THE FRONT DOOR, AND ONE DECLARATION OF THE INSTRUMENT");
        Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
        L.join("\n").includes("[stability]"),
        L.length + " lines, self-named");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n9. mechanicalEnergy() DIRECTLY, AGAINST A HAND-COMPUTED SYNTHETIC PARTICLE SET");
+{
+    // A fabricated three-particle "world" -- mechanicalEnergy only reads w.particles[*].{vx,vy,vz,y}, so no
+    // solver is needed to test the formula itself: ke = mean(0.5|v|^2), pe = mean(G*y), total = their sum.
+    const w = { particles: [
+        { vx: 3, vy: 4, vz: 0, y: 2 },      // |v|^2 = 25
+        { vx: 0, vy: 0, vz: 0, y: 5 },      // at rest
+        { vx: 1, vy: -2, vz: 2, y: -1 },    // |v|^2 = 9, negative height (below the floor is still a valid y)
+    ] };
+    const handKe = (0.5 * 25 + 0.5 * 0 + 0.5 * 9) / 3;              // (12.5 + 0 + 4.5) / 3
+    const handPe = (G * 2 + G * 5 + G * -1) / 3;                     // G * (2+5-1) / 3 = 2G
+    const r = mechanicalEnergy(w);
+    ok("!! mechanicalEnergy's KE matches 0.5*mean(|v|^2) computed by hand, exactly", r.ke === handKe,
+        `mechanicalEnergy gave ke=${r.ke}, hand-computed (12.5+0+4.5)/3=${handKe}`);
+    ok("!! mechanicalEnergy's PE matches mean(G*y) computed by hand, exactly", r.pe === handPe,
+        `mechanicalEnergy gave pe=${r.pe}, hand-computed G*(2+5-1)/3=${handPe} using G=${G}`);
+    ok("!! and total is exactly ke+pe, not some other combination", r.total === r.ke + r.pe && r.total === handKe + handPe,
+        `total=${r.total}`);
+    // A single at-rest particle at y=0 must read exactly zero on both halves -- the cleanest possible case,
+    // and one no bisection-based check above ever isolates because every fixture there is moving.
+    const zero = mechanicalEnergy({ particles: [{ vx: 0, vy: 0, vz: 0, y: 0 }] });
+    ok("!! a single particle at rest at y=0 reads EXACTLY zero KE and zero PE", zero.ke === 0 && zero.pe === 0 && zero.total === 0,
+        `zero = ${JSON.stringify(zero)} -- no |v|^2, no height, nothing to sum`);
 }
 
 console.log(`\nstability-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

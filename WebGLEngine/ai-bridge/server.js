@@ -1511,9 +1511,23 @@ const driveOauth = require("./driveOauth.js");               // v1751 - OAuth in
 // values from Home Assistant. Module degrades gracefully when HA env
 // vars aren't set (latest() returns { available: false, ... }).
 const haSolar = require("./haSolar.js");
+// v4063 — the SAME values read STRAIGHT OFF the Enphase IQ Gateway, no Home Assistant in the path.
+// envoySolar.latest() answers the identical contract (available/stale/lastOkMs/values/roles), so
+// _solar() below can hand either one to /ha/solar and nothing downstream can tell them apart.
+// OPT-IN AND DEFAULTED OFF: SOLAR_SOURCE=envoy switches; unset keeps HA exactly as it was, because
+// a box already reading solar through HA must not change behaviour because a new file landed.
+const envoySolar = require("./envoySolar.js");
 const ballAlerts = require("./ballAlerts.js");   // v1357 — Ball alert/pulse manager
 const tvNotify = require("./tvNotifyBridge.js");   // v1868 — auto-toast engine events onto the TV
 try { haSolar.start(); } catch (e) { console.warn("[ha-solar] start failed:", e.message); }
+// v4063 — start the direct reader only when asked for. Both may run: envoySolar with no token
+// logs one line and stays idle, so the cost of leaving this call in is a no-op on an HA-only box.
+const SOLAR_SOURCE = (process.env.SOLAR_SOURCE || "ha").trim().toLowerCase();
+if (SOLAR_SOURCE === "envoy") { try { envoySolar.start(); } catch (e) { console.warn("[envoy] start failed:", e.message); } }
+// ONE PLACE DECIDES WHICH SOURCE ANSWERS, so /ha/solar and the mood tie-in can never disagree about
+// where today's number came from -- two call sites each picking for themselves is how a panel ends
+// up showing HA's stale copy beside the gateway's live one.
+function _solar() { return SOLAR_SOURCE === "envoy" ? envoySolar : haSolar; }
 // v1332 — optional solar/battery -> avatar mood tie (gated by ha-solar.json "mood": true,
 // set from the solar gauges panel). Battery-centric so it's sign-convention-safe; only
 // touches avatarMood when the band changes, so it never spams. Falls back to production
@@ -10402,9 +10416,11 @@ ${text.replace(/'/g, "''")}
     // v740 — solar values cached by haSolar.js. Returns { available, stale,
     // lastOkMs, values: {entity_id: {state, unit, name, ts}} }. The Pip
     // panel + engine can poll this endpoint to render a "☀ N.NkW" chip.
+    // v4063 — served by whichever source SOLAR_SOURCE selected. The reply shape is identical either
+    // way; the direct reader adds source/host/batterySource so a reader CAN tell, without having to.
     if (req.method === "GET" && req.url === "/ha/solar") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(haSolar.latest()));
+        res.end(JSON.stringify(_solar().latest()));
         return;
     }
     // v1051 — read/write which HA entities map to which solar role + which
@@ -16281,6 +16297,70 @@ ${text.replace(/'/g, "''")}
         if (req.method === "POST" && cp === "/comic/launch") { sendJson(comicTranslateBridge.launch()); return; }
         if (req.method === "POST" && cp === "/comic/stop") { sendJson(comicTranslateBridge.stop()); return; }
     }
+    // v4107 — pairlane (kiyo-e/pairlane, MIT): browser-to-browser file transfer for somebody who has NOTHING
+    // installed, which is the one case webtorrent / copyparty / the trusted-peer path all miss.
+    //
+    // *** LOCAL-ONLY, AND THAT IS NOT BOILERPLATE HERE. *** These routes spawn a process AND publish a chosen
+    // file to anyone holding the room URL. That URL carries the decryption key in its fragment, so /pairlane/
+    // status returns a BEARER SECRET -- a LAN-reachable version of this route would hand every peer on the
+    // network the ability to start a send and read back the link for it.
+    //
+    // Lazily required, same discipline as sharpBridge: a tree missing the file still boots.
+    //
+    // v4109 — Keith: "can we call a mac peer to start the pairlane bridge, like we do with other mac services?"
+    // pairlane refuses on win32 (its own README lists Linux/macOS only), and Keith's primary rig is win32 --
+    // so on that box THIS FAR is the end of the road without a relay. raycastBridge's /raycast/relay +
+    // /raycast/peer-exec is the SAME SHAPE this need already has an answer for (Raycast is also darwin-only
+    // and the PC drives it through a known mesh peer), so it is reused rather than reinvented: a PC-side
+    // /pairlane/relay forwards a whitelisted action to a KNOWN peer's /pairlane/peer-exec, which runs it
+    // locally there and returns the result. Two different trust levels on purpose, same split raycast draws:
+    // relay is _isTrustedReq ONLY (this box's own owner decides who gets driven), peer-exec accepts a trusted
+    // caller OR a KNOWN MESH PEER (so the relay itself, calling FROM the PC, is recognised on the Mac side).
+    const PB = () => require("./pairlaneBridge.js");
+    async function _pairlanePeerAction(action, d) {
+        const P = PB();
+        switch (action) {
+            case "status":  return P.status();
+            case "send":    return P.send((d && d.file) || "", { encrypt: !d || d.encrypt !== false });
+            case "receive": return P.receive((d && d.room) || "", (d && d.outputDir) || "");
+            case "stop":    return P.stop((d && d.id) || "");
+            case "config":  return P.setConfig(d || {});
+            default: return { ok: false, error: "unknown action", allow: ["status", "send", "receive", "stop", "config"] };
+        }
+    }
+    if (req.method === "POST" && req.url === "/pairlane/peer-exec") {
+        if (!_isTrustedReq(req) && !_knownPeerReq(req)) { sendJson({ ok: false, error: "trusted or known mesh peer only" }, 403); return; }
+        readJson((d) => { _pairlanePeerAction(String((d && d.action) || ""), d).then(sendJson).catch(e => sendJson({ ok: false, error: String((e && e.message) || e) }, 500)); });
+        return;
+    }
+    if (req.method === "POST" && req.url === "/pairlane/relay") {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only" }, 403); return; }
+        readJson((d) => {
+            (async () => {
+                const peer = String((d && d.peer) || "").replace(/\/+$/, "");
+                const known = new Set();
+                try { for (const u of assetSync.loadPeers()) known.add(String(u).replace(/\/+$/, "")); } catch {}
+                try { for (const dd of assetDiscovery.discovered()) if (dd && dd.url) known.add(String(dd.url).replace(/\/+$/, "")); } catch {}
+                try { for (const u of tunnelRegistry.aliveUrls()) known.add(String(u).replace(/\/+$/, "")); } catch {}
+                if (!known.has(peer)) { sendJson({ ok: false, error: "peer not in the known mesh (pair it first — LAN discovery or /net/peer/external)", knownCount: known.size }); return; }
+                const body = Object.assign({}, d || {}); delete body.peer;
+                const r = await _peerJSON(peer, "/pairlane/peer-exec", "POST", body, 15000);
+                sendJson(r || { ok: false, error: "peer did not answer" });
+            })().catch(e => sendJson({ ok: false, error: String((e && e.message) || e) }, 500));
+        });
+        return;
+    }
+    if (req.url.split("?")[0].startsWith("/pairlane/")) {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only" }, 403); return; }
+        const pp = req.url.split("?")[0];
+        try {
+            if (req.method === "GET" && pp === "/pairlane/status") { sendJson(PB().status()); return; }
+            if (req.method === "POST" && pp === "/pairlane/send") { readJson(d => sendJson(PB().send((d || {}).file, d || {}))); return; }
+            if (req.method === "POST" && pp === "/pairlane/receive") { readJson(d => sendJson(PB().receive((d || {}).room, (d || {}).outputDir))); return; }
+            if (req.method === "POST" && pp === "/pairlane/stop") { readJson(d => sendJson(PB().stop((d || {}).id))); return; }
+            if (req.method === "POST" && pp === "/pairlane/config") { readJson(d => sendJson(PB().setConfig(d || {}))); return; }
+        } catch (e) { sendJson({ ok: false, error: "pairlane bridge unavailable: " + String(e && e.message || e) }); return; }
+    }
     if (req.method === "POST" && req.url === "/github/release") { readJson(d => githubBridge.createRelease(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/upload") { readJson(d => githubBridge.uploadAsset(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/publish") { readJson(d => githubBridge.publishVersion(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
@@ -16325,6 +16405,51 @@ ${text.replace(/'/g, "''")}
             try { require("./sharpBridge.js").predict(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
             catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
         });
+        return;
+    }
+    // v4104 — Install button: clone apple/ml-sharp (outside the tree) then pip-install its requirements.
+    // Fire-and-poll like every other long-running install in this tree (autoInstall.js, comicTranslateBridge.js)
+    // — install() returns the moment the job STARTS, not when it finishes; the panel reads progress back off
+    // the installJob field /sharp/status already carries.
+    if (req.url === "/sharp/install" && req.method === "POST") {
+        try { sendJson(require("./sharpBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
+    // --- voxtral: the install button for voxtral.html's engine -------------------------------------
+    // v4116 -- Keith: "we have a button to do the install?" v4115 shipped the page with the clone-and-copy
+    // written out as two shell lines, and a feature whose setup is a paste-this-into-a-terminal is one most
+    // people will not use. Same fire-and-poll shape as /sharp/install: install() returns when the job STARTS.
+    //
+    // *** IT STAGES OUTSIDE THE TREE, WHICH IS THE POINT. *** packagerBridge's SKIP_DIRS does NOT contain
+    // `vendor/`, so a button that copied into vendor/voxtral/ would add 9.4 MB to every release zip and undo
+    // v4115's whole reason for not vendoring it. The engine lands in ~/.voxelbridge/voxtral-engine and is
+    // SERVED from there by the route below.
+    if (req.url.split("?")[0] === "/voxtral/status" && req.method === "GET") {
+        try { require("./voxtralBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "voxtral bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/voxtral/install" && req.method === "POST") {
+        try { sendJson(require("./voxtralBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "voxtral bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    // Serve one staged artefact. *** THE NAME IS NEVER JOINED ONTO A PATH HERE: *** engineFile() matches it
+    // against the two pinned artefact names and returns null for anything else, so a request path -- which is
+    // attacker-controlled -- cannot walk out of the engine directory.
+    if (req.method === "GET" && req.url.split("?")[0].startsWith("/voxtral/engine/")) {
+        const want = decodeURIComponent(req.url.split("?")[0].slice("/voxtral/engine/".length));
+        let vb = null;
+        try { vb = require("./voxtralBridge.js"); } catch (e) { res.writeHead(404); res.end("voxtral bridge unavailable"); return; }
+        vb.engineFile(want).then((abs) => {
+            if (!abs) { res.writeHead(404); res.end("not staged"); return; }
+            res.writeHead(200, { "Content-Type": /\.wasm$/.test(abs) ? "application/wasm" : "text/javascript",
+                                 "Content-Length": fs.statSync(abs).size, "Cache-Control": "no-cache" });
+            if (req.method === "HEAD") { res.end(); return; }
+            fs.createReadStream(abs).pipe(res);
+        }).catch((e) => { res.writeHead(500); res.end(String(e && e.message || e)); });
         return;
     }
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.

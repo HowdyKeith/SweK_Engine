@@ -1,15 +1,31 @@
-// tools/roundhouse/costRecord.mjs -- v4041
+// tools/roundhouse/costRecord.mjs -- v4080
 //
-// *** WHAT EACH BUILD ACTUALLY COST, MEASURED AND KEPT, BECAUSE THE PROXY DID NOT WORK. ***
+// *** WHAT EACH BUILD ACTUALLY COST, MEASURED AND KEPT, BECAUSE A RAW-CALL COUNT IS NOT A COST MODEL. ***
 //
-// v4040 proposed deriving a cost model from rawCalls -- a number the census already reports, and whose use
-// would have removed the one hand-calibrated constant in this lab's scheduling. It was measured first and
-// refused: kuramoto makes 3.3x more libm calls than twof and takes 15x LESS time, and ms-per-Mcall spans
-// 267x across the lab. A counter of one kind of work cannot price the others.
+// corroborationCensus.mjs's decline logic (v4037) already asks a device what it costs before starting it, via
+// the OPTIONAL `costHint` a device may declare -- but as of v4038a only one device in the lab (twof) declares
+// one, so the decline check does nothing for the other 128. The obvious next move is to derive a hint from a
+// number the census already counts for every device: `rawCalls`, the libm-call tripwire corroborationCensus.mjs
+// carries for a completely different reason (portability). It was proposed, measured, and refused. MEASURED ON
+// THIS MACHINE, one build of each device's named mode, timed directly (not read from a census log -- see the
+// contention warning below for why that distinction matters):
+//
+//     kuramoto.curve       19396 ms   353,976,576 calls      54.8 ms/Mcall
+//     twof.inlet           92078 ms   108,192,309 calls     851.1 ms/Mcall
+//     stability.response   16355 ms     3,430,000 calls    4768.2 ms/Mcall
+//
+// kuramoto makes 3.3x MORE libm calls than twof and costs 4.75x LESS wall time -- and stability, with the
+// FEWEST calls of the three by two orders of magnitude, is the MOST expensive per build. Not a weak predictor
+// -- an ANTI-predictor at the extremes: ms-per-Mcall spans 87x between kuramoto and stability alone in this
+// sample (4768.2 / 54.8), and a scheduler that ranked these three by rawCalls would put kuramoto LAST when it
+// is in fact the cheapest of the three by a wide margin. A call counter cannot price the work a build does
+// BETWEEN calls -- SPH neighbour search and an energy-conservation sweep (stability), an LBM lattice update
+// (twof) -- which is exactly what those two devices spend most of their time on and kuramoto barely touches.
+// rawCalls is blind to that by construction, so a fitted proxy built on it would be precise and wrong.
 //
 // *** SO THE RECORD IS THE MEASUREMENT ITSELF, WHICH IS THE THING A FITTED PROXY WAS ONLY EVER APPROXIMATING.
-// *** corroborationCensus already produces (device, mode, ms) for all 484 builds on every full run. Keeping
-// that costs nothing and is strictly better than any model of it: it needs no coefficients, it cannot be
+// *** corroborationCensus already produces (device, mode, ms) for every build a complete run makes. Keeping
+// that costs nothing extra and is strictly better than any model of it: it needs no coefficients, it cannot be
 // wrong about a device whose cost is unlike its neighbours', and it improves automatically every time the
 // census is re-frozen.
 //
@@ -43,6 +59,11 @@
 //   That is what makes the 1.9x and 15x readings above diagnosable instead of just noisy: a lab whose
 //   repeat measurements disagreed by 50 % could not have told any of those stories.
 //
+//   AND ACROSS MACHINES THE RELATIVE ORDER IS STILL GOOD (main's v4080 note, kept because the
+//   paragraphs above only bound the ABSOLUTE numbers): a reader is entitled to distrust the
+//   milliseconds while still trusting which device is dearer than which, and a scheduling
+//   decline needs nothing more than that order.
+//
 //   NOT A RATCHET. corroboration-reach-baseline.json exists to catch a number FALLING and says so. This one
 //   carries no assertion at all: a device getting slower is news about the device, not a regression in the
 //   record, and pinning costs with === would fire on every machine that is not the one that froze it.
@@ -74,7 +95,9 @@ export function costFor(device, mode, rec = null) {
 /**
  * Freeze a set of { device, mode, ms } observations. WRITTEN ONLY FROM AN EXPLICIT FREEZE, following
  * corroborationReach's convention (SWEK_FREEZE_CORROBORATION_REACH=1): a gate reads by default and records
- * only when asked, so it stays a gate rather than becoming a gate and a report at once.
+ * only when asked, so it stays a gate rather than becoming a gate and a report at once (capabilityCard-
+ * selfcheck's rule). This file's own convention is SWEK_FREEZE_DEVICE_COST=1, checked in
+ * corroborationCensus-selfcheck.mjs beside the sweep that already produces the numbers to freeze.
  */
 export function writeCostRecord(pairs, { file = COST_BASELINE, note = "" } = {}) {
     const costs = {};

@@ -1,6 +1,6 @@
 // tools/roundhouse/structureFactorBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/structureFactorBind-selfcheck.mjs   (~1s MEASURED -- two sweeps over 729 hkl)
+// Run: node tools/roundhouse/structureFactorBind-selfcheck.mjs   (~0.3s MEASURED -- two sweeps over 729 hkl)
 //
 // THIS GRADES THE BIND. physics/crystal/structureFactor.mjs owns the physics.
 //

@@ -628,6 +628,11 @@ window.addEventListener("load", function () {
                  which fetches zero model bytes before anything downloads a gigabyte. Filed with System Tools
                  beside Node/Bun for the same reason -- it answers "can this box do X" rather than showing physics. -->
             <a href="/webgpu-llm.html" target="_blank" rel="noopener" title="Can this box run a local model? -- a WebGPU adapter, reported-VRAM and model-cache probe that runs before anything downloads a gigabyte. Structurally cannot say yes: VRAM is not readable by any browser API, so the verdict is only ever no / unknown / maybe, and the page fetches zero model bytes to produce it.">WebGPU / Local Model</a>
+            <!-- v4115 -- voxtral.html JOINS, next to webgpu-llm.html for the same reason: it asks what THIS BOX
+                 can do rather than showing physics. It is the opt-in wrapper around a 2.5 GB third-party speech
+                 model that runs entirely in the tab. The link says the cost out loud (14x slower than real time)
+                 because the page's whole design is that the expensive facts come BEFORE the decision. -->
+            <a href="/voxtral.html" target="_blank" rel="noopener" title="Voxtral in the tab (opt-in) -- speech recognition with no bridge, no local server and no Windows, running as WASM + WebGPU entirely client-side. Downloads nothing until you say so, twice: a 9.4 MB engine checked against a pinned SHA-256, then 2.5 GB of weights as a separate decision. Upstream measures it at 14x SLOWER than real time on a DGX Spark, and whisperBridge already does the same job natively and fast -- the only thing this adds is needing none of it.">Voxtral (in-tab ASR)</a>
             <a href="/petfbi.html" target="_blank" rel="noopener" title="PetFBI -- the lost-pet posting flow.">PetFBI</a>
             <a href="/path-tracer.html" target="_blank" rel="noopener" title="Path tracer: Monte Carlo global illumination on the CPU. The furnace scene must render FLAT -- the sphere disappears -- which is the answer key six rounds of physics/render were built around.">Path Tracer</a>
             <a href="/petfbi-board.html" target="_blank" rel="noopener" title="PetFBI board -- the lost-pet board itself.">PetFBI Board</a>
@@ -806,6 +811,9 @@ window.addEventListener("load", function () {
             <a href="/wall.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🎛 Switchboard</a>
             <a href="/instrument-bench.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🔬 Instrument Bench</a>
             <a href="/raycast.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🚀 Raycast Local LLM</a>
+            <a href="/pairlane.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">📦 Pairlane File Drop</a>
+            <a href="/cat-reactions.html" target="_blank" rel="noopener" title="Your expression, named and answered by a cat. The front door for ui/faceExpressionSet.js -- a PURE classifier over MediaPipe's blendshapes, so every recipe and every near-miss it must refuse is gated headless rather than demoed at a webcam. It shows all eight recipe scores live, not just its winner, and it says out loud that it will NOT claim a tongue: MediaPipe has no tongueOut blendshape, and faking one from an open jaw would be a detector that lies. No cat photographs ship with the engine -- the reactions are emoji, and you can point it at your own images." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">😼 Cat Reactions</a>
+            <a href="/gesture-vfx.html" target="_blank" rel="noopener" title="Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures (pinch, fist, point, open palm, palms together, palms apart) read from MediaPipeHandTracker's own metrics, edge-triggered so a held gesture is ONE gesture, with a separate cooldown for threshold flicker. The judgement AND the particle simulation are both pure, so every gesture, every ambiguity, and 600 frames of physics are gated headless rather than watched. It refuses crossed fingers by name: metrics() reports finger FOLD, never the middle fingertip position, so the pose is not expressible from this input." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">✨ Gesture VFX</a>
             <a href="/box3d-contacts.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">◆ Box3D Contacts</a>
             <a href="/curriculum.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#127891; Curriculum</a>
             <a href="/ssim-compare.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#128200; SSIM Compare</a>
@@ -935,7 +943,11 @@ window.addEventListener("load", function () {
              it -- the third time this project has caught me shipping a module nobody can reach (fitCanvas v2880,
              machine.mjs v2988). The bridge census I wrote LAST ROUND checks that a bridge is required and
              dispatched, and that is exactly the pair of facts that were already true here. -->
-        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; NearShare</span><span class="gtabState" id="nsStat"></span></button>
+        <!-- v4109 -- Keith: "so NearShare is an app, that button could rename to File Transfer Utils, and both
+             could be in there." Renamed the VISIBLE label only -- data-tab/data-panel stay "nearshare" so
+             every existing selector, the pageSections id, and the pages/placements JSON key keep pointing at
+             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round. -->
+        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; File Transfer Utils</span><span class="gtabState" id="nsStat"></span></button>
         <!-- v3020 -- the roundhouse had NO minipanel. Seventeen tabs on this page and the thing the engine is
              actually FOR was not one of them: everything built in v3016-v3019 landed on report.html, a separate
              page you have to go to. Keith asked where the button was, which is the right question. -->
@@ -1807,6 +1819,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
           </div>
           <div id="sharpLicence" style="font-size:11px;color:#e8c07a;background:#1e1704;border:1px solid #5a4520;border-radius:6px;padding:6px 9px;margin-bottom:8px;">checking&hellip;</div>
           <div id="sharpStatus" style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;margin-bottom:8px;">checking&hellip;</div>
+          <div id="sharpInstallWrap" hidden style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <button id="sharpInstallBtn" style="font-size:11px;padding:3px 12px;background:#1a2438;color:#b0c4ff;border:1px solid #3a4a6a;border-radius:5px;cursor:pointer;">&#11015;&#65039; Install ml-sharp</button>
+              <span id="sharpInstallState" style="font-size:11px;color:var(--dim);"></span>
+            </div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px;">Clones <code>apple/ml-sharp</code> outside the engine tree and runs its own <code>pip install -r requirements.txt</code>. Pulls PyTorch -- multi-GB, can take a while; weights are fetched separately on first prediction.</div>
+            <pre id="sharpInstallLog" hidden style="background:#04060d;border:1px solid #14203a;border-radius:6px;padding:6px 8px;margin:6px 0 0;overflow:auto;font-size:10px;color:#b9c9e6;white-space:pre-wrap;max-height:140px;"></pre>
+          </div>
 
           <div style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
             <div style="font-size:11px;color:#b0c4ff;margin-bottom:5px;">&#9729;&#65039; Modal endpoint (optional &mdash; lets a box with no GPU still predict)</div>
@@ -7835,6 +7855,7 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
   (function(){
     const esc=(x)=>String(x==null?"":x).replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
     let lastStatus = null;
+    let installPoll = null;   // set only while a job is in flight, so this stays load-on-click otherwise
 
     async function sharpLoad(){
       const lic=document.getElementById("sharpLicence"), body=document.getElementById("sharpStatus"),
@@ -7861,8 +7882,45 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
         rows.push("writes to: <span style=\"color:#6f8a7c\">" + esc(j.outDir||"") + "</span>");
         body.innerHTML = rows.map(r=>"<div>"+r+"</div>").join("");
         if(stat) stat.textContent = j.ready ? j.where : "not ready";
+
+        // Install is a LOCAL concept -- a Modal endpoint already runs elsewhere, so there is nothing here to
+        // install into. Shown whenever the local path is in play, whether or not ml-sharp is installed yet, so
+        // re-installing (a broken venv, an interrupted pip step) is always reachable, not just the first time.
+        sharpRenderInstall(j);
       }catch(e){ body.textContent = "bridge unreachable"; }
     }
+
+    function sharpRenderInstall(j){
+      const wrap=document.getElementById("sharpInstallWrap"), btn=document.getElementById("sharpInstallBtn"),
+            st=document.getElementById("sharpInstallState"), log=document.getElementById("sharpInstallLog");
+      if(!wrap) return;
+      if(j.where === "modal"){ wrap.hidden = true; if(installPoll){ clearInterval(installPoll); installPoll = null; } return; }
+      wrap.hidden = false;
+      const job = j.installJob;
+      const running = !!(job && !job.done);
+      if(btn){ btn.disabled = running; btn.textContent = j.sharpInstalled ? "⬇️ Re-install ml-sharp" : "⬇️ Install ml-sharp"; }
+      if(st) st.textContent = running ? ("(" + job.kind + "… " + Math.round(job.uptimeMs/1000) + "s)")
+                             : (job ? (job.code === 0 ? "✓ done" : "exited " + job.code) : "");
+      if(log){
+        if(job){ log.hidden = false; log.textContent = job.tail || "(no output yet)"; }
+        else { log.hidden = true; }
+      }
+      // Poll only while something is actually running -- this panel is load-on-click by design (v3963's own
+      // comment above), so an interval that outlived the job would be the exact "fires on every page load for
+      // a panel nobody opened" cost that comment exists to avoid.
+      if(running && !installPoll) installPoll = setInterval(sharpLoad, 1500);
+      if(!running && installPoll){ clearInterval(installPoll); installPoll = null; }
+    }
+
+    const installBtn=document.getElementById("sharpInstallBtn");
+    if(installBtn) installBtn.addEventListener("click", async ()=>{
+      installBtn.disabled = true;
+      try{
+        const j = await (await fetch("/sharp/install",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})).json();
+        if(!j.ok){ const st=document.getElementById("sharpInstallState"); if(st) st.textContent = "error: " + (j.error||"?"); installBtn.disabled = false; return; }
+      }catch(e){ const st=document.getElementById("sharpInstallState"); if(st) st.textContent = "bridge unreachable"; installBtn.disabled = false; return; }
+      await sharpLoad();   // picks up installJob and starts polling itself
+    });
 
     const epIn=document.getElementById("sharpEndpoint");
     if(epIn) epIn.addEventListener("input", ()=>{ epIn.dataset.touched = "1"; });

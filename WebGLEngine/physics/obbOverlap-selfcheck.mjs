@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { obbOverlap, obbOverlapFacesOnly, obbFromPosed } from "./obbOverlap.js";
+import { obbOverlap, obbOverlapFacesOnly, obbFromPosed, obbContact } from "./obbOverlap.js";
 import { rotateByQuat } from "./voxelPose.js";
 
 let fails = 0;
@@ -109,6 +109,66 @@ const axesFromQ = (q) => [rotateByQuat(q, [1, 0, 0]), rotateByQuat(q, [0, 1, 0])
     const banned = /Math\.(sin|cos|tan|asin|acos|atan|atan2|exp|log|log2|log10|pow|cbrt|sinh|cosh|tanh|hypot)\b/;
     ok("!! the narrow phase uses no transcendental math (bit-identical across architectures)", !banned.test(src),
        "grep of obbOverlap.js after stripping comments finds only +,-,*,abs -- IEEE-exact operations. THE COLLISION TEST GIVES THE SAME BITS ON x86_64 AND arm64, so it is lockstep-safe without box3d.");
+}
+
+// ---- 7. obbContact: THE MTV -- HIT/NORMAL/DEPTH, AND THE NORMAL+DEPTH ACTUALLY SEPARATES -----------------------
+{
+    // Two axis-aligned unit cubes overlapping by exactly 0.1 along +x: centers 1.9 apart, half-widths 1 each.
+    const a = box([0, 0, 0], [1, 1, 1]);
+    const overlapping = box([1.9, 0, 0], [1, 1, 1]);
+    const separated = box([2.1, 0, 0], [1, 1, 1]);
+    const rc = obbContact(a, overlapping), rs = obbContact(a, separated);
+    ok("!! obbContact reports hit:true for two boxes constructed to intersect", rc.hit === true,
+       "unit cubes with centers 1.9 apart (gap < 2*half) -- rc = " + JSON.stringify(rc));
+    ok("!! obbContact reports hit:false for two boxes constructed to be clearly separated", rs.hit === false,
+       "same cubes with centers 2.1 apart (gap > 2*half) -- rs = " + JSON.stringify(rs));
+    ok("!! the MTV depth is exact for the axis-aligned overlap: 2*half - separation = 0.1", Math.abs(rc.depth - 0.1) < 1e-12,
+       "centers 1.9 apart, each half-width 1 -> the boxes overlap by (1+1) - 1.9 = 0.1 along x; measured depth " + rc.depth.toFixed(12));
+    ok("!! the MTV normal points from a toward b along +x, the only axis of overlap here", Math.abs(rc.normal[0] - 1) < 1e-12 && Math.abs(rc.normal[1]) < 1e-12 && Math.abs(rc.normal[2]) < 1e-12,
+       "normal = " + JSON.stringify(rc.normal) + " -- b sits at +x of a and the only separating direction on this configuration is x");
+    // mirror the same overlap to the -x side: the reported normal must FLIP with it (this is the branch that
+    // negates the raw axis when the two centers' displacement runs against it).
+    const rcNeg = obbContact(a, box([-1.9, 0, 0], [1, 1, 1]));
+    ok("!! and with b on the OTHER side, the normal flips to -x -- it tracks a-toward-b, not a fixed axis sign",
+       rcNeg.hit === true && Math.abs(rcNeg.normal[0] + 1) < 1e-12 && Math.abs(rcNeg.depth - 0.1) < 1e-12,
+       "rcNeg = " + JSON.stringify(rcNeg) + " -- same overlap depth, opposite side, opposite-signed normal. A " +
+       "routine that always returned the raw (unsigned-by-side) axis would pass the +x case above and fail this one");
+    ok("!! translating b by depth*normal lands it EXACTLY on the boundary (still counted as touching, not clear of it)",
+       (() => {
+        const moved = { center: [overlapping.center[0] + rc.depth * rc.normal[0], overlapping.center[1] + rc.depth * rc.normal[1], overlapping.center[2] + rc.depth * rc.normal[2]], half: overlapping.half, axes: overlapping.axes };
+        return obbOverlap(a, moved);   // SAT's ">" test is boundary-inclusive, so exactly-touching still reads as overlap
+    })(), "moving by exactly depth*normal puts the gap at precisely 2*half -- the boundary obbOverlap's strict '>' " +
+       "test still calls overlapping, which is the correct edge behaviour for a minimum translation vector");
+    ok("!! and nudging PAST that boundary by one more ULP-scale epsilon does separate the pair", (() => {
+        const push = rc.depth * (1 + 1e-9) + 1e-12;
+        const moved = { center: [overlapping.center[0] + push * rc.normal[0], overlapping.center[1] + push * rc.normal[1], overlapping.center[2] + push * rc.normal[2]], half: overlapping.half, axes: overlapping.axes };
+        return !obbOverlap(a, moved);
+    })(), "the MTV's depth is the MINIMUM push that clears the overlap: depth alone lands on the boundary, and " +
+       "anything more clears it -- confirming depth is neither an over- nor an under-estimate of the true overlap");
+}
+
+// ---- 8. obbContact ON A TOUCHING (EDGE) CASE, AND AGREEMENT WITH obbOverlap ACROSS A SWEEP ----------------------
+{
+    const a = box([0, 0, 0], [1, 1, 1]);
+    const justTouching = box([2.0 - 1e-9, 0, 0], [1, 1, 1]);     // gap infinitesimally under 2*half -> tiny overlap
+    const justClear = box([2.0 + 1e-9, 0, 0], [1, 1, 1]);        // gap infinitesimally over 2*half -> no overlap
+    const rt = obbContact(a, justTouching), rj = obbContact(a, justClear);
+    ok("!! at the edge, an infinitesimal overlap still reports hit:true with a correspondingly tiny depth", rt.hit === true && rt.depth < 1e-6,
+       "gap 2 - 1e-9 -- rt.depth = " + rt.depth.toExponential(3));
+    ok("!! and just past the edge, obbContact agrees with obbOverlap that there is no hit", rj.hit === false && !obbOverlap(a, justClear),
+       "gap 2 + 1e-9 -- both the boolean test and the contact routine call it separated");
+    // obbContact.hit must agree with obbOverlap's boolean over the same rotated sweep used in section 3/4.
+    let agree = 0, total = 0;
+    for (let k = 0; k < 100; k++) {
+        const qa = qZ(k * 0.11), qb = qZ(k * 0.07 + 1);
+        const A = { center: [0, 0, 0], half: [1, 0.5, 1.2], axes: axesFromQ(qa) };
+        const B = { center: [(k % 7) * 0.4, (k % 5) * 0.3, (k % 3) * 0.5], half: [0.8, 1.1, 0.6], axes: axesFromQ(qb) };
+        total++;
+        if (obbContact(A, B).hit === obbOverlap(A, B)) agree++;
+    }
+    ok("!! obbContact's hit flag agrees with obbOverlap's boolean on every case in a 100-pair rotated sweep", agree === total,
+       agree + "/" + total + " agree -- the MTV routine and the pure SAT boolean are answering the same question " +
+       "(same 15 axes) and must never disagree on whether the boxes touch");
 }
 
 console.log(fails ? "\nobbOverlap-selfcheck: " + fails + " FAILED" : "\nobbOverlap-selfcheck: all checks pass");

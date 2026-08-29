@@ -207,7 +207,7 @@ export async function corroborationCensus({ modes = null, verbose = false,
     const plannedDeviceModes = planned.length;
 
     // Read once, not per build. A missing file is normal and yields an empty record, so every device simply
-    // has no prior and the sweep behaves exactly as it did before this existed.
+    // has no prior and the sweep behaves exactly as it did before costRecord.mjs existed.
     const costRec = readCostRecord();
     const started = Date.now();
     const deadline = started + budgetMs;
@@ -239,12 +239,16 @@ export async function corroborationCensus({ modes = null, verbose = false,
             // before. What it must not do is silently drop the build: an over-cost skip is recorded in
             // `skipped` beside the budget skips, so coverage still counts it as not swept.
             {
-                // *** v4041 -- A DECLARED HINT FIRST, THEN WHAT THE DEVICE ACTUALLY COST LAST TIME. ***
-                // The two are complementary rather than redundant. A costHint is a function of the config, so
-                // it knows that twof at settle 300 / record 900 costs a fortieth of twof at its default; the
-                // record cannot, because it holds one number per device/mode at the DEFAULT config. What the
-                // record has instead is COVERAGE: it prices every device that declares nothing, which is all
-                // but one of them, and it does it without anyone calibrating a constant.
+                // *** v4080 -- A DECLARED HINT FIRST, THEN WHAT THE DEVICE ACTUALLY COST LAST TIME. ***
+                // v4037 read only `dev.costHint`, and as of v4038a exactly one device in the whole lab (twof)
+                // declares one -- so the decline check did nothing for the other 128. The two sources are
+                // complementary rather than redundant: a costHint is a function of the CONFIG, so it knows
+                // twof at settle 300 costs a fortieth of twof at its shipped default; costFor cannot, because
+                // it holds one number per device/mode at the default config alone. What the record has instead
+                // is COVERAGE -- it prices every device that declares nothing, which after this round is all
+                // but one of them, without anyone hand-calibrating a constant (rawCalls was tried for that job
+                // and measured to be a poor-to-anti predictor of wall time; see costRecord.mjs and
+                // twoFBind.mjs).
                 let hint = null;
                 if (typeof dev.costHint === "function") {
                     try { hint = dev.costHint({ mode, config: {} }); } catch { hint = null; }
@@ -291,6 +295,10 @@ export async function corroborationCensus({ modes = null, verbose = false,
                 keyed, unkeyed, structural,
                 portable: port.rawCalls === 0,
                 rawCalls: port.rawCalls,
+                // v4080 -- KEPT ON THE ROW, NOT ONLY HANDED TO onProgress. The sweep already times every build
+                // for its own progress line; this is the same number, so costVsCalls (below) and a freeze both
+                // read it from here instead of every caller re-deriving a side channel for it.
+                ms: Date.now() - t0,
                 sites: port.sites, byFn: port.byFn,
                 refinable,
                 knob: refinable ? knob.key : null,
@@ -361,6 +369,35 @@ export const CENSUS_REGISTRATION = preRegister({
         "A clean verdict here would mean the tripwire is not reaching device builds, which would invalidate " +
         "every OTHER portable verdict this census reports -- so this is a control, not a discovery.",
 });
+
+/**
+ * *** v4080 -- rawCalls IS NOT A COST MODEL, MEASURED RATHER THAN PROPOSED. ***
+ *
+ * The census already carries (rawCalls, ms) per device/mode -- one for portability, the other for scheduling
+ * (v4036's onProgress, now also kept on the row). It is tempting to derive a cost hint from the first instead
+ * of asking every device to declare its own (v4037's `costHint`, which as of this round exactly one device in
+ * the lab bothers with): a call counter is free, already computed, and looks like exactly the kind of proxy a
+ * scheduling decline wants. MEASURED here instead of assumed: ms-per-Mcall (milliseconds per million libm
+ * calls) spans orders of magnitude across the rows this sweep actually built, because a build's wall time is
+ * NOT bounded by its transcendental-function count -- SPH neighbour search, an LBM lattice sweep, and a matrix
+ * solve all cost real time and make comparatively few or zero Math.sin/cos/pow calls, while a device that is
+ * ALMOST NOTHING BUT trig (a Kuramoto phase update, say) can make hundreds of millions of calls and still
+ * finish quickly because there is nothing else in its inner loop. So a device with FEWER calls can cost MORE
+ * time, and the ranking a rawCalls-based hint would produce is not merely imprecise, it can point the wrong
+ * way at the extremes -- which is why costRecord.mjs measures wall time directly instead of fitting one.
+ *
+ * @returns { rows: [{device,mode,rawCalls,ms,msPerMcall}], spanX, cheapest, priciest } over the rows with at
+ * least one libm call (msPerMcall is undefined, not zero, for a build that made none -- see the caller).
+ */
+export function costVsCalls(rows) {
+    const withCalls = rows.filter((r) => r.rawCalls > 0 && typeof r.ms === "number")
+        .map((r) => ({ device: r.device, mode: r.mode, rawCalls: r.rawCalls, ms: r.ms,
+                       msPerMcall: r.ms / (r.rawCalls / 1e6) }))
+        .sort((a, b) => a.msPerMcall - b.msPerMcall);
+    if (!withCalls.length) return { rows: [], spanX: null, cheapest: null, priciest: null };
+    const cheapest = withCalls[0], priciest = withCalls[withCalls.length - 1];
+    return { rows: withCalls, spanX: priciest.msPerMcall / cheapest.msPerMcall, cheapest, priciest };
+}
 
 export function censusLines(c) {
     const L = [];

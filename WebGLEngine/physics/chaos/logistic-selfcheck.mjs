@@ -19,7 +19,7 @@
 // what is true (they cluster tightly around the constant, best within 1%) rather than a monotone convergence
 // that the arithmetic cannot deliver at this precision.
 
-import { FEIGENBAUM_DELTA, CHAOS_ONSET, LN2, logistic, fixedPoint, secondDoubling, orbit, periodOf, lyapunov, bifurcationPoint, cascade, deltaEstimates, diagram } from "./logistic.js";
+import { FEIGENBAUM_DELTA, CHAOS_ONSET, LN2, logistic, fixedPoint, secondDoubling, orbit, periodOf, lyapunov, LOGISTIC_SLOPE, bifurcationPoint, cascade, deltaEstimates, diagram } from "./logistic.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -31,6 +31,26 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     for (const r of [1.5, 2, 2.5, 2.9]) worst = Math.max(worst, Math.abs(orbit(r, { samples: 4 })[0] - fixedPoint(r)));
     ok("for 1 < r < 3 the orbit settles on EXACTLY 1 - 1/r", worst < 1e-9, "worst " + worst.toExponential(2));
     ok("x=0 and x=1 are fixed at zero (the map cannot escape its interval)", logistic(3.9, 0) === 0 && logistic(3.9, 1) === 0);
+}
+
+// 1b. LOGISTIC_SLOPE is EXACTLY the analytic derivative d/dx[r x (1-x)] = r(1 - 2x), not the map itself
+{
+    ok("!! LOGISTIC_SLOPE matches r(1-2x) by construction, at unrelated (r, x) pairs",
+        [[3, 0.5], [4, 0.2], [3.83, 0.7], [2.5, 0]].every(([r, x]) => LOGISTIC_SLOPE(r, x) === r * (1 - 2 * x)));
+    // finite-difference check against the actual map: d/dx logistic(r,x) ~= (logistic(r,x+h) - logistic(r,x-h)) / 2h
+    let worst = 0;
+    for (const [r, x] of [[3.2, 0.3], [3.9, 0.6], [2.7, 0.15]]) {
+        const h = 1e-6;
+        const fd = (logistic(r, x + h) - logistic(r, x - h)) / (2 * h);
+        worst = Math.max(worst, Math.abs(LOGISTIC_SLOPE(r, x) - fd));
+    }
+    ok("!! and it agrees with a numeric finite-difference derivative of the ACTUAL map, not a stand-in for it",
+        worst < 1e-6, "worst |LOGISTIC_SLOPE - central difference| = " + worst.toExponential(2));
+    // the classic slip this file warns about: r(1-x) IS x_{i+1}/x_i, not the derivative -- confirm ours is NOT that
+    ok("...and it is NOT the classic wrong slope r(1-x) (which is x_{i+1}/x_i, not d/dx)",
+        Math.abs(LOGISTIC_SLOPE(3.5, 0.3) - 3.5 * (1 - 0.3)) > 1e-3);
+    ok("at the fixed point x* = 1 - 1/r the slope is EXACTLY 2 - r (the classic stability formula)",
+        Math.abs(LOGISTIC_SLOPE(3, fixedPoint(3)) - (2 - 3)) < 1e-12);
 }
 
 // 2. PERIOD DOUBLING happens where the algebra says it does

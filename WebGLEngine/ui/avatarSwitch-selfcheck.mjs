@@ -53,17 +53,19 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // Two named avatar slots (stickwoman, robotexpressive2) inserted between "rigged" (the favorite-of-the-
     // moment slot, unchanged) and "blob". v4046 adds "krbn"; v4050 adds "ascii" right after it -- Keith's own
     // "instead of Krbn, we could also have the ascii version" was a SIBLING request, not a replacement, so both
-    // stay. TEN surfaces now, cheapest still first, and the two per-frame-cost modes (krbn heavy, ascii cheap)
-    // sit together rather than either landing among the slots a stray click can hit first.
-    ok("!! ten surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, ASCII, Gauges 3000",
-       MODES.length === 10 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,ascii,gauges3000",
-       MODES.map((m) => m.id).join(" -> ") + " — the two DOWNLOAD-COST modes sit before the tail, so a stray " +
+    // stay. Same shape again for "heerich" (Keith: "can we do an avatar switch to render through Heerich, like
+    // we did for krbn and ascii?"), inserted right after ascii and before gauges3000, which stays the frozen
+    // last choice. ELEVEN surfaces now, cheapest still first, the per-frame-cost modes grouped together rather
+    // than landing among the slots a stray click can hit first.
+    ok("!! eleven surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, ASCII, Heerich voxels, Gauges 3000",
+       MODES.length === 11 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,ascii,heerich,gauges3000",
+       MODES.map((m) => m.id).join(" -> ") + " — the download-cost modes sit before the tail, so a stray " +
        "click lands on something cheap rather than starting a 12 MB download");
     ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
        nextMode("svg") === "rigged" && nextMode("rigged") === "stickwoman" && nextMode("stickwoman") === "robotexpressive2"
        && nextMode("robotexpressive2") === "blob" && nextMode("blob") === "blobgpu"
        && nextMode("blobgpu") === "thead" && nextMode("thead") === "krbn" && nextMode("krbn") === "ascii"
-       && nextMode("ascii") === "gauges3000" && nextMode("gauges3000") === "svg");
+       && nextMode("ascii") === "heerich" && nextMode("heerich") === "gauges3000" && nextMode("gauges3000") === "svg");
     ok("!! StickWoman is choice 3 and RobotExpressive is choice 4, as asked",
        MODES.findIndex((m) => m.id === "stickwoman") === 2 && MODES.findIndex((m) => m.id === "robotexpressive2") === 3,
        "1-indexed: " + MODES.map((m, i) => (i + 1) + ":" + m.id).join(" "));
@@ -87,15 +89,18 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
        ["blobgpu", "thead"].every((id) => MODES.findIndex((m) => m.id === id) >
            Math.max(...["svg", "rigged", "stickwoman", "robotexpressive2", "blob"].map((c) => MODES.findIndex((m) => m.id === c)))),
        MODES.map((m) => m.id + (m.heavy ? "*" : "")).join(" -> ") + "   (* = declares a download cost)");
-    // v4046 -- THREE now, and the third is a different SPECIES of cost, which is why the check names it
-    // separately: blobgpu needs a capability and thead is a one-time download, but the Krbn pencil spends
-    // ~0.5s of MAIN-THREAD CPU on every redraw, for as long as it is mounted. A cost that recurs is the one a
-    // reader most needs told before the click, not after.
-    ok("!! the three expensive modes DECLARE their cost, so the button can say it before the click",
-       MODES.filter((m) => m.heavy).length === 3 &&
+    // v4046 -- THREE, then FOUR: each addition is a different SPECIES of cost, which is why the check names
+    // each separately. blobgpu needs a capability and thead is a one-time download; the Krbn pencil spends
+    // ~0.5s of MAIN-THREAD CPU on every redraw, and Heerich (added this round) spends a MEASURED ~50-90ms
+    // rebuilding its voxel CSG and re-rendering to SVG on every redraw -- cheaper than Krbn's per-redraw cost
+    // but not free the way ascii's is, so it carries the same species of warning as Krbn rather than ascii's
+    // silence. A cost that recurs is the one a reader most needs told before the click, not after.
+    ok("!! the four expensive modes DECLARE their cost, so the button can say it before the click",
+       MODES.filter((m) => m.heavy).length === 4 &&
        /12 MB/.test(MODES.find((m) => m.id === "thead").heavy) &&
        /WebGPU/.test(MODES.find((m) => m.id === "blobgpu").heavy) &&
-       /CPU/.test(MODES.find((m) => m.id === "krbn").heavy),
+       /CPU/.test(MODES.find((m) => m.id === "krbn").heavy) &&
+       /CSG/.test(MODES.find((m) => m.id === "heerich").heavy),
        "MediaPipe is ~12 MB on first use and WebGPU is not everywhere — a cost discovered after the click is a " +
        "cost the reader never agreed to");
     ok("!! ...and the talking head is the MediaPipe one (a Google API) rather than the wireframe or the mirror",

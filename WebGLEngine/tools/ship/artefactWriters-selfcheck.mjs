@@ -90,7 +90,14 @@ const SHIPPED_DETECTOR = /export const OUT\s*=\s*["']([^"']+)["']/;
 // ---- 5. alwaysWrites IS ADMITTED BY MEASUREMENT, NEVER BY DECLARATION --------------------------------------------------
 {
     const always = ARTEFACT_TOOLS.filter((t) => t.alwaysWrites === true);
-    ok("exactly the two regenerators declare alwaysWrites", always.length === 2, always.map((t) => t.label).join(", "));
+    // v4072 -- this asserted `always.length === 2`, which is a ratchet on the COUNT and therefore blind to a
+    // SWAP: drop one regenerator and add another and the number is still 2. The names are the claim, so the
+    // names are what is compared -- and the third was added deliberately, with its idempotence measured by the
+    // loop directly below rather than asserted here.
+    const alwaysLabels = always.map((t) => t.label).sort().join(", ");
+    ok("exactly the three regenerators declare alwaysWrites, BY NAME rather than by count",
+        alwaysLabels === "Engine catalog, Knowledge index, Page index",
+        alwaysLabels + ". A count ratchet cannot see a swap; this one can.");
     for (const t of always) {
         const r = idempotent(t.rel, t.artefact);
         ok("!! " + t.label + " is IDEMPOTENT, measured by running it twice", r.ok,

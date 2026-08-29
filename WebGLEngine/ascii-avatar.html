@@ -247,8 +247,28 @@ function frame() {
 // *** TEARDOWN. *** ui/avatarSwitch.js removes the iframe rather than hiding it, but the rAF loop and the GPU
 // context it drives do not know that until told -- the same "second GPU context burning frames behind a panel
 // nobody is looking at" this tree already refuses elsewhere.
-addEventListener("pagehide", () => { dead = true; cancelAnimationFrame(raf); if (group) disposeObject3D(group); if (renderer) renderer.dispose(); });
-addEventListener("unload",   () => { dead = true; cancelAnimationFrame(raf); });
+// v4073 -- *** pagehide FIRES FOR THE BACK-FORWARD CACHE TOO, AND THIS TORE THE PAGE DOWN THERE. *** Entering
+// bfcache is PAUSED, not GONE: the document is frozen and restored intact. Disposing the GL context and the
+// model on a freeze meant a back-navigation returned a page with `dead = true`, no renderer and no model --
+// a dead page that looks like a broken one, which is v3052's exact finding reintroduced at v4050.
+//
+// This page holds NO socket, so a freeze breaks nothing by itself and there is nothing to rebuild: NOT tearing
+// down is the whole fix. raymarch-live and volume-cache reload on pageshow because bfcache SEVERS WEBSOCKETS
+// and theirs is gone on restore; copying that reload here would be borrowing a remedy for an ailment this page
+// does not have. The rAF loop resumes on its own, because the browser froze it rather than cancelling it.
+//
+// AND THE `unload` LISTENER IS GONE, WHICH IS THE HALF THAT MAKES THIS MORE THAN COSMETIC. An unload handler
+// makes a page INELIGIBLE for bfcache, so with it in place the guard above could never once be exercised --
+// the page would simply never be cached, and a green gate would be reporting a code path no browser reaches.
+// Nothing is lost by removing it: pagehide fires in every case unload does, and unload is unreliable on
+// mobile besides. ui/avatarSwitch.js removing the iframe is a REAL unload -- persisted is false -- so that
+// path still disposes exactly as before, which is the case the teardown was written for.
+addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    dead = true; cancelAnimationFrame(raf);
+    if (group) disposeObject3D(group);
+    if (renderer) renderer.dispose();
+});
 </script>
 </body>
 </html>

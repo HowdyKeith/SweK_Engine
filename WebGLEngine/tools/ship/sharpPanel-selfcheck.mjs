@@ -40,7 +40,10 @@ async function load(statusBody, { cfgOk = true, predictOk = true } = {}) {
         const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
         if (u.pathname === "/sys/firewall/status") return json({ open: true, port: 8787 });
         if (u.pathname === "/self/whoami") return json({ ok: true });
-        if (u.pathname === "/sharp/status") { requested.push("status"); return json(statusBody); }
+        if (u.pathname === "/sharp/status") {
+            requested.push("status");
+            return json(typeof statusBody === "function" ? statusBody(requested.filter((r) => r === "status").length) : statusBody);
+        }
         if (u.pathname === "/sharp/config" && route.request().method() === "POST") {
             requested.push("config"); cfgBody = route.request().postData();
             return cfgOk ? json({ ok: true, endpoint: "https://x--sharp.modal.run", hasToken: true, path: "~/.voxelbridge/sharp.json" })
@@ -51,6 +54,10 @@ async function load(statusBody, { cfgOk = true, predictOk = true } = {}) {
             return predictOk
                 ? json({ ok: true, ply: "/lib/sharp-splats/photo.ply", name: "photo.ply", bytes: 2500000, mb: 2.38, ms: 4231, invocation: "sharp", licence: {}, alsoWrote: [] })
                 : json({ ok: false, error: "ml-sharp is not installed for python3" });
+        }
+        if (u.pathname === "/sharp/install" && route.request().method() === "POST") {
+            requested.push("install");
+            return json({ ok: true, kind: "clone" });
         }
         const p = path.join(ROOT, decodeURIComponent(u.pathname));
         if (fs.existsSync(p) && fs.statSync(p).isFile()) {
@@ -117,6 +124,67 @@ async function load(statusBody, { cfgOk = true, predictOk = true } = {}) {
     const epVal = await page.evaluate(() => document.getElementById("sharpEndpoint")?.value || "");
     ok("!! the saved endpoint prefills the field so the box's own config is visible without re-typing it",
         epVal === "https://x--sharp.modal.run", "got " + JSON.stringify(epVal));
+    await b.close();
+}
+
+// ---- 3b. the install button is LOCAL-ONLY: hidden the moment a Modal endpoint is the actual answer -----------
+{
+    const { b, page } = await load({
+        ok: true, licence: { summary: "x" }, outDir: "/lib/sharp-splats",
+        python: "", pythonVersion: "", sharpInstalled: false, invocation: "",
+        weightsCached: false, remote: true, remoteEndpoint: "https://x--sharp.modal.run", remoteHasToken: true,
+        where: "modal", ready: true, why: "", installJob: null,
+    });
+    await page.click('[data-tab="sharp"]').catch(() => { });
+    await page.waitForTimeout(300);
+    ok("!! the Install button is HIDDEN in the modal case -- there is nothing local to install into",
+        await page.evaluate(() => document.getElementById("sharpInstallWrap")?.hidden === true));
+    await b.close();
+}
+
+// ---- 3c. the install button on the local path: pressing it starts a job and polls it to completion -----------
+// v4104 -- Keith: "for the ML-Sharp panel, we need an install button." Driven end-to-end against a status
+// endpoint that ADVANCES ITS OWN ANSWER call over call -- not installed, then installing, then installed -- so
+// this proves the panel actually polls while a job is in flight rather than reading /sharp/status once and
+// going stale, the exact "load-on-click forever" trap the comment above sharpLoad() warns against for the
+// panel as a whole.
+{
+    const seq = (n) => {
+        const base = { ok: true, licence: { summary: "x" }, outDir: "/lib/sharp-splats",
+            python: "python3", pythonVersion: "3.11.4", invocation: "", weightsCached: false,
+            remote: false, remoteEndpoint: "", remoteHasToken: false, where: "local" };
+        if (n <= 1) return Object.assign({}, base, { sharpInstalled: false, ready: false, why: "ml-sharp is not installed for python3",
+            installJob: null });
+        if (n <= 3) return Object.assign({}, base, { sharpInstalled: false, ready: false, why: "ml-sharp is not installed for python3",
+            installJob: { kind: "clone", done: false, code: null, uptimeMs: (n - 1) * 1500, tail: "Cloning into 'ml-sharp'...\n" } });
+        return Object.assign({}, base, { sharpInstalled: true, ready: true, why: "", invocation: "sharp",
+            installJob: { kind: "pip", done: true, code: 0, uptimeMs: 6000, tail: "Successfully installed sharp\n" } });
+    };
+    const { b, page, requested } = await load(seq);
+    await page.click('[data-tab="sharp"]').catch(() => { });
+    await page.waitForTimeout(300);
+    ok("!! not-yet-installed shows the Install button, enabled, with nothing running",
+        await page.evaluate(() => !document.getElementById("sharpInstallWrap").hidden && !document.getElementById("sharpInstallBtn").disabled));
+
+    await page.click("#sharpInstallBtn");
+    await page.waitForTimeout(250);
+    ok("!! clicking Install posts to /sharp/install", requested.includes("install"));
+    ok("!! ...and the button disables the moment a job is in flight, so a second click cannot race the first",
+        await page.evaluate(() => document.getElementById("sharpInstallBtn").disabled === true));
+    let logTxt = await page.evaluate(() => document.getElementById("sharpInstallLog")?.textContent || "");
+    ok("!! the job's own log tail is shown while it runs, not a generic spinner with no information",
+        /Cloning into/.test(logTxt), logTxt.slice(0, 60));
+
+    // The panel must keep polling on its own -- nothing here clicks anything again.
+    await page.waitForTimeout(4500);
+    const html = await page.evaluate(() => document.getElementById("sharpStatus")?.innerHTML || "");
+    ok("!! once the job finishes, the panel reflects installed:true WITHOUT another click",
+        /installed/.test(html) && !/not installed/.test(html), html.slice(0, 160));
+    ok("!! ...and the Install button re-enables and re-labels once nothing is running",
+        await page.evaluate(() => {
+            const btn = document.getElementById("sharpInstallBtn");
+            return !btn.disabled && /Re-install/.test(btn.textContent);
+        }));
     await b.close();
 }
 

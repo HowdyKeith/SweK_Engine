@@ -1,0 +1,360 @@
+<meta charset="utf-8">
+<title>Voxtral in the tab (opt-in)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; padding:26px 18px 60px }
+  h1 { font-size:20px; margin:0 0 4px }
+  .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  .card.locked { opacity:.55 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  table { border-collapse:collapse; width:100% ; font-size:12.5px }
+  td { padding:4px 8px 4px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.k { color:var(--dim); width:170px; white-space:nowrap }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  .banner { border:1px solid #4a2f2c; background:#150a09; border-radius:9px; padding:12px 14px; margin-bottom:16px }
+  .banner b { color:#f0a79e }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:3px 0; font-size:12px; color:var(--dim) }
+  .bar { height:6px; background:#0d1826; border-radius:4px; overflow:hidden; margin-top:6px }
+  .bar > i { display:block; height:100%; background:#2f6ea8; width:0 }
+  .log { font:11.5px ui-monospace,Consolas,monospace; color:var(--dim); white-space:pre-wrap; max-height:190px; overflow:auto; margin-top:8px }
+</style>
+<div class="wrap">
+  <h1>Voxtral, entirely in this tab</h1>
+  <p class="sub">Speech recognition with <b>no bridge, no local server and no Windows</b> &mdash; and it is
+    <b>14&times; slower than real time</b>. Both halves of that are the point. Nothing downloads until you say so.</p>
+
+  <div class="banner" id="headline"></div>
+
+  <div class="card">
+    <h2>What it costs, before you decide</h2>
+    <p class="note">Every speed number below is <b>upstream's, on hardware you almost certainly do not have</b>
+      (an NVIDIA DGX Spark). They are recorded with the source attached rather than restated as predictions.
+      The only figure that will ever describe <i>your</i> machine is the one this page measures at the bottom,
+      after you have run something.</p>
+    <table id="cost"></table>
+  </div>
+
+  <div class="card">
+    <h2>1 &mdash; What this box can actually do</h2>
+    <p class="note">Read locally. This touches no network and downloads nothing.</p>
+    <div><button id="probe">Probe this box</button> <span id="probeState" class="note"></span></div>
+    <table id="facts"></table>
+    <div id="factNotes"></div>
+  </div>
+
+  <div class="card" id="card2">
+    <h2>2 &mdash; Enable the engine <span class="note" style="font-weight:400" id="engSize"></span></h2>
+    <p class="note">
+      The engine is <b>not shipped with this tree</b>. It is 9.4&nbsp;MB and the largest thing otherwise vendored
+      here is 3.5&nbsp;MB, so copying it in would make one opt-in curiosity the biggest file in a repo that
+      publishes public zips. <b>Install&nbsp;it&nbsp;for&nbsp;me</b> does the clone and the staging for you if a
+      bridge is running; otherwise supply the two files by hand, from a staged <code>/vendor/voxtral/</code>
+      directory or the file picker. <b>Every route ends at the same check: the bytes are matched against a
+      pinned SHA-256 before a single one is executed</b>, whether they came from the installer, the disk or a
+      file you chose. A mismatch is refused outright, not warned about.
+    </p>
+    <div>
+      <button id="consent">Enable the browser build</button>
+      <button id="installBtn" disabled>Install the engine for me</button>
+      <button id="stagedBtn" disabled>Load the engine</button>
+      <label><input type="file" id="files" multiple accept=".wasm,.js" disabled style="display:none"><button id="pickBtn" disabled>Choose the two files&hellip;</button></label>
+      <span id="engineState" class="note"></span>
+    </div>
+    <p class="note" id="bridgeLine" style="margin-top:8px"></p>
+    <div class="log" id="iLog" style="display:none"></div>
+    <div id="digests"></div>
+  </div>
+
+  <div class="card locked" id="card3">
+    <h2>3 &mdash; Download the weights <span class="note" style="font-weight:400" id="wSize"></span></h2>
+    <p class="note">
+      Deliberately a <b>second</b> gate. Agreeing to look at a 9&nbsp;MB engine is not agreeing to spend two and a
+      half gigabytes. Cached in the browser afterwards, so this is once per profile.
+      <b>This step was never exercised where the page was built</b> &mdash; huggingface.co was unreachable there
+      (curl returned 000), so unlike the digest check above, nothing proves this path works. Said plainly rather
+      than papered over.
+    </p>
+    <div><button id="weights" disabled>Download the weights</button> <span id="wState" class="note"></span></div>
+    <div class="bar"><i id="wBar"></i></div>
+    <div class="log" id="wLog"></div>
+  </div>
+
+  <div class="card locked" id="card4">
+    <h2>4 &mdash; Transcribe, and measure <i>your</i> real-time factor</h2>
+    <p class="note">This is the only speed number on the page that is about your machine. Any audio file; it is
+      resampled to the 16&nbsp;kHz mono the model expects.</p>
+    <div><button id="pickAudio" disabled>Choose audio&hellip;</button>
+         <input type="file" id="audio" accept="audio/*" style="display:none">
+         <span id="tState" class="note"></span></div>
+    <div id="result"></div>
+  </div>
+
+  <div class="card">
+    <h2>What this page refuses to do</h2>
+    <p class="note">Kept as data, each with the number behind it, so their absence cannot be mistaken for an
+      oversight later.</p>
+    <div id="refused"></div>
+  </div>
+
+  <div class="card">
+    <h2>Provenance</h2>
+    <table id="prov"></table>
+  </div>
+</div>
+
+<script type="module">
+import { UPSTREAM, ARTEFACTS, WEIGHTS, UPSTREAM_BENCH, MEASURED_HERE, REFUSED,
+         gb, humanDuration, estimateWallClock, initialState, nextStep,
+         blockersFrom, warningsFrom, verifyArtefact, costLines, humanBytes } from "/ui/voxtralBrowser.js";
+import { probeLocalModel } from "/ui/localModelProbe.js";
+
+const $ = (id) => document.getElementById(id);
+let state = initialState();      // inert: constructing this starts nothing
+let facts = null, mod = null, vox = null;
+
+// ---- the headline, built from the same numbers the gate reads ------------------------------------------------
+{
+  const e = estimateWallClock(UPSTREAM_BENCH.asrWasm.audioS);
+  $("headline").innerHTML =
+    "<b>Read this first.</b> Upstream measures the in-browser path at <b>RTF " + UPSTREAM_BENCH.asrWasm.rtf +
+    "</b> &mdash; about <b>" + e.pretty + " to transcribe " + e.audioSeconds + " seconds of speech</b> &mdash; on " +
+    e.hardware + ". Treat that as a <b>floor</b>, not a forecast. This tree already runs the same job natively " +
+    "and fast through <code>whisperBridge</code>; the only thing this page adds is that it needs none of it.";
+}
+
+const rows = (t, pairs) => { t.innerHTML = pairs.map(([k, v]) =>
+  `<tr><td class="k">${k}</td><td>${v}</td></tr>`).join(""); };
+
+rows($("cost"), costLines().map((l) => [l.k, l.v]));
+$("engSize").textContent = "(" + humanBytes(ARTEFACTS.wasm.bytes) + " of WebAssembly)";
+$("wSize").textContent = "(" + humanBytes(WEIGHTS.approxBytes) + ", a separate decision)";
+rows($("prov"), [
+  ["Project", `<a href="${UPSTREAM.repo}" style="color:#9fd7ff">${UPSTREAM.repo}</a>`],
+  ["Commit", `<code>${UPSTREAM.commit}</code>`],
+  ["Version / licence", `${UPSTREAM.version} &mdash; <b>${UPSTREAM.license}</b> (${UPSTREAM.licenseVerified})`],
+  ["Model", `<code>${UPSTREAM.model}</code>`],
+  ["Runtime", UPSTREAM.framework],
+  ["Engine SHA-256", `<code>${ARTEFACTS.wasm.sha256}</code>`],
+  ["Glue SHA-256", `<code>${ARTEFACTS.glue.sha256}</code>`],
+  ["Measured here", `${MEASURED_HERE.wasmInstantiateMs} ms to instantiate, ${MEASURED_HERE.wgpuDeviceMs} ms to a
+     WebGPU device (${MEASURED_HERE.where}). <b>${MEASURED_HERE.note}</b>`],
+]);
+$("refused").innerHTML = "<ul>" + REFUSED.map((r) =>
+  `<li><b class="no">${r.what}</b> &mdash; ${r.why} <i>Would need: ${r.wouldNeed}</i></li>`).join("") + "</ul>";
+
+// ---- 1. local probe -------------------------------------------------------------------------------------------
+$("probe").onclick = async () => {
+  $("probeState").textContent = "reading…";
+  facts = await probeLocalModel();
+  const blockers = blockersFrom(facts), warns = warningsFrom(facts);
+  rows($("facts"), [
+    ["WebGPU namespace", facts.gpuNamespace ? '<b class="yes">present</b>' : '<b class="no">absent</b>'],
+    ["Adapter", facts.adapter ? '<b class="yes">granted</b>' : '<b class="no">null</b>'],
+    ["Adapter is software", facts.softwareRenderer === null ? '<b class="unk">unknown</b>'
+        : facts.softwareRenderer ? '<b class="warn">yes &mdash; CPU emulation</b>' : '<b class="yes">no</b>'],
+    ["Storage quota", typeof facts.quotaBytes === "number" ? gb(facts.quotaBytes) : '<b class="unk">unknown</b>'],
+    ["Weights fit the quota", typeof facts.quotaBytes !== "number" ? '<b class="unk">unknown</b>'
+        : facts.quotaBytes >= WEIGHTS.approxBytes ? '<b class="yes">not ruled out</b>' : '<b class="no">no</b>'],
+  ]);
+  $("factNotes").innerHTML =
+    (blockers.length ? `<div class="note no" style="margin-top:8px"><b>Blocked:</b> ${blockers.join("; ")}</div>` : "") +
+    (warns.length ? "<ul>" + warns.map((w) => `<li class="unk">${w}</li>`).join("") + "</ul>" : "");
+  $("probeState").textContent = blockers.length ? "cannot run here" : "read";
+  refresh();
+};
+
+// ---- 2. consent, then supply + VERIFY the engine ---------------------------------------------------------------
+$("consent").onclick = () => {
+  state = { ...state, consented: true };
+  $("engineState").textContent = "enabled — now supply the engine files; no engine or weights downloaded yet";
+  refresh();
+  askBridge();          // a status question, not a download
+};
+
+function refresh() {
+  const step = nextStep(state, facts);
+  const canLoad = step.action === "load-module";
+  $("stagedBtn").disabled = !canLoad; $("pickBtn").disabled = !canLoad;
+  // Offered only when a bridge is there AND has not already staged a verified engine.
+  $("installBtn").disabled = !canLoad || !bridge || !bridge.ok || bridge.installed;
+  $("weights").disabled = step.action !== "download-weights";
+  $("pickAudio").disabled = step.action !== "transcribe";
+  $("card3").classList.toggle("locked", !state.moduleReady);
+  $("card4").classList.toggle("locked", !state.weightsReady);
+  $("consent").disabled = state.consented;
+  if (step.action === "blocked") $("engineState").innerHTML = `<b class="no">${step.detail}</b>`;
+}
+
+async function useBytes(glueText, wasmBuf) {
+  const gEnc = new TextEncoder().encode(glueText);
+  const gv = await verifyArtefact(gEnc, ARTEFACTS.glue);
+  const wv = await verifyArtefact(wasmBuf, ARTEFACTS.wasm);
+  $("digests").innerHTML = [["Glue", gv], ["Engine", wv]].map(([n, v]) =>
+    `<div class="note"><b class="${v.ok ? "yes" : "no"}">${n}: ${v.ok ? "verified" : "REFUSED"}</b> &mdash; ${v.reason}` +
+    (v.got && !v.ok ? `<br>got <code>${v.got}</code>` : "") + `</div>`).join("");
+  if (!gv.ok || !wv.ok) { $("engineState").innerHTML = '<b class="no">not executed &mdash; digest check failed</b>'; return; }
+
+  // Import the verified glue from a blob URL and hand it the verified wasm bytes directly, so no remote URL is
+  // ever trusted: the only thing that runs is the exact build these digests describe.
+  const url = URL.createObjectURL(new Blob([glueText], { type: "text/javascript" }));
+  try {
+    mod = await import(url);
+    const t0 = performance.now();
+    await mod.default({ module_or_path: wasmBuf });
+    await mod.initWgpuDevice();
+    vox = new mod.VoxtralQ4();
+    state = { ...state, moduleReady: true };
+    $("engineState").innerHTML = `<b class="yes">engine live</b> — instantiated and WebGPU device acquired in
+      ${Math.round(performance.now() - t0)} ms on this box`;
+  } catch (e) {
+    $("engineState").innerHTML = `<b class="no">failed to start: ${String(e).slice(0, 200)}</b>`;
+  } finally { URL.revokeObjectURL(url); refresh(); }
+}
+
+// *** THE BRIDGE IS ASKED ABOUT, NEVER RELIED ON. *** This page's whole claim is that it needs no bridge, no
+// local server and no Windows. So a missing /voxtral/status is a NORMAL outcome that just hides one button;
+// the file picker is always there. This status call is the only request consent triggers, and it fetches no
+// engine and no weights -- the gate asserts exactly that, rather than a bare "zero requests" that would have
+// to be weakened the moment a status probe existed.
+let bridge = null;
+async function askBridge() {
+  try {
+    const r = await fetch("/voxtral/status");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    bridge = await r.json();
+  } catch { bridge = null; }
+  if (!bridge || !bridge.ok) {
+    $("bridgeLine").innerHTML = "<b>No install bridge here.</b> That is fine — supply the two files with the " +
+      "picker. The bridge is a convenience; this page is built to need no server at all.";
+  } else if (bridge.installed) {
+    $("bridgeLine").innerHTML = `<b class="yes">Engine already installed</b> and digest-verified, staged in
+      <code>${bridge.engineDir}</code>. Press <b>Load the engine</b>.`;
+  } else {
+    $("bridgeLine").innerHTML = `<b>An install bridge is available.</b> It shallow-clones
+      <code>${bridge.repo}</code>, <b>verifies both SHA-256s</b>, and stages the two files in
+      <code>${bridge.engineDir}</code> — <b>outside the engine tree on purpose</b>, because
+      <code>vendor/</code> is not in the packager's skip list and installing there would add 9.4&nbsp;MB to
+      every release zip.`;
+  }
+  refresh();
+}
+
+$("installBtn").onclick = async () => {
+  $("installBtn").disabled = true;
+  $("iLog").style.display = "block";
+  $("iLog").textContent = "starting\n";
+  try {
+    const r = await (await fetch("/voxtral/install", { method: "POST" })).json();
+    if (!r.ok) throw new Error(r.error || "install refused");
+  } catch (e) { $("iLog").textContent += "FAILED: " + e + "\n"; $("installBtn").disabled = false; return; }
+  const tick = async () => {
+    let st;
+    try { st = await (await fetch("/voxtral/status")).json(); } catch { setTimeout(tick, 1200); return; }
+    if (st.installJob) $("iLog").textContent = st.installJob.tail || "";
+    if (st.installJob && st.installJob.done) {
+      bridge = st;
+      $("engineState").innerHTML = st.installed
+        ? '<b class="yes">installed and verified</b> — now press Load the engine'
+        : '<b class="no">install did not verify — nothing was staged</b>';
+      if (!st.installed) $("installBtn").disabled = false;
+      refresh(); return;
+    }
+    setTimeout(tick, 900);
+  };
+  tick();
+};
+
+// Load order: the bridge's staged copy, then a hand-staged /vendor/voxtral/, then the picker. Whichever
+// supplies the bytes, they go through the SAME digest check before anything is executed.
+$("stagedBtn").onclick = async () => {
+  const sources = [];
+  if (bridge && bridge.ok) sources.push(["the installed engine", "/voxtral/engine/"]);
+  sources.push(["/vendor/voxtral/", "/vendor/voxtral/"]);
+  for (const [label, base] of sources) {
+    $("engineState").textContent = "looking in " + label + "…";
+    try {
+      const [g, w] = await Promise.all([
+        fetch(base + ARTEFACTS.glue.name).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
+        fetch(base + ARTEFACTS.wasm.name).then((r) => r.ok ? r.arrayBuffer() : Promise.reject(r.status)),
+      ]);
+      await useBytes(g, w);
+      return;
+    } catch { /* try the next source */ }
+  }
+  $("engineState").innerHTML = '<span class="unk">not staged anywhere — install it above, or use the file picker</span>';
+};
+$("pickBtn").onclick = () => $("files").click();
+$("files").onchange = async (ev) => {
+  const fs = [...ev.target.files];
+  const g = fs.find((f) => f.name.endsWith(".js")), w = fs.find((f) => f.name.endsWith(".wasm"));
+  if (!g || !w) { $("engineState").innerHTML = '<b class="no">need both the .js glue and the .wasm</b>'; return; }
+  await useBytes(await g.text(), await w.arrayBuffer());
+};
+
+// ---- 3. weights ------------------------------------------------------------------------------------------------
+$("weights").onclick = async () => {
+  $("weights").disabled = true;
+  const log = (m) => { $("wLog").textContent += m + "\n"; $("wLog").scrollTop = 1e6; };
+  try {
+    const cache = await caches.open(WEIGHTS.cacheName);
+    for (let i = 0; i < WEIGHTS.shards.length; i++) {
+      const name = WEIGHTS.shards[i], url = `${WEIGHTS.base}/${name}`;
+      $("wState").textContent = `shard ${i + 1}/${WEIGHTS.shards.length}`;
+      let res = await cache.match(url);
+      if (res) log(`${name}: from cache`);
+      else { log(`${name}: downloading…`); const r = await fetch(url);
+             if (!r.ok) throw new Error(`${name} -> HTTP ${r.status}`); await cache.put(url, r.clone()); res = r; }
+      vox.appendModelShard(new Uint8Array(await res.arrayBuffer()));
+      $("wBar").style.width = Math.round(((i + 1) / (WEIGHTS.shards.length + 1)) * 100) + "%";
+    }
+    log("tokenizer…");
+    const tk = await fetch(`${WEIGHTS.base}/tekken.json`);
+    if (!tk.ok) throw new Error(`tekken.json -> HTTP ${tk.status}`);
+    vox.loadModelFromShards(await tk.text());
+    $("wBar").style.width = "100%";
+    state = { ...state, weightsReady: true };
+    $("wState").innerHTML = '<b class="yes">weights loaded</b>';
+    log("ready.");
+  } catch (e) {
+    $("wState").innerHTML = `<b class="no">${String(e).slice(0, 200)}</b>`;
+    log("FAILED: " + e);
+    $("weights").disabled = false;
+  }
+  refresh();
+};
+
+// ---- 4. transcribe, and report the ONE honest speed number on the page -------------------------------------------
+$("pickAudio").onclick = () => $("audio").click();
+$("audio").onchange = async (ev) => {
+  const f = ev.target.files[0]; if (!f) return;
+  $("tState").textContent = "decoding…";
+  const ac = new AudioContext({ sampleRate: 16000 });
+  const buf = await ac.decodeAudioData(await f.arrayBuffer());
+  const pcm = buf.getChannelData(0), audioS = buf.duration;
+  $("tState").textContent = `transcribing ${audioS.toFixed(1)}s — expect this to take a while…`;
+  const t0 = performance.now();
+  let text;
+  try { text = await vox.transcribe(pcm); }
+  catch (e) { $("tState").innerHTML = `<b class="no">${String(e).slice(0, 200)}</b>`; return; }
+  const wall = (performance.now() - t0) / 1000, rtf = wall / audioS;
+  $("tState").textContent = "";
+  $("result").innerHTML =
+    `<div class="verdict" style="border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-top:9px">
+       <b>${text.replace(/</g, "&lt;") || "(empty)"}</b></div>` +
+    `<table><tr><td class="k">Audio</td><td>${audioS.toFixed(2)} s</td></tr>
+       <tr><td class="k">Wall clock</td><td>${humanDuration(wall)} (${wall.toFixed(1)} s)</td></tr>
+       <tr><td class="k"><b>Your real RTF</b></td><td><b>${rtf.toFixed(1)}× slower than real time</b> &mdash;
+         upstream reported ${UPSTREAM_BENCH.asrWasm.rtf}× on ${UPSTREAM_BENCH.hardware}.
+         <b>This row is the only speed figure here measured on your machine.</b></td></tr></table>`;
+};
+
+refresh();
+</script>

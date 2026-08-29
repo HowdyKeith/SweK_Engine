@@ -54,6 +54,7 @@ const R = {
     verifyExit: null,
     error: "",
     publish: null,          // the last publish result, if any
+    launched: null,         // {port, root, version, at} of the verify preview THIS bridge process last started
 };
 
 const MAX_LOG = 256 * 1024;
@@ -74,6 +75,7 @@ function status() {
         verifyExit: R.verifyExit,
         error: R.error,
         publish: R.publish,
+        launched: R.launched,
         // *** THE ONE FIELD THE UI IS ALLOWED TO GATE ITS BUTTON ON, AND IT IS COMPUTED HERE. *** A UI that
         // derived "may I publish" from three separate fields would be a second copy of this rule, and the copy
         // is the one that would drift open. Everything the button needs to know is this boolean.
@@ -303,16 +305,44 @@ function _launchGuard(clone) {
     return { ok: true, why: "" };
 }
 
+// v4103 -- *** "SIDE BY SIDE, NEVER OVER THE TOP" MEANT PRODUCTION. IT ALSO MEANT EVERY OLDER PREVIEW, WHICH
+// NOBODY ASKED FOR. *** Keith: "old swek launcher is still running, and old kpop listener is still running too,
+// not closing" -- then, when the obvious workaround was floated, "closing manually would be dangerous as a user
+// could not easily tell which is old." Both are correct, and both trace to the same line: _freePort() hands out
+// a FRESH OS PORT on every call, by design (v4014, so a preview never fights production for :8787), but nothing
+// ever recorded what an earlier call had started. Click "launch" three times and there are three live engines,
+// three console windows, and -- because kpop-guard.ps1's alive check has no way to know which one is "current" --
+// no signal telling a human which window is safe to close.
+//
+// THE FIX IS NOT TO STOP TOUCHING PRODUCTION -- that guarantee is exactly right and stays. It is to stop treating
+// EVERY PAST PREVIEW as equally sacred: this bridge process is the only thing that ever calls launch(), so it is
+// the one place that can know "the preview I started five minutes ago is superseded by the one I am starting
+// now" without guessing. So the SECOND launch stops the FIRST -- reusing portHandoff's freePort(), the same
+// battle-tested kill-whatever-is-listening-here helper the production handoff already relies on, pointed at the
+// port THIS bridge itself recorded rather than a port a human has to identify by eye. A launch this bridge never
+// made (production, or a preview from a process that has since restarted) is never touched, because R.launched
+// only ever names what THIS launch() wrote.
 async function launch() {
     const guard = _launchGuard(R.clone);
     if (!guard.ok) return { ok: false, error: guard.why };
     const root = R.clone.path;
+
+    if (R.launched && R.launched.port) {
+        push("[chain] stopping the previous verify preview (v" + R.launched.version + " on :" + R.launched.port + ") before starting this one\n");
+        try { require("./portHandoff.js").freePort(R.launched.port, (m) => push("[chain] " + m + "\n")); } catch {}
+        R.launched = null;
+    }
 
     let port;
     try { port = await _freePort(); }
     catch (e) { return { ok: false, error: "could not find a free port: " + String((e && e.message) || e) }; }
 
     const env = Object.assign({}, process.env, { PORT: String(port) });
+    // A REAL TITLE, NOT THE EMPTY STRING `start` NEEDS AS ITS DUMMY FIRST ARG. Auto-stopping this bridge's own
+    // previous preview closes the ordinary case; a title naming the version and port is what makes any preview
+    // that DOES linger (a crash between launches, a manual close that missed) identifiable at a glance instead of
+    // indistinguishable from production, which is the actual danger Keith named.
+    const title = "SweK Verify v" + (R.clone.version || "?") + " :" + port;
 
     if (isWin) {
         let sysadmin = null; try { sysadmin = require("./sysadminBridge.js"); } catch {}
@@ -330,7 +360,7 @@ async function launch() {
             return { ok: false, error: "no launcher found in " + root + " -- looked for: " + tried.join(", ") };
         }
         try {
-            const c = spawn("cmd", ["/c", "start", "", "/d", root, name], { detached: true, windowsHide: false, stdio: "ignore", env });
+            const c = spawn("cmd", ["/c", "start", title, "/d", root, name], { detached: true, windowsHide: false, stdio: "ignore", env });
             c.unref();
         } catch (e) { return { ok: false, error: "launch failed: " + String((e && e.message) || e) }; }
     } else if (isMac) {
@@ -346,6 +376,8 @@ async function launch() {
     }
 
     const healthy = await _waitHealthy(port);
+    R.launched = { port, root, version: R.clone.version, at: Date.now() };
+    push("[chain] launched verify preview v" + R.clone.version + " on :" + port + (healthy ? " (answered /health)" : " (did not answer /health yet)") + "\n");
     return {
         ok: true, port, path: root, version: R.clone.version,
         url: "http://127.0.0.1:" + port + "/server.html",

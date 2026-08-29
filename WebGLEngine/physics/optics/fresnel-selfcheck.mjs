@@ -13,7 +13,7 @@
 // constant used as a cross-check, not as the primary claim -- the primary claim at the edge is I = 1/4 EXACTLY,
 // and that follows from C(0)=S(0)=0.
 
-import { fresnelCS, knifeEdgeIntensity, edgeV, slitFresnel, slitFresnelNumeric, slitFresnelAtAngles, fresnelNumber, regime, profileRms } from "./fresnel.js";
+import { fresnelCS, knifeEdgeIntensity, knifeEdgeProfile, edgeV, slitFresnel, slitFresnelNumeric, slitFresnelAtAngles, fresnelNumber, regime, profileRms } from "./fresnel.js";
 import { slitAnalytic } from "./diffraction.js";
 
 let fails = 0;
@@ -73,6 +73,18 @@ const Sser = (x) => P * x ** 3 / 3 - P ** 3 * x ** 7 / 42 + P ** 5 * x ** 11 / 1
     ok("far into the light tends to unobstructed", Math.abs(knifeEdgeIntensity(12) - 1) < 0.05);
     ok("fringes OVERSHOOT unity on the lit side (that is the physics, not an artefact)", best > 1.3);
     ok("edgeV scales as 1/sqrt(lambda z)", Math.abs(edgeV(1, 500e-6, 100) / edgeV(1, 500e-6, 400) - 2) < 1e-9);
+}
+
+// 4b. knifeEdgeProfile IS THE POINTWISE PROFILE, NOT A DECORATION AROUND IT
+{
+    const vs = [0, 1.2172, -8, 12];
+    const prof = knifeEdgeProfile(vs);
+    ok("knifeEdgeProfile equals knifeEdgeIntensity applied pointwise, in order", vs.every((v, i) => prof[i] === knifeEdgeIntensity(v)),
+       "profile(" + vs.join(",") + ") = " + prof.map((x) => x.toFixed(4)).join(","));
+    // and the values it produces are the same physical landmarks checked above for the scalar function
+    ok("!! ...so it reproduces the exact quarter at the shadow edge and the textbook fringe peak", Math.abs(prof[0] - 0.25) < 1e-12 && Math.abs(prof[1] - 1.3704) < 0.002,
+       "profile[0]=" + prof[0] + "  profile[1]=" + prof[1].toFixed(4));
+    ok("output length tracks input length", knifeEdgeProfile([1, 2, 3, 4, 5]).length === 5);
 }
 
 // 5. TWO INDEPENDENT ROUTES to the near-field slit pattern agree

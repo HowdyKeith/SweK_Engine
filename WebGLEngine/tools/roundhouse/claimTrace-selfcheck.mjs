@@ -158,7 +158,11 @@ const r = await C.claimTrace(ENG, D, K, { modes: MODES, table: TABLE });
 
     ok("!! no gate has NEW untraceable claims",
         appeared.length === 0,
-        appeared.length ? "APPEARED: " + appeared.join(", ") : "none. A gate that starts citing numbers nobody " +
+        // v4075 -- *** THIS NAMED TWENTY-TWO GATES AND NOT ONE COUNT, so bellBind's single claim and
+        // tempering's nine read identically and there was no way to tell where the weight was. Same defect
+        // this session fixed in boundaryLint, whose failure printed four newcomers out of eleven. A list
+        // without magnitudes is a set membership test wearing a report's clothes.
+        appeared.length ? "APPEARED: " + appeared.map((g) => g + " (" + now[g] + ")").join(", ") : "none. A gate that starts citing numbers nobody " +
         "can re-derive is the pile growing, and the pile is already 26");
 
     ok("!! *** and no gate's untraceable count has GROWN ***",
@@ -187,9 +191,21 @@ const r = await C.claimTrace(ENG, D, K, { modes: MODES, table: TABLE });
 
 console.log();
 console.log("  ----  THE TRACE, so a claim can be made checkable rather than merely written down:");
+// v4075 -- *** AND THE NUMBERS THEMSELVES ARE PRINTED NOW, WHICH IS WHAT MAKES THE PILE ADDRESSABLE AT ALL. ***
+// This reported that a gate had N untraceable claims and never WHICH ONES, while the closing line below asks
+// its reader to "state the CONFIG beside the number" -- AN INSTRUCTION NOBODY COULD FOLLOW, because the number
+// was never shown. 75 untraceable claims sat behind a count for the whole life of this gate, so the only move
+// it left anybody was re-freezing. A report that names a quantity of debt without naming the debt cannot be
+// paid down; it can only be counted again next round. Bounded at six per row so a nine-claim gate does not
+// bury the table, with the remainder counted rather than silently dropped.
 for (const x of r.rows) {
     const mark = x.unmatched.length === 0 ? "traceable  " : (x.unmatched.length === x.claims ? "NONE trace " : "partial    ");
     console.log("  ----    " + mark + x.gate.padEnd(22) + x.device.padEnd(11) + x.claims + " claims, " + x.unmatched.length + " untraceable");
+    if (x.unmatched.length) {
+        const shown = x.unmatched.slice(0, 6).map((u) => (typeof u === "object" && u !== null ? (u.value ?? u.number ?? JSON.stringify(u)) : u));
+        console.log("  ----        unmatched: " + shown.join(", ") +
+            (x.unmatched.length > 6 ? "  (+" + (x.unmatched.length - 6) + " more)" : ""));
+    }
 }
 console.log("  ----  WHAT WOULD FIX A ROW: state the CONFIG beside the number. 'Ra_c 1752.5 at 64x33, tau 0.52'");
 console.log("  ----  is re-derivable by anybody; '1752.5' is a number you have to trust. THAT IS THE WHOLE");

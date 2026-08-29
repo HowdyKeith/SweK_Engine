@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { colorConstraints } from "./xpbd.js";
-import { generateIcosphere, buildEdges, enclosedVolume, volumeSubstep } from "./volume.js";
+import { generateIcosphere, buildEdges, enclosedVolume, volumeSubstep, solveVolume } from "./volume.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -70,6 +70,43 @@ function balloon(subdiv = 2) {
     const clean = !/Math\.(sin|cos|tan|exp|log|pow|hypot|random|acos|asin|atan)\b/.test(src);
     ok("!! the closed-mesh generator and volume solver use no transcendental", clean,
        "the sphere is a subdivided octahedron with square-root-normalised midpoints -- no sin/cos anywhere, so a Mac and a PC start from the identical vertices.");
+}
+
+// ---- 5b. solveVolume IN ISOLATION: a body already at rest volume is untouched, and one call always shrinks ----
+//         the constraint violation -- never grows it, whether inflating or deflating.
+{
+    const s = generateIcosphere(1);
+    const invMass = new Float64Array(s.n).fill(1);
+    const restVol = enclosedVolume(s.pos, s.tris);
+
+    // At rest inflation (target == current volume, compliance 0): C is exactly zero, so dLambda is exactly zero
+    // and the solve must leave every position byte-identical.
+    const atRest = Float64Array.from(s.pos);
+    const lamAfter = solveVolume(atRest, invMass, s.tris, restVol, 1.0, 0, 0.016, 0);
+    let untouched = true; for (let i = 0; i < atRest.length; i++) if (atRest[i] !== s.pos[i]) untouched = false;
+    const atRestVolume = restVol;
+
+    // Inflate: scale the sphere up uniformly first (a real over-volume body), then one solveVolume call toward
+    // the SAME restVol must move the enclosed volume STRICTLY closer to target than before -- shrink, not grow,
+    // the constraint violation |C|.
+    const inflatedPred = Float64Array.from(s.pos.map((v) => v * 1.4));
+    const cBefore = enclosedVolume(inflatedPred, s.tris) - restVol;
+    solveVolume(inflatedPred, invMass, s.tris, restVol, 1.0, 0, 0.016, 0);
+    const cAfterInflate = enclosedVolume(inflatedPred, s.tris) - restVol;
+
+    // Deflate: scale down instead -- an under-volume body -- and confirm the same reduction-of-violation holds
+    // in the OTHER direction, so the check is not merely "shrinking always wins by coincidence".
+    const deflatedPred = Float64Array.from(s.pos.map((v) => v * 0.7));
+    const cBeforeDeflate = enclosedVolume(deflatedPred, s.tris) - restVol;
+    solveVolume(deflatedPred, invMass, s.tris, restVol, 1.0, 0, 0.016, 0);
+    const cAfterDeflate = enclosedVolume(deflatedPred, s.tris) - restVol;
+
+    ok("!! a body already at rest volume is left byte-identical, and a single call always shrinks |C| toward target, over- or under-volume alike",
+       untouched && lamAfter === 0 &&
+       Math.abs(cAfterInflate) < Math.abs(cBefore) && Math.abs(cAfterDeflate) < Math.abs(cBeforeDeflate),
+       "at rest (V=" + atRestVolume.toFixed(4) + ") the solve changes nothing and returns lambda 0; scaled up 1.4x the violation fell from " +
+       cBefore.toFixed(4) + " to " + cAfterInflate.toFixed(4) + ", and scaled down 0.7x it fell from " + cBeforeDeflate.toFixed(4) +
+       " to " + cAfterDeflate.toFixed(4) + " -- a single global constraint pulling toward target from either side, in one call.");
 }
 
 // ---- 6. STABILITY: strong inflation and deflation stay finite ------------------------------------------------

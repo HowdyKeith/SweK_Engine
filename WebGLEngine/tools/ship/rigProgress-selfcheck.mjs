@@ -127,7 +127,10 @@ console.log("\n2. *** THE HASH IS SHOWN. IT IS NEVER ACTED ON. ***");
         "the chip is INFORMATION. A gate's verdict depends on the code it checks, which is not in this hash, " +
         "so an unchanged gate over changed physics is exactly the case where running it matters most");
     ok("...and the page says so where a reader will meet it, not only here",
-        /IT DOES NOT MEAN IT WOULD STILL PASS/.test(PAGE),
+        // v4075 -- the caveat is a STRING LITERAL in rig.html's tooltip, so the hazard is an HTML comment
+        // carrying the same words rather than a JS one; stripped, and whitespace collapsed so rewrapping the
+        // concatenated string cannot redden a page that still shows the caveat.
+        /IT DOES NOT MEAN IT WOULD STILL PASS/.test(PAGE.replace(/<!--[\s\S]*?-->/g, " ").replace(/\s+/g, " ")),
         "the caveat rides in the chip's own tooltip, because a limit recorded only in a gate is a limit the " +
         "person clicking the button never sees");
 }

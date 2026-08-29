@@ -20,8 +20,8 @@
 // refinement knobs, these numbers move and the check says so.
 
 import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS,
-         measurePortabilitySampled } from "./corroborationCensus.mjs";
-import { writeCostRecord, readCostRecord, dearest, COST_BASELINE } from "./costRecord.mjs";
+         measurePortabilitySampled, costVsCalls } from "./corroborationCensus.mjs";
+import { writeCostRecord, readCostRecord, dearest } from "./costRecord.mjs";
 import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
@@ -33,12 +33,16 @@ const report = (name, detail) => console.log("  ----  " + name + (detail ? "   "
 // `unkeyedTotal > keyedTotal` would pass on half the devices and mean nothing. A partial run REPORTS them and
 // says it cannot vouch for them; it does not quietly pass.
 //
-// *** v4039a -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE ONE SECTION'S BLOCK AND USED IN THE
-// NEXT, AND `const` IS BLOCK-SCOPED. *** The unbudgeted run swept all 484 device/modes, passed every
-// assertion, and then died with `ReferenceError: pinned is not defined` on the last one. The budgeted runs
-// crashed there too and I READ THE TRAILING STACK TRACE AS THE END OF THE OUTPUT and reported the guards as
-// firing correctly. They did -- and the gate still exited non-zero one line later, which is exactly the kind
-// of thing a gate exists to make impossible to miss.
+// *** v4080 -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE SECTION 2's BLOCK AND USED IN SECTION
+// 3, AND `const` IS BLOCK-SCOPED. *** MEASURED WHILE TRYING TO FREEZE A COST RECORD THIS ROUND: `node
+// tools/roundhouse/corroborationCensus-selfcheck.mjs --budget 5000` reported 82 of 484 device/modes, printed
+// section 2's PARTIAL notices correctly, and then died one line into section 3 --
+// `ReferenceError: pinned is not defined` -- because `pinned` only existed inside section 2's `{ }` and
+// section 3 is a second block. The unbudgeted (freeze) attempt this round hit an unrelated wall first (it
+// never finished within the time this round had -- see costRecord.mjs and device-cost-baseline.json's
+// absence), so this was found from the SHORT end rather than the long one, but it is the identical defect:
+// declared where it is used once, used again one section later, and `const` does not survive the block
+// boundary in between.
 let censusComplete = true, sweptSoFar = "";
 const pinned = (name, cond, detail) => censusComplete
     ? ok(name, cond, detail)
@@ -173,9 +177,13 @@ console.log();
     // reached kerr this line passed by having nothing to check -- the vacuous pass this session already found
     // in mpmstep's sideways negative, where a grid too small to hold the block satisfied "driftX is exactly
     // zero" by never moving it. Unreachable before a budget existed; reachable the moment one did.
-    // `pinned`, for the same reason as the totals: on a partial sweep kerr may simply not have been reached,
-    // which is missing data and not a defect. The kerr.length > 0 guard still stands for the complete run,
-    // where an empty list would mean the rows vanished rather than that the budget ran out.
+    // `pinned`, for the same reason as the totals above: on a partial sweep kerr may simply not have been
+    // reached, which is missing data and not a defect. MEASURED this round at --budget 5000: kerr was one of
+    // the 402 device/modes skipped, and the un-fixed `ok` here reported "kerr modes: " (an empty list) as a
+    // FAILURE rather than an admission -- exactly the vacuous-pass shape this file's own v4036 comment already
+    // named for `kerr.length > 0`, just on the other side of the guard. The kerr.length > 0 check inside the
+    // condition still stands for the COMPLETE run, where an empty list would mean the rows vanished rather
+    // than that the budget ran out.
     pinned("build-level granularity demonstrably overstates the taint",
         kerr.length > 0 && kerr.every((r) => !r.portable && r.rawCalls < 100 && r.unkeyed.length >= 10),
         "kerr modes: " + kerr.map((r) => r.mode + "(" + r.rawCalls + " calls, " + r.unkeyed.length + " unkeyed)").join(", ") +
@@ -340,6 +348,66 @@ console.log("\n3d. *** WHAT EACH BUILD COST, KEPT, BECAUSE THE PROXY DID NOT WOR
     console.log("  NOTE   criterion 2 is absent above on purpose. v2902 established the lab has no stochastic");
     console.log("         input, so seed sweeps are vacuous and were replaced by nuisance-parameter invariance --");
     console.log("         which needs a per-device knob the physics says cannot matter, and nobody has declared one.");
+}
+
+// ---- 5. v4080 -- rawCalls IS NOT A COST MODEL, MEASURED ON THE ROWS THIS SWEEP ACTUALLY BUILT ---------------------
+{
+    const cv = costVsCalls(c.rows);
+    if (!cv.rows.length) {
+        report("costVsCalls has nothing to compare", "no row in this sweep made a libm call, so ms-per-Mcall " +
+            "cannot be computed. That is a fact about which rows were reached, not about the finding.");
+    } else {
+        // *** THIS IS THE SAME MISTAKE A COST HINT DERIVED FROM rawCalls WOULD HAVE MADE, MEASURED RATHER THAN
+        // ARGUED. *** A call counter prices transcendental-function work and nothing else; a build whose inner
+        // loop is mostly SPH neighbour search, an LBM lattice update, or a linear solve can cost far more wall
+        // time than one that is almost nothing BUT trig, however many million calls the second one makes.
+        pinned("!! *** ms-per-Mcall SPANS ORDERS OF MAGNITUDE ACROSS THE ROWS THIS SWEEP BUILT ***",
+            cv.spanX > 10,
+            cv.cheapest.device + "." + cv.cheapest.mode + " " + cv.cheapest.msPerMcall.toFixed(1) +
+            " ms/Mcall (" + cv.cheapest.rawCalls.toLocaleString() + " calls, " + cv.cheapest.ms + " ms) vs " +
+            cv.priciest.device + "." + cv.priciest.mode + " " + cv.priciest.msPerMcall.toFixed(1) +
+            " ms/Mcall (" + cv.priciest.rawCalls.toLocaleString() + " calls, " + cv.priciest.ms + " ms) -- " +
+            cv.spanX.toFixed(1) + "x apart. A device that counts calls to schedule by this number alone would " +
+            "treat these as interchangeable and be off by " + cv.spanX.toFixed(0) + "x.");
+        report("directly measured, outside this sweep, on the applying machine (see costRecord.mjs's header)",
+            "kuramoto.curve, twof.inlet and stability.response -- three devices with wildly different inner " +
+            "loops -- were built once each and timed: the call count and the wall time do not merely fail to " +
+            "agree, the RANKING inverts between them at the extremes, which is what makes rawCalls an " +
+            "ANTI-predictor rather than merely an imprecise one. Full numbers are in that file's header comment " +
+            "so they are not duplicated and cannot drift out of sync with it.");
+    }
+
+    // *** THE FREEZE IS OPT-IN AND THE GATE READS BY DEFAULT, WHICH IS corroborationReach's CONVENTION
+    // (SWEK_FREEZE_CORROBORATION_REACH=1) AND NOT AN INVENTION HERE. *** A gate that wrote on every run would
+    // be a gate and a report at once, which capabilityCard-selfcheck records a round being refused for.
+    //
+    // *** AND ONLY A COMPLETE SWEEP MAY FREEZE. *** A budgeted run measures a prefix of the lab; writing that
+    // would record the cheap devices and silently drop every expensive one -- which is exactly the population
+    // a cost record exists to describe. The refusal is louder than the write.
+    if (process.env.SWEK_FREEZE_DEVICE_COST === "1") {
+        if (!c.complete) {
+            report("REFUSED TO FREEZE", "the sweep was PARTIAL (" + s.deviceModes + " of " + s.plannedDeviceModes +
+                "). A record written from a budgeted run would hold the cheap devices and omit every expensive " +
+                "one, which is the population it exists to describe. Re-run without --budget.");
+        } else {
+            const w = writeCostRecord(c.rows.map((r) => ({ device: r.device, mode: r.mode, ms: r.ms })),
+                { note: "measured by corroborationCensus-selfcheck, " + s.deviceModes + " device/modes, complete sweep" });
+            report("FROZE " + w.entries + " device/mode costs into device-cost-baseline.json",
+                "dearest: " + dearest(readCostRecord()).slice(0, 5).join(", "));
+        }
+    }
+
+    const rec = readCostRecord();
+    const have = Object.keys(rec.costs || {}).length;
+    if (!have) {
+        report("no cost record on this machine, which is a normal state and not a failure",
+            "every consumer treats a missing entry as UNKNOWN and schedules exactly as it did before this " +
+            "existed -- null never means free, or the most expensive unmeasured device would be attempted " +
+            "first. Freeze one with SWEK_FREEZE_DEVICE_COST=1 on a complete, unbudgeted run.");
+    } else {
+        report("cost record present", "frozen " + rec.frozenOn + ", " + have + " device/modes. dearest: " +
+            dearest(rec).slice(0, 5).join(", "));
+    }
 }
 
 console.log();

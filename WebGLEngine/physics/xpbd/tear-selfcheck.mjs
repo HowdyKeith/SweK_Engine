@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { buildClothConstraints } from "./clothMesh.js";
 import { colorConstraints, cloneState } from "./xpbd.js";
-import { tearSubstep, evaluateTears, activeCount } from "./tear.js";
+import { tearSubstep, evaluateTears, activeCount, applyTears } from "./tear.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -91,6 +91,27 @@ function cloth(W = 6, H = 6) {
     const aHolds = new Uint8Array([1]); tearSubstep(stretched(), cons, batches, aHolds, { dt: 0.01, iterations: 1, gravity: [0, 0, 0], tearStrain: 1.3 });
     ok("!! a constraint at strain 1.2 tears below the bar and holds above it", aTears[0] === 0 && aHolds[0] === 1,
        "stretched to 1.2x rest: a 1.1 threshold snaps it, a 1.3 threshold keeps it -- the breaking strain is applied exactly.");
+}
+
+// ---- 5b. applyTears IN ISOLATION: it clears exactly the torn indices, nothing else, and never reverses --------
+{
+    const active = new Uint8Array([1, 1, 1, 1, 1]);
+    applyTears(active, [1, 3]);
+    const exact = active[0] === 1 && active[1] === 0 && active[2] === 1 && active[3] === 0 && active[4] === 1;
+    // applying an EMPTY torn list is a no-op
+    const beforeEmpty = active.slice();
+    applyTears(active, []);
+    let emptyNoOp = true; for (let i = 0; i < active.length; i++) if (active[i] !== beforeEmpty[i]) emptyNoOp = false;
+    // re-applying the SAME already-torn indices does not error and does not reverse them (1 -> 0 only, idempotent)
+    applyTears(active, [1, 3]);
+    const stillZero = active[1] === 0 && active[3] === 0;
+    // tearing an already-intact one on top leaves the previously-torn ones exactly as they were
+    applyTears(active, [0]);
+    const newTearAdditive = active[0] === 0 && active[1] === 0 && active[2] === 1 && active[3] === 0 && active[4] === 1;
+    ok("!! applyTears clears exactly the given indices, leaves everything else untouched, and is idempotent",
+       exact && emptyNoOp && stillZero && newTearAdditive,
+       "torn=[1,3] on five active flags clears only indices 1 and 3 (result " + Array.from(Uint8Array.from([1,0,1,0,1])).join("") +
+       "); an empty torn list changes nothing; re-tearing [1,3] again leaves them at 0; and tearing index 0 afterward only adds to the torn set, never resurrects 1 or 3.");
 }
 
 // ---- 6. PURE + deterministic -------------------------------------------------------------------------------

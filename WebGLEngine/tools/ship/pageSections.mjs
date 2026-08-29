@@ -199,7 +199,12 @@ export const SECTIONS = [
       // THIS MACHINE can run a generative model in the browser (WebGPU adapter, storage quota, persistent-storage
       // permission), which is a question about the box rather than about the world -- the same kind rig.html and
       // settings.html answer. Filed by what it MEASURES, not by what it is about.
-      pages: ["webgpu-llm.html",
+      // v4115 -- voxtral.html JOINS, filed by the same rule that put webgpu-llm.html here: it answers "what can
+      // THIS BOX do" rather than showing a phenomenon. It is the opt-in front door to a 2.5 GB third-party
+      // speech model running as WASM + WebGPU in the tab, and like its neighbour it is built so the expensive
+      // facts land BEFORE the decision -- it downloads nothing on load, and says the 14x-slower-than-real-time
+      // cost on screen before any button works.
+      pages: ["webgpu-llm.html", "voxtral.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
@@ -250,7 +255,15 @@ export const SECTIONS = [
       pages: ["blob-studio.html", "blobarium.html", "blobulator.html"] },
 
     { id: "face", tab: "face", label: "Face & Population", note: "landmarks, the mirror, the GPU population field",
-      pages: ["face-mirror.html", "population.html"] },
+      // v4110 -- cat-reactions.html joins the drawer that already holds face-mirror.html. It is the front door
+      // for ui/faceExpressionSet.js (the named-expression classifier), and the mirror is the OTHER consumer of
+      // the same camera and the same blendshapes -- filing it anywhere else would put two readings of one face
+      // behind different chips.
+      // v4111 -- gesture-vfx.html joins the same drawer. It reads the HAND tracker rather than the face one,
+      // but MediaPipeHandTracker.js is explicitly "the hand sibling of MediaPipeFaceTracker" and mirrors its
+      // API exactly -- so this is the landmark-tracking drawer, and filing the hand reading away from the face
+      // readings would split one subject across two chips for no reason a reader would guess.
+      pages: ["face-mirror.html", "population.html", "cat-reactions.html", "gesture-vfx.html"] },
 
     // v3230 -- PetFBI: a real project inside the engine with three pages and no drawer. It is also the example
     // Keith reached for when describing a TAILORED FRONT DOOR -- "a PetFBI person who posts lost pets on
@@ -298,8 +311,18 @@ export const SECTIONS = [
               // reimplements would put the two halves of one claim behind different chips.
               "mpm-gpu.html", "mpm-gpu-check.html"] },
     // v3434 -- "Cross-Arch" merged into Box3D above.
-    { id: "nearshare", tab: "nearshare", label: "NearShare", note: "appended",
-      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html"] },
+    // v4109 -- label renamed to "File Transfer Utils" (id/tab stay "nearshare" -- see server.html's tab button
+    // for why). Keith: "NearShare is an app, that button could rename to File Transfer Utils, and both could
+    // be in there" -- referring to pairlane.html, added to pages[] below in the same round.
+    { id: "nearshare", tab: "nearshare", label: "File Transfer Utils", note: "appended",
+      // v4109 -- pairlane.html JOINS. Keith: "pairlane should also show up under a File Transfer panel. or a
+      // more general panel too, but i dont know which." There is no dedicated File Transfer panel -- this one's
+      // own header text is narrower than its real membership (Quick Share / Nearby Sharing specifically), but
+      // its PAGES are already the LAN-peer/transfer cluster (android-invite, remote-desktop, lan, sync-probe),
+      // which is the closer match than any topic drawer. A dedicated panel is a bigger reorg (regrouping
+      // webtorrent/copyparty/the trusted-peer transfer too) that nobody has asked for yet; this is the minimal,
+      // honest placement today.
+      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 

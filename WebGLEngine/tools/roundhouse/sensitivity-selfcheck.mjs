@@ -188,6 +188,25 @@ const KNOWN_DEAD = {
               "is CORRECT and permanent. It looked like it had a second, live observable until v3973: the same " +
               "return object carried restDensity from latticeRestDensity() called with NO ARGUMENTS, fixed at " +
               "h = 0.25 while kernelIntegral tracked the caller's h. That stowaway is removed.",
+    // v4086 -- fragmentRotationBind's fragmentCensus() feeds both knobs into massProperties(), which scales the
+    // WHOLE per-fragment inertia tensor by one positive factor each (density linearly, cell through volume and
+    // moment-arm together). Every observable this device reports through the census path is a RATIO or a
+    // BOOLEAN derived from one: physics/mechanics/fragmentRotation.mjs's traceResidual divides by |trace(I)|,
+    // spread divides by P[2], and physical/distinct compare the principal moments to EACH OTHER, never to an
+    // absolute scale. A uniform positive rescale of every entry in I changes none of those ratios.
+    "fragmentRotation:cell": "the fracture-grid voxel size. MEASURED at cell scaled 1e6x (density held at 1): " +
+              "total/distinct/degenerate 6/6/0 unchanged, allPhysical still true, worstSpread " +
+              "0.8048780487804877 -> 0.804878048780488 (last-digit float noise), worstTraceResidual moved " +
+              "between two already-machine-epsilon values (3.19e-16 -> 2.76e-16, neither a response). Dead " +
+              "here is CORRECT and permanent: cell scales every moment by the same positive factor and nothing " +
+              "reported compares a moment to an absolute unit.",
+    "fragmentRotation:density": "the fragment material density. MEASURED at density scaled 1e-9x (cell held at " +
+              "1): total/distinct/degenerate 6/6/0 unchanged, allPhysical still true, worstSpread bit-identical " +
+              "at 0.8048780487804877, worstTraceResidual moved between two already-machine-epsilon values " +
+              "(3.19e-16 -> 2.40e-16). Combined with cell scaled 5000x and density scaled 3e-4x simultaneously, " +
+              "still bit-identical on every count and boolean. Dead here is CORRECT and permanent: density " +
+              "multiplies every moment by the same positive factor and nothing reported compares a moment to " +
+              "an absolute unit.",
 };
 {
     const escalated = await escalatedSensitivity(paired.stillDead, getDevice);
@@ -209,12 +228,21 @@ const KNOWN_DEAD = {
         "perturb() asks for a slope; their response is a cliff. FOURTH limitation of the same shape: array " +
         "blindness, one-at-a-time, integer stepping, and now step SIZE");
 
+    // v4086 -- WIDENED FROM "every rung < v" TO "every rung ABOVE v is bounded absolutely", because reconQuality:
+    // thresh proved the old strictly-down contract blind to a real live knob (thresh's cliff sits at 60-100,
+    // above its default of 8, and nothing a down-only ladder tries can ever reach above the default). The safety
+    // property that matters was never "always below v" -- it was "can never turn a 200000-step device into a
+    // 200-million-step one" -- and that survives with an upward rung capped at +2000 absolute.
     ok("...and the escalation cannot run away with the cost",
-        escalations(200000).every((v) => v < 200000) && escalations(1e-8).some((v) => v === 1),
-        "integers go strictly DOWN, so a cap probe always costs LESS than the baseline run and a 200000-step " +
-        "device can never be escalated into a 200-million-step one. Floats span three orders each way, plus " +
-        "O(1) for a sub-unit tolerance -- galaxy:zeroTol turns at the Fiedler value 0.0564, 5.6 MILLION times " +
-        "its 1e-8 default, which no fixed order-of-magnitude ladder reaches");
+        escalations(200000).some((v) => v < 200000) &&
+        escalations(200000).filter((v) => v > 200000).every((v) => v - 200000 <= 2000) &&
+        escalations(1e-8).some((v) => v === 1),
+        `escalations(200000) = [${escalations(200000).join(", ")}]. Integers still go mostly DOWN -- a cap probe ` +
+        "usually costs LESS than the baseline run -- and the one upward rung is bounded ABSOLUTELY at +2000, so " +
+        "a 200000-step device is escalated to at most 202000 steps (1% more), never a 200-million-step one. " +
+        "Floats span three orders each way, plus O(1) for a sub-unit tolerance -- galaxy:zeroTol turns at the " +
+        "Fiedler value 0.0564, 5.6 MILLION times its 1e-8 default, which no fixed order-of-magnitude ladder " +
+        "reaches");
 
     const survivors = escalated.stillDead.map((x) => x.entry).sort();
     const named = Object.keys(KNOWN_DEAD).sort();

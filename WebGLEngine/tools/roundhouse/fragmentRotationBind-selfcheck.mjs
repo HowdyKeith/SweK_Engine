@@ -1,6 +1,6 @@
 // tools/roundhouse/fragmentRotationBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/fragmentRotationBind-selfcheck.mjs   (~4s MEASURED -- two carves and two censuses)
+// Run: node tools/roundhouse/fragmentRotationBind-selfcheck.mjs   (~0.4s MEASURED -- two carves and two censuses)
 //
 // THIS GRADES THE BIND. physics/mechanics/fragmentRotation-selfcheck.mjs owns the physics.
 //

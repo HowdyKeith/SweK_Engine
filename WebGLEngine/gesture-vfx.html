@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Gesture VFX">
+<meta name="demo:desc" content="Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures over the hand tracker's own metrics, edge-triggered with a cooldown, and a particle sim that is pure enough to be gated headless.">
+<meta name="demo:category" content="tools">
+<title>Gesture VFX</title>
+<style>
+  :root { --bg:#06080e; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#9d7bff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:940px; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0b0f18; display:flex; flex-direction:column; gap:8px; }
+  .card h2 { margin:0; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { padding:7px 13px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  button.run { border-color:#3a6a4a; background:#153a25; color:#9fe88f; }
+  button:disabled { opacity:.45; cursor:default; }
+  .good { color:#9fe88f; } .bad { color:#f88; } .warn { color:#eac06a; }
+  #stageWrap { position:relative; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#04060a; aspect-ratio:16/10; }
+  #fx { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #now { position:absolute; left:10px; top:8px; font-size:26px; font-weight:700; letter-spacing:.03em; text-shadow:0 2px 8px #000; }
+  #nowNote { position:absolute; left:10px; top:40px; font-size:11px; color:var(--dim); max-width:60%; text-shadow:0 1px 4px #000; }
+  .gest { display:flex; gap:8px; align-items:baseline; padding:5px 0; border-bottom:1px solid #0d1826; }
+  .gest b { min-width:120px; }
+  .gest .em { font-size:17px; min-width:26px; }
+  .gest.on { color:#9fe88f; }
+  .refused { border:1px solid #5a4520; background:#1e1704; border-radius:6px; padding:8px 10px; font-size:11px; color:#e8c07a; line-height:1.55; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#10024; Gesture VFX</h1>
+  <span class="hint">Make a shape with your hand; the effect fires on the shape's <b>onset</b>, not every frame.</span>
+</header>
+<main>
+
+  <div class="card">
+    <div class="row">
+      <button class="run" id="bStart">Start camera</button>
+      <button id="bStop" disabled>Stop</button>
+      <button id="bDemo">Fire one without a camera</button>
+      <span id="state" class="hint">idle &mdash; no camera has been requested.</span>
+    </div>
+    <div class="hint">MediaPipe runs <b>in this page</b>; the video never leaves the browser and nothing is
+      uploaded. The <i>Fire one</i> button exists so the effects can be seen without granting a camera at all.</div>
+  </div>
+
+  <div class="card">
+    <div id="stageWrap">
+      <canvas id="fx"></canvas>
+      <div id="now">&mdash;</div>
+      <div id="nowNote">Press <b>Start camera</b>, or fire one by hand.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>The gestures</h2>
+    <div id="list"></div>
+    <div class="hint">A gesture held down is <b>one</b> gesture &mdash; the burst fires on the onset. A separate
+      cooldown stops a shape that flickers at its detection threshold from re-firing on every wobble; the two
+      guards catch two different failures.</div>
+  </div>
+
+  <div class="card">
+    <h2>What this will not claim</h2>
+    <div id="refused"></div>
+  </div>
+
+</main>
+<script type="module">
+// v4111 -- the front door for ui/gestureVfx.js. THE JUDGEMENT AND THE SIMULATION ARE NOT HERE: this page owns
+// only the canvas and the colours. classifyGesture / makeGestureTrigger / spawnBurst / stepParticles all live
+// in the module, where they are pure and gated; a page that re-derived "is this a fist" or re-integrated the
+// particles would be the second copy, and the copy is the one that drifts.
+import { GESTURES, REFUSED, NONE, makeGestureTrigger, spawnBurst, stepParticles, particleAlpha } from "/ui/gestureVfx.js";
+import { MediaPipeHandTracker } from "/face/MediaPipeHandTracker.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const COLOR = { spark: "#ffd479", impact: "#ff7b6b", beam: "#7be0ff", shield: "#9d7bff", prayer: "#8effc4", rift: "#ff9de0" };
+
+// ---- the gesture list + the refusals, both built from the module's own data --------------------------------
+const rows = new Map();
+$("list").innerHTML = GESTURES.map((g) =>
+    '<div class="gest" data-g="' + g.name + '"><span class="em">' + g.emoji + '</span><b>' + esc(g.label) +
+    '</b><span class="hint">' + esc(g.note) + "</span></div>").join("");
+for (const g of GESTURES) rows.set(g.name, $("list").querySelector('[data-g="' + g.name + '"]'));
+
+$("refused").innerHTML = REFUSED.map((r) =>
+    '<div class="refused"><b>' + esc(r.name) + "</b> &mdash; " + esc(r.why) +
+    '<div style="margin-top:5px;color:#b9a06a;">Would need: ' + esc(r.wouldNeed) + "</div></div>"
+).join("") || '<div class="hint">nothing is refused</div>';
+
+// ---- canvas ------------------------------------------------------------------------------------------------
+const cv = $("fx"), ctx = cv.getContext("2d");
+function fit() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+}
+new ResizeObserver(fit).observe(cv); fit();
+
+let particles = [];
+let lastT = performance.now();
+
+function draw(t) {
+    const dt = (t - lastT) / 1000; lastT = t;
+    // The step is the MODULE'S, including its dt clamp -- this page does not integrate anything itself.
+    particles = stepParticles(particles, dt);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of particles) {
+        const a = particleAlpha(p);
+        if (a <= 0) continue;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = COLOR[p.kind] || "#fff";
+        const px = p.x * cv.width, py = p.y * cv.height;
+        const r = p.size * (cv.width / 900) * 3;
+        ctx.beginPath(); ctx.arc(px, py, Math.max(0.6, r), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// A burst is capped so a long session cannot grow the array without bound -- the module guarantees every
+// particle dies, and this guarantees a burst storm cannot outrun that in the meantime.
+const MAX = 900;
+function fire(kind, x, y, angle) {
+    const b = spawnBurst(kind, x, y, angle != null ? { angle } : {});
+    particles = particles.concat(b);
+    if (particles.length > MAX) particles = particles.slice(particles.length - MAX);
+}
+
+function showNow(name, note) {
+    const g = GESTURES.find((x) => x.name === name);
+    $("now").textContent = g ? g.emoji + " " + g.label : (name === NONE ? "—" : name);
+    $("nowNote").textContent = note || (g ? g.note : "");
+    for (const [n, el] of rows) el.classList.toggle("on", n === name);
+}
+
+// ---- demo button: prove the effects without granting a camera ---------------------------------------------
+let demoIdx = 0;
+$("bDemo").onclick = () => {
+    const g = GESTURES[demoIdx % GESTURES.length]; demoIdx++;
+    fire(g.kind, 0.5, 0.55, g.kind === "beam" ? -Math.PI / 4 : undefined);
+    showNow(g.name, "fired by hand -- no camera involved");
+};
+
+// ---- the live loop -----------------------------------------------------------------------------------------
+let tracker = null, timer = null;
+const trigger = makeGestureTrigger({ cooldownMs: 450 });
+
+$("bStart").onclick = async () => {
+    $("bStart").disabled = true;
+    $("state").innerHTML = "requesting the camera and loading the hand model&hellip;";
+    try {
+        tracker = new MediaPipeHandTracker({});
+        await tracker.start();
+    } catch (e) {
+        $("state").innerHTML = '<span class="bad">camera unavailable: ' + esc((e && e.message) || e) + "</span>";
+        $("bStart").disabled = false; tracker = null; return;
+    }
+    $("state").innerHTML = '<span class="good">running</span> &mdash; local only.';
+    $("bStop").disabled = false;
+    timer = setInterval(() => {
+        let m = null;
+        try { m = tracker && tracker.metrics ? tracker.metrics() : null; } catch {}
+        const r = trigger.update(m);
+        if (!r.usable) { showNow(NONE, "no hand in frame -- deliberately not shown as a gesture"); return; }
+        showNow(r.name);
+        if (r.fired && r.kind) {
+            // Fire AT the hand: the cursor is the index tip, already mirrored by the tracker.
+            const c = (m && m.cursor) || { x: 0.5, y: 0.5 };
+            fire(r.kind, c.x, c.y, r.kind === "beam" ? -Math.PI / 4 : undefined);
+        }
+    }, 33);
+};
+
+$("bStop").onclick = () => {
+    if (timer) { clearInterval(timer); timer = null; }
+    try { tracker && tracker.stop && tracker.stop(); } catch {}
+    tracker = null; trigger.reset();
+    $("bStart").disabled = false; $("bStop").disabled = true;
+    $("state").textContent = "stopped -- the camera is released.";
+    showNow(NONE, "stopped; the last gesture is deliberately not left on screen");
+};
+
+window.addEventListener("pagehide", () => { try { if (timer) clearInterval(timer); tracker && tracker.stop && tracker.stop(); } catch {} });
+</script>
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

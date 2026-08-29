@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { makeGyro, gyroStep, cosTilt, spinMag } from "./gyroscope.js";
+import { makeGyro, gyroStep, cosTilt, spinMag, axisOf } from "./gyroscope.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -57,6 +57,35 @@ function sweep(omega, steps) {
     const slow = sweep(30, 15).sinPhi, fast = sweep(60, 15).sinPhi, ratio = slow / fast;
     ok("!! a faster spin precesses slower -- the rate goes as one over the spin", Math.abs(ratio - 2) < 0.05,
        "doubling the spin from 30 to 60 halves the precession: the swept angle drops by " + ratio.toFixed(2) + "x -- the gyroscope's counterintuitive signature, rate = mgl/|L|.");
+}
+
+// ---- 4b. axisOf IS L/|L| EXACTLY, ON A CONSTRUCTED 3-4-5 ANGULAR-MOMENTUM VECTOR --------------------------
+{
+    // L = (3, 4, 0) is a 3-4-5 triangle: |L| = 5, and the unit axis is (0.6, 0.8, 0) -- both components
+    // exactly representable in binary, so this is bit equality, not a tolerance.
+    const a1 = axisOf({ L: [3, 4, 0] });
+    ok("!! axisOf(L) is L/|L| exactly, for a constructed 3-4-5 angular-momentum vector", a1[0] === 0.6 && a1[1] === 0.8 && a1[2] === 0,
+       "L = (3,4,0) has |L| = 5, so the spin axis is exactly (0.6, 0.8, 0) -- 3/5 and 4/5 are each correctly " +
+       "rounded to the same double as the 0.6 and 0.8 literals, so this is bit equality, not an approximation.");
+
+    // A second exact case with all three components live: L = (2, 3, 6), |L| = sqrt(4+9+36) = 7.
+    const a2 = axisOf({ L: [2, 3, 6] });
+    ok("!! and on a fully 3D vector, L = (2,3,6) with |L| = 7 exactly", a2[0] === 2 / 7 && a2[1] === 3 / 7 && a2[2] === 6 / 7,
+       "2^2+3^2+6^2 = 49 = 7^2 exactly, so |L| is an exact integer and each axis component is bit-identical to " +
+       "the corresponding division computed independently here.");
+
+    // Tie it to the quantity the rest of this gate already trusts: cosTilt(state) is defined as L[1]/|L|,
+    // which is exactly the y-component of axisOf(state) -- the tilt IS the vertical component of the unit axis.
+    const g = makeGyro({ omega: 40, I: 1 }); for (let s = 0; s < 100; s++) gyroStep(g, { tipTorque: 12, dt: 1 / 60 });
+    ok("!! axisOf(state)[1] IS cosTilt(state) -- the tilt cosine is the vertical component of the unit spin axis",
+        axisOf(g)[1] === cosTilt(g),
+        "cosTilt is defined as L[1]/|L|; axisOf is L/|L|; its y-component is the same division by construction. " +
+        "After 100 steps of real precession this still holds exactly, tying the untested axis directly to the " +
+        "tilt quantity checks 2 and 4 above already grade.");
+
+    // And it is always a unit vector, for an L that has actually precessed (not just at t=0).
+    const m = Math.sqrt(axisOf(g)[0] ** 2 + axisOf(g)[1] ** 2 + axisOf(g)[2] ** 2);
+    ok("!! axisOf always returns a unit vector", Math.abs(m - 1) < 1e-14, "|axisOf(state)| = " + m.toFixed(15) + " after 100 steps of precession.");
 }
 
 // ---- 5. DETERMINISTIC + PURE (no trig) -------------------------------------------------------------------

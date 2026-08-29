@@ -291,12 +291,93 @@ console.log("sharpBridge-selfcheck -- where a research-licensed splat is allowed
         "silently and is discovered as a 404 during a deploy");
 }
 
+// ---- 5d. THE INSTALL BUTTON, DRIVEN FOR REAL WITHOUT TOUCHING THE NETWORK ------------------------------------
+//
+// v4104 -- *** A REAL git clone AGAINST github.com/apple/ml-sharp IS THE SAME "CANNOT BE OBSERVED HERE" LINE
+// THIS FILE ALREADY DRAWS FOR predict()'s LOCAL PATH, FOR THE SAME REASON. *** So the clone step itself joins
+// predict() in "one real run on Galaxina is what turns it into a fact" -- but the CHAINING (clone exit 0 walks
+// into pip without a second click), the ALREADY-RUNNING refusal, and the RESUME-FROM-AN-EXISTING-CHECKOUT path
+// need no network at all, and are driven for real: a scratch dir with an EMPTY requirements.txt makes real pip
+// exit near-instantly with nothing to install, so this is pip actually running rather than pip mocked.
+{
+    console.log("\n5d. *** THE INSTALL BUTTON: RESUME, CHAIN, AND REFUSE, ALL DRIVEN FOR REAL ***");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "sharpinstall-"));
+    const srcDir = path.join(scratch, "ml-sharp");
+    fs.mkdirSync(path.join(srcDir, ".git"), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, "requirements.txt"), "");   // nothing to install -> pip exits fast, no network
+
+    const load = () => {
+        process.env.SHARP_SRC_DIR = srcDir;
+        const p = path.join(ENG, "ai-bridge", "sharpBridge.js");
+        delete require_.cache[require_.resolve(p)];
+        return require_(p);
+    };
+
+    let M = load();
+    ok("!! SRC_DIR is exported and honours the override, so this section proves the SHIPPED code path",
+        M.SRC_DIR === srcDir, M.SRC_DIR);
+    ok("!! before any install, installStatus() is null rather than a fabricated idle object",
+        (await M.status()).installJob === null);
+
+    const r1 = M.install();
+    ok("!! a checkout that ALREADY EXISTS skips straight to pip -- no re-clone of a tree that is already there",
+        r1.ok === true && r1.kind === "pip", JSON.stringify(r1));
+
+    const r2 = M.install();
+    ok("!! ...and a SECOND call while the first is still running is REFUSED, not queued or restarted",
+        r2.ok === false && /already running/i.test(r2.error || ""), r2.error);
+
+    const deadline = Date.now() + 15000;
+    let job = null;
+    while (Date.now() < deadline) {
+        job = M.installStatus();
+        if (job && job.done) break;
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    ok("!! the job actually finishes (real pip, real exit) within a generous wall-clock budget",
+        !!job && job.done === true, job ? ("code " + job.code) : "(timed out waiting)");
+    ok("!! ...and a job that installed nothing still reports a clean exit, not a fabricated success",
+        job && job.code === 0, "pip -r on an empty requirements.txt has nothing to fail on");
+    // uptimeMs is computed fresh on every call (Date.now() - startedAt), so it legitimately differs by a few ms
+    // between the two calls below -- compared on everything ELSE, which is the part that would drift if
+    // status() ever grew its own second copy of the job's kind/done/code/tail.
+    {
+        const a = (await M.status()).installJob, b = M.installStatus();
+        const strip = (x) => ({ kind: x.kind, done: x.done, code: x.code, tail: x.tail });
+        ok("...and status().installJob mirrors installStatus() rather than being a second declaration of the same state",
+            JSON.stringify(strip(a)) === JSON.stringify(strip(b)));
+    }
+
+    // A THIRD call, now that the job is done, must be ALLOWED (this is "resume", not "once ever").
+    const r3 = M.install();
+    ok("!! once a job finishes, Install can be pressed again -- a broken step must be retryable",
+        r3.ok === true, JSON.stringify(r3));
+    // give the second run's fast pip a moment to finish before the fixture is torn down under it
+    await new Promise((r) => setTimeout(r, 800));
+
+    delete process.env.SHARP_SRC_DIR;
+    delete require_.cache[require_.resolve(path.join(ENG, "ai-bridge", "sharpBridge.js"))];
+    fs.rmSync(scratch, { recursive: true, force: true });
+
+    // The clone step itself (no .git yet) is the part that would touch the real network -- proven from source,
+    // same technique section 4 already uses for the -m spelling: the exact repo URL and the chained exit
+    // handler that walks a successful clone into the pip step are both really there.
+    const src = fs.readFileSync(path.join(ENG, "ai-bridge", "sharpBridge.js"), "utf8");
+    ok("!! a missing checkout clones the REAL upstream repo, not a placeholder URL",
+        /"clone"/.test(src) && /"https:\/\/github\.com\/apple\/ml-sharp"/.test(src));
+    ok("!! ...and a successful clone (exit 0) walks straight into pip, rather than requiring a second click",
+        /if \(code === 0\) _runPip\(cand\)/.test(src));
+    ok("SRC_DIR resolves outside the project the same way CFG and the weights cache already do",
+        M.wouldBePackaged(srcDir) === false);
+}
+
 // ---- 6. IT IS REACHABLE ------------------------------------------------------------------------------------
 {
     console.log("\n6. THERE IS A DOOR");
     const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
-    ok("!! all three routes are dispatched",
-        /"\/sharp\/status"/.test(server) && /"\/sharp\/predict"/.test(server) && /"\/sharp\/config"/.test(server) && /sharpBridge\.js/.test(server),
+    ok("!! all four routes are dispatched",
+        /"\/sharp\/status"/.test(server) && /"\/sharp\/predict"/.test(server) && /"\/sharp\/config"/.test(server) &&
+        /"\/sharp\/install"/.test(server) && /sharpBridge\.js/.test(server),
         "a bridge with no route is the module-with-no-caller shape this tree names everywhere");
     ok("...and it is required LAZILY, so a tree without the file still boots",
         /require\("\.\/sharpBridge\.js"\)/.test(server) && !/^const sharpBridge/m.test(server),

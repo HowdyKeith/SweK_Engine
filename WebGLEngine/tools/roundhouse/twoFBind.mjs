@@ -56,10 +56,40 @@ export const TWOF_OBSERVABLES = [
 //     settle  300 / record  900  ->   6.0 s, drift 1.649e-2   -- eleven times worse
 //     settle  600 / record 1800  ->  21.4 s, drift 7.125e-3   -- five times worse
 //     settle 6000 / record 18000 -> ~115 s, drift 1.452e-3    -- the recorded result
+//
+// v4073 -- RE-MEASURED ON THE APPLYING MACHINE, because a recorded number that nobody re-runs is a number
+// nobody can check. *** THE LOAD-BEARING ROW REPRODUCES EXACTLY: the default gives 1.451886e-3 here against
+// the 1.452e-3 above, so "the Zou-He inlet HOLDS at 1.45e-3" is confirmed rather than inherited. *** The two
+// SHORT rows do not:
+//
+//     settle  300 / record  900  ->   4.7 s, drift 1.2421e-2  (table says 1.649e-2)
+//     settle  600 / record 1800  ->  15.7 s, drift 5.5710e-3  (table says 7.125e-3)
+//     settle 6000 / record 18000 ->  84.5 s, drift 1.451886e-3  -- AGREES
+//
+// The wall times are expected to differ and v4038a says so: the hint is machine-local. THE DRIFTS ARE NOT
+// SUPPOSED TO. This device is deterministic here -- the same config run twice gives 1.242150e-2 both times,
+// bit for bit -- so the short rows were measured against some other code state, not sampled from noise.
+// NOT SILENTLY OVERWRITTEN: both sets are kept, because deleting the originals would destroy the evidence
+// that they ever disagreed, and one of them may be right about a tree this one has not got.
+//
+// WHAT IS UNAFFECTED: the CONCLUSION the table exists to support. Shortening the run makes the drift much
+// worse on both sets of numbers -- 1.24e-2 and 5.57e-3 here against 1.45e-3 -- so "shortened, it reports the
+// inlet FAILING" holds, and the argument against a cheaper default stands on this machine's numbers too.
 // A shortened run does not report a cheaper version of this answer, IT REPORTS THE INLET FAILING. v2797
 // guessed "longer runs" would fix the shedding and v2834 disproved it with arithmetic; guessing "shorter
 // runs" here would be the same error pointing the other way, and it would read as the boundary condition
 // this module exists to defend having been broken.
+// v4080 -- AND THIS DEVICE IS THE COUNTEREXAMPLE THAT SETTLED WHETHER rawCalls COULD STAND IN FOR THE ms ABOVE.
+// corroborationCensus.mjs already counts every unspecified libm call this device (and every other) makes,
+// which makes "derive a cost hint from rawCalls instead of asking every device to declare one" look free --
+// the census counts it already, and this file's own inlet build makes well over a hundred million of them at
+// 24,000 lattice steps. MEASURED instead of assumed (see costRecord.mjs's header for the full comparison):
+// kuramoto.curve makes MORE libm calls than this device's inlet build and finishes in a small fraction of the
+// wall time, because kuramoto's inner loop is close to nothing BUT trig while this one spends most of its time
+// on the LBM lattice update between calls, which the counter cannot see. A rawCalls-derived hint would have
+// ranked kuramoto as the pricier of the two and been backwards. costRecord.mjs measures wall time directly
+// instead, and corroborationCensus.mjs's decline logic (v4037, extended this round) now falls back to that
+// measured record for every device -- this one included -- that declares no costHint of its own.
 const DEF = { runIndex: 0, settle: 6000, record: 18000 };
 const FEEDBACK_DRIFT = 0.12;   // the 12-21% every body-force-driven attempt showed before v2835
 

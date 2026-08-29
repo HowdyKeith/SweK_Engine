@@ -9,7 +9,7 @@
 "use strict";
 import {
     gammaOf, fromMassBeta, massless, massSq, invariantS, invariantSPair,
-    boostX, addBeta, thresholdHeadOn, sHeadOnPhoton, naiveEcm,
+    boostX, addBeta, thresholdHeadOn, sHeadOnPhoton, naiveEcm, add,
 } from "./invariants.mjs";
 
 let fails = 0;
@@ -102,6 +102,33 @@ const MP = 0.938272, MPI = 0.134977, EG = 6.35e-13;
     ok("!! adding lab energies is wrong by EXACTLY the boost's gamma, and exactly right at rest",
        worst < 1e-12 && naiveEcm(at) / Math.sqrt(invariantS(at)) === 1,
        `worst departure from gamma ${worst.toExponential(2)}; the ratio is 1.000000000000000 in the CM frame. A PREDICTED FACTOR, NOT A VAGUE ERROR.`);
+}
+
+// ---- 9. add(): THE FOUR-VECTOR ACCUMULATOR, AGAINST HAND-SUMMED COMPONENTS --------------------------------
+{
+    // Three arbitrary four-momenta, summed by hand component-by-component.
+    const p1 = { E: 5, px: 1, py: -2, pz: 3 };
+    const p2 = { E: 7.5, px: -0.5, py: 4, pz: -1 };
+    const p3 = { E: 2, px: 3, py: 3, pz: 3 };
+    const sum = add(p1, p2, p3);
+    const handE = 5 + 7.5 + 2, handPx = 1 - 0.5 + 3, handPy = -2 + 4 + 3, handPz = 3 - 1 + 3;
+    ok("!! add() of three four-momenta matches component-by-component hand summation exactly",
+       sum.E === handE && sum.px === handPx && sum.py === handPy && sum.pz === handPz,
+       `add gave {E:${sum.E}, px:${sum.px}, py:${sum.py}, pz:${sum.pz}}, hand sum {E:${handE}, px:${handPx}, py:${handPy}, pz:${handPz}}`);
+    ok("!! add() with zero arguments is the additive identity (all-zero four-vector)",
+       (() => { const z = add(); return z.E === 0 && z.px === 0 && z.py === 0 && z.pz === 0; })(),
+       "reduce()'s seed is {E:0,px:0,py:0,pz:0}; calling add with no particles must return exactly that, not undefined or NaN");
+    ok("!! add() of a single particle returns that particle's own components unchanged",
+       (() => { const s = add(p2); return s.E === p2.E && s.px === p2.px && s.py === p2.py && s.pz === p2.pz; })(),
+       "the identity-seeded reduce over one element must be a no-op on that element's components");
+    ok("!! add() is exactly what invariantS's own sum uses internally -- same components, cross-checked two ways",
+       (() => {
+           const viaAdd = add(p1, p2, p3);
+           const byHandMassSq = handE * handE - (handPx * handPx + handPy * handPy + handPz * handPz);
+           return massSq(viaAdd) === byHandMassSq && invariantS([p1, p2, p3]) === byHandMassSq;
+       })(),
+       "massSq(add(p1,p2,p3)) and invariantS([p1,p2,p3]) (which calls add internally) both equal E^2-|p|^2 of the " +
+       "hand-summed four-vector -- add() is not merely present, its OUTPUT is what feeds the physics above it");
 }
 
 console.log(fails ? "\ninvariants-selfcheck: " + fails + " FAILED" : "\ninvariants-selfcheck: all checks pass");

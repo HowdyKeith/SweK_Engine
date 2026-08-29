@@ -66,12 +66,27 @@
 // genuinely in the general population, so the alternative is a gate that gets killed for being what it is.
 // The tail table below is still where a gate belongs once it outgrows this, and v3913's rule stands --
 // TWO POPULATIONS, TWO BUDGETS, rather than widening the budget for the 1100 gates that never needed it.
-export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 60634 };
+// *** v4075 -- RE-PINNED A THIRD TIME, AND THE GATE IT NAMES HAS NOW BEEN THE SLOWEST THREE ROUNDS RUNNING.
+// *** 46.6s (v3913) -> 60.6s (v4000) -> 103.1s here, all the same gate: physics/nuclear/reactorControl.
+// The value is READ OUT OF gate-timings.json rather than typed, exactly as v4000 and v3913 were, and the
+// check's own instruction is followed to the letter -- "WHEN IT GOES RED THE ANSWER IS TO RAISE
+// SLOWEST_GENERAL FROM THE NEW MEASUREMENT, NOT TO LOWER THIS LINE."
+//
+// The default moves 181.9s -> 309.4s. THAT IS A REAL COST AND IT IS STILL THE SMALLER ONE: reactorControl
+// is genuinely in the general population -- point-reactor kinetics with six delayed-neutron precursor
+// groups, bisected inhour roots checked against RK4 integration of the same seven ODEs -- so the
+// alternative is a gate killed for being what it is.
+//
+// WHAT IS NOT DONE HERE: moving it to the tail table. v3913's rule is TWO POPULATIONS, TWO BUDGETS, and
+// the tail is for gates whose cost is a FIXTURE (the Kelvin-Helmholtz cluster, 527-690s). A 103s gate in
+// a table whose smallest entry is 49.9s would be the tail absorbing the general population instead of
+// standing apart from it -- and then nothing would be left measuring what an ordinary gate costs.
+export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 103141 };
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
 
-/** 3 x 60.6s. NOT typed: computed, so the two halves cannot drift apart. */
+/** 3 x 103.1s. NOT typed: computed, so the two halves cannot drift apart. */
 export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
 
 /**
@@ -134,7 +149,14 @@ export const MEASURED = {
     "tools/roundhouse/detectionMap-selfcheck.mjs":         90448,
     "tools/roundhouse/compose-selfcheck.mjs":              88058,
     "simulation/lbm/settleCurve-selfcheck.mjs":            82639,
-    "tools/roundhouse/hydrostatic-selfcheck.mjs":          76003,
+    // v4075 -- RE-MEASURED after a timeout on Keith's rig: 91924ms here against the 76003ms recorded in the
+    // v3211 session. The table's own rule is that "a number with its measurement attached CAN BE
+    // CONTRADICTED BY A RE-MEASURE", and this is that contradiction -- the entry understated the gate by
+    // 21%, so every budget derived from it was 21% short before any host factor was applied.
+    // NOT raised beyond the measurement: assumptionMap was re-measured in the same round and came in
+    // BELOW its entry (230.5s against 284s), and was left alone for exactly that reason. A table that is
+    // only ever revised upward is a table that drifts toward never failing.
+    "tools/roundhouse/hydrostatic-selfcheck.mjs":          91924,
     "tools/ship/doorKinds-selfcheck.mjs":                  73762,
     "physics/astroparticle/jeans-selfcheck.mjs":           67863,
     "tools/render-qa/terminatorOracle-selfcheck.mjs":      63310,
@@ -248,7 +270,18 @@ export const MEASURED = {
     // AND THE MEASUREMENT IS OF THE FIXED GATE, WHICH IS THE SMALLER NUMBER: v3853 also stopped section
     // 1 running every tool twice (562s with one run still red, 555s green), so this is not a budget
     // raised to fit a gate that was never trimmed.
-    "tools/ship/toolFrontDoor-selfcheck.mjs":        555000,
+    //
+    // *** v4098 -- RE-PINNED: 555s -> 1302s, AND THE CAUSE IS THE SAME SHAPE AGAIN, ONE TOOL DEEP. ***
+    // tools/roundhouse/knobLiveness.mjs sweeps the whole device registry with a 20s-per-device budget by
+    // default, and the registry has grown to 129 devices. MEASURED TO COMPLETION, stopwatch, alone: 744s
+    // (12m24s), exit 0, real output the whole way -- so it is not broken, it is registry-scaled, the same
+    // finding gateBudget.mjs already carries for corroborationCensus/plantedCoverage/responseCensus/
+    // libmSensitivity, just discovered on a TOOL this gate SPAWNS rather than on a `-selfcheck.mjs` gate
+    // in this table. Given a matching per-tool cap override (toolFrontDoor-selfcheck.mjs's own
+    // TOOL_CAP_OVERRIDE, 1500000ms -- roughly 2x the 744s measurement, this table's own MEASURED
+    // convention), the WHOLE GATE now measures 1302s (21m42s) stopwatch, exit 0, all pass -- up from 555s
+    // because it previously never waited long enough for knobLiveness to answer at all.
+    "tools/ship/toolFrontDoor-selfcheck.mjs":        1302000,
 
     // ================================================================================================================
     // *** v3939 -- THE ROUNDHOUSE CENSUS CLUSTER, AND IT IS ONE DEVICE RATHER THAN FIVE GATES. ***
@@ -314,6 +347,35 @@ export const MEASURED = {
     // narrows claimTrace's own scope (fewer devices per run) or twof's own build cost drops -- this number is a
     // measurement of today's lab, not a promise about tomorrow's.
     "tools/roundhouse/claimTrace-selfcheck.mjs":     555728,
+
+    // *** v4090 -- stability MOVES OUT OF UNRESOLVED, WHERE IT HAD SAT SINCE v3924 AS "exceeded a 150s cap;
+    // never timed before that". *** It was never a hung gate and never a broken one: measured to completion
+    // TWICE, all checks passing both times, and the only reason it read as a timeout is that the ~139.9s general
+    // default kills it about 40% of the way in. That is precisely the population this table exists for, and the
+    // v3924 note beside it named the correct traffic in advance ("packingTransfer was, and moved out of this
+    // list to MEASURED at 195s on the same round, which is what that traffic should look like").
+    //
+    // TWO RUNS, AND THE DIFFERENCE BETWEEN THEM IS RECORDED RATHER THAN AVERAGED AWAY: 235489ms run ALONE on an
+    // otherwise idle box, and 260224ms on a run that OVERLAPPED another gate. The higher figure is the one
+    // written here, matching this file's own convention two entries up (claimTrace: "The higher of the two is
+    // recorded here", and valueMatch records the worst of three) -- for a BUDGET the observed worst is the
+    // conservative choice, and a budget set from the fastest clean run is one that kills the gate the first time
+    // the box is busy. *** THE CONTENTION IS NAMED BECAUSE THIS TREE HAS PAID FOR NOT NAMING IT: v4039 recorded
+    // a kuramoto build reading 1064s inside a contended sweep against 19.4s in isolation, a 55x error that came
+    // from nothing but a second measurement racing the first. *** 260224 is therefore a real upper reading and
+    // not a clean-room runtime; the clean-room figure is 235489 and both are here so the next reader can tell
+    // which question they are answering.
+    //
+    // *** v4099 -- RE-PINNED: 260224 -> 405628, GROWTH FROM A SECTION THAT DID NOT EXIST WHEN 260224 WAS
+    // MEASURED. *** Keith's rig reported this gate TIMING OUT at a 182s budget; reproduced here, but not as a
+    // hang -- REPRODUCED AS GENUINE GROWTH. A first attempt killed it at a hard 400s wall mid-section-7b with
+    // every check up to that point PASSING, so re-run to completion at a 1200s budget: 405628ms, exit 0, all
+    // checks pass. Section 7b (its own header: "ADDED BY A SECOND SURFACE THAT BUILT THIS SAME ROUND IN THE
+    // SAME SANDBOX") adds a THIRD refinement axis on top of the ones this entry's 260224ms already accounted
+    // for -- viscosityThreshold bisected at T=4 as well as T=1, a 4x-longer-horizon simulation the earlier
+    // measurement never ran. Not broken, not hung: the gate grew a real section and the number describing it
+    // had not been asked since.
+    "physics/sph/stability-selfcheck.mjs":           405628,
 };
 
 export const TAIL_HEADROOM = 2;
@@ -342,12 +404,17 @@ export const UNRESOLVED = {
     // fit". IT IS NOT A RUNTIME. A LOWER BOUND IS NOT A MEASUREMENT -- the rule this table was created for --
     // so none of these gets a number in MEASURED until it has been watched to the end. packingTransfer was, and
     // moved out of this list to MEASURED at 195s on the same round, which is what that traffic should look like.
-    "physics/sph/stability-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion, so no budget is claimed",
+    // v4090 -- stability's line WAS HERE and is DELETED rather than edited, exactly as the paragraph above this
+    // table instructs. It is measured to completion in MEASURED now (260224ms, all checks passing, two runs).
     "tools/roundhouse/corroborationCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. A census over the device registry, so it grows with the lab -- the same shape as labResults, whose entry records that it will outrun any number written down",
     "tools/roundhouse/libmSensitivity-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
+        "exceeded a 150s cap at v3924; never timed before that. RE-ATTEMPTED with a 2400s (40 minute) budget " +
+        "on a device registry that has since grown to 129 devices (up from whatever count v3924 measured " +
+        "against) and STILL DID NOT COMPLETE -- 2400s is now a measured LOWER BOUND, not a runtime. Its own " +
+        "cost model explains why: three builds per device/mode (base, a determinism control, and the " +
+        "perturbed rebuild), which is the same registry-scaling shape as corroborationCensus, plantedCoverage " +
+        "and responseCensus below. Still not measured to completion",
     "tools/roundhouse/plantedCoverage-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It builds two arms of every declared plant across the whole registry, so its cost tracks the plant census rather than any fixture of its own",
     "tools/roundhouse/responseCensus-selfcheck.mjs":

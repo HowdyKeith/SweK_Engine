@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { keplerPair, orbitStep, totalEnergy, angularMomentum, separation } from "./orbit.js";
+import { keplerPair, orbitStep, totalEnergy, angularMomentum, separation, makeSystem } from "./orbit.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -62,6 +62,43 @@ function measurePeriod(a, e) {
     const ka = Ta * Ta / (1.0 * 1.0 * 1.0), kb = Tb * Tb / (1.6 * 1.6 * 1.6);
     ok("!! two orbits of different size obey T-squared over a-cubed equal (Kepler's third law)", Math.abs(ka - kb) / ka < 0.02,
        "the small orbit gives T^2/a^3 = " + ka.toFixed(2) + " and the large one " + kb.toFixed(2) + ", equal to 4*pi^2/mu -- the period grows as the three-halves power of the size.");
+}
+
+// ---- 4b. makeSystem COMPUTES NEWTON'S LAW EXACTLY AT SETUP, AND COPIES ITS INPUT --------------------------
+{
+    // Two unit masses one unit apart on the x-axis, G=1: the mutual acceleration is exactly Newton's law,
+    // magnitude G*m/r^2 = 1, body 0 pulled toward body 1 (+x) and body 1 pulled toward body 0 (-x).
+    const bodies = [{ m: 1, r: [0, 0, 0], v: [0, 0, 0] }, { m: 1, r: [1, 0, 0], v: [0, 0, 0] }];
+    const st = makeSystem(bodies, { G: 1 });
+    ok("!! makeSystem's initial acceleration IS Newton's law, exactly, for a unit two-body setup",
+        st.acc[0][0] === 1 && st.acc[0][1] === 0 && st.acc[0][2] === 0 &&
+        st.acc[1][0] === -1 && st.acc[1][1] === 0 && st.acc[1][2] === 0,
+        "two unit masses one unit apart, G=1: body 0's acceleration is exactly [1,0,0] (pulled toward body 1) and " +
+        "body 1's is exactly [-1,0,0] -- G*m/r^2 = 1/1 = 1 with no rounding to speak of, since every input is a " +
+        "power of ten that is exact in binary. This is the acceleration every orbitStep call starts from.");
+
+    // A 3-4-5 triangle: body 1 sitting at (3,4,0) from body 0, unit masses, G=1 -- |r|=5, accel magnitude 1/25,
+    // split along the exact unit vector (3/5, 4/5) the way blackHole.js's accel splits along r-hat.
+    const st2 = makeSystem([{ m: 1, r: [0, 0, 0], v: [1, 2, 3] }, { m: 1, r: [3, 4, 0], v: [-1, 0, 0] }], { G: 1 });
+    const mag = 1 / 25;
+    ok("!! and it holds on a 3-4-5 triangle, split along the exact unit vector toward the other mass",
+        Math.abs(st2.acc[0][0] - mag * 3 / 5) < 1e-15 && Math.abs(st2.acc[0][1] - mag * 4 / 5) < 1e-15 && st2.acc[0][2] === 0,
+        "body 0's acceleration toward (3,4,0) at distance 5 is (1/25)*(3/5, 4/5) -- the same r-hat decomposition " +
+        "blackHole.js's accel() uses, computed here from a genuinely 3D pairwise sum rather than a 2D special case.");
+
+    ok("!! makeSystem copies its input bodies -- the caller's arrays are never aliased into the sim state",
+        (() => {
+            const src = [{ m: 1, r: [0, 0, 0], v: [0, 1, 0] }, { m: 1, r: [2, 0, 0], v: [0, -1, 0] }];
+            const rBefore = [...src[0].r], vBefore = [...src[0].v];
+            const state = makeSystem(src, { G: 1 });
+            for (let s = 0; s < 50; s++) orbitStep(state, 0.01);
+            return state.bodies[0].r[0] !== rBefore[0] &&                 // the SIM state moved
+                src[0].r[0] === rBefore[0] && src[0].r[1] === rBefore[1] && src[0].r[2] === rBefore[2] &&
+                src[0].v[0] === vBefore[0] && src[0].v[1] === vBefore[1] && src[0].v[2] === vBefore[2];         // the CALLER's copy did not
+        })(),
+        "50 integration steps move the returned state's body 0 while the caller's original bodies array is " +
+        "untouched -- makeSystem deep-copies r and v rather than sharing references, so two systems built from " +
+        "the same template body do not secretly move in lockstep.");
 }
 
 // ---- 5. DETERMINISTIC + PURE (only +,-,*,/,sqrt) ---------------------------------------------------------

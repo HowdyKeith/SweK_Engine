@@ -32,6 +32,15 @@ doc_env/
 **/trader.json
 **/petfbi.json
 **/tts.json
+# v4063 -- HOME-INFRASTRUCTURE BEARER CREDENTIALS, and one of these two lines closes a gap that was
+# already open rather than one this round created. envoy.config.json holds the Enphase JWT that
+# ai-bridge/envoySolar.js uses to read the solar array and battery straight off the IQ Gateway --
+# a credential for Keith's house, at ~1 year of validity. ha.config.json has held the Home Assistant
+# long-lived token since v740 and was NEVER LISTED HERE: it is absent from every commit only because
+# no box that ran `git add -A` happened to have one on disk, which is luck rather than a rule.
+# Both files are written 0600 by their modules; this is the second half of that.
+**/envoy.config.json
+**/ha.config.json
 *app*password*
 *apppw*
 

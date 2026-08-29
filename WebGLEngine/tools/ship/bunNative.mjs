@@ -23,7 +23,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // fileURLToPath, NOT .pathname -- v3937's rule, and I wrote .pathname here on the first draft of a file added
 // in the same session that fixed three other instances of it. On Windows `new URL(...).pathname` yields
@@ -135,8 +135,12 @@ export async function probe() {
 }
 
 // ---------------------------------------------------------------------------
+// pathToFileURL, NOT an endsWith basename guard -- winPathGuard-selfcheck's own rule: this file already
+// imports node:url (fileURLToPath, above), so the basename comparison it used to carry was unfinished rather
+// than exempt. An unanchored endsWith was also wrong on its own terms (a suffix is not a basename: a sibling
+// file ending in the same characters would false-match), on top of never being the strong form available here.
 const isMain = typeof process !== "undefined" && process.argv && process.argv[1] &&
-    import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/").split("/").pop());
+    pathToFileURL(process.argv[1]).href === import.meta.url;
 if (isMain) {
     const r = await probe();
     if (process.argv.includes("--json")) { console.log(JSON.stringify(r, null, 1)); }

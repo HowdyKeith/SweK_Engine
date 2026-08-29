@@ -85,7 +85,15 @@ const cov = definitionCoverage(ENG);
     // one-line definitions to all 608 exported symbols found 39 unmentioned. Failing on all of them means a red
     // gate on day one and a switched-off gate on day two, so the count is FROZEN and the assertion is that it
     // must not GROW. Existing debt stays visible and shrinkable; a new untested export cannot arrive quietly.
-    const BASELINE = 37;   // v3323: iscoKm and photonSphereKm closed -- the number RATCHETS DOWN, never up
+    // v4062: RE-FROZEN AT ZERO. The debt this number tracked is PAID, not redefined -- all 81 exported symbols
+    // that physics/ was carrying unmentioned got a real assertion in their own module's gate (one that calls the
+    // function and checks something true about the result), each one sabotage-confirmed against a deliberately
+    // broken source before the source was restored byte-identical. Naming a symbol in a comment to move this
+    // number would have been the "condemn correct gates to improve a statistic" trap the import-only check below
+    // names; the rule was the opposite -- a symbol only counts as closed if breaking it turns its gate RED.
+    // AT ZERO THE RATCHET IS AT ITS STRONGEST: any newly exported symbol under physics/ that lands without its
+    // gate naming it now reddens this line immediately, which is the state the pin was always ratcheting toward.
+    const BASELINE = 0;    // v3323: 37, v4062: 0 -- the number RATCHETS DOWN, never up
     // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
     // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
     // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
@@ -128,10 +136,9 @@ const cov = definitionCoverage(ENG);
             ? "GREW to " + cov.ungated.length + ": " + cov.ungated.slice(0, 6).join(", ") + " ..."
             : `${cov.ungated.length} unmentioned of ${cov.total} exported symbols across ${cov.gatedModules} ` +
               `gated modules UNDER physics/ (this sweep's scope), against a frozen ${BASELINE}. ` +
-              "The one-line-definition subset is at ZERO -- all " +
-              "three gaps there were load-bearing and were closed. The remaining debt is exported FUNCTIONS, and " +
-              "planting errors in four of them showed all four passing silently, so it is real debt rather than " +
-              "a scan artefact");
+              "AT ZERO, so the next unmentioned export under physics/ reddens this line the round it lands. The " +
+              "81 that stood here at v4061 were closed by ASSERTION, not by mention: each got a check that calls " +
+              "it and grades the answer, and each was sabotage-confirmed RED against a broken source first");
     // *** v4060 -- WIDENED FOR REAL, NOT JUST REPORTED. *** v4059 stopped at reporting the tree-wide number
     // because reddening 209 unaudited definitions in the same breath as finding them would have been exactly
     // the "condemn correct gates to improve a statistic" trap this file argues against two lines down. But a
@@ -142,7 +149,10 @@ const cov = definitionCoverage(ENG);
     // up, existing debt stays visible and shrinkable, and a NEW ungated export anywhere in the tree cannot
     // arrive quietly. Verified NOT to be redundant with the physics ratchet above: tree-wide can go red on a
     // change under render/, rig/, ui/ etc. that the physics-scoped check above would never see at all.
-    const BASELINE_WIDE = 290;   // v4060: 597 gated modules, 2861 definitions tree-wide, frozen here -- ratchets down
+    // v4062: 290 -> 209, and the 81 came off for the RIGHT reason: physics/ paid its whole debt to zero, and
+    // because this sweep SUBSUMES the physics-only one, every symbol closed there is a symbol closed here too.
+    // Re-frozen at the new floor so the paydown cannot silently reverse.
+    const BASELINE_WIDE = 209;   // v4060: 290, v4062: 209 (physics/ closed to zero) -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,

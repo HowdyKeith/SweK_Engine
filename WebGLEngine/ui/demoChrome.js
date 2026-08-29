@@ -469,6 +469,16 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
                     document.querySelectorAll("canvas").forEach(c => { if (c === stageCanvas) return; const a = (c.width || 0) * (c.height || 0); if (a > area) { area = a; best = c; } });
                     return best;
                 };
+                // v4107 -- *** `compact: true` LOOKS LIKE THE FIX FOR "STRETCH IT TO FILL THE BOX" AND MEASURES
+                // WORSE, SO IT IS NOT APPLIED. *** avatarStage.js's _compact branch is written for a wide strip
+                // and says so ("fill the actual (wide) canvas -- no cap"), and ui/dockedGauges.js -- the other
+                // dock mounting this same stage -- passes it. I tried it here for exactly that reason. Driven in
+                // headless Chromium against this real strip (278x56): width fill 78% -> 64% and the drawn-pixel
+                // count HALVED, 7107 -> 3351. compact tightens the gauge row (SPACING 0.62 vs 0.85) and frames
+                // that tighter group, so the camera pulls IN on a narrower scene and leaves MORE empty canvas,
+                // not less. The flag is right for dockedGauges' own layout and wrong for this one; it is left off
+                // here with the measurement recorded, so the next reader does not re-try it on the strength of
+                // the same reasonable-sounding argument.
                 _stage = mod.mountStage(stageCanvas, { url: av2.url, gauges: stageGauges, scene: settings.stageScene || "diorama", carrier: settings.stageCarrier || "boat", url2: settings.stageAvatar2 || "RobotWoman", accessories: settings.accessories, getScreenCanvas, selfQuip: true, pet: true });   // v1505 — pet:true brings the wandering llama into the docked/undocked stage, matching the phone view; v1529 — accessories: worn/held GLB props on head/hand/foot bones
                 if (!_stage || !_stage.ok) { stageWrap.remove(); if (settings.liveStamp) body.insertBefore(stamp, gaugesWrap); }
             } catch (e) { try { stageWrap.remove(); } catch {} }
@@ -527,18 +537,45 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
     let dockBtn = null;
     function _nudgeStage() { try { _stage && _stage.resize && _stage.resize(); } catch {} try { window.dispatchEvent(new Event("resize")); } catch {} }
     function setDocked(v) { _leaveHead(); _headMode = false; _docked = !!v; try { localStorage.setItem("voxelengine.demoChromeDocked", _docked ? "1" : "0"); } catch {} applyDockState(); }
+    // v4106 -- Keith: "empty top-right box never loads." IT WAS NEVER LOADING BECAUSE IT WAS NEVER FLEX. pill,
+    // body and stageWrap are all built with `display: "flex"` (lines 213/234/427) -- their children rely on it:
+    // stageWrap's canvas-host div is `flex: 1 1 auto` with NO in-flow content of its own (the canvas inside it
+    // is `position: absolute`), so its height comes ENTIRELY from the flex layout sizing it against the row's
+    // siblings. "Restore" here set `.style.display = ""`, which does not restore the flex the element was
+    // BUILT with -- it REMOVES the inline override, and a bare <div> with no override falls back to `block`.
+    // Once stageWrap is `block`, `flex: 1 1 auto` on its children is inert (flex-basis/grow/shrink only mean
+    // anything inside a flex container), so canvasHost keeps its natural block height for absolutely-positioned
+    // content: ZERO. `inset: 0` on the canvas then gives it that same zero height. MEASURED, not assumed: a
+    // real headless run of webgpu-llm.html found stageWrap.style.display === "" (computed: block) and the
+    // canvas-host child's getBoundingClientRect().height === 0, on the FIRST load -- docked is the default
+    // state (_docked = true), and applyDockState() runs unconditionally at mount (line 655), so this fired on
+    // every page that mounts this chrome, every time, not intermittently -- exactly "never loads" rather than
+    // "loads late". Fixed by restoring the value each element actually needs, not the empty string.
     function applyDockState() {
         const d = _docked;
         svgTierWrap.style.display = "none";   // v1519 — full/mini never show the svg-only tier
-        pill.style.display = d ? "none" : "";
-        body.style.display = d ? "none" : "";
+        pill.style.display = d ? "none" : "flex";
+        body.style.display = d ? "none" : "flex";
         tickerOuter.style.display = d ? "none" : "";
         if (stageWrap) {
-            stageWrap.style.display = "";   // v1519 — restore after the svg-only tier hid it
+            stageWrap.style.display = "flex";   // v1519 — restore after the svg-only tier hid it; v4106 -- "flex", not "" (see header)
             try { _stage && _stage.setPaused && _stage.setPaused(false); } catch {}
             if (stageRail) stageRail.style.display = d ? "none" : "";
             if (d) {
-                Object.assign(stageWrap.style, { height: "64px", borderRadius: "10px", border: "1px solid rgba(90,200,255,0.30)", marginBottom: "0", cursor: "pointer" });
+                // v4109 -- Keith, after the compact:true experiment measured worse (v4107's comment above): "taller
+                // dock but not too taller, and spreading the scene wider". BOTH ASKS TURNED OUT TO BE THE SAME
+                // LEVER. halfH in camera()'s non-compact diorama branch is a FIXED CONSTANT (0.92) independent of
+                // aspect, while halfW already gets pulled wide by the llama's forced ±1.45 roam range
+                // (_contentSpanX's petEnabled clamp) -- so a SHORT box was vertically constrained (distH pinned
+                // the camera back) with width to spare that the fixed-height frame never used. Raising the height
+                // shrinks the aspect ratio (width stays ~278px), which grows distW relative to the fixed distH and
+                // uses more of that spare width -- MEASURED across five heights on the real page, not guessed:
+                // 64->56px canvas: 78% width fill; 76px: 84%; 84px: 88%; 96px: 94%; 112px: 100% (but a 75% height
+                // increase is the "too much taller" this was asked to avoid). 96px is a 50% increase -- not an
+                // invented number, applyHead() two branches below already uses it for its own bigger dock tier --
+                // and reaches 94% width fill, close enough to full that the remaining gap does not read as
+                // letterboxing. No camera code touched; both requests were the height alone.
+                Object.assign(stageWrap.style, { height: "96px", borderRadius: "10px", border: "1px solid rgba(90,200,255,0.30)", marginBottom: "0", cursor: "pointer" });
             } else {
                 Object.assign(stageWrap.style, {
                     height: Math.max(40, Math.min(300, settings.stageHeight || 84)) + "px",
@@ -604,7 +641,7 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
         svgTierWrap.style.display = "none"; if (_svgSet) { try { _svgSet.stop(); } catch {} }
         if (stageRail) stageRail.style.display = "none";
         if (stageWrap) {
-            stageWrap.style.display = "";
+            stageWrap.style.display = "flex";   // v4106 -- "flex", not "" (see applyDockState's header comment)
             Object.assign(stageWrap.style, { height: "96px", borderRadius: "10px", border: "1px solid rgba(140,210,255,0.45)", marginBottom: "0", cursor: "pointer" });
             try { _stage && _stage.setPaused && _stage.setPaused(false); } catch {}
         }
@@ -644,11 +681,16 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
             position: "absolute", top: "4px", right: "4px", width: "20px", height: "20px", zIndex: "3",
             borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center",
             background: "rgba(6,10,18,0.55)", color: "#bfe6ff", fontSize: "12px", lineHeight: "1",
-            cursor: "pointer", border: "1px solid rgba(120,200,255,0.35)", opacity: "0", transition: "opacity .15s",
+            // v4107 -- Keith: "we would need the dock buttons too." The button was already HERE and already
+            // wired to cycleTier(); it was just opacity:0 until a mouseenter, so the only way to discover the
+            // view cycle was to hover a 20px corner of a 64px strip and notice something fade in. An affordance
+            // nobody can see is the same defect as a missing one -- it rests at 0.5 now and brightens to 1 on
+            // hover, so the control is visible without competing with the avatar it sits on top of.
+            cursor: "pointer", border: "1px solid rgba(120,200,255,0.35)", opacity: "0.5", transition: "opacity .15s",
         });
         stageHost.appendChild(dockBtn);
         stageHost.addEventListener("mouseenter", () => { if (dockBtn) dockBtn.style.opacity = "1"; if (_docked) stageWrap.style.boxShadow = "0 0 0 1px rgba(120,200,255,0.6), 0 6px 20px rgba(0,0,0,0.5)"; });
-        stageHost.addEventListener("mouseleave", () => { if (dockBtn) dockBtn.style.opacity = "0"; stageWrap.style.boxShadow = ""; });
+        stageHost.addEventListener("mouseleave", () => { if (dockBtn) dockBtn.style.opacity = "0.5"; stageWrap.style.boxShadow = ""; });
         stageHost.addEventListener("click", () => { if (_docked) setDocked(false); });
         dockBtn.addEventListener("click", (e) => { e.stopPropagation(); cycleTier(); });
     }

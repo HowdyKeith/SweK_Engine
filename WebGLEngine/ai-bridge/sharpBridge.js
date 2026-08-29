@@ -52,7 +52,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 const py = require("./pythonResolve.js");
 
@@ -202,6 +202,71 @@ async function _resolveInvocation(cand) {
     return null;
 }
 
+// v4104 -- *** THE PANEL COULD REPORT "not installed" AND NOTHING PRESSED FIXED IT. *** Keith: "for the ML-Sharp
+// panel, we need an install button." status() has said so since v3948 with nothing behind it but a link to
+// the repo. apple/ml-sharp's own README (fetched here, not guessed at) publishes no PyPI package -- the
+// documented path is `pip install -r requirements.txt`, RUN FROM INSIDE A CHECKOUT, verified afterward with
+// `sharp --help`, which is exactly the smoke test status() already runs via _resolveInvocation(). So there are
+// two real steps, get a checkout and pip-install it, chained into ONE job rather than making Keith press
+// Install twice -- comicTranslateBridge.js's install() for ogkalu2/comic-translate is the same shape one
+// click short of this, and reading it (rather than reinventing the job bookkeeping) is what caught that a
+// two-click flow was avoidable here: a clone that exits 0 can walk straight into the pip step itself.
+//
+// OUTSIDE THE PROJECT ROOT, same rule this file already applies to CFG and the weights cache and states in
+// its own header: wouldBePackaged() would refuse a checkout INSIDE the tree the moment a prediction ran
+// against it, so putting the checkout there in the first place is a trap that only springs later, on a
+// different call, with a more confusing error. SHARP_SRC_DIR overrides for a gate, same convention as CFG.
+const SRC_DIR = process.env.SHARP_SRC_DIR || path.join(os.homedir(), ".voxelbridge", "ml-sharp");
+let _job = null;   // one install job at a time; { kind: "clone"|"pip", log:[...], done, code, startedAt }
+
+function _appendLog(s) { if (_job) { _job.log.push(s); if (_job.log.length > 400) _job.log.shift(); } }
+
+/** Spawn one step of the job; `onDone(code)` decides what happens next rather than the step assuming it is last. */
+function _runStep(kind, cmd, args, opts, onDone) {
+    _job.kind = kind;
+    let child;
+    try { child = spawn(cmd, args, Object.assign({ windowsHide: true }, opts || {})); }
+    catch (e) { _job.done = true; _job.code = -1; _appendLog("[spawn error] " + ((e && e.message) || e) + "\n"); return; }
+    const cap = (b) => _appendLog(b.toString());
+    if (child.stdout) child.stdout.on("data", cap);
+    if (child.stderr) child.stderr.on("data", cap);
+    child.on("exit", (code) => { if (onDone) onDone(code); else { _job.done = true; _job.code = code; } });
+    child.on("error", (e) => { _job.done = true; _job.code = -1; _appendLog("[spawn error] " + ((e && e.message) || e) + "\n"); });
+}
+
+function _runPip(cand) {
+    const req = path.join(SRC_DIR, "requirements.txt");
+    if (!fs.existsSync(req)) { _job.done = true; _job.code = -1; _appendLog("[install] repo present but requirements.txt missing at " + req + "\n"); return; }
+    _runStep("pip", cand.cmd, [...cand.base, "-m", "pip", "install", "-r", "requirements.txt"], { cwd: SRC_DIR });
+}
+
+/**
+ * Kick off (or resume) the install. Long-running -- returns immediately; the caller polls status().installJob.
+ * A REPO ALREADY THERE SKIPS STRAIGHT TO PIP, so a failed or interrupted pip step can be retried by pressing
+ * Install again without re-cloning, the same "resume rather than restart" shape portHandoff.js's heal step uses.
+ */
+function install() {
+    if (_job && !_job.done) return { ok: false, error: "an install job is already running (" + _job.kind + ")" };
+    const cand = py.resolve();
+    if (!cand) return { ok: false, error: "no working Python found (tried: " + py.candidates().map(py.label).join(", ") + ")" };
+    try { fs.mkdirSync(path.dirname(SRC_DIR), { recursive: true }); } catch (e) { return { ok: false, error: "cannot create " + path.dirname(SRC_DIR) + ": " + ((e && e.message) || e) }; }
+
+    _job = { kind: "clone", log: [], done: false, code: null, startedAt: Date.now() };
+    if (!fs.existsSync(path.join(SRC_DIR, ".git"))) {
+        _runStep("clone", "git", ["clone", "--depth", "1", "https://github.com/apple/ml-sharp", SRC_DIR],
+            { cwd: path.dirname(SRC_DIR) },
+            (code) => { if (code === 0) _runPip(cand); else { _job.done = true; _job.code = code; } });
+    } else {
+        _runPip(cand);
+    }
+    return { ok: true, kind: _job.kind };
+}
+
+/** null when nothing has ever run; otherwise the live/finished state of the one job this bridge tracks. */
+function installStatus() {
+    return _job ? { kind: _job.kind, done: _job.done, code: _job.code, uptimeMs: Date.now() - _job.startedAt, tail: _job.log.slice(-12).join("") } : null;
+}
+
 async function status() {
     const cand = py.resolve();
     const python = py.label(cand);
@@ -213,6 +278,7 @@ async function status() {
         sharpInstalled: false, sharpVersion: "", invocation: "", weightsCached: false, weightsDir: "",
         remote: !!cfg.endpoint, remoteEndpoint: cfg.endpoint || "", remoteHasToken: !!cfg.token,
         where: "", ready: false, why: "",
+        installJob: installStatus(), srcDir: SRC_DIR,
     };
 
     // *** THE REMOTE PATH IS CHECKED FIRST BECAUSE IT IS THE ONE THAT MAKES THIS FEATURE EXIST OFF GALAXINA. ***
@@ -355,4 +421,5 @@ async function predict({ image, outDir } = {}) {
              invocation: inv.label, licence: LICENCE, alsoWrote: made.slice(1) };
 }
 
-module.exports = { status, predict, setConfig, endpointError, defaultOutDir, wouldBePackaged, LICENCE, PROJECT_ROOT, CFG };
+module.exports = { status, predict, setConfig, endpointError, defaultOutDir, wouldBePackaged, LICENCE, PROJECT_ROOT, CFG,
+    install, installStatus, SRC_DIR };

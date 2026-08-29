@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { buildNeighbors, pbfProject, densityStats, poly6, spikyGradMag } from "./pbf.js";
+import { buildNeighbors, pbfProject, densityStats, poly6, spikyGradMag, applyXSPH } from "./pbf.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -76,7 +76,53 @@ const RHO0 = restDensity();
        "a blob packed far past rest, projected 40 times, stays bounded -- the density solve does not blow up.");
 }
 
-// ---- 6. PURE: no transcendental, no Math.pow ---------------------------------------------------------------
+// ---- 6. XSPH MOMENTUM: a symmetric pair's viscosity blend is momentum-conserving, not just individually damped --
+{
+    // Two equal particles, each other's only neighbour, so the poly6 weight is identical both directions (same
+    // separation) -- the case where a per-particle "nudge toward the neighbourhood mean" is provably momentum-
+    // conserving: dv_i = c*(vj-vi), dv_j = c*(vi-vj), so dv_i + dv_j = 0 exactly, for any c and any velocities.
+    const h = 0.3;
+    const pos = Float64Array.from([0, 0, 0, 0.1, 0, 0]);
+    const vel = Float64Array.from([2, -1, 0.5, -3, 4, 0.5]);
+    const nbr = [[1], [0]];
+    const before = vel.slice();
+    applyXSPH(pos, vel, 2, nbr, h, 0.7);
+    const dvi = [vel[0] - before[0], vel[1] - before[1], vel[2] - before[2]];
+    const dvj = [vel[3] - before[3], vel[4] - before[4], vel[5] - before[5]];
+    const momentumZero = Math.abs(dvi[0] + dvj[0]) < 1e-12 && Math.abs(dvi[1] + dvj[1]) < 1e-12 && Math.abs(dvi[2] + dvj[2]) < 1e-12;
+    // And each particle moved TOWARD the other's velocity, not away -- it is damping the relative motion, not
+    // amplifying it: at c=1 with only one neighbour the blend is complete, vi_new == vj_old exactly.
+    const vel2 = Float64Array.from([2, -1, 0.5, -3, 4, 0.5]);
+    applyXSPH(pos, vel2, 2, nbr, h, 1.0);
+    const fullBlend = Math.abs(vel2[0] - (-3)) < 1e-9 && Math.abs(vel2[1] - 4) < 1e-9 && Math.abs(vel2[2] - 0.5) < 1e-9 &&
+                       Math.abs(vel2[3] - 2) < 1e-9 && Math.abs(vel2[4] - (-1)) < 1e-9 && Math.abs(vel2[5] - 0.5) < 1e-9;
+    ok("!! XSPH nudges a symmetric pair toward each other's velocity with zero net momentum change",
+       momentumZero && fullBlend,
+       "for a mutual-neighbour pair the blend weight is identical both directions, so particle i's velocity change is exactly the negative of particle j's (" +
+       dvi.map((x) => x.toFixed(6)) + " vs " + dvj.map((x) => x.toFixed(6)) + ") -- viscosity redistributes momentum, it does not create or destroy it; " +
+       "and at blend fraction c=1 with a single neighbour each particle's velocity becomes EXACTLY the other's original velocity.");
+}
+
+// ---- 7. XSPH BOUNDED: the blend never overshoots past the neighbourhood value, and c=0 is a no-op ------------
+{
+    const h = 0.3;
+    const pos = Float64Array.from([0, 0, 0, 0.1, 0, 0, -0.05, 0.05, 0]);
+    const vel = Float64Array.from([10, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const nbr = buildNeighbors(pos, 3, h);
+    const noOp = vel.slice(); applyXSPH(pos, noOp, 3, nbr, h, 0);
+    let unchanged = true; for (let i = 0; i < 9; i++) if (noOp[i] !== vel[i]) unchanged = false;
+    const blended = vel.slice(); applyXSPH(pos, blended, 3, nbr, h, 0.5);
+    // particle 0 started at vx=10 while its neighbours sit at vx=0 -- pulled toward them, so its new speed must
+    // land STRICTLY between 0 and 10 (damped, not reversed or amplified), and the untouched-in-x neighbours must
+    // move toward 10, not away from it.
+    const damped = blended[0] > 0 && blended[0] < 10 && blended[3] > 0 && blended[3] < 10 && blended[6] > 0 && blended[6] < 10;
+    ok("!! a zero blend fraction changes nothing, and a partial blend damps toward the neighbourhood without overshoot",
+       unchanged && damped,
+       "c=0 leaves every velocity component bit-identical; with c=0.5 the outlier at vx=10 relaxes to " + blended[0].toFixed(4) +
+       " while its neighbours at vx=0 rise to " + blended[3].toFixed(4) + " and " + blended[6].toFixed(4) + " -- all strictly inside [0,10], damping toward the mean rather than past it.");
+}
+
+// ---- 8. PURE: no transcendental, no Math.pow ---------------------------------------------------------------
 {
     const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "pbf.js"), "utf8").replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
     const clean = !/Math\.(sin|cos|tan|exp|log|pow|hypot|random|acos)\b/.test(src);

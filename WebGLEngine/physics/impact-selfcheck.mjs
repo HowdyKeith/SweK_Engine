@@ -10,7 +10,7 @@
 // energy delivered is one-half m v-squared; and the crater grows as roughly the cube root of that energy. The sabotage
 // switches off gravitational focusing -- reduces the capture radius to the planet's own width -- and the focusing check
 // fails, because a planet really does reach out past its edge to pull impactors in.
-import { escapeSpeed, impactSpeed, criticalImpactParameter, makeApproach, stepApproach, atmosphericEntry, sphereMass, impactEnergy, craterDiameter } from "./impact.js";
+import { escapeSpeed, impactSpeed, criticalImpactParameter, makeApproach, stepApproach, airDensity, entryDeceleration, atmosphericEntry, sphereMass, impactEnergy, craterDiameter } from "./impact.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -31,6 +31,32 @@ const traj = (b) => { const p = makeApproach(-40, b, 1, 0); for (let i = 0; i < 
     const vFromRest = impactSpeed(GM, R, 0), vEsc = escapeSpeed(GM, R);
     ok("!! by energy conservation nothing lands slower than the escape speed", Math.abs(vFromRest - vEsc) < 1e-9 && impactSpeed(GM, R, 1) > vEsc,
        "an asteroid falling from rest still arrives at the escape speed (" + vEsc.toFixed(3) + "), and any real approach speed only adds to that -- gravity guarantees a floor on the impact velocity.");
+}
+
+// ---- 2b. airDensity() AND entryDeceleration() CALLED DIRECTLY, AGAINST THEIR OWN CLOSED FORMS -------
+{
+    ok("!! airDensity at the surface (h=0) is EXACTLY rho0, no matter the scale height",
+       airDensity(0, 1.2, 8000) === 1.2 && airDensity(0, 3000, 1) === 3000,
+       "rho0 * exp(0) = rho0 exactly, checked at two unrelated (rho0, H) pairs");
+    const H = 8000, rho0 = 1.2;
+    ok("!! airDensity falls to EXACTLY rho0/e at one scale height, and to rho0/2 at H*ln(2)",
+       Math.abs(airDensity(H, rho0, H) - rho0 / Math.E) < 1e-9 &&
+       Math.abs(airDensity(H * Math.LN2, rho0, H) - rho0 / 2) < 1e-9,
+       "airDensity(H) = " + airDensity(H, rho0, H).toFixed(6) + " vs rho0/e = " + (rho0 / Math.E).toFixed(6) +
+       "; airDensity(H ln2) = " + airDensity(H * Math.LN2, rho0, H).toFixed(6) + " vs rho0/2 = " + (rho0 / 2).toFixed(6) +
+       " -- the defining property of an exponential atmosphere's scale height");
+
+    ok("!! entryDeceleration matches its closed form 3 rho Cd v^2 / (8 r rhoBody), by hand at rho=Cd=v=r=rhoBody=1",
+       entryDeceleration(1, 1, 1, 1, 1) === 3 / 8);
+    const base = entryDeceleration(1.2, 100, 1.0, 5, 3000);
+    ok("!! ...and it is QUADRATIC in v",
+       Math.abs(entryDeceleration(1.2, 200, 1.0, 5, 3000) / base - 4) < 1e-9,
+       "doubling v quadruples the deceleration (v^2 in the formula), " + base.toExponential(4) + " vs " +
+       entryDeceleration(1.2, 200, 1.0, 5, 3000).toExponential(4));
+    ok("!! ...and it goes as 1/r, which is exactly why small meteors burn up and large ones do not",
+       Math.abs(entryDeceleration(1.2, 100, 1.0, 10, 3000) / base - 0.5) < 1e-9,
+       "doubling the radius HALVES the deceleration -- the header's own claim, checked directly on the function " +
+       "rather than only through the integrated atmosphericEntry() outcome");
 }
 
 // ---- 3. THE ATMOSPHERE IS SELECTIVE: small bodies burn, large ones punch through --------------------

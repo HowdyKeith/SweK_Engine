@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { phantomField, radon, backProject, scoreRecon, angleSet } from "./ct.js";
-import { matchedBackProject, powerStep, residual, landweber } from "./reconOps.mjs";
+import { matchedBackProject, powerStep, residual, landweber, landweberDescent } from "./reconOps.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(HERE, "..", "..");
@@ -182,6 +182,44 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     ok("...and the old operator is still reachable by name, so the turn-round stays drivable",
        asShipped.step > 0 && asShipped.step !== asMatched.step,
        "pass `adjoint: backProject` -- v3616's finding is held on the record by sirt-selfcheck, not by prose");
+}
+
+// ---- 5. landweberDescent() CALLED DIRECTLY -- MONOTONIC DESCENT AND CONVERGENCE ON A SYNTHETIC PHANTOM --------------
+//
+// landweberDescent is v3847's ALIAS -- "the same operator as the default, kept anyway because the name carries
+// the claim". Section 4 above proves landweber's DEFAULT is matchedBackProject by identity; this proves the
+// ALIAS ITSELF, called directly, both (a) is that same operator by identity and (b) actually does what its name
+// promises on a small synthetic linear system: the residual falls at every checkpoint and the reconstruction
+// converges toward the known true image, not merely toward SOME fixed point.
+{
+    const N = 24, nDet = 24, nAngles = 12;
+    const phantom = [{ cx: 0, cy: 0, a: 0.5, b: 0.5, rho: 1 }];
+    const truth = phantomField(N, phantom), ang = angleSet(nAngles), sino = radon(truth, N, ang, nDet);
+
+    const viaDescent = landweberDescent(sino, N, ang, nDet, { iters: 300, every: 30 });
+    const viaExplicit = landweber(sino, N, ang, nDet, { iters: 300, every: 30, adjoint: (r) => matchedBackProject(r, N, ang, nDet) });
+    ok("!! landweberDescent IS landweber-with-the-matched-operator, by IDENTITY of the result",
+       viaDescent.step === viaExplicit.step && viaDescent.x.every((v, i) => v === viaExplicit.x[i]),
+       "bit-identical step and reconstruction to an explicit matched-operator call -- an alias, not a second implementation");
+
+    ok("!! the residual norm DECREASES AT EVERY CHECKPOINT on a synthetic single-ellipse phantom",
+       viaDescent.history.every((r, i) => i === 0 || r.residual < viaDescent.history[i - 1].residual),
+       "history: " + viaDescent.history.map((r) => r.residual.toFixed(4)).join(" -> "));
+    ok("!! ...and the residual at the end is a small fraction of where it started (real descent, not a plateau)",
+       viaDescent.residual < viaDescent.history[0].residual * 0.02,
+       "start " + viaDescent.history[0].residual.toFixed(3) + ", end " + viaDescent.residual.toFixed(4) +
+       " -- under 2% of the starting residual after 300 iterations");
+
+    const corr = scoreRecon(viaDescent.x, truth).corr;
+    ok("!! and the reconstruction actually converges TOWARD THE KNOWN TRUE IMAGE, not merely toward some fixed point",
+       corr > 0.9, "correlation with the true phantom: " + corr.toFixed(4));
+
+    // A near-zero-iteration run must be close to the (zero) starting guess and far from converged, so the
+    // convergence claim above is not vacuously true of any x this function could ever return.
+    const barelyStarted = landweberDescent(sino, N, ang, nDet, { iters: 2, every: 1 });
+    ok("...and a 2-iteration run has NOT converged, so the 300-iteration result above is doing real work",
+       barelyStarted.residual > viaDescent.residual * 5,
+       "2 iterations: residual " + barelyStarted.residual.toFixed(3) + "; 300 iterations: " + viaDescent.residual.toFixed(4));
 }
 
 console.log(fails ? "\nreconOps-selfcheck: " + fails + " FAILED" : "\nreconOps-selfcheck: all checks pass");

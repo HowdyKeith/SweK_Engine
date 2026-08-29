@@ -73,11 +73,19 @@ function buildDebye({ mode = "capacity", config = {} } = {}) {
     };
 }
 
+const DEBYE_MODES = ["capacity"];   // v4074 -- the single source `modes` and `defaults()` both read
+
 export const debyeDevice = {
     plantKind: "method",
-    modes: ["capacity"],
+    modes: DEBYE_MODES,
     name: "debye-heat-capacity-vs-einstein",
     observables: DEBYE_OBSERVABLES,
     build: buildDebye,
-    defaults: ({ mode } = {}) => ({ mode: mode || "capacity", config: { ...DEF } }),
+    // v4074 -- ONE DECLARATION, HONOURED BY BOTH FIELDS. `defaults()` used to return `mode || "capacity"`,
+    // which ECHOES ANY STRING BACK, so checkMode asked for a nonsense mode, got it back, and concluded the
+    // device declared it. A mode selects WHICH PHYSICS RUNS, so a device that accepts a name it does not
+    // declare runs something else and says nothing. The list was never unknown -- it is the `modes` array
+    // directly above -- and build() never reads `mode` at all, so there was no second mode to protect.
+    // Both fields read MODES so a future mode cannot be added to one and missed by the other.
+    defaults: ({ mode } = {}) => ({ mode: DEBYE_MODES.includes(mode) ? mode : DEBYE_MODES[0], config: { ...DEF } }),
 };

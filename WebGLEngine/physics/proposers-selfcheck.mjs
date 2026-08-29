@@ -14,7 +14,8 @@
 // pattern the HMC tuner and the budget allocator already found separately.
 
 import { registerProposer, getProposer, listProposers, grantLicence, applyKnobs, runProposer, resetRegistry, TIERS,
-         setLicencePath, writeLicences, loadLicences , tierRank } from "./proposers.mjs";
+         bisectBoundary, probeMonotone,
+         setLicencePath, writeLicences, loadLicences , tierRank, licencePath } from "./proposers.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -261,6 +262,70 @@ try { fs.unlinkSync(TMP); } catch {}
         TIERS.every((t) => tierRank(t) <= tierRank("adopt")) && tierRank("adopt") === TIERS.length - 1,
         "adopt is the only tier that can change the tree, so a fourth tier appended after it would inherit " +
         "adopt's privileges without anyone writing that down");
+}
+
+// ---- v3653: licencePath() -- THE GETTER FOR WHERE LICENCES PERSIST, ROUND-TRIP TESTED ---------------------------
+//
+// licencePath() is a one-line getter over module-private state, and its own gate never called it. Tested for
+// real here rather than by naming it in a comment: set the path, ask licencePath() what it is, write through
+// the real writeLicences(), and read the file back from EXACTLY the path licencePath() reported -- so a bug
+// that let the setter and the getter drift apart (or let writeLicences ignore the setter) would be caught, not
+// merely a bug that broke the string comparison.
+{
+    ok("!! licencePath() reports exactly the path this gate pointed it at, at the top of the file",
+       licencePath() === TMP, "licencePath() = " + licencePath() + ", expected the gate's own TMP = " + TMP);
+
+    const TMP2 = path.join(os.tmpdir(), "swek-knob-licences-test2-" + process.pid + ".json");
+    try { fs.unlinkSync(TMP2); } catch {}
+    setLicencePath(TMP2);
+    ok("!! setLicencePath moves what licencePath() reports, immediately and to the exact new path",
+       licencePath() === TMP2 && licencePath() !== TMP,
+       "licencePath() is now " + licencePath() + " -- the getter is not caching the value from before the setter ran");
+
+    resetRegistry();
+    registerProposer({
+        id: "licence-path-probe", knobs: ["x"], defaultTier: "propose",
+        propose: () => [{ x: 1 }], score: (c) => c.x, adjudicate: () => ({ pass: true, evidence: {} }),
+    });
+    const w = writeLicences();
+    ok("!! writeLicences() writes to exactly the path licencePath() currently names, not a stale one",
+       w.ok && w.path === TMP2 && fs.existsSync(TMP2) && !fs.existsSync(TMP),
+       "writeLicences() returned path " + w.path + " (licencePath() said " + licencePath() + "); TMP2 exists: " +
+       fs.existsSync(TMP2) + "; the OLD path TMP was never touched after the setter moved: " + !fs.existsSync(TMP));
+
+    const onDisk = JSON.parse(fs.readFileSync(licencePath(), "utf8"));
+    ok("!! reading the file back from licencePath() itself (not a hardcoded path) finds what writeLicences just wrote",
+       onDisk.kind === "swek-knob-licences" && "licence-path-probe" in onDisk.licences,
+       "set -> licencePath() -> writeLicences() -> read via that SAME reported path closes the loop end to end");
+
+    setLicencePath(TMP);   // restore the path the rest of this file (and its cleanup) assumes
+    try { fs.unlinkSync(TMP2); } catch {}
+    resetRegistry();
+}
+
+// ---- v4066: THE TWO ADAPTIVE-SEARCH PRIMITIVES, EXERCISED IN THEIR OWN MODULE'S GATE -------------------
+// The full adaptive path (the runProposer integration, the real lab adjudicators, the monotonicity split that
+// disqualified lz-window) is driven by physics/adaptiveKnob-selfcheck.mjs. These are the two exported
+// primitives graded HERE, where definitionGates looks for them -- against known-answer steps, so each is
+// checked against a number rather than against its own plausibility.
+{
+    // A step at 37 makes the true edge knowable: 37 passes, 36 does not.
+    const b = bisectBoundary({ cheap: 0, costly: 1000, integer: true, passes: (v) => v >= 37 });
+    ok("!! bisectBoundary lands on the EXACT edge of a known step, and names the failing side beside it",
+       b.ok && b.bracketed && b.boundary === 37 && b.failingSide === 36 && b.calls <= 14,
+       "boundary=" + b.boundary + " failingSide=" + b.failingSide + " in " + b.calls + " probes over a " +
+       "1000-wide range. A PASSING VALUE WITH NO FAILING NEIGHBOUR IS NOT AN EDGE, which is why both are returned");
+    ok("...and a range whose costly end still fails is reported as a finding, not thrown",
+       bisectBoundary({ cheap: 0, costly: 10, passes: () => false }).ok === false,
+       "'nothing here survives adjudication' is a real answer about the instrument");
+
+    const mono = probeMonotone({ cheap: 0, costly: 100, samples: 40, passes: (v) => v >= 37 });
+    const ring = probeMonotone({ cheap: 0, costly: 100, samples: 40, passes: (v) => Math.floor(v / 7) % 2 === 0 });
+    ok("!! probeMonotone separates a single step from an OSCILLATING verdict",
+       mono.flips === 1 && mono.monotone === true && ring.flips > 1 && ring.monotone === false,
+       "step flips=" + mono.flips + " vs ringing flips=" + ring.flips + ". This is the check that decides " +
+       "whether a knob may declare a search at all -- it disqualified lz-window, whose LZ sweep rings");
+    resetRegistry();
 }
 
 console.log(fails ? ("[proposers-selfcheck] FAILED " + fails) : "[proposers-selfcheck] all passed");

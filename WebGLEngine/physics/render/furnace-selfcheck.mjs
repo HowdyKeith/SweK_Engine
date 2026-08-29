@@ -9,7 +9,7 @@
 // AND THE THREE CLASSIC ERRORS ARE TOLD APART BY THEIR RATIO, NOT BY A THRESHOLD, because each predicts a
 // different exact multiple: 1/(2 pi), 2, and 4/pi. A tolerance would lump them; a ratio names which one.
 "use strict";
-import { furnace, EXPECTED, uniformSampleHemisphere, uniformThetaHemisphere, createCoordinateSystem, rng } from "./furnace.mjs";
+import { furnace, EXPECTED, uniformSampleHemisphere, uniformThetaHemisphere, createCoordinateSystem, rng, cosineSampleHemisphere, cosinePdf, toWorld } from "./furnace.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -104,6 +104,78 @@ const RHO = 0.18;   // the albedo the lesson uses, and the one every renderer is
     ok("!! *** QUADRUPLING THE SAMPLES HALVES THE ERROR -- Monte Carlo's 1/sqrt(N), measured ***",
        Math.abs(r1 - 2) < 0.45 && Math.abs(r2 - 2) < 0.45,
        `ratios ${r1.toFixed(3)} and ${r2.toFixed(3)} against a predicted 2.000. This is what makes path tracing expensive and it is a PROPERTY OF THE ESTIMATOR, not of the scene -- an implementation converging faster than this is biased, and one converging slower has a bug.`);
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 5. THE COSINE-WEIGHTED SAMPLER, ITS PDF, AND THE FRAME TRANSFORM -- EACH CHECKED DIRECTLY, NOT VIA furnace()
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    // cosineSampleHemisphere: E[cos theta] under ITS OWN distribution is 2/3, not 1/2 -- the exact number the
+    // comment above it names, and the one that makes "importance-sample AND still multiply by cos" a 0.667x
+    // darkening rather than a crash.
+    const rand = rng(41);
+    let sum = 0, n = 300000;
+    for (let i = 0; i < n; i++) sum += cosineSampleHemisphere(rand(), rand())[1];
+    const mean = sum / n;
+    ok("!! E[cos theta] = 2/3 under cosine-weighted sampling, measured directly on cosineSampleHemisphere",
+       Math.abs(mean - 2 / 3) < 3e-3,
+       `${mean.toFixed(5)} against exactly 2/3 = ${(2 / 3).toFixed(5)}. Checked on the SAMPLER itself, not through furnace()'s cosine strategy, so a compensating bug elsewhere in the estimator cannot hide a broken sampler here.`);
+
+    // Every sample must land on the unit hemisphere: x^2+y^2+z^2=1 (Malley's method preserves length by
+    // construction: r^2 + (1-r1) with r=sqrt(r1) is exactly 1) and y >= 0 (upper hemisphere only).
+    const rand2 = rng(43);
+    let maxLenErr = 0, minY = Infinity;
+    for (let i = 0; i < 20000; i++) {
+        const s = cosineSampleHemisphere(rand2(), rand2());
+        maxLenErr = Math.max(maxLenErr, Math.abs(s[0] * s[0] + s[1] * s[1] + s[2] * s[2] - 1));
+        minY = Math.min(minY, s[1]);
+    }
+    ok("!! cosineSampleHemisphere returns unit vectors confined to the upper hemisphere (y >= 0)",
+       maxLenErr < 1e-9 && minY >= 0,
+       `worst |len^2-1| over 20000 draws: ${maxLenErr.toExponential(2)}, minimum y: ${minY.toFixed(6)}.`);
+
+    // cosinePdf: INT cosinePdf(cos theta) dOmega over the hemisphere must be exactly 1 -- that is what makes it
+    // a pdf. Estimated with the UNIFORM sampler (a different function, with a different, already-verified pdf
+    // 1/(2pi)) so the check cannot be fooled by cosinePdf and cosineSampleHemisphere sharing one bug.
+    const rand3 = rng(53);
+    let acc = 0, n3 = 300000;
+    for (let i = 0; i < n3; i++) {
+        const s = uniformSampleHemisphere(rand3(), rand3());
+        acc += cosinePdf(s[1]) / (1 / (2 * Math.PI));
+    }
+    const estimate = acc / n3;
+    ok("!! *** cosinePdf INTEGRATES TO EXACTLY 1 OVER THE HEMISPHERE, MEASURED BY IMPORTANCE SAMPLING FROM A DIFFERENT SAMPLER ***",
+       Math.abs(estimate - 1) < 3e-3,
+       `${estimate.toFixed(5)} against exactly 1. cosinePdf is called directly and integrated with uniformSampleHemisphere's own pdf, not cosineSampleHemisphere's -- so a normalising-constant bug shared between the pdf and the sampler that produced it (the classic way to hide one) cannot cancel here.`);
+    ok("...and cosinePdf(1) = 1/pi exactly, the value straight down the normal",
+       Math.abs(cosinePdf(1) - 1 / Math.PI) < 1e-15,
+       `${cosinePdf(1)} against ${1 / Math.PI}.`);
+
+    // toWorld: the frame's own local axes must map back to exactly what createCoordinateSystem built them from
+    // -- local +Y (the "up" every sampler here returns as its cosine/solid-angle axis) must land on N itself,
+    // and local +X / +Z must land on Nb / Nt, because those are the basis toWorld is defined in terms of.
+    const N = [0.2672612419124244, 0.5345224838248488, 0.8017837257372732]; // a normalized, non-axis-aligned N
+    const { Nt, Nb } = createCoordinateSystem(N);
+    const up = toWorld([0, 1, 0], N, Nt, Nb);
+    const ex = toWorld([1, 0, 0], N, Nt, Nb);
+    const ez = toWorld([0, 0, 1], N, Nt, Nb);
+    ok("!! *** toWorld MAPS THE FRAME'S OWN LOCAL AXES BACK ONTO N, Nb AND Nt -- EXACTLY, NOT WITHIN TOLERANCE ***",
+       up.every((v, i) => v === N[i]) && ex.every((v, i) => v === Nb[i]) && ez.every((v, i) => v === Nt[i]),
+       `local +Y -> [${up.map((v) => v.toFixed(6))}] against N [${N.map((v) => v.toFixed(6))}]; local +X -> Nb, local +Z -> Nt. Every sampler in this file returns its cosine axis as the middle component, so if toWorld put N in the wrong slot every furnace reading above would be shading with the wrong normal while still looking like a smooth sphere.`);
+
+    // And it must be an isometry: an orthonormal change of basis preserves length, for a vector that is not
+    // one of the axes (which would trivially pass via the exact check above).
+    const rand4 = rng(61);
+    let maxDelta = 0;
+    for (let i = 0; i < 5000; i++) {
+        const s = [rand4() * 2 - 1, rand4() * 2 - 1, rand4() * 2 - 1];
+        const sLen = Math.hypot(...s);
+        const w = toWorld(s, N, Nt, Nb);
+        maxDelta = Math.max(maxDelta, Math.abs(Math.hypot(...w) - sLen));
+    }
+    ok("!! toWorld preserves vector length for arbitrary (non-axis) local vectors, as an orthonormal transform must",
+       maxDelta < 1e-9,
+       `worst |len(toWorld(s)) - len(s)| over 5000 random s: ${maxDelta.toExponential(2)}. A dropped or duplicated term in the linear combination would show up here even on directions the two exact axis checks above do not exercise.`);
 }
 
 console.log(fails ? "\nfurnace-selfcheck: " + fails + " FAILED" : "\nfurnace-selfcheck: all checks pass");

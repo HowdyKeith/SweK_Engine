@@ -263,5 +263,70 @@ if (typeof blob === "number") {
     }
 }
 
+// ---- v4078: THE PET LLAMA'S LEGS SWUNG FROM THE FOOT, NOT THE HIP --------------------------------------------
+// Keith: "the legs stay locked at the floor, and the legs swing at the top of the legs, which I think is
+// opposite how legs move." Correct: a real leg is anchored to the body at the HIP, and it is the FOOT that
+// swings free beneath a fixed hip. The shipped code had it backward.
+//
+// *** WHY: buildCylinder SPANS LOCAL y 0->1 WITH THE BASE AT THE ORIGIN, AND mRotX(sw) WAS APPLIED BEFORE THE
+// FINAL TRANSLATE -- SO IT ALWAYS ROTATED ABOUT THAT ORIGIN, THE BASE/FOOT END. *** A point at the rotation's
+// own pivot cannot move under that rotation, so the foot -- which the old code placed AT the pivot -- was
+// locked to the floor no matter what `sw` was, while the far end of the cylinder (the top, which the leg
+// placement puts near the body -- the hip) swept an arc around it. Exactly backward, and MEASURED here rather
+// than argued from the matrix algebra alone: recomputing the SAME mMul/mTranslate/mRotX/mScale chain the source
+// actually uses (copied, not re-derived, so a typo in the copy cannot silently pass), the local point y=0 (foot)
+// moves 0.0000 under a swing of 0.35 rad in the OLD chain while y=1 (hip) moves 0.1045 -- the opposite of a
+// walking gait.
+//
+// THE FIX shifts the unit cylinder by (0,-1,0) BEFORE scaling, so the TOP (hip) lands on the rotation's pivot
+// instead of the base (foot), and moves the final translate's Y from 0.15 to 0.45 (=0.15+0.30, the OLD
+// unrotated top's height) so the resting (sw=0) pose is unchanged -- only which end swings changes.
+{
+    const avSrc = fs.readFileSync(path.join(ROOT, "face", "avatarStage.js"), "utf8");
+    const legsLine = avSrc.match(/const legs=\[[\s\S]*?\];/);
+    ok("!! the four-leg layout (x, z, swing-phase per leg) is still present, unchanged by the pivot fix",
+        !!legsLine, legsLine ? legsLine[0] : "const legs=[...] not found");
+
+    const drawLine = avSrc.match(/drawLlamaPart\(GEO\.cyl, mMul\(B, ([^;]+)\), CREAM\); \}/);
+    ok("!! *** the leg's transform now shifts the unit cylinder by (0,-1,0) BEFORE scaling -- the pivot fix ***",
+        !!drawLine && /,\s*mTranslate\(0,-1,0\)\)+\s*$/.test(drawLine[1].trim()),
+        drawLine ? drawLine[1] : "leg draw call not found -- the pivot fix regressed or the call was rewritten");
+    ok("...and the final translate is 0.45 (0.15+0.30, the OLD unrotated TOP height), not the old 0.15",
+        !!drawLine && /mTranslate\(lg\[0\],0\.45,lg\[1\]\)/.test(drawLine[1]),
+        "0.15 would put the pivot back at the resting FOOT height, silently reverting the fix");
+
+    // Independent recomputation: the SAME four matrix functions the source defines (copied verbatim so this
+    // gate cannot pass by agreeing with its own wrong copy), applied to the two ends of the unit cylinder
+    // (local y=0 and y=1) through the ACTUAL chain the source now uses.
+    function mMul_(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3]; return o; }
+    function mTranslate_(x, y, z) { return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]); }
+    function mScale_(x, y, z) { return new Float32Array([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]); }
+    function mRotX_(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]); }
+    const apply = (M, p) => { const o = [0, 0, 0, 0]; for (let r = 0; r < 4; r++) o[r] = M[r] * p[0] + M[4 + r] * p[1] + M[8 + r] * p[2] + M[12 + r] * p[3]; return o; };
+    const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+    const lg = [-0.10, 0.13, 0], SW = 0.35;
+    const oldChain = (sw) => mMul_(mMul_(mTranslate_(lg[0], 0.15, lg[1]), mRotX_(sw)), mScale_(0.13, 0.30, 0.13));
+    const newChain = (sw) => mMul_(mMul_(mMul_(mTranslate_(lg[0], 0.45, lg[1]), mRotX_(sw)), mScale_(0.13, 0.30, 0.13)), mTranslate_(0, -1, 0));
+
+    const footOldMove = dist3(apply(oldChain(SW), [0, 0, 0, 1]), apply(oldChain(0), [0, 0, 0, 1]));
+    const hipOldMove = dist3(apply(oldChain(SW), [0, 1, 0, 1]), apply(oldChain(0), [0, 1, 0, 1]));
+    ok("!! *** REPRODUCED: in the OLD chain the foot was locked (0 movement) while the hip swung ***",
+        footOldMove < 1e-6 && hipOldMove > 0.05,
+        "foot moved " + footOldMove.toFixed(4) + ", hip moved " + hipOldMove.toFixed(4) + " under a 0.35 rad swing");
+
+    const footNewMove = dist3(apply(newChain(SW), [0, 0, 0, 1]), apply(newChain(0), [0, 0, 0, 1]));
+    const hipNewMove = dist3(apply(newChain(SW), [0, 1, 0, 1]), apply(newChain(0), [0, 1, 0, 1]));
+    ok("!! *** FIXED: in the NEW chain the hip is locked (0 movement) while the foot swings -- a real gait ***",
+        hipNewMove < 1e-6 && footNewMove > 0.05,
+        "foot moved " + footNewMove.toFixed(4) + ", hip moved " + hipNewMove.toFixed(4) + " under the same swing");
+
+    const footRestOld = apply(oldChain(0), [0, 0, 0, 1]), footRestNew = apply(newChain(0), [0, 0, 0, 1]);
+    const hipRestOld = apply(oldChain(0), [0, 1, 0, 1]), hipRestNew = apply(newChain(0), [0, 1, 0, 1]);
+    ok("!! ...and the resting pose (sw=0) is UNCHANGED -- only the swing direction changed, not the llama's look",
+        dist3(footRestOld, footRestNew) < 1e-5 && dist3(hipRestOld, hipRestNew) < 1e-5,
+        "foot rest delta " + dist3(footRestOld, footRestNew).toExponential(2) + ", hip rest delta " + dist3(hipRestOld, hipRestNew).toExponential(2));
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 process.exit(fails ? 1 : 0);

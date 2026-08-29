@@ -1183,7 +1183,17 @@
   "world/planetSurface-selfcheck.mjs": 276,
   "world/procPlanet-selfcheck.mjs": 134,
   "world/spaceStructures-selfcheck.mjs": 293,
-  "world/tools/water-attacks-selfcheck.mjs": 68
+  "world/tools/water-attacks-selfcheck.mjs": 68,
+  "ai-bridge/envoySolar-selfcheck.mjs": 84,
+  "physics/adaptiveKnob-selfcheck.mjs": 3463,
+  "render/cloudField-selfcheck.mjs": 42469,
+  "rig/cinematicShot-selfcheck.mjs": 61489,
+  "tools/krbn/krbnCompareLive-selfcheck.mjs": 30552,
+  "tools/mcp/physicsAi-selfcheck.mjs": 881,
+  "tools/roundhouse/swekWebviewApk-selfcheck.mjs": 1345,
+  "tools/roundhouse/tidalBind-selfcheck.mjs": 845,
+  "tools/ship/realTerrainFlyIn-selfcheck.mjs": 26295,
+  "ui/pageGauges-selfcheck.mjs": 2300
  },
  "coverage": {
   "complete": false,

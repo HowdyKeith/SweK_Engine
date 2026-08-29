@@ -1,6 +1,6 @@
 // tools/roundhouse/chemicalPotentialBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/chemicalPotentialBind-selfcheck.mjs   (~0.4s MEASURED)
+// Run: node tools/roundhouse/chemicalPotentialBind-selfcheck.mjs   (~2s MEASURED)
 //
 // THIS GRADES THE BIND. physics/thermal/chemicalPotential-selfcheck.mjs owns the physics.
 //

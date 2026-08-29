@@ -8,7 +8,7 @@
 // green. The sabotage below is exactly that shape: extrapolating the chi peak with the WRONG exponent produces
 // a perfectly smooth, internally consistent, wrong T_c, and only the OTHER route can say so.
 
-import { pairIsingTc, pairTrapDeltaF, pairLbmViscosity, runBoard, chiRatioTc } from "./consistency.mjs";
+import { pairIsingTc, pairTrapDeltaF, pairLbmViscosity, pairDiffusion, runBoard, chiRatioTc } from "./consistency.mjs";
 
 
 let fails = 0;
@@ -63,6 +63,20 @@ for (const p of board) ok("!! " + p.name + " — two mechanisms, one number", p.
     ok("...and the two routes really are different mechanisms, which is what makes the agreement mean anything",
        p.a.mechanism !== p.b.mechanism && p.a.mechanism === "einstein-msd" && p.b.mechanism === "green-kubo-vacf",
        "one integrates displacement over long times, the other correlates velocities over short ones; their equality is a theorem, so a disagreement is always a bug");
+}
+
+// ---- pairDiffusion called DIRECTLY (not just through runBoard): its own tolerance arithmetic ----------------------
+// pairDiffusion wraps diffusionPair() and sets tol = 10% of the mean of the two routes' values -- that formula
+// is this function's own contribution, distinct from diffusionPair's physics, so check it explicitly.
+{
+    const d1 = pairDiffusion({ fast: true });
+    const expectedTol = 0.10 * (d1.a.value + d1.b.value) / 2;
+    ok("!! pairDiffusion's tolerance is EXACTLY 10% of the mean of its two route values",
+       Math.abs(d1.tol - expectedTol) < 1e-12,
+       "tol " + d1.tol.toFixed(6) + " vs 0.10*(a+b)/2 = " + expectedTol.toFixed(6));
+    const d2 = pairDiffusion({ fast: true });
+    ok("...and calling it directly twice with fast:true reproduces bit-identically (seeded, not flaky)",
+       d1.a.value === d2.a.value && d1.b.value === d2.b.value && d1.name === d2.name);
 }
 
 console.log(fails ? ("[consistency-selfcheck] FAILED " + fails) : "[consistency-selfcheck] all passed");

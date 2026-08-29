@@ -86,6 +86,19 @@ export const MODES = [
     // warning, only the one-time GLB download the `needs` probe already covers for every rigged slot.
     { id: "ascii", label: "🔤", title: "ASCII avatar — the loaded GLB sampled into a character ramp, live (monochrome by default, color toggle in-panel)", kind: "frame",
       src: "/ascii-avatar.html?glb=RobotExpressive", needs: "/GPU_Assets/RobotExpressive.glb" },
+    // Keith: "can we do an avatar switch to render through Heerich, like we did for krbn and ascii?" A FOURTH
+    // non-WebGL surface: the loaded GLB voxelized (ui/assetVoxelizer.js, the same surface-plus-fill voxelizer
+    // asset2voxels.html uses) and drawn as a colored voxel-art SVG through vendor/heerich, a zero-dependency
+    // voxel-grid CSG-to-SVG library. `heavy` for the same reason krbn is: a redraw REBUILDS the CSG structure
+    // and re-renders to SVG, which is real CPU (MEASURED headless on RobotExpressive at this page's own
+    // resolution: ~10ms voxelize, ~2ms Heerich build, ~40-70ms toSVG with occlusion) rather than krbn's
+    // ~500ms-per-frame cost or ascii's near-zero arithmetic-over-a-framebuffer cost -- cheap enough to redraw
+    // every 700ms (heerich-avatar.html's own default) rather than krbn's 2.6s, but not free, so the button says
+    // so before the click. Placed after krbn/ascii and before gauges3000, which v4033's own gate requires stay
+    // LAST -- appending here would silently overrule that stated preference to save one edit.
+    { id: "heerich", label: "🧊", title: "Heerich voxel avatar — the loaded GLB voxelized and drawn as colored voxel-art SVG (rebuilds every ~0.7s)", kind: "frame",
+      src: "/heerich-avatar.html?glb=RobotExpressive", heavy: "rebuilds the voxel CSG and re-renders to SVG every ~0.7s",
+      needs: "/GPU_Assets/RobotExpressive.glb" },
     // v4033 -- Keith: "the last avatar choice, can we swap out the gauges and avatar scene, and swap in the
     // WebGPU gauges and avatar we already made? I think that is called Avatar3000." The page is gauges3000.html
     // ("Gauges 3000" in its own demo:title -- close enough a name that the swap is unambiguous): a WebGPU

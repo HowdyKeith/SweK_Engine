@@ -12,7 +12,7 @@
 // touches many spins, and calling it a sweep would flatter Wolff by exactly the factor being measured.
 
 import { yangMagnetisation, ONSAGER_TC } from "./ising.js";
-import { wolffMeasure, metropolisMeasure, essPerWork, pAddWRONG, pAddCorrect } from "./wolff.js";
+import { wolffMeasure, metropolisMeasure, essPerWork, pAddWRONG, pAddCorrect, makeWolff } from "./wolff.js";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -75,6 +75,52 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
     const a = wolffMeasure({ L: 16, T: 2.2, moves: 500, warmupMoves: 100 });
     const b = wolffMeasure({ L: 16, T: 2.2, moves: 500, warmupMoves: 100 });
     ok("seeded runs are bit-identical (a failure reproduces)", a.absM === b.absM && a.flips === b.flips);
+}
+
+// ---- 5. makeWolff() CALLED DIRECTLY: THE INITIAL STATE, THE TORUS INDEX, AND THE CLUSTER MOVE ITSELF -----------
+{
+    // A cold start's initial state is exact and hand-checkable: L*L spins, every one +1, zero energy above the
+    // ground state (E/N = -2 exactly, as ising.js's own header derives).
+    const L = 6;
+    const w = makeWolff({ L, T: 2.269, seed: 5, cold: true });
+    ok("!! makeWolff reports the exact L, N=L*L it was constructed with", w.L === L && w.N === L * L,
+        "L=" + w.L + ", N=" + w.N + " for L=" + L);
+    ok("!! a cold-started lattice is EXACTLY N spins of +1, none of anything else", w.spins.length === L * L && [...w.spins].every((v) => v === 1),
+        "spins.length=" + w.spins.length + ", every entry === 1");
+    ok("!! and its magnetisation/energy read the exact ground-state values, not an approximation",
+        w.magnetisation() === 1 && w.energy() === -2,
+        "magnetisation=" + w.magnetisation() + ", energy=" + w.energy() + " -- E/N=-2 is ising.js's own derived ground state");
+    ok("!! idx() wraps the torus exactly: L maps to 0 and -1 maps to L-1 on both axes",
+        w.idx(L, 3) === w.idx(0, 3) && w.idx(-1, 3) === w.idx(L - 1, 3) && w.idx(2, L) === w.idx(2, 0) && w.idx(2, -1) === w.idx(2, L - 1),
+        "periodic boundary conditions checked on both axes, not merely one");
+
+    // clusterMove() with pAdd forced to 1 (always join) on a UNIFORM cold lattice must sweep the ENTIRE aligned
+    // lattice into one cluster -- every neighbour agrees in sign and every join succeeds, so size === N exactly
+    // and the whole lattice flips sign in a single move.
+    const full = makeWolff({ L, T: 2.269, seed: 5, cold: true, pAdd: () => 1 });
+    const fullSize = full.clusterMove();
+    ok("!! clusterMove() with P_add forced to 1 on a uniform lattice claims the WHOLE lattice, size === N exactly",
+        fullSize === L * L, "cluster size " + fullSize + " for N=" + (L * L));
+    ok("!! ...and flips it entirely: magnetisation goes from +1 to EXACTLY -1 in one move",
+        full.magnetisation() === -1, "magnetisation after the move: " + full.magnetisation());
+
+    // clusterMove() with pAdd forced to 0 (never join) must be unable to grow past the seed site: size === 1
+    // exactly, and the magnetisation moves by exactly 2/N -- one spin flipped, no more, no fewer.
+    const single = makeWolff({ L, T: 2.269, seed: 5, cold: true, pAdd: () => 0 });
+    const singleSize = single.clusterMove();
+    ok("!! clusterMove() with P_add forced to 0 can only ever take the seed site, size === 1 exactly",
+        singleSize === 1, "cluster size " + singleSize);
+    ok("!! ...and magnetisation moves by EXACTLY 2/N (one spin out of N flipped, no partial or extra flips)",
+        Math.abs(single.magnetisation() - (1 - 2 / (L * L))) < 1e-15,
+        "magnetisation " + single.magnetisation() + ", expected 1 - 2/" + (L * L) + " = " + (1 - 2 / (L * L)));
+
+    // Determinism of makeWolff's OWN initial state (as distinct from wolffMeasure's determinism, checked in
+    // section 4 above): same seed, same L, same cold flag must produce bit-identical initial spins.
+    const rep1 = makeWolff({ L: 8, T: 2, seed: 99, cold: false });
+    const rep2 = makeWolff({ L: 8, T: 2, seed: 99, cold: false });
+    ok("!! makeWolff's own random initial state is seed-reproducible, spin by spin",
+        [...rep1.spins].every((v, i) => v === rep2.spins[i]),
+        "two independent constructions with the same seed produce an identical initial lattice");
 }
 
 console.log(fails ? ("[wolff-selfcheck] FAILED " + fails) : "[wolff-selfcheck] all passed");

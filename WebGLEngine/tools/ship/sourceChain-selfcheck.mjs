@@ -246,6 +246,38 @@ ok("!! ...and its enabled state is read from the server's canPublish, never reco
     ok("...and a refusal lists what it looked for", /looked for: /.test(src));
 }
 
+// ---- 9b. A SECOND LAUNCH STOPS THE FIRST, AND NEVER TOUCHES PRODUCTION -------------------------------------
+// v4103 -- Keith: "old swek launcher is still running, and old kpop listener is still running too, not
+// closing" -- then "closing manually would be dangerous as a user could not easily tell which is old." Root
+// cause: _freePort() hands out a fresh OS port on EVERY launch() call by design (v4014, so a preview never
+// fights production for :8787), and nothing ever tracked what an earlier call had started. Click launch three
+// times, get three orphaned engines nobody can tell apart.
+//
+// *** NO WINDOWS BOX TO DRIVE THE REAL SPAWN ON, SO THE SOURCE PROPERTIES ARE WHAT CAN BE PROVEN HERE -- SAME
+// TECHNIQUE AS SECTION 8b's launcherName() REGRESSION. *** The load-bearing claim is narrow and checkable
+// without a process tree: the stop targets R.launched.port (a port THIS bridge itself recorded), never PORT
+// (production's own bound port) -- so a launch this bridge never made is structurally unreachable, not just
+// unlikely.
+{
+    ok("!! *** the SECOND launch stops the FIRST, before requesting a new port ***",
+        /if \(R\.launched && R\.launched\.port\)/.test(src) &&
+        /portHandoff\.js"\)\.freePort\(R\.launched\.port/.test(src) &&
+        src.indexOf("R.launched.port)") < src.indexOf("await _freePort()"),
+        "the auto-stop must run before a new port is requested, or a crash mid-launch leaks the old preview");
+
+    ok("!! ...and it can ONLY ever target a port THIS bridge recorded, never production's own PORT",
+        !/freePort\(PORT[,)]/.test(src),
+        "freePort(PORT) would let a preview launch kill the engine serving the page it was clicked from");
+
+    ok("!! the window gets a REAL title instead of the empty string `start` used as its dummy arg",
+        /const title = "SweK Verify v"/.test(src) && /"start", title, "\/d"/.test(src),
+        "an unlabeled console window is indistinguishable from production -- the exact danger Keith named");
+
+    ok("!! R.launched is recorded after a successful spawn, and surfaced on status()",
+        /R\.launched = \{ port, root, version: R\.clone\.version, at: Date\.now\(\) \}/.test(src) &&
+        /launched: R\.launched,/.test(src));
+}
+
 // ---- 9. LAUNCH IS ROUTED, AND THE PANEL HAS A BUTTON FOR IT --------------------------------------------------
 ok("!! /source-chain/launch is dispatched by handle()", /route === "\/launch"/.test(src));
 {

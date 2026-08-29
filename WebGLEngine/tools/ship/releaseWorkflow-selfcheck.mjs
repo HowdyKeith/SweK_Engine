@@ -19,7 +19,11 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+const require_ = createRequire(import.meta.url);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT = path.resolve(ENG, "..");
@@ -41,10 +45,13 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
 // ---- 1. IT OWNS NO OPINION ABOUT WHAT IS IN A RELEASE ------------------------------------------------------
 {
     console.log("1. *** THE EXCLUDE LIST LIVES IN ONE PLACE, AND IT IS NOT THIS FILE ***");
-    ok("!! the workflow calls the shared packer",
-        /tools\/ship\/packRelease\.mjs/.test(code),
-        "packRelease.mjs resolves makeInstallable() -- the same call the GitHub panel's Release button makes, so " +
-        "CI and the button cannot produce different archives");
+    // v4070 -- THIS USED TO ASSERT THAT CI CALLED packRelease, SO CI AND THE BUTTON COULD NOT DIVERGE. CI does
+    // not pack at all now: it takes the PUBLISHED archive, so there is no second build to diverge FROM, which
+    // is a stronger form of the same property than agreeing with the packer ever was.
+    ok("!! *** CI PACKS NOTHING -- IT VERIFIES THE ARCHIVE THE PUBLIC ACTUALLY DOWNLOADS ***",
+        !/packRelease\.mjs/.test(code) && /gh release download/.test(code),
+        "a zip CI built is a zip with no users: since v4068 the rig publishes, so vetting CI's own copy proved " +
+        "something about a file nobody would ever fetch while the released one was checked by nothing");
     ok("!! ...and does NOT roll its own archive",
         !/\bzip\s+-r/.test(code) && !/Compress-Archive/.test(code) && !/tar\s+-c/.test(code),
         "*** THE FAILURE MODE OF A DRIFTED COPY IS PUBLISHING A CREDENTIAL, NOT A BROKEN BUILD. *** A second " +
@@ -66,7 +73,7 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
         "the tag is what everybody downloads BY, so a tag saying one thing while main.js says another ships a " +
         "build under a name that is not its own -- the exact failure the ship ritual was written for");
     ok("!! ...and the mismatch EXITS rather than warning",
-        /refusing to publish a mislabeled build/.test(code) && /exit 1/.test(code),
+        /the published build is mislabeled/.test(code) && /exit 1/.test(code),
         "a warning in a log nobody reads after the release is already published is not a gate");
     ok("!! ...and a tree with no marker at all is refused too, not defaulted",
         /no ENGINE_VERSION marker/.test(code) && /exit 2/.test(code),
@@ -126,22 +133,126 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
 
 // ---- 5. PUBLISHING IS THE NARROW PATH ---------------------------------------------------------------------
 {
-    console.log("\n5. THE ONLY STEP THAT CANNOT BE UNDONE IS THE MOST CONDITIONAL");
-    ok("!! publishing requires a real pushed TAG, not a manual click",
-        /github\.event_name == 'push'/.test(code) && /ref_type == 'tag'/.test(code),
-        "the manual button builds and verifies and publishes NOTHING, so the whole path can be exercised " +
-        "without putting anything on the releases page");
-    ok("!! ...and it waits for the cross-OS verify, not just the build",
-        /needs:\s*\[\s*build\s*,\s*verify\s*\]/.test(code),
-        "publishing on `needs: build` alone would attach an artifact that no other machine had opened -- which " +
-        "is the state this workflow exists to end");
-    ok("...and gh --verify-tag refuses to invent a tag",
-        /--verify-tag/.test(code),
-        "gh release create will happily CREATE a missing tag otherwise, which would mint a release for a commit " +
-        "nobody tagged");
-    ok("the token is the workflow's own, with contents:write and nothing else",
-        /permissions:/.test(code) && /contents:\s*write/.test(code) && !/secrets\.[A-Z_]*(PAT|TOKEN)/.test(code.replace(/github\.token/g, "")),
-        "no personal access token is referenced; a release workflow needs to write releases and nothing more");
+    console.log("\n5. *** PUBLISHING IS THE RIG'S JOB, AND THIS WORKFLOW MUST NOT TAKE IT BACK ***");
+    // v4068 -- THIS SECTION USED TO GRADE THE PUBLISH STEP'S CONDITIONS, AND THE PUBLISH STEP IS GONE. It is
+    // re-pointed rather than deleted, because what replaced it is a REAL invariant with a measured history
+    // behind it: every run of this workflow since it was written -- ten, v3958 through v4067 -- died on
+    // `gh release create` with "a release with the same tag name already exists", because the rig publishes
+    // first and its tag push is what STARTS this workflow (v4067: release at 17:13:34Z, run at 17:13:36Z).
+    // Re-adding a publish step would resurrect a job that has never once succeeded.
+    //
+    // AND THE OBVIOUS REPAIR IS THE DANGEROUS ONE, WHICH IS WHY --clobber IS NAMED HERE RATHER THAN LEFT TO
+    // JUDGEMENT: the zip is not byte-reproducible across machines (the same commit dbc0855 packed to
+    // 26,775,683 bytes on the runner, 27,424,068 on the rig, 27,766,762 in a third checkout), so an upload
+    // over the rig's asset would silently replace a verified, already-downloaded artifact with a different one.
+    ok("!! the workflow does NOT create or upload a release -- the rig is the publisher",
+        !/gh\s+release\s+(create|upload|edit|delete)/.test(code),
+        "ten straight red runs came from racing a publisher that had already finished. Build and verify are " +
+        "what this workflow is for and what has always passed");
+    ok("!! *** AND IF PUBLISHING EVER COMES BACK, IT MAY NOT CLOBBER *** -- --clobber is refused outright",
+        !/--clobber/.test(code),
+        "the zip is not byte-reproducible across machines, so overwriting the rig's asset would replace a " +
+        "verified build with a differently-assembled one, under a release somebody had already downloaded. " +
+        "A publisher that overwrites a good artifact to make its own log go green is worse than a red X");
+    ok("!! the token asks for READ and nothing more, now that nothing writes",
+        /permissions:/.test(code) && /contents:\s*read/.test(code) && !/contents:\s*write/.test(code) &&
+        !/secrets\.[A-Z_]*(PAT|TOKEN)/.test(code.replace(/github\.token/g, "")),
+        "least privilege is checkable here: the token's reach should end where the job's work does, and no " +
+        "personal access token is referenced either");
+    ok("!! no input is declared that nothing reads -- the dry_run flag that lied is gone",
+        !/dry_run/.test(code),
+        "dry_run was declared 'Build and verify, but publish nothing' and referenced NOWHERE: publish already " +
+        "gated on push+tag, which is false for a manual run, so the button was a dry run whether the toggle " +
+        "said true or false. A control that reads as a choice and is wired to nothing is worse than no control");
+    ok("...and the cross-OS verify gates on the fetch, so all three open THE PUBLISHED bytes",
+        /needs:\s*fetch/.test(code) && !/needs:\s*build/.test(code),
+        "the archive is downloaded ONCE and handed to the matrix: re-downloading per job would let a mid-run " +
+        "re-upload split the three, and packing per job would have them opening three different zips");
+}
+
+// ---- 6. THE PUBLISHED ARCHIVE IS TAKEN CAREFULLY, NOT ASSUMED --------------------------------------------
+{
+    console.log("\n6. *** VERIFYING THE PUBLISHED ARCHIVE MEANS WAITING FOR IT AND DISTRUSTING IT ***");
+    // v4070 -- fetching what the rig published introduces three states that packing your own never had: the
+    // asset may not exist YET, may never exist, and may be half-uploaded. Each is checked, because each fails
+    // differently and only one of them is a real problem with the release.
+    ok("!! the asset is WAITED for rather than read once -- the race is real and measured",
+        /for i in \$\(seq 1 \d+\)/.test(code) && /sleep \d+/.test(code),
+        "the rig pushes the tag AS PART of publishing, so this workflow starts while the upload is still " +
+        "finishing: on v4067 the run began at 17:13:36Z against an asset whose updated_at was 17:13:37Z. " +
+        "Reading once and failing would be a flake generator");
+    ok("!! ...and the wait is BOUNDED, so a release that never got a build fails loudly instead of hanging",
+        /carries no \.zip after/.test(code) && /exit 1/.test(code),
+        "'the rig did not publish' is a real finding about the release -- an unbounded wait would turn it into " +
+        "a job that never reports");
+    ok("!! *** A PARTIAL UPLOAD IS DISPROVED WITH unzip -t, NOT WITH A SIZE CHECK ***",
+        /unzip -t/.test(code) && /not a complete zip/.test(code),
+        "an asset that EXISTS and a COMPLETE archive are different facts, and a size check passes a truncated " +
+        "one. Driven against a deliberately truncated zip before shipping: caught, exit 1");
+    ok("!! the credential sweep and the ship gate both read the DOWNLOADED archive, not a packed one",
+        /unzip -Z1 "\$ZIP"/.test(code) && /dl\/\$\{\{ steps\.get\.outputs\.zipname \}\}/.test(code),
+        "*** THIS IS THE GAP v4070 CLOSED. *** The sweep's own note calls it the one claim whose failure cannot " +
+        "be taken back once a release is public -- and it was reading a file CI packed itself. If the rig's " +
+        "packer ever drifted from SKIP_FILES, CI would have gone green while the public archive carried the secret");
+    ok("...and the token still asks only for read, since downloading a public release needs nothing more",
+        /contents:\s*read/.test(code) && !/contents:\s*write/.test(code),
+        "fetching an asset is a read; the reach did not have to grow to gain the coverage");
+}
+
+// ---- 7. THE ARCHIVE THE RIG ACTUALLY PRODUCES IS SPEC-CONFORMANT ------------------------------------------
+{
+    console.log("\n7. *** BACKSLASH SEPARATORS: THE DEFECT v4070's OWN CHANGE FOUND ON ITS FIRST RUN ***");
+    // PowerShell's Compress-Archive -- the win32 branch of packagerBridge._zip -- writes BACKSLASH separators,
+    // against APPNOTE 4.4.17.1 ("All slashes MUST be forward slashes '/'"). Measured on the published
+    // SweK_Engine_v4070.zip: 4910 entries, 4910 with a backslash, zero with a forward slash. Info-ZIP's unzip
+    // warns and repairs, which is why it never showed on the rig; Python's zipfile does not, which is how
+    // verify_zip.py found it the moment v4070 pointed CI at the PUBLISHED archive instead of a local copy.
+    const { normalizeZipSeparators } = require_(path.join(ENG, "ai-bridge", "packagerBridge.js"));
+    ok("!! the packer exports a separator normaliser at all", typeof normalizeZipSeparators === "function");
+
+    // A REAL zip, built here with a backslash name, so this drives the function rather than reading it.
+    const nm = Buffer.from("Pack_v1\\sub\\a.txt", "latin1"), data = Buffer.from("hi");
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 8);
+    lh.writeUInt32LE(0xDEADBEEF, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22);
+    lh.writeUInt16LE(nm.length, 26);
+    const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(0, 10); cd.writeUInt32LE(0xDEADBEEF, 16); cd.writeUInt32LE(data.length, 20);
+    cd.writeUInt32LE(data.length, 24); cd.writeUInt16LE(nm.length, 28); cd.writeUInt32LE(0, 42);
+    const cdStart = lh.length + nm.length + data.length;
+    const eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(1, 8); eo.writeUInt16LE(1, 10);
+    eo.writeUInt32LE(cd.length + nm.length, 12); eo.writeUInt32LE(cdStart, 16);
+    const zipPath = path.join(os.tmpdir(), "swek-sep-gate-" + process.pid + ".zip");
+    fs.writeFileSync(zipPath, Buffer.concat([lh, nm, data, cd, nm, eo]));
+
+    const before = fs.readFileSync(zipPath);
+    const r = normalizeZipSeparators(zipPath);
+    const after = fs.readFileSync(zipPath);
+    ok("!! it rewrites BOTH copies of the name -- the central directory's and the local header's",
+        r.ok && r.entries === 1 && r.bytesFixed === 4,
+        "two backslashes, stored twice = 4 bytes. A reader may consult either copy, so fixing one would leave " +
+        "the archive disagreeing with itself: " + JSON.stringify(r));
+    ok("!! ...and NOTHING BUT THOSE BYTES MOVES -- same length, same CRC, same offsets",
+        after.length === before.length &&
+        after.readUInt32LE(cdStart + 16) === 0xDEADBEEF &&      // the CRC field, untouched
+        after.readUInt32LE(cdStart + 42) === 0,                 // the local-header offset, untouched
+        "*** THIS IS WHY THE REPAIR IS SAFE: '\\' and '/' are both ONE BYTE. *** Rewriting names in place " +
+        "changes no size, no offset and no checksum, so the archive is structurally identical afterwards -- " +
+        "which a re-pack could never promise");
+    const names = after.slice(cdStart + 46, cdStart + 46 + nm.length).toString("latin1");
+    ok("!! the stored name is a real path now",
+        names === "Pack_v1/sub/a.txt" && !names.includes("\\"),
+        "stored as: " + names);
+    ok("!! ...and a second pass is a NO-OP, so an already-clean archive is never rewritten",
+        normalizeZipSeparators(zipPath).bytesFixed === 0,
+        "`zip -rq` on Linux already writes forward slashes, so this must cost nothing there -- and it means a " +
+        "future packer change cannot silently reintroduce the defect either");
+    try { fs.unlinkSync(zipPath); } catch {}
+
+    const pb = fs.readFileSync(path.join(ENG, "ai-bridge", "packagerBridge.js"), "utf8");
+    const pbCode = pb.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    ok("!! and _zip calls it on EVERY archive, not only the Windows one",
+        /normalizeZipSeparators\(outZip\)/.test(pbCode) && !/win32[\s\S]{0,80}normalizeZipSeparators/.test(pbCode),
+        "gating it behind a platform test would leave the defect one packer-swap away from returning");
 }
 
 console.log(fails ? `\nreleaseWorkflow-selfcheck: ${fails} FAILED` : "\nreleaseWorkflow-selfcheck: all checks pass");

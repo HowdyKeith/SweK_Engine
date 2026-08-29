@@ -187,8 +187,19 @@ async function loadAvatar(src, label) {
 // about:blank precisely because a hidden surface that keeps working is "a second GPU context burning frames
 // behind a panel nobody is looking at". This one burns CPU rather than GPU, on the main thread, for half a
 // second at a time -- so the interval is cleared on unload rather than left to the frame's destruction timing.
-addEventListener("pagehide", () => { dead = true; clearInterval(timer); });
-addEventListener("unload",   () => { dead = true; clearInterval(timer); });
+// v4073 -- the same one-way teardown as its ascii sibling, and THE GATE COULD NOT SEE THIS ONE. bfcache's
+// detector looks for dispose/close/terminate/loseContext/abort near a pagehide; this handler reaches the same
+// end -- a restored page frozen at `dead = true` with its timer cleared and nothing to restart it -- using
+// none of those verbs, so it passed while ascii-avatar.html failed. Same defect, same round (v4046/v4050),
+// caught only because fixing the sibling meant reading it. The detector is widened in the same commit.
+//
+// No socket here either, so the freeze breaks nothing and there is nothing to rebuild. The `unload` listener
+// is removed for the reason given in ascii-avatar.html: it makes the page bfcache-ineligible, so leaving it
+// would mean shipping a guard no browser ever reaches.
+addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    dead = true; clearInterval(timer);
+});
 
 // Re-fit when the host box changes shape. Cheap: it only re-draws, it does not re-parse the GLB.
 let rz = 0;

@@ -91,11 +91,38 @@ function nodeGlobalsIn(rel) {
     // This is not a parser and does not pretend to be. It knows one shape -- `if (IS_NODE ...) { ... }` -- and
     // that is the shape the fix uses. A GATE THAT UNDERSTANDS EXACTLY THE THING IT GUARDS IS HONEST; ONE THAT
     // CLAIMS TO UNDERSTAND JAVASCRIPT IS LYING.
+    // v4073 -- *** AND A LINE-BASED GATE CANNOT SEE A MULTI-LINE CONDITION EITHER, WHICH IS THE SAME LESSON THIS
+    // FILE HAS NOW LEARNED THREE TIMES. *** The rig flagged physics/crystal/structureFactor.mjs [243, 245] and
+    // physics/crystal/powder.mjs [230, 232]. ALL FOUR LINES ARE CORRECTLY GUARDED. Their guard is:
+    //
+    //     if (typeof process !== "undefined" && Array.isArray(process.argv) &&
+    //         import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1] || "").href) {
+    //
+    // The opening `{` is on the SECOND line, so on the first line `opensGuard` fired, `guardDepth` was set to
+    // the current depth, no brace was counted, and the very next statement -- `depth <= guardDepth` -- CLOSED
+    // THE GUARD BEFORE IT HAD EVER OPENED. Everything after it read as unguarded. Measured in isolation before
+    // the fix: the shipped detector returned ["3: process","4: process"] on a two-line guard and [] on the
+    // one-line spelling of exactly the same thing.
+    //
+    // The continuation lines of the condition are protected by the SAME short circuit as the first: once
+    // `typeof process !== "undefined" &&` is false, nothing further in that condition is evaluated at all. So
+    // they are excused as part of the test, not as part of the body. A guard is PENDING from the line that
+    // opens it until the brace that opens its block, and only a guard that actually opened can close.
+    //
+    // v4000 said "A GATE THAT ONLY RECOGNISES THE IDIOM ITS AUTHOR HAPPENED TO WRITE IS A STYLE RULE WEARING A
+    // SAFETY RULE'S CLOTHES." This was the same thing about WHERE THE AUTHOR HAPPENED TO PUT A NEWLINE -- and
+    // the cost is the one the header already names: two innocent physics modules reported as unsafe, in a gate
+    // whose whole value is that somebody believes it at 2am.
+    //
+    // WHAT THIS STILL DOES NOT CLAIM: the INVERTED guard's test (`typeof process === "undefined" || ...`) is
+    // excused only on the lines that carry the `typeof process` spelling, so an inverted test split across
+    // lines would still report its continuation. That is stated rather than fixed blind -- the tree has no
+    // instance of it, and the positive control below requires the inverted guard's BODY to stay catchable.
     const bad = [];
-    let guardDepth = -1, depth = 0;
+    let guardDepth = -1, depth = 0, guardPending = false;
     src.split("\n").forEach((line, i) => {
         const opensGuard = /if\s*\(\s*IS_NODE\s*&&/.test(line) || /if\s*\(\s*typeof process\s*!==?\s*["']undefined["']/.test(line);
-        const inGuard = guardDepth >= 0 && depth > guardDepth;
+        const inGuard = guardDepth >= 0 && (guardPending || depth > guardDepth);
         if (!inGuard && !opensGuard) {
             // THE GUARD'S OWN DEFINITION LINE IS NOT A USE, AND IT HAS TWO SPELLINGS.
             //
@@ -116,9 +143,11 @@ function nodeGlobalsIn(rel) {
                 if (/(^|[^.\w])__dirname/.test(line)) bad.push((i + 1) + ": __dirname");
             }
         }
-        if (opensGuard && guardDepth < 0) guardDepth = depth;
+        if (opensGuard && guardDepth < 0) { guardDepth = depth; guardPending = true; }
         for (const ch of line) { if (ch === "{") depth++; else if (ch === "}") depth--; }
-        if (guardDepth >= 0 && depth <= guardDepth) guardDepth = -1;
+        // A GUARD THAT HAS NOT OPENED YET CANNOT CLOSE -- this is the whole v4073 fix.
+        if (guardDepth >= 0 && !guardPending && depth <= guardDepth) guardDepth = -1;
+        if (guardPending && depth > guardDepth) guardPending = false;
     });
     return bad;
 }
@@ -152,6 +181,39 @@ function nodeGlobalsIn(rel) {
     fs.unlinkSync(guarded);
     ok("...and it does NOT flag a correctly guarded use", clean.length === 0,
        "`typeof process !== 'undefined'` IS the fix, so a gate that flagged it would force everyone to delete their CLIs. A GATE THAT CANNOT BE SATISFIED GETS SWITCHED OFF.");
+
+    // v4073 -- *** THE FIXTURE ABOVE IS ONE LINE LONG, AND THAT IS WHY IT PASSED THROUGH THE BUG. *** The
+    // detector forgot any guard whose opening brace was not on the line that opened it, so the two real physics
+    // modules using the multi-line spelling were reported as unsafe while this single-line control stayed
+    // green. A positive control that only exercises the author's own formatting proves the author's formatting.
+    const multi = path.join(ROOT, "brain", "bench", "__gatecheck3.mjs");
+    fs.writeFileSync(multi, 'export const x = 1;\n' +
+        'if (typeof process !== "undefined" && Array.isArray(process.argv) &&\n' +
+        '    import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1] || "").href) {\n' +
+        '    process.exit(0);\n}\n');
+    const spread = nodeGlobalsIn("brain/bench/__gatecheck3.mjs");
+    fs.unlinkSync(multi);
+    ok("!! ...INCLUDING one whose condition SPANS LINES, which is the shape the tree actually uses",
+       spread.length === 0,
+       "the guard's `{` lands on the second line, so the shipped detector set guardDepth and then CLOSED IT ON " +
+       "THE SAME LINE -- `depth <= guardDepth` with no brace counted yet -- and everything after read as " +
+       "unguarded. Measured before the fix: [\"3: process\",\"4: process\"] here against [] for the identical " +
+       "one-line guard. A guard is PENDING until the brace that opens its block, and only an OPENED guard can " +
+       "close. Both physics/crystal modules use this spelling and both were innocent.");
+
+    // ...and the widening must not have bought the pass by forgiving a real bug. The INVERTED guard opens the
+    // BROWSER branch, so a node global inside its body is exactly the crash this gate exists for.
+    const inverted = path.join(ROOT, "brain", "bench", "__gatecheck4.mjs");
+    fs.writeFileSync(inverted, 'export const x = 1;\n' +
+        'if (typeof process === "undefined" || !process.versions) {\n' +
+        '    console.log(process.argv[1]);\n}\n');
+    const stillCaught = nodeGlobalsIn("brain/bench/__gatecheck4.mjs");
+    fs.unlinkSync(inverted);
+    ok("!! ...and the BODY of an inverted guard is STILL caught, so the widening bought no false pass",
+       stillCaught.length === 1 && stillCaught[0].startsWith("3:"),
+       JSON.stringify(stillCaught) + " -- `typeof process === \"undefined\"` opens the branch that runs WHERE " +
+       "THERE IS NO process, so a node global in there is the bug itself. v4000 excused that guard's TEST line " +
+       "and never its block, and this check is what keeps the v4073 widening from quietly excusing the block too.");
 }
 
 // ---- 3. THE LIVE GATE: LOAD THE ACTUAL PAGE IN AN ACTUAL BROWSER -------------------------------------------------

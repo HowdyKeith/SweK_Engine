@@ -12,6 +12,14 @@
 
 const TYPES = [
     { type: "home-assistant", protocol: "tcp" },   // the one we care about most
+    // v4063 — the Enphase IQ Gateway (Envoy) advertises itself with its serial in the TXT record
+    // ("serialnum"), which is how Home Assistant discovers it too. envoySolar.js reads the LAN
+    // solar/battery truth straight off that gateway and asks THIS browser where it lives, rather
+    // than opening a second socket on 224.0.0.251:5353 — two browsers on the multicast group is the
+    // shape that produces the "UDP panics on Bun/Windows" bug the camera and Roku discoverers
+    // already carry notes about. envoySolar.MDNS_TYPE must equal the `type` here; its gate asserts
+    // that rather than trusting this comment.
+    { type: "enphase-envoy", protocol: "tcp" },
     { type: "http",        protocol: "tcp" },
     { type: "https",       protocol: "tcp" },
     { type: "hap",         protocol: "tcp" },       // HomeKit accessories

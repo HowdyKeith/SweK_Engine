@@ -1,8 +1,8 @@
 {
  "note": "v3186 -- FROZEN LAB RESULTS. Every gate in the lab checks a RELATIONSHIP (error < tol, ratio ~ 2, converges) and NOTHING CHECKED THE VALUES, so a number could drift on a refactor, a dependency bump or a float change and every gate would still pass. 26 of 27 devices are DETERMINISTIC (measured, replay-exact); lbm has no defaults() and its ABSENCE IS FROZEN so the day it grows one the gate says so. Comparison is EXACT: a difference is a FINDING, and a tolerance would hide the day a device stops being deterministic. Re-freeze DELIBERATELY after an intended change: SWEK_FREEZE_LAB_RESULTS=1 node tools/roundhouse/labResults-selfcheck.mjs  RE-FROZEN v3336: the previous capture was stamped v3186 -- 150 versions and 17 devices stale, and verify.mjs does not run this gate. IT WAS NOT RE-FROZEN BLIND: all 52 devices were compared against the v3186 values first and NOTHING HAD MOVED (moved 0, vanished 0, appeared 0), so this absorbs 17 NEW devices and no drift. A blanket re-freeze without that comparison would have been a record of whatever happened to be there.  v3340: ONE DEVICE ADDED (fieldnav) BY DELTA, NOT BY BLANKET RE-FREEZE. All 52 existing devices were compared first and NONE had moved (moved 0, vanished 0, appeared 0) despite the v3339 patches touching probeBind and instruments -- so their v3336 values stand untouched rather than being rewritten from a run they did not need. Rewriting them would have discarded the ratchet to add one row.  v3366: added by DELTA again -- only the devices absent from the baseline were captured; every existing row keeps its frozen value, so the ratchet is extended rather than discarded.  v3379: reaction added BY DELTA -- only the new device was captured; every existing row keeps its frozen value.  v3380: beam added BY DELTA -- only the new device captured.  v3381: pulsar added BY DELTA.  v3382: galaxy and geostats added, AND THE FIRST FULL RE-RUN OF EVERY FROZEN ROW SINCE v3336 -- five rounds had extended this baseline BY DELTA, which never re-runs the rows it protects. All 57 existing devices were captured in two chunks (twof 100s and kh 22s in one, the other 55 in the other) and compared BEFORE anything was written: MOVED 0, VANISHED 0, APPEARED 1. The one appearance is twof.dragOverLift, null at freeze time and 0.1262 now, WITH EVERY OTHER twof VALUE BIT-IDENTICAL -- so the physics did not move. THE CAUSE IS v3341, which fixed dominantFrequency(...).freq being read as an object: every frequency in twoFExperiment.mjs had been NaN since v2862, so the ratio was absent for a reason that no longer holds. liftSustained is STILL false, so the run remains DISQUALIFIED and the 2f question remains open -- what changed is that the negative is now a number from a bad run rather than no number at all. Absorbed DELIBERATELY with that reason, and the stale lbm-two-frequency instrument key was corrected in the same commit.  v3391: FULL RE-RUN AGAIN, second in a row -- v3382 argued a delta never re-runs the rows it protects, so this build re-ran all 59 existing devices in two chunks before writing. MOVED 0, VANISHED 0, APPEARED 1. The appearance is clocks.crossoverErrOrder = 0, added THIS round as the order statistic for the clocks planted error, and it reads zero because the baseline run plants nothing. Four new devices absorbed from the v3390 patch (nuclear, seismic, acoustics, em).  v3392: FULL RE-RUN, third in a row. All 63 devices captured in two chunks and compared BEFORE writing: MOVED 0, VANISHED 0, APPEARED 2 -- inspiral.ratePower and inspiral.a0Exponent, both added THIS round for the wrong-power-law plant, and the unplanted run reports 3 and 4 exactly as Peters does. kerr gained `planted` (boolean, so runRecord drops it) and its horizon values are UNCHANGED, which is the evidence that the plant is opt-in rather than always on. AND THE CAPTURE SCRIPT ITSELF FAILED SILENTLY FIRST: it still pointed at the previous rounds path, exited 1, and the comparison ran against STALE JSON and reported a comfortable moved 0. A COMPARISON IS ONLY AS GOOD AS THE FRESHNESS OF BOTH SIDES.  v3393: FULL RE-RUN, fourth in a row, and THE CAPTURE SCRIPT WAS REPOINTED AT THE CURRENT DIRECTORY FIRST -- v3392 ran it against a renamed path, got exit 1, and compared stale JSON to the baseline while reporting a comfortable moved 0. MOVED 0, VANISHED 0, APPEARED 0: pipe3d gained only `planted`, which is a boolean and dropped by runRecord, so the reader plant leaves every frozen number untouched -- which is the evidence that it is opt-in.",
  "captured": "v3446",
- "deviceCount": 75,
- "observables": 638,
+ "deviceCount": 129,
+ "observables": 1264,
  "devices": {
   "friction": {
    "mode": "critical",
@@ -135,8 +135,8 @@
     "period": 6.32591,
     "returnDist": 0.000005305096075403748,
     "thirdDist": -1,
-    "energyDriftFrac": -1,
-    "angMomDrift": -1,
+    "energyDriftFrac": 8.625489897207176e-16,
+    "angMomDrift": 1.2664718042733683e-15,
     "nudge": 0,
     "returnRatio": -1,
     "linearityErrFrac": -1,
@@ -199,6 +199,176 @@
     "energyDriftFrac": 3.410225004143458e-10
    }
   },
+  "xenon": {
+   "mode": "pit",
+   "outputs": {
+    "eqIodine": 2869836127203242.5,
+    "eqXenon": 866163547498442.1,
+    "batemanXe": 1579085736867541.8,
+    "rk4Xe": 1579085736867529.5,
+    "batemanVsRk4Rel": 7.757653504173004e-15,
+    "peakHours": 8.383333333333333,
+    "peakRatio": 1.903385296561501,
+    "peakTimeLimitH": 11.129092398335509,
+    "peakAtHighFlux": 11.12888888888889,
+    "limitApproachRel": 0.00001828625725575816,
+    "approachSpanH": 0.9905555555555559,
+    "approachMonotone": 1,
+    "pitRisingSign": 1,
+    "pitThresholdClosed": 283815966302.10126,
+    "pitThresholdBisected": 283815966302.10284,
+    "thresholdRel": 5.591348799633233e-15
+   }
+  },
+  "fragmentRotation": {
+   "mode": "fragments",
+   "outputs": {
+    "rotatedBoxWorstErr": 3.552713678800501e-15,
+    "traceResidual": 0,
+    "spectrumPhysical": 1,
+    "censusTotal": 6,
+    "censusDistinct": 6,
+    "censusDegenerate": 0,
+    "censusWorstTraceResidual": 3.1933652770518397e-16,
+    "censusAllPhysical": 1,
+    "censusWorstSpread": 0.8048780487804877
+   }
+  },
+  "structureFactor": {
+   "mode": "absences",
+   "outputs": {
+    "nAbsent": 540,
+    "nAllowed": 188,
+    "worstAbsent": 9.797174393178826e-16,
+    "minAllowed": 4,
+    "absenceGap": 4082809838298842.5,
+    "closedVsSumWorst": 9.797174393178826e-16,
+    "reciprocalResidualCubic": 0,
+    "reciprocalResidualTriclinic": 8.881784197001252e-16,
+    "forbiddenLitUp": 0
+   }
+  },
+  "powder": {
+   "mode": "friedel",
+   "outputs": {
+    "r3Mismatches": 0,
+    "r3CheckedTo": 121,
+    "r3AtSeven": 0,
+    "legendreGaps": 19,
+    "legendreGapsAbsentFromRings": 19,
+    "friedelPairs": 2916,
+    "friedelWorstReal": 0,
+    "breakNonCentroHalf": 2.738966595928402,
+    "breakNonCentroTwo": 6.992256391181141,
+    "breakNonCentroZero": 0,
+    "breakCentroTwo": 1.7763568394002505e-15,
+    "unreachableRingRefused": 1
+   }
+  },
+  "renderBounce": {
+   "mode": "series",
+   "outputs": {
+    "kMeasured": 0.24911666666666665,
+    "kGeometric": 0.25,
+    "kResidual": 0.0008833333333333471,
+    "seriesWorstRel": 0.0046167846760963895,
+    "seriesDepths": 6,
+    "whiteFurnaceWorstRel": 0.003418196346525271,
+    "deficitVsKPowNWorst": 0.002566666666666717,
+    "neeRel": 0.00025162909855866444,
+    "bsdfRel": 0.010333333333333306,
+    "misRel": 0.000991288376667454,
+    "misWeightSumErr": 0,
+    "identityResidual": 0.002333333333496501
+   }
+  },
+  "reconQuality": {
+   "mode": "blindspot",
+   "outputs": {
+    "scaledCorr": 1.0000000000000522,
+    "scaledRms": 9.88128930732152e-14,
+    "shiftedCorr": 1.000000000000074,
+    "shiftedRms": 2.9432502564068614e-13,
+    "recoveredGain": 1.3000000000000853,
+    "gainRecoveryErr": 8.526512829121202e-14,
+    "recoveredOffset": 0.39999999999979885,
+    "offsetRecoveryErr": 2.0117241206207837e-13,
+    "absRmsScaled": 0.41819470701314565,
+    "absRmsShifted": 0.7922615625356775,
+    "structureScaled": 0.8412698412698413,
+    "ssimScaled": 0.9365533439124712,
+    "edgesScaled": 0.9175257731958762,
+    "iouScaled": 1,
+    "iouShifted": 0.4952256944444444,
+    "fbpRatioMean": 0.9455679270833335,
+    "fbpRatioSpread": 0.018543833333333315,
+    "fbpGainSpread": 0.502127
+   }
+  },
+  "manifoldCensus": {
+   "mode": "census",
+   "outputs": {
+    "tetraNmVertices": 0,
+    "tetraClosed": 1,
+    "tetraEuler": 2,
+    "tetraEulerDefect": 0,
+    "bowtieBoundary": 0,
+    "bowtieNmEdges": 0,
+    "bowtieNmVertices": 1,
+    "bowtieClosed": 0,
+    "bowtieComponents": 1,
+    "bowtieEuler": 3,
+    "bowtieEulerDefect": 1,
+    "openQuadBoundary": 4,
+    "openQuadNmVertices": 0,
+    "finNmEdges": 1,
+    "mtFaces": 3168,
+    "mtNmEdges": 0,
+    "mtNmVertices": 0,
+    "mtClosed": 1,
+    "mtComponents": 1,
+    "mtEuler": 2,
+    "mtEulerDefect": 0,
+    "dcFaces": 414,
+    "dcNmEdges": 0,
+    "dcNmVertices": 0,
+    "dcClosed": 1,
+    "dcComponents": 1,
+    "dcEuler": 2,
+    "dcEulerDefect": 0,
+    "csgFaces": 120,
+    "csgNmVertices": 0,
+    "csgComponents": 4,
+    "csgEuler": 8,
+    "csgEulerDefect": 0,
+    "emptyClosed": 1,
+    "emptyComponents": 0,
+    "emptyEuler": 0
+   }
+  },
+  "strokeMorph": {
+   "mode": "morph",
+   "outputs": {
+    "straightLineWorstErr": 6.280369834735101e-16,
+    "resampleEndpointMismatch": 0,
+    "resampleEndpointPlantedMismatch": 0,
+    "morphZeroMismatch": 0,
+    "morphOneMismatch": 0,
+    "morphComparisons": 640,
+    "naiveLerpZeroMismatch": 0,
+    "naiveLerpOneMismatch": 40,
+    "naiveWorstDrift": 1.7763568394002505e-15,
+    "pathStringDiffPairs": 0,
+    "reversedPairs": 4,
+    "travelSavedWorst": 110.86922015766083,
+    "parserRefusals": 5,
+    "parserAccepted": 0,
+    "glyphs": 10,
+    "multiSubpathGlyphs": 0,
+    "zTerminatedGlyphs": 0,
+    "endpointCoincidentGlyphs": 2
+   }
+  },
   "xpbd": {
    "mode": "hooke",
    "outputs": {
@@ -258,6 +428,155 @@
     "nB": 0.07133219721404896,
     "nC": 0.6820708388443446,
     "planted": false
+   }
+  },
+  "kinetics": {
+   "mode": "period",
+   "outputs": {
+    "rootCount": 7,
+    "dominantRate": 0.17439672775521292,
+    "periodSeconds": 5.734052541419366,
+    "inhourVsRk4": 2.4986852836884635e-14,
+    "planted": false
+   }
+  },
+  "bell": {
+   "mode": "chsh",
+   "outputs": {
+    "chshExact": 2.82842712474619,
+    "chshMatrix": 2.82842712474619,
+    "violatesClassical": true,
+    "tsirelsonGap": 4.440892098500626e-16,
+    "classicalMargin": 0.8284271247461898,
+    "planted": false
+   }
+  },
+  "laneemden": {
+   "mode": "profile",
+   "outputs": {
+    "xi1": 3.141592653623956,
+    "hasSurface": true,
+    "massIntegral": 3.141592653588522,
+    "surfaceVsExact": 1.0874387134916686e-11,
+    "planted": false
+   }
+  },
+  "lotkavolterra": {
+   "mode": "cycle",
+   "outputs": {
+    "firstIntegralDrift": 0.0003456409606844568,
+    "amplitudeRatio": 1.0000030430795412,
+    "firstIntegralSeries": [
+     -0.12947716197787473,
+     -0.12919294889388677,
+     -0.1291842494295098,
+     -0.12938001687079803,
+     -0.12959596940320006,
+     -0.12970778041999387,
+     -0.1296766011707018,
+     -0.12952602488944476,
+     -0.12932608104142762,
+     -0.1291871873584971,
+     -0.12923348447716143,
+     -0.1294995309740501,
+     -0.12977766607905727,
+     -0.12973606833368723,
+     -0.12940458524274878,
+     -0.1291672083274431,
+     -0.12921351196524877,
+     -0.12942767896064655,
+     -0.12962952356993862,
+     -0.1297130146809291,
+     -0.12965400917193648,
+     -0.12948632647898728,
+     -0.129288709968169,
+     -0.12917813646754972,
+     -0.1292722672991653,
+     -0.1295667305025141,
+     -0.1298023468024454,
+     -0.12968138375858684,
+     -0.12933689520390723,
+     -0.1291543604109493,
+     -0.12924983778027377,
+     -0.12947452702673212,
+     -0.12965790609200178,
+     -0.12971217362275267,
+     -0.1296267802978992,
+     -0.12944525341473,
+     -0.12925489302158066,
+     -0.12917791453550675,
+     -0.1293203431446064,
+     -0.12963186976676977,
+     -0.1298104208562636,
+     -0.12961641468818508,
+     -0.12927717463818755,
+     -0.12915395820161346,
+     -0.12929148159228665,
+     -0.1295193476184392,
+     -0.12968069308453922,
+     -0.12970538774360518,
+     -0.1295954349832973,
+     -0.1294036837740966,
+     -0.12922576872533442,
+     -0.1291872639463032,
+     -0.12937646958588855,
+     -0.1296914542769907,
+     -0.12980102007372518,
+     -0.1295449731117757,
+     -0.12922779539013374,
+     -0.12916505698400393,
+     -0.1293367227653992,
+     -0.12956109743357447,
+     -0.12969759387856272,
+     -0.12969287484236103,
+     -0.12956056666503346,
+     -0.1293625652081345
+    ],
+    "firstIntegralGrowthShared": 1.0248291224194015,
+    "firstIntegralVerdictBounded": 1,
+    "firstIntegralSamples": 64,
+    "growthGapFrac": 0.024829008663213286,
+    "planted": false,
+    "driftGrowthRatio": 1.0000001110001642,
+    "driftFirstHalf": 0.0003456409223182577,
+    "measuredPeriod": 9.574191656881307,
+    "theoryPeriod": 9.472258250994829,
+    "periodErrFrac": 0.01076125705037374,
+    "cyclesCompleted": 58,
+    "blewUpAtCycle": -1
+   }
+  },
+  "blobvitals": {
+   "mode": "healthy",
+   "outputs": {
+    "closestPair": 0.21026439326193083,
+    "peak": 3.4645895759174072,
+    "floor": 2.2796484747435897,
+    "peakMinusFloor": 1.1849411011738176,
+    "real": 1,
+    "home": 1,
+    "together": 1,
+    "himself": 1,
+    "healthy": 1,
+    "diagnosis": "well"
+   }
+  },
+  "cartpole": {
+   "mode": "regulate",
+   "outputs": {
+    "trueClosedLoopStable": 1,
+    "poleFellAtSeconds": -1,
+    "planted": false,
+    "gainX": -3.1622776601677227,
+    "gainV": -5.914436317232868,
+    "gainTheta": -49.53827174849566,
+    "gainOmega": -12.846078506304526,
+    "areResidual": 7.59284509965426e-12,
+    "designStableHurwitz": 1,
+    "designStableLyapunov": 1,
+    "designRhpCount": 0,
+    "openLoopRhpCount": 1,
+    "positionGainVsExact": 0.9999999999997923
    }
   },
   "astroparticle": {
@@ -583,7 +902,9 @@
     "nAngles": 120,
     "fbpCorr": 0.9920681537548257,
     "bpCorr": 0.908728748024742,
-    "rampGain": 0.0833394057300837
+    "rampGain": 0.0833394057300837,
+    "absoluteGain": 0.9745688416257908,
+    "absoluteOffset": 0.01896824566267541
    }
   },
   "interferometer": {
@@ -602,6 +923,8 @@
    "mode": "balance",
    "outputs": {
     "balanceErr": 0.2813276177045468,
+    "solidFx": 0.051226967410004265,
+    "appliedFx": 0.07127999999997824,
     "massDrift": 3.0527021240063563e-13,
     "steps": 3500
    }
@@ -812,6 +1135,10 @@
   "eccentric": {
    "mode": "invariant",
    "outputs": {
+    "inspiralTime": 16.26995608976212,
+    "closedFormTime": 16.27589757091638,
+    "timeErrFrac": 0.0003650478339750666,
+    "enhancement": 0.9996349521660249,
     "worstInvariantDev": 3.631767989685781e-9,
     "worstAtE": 0.22759966457696176,
     "c0": 5.972009477896604,
@@ -917,6 +1244,146 @@
     "N": 64
    }
   },
+  "blackbody": {
+   "mode": "spectrum",
+   "outputs": {
+    "wienLambdaRoot": 4.965114231744277,
+    "wienLambdaMax": 4.9651142408849935,
+    "wienLambdaAgreeRel": 1.8409881796443835e-9,
+    "wienNuRoot": 2.8214393721220787,
+    "wienNuMax": 2.8214393961415425,
+    "wienNuAgreeRel": 8.51319499690448e-9,
+    "peakProductRatio": 0.568252660549743,
+    "bose4Quad": 6.493939402265725,
+    "bose4Closed": 6.4939394022668395,
+    "bose4Rel": 1.7164679983532977e-13,
+    "bose3Quad": 2.4041138063186294,
+    "bose3Closed": 2.4041138063191916,
+    "bose3Rel": 2.338562085506922e-13,
+    "sigma": 5.6703744191844314e-8,
+    "wienB": 0.0028977719551851722,
+    "exitanceQuarticRel": 0
+   }
+  },
+  "debye": {
+   "mode": "capacity",
+   "outputs": {
+    "cvHighT": 2.9999400008571198,
+    "dulongPetitRel": 0.00001999971429341348,
+    "cvLowT": 0.0018702545478528055,
+    "lowTSlope": 233.78181848160065,
+    "lowTSlopeRel": 2.2004831001465952e-14,
+    "lowTCoeffFromBose": 233.7818184815661,
+    "boseJoinRel": 1.6983839176269577e-13,
+    "cvMid": 2.8551964071098395,
+    "dUdTMid": 2.855196407769433,
+    "derivativeRel": 2.3101518031711412e-10
+   }
+  },
+  "sackurTetrode": {
+   "mode": "classical",
+   "outputs": {
+    "sackurAtUnity": 2.5,
+    "zeroCrossingS": 0,
+    "eosBoson": 0.9116116523516815,
+    "eosFermion": 1.0883883476483185,
+    "eosSymmetryRel": 0,
+    "becThresholdPhi": 2.612375348685491,
+    "sackurAtBecThreshold": 1.539740097269214,
+    "lateAlarmFactor": 4.663378088770255,
+    "entropyOneBox": 480.2585092994046,
+    "entropyDoubled": 960.5170185988092,
+    "extensivityRel": 0,
+    "spuriousMixing": 0,
+    "spuriousOverNln2": 0
+   }
+  },
+  "fermi": {
+   "mode": "degenerate",
+   "outputs": {
+    "fermiInt2": 0.8224670334239729,
+    "fermiInt2Closed": 0.8224670334241146,
+    "fermiInt2Rel": 1.7237831363816418e-13,
+    "mirrorRatio": 0.7500000000000504,
+    "mirrorPredicted": 0.75,
+    "mirrorRel": 6.720550042397615e-14,
+    "groundFraction": 0.6,
+    "pressureFraction": 0.4,
+    "pressureOverEnergyDensity": 0.6666666666666667,
+    "polytropeExponent": 1.6666666666666667,
+    "cvLow": 0.004934802200544679,
+    "cvHigh": 0.009869604401089358,
+    "sommerfeldLinearityRel": 0,
+    "classicalOverFermi": 303.96355092701333
+   }
+  },
+  "paramagnet": {
+   "mode": "spins",
+   "outputs": {
+    "bHalf": 0.6043677771171634,
+    "tanhY": 0.6043677771171636,
+    "halfIsTanhRel": 3.673998074222038e-16,
+    "bHighJ": 0.3118655667931214,
+    "slopeHighJ": 0.4666666666666667,
+    "slopePredictedHighJ": 0.4666666666666667,
+    "slopeHighJRel": 0,
+    "satHighJ": 0.9830022637780806,
+    "curieConstantHalf": 0.25,
+    "curieConstantHighJ": 2.9166666666666665,
+    "schottkyNewton": 2.3993572805154675,
+    "schottkyMaximise": 2.3993573025244928,
+    "schottkyPeakRel": 9.172883607533661e-9,
+    "schottkyCmax": 0.4392288398906452,
+    "schottkyResid": 2.220446049250313e-16,
+    "schottkyHot": 0.00002499937501041652,
+    "schottkyCold": 8.244614455767398e-7,
+    "entropyHot": 0.6931346807161937,
+    "entropyLn2Rel": 0.000018033462592353795,
+    "entropyCold": 4.328422605384764e-8
+   }
+  },
+  "chemicalPotential": {
+   "mode": "fugacity",
+   "outputs": {
+    "crossoverBose": 2.612375348685491,
+    "crossoverClassical": 1,
+    "crossoverFermi": 0.7651470246254088,
+    "crossoverOrdered": 1,
+    "crossoverSpread": 1.847228324060082,
+    "zBose": 0.4844348509990608,
+    "zClassical": 0.6,
+    "zFermi": 0.7404892695876486,
+    "fugacityOrdered": 1,
+    "muBose": -0.7247723231549482,
+    "muClassical": -0.5108256237659907,
+    "muFermi": -0.3004441361454491,
+    "sommerfeldCoeff": 0.8224670334241132,
+    "fermiIntegralAt2": 0.8224670334239729,
+    "sommerfeldJoinRel": 1.7062348350718644e-13,
+    "muSommerfeldClosed": 0.9979438324164397,
+    "muSommerfeldComputed": 0.997936070266049,
+    "muSommerfeldRel": 0.000007778143557309451
+   }
+  },
+  "bec": {
+   "mode": "condensation",
+   "outputs": {
+    "criticalDensity": 2.612375348685491,
+    "criticalFromBoseIntegral": 2.61237534868475,
+    "criticalFromZeta": 2.612375348685491,
+    "criticalJoinRel": 2.8355067827547617e-13,
+    "cvPeakValue": 1.9256716754819556,
+    "condensateAtZero": 1,
+    "condensateAtTc": 0,
+    "condensateAtHalf": 0.6464466094067263,
+    "exponentRecovered": 1.5000000000000002,
+    "exponentRel": 1.4802973661668753e-16,
+    "ceiling1D": -1.4603545088095864,
+    "ceiling3D": 2.612375348685491,
+    "ceiling4D": 1.6449340668482288,
+    "twoDimensionsDiverge": 1
+   }
+  },
   "hydrostatic": {
    "mode": "matched",
    "outputs": {
@@ -955,7 +1422,9 @@
     "boxFamilyAgrees": true,
     "sphereSubsetOfBox": true,
     "pointMismatches": [],
-    "boxMismatches": []
+    "boxMismatches": [],
+    "boxExtraPairs": 0,
+    "boxMissingPairs": 0
    }
   },
   "twof": {
@@ -973,6 +1442,426 @@
     "recordedLift": 0.0227
    }
   },
+  "adjoint": {
+   "mode": "identity",
+   "outputs": {
+    "N": 32,
+    "nDet": 32,
+    "na": 16,
+    "recordedControl": 8.304e-14,
+    "recordedShipped": 27.51,
+    "controlDefect": 8.303842671843165e-14,
+    "shippedDefect": 27.509668685266085,
+    "defect": 8.303842671843165e-14,
+    "identityHolds": true,
+    "controlErrFrac": 0.000018946068983030796,
+    "shippedErrFrac": 0.000012043429077293478
+   }
+  },
+  "fft": {
+   "mode": "absolute",
+   "outputs": {
+    "N": 64,
+    "tone": 5,
+    "amplitude": 1,
+    "parsevalDefect": 0,
+    "sinusoidErrFrac": 0,
+    "mixedToneErrFrac": 0,
+    "conventionHolds": true,
+    "roundTripWorst": 2.220446049250313e-16,
+    "peakBinFound": 5,
+    "peakBinExpected": 5
+   }
+  },
+  "thermostat": {
+   "mode": "relax",
+   "outputs": {
+    "N": 600,
+    "dof": 1797,
+    "tau": 0.1,
+    "dt": 0.002,
+    "steps": 50,
+    "target": 4,
+    "momentumMagnitude": 4.704497402354719e-14,
+    "momentumHolds": true,
+    "tMeasured": 2.907490959738645,
+    "tAnalytic": 2.8963616764856726,
+    "relaxErrFrac": 0.0038425046648443424,
+    "relaxHolds": true
+   }
+  },
+  "cfl": {
+   "mode": "acoustic",
+   "outputs": {
+    "h": 0.1,
+    "dt": 0.002,
+    "steps": 200,
+    "particles": 216,
+    "soundSpeed": 15,
+    "maxSpeed": 3.6004129758538643,
+    "advectiveCourant": 0.07200825951707729,
+    "acousticCourant": 0.3,
+    "optimismFactor": 4.166188740179907,
+    "allFinite": true
+   }
+  },
+  "entropy": {
+   "mode": "coding",
+   "outputs": {
+    "symbols": 6,
+    "H": 2.219879978107314,
+    "expectedLen": 2.24,
+    "excessOverH": 0.020120021892686246,
+    "shannonHolds": true,
+    "kraftSum": 1,
+    "kraftHolds": true
+   }
+  },
+  "voxelize": {
+   "mode": "order",
+   "outputs": {
+    "radius": 1,
+    "segments": 32,
+    "gridN": 32,
+    "analyticVolume": 4.1887902047863905,
+    "meshVolumeAt": 4.1775875933386954,
+    "deficit": 0.002674426481157788,
+    "orderRatios": [
+     3.7996691161936265,
+     3.948802058746265,
+     3.987129784744917
+    ],
+    "order": 1.967857315819181,
+    "secondOrder": true,
+    "ladder": [
+     {
+      "seg": 8,
+      "mv": 3.518611245019581,
+      "deficit": 0.1599934413046083
+     },
+     {
+      "seg": 16,
+      "mv": 4.012411962557191,
+      "deficit": 0.04210720365695528
+     },
+     {
+      "seg": 32,
+      "mv": 4.144123939016361,
+      "deficit": 0.010663285480134756
+     },
+     {
+      "seg": 64,
+      "mv": 4.1775875933386954,
+      "deficit": 0.002674426481157788
+     }
+    ]
+   }
+  },
+  "stability": {
+   "mode": "response",
+   "outputs": {
+    "viscosity": 0.47,
+    "horizon": 1,
+    "ratioLadder": [
+     {
+      "visc": 0.1,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 0.3,
+      "ratio": 1.549745456117029
+     },
+     {
+      "visc": 0.47,
+      "ratio": 0.775476180324773
+     },
+     {
+      "visc": 0.7,
+      "ratio": 0.6916453535441158
+     },
+     {
+      "visc": 1.5,
+      "ratio": 0.34605131386197197
+     }
+    ],
+    "ratio": 0.775476180324773,
+    "monotoneInViscosity": true,
+    "spanAcrossViscosity": 7.9005432550727015,
+    "respondsToViscosity": true
+   }
+  },
+  "mpmtransfer": {
+   "mode": "conserve",
+   "outputs": {
+    "h": 1,
+    "particles": 36,
+    "nodes": 169,
+    "linearErr": 1.6504651808933464e-15,
+    "linearHolds": true,
+    "angularParticles": 64.15499999999996,
+    "angularGrid": 64.155,
+    "angularLostFrac": 6.645244196961428e-16,
+    "angularHolds": true
+   }
+  },
+  "mpmgrid": {
+   "mode": "impulse",
+   "outputs": {
+    "nx": 12,
+    "impulseY": -2.0600999999999994,
+    "expectedImpulseY": -2.0601000000000003,
+    "impulseErrFrac": 4.311336438523009e-16,
+    "impulseHolds": true,
+    "totalMass": 25.2,
+    "liveNodes": 25
+   }
+  },
+  "mpmstress": {
+   "mode": "symmetry",
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "asymmetry": 0,
+    "symmetryHolds": true,
+    "J": 1.3
+   }
+  },
+  "mpmplastic": {
+   "mode": "split",
+   "outputs": {
+    "thetaC": 0.025,
+    "thetaS": 0.0075,
+    "clamped": true,
+    "singularMin": 0.9749999999999998,
+    "singularMax": 0.9749999999999998,
+    "clampHolds": true,
+    "splitDrift": 2.220446049250313e-16,
+    "splitHolds": true,
+    "volumeChange": 3.3306690738754696e-16
+   }
+  },
+  "mpmforce": {
+   "mode": "thirdlaw",
+   "outputs": {
+    "h": 1,
+    "netForce": 7.944109290391274e-15,
+    "thirdLawHolds": true
+   }
+  },
+  "mpmstep": {
+   "mode": "freefall",
+   "outputs": {
+    "steps": 120,
+    "dt": 0.004166666666666667,
+    "gotY": 5.263531249999998,
+    "wantY": 5.263531249999997,
+    "errY": 8.881784197001252e-16,
+    "fell": 1.2364687499999993,
+    "parabolaHolds": true,
+    "driftX": 0,
+    "noSidewaysDrift": true,
+    "blockFell": true,
+    "errNoPlastic": 8.881784197001252e-16,
+    "plasticIrrelevant": true
+   }
+  },
+  "mpmcolumn": {
+   "mode": "energy",
+   "outputs": {
+    "worstRise": 0.000006848819678349628,
+    "energyFalls": true,
+    "samples": 6,
+    "totalStart": 95.35320000000002,
+    "totalEnd": 40.714499930815194,
+    "dissipatedFrac": 0.5730138062402186,
+    "keEnd": 0.000011595224025025239,
+    "cameToRest": true,
+    "comStart": 2.6999999999999993,
+    "comEnd": 1.1515795037687855,
+    "collapsed": true,
+    "creepPerStep": 8.243426982172213e-7
+   }
+  },
+  "mpmmomentum": {
+   "mode": "slide",
+   "outputs": {
+    "floorOffset": 3,
+    "steps": 480,
+    "pxStart": 3.7499999999999987,
+    "pxEnd": 3.749999999999996,
+    "massStart": 2.500000000000001,
+    "massEnd": 2.500000000000001,
+    "pxErrFrac": 7.105427357601004e-16,
+    "momentumHolds": true,
+    "landed": true,
+    "massHolds": true
+   }
+  },
+  "mpmdrucker": {
+   "mode": "surface",
+   "outputs": {
+    "frictionDeg": 30,
+    "elasticUntouched": true,
+    "yieldAfter": 3.383079066031132e-16,
+    "landsOnSurface": true
+   }
+  },
+  "mpmpile": {
+   "mode": "friction",
+   "outputs": {
+    "angles": [
+     25,
+     30,
+     35,
+     40,
+     45
+    ],
+    "widths": [
+     21.5233388177572,
+     21.36171523796185,
+     21.186937708157032,
+     19.299196167913557,
+     16.478925172119233
+    ],
+    "steps": 720,
+    "contained": true,
+    "widthAtLow": 21.5233388177572,
+    "widthAtHigh": 16.478925172119233,
+    "monotone": true,
+    "spread": 1.306113025755626,
+    "narrowing": true
+   }
+  },
+  "mpmrefine": {
+   "mode": "refine",
+   "outputs": {
+    "levels": [
+     1,
+     2
+    ],
+    "values": [
+     1.151674426681776,
+     1.3717140330637192
+    ],
+    "diffs": [
+     0.2200396063819432
+    ],
+    "floorHeights": [
+     1.5,
+     1.5
+    ],
+    "totalMasses": [
+     3.600000000000002,
+     3.599999999999991
+    ],
+    "blockExtents": [
+     1,
+     1
+    ],
+    "restVmax": [
+     0.014894745873809736,
+     0.025424964247445857
+    ],
+    "comDrift": [
+     0.0009038668902294766,
+     0.00020899559936449208
+    ],
+    "floorDriftFrac": 0,
+    "fixtureInvariant": true,
+    "massDriftFrac": 2.9605947323337493e-15,
+    "massInvariant": true,
+    "extentDriftFrac": 0,
+    "extentInvariant": true,
+    "restedAtSample": true,
+    "converges": true
+   }
+  },
+  "mpmcouple": {
+   "mode": "contact",
+   "outputs": {
+    "grids": 1,
+    "pxStart": 1.4399999999999977,
+    "pxEnd": 1.4400000000000004,
+    "pxErrFrac": 1.850371707708597e-15,
+    "momentumHolds": true,
+    "gapStart": 1.9,
+    "gapEnd": 0.5527122005990659,
+    "minGap": 0.5334014281310613,
+    "separated": true,
+    "interpenetrated": false
+   }
+  },
+  "mpm3d": {
+   "mode": "conserve",
+   "outputs": {
+    "stencil": 27,
+    "particles": 64,
+    "nodes": 2197,
+    "linearErr": 3.1903070425770667e-15,
+    "linearHolds": true,
+    "angularParticles": [
+     20.16000000000002,
+     31.679999999999982,
+     -14.399999999999977
+    ],
+    "angularGrid": [
+     20.15999999999999,
+     31.679999999999986,
+     -14.399999999999988
+    ],
+    "angularLostPerAxis": [
+     1.5860328923216505e-15,
+     1.1214373986112698e-16,
+     7.401486830834389e-16
+    ],
+    "angularWorstFrac": 1.5860328923216505e-15,
+    "angularHolds": true
+   }
+  },
+  "nbench": {
+   "mode": "compare",
+   "outputs": {
+    "identicalLists": 2500,
+    "differingLists": 0,
+    "listsMatch": true,
+    "gridCandPerQuery": [
+     33.412,
+     71.771
+    ],
+    "bvhVisitsPerQuery": [
+     278.32,
+     580.889
+    ],
+    "bvhBuildNodes": [
+     999,
+     3999
+    ],
+    "ratios": [
+     8.329941338441278,
+     8.093645065555727
+    ],
+    "gridWins": true,
+    "ratioStable": true
+   }
+  },
+  "hands": {
+   "mode": "rigid",
+   "outputs": {
+    "kind": "rigid",
+    "rigidDisagreements": 0,
+    "rotationDisagreements": 0,
+    "translationDisagreements": 0,
+    "outOfPlaneDisagreements": 0,
+    "inPlaneDisagreements": 0,
+    "posesSwept": 256,
+    "poses": 4,
+    "twoHandSpreadDrift": 5.551115123125783e-17,
+    "inPlaneBoundaryDisagreements": 0,
+    "inPlaneBoundarySwept": 16,
+    "boundaryFlexDeg": 44.09616100025871,
+    "boundaryMarginPct": 1.0602629885170245e-11
+   }
+  },
   "fdtd": {
    "mode": "dispersion",
    "outputs": {
@@ -981,7 +1870,12 @@
     "vpPredicted": 0.9977818819115514,
     "vpMeasured": 0.9977659457136329,
     "vpErrAbs": 0.000015936197918509087,
-    "steps": 2600
+    "steps": 2600,
+    "epsR": 4,
+    "vpInSlab": 0.49875311720698257,
+    "indexMeasured": 2.005,
+    "indexExact": 2,
+    "indexErrFrac": 0.0024999999999999467
    }
   },
   "tempering": {
@@ -1046,7 +1940,10 @@
     "trips": 4,
     "gridN": 64,
     "voxels": 262144,
-    "bodyCount": 7
+    "bodyCount": 7,
+    "shiftKept": 0.9999999995805936,
+    "oneWayShift": 0.3333333331935312,
+    "expectedShift": 0.3333333333333333
    }
   },
   "quantum": {
@@ -1067,6 +1964,124 @@
     "fixedPointExact": 0.6,
     "fixedPointErr": 0,
     "period": 1
+   }
+  },
+  "flip2d": {
+   "mode": "hydrostatic",
+   "outputs": {
+    "slopePerCell": -9.81000645841871,
+    "slopeExact": -9.81,
+    "slopeErrFrac": 6.583505310961868e-7,
+    "linearityR2": 0.9999999999999722,
+    "topCellPressure": 9.810006141662598,
+    "topCellExact": 9.81,
+    "fluidCellsInColumn": 15,
+    "particles": 840,
+    "steps": 400
+   }
+  },
+  "freesurface": {
+   "mode": "vessels",
+   "outputs": {
+    "gapInitial": 12,
+    "gapInitialExact": 12,
+    "sdInitial": 6,
+    "gapEnvelope": 0.05263157894736814,
+    "gapFinal": 0,
+    "gapBoundCells": 1,
+    "gapQuantum": 0.05263157894736842,
+    "sdEnvelope": 0.16007269816574266,
+    "sdFinal": 0,
+    "depthObserved": 9,
+    "depthPredicted": 9.473684210526315,
+    "depthRatio": 0.9500000000000001,
+    "depthErrFrac": 0.049999999999999926,
+    "columns": 38,
+    "particles": 1440,
+    "steps": 3000,
+    "settleWindow": 600,
+    "samples": 10
+   }
+  },
+  "flip3d": {
+   "mode": "hydrostatic",
+   "outputs": {
+    "kind": "hydrostatic",
+    "slopePerCell": -9.810029515353117,
+    "slopeExact": -9.81,
+    "slopeErrFrac": 0.0000030087006234697686,
+    "linearityR2": 0.999999999999711,
+    "bottomPressure": 98.10029602050781,
+    "bottomExact": 98.10000000000001,
+    "bottomErrFrac": 0.0000030175383058509016,
+    "fluidCellsInColumn": 10,
+    "particles": 8000,
+    "steps": 300,
+    "iters": 60
+   }
+  },
+  "kerrladder": {
+   "mode": "photon",
+   "outputs": {
+    "kind": "photon",
+    "photonMeasured": 3,
+    "photonClosedForm": 3,
+    "photonErr": 0,
+    "photonWorstErr": 1.2434497875801753e-14,
+    "photonRows": 10,
+    "spins": [
+     0,
+     0.5,
+     0.9,
+     0.998,
+     0.99999
+    ],
+    "spin": 0,
+    "prograde": true
+   }
+  },
+  "induction": {
+   "mode": "faraday",
+   "outputs": {
+    "kind": "faraday",
+    "circulation": -11.623892818280774,
+    "circulationExact": -11.623892818282235,
+    "circulationErr": 1.2561758309491944e-13,
+    "circulationWorstErr": 1.6774321799760662e-13,
+    "loops": 6,
+    "dBdt": 3.7,
+    "quadN": 20000
+   }
+  },
+  "multigrid3d": {
+   "mode": "scaling",
+   "outputs": {
+    "kind": "scaling",
+    "itersSmall": 20,
+    "itersLarge": 28,
+    "cellRatio": 8,
+    "iterRatio": 1.4,
+    "iters": 28,
+    "residual": 6.197804563547826e-7,
+    "converged": true,
+    "cells": 32768,
+    "levels": 4,
+    "n": 32,
+    "compatible": true
+   }
+  },
+  "multigridgpu": {
+   "mode": "adjoint",
+   "outputs": {
+    "kind": "adjoint",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "pairs": 3,
+    "adjointWorst": 7.18920849983558e-16,
+    "innerFine": 1.2354328292473906,
+    "innerCoarse": 1.2354328292473888,
+    "wgslGraded": 0
    }
   },
   "splat": {
@@ -1139,6 +2154,100 @@
     "dErrFrac": 0.007039798409297348,
     "msd": 0.0679780554008995,
     "walkers": 2000
+   }
+  },
+  "melt": {
+   "mode": "front",
+   "outputs": {
+    "kind": "front",
+    "stefanNumber": 1,
+    "lambda": 0.6200626333135955,
+    "lambdaResidual": 1.1102230246251565e-16,
+    "exactFront": 1.240125266627191,
+    "solverFront": 1.2251281445435915,
+    "frontRelErr": 0.012093231617147468,
+    "moltenFraction": 0.3075,
+    "naiveMoltenFraction": 1
+   }
+  },
+  "freeze": {
+   "mode": "asymmetry",
+   "outputs": {
+    "kind": "asymmetry",
+    "material": "ice",
+    "ratioExact": 2.0551428538185608,
+    "ratioSolver": 1.946977440459689,
+    "diffusivityPart": 2.8359995580527113,
+    "lambdaPart": 0.7246626142740614,
+    "productCheck": 0,
+    "meltFront": 0.017369598802315915,
+    "freezeFront": 0.03381821701794472,
+    "meltExact": 0.017141051449653864,
+    "freezeExact": 0.03522730939369242,
+    "meltRelErr": 0.013333333333333327,
+    "freezeRelErr": 0.04000000000000002,
+    "alphaSolid": 0.000001152827543231033,
+    "alphaLiquid": 1.433349259436216e-7
+   }
+  },
+  "vaporize": {
+   "mode": "key",
+   "outputs": {
+    "kind": "key",
+    "anchorRel": 0,
+    "worstAwayRel": 0.3671367904531096,
+    "criticalRel": 0.17907784814442063,
+    "rows": [
+     {
+      "T": 273.16,
+      "cc": 836.2187878381777,
+      "known": 611.657,
+      "rel": 0.3671367904531096
+     },
+     {
+      "T": 293.15,
+      "cc": 2834.640388375374,
+      "known": 2339,
+      "rel": 0.21190268848883034
+     },
+     {
+      "T": 323.15,
+      "cc": 13337.570559680662,
+      "known": 12344,
+      "rel": 0.0804901619961651
+     },
+     {
+      "T": 373.15,
+      "cc": 101325,
+      "known": 101325,
+      "rel": 0
+     },
+     {
+      "T": 423.15,
+      "cc": 476695.6590265414,
+      "known": 476000,
+      "rel": 0.0014614685431541972
+     },
+     {
+      "T": 473.15,
+      "cc": 1616694.905206334,
+      "known": 1555000,
+      "rel": 0.03967518019699941
+     }
+    ],
+    "note": "EXACT AT THE ANCHOR BY CONSTRUCTION -- the away rows are the evidence"
+   }
+  },
+  "crystallize": {
+   "mode": "exponent",
+   "outputs": {
+    "kind": "exponent",
+    "mode": "3d-site-saturated",
+    "predicted": 3,
+    "exponent": 2.959848806074903,
+    "exponentErr": 0.04015119392509714,
+    "fitPoints": 41,
+    "note": "ONE SEED. This number is NOT the answer on its own -- see the `spread` mode, which exists because ising.L converged beautifully at its default seed and was flat over four."
    }
   },
   "blobkelvin": {
@@ -1222,6 +2331,23 @@
     "travelHalfMu": 7.2769773065465735,
     "zeroMuRatio": -1,
     "monotoneViolations": 0,
+    "mu": 0.5
+   }
+  },
+  "friction/constantbound": {
+   "outputs": {
+    "criticalSlope": 3.9999999999981815,
+    "criticalKey": 0.5,
+    "criticalErrAbs": 3.4999999999981815,
+    "criticalErrFrac": 6.999999999996363,
+    "travelBelow": -1,
+    "travelAbove": -1,
+    "sticksBelow": -1,
+    "slidesAbove": -1,
+    "travelZeroMu": -1,
+    "travelHalfMu": -1,
+    "zeroMuRatio": -1,
+    "monotoneViolations": -1,
     "mu": 0.5
    }
   },
@@ -1313,6 +2439,28 @@
     "creepFreeSamples": 5
    }
   },
+  "plastic/tensiononly": {
+   "outputs": {
+    "yieldKey": 0.1,
+    "yieldTension": 0.1000000000000002,
+    "yieldCompression": 0.1000000000000002,
+    "yieldWorstErrAbs": 0.7000000000000002,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": 1,
+    "creepKey": -1,
+    "creepRegressed": -1,
+    "creepErrAbs": -1,
+    "creepPoints": -1,
+    "capKey": -1,
+    "capAttained": -1,
+    "capErrAbs": -1,
+    "capRatchets": -1,
+    "creepFreeSpread": -1,
+    "creepFreeWorstBudgetUsed": -1,
+    "creepFreeFallsWithCreep": -1,
+    "creepFreeSamples": -1
+   }
+  },
   "vibrations/moments": {
    "outputs": {
     "sumW2": 24,
@@ -1365,6 +2513,16 @@
      3.969015654998146
     ],
     "dispersionExponent": 1.9887812527745432
+   }
+  },
+  "vibrations/sixNplus6": {
+   "outputs": {
+    "sumW2": 24,
+    "sumW2Key": 24,
+    "sumW2ErrRel": 0,
+    "sumW4": 70,
+    "sumW4Key": 78,
+    "sumW4ErrRel": 0.10256410256410256
    }
   },
   "md/madelung": {
@@ -1664,6 +2822,39 @@
     "integratorErrAtRefDt": 0.00004005175633250023
    }
   },
+  "md/noselfenergy": {
+   "outputs": {
+    "madelung": -0.5091931880640161,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": 1.2913730282917326,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
   "zeta/even": {
    "outputs": {
     "M": 12,
@@ -1733,6 +2924,24 @@
     "errNoCorrection": 0.0000963173162127351,
     "errWithCorrection": 2.4424906541753444e-15,
     "correctionGain": 39434057218.63636,
+    "worstHigherErr": -1
+   }
+  },
+  "zeta/nocorrection": {
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 2,
+    "value": 1.6448377495320137,
+    "closedForm": 1.6449340668482264,
+    "errAbs": 0.0000963173162127351,
+    "errFrac": 0.000058553906903565896,
+    "piRecovered": 3.1415926535897953,
+    "piErrAbs": 2.220446049250313e-15,
+    "hasClosedForm": 1,
+    "errNoCorrection": -1,
+    "errWithCorrection": -1,
+    "correctionGain": -1,
     "worstHigherErr": -1
    }
   },
@@ -1822,8 +3031,8 @@
     "period": 6.32591,
     "returnDist": 0.000005305096075403748,
     "thirdDist": -1,
-    "energyDriftFrac": -1,
-    "angMomDrift": -1,
+    "energyDriftFrac": 8.625489897207176e-16,
+    "angMomDrift": 1.2664718042733683e-15,
     "nudge": 0,
     "returnRatio": -1,
     "linearityErrFrac": -1,
@@ -1870,6 +3079,20 @@
     "returnRatio": -1,
     "linearityErrFrac": -1,
     "closes": 1
+   }
+  },
+  "figureeight/euler": {
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.05535724492571416,
+    "thirdDist": -1,
+    "energyDriftFrac": 0.009814403452678417,
+    "angMomDrift": 0.000011621993761118388,
+    "nudge": 0,
+    "returnRatio": -1,
+    "linearityErrFrac": -1,
+    "closes": 0
    }
   },
   "heidler/peak": {
@@ -1928,6 +3151,28 @@
     "atFar": 4.248350180325027e-18,
     "maxima": 1,
     "tPeakInRange": 1
+   }
+  },
+  "heidler/noroot": {
+   "outputs": {
+    "i0": 30,
+    "t1": 19,
+    "t2": 485,
+    "etaStandard": 0.755850539963127,
+    "etaTrue": 0.806256630935786,
+    "etaRatio": 1.0666879076055407,
+    "setName": "first",
+    "peakOverI0First": 1.0666879076055407,
+    "peakOverI0Subsequent": 1.0397220144145967,
+    "peakOverI0Fast": 1.0504911078652872,
+    "peakMeasured": 178.72426428358042,
+    "peakOverI0": 5.957475476119347,
+    "peakErrFrac": 4.957475476119347,
+    "tPeak": 68.77750284742575,
+    "atZero": -1,
+    "atFar": -1,
+    "maxima": -1,
+    "tPeakInRange": -1
    }
   },
   "spacefill/stroke": {
@@ -2002,10 +3247,10 @@
   "blackhole/onset": {
    "outputs": {
     "kind": "onset",
-    "captureOnsetR": 6.0357421874999995,
+    "captureOnsetR": 6.025195312499999,
     "captureOnsetRBracket": [
-     6.028124999999999,
-     6.043359375
+     6.01875,
+     6.031640625
     ],
     "iscoTheory": 6
    }
@@ -2034,6 +3279,168 @@
     "iscoOutside": true,
     "photonSphereOutside": false,
     "escapeFrac": 0.6130757034672131
+   }
+  },
+  "xenon/pit": {
+   "outputs": {
+    "eqIodine": 2869836127203242.5,
+    "eqXenon": 866163547498442.1,
+    "batemanXe": 1579085736867541.8,
+    "rk4Xe": 1579085736867529.5,
+    "batemanVsRk4Rel": 7.757653504173004e-15,
+    "peakHours": 8.383333333333333,
+    "peakRatio": 1.903385296561501,
+    "peakTimeLimitH": 11.129092398335509,
+    "peakAtHighFlux": 11.12888888888889,
+    "limitApproachRel": 0.00001828625725575816,
+    "approachSpanH": 0.9905555555555559,
+    "approachMonotone": 1,
+    "pitRisingSign": 1,
+    "pitThresholdClosed": 283815966302.10126,
+    "pitThresholdBisected": 283815966302.10284,
+    "thresholdRel": 5.591348799633233e-15
+   }
+  },
+  "fragmentRotation/fragments": {
+   "outputs": {
+    "rotatedBoxWorstErr": 3.552713678800501e-15,
+    "traceResidual": 0,
+    "spectrumPhysical": 1,
+    "censusTotal": 6,
+    "censusDistinct": 6,
+    "censusDegenerate": 0,
+    "censusWorstTraceResidual": 3.1933652770518397e-16,
+    "censusAllPhysical": 1,
+    "censusWorstSpread": 0.8048780487804877
+   }
+  },
+  "structureFactor/absences": {
+   "outputs": {
+    "nAbsent": 540,
+    "nAllowed": 188,
+    "worstAbsent": 9.797174393178826e-16,
+    "minAllowed": 4,
+    "absenceGap": 4082809838298842.5,
+    "closedVsSumWorst": 9.797174393178826e-16,
+    "reciprocalResidualCubic": 0,
+    "reciprocalResidualTriclinic": 8.881784197001252e-16,
+    "forbiddenLitUp": 0
+   }
+  },
+  "powder/friedel": {
+   "outputs": {
+    "r3Mismatches": 0,
+    "r3CheckedTo": 121,
+    "r3AtSeven": 0,
+    "legendreGaps": 19,
+    "legendreGapsAbsentFromRings": 19,
+    "friedelPairs": 2916,
+    "friedelWorstReal": 0,
+    "breakNonCentroHalf": 2.738966595928402,
+    "breakNonCentroTwo": 6.992256391181141,
+    "breakNonCentroZero": 0,
+    "breakCentroTwo": 1.7763568394002505e-15,
+    "unreachableRingRefused": 1
+   }
+  },
+  "renderBounce/series": {
+   "outputs": {
+    "kMeasured": 0.24911666666666665,
+    "kGeometric": 0.25,
+    "kResidual": 0.0008833333333333471,
+    "seriesWorstRel": 0.0046167846760963895,
+    "seriesDepths": 6,
+    "whiteFurnaceWorstRel": 0.003418196346525271,
+    "deficitVsKPowNWorst": 0.002566666666666717,
+    "neeRel": 0.00025162909855866444,
+    "bsdfRel": 0.010333333333333306,
+    "misRel": 0.000991288376667454,
+    "misWeightSumErr": 0,
+    "identityResidual": 0.002333333333496501
+   }
+  },
+  "reconQuality/blindspot": {
+   "outputs": {
+    "scaledCorr": 1.0000000000000522,
+    "scaledRms": 9.88128930732152e-14,
+    "shiftedCorr": 1.000000000000074,
+    "shiftedRms": 2.9432502564068614e-13,
+    "recoveredGain": 1.3000000000000853,
+    "gainRecoveryErr": 8.526512829121202e-14,
+    "recoveredOffset": 0.39999999999979885,
+    "offsetRecoveryErr": 2.0117241206207837e-13,
+    "absRmsScaled": 0.41819470701314565,
+    "absRmsShifted": 0.7922615625356775,
+    "structureScaled": 0.8412698412698413,
+    "ssimScaled": 0.9365533439124712,
+    "edgesScaled": 0.9175257731958762,
+    "iouScaled": 1,
+    "iouShifted": 0.4952256944444444,
+    "fbpRatioMean": 0.9455679270833335,
+    "fbpRatioSpread": 0.018543833333333315,
+    "fbpGainSpread": 0.502127
+   }
+  },
+  "manifoldCensus/census": {
+   "outputs": {
+    "tetraNmVertices": 0,
+    "tetraClosed": 1,
+    "tetraEuler": 2,
+    "tetraEulerDefect": 0,
+    "bowtieBoundary": 0,
+    "bowtieNmEdges": 0,
+    "bowtieNmVertices": 1,
+    "bowtieClosed": 0,
+    "bowtieComponents": 1,
+    "bowtieEuler": 3,
+    "bowtieEulerDefect": 1,
+    "openQuadBoundary": 4,
+    "openQuadNmVertices": 0,
+    "finNmEdges": 1,
+    "mtFaces": 3168,
+    "mtNmEdges": 0,
+    "mtNmVertices": 0,
+    "mtClosed": 1,
+    "mtComponents": 1,
+    "mtEuler": 2,
+    "mtEulerDefect": 0,
+    "dcFaces": 414,
+    "dcNmEdges": 0,
+    "dcNmVertices": 0,
+    "dcClosed": 1,
+    "dcComponents": 1,
+    "dcEuler": 2,
+    "dcEulerDefect": 0,
+    "csgFaces": 120,
+    "csgNmVertices": 0,
+    "csgComponents": 4,
+    "csgEuler": 8,
+    "csgEulerDefect": 0,
+    "emptyClosed": 1,
+    "emptyComponents": 0,
+    "emptyEuler": 0
+   }
+  },
+  "strokeMorph/morph": {
+   "outputs": {
+    "straightLineWorstErr": 6.280369834735101e-16,
+    "resampleEndpointMismatch": 0,
+    "resampleEndpointPlantedMismatch": 0,
+    "morphZeroMismatch": 0,
+    "morphOneMismatch": 0,
+    "morphComparisons": 640,
+    "naiveLerpZeroMismatch": 0,
+    "naiveLerpOneMismatch": 40,
+    "naiveWorstDrift": 1.7763568394002505e-15,
+    "pathStringDiffPairs": 0,
+    "reversedPairs": 4,
+    "travelSavedWorst": 110.86922015766083,
+    "parserRefusals": 5,
+    "parserAccepted": 0,
+    "glyphs": 10,
+    "multiSubpathGlyphs": 0,
+    "zTerminatedGlyphs": 0,
+    "endpointCoincidentGlyphs": 2
    }
   },
   "xpbd/hooke": {
@@ -2130,8 +3537,7 @@
     "substeps": 800,
     "planted": false,
     "kernelIntegral": 1.0000000000000153,
-    "kernelIntegralErr": 1.532107773982716e-14,
-    "restDensity": 185.76967340822029
+    "kernelIntegralErr": 1.532107773982716e-14
    }
   },
   "xpbd/density": {
@@ -2467,6 +3873,549 @@
     "planted": false
    }
   },
+  "kinetics/period": {
+   "outputs": {
+    "rootCount": 7,
+    "dominantRate": 0.17439672775521292,
+    "periodSeconds": 5.734052541419366,
+    "inhourVsRk4": 2.4986852836884635e-14,
+    "planted": false
+   }
+  },
+  "kinetics/scram": {
+   "outputs": {
+    "rootCount": 7,
+    "dominantRate": -0.01235833451798165,
+    "scramRate": -0.01235833451798165,
+    "asymptoteGap": 0.00004166548201835034,
+    "floorRespected": true,
+    "approachMonotone": true,
+    "planted": false
+   }
+  },
+  "kinetics/prompt": {
+   "outputs": {
+    "rootCount": 7,
+    "dominantRate": 325.5030159842453,
+    "genSensLow": 0.9971104350890713,
+    "genSensHigh": 0.010012271877733701,
+    "regimeSeparation": 99.58882931520726,
+    "betaRecovered": 0.006493939680315094,
+    "betaRelErr": 0.001239667746063671,
+    "planted": false
+   }
+  },
+  "bell/chsh": {
+   "outputs": {
+    "chshExact": 2.82842712474619,
+    "chshMatrix": 2.82842712474619,
+    "violatesClassical": true,
+    "tsirelsonGap": 4.440892098500626e-16,
+    "classicalMargin": 0.8284271247461898,
+    "planted": false
+   }
+  },
+  "bell/routes": {
+   "outputs": {
+    "chshMonteCarlo": 2.83285,
+    "tsirelsonGap": 4.440892098500626e-16,
+    "routeSpreadExact": 0,
+    "routeSpreadMonteCarlo": 0.001409968270664419,
+    "correlatorAtProbe": -0.6216099682706644,
+    "planted": false
+   }
+  },
+  "bell/bounds": {
+   "outputs": {
+    "tsirelsonGap": 4.440892098500626e-16,
+    "lhvMax": 2,
+    "lhvStrategies": 16,
+    "sweepMax": 2.8106425686535266,
+    "sweepGap": 0.017784556092663717,
+    "planted": false
+   }
+  },
+  "laneemden/profile": {
+   "outputs": {
+    "xi1": 3.141592653623956,
+    "hasSurface": true,
+    "massIntegral": 3.141592653588522,
+    "surfaceVsExact": 1.0874387134916686e-11,
+    "planted": false
+   }
+  },
+  "laneemden/mass": {
+   "outputs": {
+    "xi1": 3.141592653623956,
+    "hasSurface": true,
+    "massIntegral": 3.141592653588522,
+    "massBoundary": 3.141592653588522,
+    "massQuadrature": 3.1415926534853145,
+    "massRouteSpread": 3.285201998384288e-11,
+    "planted": false
+   }
+  },
+  "laneemden/scaling": {
+   "outputs": {
+    "xi1": 3.141592653623956,
+    "hasSurface": true,
+    "massIntegral": 3.141592653588522,
+    "scalingExponent": 0,
+    "scalingExpected": 0,
+    "scalingDegenerate": 1,
+    "scalingProbeIndex": 1.5,
+    "scalingProbeErr": 1.6653345369377348e-16,
+    "massAtLowDensity": 25.361900947542807,
+    "massAtHighDensity": 25.361900947542807,
+    "massInvariance": 0,
+    "radiusAtLowDensity": 6.896848619412085,
+    "radiusAtHighDensity": 3.4484243097060423,
+    "radiusRatio": 2,
+    "planted": false
+   }
+  },
+  "lotkavolterra/cycle": {
+   "outputs": {
+    "firstIntegralDrift": 0.0003456409606844568,
+    "amplitudeRatio": 1.0000030430795412,
+    "firstIntegralSeries": [
+     -0.12947716197787473,
+     -0.12919294889388677,
+     -0.1291842494295098,
+     -0.12938001687079803,
+     -0.12959596940320006,
+     -0.12970778041999387,
+     -0.1296766011707018,
+     -0.12952602488944476,
+     -0.12932608104142762,
+     -0.1291871873584971,
+     -0.12923348447716143,
+     -0.1294995309740501,
+     -0.12977766607905727,
+     -0.12973606833368723,
+     -0.12940458524274878,
+     -0.1291672083274431,
+     -0.12921351196524877,
+     -0.12942767896064655,
+     -0.12962952356993862,
+     -0.1297130146809291,
+     -0.12965400917193648,
+     -0.12948632647898728,
+     -0.129288709968169,
+     -0.12917813646754972,
+     -0.1292722672991653,
+     -0.1295667305025141,
+     -0.1298023468024454,
+     -0.12968138375858684,
+     -0.12933689520390723,
+     -0.1291543604109493,
+     -0.12924983778027377,
+     -0.12947452702673212,
+     -0.12965790609200178,
+     -0.12971217362275267,
+     -0.1296267802978992,
+     -0.12944525341473,
+     -0.12925489302158066,
+     -0.12917791453550675,
+     -0.1293203431446064,
+     -0.12963186976676977,
+     -0.1298104208562636,
+     -0.12961641468818508,
+     -0.12927717463818755,
+     -0.12915395820161346,
+     -0.12929148159228665,
+     -0.1295193476184392,
+     -0.12968069308453922,
+     -0.12970538774360518,
+     -0.1295954349832973,
+     -0.1294036837740966,
+     -0.12922576872533442,
+     -0.1291872639463032,
+     -0.12937646958588855,
+     -0.1296914542769907,
+     -0.12980102007372518,
+     -0.1295449731117757,
+     -0.12922779539013374,
+     -0.12916505698400393,
+     -0.1293367227653992,
+     -0.12956109743357447,
+     -0.12969759387856272,
+     -0.12969287484236103,
+     -0.12956056666503346,
+     -0.1293625652081345
+    ],
+    "firstIntegralGrowthShared": 1.0248291224194015,
+    "firstIntegralVerdictBounded": 1,
+    "firstIntegralSamples": 64,
+    "growthGapFrac": 0.024829008663213286,
+    "planted": false,
+    "driftGrowthRatio": 1.0000001110001642,
+    "driftFirstHalf": 0.0003456409223182577,
+    "measuredPeriod": 9.574191656881307,
+    "theoryPeriod": 9.472258250994829,
+    "periodErrFrac": 0.01076125705037374,
+    "cyclesCompleted": 58,
+    "blewUpAtCycle": -1
+   }
+  },
+  "lotkavolterra/average": {
+   "outputs": {
+    "firstIntegralDrift": 0.0003456409606844568,
+    "amplitudeRatio": 1.0000030430795412,
+    "firstIntegralSeries": [
+     -0.12947716197787473,
+     -0.12919294889388677,
+     -0.1291842494295098,
+     -0.12938001687079803,
+     -0.12959596940320006,
+     -0.12970778041999387,
+     -0.1296766011707018,
+     -0.12952602488944476,
+     -0.12932608104142762,
+     -0.1291871873584971,
+     -0.12923348447716143,
+     -0.1294995309740501,
+     -0.12977766607905727,
+     -0.12973606833368723,
+     -0.12940458524274878,
+     -0.1291672083274431,
+     -0.12921351196524877,
+     -0.12942767896064655,
+     -0.12962952356993862,
+     -0.1297130146809291,
+     -0.12965400917193648,
+     -0.12948632647898728,
+     -0.129288709968169,
+     -0.12917813646754972,
+     -0.1292722672991653,
+     -0.1295667305025141,
+     -0.1298023468024454,
+     -0.12968138375858684,
+     -0.12933689520390723,
+     -0.1291543604109493,
+     -0.12924983778027377,
+     -0.12947452702673212,
+     -0.12965790609200178,
+     -0.12971217362275267,
+     -0.1296267802978992,
+     -0.12944525341473,
+     -0.12925489302158066,
+     -0.12917791453550675,
+     -0.1293203431446064,
+     -0.12963186976676977,
+     -0.1298104208562636,
+     -0.12961641468818508,
+     -0.12927717463818755,
+     -0.12915395820161346,
+     -0.12929148159228665,
+     -0.1295193476184392,
+     -0.12968069308453922,
+     -0.12970538774360518,
+     -0.1295954349832973,
+     -0.1294036837740966,
+     -0.12922576872533442,
+     -0.1291872639463032,
+     -0.12937646958588855,
+     -0.1296914542769907,
+     -0.12980102007372518,
+     -0.1295449731117757,
+     -0.12922779539013374,
+     -0.12916505698400393,
+     -0.1293367227653992,
+     -0.12956109743357447,
+     -0.12969759387856272,
+     -0.12969287484236103,
+     -0.12956056666503346,
+     -0.1293625652081345
+    ],
+    "firstIntegralGrowthShared": 1.0248291224194015,
+    "firstIntegralVerdictBounded": 1,
+    "firstIntegralSamples": 64,
+    "growthGapFrac": 0.024829008663213286,
+    "planted": false,
+    "meanPrey": 4.000000305003112,
+    "meanPredator": 2.7499904800058714,
+    "exactPrey": 4,
+    "exactPredator": 2.75,
+    "meanPreyErr": 7.62507779139554e-8,
+    "meanPredatorErr": 0.0000034618160467529564,
+    "cyclesCompleted": 58
+   }
+  },
+  "lotkavolterra/volterra": {
+   "outputs": {
+    "firstIntegralDrift": 0.0003456409606844568,
+    "amplitudeRatio": 1.0000030430795412,
+    "firstIntegralSeries": [
+     -0.12947716197787473,
+     -0.12919294889388677,
+     -0.1291842494295098,
+     -0.12938001687079803,
+     -0.12959596940320006,
+     -0.12970778041999387,
+     -0.1296766011707018,
+     -0.12952602488944476,
+     -0.12932608104142762,
+     -0.1291871873584971,
+     -0.12923348447716143,
+     -0.1294995309740501,
+     -0.12977766607905727,
+     -0.12973606833368723,
+     -0.12940458524274878,
+     -0.1291672083274431,
+     -0.12921351196524877,
+     -0.12942767896064655,
+     -0.12962952356993862,
+     -0.1297130146809291,
+     -0.12965400917193648,
+     -0.12948632647898728,
+     -0.129288709968169,
+     -0.12917813646754972,
+     -0.1292722672991653,
+     -0.1295667305025141,
+     -0.1298023468024454,
+     -0.12968138375858684,
+     -0.12933689520390723,
+     -0.1291543604109493,
+     -0.12924983778027377,
+     -0.12947452702673212,
+     -0.12965790609200178,
+     -0.12971217362275267,
+     -0.1296267802978992,
+     -0.12944525341473,
+     -0.12925489302158066,
+     -0.12917791453550675,
+     -0.1293203431446064,
+     -0.12963186976676977,
+     -0.1298104208562636,
+     -0.12961641468818508,
+     -0.12927717463818755,
+     -0.12915395820161346,
+     -0.12929148159228665,
+     -0.1295193476184392,
+     -0.12968069308453922,
+     -0.12970538774360518,
+     -0.1295954349832973,
+     -0.1294036837740966,
+     -0.12922576872533442,
+     -0.1291872639463032,
+     -0.12937646958588855,
+     -0.1296914542769907,
+     -0.12980102007372518,
+     -0.1295449731117757,
+     -0.12922779539013374,
+     -0.12916505698400393,
+     -0.1293367227653992,
+     -0.12956109743357447,
+     -0.12969759387856272,
+     -0.12969287484236103,
+     -0.12956056666503346,
+     -0.1293625652081345
+    ],
+    "firstIntegralGrowthShared": 1.0248291224194015,
+    "firstIntegralVerdictBounded": 1,
+    "firstIntegralSamples": 64,
+    "growthGapFrac": 0.024829008663213286,
+    "planted": false,
+    "harvest": 0.2,
+    "preyBefore": 4,
+    "preyAfter": 6.000000000000001,
+    "predatorBefore": 2.75,
+    "predatorAfter": 2.25,
+    "preyFactor": 1.5000000000000002,
+    "predatorFactor": 0.8181818181818182,
+    "meanPrey": 6.000001064465613,
+    "meanPredator": 2.2499812552829446,
+    "meanPreyErr": 1.7741093542393094e-7,
+    "meanPredatorErr": 0.000008330985357968896
+   }
+  },
+  "lotkavolterra/integrators": {
+   "outputs": {
+    "firstIntegralDrift": 0.0003456409606844568,
+    "amplitudeRatio": 1.0000030430795412,
+    "firstIntegralSeries": [
+     -0.12947716197787473,
+     -0.12919294889388677,
+     -0.1291842494295098,
+     -0.12938001687079803,
+     -0.12959596940320006,
+     -0.12970778041999387,
+     -0.1296766011707018,
+     -0.12952602488944476,
+     -0.12932608104142762,
+     -0.1291871873584971,
+     -0.12923348447716143,
+     -0.1294995309740501,
+     -0.12977766607905727,
+     -0.12973606833368723,
+     -0.12940458524274878,
+     -0.1291672083274431,
+     -0.12921351196524877,
+     -0.12942767896064655,
+     -0.12962952356993862,
+     -0.1297130146809291,
+     -0.12965400917193648,
+     -0.12948632647898728,
+     -0.129288709968169,
+     -0.12917813646754972,
+     -0.1292722672991653,
+     -0.1295667305025141,
+     -0.1298023468024454,
+     -0.12968138375858684,
+     -0.12933689520390723,
+     -0.1291543604109493,
+     -0.12924983778027377,
+     -0.12947452702673212,
+     -0.12965790609200178,
+     -0.12971217362275267,
+     -0.1296267802978992,
+     -0.12944525341473,
+     -0.12925489302158066,
+     -0.12917791453550675,
+     -0.1293203431446064,
+     -0.12963186976676977,
+     -0.1298104208562636,
+     -0.12961641468818508,
+     -0.12927717463818755,
+     -0.12915395820161346,
+     -0.12929148159228665,
+     -0.1295193476184392,
+     -0.12968069308453922,
+     -0.12970538774360518,
+     -0.1295954349832973,
+     -0.1294036837740966,
+     -0.12922576872533442,
+     -0.1291872639463032,
+     -0.12937646958588855,
+     -0.1296914542769907,
+     -0.12980102007372518,
+     -0.1295449731117757,
+     -0.12922779539013374,
+     -0.12916505698400393,
+     -0.1293367227653992,
+     -0.12956109743357447,
+     -0.12969759387856272,
+     -0.12969287484236103,
+     -0.12956056666503346,
+     -0.1293625652081345
+    ],
+    "firstIntegralGrowthShared": 1.0248291224194015,
+    "firstIntegralVerdictBounded": 1,
+    "firstIntegralSamples": 64,
+    "growthGapFrac": 0.024829008663213286,
+    "planted": false,
+    "eulerBlewUpAtCycle": -1,
+    "symplecticDrift": 0.0003456409606844568,
+    "rk4Drift": 2.8364943727154923e-10,
+    "symplecticRatio": 1.0000001110001642,
+    "rk4Ratio": 1.8501272697648314,
+    "accuracyGap": 1218549.7845834277
+   }
+  },
+  "blobvitals/healthy": {
+   "outputs": {
+    "closestPair": 0.21026439326193083,
+    "peak": 3.4645895759174072,
+    "floor": 2.2796484747435897,
+    "peakMinusFloor": 1.1849411011738176,
+    "real": 1,
+    "home": 1,
+    "together": 1,
+    "himself": 1,
+    "healthy": 1,
+    "diagnosis": "well"
+   }
+  },
+  "blobvitals/dismantled": {
+   "outputs": {
+    "closestPair": 0.8410575730477233,
+    "peak": 2.1690138370468035,
+    "floor": 2.2796484747435897,
+    "peakMinusFloor": -0.11063463769678616,
+    "real": 1,
+    "home": 1,
+    "together": 0,
+    "himself": 0,
+    "healthy": 0,
+    "diagnosis": "COMING APART -- the solver is separating the lumps. v2595 shipped this: field radius used as collision radius."
+   }
+  },
+  "blobvitals/dropped": {
+   "outputs": {
+    "closestPair": 0.21026439326193083,
+    "peak": 3.4645895759174072,
+    "floor": 2.2796484747435897,
+    "peakMinusFloor": 1.1849411011738176,
+    "real": 1,
+    "home": 0,
+    "together": 1,
+    "himself": 1,
+    "healthy": 0,
+    "diagnosis": "GONE -- he has left the imaged volume. v2597 shipped this: the aquarium had no bottom."
+   }
+  },
+  "blobvitals/vanished": {
+   "outputs": {
+    "peak": 0,
+    "floor": 2.2796484747435897,
+    "peakMinusFloor": -2.2796484747435897,
+    "real": 0,
+    "home": 0,
+    "together": 0,
+    "himself": 0,
+    "healthy": 0,
+    "diagnosis": "NOT REAL -- a coordinate is NaN. v2597 shipped this: setTransform with loose numbers instead of arrays."
+   }
+  },
+  "cartpole/regulate": {
+   "outputs": {
+    "trueClosedLoopStable": 1,
+    "poleFellAtSeconds": -1,
+    "planted": false,
+    "gainX": -3.1622776601677227,
+    "gainV": -5.914436317232868,
+    "gainTheta": -49.53827174849566,
+    "gainOmega": -12.846078506304526,
+    "areResidual": 7.59284509965426e-12,
+    "designStableHurwitz": 1,
+    "designStableLyapunov": 1,
+    "designRhpCount": 0,
+    "openLoopRhpCount": 1,
+    "positionGainVsExact": 0.9999999999997923
+   }
+  },
+  "cartpole/margin": {
+   "outputs": {
+    "trueClosedLoopStable": 1,
+    "poleFellAtSeconds": -1,
+    "planted": false,
+    "returnDifferenceMin": 1.0000001546698039,
+    "satisfiesKalman": 1,
+    "gainMarginLower": 0.3572594366526177,
+    "stableAtKappa1e6": 1
+   }
+  },
+  "cartpole/cost": {
+   "outputs": {
+    "trueClosedLoopStable": 1,
+    "poleFellAtSeconds": -1,
+    "planted": false,
+    "predictedCost": 0.3324061348392295,
+    "simulatedCost": 0.33240705710821733,
+    "costAgreement": 0.0000027745245685443513
+   }
+  },
+  "cartpole/balance": {
+   "outputs": {
+    "trueClosedLoopStable": 1,
+    "poleFellAtSeconds": -1,
+    "planted": false,
+    "finalAngle": 6.783777501700101e-12,
+    "finalCartPosition": 3.7506375778275823e-11,
+    "settledWithin": 1
+   }
+  },
   "astroparticle/oscillation": {
    "outputs": {
     "unitarityErr": 0,
@@ -2683,6 +4632,18 @@
     "turingFirst": true,
     "gap": 5.753679656440357,
     "continuousModeIndex": 5.24515396113749
+   }
+  },
+  "reaction/seeded": {
+   "outputs": {
+    "winningMode": 5,
+    "k": 0.9817477042468103,
+    "amp": 3.707073967369298,
+    "criticalK": 1.0298835719535588,
+    "criticalB": 4.246320343559643,
+    "hopfB": 10,
+    "aboveThreshold": true,
+    "dkFromCritical": 0.04813586770674849
    }
   },
   "beam/exponent": {
@@ -3196,6 +5157,29 @@
     "linksBroken": 227
    }
   },
+  "galaxy/unorderedtri": {
+   "outputs": {
+    "trA": 0,
+    "trA2": 228,
+    "trA3": 276,
+    "linkCount": 228,
+    "triangles": 276,
+    "reciprocalGap": 0,
+    "triangleErr": 1380,
+    "selfLoops": 0
+   }
+  },
+  "geostats/nugget": {
+   "outputs": {
+    "value": 1.625,
+    "mean": 1.625,
+    "valueErr": 0,
+    "worstWeightErr": 5.551115123125783e-17,
+    "variance": 1.1666666666666667,
+    "predictedVariance": 1.1666666666666667,
+    "varianceErr": 0
+   }
+  },
   "geostats/bridge": {
    "outputs": {
     "worstValueErr": 2.6645352591003757e-15,
@@ -3265,17 +5249,6 @@
     "slopeSpread": 0.0014175152407930741
    }
   },
-  "geostats/nugget": {
-   "outputs": {
-    "value": 1.625,
-    "mean": 1.625,
-    "valueErr": 0,
-    "worstWeightErr": 5.551115123125783e-17,
-    "variance": 1.1666666666666667,
-    "predictedVariance": 1.1666666666666667,
-    "varianceErr": 0
-   }
-  },
   "geostats/scale": {
    "outputs": {
     "worstWeightDelta": 3.344736968365582e-16,
@@ -3284,6 +5257,17 @@
     "scale": 7.3,
     "varianceRatioErr": 4.440892098500626e-15,
     "selfConsistent": true
+   }
+  },
+  "geostats/noconstraint": {
+   "outputs": {
+    "value": 1.9500000000000002,
+    "mean": 1.625,
+    "valueErr": 0.3250000000000002,
+    "worstWeightErr": 0.03333333333333338,
+    "variance": 1.2,
+    "predictedVariance": 1.1666666666666667,
+    "varianceErr": 0.033333333333333215
    }
   },
   "pulsar/residualCurvature": {
@@ -3314,6 +5298,18 @@
     "steadyPeakToPeak": 1.1825613910332322e-10,
     "steadyCurvature": -8.577589941513407e-21,
     "ratio": 5023763399.660831
+   }
+  },
+  "pulsar/twof0": {
+   "outputs": {
+    "curvature": 3.336300303680453e-7,
+    "predicted": 2.2222222222222222e-7,
+    "ratio": 1.5013351366562038,
+    "error": 0.5013351366562038,
+    "recoveredFdot": -0.000001000890091104136,
+    "trueFdot": -0.000001,
+    "peakToPeak": 0.5940908634124753,
+    "span": 2668.3734055439336
    }
   },
   "fieldnav/policy": {
@@ -3355,6 +5351,19 @@
     "degradesWithRoughness": true
    }
   },
+  "fieldnav/crowflight": {
+   "outputs": {
+    "optimalCost": 62.22539674441619,
+    "walkedCost": 395.3924283981323,
+    "excessFrac": 5.354196985230359,
+    "arrived": true,
+    "looped": false,
+    "steps": 88,
+    "reachableCells": 2304,
+    "cells": 2304,
+    "amp": 1.5
+   }
+  },
   "optics/airy": {
    "outputs": {
     "rayleighFactor": 1.2196950472018169,
@@ -3376,6 +5385,20 @@
     "edgeFirstFringeV": 1.217199999999999,
     "edgeFirstFringeExact": 1.3704429197121788,
     "edgeFirstFringeErrFrac": 5.951950602681156e-12
+   }
+  },
+  "optics/converge": {
+   "outputs": {
+    "fresnelNumber": 0.010000000000000002,
+    "quadratureEvals": 231840000,
+    "nearFarRms": 0.000001227843833700814
+   }
+  },
+  "optics/radiusconfusion": {
+   "outputs": {
+    "rayleighFactor": 2.4393537055919547,
+    "rayleighFactorExact": 1.2196698912665045,
+    "airyRingErrFrac": 1.0000114154321964
    }
   },
   "kerr/spin": {
@@ -3449,7 +5472,9 @@
     "nAngles": 120,
     "fbpCorr": 0.9920681537548257,
     "bpCorr": 0.908728748024742,
-    "rampGain": 0.0833394057300837
+    "rampGain": 0.0833394057300837,
+    "absoluteGain": 0.9745688416257908,
+    "absoluteOffset": 0.01896824566267541
    }
   },
   "ct/fan": {
@@ -3463,6 +5488,58 @@
     "halfFanDeg": 14.595893500201464
    }
   },
+  "ct/gain": {
+   "outputs": {
+    "nAngles": 120,
+    "gainViews": [
+     30,
+     60,
+     120,
+     240
+    ],
+    "gainAtViews": [
+     0.9745541980564104,
+     0.974246469265151,
+     0.9745688416257908,
+     0.9758797236531074
+    ],
+    "corrAtViews": [
+     0.959522744633723,
+     0.9825069975222396,
+     0.9920681537548257,
+     0.9946170682452325
+    ],
+    "absoluteGain": 0.9745688416257908,
+    "absoluteOffset": 0.01896824566267541,
+    "gainViewSpread": 0.0016764283366490246
+   }
+  },
+  "ct/unweighted": {
+   "outputs": {
+    "nAngles": 120,
+    "gainViews": [
+     30,
+     60,
+     120,
+     240
+    ],
+    "gainAtViews": [
+     9.306307075898117,
+     18.606736964804988,
+     37.22578764674126,
+     74.55171930362097
+    ],
+    "corrAtViews": [
+     0.9595227446337211,
+     0.9825069975222389,
+     0.9920681537548364,
+     0.9946170682452237
+    ],
+    "absoluteGain": 37.22578764674126,
+    "absoluteOffset": 0.01896824566267541,
+    "gainViewSpread": 7.0108810826475185
+   }
+  },
   "interferometer/recover": {
    "outputs": {
     "rmsResidual": 9.253371780321849e-17,
@@ -3474,9 +5551,56 @@
     "unwrapGain": 5276657305622333
    }
   },
+  "interferometer/nounwrap": {
+   "outputs": {
+    "rmsResidual": 0.4882687180627482,
+    "maxResidual": 1.2119201660156245,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 0.3066401213468151,
+    "unwrapped": false,
+    "lambda": 0.55
+   }
+  },
+  "interferometer/lambda": {
+   "outputs": {
+    "rmsResidual": 9.253371780321849e-17,
+    "maxResidual": 6.661338147750939e-16,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 5.811257081639297e-17,
+    "unwrapped": true,
+    "lambda": 0.55
+   }
+  },
+  "interferometer/alias": {
+   "outputs": {
+    "rmsResidual": 0.4882687180627482,
+    "maxResidual": 1.2119201660156245,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 0.3066401213468151,
+    "unwrapped": false,
+    "lambda": 0.55,
+    "aliasHeadroom": 11.58151602144178,
+    "aliasBand": 0.1375,
+    "aliasMaxHeight": 1.5924584529482448,
+    "aliasGradientHeadroom": 0.782923333345703,
+    "aliasedNow": true
+   }
+  },
+  "interferometer/stepsswapped": {
+   "outputs": {
+    "rmsResidual": 0.9451886467195392,
+    "maxResidual": 2.2892199076524706,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 0.5935927299943565,
+    "unwrapped": true,
+    "lambda": 0.55
+   }
+  },
   "windtunnel/balance": {
    "outputs": {
     "balanceErr": 0.2813276177045468,
+    "solidFx": 0.051226967410004265,
+    "appliedFx": 0.07127999999997824,
     "massDrift": 3.0527021240063563e-13,
     "steps": 3500
    }
@@ -3484,6 +5608,8 @@
   "windtunnel/drag": {
    "outputs": {
     "balanceErr": 0.030242283246406588,
+    "solidFx": 0.06796075554677922,
+    "appliedFx": 0.07008013895912872,
     "massDrift": 0.0000019828642796380325,
     "steps": 3500,
     "uMeasured": 0.03921382799347091,
@@ -3491,6 +5617,15 @@
     "cd": 5.477301579418315,
     "cl": -0.08093270643878146,
     "liftToDragRatio": 0.014776017947030123
+   }
+  },
+  "windtunnel/sourceconfusion": {
+   "outputs": {
+    "balanceErr": 1,
+    "solidFx": 0,
+    "appliedFx": 0.07127999999997824,
+    "massDrift": 3.0527021240063563e-13,
+    "steps": 3500
    }
   },
   "thermal/diffuse": {
@@ -3529,6 +5664,15 @@
      0.010192034682119593,
      0.01135633172792427
     ],
+    "steps": 360
+   }
+  },
+  "thermal/onedmoment": {
+   "outputs": {
+    "alphaMeasured": 0.19999649148232412,
+    "alphaTheory": 0.1,
+    "alphaErrFrac": 0.9999649148232411,
+    "tempRange": 0.1812385051653826,
     "steps": 360
    }
   },
@@ -3608,6 +5752,20 @@
     "hasVolumeTruth": true
    }
   },
+  "geometry/midpoint": {
+   "outputs": {
+    "surfaceDeviation": 0.17952806122449005,
+    "watertight": true,
+    "boundaryEdges": 0,
+    "volumeMeasured": 4.176316508746498,
+    "volumeTheory": 4.1887902047863905,
+    "volumeErrFrac": 0.0029778755750620002,
+    "triangles": 9888,
+    "vertices": 4946,
+    "resolution": 28,
+    "hasVolumeTruth": true
+   }
+  },
   "kh/sweep": {
    "outputs": {
     "peakKD": 0.39269908169872414,
@@ -3641,6 +5799,20 @@
     "stableCount": 1,
     "michalkePeakKD": 0.4446,
     "points": 2
+   }
+  },
+  "kh/halfthickness": {
+   "outputs": {
+    "peakKD": 0.19634954084936207,
+    "peakSigmaNorm": 0.10590929424463459,
+    "michalkePeakKD": 0.4446,
+    "michalkePeakSigma": 0.1897,
+    "peakKDErrFrac": 0.558368104252447,
+    "peakSigmaErrFrac": 0.4417011373503712,
+    "neutralRespected": false,
+    "unstableCount": 4,
+    "stableCount": 1,
+    "points": 5
    }
   },
   "born/validity": {
@@ -3707,6 +5879,31 @@
     "mAbove": 0.2295225694444445,
     "orderRatio": 3.9766272077455502,
     "onsagerTc": 2.269185314213022
+   }
+  },
+  "ising/halfbond": {
+   "outputs": {
+    "temperature": 2,
+    "magnetisation": 0.0713020833333333,
+    "yangExact": 0.911319377877496,
+    "magnetisationErrFrac": 0.9217595004954255,
+    "energy": -0.5540798611111107,
+    "susceptibility": 0.8754992187500047,
+    "specificHeat": 0.6661968315972837,
+    "onsagerTc": 2.269185314213022
+   }
+  },
+  "kepler/kepler3": {
+   "outputs": {
+    "slopeMeasured": 1.500000000000014,
+    "slopeTheory": 1.5,
+    "slopeErrFrac": 9.325873406851315e-15,
+    "periodErrFrac": 0.00003884733972182381,
+    "integrator": "verlet",
+    "specificEnergy": -0.5000000000000002,
+    "angMomentum": 0.8660254037844386,
+    "energyDimensionless": -0.5000000000000002,
+    "angMomDimensionless": 1
    }
   },
   "kepler/conserve": {
@@ -3792,19 +5989,6 @@
     "eccentricity": 0.5
    }
   },
-  "kepler/kepler3": {
-   "outputs": {
-    "slopeMeasured": 1.500000000000014,
-    "slopeTheory": 1.5,
-    "slopeErrFrac": 9.325873406851315e-15,
-    "periodErrFrac": 0.00003884733972182381,
-    "integrator": "verlet",
-    "specificEnergy": -0.5000000000000002,
-    "angMomentum": 0.8660254037844386,
-    "energyDimensionless": -0.5000000000000002,
-    "angMomDimensionless": 1
-   }
-  },
   "kepler/closure": {
    "outputs": {
     "precessionPerOrbit": 0.00027997056649185407,
@@ -3830,6 +6014,19 @@
     "periodRatioExact": 8,
     "worstEnergyRelErr": 4.440892098500626e-16,
     "worstAngMomRelErr": 2.0297180930734832e-16
+   }
+  },
+  "kepler/startspeed": {
+   "outputs": {
+    "slopeMeasured": 1.500000000000014,
+    "slopeTheory": 1.5,
+    "slopeErrFrac": 9.325873406851315e-15,
+    "periodErrFrac": 0.8575899347085557,
+    "integrator": "verlet",
+    "specificEnergy": -0.5000000000000002,
+    "angMomentum": 0.8660254037844386,
+    "energyDimensionless": -0.5000000000000002,
+    "angMomDimensionless": 1
    }
   },
   "twobody/orbit": {
@@ -3904,6 +6101,10 @@
   },
   "eccentric/invariant": {
    "outputs": {
+    "inspiralTime": 16.26995608976212,
+    "closedFormTime": 16.27589757091638,
+    "timeErrFrac": 0.0003650478339750666,
+    "enhancement": 0.9996349521660249,
     "worstInvariantDev": 3.631767989685781e-9,
     "worstAtE": 0.22759966457696176,
     "c0": 5.972009477896604,
@@ -3938,6 +6139,34 @@
     "m1": 3,
     "m2": 1,
     "steps": 34234
+   }
+  },
+  "eccentric/time": {
+   "outputs": {
+    "inspiralTime": 16.26995608976212,
+    "closedFormTime": 16.27589757091638,
+    "timeErrFrac": 0.0003650478339750666,
+    "enhancement": 0.9996349521660249,
+    "a0": 10,
+    "e0": 0.01,
+    "m1": 3,
+    "m2": 1,
+    "steps": 29081,
+    "aFinal": 0.5454759344124437
+   }
+  },
+  "eccentric/slowrate": {
+   "outputs": {
+    "inspiralTime": 16.26995608976212,
+    "closedFormTime": 32.55179514183276,
+    "timeErrFrac": 0.5001825239169876,
+    "enhancement": 0.49981747608301247,
+    "a0": 10,
+    "e0": 0.01,
+    "m1": 3,
+    "m2": 1,
+    "steps": 29081,
+    "aFinal": 0.5454759344124437
    }
   },
   "kuramoto/curve": {
@@ -4030,6 +6259,15 @@
     "repeats": 30
    }
   },
+  "inference/overconfident": {
+   "outputs": {
+    "muErr": 0.00165270467739842,
+    "sigmaErr": 0.06373904242290233,
+    "acceptRate": 0.9266666666666666,
+    "samples": 3000,
+    "repeats": 0
+   }
+  },
   "langevin/jarzynski": {
    "outputs": {
     "dFerr": 0.002898644947859741,
@@ -4101,6 +6339,139 @@
     "N": 64
    }
   },
+  "blackbody/spectrum": {
+   "outputs": {
+    "wienLambdaRoot": 4.965114231744277,
+    "wienLambdaMax": 4.9651142408849935,
+    "wienLambdaAgreeRel": 1.8409881796443835e-9,
+    "wienNuRoot": 2.8214393721220787,
+    "wienNuMax": 2.8214393961415425,
+    "wienNuAgreeRel": 8.51319499690448e-9,
+    "peakProductRatio": 0.568252660549743,
+    "bose4Quad": 6.493939402265725,
+    "bose4Closed": 6.4939394022668395,
+    "bose4Rel": 1.7164679983532977e-13,
+    "bose3Quad": 2.4041138063186294,
+    "bose3Closed": 2.4041138063191916,
+    "bose3Rel": 2.338562085506922e-13,
+    "sigma": 5.6703744191844314e-8,
+    "wienB": 0.0028977719551851722,
+    "exitanceQuarticRel": 0
+   }
+  },
+  "debye/capacity": {
+   "outputs": {
+    "cvHighT": 2.9999400008571198,
+    "dulongPetitRel": 0.00001999971429341348,
+    "cvLowT": 0.0018702545478528055,
+    "lowTSlope": 233.78181848160065,
+    "lowTSlopeRel": 2.2004831001465952e-14,
+    "lowTCoeffFromBose": 233.7818184815661,
+    "boseJoinRel": 1.6983839176269577e-13,
+    "cvMid": 2.8551964071098395,
+    "dUdTMid": 2.855196407769433,
+    "derivativeRel": 2.3101518031711412e-10
+   }
+  },
+  "sackurTetrode/classical": {
+   "outputs": {
+    "sackurAtUnity": 2.5,
+    "zeroCrossingS": 0,
+    "eosBoson": 0.9116116523516815,
+    "eosFermion": 1.0883883476483185,
+    "eosSymmetryRel": 0,
+    "becThresholdPhi": 2.612375348685491,
+    "sackurAtBecThreshold": 1.539740097269214,
+    "lateAlarmFactor": 4.663378088770255,
+    "entropyOneBox": 480.2585092994046,
+    "entropyDoubled": 960.5170185988092,
+    "extensivityRel": 0,
+    "spuriousMixing": 0,
+    "spuriousOverNln2": 0
+   }
+  },
+  "fermi/degenerate": {
+   "outputs": {
+    "fermiInt2": 0.8224670334239729,
+    "fermiInt2Closed": 0.8224670334241146,
+    "fermiInt2Rel": 1.7237831363816418e-13,
+    "mirrorRatio": 0.7500000000000504,
+    "mirrorPredicted": 0.75,
+    "mirrorRel": 6.720550042397615e-14,
+    "groundFraction": 0.6,
+    "pressureFraction": 0.4,
+    "pressureOverEnergyDensity": 0.6666666666666667,
+    "polytropeExponent": 1.6666666666666667,
+    "cvLow": 0.004934802200544679,
+    "cvHigh": 0.009869604401089358,
+    "sommerfeldLinearityRel": 0,
+    "classicalOverFermi": 303.96355092701333
+   }
+  },
+  "paramagnet/spins": {
+   "outputs": {
+    "bHalf": 0.6043677771171634,
+    "tanhY": 0.6043677771171636,
+    "halfIsTanhRel": 3.673998074222038e-16,
+    "bHighJ": 0.3118655667931214,
+    "slopeHighJ": 0.4666666666666667,
+    "slopePredictedHighJ": 0.4666666666666667,
+    "slopeHighJRel": 0,
+    "satHighJ": 0.9830022637780806,
+    "curieConstantHalf": 0.25,
+    "curieConstantHighJ": 2.9166666666666665,
+    "schottkyNewton": 2.3993572805154675,
+    "schottkyMaximise": 2.3993573025244928,
+    "schottkyPeakRel": 9.172883607533661e-9,
+    "schottkyCmax": 0.4392288398906452,
+    "schottkyResid": 2.220446049250313e-16,
+    "schottkyHot": 0.00002499937501041652,
+    "schottkyCold": 8.244614455767398e-7,
+    "entropyHot": 0.6931346807161937,
+    "entropyLn2Rel": 0.000018033462592353795,
+    "entropyCold": 4.328422605384764e-8
+   }
+  },
+  "chemicalPotential/fugacity": {
+   "outputs": {
+    "crossoverBose": 2.612375348685491,
+    "crossoverClassical": 1,
+    "crossoverFermi": 0.7651470246254088,
+    "crossoverOrdered": 1,
+    "crossoverSpread": 1.847228324060082,
+    "zBose": 0.4844348509990608,
+    "zClassical": 0.6,
+    "zFermi": 0.7404892695876486,
+    "fugacityOrdered": 1,
+    "muBose": -0.7247723231549482,
+    "muClassical": -0.5108256237659907,
+    "muFermi": -0.3004441361454491,
+    "sommerfeldCoeff": 0.8224670334241132,
+    "fermiIntegralAt2": 0.8224670334239729,
+    "sommerfeldJoinRel": 1.7062348350718644e-13,
+    "muSommerfeldClosed": 0.9979438324164397,
+    "muSommerfeldComputed": 0.997936070266049,
+    "muSommerfeldRel": 0.000007778143557309451
+   }
+  },
+  "bec/condensation": {
+   "outputs": {
+    "criticalDensity": 2.612375348685491,
+    "criticalFromBoseIntegral": 2.61237534868475,
+    "criticalFromZeta": 2.612375348685491,
+    "criticalJoinRel": 2.8355067827547617e-13,
+    "cvPeakValue": 1.9256716754819556,
+    "condensateAtZero": 1,
+    "condensateAtTc": 0,
+    "condensateAtHalf": 0.6464466094067263,
+    "exponentRecovered": 1.5000000000000002,
+    "exponentRel": 1.4802973661668753e-16,
+    "ceiling1D": -1.4603545088095864,
+    "ceiling3D": 2.612375348685491,
+    "ceiling4D": 1.6449340668482288,
+    "twoDimensionsDiverge": 1
+   }
+  },
   "hydrostatic/matched": {
    "outputs": {
     "retained": 0.6324450444893971,
@@ -4140,6 +6511,19 @@
     "endHeight": 0.058563139271236145
    }
   },
+  "hydrostatic/surfacedensity": {
+   "outputs": {
+    "retained": 0.6324450444893971,
+    "collapsed": true,
+    "expanded": false,
+    "finite": true,
+    "restDensity": 144,
+    "packedDensity": 140.32618631692998,
+    "densityMismatch": 0.0261805282356397,
+    "startHeight": 0.65,
+    "endHeight": 0.4110892789181081
+   }
+  },
   "wolff/magnetisation": {
    "outputs": {
     "absM": 0.9108697916666667,
@@ -4172,7 +6556,28 @@
     "boxFamilyAgrees": true,
     "sphereSubsetOfBox": true,
     "pointMismatches": [],
-    "boxMismatches": []
+    "boxMismatches": [],
+    "boxExtraPairs": 0,
+    "boxMissingPairs": 0
+   }
+  },
+  "spatial/supersetbox": {
+   "outputs": {
+    "n": 400,
+    "r": 1.2,
+    "spherePairs": 462,
+    "boxPairs": 912,
+    "cornerPairs": 450,
+    "pointFamilyAgrees": true,
+    "boxFamilyAgrees": false,
+    "sphereSubsetOfBox": true,
+    "pointMismatches": [],
+    "boxMismatches": [
+     "aabbGrid",
+     "aabbTree"
+    ],
+    "boxExtraPairs": 10168,
+    "boxMissingPairs": 0
    }
   },
   "twof/inlet": {
@@ -4197,6 +6602,1327 @@
     "blockageFrac": 0.099
    }
   },
+  "twof/nofixedinlet": {
+   "outputs": {
+    "inletDriftFrac": 0.010151601781432634,
+    "driftImprovementVsFeedback": 11.82079464735122,
+    "liftAmplitude": 6.2141693747699525e-12,
+    "liftSustained": true,
+    "dragOverLift": 0.5152506449833423,
+    "healthy": true,
+    "reNominal": 64.79999999999995,
+    "blockageFrac": 0.14814814814814814,
+    "recordedDrift": 0.00145,
+    "recordedLift": 0.0227
+   }
+  },
+  "adjoint/identity": {
+   "outputs": {
+    "N": 32,
+    "nDet": 32,
+    "na": 16,
+    "recordedControl": 8.304e-14,
+    "recordedShipped": 27.51,
+    "controlDefect": 8.303842671843165e-14,
+    "shippedDefect": 27.509668685266085,
+    "defect": 8.303842671843165e-14,
+    "identityHolds": true,
+    "controlErrFrac": 0.000018946068983030796,
+    "shippedErrFrac": 0.000012043429077293478
+   }
+  },
+  "adjoint/shipped": {
+   "outputs": {
+    "N": 32,
+    "nDet": 32,
+    "na": 16,
+    "recordedControl": 8.304e-14,
+    "recordedShipped": 27.51,
+    "controlDefect": 8.303842671843165e-14,
+    "shippedDefect": 27.509668685266085,
+    "defect": 27.509668685266085,
+    "identityHolds": true,
+    "controlErrFrac": 0.000018946068983030796,
+    "shippedErrFrac": 0.000012043429077293478
+   }
+  },
+  "adjoint/scalar": {
+   "outputs": {
+    "N": 32,
+    "nDet": 32,
+    "na": 16,
+    "recordedControl": 8.304e-14,
+    "recordedShipped": 27.51,
+    "correlation": 0.8152655208126863,
+    "bestScalar": 4.583732729299341,
+    "residualAfterScaling": 0.5170146562742509
+   }
+  },
+  "adjoint/rowmajor": {
+   "outputs": {
+    "N": 32,
+    "nDet": 32,
+    "na": 16,
+    "recordedControl": 8.304e-14,
+    "recordedShipped": 27.51,
+    "controlDefect": 1808.5352649803863,
+    "shippedDefect": 27.509668685266085,
+    "defect": 1808.5352649803863,
+    "identityHolds": false,
+    "controlErrFrac": 21779085560939140,
+    "shippedErrFrac": 0.000012043429077293478
+   }
+  },
+  "fft/absolute": {
+   "outputs": {
+    "N": 64,
+    "tone": 5,
+    "amplitude": 1,
+    "parsevalDefect": 0,
+    "sinusoidErrFrac": 0,
+    "mixedToneErrFrac": 0,
+    "conventionHolds": true,
+    "roundTripWorst": 2.220446049250313e-16,
+    "peakBinFound": 5,
+    "peakBinExpected": 5
+   }
+  },
+  "fft/parseval": {
+   "outputs": {
+    "N": 64,
+    "tone": 5,
+    "amplitude": 1,
+    "parsevalDefect": 0,
+    "sinusoidErrFrac": 0,
+    "mixedToneErrFrac": 0,
+    "conventionHolds": true,
+    "roundTripWorst": 2.220446049250313e-16,
+    "peakBinFound": 5,
+    "peakBinExpected": 5
+   }
+  },
+  "fft/roundtrip": {
+   "outputs": {
+    "N": 64,
+    "tone": 5,
+    "amplitude": 1,
+    "parsevalDefect": 0,
+    "sinusoidErrFrac": 0,
+    "mixedToneErrFrac": 0,
+    "conventionHolds": true,
+    "roundTripWorst": 2.220446049250313e-16,
+    "peakBinFound": 5,
+    "peakBinExpected": 5
+   }
+  },
+  "fft/halfscale": {
+   "outputs": {
+    "N": 64,
+    "tone": 5,
+    "amplitude": 1,
+    "parsevalDefect": 0.984375,
+    "sinusoidErrFrac": 0.875,
+    "mixedToneErrFrac": 0.875,
+    "conventionHolds": false,
+    "roundTripWorst": 2.220446049250313e-16,
+    "peakBinFound": 5,
+    "peakBinExpected": 5
+   }
+  },
+  "thermostat/relax": {
+   "outputs": {
+    "N": 600,
+    "dof": 1797,
+    "tau": 0.1,
+    "dt": 0.002,
+    "steps": 50,
+    "target": 4,
+    "momentumMagnitude": 4.704497402354719e-14,
+    "momentumHolds": true,
+    "tMeasured": 2.907490959738645,
+    "tAnalytic": 2.8963616764856726,
+    "relaxErrFrac": 0.0038425046648443424,
+    "relaxHolds": true
+   }
+  },
+  "thermostat/momentum": {
+   "outputs": {
+    "N": 600,
+    "dof": 1797,
+    "tau": 0.1,
+    "dt": 0.002,
+    "steps": 50,
+    "target": 4,
+    "momentumMagnitude": 4.704497402354719e-14,
+    "momentumHolds": true,
+    "tMeasured": 2.907490959738645,
+    "tAnalytic": 2.8963616764856726,
+    "relaxErrFrac": 0.0038425046648443424,
+    "relaxHolds": true
+   }
+  },
+  "thermostat/mirror": {
+   "outputs": {
+    "N": 600,
+    "dof": 1797,
+    "tau": 0.1,
+    "dt": 0.002,
+    "steps": 50,
+    "target": 4,
+    "momentumMagnitude": 4.704497402354719e-14,
+    "momentumHolds": true,
+    "tAfterRescale": 3.999999999999996,
+    "rescaleErrFrac": 9.992007221626409e-16,
+    "mirrorNote": "rescaleToT SETS this and temperature() READS IT BACK -- not evidence about the module"
+   }
+  },
+  "thermostat/nosqrt": {
+   "outputs": {
+    "N": 600,
+    "dof": 1797,
+    "tau": 0.1,
+    "dt": 0.002,
+    "steps": 50,
+    "target": 4,
+    "momentumMagnitude": 4.704497402354719e-14,
+    "momentumHolds": true,
+    "tMeasured": 3.6155938487727606,
+    "tAnalytic": 2.8963616764856726,
+    "relaxErrFrac": 0.24832263806216878,
+    "relaxHolds": false
+   }
+  },
+  "cfl/sweep": {
+   "outputs": {
+    "h": 0.1,
+    "dt": 0.002,
+    "steps": 200,
+    "particles": 216,
+    "soundSpeed": 15,
+    "breakDt": 0.003,
+    "lastGoodDt": 0.002,
+    "breakOverHOverC": 0.44999999999999996,
+    "scalesWithC": true,
+    "ratioSpread": 0.3333333333333334,
+    "ladder": [
+     {
+      "c": 15,
+      "lastGood": 0.002,
+      "breakDt": 0.003,
+      "ratio": 0.44999999999999996
+     },
+     {
+      "c": 30,
+      "lastGood": 0.001,
+      "breakDt": 0.002,
+      "ratio": 0.6
+     },
+     {
+      "c": 60,
+      "lastGood": 0.0005,
+      "breakDt": 0.001,
+      "ratio": 0.6
+     }
+    ]
+   }
+  },
+  "cfl/acoustic": {
+   "outputs": {
+    "h": 0.1,
+    "dt": 0.002,
+    "steps": 200,
+    "particles": 216,
+    "soundSpeed": 15,
+    "maxSpeed": 3.6004129758538643,
+    "advectiveCourant": 0.07200825951707729,
+    "acousticCourant": 0.3,
+    "optimismFactor": 4.166188740179907,
+    "allFinite": true
+   }
+  },
+  "cfl/runaway": {
+   "outputs": {
+    "h": 0.1,
+    "dt": 0.002,
+    "steps": 200,
+    "particles": 216,
+    "soundSpeed": 15,
+    "maxSpeed": 879657329.0585285,
+    "allFinite": true,
+    "finiteButBroken": true,
+    "acousticCourant": 2.9999999999999996,
+    "advectiveCourant": 175931465.81170568
+   }
+  },
+  "cfl/advectiveonly": {
+   "outputs": {
+    "h": 0.1,
+    "dt": 0.002,
+    "steps": 200,
+    "particles": 216,
+    "soundSpeed": 15,
+    "breakDt": 0.003,
+    "lastGoodDt": 0.002,
+    "breakOverHOverC": 0.10801238927561593,
+    "scalesWithC": false,
+    "ratioSpread": 44.14513789228817,
+    "ladder": [
+     {
+      "c": 15,
+      "lastGood": 0.002,
+      "breakDt": 0.003,
+      "ratio": 0.10801238927561593
+     },
+     {
+      "c": 30,
+      "lastGood": 0.001,
+      "breakDt": 0.002,
+      "ratio": 2.7426238070804523
+     },
+     {
+      "c": 60,
+      "lastGood": 0.0005,
+      "breakDt": 0.001,
+      "ratio": 4.876234207923189
+     }
+    ]
+   }
+  },
+  "entropy/coding": {
+   "outputs": {
+    "symbols": 6,
+    "H": 2.219879978107314,
+    "expectedLen": 2.24,
+    "excessOverH": 0.020120021892686246,
+    "shannonHolds": true,
+    "kraftSum": 1,
+    "kraftHolds": true
+   }
+  },
+  "entropy/bounds": {
+   "outputs": {
+    "symbols": 6,
+    "uniformH": 3,
+    "uniformExact": true,
+    "maxH": 2.584962500721156,
+    "H": 2.219879978107314,
+    "belowMax": true,
+    "binaryAtHalf": 1
+   }
+  },
+  "entropy/mergelargest": {
+   "outputs": {
+    "symbols": 6,
+    "H": 2.219879978107314,
+    "expectedLen": 4.159999999999999,
+    "excessOverH": 1.9401200218926853,
+    "shannonHolds": false,
+    "kraftSum": 1,
+    "kraftHolds": true
+   }
+  },
+  "voxelize/order": {
+   "outputs": {
+    "radius": 1,
+    "segments": 32,
+    "gridN": 32,
+    "analyticVolume": 4.1887902047863905,
+    "meshVolumeAt": 4.1775875933386954,
+    "deficit": 0.002674426481157788,
+    "orderRatios": [
+     3.7996691161936265,
+     3.948802058746265,
+     3.987129784744917
+    ],
+    "order": 1.967857315819181,
+    "secondOrder": true,
+    "ladder": [
+     {
+      "seg": 8,
+      "mv": 3.518611245019581,
+      "deficit": 0.1599934413046083
+     },
+     {
+      "seg": 16,
+      "mv": 4.012411962557191,
+      "deficit": 0.04210720365695528
+     },
+     {
+      "seg": 32,
+      "mv": 4.144123939016361,
+      "deficit": 0.010663285480134756
+     },
+     {
+      "seg": 64,
+      "mv": 4.1775875933386954,
+      "deficit": 0.002674426481157788
+     }
+    ]
+   }
+  },
+  "voxelize/agreement": {
+   "outputs": {
+    "radius": 1,
+    "segments": 32,
+    "gridN": 32,
+    "analyticVolume": 4.1887902047863905,
+    "meshVolumeAt": 4.144123939016361,
+    "voxelVolumeAt": 4.14299275,
+    "voxelAgreement": 0.0014500196113983687,
+    "voxelMonotone": false,
+    "voxelBounded": true,
+    "ladder": [
+     {
+      "n": 16,
+      "vv": 4.1479360000000005,
+      "err": 0.0009198713744416195
+     },
+     {
+      "n": 32,
+      "vv": 4.150133,
+      "err": 0.0014500196113983687
+     },
+     {
+      "n": 64,
+      "vv": 4.14299275,
+      "err": 0.00027296215871122685
+     }
+    ]
+   }
+  },
+  "voxelize/closure": {
+   "outputs": {
+    "radius": 1,
+    "segments": 32,
+    "gridN": 32,
+    "analyticVolume": 4.1887902047863905,
+    "closed": true,
+    "boundaryEdges": 0,
+    "nonManifoldEdges": 0
+   }
+  },
+  "voxelize/oneaxis": {
+   "outputs": {
+    "radius": 1,
+    "segments": 32,
+    "gridN": 32,
+    "analyticVolume": 4.1887902047863905,
+    "meshVolumeAt": 3.56961546515426,
+    "deficit": 0.14781708067513624,
+    "orderRatios": [
+     1.376395255193024,
+     1.107263999155432,
+     1.0277606191591038
+    ],
+    "order": 0.22709201421293762,
+    "secondOrder": false,
+    "ladder": [
+     {
+      "seg": 8,
+      "mv": 3.218951416497458,
+      "deficit": 0.2315319557376567
+     },
+     {
+      "seg": 16,
+      "mv": 3.4841679063370083,
+      "deficit": 0.1682161827164879
+     },
+     {
+      "seg": 32,
+      "mv": 3.5524267910143954,
+      "deficit": 0.1519205743569692
+     },
+     {
+      "seg": 64,
+      "mv": 3.56961546515426,
+      "deficit": 0.14781708067513624
+     }
+    ]
+   }
+  },
+  "stability/response": {
+   "outputs": {
+    "viscosity": 0.47,
+    "horizon": 1,
+    "ratioLadder": [
+     {
+      "visc": 0.1,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 0.3,
+      "ratio": 1.549745456117029
+     },
+     {
+      "visc": 0.47,
+      "ratio": 0.775476180324773
+     },
+     {
+      "visc": 0.7,
+      "ratio": 0.6916453535441158
+     },
+     {
+      "visc": 1.5,
+      "ratio": 0.34605131386197197
+     }
+    ],
+    "ratio": 0.775476180324773,
+    "monotoneInViscosity": true,
+    "spanAcrossViscosity": 7.9005432550727015,
+    "respondsToViscosity": true
+   }
+  },
+  "stability/direction": {
+   "outputs": {
+    "viscosity": 0.47,
+    "horizon": 1,
+    "ratio": 0.775476180324773,
+    "createsEnergy": false
+   }
+  },
+  "stability/horizon": {
+   "outputs": {
+    "viscosity": 0.47,
+    "horizon": 1,
+    "ratioShort": 0.775476180324773,
+    "ratioLong": 0.8182025446165591,
+    "horizonDrift": 0.055096939629908574,
+    "driftsWithHorizon": false
+   }
+  },
+  "stability/deafknob": {
+   "outputs": {
+    "viscosity": 0.47,
+    "horizon": 1,
+    "ratioLadder": [
+     {
+      "visc": 0.1,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 0.3,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 0.47,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 0.7,
+      "ratio": 2.733993373641249
+     },
+     {
+      "visc": 1.5,
+      "ratio": 2.733993373641249
+     }
+    ],
+    "ratio": 2.733993373641249,
+    "monotoneInViscosity": true,
+    "spanAcrossViscosity": 1,
+    "respondsToViscosity": false
+   }
+  },
+  "mpmtransfer/conserve": {
+   "outputs": {
+    "h": 1,
+    "particles": 36,
+    "nodes": 169,
+    "linearErr": 1.6504651808933464e-15,
+    "linearHolds": true,
+    "angularParticles": 64.15499999999996,
+    "angularGrid": 64.155,
+    "angularLostFrac": 6.645244196961428e-16,
+    "angularHolds": true
+   }
+  },
+  "mpmtransfer/unity": {
+   "outputs": {
+    "h": 1,
+    "unityWorst": 1.1102230246251565e-16,
+    "unityHolds": true
+   }
+  },
+  "mpmtransfer/roundtrip": {
+   "outputs": {
+    "h": 1,
+    "particles": 36,
+    "nodes": 169,
+    "roundTripVelErr": 4.577566798522237e-16
+   }
+  },
+  "mpmtransfer/pic": {
+   "outputs": {
+    "h": 1,
+    "particles": 36,
+    "nodes": 169,
+    "linearErr": 9.550499576785472e-16,
+    "linearHolds": true,
+    "angularParticles": 64.15499999999996,
+    "angularGrid": 47.775000000000006,
+    "angularLostFrac": 0.25531914893616964,
+    "angularHolds": false
+   }
+  },
+  "mpmgrid/impulse": {
+   "outputs": {
+    "nx": 12,
+    "impulseY": -2.0600999999999994,
+    "expectedImpulseY": -2.0601000000000003,
+    "impulseErrFrac": 4.311336438523009e-16,
+    "impulseHolds": true,
+    "totalMass": 25.2,
+    "liveNodes": 25
+   }
+  },
+  "mpmgrid/resolution": {
+   "outputs": {
+    "nx": 12,
+    "coarseErrFrac": 4.311336438523009e-16,
+    "fineErrFrac": 2.155668219261505e-16,
+    "scalesWithGrid": false
+   }
+  },
+  "mpmgrid/walls": {
+   "outputs": {
+    "nx": 12,
+    "wallNormalMax": 0,
+    "wallsHold": true
+   }
+  },
+  "mpmgrid/forcefirst": {
+   "outputs": {
+    "nx": 12,
+    "impulseY": -2.04375,
+    "expectedImpulseY": -2.0601000000000003,
+    "impulseErrFrac": 0.007936507936507978,
+    "impulseHolds": false,
+    "totalMass": 25.2,
+    "liveNodes": 25
+   }
+  },
+  "mpmstress/symmetry": {
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "asymmetry": 0,
+    "symmetryHolds": true,
+    "J": 1.3
+   }
+  },
+  "mpmstress/rest": {
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "restStressMax": 0,
+    "restHolds": true,
+    "J": 1
+   }
+  },
+  "mpmstress/dilation": {
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "dilationShearMax": 0,
+    "dilationNormalsEqual": true,
+    "dilationHolds": true,
+    "J": 1.2100000000000002
+   }
+  },
+  "mpmstress/blindfixtures": {
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "dilationPlantDelta": 0,
+    "shearPlantDelta": 15.384615384615385,
+    "shearAsymmetry": 0
+   }
+  },
+  "mpmstress/transposed": {
+   "outputs": {
+    "E": 1000,
+    "nu": 0.3,
+    "asymmetry": 72.60613165283769,
+    "symmetryHolds": false,
+    "J": 1.3
+   }
+  },
+  "mpmplastic/split": {
+   "outputs": {
+    "thetaC": 0.025,
+    "thetaS": 0.0075,
+    "clamped": true,
+    "singularMin": 0.9749999999999998,
+    "singularMax": 0.9749999999999998,
+    "clampHolds": true,
+    "splitDrift": 2.220446049250313e-16,
+    "splitHolds": true,
+    "volumeChange": 3.3306690738754696e-16
+   }
+  },
+  "mpmplastic/clamp": {
+   "outputs": {
+    "thetaC": 0.025,
+    "thetaS": 0.0075,
+    "clamped": true,
+    "singularMin": 0.9749999999999998,
+    "singularMax": 0.9749999999999998,
+    "clampHolds": true,
+    "splitDrift": 2.220446049250313e-16,
+    "splitHolds": true,
+    "volumeChange": 3.3306690738754696e-16
+   }
+  },
+  "mpmplastic/svd": {
+   "outputs": {
+    "thetaC": 0.025,
+    "thetaS": 0.0075,
+    "svdResidual": 1.1102230246251565e-16,
+    "singularMin": 0.8495029441690137,
+    "singularMax": 0.9223040430618189
+   }
+  },
+  "mpmplastic/nofp": {
+   "outputs": {
+    "thetaC": 0.025,
+    "thetaS": 0.0075,
+    "clamped": true,
+    "singularMin": 0.9749999999999998,
+    "singularMax": 0.9749999999999998,
+    "clampHolds": true,
+    "splitDrift": 0.12400564081598098,
+    "splitHolds": false,
+    "volumeChange": 0.16712499999999975
+   }
+  },
+  "mpmforce/thirdlaw": {
+   "outputs": {
+    "h": 1,
+    "netForce": 7.944109290391274e-15,
+    "thirdLawHolds": true
+   }
+  },
+  "mpmforce/scaling": {
+   "outputs": {
+    "h": 1,
+    "maxForceCoarse": 55.24010853486899,
+    "maxForceFine": 110.48021706973798,
+    "scaleRatio": 2,
+    "scalesWithH": true
+   }
+  },
+  "mpmforce/stencil": {
+   "outputs": {
+    "h": 1,
+    "gradientSum": 0,
+    "weightSum": 1,
+    "stencilHolds": true
+   }
+  },
+  "mpmforce/brokenstencil": {
+   "outputs": {
+    "h": 1,
+    "netForce": 5.02144306038988,
+    "thirdLawHolds": false
+   }
+  },
+  "mpmstep/freefall": {
+   "outputs": {
+    "steps": 120,
+    "dt": 0.004166666666666667,
+    "gotY": 5.263531249999998,
+    "wantY": 5.263531249999997,
+    "errY": 8.881784197001252e-16,
+    "fell": 1.2364687499999993,
+    "parabolaHolds": true,
+    "driftX": 0,
+    "noSidewaysDrift": true,
+    "blockFell": true,
+    "errNoPlastic": 8.881784197001252e-16,
+    "plasticIrrelevant": true
+   }
+  },
+  "mpmstep/noplastic": {
+   "outputs": {
+    "steps": 120,
+    "dt": 0.004166666666666667,
+    "gotY": 5.263531249999998,
+    "wantY": 5.263531249999997,
+    "errY": 8.881784197001252e-16,
+    "fell": 1.2364687499999993,
+    "parabolaHolds": true,
+    "driftX": 0,
+    "noSidewaysDrift": true,
+    "blockFell": true
+   }
+  },
+  "mpmstep/sideways": {
+   "outputs": {
+    "steps": 120,
+    "dt": 0.004166666666666667,
+    "driftX": 0,
+    "noSidewaysDrift": true,
+    "fell": 1.2364687499999993,
+    "blockFell": true
+   }
+  },
+  "mpmstep/continuous": {
+   "outputs": {
+    "steps": 120,
+    "dt": 0.004166666666666667,
+    "gotY": 5.263531249999998,
+    "wantY": 5.273749999999997,
+    "errY": 0.010218749999999055,
+    "parabolaHolds": false,
+    "driftX": 0,
+    "noSidewaysDrift": true,
+    "blockFell": true
+   }
+  },
+  "mpmcolumn/energy": {
+   "outputs": {
+    "worstRise": 0.000006848819678349628,
+    "energyFalls": true,
+    "samples": 6,
+    "totalStart": 95.35320000000002,
+    "totalEnd": 40.714499930815194,
+    "dissipatedFrac": 0.5730138062402186,
+    "keEnd": 0.000011595224025025239,
+    "cameToRest": true,
+    "comStart": 2.6999999999999993,
+    "comEnd": 1.1515795037687855,
+    "collapsed": true,
+    "creepPerStep": 8.243426982172213e-7
+   }
+  },
+  "mpmcolumn/settle": {
+   "outputs": {
+    "worstRise": 0.000006848819678349628,
+    "energyFalls": true,
+    "samples": 6,
+    "totalStart": 95.35320000000002,
+    "totalEnd": 40.714499930815194,
+    "dissipatedFrac": 0.5730138062402186,
+    "keEnd": 0.000011595224025025239,
+    "cameToRest": true,
+    "comStart": 2.6999999999999993,
+    "comEnd": 1.1515795037687855,
+    "collapsed": true,
+    "creepPerStep": 8.243426982172213e-7
+   }
+  },
+  "mpmcolumn/elastic": {
+   "outputs": {
+    "worstRise": 0,
+    "energyFalls": true,
+    "samples": 6,
+    "totalStart": 95.35320000000002,
+    "totalEnd": 72.88893658081766,
+    "dissipatedFrac": 0.23559003178899454,
+    "keEnd": 0.11092567222435115,
+    "cameToRest": false,
+    "comStart": 2.6999999999999993,
+    "comEnd": 2.000226562205513,
+    "collapsed": true,
+    "creepPerStep": 0.0001621114737512345
+   }
+  },
+  "mpmcolumn/noelastic": {
+   "outputs": {
+    "worstRise": 0.34932265345782654,
+    "energyFalls": false,
+    "samples": 6,
+    "totalStart": 95.35320000000002,
+    "totalEnd": 70.7509269430743,
+    "dissipatedFrac": 0.25801203375372517,
+    "keEnd": 0.11092567222435115,
+    "cameToRest": false,
+    "comStart": 2.6999999999999993,
+    "comEnd": 2.000226562205513,
+    "collapsed": true,
+    "creepPerStep": 0.0001621114737512345
+   }
+  },
+  "mpmmomentum/slide": {
+   "outputs": {
+    "floorOffset": 3,
+    "steps": 480,
+    "pxStart": 3.7499999999999987,
+    "pxEnd": 3.749999999999996,
+    "massStart": 2.500000000000001,
+    "massEnd": 2.500000000000001,
+    "pxErrFrac": 7.105427357601004e-16,
+    "momentumHolds": true,
+    "landed": true,
+    "massHolds": true
+   }
+  },
+  "mpmmomentum/mass": {
+   "outputs": {
+    "floorOffset": 3,
+    "steps": 480,
+    "pxStart": 3.7499999999999987,
+    "pxEnd": 3.749999999999996,
+    "massStart": 2.500000000000001,
+    "massEnd": 2.500000000000001,
+    "pxErrFrac": 7.105427357601004e-16,
+    "momentumHolds": true,
+    "landed": true,
+    "massHolds": true
+   }
+  },
+  "mpmmomentum/edgefloor": {
+   "outputs": {
+    "floorOffset": 1,
+    "steps": 480,
+    "pxStart": 3.7499999999999987,
+    "pxEnd": 0.1750120706653573,
+    "massStart": 2.500000000000001,
+    "massEnd": 2.500000000000001,
+    "pxErrFrac": 0.953330114489238,
+    "momentumHolds": false,
+    "landed": true,
+    "massHolds": true
+   }
+  },
+  "mpmdrucker/angle": {
+   "outputs": {
+    "frictionDeg": 30,
+    "alpha20": 0.2101282121702967,
+    "alpha40": 0.44530046399592604,
+    "shearAt20": 0.04526109222290261,
+    "shearAt40": 0.09594518562285423,
+    "shearSpread": 2.119815959154095,
+    "angleMatters": true
+   }
+  },
+  "mpmdrucker/surface": {
+   "outputs": {
+    "frictionDeg": 30,
+    "elasticUntouched": true,
+    "yieldAfter": 3.383079066031132e-16,
+    "landsOnSurface": true
+   }
+  },
+  "mpmdrucker/tension": {
+   "outputs": {
+    "frictionDeg": 30,
+    "apexCase": "apex",
+    "apexYield": 0,
+    "landsOnSurface": true
+   }
+  },
+  "mpmdrucker/deafangle": {
+   "outputs": {
+    "frictionDeg": 30,
+    "alpha20": 0.2101282121702967,
+    "alpha40": 0.44530046399592604,
+    "shearAt20": 0.07035702995186462,
+    "shearAt40": 0.07035702995186462,
+    "shearSpread": 1,
+    "angleMatters": false
+   }
+  },
+  "mpmpile/friction": {
+   "outputs": {
+    "angles": [
+     25,
+     30,
+     35,
+     40,
+     45
+    ],
+    "widths": [
+     21.5233388177572,
+     21.36171523796185,
+     21.186937708157032,
+     19.299196167913557,
+     16.478925172119233
+    ],
+    "steps": 720,
+    "contained": true,
+    "widthAtLow": 21.5233388177572,
+    "widthAtHigh": 16.478925172119233,
+    "monotone": true,
+    "spread": 1.306113025755626,
+    "narrowing": true
+   }
+  },
+  "mpmpile/clamp": {
+   "outputs": {
+    "angles": [
+     25,
+     30,
+     35,
+     40,
+     45
+    ],
+    "widths": [
+     2.017649480636411,
+     2.017649480636411,
+     2.017649480636411,
+     2.017649480636411,
+     2.017649480636411
+    ],
+    "steps": 720,
+    "contained": true,
+    "widthAtLow": 2.017649480636411,
+    "widthAtHigh": 2.017649480636411,
+    "monotone": true,
+    "spread": 1,
+    "narrowing": false
+   }
+  },
+  "mpmpile/deafangle": {
+   "outputs": {
+    "angles": [
+     25,
+     30,
+     35,
+     40,
+     45
+    ],
+    "widths": [
+     21.36171523796185,
+     21.36171523796185,
+     21.36171523796185,
+     21.36171523796185,
+     21.36171523796185
+    ],
+    "steps": 720,
+    "contained": true,
+    "widthAtLow": 21.36171523796185,
+    "widthAtHigh": 21.36171523796185,
+    "monotone": true,
+    "spread": 1,
+    "narrowing": false
+   }
+  },
+  "mpmrefine/refine": {
+   "outputs": {
+    "levels": [
+     1,
+     2
+    ],
+    "values": [
+     1.151674426681776,
+     1.3717140330637192
+    ],
+    "diffs": [
+     0.2200396063819432
+    ],
+    "floorHeights": [
+     1.5,
+     1.5
+    ],
+    "totalMasses": [
+     3.600000000000002,
+     3.599999999999991
+    ],
+    "blockExtents": [
+     1,
+     1
+    ],
+    "restVmax": [
+     0.014894745873809736,
+     0.025424964247445857
+    ],
+    "comDrift": [
+     0.0009038668902294766,
+     0.00020899559936449208
+    ],
+    "floorDriftFrac": 0,
+    "fixtureInvariant": true,
+    "massDriftFrac": 2.9605947323337493e-15,
+    "massInvariant": true,
+    "extentDriftFrac": 0,
+    "extentInvariant": true,
+    "restedAtSample": true,
+    "converges": true
+   }
+  },
+  "mpmrefine/cellfloor": {
+   "outputs": {
+    "levels": [
+     1,
+     2
+    ],
+    "values": [
+     1.151674426681776,
+     0.5818235644814977
+    ],
+    "diffs": [
+     0.5698508622002783
+    ],
+    "floorHeights": [
+     1.5,
+     0.75
+    ],
+    "totalMasses": [
+     3.600000000000002,
+     3.599999999999991
+    ],
+    "blockExtents": [
+     1,
+     1
+    ],
+    "restVmax": [
+     0.014894745873809736,
+     0.022303230469350073
+    ],
+    "comDrift": [
+     0.0009038668902294766,
+     0.00013797431235418323
+    ],
+    "floorDriftFrac": 0.5,
+    "fixtureInvariant": false,
+    "massDriftFrac": 2.9605947323337493e-15,
+    "massInvariant": true,
+    "extentDriftFrac": 0,
+    "extentInvariant": true,
+    "restedAtSample": true,
+    "converges": false
+   }
+  },
+  "mpmcouple/contact": {
+   "outputs": {
+    "grids": 1,
+    "pxStart": 1.4399999999999977,
+    "pxEnd": 1.4400000000000004,
+    "pxErrFrac": 1.850371707708597e-15,
+    "momentumHolds": true,
+    "gapStart": 1.9,
+    "gapEnd": 0.5527122005990659,
+    "minGap": 0.5334014281310613,
+    "separated": true,
+    "interpenetrated": false
+   }
+  },
+  "mpmcouple/separategrids": {
+   "outputs": {
+    "grids": 2,
+    "pxStart": 1.4399999999999977,
+    "pxEnd": 1.4400000000000197,
+    "pxErrFrac": 1.5265566588595928e-14,
+    "momentumHolds": true,
+    "gapStart": 1.9,
+    "gapEnd": -1.3999999999999684,
+    "minGap": -1.3999999999999684,
+    "separated": false,
+    "interpenetrated": true
+   }
+  },
+  "mpm3d/conserve": {
+   "outputs": {
+    "stencil": 27,
+    "particles": 64,
+    "nodes": 2197,
+    "linearErr": 3.1903070425770667e-15,
+    "linearHolds": true,
+    "angularParticles": [
+     20.16000000000002,
+     31.679999999999982,
+     -14.399999999999977
+    ],
+    "angularGrid": [
+     20.15999999999999,
+     31.679999999999986,
+     -14.399999999999988
+    ],
+    "angularLostPerAxis": [
+     1.5860328923216505e-15,
+     1.1214373986112698e-16,
+     7.401486830834389e-16
+    ],
+    "angularWorstFrac": 1.5860328923216505e-15,
+    "angularHolds": true
+   }
+  },
+  "mpm3d/unity": {
+   "outputs": {
+    "stencil": 27,
+    "unityWorst": 1.1102230246251565e-16,
+    "unityHolds": true
+   }
+  },
+  "mpm3d/roundtrip": {
+   "outputs": {
+    "stencil": 27,
+    "particles": 64,
+    "nodes": 2197,
+    "roundTripVelErr": 7.021666937153402e-16
+   }
+  },
+  "mpm3d/pic": {
+   "outputs": {
+    "stencil": 27,
+    "particles": 64,
+    "nodes": 2197,
+    "linearErr": 1.7145580697244688e-15,
+    "linearHolds": true,
+    "angularParticles": [
+     20.16000000000002,
+     31.679999999999982,
+     -14.399999999999977
+    ],
+    "angularGrid": [
+     8.959999999999996,
+     14.079999999999988,
+     -6.399999999999978
+    ],
+    "angularLostPerAxis": [
+     0.5555555555555562,
+     0.5555555555555557,
+     0.5555555555555564
+    ],
+    "angularWorstFrac": 0.5555555555555564,
+    "angularHolds": false
+   }
+  },
+  "nbench/compare": {
+   "outputs": {
+    "identicalLists": 2500,
+    "differingLists": 0,
+    "listsMatch": true,
+    "gridCandPerQuery": [
+     33.412,
+     71.771
+    ],
+    "bvhVisitsPerQuery": [
+     278.32,
+     580.889
+    ],
+    "bvhBuildNodes": [
+     999,
+     3999
+    ],
+    "ratios": [
+     8.329941338441278,
+     8.093645065555727
+    ],
+    "gridWins": true,
+    "ratioStable": true
+   }
+  },
+  "nbench/boxhits": {
+   "outputs": {
+    "identicalLists": 0,
+    "differingLists": 2500,
+    "listsMatch": false,
+    "gridCandPerQuery": [
+     33.412,
+     71.771
+    ],
+    "bvhVisitsPerQuery": [
+     278.32,
+     580.889
+    ],
+    "bvhBuildNodes": [
+     999,
+     3999
+    ],
+    "ratios": [
+     8.329941338441278,
+     8.093645065555727
+    ],
+    "gridWins": false,
+    "ratioStable": true
+   }
+  },
+  "hands/rigid": {
+   "outputs": {
+    "kind": "rigid",
+    "rigidDisagreements": 0,
+    "rotationDisagreements": 0,
+    "translationDisagreements": 0,
+    "outOfPlaneDisagreements": 0,
+    "inPlaneDisagreements": 0,
+    "posesSwept": 256,
+    "poses": 4,
+    "twoHandSpreadDrift": 5.551115123125783e-17,
+    "inPlaneBoundaryDisagreements": 0,
+    "inPlaneBoundarySwept": 16,
+    "boundaryFlexDeg": 44.09616100025871,
+    "boundaryMarginPct": 1.0602629885170245e-11
+   }
+  },
+  "hands/scale": {
+   "outputs": {
+    "kind": "scale",
+    "foldScaleDisagreements": 0,
+    "scalesSwept": 32,
+    "pinchHomogeneityErr": 2.14164261263749e-15,
+    "pinchCriticalScale": 0.6291298599907221,
+    "pinchFlipsAtCritical": 4,
+    "poses": 4
+   }
+  },
+  "hands/mirror": {
+   "outputs": {
+    "kind": "mirror",
+    "mirrorMaxDelta": 0,
+    "mirrorPoses": 4,
+    "poses": 4
+   }
+  },
+  "hands/flatdistance": {
+   "outputs": {
+    "kind": "flatdistance",
+    "rigidDisagreements": 20,
+    "rotationDisagreements": 20,
+    "translationDisagreements": 0,
+    "outOfPlaneDisagreements": 20,
+    "inPlaneDisagreements": 0,
+    "posesSwept": 256,
+    "poses": 4,
+    "twoHandSpreadDrift": 5.551115123125783e-17,
+    "inPlaneBoundaryDisagreements": 0,
+    "inPlaneBoundarySwept": 16,
+    "boundaryFlexDeg": 36.78809577615847,
+    "boundaryMarginPct": 7.24876623835482
+   }
+  },
+  "hands/fixedanchor": {
+   "outputs": {
+    "kind": "rigid",
+    "rigidDisagreements": 24,
+    "rotationDisagreements": 0,
+    "translationDisagreements": 24,
+    "outOfPlaneDisagreements": 0,
+    "inPlaneDisagreements": 0,
+    "posesSwept": 256,
+    "poses": 4,
+    "twoHandSpreadDrift": 5.551115123125783e-17,
+    "inPlaneBoundaryDisagreements": 8,
+    "inPlaneBoundarySwept": 16,
+    "boundaryFlexDeg": 52.82331365220712,
+    "boundaryMarginPct": 8.803374722719138
+   }
+  },
+  "hands/manhattan": {
+   "outputs": {
+    "kind": "rigid",
+    "rigidDisagreements": 0,
+    "rotationDisagreements": 0,
+    "translationDisagreements": 0,
+    "outOfPlaneDisagreements": 0,
+    "inPlaneDisagreements": 0,
+    "posesSwept": 256,
+    "poses": 4,
+    "twoHandSpreadDrift": 5.551115123125783e-17,
+    "inPlaneBoundaryDisagreements": 16,
+    "inPlaneBoundarySwept": 16,
+    "boundaryFlexDeg": 55.23928130264515,
+    "boundaryMarginPct": 11.129535961029546
+   }
+  },
+  "hands/mirrorhalf": {
+   "outputs": {
+    "kind": "mirror",
+    "mirrorMaxDelta": 0.127,
+    "mirrorPoses": 4,
+    "poses": 4
+   }
+  },
   "fdtd/dispersion": {
    "outputs": {
     "S": 0.9,
@@ -4204,7 +7930,12 @@
     "vpPredicted": 0.9977818819115514,
     "vpMeasured": 0.9977659457136329,
     "vpErrAbs": 0.000015936197918509087,
-    "steps": 2600
+    "steps": 2600,
+    "epsR": 4,
+    "vpInSlab": 0.49875311720698257,
+    "indexMeasured": 2.005,
+    "indexExact": 2,
+    "indexErrFrac": 0.0024999999999999467
    }
   },
   "fdtd/magic": {
@@ -4224,6 +7955,26 @@
     "cErrFrac": 0,
     "S": 1,
     "steps": 840
+   }
+  },
+  "fdtd/dielectric": {
+   "outputs": {
+    "epsR": 4,
+    "vpInSlab": 0.49875311720698257,
+    "indexMeasured": 2.005,
+    "indexExact": 2,
+    "indexErrFrac": 0.0024999999999999467,
+    "steps": 3000
+   }
+  },
+  "fdtd/indexconfusion": {
+   "outputs": {
+    "epsR": 4,
+    "vpInSlab": 0.7067137809187279,
+    "indexMeasured": 1.415,
+    "indexExact": 2,
+    "indexErrFrac": 0.2925,
+    "steps": 3000
    }
   },
   "tempering/marginals": {
@@ -4276,6 +8027,19 @@
     "cutoff": 2.5
    }
   },
+  "pbc/wrapwrong": {
+   "outputs": {
+    "worstForceDiff": 1.0488665217844995,
+    "maxForceMagnitude": 1.0277073099037286,
+    "plantedForceDiff": 1.0488665217844995,
+    "virialPBC": -66.03383237091879,
+    "virialImages": -87.83814054457133,
+    "momentumDrift": 7.216449660063518e-15,
+    "N": 64,
+    "L": 8,
+    "cutoff": 2.5
+   }
+  },
   "blobbodies/roundtrip": {
    "outputs": {
     "peakKept": 0.5789179092783062,
@@ -4285,7 +8049,10 @@
     "trips": 4,
     "gridN": 64,
     "voxels": 262144,
-    "bodyCount": 7
+    "bodyCount": 7,
+    "shiftKept": 0.9999999995805936,
+    "oneWayShift": 0.3333333331935312,
+    "expectedShift": 0.3333333333333333
    }
   },
   "blobbodies/bodies": {
@@ -4296,6 +8063,20 @@
     "bodyPeakKept": 1.0000000000000002,
     "bodyDrift": 8.881784197001252e-16,
     "bodyCount": 7
+   }
+  },
+  "quantum/bands": {
+   "outputs": {
+    "edgeSymmetryMismatches": 0,
+    "bandCount": 4,
+    "gapCount": 3,
+    "widestGap": 5.587939453767092,
+    "edgeRhsWorst": 1.5543122344752192e-15,
+    "insideGapWorst": 1.0749109237668668,
+    "insideBandWorst": 0.20431870578295985,
+    "numericEdgeWorst": 0.0035726764310957163,
+    "bandGridN": 400,
+    "groundState": 2.0400457574856183
    }
   },
   "quantum/well": {
@@ -4331,14 +8112,17 @@
     "gridN": 600
    }
   },
-  "quantum/bands": {
+  "quantum/stencil": {
    "outputs": {
+    "edgeSymmetryMismatches": 0,
     "bandCount": 4,
     "gapCount": 3,
     "widestGap": 5.587939453767092,
     "edgeRhsWorst": 1.5543122344752192e-15,
     "insideGapWorst": 1.0749109237668668,
     "insideBandWorst": 0.20431870578295985,
+    "numericEdgeWorst": 54464.74819122355,
+    "bandGridN": 400,
     "groundState": 2.0400457574856183
    }
   },
@@ -4375,6 +8159,430 @@
     "period": 1
    }
   },
+  "flip2d/hydrostatic": {
+   "outputs": {
+    "slopePerCell": -9.81000645841871,
+    "slopeExact": -9.81,
+    "slopeErrFrac": 6.583505310961868e-7,
+    "linearityR2": 0.9999999999999722,
+    "topCellPressure": 9.810006141662598,
+    "topCellExact": 9.81,
+    "fluidCellsInColumn": 15,
+    "particles": 840,
+    "steps": 400
+   }
+  },
+  "flip2d/forceslate": {
+   "outputs": {
+    "slopePerCell": -9.794319341470906,
+    "slopeExact": -9.81,
+    "slopeErrFrac": 0.0015984361395610662,
+    "linearityR2": 0.9999970172883711,
+    "topCellPressure": 9.83096694946289,
+    "topCellExact": 9.81,
+    "fluidCellsInColumn": 14,
+    "particles": 840,
+    "steps": 400
+   }
+  },
+  "freesurface/vessels": {
+   "outputs": {
+    "gapInitial": 12,
+    "gapInitialExact": 12,
+    "sdInitial": 6,
+    "gapEnvelope": 0.05263157894736814,
+    "gapFinal": 0,
+    "gapBoundCells": 1,
+    "gapQuantum": 0.05263157894736842,
+    "sdEnvelope": 0.16007269816574266,
+    "sdFinal": 0,
+    "depthObserved": 9,
+    "depthPredicted": 9.473684210526315,
+    "depthRatio": 0.9500000000000001,
+    "depthErrFrac": 0.049999999999999926,
+    "columns": 38,
+    "particles": 1440,
+    "steps": 3000,
+    "settleWindow": 600,
+    "samples": 10
+   }
+  },
+  "freesurface/depth": {
+   "outputs": {
+    "gapInitial": 12,
+    "gapInitialExact": 12,
+    "sdInitial": 6,
+    "gapEnvelope": 0.05263157894736814,
+    "gapFinal": 0,
+    "gapBoundCells": 1,
+    "gapQuantum": 0.05263157894736842,
+    "sdEnvelope": 0.16007269816574266,
+    "sdFinal": 0,
+    "depthObserved": 9,
+    "depthPredicted": 9.473684210526315,
+    "depthRatio": 0.9500000000000001,
+    "depthErrFrac": 0.049999999999999926,
+    "columns": 38,
+    "particles": 1440,
+    "steps": 3000,
+    "settleWindow": 600,
+    "samples": 10
+   }
+  },
+  "freesurface/mincell": {
+   "outputs": {
+    "gapInitial": 0,
+    "gapInitialExact": 12,
+    "sdInitial": 0,
+    "gapEnvelope": 0,
+    "gapFinal": 0,
+    "gapBoundCells": 1,
+    "gapQuantum": 0.05263157894736842,
+    "sdEnvelope": 0,
+    "sdFinal": 0,
+    "depthObserved": 1,
+    "depthPredicted": 9.473684210526315,
+    "depthRatio": 0.10555555555555557,
+    "depthErrFrac": 0.8944444444444445,
+    "columns": 38,
+    "particles": 1440,
+    "steps": 3000,
+    "settleWindow": 600,
+    "samples": 10
+   }
+  },
+  "flip3d/isotropy": {
+   "outputs": {
+    "kind": "isotropy",
+    "frontRel": 0,
+    "meanAlongRel": 0,
+    "meanHeightRel": 0,
+    "maxDivRel": 0,
+    "meanSpeedRel": 2.0172012026347947e-16,
+    "worstRel": 0,
+    "transposed": 4000,
+    "particles": 4000,
+    "steps": 300,
+    "iters": 60
+   }
+  },
+  "flip3d/hydrostatic": {
+   "outputs": {
+    "kind": "hydrostatic",
+    "slopePerCell": -9.810029515353117,
+    "slopeExact": -9.81,
+    "slopeErrFrac": 0.0000030087006234697686,
+    "linearityR2": 0.999999999999711,
+    "bottomPressure": 98.10029602050781,
+    "bottomExact": 98.10000000000001,
+    "bottomErrFrac": 0.0000030175383058509016,
+    "fluidCellsInColumn": 10,
+    "particles": 8000,
+    "steps": 300,
+    "iters": 60
+   }
+  },
+  "flip3d/footprint": {
+   "outputs": {
+    "kind": "footprint",
+    "footprints": [
+     6,
+     10,
+     14
+    ],
+    "footprintSpread": 0.0000033441681789954353,
+    "massRatio": 9,
+    "bottomPressure": 98.09999084472656,
+    "bottomExact": 98.10000000000001,
+    "particles": 17920,
+    "steps": 300,
+    "iters": 60
+   }
+  },
+  "flip3d/flatdivergence": {
+   "outputs": {
+    "kind": "flatdivergence",
+    "frontRel": 0.008644769633620762,
+    "meanAlongRel": 0.34672954188726474,
+    "meanHeightRel": 0.25089813559058766,
+    "maxDivRel": 0.07352391779411954,
+    "meanSpeedRel": 0.6099033419884634,
+    "worstRel": 0.34672954188726474,
+    "transposed": 4000,
+    "particles": 4000,
+    "steps": 300,
+    "iters": 60
+   }
+  },
+  "kerrladder/isco": {
+   "outputs": {
+    "kind": "isco",
+    "iscoMeasured": 6.000000081973685,
+    "iscoReference": 6,
+    "iscoRadiusErr": 8.197368472906419e-8,
+    "iscoWorstRadiusErr": 2.0148224422200656e-7,
+    "energyAtIsco": 0.9428090415820635,
+    "energyAnchor": 0.9428090415820634,
+    "energyErr": 1.1102230246251565e-16,
+    "bindingFraction": 0.05719095841793653,
+    "sqrtEps": 1.4901161193847656e-8,
+    "photonRows": 10,
+    "spins": [
+     0,
+     0.5,
+     0.9,
+     0.998,
+     0.99999
+    ],
+    "spin": 0,
+    "prograde": true
+   }
+  },
+  "kerrladder/photon": {
+   "outputs": {
+    "kind": "photon",
+    "photonMeasured": 3,
+    "photonClosedForm": 3,
+    "photonErr": 0,
+    "photonWorstErr": 1.2434497875801753e-14,
+    "photonRows": 10,
+    "spins": [
+     0,
+     0.5,
+     0.9,
+     0.998,
+     0.99999
+    ],
+    "spin": 0,
+    "prograde": true
+   }
+  },
+  "kerrladder/extremal": {
+   "outputs": {
+    "kind": "extremal",
+    "bindings": [
+     0.05719095841793653,
+     0.15575299199446402,
+     0.26403010011626626,
+     0.3397940734762006,
+     0.40332403490598756
+    ],
+    "spins": [
+     0,
+     0.9,
+     0.99,
+     0.999,
+     0.99999
+    ],
+    "monotone": true,
+    "approaches": true,
+    "limitValue": 0.42264973081037416,
+    "limitGap": 0.019325695904386597,
+    "bindingFraction": 0.40332403490598756
+   }
+  },
+  "kerrladder/spinsense": {
+   "outputs": {
+    "kind": "isco",
+    "iscoMeasured": 5.999999875392135,
+    "iscoReference": 6,
+    "iscoRadiusErr": 1.2460786535939405e-7,
+    "iscoWorstRadiusErr": 7.964739663900474,
+    "energyAtIsco": 0.9428090415820635,
+    "energyAnchor": 0.9428090415820634,
+    "energyErr": 1.1102230246251565e-16,
+    "bindingFraction": 0.05719095841793653,
+    "sqrtEps": 1.4901161193847656e-8,
+    "photonRows": 10,
+    "spins": [
+     0,
+     0.5,
+     0.9,
+     0.998,
+     0.99999
+    ],
+    "spin": 0,
+    "prograde": true
+   }
+  },
+  "induction/faraday": {
+   "outputs": {
+    "kind": "faraday",
+    "circulation": -11.623892818280774,
+    "circulationExact": -11.623892818282235,
+    "circulationErr": 1.2561758309491944e-13,
+    "circulationWorstErr": 1.6774321799760662e-13,
+    "loops": 6,
+    "dBdt": 3.7,
+    "quadN": 20000
+   }
+  },
+  "induction/gauss": {
+   "outputs": {
+    "kind": "gauss",
+    "fluxAtRadius": 12.566499808107295,
+    "fluxExact": 12.566370614359172,
+    "fluxSpread": 0,
+    "fluxAbsErr": 0.000010280911815148676,
+    "fluxOutside": 7.755254645610404e-8,
+    "radii": [
+     0.5,
+     1,
+     2,
+     7
+    ],
+    "charge": 1,
+    "quadN": 80000
+   }
+  },
+  "induction/separation": {
+   "outputs": {
+    "kind": "separation",
+    "circulation": -11.623892818280774,
+    "circulationOfCoulomb": 9.918911483269129e-20,
+    "fluxAtRadius": 12.566499808107295,
+    "fluxOfInduced": 3.513898664180393e-19,
+    "divergenceOfInduced": 5.551115123125782e-11,
+    "divergenceOfCoulomb": -1.7347234759768068e-13,
+    "separates": true,
+    "dBdt": 3.7,
+    "charge": 1,
+    "quadN": 20000
+   }
+  },
+  "induction/radialdot": {
+   "outputs": {
+    "kind": "faraday",
+    "circulation": -7.871036053342991e-19,
+    "circulationExact": -11.623892818282235,
+    "circulationErr": 1,
+    "circulationWorstErr": 1.0000000000000044,
+    "loops": 6,
+    "dBdt": 3.7,
+    "quadN": 20000
+   }
+  },
+  "multigrid3d/scaling": {
+   "outputs": {
+    "kind": "scaling",
+    "itersSmall": 20,
+    "itersLarge": 28,
+    "cellRatio": 8,
+    "iterRatio": 1.4,
+    "iters": 28,
+    "residual": 6.197804563547826e-7,
+    "converged": true,
+    "cells": 32768,
+    "levels": 4,
+    "n": 32,
+    "compatible": true
+   }
+  },
+  "multigrid3d/solve": {
+   "outputs": {
+    "kind": "solve",
+    "iters": 22,
+    "residual": 4.499243854188265e-7,
+    "converged": true,
+    "cells": 13824,
+    "levels": 4,
+    "n": 24,
+    "compatible": true
+   }
+  },
+  "multigrid3d/incompatible": {
+   "outputs": {
+    "kind": "incompatible",
+    "iters": 200,
+    "residual": 140059.96184212342,
+    "converged": false,
+    "cells": 13824,
+    "levels": 4,
+    "n": 24,
+    "compatible": false
+   }
+  },
+  "multigrid3d/nopreconditioner": {
+   "outputs": {
+    "kind": "scaling",
+    "itersSmall": 43,
+    "itersLarge": 93,
+    "cellRatio": 8,
+    "iterRatio": 2.1627906976744184,
+    "iters": 93,
+    "residual": 7.81507477153848e-7,
+    "converged": true,
+    "cells": 32768,
+    "levels": 4,
+    "n": 32,
+    "compatible": true
+   }
+  },
+  "multigridgpu/adjoint": {
+   "outputs": {
+    "kind": "adjoint",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "pairs": 3,
+    "adjointWorst": 7.18920849983558e-16,
+    "innerFine": 1.2354328292473906,
+    "innerCoarse": 1.2354328292473888,
+    "wgslGraded": 0
+   }
+  },
+  "multigridgpu/window": {
+   "outputs": {
+    "kind": "window",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "innerFine": -9.058362423854804,
+    "innerCoarse": -9.05836242385481,
+    "narrowInner": -6.8822922793814385,
+    "codeInner": -9.05836242385481,
+    "codeRel": 0,
+    "narrowRel": 0.1365107133292075,
+    "shippedRel": 2.941519818287947e-16,
+    "widerRel": 2.941519818287947e-16,
+    "widerExact": 1,
+    "wgslGraded": 0
+   }
+  },
+  "multigridgpu/reference": {
+   "outputs": {
+    "kind": "reference",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "pairs": 3,
+    "refWorst": 6.299454323727202e-16,
+    "wgslGraded": 0
+   }
+  },
+  "multigridgpu/solve": {
+   "outputs": {
+    "kind": "solve",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "fieldMax": 636.9544677734375,
+    "wgslGraded": 0
+   }
+  },
+  "multigridgpu/narrowwindow": {
+   "outputs": {
+    "kind": "adjoint",
+    "n": 32,
+    "cells": 1024,
+    "levels": 4,
+    "pairs": 3,
+    "adjointWorst": 0.29340895523131094,
+    "innerFine": 1.2354328292473906,
+    "innerCoarse": 2.2614493868351078,
+    "wgslGraded": 0
+   }
+  },
   "splat/integral": {
    "outputs": {
     "integralRatio": 0.9999999999999251,
@@ -4382,6 +8590,14 @@
     "gridN": 256,
     "isoRollDeviation": 1.1102230246251565e-14,
     "axisRatio": 1
+   }
+  },
+  "splat/perspective": {
+   "outputs": {
+    "areaSlope": -2,
+    "areaSlopeErr": 0,
+    "areaIntercept": 8.764053269347762,
+    "areaAtUnitDepth": 6399.9999999999945
    }
   },
   "splat/compose": {
@@ -4395,12 +8611,11 @@
     "orderDependenceCorrect": true
    }
   },
-  "splat/perspective": {
+  "splat/shear": {
    "outputs": {
-    "areaSlope": -2,
-    "areaSlopeErr": 0,
-    "areaIntercept": 8.764053269347762,
-    "areaAtUnitDepth": 6399.9999999999945
+    "onAxisShearDelta": 0,
+    "offAxisShearDelta": 0.010005420663719955,
+    "shearGrows": true
    }
   },
   "splat/precision": {
@@ -4415,11 +8630,13 @@
     "metricsDiffer": true
    }
   },
-  "splat/shear": {
+  "splat/detnotsqrt": {
    "outputs": {
-    "onAxisShearDelta": 0,
-    "offAxisShearDelta": 0.010005420663719955,
-    "shearGrows": true
+    "integralRatio": 0.0039062499999997064,
+    "integralErrFrac": 0.9960937500000003,
+    "gridN": 256,
+    "isoRollDeviation": 1.1102230246251565e-14,
+    "axisRatio": 1
    }
   },
   "discovery/kepler": {
@@ -4502,13 +8719,11 @@
     "orbits": 18
    }
   },
-  "probe/isco": {
+  "probe/firstorder": {
    "outputs": {
-    "iscoR": 6,
-    "iscoL": 3.4641016151377544,
-    "iscoLIndependent": 3.4641016151377544,
-    "iscoAgrees": true,
-    "redshiftAtHorizonInfinite": true
+    "ratio1": 2.0046130214944817,
+    "ratio2": 2.002248603485653,
+    "firstOrderHolds": true
    }
   },
   "probe/closure": {
@@ -4518,11 +8733,13 @@
     "orbits": 19
    }
   },
-  "probe/firstorder": {
+  "probe/isco": {
    "outputs": {
-    "ratio1": 2.0046130214944817,
-    "ratio2": 2.002248603485653,
-    "firstOrderHolds": true
+    "iscoR": 6,
+    "iscoL": 3.4641016151377544,
+    "iscoLIndependent": 3.4641016151377544,
+    "iscoAgrees": true,
+    "redshiftAtHorizonInfinite": true
    }
   },
   "probe/capture": {
@@ -4531,24 +8748,6 @@
     "plunges": true,
     "properTime": 99.345882657961,
     "iscoL": 3.4641016151377544
-   }
-  },
-  "probe/findisco": {
-   "outputs": {
-    "iscoFoundR": 5.960687453046558,
-    "iscoExactR": 6,
-    "iscoDeficitFrac": 0.0065520911589070545,
-    "iscoTrials": 35
-   }
-  },
-  "probe/mission": {
-   "outputs": {
-    "achieved": 2,
-    "refuted": 1,
-    "impossible": 1,
-    "malformed": 1,
-    "notAllAchieved": true,
-    "missionVerdict": "5 proposals: {\"achieved\":2,\"refuted\":1,\"impossible\":1,\"malformed\":1}"
    }
   },
   "probe/steer": {
@@ -4571,6 +8770,24 @@
     "steerTrials": 43,
     "steerEcc": 7.64980671395035e-12,
     "steerStable": true
+   }
+  },
+  "probe/mission": {
+   "outputs": {
+    "achieved": 2,
+    "refuted": 1,
+    "impossible": 1,
+    "malformed": 1,
+    "notAllAchieved": true,
+    "missionVerdict": "5 proposals: {\"achieved\":2,\"refuted\":1,\"impossible\":1,\"malformed\":1}"
+   }
+  },
+  "probe/findisco": {
+   "outputs": {
+    "iscoFoundR": 5.960687453046558,
+    "iscoExactR": 6,
+    "iscoDeficitFrac": 0.0065520911589070545,
+    "iscoTrials": 35
    }
   },
   "probe/pilot": {
@@ -4642,6 +8859,14 @@
     "emitInsidePhotonSphere": false
    }
   },
+  "probe/halfadvance": {
+   "outputs": {
+    "precessionMeasured": 0.009856260938135186,
+    "precessionExact": 0.004908738521234052,
+    "precessionErrFrac": 1.007900990345954,
+    "orbits": 18
+   }
+  },
   "lens/shadow": {
    "outputs": {
     "rObs": 20,
@@ -4660,57 +8885,6 @@
     "pixelDiameterExact": 225.5345739005167,
     "pixelErrFrac": 2.1423281227382634e-15,
     "shadowAngleExact": 0.2490415079291829
-   }
-  },
-  "lens/images": {
-   "outputs": {
-    "sourceU": 0.3,
-    "imagePlus": 1.1611874208078343,
-    "imageMinus": -0.8611874208078343,
-    "imagePlusExact": 1.161187420807834,
-    "imageMinusExact": -0.8611874208078342,
-    "imageErrFrac": 1.9122202061968225e-16
-   }
-  },
-  "lens/pointmag": {
-   "outputs": {
-    "sourceU": 0.3,
-    "magTotal": 3.4447949623474874,
-    "magTotalExact": 3.4447949624912364,
-    "magErrFrac": 4.1729337814999744e-11
-   }
-  },
-  "lens/finite": {
-   "outputs": {
-    "sourceRho": 0.1,
-    "magFinite": 20.024984286256288,
-    "magFiniteExact": 20.024984394500784,
-    "magFiniteErrFrac": 5.405472179190309e-9,
-    "pointDivergence": 10000.0000375,
-    "sizeInferred": 0.1000000005418986,
-    "sizeTrue": 0.1,
-    "sizeErrFrac": 5.418985954408484e-9
-   }
-  },
-  "lens/map": {
-   "outputs": {
-    "mapN": 21,
-    "mapSpan": 0.6,
-    "sourceRho": 0.1,
-    "mapCells": 441,
-    "mapPeak": 20.024981687576595,
-    "mapPeakExact": 20.024984394500784,
-    "mapPeakErrFrac": 1.3517734323645215e-7
-   }
-  },
-  "lens/structure": {
-   "outputs": {
-    "sourceRho": 0.1,
-    "sepU": 0.2,
-    "magSingle": 20.024984150798122,
-    "magDouble": 12.688716508158578,
-    "structureResolved": true,
-    "magErrFrac": 0.3663557277945285
    }
   },
   "lens/bcrit": {
@@ -4752,6 +8926,82 @@
     "deflectionMeasured": 0.5452280703646171
    }
   },
+  "lens/aim": {
+   "outputs": {
+    "rObs": 20,
+    "impactParameter": 102.96510205067577,
+    "aimB": 102.96510205067577,
+    "aimBWeak": 100,
+    "aimBErrFrac": 0.029651020506757674,
+    "aimTrueDeg": 90,
+    "aimApparentDeg": 90,
+    "aimOffsetDeg": 0,
+    "aimNaiveMissRad": 0.04,
+    "aimCorrectedMissRad": 4.0939474033052647e-16,
+    "aimNaiveHits": false,
+    "aimCorrectedHits": true
+   }
+  },
+  "lens/images": {
+   "outputs": {
+    "sourceU": 0.3,
+    "imagePlus": 1.1611874208078343,
+    "imageMinus": -0.8611874208078343,
+    "imagePlusExact": 1.161187420807834,
+    "imageMinusExact": -0.8611874208078342,
+    "imageErrFrac": 1.9122202061968225e-16
+   }
+  },
+  "lens/pointmag": {
+   "outputs": {
+    "sourceU": 0.3,
+    "magTotal": 3.4447949623474874,
+    "magTotalExact": 3.4447949624912364,
+    "magErrFrac": 4.1729337814999744e-11
+   }
+  },
+  "lens/finite": {
+   "outputs": {
+    "sourceRho": 0.1,
+    "magFinite": 20.024984286256288,
+    "magFiniteExact": 20.024984394500784,
+    "magFiniteErrFrac": 5.405472179190309e-9,
+    "pointDivergence": 10000.0000375,
+    "sizeInferred": 0.1000000005418986,
+    "sizeTrue": 0.1,
+    "sizeErrFrac": 5.418985954408484e-9
+   }
+  },
+  "lens/structure": {
+   "outputs": {
+    "sourceRho": 0.1,
+    "sepU": 0.2,
+    "magSingle": 20.024984150798122,
+    "magDouble": 12.688716508158578,
+    "structureResolved": true,
+    "magErrFrac": 0.3663557277945285
+   }
+  },
+  "lens/map": {
+   "outputs": {
+    "mapN": 21,
+    "mapSpan": 0.6,
+    "sourceRho": 0.1,
+    "mapCells": 441,
+    "mapPeak": 20.024981687576595,
+    "mapPeakExact": 20.024984394500784,
+    "mapPeakErrFrac": 1.3517734323645215e-7
+   }
+  },
+  "lens/flatshadow": {
+   "outputs": {
+    "rObs": 20,
+    "shadowAngleRad": 0.2490415079291834,
+    "shadowAngleExact": 0.2628229775671818,
+    "shadowErrFrac": 0.05243631955457797,
+    "shadowFillsSky": false
+   }
+  },
   "tidal/deviation": {
    "outputs": {
     "kind": "deviation",
@@ -4780,6 +9030,18 @@
     "rocheMeasured": 62.74668231489607,
     "rocheExact": 62.99605249474366,
     "rocheErrFrac": 0.0039585048581956064
+   }
+  },
+  "tidal/blob": {
+   "outputs": {
+    "kind": "blob",
+    "blobCount": 24,
+    "blobStretch": 4.737977679914532,
+    "blobStretchPredicted": 9.075715616039856,
+    "blobStretchErrFrac": 0.4779499622552161,
+    "blobDisrupted": true,
+    "rFinal": 2.001240631255887,
+    "properTime": 385.4709999977967
    }
   },
   "box3d/drop": {
@@ -4879,6 +9141,248 @@
     "diverging": false
    }
   },
+  "melt/front": {
+   "outputs": {
+    "kind": "front",
+    "stefanNumber": 1,
+    "lambda": 0.6200626333135955,
+    "lambdaResidual": 1.1102230246251565e-16,
+    "exactFront": 1.240125266627191,
+    "solverFront": 1.2251281445435915,
+    "frontRelErr": 0.012093231617147468,
+    "moltenFraction": 0.3075,
+    "naiveMoltenFraction": 1
+   }
+  },
+  "melt/convergence": {
+   "outputs": {
+    "kind": "convergence",
+    "exactFront": 1.240125266627191,
+    "rows": [
+     {
+      "n": 200,
+      "front": 1.2105041332702797,
+      "relErr": 0.023885597813415052
+     },
+     {
+      "n": 400,
+      "front": 1.2251281445435915,
+      "relErr": 0.012093231617147468
+     },
+     {
+      "n": 800,
+      "front": 1.2325329166281382,
+      "relErr": 0.00612224442430871
+     }
+    ],
+    "convergenceRatio": 1.9752074997223064,
+    "stefanNumber": 1
+   }
+  },
+  "melt/stall": {
+   "outputs": {
+    "kind": "stall",
+    "samples": 13,
+    "insideMushy": 11,
+    "stallExact": true,
+    "worstDeparture": 0,
+    "stefanNumber": 1
+   }
+  },
+  "melt/naive": {
+   "outputs": {
+    "kind": "naive",
+    "stefanNumber": 1,
+    "lambda": 0.6200626333135955,
+    "lambdaResidual": 1.1102230246251565e-16,
+    "exactFront": 1.240125266627191,
+    "moltenFraction": 1,
+    "naiveMoltenFraction": 1
+   }
+  },
+  "freeze/control": {
+   "outputs": {
+    "kind": "control",
+    "material": "ice",
+    "exactRatio": 1,
+    "meltFront": 0.03475761193510985,
+    "freezeFront": 0.03475761193510985,
+    "controlFrontTie": true,
+    "controlFieldMirror": 3.133214859976195e-14,
+    "cells": 150
+   }
+  },
+  "freeze/asymmetry": {
+   "outputs": {
+    "kind": "asymmetry",
+    "material": "ice",
+    "ratioExact": 2.0551428538185608,
+    "ratioSolver": 1.946977440459689,
+    "diffusivityPart": 2.8359995580527113,
+    "lambdaPart": 0.7246626142740614,
+    "productCheck": 0,
+    "meltFront": 0.017369598802315915,
+    "freezeFront": 0.03381821701794472,
+    "meltExact": 0.017141051449653864,
+    "freezeExact": 0.03522730939369242,
+    "meltRelErr": 0.013333333333333327,
+    "freezeRelErr": 0.04000000000000002,
+    "alphaSolid": 0.000001152827543231033,
+    "alphaLiquid": 1.433349259436216e-7
+   }
+  },
+  "freeze/reversibility": {
+   "outputs": {
+    "kind": "reversibility",
+    "material": "ice",
+    "addRemove": 0,
+    "roundTrip": 1.337941128095425e-15,
+    "mushyShare": 0.5121951219512195,
+    "samples": 41,
+    "note": "addRemove holds EVERYWHERE because H is the state; roundTrip is only asked OUTSIDE the CLOSED interval [0, rho*L], where many H share one T and there is no inverse -- endpoints included."
+   }
+  },
+  "freeze/slowfreeze": {
+   "outputs": {
+    "kind": "slowfreeze",
+    "material": "ice",
+    "exactRatio": 1,
+    "meltFront": 0.03475761193510985,
+    "freezeFront": 0.03475761193510985,
+    "controlFrontTie": true,
+    "controlFieldMirror": 0.00006345861638816566,
+    "cells": 150
+   }
+  },
+  "vaporize/ratio": {
+   "outputs": {
+    "kind": "ratio",
+    "T": 373.15,
+    "ratioIdeal": 1628.2918953171716,
+    "ratioMeasured": 1602.810774636105,
+    "routeGap": 0.01589777226625628,
+    "ratioSpan": 1602.810774636105,
+    "note": "TWO ROUTES SHARING NO FORMULA. They agree far from critical and diverge near it, so the agreement is a reading about the regime rather than a restatement."
+   }
+  },
+  "vaporize/key": {
+   "outputs": {
+    "kind": "key",
+    "anchorRel": 0,
+    "worstAwayRel": 0.3671367904531096,
+    "criticalRel": 0.17907784814442063,
+    "rows": [
+     {
+      "T": 273.16,
+      "cc": 836.2187878381777,
+      "known": 611.657,
+      "rel": 0.3671367904531096
+     },
+     {
+      "T": 293.15,
+      "cc": 2834.640388375374,
+      "known": 2339,
+      "rel": 0.21190268848883034
+     },
+     {
+      "T": 323.15,
+      "cc": 13337.570559680662,
+      "known": 12344,
+      "rel": 0.0804901619961651
+     },
+     {
+      "T": 373.15,
+      "cc": 101325,
+      "known": 101325,
+      "rel": 0
+     },
+     {
+      "T": 423.15,
+      "cc": 476695.6590265414,
+      "known": 476000,
+      "rel": 0.0014614685431541972
+     },
+     {
+      "T": 473.15,
+      "cc": 1616694.905206334,
+      "known": 1555000,
+      "rel": 0.03967518019699941
+     }
+    ],
+    "note": "EXACT AT THE ANCHOR BY CONSTRUCTION -- the away rows are the evidence"
+   }
+  },
+  "vaporize/trilemma": {
+   "outputs": {
+    "kind": "trilemma",
+    "T": 373.15,
+    "r": 1602.810774636105,
+    "massFactor": 0.0006239039665970773,
+    "volumeFactor": 0.0006239039665970773,
+    "voxelCost": 1602.810774636105,
+    "blockSide": 11.70291590857078,
+    "allPenaltiesEqualR": true,
+    "criticalRatio": 1,
+    "note": "ONE NUMBER DECIDES EVERY PENALTY, and it is EXACTLY 1 at the critical point -- where all three schemes coincide and in-place gasification is exact on the same grid."
+   }
+  },
+  "vaporize/celsius": {
+   "outputs": {
+    "kind": "celsius",
+    "T": 373.15,
+    "ratioIdeal": 436.3639006611742,
+    "ratioMeasured": 1602.810774636105,
+    "routeGap": 0.7277508314977204,
+    "ratioSpan": 1602.810774636105,
+    "note": "TWO ROUTES SHARING NO FORMULA. They agree far from critical and diverge near it, so the agreement is a reading about the regime rather than a restatement."
+   }
+  },
+  "crystallize/exponent": {
+   "outputs": {
+    "kind": "exponent",
+    "mode": "3d-site-saturated",
+    "predicted": 3,
+    "exponent": 2.959848806074903,
+    "exponentErr": 0.04015119392509714,
+    "fitPoints": 41,
+    "note": "ONE SEED. This number is NOT the answer on its own -- see the `spread` mode, which exists because ising.L converged beautifully at its default seed and was flat over four."
+   }
+  },
+  "crystallize/spread": {
+   "outputs": {
+    "kind": "spread",
+    "continuous": false,
+    "mean": 2.9621719551060854,
+    "sd": 0.1453979954989185,
+    "spreadMin": 2.7851536468868447,
+    "spreadMax": 3.1412830931521363,
+    "ns": [
+     2.959848806074903,
+     2.9624022743104566,
+     2.7851536468868447,
+     3.1412830931521363
+    ],
+    "seeds": 4,
+    "note": "THE SPREAD IS THE MEASUREMENT, not a caveat on one. A zero spread here would mean the ensemble is one run repeated and every ratio in `discrimination` is meaningless."
+   }
+  },
+  "crystallize/discrimination": {
+   "outputs": {
+    "kind": "discrimination",
+    "gap": 1,
+    "satMean": 2.9621719551060854,
+    "conMean": 3.9198793471604327,
+    "satSd": 0.1453979954989185,
+    "conSd": 0.3254034003077653,
+    "effectOverNoise": 3.073108637015482,
+    "populationMargin": 0.45711414384575466,
+    "marginInSigma": 1.4047614235543262,
+    "separated": true,
+    "satErr": 0.03782804489391456,
+    "conErr": 0.08012065283956726,
+    "note": "THE MEANS SEPARATE MORE COMFORTABLY THAN THE POPULATIONS DO, and the population margin is the honest number: the ensemble discriminates the two nucleation modes, a single seed is not comfortably clear of the wrong answer."
+   }
+  },
   "blobkelvin/convert": {
    "outputs": {
     "kind": "convert",
@@ -4897,6 +9401,6 @@
    }
   }
  },
- "pairCount": 283,
- "pairObservables": 2339
+ "pairCount": 484,
+ "pairObservables": 4264
 }

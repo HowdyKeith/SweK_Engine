@@ -69,9 +69,11 @@ import { sceneScale } from "/ev/esFlight3dMath.js";
 import { mountShipModels } from "/ev/esShipModels.js";   // v3827 -- user-assignable .glb ships per class
 import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-mean auto-exposure
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
-import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
+import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt, surfaceNormal, makeSurfaceParams } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera; v4077 -- surfaceNormal/makeSurfaceParams for the root/arch's orientation
 import { sampleShot, sampleSequence, chainLegs, sequenceDuration, toClip, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 sequence; v4057 clip export
 import { buildPuffsShell } from "/render/cloudField.js";   // v4055 -- the engine's own cloud types, on a shell
+import { buildMossShell } from "/render/mossField.js";   // v4076 -- ground cover on the SAME displaced surface
+import { rootArch } from "/world/rootArch.js";   // v4077 -- one procedural root/arch landmark
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
@@ -1014,6 +1016,146 @@ window.swekCloudProbe = () => {
   return { deck: true, puffs: p.count, minR, maxR, camR, inside: camR < maxR && camR > minR, below: camR < minR };
 };
 
+// v4076 -- MOSS ON THE PLANET, GROWN FROM THE SAME render/mossField.js THE VOXEL TERRAIN USES (render/mossPatches.js).
+// *** WHY THIS IS A CHILD OF planetMesh AND THE CLOUD DECK IS NOT. *** planetMesh carries a static tilt
+// (rotation.z = spec.tilt, set once) AND a continuous spin (rotation.y += planetSpin*dt, every frame, line
+// ~699). The cloud deck is built in WORLD space and added to `scene` directly -- fine for weather, which is
+// not attached to the ground and can drift from a spinning planet without anyone noticing. Moss is GROUND
+// COVER: if it were built the same way it would visibly detach from the terrain within seconds of watching the
+// planet spin. Parenting the InstancedMesh under planetMesh means Three's own scene graph carries tilt AND
+// spin for free, forever, with no per-frame code here at all -- and building the tufts in the mesh's LOCAL
+// (pre-rotation) frame is exactly the frame the vertex displacement loop above already computed heights in, so
+// nothing about the arithmetic changes, only whose transform is applied to the result.
+// v4077 -- SPECIES BY PLANET TYPE AND LATITUDE, THE PLANET'S OWN EQUIVALENT OF mossPatches.js's BIOME MAP.
+// There is no per-point heat/moisture field on a planet the way world/worleyBiomes.js gives voxel terrain, so
+// this reads the two REAL signals a planet already carries: spec.type (terran/desert/ice/gas/molten) and, for
+// a terran world, latitude via dir[1] -- world/procPlanet.js's own comment states dir[1] IS sin(latitude) on
+// the unit sphere, the SAME quantity surfaceColor() already uses for its ice-cap band. gas and molten worlds
+// have no solid biosphere-friendly surface at all and grow no moss; desert refuses for the same ecological
+// reason mossPatches.js's own desert biome does -- arid, exposed rock, no moss habitat.
+function mossSpeciesForPlanet(spec, dir) {
+    switch (spec.type) {
+        case "terran": return (spec.iceCap && Math.abs(dir[1]) > spec.iceCap) ? "pale" : "common";
+        case "ice": return "pale";
+        case "desert": return null;
+        case "gas": case "molten": return null;
+        default: return "common";
+    }
+}
+let mossDeck = null;
+function buildMossDeck(dir) {
+  if (mossDeck) { planetMesh.remove(mossDeck); mossDeck.geometry.dispose(); mossDeck.material.dispose(); mossDeck = null; }
+  if (!planetMesh || !planetSpec_) return null;
+  const tufts = buildMossShell({ spec: planetSpec_, groundRadius: planetR, ampFrac: PLANET_AMP_FRAC,
+                                  dir, coverage: 0.55, sizeScale: 0.06, seed: planetSpec_.seed, maxSlope: 4.5,
+                                  speciesFor: (d) => mossSpeciesForPlanet(planetSpec_, d) });
+  if (!tufts.length) return null;
+
+  // A squashed low-poly hummock -- one shared geometry, matching the "rocks" InstancedMesh recipe already
+  // proven in this file (icosphere-like clump, MeshStandardMaterial, per-instance Matrix4.compose).
+  const clumpGeo = new THREE.IcosahedronGeometry(1, 0);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0, flatShading: true });
+  const inst = new THREE.InstancedMesh(clumpGeo, mat, tufts.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), spinQ = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+  tufts.forEach((t, i) => {
+    // orientation: align the hummock's local +Y to the terrain's own normal here, then spin it around that
+    // normal by the tuft's own random angle -- the same setFromUnitVectors + axis-angle compose the rocks use,
+    // aimed at a surface normal instead of an arbitrary spin axis.
+    q.setFromUnitVectors(up, new THREE.Vector3(t.normal[0], t.normal[1], t.normal[2]));
+    spinQ.setFromAxisAngle(new THREE.Vector3(t.normal[0], t.normal[1], t.normal[2]), t.spin);
+    q.premultiply(spinQ);
+    v.set(t.x, t.y, t.z);
+    s.set(t.scale, t.scale * 0.35, t.scale);   // flattened -- a clump, not a boulder
+    inst.setMatrixAt(i, m.compose(v, q, s));
+    // v4077 -- the species' OWN colour pair (mossField.js's MOSS_SPECIES), not a single hardcoded green range.
+    // One instance = one flat colour (no per-vertex height gradient on an icosphere this coarse), leaning
+    // toward the top colour, which is the one that reads at a distance.
+    col.setRGB(t.colBot[0] * 0.35 + t.colTop[0] * 0.65, t.colBot[1] * 0.35 + t.colTop[1] * 0.65, t.colBot[2] * 0.35 + t.colTop[2] * 0.65);
+    inst.setColorAt(i, col);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  inst.frustumCulled = false;
+  planetMesh.add(inst);   // LOCAL frame: tilt + spin inherited from the parent, not re-derived here
+  mossDeck = inst;
+  return { type: "moss", count: tufts.length };
+}
+window.swekMoss = (on) => {
+  if (on === false || on === "off") {
+    if (mossDeck) { planetMesh.remove(mossDeck); mossDeck.geometry.dispose(); mossDeck.material.dispose(); mossDeck = null; }
+    return null;
+  }
+  if (!planetMesh) return null;
+  // the SAME local-frame direction buildMossDeck used at init -- see there for why this is not a world-space dir.
+  const q = planetMesh.quaternion.clone().invert();
+  const worldDir = cnorm3([camera.position.x - planetMesh.position.x, camera.position.y - planetMesh.position.y, camera.position.z - planetMesh.position.z]);
+  const localDir = new THREE.Vector3(worldDir[0], worldDir[1], worldDir[2]).applyQuaternion(q).normalize();
+  return buildMossDeck([localDir.x, localDir.y, localDir.z]);
+};
+window.swekMossProbe = () => {
+  if (!mossDeck || !planetMesh) return { deck: false };
+  const p = mossDeck.instanceMatrix, m = new THREE.Matrix4(), v = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  let minR = Infinity, maxR = -Infinity;
+  for (let i = 0; i < mossDeck.count; i++) {
+    m.fromArray(p.array, i * 16); m.decompose(v, q, s);
+    minR = Math.min(minR, v.length()); maxR = Math.max(maxR, v.length());
+  }
+  return { deck: true, count: mossDeck.count, minR, maxR };
+};
+
+// v4077 -- ONE root/arch landmark (world/rootArch.js), oriented to the real displaced surface at a fixed
+// direction the same way buildMossDeck's tufts are (setFromUnitVectors against surfaceNormal), but placed just
+// ONCE rather than rebuilt: world/rootArch.js's own header states this is a landmark, not ground cover, so
+// (unlike buildMossDeck/buildCloudDeck above) calling this again after a successful placement is a no-op. Skips
+// gas/molten worlds outright -- no solid biosphere-friendly surface to root into, the SAME refusal
+// mossSpeciesForPlanet already makes for ground cover on those two types.
+let rootArchLandmarkMesh = null;
+function buildRootArchLandmark(dir) {
+  if (rootArchLandmarkMesh) return { type: "rootArch", already: true, branchCount: rootArchLandmarkMesh.userData.branchCount };
+  if (!planetMesh || !planetSpec_) return null;
+  if (planetSpec_.type === "gas" || planetSpec_.type === "molten") return null;
+
+  const mesh = rootArch((planetSpec_.seed ^ 0x726F6F74) >>> 0, { span: 3.2, height: 1.6, baseRadius: 0.12, tipRadius: 0.03 });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3));
+  geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+  const mat = new THREE.MeshStandardMaterial({ color: 0x584730, roughness: 0.92, metalness: 0.04 });
+  const obj = new THREE.Mesh(geo, mat);
+
+  const P = makeSurfaceParams();
+  const nrm = surfaceNormal(planetSpec_, dir, P);
+  const radius = surfaceRadiusAt(planetSpec_, dir, { radius: planetR, ampFrac: PLANET_AMP_FRAC });
+  // same setFromUnitVectors(up, normal) technique buildMossDeck's tufts use, applied to one structure instead
+  // of many -- local +Y (the generator's "up", along which its branches gain height) aligns to the terrain's
+  // own normal here, so the arch stands on the ground rather than floating level with the planet's core.
+  obj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(nrm[0], nrm[1], nrm[2]));
+  obj.position.set(dir[0] * radius, dir[1] * radius, dir[2] * radius);
+  obj.userData.branchCount = mesh.branchCount;
+  planetMesh.add(obj);   // LOCAL frame: tilt + spin inherited from the parent, not re-derived here
+  rootArchLandmarkMesh = obj;
+  return { type: "rootArch", branchCount: mesh.branchCount };
+}
+window.swekRootArch = (on) => {
+  if (on === false || on === "off") {
+    if (rootArchLandmarkMesh) { planetMesh.remove(rootArchLandmarkMesh); rootArchLandmarkMesh.geometry.dispose(); rootArchLandmarkMesh.material.dispose(); rootArchLandmarkMesh = null; }
+    return null;
+  }
+  if (rootArchLandmarkMesh) return { type: "rootArch", already: true };
+  if (!planetMesh) return null;
+  // the SAME local-frame direction buildMossDeck's own init call computes -- see there for why this is not a
+  // world-space dir.
+  const q = planetMesh.quaternion.clone().invert();
+  const worldDir = cnorm3([camera.position.x - planetMesh.position.x, camera.position.y - planetMesh.position.y, camera.position.z - planetMesh.position.z]);
+  const localDir = new THREE.Vector3(worldDir[0], worldDir[1], worldDir[2]).applyQuaternion(q).normalize();
+  return buildRootArchLandmark([localDir.x, localDir.y, localDir.z]);
+};
+window.swekRootArchProbe = () => {
+  if (!rootArchLandmarkMesh || !planetMesh) return { placed: false };
+  return { placed: true, branchCount: rootArchLandmarkMesh.userData.branchCount, localRadius: rootArchLandmarkMesh.position.length() };
+};
+
 window.swekArrivalProbe = () => {
   if (!arrival) return { flying: false };
   const f = sampleSequence(arrival.legs, arrival.t);
@@ -1037,6 +1179,8 @@ window.swekDescentProbe = () => {
 
   newBattle();
   try { buildCloudDeck(CLOUD_ORDER[0]); cloudsBtn.textContent = "\u2601 " + CLOUD_ORDER[0]; } catch (e) {}   // v4055 -- a deck to arrive through
+  try { window.swekMoss(); } catch (e) {}   // v4076 -- ground cover on the same arrival face
+  try { window.swekRootArch(); } catch (e) {}   // v4077 -- one landmark, same arrival face, gas/molten refuse
   requestAnimationFrame(frame);
 })();
 </script>
