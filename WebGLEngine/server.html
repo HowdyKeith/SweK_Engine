@@ -324,7 +324,13 @@ window.addEventListener("load", function () {
 <body>
   <header>
     <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span></span>
-<a id="androidPeerBtn" href="/android-peer.html" title="SweK Android Peer - install guide, expectations, and the verdict front door for the phone's ballot" style="font-size:11px;padding:2px 10px;margin-left:6px;background:#143020;color:#8fe0ae;border:1px solid #2c6a45;border-radius:5px;cursor:pointer;text-decoration:none;">&#129302; Android Peer</a><!-- v2922 android-peer (install) -->
+<!-- v4147 -- STEAM DECK GOES FIRST, AND THE ORDER IS THE CLAIM. These three buttons now read in DESCENDING
+     capability: a Deck runs ai-bridge/server.js ITSELF, Android runs a subset under Termux, iOS runs a subset
+     in Safari. Keith expected Android to be king; it is not, and the reason is architectural rather than a
+     matter of degree -- the phones are guests in a browser or a sandbox and the Deck is the host. Putting it
+     last or in the middle would have implied a ranking the pages themselves contradict. -->
+<a id="steamdeckPeerBtn" href="/steamdeck-peer.html" title="SweK Steam Deck Peer - SteamOS/Linux: the only peer that runs ai-bridge/server.js itself rather than a subset. Full fleet beacon, mDNS, spawning suite and GPU brain. HONEST CAVEAT ON THE PAGE: no physical Deck has ever run it -- the server, beacon, mDNS and port-takeover rows were measured on generic x86_64 Linux, while the RDNA2 GPU, read-only root and Game Mode rows are reasoned from Valve's documentation and marked unverified." style="font-size:11px;padding:2px 10px;margin-left:6px;background:#1a1630;color:#bfb0ff;border:1px solid #4a3f7a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127918; Steam Deck Peer</a><!-- v4147 steamdeck-peer -->
+<a id="androidPeerBtn" href="/android-peer.html" title="SweK Android Peer - install guide, expectations, and the verdict front door for the phone's ballot" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#143020;color:#8fe0ae;border:1px solid #2c6a45;border-radius:5px;cursor:pointer;text-decoration:none;">&#129302; Android Peer</a><!-- v2922 android-peer (install) -->
 <a id="iosPeerBtn" href="/ios-peer.html" title="SweK iOS Peer - iPhone/iPad: portable physics subset in-page, plus the Apple GPU as a first-class magmap vendor" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#141f30;color:#9ec9ff;border:1px solid #2c4a6a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127823; iOS Peer</a><!-- v2925 ios-peer (install) -->
     <!-- v3245 -- checkPeersVer and updateNowBtn MERGED INTO #verBtn beside the version number. THREE CONTROLS
          SAID ONE THING: a permanent "Version Check", a hidden "Update SweK Now" that appeared beside it,
@@ -8529,8 +8535,13 @@ try {
   const { detect, peerPageFor } = await import("/ui/deviceKind.mjs");
   const d = detect(window);
   const page = peerPageFor(d.kind);
-  const btn = page === "/android-peer.html" ? document.getElementById("androidPeerBtn")
-            : page === "/ios-peer.html"     ? document.getElementById("iosPeerBtn") : null;
+  const btn = page === "/android-peer.html"   ? document.getElementById("androidPeerBtn")
+            : page === "/ios-peer.html"       ? document.getElementById("iosPeerBtn")
+            // v4147 -- the Deck joins the same OFFER-ONLY contract: highlight, never navigate. It is detected
+            // by its panel (1280x800 + touch + Linux) or by its GPU naming itself, because a Deck in Desktop
+            // Mode has no user-agent token of its own. A DOCKED Deck is deliberately NOT detected -- it drives
+            // an external display, so it reads as `desktop`, which is both true and how it is being used.
+            : page === "/steamdeck-peer.html" ? document.getElementById("steamdeckPeerBtn") : null;
   window.__swekDevice = d;          // read by the gate, and worth having in a console on a real phone
   if (btn && d.confident) {
     btn.dataset.deviceMatch = d.kind;

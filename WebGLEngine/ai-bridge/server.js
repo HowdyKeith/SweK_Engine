@@ -1725,7 +1725,19 @@ function kpopPipeConnect(pipePath) {
 }
 const mdns = require("./mdnsDiscovery.js");
 const mdnsAd = require("./mdnsAdvertise.js");
-if (_isBunRuntime) {
+// *** v4147 -- THE GUARD SAID "Bun/Windows" AND CHECKED ONLY "Bun". *** v1147's comment above names the cause
+// exactly: bonjour-service's node:dgram multicast trips a panic ON BUN-ON-WINDOWS ("No handlers set on
+// Socket") that takes the whole process down. The condition never mentioned the platform, so EVERY Bun run
+// lost mDNS -- and start-steamdeck.sh PREFERS Bun, which meant a Steam Deck peer gave up `.local` discovery
+// to dodge a Windows bug it can never hit. The UDP 47474 beacon still worked, so the box still joined the
+// fleet by IP; it was quietly a weaker peer than the hardware allows, for no reason that applied to it.
+//
+// MEASURED BEFORE NARROWING, not argued from the comment: Bun 1.3.11 on Linux x64 was made to require the
+// real mdnsDiscovery.js and mdnsAdvertise.js and call start() on both. Discovery came up browsing 9 service
+// types, the advertiser started, neither threw, and the process was still alive six seconds later. NO PANIC.
+// The Windows half is left exactly as it was -- it is a real crash and this box cannot test it, so the
+// platform that reported it keeps the workaround and the platforms that never had it get their discovery back.
+if (_isBunRuntime && process.platform === "win32") {
     console.log("[bun] skipping mDNS (dgram/UDP) — works around a Bun/Windows socket panic; reach the engine by IP, or run on Node for .local discovery");
     try { const cache = JSON.parse(fs.readFileSync(path.join(__dirname, "discovery-cache.json"), "utf8")); if (cache && (Date.now() - (cache.ts || 0) < 30 * 60 * 1000)) console.log("[bun] using Node-primed discovery cache: " + ((cache.cameras || []).length) + " camera(s), " + ((cache.mdns || []).length) + " mDNS, " + ((cache.roku || []).length) + " Roku" + (cache.falloutHost ? ", Fallout@" + cache.falloutHost : "") + " from " + Math.round((Date.now() - cache.ts) / 1000) + "s ago (run bun-prime.js on Node to refresh)"); } catch {}
 } else {
