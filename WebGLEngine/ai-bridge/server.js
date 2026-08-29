@@ -16507,6 +16507,41 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- verified-polygon-intersection: install button for schildep/verified-polygon-intersection (MIT) -----
+    // v4143 -- a Lean4-formally-verified multipolygon intersection demo. Lower risk than grdpwasm/galaxy-profile:
+    // no build, no subprocess, no port of its own -- just four static files (index.html, lean_app.js,
+    // lean_app.wasm, coi-serviceworker.min.js) fetched from a pinned commit and served back. /vpi/app/<name>
+    // mirrors /voxtral/engine/<name>'s path-safety: the requested name is matched against a fixed artefact
+    // list inside the bridge (readArtefact), never joined onto a filesystem path, so an attacker-controlled
+    // request string cannot walk out of SRC_DIR. COOP/COEP are set on every response under this route (not
+    // just index.html) because it costs nothing on the JS/WASM subresources and is required on the document --
+    // see the bridge's own header for why real headers replace upstream's service-worker workaround here.
+    if (req.url.split("?")[0] === "/vpi/status" && req.method === "GET") {
+        try { sendJson(require("./verifiedPolygonIntersectionBridge.js").status()); }
+        catch (e) { sendJson({ ok: false, error: "verified-polygon-intersection bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/vpi/install" && req.method === "POST") {
+        try { sendJson(require("./verifiedPolygonIntersectionBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "verified-polygon-intersection bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.method === "GET" && req.url.split("?")[0].startsWith("/vpi/app/")) {
+        const want = decodeURIComponent(req.url.split("?")[0].slice("/vpi/app/".length));
+        let vpi = null;
+        try { vpi = require("./verifiedPolygonIntersectionBridge.js"); } catch (e) { res.writeHead(404); res.end("verified-polygon-intersection bridge unavailable"); return; }
+        const buf = vpi.readArtefact(want || "index.html");
+        if (!buf) { res.writeHead(404); res.end("not installed or not a recognized file -- POST /vpi/install first"); return; }
+        const ct = /\.wasm$/.test(want) ? "application/wasm" : /\.js$/.test(want) ? "text/javascript; charset=utf-8" :
+                   /\.html$/.test(want) || want === "" ? "text/html; charset=utf-8" : "application/octet-stream";
+        res.writeHead(200, {
+            "Content-Type": ct, "Content-Length": buf.length, "Cache-Control": "no-cache",
+            "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp",
+        });
+        res.end(buf);
+        return;
+    }
+
     // --- ntfs-mounter: install button for zavierferodova/Mac-NTFS-Mounter (no licence, macOS-only) ---------
     // v4125 -- Keith: the free Mac App Store NTFS mounters lie about being free, the paid one he has fails
     // often. Same non-vendoring reasoning as /galaxy/*, but this one asks for root and touches a real disk, so

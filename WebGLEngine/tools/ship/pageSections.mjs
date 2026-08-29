@@ -220,6 +220,11 @@ export const SECTIONS = [
       // work, installed and run on this machine rather than vendored, with licence and attribution on the page.
       // Its page carries one thing the others do not: WHY it is started on loopback, because upstream's proxy
       // binds all interfaces, accepts any origin and dials any host:port a caller names.
+      // v4143 -- vpi.html JOINS: an opt-in install button for schildep/verified-polygon-intersection (MIT), a
+      // Lean4-formally-verified multipolygon intersection demo compiled to WASM. Lowest-risk of the shelf --
+      // four static files fetched and served, no build, no subprocess, no port of its own, so its page carries
+      // no bind-address warning; what it carries instead is why the WASM works without upstream's service
+      // worker (this server sets the real COOP/COEP headers GitHub Pages can't).
       // *** v4138 -- FIVE OF THESE MOVED OUT, INTO THE SUB-DRAWER BELOW, AND THE COMMENTS ABOVE ARE WHY. ***
       // v4115, v4118, v4124 and v4125 each wrote "JOINS, same rule again" about a page that is an opt-in front
       // door to SOMEBODY ELSE'S work. Four notes saying one sentence is a category the file kept documenting
@@ -264,7 +269,7 @@ export const SECTIONS = [
     // gpanel and a slot -- and v4127 is on record that gtab wiring is where this row breaks.
     { id: "thirdparty", tab: null, parentTab: "systools", label: "Opt-in: somebody else's work",
       note: "install buttons for repos this engine did not write -- cloned and run on your machine, never vendored",
-      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html"] },
+      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html", "vpi.html"] },
 
     { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
       pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",
