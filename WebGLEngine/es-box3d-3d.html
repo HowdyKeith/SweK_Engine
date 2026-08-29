@@ -11,8 +11,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).">
-<title>SweK &middot; Endless Sky on Box3D &mdash; 3D</title>
+<meta name="demo:desc" content="PLANAR FIGHT, 3D VIEW (the sim is unchanged, only the camera is; formerly labelled Round A): the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).">
+<title>SweK &middot; Endless Sky on Box3D &mdash; planar fight, 3D view</title>
 <style>
   html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
   #hud { position:fixed; top:8px; left:10px; right:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; }
@@ -30,7 +30,7 @@
   <span id="mode" class="fallback">detecting&hellip;</span>
   <span id="stat" style="color:#7d8fa8"></span>
   <a href="/es-box3d.html" title="the original 2D canvas view of this same fight">2D view &#8599;</a>
-  <a href="/es-box3d-fly3d.html" title="Round B: ships actually fly in 3D -- pitch, altitude, 3D dogfight">Round B: 3D flight &#8599;</a>
+  <a href="/es-box3d-fly3d.html" title="ships actually fly in 3D -- pitch, altitude, 3D dogfight">3D flight &#8599;</a>
 </div>
 <div id="hint">drag to orbit &middot; scroll to zoom &middot; ships collide on box3d, the plane is unchanged &mdash; only the camera is free</div>
 
