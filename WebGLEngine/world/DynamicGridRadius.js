@@ -38,6 +38,8 @@ const SAMPLE_WINDOW_MS  = 5000;
 const GROW_COOLDOWN_MS  = 8000;
 const SHRINK_TO_GROW_MS = 3000;
 
+import { growthWouldBeInvisible } from "../render/screenSpaceError.js";
+
 export class DynamicGridRadius {
     constructor({
         world,
@@ -47,8 +49,13 @@ export class DynamicGridRadius {
         shrinkThreshold = 32,     // shrink when avg <= this
         minRadius = 5,
         maxRadius = 12,
+        // v4150 -- OPTIONAL screen metrics. Supply { screenHeightPx(), fovYRad(), targetPx } and a grow is also
+        // asked whether the ring it would add is RESOLVABLE. Omit it and this class behaves exactly as it has
+        // since round 291: an engine with no screen metrics must not change behaviour because a field was added.
+        sse = null,
     }) {
         this.world = world;
+        this._sse = sse;
         this.fpsSource = fpsSource;
         this.targetFps = targetFps;
         this.growThreshold = growThreshold;
@@ -67,6 +74,29 @@ export class DynamicGridRadius {
         this._lastShrinkMs = -Infinity;
         this._growCount = 0;
         this._shrinkCount = 0;
+        this._sseVetoes = 0;
+    }
+
+    /**
+     * v4150 -- would the ring this grow would ADD be below the visible threshold?
+     *
+     * The new ring sits one chunk further out than the current edge, so its distance is measured to the OUTER
+     * face of the ring being added: (radius + 1) chunks of chunkSize. Asking about the current edge instead
+     * would veto on the ring that is already drawn, which is the off-by-one that turns this from a leading
+     * signal into a wrong one.
+     */
+    _growWouldBeInvisible(radius) {
+        const cs = this.world?.chunkSize || 16;
+        try {
+            const h = typeof this._sse.screenHeightPx === "function" ? this._sse.screenHeightPx() : this._sse.screenHeightPx;
+            const f = typeof this._sse.fovYRad === "function" ? this._sse.fovYRad() : this._sse.fovYRad;
+            return growthWouldBeInvisible({
+                ringDistance: (radius + 1) * cs,
+                chunkSize: cs, screenHeightPx: h, fovYRad: f,
+                targetPx: this._sse.targetPx ?? 1,
+                voxelSize: this._sse.voxelSize ?? 1,
+            });
+        } catch { return false; }   // a metrics source that throws must not pin the view distance
     }
 
     setEnabled(on) {
@@ -157,6 +187,20 @@ export class DynamicGridRadius {
         if (avg >= this.growThreshold && radius < this.maxRadius) {
             if (now - this._lastGrowMs < GROW_COOLDOWN_MS) return;
             if (now - this._lastShrinkMs < SHRINK_TO_GROW_MS) return;
+            // v4150 -- *** AND IS THERE ANYTHING OUT THERE TO SEE? *** Frame rate is a LAGGING signal: this loop
+            // can only shrink after frames have already been dropped, and it grows whenever there is headroom
+            // whether or not the new ring shows anybody anything. render/screenSpaceError.mjs asks the leading
+            // question -- at the distance that ring would sit, does a whole chunk still subtend even one pixel?
+            // If not, growing spends real frame budget on geometry nobody can resolve.
+            //
+            // GROWTH ONLY, NEVER SHRINKING, and that asymmetry is deliberate: a veto that could also force a
+            // shrink would be a second controller fighting the frame-rate one, and two controllers on one
+            // actuator oscillate. Refusing to grow can at worst leave the view exactly where it already was.
+            // An unanswerable measurement does not veto either -- see growthWouldBeInvisible's own refusal.
+            if (this._sse && this._growWouldBeInvisible(radius)) {
+                this._sseVetoes++;
+                return;
+            }
             console.log(`[DynamicGridRadius] growing — avg ${avg.toFixed(1)} fps >= ${this.growThreshold}`);
             this.world.growGrid(1);
             this._lastGrowMs = now;
