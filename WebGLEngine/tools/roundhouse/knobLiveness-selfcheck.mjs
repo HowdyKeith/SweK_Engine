@@ -148,26 +148,39 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     // *** v4051c -- THE FIRST VERSION OF THIS SCAN ASSERTED "null default THEREFORE unprobed", AND THAT
     // IMPLICATION IS FALSE. *** It went red on optics.spread the moment v4051b gave that knob declared
     // choices: the default is still null -- deliberately, because null MEANS self-scale there -- but the
-    // census can now walk a ladder and answer it. Part (a) of this very block states the escape hatch that
-    // breaks the implication, so the test contradicted its own first assertion one screen further down.
-    // A null default is not what makes a knob unanswerable. HAVING NO LADDER TO WALK is, and a declared
-    // choice IS a ladder. So the population is split by the property that actually decides it.
-    const nullDefaults = new Map();          // "device.knob" -> does ANY mode declare choices for it?
+    // census can now walk a ladder and answer it. A null default is not what makes a knob unanswerable.
+    // HAVING NO LADDER TO WALK is, and a declared choice IS a ladder.
+    //
+    // *** v4059 -- AND SCANNING FOR NULLS WAS STILL THE WRONG POPULATION, WHICH SWEEP 6 PROVED THE SAME DAY.
+    // *** mpmcouple.left and .right came back unprobed with kind "object". Not null, so this scan could not
+    // see them: a check written to stop exactly this class going unnoticed missed two live examples hours
+    // after it was written. THE RULE IN (a) WAS NEVER WRONG -- the population was narrower than the rule it
+    // was quantifying.
+    //
+    // So the scan now asks the predicate that actually decides it, rather than one cause of it: a knob is
+    // unanswerable when probeValues yields NO RUNGS for its default and its declared choices. MEASURED, that
+    // covers null, string, object, empty array and undefined, and it needs no list of kinds to keep in sync --
+    // a sixth unladderable kind added to probeValues tomorrow is in this population automatically.
+    const bare = new Map();        // "device.knob" -> does its RAW default ladder in any mode?
+    const withChoices = new Map(); // "device.knob" -> does it ladder in any mode once choices are consulted?
     for (const name of DEVICE_NAMES) {
         let dev; try { dev = await getDevice(name); } catch { continue; }
         if (typeof dev.defaults !== "function") continue;
         for (const mode of (Array.isArray(dev.modes) && dev.modes.length ? dev.modes : [undefined])) {
             let cfg; try { cfg = (dev.defaults({ mode }) || {}).config || {}; } catch { continue; }
-            for (const [k, v] of Object.entries(cfg)) if (v === null) {
+            for (const [k, v] of Object.entries(cfg)) {
                 const key = name + "." + k;
-                nullDefaults.set(key, !!nullDefaults.get(key) || !!choicesFor(dev, k, mode));
+                bare.set(key, !!bare.get(key) || probeValues(v).length > 0);
+                withChoices.set(key, !!withChoices.get(key)
+                    || probeValues(v, choicesFor(dev, k, mode)).length > 0);
             }
         }
     }
-    const population = [...nullDefaults.keys()].sort();
-    const unanswerable = population.filter((k) => !nullDefaults.get(k));   // null default AND no ladder
-    const laddered = population.filter((k) => nullDefaults.get(k));        // null default WITH declared choices
-    const devs = [...new Set(population.map((x) => x.split(".")[0]))];
+    const unanswerable = [...withChoices.keys()].filter((k) => !withChoices.get(k)).sort();
+    // Knobs whose RAW default has no ordering and which are answerable ONLY because choices were declared --
+    // the escape hatch working end to end, which is a different claim from the rule and needs its own check.
+    const rescued = [...withChoices.keys()].filter((k) => withChoices.get(k) && !bare.get(k)).sort();
+    const devs = [...new Set([...unanswerable, ...rescued].map((x) => x.split(".")[0]))];
     const { rows } = await knobLiveness({ only: [...new Set([...devs, "blackhole"])], budgetMs: 200000 });
     const un = unprobedKnobs(rows);
     const named = (k) => un.some((u) => u === k || u.startsWith(k + " "));
@@ -175,21 +188,23 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     if (unanswerable.length) {
         ok("!! *** EVERY knob with no ladder is reported, and none is counted still ***",
             unanswerable.every(named) && !stillKnobs(rows).some((k) => unanswerable.includes(k)),
-            unanswerable.length + " of " + population.length + " null defaults have no ladder: "
-            + unanswerable.join(", ") + ". Quantified over whatever the lab HAS, so closing one is not a "
-            + "regression and adding one cannot go unnoticed.");
+            unanswerable.length + " unladderable across " + bare.size + " knobs scanned: "
+            + unanswerable.join(", ") + ". Quantified over whatever the lab HAS, by the predicate that decides "
+            + "answerability rather than by a list of kinds, so closing one is not a regression and adding one "
+            + "cannot go unnoticed.");
     } else {
-        report("*** EVERY null default in the lab (" + population.length + ") NOW CARRIES A LADDER, so there "
-            + "is no unanswerable knob left to report on -- STATED RATHER THAN PASSED. A quantifier over an "
-            + "empty set is true for free, and a green check meaning 'there was nothing to check' is the "
-            + "vacuous pass this lab refuses everywhere else. The rule in (a) carries the weight.");
+        report("*** EVERY knob in the lab (" + bare.size + " scanned) NOW CARRIES A LADDER, so there is no "
+            + "unanswerable knob left to report on -- STATED RATHER THAN PASSED. A quantifier over an empty "
+            + "set is true for free, and a green check meaning 'there was nothing to check' is the vacuous "
+            + "pass this lab refuses everywhere else. The rule in (a) carries the weight.");
     }
-    if (laddered.length) {
-        ok("!! ...and a null default WITH a declared ladder is ANSWERED, never admitted",
-            laddered.every((k) => !named(k)),
-            laddered.join(", ") + " -- null default, real ladder, so these belong in a VERDICT and not in the "
-            + "admission list. *** THIS IS THE ASSERTION THE FIRST DRAFT GOT BACKWARDS, and optics.spread "
-            + "failing it is what showed the population had to be split by ladder rather than by default. ***");
+    if (rescued.length) {
+        ok("!! ...and a knob answerable ONLY through declared choices is ANSWERED, never admitted",
+            rescued.every((k) => !named(k)),
+            rescued.join(", ") + " -- no ordering in the default, a real ladder from the declaration, so these "
+            + "belong in a VERDICT and not in the admission list. *** THIS IS THE ASSERTION THE FIRST DRAFT GOT "
+            + "BACKWARDS, and optics.spread failing it is what showed the population had to be split by ladder "
+            + "rather than by default. ***");
     }
 
     // (c) THE RATCHET. A positive claim, so it survives every future fix.
