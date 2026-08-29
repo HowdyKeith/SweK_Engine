@@ -184,7 +184,12 @@ function stop(id) {
     if (!job) return { ok: false, error: "no such job: " + id };
     if (job.done) return { ok: false, error: "job " + id + " already finished" };
     try { job.child.kill("SIGTERM"); } catch {}
-    return { ok: true, id: job.id };
+    // v4132 -- SIGTERM IS A REQUEST, NOT AN OUTCOME, and `{ok:true}` alone read as "it is stopped".
+    // The handle is deliberately kept (never nulled) and _spawnJob installs child.on("exit") which sets
+    // job.done, so whether the child ACTUALLY went is knowable -- it just is not known YET at this line,
+    // and it will not be for as long as the child takes to honour the signal or refuse it. So this reports
+    // what it did (signalled), what is true so far (done), and where the real answer arrives.
+    return { ok: true, id: job.id, signalled: "SIGTERM", done: !!job.done, verifyWith: "status(" + job.id + ").done" };
 }
 
 /** One job's public shape. The URL is included -- callers that must not see it simply do not ask for it. */

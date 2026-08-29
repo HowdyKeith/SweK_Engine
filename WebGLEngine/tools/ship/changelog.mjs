@@ -107,8 +107,36 @@ const _pending = [];
 // file would break the one instruction anybody has memorised.
 if (backlogFile) _pending.push([changelogPath(findRoot()), fs.readFileSync(backlogFile, "utf8")]);
 if (todoFile) { console.error("[changelog] --todo is RETIRED: TODO.md is on no machine and has no successor. Ignored."); }
+// *** v4132 -- AN ENTRY WITH NO HEADING IS NOT AN ENTRY, AND FOR EIGHTEEN ROUNDS THIS DID NOT SAY SO. ***
+// ENTRY_HEAD was used to find the INSERTION POINT and never to check the incoming text. So an entry that
+// opened with prose was inserted happily -- above the newest heading, which meant every headless round landed
+// BELOW the previous one and the run accumulated OLDEST-FIRST inside a newest-first file. The record was
+// there; it was unattributable. namesVersion() answered false for v4114..v4131, newestVersion() kept saying
+// v4113, and changelogCurrency-selfcheck was right every single time it went red.
+//
+// THE SHAPE OF THE FAILURE IS THE ARGUMENT FOR CHECKING IT HERE: the ritual is done from memory each round,
+// the prose reads perfectly to a human, and nothing downstream re-reads what was written. A refusal at the
+// write is the only place the mistake is cheap.
+//
+// --version is OPTIONAL but CROSS-CHECKED when given: a heading that names a different round is worse than
+// no heading, because it files this round's work under someone else's version.
+const wantVersion = arg("--version");
 for (const [file, entry] of _pending) {
   if (!fs.existsSync(file)) { console.error(`[changelog] ${file} not found -- refusing to create it blank. Nothing was written.`); process.exit(3); }
+  const head = /^## (?:Since )?v(\d+)\b.*$/m.exec(entry);
+  if (!head) {
+    console.error(`[changelog] ABORT: the entry for ${path.basename(file)} has NO heading. Nothing was written.`);
+    console.error(`[changelog]   Entries must open with a line like:  ## Since v4132 -- what this round did`);
+    console.error(`[changelog]   Without it the entry is inserted above the newest heading and belongs to no`);
+    console.error(`[changelog]   version: namesVersion() cannot find it and newestVersion() skips past it.`);
+    console.error(`[changelog]   This went unnoticed for v4114..v4131 -- eighteen rounds of unattributable prose.`);
+    process.exit(6);
+  }
+  if (wantVersion && head[1] !== String(wantVersion).replace(/^v/, "")) {
+    console.error(`[changelog] ABORT: heading names v${head[1]} but --version says ${wantVersion}. Nothing was written.`);
+    console.error(`[changelog]   Filing a round under the wrong version is worse than filing it under none.`);
+    process.exit(7);
+  }
   const bad = firstNonAscii(entry);
   if (bad) {
     console.error(`[changelog] ABORT: non-ASCII char U+${bad.code.toString(16).toUpperCase()} ("${bad.char}") at index ${bad.index} in the entry for ${path.basename(file)}.`);

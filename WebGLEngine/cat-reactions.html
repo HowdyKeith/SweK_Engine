@@ -221,7 +221,18 @@ $("bStop").onclick = () => {
 };
 
 // Release the camera if the page is hidden/unloaded -- an orphaned getUserMedia keeps the light on.
-window.addEventListener("pagehide", () => { try { if (timer) clearInterval(timer); tracker && tracker.stop && tracker.stop(); } catch {} });
+// v4132 -- pagehide FIRES FOR THE BACK-FORWARD CACHE TOO, and a camera page needs BOTH halves of that.
+// Releasing the camera on a freeze is right and STAYS right: a live getUserMedia keeps the indicator light on
+// while the page sits frozen, which is a privacy problem, not a performance one -- so this is deliberately NOT
+// the `if (e.persisted) return` shape the GL pages use. What was missing is what the RESTORED page then shows.
+// This handler tore down the tracker and the interval but not the UI, so a back-navigation came back reading
+// "running", Start still disabled, nothing behind it: dead and claiming otherwise. On a FREEZE it now goes
+// through the page's own Stop path, which releases the camera AND says so, leaving a page you can start again.
+// A real unload keeps the cheap teardown -- nothing will ever see the UI it would have updated.
+window.addEventListener("pagehide", (e) => {
+    if (e.persisted) { if (timer || tracker) { try { $("bStop").onclick(); } catch {} } return; }
+    try { if (timer) clearInterval(timer); tracker && tracker.stop && tracker.stop(); } catch {}
+});
 </script>
 <script type="module" src="/ui/demoChrome.js"></script>
 </body>

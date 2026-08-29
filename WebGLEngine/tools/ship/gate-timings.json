@@ -863,6 +863,7 @@
   "tools/ship/benchBridge-selfcheck.mjs": 9335,
   "tools/ship/benchCollect-selfcheck.mjs": 9404,
   "tools/ship/bfcache-selfcheck.mjs": 528,
+  "tools/ship/blobulatorSkins-selfcheck.mjs": 11725,
   "tools/ship/biomeDecorWiring-selfcheck.mjs": 144,
   "tools/ship/biomeSpawnWiring-selfcheck.mjs": 102,
   "tools/ship/biomeSpawns-selfcheck.mjs": 126,
