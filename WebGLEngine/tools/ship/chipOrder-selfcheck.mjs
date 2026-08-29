@@ -94,15 +94,25 @@ ok("...and no pinned chip leaked into the tail",
 // ---- Keith's rename -------------------------------------------------------------------------------------
 // The prefix exists so the three Physics Lab drawers COLLECT, which only pays off if the sort puts them
 // together -- so the two halves of the round are checked as one claim rather than two.
-const PL = ["optics", "cosmic", "em"];
-const plAt = PL.map((t) => row.findIndex((c) => c.tab === t));
-ok("!! the three Physics Lab drawers are labelled 'PL: ' -- the prefix Keith asked for",
-    PL.every((t) => (row.find((c) => c.tab === t) || {}).label?.includes("PL: ")),
-    PL.map((t) => (row.find((c) => c.tab === t) || {}).label).join(" | "));
-ok("!! ...AND THE PREFIX PAYS OFF: sorted, they land CONSECUTIVELY. A prefix that did not group them " +
-    "would be three renames and no gain",
-    plAt.every((i) => i >= 0) && Math.max(...plAt) - Math.min(...plAt) === PL.length - 1,
-    "positions " + plAt.map((i) => i + 1).sort((a, c) => a - c).join(", "));
+// v4127 -- *** THIS CHECK USED TO HARDCODE THREE DRAWERS AND THE COUNT HAD ALREADY GONE STALE. *** It read
+// `const PL = ["optics", "cosmic", "em"]`, written when three drawers carried the prefix. By v4034 "PL:
+// Boundaries & Reconstruction" and "PL: Discretisation & Meshes" existed and were never added to the list, so
+// the gate was grading three of five -- and still PASSED, because those two happened to sort adjacent to the
+// three it knew about. It only FAILED when v4127 renamed "Fluid" and "Matter & Chaos" into the prefix and the
+// unlisted members finally spread the three apart. A CHECK THAT NAMES ITS MEMBERS BY HAND GOES STALE THE NEXT
+// TIME SOMEBODY JOINS, and this one proved it by grading a shrinking fraction of the thing it defends.
+//
+// So the set is DERIVED from the row: every chip whose label carries the prefix, however many that is. The
+// property worth defending was never "these three are adjacent" -- it is "the prefix collects ALL of them into
+// one run", which is what makes the rename pay off and what a new PL drawer must not break.
+const plChips = row.filter((c) => (c.label || "").includes("PL: "));
+const plAt = plChips.map((c) => row.indexOf(c));
+ok("!! the Physics Lab drawers carry the 'PL: ' prefix Keith asked for   (" + plChips.length + " of them)",
+    plChips.length >= 3, plChips.map((c) => c.label).join(" | "));
+ok("!! *** ...AND THE PREFIX PAYS OFF: sorted, ALL of them land in ONE CONSECUTIVE RUN ***",
+    plAt.length > 0 && Math.max(...plAt) - Math.min(...plAt) === plAt.length - 1,
+    "positions " + plAt.map((i) => i + 1).sort((a, c) => a - c).join(", ") +
+    " -- a prefix that did not group every one of them would be renames with no gain");
 
 // ---- the seam with the group mover ----------------------------------------------------------------------
 // CHIP_GROUPS lifts chips OUT of this row. The sort runs after it; if that sequencing were reversed the sort

@@ -1003,7 +1003,9 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="macsystem"><span class="gtabTog">&#9656;</span><span>&#63743; Mac System</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="smarthome"><span class="gtabTog">&#9656;</span><span>&#127968; Smart Home</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="boundaries"><span class="gtabTog">&#9656;</span><span>&#9636; PL: Boundaries &amp; Reconstruction</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="matter"><span class="gtabTog">&#9656;</span><span>&#9883;&#65039; Matter &amp; Chaos</span><span class="gtabState"></span></button>
+        <!-- v4127 -- Keith: '"Matter & Chaos" can be renamed "PL: Matter & Chaos"'. Visible label only, same
+             rule as the fluidgpu rename above: data-tab stays "matter". -->
+        <button class="gtab" data-tab="matter"><span class="gtabTog">&#9656;</span><span>&#9883;&#65039; PL: Matter &amp; Chaos</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="systools"><span class="gtabTog">&#9656;</span><span>&#128295; System Tools</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="voxelrender"><span class="gtabTog">&#9656;</span><span>&#129513; Voxel &amp; Render</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
@@ -1012,7 +1014,12 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="gametheory"><span class="gtabTog">&#9656;</span><span>&#127918; Game Theory</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="petfbi"><span class="gtabTog">&#9656;</span><span>&#128062; PetFBI</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="brain"><span class="gtabTog">&#9656;</span><span>&#129504; GPU Brain</span><span class="gtabState" id="brainTabState"></span></button>
-        <button class="gtab" data-tab="fluidgpu"><span class="gtabTog">&#9656;</span><span>&#127754; Fluid &mdash; verify the GPU</span><span class="gtabState" id="fluidTabState"></span></button>
+        <!-- v4127 -- Keith: '"Fluid -- verify the GPU" can be renamed "PL: Fluids"'. VISIBLE LABEL ONLY:
+             data-tab/data-panel stay "fluidgpu", so every selector, the pageSections id and the placements
+             JSON key keep pointing at the same panel -- the same rule v4109's "File Transfer Utils" rename
+             followed. pageSections.mjs's own label for this section is renamed to match in the same round,
+             because a label declared twice that disagrees is this tree's most-repeated defect. -->
+        <button class="gtab" data-tab="fluidgpu"><span class="gtabTog">&#9656;</span><span>&#127754; PL: Fluids</span><span class="gtabState" id="fluidTabState"></span></button>
         <!-- v4039 -- renamed "Game: Endless Sky", same reasoning as "ev"'s rename beside it -- see that comment. -->
         <button class="gtab" data-tab="endlesssky"><span class="gtabTog">&#9656;</span><span>&#128640; Game: Endless Sky</span><span class="gtabState" id="esTabState"></span></button>
         <button class="gtab" data-tab="bzflag"><span class="gtabTog">&#9656;</span><span>&#128737; BZFlag</span><span class="gtabState" id="bzTabState"></span></button>
@@ -1272,7 +1279,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="fluidgpu" hidden>
           <div data-panel-pages="fluidgpu" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0 8px;"></div>
-          <div class="gpanelHdr">&#127754; Fluid &mdash; verify the GPU on this machine</div>
+          <div class="gpanelHdr">&#127754; PL: Fluids &mdash; verify the GPU on this machine</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;line-height:1.7;">
             The engine's fluid solvers are checked against exact analytic answers &mdash; Poiseuille's parabola, the speed of sound,
             a shock compressing by exactly six, Rayleigh's 1708. All of that runs on the CPU, and it re-runs on every build.
@@ -1445,6 +1452,11 @@ window.addEventListener("load", function () {
             <button id="mlxPanelBtn" style="padding:7px 12px;background:#3a2a5a;color:#cfe;border:1px solid #6a4a9a;border-radius:6px;cursor:pointer;font:12px system-ui;">&#127814; Local MLX &mdash; point the brain at a local Mac model server</button>
             <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;">Rapid-MLX, Osaurus, vMLX, mlx-omni-server &mdash; the same config as the engine page's Local MLX settings tab, including the macOS-only Detect/Install buttons.</div>
           </div>
+          <!-- v4127 -- THE SLOT CHIP_GROUPS MOVES "Homebrew formula" INTO, at Keith's ask. Empty in the static
+               markup on purpose: the chip is MOVED here at runtime, node and all, so its click listener and its
+               live gtabState span come with it -- rebuilding a copy here would drop both, which is the rule the
+               chip grouper's own header states. Same shape as the systools slot. -->
+          <div data-group-chips="macsystem" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="macsystem" style="display:flex;flex-direction:column;gap:3px;"></div>
         </div>
         <div class="gpanel" data-panel="smarthome" hidden>
@@ -1462,7 +1474,7 @@ window.addEventListener("load", function () {
           <div data-panel-pages="boundaries" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
         <div class="gpanel" data-panel="matter" hidden>
-          <div class="gpanelHdr">&#9883;&#65039; Matter &amp; Chaos</div>
+          <div class="gpanelHdr">&#9883;&#65039; PL: Matter &amp; Chaos</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="matter" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>

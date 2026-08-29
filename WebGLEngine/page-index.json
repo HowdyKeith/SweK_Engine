@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 410,
+ "count": 418,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -547,6 +547,13 @@
    "t": "SweK Engine &mdash; a physics engine you can prove",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "cat-reactions.html",
+   "t": "Cat Reactions",
+   "d": "Your expression, named and mirrored back as a reaction cat. Pure-classifier front door for ui/faceExpressionSet.js -- shows every recipe's live score, and says out loud which expression it refuses to claim and why.",
+   "g": "face",
    "p": 0
   },
   {
@@ -1208,6 +1215,13 @@
    "p": 0
   },
   {
+   "f": "galaxy-profile.html",
+   "t": "Galaxy Profile SVGs (opt-in)",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
    "f": "gallery.html",
    "t": "SweK &middot; Demo Gallery",
    "d": "",
@@ -1247,6 +1261,13 @@
    "t": "Black-hole lensing -- GR-exact light bending",
    "d": "",
    "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "gesture-vfx.html",
+   "t": "Gesture VFX",
+   "d": "Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures over the hand tracker's own metrics, edge-triggered with a cooldown, and a particle sim that is pure enough to be gated headless.",
+   "g": "face",
    "p": 0
   },
   {
@@ -1337,6 +1358,13 @@
    "f": "health.html",
    "t": "Bridge health",
    "d": "Live status of the ai-bridge endpoints — pings the per-tool detect/status/config routes, grouped, with latency. Ping all + auto-refresh.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "heerich-avatar.html",
+   "t": "SweK &middot; Heerich Avatar (voxel CSG, in the panel)",
+   "d": "The rigged avatar GLB voxelized and rendered as a colored voxel-art SVG through Heerich's CSG-to-SVG pipeline, redrawn on a slow turntable.",
    "g": "",
    "p": 0
   },
@@ -1838,6 +1866,13 @@
    "p": 0
   },
   {
+   "f": "ntfs-mounter.html",
+   "t": "NTFS Mounter (opt-in, macOS only)",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
    "f": "office-floor.html",
    "t": "Office floor - who is working on what",
    "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
@@ -1877,6 +1912,13 @@
    "t": "SweK Page Index -- launch and assemble",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "pairlane.html",
+   "t": "Pairlane File Drop",
+   "d": "",
+   "g": "nearshare",
    "p": 0
   },
   {
@@ -2706,6 +2748,13 @@
    "p": 0
   },
   {
+   "f": "voxtral.html",
+   "t": "Voxtral in the tab (opt-in)",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
    "f": "wadmap.html",
    "t": "WAD Map — Engine Companion",
    "d": "DOOM WAD map viewer — load a .wad and explore the level geometry.",
@@ -2799,6 +2848,13 @@
   {
    "f": "webgpu-llm.html",
    "t": "Can this box run a model in the page?",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "webrtx.html",
+   "t": "Ray tracing in the page (opt-in)",
    "d": "",
    "g": "systools",
    "p": 0

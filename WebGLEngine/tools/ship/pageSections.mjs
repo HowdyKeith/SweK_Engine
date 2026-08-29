@@ -170,7 +170,9 @@ export const SECTIONS = [
       pages: ["home.html", "ha-switches.html", "ha-capabilities.html", "ha-diagram.html", "presence.html",
               "arrival.html", "doorbell.html", "alexa.html", "echo-show.html", "agenda.html",
               "air-quality.html", "nest-protect.html", "solar.html", "ac.html", "wall.html"] },
-    { id: "matter", tab: "matter", label: "Matter & Chaos", note: "statistical mechanics, quantum, dynamics",
+    // v4127 -- label renamed with the gtab in server.html, at Keith's ask, so the two declarations of this
+    // section's NAME cannot disagree. The id and tab are untouched: they are the wiring, not the wording.
+    { id: "matter", tab: "matter", label: "PL: Matter & Chaos", note: "statistical mechanics, quantum, dynamics",
       // v3669 -- phase-change.html joins "matter": melting, freezing, gasification and crystallisation are
       // statistical/thermal physics and this drawer's own note already says so. Matter goes to 14 of 15 --
       // AT THE CAP'S EDGE, and the next arrival here should be read as the ratchet asking whether a
@@ -302,7 +304,8 @@ export const SECTIONS = [
     // Keith: "celltrack is a big button item, it is it's own very large science project." NOTHING ELSE IN HERE.
     { id: "celltrack", tab: "celltrack", label: "Cell Tracking", note: "appended -- its own project, on purpose",
       pages: ["celltrack.html"] },
-    { id: "fluidgpu", tab: "fluidgpu", label: "Fluid", note: "appended",
+    // v4127 -- renamed with its gtab, same reason as "matter" above.
+    { id: "fluidgpu", tab: "fluidgpu", label: "PL: Fluids", note: "appended",
       // v3927 -- three more lattice-Boltzmann pages join, same round and same reason as the brain eight:
       // "Lattice Boltzmann", "Duct" and "GPU adjudicator". lbm3d-gpu.html was ALREADY here and
       // lbm3d-gpu-check.html is the *-gpu-check pattern this drawer already holds twice (euler, mpm), so the
@@ -484,9 +487,16 @@ export function sectionsFor(profile) {
 // v4039 -- "cloud" REMOVED, at Keith's request: "this button on the right of server.html needs to be
 // completely removed." Its gtab/gpanel is gone (see server.html's own v4039 note), so a pin naming it would be
 // exactly the "config line that does nothing" chipOrder-selfcheck.mjs already checks for on every OTHER pin.
+// v4127 -- SEVEN PINS DROPPED, AND FOR TWO DIFFERENT REASONS. Keith: "these items do not get their own button
+// on Server.html and can go in the alphabetized section" (roundhouse, terrain, crossarch, policymass) -- they
+// keep their chip, they just stop being PINNED, which is exactly what this list is for: unpinning is how a chip
+// joins the alphabetised run. Nothing is hidden and no panel is touched.
+// The other three LEAVE the row entirely, into a group slot: renderqa and rigjob to System Tools ("this goes in
+// System Tools") and brew to Mac System ("'Homebrew formula' goes in Mac System") -- see CHIP_GROUPS below.
+// A chip that CHIP_GROUPS lifts out of the row must not also be pinned in it: the pin would be a config line
+// that does nothing, which is the exact fault chipOrder-selfcheck.mjs checks for and v4039 removed "cloud" for.
 export const CHIP_PINNED = [
-    "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "roundhouse", "rigjob",
-    "terrain", "crossarch", "policymass", "celltrack", "renderqa", "brew",
+    "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "celltrack",
 ];
 
 export const CHIP_GROUPS = [
@@ -496,7 +506,17 @@ export const CHIP_GROUPS = [
     // Keith: "'Rig Verify' should be part of System Tools on Server.html". The systools chip already exists and
     // already holds the system-tool PAGES, so the group and the drawer are the same chip -- which is right:
     // rig.html and the Rig Verify surface are the same subject seen from two sides.
+    // v4127 -- renderqa and rigjob JOIN, at Keith's ask ("this goes in System Tools"), by the same reasoning
+    // that put "verify" here: they are rig surfaces seen from another side. Both are pure service panels that
+    // claim no page in SECTIONS, so this moves a chip and strands nothing.
     { id: "systools", tab: "systools", label: "System Tools",
       note: "the rig, the ship ritual, the record -- and the live verify surface",
-      chips: ["verify"] },
+      chips: ["verify", "renderqa", "rigjob"] },
+    // v4127 -- Keith: "'Homebrew formula' goes in Mac System". `brew install swek-engine` is macOS-only by
+    // construction, so it belongs with the other things that need a Mac rather than in the top row. The slot
+    // it moves into is added to the macsystem gpanel in server.html the same round -- a group with no slot is
+    // reported by the mover's own "NO SLOT" line rather than failing silently.
+    { id: "macsystem", tab: "macsystem", label: "Mac System",
+      note: "the Homebrew formula, filed with everything else that needs a Mac",
+      chips: ["brew"] },
 ];
