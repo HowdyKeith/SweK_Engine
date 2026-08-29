@@ -60,7 +60,7 @@ export const POWDER_OBSERVABLES = [
     "r3Mismatches", "r3CheckedTo", "r3AtSeven", "legendreGaps", "legendreGapsAbsentFromRings",
     "friedelPairs", "friedelWorstReal",
     "breakNonCentroHalf", "breakNonCentroTwo", "breakNonCentroZero", "breakCentroTwo",
-    "unreachableRingRefused",
+    "unreachableRingRefused", "ringAtLimitAccepted", "ringPastLimitRefused",
 ];
 
 const DEF = { hklMax: 4, checkTo: 121, fpp: 0.5 };
@@ -147,7 +147,23 @@ function buildPowder({ mode = "friedel", config = {} } = {}) {
         breakCentroTwo: breakWorst(2, { centro: true }, planted),
         // A ring beyond the sphere the wavelength can reach is REFUSED rather than clamped. 1 when the module
         // returns null for an unreachable reflection -- a fact about the experiment, not a drawing decision.
+        // *** v4067 -- THIS REFUSAL HAD NO COUNTERPART, SO IT COULD PASS VACUOUSLY. *** An observable census
+        // flagged it as moved by nothing, which is true and expected of a constant -- but following it showed
+        // ringTwoTheta is called EXACTLY ONCE in this entire bind, here, and only to check that it says NO.
+        // A ringTwoTheta that returned null for EVERY input would leave this reading 1 and passing, while the
+        // function it grades was completely broken. That is mpmstep's noSidewaysDrift before blockFell, and
+        // centrifuge's driftAtNeutral before driftOffNeutral: A LOAD-BEARING NEGATIVE NEEDS A WITNESS THAT
+        // THE RUN COULD HAVE FAILED.
+        //
+        // THE WITNESS IS THE BOUNDARY, NOT AN ARBITRARY REACHABLE RING, and the boundary is DERIVED: Bragg
+        // gives sin(theta) = lambda*sqrt(N) / (2a), so a ring exists only while N <= (2a/lambda)^2, which is
+        // 4 at the a = lambda = 1 used here. MEASURED: N = 4 returns exactly 180 (grazing incidence, the last
+        // ring there is) and N = 5 returns null. The pair pins the refusal AT THE RIGHT PLACE -- a function
+        // that refused everything would fail the first, one that accepted everything would fail the second,
+        // and the original check alone could not see either.
         unreachableRingRefused: ringTwoTheta(400, 1, 1) === null ? 1 : 0,
+        ringAtLimitAccepted: ringTwoTheta(4, 1, 1),
+        ringPastLimitRefused: ringTwoTheta(5, 1, 1) === null ? 1 : 0,
     };
 }
 
