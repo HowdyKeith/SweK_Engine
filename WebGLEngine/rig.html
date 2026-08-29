@@ -59,15 +59,16 @@
   <h1>Rig</h1>
   <p class="sub">Every check in this engine, one click each. The verdict is the process exit code -- not text scraped out of the output.</p>
 
-  <div class="panel">
-    <h2>Only a human at the rig can do these</h2>
-    <div id="rigOnly"></div>
-    <div class="note">
-      These are not tests. They are the pile that has been accumulating in changelogs where nobody could click
-      them. Each says what it unblocks, because "rebuild the wasm" is a chore and "rebuild the wasm, it blocks
-      five things" is a decision.
-    </div>
-  </div>
+  <!-- v4129 -- "Only a human at the rig can do these" REMOVED, at Keith's request. His one condition was not
+       losing the pages it linked to, so that was CHECKED RATHER THAN ASSUMED before deleting anything: all ten
+       distinct links (box3d-info, blobulator, brain-bench, server, brain-replay, flesh, wind-tunnel, rig,
+       models, rle-mesh-demo) appear on at least one other page, and nine of the ten are also claimed by a
+       topic in tools/ship/pageSections.mjs. models.html -- the one Keith named as the one he was unsure about
+       -- is linked from server.html AND carries a topic, so it is reachable twice over.
+       *** THE LIST ITSELF IS NOT DELETED. *** RIG_ONLY still lives in ai-bridge/rigRunner.js and is still
+       served on /rig/list: it is fourteen items of recorded reasoning about what each chore UNBLOCKS, which is
+       the kind of thing that is expensive to write and impossible to reconstruct. Removing the panel takes it
+       off this page; it does not throw the record away. See that file's own note for where it surfaces now. -->
 
   <!-- v3458 -- THE LONG RUNS ARE A THIRD CHANNEL ON THIS PAGE AND ARE NEVER MERGED WITH THE OTHER TWO.
        Keith: the three Run buttons should come off server.html. They were NOT a duplicate of anything here --
@@ -109,17 +110,9 @@
   function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
 
   function render(data) {
-    var ro = document.getElementById("rigOnly");
-    data.rigOnly.forEach(function (r) {
-      var d = el("div", "rig");
-      d.appendChild(el("div", "t", r.title));
-      d.appendChild(el("div", "w", r.why));
-      var h = el("div", "h"); h.textContent = r.how;
-      if (r.link) { h.appendChild(document.createTextNode("  ")); var a = el("a", null, r.link); a.href = r.link; h.appendChild(a); }
-      d.appendChild(h);
-      ro.appendChild(d);
-    });
-
+    // v4129 -- the rigOnly loop went with its panel (see the note above where that panel used to be).
+    // data.rigOnly is still SENT by /rig/list and is deliberately not read here: the payload is shared with
+    // other callers, and narrowing a response because one consumer stopped rendering it would break them.
     checks = data.checks;
     document.getElementById("count").textContent = "(" + checks.length + " found on disk)";
     var list = document.getElementById("list");

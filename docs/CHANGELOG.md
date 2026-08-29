@@ -223,6 +223,19 @@ THE GATE'S FIRST VERSION WOULD HAVE BROKEN THREE WORKING PAGES. Checking for \' 
 Finally, the embers are round. Keith: "can we make the float particles round or roundish?" A THREE.PointsMaterial with no map draws each point as a flat square -- that is simply what an untextured point sprite is -- so the flaming river was throwing off little orange tiles. The sprite is generated on a canvas rather than shipped as a PNG, since a binary nobody can review in a diff is what this tree avoids adding, and it is white so vertexColors still decides the colour and this only decides the shape.
 
 Gate: tools/ship/blobulatorSkins-selfcheck.mjs, 12 checks, all pass, including cycling all five skins in a real browser with zero page errors.
+The nebula's stars stop being blocks, and rig.html loses a panel after its links were checked rather than assumed.
+
+Keith: "the stars in Escape velocity Nebula are square voxels, can they be stars?" -- on es-box3d-fly3d.html, whose backdrop is a baked cubemap from render/nebulaSkybox.js. NOTHING WAS DRAWING A SQUARE. The generator quantises a direction onto a lattice and, if that cell holds a star, added the SAME full brightness for every direction inside it. A flat-topped cell magnified across a skybox face is exactly what a voxel looks like. The fix is a radial falloff from the cell centre, computed from the same direction the cell test already uses -- so the seamlessness the lattice exists for is untouched: two faces meeting at an edge evaluate the same direction and still get the same value.
+
+THE VALUE WAS MEASURED, AND MY FIRST ONE WAS WRONG. I picked 0.42 cells first, on the reasoning that a star should not touch its neighbour. Measured at the page's real bake size of 256, that shrinks a star BELOW one texel: lit texels fall from 2313 to 659 and almost no adjacent lit pairs survive. That is not a rounder star, it is a thinner sky -- a different look sold as a fix. Swept properly, 1.0 keeps the ORIGINAL footprint (2313 lit texels) and takes the fraction of adjacent lit pairs that DIFFER from 11% to 99%: the same stars, now shaded centre to edge. It also reaches exactly zero at the cell boundary, so a star cannot spill into its neighbour and there is no rim to read as an edge.
+
+The gate compares the two settings against each other rather than against a number I chose: starRadius 0 restores the old behaviour exactly, so the falloff has to earn the difference. It also pins the FOOTPRINT, because a "fix" that shades stars by deleting most of them would otherwise pass.
+
+WRITING THAT GATE FOUND A SECOND BUG. Asking for the shipped default by passing starRadius: undefined produced the flat squares again -- makeParams spreads opts over DEFAULTS, and a spread copies an explicitly undefined key, so the default was being wiped by the absence of a value. Any caller building options from an optional field would have hit it. null and undefined now mean "not specified" while zero still means zero.
+
+rig.html: "Only a human at the rig can do these" is removed at Keith's request. His one condition was not losing the pages it linked to, so that was checked rather than assumed: all ten distinct links appear on at least one other page, and nine of the ten also carry a topic in pageSections.mjs. models.html -- the one he named as the one he was unsure about -- is linked from server.html AND has a topic, so it is reachable twice over. The LIST ITSELF IS NOT DELETED: RIG_ONLY still lives in ai-bridge/rigRunner.js and is still served on /rig/list, because fourteen items of recorded reasoning about what each chore unblocks is expensive to write and impossible to reconstruct. Removing the panel takes it off the page; it does not throw the record away.
+
+Gate: render/nebulaSkybox-selfcheck.mjs, 17 checks, all pass.
 ## Since v4113 -- the storage quota is a promise, not a reservation
 
 Found while running the measurement Keith asked for: does voxtral (2.5-9 GB) clear `localModelProbe`'s quota
