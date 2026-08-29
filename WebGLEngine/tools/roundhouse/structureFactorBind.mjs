@@ -81,6 +81,28 @@ function buildSF({ mode = "absences", config = {} } = {}) {
         absenceGap: sweep.worstAbsent > 0 ? sweep.minAllowed / sweep.worstAbsent : Infinity,
         closedVsSumWorst,
         // The lattice is untouched by a basis displacement, so these are the reference that must not move.
+        //
+        // *** v4066 -- AN OBSERVABLE CENSUS FLAGGED BOTH OF THESE AS MOVED BY NOTHING, AND THAT IS CORRECT AND
+        // INTENDED. *** The cells are typed here on purpose: they are REFERENCES, so no knob reaches them and
+        // the displacement plant cannot touch them. A number that changed with `lattice` or `displace` would
+        // be the defect. This is mpmstep.nu's shape -- flat BECAUSE the claim is true -- and the entry exists
+        // so the next census does not re-open a question already answered.
+        //
+        // *** AND THE CONTROL WAS MEASURED FOR TEETH RATHER THAN ASSUMED TO HAVE THEM, because a reference
+        // that cannot fail is worth nothing and looks identical to one that cannot be moved. *** Against a
+        // deliberately wrong reciprocal, scaling the true b by s, the diagonal residual reads:
+        //     s = 2         -> 6.283      (exactly TAU, the whole identity gone)
+        //     s = 1.001     -> 6.28e-3
+        //     s = 1 + 1e-9  -> 6.28e-9
+        // against a noise floor of 8.88e-16 on the triclinic cell. SEVEN ORDERS OF MAGNITUDE of sensitivity to
+        // a wrong reciprocal, so the zero is a measurement and not an accident of arithmetic.
+        //
+        // THE TRICLINIC CELL IS THE LOAD-BEARING ONE AND THE CUBIC IS NOT, which the same measurement shows:
+        // an orthonormal basis makes every dot product exact, so reciprocalResidualCubic is EXACTLY 0 and
+        // would stay 0 under a reciprocal that only got general cells wrong. The triclinic residual is
+        // 8.88e-16 -- nonzero, i.e. actually exercising the cross products and the 1/volume normalisation.
+        // A device carrying only the cubic reference would be carrying a check that cannot see the bug class
+        // it exists for. (A coplanar cell is refused outright, ok:false, so the singular guard fires too.)
         reciprocalResidualCubic: recipWorst([1, 0, 0], [0, 1, 0], [0, 0, 1]),
         reciprocalResidualTriclinic: recipWorst([1, 0, 0], [0.3, 1.1, 0], [0.2, 0.4, 0.9]),
         forbiddenLitUp,
