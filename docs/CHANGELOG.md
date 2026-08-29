@@ -8,6 +8,23 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4137 -- a check that pinned the size of a chaotic runaway, which is not a portable number
+
+Keith's rig: cflBind-selfcheck FAILED with "maxSpeed 1.20e+2" against the 8.8e8 written into the check's own name.
+
+*** IT IS NOT FLAKY HERE AND IT IS NOT RANDOM. *** Measured before touching anything: 6.76e+8, identical across five consecutive runs and identical again under Node 20 and Node 22. No unseeded randomness, no timing dependence. His rig runs Node 24 on Windows and produced 120 from the same code.
+
+WHY THOSE TWO NUMBERS CAN BOTH BE HONEST. A scheme stepped past its stability limit grows EXPONENTIALLY, so how big it is after a fixed number of steps is set by WHEN the instability takes hold -- and that onset is set by perturbations in the last bit, which ECMAScript expressly permits Math to implement differently between engines. Nine orders of magnitude apart is not two machines disagreeing about arithmetic; it is two machines agreeing about arithmetic and disagreeing about a chaotic trajectory. Asserting `maxSpeed > 1e4` was asserting that they would not.
+
+AND ALL THREE CONJUNCTS WERE ONE CONJUNCT. The check read `finiteButBroken === true && allFinite === true && maxSpeed > 1e4`, and cflBind.mjs line 98 defines finiteButBroken as `allFinite && maxSpeed > 1e4`. The same condition, three times, every spelling of it resting on the unportable half.
+
+*** THE CLAIM SURVIVES WITHOUT THE MAGNITUDE, BECAUSE IT NEVER RESTED ON IT. *** The point is that a run stepped far past its limit produces NO NaN, so a NaN-only check waves a completely broken run through. "Far past its limit" is the ACOUSTIC COURANT, and that is soundSpeed*dt/h -- three fixture values and a literal, 3.0 exactly, the same on every machine that will ever run it. So the check now asserts acousticCourant > 1 AND allFinite, and REPORTS maxSpeed as a measurement of the host it ran on. Reporting a measurement is not the same as requiring one.
+
+SABOTAGE-CONFIRMED THREE WAYS, including the one that matters most: forcing the acoustic courant below 1 reddens it, forcing allFinite false reddens it, and FEEDING IT KEITH'S OWN 120 PASSES -- so the fix demonstrably resolves his failure without hollowing out the check that failed.
+
+WHAT IS DELIBERATELY NOT CHANGED. finiteButBroken still carries the 1e4 threshold inside the device, and lab-results-baseline.json pins that row true -- so that baseline row is host-dependent as well. The observable is a MEASUREMENT and the baseline is a RECORD of one; rewriting either to make a gate portable would be editing the evidence instead of the check that misused it. It is reported in the gate's own output so the next reader meets it as a known property rather than a surprise.
+
+Also noted while here and left alone: the runaway mode reports `dt` as the config's 0.002 while it actually runs at 0.02. The acoustic courant it reports is computed from the dt it RAN, so the check is unaffected; the reported dt is misleading and belongs to whoever changes the device next. 1232 gates.
 ## Since v4136 -- a gate that has hard-crashed since v4055, and a timeout report that named the culprit while calling it something else
 
 Two rig failures from Keith, and neither was the thing it looked like.
