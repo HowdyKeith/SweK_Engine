@@ -82,12 +82,21 @@ console.log("\n2. THE SHARED HELPER CAN BE TOLD, AND STILL WORKS WHEN IT IS NOT"
     ok("!! ...and an ABSENT argument still means the default, because four other launchers pass none",
         /if "%PORT%"=="" set "PORT=8787"/.test(free),
         "START_BUN.bat, START_BUN_Full.bat, START_NODE_Full.bat and run_node_full.bat call it bare");
-    ok("!! the netstat match is the PRECISE form, not a substring",
-        !/findstr :\d+ \^\| findstr LISTENING/.test(free) && /findstr \/C:":%PORT% "/.test(free),
-        "`findstr :8787` also matches :87870 and :18787 -- and a port from the ephemeral range makes that " +
-        "collision far likelier than 8787 ever did");
-    const holders = [...free.matchAll(/findstr \/C:":%PORT% "/g)].length;
-    ok("...on BOTH passes, the kill and the verify", holders === 2, holders + " of 2");
+    // *** v4135 -- THIS CHECK USED TO DEMAND THE QUOTED FORM, AND THAT DEMAND CAUSED AN OUTAGE. ***
+    // v4134 "tightened" both loops to findstr /C:":%PORT% " on correct reasoning -- a bare :8787 also matches
+    // :87870. But swek_ask_exit.bat uses that quoted form on a PLAIN command line, while these two sit inside
+    // for /f ('...'), where nested quotes are fragile. On a machine that could not run batch, the difference
+    // was invisible; on Keith's rig the loop stopped finding the holder, a held port went unfreed, the server
+    // died on EADDRINUSE, and the launcher window closed taking every console with it -- "it opened and then
+    // all consoles closed". The check now pins what actually matters (the port is a PARAMETER) and explicitly
+    // does NOT require the quoting, so nobody re-applies it in a file this box cannot execute.
+    const loops = [...free.matchAll(/for \/f "tokens=5"[^\n]*findstr :%PORT%[^\n]*LISTENING/g)].length;
+    ok("!! both netstat loops search the PORT THEY WERE GIVEN, on the shape that shipped for years",
+        loops === 2, loops + " of 2 loops parameterised");
+    ok("!! ...and the quoted /C: form is NOT reintroduced inside a for /f",
+        !/for \/f[^\n]*findstr \/C:/.test(free),
+        "correct reasoning, wrong place: nested quotes inside for /f ('...') is what broke the launcher at " +
+        "v4134. The substring concern is real, PRE-EXISTING, and does not get fixed in a file no gate can run");
 }
 
 console.log("\n3. LINE ENDINGS -- A BATCH FILE WITH MIXED ONES IS A BATCH FILE THAT MISBEHAVES");

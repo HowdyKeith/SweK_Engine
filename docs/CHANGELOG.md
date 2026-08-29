@@ -8,6 +8,19 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4135 -- the launcher fix was right and the polish I bundled with it was not
+
+Keith, on the v4134 clone: "it opened and then all consoles closed. now nothing is running."
+
+*** THE PORT FIX WAS CORRECT. THE THING I ADDED ALONGSIDE IT, IN THE SAME UNTESTABLE FILE, WAS NOT. *** v4134 gave swek_free_port.bat the port argument its two siblings always had -- that is the actual fix and it stays. It ALSO "tightened" both of its netstat loops from `findstr :%PORT%` to `findstr /C:":%PORT% "`, on reasoning that is perfectly sound: a bare `:8787` also matches `:87870`. THE REASONING WAS RIGHT AND THE PLACE WAS WRONG. swek_ask_exit.bat uses that quoted form on a PLAIN command line; these two sit inside `for /f ('...')`, where nested quotes are fragile. A loop that yields nothing leaves SWEK_HOLDER unset, a genuinely held port never gets freed, the server that follows dies on EADDRINUSE, and the launcher window closes -- taking the KPop Listener and the GPU Brain with it, which is this file's own documented failure mode from v3850.
+
+WHAT MADE IT REACH THE RIG: this box runs Linux and cannot execute a .bat, so portAgreement-selfcheck reads source and says so in its own output. It could see that the form CHANGED; it could not see that the new form stops matching. A gate that reads is not a gate that runs, and I treated a source check as if it were a run.
+
+THE RULE I BROKE IS ONE THIS TREE ALREADY STATES: don't bundle optional polish into a fix you cannot execute. The port argument is a substitution in positions that already worked. The quoting was a behaviour change to a matching expression, in a file no gate on this machine can run, shipped in the same commit -- so when it broke, the blast radius was the whole launcher rather than one improvement. The substring concern is REAL and PRE-EXISTING and it is not fixed here; it is recorded, and portAgreement now asserts the quoted form is NOT reintroduced inside a for /f, so nobody re-applies it from the same correct reasoning.
+
+VERIFIED, since verifying is the point: the server itself was never the problem. ai-bridge/server.js boots clean on this box under an arbitrary PORT (51999), binds it, and answers /health with ok:true -- so v4133's githubBridge changes and v4134's main.js layer imports are not implicated. The fault was entirely in the batch helper.
+
+AND THE CLOTH JOB WAS FINE. Keith: "it showed running for maybe a minute and then returned to normal. so maybe it ran okay, but maybe it did not?" It ran. Measured here, pure Node exactly as its registry entry promises: 3.9 SECONDS, exit 0, full verdict printed -- the honest radius r <= h/2 = 0.15 set by coherence rather than feasibility, the whole window swept, and v3603's compliance anomaly retracted. The minute is rigJobBridge's declared `minutes: 1` UPPER BOUND, which that entry's own comment calls an upper bound rather than an estimate; it is not the runtime and never was. The job's output lives in server memory at /rigjob/log, which is why it vanished with the consoles rather than because anything failed. 1232 gates.
 ## Since v4134 -- two ports that disagreed, and an arrival that never went high enough to have layers
 
 Three things Keith asked for, and each one turned out to be a measurement before it was a fix.
