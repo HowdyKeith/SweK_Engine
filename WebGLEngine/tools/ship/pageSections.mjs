@@ -269,7 +269,14 @@ export const SECTIONS = [
     // gpanel and a slot -- and v4127 is on record that gtab wiring is where this row breaks.
     { id: "thirdparty", tab: null, parentTab: "systools", label: "Opt-in: somebody else's work",
       note: "install buttons for repos this engine did not write -- cloned and run on your machine, never vendored",
-      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html", "vpi.html"] },
+      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html", "vpi.html",
+              // v4144 -- ws-scrcpy.html JOINS: an opt-in install button for NetrisTV/ws-scrcpy (MIT), browser-
+              // based Android screen mirroring and control. Filed here for the same reason as its neighbours.
+              // *** IT IS THE ONE ON THIS SHELF WHOSE EXPOSURE CANNOT BE NARROWED FROM OUTSIDE: *** grdpwasm's
+              // proxy took a -listen flag this engine could point at loopback using upstream's own mechanism;
+              // ws-scrcpy calls server.listen(port, cb) with no host argument and ships no auth at all, so the
+              // page states the exposure and confirms before every start instead of running a patched fork.
+              "ws-scrcpy.html"] },
 
     { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
       pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",

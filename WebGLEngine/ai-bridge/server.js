@@ -16542,6 +16542,37 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- ws-scrcpy: install button for NetrisTV/ws-scrcpy (MIT), never vendored -----------------------------
+    // v4144 -- browser-based Android screen mirroring and control. Same non-vendoring reasoning as /grdpwasm
+    // above, and the same commit pin. *** THE DIFFERENCE FROM grdpwasm IS THAT THE EXPOSURE CANNOT BE FIXED
+    // FROM OUTSIDE THEIR CODE: *** grdpwasm's proxy took a -listen flag this engine could point at loopback
+    // using their own mechanism, unmodified. ws-scrcpy calls server.listen(port, cb) with no host argument
+    // anywhere and has no config field for one, and ships with no authentication at all by design. Patching
+    // either would mean running a fork of their behaviour, which this shelf refuses to do -- so /ws-scrcpy/start
+    // ALWAYS returns a warning naming the real exposure, and the page shows it before every start.
+    if (req.url.split("?")[0] === "/ws-scrcpy/status" && req.method === "GET") {
+        try { require("./wsScrcpyBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ws-scrcpy/install" && req.method === "POST") {
+        try { sendJson(require("./wsScrcpyBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ws-scrcpy/start" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./wsScrcpyBridge.js").start(d || {})); }
+            catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/ws-scrcpy/stop" && req.method === "POST") {
+        try { sendJson(require("./wsScrcpyBridge.js").stop()); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
     // --- ntfs-mounter: install button for zavierferodova/Mac-NTFS-Mounter (no licence, macOS-only) ---------
     // v4125 -- Keith: the free Mac App Store NTFS mounters lie about being free, the paid one he has fails
     // often. Same non-vendoring reasoning as /galaxy/*, but this one asks for root and touches a real disk, so

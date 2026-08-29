@@ -657,6 +657,16 @@ window.addEventListener("load", function () {
                  upstream ships a service worker that fakes them. This server CAN set the real ones, so it does,
                  without touching a byte of their files. -->
             <a href="/vpi.html" target="_blank" rel="noopener" title="Verified polygon intersection (opt-in) -- an install button for schildep/verified-polygon-intersection (MIT), a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo you draw two multipolygons on. Nothing of theirs is vendored into this tree or imported into this engine's process: the button fetches the four prebuilt static files GitHub Pages already serves, pinned to a reviewed commit, into a folder outside this tree, and this server serves them back with real Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy headers -- upstream's own service worker exists only because GitHub Pages cannot set HTTP headers.">Verified polygon intersection</a>
+            <!-- v4144 -- ws-scrcpy.html JOINS the same shelf: an opt-in front door to NetrisTV/ws-scrcpy (MIT),
+                 browser-based Android screen mirroring and control over adb. Same non-vendoring reasoning as
+                 its neighbours. *** IT IS THE ONE WHOSE EXPOSURE CANNOT BE NARROWED FROM OUTSIDE, AND THE
+                 TITLE SAYS SO: *** grdpwasm's proxy took a -listen flag this engine could point at loopback
+                 using upstream's OWN mechanism, code unmodified. ws-scrcpy calls server.listen(port, cb) with
+                 no host argument anywhere, has no config field for one, and ships no authentication at all by
+                 design -- so there is no honest argument to pass. Patching it would mean running a fork of
+                 their behaviour, which this shelf refuses; the page states the exposure and confirms before
+                 every start instead. -->
+            <a href="/ws-scrcpy.html" target="_blank" rel="noopener" title="Android in the browser (opt-in) -- an install button for NetrisTV/ws-scrcpy (MIT), browser-based Android screen mirroring and control over adb, using a vendored unmodified prebuilt Genymobile scrcpy-server.jar (no JDK needed). Nothing of theirs is vendored into this tree or imported into this engine's process: the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, runs their own five-stage build (~65s, needs a C/C++ toolchain for node-pty) and runs their server as a subprocess. WARNING -- IT BINDS TO ALL INTERFACES AND HAS NO LOGIN, and unlike grdpwasm that cannot be narrowed without patching their code: their HttpServer.ts calls server.listen(port, cb) with no host argument and has no config field for one. While it runs, anything on your LAN that reaches the port can view AND control any Android device the machine can see over adb. The page confirms before every start.">Android in the browser</a>
             <!-- v4125 -- ntfs-mounter.html JOINS beside galaxy-profile.html: another opt-in front door to
                  somebody else's work (zavierferodova/Mac-NTFS-Mounter, no licence file at all), installed and
                  run on this machine rather than vendored. Also appears in the Mac System panel (a view, via
