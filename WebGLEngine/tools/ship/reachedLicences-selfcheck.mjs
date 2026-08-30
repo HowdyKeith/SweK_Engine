@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/reachedLicences-selfcheck.mjs -- v4198
+// WebGLEngine/tools/ship/reachedLicences-selfcheck.mjs -- v4198, section 6 added at v4203
 //
 // GATES world/reachedLicences.mjs -- the register of sources this tree READ and did not vendor.
 //
@@ -14,10 +14,12 @@
 //
 // Run: node tools/ship/reachedLicences-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
-import { REACHED_SOURCES, POSTURE, SEVERITY, CODROPS_2015, CODROPS_2018,
-         validateEntry, nonRedistributable, codropsDrift, severityOf, asBodies,
-         describeSource } from "../../world/reachedLicences.mjs";
-import { codeOnly, prose } from "./sourceScan.mjs";
+import { REACHED_SOURCES, POSTURE, SEVERITY, SEVERITY_NAMES, CODROPS_2015, CODROPS_2018, LICENCE_TEXTS,
+         validateEntry, validateQuotation, quotationOf, nonRedistributable, codropsDrift, severityOf,
+         asBodies, describeSource } from "../../world/reachedLicences.mjs";
+import { licenceSection } from "./verifyLicenceTexts.mjs";
+import { createHash } from "node:crypto";
+import { codeOnly, noComments, prose } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,16 +52,29 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
         "*** but BOTH grant the same permission: integrate or build upon, free, personal or commercial ***");
     ok(d.bothForbidRedistribution,
         "*** and BOTH forbid the same thing: republish, redistribute, sell as-is ***");
-    ok(d.yearsApart === 3,
-        `*** and they are ${d.yearsApart} years apart, not four -- backlog item #59 read "two different ` +
-        `licences four years apart", and the evidence says ONE licence restated once ***`);
-    ok(d.addedIn2018.length === 2, `2018 adds exactly two clauses: ${d.addedIn2018.join("; ")}`);
+    // *** THIS SAID THREE YEARS AT v4198 AND THE ANSWER MOVED TWICE. *** #59 read "two different licences
+    // four years apart". v4198 read four codrops repos and said one licence, three years apart. v4203 found
+    // the same 123 bytes in lbebber/HeatDistortionEffect (c) 2016 -- a repo v4198 recorded as not restating
+    // its licence at all -- so the earlier wording is attested ACROSS 2015-2016 and the gap to the 2018
+    // restatement is two years. The finding did not reverse; it got more precise each time somebody read
+    // one more source, which is the argument for recording URLs rather than conclusions.
+    ok(d.yearsApart === 2,
+        `*** ${d.yearsApart} years apart, not three and not four -- and the earlier text spans ` +
+        `${d.earlierAttestedFrom}-${d.earlierAttestedTo} rather than sitting at one year ***`);
+    // *** AND THIS SAID TWO CLAUSES WHILE THE CORPUS WAS MISSING THE OTHER TWO. *** v4198's CODROPS_2018 was
+    // truncated at 48 of 77 words, so codropsDrift could not see the attribution requirement or the
+    // bundled-licence clause, and this check froze that blindness as an expected count.
+    ok(d.addedIn2018.length === 4, `2018 adds four clauses: ${d.addedIn2018.join("; ")}`);
     ok(/one licence, restated/.test(d.verdict), "the verdict states which of the two things happened");
-    // The quotations are quotations. A paraphrase here would make every claim above unfalsifiable.
-    ok(CODROPS_2015.includes("Don't republish, redistribute or sell 'as-is'."),
-        "the 2015 text is quoted verbatim, prohibition included");
-    ok(CODROPS_2018.includes("sell 'pluginized' versions of it."),
-        "and the 2018 text, including the clause that is new");
+    // *** THE QUOTATIONS ARE QUOTATIONS -- AND THESE TWO CHECKS AGREED WITH A BAD TRANSCRIPTION. *** Both
+    // were written asserting 'as-is' and 'pluginized' in SINGLE quotes. Both sources use DOUBLE quotes. The
+    // gate matched because it was written from the same mistaken reading as the record, which is what a
+    // self-consistency check is worth on its own -- and why section 6 hashes the text against a fetched
+    // digest instead of spot-checking phrases.
+    ok(CODROPS_2015.includes('Don\'t republish, redistribute or sell "as-is".'),
+        "the earlier text is quoted verbatim, prohibition and quote characters included");
+    ok(CODROPS_2018.includes('sell "pluginized" versions of it.'),
+        "and the 2018 text, with the quote characters its source actually uses");
     ok(CODROPS_2015.length < CODROPS_2018.length,
         `and the later one is LONGER (${CODROPS_2015.length} -> ${CODROPS_2018.length} chars), which is the ` +
         "direction a licence drifts when it is being tightened rather than relaxed");
@@ -174,7 +189,10 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
         "control: flip that one field and the identical licence is OPEN -- so the licence text is not what decides");
 
     // The question is REQUIRED, which is the mechanism. A severity nobody remembers to apply is a comment.
-    const noAnswer = { repo: "x", posture: POSTURE.REACHED, licenceExists: true, redistributable: false,
+    // sourceUrl joined the required fields at v4203, after an entry naming a 404 repository sat here for
+    // four versions looking like evidence.
+    const noAnswer = { repo: "x", sourceUrl: "https://github.com/o/x", posture: POSTURE.REACHED,
+                       licenceExists: true, redistributable: false,
                        taken: null, takenPaths: [], citedPaths: [], why: "because", spdx: "MIT" };
     ok(validateEntry(noAnswer).some((p) => /GRANTOR HELD THE RIGHTS/.test(p)),
         "*** an entry that does not answer it is INVALID -- the question cannot be skipped at record time ***");
@@ -183,11 +201,16 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     ok(validateEntry({ ...noAnswer, grantorHoldsRights: null }).some((p) => /GRANTOR/.test(p)),
         "null is not an answer either -- an asset whose provenance is unestablished is not yet an entry");
 
-    // And the state of the tree: nothing recorded is encumbered.
+    // *** AND THE STATE OF THE TREE, WHICH FLIPPED AT v4203. *** v4200 defined ENCUMBERED from a question
+    // Keith asked about TIE fighter models -- a hypothetical, and the check here recorded that the register
+    // held no such source, "defined before it was needed, which is the only time it can be defined calmly".
+    // v4203 found a real one by reading: projapati66/Svg-IsometricCityAnimation ships an MIT LICENSE file
+    // over artwork its author does not own. The category being ready is why that entry took one field to
+    // file rather than a round to argue about.
     const enc = REACHED_SOURCES.filter((e) => severityOf(e) === SEVERITY.ENCUMBERED);
-    ok(enc.length === 0,
-        `no source in the register is encumbered${enc.length ? ": " + enc.map((e) => e.repo).join(", ") : ""} -- ` +
-        "the category is defined before it was needed, which is the only time it can be defined calmly");
+    ok(enc.length === 1 && /Svg-IsometricCityAnimation/.test(enc[0].repo),
+        `exactly one source in the register is encumbered: ${enc.map((e) => e.repo).join(", ")} -- ` +
+        "found by reading a repo, three versions after the category was defined from a hypothetical");
     ok(REACHED_SOURCES.every((e) => typeof e.grantorHoldsRights === "boolean"),
         `and all ${REACHED_SOURCES.length} existing entries answer the question, rather than it applying only to new ones`);
 
@@ -211,6 +234,120 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
         "and it says how it differs from world/orrery.mjs, which is the obvious question a reader has");
     ok(Object.values(POSTURE).length === 3, `${Object.values(POSTURE).length} postures: ${Object.values(POSTURE).join(", ")}`);
     for (const e of REACHED_SOURCES) note(describeSource(e));
+}
+
+// 6) *** THE QUOTATIONS, WHICH THIS GATE PASSED ON WHILE TWO OF THEM WERE WRONG. ***
+//
+// v4198 shipped a 48-word transcription of a 77-word licence, spelled "build" as "built", and named a
+// repository that 404s -- and every check in sections 1-5 stayed green, because all of them compared the
+// register against ITSELF. `codropsDrift()` in particular read both texts, reported on their differences,
+// and could not notice that one of them was missing its last two sentences: a drift detector cannot report
+// a clause its own corpus does not contain.
+//
+// What is checkable WITHOUT a network is that the record is self-consistent and attributed. That is what
+// this section does. Whether the record is TRUE is tools/ship/verifyLicenceTexts.mjs's job, because the only
+// evidence for a quotation is the source, and a gate that needs a network is a gate that silently passes
+// when offline.
+{
+    for (const [id, q] of Object.entries(LICENCE_TEXTS)) {
+        ok(validateQuotation(id).length === 0, `${id}: internally consistent -- ${validateQuotation(id).join("; ") || "no problems"}`);
+        const actual = createHash("sha256").update(q.text, "utf8").digest("hex");
+        ok(actual === q.sha256, `${id}: the text hashes to its recorded sha256 (${q.sha256.slice(0, 12)})`);
+        ok(q.text.split(/\s+/).filter(Boolean).length === q.words, `${id}: ${q.words} words, counted`);
+        ok(q.text.length === q.chars, `${id}: ${q.chars} chars, counted`);
+        ok(Array.isArray(q.sourceUrls) && q.sourceUrls.every((u) => /^https:\/\//.test(u)),
+            `${id}: ${q.sourceUrls.length} source URL(s), all https -- somewhere a person can go and check`);
+        ok(/^\d{4}-\d{2}-\d{2}$/.test(q.retrieved), `${id}: read on ${q.retrieved}`);
+    }
+    ok(quotationOf("codrops-2018") !== null && quotationOf("nope") === null, "quotationOf resolves a known id and refuses an unknown one");
+    ok(quotationOf("codrops-2018").sourceUrls !== LICENCE_TEXTS["codrops-2018"].sourceUrls,
+        "and hands back a copy of the URL list, so a caller cannot edit the register through it");
+
+    // *** THE ACTUAL v4198 BUG, REPLAYED. *** Not "a truncation would be caught" as an assertion -- the
+    // exact string that shipped, fed to the exact checks, required to go red. A gate that reproduces the
+    // bug it was written for cannot quietly stop covering it.
+    const V4198_2018 =
+        "This resource can be used freely if integrated or built upon in personal or commercial projects such as " +
+        "websites, web apps and web templates intended for sale. It is not allowed to take the resource 'as-is' " +
+        "and sell it, redistribute, re-publish it, or sell 'pluginized' versions of it.";
+    ok(V4198_2018.split(/\s+/).length === 48 && CODROPS_2018.split(/\s+/).length === 77,
+        `what shipped at v4198 was ${V4198_2018.split(/\s+/).length} words of a ${CODROPS_2018.split(/\s+/).length}-word licence`);
+    ok(createHash("sha256").update(V4198_2018, "utf8").digest("hex") !== LICENCE_TEXTS["codrops-2018"].sha256,
+        "the v4198 text does not hash to the recorded digest -- the digest check would have caught it");
+    ok(/built upon/.test(V4198_2018) && /build upon/.test(CODROPS_2018) && !/built upon/.test(CODROPS_2018),
+        "and it read 'built upon' where the source says 'build upon' -- the word v4198 widened a regex for");
+
+    // *** THE TWO SENTENCES THAT WENT MISSING ARE TERMS, NOT BOILERPLATE. ***
+    ok(/visible mention and link to the original work/.test(CODROPS_2018) && !/visible mention/.test(V4198_2018),
+        "the truncation dropped an ATTRIBUTION REQUIREMENT -- a condition, gone from a field the gate treats as a quotation");
+    ok(/Always consider the licenses of all included/.test(CODROPS_2018) && !/Always consider/.test(V4198_2018),
+        "and the clause that decides the DesignTheWay entry: consider the licences of all included libraries, scripts and images");
+    const drift = codropsDrift();
+    ok(drift.addedIn2018.length === 4, `codropsDrift now reports ${drift.addedIn2018.length} added clauses; with the truncated text it could see at most 2`);
+    ok(drift.addedIn2018.some((c) => /visible mention/.test(c)), "including the attribution requirement it was previously blind to");
+    ok(drift.bothForbidRedistribution && drift.bothGrantIntegration, "and the finding itself survives: one licence, restated");
+    ok(drift.earlierAttestedFrom === 2015 && drift.earlierAttestedTo === 2016,
+        `the earlier text is attested 2015-2016, not at a single year -- the same bytes appear in a 2016 repo`);
+
+    // *** ONE TEXT, THREE REPOSITORIES -- INCLUDING THE ONE v4198 SAID DID NOT RESTATE IT. ***
+    const t15 = LICENCE_TEXTS["codrops-2015"];
+    ok(t15.sourceUrls.length === 3, `the earlier text is attested by ${t15.sourceUrls.length} repositories, byte for byte`);
+    ok(t15.sourceUrls.some((u) => /lbebber\/HeatDistortionEffect/.test(u)),
+        "one of them is lbebber/HeatDistortionEffect, whose entry previously said it referenced the licence by link instead of restating it");
+    const heat = REACHED_SOURCES.find((e) => /HeatDistortionEffect/.test(e.repo));
+    // The message must not interpolate the value it is asserting on both sides -- under sabotage the first
+    // draft read "the entry names codrops/X, not codrops/X, which 404s", which tells a reader nothing.
+    ok(heat.repo === "lbebber/HeatDistortionEffect",
+        `the heat-distortion entry names ${JSON.stringify(heat.repo)}; it must be "lbebber/HeatDistortionEffect", ` +
+        `because "codrops/HeatDistortionEffect" -- what v4198 recorded -- 404s`);
+    ok(heat.licence === CODROPS_2015 && heat.licenceId === "codrops-2015", "and now quotes the text it actually carries");
+
+    // *** EVERY ENTRY IS OPENABLE, WHICH IS THE FIELD THE 404 EXISTED FOR LACK OF. ***
+    for (const e of REACHED_SOURCES) {
+        ok(/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(e.sourceUrl || ""), `${e.repo}: sourceUrl is a github repo URL`);
+        ok((e.sourceUrl || "").endsWith("/" + e.repo), `${e.repo}: and its URL names the same repo the entry does`);
+    }
+
+    // *** THE SECOND ENCUMBERED CASE, AND THE FIRST FOUND BY READING RATHER THAN BY ASKING. ***
+    const dtw = REACHED_SOURCES.find((e) => /Svg-IsometricCityAnimation/.test(e.repo));
+    ok(dtw && severityOf(dtw) === SEVERITY.ENCUMBERED, "the isometric-city entry ranks ENCUMBERED");
+    ok(dtw.spdx === "MIT", "even though its LICENSE file is a plain MIT -- which is exactly what makes it encumbered rather than open");
+    ok(dtw.licence === CODROPS_2018,
+        "its README's licence section is codrops's 2018 text, byte for byte, on a repository that is not codrops");
+    ok(LICENCE_TEXTS["codrops-2018"].sourceUrls.some((u) => /Svg-IsometricCityAnimation/.test(u)),
+        "recorded as a source URL for that text, so the coincidence is evidence rather than an anecdote");
+    ok(/Freepik/i.test(dtw.licenceNote) && /GSAP/i.test(dtw.licenceNote),
+        "and the note names the two parties whose rights the grantor does not hold: Freepik's artwork and GreenSock's library");
+    ok(/DISAGREE/.test(describeSource(dtw)), `describeSource surfaces the conflict: ${describeSource(dtw)}`);
+    ok(!/DISAGREE/.test(describeSource(REACHED_SOURCES.find((e) => /beez/.test(e.repo)))),
+        "and does not cry conflict on an entry with a single licence");
+    ok(SEVERITY_NAMES[SEVERITY.ENCUMBERED] === "ENCUMBERED" && SEVERITY_NAMES.length === 5,
+        "severity numbers have names, so a console line does not read '4' and leave the reader to remember");
+
+    // *** THE EXTRACTOR, TESTED OFFLINE ON HAND-WRITTEN READMEs. *** verifyLicenceTexts needs a network;
+    // licenceSection does not, and it is the piece that decides what counts as the licence.
+    const README = ["# Thing", "", "## Build", "", "npm i", "", "## License", "",
+                    "Some terms here.", "", "Read more here: [License](http://example.com/)", "",
+                    "## Misc", "", "Follow us"].join("\n");
+    ok(licenceSection(README) === "Some terms here.", "licenceSection takes the License section and stops at the next heading");
+    ok(!/Read more here/.test(licenceSection(README)), "and drops the 'Read more here' link line, which LICENCE_TEXTS[].note records");
+    ok(licenceSection("# Thing\n\nno licence section at all\n") === "", "a README with no License section yields nothing, not the whole file");
+    ok(licenceSection("## License\n\nA.\n\nB.\n") === "A.B.", "multi-paragraph sections join, so a dropped paragraph changes the length");
+    // *** AND IT IS REACHABLE NOW, WHICH IT WAS NOT FOR FIVE VERSIONS. *** v4198 shipped this register and
+    // nothing but this gate imported it -- the shape #39 was filed for. A record of what was deliberately
+    // NOT taken that only its own test can read is a record nobody consults at the moment they need it.
+    // Quoted paths are matched against noComments (strings kept, comments stripped), code shapes against
+    // codeOnly, which is the rule three wiring checks in six versions were caught ignoring.
+    const mainQ = noComments(read("main.js"));
+    const mainC = codeOnly(read("main.js"));
+    ok(/import\s*\{[^}]*REACHED_SOURCES[^}]*\}\s*from\s*["']\.\/world\/reachedLicences\.mjs["']/.test(mainQ),
+        "main.js imports the register from world/reachedLicences.mjs");
+    ok(/window\.licences\s*=/.test(mainC), "and hangs it off window.licences");
+    for (const fn of ["list", "quote", "drift"]) ok(new RegExp(`\\b${fn}\\s*:`).test(mainC), `licences.${fn}() is exposed`);
+    ok(/sourceUrls\.join/.test(mainC),
+        "and quote() prints the URLs, so the console answer ends at a source rather than at this tree's word for it");
+
+    for (const [id, q] of Object.entries(LICENCE_TEXTS)) note(`${id}: ${q.words} words, sha ${q.sha256.slice(0, 12)}, ${q.sourceUrls.length} source(s), read ${q.retrieved}`);
 }
 
 console.log(`reachedLicences-selfcheck: ${pass} passed, ${fail} failed`);

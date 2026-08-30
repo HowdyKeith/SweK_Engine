@@ -8,6 +8,91 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4203 -- the register quoted three things wrong, in the file whose purpose is quoting licences verbatim
+
+Keith sent five repositories to assess. One of them, projapati66/Svg-IsometricCityAnimation, carries an MIT
+LICENSE file AND a README whose "## License" section is not MIT. That section is codrops's 2018 licence text,
+byte for byte, sha256 1fb1764108a736f8, on a repository that has nothing to do with codrops.
+
+Comparing it against what world/reachedLicences.mjs recorded at v4198 found three defects in this tree's own
+record.
+
+**1. CODROPS_2018 was truncated: 48 words of a 77-word licence.** The two dropped sentences are not
+boilerplate. One is an attribution requirement -- "Free plugins built using this resource should have a
+visible mention and link to the original work" -- which is a CONDITION, removed from a field the gate treats
+as a quotation. The other is "Always consider the licenses of all included libraries, scripts and images
+used", which is the clause that decides the new entry filed this round. The truncation deleted the sentence
+that would have settled the case it was later needed for.
+
+**2. It read "built upon" where the source says "build upon".** This is the same word v4198 wrote a regex fix
+for. Facing a text that would not match `built? upon`, I widened the pattern to `buil[dt] upon` and recorded
+that as the finding. The regex was right to be widened -- the character class is correct either way -- but
+the reason it failed was that my transcription disagreed with its source, and I never asked why a text
+disagreed with itself.
+
+**3. The heat-distortion entry named a repository that does not exist.** `codrops/HeatDistortionEffect` 404s;
+the repo is `lbebber/HeatDistortionEffect`. Lucas Bebber wrote the RainEffect and ElasticProgress ones too;
+codrops hosts the article, not the code. And the note explaining why its licence was not quoted -- "the
+README points at the Codrops licence page rather than restating it" -- was simply false. It restates it in
+full. Being careful not to record a paraphrase was right; recording a claim ABOUT the source without reading
+the source is the same failure one level up.
+
+So backlog item #59's answer gets sharper rather than overturned. The earlier text is not a 2015 text: the
+identical 123 bytes, sha256 92e30c8db85cf371, appear in ElasticProgress (2015), RainEffect (2015) and
+HeatDistortionEffect (2016). One licence attested across at least 2015-2016, restated once in 2018, two years
+apart -- not four as the item read, not three as v4198 concluded. Each reading of one more source made it more
+precise, which is the argument for recording URLs rather than conclusions.
+
+And codropsDrift() now reports FOUR clauses added in 2018 where it reported two. The other two were
+truncated out of its own corpus: a drift detector cannot report a clause its corpus does not contain.
+
+WHY ALL THREE SURVIVED FOUR VERSIONS AND A ROUND WHOSE SUBJECT WAS THAT LICENCE: every check that existed
+compared the register against itself. Two of the gate's own spot-checks asserted 'as-is' and 'pluginized' in
+SINGLE quotes, where both sources use DOUBLE quotes -- the gate matched because it was written from the same
+misreading as the record. Self-consistency is worth having, and it is worth exactly nothing against a
+transcription error.
+
+The fix is attribution, which gpu/khronosSamples.mjs has had since it was written and this file did not.
+That module gives every model a licenceUrlFor() -- where a person goes to read the licence themselves, even
+for the 134 nobody has read. Nothing here carried a URL, so no quotation in this file could be checked
+against anything.
+
+Now: every quoted text lives in LICENCE_TEXTS with its source URLs, retrieval date, word count, character
+count and sha256. `sourceUrl` is a required field on every entry, so an entry naming a 404 is invalid.
+An entry that quotes a licence must name the LICENCE_TEXTS id it quotes, and its text must equal that
+registry's text, so a hand-edited near-copy cannot sit beside the checked one.
+
+New tools/ship/verifyLicenceTexts.mjs re-fetches every source URL and compares byte for byte. It is a TOOL
+and not a gate, deliberately: the gate can prove the record has not drifted, and only the source can prove
+the record was true, and a hermetic suite that silently passes when offline is worse than no check. MEASURED
+this round: 5 sources, 5 agree, 0 disagree. Replayed against the v4198 text it names the divergence at word 9
+-- recorded "built", source "build" -- and prints the 29 words that went missing.
+
+New entry, and the first ENCUMBERED case found by reading rather than from a hypothetical. v4200 defined the
+category from a question Keith asked about TIE fighter models. This one is real: Ananda's MIT covers Ananda's
+code and cannot reach Freepik's city artwork or GreenSock's GSAP, because Ananda never held those rights.
+severityOf ranks it 4 -- reading the licence gives the wrong answer -- and describeSource now reports that the
+LICENSE file and the README DISAGREE instead of preferring the tidier of the two. It previously said "MIT",
+which is the one word in that record that misleads.
+
+Also wired. The register shipped at v4198 and nothing but its own gate imported it -- the shape backlog #39
+was filed for. A record of what was deliberately not taken, readable only by its own test, is a record nobody
+consults at the moment they need it. window.licences.list() prints every source with its severity and reason,
+.quote(id) prints a licence with the URLs it was read from and its digest, .drift() prints the codrops
+finding.
+
+The other four repositories Keith sent, licences read directly rather than summarised: coderitual/xna.js and
+coderitual/jtop both carry real MIT files (c) 2017. NiklasKnaack/jquery-warpdrive-plugin asserts MIT in its
+README with no LICENSE file at any of the three usual names, and positlabs/temporalis says "MIT" in
+package.json with no LICENSE file -- both UNPAPERED, both unvendorable, neither yet filed.
+
+Gate: tools/ship/reachedLicences-selfcheck.mjs, 124 checks, all pass. Twelve sabotages, all red: re-truncating
+CODROPS_2018 to exactly what v4198 shipped (which reports "recorded 77 words, the text has 48"), restoring the
+one-letter "built upon" slip, restoring the 404 repo name, dropping a sourceUrl, letting an entry quote a
+hand-edited near-copy, marking the encumbered entry as rights-holding, two on the licence-section extractor,
+reverting describeSource to prefer spdx, letting quotationOf hand back its live array, unwiring
+window.licences, and dropping the source URLs from quote(). All four touched files restored byte-identical.
+The build now stands at 1283 gates.
 ## v4202 -- spark-liquefy: a displacement that remembers, and a primitive I said the tree did not have
 
 Shape from positlabs/spark-liquefy (MIT), a Meta Spark effect that smudges the camera texture under a finger.
