@@ -1,0 +1,169 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="The Excel half: link the VBA archive (transmitter, OpenGL render engine, connector workbook) into this install, assemble a workbook from its modules, and run one allowlisted macro.">
+<title>SweK Excel &mdash; the VBA half</title>
+<style>
+:root{--bg:#0e1116;--fg:#dfe6f0;--dim:#8e9bb0;--line:#26303d;--card:#151b24;--ok:#8fe0ae;--warn:#ffd479;--bad:#ff9d9d;--acc:#9ce0b4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px}
+h1{font-size:19px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px;color:var(--acc)}
+a{color:var(--acc)}.sub{color:var(--dim);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.unverified{border-color:#6a5320;background:#1d1808}
+.absent{border-color:#33455c;background:#111722}
+button{font:inherit;padding:5px 12px;background:#1a2230;color:var(--fg);border:1px solid #33455c;border-radius:5px;cursor:pointer;margin:2px 4px 2px 0}
+button:hover{background:#22304a}
+input{font:inherit;padding:5px 8px;background:#0b0f15;color:var(--fg);border:1px solid #33455c;border-radius:5px;margin:2px 6px 2px 0;min-width:min(420px,72vw)}
+table{border-collapse:collapse;width:100%;margin:6px 0}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top;font-size:13px}
+th{background:#111722;color:var(--dim);font-weight:600}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+pre{background:#0b0f15;border:1px solid var(--line);border-radius:6px;padding:9px;overflow:auto;max-height:300px}
+.y{color:var(--ok);font-weight:700}.n{color:var(--dim)}.w{color:var(--warn);font-weight:700}
+ul{margin:6px 0;padding-left:20px}li{margin:4px 0}
+small{color:var(--dim)}
+</style></head><body>
+
+<h1>&#128202; SweK Excel &mdash; the VBA half</h1>
+<p class="sub"><b>This part was started first.</b> Before any of this engine existed there was a VBA transmitter
+doing Winsock, an OpenGL render engine drawing from a worksheet, and a connector workbook talking to what
+became SweK. This page is where that work attaches to this install.</p>
+
+<div class="card absent">
+  <b>The archive is not in this repository, and this page does not put it there.</b>
+  It <b>links</b> to a copy on this machine and reads it. Copying 189 transmitter modules into the tree would
+  <b>fork</b> them &mdash; the archive stays what you edit, this tree keeps a snapshot, and the two drift until
+  somebody asks which one a workbook was built from. A pointer cannot drift. It can go <i>stale</i>, and that
+  is a condition this reports rather than hides.
+  <br><br>
+  <b>Nothing is ever written inside the archive.</b> It is opened read-only.
+</div>
+
+<h2>1 &middot; Point it at the archive</h2>
+<div class="card">
+  <div><input id="root" placeholder="path to the folder holding the archive"> <button onclick="scan()">Scan</button> <button onclick="link()">Link it</button> <button onclick="unlink()">Unlink</button></div>
+  <div style="margin-top:6px"><input id="zip" placeholder="or a path to the archive .zip"> <button onclick="extract()">Extract &amp; scan</button></div>
+  <div style="margin-top:6px"><small>Extraction lands in <code>~/.voxelbridge/vba/</code> &mdash; outside this tree on purpose, since every gate here walks every file in the repository. The destination is not a parameter: a zip can carry <code>../</code> in its entries.</small></div>
+  <div id="cands" style="margin-top:8px"></div>
+  <pre id="out">press Scan, or Link it to store the pointer</pre>
+</div>
+
+<h2>2 &middot; The four parts</h2>
+<div class="card">
+  <p style="margin-top:0"><small>A folder is recognised by <b>module name, not folder name</b> &mdash; yours can be called anything. A part needs <b>two decisive markers</b>, modules only it has. <b><code>Shared/Net/</code> in this repository is the trap this is built around:</b> it carries three of the transmitter's Winsock modules because its README says they were extracted from it, so those three <i>corroborate</i> and never decide. A folder with no decisive marker is reported <b>unclassified</b>, not guessed at.</small></p>
+  <table><thead><tr><th>part</th><th>what it is</th><th>here?</th><th>modules</th><th>the fragment already in this tree</th></tr></thead><tbody id="parts"><tr><td colspan="5" class="n">press Scan</td></tr></tbody></table>
+  <div id="uncl"></div>
+</div>
+
+<h2>3 &middot; Build a workbook from the modules</h2>
+<div class="card">
+  <p style="margin-top:0"><small>Excel can build a VBA project from source and openpyxl cannot, so this drives Excel's own VBE through <code>assemble-workbook.vbs</code>. Needs <b>Options &rsaquo; Trust Center &rsaquo; Macro Settings &rsaquo; &ldquo;Trust access to the VBA project object model&rdquo;</b>. Per the README's recipe a workbook is <b>its own folder plus <code>Shared/</code></b>; <code>ThisWorkbook</code> and <code>Sheet*</code> are document modules and are pasted, never imported.</small></p>
+  <button onclick="folders()">List VBA folders</button>
+  <span id="asm"></span>
+  <pre id="fout">press List VBA folders</pre>
+</div>
+
+<h2>4 &middot; Control Excel</h2>
+<div class="card">
+  <p style="margin-top:0"><small><b>An allowlist, not a denylist.</b> <code>Application.Run</code> takes any name and VBA can delete files, reach the network and drive COM &mdash; so a denylist would be correct exactly until the archive gained the next dangerous macro. These are the engine's own entry points, refused by name if you ask for anything else. The workbook is opened with events off so <code>Workbook_Open</code> does not fire, and is <b>never saved</b> on the way out.</small></p>
+  <div><input id="book" placeholder="path to the .xlsm workbook"></div>
+  <div id="macros" style="margin-top:6px"></div>
+  <pre id="mout">pick a workbook and a macro</pre>
+</div>
+
+<h2>5 &middot; Where the halves meet</h2>
+<div class="card">
+  <ul>
+    <li><b>The connector posts here.</b> <code>Shared/modEngineBridge.bas</code> POSTs each tick to
+        <code>/bridge/game_tick</code> and drains the directives the browser queued. That traffic is what the
+        <b>Excel AI Brains</b> panel on the render page is showing &mdash; renamed at v4159, because on a page
+        carrying LLM consoles, GPU brains and a physics-lab roster, &ldquo;AI Brain&rdquo; was the one label
+        that never said <i>whose</i>.</li>
+    <li><b>The transmitter can host instead.</b> <code>ResolveBridgeHost</code> probes Node on
+        <code>:8787</code>, then a transmitter on <code>:8099</code>, and repoints at whichever answers &mdash;
+        so the panels stay up with node stopped. That port is not chosen on this page; it is read off the
+        client that has been probing for it all along.</li>
+    <li><b>The GPU brains are already in the tree.</b> <code>WebGLEngine/vba/</code> &mdash; <code>modGPUBrain</code>,
+        <code>modGPUBrainSteer</code>, <code>modRaycasterDemo</code>. They need the FixPack's
+        <code>clsStringBuilder</code> and <code>JSONParser</code>, which live in the <b>transmitter</b>, which is
+        why those two are decisive markers for it.</li>
+  </ul>
+</div>
+
+<div class="card unverified">
+  <b>&#9888;&#65039; No Excel has ever run against this.</b> The box this was written on is Linux with no Excel and
+  no copy of the archive. <b>What is measured:</b> the recogniser and the refusals &mdash; scanning this whole
+  repository links <b>zero of four</b> parts and calls <code>Shared/Net/</code> unclassified, which is the
+  correct answer and is asserted by <code>tools/ship/vbaArchive-selfcheck.mjs</code>. <b>What is not:</b>
+  everything past &ldquo;Excel answered&rdquo; &mdash; assembling a workbook, running a macro, and the marker
+  lists themselves. Those names were read out of this tree's changelog and notes, not out of a directory
+  listing of the archive, so the manifest reports itself <code>provisional</code> until a real archive has been
+  scanned. If a part classifies wrong, the fix is to widen its markers from that listing &mdash; never to lower
+  the threshold until something matches.
+</div>
+
+<p><a href="/server.html">&larr; back to the front door</a></p>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const j = async (url, body) => {
+    const r = await fetch(url, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return r.json();
+};
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function render(s) {
+    $("out").textContent = (s.summary || s.error || "") + (s.root ? "\n\nroot: " + s.root : "") +
+        (s.stale ? "\n\nSTALE -- the linked folder is gone." : "") +
+        (s.extractedTo ? "\n\nextracted to: " + s.extractedTo : "") +
+        (s.saved ? "\n\npointer saved: " + s.linkFile : "") +
+        (s.hint ? "\n\n" + s.hint : "");
+    if (Array.isArray(s.parts)) {
+        $("parts").innerHTML = s.parts.map((p) =>
+            "<tr><td><b>" + esc(p.title) + "</b><br><small>" + esc(p.id) + (p.port ? " &middot; :" + p.port : "") + "</small></td>" +
+            "<td><small>" + esc(p.what) + "</small></td>" +
+            "<td>" + (p.present ? '<span class="y">linked</span><br><small>' + esc(p.dir) + "</small>" : '<span class="n">not linked</span>') + "</td>" +
+            "<td>" + (p.present ? p.sources : "&mdash;") +
+                (p.modulesRecorded != null ? '<br><small>recorded: ' + p.modulesRecorded +
+                    (p.countsAgree === false ? ' <span class="w">(differs)</span>' : "") + "</small>" : "") + "</td>" +
+            "<td><small>" + (p.inTreeFragment ? esc(p.inTreeFragment) : '<span class="n">none</span>') + "</small></td></tr>").join("");
+    }
+    const u = s.unclassified || [];
+    $("uncl").innerHTML = u.length
+        ? "<p><b>Unclassified</b> &mdash; VBA source with no decisive marker. Named, not guessed at:</p><table><thead><tr><th>folder</th><th>files</th><th>why not</th><th>sample</th></tr></thead><tbody>" +
+          u.map((f) => "<tr><td><code>" + esc(f.rel || f.name) + "</code></td><td>" + f.sources + "</td><td><small>" + esc(f.reason) + "</small></td><td><small>" + esc((f.sample || []).join(", ")) + "</small></td></tr>").join("") + "</tbody></table>"
+        : "";
+    if (Array.isArray(s.candidates) && s.candidates.length) {
+        $("cands").innerHTML = "<small>try: " + s.candidates.map((c) =>
+            '<button onclick="pick(this.textContent)">' + esc(c.dir) + "</button>").join(" ") + "</small>";
+    }
+    if (Array.isArray(s.macros)) {
+        $("macros").innerHTML = s.macros.map((m) =>
+            '<button title="' + esc(m.why) + '" onclick="run(\'' + esc(m.name) + '\')">' + esc(m.name) + "</button>").join(" ") +
+            (s.excel === false ? '<div><small class="w">This box is not Windows, so no macro can run here. The allowlist and every refusal still answer.</small></div>' : "");
+    }
+}
+function pick(dir) { $("root").value = dir; }
+async function stateNow() { render(await j("/vba/state")); }
+async function scan() { render(await j("/vba/scan", { root: $("root").value })); }
+async function link() { render(await j("/vba/link", { root: $("root").value })); }
+async function unlink() { render(await j("/vba/unlink", {})); }
+async function extract() { render(await j("/vba/extract", { zip: $("zip").value })); }
+async function run(macro) {
+    $("mout").textContent = "running " + macro + " ...";
+    const r = await j("/vba/run", { book: $("book").value, macro });
+    $("mout").textContent = JSON.stringify(r, null, 1);
+}
+async function folders() {
+    const r = await j("/workbook/folders");
+    $("fout").textContent = JSON.stringify(r, null, 1);
+    $("asm").innerHTML = (r.folders || []).map((f) =>
+        '<button onclick="assemble(\'' + esc(f.path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + '\')">Assemble ' + esc(f.name) + " (" + f.count + ")</button>").join(" ");
+}
+async function assemble(srcDir) {
+    $("fout").textContent = "assembling " + srcDir + " ...";
+    $("fout").textContent = JSON.stringify(await j("/workbook/assemble", { srcDir, format: "xlsm" }), null, 1);
+}
+stateNow();
+</script>
+</body></html>

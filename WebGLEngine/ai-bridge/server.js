@@ -2625,6 +2625,7 @@ const toolsBridge = require("./toolsBridge.js");          // v3220 - front door 
 const shipBridge = require("./shipBridge.js");            // v2807 - ship-ritual front door at /ship (dry run free; a real ship needs an explicit confirm).
 const deviceBridge = require("./deviceBridge.js");        // v2813 - roundhouse DEVICE front door at /device (pick a lab, watch the loop crystallise round by round).
 const repoTerrainBridge = require("./repoTerrainBridge.js");  // v4149 - count a source tree so world/repoHeightfield.js can make ground out of it.
+const vbaArchiveBridge = require("./vbaArchiveBridge.js");  // v4159 - link the VBA archive (transmitter, OpenGL engine, connector workbook) into this install.
 const sunshineBridge = require("./sunshineBridge.js");        // v4154 - the HOST half Moonlight dials, plus the one am-start surface that client exposes.
 const iosDeviceBridge = require("./iosDeviceBridge.js");      // v4155 - adb-for-iOS via doronz88/pymobiledevice3, allowlisted and read-only.
 const policyMassBridge = require("./policyMassBridge.js");
@@ -4979,6 +4980,14 @@ const server = http.createServer((req, res) => {
         // /sunshine - install/start/stop the Sunshine HOST, and launch Moonlight V+ on a phone over adb.
         Promise.resolve(sunshineBridge.handle(req, res, { sendJson, readJson }))
             .catch((e) => { try { sendJson({ ok: false, error: "sunshine", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
+    if (vbaArchiveBridge.owns(req.url)) {
+        // /vba - the VBA archive: scan a folder for its four parts, link a copy, extract its zip, and run one
+        // ALLOWLISTED macro in a workbook. Mounted here, below readJson, for the reason the two mounts above
+        // record -- every route of this bridge except /vba/state and /vba/manifest is a POST that needs it.
+        Promise.resolve(vbaArchiveBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "vba", message: String(e && e.message || e) }, 500); } catch {} });
         return;
     }
     try {

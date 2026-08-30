@@ -8,6 +8,112 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4159 -- the VBA half, linked into the install rather than copied into the tree
+
+Keith: *"i want to get the vba achives linked into the SweK install. I have the last vba archive, which connects
+as an addon to SweK Engine. that vba part was started first."* Then, naming the pieces: a **VBA transmitter,
+which does winsock**; the **VBA opengl render engine** ("pretty cool, last we left it many months ago"); a
+**VBA to SweK Engine connector workbook**; and **some smaller parts**.
+
+**The archive is not in this repository, and the root README has said so for hundreds of versions** -- the
+exploded module folders "ship separately." Separately has meant, in practice, *nowhere*: nothing in this tree
+could say what the archive contains, whether a copy on the machine was the right one, or which of its parts the
+engine was actually talking to. What ships here are fragments of it: `Shared/Net/`'s slim Winsock extract,
+`Shared/modEngineBridge.bas`, and `WebGLEngine/vba/`'s GPU-brain modules.
+
+#### `vba/archiveManifest.mjs` -- the four parts, and how a folder is recognised as one
+
+| part | what it is | recorded | the fragment already in this tree |
+|---|---|---|---|
+| `transmitter` | Winsock + the HTTP/WebSocket/MQTT **servers** on top. The one part that can HOST. | 189 modules | `Shared/Net/` (~650 lines) |
+| `engine` | the OpenGL/D3D11 render workbook | -- | `HomeAssistant/modHAInstall.bas` |
+| `connector` | the workbook wired to **this** engine | 73 modules | `Shared/modEngineBridge.bas` |
+| `smaller` | the sync tool, the demo addons | -- | -- |
+
+The transmitter's port is not chosen here. `Shared/modEngineBridge.bas` has always defaulted its candidate list
+to "Node :8787, then transmitter :8099" and repointed at whichever answers -- the number is read off the client
+that has been probing for it all along.
+
+**Recognition is by module name, not folder name.** Yours can be called `vba_final` or `Engine (2)`; the name is
+corroboration and never a verdict.
+
+#### The trap it is built around is already in this repository
+
+`Shared/Net/` carries `WinsockDeclares.bas`, `WinsockUtils.bas` and `WinAPI.bas` -- three modules the transmitter
+also has, because that folder's own README says in as many words that they were *"extracted from the VBA smart
+transmitter."* **A classifier that counted marker hits would find three transmitter modules there and link the
+engine's 650-line extract as the 189-module transmitter, then report itself healthy.**
+
+So those three are **shared** markers: they corroborate, they never decide. What decides is a module the extract
+provably lacks -- a server, a host, a broker. A folder needs **two** decisive markers, because one is a
+coincidence: somebody copying a single module out of the transmitter to read it should not relabel whatever
+folder it landed in. A folder that reaches neither is reported **unclassified**, with its file count and a
+five-name sample, rather than forced into one of four buckets.
+
+Measured, on real disk:
+
+- scanning **this entire repository** finds **6** folders of genuine VBA source and links **zero of four** parts,
+  calling `Shared/Net/` unclassified. That is the correct answer, and it is now asserted.
+- a fixture archive links **4 of 4**, including `addons/VBAOpenGL_Demos/` at depth 3.
+- `modGLConstants` is decisive for **both** workbooks, so a genuine tie exists; it is reported as
+  `confidence: "low"` with the runner-up named, and broken by the folder name, rather than coin-tossed.
+
+**Missing is `ok:true`, not an error.** The archive ships separately by design, so `linked: false` is a healthy
+state. The arriving-pages check spent versions proving the converse: a gate that cries about the ordinary case
+is one people learn to ignore, and then it cannot tell them anything.
+
+#### `ai-bridge/vbaArchiveBridge.js` -- it links, and it never copies
+
+Pulling 189 transmitter modules into this tree would **fork** them: the archive stays what Keith edits, this tree
+keeps a snapshot, and the two drift silently until somebody asks which one a workbook was built from. A pointer
+cannot drift. It can go *stale* -- and a pointer whose folder is gone reports `stale: true` rather than "not
+linked," because the quiet answer is the same lie a stale copy tells, in the other direction.
+
+One file is written: `vba-archive.local.json`, beside `host-timings.local.json` and gitignored the same way.
+Delete it and the archive is unlinked; nothing else changes. **Nothing is ever written inside the archive** -- the
+fixture test re-scans and asserts not one byte changed, rather than trusting the header that says so. Extraction
+is the one write and it lands in `~/.voxelbridge/vba/`, outside this tree on purpose since every gate here walks
+every file in it; **the destination is not a parameter**, because a zip can carry `../` in its entries.
+
+#### `excel.html` + an Excel button on `server.html`
+
+The only thing on that opt-in shelf that is not somebody else's work. It reuses the existing `/workbook/folders`
+and `/workbook/assemble` routes rather than growing a second assembler.
+
+**Macro execution is an allowlist, the same call `ios-tools` made and for the same reason.** `Application.Run`
+takes any name, and VBA can delete files, reach the network and drive COM -- a denylist would be correct exactly
+until the archive gained the next dangerous macro. **7** of the engine's own entry points, each carrying the
+reason it is allowed, and membership is **exact**: a name that merely *contains* an allowed one is refused, since
+a prefix match would be an argument-injection hole straight into `Application.Run`.
+
+**The allowlist is checked before the platform, and that order is load-bearing.** The first draft returned "needs
+Windows + Excel" first -- which made every refusal untestable on the Linux box that had to check them, and would
+have made excel.html's claim that "the allowlist and every refusal still answer" false on the one machine able to
+verify it. A refusal by name does not depend on the platform, so it no longer waits for one.
+
+`ai-bridge/run-macro.vbs` opens the workbook read-only with `EnableEvents = False` (so `Workbook_Open` does not
+fire just to call one macro) and never saves on the way out. It carries **no second copy of the allowlist**: two
+lists that must agree are one list and one stale list, and the stale one is always the permissive one.
+
+#### "AI Brain" is now "Excel AI Brains"
+
+Keith: *"there is an 'AI Brain' panel on main render page that really should read 'Excel AI Brains'."* Right, and
+for a sharper reason than tidiness: on a render page carrying LLM consoles, GPU brains and a physics-lab roster,
+that was the one label that never said *whose*. Every number in the panel arrives from a workbook -- the tick
+count, the entity list, the directives its buttons queue. The plural is deliberate: the workbook runs a brain per
+entity. Renamed at the header **and** the minitab, and the gate asserts the tab's own line, since a file-wide
+search for the new name would pass on a half-rename.
+
+#### What is *not* verified
+
+Everything past "Excel answered." The box this was written on is Linux with no Excel and no copy of the archive.
+The marker names were read out of this tree's changelog and NOTES -- not out of a directory listing of a folder
+anyone here has opened -- so the manifest reports itself **`provisional: true`** in the data rather than in a
+comment, the page prints it, and the gate asserts the flag is still up. When a real archive is scanned the flag
+comes down and the markers come from its listing. If a part classifies wrong, the fix is to widen its markers
+from that listing, never to lower the threshold until something matches.
+
+New `tools/ship/vbaArchive-selfcheck.mjs` takes the tree to 1246 gates.
 ## Since v4157 -- two solutions to one spring, and a readout that changes instead of being replaced
 
 v4158 -- Keith asked for lochie/torph's text morphing on the ticker. *** IT IS DELIBERATELY NOT ON THE TICKER, AND THE ARITHMETIC IS THE REASON. *** server.html's ticker is a marquee: 0.9px per frame at 60fps is 54px/s across a 220px clip, so a message sits on screen for 6.0s at 80px wide and 17.5s at 700px, against a queue that caps at 40 -- ABOUT FIVE AND A HALF MINUTES OF BACKLOG. Its problem is THROUGHPUT, which no transition fixes. And morphing only earns anything when the two strings SHARE STRUCTURE: consecutive log lines share almost nothing, so every glyph would fade out and every glyph fade in -- a crossfade with extra machinery, slower to read than the scroll it replaced. The measurement is now ASSERTED BY THE GATE against the ticker's own scroll constant, so if it is ever retimed the decision is revisited rather than inherited. Pointed at the READOUTS instead, where old and new always share structure. *** THE FOUNDATION IS A SECOND SOLUTION TO A SPRING THIS TREE ALREADY HAD, AND THAT IS WHAT MAKES THE GATE STRONG. *** ui/springMotion.js's step() INTEGRATES the damped harmonic oscillator numerically -- retargetable mid-flight, which an interruptible toast needs, and one call per frame on the main thread. New springToCssLinear() SOLVES THE SAME EQUATION IN CLOSED FORM and samples it into a CSS linear() easing, so the browser runs it ON THE COMPOSITOR and a busy main thread cannot make it stutter, at the cost of being a baked curve nothing can interrupt. Two independent answers to one question can be pointed at each other, and the agreement is asserted AS CONVERGENCE RATHER THAN AS A TOLERANCE: semi-implicit Euler is first order, so halving dt must halve the error. MEASURED at dt 1/480, 1/960 and 1/1920: errors 1.31e-2, 6.54e-3, 3.26e-3, ratios 2.01 and 2.00. *** A WRONG CLOSED FORM CANNOT DO THAT -- it would plateau at whatever constant it disagrees by, and a tolerance-based check would have passed it. *** The parameters are the SHARED PRESETS read through the shared dampingRatio(), so a CSS transition and a JS toast cannot disagree about what "snappy" means. *** AND THE CRITICAL BAND IS A SEPARATE BRANCH, WHICH THE OBVIOUS IMPLEMENTATION DIVIDES BY ZERO IN: *** the overdamped solution divides by (r2 - r1) and those roots COINCIDE at zeta 1, and this tree's `stiff` preset is zeta 1.0006 -- inside that band, and it is the preset meant for surfaces where overshoot would look like a bug. The last sampled point is pinned to EXACTLY 1, because a curve ending at 0.9997 makes CSS animate to 0.9997 and stop, which is the same defect step()'s snap-on-rest exists to prevent arriving in the other engine. New ui/textMorph.js diffs by LCS AND NOT BY A PREFIX/SUFFIX TRIM: "3 peers" -> "13 peers" keeps ALL SEVEN survivors and inserts one, where a trim sees a changed first character and rewrites the whole string -- saying "different value" when the truth is "one digit arrived". *** AND IT SEGMENTS BY GRAPHEME, WHICH THIS TREE'S UI MAKES NECESSARY RATHER THAN TIDY: *** the gear in server.html's own header is U+2699 followed by U+FE0F, and [...str] splits that into two, the second an invisible modifier that renders as a stray box on its own -- so a naive morph does not animate badly, IT CORRUPTS THE TEXT. Flags, ZWJ families and surrogate pairs are all gated. Segmentation, the diff and the plan are pure, so every number is settled in node; only the FLIP touches the DOM. Wired into the engine version in server.html through morphText(), at BOTH write sites -- boot and the update check -- since morphing one and not the other would make the animation depend on which path last ran. The module is fetched lazily and every failure falls back to textContent, because a readout that stopped updating when an animation module 404'd would be a strictly worse front door than one that never animated. New tools/ship/textMorph-selfcheck.mjs takes the tree to 1245 gates. Full changelog on docs/CHANGELOG.md.

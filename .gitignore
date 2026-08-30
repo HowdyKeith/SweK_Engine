@@ -94,6 +94,10 @@ Root Utils/email-draft.md
 # v3923 -- per-host observed gate runtimes. gate-timings.json is the shipped REFERENCE; this is one
 # box's comparison against it and must never travel, or a fast machine would export its scale to a slow one.
 WebGLEngine/tools/ship/host-timings.local.json
+# v4159 -- the pointer to the VBA archive on THIS machine. The archive itself is not in this repository
+# (the transmitter, the OpenGL render engine and the connector workbook ship separately); this file only says
+# where a copy of it lives here. Deleting it unlinks the archive and changes nothing else.
+WebGLEngine/tools/ship/vba-archive.local.json
 # v3951 -- install-history.json is the SAME KIND OF THING one line up: ai-bridge/installHistory.js writes THIS
 # box's boot timings into it (installToReadyMs, bootAt, downMs), so it is a per-machine measurement and not
 # source. It appeared untracked during a routine round; committing it would have exported a sandbox's boot times
