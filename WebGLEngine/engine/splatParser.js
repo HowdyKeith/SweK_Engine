@@ -82,16 +82,27 @@ export function parsePly(arrayBuffer) {
     // size in bytes is variable so we can't just slice the first 4KB.
     const bytes = new Uint8Array(arrayBuffer);
     const td = new TextDecoder("utf-8");
-    // Find end_header by scanning for \n
+    // Find end_header, then step over WHATEVER ends that line.
+    //
+    // *** v4195 -- THE LINE ENDING IS NOT PART OF THE MARKER. *** This scanned for the eleven bytes
+    // "end_header\n" and so rejected every .ply whose header used CRLF -- i.e. every one written on
+    // Windows -- with "could not find end_header", an error blaming the file for missing a marker it
+    // plainly has. Measured before the fix: a byte-identical fixture parsed with LF and threw with CRLF,
+    // while gpu/SplatLoader.js read both. The marker is "end_header"; the newline after it is
+    // whitespace, and \r is whitespace too.
     let headerEnd = -1;
-    const needle = "end_header\n";
+    const needle = "end_header";
     const maxScan = Math.min(bytes.length, 65536);
     for (let i = 0; i <= maxScan - needle.length; i++) {
         let match = true;
         for (let k = 0; k < needle.length; k++) {
             if (bytes[i + k] !== needle.charCodeAt(k)) { match = false; break; }
         }
-        if (match) { headerEnd = i + needle.length; break; }
+        if (match) {
+            headerEnd = i + needle.length;
+            while (headerEnd < bytes.length && (bytes[headerEnd] === 0x0a || bytes[headerEnd] === 0x0d)) headerEnd++;
+            break;
+        }
     }
     if (headerEnd < 0) throw new Error("[splatParser] could not find end_header in first 64KB");
     const headerText = td.decode(bytes.slice(0, headerEnd));

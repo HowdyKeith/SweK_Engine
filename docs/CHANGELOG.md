@@ -8,6 +8,59 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4195 -- The splat stack had two .ply parsers, 3,302 lines, and not one gate -- because nothing could write the format
+
+`engine/splatParser.js` and `gpu/SplatLoader.js` both read 3DGS `.ply`, into two different shapes, for two
+different renderers. Neither was gated: `physics/splat/gaussianSplat-selfcheck.mjs` and
+`tools/roundhouse/splatNuisance-selfcheck.mjs` gate the splat MATHS and contain zero references to any of the
+code that reads the file. The reason is mechanical -- **every test would have needed a vendored
+multi-megabyte capture from someone else's scanner**, so none was written. New `engine/plyWriter.mjs` makes
+the fixture **693 bytes** of this repo's own bytes. Writing a `.ply` is also the export half this tree never
+had, the same shape of gap as the Minecraft `.schem` writer.
+
+**The round trip found a live defect on the path `main.js` actually uses.** `engine/splatParser.js` scanned
+for the eleven bytes `end_header\n`, so a `.ply` with a CRLF header -- every one written on Windows -- was
+refused with *"could not find end_header in first 64KB"*, an error blaming the file for missing a marker it
+plainly has. `gpu/SplatLoader.js` read the same bytes without complaint. Measured before the fix: a
+byte-identical fixture parsed with LF and threw with CRLF. The marker is `end_header`; the newline after it
+is whitespace, and `\r` is whitespace too. The regression check carries an LF control beside it, so a fix
+that loosened the scan into uselessness could not pass either.
+
+**And the two parsers are not in conflict -- they sit on opposite sides of one undocumented boundary.**
+`engine/splatParser` hands back the file's own units (log scales, raw logit opacity, float RGB) because
+`engine/SplatRenderer.js` applies `exp(a_scale)` and `1.0/(1.0+exp(-a_opacity))` **in its vertex shader**.
+`gpu/SplatLoader` applies both on the CPU because `render/SplatRenderer.js` uploads colour as
+`UNSIGNED_BYTE` and multiplies `aScale` straight into the covariance. Measured across all four header
+variants: `exp(engineScale)` equals `gpuScale` to **5.3e-8**, and `round(engineColour*255)` and
+`sigmoid(engineOpacity)*255` equal the gpu bytes **exactly -- all 24 of them**. Neither convention is wrong.
+The defect was that the choice was unwritten, so a struct from one half handed to the other half's renderer
+drew a plausible, wrong picture instead of failing.
+
+**The conventions are derived from the format, not from the parsers.** A gate comparing the two only to each
+other would pass with both of them broken the same way, so `toShaderConvention()` and `toRenderConvention()`
+are written out from the 3DGS definition and each parser is held to its own before the two are compared.
+
+**And `.splat` is not a lossless interchange format, in numbers.** A quaternion component is stored as
+`round(q*128+128)`, so `+1` needs the byte 256, clamps to 255, and decodes as 0.9921875 -- **0.0078 off a
+unit quaternion**. A nearly-transparent splat (sigmoid 0.0025) lands on byte 1 (0.0039) and comes back
+**0.46 out in logit space**, a 57 percent error in linear alpha. Measured, not assumed.
+
+**And the export half is wired, not just claimed.** Until now this tree could read four splat formats and
+produce none of them, so a scene loaded here could never leave. `window.splat.save()` writes a loaded splat
+back out as `.ply` or `.splat`, and the write-read-write cycle is the strongest statement the fixture makes:
+**every field is byte-exact through a full export cycle except colour**. Colour splits cleanly in two, and
+the split is the clamp -- `engine/splatParser.js` clamps `f_dc` to a displayable 0..1 on the way in, so
+recovery is exact to **1.5e-7** where the coefficient fitted that range and **7.23 out** where it saturated.
+The gate names the field and the number rather than relaxing until it passes. Higher SH bands were never read
+(`f_rest_*`, 45 floats a splat), so they are not written either -- this exports what it imported.
+
+**93 new checks, 11 sabotages all red** -- reverting the CRLF fix, removing either the `exp` or the sigmoid
+from `gpu/SplatLoader`, adding an `exp` to `engine/splatParser`, adding one to `render/SplatRenderer`'s
+shader, dropping either live colour clamp, mis-quantising the writer's quaternion, dropping the SH0 inverse
+on export, swapping two quaternion components, and cutting `save()`'s call to the converter -- that last
+being exactly the failure mode of the v4191 gate I shipped as decoration, so it is checked by call and not by
+mention. **A twelfth stayed green**, which was the useful one: it found a `clamp01` in my own writer that
+`u8` already did, so the unreachable line was removed rather than annotated. The tree now carries 1276 gates.
 ## v4194 -- the accessibility defect I shipped in v4191, and two ideas from tiks
 
 rexa-developer/tiks (MIT) generates ten UI sounds from live Web Audio node graphs. That is the architecture
