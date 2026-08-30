@@ -8,6 +8,47 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4191 -- the DOM is a source too: the dirty flag could not see 86 animations
+
+From gibbok/animatelo (MIT), which ports animate.css to the Web Animations API. The half worth having is not
+the animations -- it is that WAAPI makes an animation an **object the page can be asked about**.
+
+**engine/frameDirty.js had eleven sources and not one of them was about the DOM.** camera, demo, particles,
+water, dayNight, weather, projectiles, debris, agents, scripted, reactions -- every one about the 3D scene.
+Meanwhile this tree carries **86 distinct @keyframes rules across 34 files** (19 in pages and 60 in ui/*.js
+modules that inject their own styles, which is exactly where a HUD animation lives), and
+document.getAnimations() was called in **exactly zero files**. A spinner could turn in the corner of the HUD
+while the dirty flag reported the frame quiet. One call covers all 86 at once: getAnimations returns CSS
+animations, CSS transitions and WAAPI animations together.
+
+**And it fails safe, which is frameDirty's own rule that clean is proven rather than assumed.** No
+getAnimations, an unreadable list, or a playState the model does not recognise all report DIRTY. Reporting
+quiet there would freeze a page that is visibly moving, which is far worse than drawing frames nobody needed.
+
+Verified in a real browser end to end, not only in the model:
+
+    idle page          quiet
+    pulse running      dirty
+    pulse finished     quiet
+    paused             quiet     (it holds its element still until an event resumes it)
+    spin (endless)     dirty, and NAMED as endless
+    CSS @keyframes     dirty, named swekTestSpin, flagged endless
+    after removing it  quiet
+
+The keyframes are **data**, the same move v4190 made for sound: twelve animations as a frozen table with an
+explicit offset on every frame. Validated rather than trusted -- offsets that go backwards make
+element.animate() throw at runtime on the page, and a frame with no properties animates *nothing* and reports
+nothing, so the element simply sits there. Exactly one animation in the table is endless, and it declares
+itself: an infinite spin holds the flag open forever by design, so quietStateOf reports endless animations by
+name and a page that will never go quiet can say why instead of merely being slow.
+
+**A number of mine was wrong and the gate caught it.** The first draft of this note said "77 across 14
+pages". Both figures were real and they measured different things -- 77 counted pages *and* ui modules, 14
+counted pages alone. Two measurements in one sentence is the shape of a number nobody can check. The gate now
+scans both and reports 86 across 34.
+
+95 new checks in tools/ship/domAnimation-selfcheck.mjs, 6 sabotages all red and all files restored
+byte-identical. The tree now carries 1273 gates.
 ## v4190 -- sound effects as data, and the first sound in this engine that can be tested
 
 From loov/jsfx (MIT, sfxr's lineage) -- the idea, written here rather than vendored.
