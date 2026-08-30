@@ -18,7 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
-         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -410,6 +410,95 @@ console.log("\n11. batch 5 -- clamped, then un-clamped");
            "premultiplied alpha (emboss), points (chromaticSplit spread, glitch scanline), half (throughout), " +
            "both remainders (hsb2rgb needs fmod, kaleidoscope needs mod), and edges (glitch clamps then " +
            "un-clamps). The table is no longer a prediction.");
+}
+
+// ---- 12. BATCH 6: THE Y FLIP, EXPLAINED BY ITS OWN AUTHOR ---------------------------------------------------------
+console.log("\n12. batch 6 -- \"negative Y = pull up = melt down\"");
+{
+    const W = 32, H = 32;
+    const bar = (y0, y1) => { const data = new Float32Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;
+            const v = (y >= y0 && y < y1) ? 1 : 0; data[i] = data[i+1] = data[i+2] = v; data[i+3] = 1; }
+        return { w: W, h: H, data, premultiplied: true }; };
+    const span = (im, x) => { let lo = 99, hi = -1;
+        for (let y = 0; y < H; y++) if (im.data[(y * W + x) * 4] > 0.5) { if (y < lo) lo = y; if (y > hi) hi = y; }
+        return [lo, hi]; };
+
+    // *** THE SHADER'S OWN COMMENT IS THE SPECIFICATION, AND IT IS FRAME-DEPENDENT. *** "negative Y = pull up
+    // = melt down" is true only where y grows downward. Unflipped, -drip samples from BELOW and the picture
+    // melts upward -- animating perfectly, gravity backwards.
+    const img = bar(18, 22);
+    const m = bcsMelt(img, { time: 0.5, meltAmount: 16, dripScale: 4, heat: 0 });
+    const reaches = [4, 12, 20, 28].map((x) => span(m, x)[1] - span(img, x)[1]);
+    ok("!! *** the bar reaches DOWNWARD, which is what -drip means in a y-down frame ***",
+        reaches.every((r) => r > 0),
+        "rows gained per column: " + reaches.join(", ") + ". Ported against gl_FragCoord without the flip this " +
+        "is the same magnitude UPWARD, and it still looks like flowing liquid");
+    ok("!! ...and it never reaches UP, so the drip has one direction",
+        [4, 12, 20, 28].every((x) => span(m, x)[0] >= span(img, x)[0]));
+    // THE SECOND Y-DEPENDENCY: gravity = uv.y * uv.y, "bottom melts more". Unflipped it peaks at the top, so
+    // the two errors COMPOUND rather than cancel.
+    const high = bcsMelt(bar(4, 8), { time: 0.5, meltAmount: 16, dripScale: 4, heat: 0 });
+    const low = bcsMelt(bar(24, 28), { time: 0.5, meltAmount: 16, dripScale: 4, heat: 0 });
+    ok("!! *** gravity is quadratic in uv.y, so a low bar drips far more than a high one ***",
+        (span(low, 12)[1] - 27) > (span(high, 12)[1] - 7),
+        "bar at 4-7 -> " + span(high, 12).join("-") + ", bar at 24-27 -> " + span(low, 12).join("-") +
+        ". THE TWO Y-DEPENDENCIES COMPOUND: unflipped, the top melts most AND it melts upward");
+    // *** MELT AT ZERO IS NOT THE IDENTITY, AND THAT IS UPSTREAM'S DOING. *** drip and wobble both scale with
+    // melt_amount and vanish, so the SAMPLE is the identity -- but the specular lip does not:
+    //     dripEdge = abs(fbm(column + 0.01, ...) - dripNoise);
+    //     specular = pow(dripEdge * 5.0, 3.0) * gravity * 0.4;
+    // Nothing there mentions melt_amount, so "melt off" still brightens the picture. Reproduced rather than
+    // fixed: a port that quietly gated the specular would be a different shader, and the place to argue about
+    // it is upstream. Asserted as a PROPERTY -- the residual is achromatic, because a specular highlight is
+    // added equally to all three channels -- so if it ever becomes a colour shift this line notices.
+    {
+        const flat = (() => { const data = new Float32Array(8 * 8 * 4);
+            for (let i = 0; i < 64; i++) { data[i*4] = data[i*4+1] = data[i*4+2] = 0.4; data[i*4+3] = 1; }
+            return { w: 8, h: 8, data, premultiplied: true }; })();
+        const z = bcsMelt(flat, { meltAmount: 0, heat: 0 });
+        let achromatic = true, worst = 0;
+        for (let i = 0; i < flat.data.length; i += 4) {
+            const dr = z.data[i] - flat.data[i], dg = z.data[i+1] - flat.data[i+1], db = z.data[i+2] - flat.data[i+2];
+            if (Math.abs(dr - dg) > 1e-9 || Math.abs(dg - db) > 1e-9) achromatic = false;
+            worst = Math.max(worst, Math.abs(dr));
+        }
+        ok("!! melt at zero leaves the GEOMETRY alone but still adds its specular, as upstream does",
+            achromatic && worst > 0 && worst < 4 / 255,
+            "residual " + worst.toExponential(2) + ", identical in all three channels, and BELOW ONE 8-BIT " +
+            "LEVEL (3.9e-3) -- so this is a structural quirk and not a visible one, which is the honest way " +
+            "to state it. Measured larger on a bigger fixture (2.8e-4 at 32x32) and growing downward with " +
+            "gravity, so a shader that ever scaled it up would land here rather than in somebody's eyes");
+    }
+    ok("...and the shader carries both y terms in SwiftUI's frame",
+        /vec2 p = swPos\(\);/.test(pass.SHADERS.melt) && /gravity = uv\.y \* uv\.y/.test(pass.SHADERS.melt) &&
+        /vec2\(wobble, -drip\)/.test(pass.SHADERS.melt));
+
+    // TOPOGRAPHIC: the contour is double-sided, and the palette breakpoints are upstream's.
+    const grey = (() => { const data = new Float32Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;
+            const v = x / W; data[i] = data[i+1] = data[i+2] = v; data[i+3] = 1; }
+        return { w: W, h: H, data, premultiplied: true }; })();
+    const t = bcsTopographic(grey, { lineCount: 12, colorize: 1 });
+    ok("!! topographic draws contour lines on a ramp", (() => {
+        let dark = 0; for (let x = 0; x < W; x++) if (t.data[(16 * W + x) * 4] < 0.3) dark++;
+        return dark > 0 && dark < W; })(), "some columns are line, some are not -- a ramp becomes a map");
+    ok("!! the palette breakpoints are upstream's 0.2 / 0.5 / 0.75",
+        Math.abs(topoColor(0.19)[2] - 0.31) < 0.02 && Math.abs(topoColor(0.2)[2] - 0.30) < 0.02 &&
+        Math.abs(topoColor(0.74)[0] - 0.66) < 0.02 && Math.abs(topoColor(0.75)[0] - 0.65) < 0.02,
+        "four elevation bands, water through green through sand to snow");
+    ok("!! the contour is DOUBLE-SIDED in both halves",
+        /1\.0 - ss\(lineWidth, lineWidth \+ 0\.02, cv\)\) \+ \(1 - ss/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8").replace(/1 - ss/g, "1.0 - ss").replace(/1\.0 - ss\(lineWidth, lineWidth \+ 0\.02, cv\)\)/, "1.0 - ss(lineWidth, lineWidth + 0.02, cv))")) ||
+        /\(1 - ss\(lineWidth, lineWidth \+ 0\.02, cv\)\) \+ \(1 - ss\(lineWidth, lineWidth \+ 0\.02, 1 - cv\)\)/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")),
+        "one side only halves every line and reads as hatching rather than a contour");
+    ok("...topographic output is finite", t.data.every(Number.isFinite));
+    for (const [name, keys] of [["melt", ["uMeltAmount", "uDripScale", "uHeat"]],
+                                ["topographic", ["uLineCount", "uLineWidth", "uColorize"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED: 12 of 41. TWO SHADERS HAVE NOW DOCUMENTED THEIR OWN TRAP FOR US -- chromaticSplit calls " +
+           "points \"pixels\", and melt explains a downward drip that is only downward one way up. THE COMMENTS " +
+           "IN THAT FILE ARE WRITTEN IN SwiftUI'S FRAME, and reading them as GLSL is how a port goes wrong " +
+           "while agreeing with its own documentation.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

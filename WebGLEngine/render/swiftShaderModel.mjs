@@ -513,6 +513,107 @@ export function bcsGlitch(img, { time = 0, intensity = 0.5, blockSize = 12, scan
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+
+// =============================================================================================================
+// BATCH 6 (v4164) -- THE NOISE FAMILY, AND THE Y FLIP WITH THE AUTHOR'S OWN EXPLANATION ATTACHED.
+//
+// *** bcs_melt COMMENTS THE TRAP FOR US. ***
+//
+//     float2 displaced = position + float2(wobble, -drip); // negative Y = pull up = melt down
+//
+// That sentence is TRUE ONLY IN A Y-DOWN COORDINATE SYSTEM. Sampling from a smaller y means sampling from
+// HIGHER UP the picture and drawing it here, which reads as the image sagging downward. Port it against
+// gl_FragCoord, where y grows upward, and -drip samples from BELOW: the picture melts UP. It still animates,
+// still looks like flowing liquid, and gravity runs backwards.
+//
+// AND IT IS THE SECOND Y-DEPENDENCY IN THE SAME SHADER: `gravity = uv.y * uv.y` with the comment "bottom melts
+// more" puts the strongest drip at uv.y = 1, which is the BOTTOM only when y grows down. Unflipped, the top
+// melts most and the bottom stays crisp -- so the two errors do not even cancel, they compound into a picture
+// that drips upward from the wrong end.
+//
+// chromaticSplit called points "pixels"; melt explains a downward drip that is only downward one way up. THE
+// COMMENTS IN THIS FILE ARE WRITTEN IN SwiftUI'S FRAME, and reading them as if they were GLSL is how a port
+// goes wrong while agreeing with its own documentation.
+// =============================================================================================================
+
+/**
+ * bcs_melt -- per-column drip driven by fbm, with a quadratic gravity term and a specular lip.
+ *
+ * Both y-dependencies are computed in SwiftUI space (the pass flips once at the top), so `-drip` pulls from
+ * above and `gravity` peaks at the bottom, as upstream intends.
+ *
+ * *** ONE QUIRK REPRODUCED RATHER THAN FIXED: THE SPECULAR IS NOT SCALED BY melt_amount. *** drip and wobble
+ * both vanish at melt_amount 0, so the SAMPLE becomes the identity -- but `specular` is built from a difference
+ * of two fbm taps and `gravity`, neither of which mentions melt_amount, so a little light is added even with
+ * the effect nominally off. MEASURED at 2.8e-4 on a 32x32 fixture, growing downward with gravity and BELOW ONE
+ * 8-BIT LEVEL, so it is structural rather than visible. Gating it here would make this a different shader from
+ * the original, and the place to argue about it is upstream.
+ */
+export function bcsMelt(img, { time = 0, meltAmount = 30, dripScale = 6, speed = 1, heat = 0.5,
+                               pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5, i = (y * w + x) * 4;
+        const uvx = px / w, uvy = py / h;
+        const column = uvx * dripScale;
+        const dripNoise = bcsFbm(column, time * speed * 0.3, 4);
+        const dripNoise2 = bcsFbm(column * 1.7 + 3.0, time * speed * 0.25, 3);
+        const gravity = uvy * uvy;                       // uv.y grows DOWN, so this peaks at the bottom
+        const drip = (dripNoise * 0.7 + dripNoise2 * 0.3) * meltAmount * gravity * pointScale;
+        const wobble = Math.sin(uvy * 10 + time * speed * 2 + dripNoise * 5) * meltAmount * 0.05 * gravity * pointScale;
+        // -drip pulls from ABOVE, which is what makes it sag downward. See the note above.
+        const c = s(clamp(px + wobble, 0, w), clamp(py - drip, 0, h));
+        const meltFactor = drip / Math.max(meltAmount, 1);
+        let R = c[0] + toHalf(meltFactor * heat * 0.3);
+        let G = c[1] - toHalf(meltFactor * heat * 0.1);
+        let B = c[2] - toHalf(meltFactor * heat * 0.2);
+        const dripEdge = Math.abs(bcsFbm(column + 0.01, time * speed * 0.3, 4) - dripNoise);
+        const specular = Math.pow(dripEdge * 5, 3) * gravity * 0.4;
+        R += specular; G += specular; B += specular;
+        out[i] = R; out[i + 1] = G; out[i + 2] = B; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** The topographic palette: four elevation bands with mixes between them, at upstream's breakpoints. */
+export function topoColor(lum) {
+    const M = (a, b, t) => a.map((v, k) => mix(v, b[k], clamp(t, 0, 1)));
+    if (lum < 0.2) return M([0.1, 0.3, 0.5], [0.15, 0.45, 0.3], toHalf(lum * 5));
+    if (lum < 0.5) return M([0.15, 0.45, 0.3], [0.8, 0.75, 0.4], toHalf((lum - 0.2) * 3.33));
+    if (lum < 0.75) return M([0.8, 0.75, 0.4], [0.65, 0.45, 0.3], toHalf((lum - 0.5) * 4));
+    return M([0.65, 0.45, 0.3], [0.95, 0.95, 0.97], toHalf((lum - 0.75) * 4));
+}
+
+/**
+ * bcs_topographic -- contour lines drawn on the image's own luminance, as a map of its brightness.
+ *
+ * The contour is DOUBLE-SIDED: `1 - smoothstep(w, w+e, c) + 1 - smoothstep(w, w+e, 1 - c)` lights a band on
+ * both sides of every integer crossing, then clamps. Taking only one side halves every line and makes the map
+ * look like a hatching rather than a contour.
+ */
+export function bcsTopographic(img, { time = 0, lineCount = 12, lineWidth = 0.05, colorize = 1, animate = 0 } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    const ss = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    const fract = (v) => v - Math.floor(v);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const lum = luma(img.data[i], img.data[i + 1], img.data[i + 2]);
+        const elevation = lum + time * animate * 0.05;
+        const cv = fract(elevation * lineCount);
+        const contourLine = clamp((1 - ss(lineWidth, lineWidth + 0.02, cv)) + (1 - ss(lineWidth, lineWidth + 0.02, 1 - cv)), 0, 1);
+        const mv = fract(elevation * lineCount / 5);
+        const majorLine = clamp((1 - ss(lineWidth * 2, lineWidth * 2 + 0.03, mv)) + (1 - ss(lineWidth * 2, lineWidth * 2 + 0.03, 1 - mv)), 0, 1);
+        const base = [0, 1, 2].map((k) => mix(img.data[i + k], topoColor(lum)[k], toHalf(colorize)));
+        let res = base.map((v, k) => mix(v, [0.15, 0.12, 0.1][k], toHalf(contourLine * 0.7)));
+        res = res.map((v, k) => mix(v, [0.05, 0.04, 0.03][k], toHalf(majorLine * 0.9)));
+        const paper = bcsValueNoise(uvx * 200, uvy * 200) * 0.06 - 0.03;
+        for (let k = 0; k < 3; k++) out[i + k] = res[k] + paper;
+        out[i + 3] = img.data[i + 3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",

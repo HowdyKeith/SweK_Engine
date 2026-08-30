@@ -279,7 +279,61 @@ void main() {
     fragColor = vec4(res, g.a);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG };
+
+// ---- BATCH 6 (v4164): the noise family, with the y flip explained by its own author ------------------------
+// *** melt's COMMENT IS "negative Y = pull up = melt down", AND THAT IS TRUE ONLY Y-DOWN. *** Sampling a
+// smaller y means sampling HIGHER UP and drawing it here, which reads as sagging. Against gl_FragCoord, where
+// y grows up, -drip samples from BELOW and the picture melts UPWARD -- still animating, still liquid, gravity
+// backwards. And `gravity = uv.y * uv.y` ("bottom melts more") peaks at the bottom only the same way up, so
+// the two errors COMPOUND rather than cancel. swPos() puts both in SwiftUI's frame, once.
+const MELT_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uMeltAmount, uDripScale, uSpeed, uHeat, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float column = uv.x * uDripScale;
+    float dripNoise = bcs_fbm(vec2(column, uTime * uSpeed * 0.3), 4);
+    float dripNoise2 = bcs_fbm(vec2(column * 1.7 + 3.0, uTime * uSpeed * 0.25), 3);
+    float gravity = uv.y * uv.y;                      // uv.y grows DOWN, so this peaks at the bottom
+    float drip = (dripNoise * 0.7 + dripNoise2 * 0.3) * uMeltAmount * gravity * uPointScale;
+    float wobble = sin(uv.y * 10.0 + uTime * uSpeed * 2.0 + dripNoise * 5.0) * uMeltAmount * 0.05 * gravity * uPointScale;
+    vec4 color = layerSample(clamp(p + vec2(wobble, -drip), vec2(0.0), uSize));
+    float meltFactor = drip / max(uMeltAmount, 1.0);
+    color.r += toHalf(meltFactor * uHeat * 0.3);
+    color.g -= toHalf(meltFactor * uHeat * 0.1);
+    color.b -= toHalf(meltFactor * uHeat * 0.2);
+    float dripEdge = abs(bcs_fbm(vec2(column + 0.01, uTime * uSpeed * 0.3), 4) - dripNoise);
+    color.rgb += vec3(pow(dripEdge * 5.0, 3.0) * gravity * 0.4);
+    fragColor = color;
+}`;
+
+const TOPO_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uLineCount, uLineWidth, uColorize, uAnimate;
+void main() {
+    vec2 p = swPos();
+    vec4 original = layerSample(p);
+    float lum = luma601(original.rgb);
+    float elevation = lum + uTime * uAnimate * 0.05;
+    float cv = fract(elevation * uLineCount);
+    // DOUBLE-SIDED: a band on both sides of every crossing. One side only halves every line and reads as
+    // hatching rather than as a contour.
+    float contourLine = clamp((1.0 - smoothstep(uLineWidth, uLineWidth + 0.02, cv))
+                            + (1.0 - smoothstep(uLineWidth, uLineWidth + 0.02, 1.0 - cv)), 0.0, 1.0);
+    float mv = fract(elevation * uLineCount / 5.0);
+    float majorLine = clamp((1.0 - smoothstep(uLineWidth * 2.0, uLineWidth * 2.0 + 0.03, mv))
+                          + (1.0 - smoothstep(uLineWidth * 2.0, uLineWidth * 2.0 + 0.03, 1.0 - mv)), 0.0, 1.0);
+    vec3 topo = (lum < 0.2)  ? mix(vec3(0.10, 0.30, 0.50), vec3(0.15, 0.45, 0.30), toHalf(lum * 5.0))
+              : (lum < 0.5)  ? mix(vec3(0.15, 0.45, 0.30), vec3(0.80, 0.75, 0.40), toHalf((lum - 0.2) * 3.33))
+              : (lum < 0.75) ? mix(vec3(0.80, 0.75, 0.40), vec3(0.65, 0.45, 0.30), toHalf((lum - 0.5) * 4.0))
+                             : mix(vec3(0.65, 0.45, 0.30), vec3(0.95, 0.95, 0.97), toHalf((lum - 0.75) * 4.0));
+    vec3 res = mix(original.rgb, topo, toHalf(uColorize));
+    res = mix(res, vec3(0.15, 0.12, 0.10), toHalf(contourLine * 0.7));
+    res = mix(res, vec3(0.05, 0.04, 0.03), toHalf(majorLine * 0.9));
+    res += vec3(bcs_valueNoise(p / uSize * 200.0) * 0.06 - 0.03);
+    fragColor = vec4(res, original.a);
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
@@ -293,6 +347,8 @@ const KNOBS = {
     plasma: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", colorMode: "uColorMode", clampOutput: "uClampOutput" },
     echo: { time: "uTime", echoCount: "uEchoCount", spread: "uSpread", direction: "uDirection", fade: "uFade", pointScale: "uPointScale" },
     glitch: { time: "uTime", intensity: "uIntensity", blockSize: "uBlockSize", scanLines: "uScanLines", colorShift: "uColorShift", pointScale: "uPointScale" },
+    melt: { time: "uTime", meltAmount: "uMeltAmount", dripScale: "uDripScale", speed: "uSpeed", heat: "uHeat", pointScale: "uPointScale" },
+    topographic: { time: "uTime", lineCount: "uLineCount", lineWidth: "uLineWidth", colorize: "uColorize", animate: "uAnimate" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG };
