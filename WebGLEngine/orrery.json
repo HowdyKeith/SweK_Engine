@@ -5,6 +5,7 @@
   {
    "name": "box3d",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 978055,
    "files": [
     {
@@ -20,6 +21,7 @@
   {
    "name": "draco",
    "arrived": "2026-08-30",
+   "sha": "7985f885e6a11a92c2e43c70cba25b76779262fd",
    "bytes": 257428,
    "files": [
     {
@@ -35,6 +37,7 @@
   {
    "name": "fonts",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 164836,
    "files": [
     {
@@ -50,6 +53,7 @@
   {
    "name": "gifenc",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 10453,
    "files": [
     {
@@ -69,6 +73,7 @@
   {
    "name": "grass",
    "arrived": "2026-08-30",
+   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
    "bytes": 1064,
    "files": [
     {
@@ -80,6 +85,7 @@
   {
    "name": "heerich",
    "arrived": "2026-08-28",
+   "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2",
    "bytes": 119007,
    "files": [
     {
@@ -123,6 +129,7 @@
   {
    "name": "htmx",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 54382,
    "files": [
     {
@@ -142,6 +149,7 @@
   {
    "name": "jolt",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 3223645,
    "files": [
     {
@@ -161,6 +169,7 @@
   {
    "name": "keyhunt",
    "arrived": "2026-08-30",
+   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
    "bytes": 338,
    "files": [
     {
@@ -172,6 +181,7 @@
   {
    "name": "krbn",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 940443,
    "files": [
     {
@@ -1111,6 +1121,7 @@
   {
    "name": "slug",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 3821,
    "files": [
     {
@@ -1126,6 +1137,7 @@
   {
    "name": "taichi-js",
    "arrived": "2026-08-23",
+   "sha": "e6d46a775e89e71ac5d41f5318b925b2a05c4649",
    "bytes": 3638669,
    "files": [
     {
@@ -1145,6 +1157,7 @@
   {
    "name": "three",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 1550472,
    "files": [
     {
@@ -1188,6 +1201,7 @@
   {
    "name": "wasm",
    "arrived": "2026-08-19",
+   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
    "bytes": 810948,
    "files": [
     {

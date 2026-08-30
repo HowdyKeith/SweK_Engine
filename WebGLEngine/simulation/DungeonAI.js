@@ -213,7 +213,22 @@ export function makeDungeonAI(opts) {
                     // is how a monster ended up 17 frames deep inside solid stone. Refusing the move instead
                     // would only trade a monster that cheats for one standing at the wall waiting to be
                     // killed. Right-hand rule: turn right if you can, else straight, else left, else back.
-                    if (!m.follow) m.follow = new WallFollower(dirToward(dxp, dzp));
+                    if (!m.follow) {
+                        // *** THE BRAIN PICKS WHICH WAY TO SET OFF, AND THEN THE HAND RULE WALKS. *** This is
+                        // where PATCH-B14's flow field belongs now: the brain's terrain-cost field routes
+                        // corridors the flat BFS grid cannot see, and this is exactly the "BFS found no path"
+                        // case it was written for. But it steers the OPENING DIRECTION ONLY. Blending it into
+                        // every step would be the same mistake v4187 measured and rejected for
+                        // extend-and-choose: a heading that is re-chosen each step abandons the wall, and the
+                        // hand rule's guarantee goes with it. A one-time hint cannot break the guarantee -- at
+                        // worst the follower goes the long way round. No brain -> dirToward, exactly as before.
+                        let openDir = dirToward(dxp, dzp);
+                        if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
+                            const f = window.sampleBrainPlayerFlow(m.x, m.z);
+                            if (f && (Math.abs(f.x) > 1e-4 || Math.abs(f.z) > 1e-4)) openDir = dirToward(f.x, f.z);
+                        }
+                        m.follow = new WallFollower(openDir);
+                    }
                     const nx = m.follow.next(mgx, mgz, isWall);
                     if (nx) m.step = [nx.gx, nx.gz];
                     else {
@@ -230,21 +245,12 @@ export function makeDungeonAI(opts) {
             const _wc = cellToWorld(m.step[0], m.step[1]);
             let tx = _wc[0], tz = _wc[1];
             let ddx = tx - m.x, ddz = tz - m.z, dd = Math.hypot(ddx, ddz) || 1;
-            // PATCH-B14 -- GPU Brain phase 11. When the local BFS found no
-            // path (the straight-line case above), blend the brain's
-            // player-seeking flow field 60/40 into the heading -- dungeon
-            // walls are voxels, so the terrain-cost field routes corridors
-            // the 8x8 BFS grid can't see. No brain -> no change, exactly
-            // like the kaiju planner-failed hook (PATCH-B3).
-            if (!m.step && typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
-                const f = window.sampleBrainPlayerFlow(m.x, m.z);
-                if (f) {
-                    const bx = 0.6 * f.x + 0.4 * (ddx / dd);
-                    const bz = 0.6 * f.z + 0.4 * (ddz / dd);
-                    const bn = Math.hypot(bx, bz);
-                    if (bn > 1e-4) { ddx = bx / bn; ddz = bz / bn; dd = 1; }
-                }
-            }
+            // *** PATCH-B14 USED TO SIT HERE AND v4187 KILLED IT WITHOUT NOTICING. *** It read
+            // `if (!m.step && window.sampleBrainPlayerFlow)` -- blend the brain's flow field in when BFS found
+            // no path. v4187 added an earlier `if (!m.step) ... continue`, so by this line m.step is ALWAYS
+            // set and the condition could never be true again. Dead code that still looked wired. The hook is
+            // not gone; it MOVED, to where the wall-follower is created above, which is now the branch that
+            // means "BFS found no path". It steers the OPENING DIRECTION only -- see the note there.
             const adv = Math.min(dd, m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * (enr ? 1.5 : 1) * dt);
             // *** THE MOVE IS COLLISION-TESTED, THE SAME WAY THE FLEE BRANCH ALREADY DID IT. *** This file
             // wrote a monster's position in exactly two places and only ONE of them checked isWall: fleeing

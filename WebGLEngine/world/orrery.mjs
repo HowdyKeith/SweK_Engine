@@ -1,4 +1,4 @@
-// FILE: world/orrery.mjs -- v4186
+// FILE: world/orrery.mjs -- v4189
 //
 // SweK at the centre, the things it has taken in orbit around it.
 //
@@ -41,6 +41,7 @@
 // because it checked T^2 = a^3, which is true of the WRONG constant too. Restating a law is how two modules
 // end up describing different universes; importing the function is how they cannot.
 import { period as keplerPeriod } from "../physics/orbits/kepler.js";
+import { seedFor, seedProvenance } from "./orrerySeed.mjs";   // v4189 -- the commit that brought a body in is its planet seed
 
 /** A body's relationship to SweK. Frozen so a caller can compare against these rather than retype them. */
 export const CAPTURED = "captured";
@@ -143,6 +144,11 @@ export function buildOrrery(bodies = [], opts = {}) {
             arrived: b.arrived || null, ageDays: days, ageKnown: !!arrived,
             a: orb.a, period: orb.period, radius: radiusFor(b.bytes, opts),
             bytes: Math.max(0, Number(b.bytes) || 0),
+            // the git half of the seed, and whether it is really there -- world/orrerySeed.mjs explains why
+            // the NAME is folded in with it (nine bodies share one first commit)
+            sha: b.sha || null,
+            seed: seedFor(b.sha, b.name),
+            seedSourced: seedProvenance(b.sha).sourced,
             // carried through for the TERRAIN scale -- world/orreryView.mjs turns these into heightfield entries
             files: Array.isArray(b.files) ? b.files : null,
             parent: b.parent || "SweK",

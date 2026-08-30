@@ -1,4 +1,4 @@
-// FILE: tools/ship/orreryBake.mjs -- v4186
+// FILE: tools/ship/orreryBake.mjs -- v4189
 //
 // Bakes orrery.json, because orrery.html cannot run the scanner: reading vendor/ and asking git when each
 // directory arrived are fs and child_process, and a browser has neither. Same reason knowledge-index.json and
@@ -35,6 +35,7 @@ export function bakePayload(engineRoot = ENG, repoRoot = REPO) {
         .map((b) => ({
             name: b.name,
             arrived: b.arrived || null,
+            sha: b.sha || null,          // baked, because a browser cannot run git and the seed is the point
             bytes: b.bytes,
             // sorted so filesystem enumeration order cannot make the file churn
             files: b.files.slice().sort((x, y) => x.path.localeCompare(y.path))
@@ -68,6 +69,8 @@ export function drift(engineRoot = ENG, repoRoot = REPO, file = BAKE_PATH) {
         if (!b) continue;
         if (b.bytes !== l.bytes) out.push(`${n}: baked ${b.bytes} bytes, tree has ${l.bytes}`);
         if ((b.arrived || null) !== (l.arrived || null)) out.push(`${n}: baked arrival ${b.arrived}, git says ${l.arrived}`);
+        // a changed first-commit sha is a DIFFERENT PLANET, so the staleness check has to see it
+        if ((b.sha || null) !== (l.sha || null)) out.push(`${n}: baked sha ${String(b.sha).slice(0, 12)}, git says ${String(l.sha).slice(0, 12)}`);
         if ((b.files || []).length !== l.files.length) out.push(`${n}: baked ${(b.files || []).length} files, tree has ${l.files.length}`);
     }
     return out;

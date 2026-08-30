@@ -1,4 +1,4 @@
-// FILE: ui/orreryDraw.js -- v4186
+// FILE: ui/orreryDraw.js -- v4189
 //
 // Draws the orrery at its three magnifications. Canvas 2D on purpose: this is a MAP of the tree, and the
 // engine's WebGL renderer is the thing being mapped -- a view that needed the renderer up could not be opened
@@ -14,6 +14,7 @@ import { positionAt, terrainEntriesFor, apparentPx, levelFor,
 import { repoHeightfield, BIOME_ORDER } from "../world/repoHeightfield.js";
 import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
+import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
 
 /** Licence posture is the one thing in this picture that is a JUDGEMENT, so it gets the loudest channel. */
 export const STATE_COLOUR = Object.freeze({
@@ -231,6 +232,76 @@ export function drawPlanet(ctx, body, field, x, y, R, spin = 0) {
             px[o] = Math.min(255, rgb[0] * k * 255);
             px[o + 1] = Math.min(255, rgb[1] * k * 255);
             px[o + 2] = Math.min(255, rgb[2] * k * 255);
+            px[o + 3] = 255;
+        }
+    }
+    ctx.putImageData(img, Math.round(x - d / 2), Math.round(y - d / 2));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// THE SEEDED SURFACE -- generated from the git log, NOT measured from the files
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * *** TWO SURFACES, AND THE VIEW MUST NEVER LET THEM BE CONFUSED. ***
+ *
+ * drawPlanet() above wraps the body's own FILE TREE onto the sphere: every ridge is a real file and the blue
+ * is really its data files. This one asks world/procPlanet.js for a planet generated from the body's commit
+ * seed. Both are legitimate and they mean completely different things -- one is a measurement, the other is a
+ * picture derived from a hash. The page shows which is on at all times, and SURFACE_KIND is what it reads.
+ *
+ * The generated one earns its place because it is fully deterministic: procPlanet takes a seed and no clock
+ * and no randomness, so the same commit always paints the same world. Keith's rule for this -- run it twice
+ * and get the same result unless the repository changed -- is a property this surface HAS, not one it claims.
+ */
+export const SURFACE_MEASURED = "file tree (measured)";
+export const SURFACE_SEEDED = "seeded from commit (generated)";
+export const SURFACE_KIND = Object.freeze([SURFACE_MEASURED, SURFACE_SEEDED]);
+
+const _planetCache = new Map();
+
+/** The equirectangular texture for a body's seeded planet, baked once. Keyed on the SEED, so a new commit rebakes. */
+export function seededPlanetFor(body, size = 256) {
+    const seed = (body && body.seed) >>> 0;
+    const key = `${seed}:${size}`;
+    if (!_planetCache.has(key)) {
+        const spec = planetSpec(seed);
+        _planetCache.set(key, { spec, tex: bakeEquirect(spec, size, size >> 1) });
+    }
+    return _planetCache.get(key);
+}
+
+/**
+ * The same orthographic sphere as drawPlanet, sampling the generated equirect instead of the heightfield.
+ * The two share their projection deliberately: a viewer toggling between them is comparing the SURFACES, and
+ * a different projection would make the comparison meaningless.
+ */
+export function drawSeededPlanet(ctx, body, x, y, R, spin = 0, size = 256) {
+    const { tex } = seededPlanetFor(body, size);
+    const d = Math.max(2, Math.ceil(R * 2));
+    const img = ctx.createImageData(d, d);
+    const px = img.data;
+    const L = [-0.45, -0.55, 0.70];
+    const Ln = Math.hypot(L[0], L[1], L[2]);
+    L[0] /= Ln; L[1] /= Ln; L[2] /= Ln;
+    for (let j = 0; j < d; j++) {
+        for (let i = 0; i < d; i++) {
+            const nx = (i - d / 2 + 0.5) / R, ny = (j - d / 2 + 0.5) / R;
+            const r2 = nx * nx + ny * ny;
+            const o = (j * d + i) * 4;
+            if (r2 > 1) { px[o + 3] = 0; continue; }
+            const nz = Math.sqrt(1 - r2);
+            const lam = Math.max(0.06, nx * L[0] + ny * L[1] + nz * L[2]);
+            const lon = Math.atan2(nx, nz) + spin;
+            const lat = Math.asin(Math.max(-1, Math.min(1, -ny)));
+            let u = (lon / (2 * Math.PI) + 0.5) % 1; if (u < 0) u += 1;
+            const v = 0.5 - lat / Math.PI;                      // row 0 = north, matching bakeEquirect
+            const c = Math.min(tex.w - 1, Math.max(0, Math.floor(u * tex.w)));
+            const rw = Math.min(tex.h - 1, Math.max(0, Math.floor(v * tex.h)));
+            const ti = (rw * tex.w + c) * 4;
+            px[o] = tex.rgba[ti] * lam;
+            px[o + 1] = tex.rgba[ti + 1] * lam;
+            px[o + 2] = tex.rgba[ti + 2] * lam;
             px[o + 3] = 255;
         }
     }

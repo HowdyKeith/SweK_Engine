@@ -60,7 +60,15 @@ const TYPES = [
       pal: { sea: [0.20, 0.12, 0.06], low: [0.62, 0.42, 0.22], high: [0.82, 0.66, 0.42], ice: [0.86, 0.8, 0.7] } },
     { name: "ice", w: 14, radius: [80, 180], sea: [0.12, 0.35], atmo: [0.6, 0.8, 0.95], atmoT: [0.02, 0.05],
       pal: { sea: [0.10, 0.24, 0.36], low: [0.62, 0.74, 0.82], high: [0.85, 0.92, 0.97], ice: [0.96, 0.98, 1.0] } },
-    { name: "gas", w: 16, radius: [260, 460], sea: [1.0, 1.0], atmo: [0.7, 0.6, 0.4], atmoT: [0.06, 0.11],
+    // *** GAS GIANTS HAVE NO SEA, AND SETTING seaLevel TO 1.0 DID NOT MEAN "ALL SEA" -- IT MEANT NO BANDS. ***
+    // heightAt() computes latitudinal banding for these worlds and clamps it to [0,1]; surfaceColor then asks
+    // `height < seaLevel`, which at 1.0 is true for EVERY pixel, so every band was overwritten with the flat
+    // sea colour. Both gas giants in this tree rendered as the same featureless brown disc -- identical byte
+    // for byte at 64x32, 128x64 and 256x128 -- despite having different noise seeds and frequencies. Found by
+    // the orrery's seeded planets (v4189): two bodies with distinct commit seeds wearing one world. A gas
+    // giant has no sea, so the sea LEVEL is 0 and the low->high ramp covers the whole range, which is what
+    // makes the bands visible. Nothing in this file's 419 checks looked at what a gas giant actually painted.
+    { name: "gas", w: 16, radius: [260, 460], sea: [0.0, 0.0], atmo: [0.7, 0.6, 0.4], atmoT: [0.06, 0.11],
       pal: { sea: [0.36, 0.28, 0.18], low: [0.6, 0.5, 0.34], high: [0.82, 0.74, 0.56], ice: [0.9, 0.86, 0.74] } },
     { name: "molten", w: 8, radius: [90, 190], sea: [0.35, 0.6], atmo: [1.0, 0.4, 0.2], atmoT: [0.03, 0.06],
       pal: { sea: [0.5, 0.08, 0.02], low: [0.2, 0.08, 0.06], high: [0.7, 0.3, 0.1], ice: [0.9, 0.7, 0.3] } },

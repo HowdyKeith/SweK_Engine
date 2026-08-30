@@ -8,6 +8,49 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4189 -- the git log is the universe's seed, and a gas giant bug that 419 checks never saw
+
+Keith asked for the ES planets in the github demos, "as processes determined on a github log" -- run the
+simulation twice and get the same result unless the repository changed.
+
+**The planets turned out to be free.** world/procPlanet.js has zero Math.random, is mulberry32-seeded, its own
+header already claimed "same seed -> byte-identical planet", and it already carried 419 checks. Proven here:
+seed 12345 bakes to 6aedfe21ec2f0a5c twice. So the round was about the *seed*.
+
+**The SHA alone is not it, and that is a fact about this repository.** Nine of the fourteen vendored bodies
+share one first commit -- 66db97c45b52, where vendor/ was first added -- so seeding on the hash would hand
+box3d, fonts, gifenc, htmx, jolt, krbn, slug, three and wasm the same planet. The name is folded in with it,
+and all fourteen now seed distinctly. **All forty characters are folded**, not the first eight:
+`sha.slice(0, 8)` is the obvious one-liner, throws away 128 of 160 bits, and is exactly the abbreviation git
+prints -- so two commits that look different in a log could seed identically.
+
+**The claim is gated, not promised.** Two builds of an unchanged repository are identical field for field, and
+all fourteen planet surfaces are byte-identical. Change one commit hash and **exactly one** planet changes,
+while every orbit stays put -- because orbits come from dates and worlds come from hashes.
+
+**Then the seeded planets found a real bug in procPlanet.** Two bodies with different seeds wore an identical
+world. Gas giants had `seaLevel: 1.0`, and surfaceColor asks `height < seaLevel` -- true for every pixel -- so
+the latitudinal banding it had just computed was overwritten with flat sea on every one. Both gas giants
+painted the same featureless brown disc, byte-identical at 64x32, 128x64 *and* 256x128, despite different
+noise seeds and frequencies. A gas giant has no sea: the level is 0, the band ramp covers the whole range, and
+a meridian now shows 9 distinct latitude colours instead of one. procPlanet's own 419 checks never looked at
+what a gas giant painted.
+
+A generated surface is never allowed to pass for a measured one. A micro planet wears either its real file
+tree (every ridge a file, every lake a data file) or a world generated from its commit, and the caption names
+which, plus the commit and the seed.
+
+**And Keith's next question found a regression v4187 had just shipped.** He asked whether the GPU brain would
+benefit from the dungeon's escape clause. It could not: PATCH-B14's flow-field hook read
+`if (!m.step && window.sampleBrainPlayerFlow)`, and v4187's new `if (!m.step) ... continue` above it meant
+m.step was always set by that line. Dead code that still read as wired, and nothing went red. The hook now
+lives where the wall-follower is built -- which *is* the "BFS found no path" branch it was written for -- and
+steers the opening direction only. Per-step steering would abandon the wall and lose the hand rule's
+guarantee, the same lesson v4187 measured and rejected for extend-and-choose; a one-time hint costs at worst
+the long way round.
+
+62 new checks across tools/ship/orrerySeed-selfcheck.mjs and the dungeon gate, 7 sabotages all red and all
+files restored byte-identical. The tree now carries 1271 gates.
 ## v4188 -- a live camera frame as a GL texture, and the keyer the tree never had
 
 Keith sent eight webcam-effect repositories. **The recommendation was to port none of them.**

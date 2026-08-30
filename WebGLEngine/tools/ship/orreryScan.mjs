@@ -1,4 +1,4 @@
-// FILE: tools/ship/orreryScan.mjs -- v4186
+// FILE: tools/ship/orreryScan.mjs -- v4189
 //
 // Feeds world/orrery.mjs from the real tree: what is under vendor/, what licence provenance each body has,
 // how large it is, and when git says it arrived. Node-only (fs and git), which is why it lives here and not
@@ -50,12 +50,28 @@ export function listFileSizes(dir) {
  * (a shallow clone, or a path never committed) and is NOT the same as "arrived today".
  */
 export function firstSeen(repoRoot, rel) {
+    return firstCommit(repoRoot, rel).date;
+}
+
+/**
+ * The commit that first added a path: its date AND its full hash.
+ *
+ * *** THE FULL HASH, NOT THE ABBREVIATION. *** %H rather than %h, because world/orrerySeed.mjs folds every
+ * character of it into the body's planet seed and an abbreviation would throw away 128 of the 160 bits.
+ * Both halves come from ONE git invocation: asking twice could straddle a commit and pair a date with a
+ * different commit's hash, which is a small window and a genuinely confusing bug to chase.
+ */
+export function firstCommit(repoRoot, rel) {
     try {
-        const out = execFileSync("git", ["log", "--diff-filter=A", "--format=%ad", "--date=short", "--", rel],
+        const out = execFileSync("git", ["log", "--diff-filter=A", "--format=%H %ad", "--date=short", "--", rel],
                                  { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
         const lines = out.trim().split("\n").filter(Boolean);
-        return lines.length ? lines[lines.length - 1] : null;
-    } catch { return null; }
+        if (!lines.length) return { sha: null, date: null };
+        const last = lines[lines.length - 1];         // the OLDEST such commit -- git lists newest first
+        const sp = last.indexOf(" ");
+        if (sp < 0) return { sha: null, date: null };
+        return { sha: last.slice(0, sp), date: last.slice(sp + 1).trim() || null };
+    } catch { return { sha: null, date: null }; }
 }
 
 /**
@@ -72,12 +88,14 @@ export function scanVendor(engineRoot, repoRoot) {
         // disagree -- a file written between them would be in one and not the other -- and then the planet's
         // size and its terrain would describe different trees.
         const files = listFileSizes(path.join(vendorDir, name));
+        const first = firstCommit(repoRoot, path.posix.join("WebGLEngine", "vendor", name));
         return {
             name,
             files,
             paths: files.map((f) => f.path),
             bytes: files.reduce((n, f) => n + f.bytes, 0),
-            arrived: firstSeen(repoRoot, path.posix.join("WebGLEngine", "vendor", name)),
+            arrived: first.date,
+            sha: first.sha,          // the planet seed -- see world/orrerySeed.mjs
         };
     });
 }

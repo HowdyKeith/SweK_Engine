@@ -51,6 +51,7 @@
   <div><i style="background:#ff6b5e"></i>unpapered &mdash; vendored, none found</div>
   <div><i style="background:#33ccff"></i>reached &mdash; never copied in</div>
   <div><i style="border:1.5px dashed #ffcc66;background:none"></i>undated &mdash; inner orbit is a default</div>
+  <div style="margin-top:8px"><button id="surf" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:11px">surface: file tree (measured)</button></div>
 </div>
 
 <div class="card" id="ratchet"><h2>ratchet</h2><p id="rtext">reading&hellip;</p></div>
@@ -67,11 +68,13 @@
 import { buildOrrery, UNPAPERED_BASELINE, UNPAPERED } from "./world/orrery.mjs";
 import { positionAt, apparentPx, levelFor, extentOf, slowestPeriod,
          ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "./world/orreryView.mjs";
-import { drawSystem, drawPlanet, drawTerrain, fieldFor } from "./ui/orreryDraw.js";
+import { drawSystem, drawPlanet, drawTerrain, fieldFor, drawSeededPlanet, seededPlanetFor,
+         SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
 
 const cv = document.getElementById("stage"), ctx = cv.getContext("2d");
 let system = null, hits = [], focus = null, hover = null;
 let t = 0, playing = true, last = performance.now();
+let seeded = false;      // which SURFACE a micro planet wears -- measured file tree, or generated from the commit
 
 // pxPerUnit is the ONE camera number. The zoom level is read off it rather than set beside it, so there is no
 // second variable that could say "planet" while the body on screen is four pixels wide.
@@ -128,11 +131,19 @@ function draw() {
         return;
     }
     if (level === ZOOM_PLANET) {
-        const field = fieldFor(focus);
         // the planet turns on ITS OWN period, the same number that moves it around SweK
         const spin = focus.period > 0 ? (2 * Math.PI * t) / focus.period : 0;
-        drawPlanet(ctx, focus, field, innerWidth / 2, innerHeight / 2, px / 2, spin);
-        caption(`${focus.name} — micro planet. Its surface IS its file tree; it turns once per orbit.`);
+        if (seeded) {
+            drawSeededPlanet(ctx, focus, innerWidth / 2, innerHeight / 2, px / 2, spin);
+            const sp = seededPlanetFor(focus).spec;
+            // *** THE CAPTION SAYS GENERATED, EVERY TIME. *** This surface is a picture derived from a commit
+            // hash, not a measurement of the files, and a viewer who cannot tell which they are looking at is
+            // being misled by a page whose whole point is that its numbers come from somewhere.
+            caption(`${focus.name} — ${SURFACE_SEEDED}: a ${sp.type} world from commit ${String(focus.sha || "").slice(0, 12)} (seed ${focus.seed}). Same commit, same planet, always.`);
+        } else {
+            drawPlanet(ctx, focus, fieldFor(focus), innerWidth / 2, innerHeight / 2, px / 2, spin);
+            caption(`${focus.name} — ${SURFACE_MEASURED}: every ridge is a real file, every lake a data file.`);
+        }
         return;
     }
 
@@ -143,8 +154,15 @@ function draw() {
 }
 
 function caption(s) {
-    ctx.fillStyle = "rgba(207,230,218,0.9)"; ctx.font = "12px ui-monospace, monospace"; ctx.textAlign = "center";
-    ctx.fillText(s, innerWidth / 2, innerHeight - 96); ctx.textAlign = "left";
+    // on a plate and clear of the legend card: the seeded caption names a commit and a seed, which makes it
+    // long, and it was running underneath the legend where the half that says "generated" was the half hidden
+    ctx.font = "12px ui-monospace, monospace";
+    const w = Math.min(innerWidth - 40, ctx.measureText(s).width + 20);
+    const x = innerWidth / 2, y = innerHeight - 118;
+    ctx.fillStyle = "rgba(6,18,11,0.86)";
+    ctx.fillRect(x - w / 2, y - 14, w, 22);
+    ctx.fillStyle = "rgba(207,230,218,0.92)"; ctx.textAlign = "center";
+    ctx.fillText(s, x, y + 2); ctx.textAlign = "left";
 }
 
 cv.addEventListener("wheel", (e) => {
@@ -199,8 +217,15 @@ window.orrery = {
     follow: (name) => { follow(name ? window.orrery.body(name) : null); },
     zoomTo: (px) => { if (focus) pxPerUnit = px / (2 * focus.radius); },
     setTime: (days) => { t = days; },
+    setSeeded: (v) => { seeded = !!v; document.getElementById("surf").textContent = "surface: " + (seeded ? SURFACE_SEEDED : SURFACE_MEASURED); },
+    get seeded() { return seeded; },
     pause: () => { playing = false; document.getElementById("play").innerHTML = "&#9654; play"; },
 };
+
+document.getElementById("surf").addEventListener("click", (e) => {
+    seeded = !seeded;
+    e.target.textContent = "surface: " + (seeded ? SURFACE_SEEDED : SURFACE_MEASURED);
+});
 
 document.getElementById("play").addEventListener("click", (e) => {
     playing = !playing;

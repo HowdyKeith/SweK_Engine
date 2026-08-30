@@ -252,6 +252,24 @@ const grid = (rows) => {
     ok(!/let\s+tx\s*=\s*p\.x/.test(aiC), "*** the straight-line-at-the-player fallback is GONE -- that is the line that walked through stone ***");
     ok(/WallFollower/.test(aiC) && /dirToward/.test(aiC), "the follower and its opening facing are both used");
 
+    // *** THE GPU BRAIN HOOK MUST BE LIVE, AND v4187 SILENTLY KILLED IT. *** PATCH-B14 read
+    // `if (!m.step && window.sampleBrainPlayerFlow)` -- blend the brain's flow field when BFS found no path.
+    // v4187 added an earlier `if (!m.step) ... continue`, so m.step was always set by that line and the
+    // condition could never fire again. Dead code that still read as wired, and nothing went red. The hook now
+    // lives where the wall-follower is built, which IS the "BFS found no path" branch, and steers the opening
+    // direction only -- a one-time hint cannot break the hand rule's guarantee, where per-step steering would.
+    ok(/sampleBrainPlayerFlow/.test(aiC), "the GPU brain's flow field is still consulted somewhere in the chase");
+    ok(!/!m\.step\s*&&\s*typeof window/.test(aiC),
+        "*** and NOT behind `!m.step`, which this file's own control flow made unreachable ***");
+    const followBlock = (aiC.match(/if\s*\(!m\.follow\)[\s\S]{0,700}?new WallFollower/) || [""])[0];
+    ok(/sampleBrainPlayerFlow/.test(followBlock),
+        "*** the brain is asked exactly where BFS failed -- at the moment the follower is created ***");
+    ok(/openDir/.test(followBlock) && /dirToward/.test(followBlock),
+        "it chooses the OPENING direction, and falls back to dirToward when there is no brain");
+    // and with no brain present (node has no window) the behaviour must be unchanged -- section 6 above
+    // already proves the door case passes here, which IS the no-brain path.
+    ok(typeof globalThis.window === "undefined", "fixture: these checks ran with no window, so the no-brain path is what section 6 exercised");
+
     const wf = read("simulation/wallFollow.mjs"), wfC = codeOnly(wf);
     ok(!/\bdocument\b|\bwindow\b|require\(|node:/.test(wfC), "wallFollow is pure -- no DOM, no node, so a gate and a dungeon see identical answers");
     ok(!/Math\.random/.test(wfC), "and no randomness: the same maze walks the same way every time");
