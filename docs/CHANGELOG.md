@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4161 -- two machines disagreed about the fluid, and the gate was asserting the fragile half of its own sentence
+
+Keith's rig went red on a check that passes here, on the same commit:
+
+```
+FAIL  AND THE CENSUS INVERTS: soundSpeed IS LAST IN THE BOX AND FIRST OUT OF IT
+      shipped gamma > soundSpeed > viscosity  |  free soundSpeed > viscosity > gamma
+```
+
+This box orders the shipped container `viscosity > gamma > soundSpeed`. His orders it
+`gamma > soundSpeed > viscosity`.
+
+#### The split runs exactly along the equation of state
+
+| quantity | this box | Keith's rig |
+|---|---|---|
+| sec 7 ideal, retained @1200 / @2400 | 0.6507 / 0.3316 | **0.6507 / 0.3316** |
+| sec 3 ideal, stiffness sensitivity | 8.377e-2 | **8.377e-2** |
+| sec 4 tait, retained at shipped lid | 1.8446 | 1.8354 |
+| sec 4 tait, lid gap | 0.0010 | 0.0070 |
+| sec 5 tait, compensated spread | 8.481e-3 | 7.059e-3 |
+
+**Every ideal-EOS number matches to every printed digit. Every Tait number diverges from the third decimal.**
+
+`pressureOf`'s ideal branch is `stiffness * (rho - rho0)` -- multiply and subtract, which IEEE 754 pins exactly,
+correctly rounded and bit-identical on any conforming hardware. Its Tait branch is `B * (Math.pow(r, gamma) - 1)`,
+and ECMAScript calls `Math.pow` **implementation-approximated**. One ulp at step 1, in a column this same gate
+documents as *exploding* -- energy quadruples over 2000 steps -- is a third-decimal difference by step 1200. Three
+residues sitting within 30x of each other then reorder.
+
+#### The correct assertion was already written down, one line below the one that failed
+
+`MEASURED_V3541`'s own note: *"a 433x suppression that INVERTS the ranking."* The gate asserted the inversion and
+not the suppression.
+
+Measured here at 1200 steps: soundSpeed **8.366e-4** at the shipped lid against **3.619e-1** at a free one --
+**433x**, reproducing that recorded table to every digit. Now asserted as:
+
+1. **the suppression**, threshold 20x against a measured 433x -- twenty-one-fold headroom over a number that has
+   to survive another machine's `Math.pow`; and
+2. **the rank claim both boxes agree on**: soundSpeed *first* in the free box and *not first* in the shipped one.
+
+**This is not a loosening, and the arithmetic says so.** A claim about a factor of 433 is far harder to satisfy by
+accident than a claim about which of three numbers within 30x is smallest -- and the old check would still have
+passed on a fixture where the suppression had vanished entirely, so long as the residues happened to sort the
+right way. Keith ranks soundSpeed **second** inside the box and this machine ranks it **third**; both are the same
+physical statement, that the ceiling takes the most important material parameter out of first place.
+
+#### The prose was corrected in the same round
+
+Two other sites stated the old claim -- `materialKnobs`' finding C ("goes from the WEAKEST knob to the STRONGEST")
+and `MEASURED_V3541`'s note. Both now say *suppressed* rather than *weakest*, both record that the final rank is
+not portable, and the table carries a warning that its magnitudes are this box's and only the ratio travels. A
+tree whose comments outlive its assertions is how a register rots, which is the failure mode this file was
+written to fight.
+
+#### The antidote is written against the fix that is coming
+
+> **DO NOT RESTORE THE RANK-LAST ASSERTION IF THE TAIT BRANCH IS EVER MADE BIT-EXACT ACROSS MACHINES.**
+> Reproducible is not the same as meaningful: an ordering of three residues within 30x of each other in an
+> exploding column would then be stable and still would not be a fact about the fluid.
+
+Gate count unchanged at 1246 gates. The `Math.pow` divergence itself is a separate, larger round: this tree
+already made that call at v2546 for `physics/sph/kernels.js`, and `physics/sph/sph.js` -- which holds the equation
+of state -- is not on `portableMath-selfcheck`'s `DETERMINISTIC` list.
 ## v4160 -- the archive arrived, and corrected the manifest built to receive it
 
 `SweK_VBA_v3499.zip`, extracted and scanned through v4159's own bridge:
