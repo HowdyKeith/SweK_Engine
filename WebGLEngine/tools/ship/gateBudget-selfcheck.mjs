@@ -167,6 +167,55 @@ console.log("  ----  claiming 90s, 40s, 90s and 35s. NONE OF THEM WAS EVER BROKE
 console.log("  ----  60s and counted among 41 FAILED. The Kelvin-Helmholtz cluster is ONE FIXTURE COST, not");
 console.log("  ----  three bugs. UNRESOLVED is now empty, so the check above passes VACUOUSLY -- it prints its");
 console.log("  ----  zero rather than hiding it, because a check with nothing to check should say so.");
+console.log("\n*** THE BUDGET BASIS AND THE OBSERVED RUNTIME ARE TWO RECORDINGS OF ONE QUANTITY ***");
+{
+    // *** v4171 -- NOBODY HAD EVER COMPARED THEM, AND 26 OF 42 DISAGREED. ***
+    //
+    // MEASURED[g] is what budgetFor multiplies by TAIL_HEADROOM. timings[g] is what the gate was observed to
+    // take. They are the same number recorded twice, and they had drifted: weightScaling was budgeted from
+    // 50.6s while running 76.8s, jeans 67.9s against 98.9s, twoFBind 249.0s against 352.3s. ONLY ONE OF THE
+    // FORTY-TWO AGREED WITHIN 1%.
+    //
+    // *** THE HEADROOM WAS BEING SPENT BEFORE THE GATE EVEN RAN. *** TAIL_HEADROOM is 2, and it exists so a
+    // gate can have a slow day. Where the basis is 1.4x under the truth, the real margin is 1.4x, not 2x --
+    // and v4166 narrowed the host-scale band at the same time (a timeout now needs 2 x scale rather than the
+    // inflated 8, so the danger threshold moved from 16x its recorded time down to ~4.1x). Two safety factors
+    // quietly eating each other is how a suite starts timing out for no reason anybody can name.
+    //
+    // The basis is RAISED to the observation, never lowered: this module's own header says the scale only ever
+    // GROWS a budget, because "shortening one is how you manufacture a timeout out of a machine that was doing
+    // fine". A gate that got FASTER keeps its older, larger basis and simply gains margin.
+    const T = JSON.parse(fs.readFileSync(path.join(HERE, "gate-timings.json"), "utf8")).timings;
+    const under = [];
+    for (const [g, base] of Object.entries(MEASURED)) {
+        const obs = T[g];
+        if (!(obs > 0)) continue;
+        if (obs > base * 1.01) under.push(g + " basis " + (base / 1000).toFixed(1) + "s < observed " +
+                                         (obs / 1000).toFixed(1) + "s (" + (obs / base).toFixed(2) + "x)");
+    }
+    ok("!! *** no gate is budgeted from a basis its own recorded runtime already exceeds ***",
+        under.length === 0,
+        under.length ? under.length + " under-budgeted: " + under.slice(0, 4).join("; ") +
+            (under.length > 4 ? " ... and " + (under.length - 4) + " more" : "")
+          : Object.keys(MEASURED).filter((g) => T[g] > 0).length + " gates cross-checked against " +
+            "gate-timings.json, none under-budgeted. THE FIX IS TO RAISE THE BASIS, never to widen " +
+            "TAIL_HEADROOM: the multiplier is the safety margin and the basis is the measurement, and " +
+            "loosening the first to cover an error in the second spends the margin on nothing");
+
+    // *** AND A GATE THAT HAS BEEN MEASURED MAY NOT STILL BE SITTING IN UNRESOLVED. ***
+    // That table's own header says so in as many words -- "WHEN ONE OF THESE IS MEASURED TO COMPLETION, IT
+    // MOVES INTO MEASURED ABOVE AND ITS LINE HERE IS DELETED, NOT EDITED IN PLACE" -- and two had been
+    // measured and left there anyway, on the 309s default with 1.21x and 1.07x of headroom. shaderRefs duly
+    // timed out on Keith's rig. A DEFAULT IS WHAT A GATE GETS WHILE NOBODY KNOWS, and these were known.
+    const stale = Object.keys(UNRESOLVED).filter((g) => T[g] > 0);
+    ok("!! *** nothing sits in UNRESOLVED that gate-timings.json has already measured ***",
+        stale.length === 0,
+        stale.length ? stale.map((g) => g + " ran " + (T[g] / 1000).toFixed(1) + "s").join("; ") +
+            " -- move each into MEASURED and DELETE the UNRESOLVED line, which is that table's own instruction"
+          : Object.keys(UNRESOLVED).length + " still genuinely unmeasured; a SKIP (~0.05s) is excluded from " +
+            "the record by selfchecks, so a time here is a real completion");
+}
+
 console.log("  ----  AND THE SUITE GETS LONGER: the v3211 run was 1719s with thirteen gates dying early.");
 console.log("  ----  Letting the eight measured ones finish costs about 26 more minutes of real work.");
 if (fails) { console.log("gateBudget-selfcheck: " + fails + " FAILURES"); process.exit(1); }

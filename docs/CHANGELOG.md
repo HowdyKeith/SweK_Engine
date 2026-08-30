@@ -8,6 +8,74 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4171 -- budget hygiene before the next rig run, because v4166 made the margins tighter and that is my doing
+
+Correcting the host scale at v4166 -- from a runaway 8 down to the honest 2.05 -- **cut every budget on Keith's
+rig by about 4x**. A gate times out once it runs slower than `TAIL_HEADROOM x scale` times its recorded time,
+so the danger threshold moved from **>16x down to >4.1x**. That is the right change, and it needed a sweep
+behind it before anyone ran the rig again.
+
+### The budget basis and the observed runtime were two recordings of one quantity, and 26 of 42 disagreed
+
+`MEASURED[g]` is what `budgetFor` multiplies by `TAIL_HEADROOM`. `timings[g]` is what the gate was observed to
+take. Nobody had ever compared them. **Only one of the forty-two agreed within 1%.**
+
+| gate | basis | observed | |
+|---|---|---|---|
+| `weightScaling` | 50.6s | 76.8s | 1.52x |
+| `jeans` | 67.9s | 98.9s | 1.46x |
+| `hydrostatic` | 91.9s | 132.2s | 1.44x |
+| `twoFBind` | 249.0s | 352.3s | 1.41x |
+
+**The headroom was being spent before the gate even ran.** `TAIL_HEADROOM` is 2 so a gate can have a slow day;
+where the basis sat 1.4x under the truth, the real margin was 1.4x, not 2x. Two safety factors quietly eating
+each other is how a suite starts timing out for reasons nobody can name.
+
+26 bases **raised** to the observation, **zero lowered** -- this module's own header says a budget only ever
+grows, because *"shortening one is how you manufacture a timeout out of a machine that was doing fine"*. A gate
+that got faster keeps its older, larger basis and simply gains margin. Gates under 2.0x margin: **29 -> 1**
+(the holdout is `levelClaim` at 1.98x, a 0.89% difference that is noise, not drift).
+
+### Two gates sat in UNRESOLVED that had already been measured -- with the thinnest margins in the tree
+
+`shaderRefs` runs 288.0s against the 309s default: **1.07x**. It duly timed out on the rig this session.
+`orphanTriage` runs 255.9s: 1.21x. Both were listed as *"exceeded a 150s cap at v3924"* and both have since
+been measured to completion -- a skip reads ~0.05s and `selfchecks` excludes skipped runs, so these are real.
+
+That table's own header names the correct response in advance: *"WHEN ONE OF THESE IS MEASURED TO COMPLETION,
+IT MOVES INTO MEASURED ABOVE AND ITS LINE HERE IS DELETED, NOT EDITED IN PLACE."* Followed exactly.
+`shaderRefs` now has 576s. **A default is what a gate gets while nobody knows**, and these were known.
+
+Both disagreements are now gated: no gate may be budgeted from a basis its own recorded runtime exceeds, and
+nothing may sit in `UNRESOLVED` that `gate-timings.json` has already measured.
+
+### Then three gates went red, and all three were mine
+
+- **`hostScale`** -- its fixtures hardcoded `568000` and `557100` and asserted `scale >= 2`. Re-measuring
+  `assumptionMap`'s basis made those 1.91 and 1.88, so they reported a fault in code that had not changed.
+  **A fixture pinned to a constant that describes a number somewhere else breaks when that number is
+  corrected.** Both derive from `REF` now, and the Windows-key one asserts the **equivalence** it is actually
+  about -- the same run under two spellings gives the same scale -- rather than a threshold it never was.
+
+- **`gateQuality`** -- caught `sunshineHost` matching an English sentence against raw source. The **negative**
+  form was the worse half: `!/store or forward Sunshine's web-UI credentials/` fails on the one wording it
+  knows and blesses every other, so rewording the page leaves a second copy sitting there while the check
+  passes. **A negative check keyed on exact prose can only ever be vacuous.** It reads the bridge's own
+  `REFUSED` list now and covers all five, so a refusal added there is covered without anyone remembering.
+
+- **`budgetEvidence`** -- 24 gates carried no runtime evidence of any kind, most of them mine from recent
+  rounds. Each timed individually, median of three, run sequentially so the numbers are not contended. 23
+  recorded; **`referenceKind` excluded because it exits 1**, and a failing run's elapsed time is not a budget
+  -- its 59709ms (60481/59709/59469) is written into the provenance prose instead, so the measurement is not
+  lost while staying out of the table budgets derive from. **0 gates now carry no evidence.**
+
+### And the gate whose job is comparing stated runtimes to measured ones caught itself
+
+`statedRuntime` had no recorded time until this round, so **it had never been able to run its own check on its
+own header** -- which read *"~2s -- MEASURED"* against a real **176ms**. Corrected from the measurement, not
+added to the baseline.
+
+Tree at 1252 gates.
 ## v4170 -- my own v4122 regression, and the interesting part is that it never threw
 
 `neighbourBakeoff-selfcheck` had been red since v4122 with `gridCellTouches` reading **0** for three straight
