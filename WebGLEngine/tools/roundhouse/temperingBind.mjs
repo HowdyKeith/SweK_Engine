@@ -70,6 +70,11 @@ export const temperingDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4099 -- NAMED, THE SAME COMPLETION v3851/v4088-v4098 gave the rest of this family. MEASURED, both arms:
+    // worstMagErrBelowTc 0.0169 -> 0.2656, spreadAcrossLadder 0.699 -> 0.146 (the ladder smearing the header
+    // describes), meanSwapRate 26% -> 100%.
+    planted: { knob: "planted", observable: "worstMagErrBelowTc",
+               note: "swapAlwaysWRONG accepts every replica exchange instead of the Metropolis rule the joint ensemble requires -- every chain still runs and looks plausible, but the ladder blends into one distribution wearing five temperature labels, and each replica's marginal stops owing the Yang magnetisation at its own temperature" },
     modes: ["marginals"],
     name: "parallel-tempering-replica-exchange", observables: TEMPERING_OBSERVABLES, build: buildTempering,
     defaults: ({ mode } = {}) => ({ mode: mode || "marginals", config: { ...DEF } }),

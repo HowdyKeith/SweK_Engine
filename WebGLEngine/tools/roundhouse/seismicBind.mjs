@@ -70,6 +70,13 @@ export const seismicDevice = {
     // right and the reading is right; the EVALUATION is wrong -- the same integral parametrised in depth, where
     // dx/dz diverges at the turning point. Neither "the derivation is wrong" nor "the number was substituted".
     plantKind: "method",
+    // v4089 -- NAMED, THE SAME COMPLETION v3851/v4088 gave born/chaos/box3d/acoustics: plantKind was declared
+    // but the config.planted flag it reads (`rays` mode only) had no `planted: {}` object saying what it
+    // overturns. worstRouteDiff is the max departure of EITHER alternate route from the closed form, so it is
+    // the single number that catches the depth-parametrised integral however it goes wrong. MEASURED, both
+    // arms: 1.21e-11 -> 8.12e-3.
+    planted: { knob: "planted", observable: "worstRouteDiff",
+               note: "integrating the ray in depth instead of angle diverges as dx/dz near the turning point; the closed form and the arc-geometry route both stay agreed with the honest integral to 1e-11, and disagree with the depth-parametrised one at the 8e-3 level" },
     modes: ["rays", "moduli", "interface"],
     name: "seismic-rays-and-moduli", observables: SEISMIC_OBSERVABLES, build: buildSeismic,
     defaults: ({ mode } = {}) => ({ mode: mode || "rays", config: { ...DEF } }),

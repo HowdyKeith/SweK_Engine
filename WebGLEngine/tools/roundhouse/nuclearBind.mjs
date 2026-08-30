@@ -118,7 +118,12 @@ export const nuclearDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
-    modes: ["chain", "equilib", "binding"],
+    // v4090 -- NAMED, THE SAME COMPLETION v3851/v4088/v4089 gave born/chaos/box3d/acoustics/seismic: plantKind
+    // was declared but the config.planted flag (`binding` mode only) had no `planted: {}` object. peakA is the
+    // sharpest single number -- not a tolerance, a LOCATION -- so a missing surface term cannot merely shift it,
+    // it moves the peak somewhere the physics forbids. MEASURED, both arms: peakA 58 -> 2.
+    planted: { knob: "planted", observable: "peakA",
+               note: "deleting the SEMF's A^(2/3) surface term leaves binding energy still rising with A and still MeV-plausible, but with no competing term to stop it -- the peak collapses to the smallest A rather than sitting near iron" },
     name: "nuclear-decay-and-binding", observables: NUCLEAR_OBSERVABLES, build: buildNuclear,
     defaults: ({ mode } = {}) => ({ mode: mode || "chain", config: { ...DEF } }),
 };

@@ -111,6 +111,14 @@ export const acousticsDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // *** v4088 -- NAMED, THE SAME COMPLETION v3851 GAVE born/chaos/box3d. *** This device carries TWO plants
+    // behind the SAME config.planted flag -- propagate's Courant number (1 -> 0.5) and speed's sound-speed law
+    // (real gas -> Newton's isothermal) -- and neither was ever named as data, only in prose. `propagate` is
+    // the primary: it is modes[0] and the header's headline finding. MEASURED, both arms:
+    //   propagationError   5.26e-21 -> 3.63e-3   (the "fifteen orders of magnitude" the header quotes)
+    //   airErrFrac         1.02e-4 -> 1.55e-1    (speed mode's Newton plant, ~15% low, reported separately)
+    planted: { knob: "planted", observable: "propagationError",
+               note: "Courant number 1 (exact at the magic time step) vs the 'safe' 0.5 -- stable, plausible, and 15 orders of magnitude less accurate. A second plant on the same flag lives in `speed` mode (Newton's isothermal sound speed vs the real adiabatic one, airErrFrac 1.02e-4 -> 1.55e-1) and is not this declaration's target." },
     modes: ["propagate", "stability", "doppler", "modes", "speed"],
     name: "acoustic-waves", observables: ACOUSTIC_OBSERVABLES, build: buildAcoustics,
     defaults: ({ mode } = {}) => ({ mode: mode || "propagate", config: { ...DEF } }),

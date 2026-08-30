@@ -63,6 +63,13 @@ export const hmcDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4097 -- NAMED, THE SAME COMPLETION v3851/v4088-v4096 gave the rest of this family. The plant reaches
+    // `symplectic` only -- `moments` calls sampleChain without ever passing the integrator, so config.planted
+    // is dead there by design (probeLiveness confirms: symplectic 3/4 moved, moments 0/5). MEASURED, symplectic
+    // mode both arms: jacobianErr 2.32e-11 -> 0.0599, reversibilityResidual 5.55e-17 -> 1.590 -- matching the
+    // header's own quoted 1.0599 and 5.6e-17 exactly.
+    planted: { knob: "planted", observable: "jacobianErr",
+               note: "eulerStepWRONG replaces leapfrog: a non-symplectic integrator does not preserve phase-space volume, so det(d(q',p')/d(q,p)) drifts off its exact 1 -- structural, not statistical, and needs no chain to show" },
     modes: ["moments", "symplectic"],
     name: "hamiltonian-monte-carlo", observables: HMC_OBSERVABLES, build: buildHmc,
     defaults: ({ mode } = {}) => ({ mode: mode || "moments", config: { ...DEF } }),

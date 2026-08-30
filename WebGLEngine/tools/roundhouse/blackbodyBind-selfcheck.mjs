@@ -70,6 +70,18 @@ console.log("\n3. THE TWO-ROUTE AGREEMENTS HOLD, WHICH IS WHAT MAKES THE OBSERVA
     // `v.exitanceQuarticRel.toExponential(3)` threw and the gate has hard-crashed on every run since v4055 --
     // reaching Keith as a stack trace where a verdict should have been. Not re-implemented: restoring the
     // observable would restore the tautology v4055 spent a round arguing away.
+    //
+    // *** v4167 -- AND THE TIER-2 BRANCH FIXED THIS INDEPENDENTLY, AT v4100, AND ITS FIX WAS THE BETTER HALF
+    // OF THE TWO. *** Both branches found the same crash from the same cause. This side DELETED the check,
+    // arguing that restoring it would restore the tautology -- true of `exitanceQuarticRel`, and it left NO
+    // check where v4055 had explicitly "put" a replacement. The branch ASSERTED that replacement instead.
+    // sigmaFromBoseRel is not the tautology wearing a new name: it builds sigma from the Bose integral and
+    // meets the typed closed form by a different route, so a wrong power of pi or a zeta given the wrong
+    // argument moves it off zero. THE ARGUMENT AGAINST THE OLD OBSERVABLE WAS CARRIED OVER ONTO ITS
+    // SUCCESSOR, WHICH IS HOW A DELETION BECOMES A GAP. The branch's assertion is taken.
+    ok("!! sigma (typed as the closed form) meets the Bose integral by a different route", v.sigmaFromBoseRel < 1e-10,
+        "rel " + v.sigmaFromBoseRel.toExponential(3) + " -- 2 pi k^4/(h^3 c^2) times Gamma(4)zeta(4) against the "
+        + "closed form, so a wrong power of pi or a zeta returning the wrong argument moves it off zero");
     report("not one reference value is typed in the bind. The selfcheck beside it owns the CODATA comparison; a "
         + "device carrying its own copy of 5.670374419e-8 would be a second declaration of a number.");
 }
@@ -102,7 +114,12 @@ console.log("\n4. *** THE PLANT MOVES EXACTLY THREE OBSERVABLES, AND THE OTHER T
     // seven bit-identical observables was really asserting six and getting a free pass on the seventh. That is
     // worse than the crash, because a crash announces itself. The list is now checked to EXIST before it is
     // checked to MATCH, so deleting an observable can never again quietly hollow out the check that named it.
-    const blind = ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad"];
+    // v4167 -- sigmaFromBoseRel added from the tier-2 branch, which listed it and was right to: it is bit-
+    // identical under the plant for the same reason the others are. Kept in the SINGLE `blind` array rather
+    // than the branch's inlined copy, because this array also feeds the "does the device actually produce
+    // this key" guard on the line below -- an inlined list skips that guard, which is the undefined ===
+    // undefined vacuous pass this very section was written to close.
+    const blind = ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad", "sigmaFromBoseRel"];
     ok("!! every observable this check names is one the device actually PRODUCES",
         blind.every((k) => k in h && k in p),
         "guards against undefined === undefined -- " + (blind.filter((k) => !(k in h)).join(", ") || "all " + blind.length + " present"));

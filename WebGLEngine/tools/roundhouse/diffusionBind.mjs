@@ -52,6 +52,12 @@ export const diffusionDevice = {
     // accumulated from WRAPPED coordinates, so a particle that crosses the box reads as having come back). No
     // input to this simulation produces that failure, which is exactly pipe3d's case and why the kind exists.
     plantKind: "reader",
+    // v4094 -- NAMED, THE SAME COMPLETION v3851/v4088-v4093 gave the rest of this family. MEASURED, both arms:
+    // einsteinD 0.8393 -> 0.0771 (a particle that wraps reads as never having moved), greenKuboD UNCHANGED at
+    // 0.8603 (velocities do not wrap), disagreeFrac 2.47% -> 167% -- the pair is what notices, not either route
+    // alone.
+    planted: { knob: "planted", observable: "disagreeFrac",
+               note: "MSD accumulated from periodic-wrapped coordinates instead of unwrapped ones collapses the Einstein route while leaving Green-Kubo (built from velocities, which never wrap) completely unaffected" },
     modes: ["pair"],
     name: "self-diffusion-two-routes", observables: DIFFUSION_OBSERVABLES, build: buildDiffusion,
     defaults: ({ mode } = {}) => ({ mode: mode || "pair", config: { ...DEF } }),

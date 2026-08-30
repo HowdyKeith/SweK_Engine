@@ -147,4 +147,11 @@ export const pipeDevice = {
     // identical (a config key goes in, numbers change). The distinction is about WHERE the perturbation enters,
     // and only the author of the plant knows. THE TWO ARE NEVER SUMMED INTO ONE COVERAGE NUMBER.
     plantKind: "reader",
+    // v4096 -- NAMED, THE SAME COMPLETION v3851/v4088-v4095 gave the rest of this family. MEASURED, profile
+    // mode both arms: centrelineErrFrac bit-identical at 0.0269 (the blind key, deliberately -- see the comment
+    // above), profileRms 0.0454 -> 0.655, flowErrFrac 0.0498 -> 0.930. flowErrFrac is the sharper signal and
+    // the one the file's own comment argues is independent of the centreline check by construction (it looks
+    // where the centreline check is blind), so it is the declared target.
+    planted: { knob: "planted", observable: "flowErrFrac",
+               note: "every cell reads the measured centreline speed (a plug profile) instead of its own value -- the peak is right, the shape is gone, and flowTheory's integral over the cross section catches what a single-point centreline check cannot" },
     modes: ["profile", "noslip"], name: "hagen-poiseuille-pipe-3d", observables: PIPE_OBSERVABLES, build: buildPipe, defaults: pipeDefaults };

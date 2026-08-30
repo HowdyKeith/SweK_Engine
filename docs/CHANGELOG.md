@@ -8,6 +8,82 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4167 -- the other branch, read rather than assumed
+
+Four branches sit on the remote besides this one. Checking them turned out to be worth more than merging
+them, because two of the four answers were not the obvious one.
+
+### The tier-2 branch was still running
+
+It pushed four more rounds after the v4165 merge -- `v4088` through `v4100` -- adding `planted` metadata to
+twelve device binds: `acoustics`, `seismic`, `nuclear`, `blackhole`, `kerr`, `wolff`, `diffusion`,
+`blackbody`, `pipe3d`, `hmc`, `percolation`, `tempering`. Each plant was **measured in both arms** before
+being named, and each matches its own file's header claims to the digit.
+
+`wolff`'s is the shape of the whole set:
+
+> `pAdd = 1 - exp(-J/T)` instead of `1 - exp(-2J/T)` is one character of difference from the value detailed
+> balance requires; the algorithm still builds clusters, still flips them, still runs to completion, and
+> samples the wrong distribution the whole time.
+
+Measured: `absM` 0.9109 -> 0.0426, `magErr` 4.50e-4 -> 0.869.
+
+### Its headline find was a rediscovery, and that is the real news
+
+The branch reported one live crash: `blackbodyBind-selfcheck` throwing
+`TypeError: Cannot read properties of undefined` on every run since v4055, because v4055 deleted
+`exitanceQuarticRel` and the gate kept reading it.
+
+**Main had already found and fixed exactly that at v4136** -- forty-five versions earlier -- *including* the
+second half both sides found independently: a blind-observable list holding the dead key, where
+`undefined === undefined` passed vacuously. Run on main before merging, the gate exits 0 and the only
+remaining mentions of the dead observable are comments explaining its removal.
+
+The branch is **85 commits behind main**. It is now re-covering ground main has covered, which is the cost of
+a long-lived branch rather than a fault in its work.
+
+### But its fix was the better half of the two, and is taken
+
+Both branches fixed the same crash differently, and the conflict is instructive:
+
+- **This side deleted the check**, arguing that restoring it would restore the tautology. True of
+  `exitanceQuarticRel` -- `pow(a,4)/pow(b,4)` *is* `pow(a/b,4)` and cannot fail -- but it left **no check at
+  all** where v4055 had explicitly *put* a replacement.
+- **The branch asserted the replacement.** `sigmaFromBoseRel` is not the tautology under a new name: it
+  builds sigma from the Bose integral and meets the typed closed form by a different route. Measured
+  agreement **1.517e-15**, and a wrong power of pi or a zeta given the wrong argument moves it off zero.
+
+**The argument against an observable had been carried over onto its successor, which is how a deletion
+becomes a gap.** The branch's assertion is restored, with this side's explanation of why the *old* check is
+gone kept beside it.
+
+The second hunk went the other way: the branch listed the missing key but inlined its list, which bypasses
+the "does the device actually produce this key" guard on the line above -- the very undefined-equals-undefined
+vacuous pass that section exists to close. The key is added to the **single** `blind` array instead, so both
+the produces-guard and the bit-identical check now cover all seven. Verified: `all 7 present`, gate green.
+
+### The three older branches, and two of the answers are not "merge it"
+
+| branch | unmerged | behind | verdict |
+|---|---|---|---|
+| `long-silence-elements-check` | **0** | 594 | fully absorbed -- nothing to do |
+| `barehands-integration` | 1 | 630 | **SUPERSEDED, not pending** |
+| `exported-functions-mesh-render` | 3 | 630 | real work, needs its own round |
+
+`barehands` is the one worth stating carefully, because "1 commit unmerged" invites merging it. Its v3850
+work -- `MediaPipeHandTracker.js`, `handsBind.mjs`, `handsBind-selfcheck.mjs` -- **all three already exist on
+main**, having landed at v3900, and have grown substantially since: `handsBind.mjs` is 361 lines on the
+branch against **532** on main, the selfcheck 251 against **364**. Merging it would *regress* work that is
+already shipped and further along. **A branch that is "1 commit ahead" can still be entirely behind**, and
+the commit count alone cannot tell you which.
+
+`exported-functions` (v3904-v3906) is the genuine remainder. Its *modules* are byte-identical to main's --
+`poisson.mjs`, `discontinuity.mjs`, `strokeMorph.mjs` all match -- but its **gates carry coverage main
+lacks**: `poisson-selfcheck` is 180 lines on main against 280 on the branch, `discontinuity-selfcheck` 186
+against 229. That is roughly 100 lines of stepper checks main has never had. At 630 commits behind it
+conflicts in six selfchecks, so it is a round with a fixture, not a merge to squeeze in here.
+
+Tree at 1252 gates.
 ## v4166 -- four gates from the rig, and every one measured the machine while naming the code
 
 Keith ran eight gates. Four had real defects, and they are the same defect wearing four costumes: **a check

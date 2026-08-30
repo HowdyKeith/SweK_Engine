@@ -292,6 +292,11 @@ export function buildBH(hyp, base = {}) {
 // The device descriptor deviceBind.mjs consumes.
 export const blackHoleDevice = {
     plantKind: "knob",   // v3708 -- config.planted halves rs; THE ONSET BISECTION is what separates it
+    // v4091 -- NAMED, THE SAME COMPLETION v3851/v4088-v4090 gave born/chaos/box3d/acoustics/seismic/nuclear.
+    // MEASURED, onset mode both arms: captureOnsetR 6.025 -> 2.900, against an iscoTheory of 6 that never moves
+    // (the plant halves rs in the SIMULATION, not in the closed form the bisection is graded against).
+    planted: { knob: "planted", observable: "captureOnsetR",
+               note: "rs halved in the definition, not the law -- orbit still integrates, capture still happens at SOME radius, and only the onset bisection (which never reads the closed form) shows the ISCO has moved off its exact 6M" },
     // v3191 -- EXPORTED so nothing has to GUESS. A probed mode count is a LOWER BOUND: you can only ask
     // about a mode you already thought of, and these names were in nobody's candidate list, so this
     // device reported as having NO DISCOVERABLE MODES. Derived from this file's own default plus every
