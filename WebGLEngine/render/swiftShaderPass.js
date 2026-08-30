@@ -30,9 +30,18 @@ vec4 layerSample(vec2 p) {
     return texelFetch(uTex, t, 0);
 }
 // half(x) in the Metal source is a DELIBERATE quantisation to mediump, not an accident of typing.
+//
+// *** v4196 -- THE EXPONENT IS CLAMPED, AND WITHOUT THAT THIS RETURNED NaN. *** A half has five exponent
+// bits and cannot represent 1e-35; the answer there is 0. Unclamped, e = -116 made exp2(e - 10) so small
+// that x / q was Inf and floor(Inf + 0.5) * q was NaN -- one contagious NaN, and the pixel came out black.
+// bcs_refractLens computes pow(dot, 64.0), which reaches 1e-35 for an ordinary dot of 0.28. Measured in a
+// headless GL context: four pixels of the lens rendered pure black before this line.
+// -14.0 is half's smallest NORMAL exponent, so subnormals land on multiples of 2^-24 and smaller values
+// flush to zero -- which is what the hardware does.
 float toHalf(float x) {
     if (x == 0.0) return x;
-    float e = floor(log2(abs(x)));
+    if (abs(x) > 65504.0) return sign(x) * 65504.0;
+    float e = max(floor(log2(abs(x))), -14.0);
     float q = exp2(e - 10.0);
     return floor(x / q + 0.5) * q;
 }`;
@@ -390,9 +399,172 @@ void main() {
     fragColor = vec4(original.rgb * toHalf(uMixOriginal * 0.5) + neon * toHalf(edgeMag + bloom), original.a);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
+
+// ---- BATCH 9 (v4196): five radial displacement shaders ---------------------------------------------------
+//
+// *** THE KNOB IS A COORDINATE. *** uTouchX/uTouchY arrive in POINTS with y measured DOWN, the same frame
+// swPos() produces -- so they need the SAME scaling the fragment coordinate gets, and the caller has to hand
+// over a y that was already flipped. Nothing in the shader can detect a y that was not. See the model header.
+//
+// *** AND `delta.x *= aspect` CONVERTS uv INTO PIXEL PROPORTIONS, IT DOES NOT ABSTRACTLY ROUND THE FIELD. ***
+// So a direction spent on `position` must NOT be divided back, and one spent on a uv must be. liveRipple and
+// refractLens's push ring divide back where they should not; both are reproduced as upstream wrote them and
+// measured by the gate. Marked at the line in each.
+
+const TOUCHRIPPLE_FRAG = PREAMBLE + `
+uniform float uTouchX, uTouchY, uTouchAge, uAmplitude, uFrequency, uSpeed, uDecay, uPointScale;
+void main() {
+    vec2 p = swPos();
+    // THE EARLY-OUT IS HOW THE RIPPLE ENDS -- not a guard. Clamping instead freezes a ring on screen forever.
+    if (uTouchAge < 0.01 || uTouchAge > 5.0) { fragColor = layerSample(p); return; }
+    vec2 touch = vec2(uTouchX, uTouchY) * uPointScale;   // POINTS, y DOWN -- the same frame as swPos()
+    vec2 delta = p - touch;
+    float dist = length(delta);                          // raw pixel length: no aspect term anywhere
+    float distFromFront = dist - uTouchAge * uSpeed * uPointScale;
+    float waveWidth = (60.0 + uTouchAge * 40.0) * uPointScale;
+    float envelope = exp(-(distFromFront * distFromFront) / (2.0 * waveWidth * waveWidth));
+    float timeFade = exp(-uTouchAge * uDecay);
+    float wave = (sin(distFromFront * uFrequency * 0.008)
+                + sin(distFromFront * uFrequency * 0.005 + 1.0) * 0.5)
+                * 0.67 * envelope * timeFade * uAmplitude * uPointScale;
+    vec2 dir = dist > 0.5 * uPointScale ? delta / dist : vec2(0.0);
+    vec2 disp = clamp(p + dir * wave, vec2(0.0), uSize);
+    vec4 c = layerSample(disp);
+    float chromaAmt = abs(wave) * 0.08;
+    vec4 r = layerSample(clamp(disp + dir * chromaAmt, vec2(0.0), uSize));
+    vec4 b = layerSample(clamp(disp - dir * chromaAmt, vec2(0.0), uSize));
+    float t = toHalf(envelope * timeFade * 0.3);
+    fragColor = vec4(mix(c.r, r.r, t), c.g, mix(c.b, b.b, t), c.a);
+}`;
+
+const LIVERIPPLE_FRAG = PREAMBLE + `
+uniform float uTime, uAmplitude, uFrequency, uSpeed, uDamping, uRingCount, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float aspect = uSize.x / uSize.y;
+    vec2 off = vec2(0.0);
+    for (int i = 0; i < 8; i++) {                        // constant bound + break: this file's idiom
+        if (float(i) >= uRingCount) break;
+        float phase = float(i) * 1.256;
+        vec2 rc = vec2(0.5) + vec2(sin(uTime * 0.3 + phase), cos(uTime * 0.4 + phase)) * 0.05;
+        vec2 d = vec2((uv.x - rc.x) * aspect, uv.y - rc.y);
+        float dist = length(d);
+        float wave = sin(dist * uFrequency - uTime * uSpeed + phase);
+        float envelope = exp(-dist * uDamping);
+        vec2 dir = dist > 0.001 ? d / dist : vec2(0.0);
+        dir.x /= aspect;                                 // *** THE DEFECT: d was ALREADY pixel-proportional ***
+        off += dir * wave * envelope * uAmplitude * uPointScale / uRingCount;
+    }
+    fragColor = layerSample(clamp(p + off, vec2(0.0), uSize));
+}`;
+
+const SHOCKWAVE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uWaveSpeed, uRingWidth, uStrength, uRepeatRate, uPointScale;
+void main() {
+    vec2 p = swPos();
+    float aspect = uSize.x / uSize.y;
+    vec2 d = vec2((p.x / uSize.x - 0.5) * aspect, p.y / uSize.y - 0.5);
+    float dist = length(d) * uSize.y;
+    // *** uRepeatRate == 0 MAKES EVERY PIXEL NaN. *** Upstream documents 0.5-5 and never guards it; 0 is
+    // what an undragged slider reports. Reproduced -- the gate names it rather than letting it surprise.
+    float cycleTime = bcs_fmod(uTime, uRepeatRate);
+    float waveFront = cycleTime * uWaveSpeed * uPointScale;
+    float fadeWithDist = exp(-waveFront * 0.003);
+    float ringMask = 1.0 - smoothstep(0.0, uRingWidth * uPointScale, abs(dist - waveFront));
+    ringMask *= ringMask; ringMask *= fadeWithDist;
+    vec2 dir = dist > 0.001 ? d / length(d) : vec2(0.0);  // *** correctly NOT divided back by aspect ***
+    float waveFront2 = max(cycleTime - 0.15, 0.0) * uWaveSpeed * 0.9 * uPointScale;
+    float ringMask2 = 1.0 - smoothstep(0.0, uRingWidth * 0.7 * uPointScale, abs(dist - waveFront2));
+    ringMask2 *= ringMask2 * fadeWithDist * 0.5;
+    float amt = ringMask * uStrength * uPointScale + ringMask2 * uStrength * 0.4 * uPointScale;
+    vec2 sp = clamp(p + dir * amt, vec2(0.0), uSize);
+    vec4 c = layerSample(sp);
+    float chromaAmt = ringMask * uStrength * 0.15 * uPointScale;
+    vec4 r = layerSample(clamp(sp + dir * chromaAmt, vec2(0.0), uSize));
+    vec4 b = layerSample(clamp(sp - dir * chromaAmt, vec2(0.0), uSize));
+    float t = toHalf(ringMask * 0.6), flash = toHalf(ringMask * 0.15);
+    fragColor = vec4(mix(c.r, r.r, t) + flash, c.g + flash, mix(c.b, b.b, t) + flash, c.a);
+}`;
+
+const GRAVITYWELLS_FRAG = PREAMBLE + `
+uniform float uTime, uWellStrength, uWellCount, uOrbitSpeed, uWarpFalloff, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float aspect = uSize.x / uSize.y;
+    float wells = floor(clamp(uWellCount, 1.0, 5.0));     // upstream clamps BEFORE the int -- never zero trips
+    vec2 total = vec2(0.0);
+    for (int i = 0; i < 5; i++) {
+        if (float(i) >= wells) break;
+        float phase = float(i) * 6.2832 / wells;
+        float sp = uOrbitSpeed * (0.7 + float(i) * 0.15);
+        float orbitRadius = 0.2 + float(i) * 0.06;
+        vec2 wp = vec2(0.5 + cos(uTime * sp + phase) * orbitRadius,
+                       0.5 + sin(uTime * sp * 0.8 + phase * 1.3) * orbitRadius);
+        vec2 d = vec2((uv.x - wp.x) * aspect, uv.y - wp.y);
+        float dist = length(d);
+        float pull = uWellStrength / (pow(dist, uWarpFalloff) * uSize.y + 10.0 * uPointScale);
+        pull = min(pull, uWellStrength * 0.5) * uPointScale;
+        vec2 dir = dist > 0.001 ? d / dist : vec2(0.0);
+        total -= dir * pull;                              // *** correctly NOT divided back by aspect ***
+    }
+    vec2 sp2 = clamp(p + total, vec2(0.0), uSize);
+    vec4 c = layerSample(sp2);
+    vec2 chroma = total * 0.08;
+    vec4 r = layerSample(clamp(sp2 + chroma, vec2(0.0), uSize));
+    vec4 b = layerSample(clamp(sp2 - chroma, vec2(0.0), uSize));
+    float t = toHalf(clamp(length(total) * 0.1 * 0.02, 0.0, 0.5));
+    fragColor = vec4(mix(c.r, r.r, t), c.g, mix(c.b, b.b, t), c.a);
+}`;
+
+const REFRACTLENS_FRAG = PREAMBLE + `
+uniform float uTouchX, uTouchY, uLensRadius, uRefraction, uAberration, uWobble, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float aspect = uSize.x / uSize.y;
+    vec2 lc = clamp(vec2(uTouchX, uTouchY) * uPointScale / uSize, vec2(0.05), vec2(0.95));
+    vec2 d = vec2((uv.x - lc.x) * aspect, uv.y - lc.y);
+    float dist = length(d);
+    if (dist > uLensRadius * 1.3) { fragColor = layerSample(p); return; }      // 1) outside
+    if (dist > uLensRadius) {                                                  // 2) the push ring
+        // smoothstep with e0 > e1 -- UNDEFINED in both specs, and relied on for a descending ramp.
+        float outerRing = smoothstep(uLensRadius * 1.3, uLensRadius, dist);
+        vec2 pd = dist > 0.001 ? d / dist : vec2(0.0);
+        pd.x /= aspect;                                   // *** WRONG HALF: this one is spent in PIXELS ***
+        fragColor = layerSample(clamp(p + pd * outerRing * 8.0 * uPointScale, vec2(0.0), uSize));
+        return;
+    }
+    float nd = dist / uLensRadius;                                             // 3) the lens
+    float z = sqrt(max(0.0, 1.0 - nd * nd));
+    vec3 n = normalize(vec3(d / uLensRadius, z));
+    float eta = 1.0 / uRefraction;
+    float cosI = n.z;
+    float sinT2 = eta * eta * (1.0 - cosI * cosI);
+    float k = eta * cosI - sqrt(max(0.0, 1.0 - sinT2));
+    vec2 ruv = uv + vec2(k * n.x, k * n.y) * uLensRadius * 0.5;
+    float chroma = uAberration * (1.0 - z) * 0.01;
+    vec2 cd = normalize(d + 0.001);
+    cd.x /= aspect;                                       // *** RIGHT HALF: this one is spent in UV ***
+    vec4 rr = layerSample(clamp((ruv + cd * chroma) * uSize, vec2(0.0), uSize));
+    vec4 gg = layerSample(clamp(ruv * uSize, vec2(0.0), uSize));
+    vec4 bb = layerSample(clamp((ruv - cd * chroma) * uSize, vec2(0.0), uSize));
+    vec3 lightDir = normalize(vec3(0.3, -0.3, 1.0));
+    vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
+    float add = toHalf(pow(max(dot(n, halfVec), 0.0), 64.0) * 0.6) + toHalf(pow(1.0 - z, 4.0) * 0.2);
+    float rim = pow(nd, 6.0) * 0.3;
+    // Additive and UNCLAMPED, as upstream leaves it -- a bright source can exceed 1.0 inside the lens.
+    fragColor = vec4(rr.r + add + toHalf(rim * 0.5),
+                     gg.g + add + toHalf(rim * 0.6),
+                     bb.b + add + toHalf(rim * 0.8), 1.0);
+}`;
+
+/** Every shader this file can build. Defined AFTER the frags -- `const` is not hoisted. */
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG };
+
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     heatShimmer: { time: "uTime", amplitude: "uAmplitude", frequency: "uFrequency", speed: "uSpeed", verticalBias: "uVerticalBias", pointScale: "uPointScale" },
@@ -408,6 +580,11 @@ const KNOBS = {
     topographic: { time: "uTime", lineCount: "uLineCount", lineWidth: "uLineWidth", colorize: "uColorize", animate: "uAnimate" },
     thermal: { time: "uTime", intensity: "uIntensity", shimmer: "uShimmer", noiseSpeed: "uNoiseSpeed", paletteShift: "uPaletteShift", pointScale: "uPointScale" },
     neonEdge: { time: "uTime", edgeStrength: "uEdgeStrength", glowAmount: "uGlowAmount", colorCycle: "uColorCycle", mixOriginal: "uMixOriginal", pointScale: "uPointScale" },
+    touchRipple: { touchX: "uTouchX", touchY: "uTouchY", touchAge: "uTouchAge", amplitude: "uAmplitude", frequency: "uFrequency", speed: "uSpeed", decay: "uDecay", pointScale: "uPointScale" },
+    liveRipple: { time: "uTime", amplitude: "uAmplitude", frequency: "uFrequency", speed: "uSpeed", damping: "uDamping", ringCount: "uRingCount", pointScale: "uPointScale" },
+    shockwave: { time: "uTime", waveSpeed: "uWaveSpeed", ringWidth: "uRingWidth", strength: "uStrength", repeatRate: "uRepeatRate", pointScale: "uPointScale" },
+    gravityWells: { time: "uTime", wellStrength: "uWellStrength", wellCount: "uWellCount", orbitSpeed: "uOrbitSpeed", warpFalloff: "uWarpFalloff", pointScale: "uPointScale" },
+    refractLens: { touchX: "uTouchX", touchY: "uTouchY", lensRadius: "uLensRadius", refraction: "uRefraction", aberration: "uAberration", wobble: "uWobble", pointScale: "uPointScale" },
 };
 
 /**
@@ -441,6 +618,11 @@ const DEFAULT_KNOBS = {
     topographic:    { time: 0, lineCount: 12, lineWidth: 0.05, colorize: 1, animate: 0 },
     thermal:        { time: 0, intensity: 1, shimmer: 4, noiseSpeed: 1, paletteShift: 0, pointScale: 1 },
     neonEdge:       { time: 0, edgeStrength: 4, glowAmount: 1, colorCycle: 1, mixOriginal: 0.3, pointScale: 1 },
+    touchRipple:    { touchX: 0, touchY: 0, touchAge: 0, amplitude: 10, frequency: 20, speed: 200, decay: 2, pointScale: 1 },
+    liveRipple:     { time: 0, amplitude: 10, frequency: 20, speed: 3, damping: 2, ringCount: 3, pointScale: 1 },
+    shockwave:      { time: 0, waveSpeed: 200, ringWidth: 30, strength: 40, repeatRate: 2, pointScale: 1 },
+    gravityWells:   { time: 0, wellStrength: 80, wellCount: 3, orbitSpeed: 1, warpFalloff: 2, pointScale: 1 },
+    refractLens:    { touchX: 0, touchY: 0, lensRadius: 0.25, refraction: 1.5, aberration: 6, wobble: 0, pointScale: 1 },
 };
 
 /* eslint-disable no-undef */
@@ -572,4 +754,5 @@ export {
     VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA,
     EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
+    TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
 };

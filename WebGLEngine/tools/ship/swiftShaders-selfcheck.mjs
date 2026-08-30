@@ -9,16 +9,33 @@
 // COMPILE, AND FIVE OF THEM CHANGE THE PICTURE IN SILENCE. *** That is what this file is for: the maths of an
 // emboss is four lines and none of the risk is in the four lines.
 //
-// WHAT CANNOT BE CHECKED HERE, STATED RATHER THAN GLOSSED: nothing on this box has a GL context, so the GLSL is
-// never executed. The CPU model IS exercised, and the shader is read for CORRESPONDENCE -- same constants, same
-// expressions, same traps applied at the same places. That is weaker than crtPass's bit-identical comparison
-// and it is what is available; the day this tree grows a headless GL, the honest upgrade is to run both.
+// *** v4196 -- THE HEADER USED TO SAY "nothing on this box has a GL context, so the GLSL is never executed",
+// AND ENDED "the day this tree grows a headless GL, the honest upgrade is to run both". THE TREE ALREADY HAD
+// ONE. *** tools/ship/playwrightResolve.mjs has resolved a headless chromium for other gates since v3941, and
+// --use-gl=swiftshader gives a real WebGL2 context. So the fourteen shaders shipped at v4163-v4164 were read
+// for CORRESPONDENCE and never once RUN, for two versions, on a box that could have run them the whole time.
+// A stated limit is better than a hidden one, but a stated limit that has quietly stopped being true is just
+// a wrong claim with good manners.
+//
+// Section 11 runs all nineteen. It found, on its first execution:
+//   1. toHalf() in the shared PREAMBLE returned NaN for tiny inputs, so four pixels of bcs_refractLens
+//      rendered PURE BLACK. Shipped since v4163; fixed this round in both the GLSL and the CPU model.
+//   2. Five of the fourteen previously-shipped shaders CANNOT agree with their CPU reference, ever, and the
+//      boundary is exactly "does it call bcs_hash". The sin-hash diverges by up to 0.68 on a 0..1 value
+//      between float64 and float32 -- not a rounding difference, a different random number.
+//   3. bcs_vortex differs at 6 pixels of 1152, by exactly one texel, where a rotation lands on a texel
+//      boundary and the two precisions round across it. Benign, and now bounded rather than unknown.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
+         bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, smoothstep,
+         HALF_MAX, HALF_MIN_SUBNORMAL,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
+import http from "node:http";
+import { createRequire } from "node:module";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // v4169 -- IMPORTED AS AN ES MODULE, WHICH IS THE ONLY WAY A PAGE COULD EVER LOAD IT. The old line here was
@@ -692,8 +709,248 @@ console.log("\n14. *** THE FILE MUST BE LOADABLE BY THE THING THAT IS SUPPOSED T
         "an import with no call site is not much better.");
 }
 
+
+// =========================================================================================================
+console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a knob that is a coordinate");
+{
+    const BATCH9 = ["touchRipple", "liveRipple", "shockwave", "gravityWells", "refractLens"];
+    for (const name of BATCH9) {
+        const keys = Object.keys(pass.KNOBS[name] || {});
+        ok("   " + name + " is registered with knobs", keys.length >= 6, keys.join(", "));
+    }
+    // *** THE OLDER SECTIONS ASK WHETHER THE KNOB NAME APPEARS IN THE FRAG, AND A COMMENT SATISFIES THAT. ***
+    // heatShimmer passes its version because the word "verticalBias" occurs in a comment, not because the
+    // uniform is declared. This is the same commentFalsePass shape the tree has caught in two other gates.
+    // The real question is whether the UNIFORM the knob writes to is DECLARED, so ask that, for all nineteen.
+    {
+        const undeclared = [];
+        for (const name of pass.swiftShaderNames()) {
+            for (const [knob, uni] of Object.entries(pass.KNOBS[name] || {})) {
+                if (!new RegExp("uniform[^;]*\\b" + uni + "\\b").test(pass.SHADERS[name])) undeclared.push(name + "." + knob + " -> " + uni);
+            }
+        }
+        ok("!! *** every knob of all 19 shaders is a DECLARED uniform, not a word in a comment ***",
+            undeclared.length === 0, undeclared.length ? undeclared.join(", ")
+            : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
+    }
+    ok("!! 19 of 41 ported", pass.swiftShaderNames().length === 19, pass.swiftShaderNames().length + " shaders");
+
+    // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
+    ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
+       "not derive ***",
+       ["touchX", "touchY"].every((k) => k in pass.KNOBS.touchRipple && k in pass.KNOBS.refractLens),
+       "it arrives in POINTS with y DOWN, so it needs the same flip and scale swPos() applies -- and the fix " +
+       "lives in the CALLER, where no assertion in this shader can reach it");
+    {
+        // A y that was not flipped puts the ripple at the vertical mirror. Measured, so "it still looks like a
+        // ripple" is a number rather than a worry.
+        const W = 32, H = 16;
+        const img = { w: W, h: H, premultiplied: true, data: new Float32Array(W * H * 4) };
+        for (let i = 0; i < W * H; i++) { img.data[i * 4] = (i % W) / W; img.data[i * 4 + 1] = ((i / W) | 0) / H; img.data[i * 4 + 3] = 1; }
+        const right = bcsTouchRipple(img, { touchX: 8, touchY: 3, touchAge: 0.3, speed: 30 });
+        const flipped = bcsTouchRipple(img, { touchX: 8, touchY: H - 3, touchAge: 0.3, speed: 30 });
+        let diff = 0;
+        for (let i = 0; i < W * H * 4; i++) if (Math.abs(right.data[i] - flipped.data[i]) > 1 / 255) diff++;
+        ok("!! ...and an unflipped touch y is a DIFFERENT PICTURE, not a subtle one",
+            diff > 200, diff + " of " + (W * H * 4) + " samples differ -- the ripple still expands and still " +
+            "decays, centred where nobody pointed. Nothing about it looks broken.");
+        // *** THE OBVIOUS VERSION OF THIS CHECK IS VACUOUS, AND SABOTAGE SAID SO. *** At touchAge 9 with the
+        // default decay of 2 the ripple has faded to nothing on its own, so removing the early-out entirely
+        // changes ZERO samples and the check passes on deleted code. The knobs below keep the ripple plainly
+        // alive at 5.5s -- a slow decay and a slow wavefront -- so the early-out is the only thing ending it.
+        const K = { touchX: 16, touchY: 8, decay: 0.1, speed: 5, amplitude: 10 };
+        const dead = bcsTouchRipple(img, { ...K, touchAge: 5.5 });
+        let same = true;
+        for (let i = 0; i < W * H * 4; i++) if (dead.data[i] !== img.data[i]) { same = false; break; }
+        ok("!! touchAge past 5s returns the layer UNTOUCHED -- the early-out is how the ripple ends", same,
+            "porting it as a clamp would leave a ring frozen on screen forever");
+        const alive = bcsTouchRipple(img, { ...K, touchAge: 4.999 });
+        let moving = 0;
+        for (let i = 0; i < W * H * 4; i++) if (Math.abs(alive.data[i] - img.data[i]) > 1 / 255) moving++;
+        ok("!! ...and the CONTROL: at 4.999s the same ripple is still plainly displacing the image",
+            moving > 400, moving + " samples differ from the source just INSIDE the window, so the check above " +
+            "is about the early-out and not about a ripple that had already faded to nothing");
+    }
+
+    // --- THE ASPECT FINDING, WHICH THIS GATE FIRST WROTE DOWN INVERTED ---
+    {
+        // delta.x *= aspect converts uv-delta INTO pixel-delta/h. So normalize() of it is ALREADY the true
+        // pixel radial direction, and dividing x back out is what breaks it.
+        const err = (W, H) => {
+            const aspect = W / H; let worst = 0;
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const cx = x + 0.5, cy = y + 0.5;
+                const dx = (cx / W - 0.5) * aspect, dy = cy / H - 0.5, m = Math.hypot(dx, dy);
+                if (m < 1e-9) continue;
+                let ux = dx / m / aspect, uy = dy / m; const mu = Math.hypot(ux, uy); ux /= mu; uy /= mu;
+                const px = cx - W / 2, py = cy - H / 2, mp = Math.hypot(px, py);
+                if (mp < 1e-9) continue;
+                const a = Math.acos(Math.min(1, Math.max(-1, ux * px / mp + uy * py / mp))) * 180 / Math.PI;
+                if (a > worst) worst = a;
+            }
+            return worst;
+        };
+        const sq = err(32, 32), w2 = err(64, 32), w3 = err(96, 32);
+        ok("!! *** the extra `dir.x /= aspect` COSTS NOTHING ON A SQUARE CANVAS ***", sq < 1e-4,
+            sq.toExponential(2) + " deg, i.e. zero to within float rounding -- which is why it survives " +
+            "review: a square preview is the one canvas on which the bug is invisible");
+        ok("!! ...and 19.47 deg at 2:1", Math.abs(w2 - 19.47) < 0.01, w2.toFixed(2) + " deg");
+        ok("!! ...and 30.00 deg at 3:1", Math.abs(w3 - 30.0) < 0.01, w3.toFixed(2) + " deg");
+        const model = fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8");
+        ok("!! *** refractLens divides x back TWICE and only one of the two is right ***",
+            /WRONG HALF: this one is spent in PIXELS/.test(model) && /RIGHT HALF: this one is spent in UV/.test(model),
+            "pushDir feeds `position + ...` (pixels, must not divide back); chromaDir feeds `(uv +/- ...) * size` " +
+            "(uv, must). Same function, same idiom, two different answers -- because the results are spent in " +
+            "different spaces. Reproduced as upstream wrote it, and recorded here rather than silently repaired.");
+    }
+
+    // --- fmod(t, 0) is a whole-frame NaN ---
+    ok("!! *** shockwave's repeat_rate = 0 makes EVERY pixel NaN ***", Number.isNaN(fmod(3.7, 0)),
+        "fmod(time, 0) is NaN and it propagates through waveFront, ringMask and the displacement. Upstream " +
+        "documents the knob as 0.5-5 and never guards it -- and 0 is exactly what an undragged slider reports.");
+
+    // --- toHalf: the defect the GPU found, pinned as a regression ---
+    {
+        const tiny = Math.pow(0.282065, 64);       // what refractLens's spec term actually computes
+        ok("!! *** toHalf models half's EXPONENT range, not just its mantissa ***",
+            toHalf(tiny) === 0 && tiny > 0,
+            "toHalf(" + tiny.toExponential(2) + ") = 0, because a half cannot represent it: the smallest " +
+            "subnormal is 2^-24 = " + HALF_MIN_SUBNORMAL.toExponential(2) + ". Before v4196 both copies " +
+            "quantised the mantissa at ANY exponent -- the CPU kept full double precision, and the GLSL " +
+            "computed exp2(-126), divided by it, and returned NaN. FOUR PIXELS OF THE LENS RENDERED BLACK.");
+        ok("   ...and clamps at the top too", toHalf(70000) === HALF_MAX, "toHalf(70000) = " + toHalf(70000));
+        ok("   ...while leaving ordinary values alone", toHalf(0.5) === 0.5 && toHalf(1) === 1 && toHalf(1234.5) === 1235);
+        const preamble = pass.PREAMBLE;
+        ok("!! ...and the GLSL carries the SAME clamp, not just the model",
+            /max\(floor\(log2\(abs\(x\)\)\), -14\.0\)/.test(preamble),
+            "the CPU model agreeing with itself is worth nothing here -- it was the GLSL that returned NaN");
+    }
+}
+
+// =========================================================================================================
+console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real WebGL2 context, against the CPU model");
+{
+    const require_ = createRequire(import.meta.url);
+    const { chromium, from: pwFrom } = resolvePlaywright(require_);
+    const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    if (skip) {
+        report("SKIPPED -- " + skip);
+        report("*** A SKIP, NOT A PASS. Sections 1-10 read the shader; only this one executes it, and it is " +
+               "the section that found a NaN two versions of correspondence-reading had missed.");
+    } else {
+        report("chromium via " + pwFrom);
+        // NON-SQUARE ON PURPOSE: the aspect finding above is exactly zero on a square canvas.
+        const W = 48, H = 24;
+        const src = new Uint8Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4;
+            src[i] = Math.round(x * 255 / (W - 1)); src[i + 1] = Math.round(y * 255 / (H - 1));
+            src[i + 2] = Math.round((x + y) * 255 / (W + H - 2)); src[i + 3] = 255;
+        }
+        const fimg = { w: W, h: H, premultiplied: true, data: Float32Array.from(src, (v) => v / 255) };
+        const srv = http.createServer((rq, rs) => {
+            const u = decodeURIComponent(rq.url.split("?")[0]);
+            if (u === "/g.html") {
+                rs.writeHead(200, { "Content-Type": "text/html" });
+                return rs.end('<script type="module">import { makeSwiftShaderPass } from "/render/swiftShaderPass.js";' +
+                              ' window.__mk = makeSwiftShaderPass; window.__ready = true;</script>');
+            }
+            const f = path.join(ENG, u);
+            if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rs.writeHead(404); return rs.end("nf"); }
+            rs.writeHead(200, { "Content-Type": /\.m?js$/.test(f) ? "text/javascript" : "text/plain" });
+            rs.end(fs.readFileSync(f));
+        });
+        await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+        const port = srv.address().port;
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const pg = await (await b.newContext()).newPage();
+        const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
+        await pg.goto("http://127.0.0.1:" + port + "/g.html", { waitUntil: "load" });
+        await pg.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
+
+        const MODEL = { emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
+            duochrome: bcsDuochrome, vortex: bcsVortex, kaleidoscope: bcsKaleidoscope,
+            chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
+            melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
+            touchRipple: bcsTouchRipple, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
+            gravityWells: bcsGravityWells, refractLens: bcsRefractLens };
+        const CASES = { emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
+            duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
+            chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
+            melt: { time: 1 }, topographic: { time: 1 }, thermal: { time: 1 }, neonEdge: { time: 1 },
+            touchRipple: { touchX: 30, touchY: 8, touchAge: 0.4 }, liveRipple: { time: 1.3 },
+            shockwave: { time: 0.35 }, gravityWells: { time: 0.9 }, refractLens: { touchX: 24, touchY: 12 } };
+        // The five that call the sin-hash. Determined from the SHADER SOURCE, not from a list I typed.
+        const HASHED = pass.swiftShaderNames().filter((n) => {
+            const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
+            return /bcs_(hash|valueNoise|fbm)\(/.test(body);
+        });
+        ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
+            HASHED.length === 5, HASHED.join(", "));
+
+        const results = {};
+        for (const name of pass.swiftShaderNames()) {
+            const gpu = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                const p = window.__mk(name, W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { name, knobs: CASES[name], W, H, src: Array.from(src) });
+            const cpu = MODEL[name](fimg, { ...pass.DEFAULT_KNOBS[name], ...CASES[name] });
+            let worst = 0, off = 0, nan = 0;
+            for (let i = 0; i < W * H * 4; i++) {
+                if (i % 4 === 3) continue;
+                if (Number.isNaN(cpu.data[i])) nan++;
+                const c = Math.max(0, Math.min(255, Math.round(cpu.data[i] * 255)));
+                const d = Math.abs(c - gpu[i]); if (d > worst) worst = d; if (d > 2) off++;
+            }
+            results[name] = { worst, off, nan, black: gpu.filter((v, i) => i % 4 !== 3 && v === 0).length };
+        }
+        ok("!! the page loaded and ran 19 shaders with no script error", errs.length === 0, errs.join(" | "));
+
+        // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
+        const EXACTISH = pass.swiftShaderNames().filter((n) => !HASHED.includes(n) && n !== "vortex");
+        for (const n of EXACTISH) {
+            ok("   " + n.padEnd(15) + " GPU matches the CPU model", results[n].worst <= 2,
+                "worst " + results[n].worst + " levels, " + results[n].off + " pixels over 2");
+        }
+        ok("!! *** all five of batch 9 are bit-exact against their CPU reference on a real GPU ***",
+            ["touchRipple", "liveRipple", "shockwave", "gravityWells", "refractLens"]
+                .every((n) => results[n].worst === 0),
+            ["touchRipple", "liveRipple", "shockwave", "gravityWells", "refractLens"]
+                .map((n) => n + " " + results[n].worst).join(", "));
+
+        // B) refractLens is the regression: it was FOUR BLACK PIXELS before the toHalf fix.
+        ok("!! *** refractLens renders no black pixel -- the toHalf NaN regression ***",
+            results.refractLens.worst === 0,
+            "before v4196 this read 252 levels at 4 pixels, all of them pure black, because toHalf(pow(dot,64)) " +
+            "was NaN. This is the check that would go red if the exponent clamp were removed.");
+
+        // C) vortex: bounded, explained, and NOT swept under the exact class.
+        ok("!! vortex differs at a handful of pixels by ONE TEXEL, and no more",
+            results.vortex.off <= 20 && results.vortex.worst <= 12,
+            results.vortex.worst + " levels at " + results.vortex.off + " pixels of " + (W * H) + " -- one texel " +
+            "of this gradient is 255/23 = 11.1 levels vertically. A rotation lands exactly on a texel boundary " +
+            "and float32 and float64 round across it. Nearest sampling, not a port error.");
+
+        // D) the five that CANNOT agree, and the reason, measured.
+        for (const n of HASHED) {
+            ok("   " + n.padEnd(15) + " DISAGREES, as the sin-hash requires", results[n].off > 100,
+                "worst " + results[n].worst + " levels over " + results[n].off + " pixels");
+        }
+        ok("!! *** the CPU model can never verify a sin-hash shader, and this is the boundary ***",
+            HASHED.every((n) => results[n].off > 100) && EXACTISH.every((n) => results[n].worst <= 2),
+            "bcs_hash is fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). Multiplying sin's output by 43758 " +
+            "turns one float32 ULP into a DIFFERENT RANDOM NUMBER: measured divergence up to 0.68 on a 0..1 " +
+            "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. Sections 1-10 are " +
+            "what checks these five, and they check the SHAPE rather than the pixels.");
+        await b.close(); srv.close();
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-            "\nunchecked here: the GLSL executing. No GL context on this box, so the shader is read for " +
-            "correspondence rather than run -- weaker than crtPass's bit-identical comparison, and stated " +
-            "rather than implied.");
+            "\nunchecked here: whether these effects look GOOD, and whether the five sin-hash shaders match " +
+            "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What is " +
+            "checked is that 19 of 41 are ported, that 13 of them agree with their CPU reference on a real " +
+            "WebGL2 context and 5 provably cannot, that a knob which is a coordinate needs the same flip a " +
+            "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero.");
 process.exit(fails ? 1 : 0);

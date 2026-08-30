@@ -8,6 +8,87 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4196 -- Five more SwiftUIShaders, a knob that is a coordinate, and the GLSL run for the first time
+
+`krispuckett/SwiftUIShaders` (MIT) goes from 14 to **19 of 41**: `touchRipple`, `liveRipple`, `shockwave`,
+`gravityWells`, `refractLens` -- all five radial displacement shaders, ported in one batch because they
+answer a single question three different ways.
+
+### 1. The new trap: a knob can be a coordinate too
+
+Every coordinate trap argued so far -- the y flip, the point scale -- was about `position`, which the shader
+**derives**. `bcs_touchRipple` and `bcs_refractLens` take their centre as a **parameter**, documented "touch
+location in pixels" and actually in **points, with y growing down**.
+
+So the fix does not live in the shader at all. It lives at the API boundary, and nothing inside the shader
+can detect a `y` that was never flipped. A letter-perfect port still puts the ripple at the vertical mirror
+of where the user touched -- still expanding, still decaying, still reading as a ripple. Measured: an
+unflipped touch y changes **852 of 2048 samples**. Nothing about it looks broken. It is simply centred
+somewhere nobody pointed.
+
+### 2. I wrote the aspect finding down backwards, and measuring it said so
+
+Reading the twelve radial shaders, they appear to split into ones that aspect-correct and convert back, and
+ones that correct and *forget* to convert back -- and the second group looks like an obvious bug. That
+reading is wrong:
+
+    delta = uv - centre;  delta.x *= size.x/size.y
+      =>  ((cx - w/2)/w * w/h,  (cy - h/2)/h)  =  (pixelDelta.x / h,  pixelDelta.y / h)
+
+**`delta.x *= aspectRatio` does not make the field abstractly circular. It converts a uv delta into a pixel
+delta.** So `normalize()` of it is *already* the true pixel radial direction, and dividing x back out is what
+breaks it. The question is never whether a shader un-corrects -- it is **what space the result is spent in**:
+`position + dir * k` must not divide back; `uv + dir * k`, then `* size`, must.
+
+On that criterion `liveRipple` and `refractLens`'s outer push ring are the defective ones, and `shockwave`
+and `gravityWells` -- the two that look like they forgot a step -- are correct. **`refractLens` divides x
+back twice and only one of the two is right**, in the same function, with the same idiom, because `pushDir`
+is spent in pixels and `chromaDir` in uv.
+
+Measured as the angle between the direction actually pushed and the true radial direction: **0.00 deg on a
+square canvas, 19.47 deg at 2:1, 30.00 deg at 3:1**. Exactly zero when width equals height, which is why it
+survives review -- a square preview is the one canvas on which the bug is invisible. Ported faithfully rather
+than repaired: a port that silently improves its source is a port nobody can check against the source.
+
+### 3. The gate said it had no GL context. The tree had had one since v3941.
+
+The header read *"nothing on this box has a GL context, so the GLSL is never executed"* and ended *"the day
+this tree grows a headless GL, the honest upgrade is to run both."* `tools/ship/playwrightResolve.mjs` has
+resolved a headless chromium for other gates since v3941, and `--use-gl=swiftshader` gives a real WebGL2
+context. So fourteen shaders were read for correspondence and **never once run, for two versions, on a box
+that could have run them the whole time**. A stated limit is better than a hidden one, but a stated limit
+that has quietly stopped being true is just a wrong claim with good manners.
+
+Running all nineteen found three things on its first execution.
+
+**`toHalf()` in the shared PREAMBLE returned NaN, and four pixels of `refractLens` rendered pure black.**
+It modelled half's *mantissa* and not its *exponent range*, quantising to 10 bits at any exponent. For a tiny
+input `exp2(e - 10)` with `e = -116` made `x / q` overflow to Inf, and `floor(Inf + 0.5) * q` was NaN -- one
+contagious NaN per pixel. Shipped since v4163; it never fired because no earlier shader raised anything to a
+high power, and `pow(dot, 64.0)` on an ordinary dot of 0.28 is about 1e-35. Clamping the exponent to half's
+smallest normal fixes it in one term and is also simply correct: **a half cannot represent 1e-35, and the
+true answer there is 0.** Fixed in the GLSL and the CPU model, which had the same gap in the other direction
+-- it silently kept full double precision.
+
+**Five of the fourteen can never agree with their CPU reference, and the boundary is exactly "does it call
+`bcs_hash`".** The sin-hash is `fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453)`. Multiplying sin's
+output by 43758 turns one float32 ULP into a **different random number**: measured divergence up to **0.68 on
+a 0..1 value**, 68 percent of the range. That is not a tolerance to widen; it is a limit to state, and it
+would hold between any two implementations. The other thirteen agree to within 2 levels, and all five of this
+round's ports are **bit-exact** against their CPU reference on a real GPU.
+
+**`bcs_vortex` differs at 12 pixels of 1152, by exactly one texel**, where a rotation lands on a texel
+boundary and float32 and float64 round across it. Benign, and now bounded rather than unknown.
+
+### 4. Two of my own checks were decoration, and sabotage said so
+
+The knob check asked whether a knob's **name** appeared anywhere in the frag -- which comments satisfy, and
+`heatShimmer` passed only because the word "verticalBias" occurs in a comment. It now asks for the declared
+`uniform`, across all nineteen. And the early-out check used `touchAge` 9, where the ripple has already faded
+to nothing on its own: deleting the early-out entirely changed **zero** samples and the check still passed.
+At a slow decay the same ripple is plainly alive at 5.5s, and the check now carries that control beside it.
+
+5 sabotages, all red. The tree carries 1276 gates.
 ## v4195 -- The splat stack had two .ply parsers, 3,302 lines, and not one gate -- because nothing could write the format
 
 `engine/splatParser.js` and `gpu/SplatLoader.js` both read 3DGS `.ply`, into two different shapes, for two

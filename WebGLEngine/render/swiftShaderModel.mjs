@@ -40,17 +40,51 @@ export const fmod = (a, b) => a - b * Math.trunc(a / b);
 export const glmod = (a, b) => a - b * Math.floor(a / b);
 
 /** Round to IEEE half (mediump). Modelled because `half(x)` in the Metal source is a deliberate quantisation. */
+export const HALF_MAX = 65504;                 // largest finite half
+export const HALF_MIN_EXP = -14;               // exponent of the smallest NORMAL half, 2^-14
+export const HALF_MIN_SUBNORMAL = Math.pow(2, -24);   // 5.96e-8 -- below half of this, a half IS zero
+
+/**
+ * Round to IEEE half (mediump). Modelled because `half(x)` in the Metal source is a deliberate quantisation.
+ *
+ * *** v4196 -- THIS MODELLED half'S MANTISSA AND NOT ITS EXPONENT RANGE, AND THE GLSL COPY TURNED THAT INTO
+ * NaN. *** Both halves quantised to 10 mantissa bits at ANY exponent. A half has five exponent bits: it
+ * cannot represent 1e-35 at all, and the true answer there is 0. The CPU version silently kept full double
+ * precision; the GLSL version computed exp2(e - 10) for e = -116, and dividing by that returned Inf, so
+ * floor(Inf + 0.5) * q was NaN -- a black pixel, and NaN is contagious.
+ *
+ * It never fired for the first fourteen ports because none raised anything to a high power. bcs_refractLens
+ * does: pow(dot, 64.0) on a dot of 0.28 is about 1e-35. MEASURED in a headless GL context, not reasoned
+ * about -- toHalf(pow(0.282065, 64.0)) came back NaN, and four pixels of the lens rendered pure black.
+ *
+ * Clamping the exponent to half's minimum NORMAL exponent fixes it in one term and is also just correct:
+ * it makes subnormals quantise to multiples of 2^-24 and anything below half of that flush to zero, which is
+ * what the hardware does.
+ */
 export function toHalf(x) {
     if (!Number.isFinite(x)) return x;
     const f = Math.fround(x);
     if (f === 0) return f;
-    const e = Math.floor(Math.log2(Math.abs(f)));
-    const q = Math.pow(2, e - 10);           // half carries 10 explicit mantissa bits
+    const a = Math.abs(f);
+    if (a > HALF_MAX) return f > 0 ? HALF_MAX : -HALF_MAX;   // a real half goes to Infinity; clamped here
+    const e = Math.max(Math.floor(Math.log2(a)), HALF_MIN_EXP);
+    const q = Math.pow(2, e - 10);           // half carries 10 explicit mantissa bits, above 2^-14
     return Math.round(f / q) * q;
 }
 
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 export const mix = (a, b, t) => a + (b - a) * t;
+/**
+ * GLSL/Metal smoothstep. Hoisted to module scope in v4196 -- it was a local const inside bcsPlasma, and
+ * batch 9 needs it in three more shaders.
+ *
+ * *** IT IS CALLED WITH e0 > e1 ON PURPOSE BY bcs_refractLens, AND BOTH SPECS CALL THAT UNDEFINED. ***
+ * `smoothstep(r * 1.3, r, dist)` wants a ramp that DESCENDS with distance. Metal and GLSL both define the
+ * result only for e0 < e1; in practice both compute clamp((x-e0)/(e1-e0)) and a negative denominator gives
+ * exactly the descending ramp upstream wants. Reproduced here because the port must match the source, and
+ * written down because "works everywhere I tried" is the whole risk profile of an undefined behaviour.
+ */
+export const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
 /** Rec.601 luma, the weights the Metal source spells out. */
 export const LUMA = [0.299, 0.587, 0.114];
 export const luma = (r, g, b) => r * LUMA[0] + g * LUMA[1] + b * LUMA[2];
@@ -734,3 +768,316 @@ export const METAL_TO_GLSL = [
     { id: "edges", metal: "layer sampling has defined edges", glsl: "wraps unless CLAMP_TO_EDGE is set",
       silent: false, note: "shows as smeared borders, which at least looks wrong" },
 ];
+
+// ============================================================================================================
+// BATCH 9 (v4196) -- FIVE RADIAL DISPLACEMENT SHADERS, AND A CORRECTION I NEARLY SHIPPED BACKWARDS
+// ============================================================================================================
+//
+// *** THE NEW TRAP: A KNOB CAN BE A COORDINATE TOO. ***
+//
+// Every coordinate trap argued so far -- the y flip, the point scale -- was about `position`, which the
+// shader DERIVES. bcs_touchRipple and bcs_refractLens take `touchPos` as a PARAMETER, documented "touch
+// location in pixels". It is neither pixels nor in our frame: it is POINTS, measured with y growing DOWN.
+//
+// So the fix does not live in the shader at all. It lives at the API boundary, in whatever hands the touch
+// point over -- and that is what makes it dangerous. A port whose shader body is letter-perfect still puts
+// the ripple at the vertical MIRROR of where the user touched, and it still expands, still decays, still
+// reads as a ripple. Nothing looks broken. It is simply centred somewhere nobody pointed.
+//
+// Modelled here as two scalar knobs, touchX and touchY, because that is what the pass machinery carries --
+// and because splitting them makes the y the caller has to think about impossible to pass by accident.
+//
+// ------------------------------------------------------------------------------------------------------
+// *** AND THE ASPECT FINDING, WHICH I FIRST WROTE DOWN INVERTED. ***
+//
+// Reading the twelve radial shaders, they appear to split into "corrects the aspect and converts back" and
+// "corrects and forgets to convert back", and the second group looks like an obvious bug. That reading is
+// wrong, and measuring it says so in one line:
+//
+//     delta = uv - centre;  delta.x *= size.x/size.y
+//       =>  ((cx - w/2)/w * w/h,  (cy - h/2)/h)  =  (pixelDelta.x / h,  pixelDelta.y / h)
+//
+// *** `delta.x *= aspectRatio` DOES NOT MAKE THE FIELD ABSTRACTLY CIRCULAR. IT CONVERTS A uv DELTA INTO A
+// PIXEL DELTA. *** So normalize() of it is ALREADY the true radial direction in pixel space, and dividing x
+// back out is what breaks it. The question is not whether a shader un-corrects. It is WHAT SPACE THE RESULT
+// IS CONSUMED IN:
+//
+//   consumed as `position + dir * k`   (PIXELS)  -> must NOT divide x back
+//   consumed as `uv + dir * k`, then `* size`    -> must divide x back
+//
+// On that criterion, audited across all twelve:
+//
+//   right, uv-consumed, divides back      vortex, kaleidoscope, blackHole, wormhole
+//   right, pixel-consumed, does not       shockwave, gravityWells
+//   right, no aspect term at all          touchRipple, wavePool, magneticField, underwaterCaustics
+//   WRONG, pixel-consumed, divides back   liveRipple, and refractLens's outer push ring
+//
+// *** refractLens IS THE ONE WORTH STOPPING ON: IT DIVIDES x BACK TWICE, AND ONLY ONE OF THE TWO IS RIGHT. ***
+// `pushDir` feeds `position + pushDir * n` -- pixels, so dividing back is wrong. `chromaDir` feeds
+// `(refractedUV +/- chromaDir * n) * size` -- uv, so dividing back is right. Same function, same idiom, two
+// different answers, because the two results are spent in different spaces.
+//
+// Measured, as the angle between the direction actually pushed and the true pixel radial direction:
+// 0.00 deg on a square canvas, 19.47 deg at 2:1, 30.00 deg at 3:1. *** IT IS EXACTLY ZERO WHEN width ==
+// height, WHICH IS WHY IT SURVIVES REVIEW *** -- a square preview is the one canvas on which the bug is
+// invisible.
+//
+// *** PORTED FAITHFULLY RATHER THAN FIXED, AND THAT IS DELIBERATE. *** These are ports; a port that silently
+// improves its source is a port nobody can check against the source. The gate pins the angle as a measured
+// number instead, so it is recorded rather than hidden -- and so that if upstream ever fixes it, our copy
+// goes red and says which shader moved.
+//
+// It is also why fourteen ports went by without this surfacing: the two radial shaders already done, vortex
+// and kaleidoscope, are both uv-consumed, where dividing back is correct.
+
+/**
+ * bcs_touchRipple -- an expanding gaussian ring from a touch point, with a chromatic lip.
+ *
+ * No aspect term anywhere: `dist` is a raw pixel length throughout, which is self-consistent and correct
+ * for a ripple. The shader that needs no conversion is the one that never leaves pixel space.
+ *
+ * *** THE EARLY-OUT IS PART OF THE EFFECT, NOT A GUARD. *** touchAge outside [0.01, 5] returns the layer
+ * untouched, which is how the ripple ENDS. Porting it as a clamp would leave a ring frozen on screen forever.
+ */
+export function bcsTouchRipple(img, { touchX = 0, touchY = 0, touchAge = 0, amplitude = 10, frequency = 20,
+                                      speed = 200, decay = 2, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const px = touchX * pointScale, py = touchY * pointScale;   // the knob is in POINTS, y DOWN
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        if (touchAge < 0.01 || touchAge > 5.0) {
+            const c = s(cx, cy);
+            out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+            continue;
+        }
+        const dx = cx - px, dy = cy - py;
+        const dist = Math.hypot(dx, dy);
+        const rippleRadius = touchAge * speed * pointScale;
+        const distFromFront = dist - rippleRadius;
+        const waveWidth = (60.0 + touchAge * 40.0) * pointScale;
+        const envelope = Math.exp(-(distFromFront * distFromFront) / (2.0 * waveWidth * waveWidth));
+        const timeFade = Math.exp(-touchAge * decay);
+        const wave1 = Math.sin(distFromFront * frequency * 0.008);
+        const wave2 = Math.sin(distFromFront * frequency * 0.005 + 1.0) * 0.5;
+        const wave = (wave1 + wave2) * 0.67 * envelope * timeFade * amplitude * pointScale;
+        const guard = 0.5 * pointScale;
+        const dirx = dist > guard ? dx / dist : 0, diry = dist > guard ? dy / dist : 0;
+        const dispx = clamp(cx + dirx * wave, 0, w), dispy = clamp(cy + diry * wave, 0, h);
+        const c = s(dispx, dispy);
+        const chromaAmt = Math.abs(wave) * 0.08;
+        const r = s(clamp(dispx + dirx * chromaAmt, 0, w), clamp(dispy + diry * chromaAmt, 0, h));
+        const b = s(clamp(dispx - dirx * chromaAmt, 0, w), clamp(dispy - diry * chromaAmt, 0, h));
+        const t = toHalf(envelope * timeFade * 0.3);
+        out[i]     = mix(c[0], r[0], t);
+        out[i + 1] = c[1];
+        out[i + 2] = mix(c[2], b[2], t);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_liveRipple -- N concentric ripple sources drifting near the centre.
+ *
+ * *** THIS IS THE ONE WITH THE DEFECT, AND IT READS LIKE THE CAREFUL ONE. *** `delta.x *= aspect` has
+ * already put the delta in pixel proportions, so normalize() is the true pixel radial direction. The extra
+ * `dir.x /= aspect` then pushes it off that direction -- by up to 19.47 degrees on a 2:1 canvas, and by
+ * exactly nothing on a square one. Reproduced as upstream wrote it; the gate measures the angle.
+ *
+ * The loop bound comes from a knob. Ported with a CONSTANT bound and an early break, which is this file's
+ * established idiom (bcs_fbm, bcs_echo) and the only form GLSL ES will unroll.
+ */
+export function bcsLiveRipple(img, { time = 0, amplitude = 10, frequency = 20, speed = 3,
+                                     damping = 2, ringCount = 3, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const rings = Math.min(8, Math.trunc(ringCount));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5;
+        const uvx = cx / w, uvy = cy / h;
+        let offx = 0, offy = 0;
+        for (let k = 0; k < rings; k++) {
+            const phase = k * 1.256;
+            const rcx = 0.5 + Math.sin(time * 0.3 + phase) * 0.05;
+            const rcy = 0.5 + Math.cos(time * 0.4 + phase) * 0.05;
+            let dx = (uvx - rcx) * aspect, dy = uvy - rcy;
+            const dist = Math.hypot(dx, dy);
+            const wave = Math.sin(dist * frequency - time * speed + phase);
+            const envelope = Math.exp(-dist * damping);
+            let dirx = dist > 0.001 ? dx / dist : 0, diry = dist > 0.001 ? dy / dist : 0;
+            dirx /= aspect;                                   // *** THE DEFECT: delta was ALREADY pixel-proportional ***
+            const g = wave * envelope * amplitude * pointScale / ringCount;
+            offx += dirx * g; offy += diry * g;
+        }
+        const c = s(clamp(cx + offx, 0, w), clamp(cy + offy, 0, h)), i = (y * w + x) * 4;
+        out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_shockwave -- a repeating ring expanding from the centre, with a chromatic lip and a flash.
+ *
+ * *** IT NEVER DIVIDES x BACK, AND THAT IS CORRECT. *** `delta.x *= aspect` has already converted the uv
+ * delta into pixel proportions, so `normalize(delta)` is the true pixel radial direction and `position +
+ * dir * ...` pushes exactly outward. The shader that looks like it forgot a step is the one that did not
+ * need it -- see the header, and liveRipple above for the same idiom used wrongly.
+ *
+ * *** AND repeat_rate = 0 MAKES THE ENTIRE FRAME NaN. *** fmod(time, 0) is NaN, which propagates through
+ * waveFront, ringMask and the displacement to every pixel. Upstream documents the knob as "0.5-5" and never
+ * guards it; 0 is exactly the value a slider that has not been dragged yet reports. Ported faithfully, and
+ * the gate pins it as a known, named cliff rather than a surprise.
+ */
+export function bcsShockwave(img, { time = 0, waveSpeed = 200, ringWidth = 30, strength = 40,
+                                    repeatRate = 2, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const cycleTime = fmod(time, repeatRate);                 // NaN when repeatRate is 0 -- upstream's shape
+    const waveFront = cycleTime * waveSpeed * pointScale;
+    const fadeWithDist = Math.exp(-waveFront * 0.003);
+    const waveFront2 = Math.max(cycleTime - 0.15, 0.0) * waveSpeed * 0.9 * pointScale;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5;
+        const dx = (cx / w - 0.5) * aspect, dy = cy / h - 0.5;
+        const dist = Math.hypot(dx, dy) * h;
+        let ringMask = 1.0 - smoothstep(0.0, ringWidth * pointScale, Math.abs(dist - waveFront));
+        ringMask *= ringMask; ringMask *= fadeWithDist;
+        const dirx = dist > 0.001 ? dx / Math.hypot(dx, dy) : 0;   // *** correctly NOT divided back ***
+        const diry = dist > 0.001 ? dy / Math.hypot(dx, dy) : 0;
+        let ringMask2 = 1.0 - smoothstep(0.0, ringWidth * 0.7 * pointScale, Math.abs(dist - waveFront2));
+        ringMask2 *= ringMask2 * fadeWithDist * 0.5;
+        const amt = ringMask * strength * pointScale + ringMask2 * strength * 0.4 * pointScale;
+        const sxp = clamp(cx + dirx * amt, 0, w), syp = clamp(cy + diry * amt, 0, h);
+        const c = s(sxp, syp);
+        const chromaAmt = ringMask * strength * 0.15 * pointScale;
+        const r = s(clamp(sxp + dirx * chromaAmt, 0, w), clamp(syp + diry * chromaAmt, 0, h));
+        const b = s(clamp(sxp - dirx * chromaAmt, 0, w), clamp(syp - diry * chromaAmt, 0, h));
+        const t = toHalf(ringMask * 0.6), flash = toHalf(ringMask * 0.15), i = (y * w + x) * 4;
+        out[i]     = mix(c[0], r[0], t) + flash;
+        out[i + 1] = c[1] + flash;
+        out[i + 2] = mix(c[2], b[2], t) + flash;
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_gravityWells -- N orbiting attractors, each pulling the image inward by an inverse power law.
+ *
+ * Pixel-consumed and correctly does not divide x back, like shockwave. `well_count` is clamped to 1..5 by
+ * upstream BEFORE the int conversion, so unlike liveRipple this one cannot be handed a zero trip count --
+ * worth noting because the two shaders sit beside each other and only one is guarded.
+ *
+ * `pow(dist, falloff)` at dist 0 is 0 for any positive falloff, and the +10 in the denominator is what keeps
+ * the pull finite at the centre. That constant is in POINTS: it is added to `pow(dist, f) * size.y`.
+ */
+export function bcsGravityWells(img, { time = 0, wellStrength = 80, wellCount = 3, orbitSpeed = 1,
+                                       warpFalloff = 2, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const wells = Math.trunc(clamp(wellCount, 1, 5));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5;
+        const uvx = cx / w, uvy = cy / h;
+        let tdx = 0, tdy = 0;
+        for (let k = 0; k < wells; k++) {
+            const phase = k * 6.2832 / wells;
+            const sp = orbitSpeed * (0.7 + k * 0.15);
+            const orbitRadius = 0.2 + k * 0.06;
+            const wx = 0.5 + Math.cos(time * sp + phase) * orbitRadius;
+            const wy = 0.5 + Math.sin(time * sp * 0.8 + phase * 1.3) * orbitRadius;
+            const dx = (uvx - wx) * aspect, dy = uvy - wy;
+            const dist = Math.hypot(dx, dy);
+            let pull = wellStrength / (Math.pow(dist, warpFalloff) * h + 10.0 * pointScale);
+            pull = Math.min(pull, wellStrength * 0.5) * pointScale;
+            const dirx = dist > 0.001 ? dx / dist : 0, diry = dist > 0.001 ? dy / dist : 0;
+            tdx -= dirx * pull; tdy -= diry * pull;           // *** correctly NOT divided back ***
+        }
+        const sxp = clamp(cx + tdx, 0, w), syp = clamp(cy + tdy, 0, h);
+        const c = s(sxp, syp);
+        const dispMag = Math.hypot(tdx, tdy) * 0.1;
+        const chx = tdx * 0.08, chy = tdy * 0.08;
+        const r = s(clamp(sxp + chx, 0, w), clamp(syp + chy, 0, h));
+        const b = s(clamp(sxp - chx, 0, w), clamp(syp - chy, 0, h));
+        const t = toHalf(clamp(dispMag * 0.02, 0, 0.5)), i = (y * w + x) * 4;
+        out[i]     = mix(c[0], r[0], t);
+        out[i + 1] = c[1];
+        out[i + 2] = mix(c[2], b[2], t);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_refractLens -- a glass sphere over the layer: Snell refraction, chromatic edges, specular and Fresnel.
+ *
+ * The second shader whose CENTRE IS A KNOB, and the one that divides x back TWICE with only one of the two
+ * correct: `pushDir` is spent in PIXELS (`position + pushDir * n`), where dividing back is wrong;
+ * `chromaDir` is spent in UV (`(refractedUV +/- chromaDir * n) * size`), where it is right. Both are
+ * reproduced as written -- see the header.
+ *
+ * *** THREE EARLY EXITS, AND THEY ARE THE SHAPE OF THE EFFECT. *** Outside 1.3r the layer passes through
+ * untouched; between r and 1.3r there is a push-only ring; inside r is the lens proper. Flattening those
+ * into one branch is how a lens turns into a smear.
+ *
+ * The specular and Fresnel terms are ADDITIVE and unclamped, exactly as upstream leaves them, so a bright
+ * source can exceed 1.0 inside the lens. That is upstream's look; clamping it here would be a silent change.
+ */
+export function bcsRefractLens(img, { touchX = 0, touchY = 0, lensRadius = 0.25, refraction = 1.5,
+                                      aberration = 6, wobble = 0, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    // The knob is in POINTS with y DOWN -- scaled here, and normalised the way upstream does.
+    let lcx = clamp((touchX * pointScale) / w, 0.05, 0.95);
+    let lcy = clamp((touchY * pointScale) / h, 0.05, 0.95);
+    const lightN = (() => { const l = [0.3, -0.3, 1.0], m = Math.hypot(l[0], l[1], l[2]); return [l[0]/m, l[1]/m, l[2]/m]; })();
+    const hv = (() => { const v = [lightN[0], lightN[1], lightN[2] + 1], m = Math.hypot(v[0], v[1], v[2]); return [v[0]/m, v[1]/m, v[2]/m]; })();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const dx = (uvx - lcx) * aspect, dy = uvy - lcy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > lensRadius * 1.3) {                        // 1) outside: untouched
+            const c = s(cx, cy);
+            out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+            continue;
+        }
+        if (dist > lensRadius) {                              // 2) the outer push ring
+            const outerRing = smoothstep(lensRadius * 1.3, lensRadius, dist);   // e0 > e1 -- see smoothstep
+            let pdx = dist > 0.001 ? dx / dist : 0, pdy = dist > 0.001 ? dy / dist : 0;
+            pdx /= aspect;                                    // *** WRONG HALF: this one is spent in PIXELS ***
+            const push = outerRing * 8.0 * pointScale;
+            const c = s(clamp(cx + pdx * push, 0, w), clamp(cy + pdy * push, 0, h));
+            out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+            continue;
+        }
+        // 3) the lens: a sphere normal, then Snell
+        const nd = dist / lensRadius;
+        const z = Math.sqrt(Math.max(0, 1.0 - nd * nd));
+        const nx0 = dx / lensRadius, ny0 = dy / lensRadius;
+        const nm = Math.hypot(nx0, ny0, z) || 1;
+        const nx = nx0 / nm, ny = ny0 / nm, nz = z / nm;
+        const eta = 1.0 / refraction;
+        const cosI = nz;                                      // -dot(normal, (0,0,-1))
+        const sinT2 = eta * eta * (1.0 - cosI * cosI);
+        const k = eta * cosI - Math.sqrt(Math.max(0.0, 1.0 - sinT2));
+        const rx = k * nx, ry = k * ny;                       // eta * incident contributes only to z
+        const ruvx = uvx + rx * lensRadius * 0.5, ruvy = uvy + ry * lensRadius * 0.5;
+        const chroma = aberration * (1.0 - z) * 0.01;
+        const cdm = Math.hypot(dx + 0.001, dy + 0.001) || 1;
+        let cdx = (dx + 0.001) / cdm, cdy = (dy + 0.001) / cdm;
+        cdx /= aspect;                                        // *** RIGHT HALF: this one is spent in UV ***
+        const rr = s(clamp((ruvx + cdx * chroma) * w, 0, w), clamp((ruvy + cdy * chroma) * h, 0, h));
+        const gg = s(clamp(ruvx * w, 0, w), clamp(ruvy * h, 0, h));
+        const bb = s(clamp((ruvx - cdx * chroma) * w, 0, w), clamp((ruvy - cdy * chroma) * h, 0, h));
+        const spec = Math.pow(Math.max(nx * hv[0] + ny * hv[1] + nz * hv[2], 0.0), 64.0);
+        const fresnel = Math.pow(1.0 - z, 4.0);
+        const rim = Math.pow(nd, 6.0) * 0.3;
+        const add = toHalf(spec * 0.6) + toHalf(fresnel * 0.2);
+        out[i]     = rr[0] + add + toHalf(rim * 0.5);
+        out[i + 1] = gg[1] + add + toHalf(rim * 0.6);
+        out[i + 2] = bb[2] + add + toHalf(rim * 0.8);
+        out[i + 3] = 1.0;                                     // upstream returns alpha 1 from the lens
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
