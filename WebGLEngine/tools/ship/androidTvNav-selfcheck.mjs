@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/androidTvNav-selfcheck.mjs -- v4117
 //
-// Run: node tools/ship/androidTvNav-selfcheck.mjs   (~4s; last section drives real Chromium)
+// Run: node tools/ship/androidTvNav-selfcheck.mjs   (~1.9s MEASURED (gate-timings.json) -- last section drives real Chromium)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES the Android TV support in android/swek-webview -- the manifest lines that decide whether the APK is

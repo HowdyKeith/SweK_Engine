@@ -52,6 +52,20 @@ const START = path.join(ENG, "start-steamdeck.sh");
 const BRAIN = path.join(ENG, "brain", "start-brain-steamdeck.sh");
 const SERVER = rd(path.join(ENG, "ai-bridge", "server.js"));
 
+// *** v4166 -- WHETHER THIS BOX HAS bash IS ESTABLISHED ONCE, BECAUSE WITHOUT IT THIS GATE REPORTED SEVEN
+// FAILURES ABOUT SHELL SCRIPTS THAT ARE FINE. *** Keith ran it on Windows (C:\Intel\SweK_Engine_v4148) and
+// every bash-backed check went red: three "parses (bash -n)" failures, the live port-owner resolution, the
+// empty-port case, the sabotage control, and the run-for-real -- all of them "Command failed" or
+// "spawnSync bash ENOENT". THE SCRIPTS WERE NEVER READ. A gate that cannot tell "this script is broken" from
+// "this machine has no shell" is asserting a property of the box while naming a property of the code, which
+// is the same defect materialKnobs, rh-hydrostatic and twoFBind carried as stopwatch assertions at v4162.
+//
+// A SKIP THAT NAMES ITSELF, then -- never a silent pass. The static checks (sections 3-7) read source and are
+// platform-independent, so they still run and still fail loudly; only the checks that need a shell stand down,
+// and they say so with the reason.
+let HAVE_BASH = false;
+try { execFileSync("bash", ["-c", "exit 0"], { timeout: 5000, stdio: "ignore" }); HAVE_BASH = true; } catch { HAVE_BASH = false; }
+
 console.log("steamdeckLaunch-selfcheck -- does the Steam Deck / Linux launcher pair actually work, and can it take over its own port?\n");
 
 console.log("1. THE THREE FILES EXIST AND PARSE AS REAL BASH");
@@ -59,8 +73,14 @@ console.log("1. THE THREE FILES EXIST AND PARSE AS REAL BASH");
     for (const [name, p] of [["install-steamdeck.sh", INSTALL], ["start-steamdeck.sh", START], ["brain/start-brain-steamdeck.sh", BRAIN]]) {
         ok("!! " + name + " exists", fs.existsSync(p));
         if (!fs.existsSync(p)) continue;
-        try { execFileSync("bash", ["-n", p], { timeout: 10000 }); ok(name + " parses (bash -n)", true); }
-        catch (e) { ok(name + " parses (bash -n)", false, String(e.message || e).slice(0, 200)); }
+        if (!HAVE_BASH) {
+            report("   " + name + " parses (bash -n) -- NOT RUN: no bash on this box",
+                "a syntax check needs the interpreter. Reporting this as a FAILING script would be a claim " +
+                "about the file made by the absence of a shell");
+        } else {
+            try { execFileSync("bash", ["-n", p], { timeout: 10000 }); ok(name + " parses (bash -n)", true); }
+            catch (e) { ok(name + " parses (bash -n)", false, String(e.message || e).slice(0, 200)); }
+        }
     }
 }
 
@@ -73,7 +93,13 @@ console.log("\n2. *** THE TAKEOVER, RUN FOR REAL -- THE FUNCTION THAT BROKE THE 
     // would have passed the broken version too -- the broken version LOOKED complete; it just returned nothing.
     const fn = /port_owner_pid\(\) \{[\s\S]*?\n\}/.exec(src);
     ok("!! port_owner_pid() can be extracted from the shipped file", !!fn);
-    if (fn) {
+    if (fn && !HAVE_BASH) {
+        report("   the live port-owner checks -- NOT RUN: no bash on this box",
+            "port_owner_pid was extracted from the shipped file (asserted above) and is a SHELL function; " +
+            "resolving a real listener with it needs a shell to run it in. On Windows every one of these " +
+            "reported 'Command failed' and read as the launcher being broken");
+    }
+    if (fn && HAVE_BASH) {
         const harness = `PORT=$1\n${fn[0]}\nport_owner_pid`;
         const probe = () => {
             const srv = net.createServer(() => {});
@@ -98,7 +124,7 @@ console.log("\n2. *** THE TAKEOVER, RUN FOR REAL -- THE FUNCTION THAT BROKE THE 
     // *** SABOTAGE: THE EXACT BUG THIS FILE WAS WRITTEN AFTER FINDING. *** Revert the fallback to the shape
     // that shipped first -- correctly detects "busy", returns nothing -- and confirm this gate would have
     // caught it. If this passes, the gate is real; if it does not, section 2 above proves nothing.
-    if (fn) {
+    if (fn) {   // the stub is BUILT and diffed on every box; only EXECUTING it needs a shell (see below)
         const stub = fn[0].replace(
             /local hexport[\s\S]*?\n    return 0\n\}/,
             "return 0\n}"
@@ -106,10 +132,29 @@ console.log("\n2. *** THE TAKEOVER, RUN FOR REAL -- THE FUNCTION THAT BROKE THE 
         ok("the stub sabotage actually changed the source", stub !== fn[0] && stub.length < fn[0].length);
         const srv2 = await (() => { const s = net.createServer(() => {}); return new Promise((res) => s.listen(0, "127.0.0.1", () => res(s))); })();
         const port2 = srv2.address().port;
-        let out; try { out = execFileSync("bash", ["-c", `PORT=$1\n${stub}\nport_owner_pid`, "_", String(port2)], { timeout: 5000, encoding: "utf8" }).trim(); } catch (e) { out = "ERR"; }
+        // *** v4166 -- A FAILED SHELL AND A STUB THAT ANSWERED ARE NOW DIFFERENT OUTCOMES, AND CONFLATING
+        // THEM BROKE THE NEGATIVE CONTROL IN THE DIRECTION THAT LIES. *** This caught `catch { out = "ERR" }`
+        // and then asserted `out === ""`, so on a box without bash the control reported "the sabotage did not
+        // remove the fix" -- i.e. THE FIX IS MISSING FROM THE SHIPPED FILE -- when in truth nothing had run.
+        // And the other way is worse: had the sentinel been "" instead of "ERR", a box with no shell would
+        // have PASSED this control every time while proving nothing at all. A CONTROL THAT CANNOT TELL
+        // WHETHER IT RAN IS NOT A CONTROL, which is exactly the vacuous-pass shape this tree keeps finding.
+        let out = null, ranStub = false;
+        try {
+            out = execFileSync("bash", ["-c", `PORT=$1\n${stub}\nport_owner_pid`, "_", String(port2)],
+                { timeout: 5000, encoding: "utf8" }).trim();
+            ranStub = true;
+        } catch (e) { out = null; ranStub = false; }
         srv2.close();
-        ok("!! SABOTAGE: the stubbed fallback (the shape that shipped first) resolves NOTHING",
-            out === "", "stub returned '" + out + "' -- if non-empty, the sabotage did not remove the fix");
+        if (!ranStub) {
+            report("   SABOTAGE control -- NOT RUN: the shell would not start",
+                "the stub was built and differs from the shipped function (asserted above), but nothing " +
+                "executed it. AN UNRUN CONTROL IS REPORTED AS UNRUN; calling it a pass or a failure would " +
+                "both be inventions");
+        } else {
+            ok("!! SABOTAGE: the stubbed fallback (the shape that shipped first) resolves NOTHING",
+                out === "", "stub returned '" + out + "' -- if non-empty, the sabotage did not remove the fix");
+        }
     }
 }
 
@@ -214,7 +259,16 @@ console.log("\n7. adb IS OFFERED FOR SHIELD/ANDROID TV, OPTIONAL, AND NEVER RUN 
     // genuinely absent here (checked: `command -v adb` exits 1), Node genuinely present but not on the system
     // PATH by default (this box's node lives under /opt), which is why that directory is named explicitly
     // rather than trusted to already be in process.env.PATH.
-    try {
+    // v4166 -- this block builds its OWN PATH (nodeDir + /usr/bin:/bin) and so finds bash even when the
+    // caller's PATH does not carry it -- which is why it kept running when the checks above stood down. On
+    // Windows there is no /bin to fall back to, so it needs the same guard: Keith's rig reported it as
+    // "spawnSync bash ENOENT", i.e. the install script failing, when no script had been executed.
+    if (!HAVE_BASH) {
+        report("   install-steamdeck.sh RUN FOR REAL -- NOT RUN: no bash on this box",
+            "the source claims above (the block is gated, never calls fail, names Distrobox) all ran and are " +
+            "platform-independent. THIS is the one that needs a shell, and an unrun execution is reported as " +
+            "unrun rather than as an install that failed");
+    } else try {
         const nodeDir = path.dirname(process.execPath);
         const out = execFileSync("bash", [INSTALL], {
             timeout: 30000, encoding: "utf8",

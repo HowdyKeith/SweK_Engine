@@ -8,6 +8,114 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4166 -- four gates from the rig, and every one measured the machine while naming the code
+
+Keith ran eight gates. Four had real defects, and they are the same defect wearing four costumes: **a check
+asserting a property of the box while reporting it as a property of the tree.** That is the shape v4162
+already fixed three times (`materialKnobs`, `rh-hydrostatic`, `twoFBind` asserting a stopwatch), so this is
+the fourth, fifth, sixth and seventh instance.
+
+### 1. The budget estimator was eating its own output
+
+Three gates timed out at enormous budgets and reported nothing. The header above each one carried the cause:
+
+```
+host x4.31 (median of 39 completed run(s) = 2.05x, raised by 3 timeout lower-bound(s) to 4.31x)
+host x8.00 (median of 39 completed run(s) = 2.05x, raised by 4 timeout lower-bound(s) to 8.63x -- CLAMPED)
+```
+
+A gate killed at its budget records elapsed **equal to that budget**, and the budget is
+`measured x TAIL_HEADROOM x scale`. Dividing by the measurement therefore returns `TAIL_HEADROOM x scale` --
+**always strictly above the scale that produced it**. Every timeout doubled the estimate: `1 -> 2 -> 4 -> 8`,
+ceiling.
+
+Verified against the rig to two decimals. `labResults` is MEASURED at 94.3s; at the then-current 4.31x it was
+granted `94.3 x 2 x 4.31 = 812.9s`; it reported `TIMEOUT (813s budget) 813.5s`; and `813.5 / 94.3 = 8.63`,
+which is exactly the figure the next header printed.
+
+**The refutation was sitting in the same line as the error.** Thirty-nine runs that actually finished say
+**2.05x**. A box genuinely 8.63x slower could not have produced them. The bound is arithmetically valid -- a
+gate killed at E did not do `base` of work in E -- but it conflates *a slow host* with *a gate slower than
+its own MEASURED entry*, and it was being attributed entirely to the host and then spent on every other
+gate's budget.
+
+So: **a lower bound is what you use in the absence of a measurement, not something that overrides one.**
+Bounds still carry the scale alone where nothing slow ever completes -- the v3923 case the module exists for
+-- and a bound that contradicts the finished runs is now *reported* as a suspect gate rather than dropped.
+
+The cost was not abstract. At the ceiling of 8 against a true 2.05, every budget on that box was ~4x too
+generous, so every timeout took ~4x longer to fire. One sweep -- `corroborationCensus`, `labResults`,
+`libmSensitivity`, `responseCensus` -- spent **7098 seconds** to report nothing, where 2.05x would have
+killed the same four in ~2290s. **An estimator that eats its own output does not merely drift; it spends the
+thing it exists to save.**
+
+**And the first fix was wrong.** I divided the bound by `TAIL_HEADROOM`, which understates a genuine reading,
+and section 4 of the gate went red insisting a killed run must still teach the scale. It was right, the fix
+was reverted, and the real answer was about *attribution*, not arithmetic. Section 4's own comment claims the
+mechanism "CONVERGES"; it doubled. The new 4b is the check that would have caught that sentence.
+
+### 2. A path pasted into a string literal, on the one platform where that breaks
+
+`shadowedHelper` built a `node -e` command by concatenating a path into JS source. On Windows:
+
+```
+Cannot find module 'C:IntelSweK_Engine_v4148WebGLEngineai-bridgegithubBridge.js'
+```
+
+`\I`, `\S`, `\W` and `\a` are not escape sequences, so JS drops the backslash and keeps the letter -- **every
+separator vanished from a path that was correct when it went in**. On POSIX the separator is `/` and there is
+nothing to escape, so this passed everywhere except the one platform it breaks on, and it reported the result
+as *"cloneEngineSource is not loadable"* -- a claim about the shipped bridge, produced by a bug in the
+harness. `hostScale.mjs` records this exact lesson at v3941, one directory over.
+
+**A path is data, and it stops being data the moment it is concatenated into source.** It travels by
+`process.argv` now, where there is no escaping rule to get wrong.
+
+### 3. A gate that could not tell a broken script from a missing shell
+
+`steamdeckLaunch` reported **seven failures** on a box with no `bash`. Three "parses (bash -n)", the live
+port-owner resolution, the empty-port case, the sabotage control, and the run-for-real -- all of them
+`Command failed` or `spawnSync bash ENOENT`. **The scripts were never read.**
+
+The worst of the seven is the negative control:
+
+```
+FAIL  SABOTAGE: the stubbed fallback resolves NOTHING   stub returned 'ERR'
+      -- if non-empty, the sabotage did not remove the fix
+```
+
+Its `catch` assigned the sentinel `"ERR"` and it then asserted `out === ""`, so a machine without a shell was
+told **the fix is missing from the shipped file**. And the other direction is worse: had the sentinel been
+`""`, that control would have **passed on every shell-less box while proving nothing at all**. A control that
+cannot tell whether it ran is not a control.
+
+The bash-backed checks now skip by name. Verified both ways: with `bash` all checks run and pass; with a
+`PATH` carrying only node, **zero failures and five named skips**. The static sections still run and still
+fail loudly, because they read source and do not care what platform they are on.
+
+### 4. Twelve stated runtimes corrected from the measurement
+
+`statedRuntime` named twelve gate headers that had drifted. Corrected from `gate-timings.json` -- not added
+to the baseline, which that gate calls "a ratchet growing back, the one thing a ratchet must never do". The
+two worth naming: `claimTrace` stated **~60s against a measured 605s** (10.1x under), and `labExport` stated
+**~241s while already carrying the word MEASURED** against a real 79s.
+
+### What was NOT fixed, and why
+
+- **`corroborationCensus`** timed out having done 1270s of real work against a 1335s budget -- 4.9% headroom,
+  so it very nearly finished. The distribution is the finding: **`twof` alone is 943.1s, 73.1% of the whole
+  sweep**, against `kh` at 8.7% and everything else together under 130s. Rebalancing that trades against
+  itself (cost-ordering maximises coverage but then the dearest four are *never* swept), so it needs a
+  measurement rather than a preference, and it is a round of its own.
+- **`referenceKind`** is red at 193 prose-rescued orphans against a ceiling of 181, and **the growth is
+  mine.** Five modules I added in v4159-v4165 have *zero* non-gate importers -- `render/swiftShaderPass.js`,
+  `render/holoFoilShader.js`, `ui/runnerPanel.js`, `tools/export/weldVertices.mjs`,
+  `tools/mac/xbarPlugin.mjs` -- and four more are held out of the census by a single mention, most likely
+  `main.js`'s own changelog comment, which is precisely the rescue-by-sentence the gate is about. So the 14
+  shader ports and the holofoil material are gated but unreachable from the running engine. The fix is
+  wiring, not a higher ceiling.
+
+Tree at 1252 gates.
 ## v4165 -- the tier-2 census branch landed, and the interesting part is how the conflicts were settled
 
 Twenty-seven commits merged from `claude/tier-2-keys-patch-4lwhzk`, which had been running on its own since

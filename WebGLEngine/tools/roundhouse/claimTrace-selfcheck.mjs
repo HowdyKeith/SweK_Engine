@@ -1,6 +1,6 @@
 // tools/roundhouse/claimTrace-selfcheck.mjs
 //
-// Run: node tools/roundhouse/claimTrace-selfcheck.mjs   (~60s)
+// Run: node tools/roundhouse/claimTrace-selfcheck.mjs   (~605s MEASURED (gate-timings.json))
 //
 // v3182 -- IS A CLAIMED NUMBER SUPPORTED BY DATA ANYONE CAN GET BACK TO?
 //

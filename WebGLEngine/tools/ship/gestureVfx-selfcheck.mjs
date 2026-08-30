@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gestureVfx-selfcheck.mjs -- v4111
 //
-// Run: node tools/ship/gestureVfx-selfcheck.mjs   (~0.2s; no camera, no browser, no network)
+// Run: node tools/ship/gestureVfx-selfcheck.mjs   (~63ms MEASURED (gate-timings.json) -- no camera, no browser, no network)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ui/gestureVfx.js -- gesture recognition, the firing rule, and the particle simulation.

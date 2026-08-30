@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/webrtxBrowser-selfcheck.mjs -- v4118
 //
-// Run: node tools/ship/webrtxBrowser-selfcheck.mjs   (~4s; last section drives real Chromium)
+// Run: node tools/ship/webrtxBrowser-selfcheck.mjs   (~996ms MEASURED (gate-timings.json) -- last section drives real Chromium)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ui/webrtxBrowser.js + webrtx.html -- the opt-in page for ray tracing in a tab via codedhead/webrtx.

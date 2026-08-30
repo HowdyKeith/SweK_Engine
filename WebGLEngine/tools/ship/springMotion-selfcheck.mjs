@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/springMotion-selfcheck.mjs -- v4114
 //
-// Run: node tools/ship/springMotion-selfcheck.mjs   (~0.2s; no browser, no DOM)
+// Run: node tools/ship/springMotion-selfcheck.mjs   (~62ms MEASURED (gate-timings.json) -- no browser, no DOM)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ui/springMotion.js -- the damped-harmonic-oscillator behind both toast surfaces.

@@ -1,6 +1,6 @@
 // tools/roundhouse/renderBounceBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/renderBounceBind-selfcheck.mjs   (~2s MEASURED -- four builds at 60k samples)
+// Run: node tools/roundhouse/renderBounceBind-selfcheck.mjs   (~859ms MEASURED (gate-timings.json) -- four builds at 60k samples)
 //
 // THIS GRADES THE BIND. physics/render/bounces-selfcheck.mjs and nee-selfcheck.mjs own the physics.
 //

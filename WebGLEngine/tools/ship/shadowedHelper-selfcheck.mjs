@@ -116,10 +116,23 @@ console.log("shadowedHelper-selfcheck -- a const that shadows the helper its own
     // and confirming the export exists and is callable -- the crash was at REQUIRE-free call time, not at parse.
     let loadable = false, err = "";
     try {
+        // *** v4166 -- THE PATH IS PASSED AS AN ARGUMENT, NOT PASTED INTO A STRING LITERAL, BECAUSE ON
+        // WINDOWS EVERY BACKSLASH WAS BEING EATEN AS AN ESCAPE. *** Keith's rig:
+        //   Cannot find module 'C:IntelSweK_Engine_v4148WebGLEngineai-bridgegithubBridge.js'
+        // -- \I, \S, \W and \a are not escape sequences, so JS drops the backslash and keeps the letter, and
+        // the separator vanishes from a path that was perfectly correct when it went in. On POSIX the
+        // separator is "/" and there is nothing to escape, SO THIS PASSES EVERYWHERE EXCEPT THE ONE PLATFORM
+        // IT BREAKS ON, and it reports the failure as "cloneEngineSource is not loadable" -- a claim about
+        // the shipped bridge, made by a bug in the harness.
+        //
+        // hostScale.mjs's own v3941 header records this same lesson ("ON WINDOWS path.relative HANDS BACK
+        // BACKSLASHES") one directory over. A PATH IS DATA AND STOPS BEING DATA THE MOMENT IT IS CONCATENATED
+        // INTO SOURCE; process.argv carries it across untouched, with no escaping rule to get right.
         const out = execFileSync(process.execPath, ["-e",
-            "const g=require('" + path.join(ENG, "ai-bridge", "githubBridge.js") + "');" +
+            "const g=require(process.argv[1]);" +
             "if (typeof g.cloneEngineSource !== 'function') { console.log('NOT-A-FUNCTION'); process.exit(0); }" +
-            "console.log('OK');"], { timeout: 20000, encoding: "utf8" });
+            "console.log('OK');", path.join(ENG, "ai-bridge", "githubBridge.js")],
+            { timeout: 20000, encoding: "utf8" });
         loadable = /OK/.test(out);
     } catch (e) { err = String((e && e.message) || e).slice(0, 200); }
     ok("!! cloneEngineSource loads and is callable", loadable, err || "exported");
