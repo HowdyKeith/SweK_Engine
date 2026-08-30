@@ -375,7 +375,7 @@
   "physics/sph/materialKnobs-selfcheck.mjs": 212006,
   "physics/sph/neighbourBakeoff-selfcheck.mjs": 131,
   "physics/sph/packingTransfer-selfcheck.mjs": 320459,
-  "physics/sph/poolFixture-selfcheck.mjs": 119027,
+  "physics/sph/poolFixture-selfcheck.mjs": 145783,
   "physics/sph/portableMath-selfcheck.mjs": 57,
   "physics/sph/spatialGrid-selfcheck.mjs": 1452,
   "physics/sph/stability-selfcheck.mjs": 345757,
@@ -1256,9 +1256,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 366,
+  "timedThisRun": 367,
   "totalInRecord": 1251,
-  "at": "2026-08-30T21:41:45Z"
+  "at": "2026-08-30T21:44:11Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
