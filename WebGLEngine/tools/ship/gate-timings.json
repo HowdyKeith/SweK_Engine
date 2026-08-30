@@ -371,10 +371,10 @@
   "physics/sph/cfl-selfcheck.mjs": 11777,
   "physics/sph/cflStabilityKeys-selfcheck.mjs": 1478,
   "physics/sph/hydrostatic-selfcheck.mjs": 43754,
-  "physics/sph/levelClaim-selfcheck.mjs": 1067411,
-  "physics/sph/materialKnobs-selfcheck.mjs": 172841,
-  "physics/sph/neighbourBakeoff-selfcheck.mjs": 151,
-  "physics/sph/packingTransfer-selfcheck.mjs": 252000,
+  "physics/sph/levelClaim-selfcheck.mjs": 1323953,
+  "physics/sph/materialKnobs-selfcheck.mjs": 212006,
+  "physics/sph/neighbourBakeoff-selfcheck.mjs": 131,
+  "physics/sph/packingTransfer-selfcheck.mjs": 320459,
   "physics/sph/poolFixture-selfcheck.mjs": 119027,
   "physics/sph/portableMath-selfcheck.mjs": 57,
   "physics/sph/spatialGrid-selfcheck.mjs": 1452,
@@ -1256,9 +1256,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 362,
+  "timedThisRun": 366,
   "totalInRecord": 1251,
-  "at": "2026-08-30T21:10:49Z"
+  "at": "2026-08-30T21:41:45Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,

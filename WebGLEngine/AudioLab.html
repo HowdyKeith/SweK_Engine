@@ -87,6 +87,14 @@ kbd { background: #112; padding: 1px 5px; border-radius: 2px; border: 1px solid 
     <div class="note">Click "Start Mic" to enable. Browsers require user gesture to access mic.</div>
     <button id="btn-mic">▶ Start Mic</button>
     <button id="btn-stop-mic">■ Stop</button>
+    <!-- v4197 -- the microphone finally reaches an EFFECT. Until now every one of this tree's four
+         getUserMedia sites connected the mic to an AnalyserNode and stopped: listened to, never processed. -->
+    <label style="margin-left:12px">chain
+      <select id="mic-chain"><option value="">(bypass)</option></select>
+    </label>
+    <label title="A mic routed to this machine's own speakers is a feedback loop through the room, and the room has no gain limit.">
+      <input type="checkbox" id="mic-monitor"> monitor to speakers
+    </label>
     <canvas id="mic-canvas" width="1100" height="220"></canvas>
     <div class="legend">Time-domain waveform via AnalyserNode.getByteTimeDomainData(). Update rate: rAF (~60 Hz).</div>
 </div>
@@ -249,15 +257,40 @@ document.querySelectorAll(".tab").forEach(t => {
 });
 
 // ----- Mic + waveform -----
+// v4197 -- effect chain state. MicChainFrom exists only because this script is classic and the class arrives
+// on window from the module above; it is the same class, not a copy.
+let micChain = null;
+function MicChainFrom(IC, context) {
+    if (!IC) throw new Error("audio/inputChain.js did not load");
+    return new IC.MicChain(context);
+}
+function applyMicChain() {
+    if (!micChain) return;
+    const name = document.getElementById("mic-chain").value;
+    try {
+        if (!name) micChain.setBypass(true);
+        else { micChain.bypass = false; micChain.setChain(name); }
+    } catch (e) {
+        console.warn("[AudioLab] chain refused:", e.message);
+    }
+    micChain.monitor(document.getElementById("mic-monitor").checked);
+}
+document.getElementById("mic-chain").onchange = applyMicChain;
+document.getElementById("mic-monitor").onchange = () => { if (micChain) micChain.monitor(document.getElementById("mic-monitor").checked); };
+
 document.getElementById("btn-mic").onclick = async () => {
     ensureCtx();
     if (micStream) return;
     try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const src = ctx.createMediaStreamSource(micStream);
+        const IC = window.__inputChain;
+        micChain = new MicChainFrom(IC, ctx);
+        micStream = await micChain.open({ audio: true });
         micAnalyser = ctx.createAnalyser();
         micAnalyser.fftSize = 2048;
-        src.connect(micAnalyser);
+        // *** THE ANALYSER NOW WATCHES THE CHAIN'S OUTPUT, NOT THE RAW MIC. *** That is the whole change:
+        // the waveform shows what the effect DID, so the picture and the sound agree.
+        micChain.output.connect(micAnalyser);
+        applyMicChain();
         drawMicWaveform();
     } catch (e) {
         alert("Mic permission denied or unavailable: " + (e?.message ?? e));
@@ -265,6 +298,7 @@ document.getElementById("btn-mic").onclick = async () => {
 };
 
 document.getElementById("btn-stop-mic").onclick = () => {
+    if (micChain) { micChain.close(); micChain = null; }
     if (micStream) {
         micStream.getTracks().forEach(t => t.stop());
         micStream = null;
@@ -608,6 +642,19 @@ refreshSynthStatus();
 </script>
 
 <!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module">
+// v4197 -- AudioLab's main script is a CLASSIC script, so the chain is imported here and handed over on
+// window rather than converting that script to a module (which would un-global every function in it).
+import { MicChain, PRESETS } from "/audio/inputChain.js";
+import { PRESET_NAMES, describeChain } from "/audio/inputChain.mjs";
+window.__inputChain = { MicChain, PRESETS, PRESET_NAMES, describeChain };
+const sel = document.getElementById("mic-chain");
+for (const n of PRESET_NAMES) {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = PRESETS[n].title || n;
+    sel.appendChild(o);
+}
+</script>
 <script type="module" src="/ui/demoChrome.js"></script>
 </body>
 </html>

@@ -8,6 +8,83 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4197 -- The microphone had been listened to in four files and never once processed
+
+`ui/sttLayer.js`, `simulation/VoiceCommander.js`, `dictation.html` and `AudioLab.html` all open
+`getUserMedia`, and all four do `src.connect(analyser)` and stop. AudioLab can already synthesise with
+oscillators, biquads, a convolver, FM and AudioWorklets. So the tree could make sound, and could hear sound,
+and could not put one through the other. This is what v4188 did for the camera, with a different input.
+
+New `audio/inputChain.mjs` (the chain as data, pure), `audio/inputChain.js` (the Web Audio half), and
+`AudioLab.html` now routes the mic through a chain -- with the analyser watching the **chain's output**
+rather than the raw mic, so the waveform shows what the effect did.
+
+### It overturns half of a claim this tree made at v4190
+
+Assessing `rexa-developer/tiks`, that round rejected the Web Audio node graph on the grounds that *"a node
+graph plays and can never be hashed"*, and built `audio/sfxModel.mjs` to render PCM offline instead. The
+first half is right and the second is not.
+
+A graph **playing** is tied to a clock and a device and cannot be hashed. The same graph rendered through an
+**`OfflineAudioContext`** is bit-deterministic. Measured on a chain chosen to be hostile -- IIR biquad state,
+a feedback delay loop, an LFO modulating `delayTime` through a fractional read head, and a waveshaper --
+three renders in one process and a fourth in a **fresh process and a fresh browser** all produced the same
+sha256. So a node graph is gateable after all, and the live microphone is simply the unreproducible input
+beside it: the arrangement `media/afContainer.mjs` (v4193) already made for video.
+
+### chorus and flanger are the argument for data over code
+
+They are the **same graph**, differing by four numbers and **one edge** -- the flanger feeds back. As two
+functions they would look unrelated; as data the difference is readable at a glance. Five presets ship
+(chorus, flanger, echo, telephone, fuzz), all valid, all rendered and measured.
+
+### What the gate asserts is derived from the chain, not typed into the gate
+
+Each preset's echo must arrive inside a window computed from **its own `delayTime` and its own modulation
+depth**, and a preset with no delay node gets **no lag assertion at all**. That second half was found by
+measuring: filter ringing produces peaks that look exactly like echoes, and `fuzz` -- which contains no delay
+whatsoever -- reported "1 echo at lag 196". A check that counted those would have passed on nonsense.
+
+Measured, all five: renders are bit-identical, **silence in gives exactly zero energy out** (the
+runaway-feedback check), nothing clips. `echo` arrives at 12000 samples against a configured 0.25 s at 48 kHz;
+`chorus` at 1234 inside [1008, 1392]; `flanger` at 148 inside [48, 240]. `telephone` passes 1 kHz and stops
+9 kHz by 9x, `fuzz` by 16x -- and `echo` treats both tones alike, which is the control that proves those two
+are measuring **filtering** and not merely "an effect happened".
+
+### The validator's real rule: a feedback loop must contain a delay
+
+Web Audio breaks a cycle only where a `DelayNode` says by how much. A loop without one is either silently
+dropped or runs away, and which one depends on the implementation -- so a chain relying on it behaves
+differently on someone else's machine. A loop **with** a delay is an echo, which is a feature. Nine
+structural rules, each sabotaged red.
+
+`ConvolverNode` is deliberately **absent**: the usual way to make an impulse response without shipping a file
+is decaying noise, which means `Math.random`, which would cost exactly the determinism everything above rests
+on. Left out, and said out loud.
+
+### anime.js's stagger taken, the library refused
+
+`juliangarnier/anime` (MIT) drives its own `requestAnimationFrame` loop, which would be invisible to
+`document.getAnimations()` and therefore to `frameDirty` -- the exact property `ui/domAnimation.mjs` (v4191)
+chose WAAPI for. Adopting it would be a regression wearing an upgrade's clothes.
+
+But this tree had already written `index * step` **three times** -- `ui/brainTrail.js`, `ui/odometerModel.mjs`
+and `ui/peerRadar.js` -- differing only in origin and one base offset. So `ui/stagger.mjs` carries exactly
+those two knobs and not anime's whole surface; grid and axis staggering are absent because nothing here needs
+them. `odometerModel.delaysFor` now goes through it and is **byte-identical**, asserted against outputs
+recorded before the change. A fractional centre is kept fractional: rounding the origin of an even count
+splits the middle pair, which is the symmetry the effect exists for.
+
+### And my own wiring check was decoration, again
+
+It asked whether the string `inputChain.js` appeared anywhere in `AudioLab.html`. Removing the import
+entirely left it **green**, because this file's own error message contains that path and `noComments()` keeps
+string literals. The rule the tree already has: noComments for anything quoted, codeOnly for code shapes --
+and an import is a code shape whose payload happens to be quoted, so the whole statement has to be matched.
+
+95 new checks, 8 sabotages: 7 red, and one green **by design** -- retuning a preset's `delayTime` moves the
+window the gate computes, because the assertion tracks the data. That is a conformance check, not a
+regression pin, and the difference is worth stating. The tree carries 1277 gates.
 ## v4196 -- Five more SwiftUIShaders, a knob that is a coordinate, and the GLSL run for the first time
 
 `krispuckett/SwiftUIShaders` (MIT) goes from 14 to **19 of 41**: `touchRipple`, `liveRipple`, `shockwave`,
