@@ -59,6 +59,11 @@
 //   That is what makes the 1.9x and 15x readings above diagnosable instead of just noisy: a lab whose
 //   repeat measurements disagreed by 50 % could not have told any of those stories.
 //
+//   AND ACROSS MACHINES THE RELATIVE ORDER IS STILL GOOD (main's v4080 note, kept because the
+//   paragraphs above only bound the ABSOLUTE numbers): a reader is entitled to distrust the
+//   milliseconds while still trusting which device is dearer than which, and a scheduling
+//   decline needs nothing more than that order.
+//
 //   NOT A RATCHET. corroboration-reach-baseline.json exists to catch a number FALLING and says so. This one
 //   carries no assertion at all: a device getting slower is news about the device, not a regression in the
 //   record, and pinning costs with === would fire on every machine that is not the one that froze it.

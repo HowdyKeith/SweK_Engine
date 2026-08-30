@@ -135,6 +135,9 @@ export function build({ mode = "selection", config = {} } = {}) {
 export const REACTION_OBSERVABLES = [
     "winningMode", "k", "amp", "criticalK", "criticalB", "hopfB", "aboveThreshold", "dkFromCritical",
     "turingFirst", "gap", "continuousModeIndex", "normalAmp", "swappedAmp", "ratio", "monotone", "nearest", "firstDk",
+    // v4085 -- COMPLETED: rows (approach's per-B table), normalMode/swappedMode (swapped's selected wavenumbers)
+    // were returned and never declared. Same defect as v3850/v4082/v4084.
+    "rows", "normalMode", "swappedMode",
 ];
 
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */

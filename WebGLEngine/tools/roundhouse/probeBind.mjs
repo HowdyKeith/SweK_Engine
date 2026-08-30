@@ -55,6 +55,9 @@ export const PROBE_OBSERVABLES = [
     // radius; the device releases the probe at the target with that L and measures what orbit it actually got.
     // A proposer for this mode needs no words -- a policy's weights can sit in the seat (see policyPilot.mjs).
     "pilotEcc", "pilotSide", "pilotPlunged", "pilotL", "pilotExactL", "pilotLErrFrac", "pilotTargetR", "pilotTurns",
+    // v4085 -- COMPLETED: tourPeriods (the per-station orbital periods `place` returns, null on `tour`) was
+    // returned and never declared. Same defect as v3850/v4082/v4084.
+    "tourPeriods",
 ];
 
 const DEF = {
@@ -309,4 +312,16 @@ export const probeDevice = {
     // needs the observable to be finite in BOTH arms, and `precession` (the primary) does not report
     // closureResidual at all. A self-contained control is invisible to the census for the same reason splat's
     // self-contained sabotage was: the contract compares ACROSS modes.
-    plantMode: "halfadvance", plantFlips: "precessionErrFrac", plantKind: "method" };
+    //
+    // *** v4080 -- plantKind WAS "method" -- WRONG BUCKET, RIGHT INSTINCT. *** The comment above is correct that
+    // measuredPrecession() is untouched and the sabotage is in which formula forms the key -- but plantedCoverage
+    // .mjs's own vocabulary for "a deliberate wrong method delivered as a MODE you select rather than a flag you
+    // set" is `plantKind: "mode"`, its exact words (declaredPlantMode's doc comment). "method" in this lab is
+    // reserved for the OTHER mechanism: a `config.planted` flag substituting the algorithm within one mode --
+    // sdfMarchBind's rawStep swap and refScanBind's streamed-generator swap, both of which read `planted`
+    // in their body and declare no plantMode/plantFlips at all. probeBind reads `planted` NOWHERE (grepped), and
+    // its plant is 100% mode selection (`h.mode === "halfadvance"`), so plantedCoverage.mjs's own
+    // declaredPlantMode/probeModePlant already grades it as a mode plant regardless of this label -- the
+    // mismatch cost nothing there, but capabilityCard.mjs publishes plantKind verbatim, and "method" disagreed
+    // with what the actual census does with this exact device.
+    plantMode: "halfadvance", plantFlips: "precessionErrFrac", plantKind: "mode" };

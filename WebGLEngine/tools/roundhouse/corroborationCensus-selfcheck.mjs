@@ -43,6 +43,22 @@ const report = (name, detail) => console.log("  ----  " + name + (detail ? "   "
 // crashed there too and I READ THE TRAILING STACK TRACE AS THE END OF THE OUTPUT and reported the guards as
 // firing correctly. They did -- and the gate still exited non-zero one line later, which is exactly the kind
 // of thing a gate exists to make impossible to miss.
+//
+// *** AND IT WAS FOUND TWICE, INDEPENDENTLY, FROM OPPOSITE ENDS OF THE SWEEP -- BOTH ACCOUNTS KEPT. ***
+// The tier-2 merge brought in a second write-up of this same defect, v4080's, which reached it from the
+// SHORT end (`--budget 5000`, 82 of 484 device/modes) where v4039a above reached it from the long one.
+// Neither is deleted: that a block-scoping bug is reachable from a two-minute partial AND from a full
+// unbudgeted sweep is evidence about how exposed the defect was, and one account alone hides it.
+// *** v4080 -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE SECTION 2's BLOCK AND USED IN SECTION
+// 3, AND `const` IS BLOCK-SCOPED. *** MEASURED WHILE TRYING TO FREEZE A COST RECORD THIS ROUND: `node
+// tools/roundhouse/corroborationCensus-selfcheck.mjs --budget 5000` reported 82 of 484 device/modes, printed
+// section 2's PARTIAL notices correctly, and then died one line into section 3 --
+// `ReferenceError: pinned is not defined` -- because `pinned` only existed inside section 2's `{ }` and
+// section 3 is a second block. The unbudgeted (freeze) attempt this round hit an unrelated wall first (it
+// never finished within the time this round had -- see costRecord.mjs and device-cost-baseline.json's
+// absence), so this was found from the SHORT end rather than the long one, but it is the identical defect:
+// declared where it is used once, used again one section later, and `const` does not survive the block
+// boundary in between.
 let censusComplete = true, sweptSoFar = "";
 const pinned = (name, cond, detail) => censusComplete
     ? ok(name, cond, detail)
@@ -177,9 +193,13 @@ console.log();
     // reached kerr this line passed by having nothing to check -- the vacuous pass this session already found
     // in mpmstep's sideways negative, where a grid too small to hold the block satisfied "driftX is exactly
     // zero" by never moving it. Unreachable before a budget existed; reachable the moment one did.
-    // `pinned`, for the same reason as the totals: on a partial sweep kerr may simply not have been reached,
-    // which is missing data and not a defect. The kerr.length > 0 guard still stands for the complete run,
-    // where an empty list would mean the rows vanished rather than that the budget ran out.
+    // `pinned`, for the same reason as the totals above: on a partial sweep kerr may simply not have been
+    // reached, which is missing data and not a defect. MEASURED this round at --budget 5000: kerr was one of
+    // the 402 device/modes skipped, and the un-fixed `ok` here reported "kerr modes: " (an empty list) as a
+    // FAILURE rather than an admission -- exactly the vacuous-pass shape this file's own v4036 comment already
+    // named for `kerr.length > 0`, just on the other side of the guard. The kerr.length > 0 check inside the
+    // condition still stands for the COMPLETE run, where an empty list would mean the rows vanished rather
+    // than that the budget ran out.
     pinned("build-level granularity demonstrably overstates the taint",
         kerr.length > 0 && kerr.every((r) => !r.portable && r.rawCalls < 100 && r.unkeyed.length >= 10),
         "kerr modes: " + kerr.map((r) => r.mode + "(" + r.rawCalls + " calls, " + r.unkeyed.length + " unkeyed)").join(", ") +

@@ -98,8 +98,12 @@ console.log("\n2. EVERY DECLARED OBSERVABLE IS PRODUCED BY SOME MODE");
 {
     // The v3759 shape, checked here because this device is where it would have hidden: five of the seventeen
     // were produced ONLY by the unreachable branch.
+    // v4085 -- `kind` no longer excluded here: it was undeclared until this round (the same defect v3850/
+    // v4082/v4084 fixed elsewhere), so this filter existed only to keep an undeclared-but-produced key out
+    // of the "nothing unadvertised" check below. Now that TIDAL_OBSERVABLES declares it, excluding it here
+    // instead makes it fail THIS check's other direction -- "declared but never produced" -- which is false.
     const produced = new Set();
-    for (const r of [dev, val, roc, blo]) for (const k of Object.keys(r)) if (k !== "kind") produced.add(k);
+    for (const r of [dev, val, roc, blo]) for (const k of Object.keys(r)) produced.add(k);
     const missing = TIDAL_OBSERVABLES.filter((k) => !produced.has(k));
     ok("!! no declared observable is produced by NO mode", missing.length === 0,
         missing.join(", ") || TIDAL_OBSERVABLES.length + " declared, all produced. *** FIVE OF THESE COME ONLY "

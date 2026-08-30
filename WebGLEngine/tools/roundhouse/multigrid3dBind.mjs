@@ -33,6 +33,9 @@ import { pathToFileURL } from "node:url";
 export const MG3D_OBSERVABLES = [
     "iters", "residual", "converged", "cells", "levels", "n",
     "itersSmall", "itersLarge", "cellRatio", "iterRatio", "compatible",
+    // v4085 -- COMPLETED: `kind` is returned by every mode (scaling/solve/incompatible/nopreconditioner)
+    // and was never declared. Same defect as v3850/v4082/v4084.
+    "kind",
 ];
 
 const DEF = { n: 24, tol: 1e-6, maxIters: 200, small: 16, large: 32 };

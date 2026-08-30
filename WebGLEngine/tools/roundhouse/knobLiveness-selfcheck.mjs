@@ -589,13 +589,24 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
         build: async ({ mode = "hears", config = {} } = {}) => {
             const c = { gain: 2, other: 5, ...config };
             const used = mode === "deaf" ? 2 : c.gain;
-            return { gain: c.gain, ladder: [{ a: 1 }, { a: 2 }], answer: used * c.other };
+            // v4165 -- `b` CAME IN FROM THE TIER-2 BRANCH AND IT SHARPENS THE PLANT FOR FREE. The old ladder
+            // was [{a:1},{a:2}] -- constant in BOTH modes, so it only ever exercised the identity trap. With
+            // `b` keyed to `used`, the ladder MOVES FOR REAL in `hears` and moves ONLY IN IDENTITY in `deaf`,
+            // which is the discrimination the check below actually claims to make.
+            return { gain: c.gain, ladder: [{ a: 1, b: used }, { a: 2, b: used * 2 }], answer: used * c.other };
         },
     };
     const cfg = { gain: 2, other: 5 };
     const base = await deaf.build({ mode: "deaf", config: cfg });
+    // *** v4165 -- ASSERTED FROM BOTH SIDES, BECAUSE THE ONE-SIDED FORM COULD PASS WITHOUT TESTING ANYTHING.
+    // *** The tier-2 branch checked `!Object.is(...) && sameValue(...)` where this side checked only the
+    // second half. sameValue alone is satisfied by a device that returns a CACHED array -- identical values
+    // AND identical identity -- in which case the reference-comparison trap is not being exercised at all and
+    // the check passes vacuously. The `!Object.is` half asserts that the trap is still armed. A CHECK THAT
+    // CANNOT TELL WHETHER ITS OWN PLANT IS PRESENT IS NOT YET A CHECK, which is this file's own v4036 rule.
+    const altLadder = (await deaf.build({ mode: "deaf", config: { ...cfg, gain: 9 } })).ladder;
     ok("!! *** AN ARRAY OBSERVABLE MUST NOT READ AS MOVED JUST FOR BEING A NEW OBJECT ***",
-        sameValue(base.ladder, (await deaf.build({ mode: "deaf", config: { ...cfg, gain: 9 } })).ladder),
+        !Object.is(base.ladder, altLadder) && sameValue(base.ladder, altLadder),
         "a device that rebuilds an array per call compares unequal TO ITSELF under Object.is, and every knob " +
         "on it reads live whatever it does. This is the mirror of the v4031 echo bug and the worse direction " +
         "of the two: a dead reading invites a look, a live one closes the question.");
@@ -647,6 +658,38 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
         "in ALL EIGHT mode/plant combinations INCLUDING deafknob, because the plant overrides viscosity and " +
         "nothing else. One stability build is ~19 s and exhaustive is four knobs across eight combinations, " +
         "so the real run is minutes; the synthetic above proves the mechanism on every run instead.");
+
+    // *** v4165 -- THE TIER-2 BRANCH DID NOT REPORT THIS, IT ASSERTED IT, AND THE ASSERTION IS KEPT -- BEHIND
+    // A FLAG, BECAUSE THIS GATE ALREADY TIMES OUT. *** The branch replaced the paragraph above with two live
+    // probeKnob calls on the REAL stability device, which is strictly better evidence: a report is a claim
+    // about a run nobody in this process made, and it goes stale the moment the device changes. It is also
+    // expensive -- probeKnob walks up to three rungs, one ~19 s build each, so the pair is a couple of
+    // minutes on top of a gate whose DEFAULT run is already over its 309 s budget.
+    //
+    // DELETING IT WOULD HAVE BEEN THE EASY MERGE AND THE WRONG ONE: the reason it costs minutes is a reason
+    // to make it opt-in, not a reason to go back to prose. Run with KNOB_REAL_PLANT=1 and the paragraph above
+    // stops being taken on trust. WHEN THE TIMEOUT IS FIXED THIS SHOULD BECOME UNCONDITIONAL; it is written
+    // to need no other change when it does.
+    if (process.env.KNOB_REAL_PLANT === "1") {
+        const rDef = stabilityDefaults({ mode: "response" });
+        const rBase = await stabilityDevice.build({ mode: "response", config: rDef.config });
+        const rResponse = await probeKnob(stabilityDevice, "response", rDef.config, "visc", rBase);
+        const dDef = stabilityDefaults({ mode: "deafknob" });
+        const dBase = await stabilityDevice.build({ mode: "deafknob", config: dDef.config });
+        const rDeafknob = await probeKnob(stabilityDevice, "deafknob", dDef.config, "visc", dBase);
+        ok("!! *** THE REAL PLANT: stability.visc READS LIVE IN response AND STILL IN deafknob ***",
+            rResponse.state === "live" && rDeafknob.state === "still",
+            "response: " + rResponse.state + " (moved " + rResponse.moved.join(",") + "), deafknob: " +
+            rDeafknob.state + ". Before the array-identity fix this same call pair measured deafknob LIVE " +
+            "(moved [\"ratioLadder\"]) -- the mode built to be caught was masked by its own rebuilt array. " +
+            "stabilityBind-selfcheck already proves the plant flattens the ladder; the separate claim here " +
+            "is that the GENERIC per-knob census can see what that direct check sees.");
+    } else {
+        report("   the real-plant assertion is OPT-IN and did not run",
+            "set KNOB_REAL_PLANT=1 to assert the paragraph above against the live stability device rather " +
+            "than quoting a past run. It is skipped by default because it costs ~2 minutes of builds and " +
+            "this gate is over budget already -- A SKIP THAT NAMES ITSELF, not a check quietly switched off.");
+    }
 }
 
 console.log("\n3j. *** v4045 -- THE ONE RULE ALL SIX LISTS KEPT NEEDING, ENFORCED INSTEAD OF REMEMBERED ***");

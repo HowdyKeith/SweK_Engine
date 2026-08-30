@@ -172,6 +172,17 @@ export async function buildThermal(hyp, base = {}) {
         // critical value from. Returning a number anyway would be an intercept of a line through noise.
         const raCritMeasured = slope > 0 ? -((sy - slope * sx) / n) / slope : null;
         return {
+            // *** v4077 -- AN OBSERVABLE CENSUS FLAGGED raCritExact AS MOVED BY NOTHING, WHICH IS CORRECT: IT
+            // IS Chandrasekhar'S PUBLISHED CONSTANT, computed nowhere in this codebase. structureFactor's
+            // shape, and the strongest form of it -- the reference is not even OUR arithmetic. ***
+            //
+            // *** AND THE PROBE THAT FOUND IT ALMOST MISREAD A SECOND DEFECT THAT WAS ITS OWN. *** Built at
+            // this device's BARE defaults (steps: 360), raCritMeasured comes back near 39285 -- 22x off --
+            // because 360 steps never lets the pitchfork develop and the default Ra sweep sits 35-50x above
+            // onset, far past where amplitude^2 is linear in Ra. rayleighOnset-selfcheck (the gate that
+            // actually exercises this mode) uses { nx:64, ny:33, steps:20000 }: AT THAT CONFIG raCritMeasured
+            // is 1752.5 against 1707.762 -- 2.6%, inside the gate's 5% tolerance. The census probe's bare
+            // config was the blind spot, not this device -- the same shape as v4044's budget-starved reading.
             raCritMeasured, raCritExact: RA_CRIT_EXACT,
             raCritErrFrac: raCritMeasured == null ? null : Math.abs(raCritMeasured - RA_CRIT_EXACT) / RA_CRIT_EXACT,
             raSweep: pts.map((q) => Math.round(q.Ra)),

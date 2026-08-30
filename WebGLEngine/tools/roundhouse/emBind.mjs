@@ -226,6 +226,19 @@ function buildEm({ mode = "vacuum", config = {} } = {}) {
         };
     }
 
+    // *** v4072 -- AN OBSERVABLE CENSUS FLAGGED cComputed, cDefined, cErrFrac AND z0 AS MOVED BY NOTHING, AND
+    // THAT IS CORRECT: `vacuum` mode has no knob that reaches MU0 or EPS0. *** cErrFrac is structureFactor's
+    // shape, not blackbody's: lightSpeed() = 1/sqrt(MU0*EPS0) is Maxwell's relation, computed independently of
+    // C_DEFINED = 299792458 (SI-exact by the metre's 2019 redefinition). Two different physical constants
+    // multiplied and inverted, checked against a definition that shares no code with either -- not the same
+    // formula compared to itself.
+    //
+    // MEASURED FOR TEETH RATHER THAN ASSUMED TO HAVE THEM: baseline cErrFrac is 2.17e-14 (CODATA MU0/EPS0
+    // against the exact 1799-era... no, 2019-era defined c). Perturbing MU0 by a relative 1e-12 moves it to
+    // 4.78e-13 -- over an order of magnitude above the noise floor, so a wrong permeability or permittivity
+    // would show up long before it mattered physically. z0 = sqrt(MU0/EPS0) is reported beside it as a typed
+    // reference the same way structureFactor's cubic and triclinic cells are: a number that must not move
+    // because nothing in this mode may reach the constants it is built from.
     const n = nOf(c.epsR, c.muR);
     return {
         ...blank,

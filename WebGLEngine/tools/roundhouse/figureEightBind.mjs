@@ -99,6 +99,15 @@ export async function buildFigureEight(args = {}) {
     }
 
     if (mode === "conserve") {
+        // v4087 -- IDENTICAL TO `period`'s FALLTHROUGH BELOW, AND THAT IS RECORDED RATHER THAN HIDDEN.
+        // gateBudget.mjs's labResults-selfcheck note (re: figureeight/period) shows `period` mode once
+        // returned -1 SENTINELS for energyDriftFrac/angMomDrift, the same way `choreography` and `perturbed`
+        // still do above -- so `conserve` was originally the ONLY mode with real conservation numbers. Giving
+        // `period` its own honest energyDriftFrac/angMomDrift (a real fix, not a regression) left both modes
+        // running the identical honest simulation and returning the identical object. `conserve` stays a
+        // separate mode name anyway: predictions.html, physics-lab.html and instruments.mjs already cite it
+        // by name as the entry point for a conservation claim, and merging it into `period` is a wider,
+        // cross-file API change this round does not make. The numbers are correct either way.
         const r = run(steps, 0);
         return { ...base, returnDist: r.ret, thirdDist: -1,
                  energyDriftFrac: Math.abs((r.E1 - r.E0) / r.E0), angMomDrift: Math.abs(r.L1 - r.L0),
@@ -118,7 +127,13 @@ export const figureEightDevice = {
     name: "figure-eight-choreography",
     // "period" stays FIRST: it owns returnDist, and the contract compares the plant against modes[0].
     modes: FIG8_MODES,
-    plantMode: "euler", plantFlips: "returnDist", plantKind: "knob",
+    // *** v4087 -- plantKind WAS "knob" -- probe's/splat's/lens's exact mistake (fixed v4080/v4081/v4086).
+    // `euler` is a registered mode (FIG8_MODES includes it), selected by name -- the same integrator switch
+    // shape as thermostat's `nosqrt`, mpmColumn's `noelastic` and every other correctly-labelled "mode" plant
+    // in this file's own device family, all five of which already declare "mode". This file never reads
+    // config.planted at all. plantedCoverage.mjs's declaredPlantMode/probeModePlant already grades this as a
+    // mode plant regardless of the label, but capabilityCard.mjs publishes plantKind verbatim.
+    plantMode: "euler", plantFlips: "returnDist", plantKind: "mode",
     plantIdeal: 0, plantIdealWhy:
         "returnDist is how far the orbit misses its own starting point after one period, so a closed orbit returns exactly to it and 0 is the ideal; euler goes 5.31e-6 -> 5.54e-2 and `closes` drops 1 -> 0",
     observables: FIG8_OBSERVABLES,

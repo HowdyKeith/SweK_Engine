@@ -53,6 +53,9 @@ export const TIDAL_OBSERVABLES = [
     "validitySeparation", "validityFrac", "validityTol",
     "rocheMeasured", "rocheExact", "rocheErrFrac",
     "blobStretch", "blobStretchPredicted", "blobStretchErrFrac", "blobCount", "blobDisrupted",
+    // v4085 -- COMPLETED: `kind` is returned by every mode and was never declared. Same defect as
+    // v3850/v4082/v4084.
+    "kind",
 ];
 
 // tau default 390: falling from r0=50 that reaches r ~ 3M, so the body is actually STRESSED. Calibration caught

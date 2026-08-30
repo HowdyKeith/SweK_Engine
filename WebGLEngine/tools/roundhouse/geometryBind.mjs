@@ -38,7 +38,8 @@ import { sphereField, wyvill, wyvillGrad, marchingTets, meshVolume, watertight, 
 export const GEOM_MODES = ["sphere", "blob", "converge", "midpoint"];
 
 export const GEOM_OBSERVABLES = [
-    "surfaceDeviation", "watertight", "boundaryEdges", "volumeMeasured", "volumeTheory", "volumeErrFrac",
+    "surfaceDeviation", "watertight", "boundaryEdges", "boundaryDetectorFires",
+    "volumeMeasured", "volumeTheory", "volumeErrFrac",
     "triangles", "vertices", "resolution", "volumeErrCoarse", "volumeErrFine", "converged", "hasVolumeTruth",
 ];
 
@@ -73,6 +74,19 @@ export function geomDefaults(hyp) {
 // 8.6035e-3 -> 1.7953e-1, twenty-one times worse. THREE KEYS THAT DO NOT AGREE ABOUT WHICH MESH IS BETTER --
 // which is exactly why this device carries three, and why the volume key alone would have been worse than
 // nothing here: it does not merely miss the defect, it endorses it.
+// *** v4075 -- boundaryEdges IS A LOAD-BEARING NEGATIVE (0 means the mesh is closed), AND NONE OF THE FOUR
+// FIXTURES IN THIS DEVICE HAS EVER BEEN BROKEN. *** An observable census flagged it as moved by nothing in
+// every mode, and MEASURED it is honest -- all four extract a closed mesh and boundaryEdges reads 0 every
+// time. But that leaves the detector itself unproven: the same shape strokeMorph's resampler endpoint check
+// was found in (v4070) and mpmstep's noSidewaysDrift was found in before blockFell. A comment beside this
+// observable already says WHY it exists ("so watertight never crystallises to a claim with no evidence"); it
+// did not yet say the crystallisation could actually fail.
+//
+// The witness: drop the LAST triangle watertight() just accepted and run the identical counter again. Every
+// edge of a removed triangle that was shared with exactly one neighbour becomes a boundary edge, so this must
+// report a positive count -- derived from the mesh the run actually produced, not a second typed fixture.
+const boundaryDetectorFires = (tris) => tris.length > 0 && watertight(tris.slice(0, -1)).boundaryEdges > 0;
+
 function runSphere(c, N, midpoint = false) {
     const fld = sphereField(c.R);
     const field = midpoint ? ((x, y, z) => Math.sign(fld.f(x, y, z))) : fld.f;
@@ -81,6 +95,7 @@ function runSphere(c, N, midpoint = false) {
     return {
         dev: maxSurfaceDeviation(m.verts, fld.f, 0),
         tight: watertight(m.tris),
+        detects: boundaryDetectorFires(m.tris),
         vol: Math.abs(vol),
         theory: fld.volume,
         tris: m.tris.length, verts: m.verts.length,
@@ -104,6 +119,7 @@ export async function buildGeometry(hyp, base = {}) {
             surfaceDeviation: maxSurfaceDeviation(m.verts, f, 0.5),
             watertight: watertight(m.tris).watertight,
             boundaryEdges: watertight(m.tris).boundaryEdges,
+            boundaryDetectorFires: boundaryDetectorFires(m.tris),
             triangles: m.tris.length, vertices: m.verts.length,
             resolution: c.N, hasVolumeTruth: false,
         };
@@ -118,6 +134,7 @@ export async function buildGeometry(hyp, base = {}) {
             volumeTheory: a.theory,
             watertight: a.tight.watertight && b.tight.watertight,
             boundaryEdges: a.tight.boundaryEdges + b.tight.boundaryEdges,
+            boundaryDetectorFires: a.detects && b.detects,
             surfaceDeviation: Math.max(a.dev, b.dev),
             hasVolumeTruth: true,
         };
@@ -128,6 +145,7 @@ export async function buildGeometry(hyp, base = {}) {
         surfaceDeviation: r.dev,
         watertight: r.tight.watertight,
         boundaryEdges: r.tight.boundaryEdges,
+        boundaryDetectorFires: r.detects,
         volumeMeasured: r.vol,
         volumeTheory: r.theory,
         volumeErrFrac: Math.abs(r.vol - r.theory) / r.theory,

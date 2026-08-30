@@ -205,6 +205,9 @@ export const GEOSTATS_OBSERVABLES = [
     "markovOuter", "worstOffMarkov", "openingIsMonotone", "slopeMean", "slopeSpread",
     "value", "mean", "valueErr", "worstWeightErr", "variance", "predictedVariance", "varianceErr",
     "worstWeightDelta", "valueDelta", "scale", "varianceRatioErr", "selfConsistent",
+    // v4085 -- COMPLETED: `rows` (bridge's per-query and screen's per-exponent tables) was returned and
+    // never declared. Same defect as v3850/v4082/v4084.
+    "rows",
 ];
 
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */

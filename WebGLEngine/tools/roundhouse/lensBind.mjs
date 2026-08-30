@@ -510,7 +510,14 @@ export const lensDevice = {
     // `shadowErrFrac` -- the ray-traced shadow edge against its closed form. `shadowAngleRad` is bit-identical
     // (the rays never learn their key changed) and `shadowFillsSky` is a boolean, which the census reports as
     // DECLARED BUT DEAD.
-    plantMode: "flatshadow", plantFlips: "shadowErrFrac", plantKind: "method",
+    //
+    // *** v4086 -- plantKind WAS "method" -- probe's and splat's exact mistake (fixed v4080/v4081). ***
+    // `flatshadow` is a registered mode (LENS_MODES includes it), selected by name -- plantedCoverage.mjs's
+    // declaredPlantMode/probeModePlant already grades this as a mode plant, hardcoded, regardless of this
+    // label. "method" in this lab means a `config.planted` flag substituting the algorithm within one mode;
+    // this file never reads `config.planted` at all (grepped -- the one hit is prose about a different flag).
+    // capabilityCard.mjs publishes plantKind verbatim, so the mislabel was a real report/census disagreement.
+    plantMode: "flatshadow", plantFlips: "shadowErrFrac", plantKind: "mode",
     name: "schwarzschild-lens",
     observables: LENS_OBSERVABLES,
     build: buildLens,

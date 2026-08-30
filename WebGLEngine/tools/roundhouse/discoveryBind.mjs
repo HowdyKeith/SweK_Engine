@@ -148,6 +148,16 @@ export const discoveryDevice = {
     //
     // NEGATIVE R-SQUARED IS THE HONEST SHAPE OF THE ANSWER: the best fit is WORSE than predicting the mean,
     // which is what "there is nothing here" looks like as a number rather than as a flag.
-    plantMode: "nolaw", plantFlips: "r2Val", plantKind: "knob",
+    //
+    // *** v4079 -- plantKind WAS "knob" -- WRONG. THIS DEVICE NEVER READS config.planted ANYWHERE IN ITS BODY. ***
+    // `nolaw` is a MODE this file already registers (see `modes` above) and switches to by name, not a config
+    // flag toggled within one mode -- multigridGPUBind's exact shape (plantMode: "narrowwindow", plantKind WAS
+    // "knob", fixed to "mode" at v4078), and the shape every other mode-plant device in this lab declares:
+    // eccentric, fdtd, flip3d, freeSurface, hands, interferometer, ising, kepler, kerrLadder, kh, optics, pbc,
+    // quantum, tomography, twoF -- all `plantKind: "mode"`. plantedCoverage.mjs's probeModePlant already
+    // verifies this plant correctly regardless of the label (it keys off plantMode/plantFlips, not plantKind),
+    // so the wrong label cost nothing there -- but capabilityCard.mjs publishes device.plantKind verbatim as
+    // this device's reported evidence kind, and "knob" was simply false.
+    plantMode: "nolaw", plantFlips: "r2Val", plantKind: "mode",
     plantIdeal: 1, plantIdealWhy:
         "r2Val is a coefficient of determination, so a law that fits perfectly gives exactly 1 -- not 0. The nolaw arm gives -0.105, WORSE THAN PREDICTING THE MEAN, and the exponent stops being computable" };
