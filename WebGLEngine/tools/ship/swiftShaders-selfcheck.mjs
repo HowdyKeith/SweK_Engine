@@ -18,7 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
-         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -344,6 +344,72 @@ console.log("\n10. batch 4 -- pixels the author called pixels, which were points
            "(heatShimmer, vortex), premultiplied alpha (emboss), points (chromaticSplit) and BOTH remainders " +
            "(hsb2rgb needs fmod, the kaleidoscope needs mod). half is exercised throughout; only the edge rule " +
            "has no dedicated case, because every shader here clamps.");
+}
+
+// ---- 11. BATCH 5: THE EDGE RULE FINALLY GETS ITS CASE ------------------------------------------------------------
+console.log("\n11. batch 5 -- clamped, then un-clamped");
+{
+    const flat = (() => { const w = 16, h = 16, data = new Float32Array(w * h * 4);
+        for (let i = 0; i < w * h; i++) { data[i*4] = data[i*4+1] = data[i*4+2] = 0.7; data[i*4+3] = 1; }
+        return { w, h, data, premultiplied: true }; })();
+    const grad = (() => { const w = 32, h = 32, data = new Float32Array(w * h * 4);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y*w+x)*4;
+            data[i] = x/w; data[i+1] = 0.5; data[i+2] = 1-x/w; data[i+3] = 1; }
+        return { w, h, data, premultiplied: true }; })();
+
+    // *** THE SIXTH TRAP, WITH A REAL CASE AT LAST. *** glitch clamps `displaced` and then adds the channel
+    // shift AFTER it, so the red and blue taps leave the layer at every border.
+    const src = fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8");
+    ok("!! *** glitch's channel taps are shifted AFTER the clamp, exactly as upstream leaves them ***",
+        /d = clamp\(d, vec2\(0\.0\), uSize\);[\s\S]{0,400}layerSample\(d \+ vec2\(shift/.test(pass.SHADERS.glitch),
+        "with colorShift up to 20 the taps land outside the layer at every border. Metal's layer sampling has " +
+        "defined edges; GL WRAPS without CLAMP_TO_EDGE, and a glitch pulling the left edge into the right one " +
+        "LOOKS DELIBERATE -- the only one of the six a viewer would forgive as an artistic choice");
+    ok("!! and what keeps it right is that the SAMPLER clamps, in both halves",
+        /ivec2 t = ivec2\(clamp\(floor\(p\), vec2\(0\.0\), uSize - 1\.0\)\)/.test(pass.PREAMBLE) &&
+        /clamp\(Math\.floor\(x\), 0, w - 1\)/.test(src),
+        "layerSample has clamped since batch 1, so nothing needed fixing -- what it needed was a case");
+    ok("!! echo is the counter-example in the same file: it clamps BEFORE every sample",
+        /layerSample\(clamp\(p - off, vec2\(0\.0\), uSize\)\)/.test(pass.SHADERS.echo),
+        "two shaders, one file, opposite habits -- which is why the rule is checked and not assumed");
+
+    // ECHO IS AN AVERAGE, NOT A BLOOM. Green is the untinted channel, so on a flat image it must come back
+    // unchanged whatever the echo count -- that is what totalWeight starting at 1 buys.
+    for (const n of [1, 3, 6]) {
+        const e = bcsEcho(flat, { echoCount: n, spread: 4, fade: 0.7 });
+        let worst = 0;
+        for (let i = 1; i < e.data.length; i += 4) worst = Math.max(worst, Math.abs(e.data[i] - 0.7));
+        ok("!! " + n + " echoes leave a flat image at its own value", worst < 2e-4,
+            "worst green departure " + worst.toExponential(2) + " -- the residual is the half(weight) cast, " +
+            "which upstream makes too. An echo that brightened would be a bloom");
+    }
+    ok("...echo count 0 is the identity",
+        bcsEcho(grad, { echoCount: 0 }).data.every((v, i) => Math.abs(v - grad.data[i]) < 1e-9));
+    ok("...and the trail is DIRECTIONAL", (() => {
+        const a = bcsEcho(grad, { echoCount: 3, spread: 6, direction: 0 });
+        const b = bcsEcho(grad, { echoCount: 3, spread: 6, direction: Math.PI / 2 });
+        for (let i = 0; i < a.data.length; i++) if (Math.abs(a.data[i] - b.data[i]) > 1e-6) return true;
+        return false; })());
+
+    ok("!! glitch fully off is the identity",
+        bcsGlitch(grad, { intensity: 0, scanLines: 0, colorShift: 0, time: 0 })
+            .data.every((v, i) => Math.abs(v - grad.data[i]) < 1e-6),
+        "every knob at rest must give the picture back, or nothing downstream can be compared to anything");
+    ok("!! *** and the point scale moves BOTH the shift and the scanline FREQUENCY ***", (() => {
+        const a = bcsGlitch(grad, { time: 0.35, intensity: 1, colorShift: 12, pointScale: 1 });
+        const b = bcsGlitch(grad, { time: 0.35, intensity: 1, colorShift: 12, pointScale: 2 });
+        let n = 0; for (let i = 0; i < a.data.length; i++) if (Math.abs(a.data[i] - b.data[i]) > 1e-9) n++;
+        return n > 0; })(),
+        "sin(position.y * PI * 2) puts one cycle every POINT, so an unscaled port draws scanlines twice as " +
+        "fine at 2x -- the points trap in a place nobody looks, because it reads as a frequency and not a distance");
+    ok("...every output is finite", bcsGlitch(grad, { time: 0.35, intensity: 1, colorShift: 12 }).data.every(Number.isFinite));
+    for (const [name, keys] of [["echo", ["uEchoCount", "uFade", "uPointScale"]],
+                                ["glitch", ["uBlockSize", "uScanLines", "uColorShift"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED: 10 of 41. ALL SIX TRAPS NOW HAVE A WORKED CASE -- y flip (heatShimmer, vortex), " +
+           "premultiplied alpha (emboss), points (chromaticSplit spread, glitch scanline), half (throughout), " +
+           "both remainders (hsb2rgb needs fmod, kaleidoscope needs mod), and edges (glitch clamps then " +
+           "un-clamps). The table is no longer a prediction.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

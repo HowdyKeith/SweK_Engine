@@ -414,6 +414,105 @@ export function bcsPlasma(img, { time = 0, intensity = 1, scale = 4, speed = 1, 
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+
+// =============================================================================================================
+// BATCH 5 (v4164) -- THE MULTI-SAMPLE FAMILY, AND THE EDGE RULE FINALLY GETS ITS CASE.
+//
+// *** bcs_glitch CLAMPS AND THEN UN-CLAMPS ITSELF, IN THAT ORDER. ***
+//
+//     displaced = clamp(displaced, float2(0.0), size);          // clamped
+//     half4 r = layer.sample(displaced + float2(shift, 0.0));   // ...and then shifted OFF the edge
+//
+// The channel shift is added AFTER the clamp, so with color_shift up to 20 the red and blue taps can land
+// outside the layer at every border. Metal's layer sampling has defined edge behaviour and this is harmless
+// there. IN GL, WITHOUT CLAMP_TO_EDGE, IT WRAPS -- and a glitch shader pulling the left edge into the right one
+// LOOKS DELIBERATE. That is the sixth trap, and it is the only one of the six whose failure a viewer would
+// forgive as an artistic choice, which makes it the worst one to leave to chance. Every shader ported before
+// this one clamped its own sampling, so the rule had no case until now; layerSample() has clamped from the
+// start, which is why this batch needed no fix, only a check.
+//
+// AND ITS SCANLINE IS IN POINTS TOO: sin(position.y * PI * 2) puts one cycle every point, so on a 2x display
+// the ported shader draws scanlines twice as fine as the original unless the scale is carried. Same trap as
+// chromaticSplit's spread, in a place nobody thinks to look, because it reads as a frequency rather than a
+// distance.
+//
+// bcs_echo is the counter-example in the same batch: it clamps INSIDE the loop, before every sample, and is
+// correct as written. Two shaders, one file, opposite habits.
+// =============================================================================================================
+
+/**
+ * bcs_echo -- N ghost copies trailing along a direction, weighted-averaged with the base.
+ *
+ * `totalWeight` starts at 1 for the base and accumulates, so the result is a true average and the image does
+ * not brighten as echoes are added -- which is what separates an echo from a bloom.
+ */
+export function bcsEcho(img, { time = 0, echoCount = 4, spread = 12, direction = 0, fade = 0.6,
+                               pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const sp = spread * pointScale;
+    const dirx = Math.cos(direction) * sp, diry = Math.sin(direction) * sp;
+    const echoes = Math.max(0, Math.floor(echoCount));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5, i = (y * w + x) * 4;
+        const base = [img.data[i], img.data[i + 1], img.data[i + 2], img.data[i + 3]];
+        let r = base[0], g = base[1], b = base[2], totalWeight = 1;
+        for (let k = 1; k <= echoes; k++) {
+            const weight = Math.pow(fade, k);
+            let ox = dirx * k + Math.sin(time * 2 + k * 1.5) * sp * 0.1;
+            let oy = diry * k + Math.cos(time * 1.7 + k * 2.0) * sp * 0.1;
+            const c = s(clamp(px - ox, 0, w), clamp(py - oy, 0, h));   // CLAMPED BEFORE THE SAMPLE
+            r += toHalf(c[0] * toHalf(1 - k * 0.08)) * toHalf(weight);
+            g += c[1] * toHalf(weight);
+            b += toHalf(c[2] * toHalf(1 + k * 0.05)) * toHalf(weight);
+            totalWeight += weight;
+        }
+        out[i] = r / totalWeight; out[i + 1] = g / totalWeight; out[i + 2] = b / totalWeight;
+        out[i + 3] = base[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_glitch -- per-row block displacement, channel separation, scanlines, occasional flash.
+ *
+ * *** THE CHANNEL TAPS ARE DELIBERATELY LEFT UNCLAMPED, BECAUSE UPSTREAM LEAVES THEM SO. *** The clamp happens
+ * to `displaced` and the shift is added after it. What keeps this correct here is that the SAMPLER clamps --
+ * which is Metal's edge behaviour, and is what layerSample() reproduces in the GLSL. Clamping the tap as well
+ * would be a different shader from the original at every border.
+ */
+export function bcsGlitch(img, { time = 0, intensity = 0.5, blockSize = 12, scanLines = 0.5, colorShift = 6,
+                                 pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const glitchTime = Math.floor(time * 10);
+    const glitchRand = bcsHash(glitchTime, 0);
+    const glitchActive = (1 - intensity * 0.5) <= glitchRand ? 1 : 0;    // step(edge, x)
+    const bs = blockSize * pointScale;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5, i = (y * w + x) * 4;
+        const uvy = py / h;
+        const blockY = Math.floor(uvy * (h / bs));
+        const blockRand = bcsHash(blockY, glitchTime);
+        const blockShift = (blockRand - 0.5) * 2 * intensity * glitchActive;
+        let dx = px + blockShift * bs * 2, dy = py;
+        const vertRand = bcsHash(blockY + 100, glitchTime);
+        if (vertRand > 0.95 && glitchActive > 0.5) dy += (bcsHash(blockY, glitchTime + 50) - 0.5) * bs;
+        dx = clamp(dx, 0, w); dy = clamp(dy, 0, h);
+        const shift = colorShift * pointScale * glitchActive;
+        // The shift is applied AFTER the clamp, exactly as upstream does. The sampler's own clamping is what
+        // keeps these taps in bounds -- in GL that means CLAMP_TO_EDGE, or the left edge appears on the right.
+        const r = s(dx + shift, dy), g = s(dx, dy), b = s(dx - shift, dy);
+        let R = r[0], G = g[1], B = b[2];
+        // The scanline is a function of position.y IN POINTS, so its frequency follows the point scale.
+        let scanLine = Math.sin((py / pointScale) * Math.PI * 2) * 0.5 + 0.5;
+        scanLine = Math.pow(scanLine, 4);
+        const dim = 1 - toHalf(scanLine * scanLines * 0.3);
+        R *= dim; G *= dim; B *= dim;
+        if (blockRand > 0.92 && glitchActive > 0.5) { R += 0.15; G += 0.15; B += 0.15; }
+        out[i] = R; out[i + 1] = G; out[i + 2] = B; out[i + 3] = g[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",

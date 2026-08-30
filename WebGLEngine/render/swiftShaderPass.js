@@ -221,7 +221,65 @@ void main() {
     fragColor = vec4(uClampOutput > 0.5 ? clamp(rgb, 0.0, 1.0) : rgb, color.a);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG };
+
+// ---- BATCH 5 (v4164): the multi-sample family, and the edge rule's first case -----------------------------
+// *** glitch CLAMPS AND THEN UN-CLAMPS ITSELF. *** `displaced` is clamped, and the channel shift is added
+// AFTER, so the red and blue taps land outside the layer at every border. Metal's layer sampling has defined
+// edges; GL WRAPS without CLAMP_TO_EDGE, and a glitch pulling the left edge into the right one LOOKS
+// DELIBERATE -- the only one of the six traps a viewer would forgive as an artistic choice. layerSample() has
+// clamped since batch 1, so nothing needed fixing here; what it needed was a case, and this is it.
+const ECHO_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uEchoCount, uSpread, uDirection, uFade, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec4 base = layerSample(p);
+    float sp = uSpread * uPointScale;
+    vec2 dir = vec2(cos(uDirection), sin(uDirection)) * sp;
+    vec3 acc = base.rgb;
+    float totalWeight = 1.0;                       // starts at 1 for the base: an AVERAGE, not a bloom
+    for (int i = 1; i <= 8; i++) {
+        if (float(i) > uEchoCount) break;
+        float weight = pow(uFade, float(i));
+        vec2 off = dir * float(i)
+                 + vec2(sin(uTime * 2.0 + float(i) * 1.5), cos(uTime * 1.7 + float(i) * 2.0)) * sp * 0.1;
+        vec4 e = layerSample(clamp(p - off, vec2(0.0), uSize));   // clamped BEFORE the sample, unlike glitch
+        acc.r += toHalf(e.r * toHalf(1.0 - float(i) * 0.08)) * toHalf(weight);
+        acc.g += e.g * toHalf(weight);
+        acc.b += toHalf(e.b * toHalf(1.0 + float(i) * 0.05)) * toHalf(weight);
+        totalWeight += weight;
+    }
+    fragColor = vec4(acc / totalWeight, base.a);
+}`;
+
+const GLITCH_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uIntensity, uBlockSize, uScanLines, uColorShift, uPointScale;
+void main() {
+    vec2 p = swPos();
+    float glitchTime = floor(uTime * 10.0);
+    float glitchActive = step(1.0 - uIntensity * 0.5, bcs_hash(vec2(glitchTime, 0.0)));
+    float bs = uBlockSize * uPointScale;
+    float blockY = floor((p.y / uSize.y) * (uSize.y / bs));
+    float blockRand = bcs_hash(vec2(blockY, glitchTime));
+    vec2 d = p;
+    d.x += (blockRand - 0.5) * 2.0 * uIntensity * glitchActive * bs * 2.0;
+    if (bcs_hash(vec2(blockY + 100.0, glitchTime)) > 0.95 && glitchActive > 0.5)
+        d.y += (bcs_hash(vec2(blockY, glitchTime + 50.0)) - 0.5) * bs;
+    d = clamp(d, vec2(0.0), uSize);
+    float shift = uColorShift * uPointScale * glitchActive;
+    // THE SHIFT IS APPLIED AFTER THE CLAMP, as upstream does. layerSample clamps, which is Metal's edge rule.
+    vec4 r = layerSample(d + vec2(shift, 0.0));
+    vec4 g = layerSample(d);
+    vec4 b = layerSample(d - vec2(shift, 0.0));
+    vec3 res = vec3(r.r, g.g, b.b);
+    // The scanline is a function of position.y IN POINTS, so its FREQUENCY follows the point scale -- the same
+    // trap as chromaticSplit's spread, in a place nobody looks because it reads as a frequency not a distance.
+    float scanLine = pow(sin((p.y / uPointScale) * 6.283185307179586) * 0.5 + 0.5, 4.0);
+    res *= 1.0 - toHalf(scanLine * uScanLines * 0.3);
+    if (blockRand > 0.92 && glitchActive > 0.5) res += vec3(0.15);
+    fragColor = vec4(res, g.a);
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
@@ -233,6 +291,8 @@ const KNOBS = {
     kaleidoscope: { time: "uTime", segments: "uSegments", rotation: "uRotation", zoom: "uZoom", animateSpeed: "uAnimateSpeed" },
     chromaticSplit: { spread: "uSpread", angle: "uAngle", edgeOnly: "uEdgeOnly", time: "uTime", animate: "uAnimate", pointScale: "uPointScale" },
     plasma: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", colorMode: "uColorMode", clampOutput: "uClampOutput" },
+    echo: { time: "uTime", echoCount: "uEchoCount", spread: "uSpread", direction: "uDirection", fade: "uFade", pointScale: "uPointScale" },
+    glitch: { time: "uTime", intensity: "uIntensity", blockSize: "uBlockSize", scanLines: "uScanLines", colorShift: "uColorShift", pointScale: "uPointScale" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG };
