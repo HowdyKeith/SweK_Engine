@@ -6,9 +6,6 @@
 // *** TWO KEYS, AND EACH IS BLIND TO WHAT THE OTHER CATCHES -- WHICH IS THE ROUND. ***
 
 import { mpmForceDevice, MPMFORCE_MODES, buildMpmForce } from "./mpmForceBind.mjs";
-import { stressForces } from "../../physics/mpm/forces.mjs";
-import { makeGrid, rotatingBlock } from "../../physics/mpm/transfer.mjs";
-import { lame, firstPiola } from "../../physics/mpm/constitutive.mjs";
 import { DEVICE_NAMES } from "./devices.mjs";
 
 let fails = 0;
@@ -46,31 +43,44 @@ console.log("\n2. THE SECOND KEY, AND THE BUG THE FIRST ONE CANNOT SEE");
         scaling.scalesWithH === true && Math.abs(scaling.scaleRatio - 2) < 0.05,
         "maxF " + scaling.maxForceCoarse.toExponential(3) + " at h and " + scaling.maxForceFine.toExponential(3) +
         " at h/2. The weight DERIVATIVE carries a chain rule the weights themselves do not");
-    // Drop the chain rule at a spacing where it is not a no-op, and watch the third law fail to notice.
+    // v4132 -- READ OFF THE DEVICE'S OWN BUILD, NOT A SECOND FIXTURE BUILT HERE. This block used to import
+    // stressForces/makeGrid/rotatingBlock/lame/firstPiola directly and re-assemble the same rig `scaling` mode
+    // already builds -- which meant mpmForceDevice.build() itself never demonstrated the claim this header
+    // spends its second half making, and plantedCoverage.mjs's census (which only ever calls the registered
+    // device) could not see it either. `scaling` mode now runs skipChainRule itself and reports it as
+    // maxForceCoarsePlanted/maxForceFinePlanted -- the same numbers, produced by the device rather than beside it.
+    ok("!! *** DROPPING THE CHAIN RULE HALVES EVERY FORCE AT h/2 AND THE THIRD LAW READS THE SAME ***",
+        Math.abs(scaling.maxForceFinePlanted / scaling.maxForceFine - 0.5) < 0.01 &&
+        scaling.scalesWithHPlanted === false,
+        "maxF " + scaling.maxForceFine.toExponential(3) + " -> " + scaling.maxForceFinePlanted.toExponential(3) +
+        " at h/2, ratio " + scaling.scaleRatioPlanted.toFixed(3) + " against the honest 2.000. *** SCALING EVERY " +
+        "GRADIENT BY THE SAME CONSTANT LEAVES A SUM OF ZERO AT ZERO (thirdlaw's own netForce is unaffected by " +
+        "this option, checked separately below), so a genuine factor-of-two force error is INVISIBLE to the " +
+        "identity. ONLY THE SCALING KEY CATCHES IT ***");
+    ok("!! *** AND AT h = 1 THAT BUG DOES NOT EXIST AT ALL -- MULTIPLYING BY h IS MULTIPLYING BY ONE ***",
+        scaling.maxForceCoarse === scaling.maxForceCoarsePlanted,
+        "*** IDENTICAL, NOT MERELY CLOSE (" + scaling.maxForceCoarse.toExponential(9) + " both arms). THE " +
+        "DEFAULT GRID SPACING ANYBODY WOULD TEST AT IS A SPACING WHERE THE BUG IS ARITHMETICALLY ABSENT -- so a " +
+        "device built only at h=1 would grade a units error as correct, twice over: the key cannot see it AND " +
+        "the fixture does not contain it ***");
+}
+
+// A direct measurement, kept OUTSIDE the ok() block above so the import stays scoped to this one purpose:
+// confirms thirdlaw's own identity truly cannot see skipChainRule, which is the reason `brokenstencil` and not
+// this option is the device's declared plant.
+{
+    const { stressForces } = await import("../../physics/mpm/forces.mjs");
+    const { makeGrid, rotatingBlock } = await import("../../physics/mpm/transfer.mjs");
+    const { lame, firstPiola } = await import("../../physics/mpm/constitutive.mjs");
     const par = lame(1000, 0.3), stressOf = (F) => firstPiola(F, par);
     const g = makeGrid(12, 12, 0.5);
     const ps = rotatingBlock({ nx: 5, ny: 5, spacing: 0.25, h: 0.5 })
         .map((p) => ({ ...p, vol0: 0.25, F: [1.08, 0.04, -0.02, 0.95], F0: [1, 0, 0, 1] }));
-    const good = stressForces(ps, g, stressOf, {});
     const bad = stressForces(ps, g, stressOf, { skipChainRule: true });
-    ok("!! *** DROPPING THE CHAIN RULE HALVES EVERY FORCE AND THE THIRD LAW READS THE SAME ***",
-        Math.abs(Math.max(...bad.fx) / Math.max(...good.fx) - 0.5) < 0.01 &&
-        Math.hypot(bad.netX, bad.netY) < 1e-9 && Math.hypot(good.netX, good.netY) < 1e-9,
-        "maxF " + Math.max(...good.fx).toExponential(3) + " -> " + Math.max(...bad.fx).toExponential(3) +
-        " at h=0.5, while the net goes " + Math.hypot(good.netX, good.netY).toExponential(2) + " -> " +
-        Math.hypot(bad.netX, bad.netY).toExponential(2) + ". *** SCALING EVERY GRADIENT BY THE SAME CONSTANT " +
-        "LEAVES A SUM OF ZERO AT ZERO, so a genuine factor-of-two force error is INVISIBLE to the identity. " +
-        "ONLY THE SCALING KEY CATCHES IT ***");
-    ok("!! *** AND AT h = 1 THAT BUG DOES NOT EXIST AT ALL -- MULTIPLYING BY h IS MULTIPLYING BY ONE ***",
-        (() => { const g1 = makeGrid(12, 12, 1);
-                 const p1 = rotatingBlock({ nx: 5, ny: 5, spacing: 0.5, h: 1 })
-                     .map((p) => ({ ...p, vol0: 0.25, F: [1.08, 0.04, -0.02, 0.95], F0: [1, 0, 0, 1] }));
-                 const a = stressForces(p1, g1, stressOf, {});
-                 const b = stressForces(p1, g1, stressOf, { skipChainRule: true });
-                 return Math.max(...a.fx) === Math.max(...b.fx); })(),
-        "*** IDENTICAL, NOT MERELY CLOSE. THE DEFAULT GRID SPACING ANYBODY WOULD TEST AT IS A SPACING WHERE THE " +
-        "BUG IS ARITHMETICALLY ABSENT -- so a device built only at h=1 would grade a units error as correct, " +
-        "twice over: the key cannot see it AND the fixture does not contain it ***");
+    ok("!! *** skipChainRule LEAVES thirdLaw's netForce AT ROUND-OFF, CONFIRMED DIRECTLY ***",
+        Math.hypot(bad.netX, bad.netY) < 1e-9,
+        "net " + Math.hypot(bad.netX, bad.netY).toExponential(3) + " -- this is WHY brokenstencil, not " +
+        "skipChainRule, is the device's declared plant for the thirdlaw/netForce pair");
 }
 
 report("*** THE ROUND'S SHAPE: I BUILT THE WRONG PLANT FIRST AND KEPT IT NAMED ***",

@@ -20,6 +20,7 @@ import { gridStep, normalise, enforceWalls } from "../../physics/mpm/gridSolve.m
 export const MPMGRID_OBSERVABLES = [
     "impulseY", "expectedImpulseY", "impulseErrFrac", "impulseHolds",
     "coarseErrFrac", "fineErrFrac", "scalesWithGrid",
+    "plantedCoarseErrFrac", "plantedFineErrFrac", "scalesWithGridPlanted",
     "wallNormalMax", "wallsHold", "totalMass", "liveNodes", "nx",
 ];
 
@@ -88,12 +89,27 @@ export async function buildMpmGrid(hyp, base = {}) {
     if (h.mode === "resolution") {
         // *** THE TELL: the honest impulse does not care about the grid, because it is weighted by MASS.
         // The planted one is weighted by NODE COUNT, so refining moves it. ***
-        const coarse = errOf(c, 1, forceFirst).err, fine = errOf(c, 2, forceFirst).err;
+        //
+        // v4132 -- BOTH ARMS, NOT JUST THE ONE `mode` SELECTS. `forceFirst` used to come from
+        // `h.mode === "forcefirst"`, which is false throughout THIS branch by construction -- "resolution" and
+        // "forcefirst" are two different strings, so a call in resolution mode could never combine with the
+        // plant. scalesWithGrid therefore could ONLY EVER read false (honest is flat, and nothing else was ever
+        // measured), and the selfcheck's own evidence text quoted specific planted-scaling numbers
+        // (7.937e-3 -> 1.540 -> 5.706) that no assertion anywhere actually computed. The claim was true --
+        // verified directly against gridStep with forceBeforeNormalise:true -- but the device could not have
+        // shown it wrong if it had stopped being true, which is what a mode existing to demonstrate a scaling
+        // difference is supposed to do.
+        const coarse = errOf(c, 1, false).err, fine = errOf(c, 2, false).err;
         out.coarseErrFrac = coarse;
         out.fineErrFrac = fine;
         // The honest impulse is weighted by MASS and does not move; the planted one is weighted by NODE COUNT
         // and grows as the grid refines over the same material.
         out.scalesWithGrid = fine > Math.max(coarse * 10, 1e-6);
+
+        const plantedCoarse = errOf(c, 1, true).err, plantedFine = errOf(c, 2, true).err;
+        out.plantedCoarseErrFrac = plantedCoarse;
+        out.plantedFineErrFrac = plantedFine;
+        out.scalesWithGridPlanted = plantedFine > Math.max(plantedCoarse * 10, 1e-6);
         return out;
     }
 

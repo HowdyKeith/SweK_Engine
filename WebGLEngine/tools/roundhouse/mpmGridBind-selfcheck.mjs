@@ -48,11 +48,20 @@ console.log("\n2. THE ORDER OF OPERATIONS");
         ". *** THE IMPULSE IS STILL THE RIGHT ORDER OF MAGNITUDE (-2.0438 against -2.0601), WHICH IS WHY THIS " +
         "BUG SHIPS: the block still falls, at very nearly the right rate, and only an identity says otherwise ***");
     ok("!! *** AND ITS SIGNATURE IS THAT IT SCALES WITH THE GRID, NOT WITH THE MATERIAL ***",
-        resHonest.scalesWithGrid === false && resHonest.fineErrFrac < 1e-9,
+        resHonest.scalesWithGrid === false && resHonest.fineErrFrac < 1e-9 &&
+        resHonest.scalesWithGridPlanted === true && resHonest.plantedFineErrFrac > resHonest.plantedCoarseErrFrac * 10,
         "the HONEST error is flat under refinement (" + resHonest.coarseErrFrac.toExponential(2) + " -> " +
-        resHonest.fineErrFrac.toExponential(2) + ") because it is weighted by MASS. The planted one grows " +
-        "7.937e-3 -> 1.540 -> 5.706 across 25 -> 64 -> 169 live nodes, because it is weighted by NODE COUNT. " +
-        "*** THAT IS THE DIAGNOSTIC A READER CAN USE WITHOUT KNOWING THE EXPECTED IMPULSE AT ALL ***");
+        resHonest.fineErrFrac.toExponential(2) + ") because it is weighted by MASS. The PLANTED one grows " +
+        resHonest.plantedCoarseErrFrac.toExponential(3) + " -> " + resHonest.plantedFineErrFrac.toExponential(3) +
+        ", because it is weighted by NODE COUNT. *** THAT IS THE DIAGNOSTIC A READER CAN USE WITHOUT KNOWING THE " +
+        "EXPECTED IMPULSE AT ALL ***");
+    report("*** v4132 -- THE PLANTED SCALING WAS QUOTED IN THIS EVIDENCE STRING AND NEVER MEASURED ***",
+        "`resolution` mode computed forceFirst from h.mode === \"forcefirst\", which is false throughout this " +
+        "branch by construction (\"resolution\" and \"forcefirst\" are two different mode strings), so a single " +
+        "build() call could never combine them. The number quoted here (7.937e-3 -> 1.540 -> 5.706) was real " +
+        "physics, verified separately against gridStep directly, but nothing in this file's own assertions had " +
+        "ever computed it -- the device could not have caught it going wrong. resolution mode now runs BOTH " +
+        "arms and plantedCoarseErrFrac/plantedFineErrFrac/scalesWithGridPlanted are real, asserted observables.");
     ok("!! the device DECLARES the plant, with `impulse` first",
         DEVICE_NAMES.includes("mpmgrid") && mpmGridDevice.plantMode === "forcefirst" &&
         mpmGridDevice.plantFlips === "impulseErrFrac" && MPMGRID_MODES[0] === "impulse");

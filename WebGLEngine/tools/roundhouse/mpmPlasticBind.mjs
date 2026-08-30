@@ -11,8 +11,12 @@
 //     BOOKKEEPING, NOT A PHYSICAL PROCESS -- moving deformation between the factors cannot create or destroy
 //     any of it.
 // MEASURED: skipping the F_p update leaves the clamp PERFECT -- singular values 0.975000 in BOTH arms, the
-// verdict passes -- WHILE THE SPLIT DRIFTS 1.110e-16 -> 1.857. A SNOWBALL SHRINKS WITH NO FORCE ACTING ON IT
-// AND THE OBVIOUS CHECK SAYS EVERYTHING IS FINE. ***
+// verdict passes -- WHILE THE SPLIT DRIFTS 2.220e-16 -> 1.240e-1. A SNOWBALL SHRINKS WITH NO FORCE ACTING ON IT
+// AND THE OBVIOUS CHECK SAYS EVERYTHING IS FINE.
+// v4132 -- CORRECTED. This comment previously read "1.110e-16 -> 1.857", which matches neither this device's
+// own build() output, nor plantIdealWhy two lines below it in this same file, nor physics/mpm/plasticity.mjs's
+// own self-test block -- all three agree on 2.220e-16 -> 1.240e-1. A stale transcription, caught by re-running
+// the measurement rather than trusting the number already in the file. ***
 
 import { returnMap, svd2, splitDrift, fromSvd } from "../../physics/mpm/plasticity.mjs";
 import { mul, det } from "../../physics/mpm/constitutive.mjs";
