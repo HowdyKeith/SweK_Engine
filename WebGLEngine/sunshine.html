@@ -1,0 +1,118 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="Install and run the Sunshine game-stream HOST, and launch Moonlight V+ on a phone over adb. The host half of the phone-as-a-screen story.">
+<title>SweK Sunshine Host</title>
+<style>
+:root{--bg:#0e1116;--fg:#dfe6f0;--dim:#8e9bb0;--line:#26303d;--card:#151b24;--ok:#8fe0ae;--warn:#ffd479;--bad:#ff9d9d;--acc:#bfb0ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px}
+h1{font-size:19px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px;color:var(--acc)}
+a{color:#9ec9ff}.sub{color:var(--dim);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.unverified{border-color:#6a5320;background:#1d1808}
+button{font:inherit;padding:5px 12px;background:#1a2230;color:var(--fg);border:1px solid #33455c;border-radius:5px;cursor:pointer;margin:2px 4px 2px 0}
+button:hover{background:#22304a}
+input{font:inherit;padding:5px 8px;background:#0b0f15;color:var(--fg);border:1px solid #33455c;border-radius:5px;margin:2px 6px 2px 0}
+table{border-collapse:collapse;width:100%;margin:6px 0}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top;font-size:13px}
+th{background:#111722;color:var(--dim);font-weight:600}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+pre{background:#0b0f15;border:1px solid var(--line);border-radius:6px;padding:9px;overflow:auto;max-height:220px}
+.m{color:var(--ok);font-weight:700}.n{color:var(--warn);font-weight:700}.r{color:var(--bad)}
+ul{margin:6px 0;padding-left:20px}li{margin:4px 0}
+</style></head><body>
+
+<h1>&#9728;&#65039; SweK Sunshine Host</h1>
+<p class="sub">The <b>host</b> half. <a href="https://github.com/LizardByte/Sunshine" target="_blank" rel="noopener">LizardByte/Sunshine</a> (GPL-3.0) streams this machine's screen; <a href="https://github.com/qiin2333/moonlight-vplus" target="_blank" rel="noopener">Moonlight V+</a> (GPL-3.0) on a phone dials in. Video and audio go down, <b>input comes back up</b> &mdash; touch, stylus, gyroscope and gamepad, at up to 165&nbsp;Hz.</p>
+
+<div class="card unverified">
+  <b>&#9888;&#65039; No Sunshine has ever run against this bridge.</b><br>
+  The box it was written on has no GPU, no Sunshine binary and no flatpak. <b>Detection and every refusal are
+  gated and run</b>; the install, start and stop commands are transcribed from LizardByte's own documentation
+  and have <b>not</b> been executed. Rows below say which is which, one by one, rather than hiding it in a footnote.
+</div>
+
+<h2>Why this is a host button and not a Moonlight plugin</h2>
+<div class="card">
+Keith asked whether non-streaming features could be pushed into Moonlight V+. Read for real, that app has
+<b>no <code>ServerSocket</code>, no <code>HttpServer</code>, no exported service and no content provider</b> &mdash;
+four exported components in its whole manifest, of which one is the main activity, one a home-screen widget and
+one the shortcut trampoline used below. Its top-level <code>LuaScripts/</code> folder looks like a plugin surface
+and is not: they are <b>Wireshark protocol dissectors</b> inherited from upstream Moonlight, for debugging the
+NVIDIA stream. So there is nothing to push into. <b>Moonlight is a client</b>; you add features to the host, and
+the client relays them.
+</div>
+
+<h2>1 &middot; The host</h2>
+<div class="card">
+  <button onclick="stat()">Status</button>
+  <button onclick="post('/sunshine/install')">Install</button>
+  <button onclick="post('/sunshine/start')">Start</button>
+  <button onclick="post('/sunshine/stop')">Stop</button>
+  <button onclick="openUi()">Open Sunshine's web UI</button>
+  <pre id="out">press Status</pre>
+  <p class="sub" style="margin:6px 0 0">Pairing happens in <b>Sunshine's own web UI</b> (<code>https://localhost:47990</code>, self-signed &mdash; the browser warning is expected). The phone shows a four-digit PIN and a human types it there. This bridge will not do that for you; see the refusals below.</p>
+</div>
+
+<h2>2 &middot; Launch Moonlight on a phone, from here</h2>
+<div class="card">
+  <p class="sub" style="margin:0 0 8px">The one push surface that client has: <code>ShortcutTrampoline</code> is
+  <code>exported="true"</code> and reads its host from an intent extra. Launch-only and one-way &mdash; no reply,
+  no status, no second command. Needs <code>adb</code> (the Steam Deck installer offers android-tools since v4142).</p>
+  <div>
+    <input id="serial" placeholder="adb serial (blank = the only device)" size="26">
+    <input id="pcname" placeholder="PC name, as Moonlight shows it" size="26">
+    <input id="appid" placeholder="AppId (optional)" size="14">
+  </div>
+  <button onclick="devices()">List devices</button>
+  <button onclick="launch()">Launch Moonlight</button>
+  <pre id="mout">&mdash;</pre>
+  <p class="sub" style="margin:6px 0 0">The <b>UUID may be left empty</b>: the trampoline falls back to looking
+  the host up <i>by name</i>, so the Deck never has to learn the phone's internal id for a machine.</p>
+</div>
+
+<h2>What is measured, and what is only read</h2>
+<table>
+<tr><th>Row</th><th>Status</th><th>On what evidence</th></tr>
+<tr><td>Moonlight V+ exposes no service, socket or provider</td><td class="m">MEASURED</td><td>Its <code>AndroidManifest.xml</code> was read: 4 <code>exported="true"</code> components, and a tree-wide grep for <code>ServerSocket</code>/<code>HttpServer</code> under <code>app/src/main/java</code> returns nothing.</td></tr>
+<tr><td>The Lua files are Wireshark dissectors, not plugins</td><td class="m">MEASURED</td><td>All three open with <code>ProtoField</code> declarations and carry the original Moonlight authors' names.</td></tr>
+<tr><td>The intent package, activity and extra names</td><td class="m">MEASURED</td><td>Read out of the source, not guessed: <code>com.limelight.root</code> (<b>not</b> stock Moonlight's <code>com.limelight</code>), <code>AppView.kt:128-129</code> for UUID/Name, <code>Game.kt:2962-2969</code> for the rest.</td></tr>
+<tr><td>An empty UUID falls back to a name lookup</td><td class="m">MEASURED</td><td><code>ShortcutTrampoline.kt:313-317</code> calls <code>getComputerByName</code>.</td></tr>
+<tr><td>The bridge's routes answer, including the POST body path</td><td class="m">MEASURED</td><td>Driven against a live server: status, launch and the bad-input refusal all returned the bridge's own JSON.</td></tr>
+<tr><td>Every refusal below</td><td class="m">MEASURED</td><td>Exercised by <code>tools/ship/sunshineHost-selfcheck.mjs</code> on a box with none of this installed &mdash; which is the box that must behave.</td></tr>
+<tr><td>Sunshine installs via flatpak / winget / brew</td><td class="n">NOT VERIFIED</td><td>Transcribed from LizardByte's documentation. Never executed here.</td></tr>
+<tr><td>The host starts, encodes and streams</td><td class="n">NOT VERIFIED</td><td>No GPU on this box. Nothing about encoding has been observed.</td></tr>
+<tr><td><code>am start</code> actually opens Moonlight</td><td class="n">NOT VERIFIED</td><td>No Android device has been attached. The command is built from the strings above; <b>the failure is handled</b> &mdash; <code>am start</code> exits 0 even for a missing activity, so its output is parsed for <code>Error type</code> rather than trusting the exit code.</td></tr>
+<tr><td>Input latency, refresh rate, gyro aim</td><td class="n">NOT VERIFIED</td><td>Claims from the fork's own README, repeated as theirs and not adopted as ours.</td></tr>
+</table>
+
+<h2>What this bridge refuses to do</h2>
+<div class="card"><ul id="ref"><li class="sub">press Status</li></ul></div>
+
+<p class="sub"><a href="/server.html">&larr; back to the server page</a></p>
+
+<script>
+const $=(i)=>document.getElementById(i);
+const show=(el,o)=>{$(el).textContent=typeof o==="string"?o:JSON.stringify(o,null,1);};
+async function jget(u){const r=await fetch(u);let b=null;try{b=await r.json();}catch{b=null;}
+  if(!r.ok||!b)throw new Error((b&&b.error)||("HTTP "+r.status+" "+r.statusText));return b;}
+async function jpost(u,d){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d||{})});
+  let b=null;try{b=await r.json();}catch{b=null;}
+  if(!b)throw new Error("HTTP "+r.status+" "+r.statusText);return b;}
+let LAST=null;
+async function stat(){try{const s=await jget("/sunshine/status");LAST=s;show("out",s);
+  const ul=$("ref");ul.innerHTML="";
+  for(const r of (s.refused||[])){const li=document.createElement("li");
+    li.innerHTML="<b>"+r.what+"</b> &mdash; <span class='sub'>"+r.why+"</span>";ul.appendChild(li);} }
+  catch(e){show("out","status failed: "+e.message);}}
+async function post(u){try{show("out",await jpost(u));}catch(e){show("out",u+" failed: "+e.message);}
+  setTimeout(stat,900);}
+function openUi(){const u=(LAST&&LAST.webUi)||"https://127.0.0.1:47990";window.open(u,"_blank","noopener");}
+async function devices(){try{show("mout",await jget("/sunshine/adb/devices"));}catch(e){show("mout","adb: "+e.message);}}
+async function launch(){
+  const d={serial:$("serial").value.trim(),name:$("pcname").value.trim(),appId:$("appid").value.trim()};
+  if(!d.appId)delete d.appId;
+  try{show("mout",await jpost("/sunshine/moonlight/launch",d));}catch(e){show("mout","launch failed: "+e.message);}}
+stat();
+</script>
+</body></html>

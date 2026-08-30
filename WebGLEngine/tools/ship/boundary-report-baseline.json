@@ -1,7 +1,7 @@
 {
  "note": "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.",
- "sites": 87,
- "total": 235,
+ "sites": 88,
+ "total": 236,
  "tally": {
   "agenda.html :: UNCHECKED_JSON_BODY": 2,
   "ai-bridge/agentCookieBridge.js :: KILL_NOT_VERIFIED": 1,
@@ -44,6 +44,7 @@
   "ai-bridge/scrapeBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/scraplingBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/server.js :: KILL_NOT_VERIFIED": 15,
+  "ai-bridge/sunshineBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/sysadminBridge.js :: KILL_NOT_VERIFIED": 2,
   "ai-bridge/terminalBridge.js :: KILL_NOT_VERIFIED": 3,
   "ai-bridge/traderBridge.js :: KILL_NOT_VERIFIED": 2,

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 422,
+ "count": 423,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2549,6 +2549,13 @@
    "t": "SweK &middot; Lane-Emden Polytropes",
    "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
    "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "sunshine.html",
+   "t": "SweK Sunshine Host",
+   "d": "Install and run the Sunshine game-stream HOST, and launch Moonlight V+ on a phone over adb. The host half of the phone-as-a-screen story.",
+   "g": "",
    "p": 0
   },
   {

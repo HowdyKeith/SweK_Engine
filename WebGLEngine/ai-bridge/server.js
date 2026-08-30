@@ -2625,6 +2625,7 @@ const toolsBridge = require("./toolsBridge.js");          // v3220 - front door 
 const shipBridge = require("./shipBridge.js");            // v2807 - ship-ritual front door at /ship (dry run free; a real ship needs an explicit confirm).
 const deviceBridge = require("./deviceBridge.js");        // v2813 - roundhouse DEVICE front door at /device (pick a lab, watch the loop crystallise round by round).
 const repoTerrainBridge = require("./repoTerrainBridge.js");  // v4149 - count a source tree so world/repoHeightfield.js can make ground out of it.
+const sunshineBridge = require("./sunshineBridge.js");        // v4154 - the HOST half Moonlight dials, plus the one am-start surface that client exposes.
 const policyMassBridge = require("./policyMassBridge.js");
 const moduleHistoryBridge = require("./moduleHistoryBridge.js");
 const frugonBridge = require("./frugonBridge.js");    // v3039 - LLM call-log cost front door at /frugon (drives frugon, never parses it).// v2856 - mass-vs-merit front door at /policymass.
@@ -4957,6 +4958,21 @@ const server = http.createServer((req, res) => {
         req.on("end", () => { if (aborted) return; let d = {}; try { d = JSON.parse(b || "{}"); } catch { res.writeHead(400, JSONH); res.end('{"ok":false,"error":"invalid_json"}'); return; } cb(d); });
         req.on("error", () => { if (!aborted) { res.writeHead(500, JSONH); res.end('{"ok":false,"error":"request_error"}'); } });
     };
+    // v4154 -- *** MOUNTED HERE, BELOW readJson, AND THAT POSITION IS THE WHOLE NOTE. ***
+    // The first draft put this beside deviceBridge and repoTerrainBridge two hundred lines UP, which is above
+    // the `const readJson` immediately preceding -- and this handler runs top to bottom on every request, so
+    // that reference sat in readJson's TEMPORAL DEAD ZONE and any POST /sunshine/moonlight/launch would have
+    // thrown "Cannot access 'readJson' before initialization" before reading a byte. THE SAME CLASS AS v4133'S
+    // CLONE BUTTON, which cost fifteen versions and an error naming a line that was fine. Caught here by
+    // noticing the declaration is at 4961 and the mount was at 4707, then DRIVEN: a live POST against a real
+    // server returned the bridge's own JSON rather than a 500. The bridges above pass only sendJson (declared
+    // at the top), which is why none of them had to care.
+    if (sunshineBridge.owns(req.url)) {
+        // /sunshine - install/start/stop the Sunshine HOST, and launch Moonlight V+ on a phone over adb.
+        Promise.resolve(sunshineBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "sunshine", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
     try {
         const _rip = String(req.socket.remoteAddress || "").replace(/^::ffff:/, "");
         if (_rip && _rip !== "::1" && !_rip.startsWith("127.") && !_ownIps.has(_rip)) lastExternalClient = { ip: _rip, at: Date.now(), url: req.url };

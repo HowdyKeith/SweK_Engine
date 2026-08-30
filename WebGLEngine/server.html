@@ -678,6 +678,14 @@ window.addEventListener("load", function () {
                  their behaviour, which this shelf refuses; the page states the exposure and confirms before
                  every start instead. -->
             <a href="/ws-scrcpy.html" target="_blank" rel="noopener" title="Android in the browser (opt-in) -- an install button for NetrisTV/ws-scrcpy (MIT), browser-based Android screen mirroring and control over adb, using a vendored unmodified prebuilt Genymobile scrcpy-server.jar (no JDK needed). Nothing of theirs is vendored into this tree or imported into this engine's process: the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, runs their own five-stage build (~65s, needs a C/C++ toolchain for node-pty) and runs their server as a subprocess. WARNING -- IT BINDS TO ALL INTERFACES AND HAS NO LOGIN, and unlike grdpwasm that cannot be narrowed without patching their code: their HttpServer.ts calls server.listen(port, cb) with no host argument and has no config field for one. While it runs, anything on your LAN that reaches the port can view AND control any Android device the machine can see over adb. The page confirms before every start.">Android in the browser</a>
+            <!-- v4154 -- sunshine.html JOINS the same opt-in shelf, and it is the HOST half of the phone story
+                 ws-scrcpy sits opposite. ws-scrcpy points a BROWSER at a phone; this points a PHONE at this
+                 machine, via LizardByte/Sunshine (GPL-3.0, installed by the user's own package manager, never
+                 vendored) with Moonlight V+ as the client. Keith asked whether features could be pushed INTO
+                 Moonlight: they cannot -- that app exposes no service, socket or provider, and its one exported
+                 surface is a launch-only shortcut trampoline, which this page also drives over adb. The page is
+                 honest per row about the fact that no Sunshine has ever run against the bridge. -->
+            <a href="/sunshine.html" target="_blank" rel="noopener" title="SweK Sunshine Host (opt-in) -- install and run LizardByte/Sunshine (GPL-3.0) so a phone running Moonlight V+ can see this machine's screen and send touch, stylus, gyro and gamepad back as input. Also launches Moonlight on a connected phone over adb. NOTHING IS VENDORED and no Sunshine has ever run against this bridge -- the page marks every row MEASURED or NOT VERIFIED." style="color:#ffd479;text-decoration:none;border:1px solid #6a5320;padding:2px 6px;border-radius:3px;font-size:11px;">&#9728;&#65039; Sunshine Host</a>
             <!-- v4125 -- ntfs-mounter.html JOINS beside galaxy-profile.html: another opt-in front door to
                  somebody else's work (zavierferodova/Mac-NTFS-Mounter, no licence file at all), installed and
                  run on this machine rather than vendored. Also appears in the Mac System panel (a view, via
