@@ -1180,10 +1180,43 @@ export class GLBParser {
         return { targets, names, weights, count: targets.length, vertexCount: vCount };
     }
 
+    /**
+     * v4163 -- WHY THIS ERROR NAMES DRACO.
+     *
+     * A Draco-compressed primitive's accessors carry NO bufferView: the vertex data lives in one compressed
+     * blob under `extensions.KHR_draco_mesh_compression`, and the accessors survive only to declare type,
+     * count and bounds. So the first thing this parser hit on a Draco file was the line below, and it said
+     * "accessor 0 has no bufferView" -- TRUE, USELESS, AND THE LAST THING SOMEBODY SEES BEFORE GIVING UP.
+     * The file is not corrupt and the accessor is not wrong; this reader simply does not decode Draco.
+     *
+     * The message now says which extension is in the way and where the path that DOES handle it lives --
+     * three r160's GLTFLoader, vendored here, which implements KHR_draco_mesh_compression in full and needed
+     * nothing but a decoder instance. Detecting it costs one property lookup on a failure path.
+     */
+    static _dracoBlocked(json) {
+        const req = json && json.extensionsRequired, used = json && json.extensionsUsed;
+        const named = (Array.isArray(req) && req.includes("KHR_draco_mesh_compression")) ||
+                      (Array.isArray(used) && used.includes("KHR_draco_mesh_compression"));
+        if (named) return true;
+        for (const m of (json && json.meshes) || []) for (const pr of m.primitives || []) {
+            if (pr.extensions && pr.extensions["KHR_draco_mesh_compression"]) return true;
+        }
+        return false;
+    }
+
     static _readAccessor(json, bin, accessorIdx) {
         const acc = json.accessors[accessorIdx];
         if (!acc) throw new Error(`accessor ${accessorIdx} missing`);
-        if (acc.bufferView == null) throw new Error(`accessor ${accessorIdx} has no bufferView`);
+        if (acc.bufferView == null) {
+            if (GLBParser._dracoBlocked(json)) {
+                throw new Error(
+                    `this GLB is Draco-compressed (KHR_draco_mesh_compression) and gpu/GLBParser.js does not ` +
+                    `decode it -- accessor ${accessorIdx} has no bufferView because its vertex data is in the ` +
+                    `compressed blob. Load it through three's GLTFLoader instead, which handles the extension ` +
+                    `in full: gpu/gltfDraco.js attaches the decoder only for files that need it.`);
+            }
+            throw new Error(`accessor ${accessorIdx} has no bufferView`);
+        }
 
         const view = json.bufferViews[acc.bufferView];
         if (!view) throw new Error(`bufferView ${acc.bufferView} missing`);

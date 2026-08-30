@@ -27,9 +27,12 @@
 // Both are asserted by the gate against a real export, not merely written down here.
 "use strict";
 
-const MAGIC = 0x46546C67;        // "glTF"
-const JSON_CHUNK = 0x4E4F534A;   // "JSON"
-const BIN_CHUNK  = 0x004E4942;   // "BIN\0"
+// v4163 -- EXPORTED so the READER can use the same three numbers the WRITER does. gpu/glbPeek.mjs needs the
+// container layout to look for a Draco extension without decoding anything, and a second spelling of "glTF"
+// somewhere else in the tree is exactly how a writer and a reader start disagreeing about a file format.
+export const MAGIC = 0x46546C67;        // "glTF"
+export const JSON_CHUNK = 0x4E4F534A;   // "JSON"
+export const BIN_CHUNK  = 0x004E4942;   // "BIN\0"
 const FLOAT = 5126;              // componentType
 const ARRAY_BUFFER = 34962;      // bufferView target
 const TRIANGLES = 4;             // primitive mode
