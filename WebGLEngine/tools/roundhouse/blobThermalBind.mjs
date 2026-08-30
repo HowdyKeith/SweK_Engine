@@ -45,6 +45,11 @@ export const BLOB_OBSERVABLES = [
     "scaleCommitted", "dmSimUnits",
     // v2896 -- PLASMA LENSING. The blob as optics, and the answer is that it is the WRONG SIGN of lens.
     "bendMeasured", "bendExact", "bendErrFrac", "bendOutward", "lensSign", "focalLength", "diverging",
+    // *** v4084 -- COMPLETED, THE SAME DEFECT v3850 FIXED IN THE THERMAL FOUR. *** These keys were RETURNED
+    // BY THE BUILDER AND NEVER DECLARED: `kind` on every mode, plus `dInput`/`msd`/`walkers` on `einstein`
+    // and `horizons` on `scheme`. An undeclared observable is invisible to every consumer that reads the
+    // list rather than the code, which is the whole reason the list exists.
+    "kind", "dInput", "msd", "walkers", "horizons",
 ];
 
 const DEF = { D: 0.01141, dt: 1 / 60, steps: 60, blobCount: 2000, seed: 42, n: 32, ext: 2, schemeSteps: 15, v: 1, dmAmp: 1, dmRadius: 1, nuLo: 0.4, nuHi: 1.4, bImpact: 0.4 };
