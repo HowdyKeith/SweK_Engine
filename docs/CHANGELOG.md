@@ -8,6 +8,72 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4198 -- The register of what was read and not taken, and #59 was wrong about its own premise
+
+`world/orrery.mjs` models a **vendored** dependency: it walks `vendor/`, finds licence files, and reports
+CAPTURED, UNPAPERED or REACHED. Its evidence is a file on disk, which makes it blind by construction to the
+case that dominates an assessment round -- a source **read and deliberately not taken** leaves nothing to
+walk. "We looked at this and chose not to vendor it, and here is why" is the fact that goes missing first and
+costs the most to reconstruct.
+
+New `world/reachedLicences.mjs` records seven such sources, with their licences **quoted rather than
+characterised**. `gpu/khronosSamples.mjs` set the shape: it already records BrainStem as
+`LicenseRef-Poser-EULA`, *"not an open licence at all"*.
+
+### Backlog #59 said "two different licences four years apart". It is one licence, restated once, three years apart.
+
+Four codrops repositories, read and compared: ElasticProgress (2015), RainEffect (2015),
+HeatDistortionEffect (2016), ParticleEffectsButtons (2018).
+
+**2015, verbatim:** *"Integrate or build upon it for free in your personal or commercial projects. Don't
+republish, redistribute or sell 'as-is'."*
+
+**2018, verbatim:** *"This resource can be used freely if integrated or built upon in personal or commercial
+projects such as websites, web apps and web templates intended for sale. It is not allowed to take the
+resource 'as-is' and sell it, redistribute, re-publish it, or sell 'pluginized' versions of it."*
+
+Both grant the same permission and forbid the same thing. The 2018 wording is longer and stricter, adding one
+permission (web templates intended for sale) and one prohibition (selling "pluginized" versions). **A drift
+in wording is not a drift in terms**, and saying which one happened is the entire value of quoting rather
+than paraphrasing.
+
+And the clause that decides everything for this tree is identical in both eras: **do not redistribute**.
+Vendoring a file into a public git repository *is* redistribution, so no codrops byte can enter this tree in
+any era of their licence, however permissive "integrate or build upon it for free" sounds on its own.
+
+### The check that matters goes and looks
+
+A register saying "we took nothing" is a promise about the past written by the party who made it. So the gate
+scans **1494 source files** for each publisher's name and requires zero hits outside the register itself. A
+planted file reading `// from codrops/RainEffect -- vendored` reddens it.
+
+**And the allowance is derived from the register, which the gate taught me.** The first scan flagged
+`render/chuckCloseModel.mjs`, which names `kamend/ChuckClose-SparkAR` -- as **attribution**, because it took
+the idea and says so. Crediting a source and smuggling one are opposite acts. The allowance now reads each
+entry's own `takenPaths`, so a new taking cannot quietly widen it, and the gate asserts that the one credited
+module really does credit -- the allowance is exercised, not merely declared.
+
+### Licence severity as a number the orrery can draw
+
+Keith's framing, and it is the right one: a restrictive licence should make a **bigger, angrier planet**, not
+a footnote. So severity ranks not by how much a licence forbids but by **how far the restriction reaches** --
+0 open, 1 unpapered (no grant, but no terms either: inert rather than hostile), 2 no-redistribution, 3
+reciprocal. AGPL is the most formidable not because it forbids the most but because its network clause
+follows your own work home. `asBodies()` hands the set to `world/orrery.mjs` with severity as heft.
+
+### Two of my own bugs, each caught by the thing it was inside
+
+`codropsDrift()` tested `/built? upon/` -- which matches "buil" and "built" and **never "build"**. The 2015
+text says "build upon", so the function reported `bothGrantIntegration: false`: **a manufactured difference
+between two licences, produced by the very function written to say whether they differ.** An optional letter
+is not a character class.
+
+`severityOf()` asked whether a licence had been **quoted** rather than whether one **exists**, ranking
+HeatDistortionEffect as UNPAPERED beside three identically-licensed siblings -- reporting a gap in *our*
+record as a gap in *theirs*. A `licenceExists` field now carries that distinction, which is exactly the line
+`world/orrery.mjs` draws for vendored code.
+
+46 new checks, 4 sabotages all red. The tree carries 1278 gates.
 ## v4197 -- The microphone had been listened to in four files and never once processed
 
 `ui/sttLayer.js`, `simulation/VoiceCommander.js`, `dictation.html` and `AudioLab.html` all open
