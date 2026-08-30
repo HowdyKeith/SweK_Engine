@@ -175,7 +175,53 @@ void main() {
     fragColor = layerSample(clamp((kal + 0.5) * uSize, vec2(0.0), uSize));
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG };
+
+// ---- BATCH 4 (v4164): the points trap, and a control -----------------------------------------------------
+// *** chromaticSplit's OWN COMMENT SAYS "0-30: pixel distance between channels" AND IT IS POINTS. *** Even its
+// author thought in pixels while writing in points. Ported straight onto gl_FragCoord a 30 becomes 30 DEVICE
+// pixels -- half the intended split at 2x, a third at 3x -- and it still works and still animates.
+const CHROMA_FRAG = PREAMBLE + HELPERS + `
+uniform float uSpread, uAngle, uEdgeOnly, uTime, uAnimate, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float mask = mix(1.0, smoothstep(0.1, 0.5, distance(uv, vec2(0.5))), uEdgeOnly);
+    float sp = uSpread + ((uAnimate > 0.01) ? sin(uTime * 2.0) * uSpread * 0.3 * uAnimate : 0.0);
+    vec2 dir = vec2(cos(uAngle), sin(uAngle)) * (sp * mask * uPointScale);
+    vec4 r = layerSample(p + dir);
+    vec4 g = layerSample(p);
+    vec4 b = layerSample(p - dir);
+    fragColor = vec4(r.r, g.g, b.b, g.a);
+}`;
+
+// The control: one sample, no offsets, no remainder, no polar step. What the machinery costs when nothing is
+// tricky -- and it still needs the flip, because uv.y feeds the sines.
+const PLASMA_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uIntensity, uScale, uSpeed, uColorMode, uClampOutput;
+void main() {
+    vec2 p = swPos();
+    vec4 color = layerSample(p);
+    vec2 st = (p / uSize) * uScale;
+    float v1 = sin(st.x + uTime * uSpeed);
+    float v2 = sin(st.y + uTime * uSpeed * 0.7);
+    float v3 = sin(st.x + st.y + uTime * uSpeed * 0.5);
+    float v4 = sin(length(st - vec2(uScale * 0.5)) + uTime * uSpeed * 1.3);
+    float plasma = (v1 + v2 + v3 + v4) * 0.25;
+    float lines = 1.0 / (1.0 + abs(plasma) * 20.0); lines = lines * lines;
+    float v5 = sin(st.x * 2.0 - st.y * 1.5 + uTime * uSpeed * 0.9);
+    float v6 = sin(length(st - vec2(uScale * 0.3, uScale * 0.7)) * 2.0 + uTime * uSpeed);
+    float plasma2 = (v5 + v6) * 0.5;
+    float lines2 = 1.0 / (1.0 + abs(plasma2) * 15.0); lines2 = lines2 * lines2;
+    float total = (lines + lines2 * 0.5) * uIntensity;
+    // The boundaries are < and not <=, matching upstream: a >= here shifts one palette across the whole knob.
+    vec3 pal = (uColorMode < 0.33) ? vec3(0.3, 0.6, 1.0)
+             : (uColorMode < 0.66) ? vec3(0.2, 1.0, 0.4)
+                                   : vec3(0.8, 0.2, 1.0);
+    vec3 rgb = color.rgb + pal * toHalf(total) + vec3(toHalf(total * 0.3));
+    fragColor = vec4(uClampOutput > 0.5 ? clamp(rgb, 0.0, 1.0) : rgb, color.a);
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
@@ -185,6 +231,8 @@ const KNOBS = {
     duochrome: { time: "uTime", intensity: "uIntensity", hue1: "uHue1", hue2: "uHue2", contrast: "uContrast" },
     vortex: { time: "uTime", twistAmount: "uTwistAmount", radius: "uRadius", speed: "uSpeed", falloff: "uFalloff" },
     kaleidoscope: { time: "uTime", segments: "uSegments", rotation: "uRotation", zoom: "uZoom", animateSpeed: "uAnimateSpeed" },
+    chromaticSplit: { spread: "uSpread", angle: "uAngle", edgeOnly: "uEdgeOnly", time: "uTime", animate: "uAnimate", pointScale: "uPointScale" },
+    plasma: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", colorMode: "uColorMode", clampOutput: "uClampOutput" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG };

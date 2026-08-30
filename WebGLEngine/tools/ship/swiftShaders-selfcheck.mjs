@@ -18,7 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
-         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -287,6 +287,63 @@ console.log("\n9. batch 3 -- the polar warps, and the remainder that must NOT be
         ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
     report("PORTED: 6 of 41. THE TWO REMAINDERS NOW HAVE A CASE EACH IN THE GATE -- hsb2rgb needs fmod, the " +
            "kaleidoscope needs mod, and choosing wrong in either direction breaks half a picture apiece.");
+}
+
+// ---- 10. BATCH 4: THE POINTS TRAP, CAUGHT BY THE SHADER'S OWN COMMENT --------------------------------------------
+console.log("\n10. batch 4 -- pixels the author called pixels, which were points");
+{
+    const img = (() => { const w = 32, h = 32, data = new Float32Array(w * h * 4);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4;
+            const v = x > w / 2 ? 1 : 0; data[i] = data[i + 1] = data[i + 2] = v; data[i + 3] = 1; }
+        return { w, h, data, premultiplied: true }; })();
+    // *** THE SHADER DOCUMENTS ITS KNOB AS "0-30: pixel distance between channels" AND position IS IN POINTS. ***
+    const one = bcsChromaticSplit(img, { spread: 8, angle: 0, pointScale: 1 });
+    const two = bcsChromaticSplit(img, { spread: 8, angle: 0, pointScale: 2 });
+    let differing = 0;
+    for (let i = 0; i < img.data.length; i++) if (Math.abs(one.data[i] - two.data[i]) > 1e-9) differing++;
+    ok("!! *** the point scale changes the split, so a Retina port is not silently half-strength ***",
+        differing > 0, differing + " components differ between scale 1 and 2. Upstream's own comment says " +
+        "\"pixel distance\" while `position` is in POINTS -- even its author thought in pixels while writing " +
+        "in points, which is why this is a parameter and not an assumption");
+    ok("!! a zero spread is the identity", bcsChromaticSplit(img, { spread: 0 }).data.every((v, i) => Math.abs(v - img.data[i]) < 1e-9));
+    ok("!! green comes from the CENTRE sample, so the picture does not drift",
+        (() => { const c = bcsChromaticSplit(img, { spread: 6 });
+                 for (let i = 1; i < img.data.length; i += 4) if (Math.abs(c.data[i] - img.data[i]) > 1e-9) return false;
+                 return true; })(),
+        "R leads and B lags; G is the anchor, and an offset there would translate the whole image");
+    ok("...and red and blue really do move apart",
+        (() => { const c = bcsChromaticSplit(img, { spread: 6 });
+                 for (let i = 0; i < img.data.length; i += 4) if (Math.abs(c.data[i] - c.data[i + 2]) > 0.5) return true;
+                 return false; })());
+    ok("...edgeOnly leaves the centre alone and works the rim",
+        (() => { const c = bcsChromaticSplit(img, { spread: 10, edgeOnly: 1 });
+                 const mid = (16 * 32 + 16) * 4;
+                 return Math.abs(c.data[mid] - img.data[mid]) < 1e-9; })(),
+        "the mask is smoothstep(0.1, 0.5, dist), so the middle tenth is untouched");
+
+    // THE CONTROL: no offsets, no remainder, no polar step.
+    ok("!! plasma's palette boundaries are < and not <=, matching upstream",
+        plasmaPalette(0.32)[1] === 0.6 && plasmaPalette(0.33)[1] === 1.0 &&
+        plasmaPalette(0.65)[1] === 1.0 && plasmaPalette(0.66)[1] === 0.2,
+        "a >= where upstream has < shifts one palette across the whole knob, which reads as the wrong colour " +
+        "rather than as a bug");
+    ok("!! intensity 0 is the identity",
+        bcsPlasma(img, { intensity: 0 }).data.every((v, i) => Math.abs(v - img.data[i]) < 1e-9));
+    ok("!! *** plasma adds TWICE and clamps neither time, as upstream leaves it ***",
+        (() => { const p = bcsPlasma(img, { intensity: 1, scale: 4 });
+                 for (let i = 0; i < p.data.length; i += 4) if (p.data[i] > 1.0) return true; return false; })(),
+        "color.rgb += palette * total, then += total * 0.3. Metal's half4 clamps at the display; clamping in " +
+        "the shader would make it a quieter effect than the original -- the same arrangement solarize has");
+    ok("...and clampOutput is there for a float target",
+        bcsPlasma(img, { intensity: 1, clampOutput: true }).data.every((v) => v >= 0 && v <= 1));
+    ok("...plasma still needs the flip, because uv.y feeds the sines", /vec2 p = swPos\(\);/.test(pass.SHADERS.plasma));
+    for (const [name, keys] of [["chromaticSplit", ["uSpread", "uEdgeOnly", "uPointScale"]],
+                                ["plasma", ["uScale", "uColorMode", "uClampOutput"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED: 8 of 41. Four of the six traps now have a worked case in this gate -- the y flip " +
+           "(heatShimmer, vortex), premultiplied alpha (emboss), points (chromaticSplit) and BOTH remainders " +
+           "(hsb2rgb needs fmod, the kaleidoscope needs mod). half is exercised throughout; only the edge rule " +
+           "has no dedicated case, because every shader here clamps.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

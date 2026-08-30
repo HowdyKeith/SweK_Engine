@@ -327,6 +327,93 @@ export function bcsKaleidoscope(img, { time = 0, segments = 6, rotation = 0, zoo
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+
+// =============================================================================================================
+// BATCH 4 (v4164) -- THE POINTS TRAP, CAUGHT BY THE SHADER'S OWN COMMENT.
+//
+// *** bcs_chromaticSplit DOCUMENTS ITS KNOB AS "0-30: pixel distance between channels" AND IT IS NOT PIXELS. ***
+// `position` in a SwiftUI stitchable shader is in POINTS, so a spread of 30 is 30 points -- 60 device pixels on
+// a 2x display and 90 on a 3x. Ported straight onto gl_FragCoord the same 30 becomes 30 DEVICE pixels, which is
+// half the intended split on a Retina panel and a third on an iPhone. The effect still works, still animates,
+// and is quietly wrong by a factor of the device scale. THE SHADER'S OWN COMMENT IS THE EVIDENCE that even its
+// author thought in pixels while writing in points, which is exactly why trap 3 is carried as a parameter
+// rather than trusted to agree.
+//
+// bcs_plasma needs none of that -- it samples once at `position` and adds -- so it is here as the control: a
+// shader with no offsets, no remainder and no polar step, to show what the machinery costs when nothing is
+// tricky. About fifteen lines.
+// =============================================================================================================
+
+/**
+ * bcs_chromaticSplit -- R, G and B sampled at three points along one direction.
+ *
+ * The spread is in POINTS. `pointScale` converts, and the gate asserts the conversion changes the result,
+ * because a scale that silently did nothing would be the same defect wearing a parameter.
+ */
+export function bcsChromaticSplit(img, { spread = 8, angle = 0, edgeOnly = 0, time = 0, animate = 0,
+                                         pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const dist = Math.hypot(uvx - 0.5, uvy - 0.5);
+        const mask = mix(1, smoothstep(0.1, 0.5, dist), edgeOnly);
+        let animatedSpread = spread;
+        if (animate > 0.01) animatedSpread += Math.sin(time * 2) * spread * 0.3 * animate;
+        const eff = animatedSpread * mask * pointScale;
+        const dx = Math.cos(angle) * eff, dy = Math.sin(angle) * eff;
+        const r = s(px + dx, py + dy), g = s(px, py), b = s(px - dx, py - dy);
+        const i = (y * w + x) * 4;
+        out[i] = r[0]; out[i + 1] = g[1]; out[i + 2] = b[2]; out[i + 3] = g[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** The three plasma palettes, at upstream's thresholds. Picked by a float rather than an enum, so the
+ *  BOUNDARIES matter: color_mode 0.33 and 0.66 are where it changes, and a >= where upstream has < would put
+ *  one palette one step off across the whole knob. */
+export const PLASMA_PALETTES = [[0.3, 0.6, 1.0], [0.2, 1.0, 0.4], [0.8, 0.2, 1.0]];
+export function plasmaPalette(colorMode) {
+    if (colorMode < 0.33) return PLASMA_PALETTES[0];
+    if (colorMode < 0.66) return PLASMA_PALETTES[1];
+    return PLASMA_PALETTES[2];
+}
+
+/**
+ * bcs_plasma -- the classic sum-of-sines, with its zero crossings sharpened into filaments.
+ *
+ * *** IT ADDS TWICE AND CLAMPS NEITHER TIME. *** `color.rgb += plasmaColor * totalPlasma` then
+ * `color.rgb += totalPlasma * 0.3`. On a bright image that leaves the range, and Metal's half4 clamps it at
+ * the display -- the same arrangement solarize has. Kept, for the same reason.
+ */
+export function bcsPlasma(img, { time = 0, intensity = 1, scale = 4, speed = 1, colorMode = 0,
+                                 clampOutput = false } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    const pal = plasmaPalette(colorMode);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const stx = ((x + 0.5) / w) * scale, sty = ((y + 0.5) / h) * scale;
+        const v1 = Math.sin(stx + time * speed);
+        const v2 = Math.sin(sty + time * speed * 0.7);
+        const v3 = Math.sin(stx + sty + time * speed * 0.5);
+        const v4 = Math.sin(Math.hypot(stx - scale * 0.5, sty - scale * 0.5) + time * speed * 1.3);
+        const plasma = (v1 + v2 + v3 + v4) * 0.25;
+        let lines = 1 / (1 + Math.abs(plasma) * 20); lines = lines * lines;
+        const v5 = Math.sin(stx * 2 - sty * 1.5 + time * speed * 0.9);
+        const v6 = Math.sin(Math.hypot(stx - scale * 0.3, sty - scale * 0.7) * 2 + time * speed);
+        const plasma2 = (v5 + v6) * 0.5;
+        let lines2 = 1 / (1 + Math.abs(plasma2) * 15); lines2 = lines2 * lines2;
+        const total = (lines + lines2 * 0.5) * intensity;
+        for (let k = 0; k < 3; k++) {
+            const v = img.data[i + k] + toHalf(pal[k] * toHalf(total)) + toHalf(total * 0.3);
+            out[i + k] = clampOutput ? clamp(v, 0, 1) : v;
+        }
+        out[i + 3] = img.data[i + 3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",
