@@ -143,11 +143,52 @@ import { xpbdDevice } from "./xpbdBind.mjs";                // v3458 - xpbd comp
 // invariances worth grading. STATIC IMPORT, for the v3768 reason spelled out in the REGISTRY below.
 import { handsDevice } from "./handsBind.mjs";
 
+// v4131 -- THE REFUSAL, NAMED. This is the roundhouse's own founding device (shedOnset.mjs, the "#1" question
+// the whole proposer/builder/evaluator pattern was named after), and it predates the planted-error convention
+// entirely -- it carries no plantKind AND no plantRefused, which made it invisible to refusalExpiry.mjs too:
+// that gate audits every DECLARED refusal for staleness and silently skips a device that never declared one at
+// all. Every other formerly-silent device in the registry (spacefill, blobvitals, beam, compose) already
+// received this treatment; this was the one left over.
+//
+// CHECKED, NOT ASSUMED: shedOnset.mjs exports exactly one physics formula, nuOf(tau) = (tau-0.5)/3, used once
+// to compute reMeasured, with no second route to it and no independent closed form for a critical Reynolds
+// number or Strouhal number in this confined-channel geometry anywhere in the file. reCritical is HALF THE
+// BRACKET WIDTH FROM THE BISECTION ITSELF -- the device's own measurement IS the answer, not a comparison
+// against one. A wrong-physics substitution in nuOf would shift every reported Re systematically and
+// self-consistently, with no observable here positioned to catch the shift, because nothing independent is
+// asked to agree with it.
+const LBM_PLANT_REFUSED =
+    "shedOnset.mjs exports one physics formula (nuOf, the BGK viscosity relation) used once, with no second " +
+    "route to it and no independent closed form for a critical Reynolds number or Strouhal number in this " +
+    "confined-channel geometry. reCritical is derived from the bisection's OWN measurement, not compared " +
+    "against an external key, so a wrong-physics substitution would shift every reported number self-" +
+    "consistently with nothing positioned to catch it. Declaring a plant here would MANUFACTURE coverage the " +
+    "way beam's and compose's refusals already named.";
+
+// The condition: shedOnset.mjs gaining an exported closed form to compare reCritical/strouhal against. Checked
+// as a FIELD on the imported module (a type test), never grepped from prose -- the rule every other refusal in
+// this registry already follows.
+async function lbmRefusalExpired() {
+    const mod = await import("./shedOnset.mjs");
+    const has = typeof mod.reCriticalExact === "function" || typeof mod.reCriticalExact === "number";
+    return {
+        expired: has,
+        observable: "shedOnset.reCriticalExact", measured: has ? typeof mod.reCriticalExact : "absent",
+        evidence: has
+            ? "shedOnset.mjs now exports reCriticalExact: an independent closed form for the critical Reynolds " +
+              "number exists, so a plant can be graded against it. THE REFUSAL HAS EXPIRED: build it."
+            : "shedOnset.mjs exports no reCriticalExact or equivalent closed form: reCritical/reMeasured/" +
+              "strouhal are self-referential bisection results with nothing independent to compare against.",
+    };
+}
+
 async function makeLbmDevice() {
     const { makeLBM } = await import("../../simulation/lbm/lbm2d.js");
     return {
         name: "lbm-cylinder-channel",
         observables: ["sheds", "reCritical", "reMeasured", "strouhal"],
+        plantRefused: LBM_PLANT_REFUSED,
+        plantRefusedExpiry: lbmRefusalExpired,
         build(hyp, base) {
             const obs = lbmBuild(makeLBM, hyp, base);
             if (obs && obs.kind === "onset") {
