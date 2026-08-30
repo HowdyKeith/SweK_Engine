@@ -30,6 +30,11 @@
 // from fixtures instead of waiting for a brain to go stale on a real box.
 "use strict";
 
+// v4180 -- the edges below are CUBIC BEZIERS, which is exactly the shape that cannot be dash-animated without
+// measuring it. ui/svgGaugeSet.js gets away with 2 * Math.PI * R because a circle's length is a formula; a
+// bezier's is not, and until ui/svgPath.mjs there was nothing in this tree that could produce the number.
+import { drawElement, primeDraw } from "./svgDraw.js";
+
 export const STALE_MS = 60000;
 
 /** Pages that really are about a stage. Verified to exist by the gate; NOT guessed from a registry. */
@@ -164,6 +169,7 @@ export function mountBrainTrail(host, opts = {}) {
         const { pos, width, height } = layout(trail.nodes);
         const svg = el("svg", { width: String(width), height: String(height), viewBox: `0 0 ${width} ${height}` });
 
+        let _drawn = 0;
         for (const e of trail.edges) {
             const a = pos.get(e.from), b = pos.get(e.to);
             if (!a || !b) continue;
@@ -174,6 +180,24 @@ export function mountBrainTrail(host, opts = {}) {
             });
             if (e.dashed) p.setAttribute("stroke-dasharray", "3 3");
             svg.appendChild(p);
+            // v4180 -- opts.draw makes each edge draw ITSELF, staggered, so the trail assembles rather than
+            // appearing. OFF by default: this mounts on a status panel that can refresh often, and a panel
+            // that re-animates every refresh is worse than one that simply updates.
+            // A DASHED edge is skipped deliberately -- its "3 3" pattern IS its meaning (a provisional link),
+            // and the draw-in would overwrite stroke-dasharray with the path length and silently turn every
+            // provisional edge solid. Two features writing the same attribute, where the later one wins and
+            // the loss is invisible.
+            if (opts.draw && !e.dashed) {
+                // The stagger is real, not decorative: drawing every edge at once reads as a single flash,
+                // where drawing them in order reads as the trail being FOLLOWED, which is what the panel is
+                // about. Each edge is primed immediately (so nothing flashes solid before its turn) and its
+                // clock starts after the delay.
+                const delay = (opts.drawStaggerMs ?? 90) * _drawn++;
+                try {
+                    primeDraw(p);
+                    setTimeout(() => { try { drawElement(p, { duration: opts.drawMs ?? 700 }); } catch (err) {} }, delay);
+                } catch (err) {}
+            }
             if (e.label) {
                 const t = el("text", { x: String(mx), y: String((y1 + y2) / 2 - 3), "text-anchor": "middle",
                                        fill: "#6a8a78", "font-size": "8.5", "font-family": "ui-monospace, monospace" });

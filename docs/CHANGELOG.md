@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4180 -- measuring a path, and being careful about what was actually missing
+
+The self-drawing line, from merri-ment/lazy-line-painter (MIT (c) 2019 Cam O'Connell) and lcdsantos/jquery-drawsvg
+(MIT (c) 2015 Leonardo Santos) -- two libraries for one technique: set stroke-dasharray to a path's length and
+animate stroke-dashoffset from that length to zero.
+
+*** THE FIRST DRAFT OF THIS FINDING WAS TOO STRONG AND CHECKING IT IS WHAT CORRECTED IT. *** I wrote that
+SweK's nine stroke-dasharray usages were "guessing" their lengths. They are not. ui/svgGaugeSet.js:326
+computes `const R = 16, C = 2 * Math.PI * R` and dashes a <circle> -- an ANALYTIC circumference, exactly
+right; ui/demoChrome.js does the same; ui/brainTrail.js's "3 3" is a static style, not an animation. Nothing
+was broken. What is true is narrower: getTotalLength() appears ZERO times in this tree, so SweK could dash a
+CIRCLE, whose length is a formula, and could not dash an arbitrary PATH at all. A missing capability, not a
+defect, and the changelog should say which.
+
+*** AND getTotalLength IS THE WRONG PRIMITIVE TO BUILD ON, WHICH IS THE MORE USEFUL PART. *** It is a DOM
+method needing a live SVGPathElement in a document, so anything resting on it cannot run in node, cannot be
+gated the way this tree gates everything, and is unavailable to svg-forge or any export path. New
+ui/svgPath.mjs parses the `d` string and measures it in pure JS: M L H V C S Q T A Z, absolute and relative,
+beziers and arcs flattened to polylines. ui/svgDraw.js PREFERS the browser's own number when a live element
+has one -- it is the same number the renderer uses for the dash pattern -- and falls back to the parser,
+with the gate asserting the two agree.
+
+*** THE MEASUREMENT IS CHECKED AGAINST GROUND TRUTH, WHICH IS UNUSUAL FOR A DRAWING EFFECT. *** A 3-4-5 line
+measures exactly 5. A closed 10x10 square measures exactly 40, and the same square unclosed exactly 30 -- so
+Z's closing segment is provably counted. A quarter arc of radius 10 measures 15.706717 against an exact
+15.707963: SHORT by 0.0079 percent, and the gate checks the SIGN as well as the size, because flattening
+replaces an arc with chords and can only ever understate. A tighter tolerance measures closer, which proves
+the tolerance is connected to something rather than decorative.
+
+Short is the failure mode the whole family of libraries has: a short dasharray means the stroke finishes
+drawing before the animation finishes, and the line sits there complete while the clock runs on. So every
+way of losing length is a named check -- the closing segment, the implicit-repeat rule (M 0 0 10 0 is a
+moveto then a LINETO, and reading it as two movetos drops the segment between them), and an unknown command,
+which is REFUSED BY NAME rather than contributing zero.
+
+*** TWO THINGS I GOT WRONG WHILE WIRING IT, BOTH FOUND BEFORE SHIPPING. *** The comment said the edges draw
+"staggered" while the code drew them all at once -- a comment describing behaviour the code did not have, in
+a file written four minutes earlier. The stagger is now real, with a named knob, and each edge is PRIMED
+immediately with only its clock deferred, since an edge waiting its turn would otherwise sit there solid.
+And the gate's import check used codeOnly(), which blanks string literals -- so `from "./svgDraw.js"` became
+`from ""` and the check went red against a correctly wired file. The same instrument mistake as the v4174
+frameDirty gate: noComments for string anchors, codeOnly for code shapes.
+
+Wired into ui/brainTrail.js rather than a demo page, because its edges are CUBIC BEZIERS -- the exact shape
+that could not be dash-animated before. Opt-in, since that panel refreshes and one that re-animates every
+refresh is worse than one that updates. *** DASHED EDGES ARE SKIPPED, AND THAT IS THE REAL BUG THE WIRING
+COULD HAVE HAD: *** a dashed edge's "3 3" pattern IS its meaning, and priming would overwrite
+stroke-dasharray with the path length and silently turn every provisional edge solid -- two features writing
+one attribute, the later one winning, and the loss invisible. Sabotage-tested, along with dropping Z's
+closing segment; both go red.
+
+Gate count 1263 gates.
 ## v4179 -- VR, and the guide's answer does not apply to this engine
 
 Asked whether SweK has VR. It did not, and the first finding was that MY OWN ANSWER WAS WRONG.
