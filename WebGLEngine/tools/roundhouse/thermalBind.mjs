@@ -221,8 +221,24 @@ export async function buildThermal(hyp, base = {}) {
         massDrift: m0 > 0 ? Math.abs(m1 - m0) / m0 : undefined,
         steps: c.steps,
     };
-    if (typeof sim.rayleigh === "function") out.rayleigh = sim.rayleigh();
-    else if (typeof sim.rayleigh === "number") out.rayleigh = sim.rayleigh;
+    // *** v4184 -- THIS READ A PROPERTY THAT HAS NEVER EXISTED, AND BECAUSE IT WAS WRITTEN AS A GUARD IT
+    // EMITTED NOTHING INSTEAD OF THROWING. *** Both arms tested `sim.rayleigh`; makeThermal exposes the
+    // Rayleigh number as `Ra`. MEASURED on the shipped simulation: typeof sim.Ra is "number" (83058.4 with
+    // buoyancy on, 0 at this mode's own defaults where gravity and beta are both 0) and typeof sim.rayleigh
+    // is "undefined", with `Ra` the only Ra-ish key the object carries. So neither branch could ever fire and
+    // `rayleigh` -- DECLARED in THERMAL_OBSERVABLES since v3145 -- was produced by no mode in any
+    // configuration. THIS FILE ALREADY KNEW THE RIGHT NAME: the `rayleigh` MODE forty lines up reads
+    // `sim.Ra` directly to build its sweep.
+    //
+    // A DECLARED OBSERVABLE NO MODE PRODUCES is v3759's optics shape (an observable living in a branch
+    // nothing runs), and the reason it survived is main's v4170 lesson from the other side: a vestigial read
+    // wrapped in a type guard returns silence, and silence is indistinguishable from "this mode did not
+    // compute it". Had it been a plain read, `rayleigh` would have appeared as undefined and the observable
+    // census would have had something to catch.
+    //
+    // READ DIRECTLY, NOT GUARDED, because the guard is what hid the fault: if `Ra` ever stops being a number,
+    // the observable goes undefined and is visible rather than absent.
+    out.rayleigh = sim.Ra;
     return out;
 }
 
