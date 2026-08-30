@@ -73,6 +73,16 @@ const DEFAULTS = {
     starGrid: 180,                        // direction-lattice resolution for star cells
     starDensity: 0.006,                   // fraction of cells that hold a star
     starMin: 0.5,                         // dimmest star brightness
+    // v4129 -- HOW FAR A STAR REACHES FROM ITS CELL CENTRE, in cell units. *** 1.0 WAS MEASURED, NOT PICKED. ***
+    // At the page's real bake size (256) a lattice cell is about 1.4 texels, so the value decides whether a star
+    // is shaded across the texels it covers or is a flat block. Swept at seed 7: radius 0 leaves 2313 lit texels
+    // with only 11% of adjacent lit pairs differing -- flat tops, which is the square. 0.42 shrinks the star
+    // BELOW one texel (659 lit, 5 adjacent pairs left): rounder in principle, but it thins the star field, which
+    // is a different look rather than a fix. 1.0 keeps the ORIGINAL footprint (2313 lit, 342 pairs) and takes
+    // adjacent-pair variation to 99% -- same stars, now shaded centre to edge. It also reaches exactly zero AT
+    // the cell boundary, so a star cannot spill into its neighbour and there is no edge to read as a seam.
+    // 0 restores the old hard-edged behaviour exactly, which is what the gate uses to prove this does the work.
+    starRadius: 1.0,
 };
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -95,10 +105,29 @@ export function shadeDirection(dir, P) {
     }
     // 3) stars quantised on a direction lattice (so a star spans the same cell on any face -> seamless)
     if (P.starDensity > 0) {
-        const cx = Math.round(x * P.starGrid), cy = Math.round(y * P.starGrid), cz = Math.round(z * P.starGrid);
+        const gx = x * P.starGrid, gy = y * P.starGrid, gz = z * P.starGrid;
+        const cx = Math.round(gx), cy = Math.round(gy), cz = Math.round(gz);
         if (hash3(cx, cy, cz, P.seed ^ 0x9e37) < P.starDensity) {
             const bright = P.starMin + hash3(cx, cy, cz, P.seed ^ 0x5151) * (1 - P.starMin);
-            r += bright; g += bright; b += bright;
+            // v4129 -- *** THE STARS WERE SQUARE BECAUSE EVERY DIRECTION IN A CELL GOT THE SAME BRIGHTNESS. ***
+            // Keith: "the stars in Escape velocity Nebula are square voxels, can they be stars?" The test above
+            // rounds a direction to a lattice cell, and the old code then added FULL brightness for any
+            // direction landing in that cell -- so a star was a filled cube with a hard edge, which is exactly
+            // what a blocky voxel looks like on a skybox face. Nothing was drawing a square; the flat fill was.
+            // The falloff is a continuous function of the SAME direction the cell test uses, so the seamless
+            // property this lattice exists for is untouched: two faces meeting at an edge evaluate the same
+            // direction and get the same value. starRadius:0 collapses this to the old behaviour exactly.
+            const dx = gx - cx, dy = gy - cy, dz = gz - cz;
+            // *** null/undefined MEANS "NOT SPECIFIED", NOT ZERO. *** makeParams spreads opts over DEFAULTS, and
+            // a spread copies an EXPLICITLY undefined key -- so { starRadius: undefined }, which is what any
+            // caller building opts from an optional field produces, would otherwise wipe the default and
+            // silently restore the flat square this exists to remove. Caught by the gate asking for the shipped
+            // default that way. Zero still means zero, because 0 == null is false.
+            const R = (P.starRadius == null) ? DEFAULTS.starRadius : P.starRadius;
+            const d2 = (dx * dx + dy * dy + dz * dz) / (R * R || 1e-9);
+            // (1 - d^2)^2: 1 at the centre, 0 at the radius, and smooth at both ends -- no rim to read as an edge.
+            const fall = R > 0 ? (d2 >= 1 ? 0 : (1 - d2) * (1 - d2)) : 1;
+            if (fall > 0) { r += bright * fall; g += bright * fall; b += bright * fall; }
         }
     }
     return [clamp01(r), clamp01(g), clamp01(b)];

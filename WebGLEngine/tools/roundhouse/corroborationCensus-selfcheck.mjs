@@ -19,9 +19,13 @@
 // so they cannot quietly improve by being forgotten: if a later round narrows the portability taint or fills in
 // refinement knobs, these numbers move and the check says so.
 
+// v4130 -- the UNION of what both sides of the tier-2 merge imported. The branch added
+// measurePortabilitySampled (its new section 3b) and this side already used costVsCalls at the ms-per-Mcall
+// check below; taking either import list alone left the other's call site referencing an undefined name, which
+// is a ReferenceError at RUN time that no syntax check would have caught.
 import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS,
          measurePortabilitySampled, costVsCalls } from "./corroborationCensus.mjs";
-import { writeCostRecord, readCostRecord, dearest } from "./costRecord.mjs";
+import { writeCostRecord, readCostRecord, dearest, COST_BASELINE } from "./costRecord.mjs";
 import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
@@ -33,6 +37,18 @@ const report = (name, detail) => console.log("  ----  " + name + (detail ? "   "
 // `unkeyedTotal > keyedTotal` would pass on half the devices and mean nothing. A partial run REPORTS them and
 // says it cannot vouch for them; it does not quietly pass.
 //
+// *** v4039a -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE ONE SECTION'S BLOCK AND USED IN THE
+// NEXT, AND `const` IS BLOCK-SCOPED. *** The unbudgeted run swept all 484 device/modes, passed every
+// assertion, and then died with `ReferenceError: pinned is not defined` on the last one. The budgeted runs
+// crashed there too and I READ THE TRAILING STACK TRACE AS THE END OF THE OUTPUT and reported the guards as
+// firing correctly. They did -- and the gate still exited non-zero one line later, which is exactly the kind
+// of thing a gate exists to make impossible to miss.
+//
+// *** AND IT WAS FOUND TWICE, INDEPENDENTLY, FROM OPPOSITE ENDS OF THE SWEEP -- BOTH ACCOUNTS KEPT. ***
+// The tier-2 merge brought in a second write-up of this same defect, v4080's, which reached it from the
+// SHORT end (`--budget 5000`, 82 of 484 device/modes) where v4039a above reached it from the long one.
+// Neither is deleted: that a block-scoping bug is reachable from a two-minute partial AND from a full
+// unbudgeted sweep is evidence about how exposed the defect was, and one account alone hides it.
 // *** v4080 -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE SECTION 2's BLOCK AND USED IN SECTION
 // 3, AND `const` IS BLOCK-SCOPED. *** MEASURED WHILE TRYING TO FREEZE A COST RECORD THIS ROUND: `node
 // tools/roundhouse/corroborationCensus-selfcheck.mjs --budget 5000` reported 82 of 484 device/modes, printed

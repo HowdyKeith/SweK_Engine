@@ -1,0 +1,161 @@
+<meta charset="utf-8">
+<title>RDP in the browser (opt-in)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="An opt-in front door to nakagami/grdpwasm (GPL-3.0): a web-based RDP client, Go compiled to WebAssembly speaking RDP in the browser with a small Go proxy bridging its WebSocket to the RDP server's TCP port. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, builds it with the local Go toolchain, and runs their binary as its own subprocess. THE PROXY IS STARTED ON LOOPBACK, and that is the point of this page: upstream's proxy defaults to -listen :8080, accepts WebSocket upgrades from ANY origin, and dials whatever host:port the query string names -- three choices that are individually reasonable for `make serve` on your own desktop and jointly an unauthenticated open TCP relay on a machine that sits on a LAN. It is launched with THEIR OWN -listen flag pointed at 127.0.0.1, so their code is unmodified, unpatched and unforked; the bind is overridable because it is your machine, but never silently, and the bridge returns a warning whenever it is not loopback.">
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+  .wrap { max-width:900px; margin:0 auto; padding:26px 18px 60px }
+  h1 { font-size:20px; margin:0 0 4px } .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  .card.locked { opacity:.55 }
+  .card.alarm { border-color:#4a2a26; background:#0d0705 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  table { border-collapse:collapse; width:100% ; font-size:12.5px }
+  td { padding:4px 8px 4px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.k { color:var(--dim); width:170px; white-space:nowrap }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  input[type=text] { background:#040810; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; width:150px }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:5px 0; font-size:12px; color:var(--dim) }
+  li b { color:#c9dcee }
+  pre.log { background:#040810; border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; font-size:11px; color:#7690ad; margin:8px 0 0; max-height:200px }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  a { color:#5ad6ff }
+</style>
+<div class="wrap">
+<h1>RDP in the browser &mdash; opt-in</h1>
+<p class="sub">A front door to somebody else's project. Nothing of theirs is in this engine.</p>
+
+<div class="card">
+  <h2>Whose work this is</h2>
+  <p class="note">This engine did not write an RDP client. This page installs and runs one that
+  <b id="author">nakagami</b> wrote, on your machine, as its own process.</p>
+  <table id="prov"></table>
+</div>
+
+<div class="card alarm">
+  <h2>&#9888; Why this one is started on loopback</h2>
+  <p class="note">Read out of their <code>proxy/main.go</code>, which is 110 lines and does three things that
+  are each perfectly reasonable on their own:</p>
+  <ul>
+    <li><b>listen defaults to <code>:8080</code></b> &mdash; all interfaces, not loopback.</li>
+    <li><b><code>CheckOrigin</code> returns true</b> &mdash; any web page may open the WebSocket.</li>
+    <li><b>the destination comes from the query string</b> and is dialled unvalidated.</li>
+  </ul>
+  <p class="note" style="margin-top:10px">Together, on a machine that sits on a network, that is an
+  unauthenticated open TCP relay: anything that can reach the port can have it dial any host and port
+  <i>this machine</i> can see &mdash; including things behind its own firewall. For <code>make serve</code>
+  on your own desktop for five minutes, upstream's defaults are the right amount of ceremony. For a button
+  that starts it unattended, they are not. So it is launched with <b>their own <code>-listen</code> flag</b>
+  pointed at <code>127.0.0.1</code>. Their source is not modified, patched or forked &mdash; this page simply
+  declines to pass the argument that publishes it to the network.</p>
+</div>
+
+<div class="card">
+  <h2>1 &middot; Install</h2>
+  <p class="note">Clones the pinned commit into <code id="srcdir">&hellip;</code> (outside this tree) and runs
+  their <code>make all</code>. Their <code>go.mod</code> asks for Go 1.26.3, so the Go toolchain may download
+  itself; the build produces about 20&nbsp;MB of artefacts and takes a few minutes cold.</p>
+  <div class="row"><button id="install">Install &amp; build</button> <span id="installState" class="note"></span></div>
+  <pre class="log" id="installLog" style="display:none"></pre>
+</div>
+
+<div class="card locked" id="card2">
+  <h2>2 &middot; Run</h2>
+  <p class="note">Starts their proxy and serves their page. The RDP host, username and password are typed into
+  <i>their</i> page in your browser &mdash; this engine never sees them and has nowhere to put them.</p>
+  <div class="row">
+    <button id="start">Start on 127.0.0.1</button>
+    <label class="note">port <input type="text" id="port" value="8088" size="6"></label>
+    <button id="stop">Stop</button>
+    <span id="runState" class="note"></span>
+  </div>
+  <p class="note" id="openRow" style="display:none;margin-top:10px">Open <a id="openLink" href="#" target="_blank" rel="noopener"></a></p>
+</div>
+
+<div class="card">
+  <h2>What this page refuses to do</h2>
+  <ul id="refused"></ul>
+</div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const api = async (u, o) => { try { const r = await fetch(u, o); return await r.json(); } catch (e) { return { ok: false, error: String(e && e.message || e) }; } };
+let poll = null;
+
+function renderProvenance(s) {
+  const u = s.upstream || {}, m = s.maintenance || {};
+  $("author").textContent = u.author || "the author";
+  $("srcdir").textContent = s.srcDir || "";
+  $("prov").innerHTML = [
+    ["Repository", '<a href="' + esc(u.repo) + '" target="_blank" rel="noopener">' + esc(u.repo) + "</a>"],
+    ["Author", esc(u.author)],
+    ["Licence", '<b class="unk">' + esc(u.license) + "</b> &mdash; " + esc(u.licenseVerified)],
+    ["What it is", esc(u.what)],
+    ["Built on", esc(u.upstreamOf)],
+    ["Pinned commit", "<code>" + esc(u.commit) + "</code> (branch <code>" + esc(u.branch) + "</code>, " + esc(u.committed) + ")"],
+    ["Upstream activity", esc(m.commits) + " commits, branches " + esc((m.branches || []).join(", ")) +
+                          ", last " + esc(m.lastCommit) + "<br><span class='note'>" + esc(m.howChecked) + "</span>"],
+    ["Clones to", "<code>" + esc(s.srcDir) + "</code> &mdash; outside this tree, never in a release zip"],
+  ].map(([k, v]) => "<tr><td class='k'>" + k + "</td><td>" + v + "</td></tr>").join("");
+  $("refused").innerHTML = (s.refused || []).map((r) =>
+    "<li><b>" + esc(r.what) + "</b><br>" + esc(r.why) + "</li>").join("");
+}
+
+function renderState(s) {
+  const j = s.installJob;
+  if (j) {
+    $("installLog").style.display = "block";
+    $("installLog").textContent = j.log || "";
+    $("installState").innerHTML = j.done
+      ? (j.code === 0 ? '<b class="yes">built</b>' : '<b class="no">failed (exit ' + j.code + ')</b>')
+      : "running (" + esc(j.kind) + ")&hellip; " + Math.round(j.ms / 1000) + "s";
+  } else if (s.built) {
+    $("installState").innerHTML = '<b class="yes">already built</b>';
+  }
+  $("install").disabled = !!(j && !j.done);
+  $("card2").classList.toggle("locked", !s.built);
+  $("start").disabled = !s.built || s.running;
+  $("stop").disabled = !s.running;
+  if (s.running) {
+    $("runState").innerHTML = '<b class="yes">running</b> on <code>' + esc(s.listen) + "</code>" +
+      (s.loopbackOnly ? " &mdash; loopback only" : ' <b class="no">&mdash; NOT loopback</b>');
+    $("openRow").style.display = "";
+    $("openLink").href = s.url; $("openLink").textContent = s.url;
+  } else {
+    $("runState").textContent = s.built ? "stopped" : "install first";
+    $("openRow").style.display = "none";
+  }
+}
+
+async function refresh() {
+  const s = await api("/grdpwasm/status");
+  if (!s.ok) { $("installState").innerHTML = '<b class="no">' + esc(s.error || "bridge unavailable") + "</b>"; return; }
+  renderProvenance(s); renderState(s);
+  if (s.installJob && !s.installJob.done) { if (!poll) poll = setInterval(refresh, 1500); }
+  else if (poll) { clearInterval(poll); poll = null; }
+}
+
+$("install").onclick = async () => {
+  $("installState").textContent = "starting…";
+  const r = await api("/grdpwasm/install", { method: "POST" });
+  if (!r.ok) { $("installState").innerHTML = '<b class="no">' + esc(r.error) + "</b>"; return; }
+  if (!poll) poll = setInterval(refresh, 1500);
+};
+$("start").onclick = async () => {
+  $("runState").textContent = "starting…";
+  const r = await api("/grdpwasm/start", { method: "POST", headers: { "Content-Type": "application/json" },
+                                           body: JSON.stringify({ port: parseInt($("port").value, 10) || undefined }) });
+  if (!r.ok) $("runState").innerHTML = '<b class="no">' + esc(r.error) + "</b>";
+  refresh();
+};
+$("stop").onclick = async () => { await api("/grdpwasm/stop", { method: "POST" }); setTimeout(refresh, 400); };
+
+refresh();
+</script>

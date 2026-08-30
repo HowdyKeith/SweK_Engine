@@ -24,11 +24,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { codeOnly, noComments } from "./sourceScan.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { UPSTREAM, ARTEFACTS, WEIGHTS, UPSTREAM_BENCH, MEASURED_HERE, REFUSED, STAGES,
+         hasSubtleCrypto, isSecure, INSECURE_WHY,
          gb, humanBytes, humanDuration, estimateWallClock, initialState, nextStep,
          blockersFrom, warningsFrom, sha256Hex, verifyArtefact, costLines } from "../../ui/voxtralBrowser.js";
 
@@ -436,6 +438,68 @@ console.log("\n9. *** THE INSTALL BRIDGE: STAGES OUTSIDE THE TREE, VERIFIES BEFO
     ok("!! the PAGE treats the bridge as optional, not required",
         /No install bridge here/.test(pageCode("voxtral.html").jsRaw),
         "the page's whole claim is that it needs no bridge; a missing one must read as normal, not as an error");
+}
+
+// ---- 10. *** THE ORIGIN IS A BROWSER FEATURE, AND SERVING FROM localhost HID A REAL BUG *** ------------------
+console.log("\n10. *** ON SweK'S OWN LAN ORIGIN, HALF THE WEB PLATFORM IS UNDEFINED ***");
+{
+    ok("!! an insecure context is a BLOCKER, and it outranks every hardware question",
+        blockersFrom({ secureContext: false, gpuNamespace: true, adapter: true }).length === 1,
+        "reporting 'no WebGPU adapter' on an insecure origin blames the machine for what the URL did");
+    ok("!! verifyArtefact REFUSES rather than throwing when there is no crypto.subtle",
+        /hasSubtleCrypto\(\)/.test(fs.readFileSync(path.join(ENG, "ui", "voxtralBrowser.js"), "utf8")),
+        "v4115 reached straight into crypto.subtle.digest; on the LAN that threw a TypeError into an un-caught " +
+        "promise and the button did NOTHING AT ALL, with no message");
+
+    const { chromium, from: pwFrom } = resolvePlaywright(require_);
+    const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    // A non-loopback address on this machine. 127.0.0.1 and localhost are BOTH secure contexts, which is
+    // exactly why every earlier section of this file missed the bug: it was serving the page to a different
+    // browser than the one Keith opens on the LAN.
+    const lan = Object.values(os.networkInterfaces()).flat()
+        .filter((n) => n && n.family === "IPv4" && !n.internal).map((n) => n.address)[0];
+    if (skip || !lan) {
+        report("live half SKIPPED -- " + (skip || "no non-loopback IPv4 address on this host"));
+        report("*** THAT IS A SKIP AND NOT A PASS: this is the section that would have caught v4115's bug.");
+    } else {
+        const srv = http.createServer((rq, rs) => {
+            const u = decodeURIComponent(rq.url.split("?")[0]);
+            const f = path.join(ENG, u === "/" ? "/voxtral.html" : u);
+            if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rs.writeHead(404); return rs.end("nf"); }
+            const e = path.extname(f);
+            rs.writeHead(200, { "Content-Type": e === ".js" || e === ".mjs" ? "text/javascript"
+                                              : e === ".html" ? "text/html" : "application/octet-stream" });
+            rs.end(fs.readFileSync(f));
+        });
+        await new Promise((r) => srv.listen(0, "0.0.0.0", r));
+        const port = srv.address().port;
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const pg = await (await b.newContext()).newPage();
+        const errs = [];
+        pg.on("pageerror", (e) => errs.push(String(e.message)));
+        await pg.goto("http://" + lan + ":" + port + "/voxtral.html", { waitUntil: "load" }).catch(() => {});
+        await pg.waitForTimeout(400);
+
+        const env = await pg.evaluate(() => ({
+            secure: window.isSecureContext, gpu: typeof navigator.gpu,
+            subtle: typeof (globalThis.crypto && globalThis.crypto.subtle),
+            text: document.body.innerText,
+        }));
+        ok("!! *** the LAN origin really is insecure, and this is the browser Keith actually opens ***",
+            env.secure === false, "origin http://" + lan + ":" + port + " -> isSecureContext " + env.secure);
+        ok("!! ...and navigator.gpu and crypto.subtle are BOTH undefined there",
+            env.gpu === "undefined" && env.subtle === "undefined",
+            "navigator.gpu=" + env.gpu + " crypto.subtle=" + env.subtle +
+            " -- so no WebGPU to audition and no digest to check, on the address the engine ships as");
+        ok("!! *** the page SAYS SO on load, instead of offering a button that silently does nothing ***",
+            /cannot work on this address/i.test(env.text),
+            "the whole defect was silence: a person on the LAN pressed Load and got no response and no reason");
+        ok("   ...and it names the fix rather than only the problem",
+            /tunnel|localhost/i.test(env.text));
+        ok("!! the page still loads without a script error on the insecure origin",
+            errs.length === 0, errs.join(" | "));
+        await b.close(); srv.close();
+    }
 }
 
 console.log("\n" + (fails ? fails + " FAILED" : "all checks pass"));

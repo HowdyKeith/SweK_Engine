@@ -356,16 +356,53 @@ export function mountGithubPanel() {
             // it did nothing and the button read as broken. publishEngineBuild() ALREADY falls back to
             // engineRepo || defaultRepo on the server -- the UI was stricter than the backend it calls, and the
             // error text described a remedy the code did not allow. AN ERROR MESSAGE IS A CLAIM TOO.
+            // v4133 -- *** WHICH BRANCH, ASKED OUT LOUD. *** This button took the DEFAULT branch and never
+            // said so. Keith ran gates against v4116 for days while the work sat on a feature branch at v4132,
+            // and every clone he made quietly handed him the stale tree again. The backend always honoured a
+            // `ref`; nothing here ever passed one and nothing here ever mentioned the choice existed.
+            // The list is loaded lazily on first open, so the panel costs no API calls until somebody looks.
+            const brSel = document.createElement("select");
+            brSel.style.cssText = "padding:5px;background:#0c0f14;color:#e8eef8;border:1px solid #2a3340;border-radius:6px;font:11px ui-monospace,monospace;margin-top:4px;width:100%;";
+            brSel.title = "Which branch to clone. The version beside each name is READ OFF ITS HEAD COMMIT SUBJECT and is a hint -- the real version is read out of the tree after the clone.";
+            const brOpt = (v, t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; return o; };
+            brSel.append(brOpt("", "branch: (default) \u2014 click to load the list"));
+            let brLoaded = false;
+            const loadBranches = async () => {
+                if (brLoaded) return; brLoaded = true;
+                let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) { brSel.options[0].textContent = "branch: (default) \u2014 set a repo first"; brLoaded = false; return; }
+                const j = await api("source-branches?repo=" + encodeURIComponent(er));   // api() is (op, body, method) -- a query object would be silently dropped
+                if (!j || !j.ok) { brSel.options[0].textContent = "branch: (default) \u2014 could not list (" + ((j && j.error) || "?") + ")"; brLoaded = false; return; }
+                brSel.textContent = "";
+                brSel.append(brOpt("", "branch: (default) = " + j.defaultBranch));
+                for (const b of j.branches || []) {
+                    const when = (b.committedAt || "").slice(0, 10);
+                    // The version is shown with a ~ because it is INFERRED from the commit subject. A dropdown
+                    // that printed it as fact would be the same over-trust that made the default branch invisible.
+                    const label = b.name + (b.versionGuess ? "  ~" + b.versionGuess : "") + (when ? "  " + when : "") + (b.isDefault ? "  (default)" : "");
+                    brSel.append(brOpt(b.name, label));
+                }
+                if (j.truncated) brSel.append(brOpt("", "\u2026 " + j.total + " branches, showing 25 newest"));
+            };
+            brSel.addEventListener("mousedown", loadBranches, { once: false });
+            brSel.addEventListener("focus", loadBranches);
+            w.append(brSel);
+
             src.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
                 if (!er) return say("pick a repo, or set engineRepo in Account", false);
-                src.disabled = true; say("cloning " + er + "\u2026 (a few hundred MB, give it a minute)");
-                const j = await api("clone-source", { repo: er });
+                const ref = brSel.value || "";
+                src.disabled = true; say("cloning " + er + (ref ? " @ " + ref : " (default branch)") + "\u2026 (a few hundred MB, give it a minute)");
+                const j = await api("clone-source", ref ? { repo: er, ref } : { repo: er });
                 src.disabled = false;
                 if (!j.ok) return say("\u2717 " + (j.error || ""), false);
-                say("\u2713 " + j.version + " cloned to\n" + j.path +
+                // The stale line comes FIRST when it applies: burying "this is older than what you are running"
+                // under a success tick is how the last one went unnoticed for sixteen versions.
+                say((j.staleWarning ? "\u26A0 " + j.staleWarning + "\n\n" : "") +
+                    "\u2713 " + j.version + " cloned from " + (j.ref || "?") + " to\n" + j.path +
                     "\n\nThis engine is still " + (j.running || "?") + " \u2014 the new copy is a SEPARATE folder and nothing here changed." +
-                    "\nTo use it: stop this server, start it from " + j.path + "\\WebGLEngine, and reload the page.", true); };
+                    "\nTo use it: stop this server, start it from " + j.path + "\\WebGLEngine, and reload the page.", !j.older); };
             eng.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
                 if (!er) return say("pick a repo, or set engineRepo in Account", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };

@@ -1,0 +1,232 @@
+<meta charset="utf-8">
+<title>Ray tracing in the page (opt-in)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+  .wrap { max-width:900px; margin:0 auto; padding:26px 18px 60px }
+  h1 { font-size:20px; margin:0 0 4px } .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  .card.locked { opacity:.55 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  table { border-collapse:collapse; width:100%; font-size:12.5px }
+  td { padding:4px 8px 4px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.k { color:var(--dim); width:180px; white-space:nowrap }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  .banner { border:1px solid #4a2f2c; background:#150a09; border-radius:9px; padding:12px 14px; margin-bottom:16px }
+  .banner b { color:#f0a79e }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:3px 0; font-size:12px; color:var(--dim) }
+  ol.recipe { margin:6px 0 0; padding-left:20px } ol.recipe li { margin:7px 0; color:var(--ink); font-size:12.5px }
+  pre { background:#040810; border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; font-size:11.5px; color:#9fd7ff; margin:5px 0 0 }
+</style>
+<div class="wrap">
+  <h1>Ray tracing in the page</h1>
+  <p class="sub">Vulkan's ray tracing pipeline &mdash; raygen, closest-hit, miss, a shader binding table, a BVH
+    &mdash; as <b>pure WebGPU compute</b>. No hardware RT cores, no special browser build. It is also
+    <b>unmaintained since 2023</b> and <b>not shipped with this tree</b>. All three are the point.</p>
+
+  <div id="originBanner"></div>
+
+  <div class="card">
+    <h2>What this is, and what it is not</h2>
+    <table id="prov"></table>
+  </div>
+
+  <div class="card">
+    <h2>1 &mdash; Can this address even do it</h2>
+    <p class="note"><b>Asked first, because it outranks the hardware.</b> <code>navigator.gpu</code> is
+      secure-context only, so on SweK's own LAN address there is no WebGPU at all &mdash; and a page that
+      reported &ldquo;no adapter&rdquo; there would be blaming the machine for what the URL did.</p>
+    <div><button id="probe">Probe this address</button> <span id="probeState" class="note"></span></div>
+    <table id="facts"></table>
+    <div id="factNotes"></div>
+  </div>
+
+  <div class="card" id="card2">
+    <h2>2 &mdash; Build it yourself <span class="note" style="font-weight:400" id="sizeNote"></span></h2>
+    <p class="note">
+      <b>There is nothing to download.</b> Upstream publishes no build at all, so unlike this tree's other
+      opt-in page there is <b>no digest to pin</b> &mdash; every consumer compiles their own and two builds
+      differ. What is pinned instead is the <b>recipe</b>, and every line of it was measured by running it.
+      The result is verified by <b>behaviour</b> in step 3.
+    </p>
+    <ol class="recipe" id="recipe"></ol>
+    <p class="note" style="margin-top:10px">Then stage <code>dist/</code> at <code>/vendor/webrtx/</code>, or
+      pick <code>index.js</code> with the file button below.</p>
+    <div>
+      <button id="consent">Enable ray tracing</button>
+      <button id="loadBtn" disabled>Load a built bundle</button>
+      <label><input type="file" id="file" accept=".js" disabled style="display:none"><button id="pickBtn" disabled>Choose index.js&hellip;</button></label>
+      <span id="loadState" class="note"></span>
+    </div>
+  </div>
+
+  <div class="card locked" id="card3">
+    <h2>3 &mdash; The smoke test <span class="note" style="font-weight:400">(behaviour, since there is no digest)</span></h2>
+    <p class="note">Four things, in order, each a real call: does it patch <code>requestDevice</code>; does
+      asking for the <code>ray_tracing</code> feature install the pipeline API; does
+      <code>beginRayTracingPass</code> appear on a command encoder; and does a bottom-level
+      <b>acceleration structure actually build</b> from real triangle vertices &mdash; which is the one that
+      proves the BVH WebAssembly executed rather than merely loaded.</p>
+    <div><button id="smoke" disabled>Run the smoke test</button> <span id="smokeState" class="note"></span></div>
+    <table id="smokeOut"></table>
+  </div>
+
+  <div class="card">
+    <h2>What this page refuses to claim</h2>
+    <div id="refused"></div>
+  </div>
+
+  <div class="card">
+    <h2>What was measured here, and what was not</h2>
+    <table id="measured"></table>
+  </div>
+</div>
+
+<script type="module">
+import { UPSTREAM, MAINTENANCE, BUILD_STEPS, MEASURED_HERE, REFUSED, STAGED_PATH,
+         initialState, nextStep, blockersFrom, warningsFrom, humanBytes, totalBytes } from "/ui/webrtxBrowser.js";
+import { probeLocalModel } from "/ui/localModelProbe.js";
+
+const $ = (id) => document.getElementById(id);
+let state = initialState(), facts = null, rtx = null;
+const rows = (t, p) => { t.innerHTML = p.map(([k, v]) => `<tr><td class="k">${k}</td><td>${v}</td></tr>`).join(""); };
+
+// *** THE ORIGIN CHECK RUNS ON LOAD, BEFORE ANY BUTTON. *** Same lesson voxtral.html learned the hard way:
+// on the LAN this page cannot work at all, and saying so beats offering controls that quietly do nothing.
+if (!window.isSecureContext) {
+  $("originBanner").innerHTML =
+    '<div class="banner"><b>This page cannot work on this address.</b> <code>' + location.origin +
+    '</code> is not a secure context, and <code>navigator.gpu</code> is secure-context only &mdash; so there ' +
+    'is no WebGPU here to build a pipeline on. <b>Measured in Chromium, one server, two origins:</b> from ' +
+    '<code>127.0.0.1</code> WebGPU, <code>crypto.subtle</code>, <code>VideoEncoder</code> and ' +
+    '<code>getUserMedia</code> all exist; from a LAN IP <b>every one is undefined</b>. Open this over the ' +
+    'https tunnel, or on localhost.</div>';
+}
+
+rows($("prov"), [
+  ["Project", `<a href="${UPSTREAM.repo}" style="color:#9fd7ff">${UPSTREAM.repo}</a>`],
+  ["What it does", UPSTREAM.what],
+  ["Licence", `<b>${UPSTREAM.license}</b> &mdash; ${UPSTREAM.licenseVerified}`],
+  ["Commit", `<code>${UPSTREAM.commit}</code> (${UPSTREAM.committed})`],
+  ["Maintenance", `<b class="unk">${MAINTENANCE.verdict}</b> &mdash; ${MAINTENANCE.commits} commit,
+     ${MAINTENANCE.tags} tags. <i>How that was checked: ${MAINTENANCE.howChecked}</i>`],
+  ["Total to build", `${humanBytes(totalBytes())} &mdash; bundle ${humanBytes(MEASURED_HERE.bundleBytes)} plus
+     three wasm modules. <b>Not vendored:</b> the largest asset otherwise vendored in this tree is 3.5 MB`],
+]);
+$("sizeNote").textContent = "(" + humanBytes(totalBytes()) + " of artefacts, built not downloaded)";
+$("recipe").innerHTML = BUILD_STEPS.map((s) =>
+  `<li><code>${s.step}</code> <span class="note">&mdash; in ${s.where}</span><div class="note" style="margin:3px 0 0">${s.why}</div></li>`).join("");
+$("refused").innerHTML = "<ul>" + REFUSED.map((r) =>
+  `<li><b class="no">${r.what}</b> &mdash; ${r.why} <i>Would need: ${r.wouldNeed}</i></li>`).join("") + "</ul>";
+rows($("measured"), [
+  ["Where", MEASURED_HERE.where],
+  ["Patched requestDevice", MEASURED_HERE.patchedRequestDevice ? '<b class="yes">yes</b>' : 'no'],
+  ["Pipeline API appeared", MEASURED_HERE.rayTracingPipelineExposed ? '<b class="yes">yes</b>' : 'no'],
+  ["Acceleration structure", MEASURED_HERE.accelerationStructureBuilt ? '<b class="yes">built from real geometry</b>' : 'no'],
+  ["<b>Not</b> measured", `<b>${MEASURED_HERE.note}</b>`],
+]);
+
+function refresh() {
+  const step = nextStep(state, facts);
+  $("loadBtn").disabled = step.action !== "load";
+  $("pickBtn").disabled = step.action !== "load";
+  $("smoke").disabled = step.action !== "verify";
+  $("consent").disabled = state.consented;
+  $("card3").classList.toggle("locked", !state.loaded);
+  if (step.action === "blocked") $("loadState").innerHTML = `<b class="no">${step.detail}</b>`;
+}
+
+$("probe").onclick = async () => {
+  $("probeState").textContent = "reading…";
+  facts = await probeLocalModel();
+  facts.secureContext = window.isSecureContext;
+  const info = facts.adapterInfo || {};
+  facts.appleGpu = /apple/i.test([info.vendor, info.architecture, info.description].filter(Boolean).join(" "));
+  rows($("facts"), [
+    ["Secure context", facts.secureContext ? '<b class="yes">yes</b> — ' + location.origin
+        : '<b class="no">NO</b> — ' + location.origin + ' (nothing below can work)'],
+    ["WebGPU namespace", facts.gpuNamespace ? '<b class="yes">present</b>' : '<b class="no">absent</b>'],
+    ["Adapter", facts.adapter ? '<b class="yes">granted</b>' : '<b class="no">null</b>'],
+    ["Adapter is software", facts.softwareRenderer === null ? '<b class="unk">unknown</b>'
+        : facts.softwareRenderer ? '<b class="unk">yes — CPU emulation</b>' : '<b class="yes">no</b>'],
+    ["Vendor", info.vendor || info.description || '<b class="unk">not exposed</b>'],
+  ]);
+  const b = blockersFrom(facts), w = warningsFrom(facts);
+  $("factNotes").innerHTML =
+    (b.length ? `<div class="note no" style="margin-top:8px"><b>Blocked:</b> ${b.join("; ")}</div>` : "") +
+    (w.length ? "<ul>" + w.map((x) => `<li class="unk">${x}</li>`).join("") + "</ul>" : "");
+  $("probeState").textContent = b.length ? "cannot run here" : "read";
+  refresh();
+};
+
+$("consent").onclick = () => { state = { ...state, consented: true }; refresh(); };
+
+async function useBundle(url, label) {
+  $("loadState").textContent = "loading " + label + "…";
+  try {
+    await import(/* webpackIgnore: true */ url);
+    // WebRTX has NO named exports: it works entirely by patching WebGPU's own prototypes on import. That is
+    // invasive, and it is also how the smoke test can tell whether it took.
+    rtx = true;
+    state = { ...state, loaded: true };
+    $("loadState").innerHTML = '<b class="yes">bundle loaded</b> — now run the smoke test';
+  } catch (e) {
+    $("loadState").innerHTML = `<b class="no">could not load: ${String(e).slice(0, 200)}</b>`;
+  }
+  refresh();
+}
+$("loadBtn").onclick = () => useBundle(STAGED_PATH, STAGED_PATH);
+$("pickBtn").onclick = () => $("file").click();
+$("file").onchange = (ev) => {
+  const f = ev.target.files[0];
+  if (f) useBundle(URL.createObjectURL(f), f.name);
+};
+
+$("smoke").onclick = async () => {
+  $("smoke").disabled = true;
+  $("smokeState").textContent = "running…";
+  const out = [];
+  const line = (k, ok, d) => out.push([k, (ok ? '<b class="yes">pass</b>' : '<b class="no">fail</b>') + (d ? " — " + d : "")]);
+  try {
+    const patched = typeof GPUAdapter !== "undefined" && !/\[native code\]/.test(String(GPUAdapter.prototype.requestDevice));
+    line("patched requestDevice", patched, patched ? "" : "the bundle did not install itself");
+    const a = await navigator.gpu.requestAdapter();
+    // The ray_tracing feature name IS the entry point: asking without it leaves the API absent, which is
+    // exactly what made the first version of this probe report a false negative.
+    const d = await a.requestDevice({ requiredFeatures: ["ray_tracing"] });
+    const hasPipe = typeof d.createRayTracingPipeline === "function";
+    line("ray tracing pipeline API", hasPipe);
+    const enc = d.createCommandEncoder();
+    line("beginRayTracingPass on encoder", typeof enc.beginRayTracingPass === "function");
+    let built = false, err = "";
+    try {
+      const v = new Float32Array([0,0,0, 1,0,0, 0,1,0]);
+      const vb = d.createBuffer({ size: v.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      d.queue.writeBuffer(vb, 0, v);
+      built = !!d.createRayTracingAccelerationContainer({
+        level: "bottom", usage: 0,
+        geometries: [{ usage: 0, type: "triangles", vertex: { buffer: vb, format: "float32x3", stride: 12, count: 3 } }],
+      });
+    } catch (e) { err = String(e).slice(0, 180); }
+    line("acceleration structure built", built, built ? "the BVH WebAssembly really ran" : err);
+    $("smokeState").innerHTML = built
+      ? '<b class="yes">ray tracing is available on this device</b>'
+      : '<b class="no">it loaded but did not work here</b>';
+    state = { ...state, verified: built };
+  } catch (e) {
+    line("smoke test", false, String(e).slice(0, 200));
+    $("smokeState").innerHTML = '<b class="no">failed</b>';
+  }
+  rows($("smokeOut"), out);
+  $("smoke").disabled = false;
+  refresh();
+};
+
+refresh();
+</script>

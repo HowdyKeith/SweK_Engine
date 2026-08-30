@@ -180,22 +180,29 @@ export function buildStrokeTubes(THREE, rigged, triangles, bind, skin, { radius 
  * The original visible meshes are removed from the export graph rather than kept alongside: Keith asked for
  * the pencil drawing rigged, not the pencil drawing layered over the shaded model it was traced from.
  */
-export function buildRiggedExportScene(THREE, gltf, tubeGeometry) {
+/**
+ * *** GENERAL SINCE v4157: THE GEOMETRY AND ITS NAMES ARE PARAMETERS, NOT KRBN'S. ***
+ * This function never knew what it was binding -- it takes a BufferGeometry carrying JOINTS/WEIGHTS in the
+ * skeleton's index space and attaches it. The only Krbn in it was three hardcoded strings and a colour, which
+ * is the difference between "the Krbn exporter" and "the reskin exporter". Defaults are exactly the old values,
+ * so krbn-rigged.html's output is unchanged.
+ */
+export function buildRiggedExportScene(THREE, gltf, tubeGeometry, opts = {}) {
     let sourceSkin = null;
     gltf.scene.traverse((o) => { if (!sourceSkin && o.isSkinnedMesh) sourceSkin = o; });
     if (!sourceSkin) throw new Error("no skinned mesh in the source -- nothing to bind the drawing to");
 
     const scene = new THREE.Scene();
-    scene.name = "krbn-rigged";
+    scene.name = opts.sceneName || "krbn-rigged";
     // detach the root bone from the ORIGINAL scene graph and re-parent under a FRESH scene, so the export
     // graph is exactly {root bone hierarchy, new mesh} -- not the original scene's now-empty mesh nodes too.
     const rootBone = sourceSkin.skeleton.bones.find((b) => !sourceSkin.skeleton.bones.includes(b.parent)) || sourceSkin.skeleton.bones[0];
     let top = rootBone; while (top.parent && top.parent.isBone) top = top.parent;
     scene.add(top);
 
-    const material = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
+    const material = opts.material || new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
     const mesh = new THREE.SkinnedMesh(tubeGeometry, material);
-    mesh.name = "krbn-pencil-strokes";
+    mesh.name = opts.meshName || "krbn-pencil-strokes";
     // bindMatrix identity: measured on the source (bindMatrixIsIdentity=true) and bindPositions() above builds
     // vertices directly in the skeleton's own space for exactly that reason -- no second transform to invert.
     mesh.bind(sourceSkin.skeleton, new THREE.Matrix4());
@@ -204,8 +211,33 @@ export function buildRiggedExportScene(THREE, gltf, tubeGeometry) {
 }
 
 /**
+ * *** THE RESKIN EXPORTER. *** Any geometry already bound to the source skeleton, out as a .glb that keeps every
+ * bone and every clip.
+ *
+ * This is the second half of exportRiggedGLB, lifted out at v4157 so the GEOMETRY SOURCE IS A PARAMETER. Krbn
+ * strokes are now one caller of it rather than the only thing it can do -- tools/export/reskin.js's glyph quads
+ * and vertex colours are others.
+ *
+ * *** `animations` IS THE LINE THAT MATTERS AND IT IS EASY TO DROP. *** GLTFExporter does NOT walk the scene for
+ * clips; it serialises the array it is handed. Omitting it exports a model that looks right, binds right, and
+ * has NOTHING TO PLAY -- with no error anywhere, which is the failure this whole file exists to avoid.
+ */
+export async function exportReskinnedGLB(THREE, GLTFExporter, gltf, geometry, opts = {}) {
+    const exportScene = buildRiggedExportScene(THREE, gltf, geometry, opts);
+    return await new Promise((res, rej) => new GLTFExporter().parse(
+        exportScene,
+        (out) => res(out),
+        (err) => rej(err),
+        { binary: true, animations: gltf.animations || [], includeCustomExtensions: false }
+    ));
+}
+
+/**
  * The whole pipeline, glTF bytes in, rigged-drawing glTF bytes out. `onProgress` is optional and called with
  * short strings -- Krbn's render is the ~500ms step in here and a caller may want to say so on screen.
+ *
+ * v4157: the last two steps are now exportReskinnedGLB above. This function is what makes KRBN geometry; it is
+ * no longer what knows how to export it.
  */
 export async function exportRiggedGLB(THREE, GLTFExporter, K, gltf, mesh, cam, onProgress = () => {}) {
     onProgress("drawing with Krbn…");
@@ -227,14 +259,7 @@ export async function exportRiggedGLB(THREE, GLTFExporter, K, gltf, mesh, cam, o
     const tubes = buildStrokeTubes(THREE, rigged, mesh.triangles, bind, skin);
 
     onProgress("building the export scene…");
-    const exportScene = buildRiggedExportScene(THREE, gltf, tubes);
-
     onProgress("serialising .glb…");
-    const buf = await new Promise((res2, rej) => new GLTFExporter().parse(
-        exportScene,
-        (out) => res2(out),
-        (err) => rej(err),
-        { binary: true, animations: gltf.animations || [], includeCustomExtensions: false }
-    ));
+    const buf = await exportReskinnedGLB(THREE, GLTFExporter, gltf, tubes);
     return { glb: buf, strokeCount: rigged.length, silhouetteCount: kinds.filter((k) => k === "silhouette").length };
 }

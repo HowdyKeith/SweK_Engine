@@ -109,5 +109,36 @@ const S = 24;
     ok(shadeDirection([0, 1, 0], flip)[2] < shadeDirection([0, -1, 0], flip)[2], "control: swapping low/high inverts the gradient");
 }
 
+// v4129 -- *** STARS ARE SHADED, NOT FLAT BLOCKS. *** Keith: "the stars in Escape velocity Nebula are square
+// voxels, can they be stars?" Nothing was drawing a square -- the lattice test gave every direction inside a
+// cell the SAME brightness, so a star was a flat-topped block and read as a voxel once magnified across a
+// skybox face. The measurable difference is not "is it round" (a texel grid cannot answer that) but WHETHER
+// ADJACENT LIT TEXELS DIFFER: flat tops means they mostly do not, a radial falloff means they nearly all do.
+// starRadius:0 restores the old behaviour exactly, so the two are compared against each other rather than
+// against a number I chose -- the falloff has to earn the difference.
+{
+    const S = 256, SEED = 7;
+    const flatField = { seed: SEED, size: S, nebulaIntensity: 0, lowColor: [0, 0, 0], highColor: [0, 0, 0] };
+    const measure = (starRadius) => {
+        const bake = bakeNebulaCubemap({ ...flatField, starRadius });
+        let lit = 0, pairs = 0, differing = 0;
+        for (let f = 0; f < 6; f++) {
+            const a = bake.faces[f], at = (x, y) => a[(y * S + x) * 3];
+            for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+                const v = at(x, y); if (!v) continue; lit++;
+                for (const [qx, qy] of [[x + 1, y], [x, y + 1]]) { const w = at(qx, qy); if (!w) continue; pairs++; if (w !== v) differing++; }
+            }
+        }
+        return { lit, pairs, pct: pairs ? (100 * differing / pairs) : 0 };
+    };
+    const hard = measure(0), soft = measure(undefined);   // undefined -> the shipped default
+    ok(hard.pairs > 50 && soft.pairs > 50, "both settings put enough adjacent lit texels down to compare");
+    ok(hard.pct < 40, `control: with starRadius 0 the stars ARE flat tops (${hard.pct.toFixed(0)}% of adjacent pairs differ)`);
+    ok(soft.pct > 90, `the shipped falloff shades every star (${soft.pct.toFixed(0)}% of adjacent pairs differ)`);
+    // The footprint must SURVIVE the change: a "fix" that shades stars by deleting most of them is a different
+    // sky, not a rounder star -- and a smaller radius does exactly that, which is why this is pinned.
+    ok(soft.lit >= hard.lit * 0.9, `the star field keeps its density (${soft.lit} lit vs ${hard.lit} before)`);
+}
+
 console.log(`nebulaSkybox-selfcheck: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

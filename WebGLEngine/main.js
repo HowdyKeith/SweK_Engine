@@ -6519,7 +6519,12 @@
 // v4113 -- *** THE STORAGE QUOTA WAS BEING TREATED AS THE AUTHORITY ON WHETHER A MODEL FITS, AND IT IS NOT ONE. *** Found while measuring whether voxtral (2.5-9GB) would clear localModelProbe's quota check -- I predicted it would be ruled out on disk, and MEASURING DISPROVED THAT: on Keith's real recorded box (10.74 GB quota, the v4032 fixture) ASR+TTS Q4 at 5.17 GB is ALLOWED with 5.57 GB spare, and only the 17 GB BF16 pair blocks. Two findings came out of the measurement that matter more than the answer. (1) *** THE QUOTA IS A PROMISE, NOT A RESERVATION. *** Measured live, headless Chromium, one container: a PERSISTENT profile reported a 162.33 GB quota on a filesystem with 28.73 GB ACTUALLY FREE -- overstating real disk by 5.6x. verdictFor()'s only storage rule was `quota < model.bytes` -> blocker, so clearing it was silently counted as "there is room" when it only ever meant "not ruled out": a download can pass this check and still die partway through on a full disk, which is exactly the mid-gigabyte failure localModelRun.js's preflightRepo() exists to prevent one layer up. Fixed by adding an UNKNOWN rather than a blocker (v3103 runs both ways -- it cannot become a "no" on a number nobody measured either), and FREE DISK IS NOT EXPOSED TO A PAGE ANY MORE THAN VRAM IS, so the new quotaNote NAMES the absent number in exactly the shape this file already uses for vramNote rather than substituting a plausible "typical free space". (2) *** THE QUOTA TRACKS THE BROWSING CONTEXT FAR MORE THAN THE DISK, and I nearly asserted a fabricated rule about it. *** I was about to state that Chromium grants roughly 60% of free disk; measuring both ways on the SAME container with the SAME 28.73 GB free gave 0.90 GB in an incognito/ephemeral context and 162.33 GB in a persistent profile -- a 180x swing from the context alone, nothing like a disk-proportional rule. Recorded as quotaContextNote because a private window refusing a model a normal window allows is a refusal a reader would otherwise read as a hardware limit. Both notes carry the measured numbers rather than the claim alone. webgpu-llm.html renders the quota caveat inline, the same way it already renders the VRAM one. Gate: localModelProbe-selfcheck, 41 checks, all pass -- including that the ceiling caveat fires when the check is CLEARED, stays an unknown rather than becoming a blocker, and does NOT fire on a quota genuinely smaller than the model (one message per state). localModelRun-selfcheck all pass, unchanged. Full changelog on docs/CHANGELOG.md.
 // v4114 -- *** KEITH ASKED FOR SILEO-STYLE PHYSICAL TOASTS, AND THE INTERESTING PART WAS NOT THE SPRING -- IT WAS THAT A CORRECT SPRING CAN BE INVISIBLE, AND I SHIPPED THAT TWICE IN ONE ROUND BEFORE A BROWSER CAUGHT IT. *** hiaaryan/sileo is React and, checked, carries NO LICENSE FILE (404) -- all-rights-reserved, unusable in a tree that publishes public zips -- so NONE of its code is here; what is adopted is a damped harmonic oscillator, which is not sileo's to own (iOS, react-spring and framer-motion have all animated this way for years). New ui/springMotion.js holds the integrator ONCE for both existing toast surfaces rather than being written into whichever was upgraded first and then again into the second. Because it is PURE (state, dt) -> state, the gate settles it headlessly and grades OVERSHOOT AGAINST exp(-pi*z/sqrt(1-z^2)), a closed form the integrator is never told: gentle 8.9% vs 9.9% predicted, snappy 9.2% vs 10.1%, stiff critically damped at 0.0%. *** THE FIRST TUNING WAS MEASURED AND REJECTED *** at zeta 0.81 it overshot 0.6-0.8%, under three pixels on a 380px slide -- a correct spring VISUALLY INDISTINGUISHABLE FROM AN EASE, which is the whole feature failing quietly with every correctness check green. Retuned to zeta 0.59. *** THEN THE SAME MISTAKE HID A SECOND TIME IN MY OWN GATE. *** The "must be visible" check hardcoded 380 -- toaster.js's travel -- and graded both surfaces against the LONGER one, so it passed while ui/toast.js rose 14px and Chromium measured its overshoot at 1.27px, sub-pixel. The check now reads each surface's travel constant OUT OF ITS SOURCE and grades in real pixels; RISE_PX is 32 and measures 2.93px. Driving both surfaces in real Chromium found two more defects no headless property could: (1) opacity derived as 1-abs(x)/TRAVEL REVERSES during an overshoot, because past the target abs(x) grows again -- the toast DIMMED to 0.909 at the peak of its own bounce, a flicker reachable only BECAUSE the motion now overshoots; fixed to travel-from-start, which clamps harmlessly at both ends. (2) toast.js's stack cap evicts with a bare .remove() that never stopped the rAF -- NINE live loops for four visible toasts, animating detached nodes; toaster.js had the guard, toast.js did not, and it is now a gated rule for both. Sabotage-verified: reverting the tuning fails 4 checks, removing the substepping diverges stiff to x=-2030 (the toast literally launched off screen), dropping the snap-on-rest fails 3. Gate: springMotion-selfcheck, 45 checks, all pass. Full changelog on docs/CHANGELOG.md.
 // v4115 -- *** VOXTRAL WIRED AS AN OPT-IN PAGE, AND THE WORD OPT-IN IS THE FEATURE, SO IT IS PROVEN RATHER THAN PROMISED. *** Keith: "wire it as an opt-in page." voxtral.html is a front door to TrevorS/voxtral-mini-realtime-rs (Apache-2.0 -- a real LICENSE file, read, unlike last round's sileo), Mistral's Voxtral Mini 4B running as WASM + WebGPU entirely client-side. *** NOTHING LARGE IS VENDORED: *** the wasm is 9.4 MB and the biggest vendored asset in this tree is 3.5 MB, so the page takes bytes the USER supplies -- staged directory or file picker -- and CHECKS THEM AGAINST A PINNED SHA-256 before executing one of them, then hands the verified buffer straight to wasm-bindgen so no remote URL is ever trusted. Two consent gates, not one, because 9.4 MB of verifiable engine and 2.5 GB of unverifiable weights are not the same decision. The gate proves both properties instead of describing them: 405 fact/state combinations cannot make nextStep() name a download from `idle` (even one lying that moduleReady and weightsReady are true), one flipped BIT is refused rather than warned about, and -- because source cannot prove a page downloads nothing -- section 8 drives real Chromium and INTERCEPTS EVERY REQUEST, confirming the only three on load are the page and its two modules, and that consenting alone adds zero. *** THREE DEFECTS CAME FROM RENDERING IT, NOT FROM READING IT. *** (1) codeOnly() on an HTML file collapsed 15852 chars to 3030 and DROPPED THE WHOLE SCRIPT -- one positive check failed and gave it away while THREE NEGATIVE CHECKS BESIDE IT PASSED AGAINST WRECKAGE, the worst outcome there is; fixed by extracting the module first, and every absence check is now preceded by a haystack-is-real assertion. (2) gb() called the 9.4 MB engine "0.01 GB", flattening the very size gap that justifies two gates. (3) blockersFrom() read `facts.webgpu`, a key localModelProbe HAS NEVER EMITTED, so that blocker could not fire on real data -- and the gate fuzzed the same invented name, so code and test agreed with each other and both were wrong; the page printing "namespace absent" directly above "adapter granted" is what exposed it, and the gate now pins those key names against a REAL probe result. Honesty is graded too: every speed figure is upstream's, carries measuredHere:false and the DGX Spark it came from, estimateWallClock() refuses to return a bare number without that hardware attached, MEASURED_HERE states out loud that NO transcription was ever run here, and TTS is refused WITH its RTF 104. Filed beside webgpu-llm.html in System Tools. Gate: voxtralBrowser-selfcheck, 62 checks, all pass; sabotage-verified four ways. Full changelog on docs/CHANGELOG.md.
-const ENGINE_VERSION = "v4116";   // v4116 -- *** AN INSTALL BUTTON FOR voxtral.html'S ENGINE, AND THE INTERESTING PART IS WHERE IT REFUSES TO PUT THINGS. *** Keith, reading v4115's two shell lines: "we have a button to do the install?" A feature whose setup is paste-this-into-a-terminal is one most people will not use. New ai-bridge/voxtralBridge.js clones upstream shallow, VERIFIES BOTH SHA-256s, and stages the two artefacts -- with /voxtral/status, /voxtral/install and /voxtral/engine/<name> on the server. *** THE OBVIOUS IMPLEMENTATION WOULD HAVE QUIETLY UNDONE v4115. *** Copying into vendor/voxtral/ is what the page's own fallback path suggests, and it would have been wrong: MEASURED, not assumed -- packagerBridge's SKIP_DIRS is node_modules, .git, __pycache__, asset_library, tts-out, doc-out, .kpop-wav, and `vendor/` IS NOT IN IT, so every install would have added 9.4 MB to every release zip from then on, which is exactly the cost v4115 declined to pay by not vendoring. So the engine lands in ~/.voxelbridge/voxtral-engine, outside the tree entirely, and the bridge SERVES it -- sharpBridge's stated rule for its checkout, reused rather than rediscovered. The gate now ASSERTS that premise (`vendor` absent from SKIP_DIRS, ENGINE_DIR outside ENG) so a later change to the packer surfaces as a failure instead of a silent 9.4 MB. *** IT VERIFIES BEFORE IT STAGES, WHICH IS THE POINT OF PINNING AT ALL. *** Driven for real: a checkout with one byte changed fails the install, stages NOTHING (the directory is left empty rather than half-filled), and says why -- naming "upstream has moved past the pinned commit" as the cause a person can act on, with both digests printed. The digests are IMPORTED from ui/voxtralBrowser.js, not retyped, because a pinned hash written twice will disagree with itself one day. engineFile() matches the requested name against the two pinned names and never joins user input onto a path; five traversal attempts resolve to null. *** AND THE OPT-IN INVARIANT WAS MADE PRECISE RATHER THAN WEAKENED. *** Consent now asks /voxtral/status whether a bridge exists, so the old "zero requests after consent" check would have had to be relaxed; instead it now asserts the thing that actually matters -- no ENGINE and no WEIGHTS bytes move -- plus that the only request consent makes is the status probe. VERIFIED END TO END against the real server in real Chromium: three requests on load, consent detects the bridge, Install clones+verifies+stages, Load instantiates the wasm and acquires a WebGPU device in 59 ms from bridge-served bytes with both digests verified, and no huggingface request at any point because the weights are still behind the second gate. The bridge is a convenience and never a requirement: it is required lazily, and a missing one reads as normal in the page rather than as an error. Gate: voxtralBrowser-selfcheck, 76 checks, all pass. Full changelog on docs/CHANGELOG.md.
+// v4116 -- *** AN INSTALL BUTTON FOR voxtral.html'S ENGINE, AND THE INTERESTING PART IS WHERE IT REFUSES TO PUT THINGS. *** Keith, reading v4115's two shell lines: "we have a button to do the install?" A feature whose setup is paste-this-into-a-terminal is one most people will not use. New ai-bridge/voxtralBridge.js clones upstream shallow, VERIFIES BOTH SHA-256s, and stages the two artefacts -- with /voxtral/status, /voxtral/install and /voxtral/engine/<name> on the server. *** THE OBVIOUS IMPLEMENTATION WOULD HAVE QUIETLY UNDONE v4115. *** Copying into vendor/voxtral/ is what the page's own fallback path suggests, and it would have been wrong: MEASURED, not assumed -- packagerBridge's SKIP_DIRS is node_modules, .git, __pycache__, asset_library, tts-out, doc-out, .kpop-wav, and `vendor/` IS NOT IN IT, so every install would have added 9.4 MB to every release zip from then on, which is exactly the cost v4115 declined to pay by not vendoring. So the engine lands in ~/.voxelbridge/voxtral-engine, outside the tree entirely, and the bridge SERVES it -- sharpBridge's stated rule for its checkout, reused rather than rediscovered. The gate now ASSERTS that premise (`vendor` absent from SKIP_DIRS, ENGINE_DIR outside ENG) so a later change to the packer surfaces as a failure instead of a silent 9.4 MB. *** IT VERIFIES BEFORE IT STAGES, WHICH IS THE POINT OF PINNING AT ALL. *** Driven for real: a checkout with one byte changed fails the install, stages NOTHING (the directory is left empty rather than half-filled), and says why -- naming "upstream has moved past the pinned commit" as the cause a person can act on, with both digests printed. The digests are IMPORTED from ui/voxtralBrowser.js, not retyped, because a pinned hash written twice will disagree with itself one day. engineFile() matches the requested name against the two pinned names and never joins user input onto a path; five traversal attempts resolve to null. *** AND THE OPT-IN INVARIANT WAS MADE PRECISE RATHER THAN WEAKENED. *** Consent now asks /voxtral/status whether a bridge exists, so the old "zero requests after consent" check would have had to be relaxed; instead it now asserts the thing that actually matters -- no ENGINE and no WEIGHTS bytes move -- plus that the only request consent makes is the status probe. VERIFIED END TO END against the real server in real Chromium: three requests on load, consent detects the bridge, Install clones+verifies+stages, Load instantiates the wasm and acquires a WebGPU device in 59 ms from bridge-served bytes with both digests verified, and no huggingface request at any point because the weights are still behind the second gate. The bridge is a convenience and never a requirement: it is required lazily, and a missing one reads as normal in the page rather than as an error. Gate: voxtralBrowser-selfcheck, 76 checks, all pass. Full changelog on docs/CHANGELOG.md.
+// v4117 -- *** ANDROID TV SUPPORT FOR THE WEBVIEW WRAPPER, AND THE ROUND WAS SHAPED SO THE PART THAT MATTERS COULD BE DRIVEN RATHER THAN ASSERTED. *** Keith asked whether an APK for the Shield running the browser-only node would do anything useful, then: "add the leanback + D-pad TV support". Three manifest lines decide whether the APK is even VISIBLE on a TV and EVERY ONE FAILS SILENTLY -- the app installs, or does not, and simply is not there: touchscreen required=false (the one that blocks the install outright, because Android assumes a touchscreen unless told otherwise), LEANBACK_LAUNCHER (the TV home lists only that category; a plain LAUNCHER app can then be started only by adb), and a banner, written as a DRAWABLE rather than a checked-in PNG because a binary in a repo is a file nobody can review in a diff. leanback stays required=false, not true, or every phone already running this wrapper is stranded. *** AND THE SETTINGS GESTURE WAS UNREACHABLE ON A TV -- THIS PROJECT'S OWN RECORDED BUG, ARRIVING A SECOND TIME. *** The server address sits behind a long-press on the page BACKGROUND, which a D-pad cannot do because it has no pointer; that is exactly "an engine on the wrong IP with no way to say so is a brick", which MainActivity already wrote about the action bar. Now bound to a long-press of OK, sharing one dialog. *** THE D-PAD IS JAVASCRIPT ON PURPOSE. *** Chromium's own spatial navigation is not exposed by WebSettings and its flag needs adb to write /data/local/tmp/webview-command-line, which an app cannot do for itself -- and writing it as an injected script means the hard half (does Right land on the control to the RIGHT) is DRIVEN in headless Chromium against this tree's real pages with real arrow keys, so the half that cannot be built here is the small half. That gate immediately caught a real bug in my first draft: ranking by along + 2*cross chose a control sitting DIAGONALLY up-left (170) over one EXACTLY to the left (200), and no fixed multiplier fixes that -- it only moves where it happens. Candidates are now PARTITIONED by rectangle overlap on the perpendicular axis, so anything in the same row beats anything merely near, which is how a person reads a remote and needs no tuned constant. Two modes because arrows already steer cameras on flight, es-* and chess3d: NAV moves focus, CAPTURE (OK on a canvas) hands the page every key, BACK returns -- and BACK reads the answer off evaluateJavascript's RETURN VALUE rather than adding an addJavascriptInterface bridge, which would be a new attack surface bought for one boolean. Text fields are passthrough in both modes; a D-pad is the only caret a TV has. *** WHAT IS STILL NOT DONE, STATED PLAINLY: NO APK HAS EVER BEEN BUILT FROM THIS TREE. *** No Android SDK here and dl.google.com is blocked (measured, 403). Verified instead: every XML parses (including the `--`-inside-a-comment rule this tree's prose style walks straight into, which broke the banner first try), javac reports 101 errors of which ZERO are syntax errors, and the D-pad runs for real. First gate the APK has ever had -- v4043 shipped it ungated. Gate: androidTvNav-selfcheck, 33 checks, sabotage-verified four ways including a real Java syntax error. Full changelog on docs/CHANGELOG.md.
+// v4118 -- *** THE ORIGIN IS A BROWSER FEATURE, AND SERVING MY OWN GATE FROM localhost HID A BUG I SHIPPED THREE ROUNDS AGO. *** Keith asked what a browser-only node could add beyond the GPU; measuring the answer found something bigger. navigator.gpu, crypto.subtle, VideoEncoder, getUserMedia and navigator.storage.estimate are ALL SECURE-CONTEXT ONLY, and SweK's primary origin is http://<lan-ip>:8787 -- neither https nor localhost. MEASURED in Chromium, one server, two origins: from 127.0.0.1 isSecureContext is true and every one of those exists; from a LAN IP isSecureContext is false and EVERY ONE IS UNDEFINED. *** THE BUG THAT CAUSED IN MY OWN v4115 WORK: *** voxtral.html's digest check called crypto.subtle.digest directly, so on the LAN it threw a TypeError into an un-caught promise and the "Load the engine" button DID NOTHING AT ALL, with no message -- and voxtralBrowser-selfcheck could not see it because it served the page from localhost, WHICH IS A SECURE CONTEXT. A probe run on the wrong ORIGIN measures a different browser. Fixed: verifyArtefact REFUSES with a reason instead of throwing, an insecure origin is a blocker that RETURNS EARLY (reporting "no WebGPU adapter" there would blame the machine for what the URL did), the page says so on load, and the gate now drives a NON-LOOPBACK address -- section 10, which fails if the old behaviour returns. ui/codecProbe.mjs recorded this exact rule for WebCodecs at v3735 and I did not carry it across. *** ALSO: ios-peer.html GAINS THE ROW THAT STOPS THE NEXT OBVIOUS MISTAKE. *** After v4117 gave the Android wrapper TV support, the symmetric move is a WKWebView wrapper for iOS -- and it would be a CAPABILITY DOWNGRADE: WebKit feature flags apply to SAFARI, not WebKit generally, so WKWebView gets WebGPU only once it is on by default, which is iOS 26. Below that a wrapper LOSES the GPU audition, the one thing the iOS peer is best at. Same idea as the Android round, opposite sign. *** AND webrtx.html SHIPS AS AN OPT-IN PAGE. *** codedhead/webrtx (MIT) implements Vulkan's ray tracing pipeline as pure WebGPU compute. I expected bit-rot and MEASURING DISPROVED IT TWICE: the "one commit" needed a git fetch --unshallow to be a real claim (a depth-1 clone reports one for every repo), and the committed Cargo.locks make it reproducible -- then the lock is exactly what blocks it, because Rust 1.94 refuses wasm-bindgen below 0.2.88. It BUILDS after four routine bumps and one config line, no code changes, and in Chromium it patched requestDevice, exposed the pipeline API and BUILT AN ACCELERATION STRUCTURE from real triangles. Unlike voxtral there is NO DIGEST TO PIN -- upstream publishes no build, so every consumer compiles their own and a digest of mine would refuse everybody else's; the page records the measured RECIPE and verifies BEHAVIOUR instead. Safari/iOS is REFUSED rather than claimed (Chrome-only-tested, and its WGSL is generated by a 2023 naga, which is what Safari's validator rejects first). Gates: voxtralBrowser-selfcheck 83 checks, webrtxBrowser-selfcheck 31, all pass. Full changelog on docs/CHANGELOG.md.
+// v4119 -- *** THE CRT FILTER, PARKED IN AUGUST AND PICKED BACK UP -- AND THE GATE CAUGHT A BUG BOTH IMPLEMENTATIONS AGREED ON. *** Keith listed four CRT repos on 2026-08-23 and said "the crt i would like to come back to later", then asked for it on the Pip-Boy screen. All four licences were checked by READING THE FILE: gingerbeardman/webgl-crt-shader, Ichiaka/CRTFilter and stefanlegg/crt-fx are MIT; *** bisqwit/crt-filter HAS NO LICENSE FILE AT ALL, *** so it is all-rights-reserved and unusable in a tree that publishes public zips -- the same finding as sileo, which is why the check is run every time rather than inferred from a name. The three MIT ones were read and hold nothing non-obvious (the standard scanline/bloom/curvature/vignette set, and gingerbeardman's is Three.js-bound), so this is written from the optics instead of lifted. *** THE REASON TO WRITE IT IS THAT A BORROWED SHADER CAN ONLY BE LOOKED AT. *** So the transfer function exists TWICE -- render/crtModel.js in plain JS, render/crtPass.js in GLSL -- and the gate renders a known busy image through the real GPU pass and through the CPU model and requires agreement: MEASURED worst 0-1/255 across pipboy, arcade and trinitron, and PRESETS.off is a passthrough at 0/255 through the shader, which is what would catch a stray gamma or a premultiply sneaking in. texelFetch and NEAREST throughout, deliberately, because bilinear filtering interpolates at a precision JS cannot reproduce and the comparison would have to slacken into "close enough". *** THEN THE PART THAT MATTERED MOST: THE SHADOW TEST PASSED WHILE BOTH SIDES WERE WRONG. *** Section 2 counts the bands that actually appear, and at the MOST NATURAL SETTING -- 240 scanlines on 480 rows, exactly two rows per line -- it found 144 bands with a range of 178..179 instead of 240 bands over 102..255. Cause: sampling the scanline cosine at the PIXEL CENTRE makes the phase (y+0.5)*pi, whose cosine is ZERO for every integer y, so the scanlines vanish into a flat dim -- and the GPU reproduced that faithfully because the shader is a faithful mirror. Two implementations agreeing is not the same as being right. Fixed by taking the scanline phase at the ROW EDGE (y/h), which aligns the raster grid to the pixel grid: cos(y*pi) alternates, one row beam and one row gap. Wired into pipboy-models.html between the screen canvas and its CanvasTexture, so every screen mode -- gauges, map, avatar, dashboard, video -- gets it at once; toggling is a texture-image pointer swap rather than a second render path, it is off by default, and makeCrtPass returns null instead of throwing where WebGL2 is missing. Gate: crtPass-selfcheck, 26 checks, all pass. Full changelog on docs/CHANGELOG.md.
+// v4120 -- *** THE CRT ON THE OTHER PIP-BOY, WHICH IS DOM AND CSS -- SO THE DOM HAD TO BECOME A TEXTURE FIRST. *** v4119 put the shader on pipboy-models.html, whose screen is a canvas the pass could sample directly; fallout.html is HTML and had nothing to sample. New ui/domToTexture.js rasterises a live subtree through SVG <foreignObject> -- native, no dependency, and it asks the browser's OWN renderer rather than re-implementing layout the way html2canvas does. *** THE FACT THE WHOLE APPROACH RESTS ON WAS MEASURED FIRST: IT DOES NOT TAINT. *** On fallout.html's real DOM, getImageData succeeds AND texImage2D succeeds, so crtPass can consume it; a tainted canvas would have killed the idea outright. Cost measured at ~10 ms serialise + 2 ms draw, which is why callers drive it on a 250 ms timer and NOT requestAnimationFrame -- and MEASURED.note says so, because 12 ms is fine for a dashboard and hopeless for animation. *** WHAT IT CANNOT DRAW IS MEASURED, NOT ASSUMED: *** a solid magenta <canvas> inside the subtree rasterised to ZERO magenta pixels while text and gradients in the SAME subtree came through -- a canvas's bitmap is not part of its markup. Cross-origin images and fonts are refused because anything fetched cross-origin would taint. *** AND I SHIPPED A BUG INTO THE BROWSER AND FOUND IT BY LOOKING. *** The CRT mode hides the page with a class and then rasterised document.body -- capturing the HIDDEN page, so the CRT view came out BLACK except its own toggle button. No check caught it; the screenshot did. The display state and the captured state are two different things, and the clone is where they get reconciled: rasterize() gained `exclude` and `stripClasses`, applied to the CLONE so there is no flash and no extra layout pass. The gate now REPRODUCES that bug -- 0 lit pixels hidden against 2969 with the strip -- so it cannot return quietly. Also: the CSS scanlines are switched off while the shader ones are on, because body::before is captured INTO the texture and two scanline grids at different pitches is a moire that reads as a broken shader. Gate: domToTexture-selfcheck, 27 checks, all pass. Full changelog on docs/CHANGELOG.md.
+const ENGINE_VERSION = "v4168";   // v4168 -- THE TIER-2 BRANCH KEPT RUNNING THROUGH A CONTAINER RESTART AND PUSHED EIGHTEEN MORE DEVICES, v4101-v4118, MERGING WITH ZERO CONFLICTS. Every plant measured in both arms before being declared and matched to its own header's digits: structureFactor 9.8e-16 -> 1.176, powder 2.739 -> 0, renderBounce 2.33e-3 -> 1.291, reconQuality 0.841 -> 1.0, strokeMorph 0 -> 40, clocks 0 -> 2.0 exactly. *** THE ONE DELETION IN THE WHOLE MERGE WAS CHECKED RATHER THAN TAKEN ON TRUST, BECAUSE REMOVING A FIELD SOMETHING READS IS A REGRESSION AND THE COMMIT MESSAGE IS NOT EVIDENCE. *** manifoldCensus carried a bare `plantFlips: "bowtieClosed"` from v4069 and the branch replaced it with the canonical planted:{} object, claiming the old field had no reader. VERIFIED TWO WAYS: plantedCoverage.mjs:70's declaredPlantMode returns null unless BOTH plantMode and plantFlips are strings, and manifoldCensusBind declares no plantMode at all -- so the census could never have read it -- and no manifoldCensus-specific gate names the field either. v4069 NAMED THE RIGHT OBSERVABLE IN A FIELD NOTHING CONSUMED, which is a fix that looks done and does nothing, and it took the third spot-check round to notice. *** xpbd IS THE OTHER ONE WORTH READING. *** Its plant was flagged earlier as investigated-but-unfixed; direct measurement across all four structurally-reachable modes confirms hooke and substep are GENUINELY BLIND -- PBD and XPBD converge to the same equilibrium stretch, and only sweeping the ITERATION count separates them -- so it is declared against iteration's iterSpread, 0 -> 0.948. A BLIND MODE PROVEN BLIND IS A RESULT, not a gap. Gates: 14 device selfchecks and capabilityCard green. plantDirection and plantedCoverage exceeded local ceilings with no output; THOSE ARE TIMEOUTS AND NOT PASSES, the same class as the census gates. Gate count 1252 gates. Full changelog on docs/CHANGELOG.md.
 
 // v4101 -- probeKnob's echo rule discarded an observable whenever it equalled the default before a probe and the probe value after -- exact for a TRUE pass-through, but ALSO the signature of a computation whose coefficient happens to be one. box3d/impulse reports speedAfter and speedIdeal, both j/mass, and the shipped default mass IS 1, so both numerically equalled j at every probe rung and were discarded as echoes: box3d.j read STILL in the one mode that actually applies it. THE RULE WRITTEN TO PREVENT FALSE LIVENESS WAS PRODUCING FALSE STILLNESS. Adapted from an uploaded bundle (swek-echoconfirm.zip) re-derived fresh against this tree's actual probeKnob shape rather than patched in -- the bundle's version tracked sawEcho/echoed fields this tree's probeKnob does not have, and its own diagnosis (a coincidental j/mass=1 identity) was re-verified directly on this tree before adopting anything: MEASURED, box3d.j went from {state:"still"} to {state:"live", moved:["speedAfter","speedIdeal"]} in 1ms (box3d is a closed-form calculation, cheap even with confirmation). The fix: a candidate echo is now CONFIRMED by trying every other numeric config knob in turn, stopping at the first that breaks the identity -- a false echo usually breaks early, a true echo pays the full O(K) to prove no knob can break it, which is the stronger claim. VERIFIED both directions on the real plant: stability.visc in mode deafknob (a TRUE echo, `viscosity: c.visc` handed straight back regardless of anything else) correctly stays STILL, now MEASURED at 230586ms standalone (three other knobs, tried at every probe rung) rather than the handful of builds it used to cost -- a confirmation cut short by the existing deadline parameter leaves a candidate an echo rather than promoting it, so a rushed sweep degrades to the old conservative behaviour rather than reinstating false stillness silently. Cost landed exactly where fixing it should: quantum.N's starvation test (already re-tuned once this session at v4100) needed re-tuning a SECOND time in the same round, 6000ms->30000ms, because quantum's bandGridN knob now pays its own confirmation cost -- the fix changed the cost landscape it is itself tested against. Added tools/roundhouse/knobLiveness-selfcheck.mjs section 3l with a cheap synthetic fixture (a coincidental k/scale identity, cheaply proving the mechanism) plus the real box3d.j grounding call; caught and fixed a bug in that fixture's own first draft (compared against the default instead of the probe value, making its "reproduce the old bug" assertion vacuously fail) before shipping. Gate: knobLiveness-selfcheck, all pass, 594.6s (two full runs needed -- the first caught both the quantum.N re-tuning and the fixture bug). Full changelog on docs/CHANGELOG.md.
 
@@ -6693,6 +6698,8 @@ import { mountDockedGauges } from "./ui/dockedGauges.js";      // v1612 — top-
 import { mountPeerCameo }   from "./ui/peerCameo.js";          // v1613 — visiting-avatar cameo for peer announcements (low disk, etc.)
 import cloudPeer            from "./ui/cloudPeer.js";          // v1617 — WebRTC P2P to remote boxes/users via the cloud rendezvous (signaling only)
 import { installPlaneMesh } from "./ui/planeMeshLayer.js";    // v1447 — 3D aircraft meshes (procedural + user .glb)
+import { installOrbitPass } from "./ui/orbitPassLayer.js";     // v4134 — satellites for the arrival to pass through
+import { installArrivalLayers } from "./ui/arrivalLayers.js";  // v4134 — satellites -> aircraft, keyed on camera altitude
 import { installWled }    from "./ui/wledLayer.js";           // v1115 — WLED reactive lighting
 import "./ui/ogreCommandPanel.js";                            // v1486 — OGRE fused sensor-view command panel (window.ogreCommandPanel)
 import { installPresenceWire } from "./ui/presenceWire.js";   // v1301 — HA presence -> engine reactions
@@ -20217,7 +20224,18 @@ window.realTerrain = {
         const target = [0, ground, 0];
         const center = [0, ground - 100000, 0];   // far below: makes the local up exactly +Y on a flat world
         const LAND_AZ = 0.9, SWEEP = 1.8, SETTLE = 60;
+        // v4134 -- *** THE ARRIVAL NOW STARTS ABOVE THE AIRCRAFT, BECAUSE IT NEVER DID. ***
+        // Keith: "we would fly into the satellite layer briefly, then see the adsblayer". Measured before
+        // building anything: the old first leg starts at distance 4000 but pitch 0.05, and 4000*sin(0.05) is
+        // an ALTITUDE OF 200 -- while adsbLayer puts a 40,000 ft airliner at world Y 190. So the "fly-in from
+        // space" has always been a low flat approach that skims the top of the airliners; there was no height
+        // for a satellite layer to be in. A 4s leg above them is added rather than the existing three being
+        // retimed, because chainLegs DERIVES each seam and the three legs below are what the shot is known to
+        // look like -- reshaping them to make room would have been changing the arrival to add to it.
         const legs = chainLegs([
+            { shot: "dive", dur: 4, p: { center, target,
+                from: { distance: 5200, pitch: 0.42, azimuth: -1.1, fov: 70, roll: 0 },
+                to:   { distance: 4000, pitch: 0.05, azimuth: -0.6, fov: 62, roll: 0 } } },
             { shot: "dive", dur: 4, p: { center, target,
                 from: { distance: 4000, pitch: 0.05, azimuth: -0.6, fov: 62, roll: 0 },
                 to:   { distance: 600,  pitch: 0.22, azimuth: 0.0,  fov: 52, roll: 0 } } },
@@ -20227,7 +20245,14 @@ window.realTerrain = {
                 to: { distance: SETTLE, pitch: 0.85, azimuth: LAND_AZ + SWEEP, fov: 42, roll: 0 } } },
         ]);
         const clip = toClip(legs, 30);
-        if (window.cameraCinematic?.play) { window.cameraCinematic.play(clip, { loop: false, ease: "linear" }); return { ok: true, duration: clip.duration, frames: clip.bones[0].frames.length }; }
+        if (window.cameraCinematic?.play) {
+            window.cameraCinematic.play(clip, { loop: false, ease: "linear" });
+            // v4134 -- WHAT YOU PASS THROUGH ON THE WAY DOWN. ui/arrivalLayers.js watches the camera's own
+            // ALTITUDE rather than this clock, so the bands stay true if the legs above are ever retimed.
+            // Opt out with flyIn({layers:false}); a tree without the layers installed simply does nothing.
+            if (o.layers !== false) { try { window.arrivalLayers?.run?.(clip.duration); } catch {} }
+            return { ok: true, duration: clip.duration, frames: clip.bones[0].frames.length };
+        }
         return { error: "cameraCinematic not installed" };
     },
     async load(o = {}) {
@@ -20332,6 +20357,228 @@ window.realTerrain = {
 };
 console.log("[realTerrain] window.realTerrain.here() / .load({lat,lon,sizeM,grid,buildings,water,raisedRoads}) / .spawnKaiju() / .savePreset() / .shareLink() / .clear()");
 
+// v4149 -- *** A SOURCE TREE, WALKED AS GROUND. *** Keith: "What about github into a terrain view? ... I have
+// at times described my VBA programming as mountains of code. maybe 3 mountains." -- then, on seeing the first
+// map, "data-storage as water" and "we have a fairly healthy biome selection".
+//
+// This object is short because it builds nothing new. ai-bridge/repoTerrainBridge.js counts the files,
+// world/repoHeightfield.js turns that count into a heightfield, and then it is handed to the SAME
+// applyRealTerrain() that voxelizes fetched elevation and the SAME flyIn() that arrives on it. A repo is just
+// another place to stand.
+window.repoTerrain = {
+    last: null, lastField: null,
+    // *** THE HTTP STATUS IS CONSULTED BEFORE THE BODY IS PARSED, ON BOTH OF THESE. *** They did not, and
+    // tools/ship/boundaryLint-selfcheck.mjs counted them. The bridge answers 400 with a JSON body for a
+    // refused directory, so the happy path looked fine -- but a route that is not mounted at all (an older
+    // engine, a server started without the bridge) returns an HTML 404, and .json() on that throws
+    // "Unexpected token <", which reads as a bug in this code rather than as a missing route.
+    async _get(url, what) {
+        const res = await fetch(url);
+        let body = null;
+        try { body = await res.json(); } catch { body = null; }
+        // A JSON error body is the useful message; only fall back to the status when there is no body at all.
+        if (!res.ok || !body || !body.ok) {
+            throw new Error("repoterrain " + what + ": " + ((body && body.error) || ("HTTP " + res.status + " " + res.statusText)));
+        }
+        return body;
+    },
+    async roots() { return (await this._get("/repoterrain/roots", "roots")).roots || []; },
+    async scan(dir) {
+        return await this._get("/repoterrain/scan" + (dir ? "?dir=" + encodeURIComponent(dir) : ""), "scan");
+    },
+    /**
+     * load({ dir, grid, massif, water, baseY, amp, fly })
+     * baseY defaults BELOW WATER_LEVEL(8) on purpose: repoHeightfield leaves an unlaid margin around the
+     * treemap, so the repository comes up as an ISLAND with a real coastline rather than filling the region
+     * edge to edge. Peaks land near snowCap(44), which is why the biggest file in a tree gets a snow cap.
+     */
+    async load(o = {}) {
+        const scan = await this.scan(o.dir);
+        const { repoHeightfield } = await import("./world/repoHeightfield.js");
+        const field = repoHeightfield(scan.entries, {
+            grid: +o.grid || 128,
+            massif: (o.massif !== undefined) ? +o.massif : undefined,
+            water: o.water !== false,
+        });
+        this.last = scan; this.lastField = field;
+        const { applyRealTerrain } = await import("./world/realTerrainStamp.js");
+        const baseY = Number.isFinite(+o.baseY) ? +o.baseY : 4;
+        const amp   = Number.isFinite(+o.amp)   ? +o.amp   : 46;
+        const summary = applyRealTerrain(world, field, { baseY, amp, region: o.region });
+        const top = field.peaks[0];
+        console.log("[repoTerrain] " + scan.root + " -- " + field.stats.files + " files as land, " +
+                    field.stats.lakeFiles + " as water; tallest " + (top ? top.path + " (" + top.lines + " lines)" : "(none)"));
+        console.table && field.peaks.length && console.table(field.peaks.map((p) => ({ lines: p.lines, biome: p.biome, file: p.path })));
+        try {
+            if (o.fly === false) {
+                const y = (summary.centerSurface || 24) + 18;
+                camera.position.x = 0; camera.position.z = 0; camera.position.y = y;
+                if ("pitch" in camera) camera.pitch = -0.45;
+            } else {
+                await window.realTerrain.flyIn({ ground: summary.centerSurface || 24, clouds: o.clouds });
+            }
+        } catch {}
+        try {
+            window._toaster?.show?.({ title: "🗻 " + (scan.root || "").split(/[\\/]/).pop(),
+                msg: field.stats.files + " files · " + field.stats.lines.toLocaleString() + " lines · " +
+                     field.stats.lakeFiles + " data lakes" + (top ? " · peak " + top.path.split("/").pop() : ""),
+                type: "system", duration: 5000 });
+        } catch {}
+        return Object.assign({ root: scan.root, peaks: field.peaks, lakes: field.lakes }, summary, field.stats);
+    },
+    legend() { return this.lastField ? this.lastField.biomeLegend : null; },
+    async clear() { const { clearRealTerrain } = await import("./world/realTerrainStamp.js"); clearRealTerrain(world); },
+};
+console.log("[repoTerrain] window.repoTerrain.load() -- this engine's own tree as terrain · .load({dir}) another repo · .roots() · .legend() · .clear()");
+
+// v4156 -- *** THE RETURN LEG. *** ui/assetVoxelizer.js has turned a GLB into voxels since v1391 and nothing
+// went the other way: the tree vendors three's GLTFExporter, and its only caller (tools/krbn/riggedExport.js)
+// is skeleton-specific. So there was no way to get the stamped world OUT -- neither the fetched real terrain
+// nor, since v4149, a repository rendered as ground.
+//
+// It writes the container by hand rather than through GLTFExporter because THE VOXEL WORLD IS NOT A three.js
+// SCENE (render/voxelrenderer.js is raw WebGL), so there would be nothing to traverse; see
+// tools/export/voxelGlb.mjs. The upshot is that the export path runs in node and is gated without a browser.
+window.swekExport = {
+    /** Bytes + stats without downloading anything -- so a caller can look before it leaps. */
+    async build(o = {}) {
+        const { exportWorldGlb } = await import("./world/worldGlbExport.js");
+        return exportWorldGlb(world, o);
+    },
+    /**
+     * Export the loaded world as a .glb and save it.
+     * swekExport.glb()                    -- everything currently loaded
+     * swekExport.glb({ skipWater: false }) -- keep the water surface
+     */
+    async glb(o = {}) {
+        const r = await this.build(o);
+        if (!r.ok) { console.warn("[swekExport]", r.error); try { window._toaster?.show?.({ title: "Nothing to export", msg: r.error, type: "warning", duration: 4000 }); } catch {} return r; }
+        const name = (o.name || "swek-world") + ".glb";
+        try {
+            const blob = new Blob([r.bytes], { type: "model/gltf-binary" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = name; a.style.display = "none";
+            document.body.appendChild(a); a.click(); a.remove();
+            // REVOKED ON A TIMER, NOT IMMEDIATELY: revoking in the same tick can cancel the download in
+            // Chromium before it has read the blob, which reads as "the button does nothing".
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 10000);
+        } catch (e) { console.warn("[swekExport] save failed:", e?.message || e); return { ok: false, error: String(e?.message || e) }; }
+        const mb = (r.bytes.length / 1048576).toFixed(2);
+        console.log("[swekExport] " + name + " -- " + r.stats.triangles.toLocaleString() + " triangles, " + mb + " MB");
+        try { window._toaster?.show?.({ title: "📦 " + name, msg: r.stats.triangles.toLocaleString() + " triangles · " + mb + " MB · " + r.stats.meshes + " meshes", type: "system", duration: 5000 }); } catch {}
+        return { ok: true, name, stats: r.stats };
+    },
+};
+console.log("[swekExport] window.swekExport.glb() -- the loaded world (real terrain OR a repo) as a .glb · .build() for the stats only");
+
+// v4157 -- *** RESKIN A RIGGED MODEL AND EXPORT IT, KEEPING EVERY BONE AND EVERY CLIP. ***
+// Keith: "i would have thought a penciled robot expressive would have the same skin dimensions as the original.
+// sort of just paste the new skin over the old skin and it still has the same joints etc." He is right, and the
+// asset is why it looked otherwise: RobotExpressive.glb has 7,214 vertices, 14 clips and NO UVs AND NO TEXTURE
+// (measured), so there is no image to swap. COLOR_0 needs no UVs, which is what makes route 1 below his idea,
+// working. See tools/export/reskin.js.
+window.swekReskin = {
+    _paths: { model: "/GPU_Assets/RobotExpressive.glb" },
+    /** Load a rigged .glb through three, the way krbn-rigged.html does. */
+    async _load(url) {
+        const [{ GLTFLoader }, T] = await Promise.all([
+            import("./vendor/three/jsm/loaders/GLTFLoader.js"), import("three")]);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("could not fetch " + url + " -- HTTP " + res.status);
+        const buf = await res.arrayBuffer();
+        const gltf = await new Promise((ok, no) => new GLTFLoader().parse(buf, "", ok, no));
+        return { THREE: T, gltf, buf };
+    },
+    /**
+     * *** ROUTE 1 -- VERTEX COLOURS. *** Same vertices, same joints, same weights, same clips; only COLOR_0 is
+     * new. No UVs needed, and none of riggedExport's four-influence machinery is even reached.
+     */
+    async colour(o = {}) {
+        const url = o.url || this._paths.model;
+        const { THREE, gltf, buf } = await this._load(url);
+        const [{ vertexColourReskin }, { GLBParser }, { exportReskinnedGLB }] = await Promise.all([
+            import("./tools/export/reskin.js"), import("./gpu/GLBParser.js"),
+            import("./tools/krbn/riggedExport.js")]);
+        const parsed = await GLBParser.parse(buf, { postProcess: false });
+        const r = vertexColourReskin(parsed, o);
+        // Attach COLOR_0 to the model's OWN skinned meshes rather than building new geometry -- that is the
+        // whole point of this route, and it is why nothing here touches the skeleton.
+        let painted = 0, off = 0;
+        gltf.scene.traverse((n) => {
+            if (!n.isMesh || !n.geometry) return;
+            const c = n.geometry.attributes.position.count;
+            const slice = r.colors.subarray(off * 3, (off + c) * 3);
+            if (slice.length === c * 3) { n.geometry.setAttribute("color", new THREE.BufferAttribute(slice.slice(), 3)); painted++; }
+            if (n.material) { n.material = n.material.clone(); n.material.vertexColors = true; }
+            off += c;
+        });
+        const { GLTFExporter } = await import("./vendor/three/jsm/exporters/GLTFExporter.js");
+        const glb = await new Promise((ok, no) => new GLTFExporter().parse(gltf.scene, ok, no,
+            { binary: true, animations: gltf.animations || [], includeCustomExtensions: false }));
+        this._save(glb, o.name || "reskin-colour");
+        console.log("[swekReskin] colour:", r.stats.vertices, "vertices,", r.stats.levelsUsed + "/" + r.stats.levels,
+                    "ramp levels, painted", painted, "meshes");
+        return { ok: true, stats: r.stats, meshesPainted: painted };
+    },
+    /**
+     * *** ROUTE 2 -- ASCII GLYPH QUADS. *** New geometry, so it DOES pay the four-influence cost -- through
+     * riggedExport's own blendInfluences, not a second copy. Each quad sits in the surface's tangent plane and
+     * carries the glyph its shade picks off asciify's ramp.
+     */
+    async glyphs(o = {}) {
+        const url = o.url || this._paths.model;
+        const { THREE, gltf, buf } = await this._load(url);
+        const [{ surfaceSamples, buildGlyphQuads }, { GLBParser }, rex] = await Promise.all([
+            import("./tools/export/reskin.js"), import("./gpu/GLBParser.js"),
+            import("./tools/krbn/riggedExport.js")]);
+        const parsed = await GLBParser.parse(buf, { postProcess: false });
+        const samples = surfaceSamples(parsed.positions, parsed.indices, { count: +o.count || 4000, seed: +o.seed || 1337 });
+        const g = buildGlyphQuads(parsed, samples, rex.blendInfluences, o);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(g.positions, 3));
+        geo.setAttribute("uv", new THREE.BufferAttribute(g.uvs, 2));
+        geo.setAttribute("skinIndex", new THREE.BufferAttribute(g.joints, 4));
+        geo.setAttribute("skinWeight", new THREE.BufferAttribute(g.weights, 4));
+        geo.setIndex(new THREE.BufferAttribute(g.indices, 1));
+        const mat = new THREE.MeshBasicMaterial({ map: this._atlas(THREE, o), transparent: true, alphaTest: 0.4, side: THREE.DoubleSide });
+        const { GLTFExporter } = await import("./vendor/three/jsm/exporters/GLTFExporter.js");
+        const glb = await rex.exportReskinnedGLB(THREE, GLTFExporter, gltf, geo,
+            { sceneName: "ascii-reskin", meshName: "ascii-glyphs", material: mat });
+        this._save(glb, o.name || "reskin-ascii");
+        console.log("[swekReskin] glyphs:", g.stats.quads, "quads,", g.stats.triangles, "triangles");
+        return { ok: true, stats: g.stats };
+    },
+    /**
+     * The glyph atlas: one row of cells, one character each, drawn with a canvas. IT LIVES HERE AND NOT IN
+     * tools/export/reskin.js ON PURPOSE -- that module stays pure so the gate can run every number in node,
+     * and a canvas is the one thing it could not have.
+     */
+    _atlas(THREE, o = {}) {
+        const RAMP = o.ramp || " .:-=+*#%@";
+        const cell = +o.cellPx || 96, cv = document.createElement("canvas");
+        cv.width = cell * RAMP.length; cv.height = cell;
+        const g = cv.getContext("2d");
+        g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height);   // black = transparent under alphaTest
+        g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle";
+        g.font = Math.round(cell * 0.8) + "px ui-monospace, Menlo, Consolas, monospace";
+        for (let i = 0; i < RAMP.length; i++) g.fillText(RAMP[i], i * cell + cell / 2, cell / 2);
+        const t = new THREE.CanvasTexture(cv);
+        t.flipY = false;                 // glTF's UV origin is top-left; three's default flip would invert every glyph
+        return t;
+    },
+    _save(buf, base) {
+        try {
+            const blob = new Blob([buf], { type: "model/gltf-binary" });
+            const url = URL.createObjectURL(blob), a = document.createElement("a");
+            a.href = url; a.download = base + ".glb"; a.style.display = "none";
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 10000);
+        } catch (e) { console.warn("[swekReskin] save failed:", e?.message || e); }
+    },
+};
+console.log("[swekReskin] window.swekReskin.colour() -- pencil shading as vertex colours (no UVs needed) · .glyphs() -- ASCII quads pinned to the surface · both keep the skeleton and all 14 clips");
+
 // v1112 — shared location resolver. Prefers Real Terrain (the spot you're
 // looking at), then a shared link, then a saved preset / last opts, then the
 // browser's geolocation. Used by location-aware features like ADS-B aircraft.
@@ -20377,6 +20624,10 @@ window.engineLocation = {
 console.log("[engineLocation] window.engineLocation.get() -> {lat,lon,source} (manual pin first, then Real Terrain, then geolocation) - pin one: engineLocation.setManual('41.7315, -71.4008')");
 try { installPlaneMesh(); } catch (e) { console.warn("[planeMesh] install failed:", e?.message ?? e); }
 try { installAdsb(); } catch (e) { console.warn("[adsb] install failed:", e?.message ?? e); }
+// v4134 -- the arrival's layers. orbitPass FIRST: arrivalLayers drives it, and an installer that runs before
+// the thing it drives would leave the first band silently empty.
+try { installOrbitPass(); } catch (e) { console.warn("[orbitPass] install failed:", e?.message ?? e); }
+try { installArrivalLayers(); } catch (e) { console.warn("[arrivalLayers] install failed:", e?.message ?? e); }
 // v1530 -- retired the old NEXRAD weather radar (radarLayer, v1114). Its draggable
 // scope was the legacy thing appearing/disappearing in the top-right corner; the
 // v1510 peerRadar below is the current network scope and stays. We do NOT mount

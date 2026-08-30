@@ -11,9 +11,24 @@
     <!-- <uses-permission android:name="android.permission.CAMERA" /> -->
     <!-- <uses-permission android:name="android.permission.RECORD_AUDIO" /> -->
 
+    <!-- v4117 — ANDROID TV (the Shield). Keith asked whether the browser-only node could run there; these three
+         lines are what decide whether the APK is even VISIBLE on one, and all three are easy to miss because
+         nothing fails loudly without them — the app installs and then simply is not in the launcher.
+
+         *** touchscreen required=false IS THE ONE THAT ACTUALLY BLOCKS THE INSTALL. *** Android assumes an app
+         requires a touchscreen unless told otherwise, and a TV has none, so without this line the Shield
+         considers the app incompatible outright. leanback=false (not true) is deliberate: `false` means "I know
+         how to be a TV app" while still installing on phones, where this wrapper is already used. Marking it
+         required would strand every phone that has it today. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!-- Engine pages are WebGL; a TV without it should not be offered the app. -->
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
+
     <application
         android:label="@string/app_name"
         android:icon="@android:drawable/ic_menu_compass"
+        android:banner="@drawable/tv_banner"
         android:networkSecurityConfig="@xml/network_security_config"
         android:hardwareAccelerated="true"
         android:supportsRtl="true"
@@ -29,6 +44,11 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- v4117 — WITHOUT THIS THE APK INSTALLS ON A SHIELD AND NEVER APPEARS IN THE LAUNCHER. The TV
+                     home screen lists LEANBACK_LAUNCHER only; a plain LAUNCHER category is invisible to it, so
+                     the app can only be started with adb or a sideload file manager. Both categories are kept,
+                     because the same APK still has to be a normal phone app. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
     </application>

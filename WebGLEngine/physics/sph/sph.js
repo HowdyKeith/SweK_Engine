@@ -67,7 +67,60 @@ const DEFAULTS = { h: 0.1, mass: 0.02, restDensity: 1000, stiffness: 3.0, viscos
                    eos: "ideal", gamma: 7, soundSpeed: null };
 
 /** Tait coefficient B = rho0 c^2 / gamma. Exposed so a caller can see the number rather than trust a default. */
+/**
+ * *** THE REFERENCE NEIGHBOUR WALK, FOR FIXTURES THAT CARRY ANSWER KEYS. ***
+ *
+ * v4121 made the grid win everywhere and dropped GRID_CROSSOVER from 1000 to 128, which silently switched
+ * every 686-particle fixture from the brute force to the grid. Two gates went red -- materialKnobs and
+ * stability -- and NEITHER because the grid is wrong: spatialGrid-selfcheck holds the two walks to 1.4e-14 on
+ * density and ZERO drift over 60 steps. They went red because their configurations are the deliberately
+ * UNSTABLE ones (physics/sph/settling.mjs records mechanical energy per particle QUADRUPLING over 2000 steps),
+ * and an exploding trajectory amplifies a 1e-14 change in summation order until a settled-state statistic
+ * moves.
+ *
+ * So the policy is explicit rather than scattered: A FIXTURE WHOSE BASELINE WAS TAKEN ON ONE WALK KEEPS THAT
+ * WALK. What is being preserved is the ORDER OF A SUM, not a property of the fluid, and that is worth saying
+ * out loud -- the alternative was re-cutting keys that four rounds of work established, against a trajectory
+ * no more correct than the one they came from. Everything that is not an answer-key fixture -- the flesh, the
+ * runtime, anything new -- gets the grid by default and the speedup with it.
+ */
+export const REFERENCE_WALK = Object.freeze({ useGrid: false });
+
 export function taitB(restDensity, soundSpeed, gamma = 7) { return (restDensity * soundSpeed * soundSpeed) / gamma; }
+
+/**
+ * v4162 -- x^n FOR A NON-NEGATIVE INTEGER n, USING NOTHING BUT IEEE 754 MULTIPLICATION.
+ *
+ * *** THIS FINISHES A JOB v2546 STARTED AND A LIST FORGOT. *** kernels.js's header made the whole argument
+ * sixteen hundred versions ago: IEEE 754 pins +, -, *, / and sqrt EXACTLY -- correctly rounded, bit-identical
+ * on any conforming hardware -- and pins NOTHING about pow, which ECMAScript calls "implementation-
+ * approximated". It converted the kernels to explicit multiplication, built portableMath-selfcheck to enforce
+ * it, and predicted the failure in as many words: "an arm64 Mac joins this fleet tomorrow, and every other box
+ * is x86_64." *** THE FILE HOLDING THE EQUATION OF STATE WAS NEVER PUT ON THAT GATE'S LIST. *** So the kernels
+ * were made portable and the pressure was not, and at v4161 Keith's box and this one produced DIFFERENT
+ * RANKINGS from the same commit -- every ideal-EOS number identical to the digit, every tait number diverging
+ * from the third decimal, because only the tait branch goes through pow.
+ *
+ * MEASURED HERE, gamma = 7, over the density ratios a column actually visits (r in [0.5, 2.0], 200k samples):
+ * Math.pow and this function DISAGREE ON 65.8% OF THEM, worst relative difference 6.571e-16 -- about 3 ulp, and
+ * the same order as the 6.09e-16 v2546 measured for h^9. Small, and in a column whose mechanical energy
+ * QUADRUPLES over 2000 steps it is third-decimal by step 1200. That is not a reason to leave it: it is the
+ * reason the two machines disagreed at all.
+ *
+ * BY SQUARING RATHER THAN BY REPEATED MULTIPLICATION, and the choice is not free. x^7 is x * x^2 * x^4 -- four
+ * roundings -- against six for x*x*x*x*x*x*x. Both are deterministic; the shorter chain accumulates less. What
+ * matters is that ONE spelling is fixed here forever, because two spellings of the same power are exactly the
+ * class of difference this function exists to eliminate.
+ */
+export function ipow(x, n) {
+    let r = 1, b = x, k = n;
+    while (k > 0) { if (k & 1) r *= b; k >>= 1; if (k) b *= b; }
+    return r;
+}
+
+/** The largest exponent ipow is trusted with. `k >>= 1` is an int32 shift, and a gamma past this is not a
+ *  fluid, so the fallback takes it rather than pretending. */
+export const IPOW_MAX = 64;
 
 /** A sound speed that keeps density variation near 1% for a column of height H under gravity g. */
 export function soundSpeedFor(H, g = 9.81, factor = 10) { return factor * Math.sqrt(Math.max(1e-12, 2 * Math.abs(g) * H)); }
@@ -81,7 +134,16 @@ export function pressureOf(rho, o) {
     if (o.eos === "tait") {
         const B = o._taitB;
         const r = rho / o.restDensity;
-        const p = B * (Math.pow(r, o.gamma) - 1);
+        // *** THE ONE LINE THAT MADE TWO MACHINES DISAGREE ABOUT THIS FLUID (v4161). *** The shipped gamma is
+        // 7, so the pinned path is the path this engine actually runs; the fallback exists because the knob
+        // census sweeps gamma at +/-20% and asks for 8.4, and a real exponent has NO decomposition into the
+        // five operations IEEE 754 pins. So the hole is narrowed to a non-integer gamma and NAMED rather than
+        // papered over -- a swept gamma is a measurement, not a configuration anything ships.
+        const g = o.gamma;
+        const rg = (Number.isInteger(g) && g >= 0 && g <= IPOW_MAX)
+            ? ipow(r, g)
+            : Math.pow(r, g);   // UNPINNED-OK: non-integer gamma has no pinned decomposition; swept only, never shipped
+        const p = B * (rg - 1);
         return o.clampPressure ? Math.max(0, p) : p;
     }
     const p = o.stiffness * (rho - o.restDensity);
@@ -108,19 +170,33 @@ function createSphWorld(opts = {}) {
     // because spatialGrid-selfcheck.mjs asserts the two AGREE, and a fast path with no slow path to check it
     // against is a fast path nobody can trust. Deleting the brute force would delete the oracle.
     const grid = new SpatialGrid(o.h);
-    // THE GRID IS NOT ALWAYS FASTER, AND MEASURING SAID SO. Constant particle density (box grows with N, as real
-    // flesh does), JIT warmed, medians:
+    // v2536 measured, and the numbers were right about the IMPLEMENTATION rather than about grids:
     //     200 -> brute 0.60ms / grid 1.50ms = 0.4x   THE GRID LOSES
     //     600 -> brute 3.51ms / grid 4.26ms = 0.8x   THE GRID LOSES
     //    1500 -> brute 18.5ms / grid 11.2ms = 1.7x
     //    3000 -> brute 68.2ms / grid 24.4ms = 2.8x
     //    6000 -> brute  283ms / grid 56.0ms = 5.1x
-    // Below ~1000 particles, 27 Map lookups and a closure per neighbour cost more than the pairs they save. The
-    // flesh runs 400. So the grid DEFAULTS OFF THERE, and forcing it on would be a pessimisation wearing the word
-    // "optimisation" -- which is exactly how the GPU brain lost to CPU Dijkstra by 50x.
+    // and it named the cause exactly: "27 Map lookups and a closure per neighbour cost more than the pairs they
+    // save". The crossover sat at 1000 and the flesh runs 400, so the grid was off where it was most wanted.
+    //
+    // *** v4121 -- THE CAUSE WAS FIXED RATHER THAN THE CONCLUSION REPEATED, AND THE CROSSOVER COLLAPSED. ***
+    // spatialGrid.js now indexes cells by arithmetic over a bounding box instead of hashing into a Map: buckets
+    // are one Int32Array linked list with no allocation per step, and because distinct cell indices cannot
+    // collide, the hash-collision dedupe went away with the hash. Same rig as above -- constant particle
+    // density, JIT warmed, medians:
+    //     200 -> brute  1.51ms / grid 0.57ms =  2.6x   (was 0.4x)
+    //     600 -> brute  2.17ms / grid 1.14ms =  1.9x   (was 0.8x)
+    //    1500 -> brute 12.17ms / grid 2.50ms =  4.9x
+    //    3000 -> brute 50.96ms / grid 4.83ms = 10.6x
+    //    6000 -> brute  189.1ms / grid 9.68ms = 19.5x
+    // The grid now wins at every size that was ever measured losing. Below ~128 particles the two are within
+    // noise of each other -- BOTH under half a millisecond, and repeated runs disagree about which is ahead --
+    // so the constant there is a formality rather than a finding, and it is set where the grid STOPS being
+    // noise-competitive and starts winning consistently. The brute force stays regardless: spatialGrid-
+    // selfcheck asserts the two agree, and deleting the slow path would delete the oracle.
     //
     // Same shape as brain/flowfieldAuto.js: the engine picks by size, and either can be forced for testing.
-    const GRID_CROSSOVER = 1000;
+    const GRID_CROSSOVER = 128;
     const gridWanted = () => (o.useGrid === undefined ? P.length >= GRID_CROSSOVER : !!o.useGrid);
 
     function addParticle(pos, vel = [0, 0, 0]) {
@@ -247,15 +323,24 @@ function createSphWorld(opts = {}) {
     // Which means the fluid can WEAR A SKIN MADE OF ITS OWN SHADOWS -- reconstruct from these and march the result.
     // And because a real scan gathers views over TIME while the fluid keeps moving, that skin smears exactly as a
     // real CT scan of a moving subject smears. The artifact is the physics.
-    const shadowAmp = () => o.mass * 315 / (64 * Math.PI * Math.pow(o.h, 3));
+    // v4162 -- h^3 by multiplication, matching kernels.js's _p9/_p6. At h = 0.1 pow and multiplication happen
+    // to agree bit-for-bit; at other h they need not, and "happens to agree at the value we tried" is not a
+    // property worth relying on.
+    const shadowAmp = () => { const h = o.h; return o.mass * 315 / (64 * Math.PI * (h * h * h)); };
     function shadowAt(s, theta, z) {
-        const ct = Math.cos(theta), st = Math.sin(theta), A = shadowAmp();
+        // UNPINNED-OK: a scan ANGLE, in the CT-sinogram diagnostic. Nothing here is integrated -- shadowAt is
+        // never called from step() -- so an ulp in cos does not enter a trajectory, and there is no pinned
+        // spelling of a rotation anyway.
+        const ct = Math.cos(theta), st = Math.sin(theta), A = shadowAmp();   // UNPINNED-OK: CT scan angle, diagnostic only -- never called from step(), so no ulp enters a trajectory
         let acc = 0;
         for (const b of P) {
             const perp = b.x * ct + b.y * st - s, dz = z - b.z;
             const c2 = perp * perp + dz * dz;
             if (c2 >= o.h * o.h) continue;
-            acc += (32 / 35) * A * o.h * Math.pow(1 - c2 / (o.h * o.h), 3.5);
+            // v4162 -- x^3.5 IS PINNABLE, WHICH IS EASY TO MISS: it is x^3 * sqrt(x), and sqrt is one of the
+            // five operations IEEE 754 fixes exactly. So the half-power costs nothing in portability.
+            const d = 1 - c2 / (o.h * o.h);
+            acc += (32 / 35) * A * o.h * (d * d * d * Math.sqrt(d));
         }
         return acc;
     }

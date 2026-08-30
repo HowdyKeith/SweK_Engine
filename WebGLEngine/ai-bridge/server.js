@@ -1725,7 +1725,19 @@ function kpopPipeConnect(pipePath) {
 }
 const mdns = require("./mdnsDiscovery.js");
 const mdnsAd = require("./mdnsAdvertise.js");
-if (_isBunRuntime) {
+// *** v4147 -- THE GUARD SAID "Bun/Windows" AND CHECKED ONLY "Bun". *** v1147's comment above names the cause
+// exactly: bonjour-service's node:dgram multicast trips a panic ON BUN-ON-WINDOWS ("No handlers set on
+// Socket") that takes the whole process down. The condition never mentioned the platform, so EVERY Bun run
+// lost mDNS -- and start-steamdeck.sh PREFERS Bun, which meant a Steam Deck peer gave up `.local` discovery
+// to dodge a Windows bug it can never hit. The UDP 47474 beacon still worked, so the box still joined the
+// fleet by IP; it was quietly a weaker peer than the hardware allows, for no reason that applied to it.
+//
+// MEASURED BEFORE NARROWING, not argued from the comment: Bun 1.3.11 on Linux x64 was made to require the
+// real mdnsDiscovery.js and mdnsAdvertise.js and call start() on both. Discovery came up browsing 9 service
+// types, the advertiser started, neither threw, and the process was still alive six seconds later. NO PANIC.
+// The Windows half is left exactly as it was -- it is a real crash and this box cannot test it, so the
+// platform that reported it keeps the workaround and the platforms that never had it get their discovery back.
+if (_isBunRuntime && process.platform === "win32") {
     console.log("[bun] skipping mDNS (dgram/UDP) — works around a Bun/Windows socket panic; reach the engine by IP, or run on Node for .local discovery");
     try { const cache = JSON.parse(fs.readFileSync(path.join(__dirname, "discovery-cache.json"), "utf8")); if (cache && (Date.now() - (cache.ts || 0) < 30 * 60 * 1000)) console.log("[bun] using Node-primed discovery cache: " + ((cache.cameras || []).length) + " camera(s), " + ((cache.mdns || []).length) + " mDNS, " + ((cache.roku || []).length) + " Roku" + (cache.falloutHost ? ", Fallout@" + cache.falloutHost : "") + " from " + Math.round((Date.now() - cache.ts) / 1000) + "s ago (run bun-prime.js on Node to refresh)"); } catch {}
 } else {
@@ -2612,6 +2624,10 @@ const gatesBridge = require("./gatesBridge.js");          // v2806 - verificatio
 const toolsBridge = require("./toolsBridge.js");          // v3220 - front door at /tools for the analysis tools that used to print nothing
 const shipBridge = require("./shipBridge.js");            // v2807 - ship-ritual front door at /ship (dry run free; a real ship needs an explicit confirm).
 const deviceBridge = require("./deviceBridge.js");        // v2813 - roundhouse DEVICE front door at /device (pick a lab, watch the loop crystallise round by round).
+const repoTerrainBridge = require("./repoTerrainBridge.js");  // v4149 - count a source tree so world/repoHeightfield.js can make ground out of it.
+const vbaArchiveBridge = require("./vbaArchiveBridge.js");  // v4159 - link the VBA archive (transmitter, OpenGL engine, connector workbook) into this install.
+const sunshineBridge = require("./sunshineBridge.js");        // v4154 - the HOST half Moonlight dials, plus the one am-start surface that client exposes.
+const iosDeviceBridge = require("./iosDeviceBridge.js");      // v4155 - adb-for-iOS via doronz88/pymobiledevice3, allowlisted and read-only.
 const policyMassBridge = require("./policyMassBridge.js");
 const moduleHistoryBridge = require("./moduleHistoryBridge.js");
 const frugonBridge = require("./frugonBridge.js");    // v3039 - LLM call-log cost front door at /frugon (drives frugon, never parses it).// v2856 - mass-vs-merit front door at /policymass.
@@ -4688,6 +4704,13 @@ const server = http.createServer((req, res) => {
             .catch((e) => { try { sendJson({ ok: false, error: "okf: " + String(e && e.message || e) }, 500); } catch (_) {} });
         return;
     }
+    if (repoTerrainBridge.owns(req.url)) {
+        // /repoterrain - walk an allowlisted repository into { path, lines } so window.repoTerrain can stand on
+        // it. Returns COUNTS, never contents, and only for directories inside a repo this box already has.
+        Promise.resolve(repoTerrainBridge.handle(req, res, { sendJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "repoterrain", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
     if (deviceBridge.owns(req.url)) {
         // /device - start a roundhouse device run and stream its rounds for device.html. Each round runs a REAL
         // simulation, so the loop is kicked off and polled rather than answered in one blocking call.
@@ -4937,6 +4960,36 @@ const server = http.createServer((req, res) => {
         req.on("end", () => { if (aborted) return; let d = {}; try { d = JSON.parse(b || "{}"); } catch { res.writeHead(400, JSONH); res.end('{"ok":false,"error":"invalid_json"}'); return; } cb(d); });
         req.on("error", () => { if (!aborted) { res.writeHead(500, JSONH); res.end('{"ok":false,"error":"request_error"}'); } });
     };
+    // v4154 -- *** MOUNTED HERE, BELOW readJson, AND THAT POSITION IS THE WHOLE NOTE. ***
+    // The first draft put this beside deviceBridge and repoTerrainBridge two hundred lines UP, which is above
+    // the `const readJson` immediately preceding -- and this handler runs top to bottom on every request, so
+    // that reference sat in readJson's TEMPORAL DEAD ZONE and any POST /sunshine/moonlight/launch would have
+    // thrown "Cannot access 'readJson' before initialization" before reading a byte. THE SAME CLASS AS v4133'S
+    // CLONE BUTTON, which cost fifteen versions and an error naming a line that was fine. Caught here by
+    // noticing the declaration is at 4961 and the mount was at 4707, then DRIVEN: a live POST against a real
+    // server returned the bridge's own JSON rather than a 500. The bridges above pass only sendJson (declared
+    // at the top), which is why none of them had to care.
+    if (iosDeviceBridge.owns(req.url)) {
+        // /iosdev - pymobiledevice3, through an ALLOWLIST. Mounted here, below readJson, for the reason the
+        // sunshine mount above records: a reference to it any earlier sits in its temporal dead zone.
+        Promise.resolve(iosDeviceBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "iosdev", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
+    if (sunshineBridge.owns(req.url)) {
+        // /sunshine - install/start/stop the Sunshine HOST, and launch Moonlight V+ on a phone over adb.
+        Promise.resolve(sunshineBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "sunshine", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
+    if (vbaArchiveBridge.owns(req.url)) {
+        // /vba - the VBA archive: scan a folder for its four parts, link a copy, extract its zip, and run one
+        // ALLOWLISTED macro in a workbook. Mounted here, below readJson, for the reason the two mounts above
+        // record -- every route of this bridge except /vba/state and /vba/manifest is a POST that needs it.
+        Promise.resolve(vbaArchiveBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "vba", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
     try {
         const _rip = String(req.socket.remoteAddress || "").replace(/^::ffff:/, "");
         if (_rip && _rip !== "::1" && !_rip.startsWith("127.") && !_ownIps.has(_rip)) lastExternalClient = { ip: _rip, at: Date.now(), url: req.url };
@@ -16452,6 +16505,176 @@ ${text.replace(/'/g, "''")}
         }).catch((e) => { res.writeHead(500); res.end(String(e && e.message || e)); });
         return;
     }
+    // --- galaxy-profile: install button for vinimlo/galaxy-profile (GPL-3.0), never vendored ---------
+    // v4124 -- Keith: is it allowed to not vendor a repo but offer to install and run it for the user? Yes, the
+    // same reasoning voxtral's engine and webrtx's build already use: cloning a PUBLIC repo onto the user's OWN
+    // machine and running it as its own process is not distributing it. Pinned to a reviewed commit (see the
+    // bridge's own header) rather than trusting `main` to stay what it was read as. Same fire-and-poll shape as
+    // /sharp/install and /voxtral/install for the clone+venv+pip job; /galaxy/generate is bounded (a couple of
+    // GitHub API calls) so it is awaited directly and the 4 SVGs travel in the one response body.
+    if (req.url.split("?")[0] === "/galaxy/status" && req.method === "GET") {
+        try { require("./galaxyProfileBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/galaxy/install" && req.method === "POST") {
+        try { sendJson(require("./galaxyProfileBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/galaxy/generate" && req.method === "POST") {
+        readJson(d => {
+            try { require("./galaxyProfileBridge.js").generate(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+            catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
+    // --- grdpwasm: install button for nakagami/grdpwasm (GPL-3.0), never vendored ---------------------
+    // v4138 -- an RDP client that runs in the browser. Same non-vendoring reasoning as /galaxy above, and the
+    // same commit pin. THE DIFFERENCE IS THE BIND ADDRESS: their proxy defaults to :8080, accepts any origin,
+    // and dials whatever host:port the query string names -- three reasonable choices that together make an
+    // open TCP relay. It is started on 127.0.0.1 using THEIR OWN -listen flag, so their code is unmodified and
+    // the relay is not published to the LAN. /grdpwasm/start takes an optional host, and the bridge returns a
+    // warning whenever that host is not loopback.
+    if (req.url.split("?")[0] === "/grdpwasm/status" && req.method === "GET") {
+        try { sendJson(require("./grdpwasmBridge.js").status()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/grdpwasm/install" && req.method === "POST") {
+        try { sendJson(require("./grdpwasmBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/grdpwasm/start" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./grdpwasmBridge.js").start(d || {})); }
+            catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/grdpwasm/stop" && req.method === "POST") {
+        try { sendJson(require("./grdpwasmBridge.js").stop()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
+    // --- verified-polygon-intersection: install button for schildep/verified-polygon-intersection (MIT) -----
+    // v4143 -- a Lean4-formally-verified multipolygon intersection demo. Lower risk than grdpwasm/galaxy-profile:
+    // no build, no subprocess, no port of its own -- just four static files (index.html, lean_app.js,
+    // lean_app.wasm, coi-serviceworker.min.js) fetched from a pinned commit and served back. /vpi/app/<name>
+    // mirrors /voxtral/engine/<name>'s path-safety: the requested name is matched against a fixed artefact
+    // list inside the bridge (readArtefact), never joined onto a filesystem path, so an attacker-controlled
+    // request string cannot walk out of SRC_DIR. COOP/COEP are set on every response under this route (not
+    // just index.html) because it costs nothing on the JS/WASM subresources and is required on the document --
+    // see the bridge's own header for why real headers replace upstream's service-worker workaround here.
+    if (req.url.split("?")[0] === "/vpi/status" && req.method === "GET") {
+        try { sendJson(require("./verifiedPolygonIntersectionBridge.js").status()); }
+        catch (e) { sendJson({ ok: false, error: "verified-polygon-intersection bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/vpi/install" && req.method === "POST") {
+        try { sendJson(require("./verifiedPolygonIntersectionBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "verified-polygon-intersection bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.method === "GET" && req.url.split("?")[0].startsWith("/vpi/app/")) {
+        const want = decodeURIComponent(req.url.split("?")[0].slice("/vpi/app/".length));
+        let vpi = null;
+        try { vpi = require("./verifiedPolygonIntersectionBridge.js"); } catch (e) { res.writeHead(404); res.end("verified-polygon-intersection bridge unavailable"); return; }
+        const buf = vpi.readArtefact(want || "index.html");
+        if (!buf) { res.writeHead(404); res.end("not installed or not a recognized file -- POST /vpi/install first"); return; }
+        const ct = /\.wasm$/.test(want) ? "application/wasm" : /\.js$/.test(want) ? "text/javascript; charset=utf-8" :
+                   /\.html$/.test(want) || want === "" ? "text/html; charset=utf-8" : "application/octet-stream";
+        res.writeHead(200, {
+            "Content-Type": ct, "Content-Length": buf.length, "Cache-Control": "no-cache",
+            "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp",
+        });
+        res.end(buf);
+        return;
+    }
+
+    // --- ws-scrcpy: install button for NetrisTV/ws-scrcpy (MIT), never vendored -----------------------------
+    // v4144 -- browser-based Android screen mirroring and control. Same non-vendoring reasoning as /grdpwasm
+    // above, and the same commit pin. *** THE DIFFERENCE FROM grdpwasm IS THAT THE EXPOSURE CANNOT BE FIXED
+    // FROM OUTSIDE THEIR CODE: *** grdpwasm's proxy took a -listen flag this engine could point at loopback
+    // using their own mechanism, unmodified. ws-scrcpy calls server.listen(port, cb) with no host argument
+    // anywhere and has no config field for one, and ships with no authentication at all by design. Patching
+    // either would mean running a fork of their behaviour, which this shelf refuses to do -- so /ws-scrcpy/start
+    // ALWAYS returns a warning naming the real exposure, and the page shows it before every start.
+    if (req.url.split("?")[0] === "/ws-scrcpy/status" && req.method === "GET") {
+        try { require("./wsScrcpyBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ws-scrcpy/install" && req.method === "POST") {
+        try { sendJson(require("./wsScrcpyBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ws-scrcpy/start" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./wsScrcpyBridge.js").start(d || {})); }
+            catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/ws-scrcpy/stop" && req.method === "POST") {
+        try { sendJson(require("./wsScrcpyBridge.js").stop()); }
+        catch (e) { sendJson({ ok: false, error: "ws-scrcpy bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
+    // --- ntfs-mounter: install button for zavierferodova/Mac-NTFS-Mounter (no licence, macOS-only) ---------
+    // v4125 -- Keith: the free Mac App Store NTFS mounters lie about being free, the paid one he has fails
+    // often. Same non-vendoring reasoning as /galaxy/*, but this one asks for root and touches a real disk, so
+    // Keith chose "confirm before each mount" over full automation: /ntfs/volumes is read-only and needs no
+    // privilege; /ntfs/mount requires the exact volume named in a SEPARATE call. Neither this route layer nor
+    // the bridge ever receives or stores a password -- every privileged step uses `sudo -n`, which fails
+    // closed rather than prompting.
+    if (req.url.split("?")[0] === "/ntfs/status" && req.method === "GET") {
+        try { require("./ntfsMounterBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ntfs/install" && req.method === "POST") {
+        try { sendJson(require("./ntfsMounterBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url.split("?")[0] === "/ntfs/volumes" && req.method === "GET") {
+        try { require("./ntfsMounterBridge.js").listVolumes().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    // v4126 -- Keith: "can we generate a .sh file to run? can that be a created terminal file that will double
+    // click and run in terminal? can that terminal file be executed by SweK and then we approve it?" Yes to
+    // all three, and it is BETTER than /ntfs/mount rather than an alternative to it: a .command opened with
+    // `open` runs in Terminal.app, so TERMINAL asks for the sudo password. The password still never reaches
+    // this server, but the "run `sudo -v` first" homework /ntfs/mount needs disappears.
+    if (req.url === "/ntfs/command" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./ntfsMounterBridge.js").writeCommandFile(d && d.name)); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/ntfs/command/open" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./ntfsMounterBridge.js").openCommandFile(!!(d && d.reveal))); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/ntfs/mount" && req.method === "POST") {
+        readJson(d => {
+            try { require("./ntfsMounterBridge.js").mount(d && d.name).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 
@@ -16527,6 +16750,10 @@ ${text.replace(/'/g, "''")}
     if (req.method === "POST" && req.url === "/github/issue/create") { readJson(d => githubBridge.createIssue(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/issue/close") { readJson(d => githubBridge.closeIssue(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "GET" && req.url.split("?")[0] === "/github/commits") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listCommits({ repo: q.get("repo"), branch: q.get("branch") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
+    // v4133 -- branches WITH their head-commit date and an inferred version, so the clone button can offer a
+    // choice instead of silently taking the default branch. See githubBridge.listSourceBranches on why the
+    // version is a GUESS here and authoritative only after the clone.
+    if (req.method === "GET" && req.url.split("?")[0] === "/github/source-branches") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listSourceBranches({ repo: q.get("repo"), limit: q.get("limit") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.method === "GET" && req.url.split("?")[0] === "/github/branches") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listBranches({ repo: q.get("repo") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.method === "POST" && req.url === "/github/file/get") { readJson(d => githubBridge.getFile(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/file/put") { readJson(d => githubBridge.putFile(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }

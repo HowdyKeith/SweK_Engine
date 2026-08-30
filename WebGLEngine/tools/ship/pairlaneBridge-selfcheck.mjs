@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/pairlaneBridge-selfcheck.mjs -- v4107
 //
-// Run: node tools/ship/pairlaneBridge-selfcheck.mjs   (~0.3s; no network, no npx, no spawn)
+// Run: node tools/ship/pairlaneBridge-selfcheck.mjs   (~81ms MEASURED (gate-timings.json) -- no network, no npx, no spawn)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ai-bridge/pairlaneBridge.js -- kiyo-e/pairlane, browser-to-browser file transfer over WebRTC.

@@ -132,3 +132,79 @@ not enforcing that, the code is.
 genuinely use them, and `onPermissionRequest` is already wired to grant them *to our own origin only*. To
 enable: uncomment the permission **and** add a runtime request. Declared-but-unused permissions make the
 install prompt ask for more than the app does, which is how an install prompt stops being read.
+
+## Android TV / NVIDIA Shield (v4117)
+
+Keith: *"would we be able to create an apk for the shield which implemented the browser only node option, and
+do anything useful?"* — then: *"add the leanback + D-pad TV support"*.
+
+### The three manifest lines, each of which fails silently
+
+None of these produce an error when missing. The app installs, or does not, and simply **is not there**.
+
+- **`android.hardware.touchscreen` `required="false"`** — the one that actually blocks the install. Android
+  assumes an app needs a touchscreen unless told otherwise, and a TV has none, so without it the Shield calls
+  the app incompatible before anything else matters.
+- **`LEANBACK_LAUNCHER`** in the intent filter — the TV home screen lists *only* this category. A plain
+  `LAUNCHER` app installs and can then be started only by adb or a sideloaded file manager.
+- **`android:banner`** — required for a leanback entry. It is `res/drawable/tv_banner.xml`, a **drawable rather
+  than a PNG**: a binary in a repo is a file nobody can review in a diff and nobody can regenerate.
+
+`leanback` is `required="false"`, not `true`. `true` would mean **TV-only** and strand every phone already
+running this wrapper.
+
+### The settings gesture was unreachable on a TV — the same bug this project already recorded once
+
+`installSettingsGesture()` puts the server address behind a **long-press on the page background**, and a D-pad
+remote cannot long-press a background because it has no pointer. That is precisely the failure
+`MainActivity.java` already describes for the action bar — *"an engine on the wrong IP with no way to say so is
+a brick"* — arriving a second time on a different device. On a TV the same dialog is bound to a **long-press of
+OK** (and MENU, where a remote has one). Both entry points share one dialog.
+
+### D-pad navigation, and the conflict it has to solve
+
+`res/raw/tv_nav.js` is injected on **every** `onPageFinished` — injecting once would give the landing page a
+working remote and every page after it none, which is worse than never working.
+
+Arrow keys already mean something on many of these pages: flight demos, `es-*`, `chess3d`, and every canvas
+that steers a camera. So there are two modes:
+
+| mode | arrows | entered by | left by |
+|---|---|---|---|
+| **nav** | move **focus** between controls | default | — |
+| **capture** | go to the **page**, untouched | OK on a `<canvas>` or `[data-tv-capture]` | **BACK** |
+
+Text fields are passthrough in both modes — a D-pad is the only caret this device has.
+
+BACK asks the page first, reading the answer off `evaluateJavascript`'s return value rather than adding an
+`addJavascriptInterface` bridge, which would be a new attack surface bought for one boolean.
+
+### Why the navigation is JavaScript rather than Java
+
+Two reasons. Chromium's own spatial navigation is **not exposed by `WebSettings`** — there is no setter, and
+the flag that enables it needs adb to write `/data/local/tmp/webview-command-line`, which an app cannot do for
+itself. And writing it as an injected script means the hard half of TV support — *does pressing Right land on
+the control to the right* — can be **driven in a headless browser against the tree's real pages**, which is
+what `tools/ship/androidTvNav-selfcheck.mjs` section 5 does. The untestable half of this round is the small
+half.
+
+That gate caught a real bug in the first draft: ranking candidates by `along + 2 * cross` chose a control
+sitting **diagonally** up-left (score 170) over one **exactly** to the left (score 200). No fixed multiplier
+fixes that — it only moves where it happens. Candidates are now **partitioned by rectangle overlap on the
+perpendicular axis** first, so anything in the same row beats anything merely near, which is how a person reads
+a remote and needs no tuned constant.
+
+### What still has not been done
+
+**No APK has ever been built from this tree, including this round.** The Android SDK is absent here and
+`dl.google.com` is blocked (measured: `CONNECT` 403). What *is* verified: every XML file parses, `javac`
+reports 101 errors of which **zero are syntax errors** (all are missing-`android.*` resolution failures), and
+the D-pad script is driven for real in Chromium. Treat the first build as a real build.
+
+### And the honest limit on "do anything useful"
+
+WebGPU on Android ships by default for **Android 12+ with Qualcomm/ARM GPUs**. The Shield is **Android 11**
+(Shield Experience 9.2.4) on an **NVIDIA Tegra X1** — outside that on *both* axes. So expect **WebGL2 yes,
+WebGPU probably no**, which makes the Shield a *display / console / presence* node rather than a GPU-audition
+or compute peer. That is a prediction from release notes, **not a measurement** — open `/webgpu-llm.html` on
+the device and let the page answer it.

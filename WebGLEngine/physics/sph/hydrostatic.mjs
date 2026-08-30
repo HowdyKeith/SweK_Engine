@@ -12,7 +12,7 @@
 // depth, p = rho0 * g * h, and the fluid either supports that or it does not. Height retention is the blunt
 // observable and it is the right one: a solver that cannot sit still cannot be trusted to move.
 "use strict";
-import { createSphWorld } from "./sph.js";
+import { createSphWorld, REFERENCE_WALK } from "./sph.js";
 
 /** A packed column. Returns the world plus the density its packing ACTUALLY produces, which is the whole story. */
 // v3541 -- `viscosity` AND `gamma` WERE NOT IN THIS SIGNATURE AND THE OMISSION WAS SILENT. viscosity was
@@ -29,9 +29,26 @@ import { createSphWorld } from "./sph.js";
 // ones therefore reports the SURFACE DEFICIT as if it were the lattice's density. THE CANONICAL SPH MISTAKE,
 // and this file's entire recorded history (v2484 / v2494 / v2881 / v2883) is about getting rho0 right.
 // Every existing row is unchanged at the default.
+// v4121 -- *** THIS FIXTURE PINS THE BRUTE-FORCE NEIGHBOUR WALK, AND THE REASON IS A REAL FAILURE. ***
+// v4121 rewrote spatialGrid.js to index cells directly instead of hashing into a Map, which made the grid win
+// at every size ever measured and dropped GRID_CROSSOVER from 1000 to 128. Every world built at 686 particles
+// therefore SWITCHED PATH -- and materialKnobs-selfcheck went red. Not by much, and not because the grid is
+// wrong: spatialGrid-selfcheck puts the two walks within 1.4e-14 on density and at ZERO drift over 60 steps.
+//
+// The cause is that this fixture's SHIPPED configuration is the deliberately UNSTABLE one -- physics/sph/
+// settling.mjs records that its mechanical energy per particle QUADRUPLES over 2000 steps -- and an exploding
+// system amplifies a 1e-14 change in summation order until it flips a sensitivity ORDERING that census()
+// reports at the 8.4e-4 scale. The claim was never wrong, but it is a claim about one trajectory, and a
+// trajectory of an unstable system is not reproducible across neighbour orders.
+//
+// So the fixture pins the walk its baselines were taken with, rather than the baselines being re-cut against a
+// new one. That keeps every answer key built on makeColumn exactly as measured, and it is honest about what is
+// being preserved: the ORDER OF A SUM, not a property of the fluid. Callers that want the fast path pass
+// useGrid explicitly; the flesh and everything outside these fixtures get it by default.
 export function makeColumn({ eos = "ideal", restDensity = null, soundSpeed = null, spacing = 0.05,
                              nx = 7, ny = 14, nz = 7, h = 0.1, mass = 0.02, stiffness = 8,
-                             viscosity = 0.1, gamma = 7, surfacePacking = false } = {}) {
+                             viscosity = 0.1, gamma = 7, surfacePacking = false,
+                             useGrid = REFERENCE_WALK.useGrid } = {}) {
     // Measure the packing's density with gravity OFF before deciding anything.
     const probe = createSphWorld({ h, mass, restDensity: 1, gravity: [0, 0, 0] });
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++)
@@ -43,7 +60,10 @@ export function makeColumn({ eos = "ideal", restDensity = null, soundSpeed = nul
     const packed = interior.reduce((a, b) => a + b, 0) / Math.max(1, interior.length);
 
     const rho0 = restDensity == null ? packed : restDensity;
-    const opts = { h, mass, restDensity: rho0, stiffness, viscosity, gravity: [0, -9.81, 0], eos, gamma };
+    // useGrid is threaded through explicitly (default false) -- see the note above makeColumn. The baselines
+    // built on this fixture were taken with the brute-force walk, and its shipped configuration is unstable
+    // enough that a change of summation order moves them.
+    const opts = { h, mass, restDensity: rho0, stiffness, viscosity, gravity: [0, -9.81, 0], eos, gamma, useGrid };
     if (eos === "tait") opts.soundSpeed = soundSpeed || 15;
     const w = createSphWorld(opts);
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++)

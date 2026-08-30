@@ -323,9 +323,20 @@ window.addEventListener("load", function () {
 </head>
 <body>
   <header>
-    <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span></span>
-<a id="androidPeerBtn" href="/android-peer.html" title="SweK Android Peer - install guide, expectations, and the verdict front door for the phone's ballot" style="font-size:11px;padding:2px 10px;margin-left:6px;background:#143020;color:#8fe0ae;border:1px solid #2c6a45;border-radius:5px;cursor:pointer;text-decoration:none;">&#129302; Android Peer</a><!-- v2922 android-peer (install) -->
-<a id="iosPeerBtn" href="/ios-peer.html" title="SweK iOS Peer - iPhone/iPad: portable physics subset in-page, plus the Apple GPU as a first-class magmap vendor" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#141f30;color:#9ec9ff;border:1px solid #2c4a6a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127823; iOS Peer</a><!-- v2925 ios-peer (install) -->
+    <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span> · Peer:</span>
+<!-- v4149 -- THE WORD "Peer" IS SAID ONCE, IN THE HEADER, INSTEAD OF THREE TIMES IN A ROW. Keith: "trying to
+     make it more concise". Three buttons each ending in the same noun spends the header's width restating the
+     category rather than naming the thing; the label now carries it and the buttons carry only what differs.
+     THE id AND THE title ARE UNTOUCHED -- the detector at the bottom of this file maps a page to its button BY
+     id, and the tooltips are where the honest caveats live.
+     v4147 -- STEAM DECK GOES FIRST, AND THE ORDER IS THE CLAIM. These three buttons now read in DESCENDING
+     capability: a Deck runs ai-bridge/server.js ITSELF, Android runs a subset under Termux, iOS runs a subset
+     in Safari. Keith expected Android to be king; it is not, and the reason is architectural rather than a
+     matter of degree -- the phones are guests in a browser or a sandbox and the Deck is the host. Putting it
+     last or in the middle would have implied a ranking the pages themselves contradict. -->
+<a id="steamdeckPeerBtn" href="/steamdeck-peer.html" title="SweK Steam Deck Peer - SteamOS/Linux: the only peer that runs ai-bridge/server.js itself rather than a subset. Full fleet beacon, mDNS, spawning suite and GPU brain. HONEST CAVEAT ON THE PAGE: no physical Deck has ever run it -- the server, beacon, mDNS and port-takeover rows were measured on generic x86_64 Linux, while the RDNA2 GPU, read-only root and Game Mode rows are reasoned from Valve's documentation and marked unverified." style="font-size:11px;padding:2px 10px;margin-left:6px;background:#1a1630;color:#bfb0ff;border:1px solid #4a3f7a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127918; Steam Deck</a><!-- v4147 steamdeck-peer -->
+<a id="androidPeerBtn" href="/android-peer.html" title="SweK Android Peer - install guide, expectations, and the verdict front door for the phone's ballot" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#143020;color:#8fe0ae;border:1px solid #2c6a45;border-radius:5px;cursor:pointer;text-decoration:none;">&#129302; Android</a><!-- v2922 android-peer (install) -->
+<a id="iosPeerBtn" href="/ios-peer.html" title="SweK iOS Peer - iPhone/iPad: portable physics subset in-page, plus the Apple GPU as a first-class magmap vendor" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#141f30;color:#9ec9ff;border:1px solid #2c4a6a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127823; iOS</a><!-- v2925 ios-peer (install) -->
     <!-- v3245 -- checkPeersVer and updateNowBtn MERGED INTO #verBtn beside the version number. THREE CONTROLS
          SAID ONE THING: a permanent "Version Check", a hidden "Update SweK Now" that appeared beside it,
          and a THIRD button the verdict block created inline when it found something. Keith counted them on the
@@ -633,6 +644,72 @@ window.addEventListener("load", function () {
                  model that runs entirely in the tab. The link says the cost out loud (14x slower than real time)
                  because the page's whole design is that the expensive facts come BEFORE the decision. -->
             <a href="/voxtral.html" target="_blank" rel="noopener" title="Voxtral in the tab (opt-in) -- speech recognition with no bridge, no local server and no Windows, running as WASM + WebGPU entirely client-side. Downloads nothing until you say so, twice: a 9.4 MB engine checked against a pinned SHA-256, then 2.5 GB of weights as a separate decision. Upstream measures it at 14x SLOWER than real time on a DGX Spark, and whisperBridge already does the same job natively and fast -- the only thing this adds is needing none of it.">Voxtral (in-tab ASR)</a>
+            <!-- v4118 -- webrtx.html JOINS beside voxtral.html: another opt-in front door to somebody else's
+                 work, filed by what it asks of THIS BOX. The link says the two things that decide whether it is
+                 worth opening: it needs a secure origin (so not the LAN address), and upstream has not been
+                 touched since 2023. -->
+            <a href="/webrtx.html" target="_blank" rel="noopener" title="Ray tracing in the page (opt-in) -- Vulkan's ray tracing pipeline as pure WebGPU compute via codedhead/webrtx (MIT), no hardware RT cores needed. Nothing ships: upstream publishes no build, so the page records a MEASURED build recipe instead of a pinned digest and verifies the result by behaviour -- including whether an acceleration structure really builds. Needs a SECURE ORIGIN: navigator.gpu does not exist on http://<lan-ip>, so open it through the https tunnel. Upstream is a single commit from July 2023 and is Chrome-only-tested; Safari/iOS is refused rather than claimed.">Ray tracing (WebRTX)</a>
+            <!-- v4124 -- galaxy-profile.html JOINS beside webrtx.html: another opt-in front door to somebody
+                 else's work, installed and run on this machine rather than vendored -- GPL-3.0 makes vendoring
+                 the wrong move, not automating the same `git clone` a person would type themselves. -->
+            <a href="/galaxy-profile.html" target="_blank" rel="noopener" title="Galaxy Profile SVGs (opt-in) -- an install button for vinimlo/galaxy-profile (GPL-3.0), a generator for animated GitHub-profile SVG banners. Nothing of theirs is vendored into this tree or imported into this engine's process: the button clones the repo onto THIS machine, pinned to a reviewed commit, and runs it as its own subprocess in a venv. A supplied GitHub token is passed only as that one subprocess's environment variable and is never written to disk.">Galaxy Profile SVGs</a>
+            <!-- v4138 -- grdpwasm.html JOINS the same shelf: an opt-in front door to nakagami/grdpwasm
+                 (GPL-3.0), an RDP client that runs in the browser. Same non-vendoring reasoning as its two
+                 neighbours. ONE THING IS DIFFERENT AND IT IS WHY THE TITLE SAYS SO: their proxy defaults to
+                 -listen :8080, accepts any origin, and dials whatever host:port the query string names --
+                 individually reasonable for `make serve` on a desktop, jointly an open TCP relay on a machine
+                 that sits on a LAN. It is started on 127.0.0.1 using THEIR OWN flag; their code is unchanged. -->
+            <a href="/grdpwasm.html" target="_blank" rel="noopener" title="RDP in the browser (opt-in) -- an install button for nakagami/grdpwasm (GPL-3.0), a web-based RDP client: Go compiled to WebAssembly speaks RDP in the browser and a small Go proxy bridges its WebSocket to the RDP server. Nothing of theirs is vendored into this tree or imported into this engine&#39;s process: the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, builds it with the local Go toolchain and runs their binary as a subprocess. STARTED ON LOOPBACK ON PURPOSE -- upstream&#39;s proxy defaults to all interfaces, accepts any origin and dials any host:port a caller names, which together would be an unauthenticated open TCP relay; it is launched with their own -listen flag pointed at 127.0.0.1, their source unmodified. RDP credentials are typed into their page and never reach this engine.">RDP in the browser</a>
+            <!-- v4143 -- vpi.html JOINS the same shelf: an opt-in front door to schildep/verified-polygon-
+                 intersection (MIT), a Lean4-formally-verified multipolygon intersection demo compiled to WASM.
+                 Lowest risk of this drawer -- four static files fetched and served, no build, no subprocess, no
+                 port of its own. ONE THING IS DIFFERENT AND IT IS WHY THE TITLE SAYS SO: their WASM needs
+                 SharedArrayBuffer, which needs real COOP/COEP response headers; GitHub Pages can't set those so
+                 upstream ships a service worker that fakes them. This server CAN set the real ones, so it does,
+                 without touching a byte of their files. -->
+            <a href="/vpi.html" target="_blank" rel="noopener" title="Verified polygon intersection (opt-in) -- an install button for schildep/verified-polygon-intersection (MIT), a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo you draw two multipolygons on. Nothing of theirs is vendored into this tree or imported into this engine's process: the button fetches the four prebuilt static files GitHub Pages already serves, pinned to a reviewed commit, into a folder outside this tree, and this server serves them back with real Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy headers -- upstream's own service worker exists only because GitHub Pages cannot set HTTP headers.">Verified polygon intersection</a>
+            <!-- v4144 -- ws-scrcpy.html JOINS the same shelf: an opt-in front door to NetrisTV/ws-scrcpy (MIT),
+                 browser-based Android screen mirroring and control over adb. Same non-vendoring reasoning as
+                 its neighbours. *** IT IS THE ONE WHOSE EXPOSURE CANNOT BE NARROWED FROM OUTSIDE, AND THE
+                 TITLE SAYS SO: *** grdpwasm's proxy took a -listen flag this engine could point at loopback
+                 using upstream's OWN mechanism, code unmodified. ws-scrcpy calls server.listen(port, cb) with
+                 no host argument anywhere, has no config field for one, and ships no authentication at all by
+                 design -- so there is no honest argument to pass. Patching it would mean running a fork of
+                 their behaviour, which this shelf refuses; the page states the exposure and confirms before
+                 every start instead. -->
+            <a href="/ws-scrcpy.html" target="_blank" rel="noopener" title="Android in the browser (opt-in) -- an install button for NetrisTV/ws-scrcpy (MIT), browser-based Android screen mirroring and control over adb, using a vendored unmodified prebuilt Genymobile scrcpy-server.jar (no JDK needed). Nothing of theirs is vendored into this tree or imported into this engine's process: the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, runs their own five-stage build (~65s, needs a C/C++ toolchain for node-pty) and runs their server as a subprocess. WARNING -- IT BINDS TO ALL INTERFACES AND HAS NO LOGIN, and unlike grdpwasm that cannot be narrowed without patching their code: their HttpServer.ts calls server.listen(port, cb) with no host argument and has no config field for one. While it runs, anything on your LAN that reaches the port can view AND control any Android device the machine can see over adb. The page confirms before every start.">Android in the browser</a>
+            <!-- v4159 -- excel.html, AND IT IS THE ONE ON THIS SHELF THAT IS NOT SOMEBODY ELSE'S WORK. Every
+                 other install button here clones a stranger's repository onto this machine. This one links the
+                 half of THIS project that was written before any of it: Keith's VBA transmitter, the OpenGL
+                 render engine, and the connector workbook. The root README has said for hundreds of versions
+                 that those module folders "ship separately", and separately has meant nowhere -- nothing in
+                 this tree could say what the archive contains or whether a copy on the box was the right one.
+                 IT LINKS, IT NEVER COPIES: 189 transmitter modules pulled into this tree would fork them.
+                 Macro execution is an ALLOWLIST, the same call ios-tools made, because Application.Run takes
+                 any name and a denylist is correct only until the archive gains the next dangerous macro. -->
+            <a href="/excel.html" target="_blank" rel="noopener" title="SweK Excel -- the VBA half, which was started FIRST: the transmitter (Winsock + the HTTP/WebSocket/MQTT servers on :8099), the OpenGL render engine, the VBA->SweK connector workbook, and the smaller parts. Links a copy of the archive on this machine and reads it READ-ONLY; it never copies the archive into this repository, because a snapshot forks from the thing you edit and then drifts silently. Recognises a folder by MODULE NAME, not folder name -- two decisive markers or it is reported unclassified rather than guessed at, which is why this repository&#39;s own Shared/Net/ Winsock extract is correctly NOT mistaken for the transmitter. Assembles a workbook through Excel&#39;s VBE, and runs the engine&#39;s own entry points through an allowlist. NO EXCEL HAS EVER RUN AGAINST IT -- the page marks every row measured or not verified." style="color:#9ce0b4;text-decoration:none;border:1px solid #2c5a3f;padding:2px 6px;border-radius:3px;font-size:11px;">&#128202; Excel</a>
+            <!-- v4155 -- ios-tools.html JOINS the shelf, and it is the third leg of the same story: ws-scrcpy
+                 points a browser at an Android, sunshine points a phone at this machine, and this points THIS
+                 MACHINE AT AN iPHONE. doronz88/pymobiledevice3 (GPL-3.0, pip-installed, never vendored) is what
+                 adb is to Android -- no jailbreak, just a device paired the ordinary way. Driven through an
+                 ALLOWLIST rather than a denylist, because that CLI can also wipe a phone and a denylist is
+                 correct only until upstream adds the next dangerous verb. IT DOES NOT PROMOTE THE iOS PEER and
+                 the page says so: an iPhone still cannot host the engine. -->
+            <a href="/ios-tools.html" target="_blank" rel="noopener" title="SweK iOS Device Tools (opt-in) -- install and drive doronz88/pymobiledevice3 (GPL-3.0) through a read-only allowlist: list devices and apps, read crash names and battery. NO JAILBREAK, just Trust This Computer. This is adb for iOS and it is a channel for the HOST -- the iOS peer is still a subset in Safari. No iPhone has ever been attached to this bridge; the page marks every row MEASURED or NOT VERIFIED." style="color:#9ec9ff;text-decoration:none;border:1px solid #2c4a6a;padding:2px 6px;border-radius:3px;font-size:11px;">&#63743; iOS Tools</a>
+            <!-- v4154 -- sunshine.html JOINS the same opt-in shelf, and it is the HOST half of the phone story
+                 ws-scrcpy sits opposite. ws-scrcpy points a BROWSER at a phone; this points a PHONE at this
+                 machine, via LizardByte/Sunshine (GPL-3.0, installed by the user's own package manager, never
+                 vendored) with Moonlight V+ as the client. Keith asked whether features could be pushed INTO
+                 Moonlight: they cannot -- that app exposes no service, socket or provider, and its one exported
+                 surface is a launch-only shortcut trampoline, which this page also drives over adb. The page is
+                 honest per row about the fact that no Sunshine has ever run against the bridge. -->
+            <a href="/sunshine.html" target="_blank" rel="noopener" title="SweK Sunshine Host (opt-in) -- install and run LizardByte/Sunshine (GPL-3.0) so a phone running Moonlight V+ can see this machine's screen and send touch, stylus, gyro and gamepad back as input. Also launches Moonlight on a connected phone over adb. NOTHING IS VENDORED and no Sunshine has ever run against this bridge -- the page marks every row MEASURED or NOT VERIFIED." style="color:#ffd479;text-decoration:none;border:1px solid #6a5320;padding:2px 6px;border-radius:3px;font-size:11px;">&#9728;&#65039; Sunshine Host</a>
+            <!-- v4125 -- ntfs-mounter.html JOINS beside galaxy-profile.html: another opt-in front door to
+                 somebody else's work (zavierferodova/Mac-NTFS-Mounter, no licence file at all), installed and
+                 run on this machine rather than vendored. Also appears in the Mac System panel (a view, via
+                 pagePlacements.mjs's macPages()) since diskutil/MacFUSE make it Mac-only by construction --
+                 this anchor is still its one real home. -->
+            <a href="/ntfs-mounter.html" target="_blank" rel="noopener" title="NTFS Mounter (opt-in, macOS only) -- an install button for zavierferodova/Mac-NTFS-Mounter, which has NO LICENSE FILE at all (checked directly, so all rights reserved by default -- automating a clone onto your own machine is still not distribution, the same reasoning as the GPL-3.0 case beside it). Needs root and touches a real disk, so unlike this tree's other install buttons it never auto-mounts: volumes are listed read-only, and mounting one needs a separate explicit confirmation naming that exact volume. Never receives, prompts for, or stores a password -- every privileged step uses `sudo -n`, which fails closed rather than prompting.">NTFS Mounter (macOS)</a>
             <a href="/petfbi.html" target="_blank" rel="noopener" title="PetFBI -- the lost-pet posting flow.">PetFBI</a>
             <a href="/path-tracer.html" target="_blank" rel="noopener" title="Path tracer: Monte Carlo global illumination on the CPU. The furnace scene must render FLAT -- the sphere disappears -- which is the answer key six rounds of physics/render were built around.">Path Tracer</a>
             <a href="/petfbi-board.html" target="_blank" rel="noopener" title="PetFBI board -- the lost-pet board itself.">PetFBI Board</a>
@@ -647,10 +724,10 @@ window.addEventListener("load", function () {
             <a href="/svg-forge.html" target="_blank" rel="noopener" title="SVG -> 3D forge: paste an SVG and bevel-extrude its paths into a metal medal/badge/insignia -- holes and inner points preserved. Thickness/bevel/metal controls.">SVG forge</a>
             <a href="/office-floor.html" target="_blank" rel="noopener" title="Office floor: the physics-lab AI roster and job queue -- what runs next, on whom, and when a human is woken. SVG, no sprites.">Office Floor</a>
       <a href="/lab-census.html" target="_blank" rel="noopener" title="The physics lab's coverage in one read: graded modules, declared plants, corroboration eligibility, instrument reach, and whether the job dispatcher is ticking. Every figure imported from the tool that owns it.">Lab census</a>
-            <!-- v3825 -- Long Silence Round A: a Three.js 3D render pass for the box3d ES fight. An <a> so it is reachable (not an orphan); it also links from es-box3d.html itself. -->
-            <a href="/es-box3d-3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D, in 3D -- real hull meshes following box3d's (x,0,z)+heading under a free OrbitControls camera, the sim unchanged and still planar (Long Silence Round A).">ES Box3D 3D</a>
-            <!-- v3826 -- Long Silence Round B: the box3d ES fight flying in 3D (pitch/altitude). Reachable anchor; also links from the Round A page. -->
-            <a href="/es-box3d-fly3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D flying in 3D -- ships pitch, climb and dive with a 3D pursuit AI; the flight model is a strict superset of the 2D one and esBox3d runs opt-in fly3d (Long Silence Round B).">ES Box3D 3D flight</a>
+            <!-- v3825 -- the planar fight given a 3D VIEW (v4131: was labelled "Round A"): a Three.js 3D render pass for the box3d ES fight. An <a> so it is reachable (not an orphan); it also links from es-box3d.html itself. -->
+            <a href="/es-box3d-3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D, in 3D -- real hull meshes following box3d's (x,0,z)+heading under a free OrbitControls camera, the sim unchanged and still planar: the VIEW is 3D, the fight is not.">ES Box3D 3D</a>
+            <!-- v3826 -- the fight itself in 3D (v4131: was labelled "Round B"): the box3d ES fight flying in 3D (pitch/altitude). Reachable anchor; also links from the planar-view page. -->
+            <a href="/es-box3d-fly3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D flying in 3D -- ships pitch, climb and dive with a 3D pursuit AI; the flight model is a strict superset of the 2D one and esBox3d runs opt-in fly3d: the FIGHT is 3D, not just the view.">ES Box3D 3D flight</a>
             <!-- v3841 -- the 3D MPM loop above the transfer, drawn: an elastic block falling into a box. An <a> so it is reachable; a demo. -->
             <a href="/mpm3d.html" target="_blank" rel="noopener" title="MPM in 3D -- the 2D material-point loop lifted to 27 nodes and a 3x3 deformation gradient, an elastic block falling into a box. The centre-of-mass fall, the symmetric 3D Cauchy stress, and the inverted-particle NaN are gated (step3d-selfcheck).">MPM 3D</a>
             <!-- v3839 -- fog of war on the wearField toroidal buffer: line-of-sight shadowcasting + remembered ground. An <a> so it is reachable; a demo, not a tool. -->
@@ -706,6 +783,19 @@ window.addEventListener("load", function () {
             <a href="/fleet-bench.html" target="_blank" rel="noopener" title="Fleet bench -- one workload run on every peer, ranked ONLY where ranking would not mislead. A peer with a time but the wrong answer is not ranked; a fleet on two engine versions is incomparable and nothing is declared fastest; an unreachable peer is FAILED, never zero.">Fleet Bench</a>
             <a href="/population.html" target="_blank" rel="noopener" title="GPU population field -- the readback planner, a live compile-and-run of the field shaders, and the GPU-vs-JS reference comparison. Nothing else in the tree runs those shaders.">population</a>
             <a href="/face-mirror.html" target="_blank" rel="noopener" title="Face mirror -- webcam landmarks, the metric-driven mirror, and the SweK robot driven from MediaPipe blendshapes. Step out of frame and the eyes should dim.">face mirror</a>
+            <!-- v4155 -- THE FOUR AVATAR PAGES GET A DOOR, BESIDE face-mirror.html WHERE THEY BELONG. All four
+                 have been INVISIBLE since v4048-v4094: ascii-avatar and krbn-avatar since v4073, krbn-rigged
+                 since v4048, heerich-avatar since v4094 -- in the tree, reachable from nothing, exactly the
+                 shape pageReach exists to find. They were not linked earlier this session for a bad reason:
+                 the Arriving check compared an ABSOLUTE COUNT to a frozen baseline, so linking four pages made
+                 a red gate redder and the cheapest thing to do was leave them invisible. THAT CHECK NOW
+                 ASSERTS THE RATIO ITS OWN SENTENCE NAMES, so doing the right thing is no longer punished --
+                 45 of 424 is 10.6% against a 15% cap. A gate that made hiding a page cheaper than linking it
+                 was working against the thing it was written for. -->
+            <a href="/ascii-avatar.html" target="_blank" rel="noopener" title="ASCII avatar -- the avatar rendered as text, one of four non-WebGL avatar surfaces" style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128100; ASCII Avatar</a>
+            <a href="/krbn-avatar.html" target="_blank" rel="noopener" title="Krbn avatar -- the Krbn drawing as an avatar surface" style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128100; Krbn Avatar</a>
+            <a href="/krbn-rigged.html" target="_blank" rel="noopener" title="Krbn rigged -- the rigged Krbn drawing exported as a real, playable skeleton (v4048)" style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#129504; Krbn Rigged</a>
+            <a href="/heerich-avatar.html" target="_blank" rel="noopener" title="Heerich voxel avatar -- a fourth non-WebGL avatar surface (v4094)" style="color:#cfe9d8;text-decoration:none;border:1px solid #2c463a;padding:2px 6px;border-radius:3px;font-size:11px;">&#129521; Heerich Avatar</a>
             <a href="/android-invite.html" target="_blank" rel="noopener" title="Join as a SweK Android Peer -- the invite page a phone is sent to. It was reachable from nothing until v3002." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128241; Android Invite</a>
             <a href="/blob-studio.html" target="_blank" rel="noopener" title="Blob Studio -- the authoring surface for the blob work, including the server-side voice used for headless export." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#127912; Blob Studio</a>
             <a href="/magmap-android.html" target="_blank" rel="noopener" title="magmap second-vendor audition: the page a phone opens to reproduce the f64 magmap reference on its own GPU. This is the page that produced the Mali evidence." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128241; Magmap Audition</a>
@@ -988,7 +1078,9 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="macsystem"><span class="gtabTog">&#9656;</span><span>&#63743; Mac System</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="smarthome"><span class="gtabTog">&#9656;</span><span>&#127968; Smart Home</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="boundaries"><span class="gtabTog">&#9656;</span><span>&#9636; PL: Boundaries &amp; Reconstruction</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="matter"><span class="gtabTog">&#9656;</span><span>&#9883;&#65039; Matter &amp; Chaos</span><span class="gtabState"></span></button>
+        <!-- v4127 -- Keith: '"Matter & Chaos" can be renamed "PL: Matter & Chaos"'. Visible label only, same
+             rule as the fluidgpu rename above: data-tab stays "matter". -->
+        <button class="gtab" data-tab="matter"><span class="gtabTog">&#9656;</span><span>&#9883;&#65039; PL: Matter &amp; Chaos</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="systools"><span class="gtabTog">&#9656;</span><span>&#128295; System Tools</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="voxelrender"><span class="gtabTog">&#9656;</span><span>&#129513; Voxel &amp; Render</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
@@ -997,7 +1089,12 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="gametheory"><span class="gtabTog">&#9656;</span><span>&#127918; Game Theory</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="petfbi"><span class="gtabTog">&#9656;</span><span>&#128062; PetFBI</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="brain"><span class="gtabTog">&#9656;</span><span>&#129504; GPU Brain</span><span class="gtabState" id="brainTabState"></span></button>
-        <button class="gtab" data-tab="fluidgpu"><span class="gtabTog">&#9656;</span><span>&#127754; Fluid &mdash; verify the GPU</span><span class="gtabState" id="fluidTabState"></span></button>
+        <!-- v4127 -- Keith: '"Fluid -- verify the GPU" can be renamed "PL: Fluids"'. VISIBLE LABEL ONLY:
+             data-tab/data-panel stay "fluidgpu", so every selector, the pageSections id and the placements
+             JSON key keep pointing at the same panel -- the same rule v4109's "File Transfer Utils" rename
+             followed. pageSections.mjs's own label for this section is renamed to match in the same round,
+             because a label declared twice that disagrees is this tree's most-repeated defect. -->
+        <button class="gtab" data-tab="fluidgpu"><span class="gtabTog">&#9656;</span><span>&#127754; PL: Fluids</span><span class="gtabState" id="fluidTabState"></span></button>
         <!-- v4039 -- renamed "Game: Endless Sky", same reasoning as "ev"'s rename beside it -- see that comment. -->
         <button class="gtab" data-tab="endlesssky"><span class="gtabTog">&#9656;</span><span>&#128640; Game: Endless Sky</span><span class="gtabState" id="esTabState"></span></button>
         <button class="gtab" data-tab="bzflag"><span class="gtabTog">&#9656;</span><span>&#128737; BZFlag</span><span class="gtabState" id="bzTabState"></span></button>
@@ -1257,7 +1354,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="fluidgpu" hidden>
           <div data-panel-pages="fluidgpu" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0 8px;"></div>
-          <div class="gpanelHdr">&#127754; Fluid &mdash; verify the GPU on this machine</div>
+          <div class="gpanelHdr">&#127754; PL: Fluids &mdash; verify the GPU on this machine</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;line-height:1.7;">
             The engine's fluid solvers are checked against exact analytic answers &mdash; Poiseuille's parabola, the speed of sound,
             a shock compressing by exactly six, Rayleigh's 1708. All of that runs on the CPU, and it re-runs on every build.
@@ -1430,6 +1527,11 @@ window.addEventListener("load", function () {
             <button id="mlxPanelBtn" style="padding:7px 12px;background:#3a2a5a;color:#cfe;border:1px solid #6a4a9a;border-radius:6px;cursor:pointer;font:12px system-ui;">&#127814; Local MLX &mdash; point the brain at a local Mac model server</button>
             <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;">Rapid-MLX, Osaurus, vMLX, mlx-omni-server &mdash; the same config as the engine page's Local MLX settings tab, including the macOS-only Detect/Install buttons.</div>
           </div>
+          <!-- v4127 -- THE SLOT CHIP_GROUPS MOVES "Homebrew formula" INTO, at Keith's ask. Empty in the static
+               markup on purpose: the chip is MOVED here at runtime, node and all, so its click listener and its
+               live gtabState span come with it -- rebuilding a copy here would drop both, which is the rule the
+               chip grouper's own header states. Same shape as the systools slot. -->
+          <div data-group-chips="macsystem" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="macsystem" style="display:flex;flex-direction:column;gap:3px;"></div>
         </div>
         <div class="gpanel" data-panel="smarthome" hidden>
@@ -1447,7 +1549,7 @@ window.addEventListener("load", function () {
           <div data-panel-pages="boundaries" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
         <div class="gpanel" data-panel="matter" hidden>
-          <div class="gpanelHdr">&#9883;&#65039; Matter &amp; Chaos</div>
+          <div class="gpanelHdr">&#9883;&#65039; PL: Matter &amp; Chaos</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="matter" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
@@ -1483,6 +1585,17 @@ window.addEventListener("load", function () {
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-group-chips="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          <!-- v4138 -- OPT-IN: SOMEBODY ELSE'S WORK. A sub-drawer of System Tools, same shape as Physics Lab's
+               Sampling & Methods: one slot, no chip of its own, because these are System Tools rather than a
+               peer of the rig. Everything filed here is a front door to a repo this engine did not write --
+               cloned and run on this machine, never vendored -- so the licence and the attribution live in one
+               place instead of four. It exists because systools had grown to 16 against its own cap of 15
+               while four separate notes in pageSections.mjs each said "JOINS, same rule again". -->
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid #24382e;">
+            <div style="font-size:11px;color:#b6f0cf;margin-bottom:4px;">&#128230; Opt-in: somebody else&#39;s work</div>
+            <div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Install buttons for repos this engine did not write &mdash; cloned and run on YOUR machine, pinned to a reviewed commit, never vendored into the tree or a release zip. Each page names the author and the licence.</div>
+            <div data-panel-pages="thirdparty" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          </div>
         </div>
         <div class="gpanel" data-panel="voxelrender" hidden>
           <div class="gpanelHdr">&#129513; Voxel &amp; Render</div>
@@ -2881,7 +2994,24 @@ A password fetches a token from the list server; an unregistered callsign needs 
   // v1690 — the event->move mapping lives in swekRobot.react() now (shared by the engine + page robots too);
   // server.html just feeds its log stream in.
   function _robotReact(line){ try { window._swekRobot && window._swekRobot.react && window._swekRobot.react(line); } catch(e){} }
-  window.swekTick = function(msg){ try { push({ t:Date.now(), level:"info", msg:String(msg) }); } catch(e){ tickShow({msg:msg}); } };
+  // *** v4146 -- RENAMED FROM swekTick, WHICH IT HAD BEEN SILENTLY OVERWRITING SINCE THE POLLING GUARD WAS
+  // ADDED. *** Two completely different functions were both called window.swekTick in this one file: the
+  // POLLING GUARD at the top (key, fn) -> SwekPoller.guardedTick, and THIS TICKER FEEDER (msg) -> push a log
+  // line. This assignment runs later, so it WON -- and every one of the thirty `swekTick("key", poll)` call
+  // sites below was calling THIS: it wrote the KEY STRING into the ticker as a log line and NEVER CALLED THE
+  // POLL FUNCTION AT ALL. Thirty pollers that looked guarded, read as guarded to the gate that greps for
+  // them, and did nothing after their first manual call.
+  //
+  // MEASURED, NOT REASONED: driving server.html in a real browser showed window.swekTick with arity 1 and
+  // this function's source, the "sharp-install" key arriving twice in the ticker, and ZERO matching fetches.
+  // FOUND BY CONVERTING ONE MORE POLLER TO THE GUARD (fetchCap's last unguarded poller) AND WATCHING ITS
+  // PANEL STOP WORKING -- the conversion was correct and it moved that poller from working-but-unguarded to
+  // silently-dead, which is what made the collision finally visible.
+  //
+  // The guard keeps the name because thirty sites use it and one used this. poller-selfcheck now asserts
+  // window.swekTick is assigned EXACTLY ONCE, which is the check that was missing: it already verified the
+  // definition came before its first use, and a SECOND definition after it satisfied that test perfectly.
+  window.swekTickerSay = function(msg){ try { push({ t:Date.now(), level:"info", msg:String(msg) }); } catch(e){ tickShow({msg:msg}); } };
   (function(){
     var mb=document.getElementById("tickMute");
     if(mb) mb.onclick=function(){ _tickMuted=!_tickMuted; try{window._swekMuted=_tickMuted;}catch(e){} mb.textContent=_tickMuted?"\ud83d\udd07":"\ud83d\udd0a"; mb.title=_tickMuted?"Unmute \u2014 read the ticker aloud with this computer's voice":"Mute the spoken ticker"; if(_tickMuted){ try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){} setTimeout(function(){ try{ if(_tickMuted&&window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){} },80); try{window._swekRobot&&window._swekRobot.setTalking&&window._swekRobot.setTalking(false);}catch(e){} } else { try{ speakAloud("Voice On"); }catch(e){} } };
@@ -2982,10 +3112,34 @@ A password fetches a token from the list server; an unregistered callsign needs 
     var hr = document.getElementById("hdrRuntime");
     if (hr) hr.textContent = " (" + name + ")";
   }).catch(function(){});
+  // v4158 -- *** READOUTS MORPH; THE TICKER DOES NOT. *** ui/textMorph.js animates the graphemes that SURVIVE
+  // a change to their new positions and fades only the ones that actually differ, so "v4157" -> "v4158" reads
+  // as one digit turning over rather than as a different string appearing. That is worth something exactly
+  // where old and new SHARE STRUCTURE, which is true of every readout on this page and false of the ticker --
+  // consecutive log lines share almost nothing, so a morph there would fade every glyph out and in, slower to
+  // read than the scroll it replaced. The measurement behind that decision is in textMorph's own header and is
+  // asserted by its gate, so if the ticker is ever retimed the question gets asked again.
+  //
+  // PROGRESSIVE, AND THE FALLBACK IS THE POINT: the module is fetched once, lazily; until it lands (and for
+  // ever, if it fails) every call is a plain textContent assignment. A readout that stopped updating because
+  // an animation module 404'd would be a strictly worse page than one that never animated.
+  var _morphFn = null, _morphAsked = false;
+  function morphText(el, txt){
+    if (!el) return;
+    if (!_morphAsked){
+      _morphAsked = true;
+      import("./ui/textMorph.js").then(function(m){ _morphFn = m.morph; }).catch(function(){ _morphFn = false; });
+    }
+    // The FIRST paint always falls through to textContent, which is correct rather than a limitation: there is
+    // nothing to morph FROM until a value has been shown once.
+    if (_morphFn){ try { _morphFn(el, txt); return; } catch(e){} }
+    el.textContent = txt;
+  }
+
   // v1796/v1823 — engine version straight after the SweK Engine link
   fetch("/package/info", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
     var ev = document.getElementById("hdrEngineVer");
-    if (ev && j && j.version) ev.textContent = " v" + String(j.version).replace(/^v/i, "");
+    if (ev && j && j.version) morphText(ev, " v" + String(j.version).replace(/^v/i, ""));
   }).catch(function(){});
 
   // controls
@@ -3284,7 +3438,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
   function auSync(on, st){
     auCb.checked = !!on;
     var note = on ? "Auto-update from Downloads: ON" : "Auto-update from Downloads: OFF";
-    if (st && st.current){ var _ev = document.getElementById("hdrEngineVer"); if (_ev) _ev.textContent = " v" + String(st.current).replace(/^v/i, ""); if (st.found && st.found > st.current) note += "  ·  v" + st.found + " waiting"; }
+    if (st && st.current){ var _ev = document.getElementById("hdrEngineVer"); if (_ev) morphText(_ev, " v" + String(st.current).replace(/^v/i, "")); if (st.found && st.found > st.current) note += "  ·  v" + st.found + " waiting"; }
     auTxt.textContent = note;
     _updLocal = !!(st && st.found && st.found > st.current); try{ _syncUpdBtn(); }catch(e){}
   }
@@ -5460,7 +5614,7 @@ t:Date.now(),level:"info",msg:"📡 RustDesk view request sent — accept the in
           el.appendChild(clr);
         }
         if(!any)el.innerHTML="<span style='color:var(--dim);font-size:10px;'>no tunnel URLs known yet — start Cloudflare on any peer and they will be remembered here</span>";
-        if(_seenTunnels){ Object.keys(live).forEach(function(k){ if(!_seenTunnels[k]){ var pp=live[k]; try{ window.swekTick && window.swekTick("[tunnel] "+pp.name+" tunnel is live: "+pp.tunnel); }catch(e){} } }); }
+        if(_seenTunnels){ Object.keys(live).forEach(function(k){ if(!_seenTunnels[k]){ var pp=live[k]; try{ window.swekTickerSay && window.swekTickerSay("[tunnel] "+pp.name+" tunnel is live: "+pp.tunnel); }catch(e){} } }); }
         _seenTunnels=live;
       }).catch(function(){el.textContent="unavailable";});
     }
@@ -7908,7 +8062,15 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
       // Poll only while something is actually running -- this panel is load-on-click by design (v3963's own
       // comment above), so an interval that outlived the job would be the exact "fires on every page load for
       // a panel nobody opened" cost that comment exists to avoid.
-      if(running && !installPoll) installPoll = setInterval(sharpLoad, 1500);
+      // *** v4146 -- THROUGH swekTick, WHICH THIS POLLER WALKED PAST WHEN IT WAS WRITTEN AT v4104. ***
+      // fetchCap-selfcheck went red with "1 still unguarded: sharpLoad@1500ms" against a baseline of ZERO --
+      // the guard already existed and this was the first new interval to skip it. The comment above is right
+      // that the interval is short-lived, and that is NOT the property the cap is about: an install job runs
+      // for minutes, ticking every 1.5s, at exactly the moment the user is ALSO watching the log fill and the
+      // rest of the page polling. Unguarded it competes for the same six sockets, and a 1500ms interval with a
+      // slower-than-1500ms response stacks a second call on top of the first. guardedTick refuses that stack
+      // and puts the request in the shared pool; the key is its own, so nothing else can starve it.
+      if(running && !installPoll) installPoll = setInterval(() => swekTick("sharp-install", sharpLoad), 1500);
       if(!running && installPoll){ clearInterval(installPoll); installPoll = null; }
     }
 
@@ -8441,8 +8603,13 @@ try {
   const { detect, peerPageFor } = await import("/ui/deviceKind.mjs");
   const d = detect(window);
   const page = peerPageFor(d.kind);
-  const btn = page === "/android-peer.html" ? document.getElementById("androidPeerBtn")
-            : page === "/ios-peer.html"     ? document.getElementById("iosPeerBtn") : null;
+  const btn = page === "/android-peer.html"   ? document.getElementById("androidPeerBtn")
+            : page === "/ios-peer.html"       ? document.getElementById("iosPeerBtn")
+            // v4147 -- the Deck joins the same OFFER-ONLY contract: highlight, never navigate. It is detected
+            // by its panel (1280x800 + touch + Linux) or by its GPU naming itself, because a Deck in Desktop
+            // Mode has no user-agent token of its own. A DOCKED Deck is deliberately NOT detected -- it drives
+            // an external display, so it reads as `desktop`, which is both true and how it is being used.
+            : page === "/steamdeck-peer.html" ? document.getElementById("steamdeckPeerBtn") : null;
   window.__swekDevice = d;          // read by the gate, and worth having in a console on a real phone
   if (btn && d.confident) {
     btn.dataset.deviceMatch = d.kind;

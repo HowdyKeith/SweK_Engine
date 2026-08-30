@@ -170,7 +170,9 @@ export const SECTIONS = [
       pages: ["home.html", "ha-switches.html", "ha-capabilities.html", "ha-diagram.html", "presence.html",
               "arrival.html", "doorbell.html", "alexa.html", "echo-show.html", "agenda.html",
               "air-quality.html", "nest-protect.html", "solar.html", "ac.html", "wall.html"] },
-    { id: "matter", tab: "matter", label: "Matter & Chaos", note: "statistical mechanics, quantum, dynamics",
+    // v4127 -- label renamed with the gtab in server.html, at Keith's ask, so the two declarations of this
+    // section's NAME cannot disagree. The id and tab are untouched: they are the wiring, not the wording.
+    { id: "matter", tab: "matter", label: "PL: Matter & Chaos", note: "statistical mechanics, quantum, dynamics",
       // v3669 -- phase-change.html joins "matter": melting, freezing, gasification and crystallisation are
       // statistical/thermal physics and this drawer's own note already says so. Matter goes to 14 of 15 --
       // AT THE CAP'S EDGE, and the next arrival here should be read as the ratchet asking whether a
@@ -204,7 +206,33 @@ export const SECTIONS = [
       // speech model running as WASM + WebGPU in the tab, and like its neighbour it is built so the expensive
       // facts land BEFORE the decision -- it downloads nothing on load, and says the 14x-slower-than-real-time
       // cost on screen before any button works.
-      pages: ["webgpu-llm.html", "voxtral.html",
+      // v4118 -- webrtx.html JOINS, same rule again: it answers what THIS BOX can do (is there a secure origin,
+      // is there WebGPU, will an acceleration structure build) rather than showing a phenomenon.
+      // v4124 -- galaxy-profile.html JOINS, filed beside webrtx.html and voxtral.html for the same reason: it is
+      // an opt-in front door to somebody else's work (vinimlo/galaxy-profile, GPL-3.0), installed and run on
+      // this machine rather than vendored into the tree, with the licence and attribution surfaced on the page.
+      // v4125 -- ntfs-mounter.html JOINS, same rule again: an opt-in install button for zavierferodova/Mac-NTFS-
+      // Mounter (no licence file at all). It ALSO appears in the Mac System view (pagePlacements.mjs's
+      // macPages()) because diskutil/MacFUSE make it Mac-only by construction -- that is a VIEW, not a second
+      // home, so this is still the one place it is actually filed.
+      // v4138 -- grdpwasm.html JOINS the same shelf: an opt-in install button for nakagami/grdpwasm (GPL-3.0),
+      // an in-browser RDP client. Filed here for the same reason as its three neighbours -- somebody else's
+      // work, installed and run on this machine rather than vendored, with licence and attribution on the page.
+      // Its page carries one thing the others do not: WHY it is started on loopback, because upstream's proxy
+      // binds all interfaces, accepts any origin and dials any host:port a caller names.
+      // v4143 -- vpi.html JOINS: an opt-in install button for schildep/verified-polygon-intersection (MIT), a
+      // Lean4-formally-verified multipolygon intersection demo compiled to WASM. Lowest-risk of the shelf --
+      // four static files fetched and served, no build, no subprocess, no port of its own, so its page carries
+      // no bind-address warning; what it carries instead is why the WASM works without upstream's service
+      // worker (this server sets the real COOP/COEP headers GitHub Pages can't).
+      // *** v4138 -- FIVE OF THESE MOVED OUT, INTO THE SUB-DRAWER BELOW, AND THE COMMENTS ABOVE ARE WHY. ***
+      // v4115, v4118, v4124 and v4125 each wrote "JOINS, same rule again" about a page that is an opt-in front
+      // door to SOMEBODY ELSE'S work. Four notes saying one sentence is a category the file kept documenting
+      // without ever creating. Adding grdpwasm made this drawer 17 -- but it was ALREADY 16 against its own cap
+      // of 15 before that, so this is not a cap bent to fit a new page: it is a pre-existing overflow with an
+      // obvious seam through it. webgpu-llm.html STAYS -- it asks what THIS BOX can do, which is rig.html's
+      // question, not "shall I install somebody's repo".
+      pages: ["webgpu-llm.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
@@ -230,6 +258,26 @@ export const SECTIONS = [
     // ray-march-demo and raymarch-gl-demo, which were already here.
     // codemap and wallpaper came OUT to make room: a code-city visualisation and a desktop wallpaper engine are
     // the weakest fits in a voxel/render PIPELINE drawer, and ten is the limit.
+    // v4138 -- THE CATEGORY systools KEPT WRITING NOTES ABOUT. Every page here is a front door to a repo this
+    // engine did not write, installed and run on the user's own machine rather than vendored into the tree --
+    // which is a licensing position (voxtral Apache-2.0, galaxy-profile and grdpwasm GPL-3.0, Mac-NTFS-Mounter
+    // no licence file at all) as much as a taxonomy. Grouping them puts the attribution in one place instead of
+    // four, and takes System Tools back under the cap it had already outgrown.
+    //
+    // A SUB-DRAWER, NOT A TOP-LEVEL CHIP: these ARE System Tools, and a chip of their own would claim they are
+    // a peer of the rig and the ship ritual. It also needs ONE data-panel-pages slot rather than a gtab, a
+    // gpanel and a slot -- and v4127 is on record that gtab wiring is where this row breaks.
+    { id: "thirdparty", tab: null, parentTab: "systools", label: "Opt-in: somebody else's work",
+      note: "install buttons for repos this engine did not write -- cloned and run on your machine, never vendored",
+      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html", "vpi.html",
+              // v4144 -- ws-scrcpy.html JOINS: an opt-in install button for NetrisTV/ws-scrcpy (MIT), browser-
+              // based Android screen mirroring and control. Filed here for the same reason as its neighbours.
+              // *** IT IS THE ONE ON THIS SHELF WHOSE EXPOSURE CANNOT BE NARROWED FROM OUTSIDE: *** grdpwasm's
+              // proxy took a -listen flag this engine could point at loopback using upstream's own mechanism;
+              // ws-scrcpy calls server.listen(port, cb) with no host argument and ships no auth at all, so the
+              // page states the exposure and confirms before every start instead of running a patched fork.
+              "ws-scrcpy.html"] },
+
     { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
       pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",
               "raymarch-gl-demo.html", "raymarch-live.html", "sphere-impostor.html", "volume-cache.html",
@@ -293,7 +341,8 @@ export const SECTIONS = [
     // Keith: "celltrack is a big button item, it is it's own very large science project." NOTHING ELSE IN HERE.
     { id: "celltrack", tab: "celltrack", label: "Cell Tracking", note: "appended -- its own project, on purpose",
       pages: ["celltrack.html"] },
-    { id: "fluidgpu", tab: "fluidgpu", label: "Fluid", note: "appended",
+    // v4127 -- renamed with its gtab, same reason as "matter" above.
+    { id: "fluidgpu", tab: "fluidgpu", label: "PL: Fluids", note: "appended",
       // v3927 -- three more lattice-Boltzmann pages join, same round and same reason as the brain eight:
       // "Lattice Boltzmann", "Duct" and "GPU adjudicator". lbm3d-gpu.html was ALREADY here and
       // lbm3d-gpu-check.html is the *-gpu-check pattern this drawer already holds twice (euler, mpm), so the
@@ -475,9 +524,16 @@ export function sectionsFor(profile) {
 // v4039 -- "cloud" REMOVED, at Keith's request: "this button on the right of server.html needs to be
 // completely removed." Its gtab/gpanel is gone (see server.html's own v4039 note), so a pin naming it would be
 // exactly the "config line that does nothing" chipOrder-selfcheck.mjs already checks for on every OTHER pin.
+// v4127 -- SEVEN PINS DROPPED, AND FOR TWO DIFFERENT REASONS. Keith: "these items do not get their own button
+// on Server.html and can go in the alphabetized section" (roundhouse, terrain, crossarch, policymass) -- they
+// keep their chip, they just stop being PINNED, which is exactly what this list is for: unpinning is how a chip
+// joins the alphabetised run. Nothing is hidden and no panel is touched.
+// The other three LEAVE the row entirely, into a group slot: renderqa and rigjob to System Tools ("this goes in
+// System Tools") and brew to Mac System ("'Homebrew formula' goes in Mac System") -- see CHIP_GROUPS below.
+// A chip that CHIP_GROUPS lifts out of the row must not also be pinned in it: the pin would be a config line
+// that does nothing, which is the exact fault chipOrder-selfcheck.mjs checks for and v4039 removed "cloud" for.
 export const CHIP_PINNED = [
-    "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "roundhouse", "rigjob",
-    "terrain", "crossarch", "policymass", "celltrack", "renderqa", "brew",
+    "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "celltrack",
 ];
 
 export const CHIP_GROUPS = [
@@ -487,7 +543,17 @@ export const CHIP_GROUPS = [
     // Keith: "'Rig Verify' should be part of System Tools on Server.html". The systools chip already exists and
     // already holds the system-tool PAGES, so the group and the drawer are the same chip -- which is right:
     // rig.html and the Rig Verify surface are the same subject seen from two sides.
+    // v4127 -- renderqa and rigjob JOIN, at Keith's ask ("this goes in System Tools"), by the same reasoning
+    // that put "verify" here: they are rig surfaces seen from another side. Both are pure service panels that
+    // claim no page in SECTIONS, so this moves a chip and strands nothing.
     { id: "systools", tab: "systools", label: "System Tools",
       note: "the rig, the ship ritual, the record -- and the live verify surface",
-      chips: ["verify"] },
+      chips: ["verify", "renderqa", "rigjob"] },
+    // v4127 -- Keith: "'Homebrew formula' goes in Mac System". `brew install swek-engine` is macOS-only by
+    // construction, so it belongs with the other things that need a Mac rather than in the top row. The slot
+    // it moves into is added to the macsystem gpanel in server.html the same round -- a group with no slot is
+    // reported by the mover's own "NO SLOT" line rather than failing silently.
+    { id: "macsystem", tab: "macsystem", label: "Mac System",
+      note: "the Homebrew formula, filed with everything else that needs a Mac",
+      chips: ["brew"] },
 ];

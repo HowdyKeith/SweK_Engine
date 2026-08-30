@@ -1,6 +1,6 @@
 // tools/roundhouse/labExport-selfcheck.mjs
 //
-// Run: node tools/roundhouse/labExport-selfcheck.mjs   (~241s -- MEASURED, was a typed ~40s)
+// Run: node tools/roundhouse/labExport-selfcheck.mjs   (~79s MEASURED (gate-timings.json) -- superseding a stated ~241s that ALSO said MEASURED)
 //
 // v3183 -- A LAB RESULT THAT CARRIES THE CONFIGURATION THAT PRODUCED IT.
 //

@@ -1991,5 +1991,34 @@ import { setLightDir, lightDir } from "./ev/flightView.js";
   paint();
 })();
 </script>
+
+<script type="module">
+// v4121 -- CRT toggle for the EV views. Unlike the two ES pages this one is WebGL, in ev/systemView.js,
+// ev/galaxyMap.js and ev/flightView.js -- which is why those four contexts now ask for
+// preserveDrawingBuffer. Without it a read outside the page's own draw returns black, and an earlier probe
+// of this page measured exactly that (0 lit pixels) before the cause was understood.
+//
+// *** THE MOUNT FOLLOWS WHICHEVER VIEW IS VISIBLE, because EV swaps between three full-size canvases by
+// toggling a class. Mounting on one of them would put the effect on a hidden surface two thirds of the
+// time and look broken. The observer re-points the toggle when the visible canvas changes.
+import { mountCrtToggle } from "/ui/crtToggle.js";
+(() => {
+  const ids = ["systemCv", "galaxyCv", "flightCv"];
+  let handle = null, current = null;
+  const visible = () => ids.map((i) => document.getElementById(i))
+                          .find((c) => c && c.offsetParent !== null && c.width > 64);
+  function repoint() {
+    const cv = visible();
+    if (!cv || cv === current) return;
+    const wasOn = handle ? handle.isOn() : false;
+    if (handle) handle.dispose();
+    current = cv;
+    handle = mountCrtToggle(cv, { preset: "trinitron", storageKey: "swek.crt.ev" });
+    if (wasOn && handle) handle.set(true);
+  }
+  repoint();
+  new MutationObserver(repoint).observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class", "style"] });
+})();
+</script>
 </body>
 </html>

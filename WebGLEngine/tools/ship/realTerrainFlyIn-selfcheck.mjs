@@ -141,15 +141,20 @@ try {
         ok("!! the synthetic building actually voxelized (buildingsPainted > 0)", summary.s.buildingsPainted > 0, "buildingsPainted=" + summary.s.buildingsPainted);
     }
 
-    console.log("\n3. WATCH -- poll the live flight through its real ~22s duration, not one screenshot on a guessed clock");
+    console.log("\n3. WATCH -- poll the live flight through its real ~26s duration, not one screenshot on a guessed clock");
     const samples = [];
     const t0 = Date.now();
     let sawPlaying = false, sawStop = false;
     while (Date.now() - t0 < 27000) {
+        // v4134 -- the arrival's LAYERS are sampled on the same poll. This flight is already running, and the
+        // band is only observable WHILE the camera is moving; standing up a second browser harness to watch
+        // the same 26 seconds would be the duplicate-definition shape this tree keeps paying for.
         const s = await page.evaluate(() => ({
             playing: !!(window.cameraCinematic && window.cameraCinematic.isPlaying),
             x: camera.position.x, y: camera.position.y, z: camera.position.z,
             yaw: camera.yaw, pitch: camera.pitch,
+            band: (() => { try { return window.arrivalLayers?.status?.().band ?? null; } catch { return null; } })(),
+            sats: (() => { try { return window.orbitPass?.status?.().count ?? null; } catch { return null; } })(),
         }));
         samples.push(Object.assign(s, { tMs: Date.now() - t0 }));
         if (s.playing) sawPlaying = true;
@@ -166,8 +171,55 @@ try {
         sawStop, sawStop ? "" : (sawPlaying ? "still playing after 27s poll (clip should be ~22s)" : "n/a, never started"));
     ok("!! the camera visited MANY distinct positions while playing, not one teleport -- catches a snap-to-end regression",
         distinctPositions >= 15, distinctPositions + " distinct positions across " + playingSamples.length + " playing samples");
-    ok("!! the observed flight duration is close to the ~22s the shot's own legs define (4s dive + 8s descent + 10s orbit)",
-        flightMs > 15000 && flightMs < 27000, (flightMs / 1000).toFixed(1) + "s observed");
+    // v4134 -- THE SHOT GREW A LEG AND THIS CLAIM HAD TO GROW WITH IT. flyIn now opens ABOVE the aircraft
+    // (4s orbital, from an altitude of ~2120) before the original three legs, because the old shot peaked at
+    // ~200 while adsbLayer puts a 40,000 ft airliner at 190 -- there was nowhere for a satellite layer to be.
+    // The bound is widened to match rather than left alone: 26s still passes a 15-27s window by luck, and a
+    // check whose NAME describes legs the shot no longer has is a false statement that happens to be green.
+    ok("!! the observed flight duration is close to the ~26s the shot's own legs define (4s orbital + 4s dive + 8s descent + 10s orbit)",
+        flightMs > 18000 && flightMs < 32000, (flightMs / 1000).toFixed(1) + "s observed");
+    // v4134 -- WHAT THE ARRIVAL ACTUALLY PASSED THROUGH, observed rather than asserted.
+    {
+        const seq = samples.map((x) => x.band).filter(Boolean).filter((b, i, a) => b !== a[i - 1]);
+        ok("!! the arrival layers RAN and reported a band while the camera was flying",
+            seq.length > 0, seq.length ? "bands: " + seq.join(" -> ") : "no band ever reported");
+        ok("!! ...and the band CHANGED on the way down -- the handover actually happened",
+            seq.length >= 2,
+            "one band for the whole flight means the stager ran and never crossed an edge, which is also " +
+            "exactly what a shot that never reaches the satellite shell would look like");
+        // THE FLICKER CHECK, and it is here because this is where the flicker was FOUND. Watching a real
+        // flight measured satellites going 5 -> 0 -> 5 -> 0: layersAt is monotone in altitude, but the dive
+        // leg interpolates distance and pitch independently so the camera dips to ~228 and climbs back to
+        // ~440 before landing. No pure-function check could see that; only the live camera could.
+        // COUNT RISING EDGES, not state changes. The first draft counted changes and read the pre-flight
+        // sample (no satellites yet, before the stager's first frame) as one -- and it also filtered on `x.p`
+        // when the field here is `playing`, so it never restricted to the flight at all. Two mistakes that
+        // between them turned a clean single appearance into "3". A FLICKER IS THE SATELLITES COMING BACK:
+        // one rising edge is the feature working, two or more is the churn this check exists to catch.
+        // COUNT RETURNS, NOT RISES -- and the difference is not pedantry, it is the check working at all.
+        // Counting rising edges and allowing one passed the sabotage: with the latch removed the satellites
+        // went on -> off -> ON, exactly one rise, and the check that exists to catch that said PASS. A RETURN
+        // is a rise that happens AFTER a dismissal, which is precisely "they came back", and it is robust to
+        // whichever state the first sampled frame happens to catch.
+        const onSeq = samples.filter((x) => x.playing).map((x) => (x.sats || 0) > 0);
+        let seenOn = false, seenOffAfterOn = false, returns = 0;
+        for (const v of onSeq) {
+            if (v && seenOffAfterOn) { returns++; seenOffAfterOn = false; }
+            else if (v) seenOn = true;
+            else if (seenOn) seenOffAfterOn = true;
+        }
+        ok("!! once dismissed the satellites do NOT come back -- no spawn/despawn flicker across the hump",
+            returns === 0 && onSeq.some(Boolean),
+            returns + " return(s) after dismissal; they were live in " + onSeq.filter(Boolean).length +
+            " of " + onSeq.length + " flight samples -- the camera dips to ~228 and climbs back to ~440 " +
+            "mid-dive, which is what made this flicker in the first place");
+        const peakSats = Math.max(0, ...samples.map((x) => x.sats || 0));
+        report("satellites spawned at peak: " + peakSats + (peakSats === 0
+            ? "  -- REPORTED, NOT ASSERTED: zero means orbitPass never got a mesh into the world. assetLoader " +
+              "readiness is a GPU-side race this harness does not control, so failing on it would make a real " +
+              "gate flaky; but zero here is still a thing to go and look at on the rig."
+            : ""));
+    }
     report(`sampled ${samples.length} frames over ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
     console.log("\n4. LANDING STATE -- weather crossed, no page errors");

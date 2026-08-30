@@ -10,7 +10,7 @@
 // peak rock) while letting the 2-axis biome drive everything in between.
 
 import { VOXEL } from "./voxelFormat.js";
-import { biomeAt } from "./worleyBiomes.js";
+import { biomeAt, BIOMES } from "./worleyBiomes.js";
 
 // worleyBiomes uses string material tags; map them to this engine's VOXEL ids.
 export const WORLEY_SURFACE_VOXEL = {
@@ -28,7 +28,13 @@ export function biomeColumnMaterials(wx, wz, seed, height, opts = {}) {
     const peakStone = opts.peakStone ?? 36;
     const snowCap = opts.snowCap ?? 44;
 
-    const b = biomeAt(wx, wz, seed);
+    // v4149 -- opts.biome FORCES one biome for this column, bypassing the Worley noise. world/repoHeightfield.js
+    // uses it to paint a source tree's language onto the ground: a directory of shaders is jungle because it is
+    // shaders, not because the noise happened to put jungle there. An unknown name falls through to the noise
+    // rather than throwing, so a stale legend degrades to ordinary terrain instead of a blank world.
+    const forced = opts.biome && BIOMES[opts.biome] ? opts.biome : null;
+    const b = forced ? { params: BIOMES[forced], primary: forced, secondary: forced, blend: 1 }
+                     : biomeAt(wx, wz, seed);
     const surfaceTag = b.params.surface, subTag = b.params.sub;
     let surface = WORLEY_SURFACE_VOXEL[surfaceTag] ?? VOXEL.GRASS;
     let sub = WORLEY_SURFACE_VOXEL[subTag] ?? VOXEL.DIRT;

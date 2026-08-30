@@ -1,6 +1,6 @@
 // tools/ship/commentFalsePass-selfcheck.mjs
 //
-// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~2s)
+// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~4.2s MEASURED (gate-timings.json))
 //
 // v3141 -- A GATE THAT ASSERTS "THE CODE DOES X" AGAINST RAW SOURCE PASSES ON A COMMENT SAYING "WE SHOULD DO X".
 //

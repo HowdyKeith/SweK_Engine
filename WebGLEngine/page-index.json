@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 410,
+ "count": 424,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -550,6 +550,13 @@
    "p": 0
   },
   {
+   "f": "cat-reactions.html",
+   "t": "Cat Reactions",
+   "d": "Your expression, named and mirrored back as a reaction cat. Pure-classifier front door for ui/faceExpressionSet.js -- shows every recipe's live score, and says out loud which expression it refuses to claim and why.",
+   "g": "face",
+   "p": 0
+  },
+  {
    "f": "catalog.html",
    "t": "- Subsystem Catalog",
    "d": "",
@@ -936,15 +943,15 @@
   },
   {
    "f": "es-box3d-3d.html",
-   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D",
-   "d": "Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; planar fight, 3D view",
+   "d": "PLANAR FIGHT, 3D VIEW (the sim is unchanged, only the camera is; formerly labelled Round A): the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
    "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-box3d-fly3d.html",
-   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)",
-   "d": "Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D flight",
+   "d": "3D FLIGHT (the fight leaves the plane; formerly labelled Round B): the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and the planar-fight 3D VIEW page (es-box3d-3d.html) are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.",
    "g": "endlesssky",
    "p": 0
   },
@@ -1208,6 +1215,13 @@
    "p": 0
   },
   {
+   "f": "galaxy-profile.html",
+   "t": "Galaxy Profile SVGs (opt-in)",
+   "d": "",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "gallery.html",
    "t": "SweK &middot; Demo Gallery",
    "d": "",
@@ -1247,6 +1261,13 @@
    "t": "Black-hole lensing -- GR-exact light bending",
    "d": "",
    "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "gesture-vfx.html",
+   "t": "Gesture VFX",
+   "d": "Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures over the hand tracker's own metrics, edge-triggered with a cooldown, and a particle sim that is pure enough to be gated headless.",
+   "g": "face",
    "p": 0
   },
   {
@@ -1306,6 +1327,13 @@
    "p": 0
   },
   {
+   "f": "grdpwasm.html",
+   "t": "RDP in the browser (opt-in)",
+   "d": "An opt-in front door to nakagami/grdpwasm (GPL-3.0): a web-based RDP client, Go compiled to WebAssembly speaking RDP in the browser with a small Go proxy bridging its WebSocket to the RDP server's TCP port. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, builds it with the local Go toolchain, and runs their binary as its own subprocess. THE PROXY IS STARTED ON LOOPBACK, and that is the point of this page: upstream's proxy defaults to -listen :8080, accepts WebSocket upgrades from ANY origin, and dials whatever host:port the query string names -- three choices that are individually reasonable for `make serve` on your own desktop and jointly an unauthenticated open TCP relay on a machine that sits on a LAN. It is launched with THEIR OWN -listen flag pointed at 127.0.0.1, so their code is unmodified, unpatched and unforked; the bind is overridable because it is your machine, but never silently, and the bridge returns a warning whenever it is not loopback.",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "grid-refinement.html",
    "t": "What adaptivity costs - a refinement interface reflects (v3632)",
    "d": "A grid refinement interface is an impedance discontinuity: the true reflection is exactly zero because the medium is identical on both sides, so everything measured is numerical artefact - second order in cell size, bounded in ratio, and it costs the magic time step everywhere else.",
@@ -1337,6 +1365,13 @@
    "f": "health.html",
    "t": "Bridge health",
    "d": "Live status of the ai-bridge endpoints — pings the per-tool detect/status/config routes, grouped, with latency. Ping all + auto-refresh.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "heerich-avatar.html",
+   "t": "SweK &middot; Heerich Avatar (voxel CSG, in the panel)",
+   "d": "The rigged avatar GLB voxelized and rendered as a colored voxel-art SVG through Heerich's CSG-to-SVG pipeline, redrawn on a slow turntable.",
    "g": "",
    "p": 0
   },
@@ -1435,6 +1470,13 @@
    "f": "ios-peer.html",
    "t": "SweK iOS Peer (iPhone / iPad)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ios-tools.html",
+   "t": "SweK iOS Device Tools",
+   "d": "adb for iOS: install and drive doronz88/pymobiledevice3 through a read-only allowlist. Lists devices and apps, reads crash names and battery, over a normal pairing with no jailbreak.",
    "g": "",
    "p": 0
   },
@@ -1838,6 +1880,13 @@
    "p": 0
   },
   {
+   "f": "ntfs-mounter.html",
+   "t": "NTFS Mounter (opt-in, macOS only)",
+   "d": "",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "office-floor.html",
    "t": "Office floor - who is working on what",
    "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
@@ -1877,6 +1926,13 @@
    "t": "SweK Page Index -- launch and assemble",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "pairlane.html",
+   "t": "Pairlane File Drop",
+   "d": "",
+   "g": "nearshare",
    "p": 0
   },
   {
@@ -2489,10 +2545,24 @@
    "p": 0
   },
   {
+   "f": "steamdeck-peer.html",
+   "t": "SweK Steam Deck Peer (SteamOS / Linux)",
+   "d": "The Steam Deck as a full SweK peer: an x86_64 Linux box that runs ai-bridge/server.js itself rather than a subset, joins the UDP 47474 fleet beacon and can host the GPU brain. Honest about the half that has never been verified -- no physical Deck has ever run this, so the RDNA2 GPU rows, SteamOS's read-only root and Game Mode are reasoned from Valve's documentation rather than measured, while the server, beacon, mDNS and port-takeover rows were measured on generic x86_64 Linux.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "stellar.html",
    "t": "SweK &middot; Lane-Emden Polytropes",
    "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
    "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "sunshine.html",
+   "t": "SweK Sunshine Host",
+   "d": "Install and run the Sunshine game-stream HOST, and launch Moonlight V+ on a phone over adb. The host half of the phone-as-a-screen story.",
+   "g": "",
    "p": 0
   },
   {
@@ -2706,6 +2776,20 @@
    "p": 0
   },
   {
+   "f": "voxtral.html",
+   "t": "Voxtral in the tab (opt-in)",
+   "d": "",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
+   "f": "vpi.html",
+   "t": "Verified polygon intersection (opt-in)",
+   "d": "An opt-in front door to schildep/verified-polygon-intersection (MIT): a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo you draw two multipolygons on and see the proved intersection computed live. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button fetches the four prebuilt static files GitHub Pages already serves (index.html, lean_app.js, lean_app.wasm, coi-serviceworker.min.js) onto THIS machine, pinned to a reviewed commit, and this server serves them back with real Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy headers -- upstream's own service worker exists only because GitHub Pages cannot set HTTP headers; this server can, so it does, without touching a byte of their files.",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "wadmap.html",
    "t": "WAD Map — Engine Companion",
    "d": "DOOM WAD map viewer — load a .wad and explore the level geometry.",
@@ -2804,6 +2888,13 @@
    "p": 0
   },
   {
+   "f": "webrtx.html",
+   "t": "Ray tracing in the page (opt-in)",
+   "d": "",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "webtorrent.html",
    "t": "SweK P2P Share",
    "d": "Seed SweK output folders (cell-tracking runs, exports) as torrents and fetch them from peers. Native WebRTC/TCP P2P — no central server; magnets broadcast on the peer bus.",
@@ -2850,6 +2941,13 @@
    "t": "Demo Writeup &mdash; SweK Engine",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "ws-scrcpy.html",
+   "t": "Android in the browser (opt-in)",
+   "d": "An opt-in front door to NetrisTV/ws-scrcpy (MIT): browser-based Android screen mirroring and control, over adb, using a vendored unmodified prebuilt Genymobile scrcpy-server.jar. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, runs their own five-stage build, and runs their server as its own subprocess. *** IT BINDS TO ALL INTERFACES AND HAS NO LOGIN, AND THAT CANNOT BE CHANGED WITHOUT PATCHING THEIR CODE: *** their HttpServer.ts calls server.listen(port, cb) with no host argument and has no config field for one, unlike grdpwasm's -listen flag which this engine could point at loopback. So the exposure is stated plainly and warned on before every start rather than silently narrowed by running a fork of their behaviour.",
+   "g": "thirdparty",
    "p": 0
   },
   {

@@ -12,7 +12,7 @@
 // hands it `isTrusted`, and an untrusted request gets 403 before the body is even read.
 
 import { createServer } from "http";
-import { shutdownServer, liveHandles } from "../../tools/ship/serverShutdown.mjs";
+import { shutdownServer, liveHandles, drainChildren } from "../../tools/ship/serverShutdown.mjs";
 import { prose } from "../../tools/ship/sourceScan.mjs";
 import { setTimeout as sleep } from "timers/promises";
 import { createRequire } from "module";
@@ -346,6 +346,12 @@ bridge.shutdown();
 // process.exit() inside that window is the crash. This gate has the identical shape and simply had
 // not been the one run that day. See tools/ship/serverShutdown.mjs for the measurement.
 await shutdownServer(srv);
+// v4152 -- AND THEN WAIT FOR THE SPAWNED PROCESSES. bridge.shutdown() above is SYNCHRONOUS: stopBrains,
+// stopRoom, stopPlay and stopTest each send a signal and return, so at this line the children have been ASKED
+// to die and may not have done it yet. shutdownServer drains loop TURNS, which is right for sockets and cannot
+// help a process the operating system has not reaped. On this box they are gone before the check; on Keith's
+// Windows rig the same gate reported "STILL LIVE: Socket, Socket, ChildProcess" after 115/0.
+await drainChildren();
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
 {

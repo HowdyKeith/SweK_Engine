@@ -63,10 +63,22 @@ console.log("\n3. THE TWO-ROUTE AGREEMENTS HOLD, WHICH IS WHAT MAKES THE OBSERVA
         "rel " + v.bose4Rel.toExponential(3) + " -- zeta from physics/zeta.js and Gamma from md/maxwellSpeed.mjs, "
         + "so THREE MODULES meet on a number none of them alone computes");
     ok("!! ...and at s=3, Apery's constant", v.bose3Rel < 1e-10, "rel " + v.bose3Rel.toExponential(3));
-    // v4100 -- FIXED: this asserted v.exitanceQuarticRel, an observable v4055 DELETED from the bind for being a
-    // tautology (pow(a,4)/pow(b,4) == pow(a/b,4), which cannot fail) and replaced with sigmaFromBoseRel -- "put
-    // where the tautology was", per that round's own comment. This selfcheck was never updated to match, so it
-    // has thrown TypeError: Cannot read properties of undefined (reading 'toExponential') on every run since.
+    // *** v4136 -- THE exitanceQuarticRel CHECK IS GONE BECAUSE v4055 DELETED THE OBSERVABLE, ON PURPOSE. ***
+    // Its own note is the argument: exitance(T) is sigma*T^4, so exitance(tHi)/exitance(tLo) IS pow(tHi/tLo,4)
+    // algebraically -- sigma cancels and so does the exponent, because the 4 is on both sides. What was left
+    // graded IEEE754, not physics. The device dropped it and tLo/tHi with it; THIS FILE KEPT READING IT, so
+    // `v.exitanceQuarticRel.toExponential(3)` threw and the gate has hard-crashed on every run since v4055 --
+    // reaching Keith as a stack trace where a verdict should have been. Not re-implemented: restoring the
+    // observable would restore the tautology v4055 spent a round arguing away.
+    //
+    // *** v4167 -- AND THE TIER-2 BRANCH FIXED THIS INDEPENDENTLY, AT v4100, AND ITS FIX WAS THE BETTER HALF
+    // OF THE TWO. *** Both branches found the same crash from the same cause. This side DELETED the check,
+    // arguing that restoring it would restore the tautology -- true of `exitanceQuarticRel`, and it left NO
+    // check where v4055 had explicitly "put" a replacement. The branch ASSERTED that replacement instead.
+    // sigmaFromBoseRel is not the tautology wearing a new name: it builds sigma from the Bose integral and
+    // meets the typed closed form by a different route, so a wrong power of pi or a zeta given the wrong
+    // argument moves it off zero. THE ARGUMENT AGAINST THE OLD OBSERVABLE WAS CARRIED OVER ONTO ITS
+    // SUCCESSOR, WHICH IS HOW A DELETION BECOMES A GAP. The branch's assertion is taken.
     ok("!! sigma (typed as the closed form) meets the Bose integral by a different route", v.sigmaFromBoseRel < 1e-10,
         "rel " + v.sigmaFromBoseRel.toExponential(3) + " -- 2 pi k^4/(h^3 c^2) times Gamma(4)zeta(4) against the "
         + "closed form, so a wrong power of pi or a zeta returning the wrong argument moves it off zero");
@@ -97,9 +109,22 @@ console.log("\n4. *** THE PLANT MOVES EXACTLY THREE OBSERVABLES, AND THE OTHER T
 
     ok("!! EXACTLY THREE observables move -- a plant that moved everything would localise nothing",
         moved.length === 3, "moved: " + moved.join(", "));
+    // *** AND THIS LIST CARRIED THE DEAD KEY TOO, WHERE IT PASSED VACUOUSLY. *** h.exitanceQuarticRel and
+    // p.exitanceQuarticRel were BOTH undefined, and undefined === undefined is true -- so a check advertising
+    // seven bit-identical observables was really asserting six and getting a free pass on the seventh. That is
+    // worse than the crash, because a crash announces itself. The list is now checked to EXIST before it is
+    // checked to MATCH, so deleting an observable can never again quietly hollow out the check that named it.
+    // v4167 -- sigmaFromBoseRel added from the tier-2 branch, which listed it and was right to: it is bit-
+    // identical under the plant for the same reason the others are. Kept in the SINGLE `blind` array rather
+    // than the branch's inlined copy, because this array also feeds the "does the device actually produce
+    // this key" guard on the line below -- an inlined list skips that guard, which is the undefined ===
+    // undefined vacuous pass this very section was written to close.
+    const blind = ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad", "sigmaFromBoseRel"];
+    ok("!! every observable this check names is one the device actually PRODUCES",
+        blind.every((k) => k in h && k in p),
+        "guards against undefined === undefined -- " + (blind.filter((k) => !(k in h)).join(", ") || "all " + blind.length + " present"));
     ok("!! ...and sigma, Wien's b and BOTH Bose integrals are BIT-IDENTICAL under it",
-        ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad", "sigmaFromBoseRel"]
-            .every((k) => h[k] === p[k]),
+        blind.every((k) => h[k] === p[k]),
         still.length + " of " + BLACKBODY_OBSERVABLES.length + " unchanged. sigma and b are built from the "
         + "WAVELENGTH root alone and the integrals touch neither peak -- THIS IS A PROPERTY, NOT A GAP, and it "
         + "is asserted so that widening the plant into something cruder cannot happen silently.");

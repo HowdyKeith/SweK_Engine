@@ -162,12 +162,48 @@ console.log("\n4. *** THE HEADLINE OBSERVABLE IS A MEASUREMENT OF THE CONTAINER 
 
     const shipC = census({ eos: "tait", lidY: SHIPPED_LID, steps: 1200 });
     const freeC = census({ eos: "tait", lidY: FREE_LID, steps: 1200 });
-    ok("!! *** AND THE CENSUS INVERTS: soundSpeed IS LAST IN THE BOX AND FIRST OUT OF IT ***",
-        shipC.ranking[shipC.ranking.length - 1] === "soundSpeed" && freeC.ranking[0] === "soundSpeed",
-        "shipped " + shipC.ranking.join(" > ") + "   |   free " + freeC.ranking.join(" > ") + " -- THE WHOLE ORDER REVERSES, not just one entry. " +
-        ". *** ASSERTED AS AN ORDERING, NOT A MAGNITUDE, so it cannot pass on a fixture whose numbers drift. " +
-        "A CENSUS RUN IN THE SHIPPED CONTAINER WOULD HAVE RANKED THE MOST IMPORTANT MATERIAL PARAMETER LAST " +
-        "-- and at 8.4e-4 a slightly different tolerance would have called it vacuous outright. ***");
+    // *** v4161 -- THIS ASSERTED "soundSpeed IS LAST" AND WENT RED ON KEITH'S BOX WHILE PASSING HERE. ***
+    // Both machines run the same commit. Under IDEAL EOS they agree to every printed digit (retained 0.6507 ->
+    // 0.3316 at section 7, stiffness 8.377e-2 at section 3). Under TAIT they diverge from the third decimal
+    // (retained 1.8446 here against 1.8354 there, lid gap 0.0010 against 0.0070). THE ONLY DIFFERENCE BETWEEN
+    // THE TWO BRANCHES IS Math.pow: pressureOf's ideal branch is stiffness*(rho-rho0), multiply and subtract,
+    // IEEE-exact everywhere; its tait branch is B*(Math.pow(r,gamma)-1), and pow is NOT required to be
+    // correctly rounded and differs between platforms and V8 builds. One ulp at step 1, in a column this file's
+    // own section 7 documents as EXPLODING -- energy quadruples over 2000 steps -- is third-decimal by step
+    // 1200. The rankings are three residues within 30x of each other, so they reorder; the shipped order here
+    // is viscosity > gamma > soundSpeed and there it is gamma > soundSpeed > viscosity.
+    //
+    // *** THE CORRECT ASSERTION WAS ALREADY WRITTEN DOWN, ONE LINE BELOW THE ONE THIS CHECKED. ***
+    // MEASURED_V3541's own note says "a 433x suppression that INVERTS the ranking". The SUPPRESSION is the
+    // finding -- soundSpeed loses two and a half orders of magnitude when the lid is dropped on it -- and the
+    // exact rank it lands in afterwards is the part that survives none of it. THIS IS NOT A LOOSENING: a claim
+    // about a factor of 433 is far harder to satisfy by accident than a claim about which of three numbers
+    // within 30x is smallest, and the old check would still pass on a fixture where the suppression had
+    // vanished entirely so long as the three residues happened to sort the right way.
+    const ssShip = shipC.rows.find((r) => r.knob === "soundSpeed").rel;
+    const ssFree = freeC.rows.find((r) => r.knob === "soundSpeed").rel;
+    const suppression = ssFree / ssShip;
+    ok("!! *** THE LID SUPPRESSES soundSpeed BY MORE THAN AN ORDER OF MAGNITUDE -- THAT IS THE FINDING ***",
+        suppression > 20,
+        "soundSpeed " + e(ssShip) + " at lid " + SHIPPED_LID + " against " + e(ssFree) + " at lid " + FREE_LID +
+        " = " + suppression.toFixed(0) + "x. MEASURED_V3541 recorded 433x and this box reproduces its whole " +
+        "table to every digit; the threshold is 20x, so there is more than an order of magnitude of headroom " +
+        "over a number that has to survive a DIFFERENT MACHINE'S Math.pow.");
+    ok("!! ...and the rank claim that survives both machines: FIRST out of the box, NOT first inside it",
+        freeC.ranking[0] === "soundSpeed" && shipC.ranking[0] !== "soundSpeed",
+        "shipped " + shipC.ranking.join(" > ") + "   |   free " + freeC.ranking.join(" > ") +
+        ". *** ASSERTED AS DEMOTION FROM FIRST, NOT AS ARRIVAL AT LAST. Keith's rig ranks it SECOND in the " +
+        "shipped box and this one ranks it THIRD, and both are the same physical statement: the ceiling takes " +
+        "the most important material parameter out of first place. A census run in the shipped container " +
+        "would still have missed it -- at 8.4e-4 a slightly different tolerance would have called it vacuous " +
+        "outright -- which is the point the old check was reaching for and overshot. ***");
+    report("ANTIDOTE",
+        "IF THE SUPPRESSION CHECK GOES RED, THE LID STOPPED CRUSHING soundSpeed AND THAT IS A REAL PHYSICS " +
+        "CHANGE -- do not raise the threshold, find what changed about the container or the equation of state. " +
+        "*** AND DO NOT RESTORE THE RANK-LAST ASSERTION IF THE TAIT BRANCH IS EVER MADE BIT-EXACT ACROSS " +
+        "MACHINES (integer gamma by repeated multiplication would do it). REPRODUCIBLE IS NOT THE SAME AS " +
+        "MEANINGFUL: an ordering of three residues within 30x of each other in an exploding column would then " +
+        "be stable and still would not be a fact about the fluid. ***");
     ok("...stiffness reads exactly zero in BOTH boxes, which is the control",
         shipC.rows.find((r) => r.knob === "stiffness").rel === 0 && freeC.rows.find((r) => r.knob === "stiffness").rel === 0,
         "*** THE ONE VERDICT THE LID CANNOT CHANGE. It proves the vacuity is a property of the equation of " +

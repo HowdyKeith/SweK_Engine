@@ -190,7 +190,14 @@ function compile(gl, t, s) { const sh = gl.createShader(t); gl.shaderSource(sh, 
 function program(gl, vs, fs) { const p = gl.createProgram(); gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error("link: " + gl.getProgramInfoLog(p)); return p; }
 
 function FlightView(canvas, opts = {}) {
-    const gl = canvas.getContext("webgl2", { antialias: true, alpha: false });
+    // v4121 -- preserveDrawingBuffer so ui/crtToggle.js can SAMPLE this canvas. Without it the drawing
+    // buffer is cleared after compositing and a read at any other moment returns BLACK -- which is
+    // exactly what an earlier probe of ev.html measured (0 lit pixels) and briefly made me think the
+    // page had no content. MEASURED COST: a 1000x588 WebGL2 canvas over 90 frames came out at 26.99 ms
+    // with the flag against 28.90 ms without -- i.e. inside the noise, on this box's SOFTWARE
+    // rasteriser. That is not proof about a real GPU, and it is why the flag is stated here with its
+    // number rather than described as free.
+    const gl = canvas.getContext("webgl2", { antialias: true, alpha: false , preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2 not available");
     const pProg = program(gl, P_VS, P_FS), sProg = program(gl, S_VS, S_FS), tProg = program(gl, T_VS, T_FS);
     const pl = { a_pos: gl.getAttribLocation(pProg, "a_pos"), a_color: gl.getAttribLocation(pProg, "a_color"), a_kind: gl.getAttribLocation(pProg, "a_kind"),

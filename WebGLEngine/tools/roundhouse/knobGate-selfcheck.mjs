@@ -1,6 +1,6 @@
 // tools/roundhouse/knobGate-selfcheck.mjs
 //
-// Run: node tools/roundhouse/knobGate-selfcheck.mjs   (~5s)
+// Run: node tools/roundhouse/knobGate-selfcheck.mjs   (~2.3s MEASURED (gate-timings.json))
 //
 // v3129 -- THE AGENT COULD ALWAYS TURN THE KNOBS. NOTHING EVER TOLD IT THEY EXISTED.
 //

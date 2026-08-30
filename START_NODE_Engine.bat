@@ -135,6 +135,21 @@ REM searched for another (%~n0*, the script name) -- so the lookup would have ma
 REM matched a DIFFERENT SweK window and claimed the port under somebody else's PID. A CLAIM UNDER THE WRONG
 REM PID IS WORSE THAN NO CLAIM: it looks valid, it survives liveness checks, and it locks out the launcher
 REM that actually owns the port.
+REM v4134 -- *** THE GUARD WATCHED 8787 WHILE THE SERVER BOUND SOMETHING ELSE. ***
+REM ai-bridge\server.js has honoured PORT since v1238 (`parseInt(process.env.PORT,10) || 8787`). This launcher
+REM never read it: 8787 was written literally at a dozen places, so with PORT set in the environment -- which
+REM is exactly what a side-by-side launch does -- the server bound the inherited port while every guard here
+REM fought over 8787. The worst of them was swek_ask_exit.bat 8787, which POSTs /sys/exit: it asked the
+REM RUNNING PRODUCTION SERVER on 8787 to shut down, on behalf of a launch that was never going to use 8787.
+REM Keith met the far end of that as "Failed to fetch" and a browser opened on a port with nothing behind it.
+REM
+REM ONE derivation, and it matches server.js's own rule exactly: PORT if set, otherwise 8787. Not exported and
+REM not re-set -- the server reads the same environment this line read, so agreeing with it is the whole job,
+REM and writing PORT back would be this launcher deciding something it was only ever meant to observe.
+REM Deliberately NOT a parenthesised if/else: cmd expands %vars% in a block at PARSE time, which is the law
+REM this file states two screens up and has already paid for twice.
+set "SWEK_PORT=8787"
+if defined PORT set "SWEK_PORT=%PORT%"
 set "SWEK_TITLE=SweK Launcher %RANDOM%%RANDOM%"
 title %SWEK_TITLE%
 set "SWEK_LAUNCHER_PID="
@@ -151,7 +166,7 @@ REM both rounds spent on a reader that asked whether the flag EXISTED and not ho
 set "SUPERSEDE="
 call "%~dp0WebGLEngine\tools\ship\swek_flag_fresh.bat"
 if "%FRESH%"=="1" set "SUPERSEDE=1"
-call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" 8787
+call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" %SWEK_PORT%
 REM v3333 -- THIS REFUSAL IS CORRECT AND ITS HOLD WAS NOT. Keith met it as a window stuck on "Press any key
 REM to continue . . ." after an auto-update, with nobody there to press one. The block is also un-parenthesised
 REM now, per this file's own law two screens up: cmd expands %vars% in a block at PARSE time.
@@ -162,7 +177,7 @@ REM case where the other launcher is deliberately standing down, and a fresh swe
 REM that statement -- written by the engine that spawned this window, seconds ago, and expiring in ninety.
 if "%SUPERSEDE%"=="1" goto :port_handover
 echo.
-echo [SweK] ANOTHER SweK LAUNCHER ^(PID %OWNER_PID%^) ALREADY OWNS PORT 8787.
+echo [SweK] ANOTHER SweK LAUNCHER ^(PID %OWNER_PID%^) ALREADY OWNS PORT %SWEK_PORT%.
 echo [SweK] Not asking its server to exit and not reaping anything: it would just start another one,
 echo [SweK] and the two windows would take turns forever. Close that window first, then run this again.
 echo.
@@ -171,11 +186,11 @@ exit /b 1
 
 :port_handover
 echo.
-echo [SweK] the running engine asked for this launch ^(fresh swek_superseded.flag^) and still owns 8787.
+echo [SweK] the running engine asked for this launch ^(fresh swek_superseded.flag^) and still owns %SWEK_PORT%.
 echo [SweK] Waiting for it to release the port rather than refusing a handover it started.
 set "SWEK_WAITED=0"
 :port_handover_loop
-call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" 8787
+call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" %SWEK_PORT%
 if not "%PORT_OWNER%"=="other" goto :port_handover_done
 set /a SWEK_WAITED+=1
 if %SWEK_WAITED% GEQ 45 goto :port_handover_timeout
@@ -183,19 +198,19 @@ timeout /t 1 /nobreak >nul 2>&1
 goto :port_handover_loop
 :port_handover_timeout
 echo.
-echo [SweK] waited 45s and PID %OWNER_PID% still owns 8787. REFUSING, exactly as an unasked launch would --
+echo [SweK] waited 45s and PID %OWNER_PID% still owns %SWEK_PORT%. REFUSING, exactly as an unasked launch would --
 echo [SweK] a flag is a statement of intent and this one was not honoured. Close that window, then run this again.
 call "%~dp0WebGLEngine\tools\ship\swek_hold.bat" 60
 exit /b 1
 :port_handover_done
-echo [SweK] the previous launcher released 8787 after %SWEK_WAITED%s -- taking over.
+echo [SweK] the previous launcher released %SWEK_PORT% after %SWEK_WAITED%s -- taking over.
 REM THE FLAG IS CONSUMED. It stays fresh for ninety seconds and it authorises exactly ONE handover; leaving it
 REM would let a third window take the port from this one on the same invitation.
 del "%TEMP%\swek_superseded.flag" >nul 2>&1
 
 :port_not_owned
 
-call "%~dp0WebGLEngine\tools\ship\swek_ask_exit.bat" 8787
+call "%~dp0WebGLEngine\tools\ship\swek_ask_exit.bat" %SWEK_PORT%
 REM v3255 -- *** AN UNSET ASKED_OK IS NOT PERMISSION TO KILL. *** The helper had an endlocal inside a for
 REM block, so this variable could come back EMPTY even when the ask had worked -- and an empty value fell
 REM through to the reap, terminating the server that had just been started politely. The helper is fixed;
@@ -338,7 +353,7 @@ REM its gate proves it; these two launchers were the ones nothing checked. Both 
     )
 )
 
-REM free port 8787: kill only the PID LISTENING on :8787 (not every node.exe), then
+REM free the port: kill only the PID LISTENING on it (not every node.exe), then
 REM settle ~3s for TIME_WAIT before re-binding. Honor the superseded flag so an
 REM update relaunch doesn't pop a duplicate browser tab.
 REM v3273 -- *** v3250 FIXED THIS EXACT BUG IN swek_exit_report.bat AND THIS LINE NEVER GOT CONVERTED. ***
@@ -353,7 +368,7 @@ REM stale flag, so the one call that does the clearing should be the FIRST thing
 REM v3097 -- v3096 wrote this check INLINE here. It is now shared with the other four launchers as
 REM swek_free_port.bat, because two definitions of one judgement is precisely what keeps costing this
 REM tree rounds. The behaviour is unchanged; the owner moved.
-call "%~dp0WebGLEngine\tools\ship\swek_free_port.bat"
+call "%~dp0WebGLEngine\tools\ship\swek_free_port.bat" %SWEK_PORT%
 
 REM v1574 - open server.html only AFTER the bridge is actually LISTENING. node runs in the
 REM foreground below, so a minimized background waiter polls /health, then opens the best LAN
@@ -361,7 +376,7 @@ REM URL + the boot-mode page (server.html). The old code opened the browser here
 REM bound the port, so it hit a dead :8787 (connection refused) and server.html never showed.
 REM Skipped on an update relaunch (SUPERSEDE) so we don't pop a duplicate tab - server.js
 REM reopens server.html itself if no tab reconnects.
-if not defined SUPERSEDE start "SweK opener" /MIN powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; $ok=$false; for($i=0;$i -lt 60;$i++){ try{ $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8787/health' -TimeoutSec 2 -UseBasicParsing; if($r.StatusCode -eq 200){$ok=$true; break} }catch{}; Start-Sleep -Milliseconds 500 }; if(-not $ok){ return }; try{$ni=Invoke-RestMethod -Uri 'http://localhost:8787/net/info' -TimeoutSec 5; $u=$ni.recommended}catch{}; if([string]::IsNullOrWhiteSpace($u)){$u='http://localhost:8787/'}; $b=$u.TrimEnd('/'); $pg='/server.html'; try{$bm=Invoke-RestMethod -Uri ($b+'/boot/mode') -TimeoutSec 4; if($bm -and $bm.url){$pg=$bm.url}}catch{}; Start-Process ($b+$pg)"
+if not defined SUPERSEDE start "SweK opener" /MIN powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; $ok=$false; for($i=0;$i -lt 60;$i++){ try{ $r=Invoke-WebRequest -Uri 'http://127.0.0.1:%SWEK_PORT%/health' -TimeoutSec 2 -UseBasicParsing; if($r.StatusCode -eq 200){$ok=$true; break} }catch{}; Start-Sleep -Milliseconds 500 }; if(-not $ok){ return }; try{$ni=Invoke-RestMethod -Uri 'http://localhost:%SWEK_PORT%/net/info' -TimeoutSec 5; $u=$ni.recommended}catch{}; if([string]::IsNullOrWhiteSpace($u)){$u='http://localhost:%SWEK_PORT%/'}; $b=$u.TrimEnd('/'); $pg='/server.html'; try{$bm=Invoke-RestMethod -Uri ($b+'/boot/mode') -TimeoutSec 4; if($bm -and $bm.url){$pg=$bm.url}}catch{}; Start-Process ($b+$pg)"
 REM --- v2212: the bridge cannot start without its deps, and the window must not vanish -------
 REM `node_modules` is NOT in the shipped zip. If the reuse-a-sibling loop above found nothing and
 REM `npm install` did not run, `require("ws")` throws MODULE_NOT_FOUND, node exits, and this window
@@ -385,7 +400,7 @@ if not exist "node_modules\ws\package.json" (
     exit /b 1
 )
 
-echo Starting ai-bridge under Node on http://127.0.0.1:8787/ ...
+echo Starting ai-bridge under Node on http://127.0.0.1:%SWEK_PORT%/ ...
 echo (server.html opens in your browser as soon as the bridge is listening...)
 node server.js
 set "NODE_RC=%ERRORLEVEL%"

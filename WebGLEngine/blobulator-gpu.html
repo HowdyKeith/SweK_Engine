@@ -48,7 +48,7 @@
 })();
 </script>
 <div id="hud">
-  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest(\'#hud\').classList.toggle(\'min\')" title="show/hide controls">&#9776;</span>&#129514; Blobulator GPU</h1>
+  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest('#hud').classList.toggle('min')" title="show/hide controls">&#9776;</span>&#129514; Blobulator GPU</h1>
   <p id="blurb">A <b>WebGPU raymarched SDF</b>: metaballs as a smooth-union of spheres, sphere-traced in a fragment
      shader with analytic normals &mdash; no mesh, no marching cubes. Blob positions come from <b>Box3D</b>.
      <span id="fps" class="dim"></span></p>
@@ -86,6 +86,32 @@
   <p><a id="fblink" href="blobulator.html">&#8594; Open the WebGL Blobulator</a></p>
   <p class="dim">Redirecting there automatically&hellip;</p>
 </div></div>
+
+
+<!-- v4128 -- *** THE WHOLE TITLE LINE TOGGLES THE PANEL, NOT JUST THE HAMBURGER. *** Keith: "can the top line
+     'Blobulator GPU' minimize the controls panel to just the top line, and then click again to re-show?" -- yes,
+     and #hud.min already does exactly that (it hides every child except the h1), so this only had to widen what
+     you can press. He also reported the hamburger "does not move/drag/activate": it is not a drag handle, it is
+     this same show/hide control, and its inline onclick was DEAD because the attribute was written
+     this.closest(\'#hud\') -- a backslash-escaped quote is invalid inside an HTML attribute, so the handler was a
+     syntax error rather than a no-op. That is fixed on the h1 line itself; this listener is the widening.
+     TWO THINGS ARE DELIBERATELY SKIPPED: a click on the .hudTab span (it carries its own onclick, and handling
+     it here too would toggle twice and look like nothing happened) and a click on any <a> -- blobulator.html's
+     title contains the "WebGPU version" link, which must navigate rather than collapse the panel. -->
+<script>
+(function () {
+  var hud = document.getElementById("hud");
+  var h1 = hud && hud.querySelector("h1");
+  if (!h1) return;
+  h1.style.cursor = "pointer";
+  h1.title = "click to show/hide the controls";
+  h1.addEventListener("click", function (ev) {
+    if (ev.target.closest(".hudTab")) return;   // its own onclick already toggles
+    if (ev.target.closest("a")) return;         // let real links navigate
+    hud.classList.toggle("min");
+  });
+})();
+</script>
 
 <script type="module">
 import { box3d } from "/physics/box3d/box3dLoader.js";

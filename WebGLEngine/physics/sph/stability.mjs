@@ -57,7 +57,7 @@
 // is a raised default, an artificial-viscosity term proportional to c*h, or a boundary that pushes back, is
 // a physics judgement and it is KEITH'S.
 "use strict";
-import { createSphWorld } from "./sph.js";
+import { createSphWorld, REFERENCE_WALK } from "./sph.js";
 import { LATTICE, packedDensity } from "./materialKnobs.mjs";
 
 import { pathToFileURL } from "node:url";
@@ -75,7 +75,9 @@ function world({ visc = 0.1, c = 15, eos = "tait", h = 0.1, mass = 0.02 } = {}) 
     const o = { h, mass, restDensity: packedDensity(h, mass), stiffness: 8, viscosity: visc,
                 gravity: [0, -G, 0], eos, gamma: 7 };
     if (eos === "tait") o.soundSpeed = c;
-    const w = createSphWorld(o); fill(w); return w;
+    // REFERENCE_WALK: this fixture's keys were taken on the brute-force walk and its configuration is the
+    // unstable one, so the walk is pinned rather than the keys re-cut. See sph.js.
+    const w = createSphWorld({ ...o, ...REFERENCE_WALK }); fill(w); return w;
 }
 
 /** KE + PE per particle. THE ONLY STATISTIC THAT SEPARATES "converting potential energy" FROM "creating it". */

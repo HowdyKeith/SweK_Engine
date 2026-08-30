@@ -1,0 +1,24 @@
+{
+  // WebGLEngine/tsconfig.json -- v4123. TYPE-CHECKING ONLY. There is no build step in this tree -- see
+  // tools/ship/typecheck-selfcheck.mjs's header -- so "noEmit" is load-bearing, not a default left in place.
+  //
+  // Scope is deliberately NARROW: "checkJs" is left OFF at the project level so tsc does not attempt the other
+  // ~3260 .js/.mjs files in this tree that never opted in; a file is checked only when IT says so, via a
+  // leading "// @ts-check" comment. That is what lets this be adopted file by file rather than needing a
+  // tree-wide pass before it can be turned on at all.
+  //
+  // This file is the ONE declaration of the compiler options; tools/ship/typecheck-selfcheck.mjs reads it
+  // back and turns it into CLI flags rather than hardcoding a second copy that could drift from it.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "typeRoots": ["./tools/ship/typeshim"]
+  }
+}

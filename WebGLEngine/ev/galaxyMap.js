@@ -139,7 +139,14 @@ function program(gl, vs, fs) {
 }
 
 function GalaxyMap(canvas, opts = {}) {
-    const gl = canvas.getContext("webgl2", { antialias: true, alpha: false });
+    // v4121 -- preserveDrawingBuffer so ui/crtToggle.js can SAMPLE this canvas. Without it the drawing
+    // buffer is cleared after compositing and a read at any other moment returns BLACK -- which is
+    // exactly what an earlier probe of ev.html measured (0 lit pixels) and briefly made me think the
+    // page had no content. MEASURED COST: a 1000x588 WebGL2 canvas over 90 frames came out at 26.99 ms
+    // with the flag against 28.90 ms without -- i.e. inside the noise, on this box's SOFTWARE
+    // rasteriser. That is not proof about a real GPU, and it is why the flag is stated here with its
+    // number rather than described as free.
+    const gl = canvas.getContext("webgl2", { antialias: true, alpha: false , preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2 not available");
     const ptProg = program(gl, PT_VS, PT_FS), lnProg = program(gl, LN_VS, LN_FS);
     const ptLoc = { a_pos: gl.getAttribLocation(ptProg, "a_pos"), a_color: gl.getAttribLocation(ptProg, "a_color"),

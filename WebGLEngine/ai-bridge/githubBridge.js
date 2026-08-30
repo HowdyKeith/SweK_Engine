@@ -487,7 +487,36 @@ async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
         try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
         return { ok: false, error: "could not name the clone " + dest + ": " + ((e && e.message) || e) };
     }
-    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: engineVersion(),
+    // v4133 -- SAY WHEN THE COPY IS OLDER THAN THE ENGINE THAT ASKED FOR IT. Both numbers were already in this
+    // return -- `version` (cloned) and `running` (here) -- and nothing compared them, while _verLt sits forty
+    // lines below and does exactly this comparison for three other callers. So a clone of a stale default
+    // branch reported success, in full, with the evidence of its own staleness sitting unread in the payload.
+    // *** v4148 -- RENAMED FROM `_run`, WHICH KILLED EVERY CLONE THIS FUNCTION EVER ATTEMPTED. ***
+    //
+    // Keith pressed Clone and got "Cannot access '_run' before initialization". The cause is entirely here:
+    // `_run` is ALSO the name of this module's git runner, `function _run(cmd, args, opts)` fourteen lines
+    // above this function. Declaring `const _run` ANYWHERE inside cloneEngineSource puts a function-scoped
+    // binding in the temporal dead zone for the WHOLE body -- so the very first `await _run("git", ...)`, up
+    // at the version probe, resolved to this const instead of the module helper and threw before git ever ran.
+    //
+    // *** THE BUG WAS AT THE BOTTOM OF THE FUNCTION AND THE CRASH WAS AT THE TOP, WHICH IS WHY THE MESSAGE
+    // POINTS NOWHERE USEFUL. *** TDZ does not care about statement order: a `const` shadows its outer name
+    // from the first line of the scope, not from its own line. Nothing about the clone was broken; the
+    // function simply could no longer reach the tool that does it.
+    //
+    // v4133 added these three lines to compare the cloned version against the running one -- a good check,
+    // and the local was named for what it holds. `_running` says the same thing and collides with nothing;
+    // it also matches the `running:` field it feeds, which is what it was named after in the first place.
+    const _running = engineVersion();
+    const _older = !!(ver && _running && _verLt(ver, _running));
+    const _newer = !!(ver && _running && _verLt(_running, ver));
+    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: _running,
+             older: _older, newer: _newer,
+             staleWarning: _older
+                 ? "the clone is " + ver + " but this engine is " + _running + " -- you asked for " +
+                   (ref ? ("branch " + ref) : "the DEFAULT branch, and newer work may be on another branch") +
+                   ". Pick a branch to clone something newer."
+                 : undefined,
              auth: usedAnon ? "anonymous" : "token", tokenRejected,
              note: tokenRejected ? "cloned ANONYMOUSLY -- the saved GitHub token was rejected by GitHub (expired or wrong scope). The clone is fine; fix the token in the Account tab before anything needing private access or a release." : undefined };
 }
@@ -506,6 +535,73 @@ async function listIssues({ repo, state } = {}) { const c = loadCfg(); if (!repo
 async function createIssue({ repo, title, body } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !title) return { ok: false, error: "repo and title required" }; const r = await _api("POST", _repoPath(repo) + "/issues", { title, body: body || "" }); if (!r.ok) return r; return { ok: true, number: r.data.number, url: r.data.html_url }; }
 async function closeIssue({ repo, number } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !number) return { ok: false, error: "repo and number required" }; const r = await _api("PATCH", _repoPath(repo) + "/issues/" + number, { state: "closed" }); if (!r.ok) return r; return { ok: true, closed: number }; }
 async function listCommits({ repo, branch } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/commits?per_page=15" + (branch ? "&sha=" + encodeURIComponent(branch) : "")); if (!r.ok) return r; return { ok: true, commits: (r.data || []).map(x => ({ sha: x.sha.slice(0, 7), msg: ((x.commit && x.commit.message) || "").split("\n")[0].slice(0, 64), author: x.commit && x.commit.author && x.commit.author.name, date: x.commit && x.commit.author && x.commit.author.date })) }; }
+// v4133 -- A READ OF A PUBLIC REPO MUST NOT FAIL ON A ROTTEN TOKEN, and this is the rule cloneEngineSource
+// already argues for in its own words: "Failing the whole clone on an expired PAT is refusing to do something
+// that needs no permission at all." It made that argument for git and nobody carried it to the REST side, so
+// an expired PAT turns a public branch list into "Bad credentials" -- which is exactly what happened on the
+// box this was written on.
+//
+// SCOPED TO READS ON PURPOSE. _api is shared by createRepo, putFile, createRelease and deleteRepo, and a
+// WRITE that silently retried without credentials would turn "your token expired" into a 404 nobody can read.
+// Anonymous is a correct answer to "show me a public branch list" and never to "publish this".
+async function _apiReadPublic(p) {
+    const r = await _api("GET", p);
+    if (r.ok || !(r.status === 401 || r.status === 403) || !effTok()) return r;
+    try {
+        const h = { "Accept": "application/vnd.github+json", "User-Agent": "SweK-Engine", "X-GitHub-Api-Version": "2022-11-28" };
+        const res = await _to("https://api.github.com" + p, { method: "GET", headers: h });
+        const txt = await res.text(); let j = {}; try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
+        if (!res.ok) return { ok: false, status: res.status, error: _apiErrorText(res.status, j), triedAnonymous: true };
+        return { ok: true, status: res.status, data: j, usedAnonymous: true };
+    } catch (e) { return { ok: false, error: String(e && e.message || e), triedAnonymous: true }; }
+}
+
+// v4133 -- *** THE CLONE BUTTON TOOK THE DEFAULT BRANCH AND NEVER SAID SO, AND THAT COST REAL DAYS. ***
+// Keith's rig ran gate after gate against v4116 while this tree was at v4132, and sent failures that could
+// not be reproduced because sixteen versions of work lived on a feature branch the clone never looked at.
+// Nothing was broken: cloneEngineSource honours a `ref` and always did, and it reads the version out of the
+// CLONED TREE rather than guessing -- so it correctly named a v4116 folder. The UI simply never offered the
+// choice, and the result never mentioned that the copy it handed back was OLDER than the engine asking for it.
+//
+// WHAT THIS LISTS AND WHAT IT REFUSES TO CLAIM. Branch names and head-commit dates are facts from the API.
+// The VERSION is not: reading a branch's true ENGINE_VERSION means fetching main.js, which is 2.5 MB, and
+// doing that for every branch to fill a dropdown is a lot of bytes for a label. So the version here is parsed
+// from the head commit's SUBJECT and is returned under the name `versionGuess`, with `versionSource` saying
+// "commit subject" -- because this repo happens to title its commits "vNNNN: ...", which is a convention and
+// not a guarantee. THE AUTHORITATIVE VERSION IS STILL THE ONE cloneEngineSource READS OUT OF THE TREE, after
+// the clone, exactly as before. A picker that guesses well and a namer that knows are the right split; a
+// picker that guessed and then got BELIEVED is how this bug would come back wearing a dropdown.
+async function listSourceBranches({ repo, limit } = {}) {
+    if (!repo) return { ok: false, error: "repo required" };
+    const meta = await _apiReadPublic(_repoPath(repo));
+    if (!meta.ok) return meta;
+    const def = (meta.data && meta.data.default_branch) || "main";
+    const br = await _apiReadPublic(_repoPath(repo) + "/branches?per_page=" + Math.min(100, Math.max(1, Number(limit) || 50)));
+    if (!br.ok) return br;
+    const names = (br.data || []).map((x) => String(x.name));
+    // One head commit per branch. Parallel, and capped, because this is N+1 calls against a rate limit that a
+    // dropdown has no business exhausting -- 25 branches is already more than anybody picks from by eye.
+    const pick = names.slice(0, 25);
+    const heads = await Promise.all(pick.map(async (name) => {
+        const c = await _apiReadPublic(_repoPath(repo) + "/commits?per_page=1&sha=" + encodeURIComponent(name));
+        const one = c.ok && Array.isArray(c.data) && c.data[0];
+        const msg = (one && one.commit && one.commit.message) || "";
+        const subject = msg.split("\n")[0].slice(0, 120);
+        const when = (one && one.commit && one.commit.committer && one.commit.committer.date) || "";
+        const m = /\bv(\d{3,5})\b/.exec(subject);
+        return {
+            name, isDefault: name === def, subject, committedAt: when,
+            versionGuess: m ? "v" + m[1] : "",
+            versionSource: m ? "commit subject" : "",
+        };
+    }));
+    // Newest commit first, but the default branch is FLAGGED rather than forced to the top: on this repo it is
+    // the stale one, and a list that always shows `main` first is the same wrong default in a new costume.
+    heads.sort((a, b) => String(b.committedAt).localeCompare(String(a.committedAt)));
+    return { ok: true, repo, defaultBranch: def, running: engineVersion(), auth: meta.usedAnonymous ? "anonymous" : "token",
+             truncated: names.length > pick.length, total: names.length, branches: heads };
+}
+
 async function listBranches({ repo } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/branches?per_page=50"); if (!r.ok) return r; return { ok: true, branches: (r.data || []).map(x => ({ name: x.name, protected: x.protected })) }; }
 async function getFile({ repo, path: fp, ref } = {}) { const c = loadCfg(); if (!repo || !fp) return { ok: false, error: "repo and path required" }; const r = await _api("GET", _repoPath(repo) + "/contents/" + fp.split("/").map(encodeURIComponent).join("/") + (ref ? "?ref=" + encodeURIComponent(ref) : "")); if (!r.ok) return r; let content = ""; try { content = Buffer.from(r.data.content || "", "base64").toString("utf8"); } catch {} return { ok: true, path: fp, sha: r.data.sha, size: r.data.size, content }; }
 async function putFile({ repo, path: fp, content, message, sha, branch } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !fp) return { ok: false, error: "repo and path required" }; const body = { message: message || ("update " + fp), content: Buffer.from(content || "", "utf8").toString("base64") }; if (sha) body.sha = sha; if (branch) body.branch = branch; const r = await _api("PUT", _repoPath(repo) + "/contents/" + fp.split("/").map(encodeURIComponent).join("/"), body); if (!r.ok) return r; return { ok: true, path: fp, commit: r.data.commit && r.data.commit.sha, url: r.data.content && r.data.content.html_url }; }
@@ -885,4 +981,4 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
              warnings: [pv.hasReadme ? null : "no README.md", pv.hasLicense ? null : "no LICENSE", pv.hasWorkflow ? null : "no CI workflow (.github/workflows/)"].filter(Boolean) };
 }
 
-module.exports = { _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

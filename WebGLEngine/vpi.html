@@ -1,0 +1,145 @@
+<meta charset="utf-8">
+<title>Verified polygon intersection (opt-in)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="An opt-in front door to schildep/verified-polygon-intersection (MIT): a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo you draw two multipolygons on and see the proved intersection computed live. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button fetches the four prebuilt static files GitHub Pages already serves (index.html, lean_app.js, lean_app.wasm, coi-serviceworker.min.js) onto THIS machine, pinned to a reviewed commit, and this server serves them back with real Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy headers -- upstream's own service worker exists only because GitHub Pages cannot set HTTP headers; this server can, so it does, without touching a byte of their files.">
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+  .wrap { max-width:900px; margin:0 auto; padding:26px 18px 60px }
+  h1 { font-size:20px; margin:0 0 4px } .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  .card.locked { opacity:.55 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  table { border-collapse:collapse; width:100% ; font-size:12.5px }
+  td { padding:4px 8px 4px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.k { color:var(--dim); width:170px; white-space:nowrap }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:5px 0; font-size:12px; color:var(--dim) }
+  li b { color:#c9dcee }
+  pre.log { background:#040810; border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; font-size:11px; color:#7690ad; margin:8px 0 0; max-height:200px }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  a { color:#5ad6ff }
+  iframe { width:100%; height:640px; border:1px solid var(--line); border-radius:8px; background:#fff; display:block }
+</style>
+<div class="wrap">
+<h1>Verified polygon intersection &mdash; opt-in</h1>
+<p class="sub">A front door to somebody else's work. Nothing of theirs is in this engine.</p>
+
+<div class="card">
+  <h2>Whose work this is</h2>
+  <p class="note">This engine did not write a formally verified geometry library. This page installs and shows
+  a demo <b id="author">P Schilde</b> built, on your machine.</p>
+  <table id="prov"></table>
+</div>
+
+<div class="card">
+  <h2>How the WASM runs without upstream's service worker</h2>
+  <p class="note">Their build passes Emscripten <code>-pthread</code>, which needs
+  <code>SharedArrayBuffer</code>, which browsers only grant a page real
+  <code>Cross-Origin-Opener-Policy</code>/<code>Cross-Origin-Embedder-Policy</code> response headers for.
+  GitHub Pages can't set those, so upstream ships a service worker that fakes them client-side. This engine's
+  own server can set the real ones directly &mdash; see <code>/vpi/app/*</code> in <code>ai-bridge/server.js</code>
+  &mdash; so that's what it does. Their <code>coi-serviceworker.min.js</code> still ships and still runs; it's
+  just redundant here rather than load-bearing.</p>
+</div>
+
+<div class="card">
+  <h2>1 &middot; Install</h2>
+  <p class="note">Fetches the four files GitHub Pages already serves &mdash; <code>index.html</code>,
+  <code>lean_app.js</code>, <code>lean_app.wasm</code>, <code>coi-serviceworker.min.js</code> &mdash; from the
+  pinned commit into <code id="srcdir">&hellip;</code> (outside this tree). No build step: these are already
+  built; rebuilding from source needs the Lean 4 toolchain plus emscripten, which this page deliberately does
+  not do (see "What this page refuses to do" below).</p>
+  <div class="row"><button id="install">Install</button> <span id="installState" class="note"></span></div>
+  <pre class="log" id="installLog" style="display:none"></pre>
+</div>
+
+<div class="card locked" id="card2">
+  <h2>2 &middot; Open</h2>
+  <p class="note">Draws load and run entirely in your browser &mdash; nothing you draw is sent anywhere,
+  including to this engine.</p>
+  <div class="row"><button id="openBtn">Open in a new tab</button> <span id="openState" class="note"></span></div>
+  <iframe id="frame" style="display:none" title="Verified polygon intersection demo"></iframe>
+</div>
+
+<div class="card">
+  <h2>What this page refuses to do</h2>
+  <ul id="refused"></ul>
+</div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const api = async (u, o) => { try { const r = await fetch(u, o); return await r.json(); } catch (e) { return { ok: false, error: String(e && e.message || e) }; } };
+let poll = null;
+
+function renderProvenance(s) {
+  const u = s.upstream || {}, m = s.maintenance || {};
+  $("author").textContent = u.author || "the author";
+  $("srcdir").textContent = s.srcDir || "";
+  $("prov").innerHTML = [
+    ["Repository", '<a href="' + esc(u.repo) + '" target="_blank" rel="noopener">' + esc(u.repo) + "</a>"],
+    ["Author", esc(u.author)],
+    ["Licence", '<b class="yes">' + esc(u.license) + "</b> &mdash; " + esc(u.licenseVerified)],
+    ["What it is", esc(u.what)],
+    ["Verification", esc(u.verification)],
+    ["Pinned commit", "<code>" + esc(u.commit) + "</code> (branch <code>" + esc(u.branch) + "</code>, " + esc(u.committed) + ")"],
+    ["Upstream activity", esc(m.commits) + " commits, branches " + esc((m.branches || []).join(", ")) +
+                          ", last " + esc(m.lastCommit) + "<br><span class='note'>" + esc(m.howChecked) + "</span>"],
+    ["Fetches to", "<code>" + esc(s.srcDir) + "</code> &mdash; outside this tree, never in a release zip"],
+  ].map(([k, v]) => "<tr><td class='k'>" + k + "</td><td>" + v + "</td></tr>").join("");
+  $("refused").innerHTML = (s.refused || []).map((r) =>
+    "<li><b>" + esc(r.what) + "</b><br>" + esc(r.why) + "</li>").join("");
+}
+
+function renderState(s) {
+  const j = s.installJob;
+  if (j) {
+    $("installLog").style.display = "block";
+    $("installLog").textContent = j.log || "";
+    $("installState").innerHTML = j.done
+      ? (j.code === 0 ? '<b class="yes">installed</b>' : '<b class="no">failed (exit ' + j.code + ')</b>')
+      : "fetching&hellip; " + Math.round(j.ms / 1000) + "s";
+  } else if (s.built) {
+    $("installState").innerHTML = '<b class="yes">already installed</b>';
+  }
+  $("install").disabled = !!(j && !j.done);
+  $("card2").classList.toggle("locked", !s.built);
+  $("openBtn").disabled = !s.built;
+  if (s.built && s.appUrl) {
+    $("openState").innerHTML = 'ready at <a href="' + esc(s.appUrl) + '" target="_blank" rel="noopener">' + esc(s.appUrl) + "</a>";
+  } else {
+    $("openState").textContent = "install first";
+    $("frame").style.display = "none";
+  }
+}
+
+async function refresh() {
+  const s = await api("/vpi/status");
+  if (!s.ok) { $("installState").innerHTML = '<b class="no">' + esc(s.error || "bridge unavailable") + "</b>"; return; }
+  renderProvenance(s); renderState(s);
+  if (s.installJob && !s.installJob.done) { if (!poll) poll = setInterval(refresh, 1500); }
+  else if (poll) { clearInterval(poll); poll = null; }
+}
+
+$("install").onclick = async () => {
+  $("installState").textContent = "starting…";
+  const r = await api("/vpi/install", { method: "POST" });
+  if (!r.ok) { $("installState").innerHTML = '<b class="no">' + esc(r.error) + "</b>"; return; }
+  if (!poll) poll = setInterval(refresh, 1500);
+};
+$("openBtn").onclick = async () => {
+  const s = await api("/vpi/status");
+  if (!s.built || !s.appUrl) return;
+  const f = $("frame");
+  f.src = s.appUrl; f.style.display = "block";
+  f.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+refresh();
+</script>

@@ -35,8 +35,17 @@
 //   particle sits ONE MILLIMETRE below y = 1.2 -- a hundredth of a smoothing length -- and raising the lid
 //   moves `retained` straight up with it. MEASURED_V2881's three tait rows agree across c = 8/15/25 not
 //   because the fluid ignores sound speed but because ALL THREE ARE PRESSED FLAT AGAINST THE SAME CEILING.
-//   *** AND THE CENSUS INVERTS WHEN THE LID IS RAISED: soundSpeed goes from the WEAKEST knob to the STRONGEST.
-//   A knob census run in the shipped container would have ranked the most important material parameter last.
+//   *** AND THE CENSUS INVERTS WHEN THE LID IS RAISED: soundSpeed goes from a SUPPRESSED knob to the STRONGEST,
+//   a factor of 433 between the two boxes. A knob census run in the shipped container would have ranked the
+//   most important material parameter near the bottom -- at 8.4e-4, close enough to vacuous to be dismissed.
+//   *** v4161: "WEAKEST" WAS TOO STRONG A WORD AND THE GATE PAID FOR IT. *** The exact rank soundSpeed lands
+//   in inside the shipped box IS NOT REPRODUCIBLE ACROSS MACHINES: this box orders viscosity > gamma >
+//   soundSpeed and Keith's orders gamma > soundSpeed > viscosity, on the same commit. The three shipped
+//   residues sit within 30x of each other in a column section 7 documents as EXPLODING, and pressureOf's tait
+//   branch runs through Math.pow, which is not correctly rounded and differs by platform -- so the ideal-EOS
+//   numbers match between the two boxes to every printed digit and the tait ones diverge from the third
+//   decimal. THE SUPPRESSION IS THE FINDING; THE FINAL RANK IS NOISE. Demotion from first is what both
+//   machines agree on and what the gate asserts.
 //   *** stiffness reads EXACTLY ZERO IN BOTH BOXES, which is the control: it proves the vacuity verdict is a
 //   property of the equation of state and NOT an artefact of the container.
 //
@@ -55,7 +64,7 @@
 // NEITHER EQUATION OF STATE PRODUCES A RESTING COLUMN, so there is nothing for a level surface to be level
 // about. The score was never the missing half -- A SETTLED COLUMN IS.
 "use strict";
-import { createSphWorld } from "./sph.js";
+import { createSphWorld, REFERENCE_WALK } from "./sph.js";
 import { knobMoves } from "../../tools/ship/floors.mjs";
 
 import { pathToFileURL } from "node:url";
@@ -105,7 +114,14 @@ export function columnSpec({ eos = "tait", lidY = SHIPPED_LID, steps = 1200, dt 
             const o = { h: c.h, mass: c.mass, restDensity: rho0, stiffness: c.stiffness, viscosity: c.viscosity,
                         gravity: [0, -9.81, 0], eos: c.eos, gamma: c.gamma };
             if (c.eos === "tait") o.soundSpeed = c.soundSpeed;
-            const w = createSphWorld(o); fill(w);
+            // v4121 -- useGrid PINNED FALSE: this census reports a SENSITIVITY ORDERING at the 8.4e-4
+            // scale, taken from a configuration physics/sph/settling.mjs records as unstable (energy
+            // per particle quadruples over 2000 steps). An unstable trajectory amplifies the ~1e-14
+            // summation-order difference between the two neighbour walks until the ordering flips --
+            // measured, when v4121 dropped GRID_CROSSOVER to 128 and these worlds changed path. The
+            // walk is pinned to the one the ordering was established with, because what is being
+            // preserved is the order of a sum and that has to be said rather than re-baselined away.
+            const w = createSphWorld({ ...o, ...REFERENCE_WALK }); fill(w);
             const y0 = w.particles.map((p) => p.y);
             const h0 = Math.max(...y0) - Math.min(...y0);
             const BOX = [0, 0, 0, 0.6, c.lidY, 0.6];
@@ -144,7 +160,8 @@ export function lidReach({ lidY = SHIPPED_LID, steps = 1200, eos = "tait", h = 0
     const o = { h, mass: 0.02, restDensity: rho0, stiffness: 8, viscosity: 0.1,
                 gravity: [0, -9.81, 0], eos, gamma: 7 };
     if (eos === "tait") o.soundSpeed = 15;
-    const w = createSphWorld(o); fill(w);
+    // v4121 -- useGrid pinned false, same reason as above.
+    const w = createSphWorld({ ...o, ...REFERENCE_WALK }); fill(w);
     const y0 = w.particles.map((p) => p.y);
     const h0 = Math.max(...y0) - Math.min(...y0);
     const BOX = [0, 0, 0, 0.6, lidY, 0.6];
@@ -184,8 +201,14 @@ export const MEASURED_V3541 = {
     taitShippedLid: { viscosity: 2.644e-2, gamma: 3.188e-3, soundSpeed: 8.366e-4, stiffness: 0 },
     taitFreeLid: { viscosity: 1.335e-1, gamma: 2.766e-1, soundSpeed: 3.619e-1, stiffness: 0 },
     lidGap: { 1.2: 0.0010, 1.6: 0.0356, 2.0: 0.0313, 3.0: 0.8019 },
-    note: "AT THE SHIPPED LID soundSpeed IS THE WEAKEST KNOB AND AT A FREE LID IT IS THE STRONGEST -- a 433x " +
-          "suppression that INVERTS the ranking. stiffness is exactly 0 in both, which is the control.",
+    note: "AT THE SHIPPED LID soundSpeed IS SUPPRESSED AND AT A FREE LID IT IS THE STRONGEST -- a 433x " +
+          "suppression that DEMOTES IT FROM FIRST PLACE. stiffness is exactly 0 in both, which is the control. " +
+          "*** THESE ROWS ARE THIS BOX'S. v4161 reproduced every one of them to the digit here and found " +
+          "Keith's rig ordering the shipped box differently on the same commit -- gamma > soundSpeed > " +
+          "viscosity against viscosity > gamma > soundSpeed. The shipped residues are within 30x of each " +
+          "other and the tait branch goes through Math.pow, so THE MAGNITUDES BELOW ARE NOT PORTABLE and the " +
+          "433x ratio is. Do not turn any row here into an assertion; the gate deliberately compares nothing " +
+          "against this table.",
 };
 
 export const REFUSED_KNOBS = {

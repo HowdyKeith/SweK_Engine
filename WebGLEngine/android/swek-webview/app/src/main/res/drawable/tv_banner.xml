@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v4117 — the Android TV launcher banner (320x180 dp at xhdpi).
+
+     *** A VECTOR, NOT A PNG, ON PURPOSE. *** android:banner is REQUIRED for a leanback launcher entry, and the
+     obvious way to supply one is a binary drop-in. A checked-in PNG is a file nobody can review in a diff and
+     nobody can regenerate; this draws the same thing from text. It is deliberately plain — the launcher tile
+     is 320x180 and read from three metres away, so a wordmark on the engine's own green is the whole brief. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0A0E0C" />
+            <stroke android:width="2dp" android:color="#224A36" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <shape android:shape="rectangle">
+            <size android:width="176dp" android:height="6dp" />
+            <solid android:color="#6FE39A" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+</layer-list>

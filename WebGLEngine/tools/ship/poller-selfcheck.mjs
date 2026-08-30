@@ -146,6 +146,22 @@ const P = await import(pathToFileURL(POLLER).href);
         /var P = window\.SwekPoller;/.test(helper) && /return fn\(\);/.test(helper) &&
         html.indexOf("window.swekTick =") < html.indexOf('swekTick("'),
         helper ? "defined at char " + html.indexOf("window.swekTick =") + ", first use at " + html.indexOf('swekTick("') : "helper not found");
+    // *** v4146 -- THE CHECK ABOVE SAYS "DEFINED ONCE" AND NEVER CHECKED IT, AND A SECOND DEFINITION HAD BEEN
+    // WINNING FOR AN UNKNOWN NUMBER OF ROUNDS. *** server.html carried TWO assignments to window.swekTick: the
+    // polling guard at the top, and -- two thousand lines later -- a TICKER FEEDER, `function(msg)`, that
+    // pushes a log line. Last assignment wins, so every `swekTick("key", poll)` site was calling the feeder:
+    // it wrote the KEY into the ticker and NEVER RAN THE POLL. Thirty pollers, silently dead, while
+    // fetchCap-selfcheck counted them as guarded because it greps for the idiom and cannot see a clobber.
+    //
+    // The old assertion passed throughout, because "first definition precedes first use" is TRUE of a file
+    // that defines the name twice -- it is the wrong question. THE RIGHT ONE IS A COUNT, and it is cheap.
+    // Measured in a real browser before the fix: window.swekTick had arity 1 and the feeder's source.
+    const tickAssigns = (html.match(/window\.swekTick\s*=/g) || []).length;
+    ok("!! *** server.html assigns window.swekTick EXACTLY ONCE -- a second definition silently wins ***",
+        tickAssigns === 1,
+        tickAssigns + " assignment(s). Two functions sharing this name is not a style problem: the poll " +
+        "function is the SECOND ARGUMENT, so a one-argument impostor drops it on the floor and every guarded " +
+        "poller in the file stops polling while still looking guarded to every gate that greps for it.");
     ok("server.html: and it is a PLAIN script, not a module -- a module would reintroduce the race it closes",
         !/type="module"[\s\S]{0,400}window\.swekTick =/.test(html));
     // the auth keepalive ping is intentionally NOT hidden-guarded (would change session relock on backgrounding)

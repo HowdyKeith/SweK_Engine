@@ -114,6 +114,46 @@ export async function shutdownServer(srv) {
  * A NAME IS NOT AN IDENTITY. The three std streams are compared by object, and by their underlying _handle,
  * because on some platforms the stream is a wrapper and the handle is what lands in the list.
  */
+/**
+ * *** WAIT FOR SPAWNED CHILDREN TO ACTUALLY DIE, WHICH A LOOP DRAIN CANNOT DO. ***
+ *
+ * shutdownServer()'s step 4 drains libuv by yielding TURNS of the event loop, and for sockets that is enough --
+ * the measurement in this file shows a Server and two Sockets present at turn 1 and gone by turn 2. A CHILD
+ * PROCESS IS NOT LIKE THAT. kill() sends a signal to another program; that program is then scheduled by the
+ * OPERATING SYSTEM, runs its own exit path, and is reaped some real number of milliseconds later. No quantity
+ * of setImmediate ticks makes that happen sooner, so a teardown built only from loop turns reports a live
+ * ChildProcess no matter how long it spins.
+ *
+ * This waits on a real timer instead, bounded, and RETURNS WHAT IS STILL THERE rather than throwing -- a
+ * teardown that hangs is worse than one that reports honestly, which is the same argument step 4 makes about
+ * its own 20-turn cap.
+ *
+ * *** MEASURED, AND THE TURN DRAIN REALLY IS NOT ENOUGH -- ON LINUX, NEVER MIND WINDOWS. *** Section 5 of the
+ * gate beside this file spawns a real child, kills it, yields TWENTY loop turns, and the ChildProcess is STILL
+ * LIVE; drainChildren then clears it in 26ms. So this is not a Windows workaround taken on faith -- the gap it
+ * fills is demonstrable on the box that could not reproduce the original failure.
+ *
+ * WHAT IS STILL UNPROVEN IS THAT IT CLOSES *THAT* FAILURE. bz/tools/bz-bridge-selfcheck.mjs went red on Keith's
+ * Windows rig with "STILL LIVE: Socket, Socket, ChildProcess" after a perfect 115/0 scoreline, and the same gate
+ * on this box is GREEN -- children reaped, exit 0 -- because enough wall-clock passes there between the kill and
+ * the check for the OS to reap them anyway. Windows has no SIGTERM (child.kill() is TerminateProcess) and the
+ * child's stdio pipes are separate handles closing on their own schedule, so the rig may still linger past any
+ * budget. THE GATE'S OWN OUTPUT ON THE RIG IS WHAT SETTLES IT. The precedent is directly above: steps 1 and 2 of
+ * shutdownServer are kept for a Windows crash this measurement cannot reach and are explicitly not called the fix.
+ *
+ * @returns { drained, ms, still } -- `still` names the handle classes that outlasted the budget
+ */
+export async function drainChildren(budgetMs = 4000, pollMs = 25) {
+    const start = Date.now();
+    const lingering = () => liveHandles().filter((n) => n === "ChildProcess" || n === "Socket");
+    for (;;) {
+        const still = lingering();
+        if (!still.length) return { drained: true, ms: Date.now() - start, still: [] };
+        if (Date.now() - start >= budgetMs) return { drained: false, ms: Date.now() - start, still };
+        await new Promise((r) => setTimeout(r, pollMs));
+    }
+}
+
 export function liveHandles() {
     let h = [];
     try { h = process._getActiveHandles ? process._getActiveHandles() : []; } catch { return []; }

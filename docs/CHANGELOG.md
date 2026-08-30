@@ -8,34 +8,1404 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
-Spring-physics toasts: one shared integrator for both toast surfaces, graded against the damping ratio that predicts its overshoot.
+## v4168 -- eighteen more device plants, and the one deletion in the merge was the only thing worth checking
 
-Keith pointed at hiaaryan/sileo -- "an opinionated, physics-based toast component" -- and asked whether our rendered toasts could move like that. None of sileo's code is used and none could be: it is a React component library (this tree ships no React) and its repository carries no LICENSE file, checked and 404, which makes it all-rights-reserved and unusable in a tree that publishes public release zips. What is adopted is the idea, which is not sileo's to own anyway -- a damped harmonic oscillator is how iOS, react-spring and framer-motion have all animated for years.
+The tier-2 branch kept running through a container restart and pushed two more rounds, `v4101-v4118`:
+`planted` metadata for eighteen further devices -- `bell`, `bonefield`, `cartPole`, `clocks`, `csg`, `em`,
+`fragmentRotation`, `kinetics`, `laneEmden`, `manifoldCensus`, `powder`, `reconQuality`, `renderBounce`,
+`strokeMorph`, `structureFactor`, `whiteDwarf`, `xenon`, `xpbd`. **Zero conflicts.**
 
-New ui/springMotion.js holds the physics once. This tree already had two in-engine toast surfaces (ui/toast.js centre-top, ui/toaster.js top-right) and writing the integrator into whichever one was upgraded first and then again into the second is the second-copy defect this session has watched land repeatedly. Because step(state, dt) -> state is pure -- no DOM, no rAF, no timers -- the gate settles thousands of frames headlessly and measures the overshoot against exp(-pi*z/sqrt(1-z^2)), a closed form the integrator is never told: gentle 8.9% against 9.9% predicted, snappy 9.2% against 10.1%, stiff critically damped at 0.0%. Agreement is evidence rather than a restatement of the constants.
+Each plant was measured in both arms before being declared, and each matches its own file's header to the
+digit: `structureFactor` 9.8e-16 -> 1.176, `powder` 2.739 -> 0, `renderBounce` 2.33e-3 -> 1.291,
+`reconQuality` 0.841 -> 1.0, `strokeMorph` 0 -> 40, `clocks` 0 -> 2.0 exactly.
 
-The first tuning was measured and rejected. At zeta 0.81 it overshot 0.6-0.8% of travel -- under three pixels on a 380px slide. It was a correct spring that was visually indistinguishable from an ease, which is the whole feature failing quietly while every correctness check passes. Retuned to zeta 0.59.
+### The one deletion, checked rather than taken on trust
 
-Then the same mistake hid a second time inside the gate written to catch it. The visibility check hardcoded 380, toaster.js's travel, and so graded both presets against the longer of the two surfaces. ui/toast.js shipped a 14px rise, and a fraction of a small number is a smaller number: Chromium measured its overshoot at 1.27px, sub-pixel on a non-retina display. The check now reads each surface's travel constant out of its own source and grades in real pixels. RISE_PX is 32 and measures 2.93px.
+Seventeen of the eighteen files are purely additive. One is not: `manifoldCensus` had a bare
+`plantFlips: "bowtieClosed"` -- added at v4069 -- and the branch **removed** it in favour of the canonical
+`planted:{}` object, on the claim that the old field had no reader.
 
-Driving both surfaces in real Chromium then found two defects no headless property could reach. Opacity derived as 1 - abs(x)/TRAVEL looks right and reverses during an overshoot, because past the target abs(x) grows again: the toast dimmed to opacity 0.909 at the peak of its own bounce, a flicker that only exists because the motion became springy. It is now measured as travel from the start, which rises monotonically inward and falls monotonically outward so both overshoots clamp harmlessly. And toast.js caps its stack at four and evicts with a bare .remove() that never stopped the running rAF: nine live loops for four visible toasts, each still writing transform and opacity to a detached node until its duration ran out. toaster.js had that guard from the start; toast.js did not, and it is now a gated rule for both.
+**A commit message is not evidence, and removing a field something reads is a regression**, so that was
+verified two ways:
 
-Retargeting is why both surfaces use one spring rather than two animations. Clicking a toast mid-entrance flips the existing spring's target instead of starting a second animation, so it reverses from where it actually is and carries its velocity out. The old CSS pair restarted from the element's committed style rather than its rendered position and the toast jumped; the browser trace of a mid-entrance click now shows a continuous turnaround.
+1. `plantedCoverage.mjs:70`'s `declaredPlantMode` returns `null` unless **both** `plantMode` and `plantFlips`
+   are strings -- and `manifoldCensusBind` declares no `plantMode` at all. The census could never have read
+   it.
+2. No `manifoldCensus`-specific gate names the field either.
 
-Sabotage-verified rather than assumed: reverting to the rejected tuning fails four checks, removing the substepping diverges the stiff preset to x = -2030 (the toast literally launched off screen), and dropping the snap-on-rest fails three. Gate: tools/ship/springMotion-selfcheck.mjs, 45 checks, all pass.
-Voxtral wired as an opt-in page: a 2.5 GB third-party speech model in the tab, where the opt-in is proven rather than promised.
+So the claim holds. **v4069 named the right observable in a field nothing consumed** -- a fix that looks done
+and does nothing -- and it took a third spot-check round to notice. The replacement is read by
+`labDevices-selfcheck` and the per-device gates, so the device moves from an inert declaration to a live one.
 
-Keith asked to wire the voxtral browser build after last round's prototype. voxtral.html is the front door to TrevorS/voxtral-mini-realtime-rs, Apache-2.0 with a real LICENSE file that was read rather than inferred from a badge -- unlike sileo the round before, which had none. It is Mistral's Voxtral Mini 4B Realtime compiled to WebAssembly, running its own WGSL compute shaders through WebGPU, entirely client-side.
+### xpbd: a blind mode proven blind is a result, not a gap
 
-Nothing large is vendored. The wasm is 9.4 MB and the largest asset otherwise vendored in this tree is 3.5 MB, so copying it in would have made one opt-in curiosity the biggest single file in a repo that publishes public release zips. Instead the page accepts bytes the user supplies -- a staged directory or a file picker -- and verifies them against a pinned SHA-256 before executing a single one, then hands the verified buffer directly to wasm-bindgen so that no remote URL is ever trusted. Consent is two gates rather than one, because 9.4 MB of verifiable engine and 2.5 GB of unverifiable weights are not the same decision.
+`xpbd`'s plant had been flagged earlier in that branch's session as investigated-but-unfixed. Direct
+measurement across all four structurally reachable modes confirms **`hooke` and `substep` are genuinely
+blind**: PBD and XPBD converge to the same equilibrium stretch, and only sweeping the **iteration count**
+separates them -- which is exactly what the `iteration` mode does and `substep` does not. Declared against
+`iteration`'s `iterSpread`, 0 -> 0.948.
 
-Both properties are proven rather than described. Four hundred and five combinations of facts and states cannot make the state machine name a download from idle, including states that falsely claim the module and weights are already loaded. One flipped bit is refused rather than warned about, and a wrong length is reported as a wrong length because that is what tells a person they grabbed the wrong file. And because no amount of source reading can prove a page downloads nothing, the last section drives real Chromium and intercepts every request it makes: the only three on load are the page and its two modules, consenting alone adds zero, and pressing the engine button reaches for the engine and nothing else.
+The other half of the old concern was the `planted` boolean echoed in all eighteen modes' returns. Confirmed
+harmless: `probeLiveness`'s finite-number filter excludes booleans, so it never reads as claimed coverage on
+a mode the plant does not reach.
 
-Three defects came from rendering the page, not from reading it. First, codeOnly() applied to an HTML file collapsed 15852 characters to 3030 and dropped the entire script block; one positive assertion failed and gave it away while three negative assertions beside it passed against the wreckage, which is the worst possible outcome because a vacuous check looks exactly like a passing one. The page's module is now extracted before codeOnly is applied, and every absence check is preceded by an assertion that its haystack is real text. Second, gb() rendered the 9.4 MB engine as "0.01 GB", flattening the three orders of magnitude that are the whole argument for having two gates. Third, blockersFrom() read facts.webgpu, a key localModelProbe has never emitted, so that blocker could never fire on real data -- and the gate fuzzed the same invented key, so the code and its test agreed with each other while both were wrong. The page printing "WebGPU namespace absent" directly above "adapter granted" is what exposed it, and the gate now pins those key names against a real probe result rather than against memory.
+### What ran, and what did not
 
-The honesty is graded as well as the behaviour. Every speed figure on the page is upstream's, measured on an NVIDIA DGX Spark, and carries measuredHere:false so nothing can quietly promote a citation to evidence. estimateWallClock() cannot return a bare number: the hardware it came from and a note that it is a floor rather than a forecast travel in the same object. MEASURED_HERE states out loud that the module loading in 260 ms is a small result and that no transcription was ever run here, because without that line a reader would take it as proof the thing works. Text-to-speech is refused with its number, RTF 104, and the refusal names piper as the thing already doing that job faster than real time.
+Green: fourteen device selfchecks (`bell`, `bonefield`, `cartPole`, `csg`, `fragmentRotation`, `kinetics`,
+`laneEmden`, `manifoldCensus`, `powder`, `reconQuality`, `renderBounce`, `strokeMorph`, `structureFactor`,
+`xenon`) plus `capabilityCard`.
 
-Filed beside webgpu-llm.html under System Tools, by the same rule: it answers what this box can do rather than showing a phenomenon. Gate: tools/ship/voxtralBrowser-selfcheck.mjs, 62 checks, all pass, sabotage-verified four ways -- removing consent, pre-fetching on load, downgrading the digest check, and reintroducing the wrong fact key.
+**Not established here:** `plantDirection` and `plantedCoverage` both exceeded local ceilings with no output.
+Those are **timeouts, not passes**, and they are the same class as the census gates already filed under the
+sweep-cost item -- a heavy device-wide sweep that no short budget can finish.
+
+Tree at 1252 gates.
+## v4167 -- the other branch, read rather than assumed
+
+Four branches sit on the remote besides this one. Checking them turned out to be worth more than merging
+them, because two of the four answers were not the obvious one.
+
+### The tier-2 branch was still running
+
+It pushed four more rounds after the v4165 merge -- `v4088` through `v4100` -- adding `planted` metadata to
+twelve device binds: `acoustics`, `seismic`, `nuclear`, `blackhole`, `kerr`, `wolff`, `diffusion`,
+`blackbody`, `pipe3d`, `hmc`, `percolation`, `tempering`. Each plant was **measured in both arms** before
+being named, and each matches its own file's header claims to the digit.
+
+`wolff`'s is the shape of the whole set:
+
+> `pAdd = 1 - exp(-J/T)` instead of `1 - exp(-2J/T)` is one character of difference from the value detailed
+> balance requires; the algorithm still builds clusters, still flips them, still runs to completion, and
+> samples the wrong distribution the whole time.
+
+Measured: `absM` 0.9109 -> 0.0426, `magErr` 4.50e-4 -> 0.869.
+
+### Its headline find was a rediscovery, and that is the real news
+
+The branch reported one live crash: `blackbodyBind-selfcheck` throwing
+`TypeError: Cannot read properties of undefined` on every run since v4055, because v4055 deleted
+`exitanceQuarticRel` and the gate kept reading it.
+
+**Main had already found and fixed exactly that at v4136** -- forty-five versions earlier -- *including* the
+second half both sides found independently: a blind-observable list holding the dead key, where
+`undefined === undefined` passed vacuously. Run on main before merging, the gate exits 0 and the only
+remaining mentions of the dead observable are comments explaining its removal.
+
+The branch is **85 commits behind main**. It is now re-covering ground main has covered, which is the cost of
+a long-lived branch rather than a fault in its work.
+
+### But its fix was the better half of the two, and is taken
+
+Both branches fixed the same crash differently, and the conflict is instructive:
+
+- **This side deleted the check**, arguing that restoring it would restore the tautology. True of
+  `exitanceQuarticRel` -- `pow(a,4)/pow(b,4)` *is* `pow(a/b,4)` and cannot fail -- but it left **no check at
+  all** where v4055 had explicitly *put* a replacement.
+- **The branch asserted the replacement.** `sigmaFromBoseRel` is not the tautology under a new name: it
+  builds sigma from the Bose integral and meets the typed closed form by a different route. Measured
+  agreement **1.517e-15**, and a wrong power of pi or a zeta given the wrong argument moves it off zero.
+
+**The argument against an observable had been carried over onto its successor, which is how a deletion
+becomes a gap.** The branch's assertion is restored, with this side's explanation of why the *old* check is
+gone kept beside it.
+
+The second hunk went the other way: the branch listed the missing key but inlined its list, which bypasses
+the "does the device actually produce this key" guard on the line above -- the very undefined-equals-undefined
+vacuous pass that section exists to close. The key is added to the **single** `blind` array instead, so both
+the produces-guard and the bit-identical check now cover all seven. Verified: `all 7 present`, gate green.
+
+### The three older branches, and two of the answers are not "merge it"
+
+| branch | unmerged | behind | verdict |
+|---|---|---|---|
+| `long-silence-elements-check` | **0** | 594 | fully absorbed -- nothing to do |
+| `barehands-integration` | 1 | 630 | **SUPERSEDED, not pending** |
+| `exported-functions-mesh-render` | 3 | 630 | real work, needs its own round |
+
+`barehands` is the one worth stating carefully, because "1 commit unmerged" invites merging it. Its v3850
+work -- `MediaPipeHandTracker.js`, `handsBind.mjs`, `handsBind-selfcheck.mjs` -- **all three already exist on
+main**, having landed at v3900, and have grown substantially since: `handsBind.mjs` is 361 lines on the
+branch against **532** on main, the selfcheck 251 against **364**. Merging it would *regress* work that is
+already shipped and further along. **A branch that is "1 commit ahead" can still be entirely behind**, and
+the commit count alone cannot tell you which.
+
+`exported-functions` (v3904-v3906) is the genuine remainder. Its *modules* are byte-identical to main's --
+`poisson.mjs`, `discontinuity.mjs`, `strokeMorph.mjs` all match -- but its **gates carry coverage main
+lacks**: `poisson-selfcheck` is 180 lines on main against 280 on the branch, `discontinuity-selfcheck` 186
+against 229. That is roughly 100 lines of stepper checks main has never had. At 630 commits behind it
+conflicts in six selfchecks, so it is a round with a fixture, not a merge to squeeze in here.
+
+Tree at 1252 gates.
+## v4166 -- four gates from the rig, and every one measured the machine while naming the code
+
+Keith ran eight gates. Four had real defects, and they are the same defect wearing four costumes: **a check
+asserting a property of the box while reporting it as a property of the tree.** That is the shape v4162
+already fixed three times (`materialKnobs`, `rh-hydrostatic`, `twoFBind` asserting a stopwatch), so this is
+the fourth, fifth, sixth and seventh instance.
+
+### 1. The budget estimator was eating its own output
+
+Three gates timed out at enormous budgets and reported nothing. The header above each one carried the cause:
+
+```
+host x4.31 (median of 39 completed run(s) = 2.05x, raised by 3 timeout lower-bound(s) to 4.31x)
+host x8.00 (median of 39 completed run(s) = 2.05x, raised by 4 timeout lower-bound(s) to 8.63x -- CLAMPED)
+```
+
+A gate killed at its budget records elapsed **equal to that budget**, and the budget is
+`measured x TAIL_HEADROOM x scale`. Dividing by the measurement therefore returns `TAIL_HEADROOM x scale` --
+**always strictly above the scale that produced it**. Every timeout doubled the estimate: `1 -> 2 -> 4 -> 8`,
+ceiling.
+
+Verified against the rig to two decimals. `labResults` is MEASURED at 94.3s; at the then-current 4.31x it was
+granted `94.3 x 2 x 4.31 = 812.9s`; it reported `TIMEOUT (813s budget) 813.5s`; and `813.5 / 94.3 = 8.63`,
+which is exactly the figure the next header printed.
+
+**The refutation was sitting in the same line as the error.** Thirty-nine runs that actually finished say
+**2.05x**. A box genuinely 8.63x slower could not have produced them. The bound is arithmetically valid -- a
+gate killed at E did not do `base` of work in E -- but it conflates *a slow host* with *a gate slower than
+its own MEASURED entry*, and it was being attributed entirely to the host and then spent on every other
+gate's budget.
+
+So: **a lower bound is what you use in the absence of a measurement, not something that overrides one.**
+Bounds still carry the scale alone where nothing slow ever completes -- the v3923 case the module exists for
+-- and a bound that contradicts the finished runs is now *reported* as a suspect gate rather than dropped.
+
+The cost was not abstract. At the ceiling of 8 against a true 2.05, every budget on that box was ~4x too
+generous, so every timeout took ~4x longer to fire. One sweep -- `corroborationCensus`, `labResults`,
+`libmSensitivity`, `responseCensus` -- spent **7098 seconds** to report nothing, where 2.05x would have
+killed the same four in ~2290s. **An estimator that eats its own output does not merely drift; it spends the
+thing it exists to save.**
+
+**And the first fix was wrong.** I divided the bound by `TAIL_HEADROOM`, which understates a genuine reading,
+and section 4 of the gate went red insisting a killed run must still teach the scale. It was right, the fix
+was reverted, and the real answer was about *attribution*, not arithmetic. Section 4's own comment claims the
+mechanism "CONVERGES"; it doubled. The new 4b is the check that would have caught that sentence.
+
+### 2. A path pasted into a string literal, on the one platform where that breaks
+
+`shadowedHelper` built a `node -e` command by concatenating a path into JS source. On Windows:
+
+```
+Cannot find module 'C:IntelSweK_Engine_v4148WebGLEngineai-bridgegithubBridge.js'
+```
+
+`\I`, `\S`, `\W` and `\a` are not escape sequences, so JS drops the backslash and keeps the letter -- **every
+separator vanished from a path that was correct when it went in**. On POSIX the separator is `/` and there is
+nothing to escape, so this passed everywhere except the one platform it breaks on, and it reported the result
+as *"cloneEngineSource is not loadable"* -- a claim about the shipped bridge, produced by a bug in the
+harness. `hostScale.mjs` records this exact lesson at v3941, one directory over.
+
+**A path is data, and it stops being data the moment it is concatenated into source.** It travels by
+`process.argv` now, where there is no escaping rule to get wrong.
+
+### 3. A gate that could not tell a broken script from a missing shell
+
+`steamdeckLaunch` reported **seven failures** on a box with no `bash`. Three "parses (bash -n)", the live
+port-owner resolution, the empty-port case, the sabotage control, and the run-for-real -- all of them
+`Command failed` or `spawnSync bash ENOENT`. **The scripts were never read.**
+
+The worst of the seven is the negative control:
+
+```
+FAIL  SABOTAGE: the stubbed fallback resolves NOTHING   stub returned 'ERR'
+      -- if non-empty, the sabotage did not remove the fix
+```
+
+Its `catch` assigned the sentinel `"ERR"` and it then asserted `out === ""`, so a machine without a shell was
+told **the fix is missing from the shipped file**. And the other direction is worse: had the sentinel been
+`""`, that control would have **passed on every shell-less box while proving nothing at all**. A control that
+cannot tell whether it ran is not a control.
+
+The bash-backed checks now skip by name. Verified both ways: with `bash` all checks run and pass; with a
+`PATH` carrying only node, **zero failures and five named skips**. The static sections still run and still
+fail loudly, because they read source and do not care what platform they are on.
+
+### 4. Twelve stated runtimes corrected from the measurement
+
+`statedRuntime` named twelve gate headers that had drifted. Corrected from `gate-timings.json` -- not added
+to the baseline, which that gate calls "a ratchet growing back, the one thing a ratchet must never do". The
+two worth naming: `claimTrace` stated **~60s against a measured 605s** (10.1x under), and `labExport` stated
+**~241s while already carrying the word MEASURED** against a real 79s.
+
+### What was NOT fixed, and why
+
+- **`corroborationCensus`** timed out having done 1270s of real work against a 1335s budget -- 4.9% headroom,
+  so it very nearly finished. The distribution is the finding: **`twof` alone is 943.1s, 73.1% of the whole
+  sweep**, against `kh` at 8.7% and everything else together under 130s. Rebalancing that trades against
+  itself (cost-ordering maximises coverage but then the dearest four are *never* swept), so it needs a
+  measurement rather than a preference, and it is a round of its own.
+- **`referenceKind`** is red at 193 prose-rescued orphans against a ceiling of 181, and **the growth is
+  mine.** Five modules I added in v4159-v4165 have *zero* non-gate importers -- `render/swiftShaderPass.js`,
+  `render/holoFoilShader.js`, `ui/runnerPanel.js`, `tools/export/weldVertices.mjs`,
+  `tools/mac/xbarPlugin.mjs` -- and four more are held out of the census by a single mention, most likely
+  `main.js`'s own changelog comment, which is precisely the rescue-by-sentence the gate is about. So the 14
+  shader ports and the holofoil material are gated but unreachable from the running engine. The fix is
+  wiring, not a higher ceiling.
+
+Tree at 1252 gates.
+## v4165 -- the tier-2 census branch landed, and the interesting part is how the conflicts were settled
+
+Twenty-seven commits merged from `claude/tier-2-keys-patch-4lwhzk`, which had been running on its own since
+v4061 and finished at v4087. Twenty-six files merged clean; six conflicted.
+
+### What the branch itself did
+
+`v4082` through `v4087` are a registry-wide sweep for **undeclared observables**: device binds that return
+keys their own declaration never lists. Around twenty binds were found and corrected -- `beamBind`,
+`kerrBind`, `thermalBind`, `emBind`, `probeBind`, `splatBind`, `lensBind`, `tidalBind` and the rest.
+
+This is the same defect `v3850` fixed once, and that `v4080`, `v4082` and `v4084` each re-found locally on a
+different device. **A defect found four times in four places was never one bug; it was a missing sweep.**
+The branch ran the sweep.
+
+### And six rounds of it never wrote a changelog entry
+
+`v4082` .. `v4087` appear nowhere in this file. That is exactly the failure `changelogCurrency-selfcheck`
+exists to catch -- rounds landing with the record unchanged -- recurring on a branch where the gate was not
+being run. **This entry is the branch's record, written by the round that merged it**, because the work is on
+`main` now and an unrecorded round is indistinguishable from one that never happened.
+
+### The six conflicts, resolved six ways on purpose
+
+A merge is a set of small judgements, and treating them uniformly is how a merge loses something.
+
+| file | resolution |
+|---|---|
+| `knowledge-index.json` | **regenerated.** A generated file has no correct merge, only a correct regeneration. |
+| `costRecord.mjs` | **both sides.** The branch's paragraph bounds the *relative* order of costs; this side's bound the *absolute* numbers. Different quantities, not rival versions. |
+| `tidalBind-selfcheck.mjs` | **this side's note** -- itself the record of an *earlier* tier-2 merge disagreeing about the same cost hint. |
+| `corroborationCensus-selfcheck.mjs` | **both accounts**, bridged. |
+| `knobLiveness.mjs` | **this side**, after measuring the one real difference. |
+| `knobLiveness-selfcheck.mjs` | **this side, plus two things the branch had right.** |
+
+### Both accounts of one bug, because it was found from both ends
+
+The two sides each carry a write-up of the same block-scoping defect -- a `const` declared inside one
+section's block and read in the next. This side found it from a **full unbudgeted sweep** that ran every
+assertion and then died on the last one. The branch found it from a **two-minute partial** at
+`--budget 5000`, 82 of 484 device/modes.
+
+Neither was deleted. That one defect was reachable from a two-minute partial *and* from a complete sweep is
+evidence about how exposed it was, and either account alone hides that.
+
+### The one real code disagreement was measured, not judged
+
+Stripping comments from both versions of `knobLiveness.mjs` reduced a 494-line diff to **23 lines of actual
+code**, and all but one of those were this side being a superset -- `echoUnconfirmed`, a third state the
+branch lacks, and richer list detail.
+
+The exception: the branch guards its echo filter with an extra `!sameValue(base[o], out[o])`. That guard is
+redundant **exactly if** `probeValues` can never return a probe value equal to the default. So that was
+swept -- 287 probe pairs across numbers, booleans, arrays, all-zero arrays, `1e308` and declared-choice sets:
+
+```
+probe pairs examined: 287
+alt === def collisions: 0
+```
+
+Zero. The guard is a no-op and dropping it changes no behaviour. **A merge preference became a merge
+measurement**, which is the only way one side "winning" means anything.
+
+### And the branch was right about two things this side had wrong
+
+1. Its synthetic ladder keys `b` to the *used* gain. This side's was `[{a:1},{a:2}]` -- constant in **both**
+   modes, so it only ever exercised the identity trap and never the discrimination the check claims to make.
+2. Its assertion is two-sided, `!Object.is(x, y) && sameValue(x, y)`, where this side checked only the second
+   half. **`sameValue` alone is satisfied by a device returning a cached array** -- identical values *and*
+   identical identity -- in which case the reference-comparison trap is not armed and the check passes
+   without testing anything. A vacuous pass, inside the file that names vacuous passes.
+
+### The expensive assertion was kept behind a flag, not dropped
+
+The branch replaced a `report()` -- prose quoting a run nobody in the process made -- with two live
+`probeKnob` calls on the **real** `stability` device. Strictly better evidence, and about two minutes of
+builds on a gate whose default run is already over its 309 s budget.
+
+Deleting it would have been the easy merge and the wrong one. It runs under `KNOB_REAL_PLANT=1`, and it was
+run once so it is not shipping untested: **PASSES -- `response: live (moved ratio), deafknob: still`.** The
+default path prints a skip that names itself rather than staying silent.
+
+**Cost is a reason to gate a check. It is not a reason to go back to prose.**
+
+Gates green after the merge: `tidalBind`, `boundKeys`, `labDevices`, `knobLiveness` both ways.
+`corroborationCensus` fails only its complete-sweep assertion under a 60 s budget -- budget-caused and
+pre-existing, confirmed by a comment-stripped comparison showing the merge changed **no code at all** in that
+file. Tree at 1252 gates.
+## v4164 -- six more shader batches, and the file that documents its own traps
+
+Six batches on top of v4163's two, taking `krispuckett/SwiftUIShaders` (MIT) from 2 ported to **14 of 41**:
+`emboss`, `heatShimmer`, `solarize`, `duochrome`, `vortex`, `kaleidoscope`, `chromaticSplit`, `plasma`,
+`echo`, `glitch`, `melt`, `topographic`, `thermal`, `neonEdge` -- plus the shared helper layer
+(`bcs_hash`, `bcs_valueNoise`, `bcs_fbm`, `bcs_hsb2rgb`, `bcs_fmod`, `luma601`) that the remaining 27
+are built on. Each ports as a GLSL pass in `render/swiftShaderPass.js` and a CPU reference in
+`render/swiftShaderModel.mjs`, and the gate compares them.
+
+None of that is the interesting part. Three things came out of the batches that are worth more than the
+ports.
+
+### 1. Three shaders explain, in their own comments, a thing that is only true in SwiftUI's frame
+
+Upstream's comments are accurate -- about Metal. Read as GLSL they are instructions for a bug, and the port
+then *agrees with its own documentation* while being wrong.
+
+- `chromaticSplit` documents its knob as `"0-30: pixel distance between channels"`. Position is in
+  **points**, not pixels. On a Retina canvas a direct port is silently half strength.
+- `melt` writes `"negative Y = pull up = melt down"`. That is downward only where y grows down. And its
+  `gravity = uv.y * uv.y` -- commented `"bottom melts more"` -- inverts too, so **the two errors compound
+  rather than cancel**: unflipped, the top melts most *and* it melts upward.
+- `thermal`'s `"rising bias"` is a negative y offset. It only rises the same way.
+
+A comment is evidence about the frame it was written in, never about ours.
+
+### 2. The fmod trap cuts both ways inside one file
+
+`bcs_hsb2rgb` **needs** `fmod`: a hue can be negative and `mod` takes the wrong branch.
+`bcs_kaleidoscope` **needs** `mod`: its fold comes from `atan2`, which returns `[-PI, PI]`, and `fmod`
+would put half of every image outside the segment. Upstream wrote the flooring form longhand rather than
+calling `fmod`, which was correct and is exactly the kind of thing a tidy-up turns into a bug.
+
+Which remainder is right is decided by **the sign at each call site**, never by preference. There is no
+house style available here.
+
+### 3. Batch 7 corrected batch 2's own worked example, and the correction is worth more than the claim
+
+Batch 2 said a negative hue makes `fmod` and `mod` "give different colours", and cited hue `-0.1`. The
+*intermediate* does differ there -- `fmod(-0.6, 6) = -0.6` against `mod`'s `5.4` -- but
+`clamp(abs(m - 3) - 1, 0, 1)` can saturate both to one answer, and at `-0.1` **it does**: both give exactly
+`(1.000, 0.000, 0.648)`.
+
+Swept 4001 hues. The final colour differs for **45.8%** of them, worst at hue `-2.0`, where `fmod` gives
+**white** and `mod` gives **pure red**. So the trap is real, common and dramatic -- and the example chosen
+to illustrate it was one of the 54% where it makes no difference at all.
+
+**An intermediate diverging is not yet a defect.** What it does downstream is the claim, and that has to be
+measured. The claim shipped in v4163's changelog unmeasured; it is corrected here.
+
+The hsb2rgb audit is closed with it: all four upstream call sites pass their hue through `fract()`, so the
+helper is **unsafe by construction and safe by convention**. The gate now asserts that convention of our
+ports, so a fifth caller that skips `fract` is caught here rather than on someone's screen.
+
+### All six Metal-to-GLSL traps now have a worked case
+
+The last outstanding one was edge behaviour, and `bcs_glitch` supplies it: it **clamps and then un-clamps
+itself**, adding the channel shift *after* the clamp, so the taps leave the layer at every border. Harmless
+in Metal. In GL without `CLAMP_TO_EDGE` the left edge appears on the right, **which looks deliberate**.
+`bcs_echo` is the counter-example in the same file and clamps before every sample.
+
+Two further measured details:
+
+- `neonEdge`'s Sobel step is **one point**. For a convolution a wrong scale changes *what counts as an
+  edge* rather than merely shifting the result: 64 lit pixels at one point against 128 at two.
+- `melt`'s specular lip is not scaled by `melt_amount`, so "melt off" still adds light. Measured:
+  **8.1e-6** at 8x8 and **2.8e-4** at 32x32 -- below one 8-bit level. Structural, not visible, and that is
+  the honest way to state it rather than calling it a visible bug.
+
+### Gate
+
+`swiftShaders` grew with each batch: knob coverage, the CPU/GLSL agreement checks, the `fract`-before-hue
+assertion, the clamp-before-sample assertion, and the corrected batch-2 example pinned as a
+regression. Tree at 1252 gates.
+## v4163 -- two effects ported from MIT sources, and neither port is the interesting part
+
+### SwiftUIShaders: the first two, and the machinery for the other 39
+
+`krispuckett/SwiftUIShaders` (MIT -- *"Use them, ship them, remix them. Attribution's appreciated, never
+required."*). Ported `bcs_emboss` and `bcs_heatShimmer`, both `layerEffect` form:
+
+```metal
+[[stitchable]] half4 bcs_emboss(float2 position, SwiftUI::Layer layer, float2 size,
+                                float strength, float angle, float mix_amount)
+```
+
+which is a screen-space pass over a source image -- the same shape as `crtPass` and `phosphorPass`, and paired
+with a CPU reference the way `crtPass` is paired with `crtModel`.
+
+**The maths of an emboss is four lines and none of the risk is in the four lines.** A shader that fails to
+compile gets fixed. The six differences between Metal and GLSL do not fail to compile, and five change the
+picture in silence:
+
+| trap | what it does |
+|---|---|
+| **y axis flips** | SwiftUI's `position.y` grows *down*, `gl_FragCoord.y` grows *up*. `heatShimmer`'s `vertical_bias` is built on `1.0 - uv.y`, so an unflipped port fades the wrong way: **a shader that compiles, animates, and is upside down.** |
+| **premultiplied alpha** | `rgb += emboss` never touches alpha -- a different operation against a straight-alpha texture. Invisible on an opaque photo, wrong on anything cut out. |
+| **points, not pixels** | the `1.5` offset is 1.5 *points*; on a 2x canvas a direct port halves the effect |
+| **`half` is mediump** | `half(x)` quantises on purpose: `toHalf(0.1)` = 0.0999755859375 |
+| **`fmod` is not `mod`** | disagree on **every** negative input -- `fmod(-0.25,1) = -0.25` against `mod(-0.25,1) = 0.75` |
+| **edges wrap** | the one that at least *looks* wrong |
+
+The flip is done **once**, in a named helper, which is the choice `crtPass.js` already made for the same reason.
+The alpha convention is now something the **caller declares** rather than a default nobody reads. And all six
+are recorded **as data** in `METAL_TO_GLSL`, with which are silent -- so the next port reads them instead of
+rediscovering them, and the other 39 shaders are one model function and one frag each.
+
+### Holosticker: a material, on geometry that already existed
+
+`jal-co/holosticker` (MIT). None of their code is here -- three is vendored and `svg-forge.html` already parses
+an SVG into `THREE.Shape` and bevel-extrudes it, so what was missing was a **material**, and a material is
+arithmetic.
+
+**A holofoil and a picture of a rainbow are indistinguishable in a screenshot.** The whole difference is what
+happens when the thing turns, so nearly every check moves the view angle. A hue ramp passes a screenshot and
+fails all of them.
+
+It is the real interference, because the real one is barely harder: `OPD = 2*n*d*cos(theta_t)` with Snell inside
+the film and a pi shift on the external reflection, sampled at 600/550/450nm.
+
+```
+cos 1.0  OPD 1064nm  RGB 0.43,0.04,0.83   violet
+cos 0.7  OPD  915nm  RGB 0.99,0.76,0.01   gold
+cos 0.3  OPD  779nm  RGB 0.65,0.93,0.56   green
+cos 0.1  OPD  749nm  RGB 0.49,0.82,0.76   cyan
+```
+
+**My own comment got the visible consequence wrong first, and the correction is the round's best line.** It
+said the colour *"walks toward blue"* at grazing. Measured at a 380nm film: blue-minus-red runs **0.40** head-on
+and **0.21** grazing -- *less* blue. **The hue does not walk anywhere, it cycles.**
+
+What is monotonic is the **path**: OPD falls 1064 to 749nm across cos 1.0 down to 0.1 and never doubles back, at
+200, 380 and 700nm alike. So the gate asserts **the monotonic path and not a colour** -- the colour is a
+consequence, the path is the physics. And that is precisely the tell: a hue wheel cycles whichever way its
+author wired it and reverses as often as not, which reads as "cheap sticker" without a viewer being able to say
+why.
+
+Two more decisions worth their own lines. **Flakes are keyed on surface coordinates, never the screen** --
+seeded from `gl_FragCoord` they crawl as the object turns and the surface appears to slide under its own
+sparkle; each carries its own tilt so they fire one at a time instead of the field flashing together. And
+**everything clamps**, because three additive layers over a base are spectacular on a dark logo and a white blob
+on a light one, which is the failure that gets blamed on the artwork.
+
+It **patches** `MeshStandardMaterial` through `onBeforeCompile` rather than replacing it -- the medal already has
+metalness, roughness, a colour and the page's lights, and a bespoke `ShaderMaterial` throws all of that away and
+then has to re-earn it. The patch is **driven** in the gate against a three-shaped fragment shader, not read for.
+
+### What neither port verifies
+
+The GLSL executing. There is no GL context on this box, so both shaders are read for **correspondence** against
+models that *are* exercised -- same constants, same expressions, same traps at the same places. That is weaker
+than `crtPass`'s bit-identical comparison and is stated rather than implied.
+
+Physics can be gated; taste cannot.
+
+Two new gates -- `swiftShaders` and `holoFoil` -- take the tree to 1252 gates.
+## v4162 -- the equation of state pinned, and three gates that asserted a stopwatch
+
+### The file the list forgot
+
+`physics/sph/kernels.js` made the whole argument at v2546:
+
+> IEEE 754 pins +, -, *, / and sqrt EXACTLY: correctly rounded, bit-identical on any conforming hardware. It
+> pins NOTHING about pow ... an arm64 Mac joins this fleet tomorrow, and every other box is x86_64.
+
+It converted the kernels to explicit multiplication and built `portableMath-selfcheck.mjs` to enforce it, with a
+`DETERMINISTIC` list of files that may use only arithmetic the standard pins:
+
+```
+physics/sph/kernels.js, physics/sph/spatialGrid.js, physics/soft/boneField.js,
+physics/soft/fleshDynamics.js, simulation/tomo/nullspace.js
+```
+
+**`physics/sph/sph.js` is not on it, and it holds the equation of state.** The kernels were made portable and
+the pressure was not. At v4161 Keith's rig and this box produced different knob rankings from the same commit --
+every ideal-EOS number identical to the printed digit, every Tait number diverging from the third decimal,
+because only the Tait branch went through `Math.pow`.
+
+New `ipow(x, n)` does `x^n` by squaring using nothing but IEEE multiplication. **Measured:** `Math.pow` and
+`ipow` disagree on **65.8%** of the density ratios a column visits, worst relative difference **6.571e-16** --
+about 3 ulp, the same order as the 6.09e-16 v2546 measured for `h^9`.
+
+Two more sites pinned: the shadow amplitude's `h^3` becomes `h*h*h`, and the shadow kernel's `x^3.5` becomes
+`x^3 * sqrt(x)`. **A half power is pinnable**, which is the part that looks impossible and is not, because
+`sqrt` is one of the five.
+
+`sph.js` joins the gate under a **marker rule** rather than a frozen count: every unpinned call must carry
+`UNPINNED-OK` and a reason on its own line, so a new one fails until somebody writes down why. Three remain, all
+argued at the call site -- one `Math.pow` for a non-integer gamma (the knob census sweeps 8.4, and a real
+exponent has no pinned decomposition) and `cos`/`sin` for a CT scan angle in a diagnostic `step()` never calls.
+The pinned path is asserted **by running `pressureOf`**, because no source scan can say which branch took the
+call.
+
+### The sweep that justified it found the round's real subject
+
+14 SPH gates re-run: 12 green.
+
+`neighbourBakeoff` was **red before this change** -- proven by running it at v4161 in a clean worktree. It is a
+v4122 regression of mine (`gridCellTouches` reads 0 because the gate reaches into `grid.map`, the hash fallback
+my dense path replaced) and is left for its own round.
+
+`rh-hydrostatic` went red and **was** mine. So a third spelling of the same power settled whether that mattered:
+`exp(gamma*log r)`, mathematically identical, about three ulp apart.
+
+| arm | c=8 | c=15 | c=25 | settled rows |
+|---|---|---|---|---|
+| `Math.pow` | 11.0% | 0.8% | 0.1% | 2 |
+| `ipow` | 6.6% | 2.5% | 1.1% | **0** |
+| `exp(g*log r)` | 2.5% | 0.7% | 0.5% | 2 |
+
+**The three arms put the settled-row count at 2, 0 and 2 with the physics unchanged.** c=8's spread moves by a
+factor of 4.4 and c=25's by a factor of 11, on a last-bit difference -- and every recorded value still brackets
+in all three. So `settled.length > 0` made the gate's verdict turn on a coin toss.
+
+The guard's **purpose** is kept -- a physics change must not buy an exemption by making rows less settled -- and
+its mechanism replaced: the **tightest** row must reproduce its record, whatever its absolute spread. One 2%
+claim is always made, it does not care where the bar fell, and the gamma plant still fails it. c=25 now
+reproduces a v2881 measurement to **0.95% of a 2% tolerance**, four hundred versions and one equation of state
+later.
+
+### twoFBind: the same disease in a third lab
+
+It required `costHint(default) > 100000` and `costHint(short) < 10000`. `costHint` is `base * (steps/24000)`
+where `base` is **read from a frozen cost record** -- this box's says **212479**, so 212479/20 = **10623.95**,
+six percent over a ceiling written against another machine. Its own note already recorded the same build timing
+117.0s, 205.0s and 207.7s under contention, a 1.8x spread; 212s sits inside that band.
+
+The claim was never the absolute cost but that **the knobs move it**, which is a ratio of exactly **20** because
+`base` cancels. And its failure text quoted 115,200 and 5,760 -- figures that record has not produced since it
+was re-frozen -- so a reader of the failing line was told numbers nobody measured. It prints the computed ones
+now.
+
+### The shape of the round
+
+`materialKnobs` (v4161), `rh-hydrostatic` and `twoFBind` were one bug in three labs: **a gate asserting a number
+that depends on whose stopwatch it was.** Two of the three said so in their own comments before they failed.
+Four new gates this session -- petfbiGallery, dracoWeld, runnerGauge and xbarPlugin -- take the tree to 1250 gates.
+## v4161 -- two machines disagreed about the fluid, and the gate was asserting the fragile half of its own sentence
+
+Keith's rig went red on a check that passes here, on the same commit:
+
+```
+FAIL  AND THE CENSUS INVERTS: soundSpeed IS LAST IN THE BOX AND FIRST OUT OF IT
+      shipped gamma > soundSpeed > viscosity  |  free soundSpeed > viscosity > gamma
+```
+
+This box orders the shipped container `viscosity > gamma > soundSpeed`. His orders it
+`gamma > soundSpeed > viscosity`.
+
+#### The split runs exactly along the equation of state
+
+| quantity | this box | Keith's rig |
+|---|---|---|
+| sec 7 ideal, retained @1200 / @2400 | 0.6507 / 0.3316 | **0.6507 / 0.3316** |
+| sec 3 ideal, stiffness sensitivity | 8.377e-2 | **8.377e-2** |
+| sec 4 tait, retained at shipped lid | 1.8446 | 1.8354 |
+| sec 4 tait, lid gap | 0.0010 | 0.0070 |
+| sec 5 tait, compensated spread | 8.481e-3 | 7.059e-3 |
+
+**Every ideal-EOS number matches to every printed digit. Every Tait number diverges from the third decimal.**
+
+`pressureOf`'s ideal branch is `stiffness * (rho - rho0)` -- multiply and subtract, which IEEE 754 pins exactly,
+correctly rounded and bit-identical on any conforming hardware. Its Tait branch is `B * (Math.pow(r, gamma) - 1)`,
+and ECMAScript calls `Math.pow` **implementation-approximated**. One ulp at step 1, in a column this same gate
+documents as *exploding* -- energy quadruples over 2000 steps -- is a third-decimal difference by step 1200. Three
+residues sitting within 30x of each other then reorder.
+
+#### The correct assertion was already written down, one line below the one that failed
+
+`MEASURED_V3541`'s own note: *"a 433x suppression that INVERTS the ranking."* The gate asserted the inversion and
+not the suppression.
+
+Measured here at 1200 steps: soundSpeed **8.366e-4** at the shipped lid against **3.619e-1** at a free one --
+**433x**, reproducing that recorded table to every digit. Now asserted as:
+
+1. **the suppression**, threshold 20x against a measured 433x -- twenty-one-fold headroom over a number that has
+   to survive another machine's `Math.pow`; and
+2. **the rank claim both boxes agree on**: soundSpeed *first* in the free box and *not first* in the shipped one.
+
+**This is not a loosening, and the arithmetic says so.** A claim about a factor of 433 is far harder to satisfy by
+accident than a claim about which of three numbers within 30x is smallest -- and the old check would still have
+passed on a fixture where the suppression had vanished entirely, so long as the residues happened to sort the
+right way. Keith ranks soundSpeed **second** inside the box and this machine ranks it **third**; both are the same
+physical statement, that the ceiling takes the most important material parameter out of first place.
+
+#### The prose was corrected in the same round
+
+Two other sites stated the old claim -- `materialKnobs`' finding C ("goes from the WEAKEST knob to the STRONGEST")
+and `MEASURED_V3541`'s note. Both now say *suppressed* rather than *weakest*, both record that the final rank is
+not portable, and the table carries a warning that its magnitudes are this box's and only the ratio travels. A
+tree whose comments outlive its assertions is how a register rots, which is the failure mode this file was
+written to fight.
+
+#### The antidote is written against the fix that is coming
+
+> **DO NOT RESTORE THE RANK-LAST ASSERTION IF THE TAIT BRANCH IS EVER MADE BIT-EXACT ACROSS MACHINES.**
+> Reproducible is not the same as meaningful: an ordering of three residues within 30x of each other in an
+> exploding column would then be stable and still would not be a fact about the fluid.
+
+Gate count unchanged at 1246 gates. The `Math.pow` divergence itself is a separate, larger round: this tree
+already made that call at v2546 for `physics/sph/kernels.js`, and `physics/sph/sph.js` -- which holds the equation
+of state -- is not on `portableMath-selfcheck`'s `DETERMINISTIC` list.
+## v4160 -- the archive arrived, and corrected the manifest built to receive it
+
+`SweK_VBA_v3499.zip`, extracted and scanned through v4159's own bridge:
+
+| folder | modules | importable | v4159 verdict |
+|---|---|---|---|
+| `VBATransmitter` | 195 | 193 | **linked**, 9 of 9 guessed markers present |
+| `VBAEngine` | 263 | 261 | **missed** -- scored 1, one short |
+| `VBAVoxelEngine` | 64 | 61 | **linked**, 2 of 2 |
+| `VBASyncCore` | 4 | 2 | **missed** -- scored 1, one short |
+| `VBAEngine/addons/VBAOpenGL_Demos` | 69 | 67 | reported unclassified |
+
+**Two of four linked, and both misses were by exactly one marker.** The threshold was not moved -- v4159 wrote
+in advance that the honest response to a bad classification is to widen the markers from the archive's listing,
+never to lower the bar until something matches. That is what happened.
+
+#### Wrong guess 1: the two workbooks do not share a GL constants module
+
+`NOTES.md` 7358 counted 81 `Public Const` in `modGLConstants.bas` while verifying **the voxel workbook**, and
+v4159 generalised that to the render engine on the reasoning that a GL renderer must declare GL. It does -- in
+**`GLConstants.bas`**, a different module. Checked across all five folders: `modGLConstants` appears only in
+`VBAVoxelEngine`, `GLConstants` only in `VBAEngine`.
+
+So the deliberate tie v4159 built its low-confidence branch around **does not exist**. The parts are cleanly
+separable, and the gate now asserts **zero** shared decisive markers -- strictly stronger than "exactly one, and
+it is modGLConstants," and it would have caught the original mistake. The tie-breaking code stays, since a
+hand-merged archive could still produce one, but the tie is now *constructed* in the fixture rather than claimed
+as a fact about this archive.
+
+The engine's real markers are its OpenGL surface: `GLConstants`, `OpenGLFacade`, `OpenGLRenderer`,
+`OpenGLWindow`, `modWGLContext`, `modGL_Declares`, `modFreeGLUT`, `Demo_BridgeFPS` -- all eight verified present
+in `VBAEngine` and absent from every other folder.
+
+#### Wrong guess 2: three of `VBASyncCore`'s four names were already deleted
+
+`docs/CHANGELOG.md` 10643 records `VBASyncImport`, `VBASyncECS` and `VBASyncGitHub` being removed as stale --
+and that is **the same line v4159 cited as the source for those names**. What survives is `VBASyncEngine` plus
+`VBASyncBootstrap`, which the entry never mentions.
+
+A manifest built from changelog prose had to be checked against a directory listing before it could stop calling
+itself provisional, and this is exactly why. `provisional` is now `false`, and `READ_AGAINST` names the archive
+that corrected it.
+
+#### Two things the real archive taught that no fixture had
+
+**A VBA folder inside a linked part is that part's sub-folder, not a stranger.** `VBAOpenGL_Demos` (69 modules),
+`VBAVoxelEngine/graphics` and `VBAVoxelEngine/wad` all came back "unclassified" on the first scan. True in the
+narrow sense that none carries a decisive marker; useless in every other, since each sits inside a folder linked
+directly above it -- and it buried the one folder that genuinely was unrecognised. Containment is by **directory**,
+so a name cannot fool it.
+
+**Document modules must not inflate a count.** `VBASyncCore` holds four `.bas/.cls`, two of them `ThisWorkbook.cls`
+and `Sheet2.cls`. Reporting "4 modules" overstates the smallest part by a factor of two -- and *two markers out of
+two importable modules* is a far stronger reading than two out of four. `importableCount` is now reported beside
+`sources` wherever they differ.
+
+#### The counts disagreed with this tree, in both directions
+
+`Shared/Net/README.md` says the transmitter is 189 modules; the archive holds **195**. `NOTES.md` verified 73 for
+the voxel workbook; this archive holds **64**. Both were reported by `countsAgree` rather than judged, because the
+archive is the authority on its own size. The recorded figures are now the archive's.
+
+After the correction: **4 of 4 parts linked at high confidence, zero unclassified folders.** Gate count unchanged
+at 1246 gates.
+## v4159 -- the VBA half, linked into the install rather than copied into the tree
+
+Keith: *"i want to get the vba achives linked into the SweK install. I have the last vba archive, which connects
+as an addon to SweK Engine. that vba part was started first."* Then, naming the pieces: a **VBA transmitter,
+which does winsock**; the **VBA opengl render engine** ("pretty cool, last we left it many months ago"); a
+**VBA to SweK Engine connector workbook**; and **some smaller parts**.
+
+**The archive is not in this repository, and the root README has said so for hundreds of versions** -- the
+exploded module folders "ship separately." Separately has meant, in practice, *nowhere*: nothing in this tree
+could say what the archive contains, whether a copy on the machine was the right one, or which of its parts the
+engine was actually talking to. What ships here are fragments of it: `Shared/Net/`'s slim Winsock extract,
+`Shared/modEngineBridge.bas`, and `WebGLEngine/vba/`'s GPU-brain modules.
+
+#### `vba/archiveManifest.mjs` -- the four parts, and how a folder is recognised as one
+
+| part | what it is | recorded | the fragment already in this tree |
+|---|---|---|---|
+| `transmitter` | Winsock + the HTTP/WebSocket/MQTT **servers** on top. The one part that can HOST. | 189 modules | `Shared/Net/` (~650 lines) |
+| `engine` | the OpenGL/D3D11 render workbook | -- | `HomeAssistant/modHAInstall.bas` |
+| `connector` | the workbook wired to **this** engine | 73 modules | `Shared/modEngineBridge.bas` |
+| `smaller` | the sync tool, the demo addons | -- | -- |
+
+The transmitter's port is not chosen here. `Shared/modEngineBridge.bas` has always defaulted its candidate list
+to "Node :8787, then transmitter :8099" and repointed at whichever answers -- the number is read off the client
+that has been probing for it all along.
+
+**Recognition is by module name, not folder name.** Yours can be called `vba_final` or `Engine (2)`; the name is
+corroboration and never a verdict.
+
+#### The trap it is built around is already in this repository
+
+`Shared/Net/` carries `WinsockDeclares.bas`, `WinsockUtils.bas` and `WinAPI.bas` -- three modules the transmitter
+also has, because that folder's own README says in as many words that they were *"extracted from the VBA smart
+transmitter."* **A classifier that counted marker hits would find three transmitter modules there and link the
+engine's 650-line extract as the 189-module transmitter, then report itself healthy.**
+
+So those three are **shared** markers: they corroborate, they never decide. What decides is a module the extract
+provably lacks -- a server, a host, a broker. A folder needs **two** decisive markers, because one is a
+coincidence: somebody copying a single module out of the transmitter to read it should not relabel whatever
+folder it landed in. A folder that reaches neither is reported **unclassified**, with its file count and a
+five-name sample, rather than forced into one of four buckets.
+
+Measured, on real disk:
+
+- scanning **this entire repository** finds **6** folders of genuine VBA source and links **zero of four** parts,
+  calling `Shared/Net/` unclassified. That is the correct answer, and it is now asserted.
+- a fixture archive links **4 of 4**, including `addons/VBAOpenGL_Demos/` at depth 3.
+- `modGLConstants` is decisive for **both** workbooks, so a genuine tie exists; it is reported as
+  `confidence: "low"` with the runner-up named, and broken by the folder name, rather than coin-tossed.
+
+**Missing is `ok:true`, not an error.** The archive ships separately by design, so `linked: false` is a healthy
+state. The arriving-pages check spent versions proving the converse: a gate that cries about the ordinary case
+is one people learn to ignore, and then it cannot tell them anything.
+
+#### `ai-bridge/vbaArchiveBridge.js` -- it links, and it never copies
+
+Pulling 189 transmitter modules into this tree would **fork** them: the archive stays what Keith edits, this tree
+keeps a snapshot, and the two drift silently until somebody asks which one a workbook was built from. A pointer
+cannot drift. It can go *stale* -- and a pointer whose folder is gone reports `stale: true` rather than "not
+linked," because the quiet answer is the same lie a stale copy tells, in the other direction.
+
+One file is written: `vba-archive.local.json`, beside `host-timings.local.json` and gitignored the same way.
+Delete it and the archive is unlinked; nothing else changes. **Nothing is ever written inside the archive** -- the
+fixture test re-scans and asserts not one byte changed, rather than trusting the header that says so. Extraction
+is the one write and it lands in `~/.voxelbridge/vba/`, outside this tree on purpose since every gate here walks
+every file in it; **the destination is not a parameter**, because a zip can carry `../` in its entries.
+
+#### `excel.html` + an Excel button on `server.html`
+
+The only thing on that opt-in shelf that is not somebody else's work. It reuses the existing `/workbook/folders`
+and `/workbook/assemble` routes rather than growing a second assembler.
+
+**Macro execution is an allowlist, the same call `ios-tools` made and for the same reason.** `Application.Run`
+takes any name, and VBA can delete files, reach the network and drive COM -- a denylist would be correct exactly
+until the archive gained the next dangerous macro. **7** of the engine's own entry points, each carrying the
+reason it is allowed, and membership is **exact**: a name that merely *contains* an allowed one is refused, since
+a prefix match would be an argument-injection hole straight into `Application.Run`.
+
+**The allowlist is checked before the platform, and that order is load-bearing.** The first draft returned "needs
+Windows + Excel" first -- which made every refusal untestable on the Linux box that had to check them, and would
+have made excel.html's claim that "the allowlist and every refusal still answer" false on the one machine able to
+verify it. A refusal by name does not depend on the platform, so it no longer waits for one.
+
+`ai-bridge/run-macro.vbs` opens the workbook read-only with `EnableEvents = False` (so `Workbook_Open` does not
+fire just to call one macro) and never saves on the way out. It carries **no second copy of the allowlist**: two
+lists that must agree are one list and one stale list, and the stale one is always the permissive one.
+
+#### "AI Brain" is now "Excel AI Brains"
+
+Keith: *"there is an 'AI Brain' panel on main render page that really should read 'Excel AI Brains'."* Right, and
+for a sharper reason than tidiness: on a render page carrying LLM consoles, GPU brains and a physics-lab roster,
+that was the one label that never said *whose*. Every number in the panel arrives from a workbook -- the tick
+count, the entity list, the directives its buttons queue. The plural is deliberate: the workbook runs a brain per
+entity. Renamed at the header **and** the minitab, and the gate asserts the tab's own line, since a file-wide
+search for the new name would pass on a half-rename.
+
+#### What is *not* verified
+
+Everything past "Excel answered." The box this was written on is Linux with no Excel and no copy of the archive.
+The marker names were read out of this tree's changelog and NOTES -- not out of a directory listing of a folder
+anyone here has opened -- so the manifest reports itself **`provisional: true`** in the data rather than in a
+comment, the page prints it, and the gate asserts the flag is still up. When a real archive is scanned the flag
+comes down and the markers come from its listing. If a part classifies wrong, the fix is to widen its markers
+from that listing, never to lower the threshold until something matches.
+
+New `tools/ship/vbaArchive-selfcheck.mjs` takes the tree to 1246 gates.
+## Since v4157 -- two solutions to one spring, and a readout that changes instead of being replaced
+
+v4158 -- Keith asked for lochie/torph's text morphing on the ticker. *** IT IS DELIBERATELY NOT ON THE TICKER, AND THE ARITHMETIC IS THE REASON. *** server.html's ticker is a marquee: 0.9px per frame at 60fps is 54px/s across a 220px clip, so a message sits on screen for 6.0s at 80px wide and 17.5s at 700px, against a queue that caps at 40 -- ABOUT FIVE AND A HALF MINUTES OF BACKLOG. Its problem is THROUGHPUT, which no transition fixes. And morphing only earns anything when the two strings SHARE STRUCTURE: consecutive log lines share almost nothing, so every glyph would fade out and every glyph fade in -- a crossfade with extra machinery, slower to read than the scroll it replaced. The measurement is now ASSERTED BY THE GATE against the ticker's own scroll constant, so if it is ever retimed the decision is revisited rather than inherited. Pointed at the READOUTS instead, where old and new always share structure. *** THE FOUNDATION IS A SECOND SOLUTION TO A SPRING THIS TREE ALREADY HAD, AND THAT IS WHAT MAKES THE GATE STRONG. *** ui/springMotion.js's step() INTEGRATES the damped harmonic oscillator numerically -- retargetable mid-flight, which an interruptible toast needs, and one call per frame on the main thread. New springToCssLinear() SOLVES THE SAME EQUATION IN CLOSED FORM and samples it into a CSS linear() easing, so the browser runs it ON THE COMPOSITOR and a busy main thread cannot make it stutter, at the cost of being a baked curve nothing can interrupt. Two independent answers to one question can be pointed at each other, and the agreement is asserted AS CONVERGENCE RATHER THAN AS A TOLERANCE: semi-implicit Euler is first order, so halving dt must halve the error. MEASURED at dt 1/480, 1/960 and 1/1920: errors 1.31e-2, 6.54e-3, 3.26e-3, ratios 2.01 and 2.00. *** A WRONG CLOSED FORM CANNOT DO THAT -- it would plateau at whatever constant it disagrees by, and a tolerance-based check would have passed it. *** The parameters are the SHARED PRESETS read through the shared dampingRatio(), so a CSS transition and a JS toast cannot disagree about what "snappy" means. *** AND THE CRITICAL BAND IS A SEPARATE BRANCH, WHICH THE OBVIOUS IMPLEMENTATION DIVIDES BY ZERO IN: *** the overdamped solution divides by (r2 - r1) and those roots COINCIDE at zeta 1, and this tree's `stiff` preset is zeta 1.0006 -- inside that band, and it is the preset meant for surfaces where overshoot would look like a bug. The last sampled point is pinned to EXACTLY 1, because a curve ending at 0.9997 makes CSS animate to 0.9997 and stop, which is the same defect step()'s snap-on-rest exists to prevent arriving in the other engine. New ui/textMorph.js diffs by LCS AND NOT BY A PREFIX/SUFFIX TRIM: "3 peers" -> "13 peers" keeps ALL SEVEN survivors and inserts one, where a trim sees a changed first character and rewrites the whole string -- saying "different value" when the truth is "one digit arrived". *** AND IT SEGMENTS BY GRAPHEME, WHICH THIS TREE'S UI MAKES NECESSARY RATHER THAN TIDY: *** the gear in server.html's own header is U+2699 followed by U+FE0F, and [...str] splits that into two, the second an invisible modifier that renders as a stray box on its own -- so a naive morph does not animate badly, IT CORRUPTS THE TEXT. Flags, ZWJ families and surrogate pairs are all gated. Segmentation, the diff and the plan are pure, so every number is settled in node; only the FLIP touches the DOM. Wired into the engine version in server.html through morphText(), at BOTH write sites -- boot and the update check -- since morphing one and not the other would make the animation depend on which path last ran. The module is fetched lazily and every failure falls back to textContent, because a readout that stopped updating when an animation module 404'd would be a strictly worse front door than one that never animated. New tools/ship/textMorph-selfcheck.mjs takes the tree to 1245 gates. Full changelog on docs/CHANGELOG.md.
+## Since v4156 -- reskin a rigged model: keep the skeleton, replace the surface
+
+v4157 -- Keith: "i would have thought a penciled robot expressive would have the same skin dimensions as the original. sort of just paste the new skin over the old skin and it still has the same joints etc." *** HE IS RIGHT IN GENERAL AND THE ASSET IS WHY IT LOOKED OTHERWISE, WHICH IS A NARROWER AND MORE USEFUL STATEMENT THAN THE ONE I MADE. *** For a TEXTURED model that IS the whole job: same vertices, same JOINTS_0/WEIGHTS_0, same skeleton, swap the image. MEASURED ON THE SHIPPED FILE: GPU_Assets/RobotExpressive.glb has 7,214 vertices, 14 animation clips, a skin -- AND NO TEXCOORD_0 AND NO TEXTURE AT ALL. It is flat-coloured by per-material baseColorFactor, so there is no UV layout and nowhere to paste an image; unwrapping 7,214 vertices is a modelling job whose automatic version puts seams down the front of a robot. I had called reskinning "structural"; the true statement is STRUCTURAL FOR THIS ASSET, and correcting it produced the route below. New tools/export/reskin.js, ROUTE 1 -- VERTEX COLOURS, which is his idea working: COLOR_0 is per-vertex and NEEDS NO UVs, so the same 7,214 vertices keep the same joints, the same weights and all 14 clips and only a colour per vertex is new. *** THE ENTIRE FOUR-INFLUENCE PROBLEM IS NOT MERELY HANDLED, IT IS NOT INCURRED. *** riggedExport's stroke tubes add NEW vertices, so each must derive its bones from a barycentric blend of three originals -- up to twelve joints culled to four and renormalised, or the limb weights stop summing to 1 and the mesh shrinks toward the origin as it animates. A vertex that already existed already has its four. The gate asserts the position, joint, weight and index arrays are THE SAME OBJECTS, not copies, because identity is a stronger claim than equality and the whole point of the route is that the rig is untouched. *** DRIVING IT CAUGHT A CLAIM THAT WOULD HAVE BEEN QUIETLY FALSE. *** Half-Lambert with an ambient floor of 0.25 cannot return anything below 0.25, so shades landed in levels 2..9 of asciify's ten-level RAMP and THE FIRST TWO WERE UNREACHABLE -- the file would have said ten levels while rendering eight, AND THE TWO IT LOSES ARE THE BLACKS. normalizeShade stretches the observed range across the whole ramp: measured raw range 0.2517..0.9983, and the histogram goes from 0,0,306,1226,1039,792,863,907,1314,767 to an even 634,898,748,698,646,599,716,757,866,652 -- all ten used. The rescale is PER MODEL and that is named as the relative-versus-absolute choice it is, the same one the repo terrain has to make about heat. ROUTE 2 -- ASCII GLYPH QUADS: new geometry, so it DOES pay the four-influence cost, and pays it through riggedExport's own blendInfluences rather than a second copy of that arithmetic. Sampling is AREA-WEIGHTED and driven rather than asserted -- on two triangles 100x apart in area the big one takes 1,990 of 2,000 samples, where one-per-triangle would have put 1,000 on each and made density read as topology rather than shading. Every corner of a quad takes the SAME four influences: blending per corner would let one corner follow the forearm and another the upper arm and tear the character in half mid-clip; 0 torn of 800 and 0 with weights off 1, checked on the real 43-bone skeleton where the 12->4 cull actually bites. Glyph UVs are inset by half a texel, because a quad landing exactly on a cell boundary samples its neighbour under linear filtering and every glyph shows a sliver of the next character. *** AND THE EXPORTER IS NOW THE RESKIN EXPORTER RATHER THAN THE KRBN EXPORTER. *** buildRiggedExportScene never knew what it was binding -- the only Krbn in it was three strings and a colour -- so those are parameters now, defaulting to the old values so krbn-rigged.html's output is unchanged (its gate re-run, still green). The serialising half is lifted out as exportReskinnedGLB(THREE, GLTFExporter, gltf, geometry, opts) and exportRiggedGLB CALLS it: Krbn strokes are one caller now, not the only thing the path can carry. The `animations` array is still passed and the gate says why -- GLTFExporter does NOT walk the scene for clips, it serialises the array it is handed, so dropping that line exports a model that looks right, binds right and HAS NOTHING TO PLAY, with no error anywhere. window.swekReskin.colour() and .glyphs() are the doors; the glyph ATLAS is built in main.js and not in the module, so tools/export/reskin.js stays free of the DOM and every number in it is checkable in node -- which is the reason the gate can run at all. New tools/ship/reskin-selfcheck.mjs takes the tree to 1244 gates, every measurement taken against the shipped RobotExpressive rather than a fixture. Full changelog on docs/CHANGELOG.md.
+## Since v4155 -- the return leg: voxels back out as a model
+
+v4156 -- *** THE PIPELINE RAN ONE WAY FOR SEVEN HUNDRED VERSIONS. *** ui/assetVoxelizer.js has turned a GLB into voxels since v1391 and nothing went the other way. The tree VENDORS three's GLTFExporter and its only caller is tools/krbn/riggedExport.js, which is skeleton-specific -- it assembles a bone hierarchy plus stroke tubes and deliberately reuses rather than clones bones so the animation clips' target UUIDs survive. main.js mentioned GLTFExporter only in changelog PROSE. So there was no way to get the stamped world out: not the fetched real terrain, and not a repository rendered as ground. New tools/export/voxelGlb.mjs + world/worldGlbExport.js + window.swekExport.glb(). *** IT WRITES THE CONTAINER BY HAND, AND THE REASON IS THAT THE VOXEL WORLD IS NOT A three.js SCENE. *** render/voxelrenderer.js is raw WebGL with its own frustum, palette and material registry, so GLTFExporter would need an entire second scene graph built for it first. Emitting the bytes directly means no renderer dependency -- a page that never loads three can still export -- and, far more usefully, IT RUNS IN NODE: the new gate ROUND-TRIPS A REAL EXPORT THROUGH THIS TREE'S OWN gpu/GLBParser.js without a browser. A GLB writer whose only test is "open it in Blender and see" is a writer nobody can regress. THE TWO THINGS A HAND-ROLLED WRITER GETS WRONG ARE BOTH ASSERTED AGAINST A REAL FILE. (1) POSITION accessors MUST carry min and max -- optional on every other accessor, REQUIRED there by glTF 2.0 5.3, and a file without them loads as invisible or unframeable rather than as an error, which is the failure nobody attributes to the exporter. (2) Every chunk and every bufferView is 4-byte aligned, JSON padded with SPACES and BIN with zeros, and the padding goes BEFORE each view rather than after -- padding only at the end leaves the NEXT view misaligned, which is the version of that bug that hides. *** AND IT REUSES THE RENDERER'S OWN MESHER, WHICH IS THE WHOLE REASON THE FILE IS SMALL. *** world/chunkMesherCore.js does greedy meshing, merging coplanar runs into single quads; MEASURED, a 512-voxel floor exports as 48 triangles against the 6,144 a cube-per-voxel writer would emit. Its header also says the verts are ALREADY world-space, offset by cx*S -- so nothing here translates anything, and a second offset would scatter every chunk to double its true distance, a bug that looks like a broken exporter and is a misread comment. Chunk height is DERIVED from the voxel buffer length rather than read off the world, so it cannot disagree with the array it is about to index. *** DRIVEN END TO END ON THIS REPOSITORY, NOT ON A FIXTURE: *** 4,665 files scanned, the v4149 heightfield built, voxels filled and exported in 303ms to a 3.56 MB .glb -- 127 meshes, 153,066 vertices, 51,022 triangles, with main.js the peak at 30,119 lines. Read back through GLBParser in 42ms: 153,066 vertices, every one finite. Refusals are gated too: writing nothing THROWS rather than emitting an empty model (a .glb that downloads and opens to nothing is indistinguishable from a broken exporter), and a colour array whose length does not match the vertex count is DROPPED rather than truncated, because a silently shortened attribute is wrong everywhere and looks fine. ONE THING CHECKED AGAINST THE FILE RATHER THAN THE PARSER, WITH THE REASON RECORDED: GLBParser returned no `colors` for a static single-primitive mesh, so the colour claim is settled by decoding the accessor straight out of the BIN chunk. THAT IS A QUESTION ABOUT ITS ASSEMBLY PATH -- it is built for skinned avatar models -- AND NOT EVIDENCE ABOUT THESE BYTES; a first theory that a shadowed `const colors` was discarding them was checked and is WRONG, the local is carried as `color:` into primData. New tools/ship/voxelGlb-selfcheck.mjs takes the tree to 1243 gates. Full changelog on docs/CHANGELOG.md.
+## Since v4154 -- adb for iOS, and a gate that was making the wrong thing cheaper
+
+v4155 -- new ai-bridge/iosDeviceBridge.js + ios-tools.html: doronz88/pymobiledevice3 (GPL-3.0, pip-installed, NEVER vendored) is what adb is to Android -- pure Python, NO JAILBREAK, talking the protocols an iPhone already speaks to a computer it has been told to trust. *** IT IS DRIVEN THROUGH AN ALLOWLIST AND THAT IS THE DESIGN RATHER THAN A PRECAUTION. *** That CLI ships 29 command groups and several of them change or destroy a device -- `restore` CAN WIPE AN IPHONE, `profile` installs configuration profiles, `amfi` toggles developer mode. A DENYLIST IS WRONG BY CONSTRUCTION: it is correct only until upstream adds the next dangerous verb, and would then pass it straight through. So six safe commands are named one at a time with what each READS, everything else is refused by default including verbs nobody has written yet, and no caller-supplied argv ever reaches the process -- run() indexes a frozen table by name and builds the argument list itself. The gate drives all of that: eight destructive verbs refused, an invented verb refused by the same rule, a udid carrying shell punctuation refused ABOVE the line that resolves the CLI. *** AND IT NEVER ELEVATES. *** The iOS 17+ tunnel needs root on Linux and Windows because it creates a TUN interface (on macOS none is needed -- it publishes Apple's own remoted tunnel), and this bridge reports that and hands the user the exact command rather than asking for a password. *** IT ALSO REFUSES TO CLAIM THE PEER LADDER MOVED, IN EVERY REPLY: *** an iPhone still cannot run node or host ai-bridge/server.js, so ios-peer.html's "a subset in Safari" stands. What changed is the HOST's grip on the phone, not the phone. NO iPHONE HAS EVER BEEN ATTACHED and pymobiledevice3 is not installed here, so the page marks five rows MEASURED and three NOT VERIFIED. *** AND THEN KEITH ASKED THE QUESTION THAT FIXED A GATE. *** "is a gate going to error every time we get new arriving pages that dont have a folder? This error doesnt sound like a problem." He was right, and pageReach-selfcheck's OWN HISTORY already agreed with him -- its v3254 note, raising 15 to 16, reads "Arriving exists to hold new work before it settles; A GENUINELY NEW PAGE LANDING THERE IS THE MECHANISM, NOT A LEAK." The defect was a mismatch between the headline and the arithmetic: the check is titled "a curated front cannot hold a third of the tree" -- A PROPORTION -- and compared an absolute count to a frozen number, so it had to be raised every time the TREE grew even while the proportion FELL. The four raise notes above it (14, 15, 16, 30) are four rounds of somebody doing exactly that. MEASURED: 41 of 424 pages is 9.7%, against the 96 of 316 -- 30.4% -- that produced the check. IT WAS FAILING THREE TIMES FURTHER FROM THE FAILURE THAN WHEN IT WAS WRITTEN. It now asserts the ratio its own sentence names, capped at 15%, with the raw count still printed and a watch line at 30 that REPORTS rather than fails. *** THE CONSEQUENCE IS THE REAL FINDING: THE GATE'S SHAPE WAS CAUSING THE DEFECT IT WAS BUILT TO CATCH. *** Four avatar pages -- ascii-avatar and krbn-avatar since v4073, krbn-rigged since v4048, heerich-avatar since v4094 -- have been in the tree reachable from nothing for eighty versions, and earlier THIS SESSION they were left that way for a bad reason: linking them made a red gate redder, so hiding them was cheaper than doing the right thing. With the check asking the right question they are now linked beside face-mirror.html, pageReach is GREEN on both of its checks for the first time in this session, and 45 of 424 is 10.6%. What this deliberately gives up is stated rather than glossed: the old check would eventually force a trim by attrition, and this one will not -- but a gate that cries wolf on the correct action teaches people to raise its baseline without reading it, which is what those four raises are. New tools/ship/iosDevice-selfcheck.mjs takes the tree to 1242 gates. Its own first run failed on an instrument rather than on the bridge: a no-sudo check read noComments() source, WHICH KEEPS STRING LITERALS, and matched the bridge legitimately naming the command it refuses to run -- codeOnly() is the right tool for a code shape, v4021's rule, re-learned by a third file. Full changelog on docs/CHANGELOG.md.
+## Since v4153 -- the Sunshine host button, and the one surface Moonlight actually exposes
+
+v4154 -- Keith asked whether non-streaming features could be pushed into Moonlight V+ (qiin2333/moonlight-vplus). *** READ FOR REAL, THE ANSWER IS NO, AND THE REASON IS STRUCTURAL RATHER THAN A MISSING FEATURE. *** That app has no ServerSocket, no HttpServer, no exported service and no content provider -- four exported components in its entire manifest, of which one is the main activity, one a home-screen widget, and one a launch-only shortcut trampoline. Its top-level LuaScripts/ folder looks exactly like a plugin surface and IS NOT: all three files open with ProtoField declarations and carry Cameron Gutman's and Diego Waxemberg's names -- they are WIRESHARK PROTOCOL DISSECTORS inherited from upstream Moonlight, for debugging the NVIDIA stream. MOONLIGHT IS A CLIENT: it dials out to a Sunshine host, and the only channel is video and audio down, INPUT UP. So you never add features to the client; you add them to the HOST. New ai-bridge/sunshineBridge.js + sunshine.html install and run LizardByte/Sunshine (GPL-3.0) through the user's own package manager -- flatpak on Linux because it is the only route that works on SteamOS's read-only root, winget on Windows, Homebrew on macOS with LizardByte's own EXPERIMENTAL warning repeated rather than smoothed over. NOTHING IS VENDORED, nothing is linked and no part of the encoder is reimplemented, so the engine's release zip carries no GPL code. Five REFUSALS are named and gated, the sharpest being that it will not type the pairing PIN: that four-digit secret is the entire control stopping a stranger on the LAN streaming your desktop, and a bridge that automated it would pair anybody who reached the port. *** AND THE OTHER HALF KEITH ASKED FOR: am start, FROM THE DECK. *** launchMoonlight() drives the one exported surface over adb, and EVERY STRING WAS READ OUT OF THE FORK'S SOURCE RATHER THAN GUESSED -- two of which would have failed silently. The package is com.limelight.root, NOT upstream's com.limelight, so the stock name would have targeted an activity that is not installed; and the trampoline reads AppId with getStringExtra before calling .toInt() while Game reads the same key with getIntExtra, so it must be sent as --es and --ei would be dropped on the floor. The UUID may be left EMPTY: ShortcutTrampoline falls back to getComputerByName, so the Deck never has to learn the phone's internal id for a machine. *** am start EXITS 0 FOR AN ACTIVITY THAT DOES NOT EXIST *** -- it prints "Error type 3" on stdout and succeeds -- so the result is decided by parsing that output, because trusting the exit code would report a successful launch forever on a phone with no Moonlight installed. *** THE ROUND'S REAL BUG WAS MINE AND IT WAS A TEMPORAL DEAD ZONE. *** The first draft mounted the bridge beside deviceBridge and repoTerrainBridge, 250 lines ABOVE `const readJson` -- same block, same top-to-bottom request handler -- so every POST to the launch route would have thrown "Cannot access 'readJson' before initialization" before reading a byte: THE SAME CLASS AS v4133'S CLONE BUTTON, which cost fifteen versions. Caught by noticing the declaration sits at 4955 and the mount was at 4707, then DRIVEN rather than reasoned: a live server now answers status, the launch route and a bad-input refusal with the bridge's own JSON. Section 5 of the new gate states it as a RULE over every mount and not a note about this one -- tools/ship/shadowedHelper.mjs hunts a const that SHADOWS a module-level function, which this is not, so nothing in the tree would have caught it; the floor is zero across 398 references. New tools/ship/sunshineHost-selfcheck.mjs takes the tree to 1241 gates, and verifies the intent strings against the real clone when MOONLIGHT_VPLUS_DIR points at one. ITS OWN FIRST RUN CRIED WOLF: a check that stripped "execFile(" and hunted a bare "exec(" matched a RegExp.prototype.exec parsing a version string, and a check that cannot tell a regular expression from a shell is one that teaches people to ignore it -- rewritten to assert the child_process IMPORT instead. NOT VERIFIED AND MARKED PER ROW ON THE PAGE: no Sunshine has ever run against this bridge, this box has no GPU and no adb, and the install, start and stream are transcribed from documentation rather than executed. Full changelog on docs/CHANGELOG.md.
+## Since v4152 -- one orphan, two registers, and the reason it is not a forgotten import
+
+v4153 -- orphanScan went red on the rig with a NEW ORPHAN, ui/avatarExpression.js, and its instruction is a fork: wire it up, or register the mechanism that reaches it in DIRECTORY_LOADED with a reason. *** BOTH BRANCHES WERE WRONG, AND FINDING OUT WHY IS THE ROUND. *** It is not directory-loaded -- claiming that would assert a loading mechanism that does not exist, in a register whose whole value is that each entry names a real one. And it is not a forgotten import either. v4112 built it as the ONE OWNER joining ui/faceExpressionSet.js (a named expression read off a face) to face/avatarStage.js's setMorph(), and *** THE TWO HALVES HAVE NEVER BEEN ON THE SAME PAGE. *** attachAvatarExpression(stage, reader, getSnap) needs both; measured, the four pages carrying an avatar stage -- krbn-compare, pipboy-models, avatarstage, phone -- track no face at all, and face-mirror.html, the one page holding the expression reader, has no avatar stage. So wiring it means putting a GLB stage on the mirror page or a camera tracker on a stage page: a real feature wanting a webcam and a GPU to look at, which is the SAME CALL this gate already makes about render/SSAOPass.js in its own passing output -- the integration point exists, the change is visible in every screenshot, and it belongs on the rig rather than in a blind edit from a box with no GPU. Recorded as known debt in tools/ship/orphan-baseline.json (6 -> 7) with that reasoning written beside it, which is what the other six entries already are: the file's own note says "orphan debt AS FOUND. A baseline, not an approval." *** AND THEN THE SAME FACT TURNED UP IN A SECOND REGISTER, WHICH IS THE CROSS-CHECK WORKING RATHER THAN A DUPLICATE. *** graveyard-selfcheck was ALREADY red before this round's edit -- verified by stashing and re-running, so it is not something this round caused -- at 93 orphaned utilities against a recorded 92, and the 93rd is the same file, listed ACTIONABLE. Two independent scanners, one module, one day. ORPHAN_UTIL_BASELINE raised 92 -> 93 with the identical reason in the source beside it, since that gate requires every raise to carry one and refuses a bare number. *** THE TIGHTENING IS NAMED IN ADVANCE, because a baseline that only ever rises is the plaque this tree keeps warning about: *** bring it back to 92 and the orphan file back to 6 the round either page gains the other half. That is a smaller job than it sounds and it is the whole of the outstanding work -- both modules exist, both are gated, and both are correct; what is missing is a page that holds them at once. The tree holds at 1240 gates. Full changelog on docs/CHANGELOG.md.
+## Since v4151 -- a child process is not a socket, and loop turns cannot reap one
+
+v4152 -- bz-bridge-selfcheck went red on Keith's rig with a PERFECT SCORELINE FOLLOWED BY A LEAK: "115 passed, 0 failed" and then "STILL LIVE: Socket, Socket, ChildProcess". *** THE SAME GATE ON THIS BOX IS GREEN, SO THE FIRST HONEST STEP WAS ADMITTING THIS BOX CANNOT REPRODUCE IT *** -- run here it reaps its children, reports nothing live and exits 0. What it CAN reproduce is the mechanism, and that turned out to be stronger evidence than the failure itself. bzBridge.shutdown() is SYNCHRONOUS: stopBrains, stopRoom, stopPlay and stopTest each send a signal and return, so at the leak check the children have been ASKED to die and may not have done it. The teardown beside it, shutdownServer(), drains libuv by yielding TURNS of the event loop -- which its own measurement shows is exactly right for sockets, a Server and two Sockets present at turn 1 and gone by turn 2 -- and A CHILD PROCESS IS NOT LIKE THAT. kill() sends a signal to ANOTHER PROGRAM, which is then scheduled by the operating system, runs its own exit path and is reaped some real number of milliseconds later; no quantity of setImmediate ticks makes that happen sooner. New drainChildren() in tools/ship/serverShutdown.mjs waits on a real timer instead, bounded, and RETURNS what is still there rather than throwing -- the same argument the turn drain makes about its own 20-turn cap, since a teardown that hangs is worse than one that reports. *** AND THE MEASUREMENT IS THE POINT, BECAUSE IT PROMOTED THIS FROM A GUESS. *** The first draft of the note called it a Windows candidate and said so. Then section 5 of serverShutdown-selfcheck.mjs was written to drive it: spawn a real child, kill it, yield TWENTY loop turns -- THE ChildProcess IS STILL LIVE -- and drainChildren clears it in 26ms. So the gap is demonstrable on the very box that could not reproduce the original failure, and the note was rewritten to say that rather than leave the weaker claim standing. WHAT REMAINS UNPROVEN IS THAT IT CLOSES THAT PARTICULAR FAILURE: the rig lingers where this box does not, Windows has no SIGTERM (child.kill() is TerminateProcess) and a child's stdio pipes are separate handles closing on their own schedule, so the rig may still outlast any budget. The gate's own output on the rig is what settles it, and this file does not call it a cure -- the precedent is shutdownServer's own steps 1 and 2, kept for a Windows crash that measurement could not reach and explicitly not claimed as the fix. Section 6 drives the giving-up half too: a child that ignores SIGTERM on purpose returns on its 300ms budget at 306ms and NAMES what outlasted it, so a caller has something to assert on rather than a hang. The tree holds at 1240 gates. Full changelog on docs/CHANGELOG.md.
+## Since v4150 -- two rig gates, and a defect the FREEZE found that the gate did not report
+
+v4151 -- *** THE BASELINE FREEZE CAUGHT A DEFECT OF MINE THAT THE GATE ITSELF REPORTED AS ABSENT, AND THAT IS THE WHOLE ROUND. *** boundaryLint went red on Keith's rig with two new tells, both KILL_NOT_VERIFIED, in grdpwasmBridge.js and wsScrcpyBridge.js. Both are correct code: each stop() KEEPS the handle, lets child.on("exit") clear it, and returns stopping:true with verifyWith:"status().running" rather than claiming the process is gone -- which is exactly the pattern that gate praises autoInstall for, and better, since it names the route to check. The broad rule counts every .kill( regardless of quality and says so in its own reason ("from source alone a kill that needs verifying is indistinguishable from one whose caller genuinely does not care"), so the sanctioned move is a deliberate freeze. BUT A FREEZE REWRITES THE WHOLE BASELINE FROM CURRENT STATE, so it was diffed against the previous file rather than trusted -- and the diff showed a THIRD change nobody had reported: main.js UNCHECKED_JSON_BODY 47 -> 49. THE RIG RAN v4148, BEFORE v4149's window.repoTerrain EXISTED, so its report could not name a tell that had not been written yet -- and freezing on the strength of that report would have absorbed two real defects of mine into a baseline as though they had always been there. Both were in the new object: roots() and scan() each called .json() on a response whose status was never consulted. The bridge answers a refused directory with a JSON 400 so the happy path looked fine, but a route that is not mounted at all -- an older engine, or a server started without the bridge -- returns an HTML 404, and .json() on that throws "Unexpected token <", which reads as a bug in the calling code rather than as a missing route. Both now go through one _get() that checks res.ok, prefers the JSON error body when there is one, and falls back to the status line when there is not; main.js is back to 47, the baseline moves 85 -> 87 sites and 237 -> 235 tells, and the re-diff shows exactly the two legitimate additions and nothing else. *** ALSO: THE ONE GENUINE commentFalsePass CASE IN THE TREE, WHICH WAS ALSO MINE. *** verifiedPolygonIntersection-selfcheck.mjs asserted that the bridge's MAINTENANCE record names the command its activity measurement was taken with, against UNPROCESSED SOURCE -- in a file that ALSO discusses that same measurement in a header comment. The assertion is true today for the right reason and would have stayed true after somebody deleted the field it is about, which is the entire failure this class describes. It now reads noComments() and not codeOnly(), because the thing asserted IS a string literal's contents and codeOnly blanks strings. commentFalsePass reports 19 flagged and, for the first time, ZERO genuine: the other 18 are all the instrument rather than the gate -- HTML targets, template literals, and one regex that hunts a comment on purpose. The tree holds at 1240 gates. Full changelog on docs/CHANGELOG.md.
+## Since v4149 -- screen-space error, and a correction to what I said Terrain3D contained
+
+v4150 -- *** A TECHNIQUE I REPORTED FROM A REPOSITORY THAT DOES NOT CONTAIN IT, CORRECTED AND THEN BUILT. *** Summarising DanWatkins/Terrain3D for Keith I called its transferable idea "the screen-space-error -> tess-level heuristic", and he asked for it. Reading Deployment/Shaders/terrain/terrain.tcs.glsl properly afterwards: lodForChunkPos() is a PLAIN DISTANCE RAMP -- distance(cameraPos, chunkCentre), full detail inside lodNear, linear interpolation out to lodFar, minimum beyond -- with no projection, no field of view and no viewport height anywhere in the file, and the commented-out alternative beside it is distance-based too. I NAMED A TECHNIQUE THAT SHADER DOES NOT CONTAIN. The correction is not merely written down: with TERRAIN3D_DIR pointed at a checkout, the new gate reads that shipped shader and asserts what is actually in it, so nobody later restores a screen-space claim about that file. THE ONE IDEA IN IT GENUINELY WORTH TAKING is a different line, three long, whose own comment reads "succumb to your neighbor to avoid cracking": the two shared outer edges of a patch adopt the NEIGHBOUR's level, so adjacent patches agree along the edge they share. It ships as edgeLevel(), and it is a MIN rather than a max because finer means a smaller step -- backwards it produces terrain that is correct in a screenshot and cracks whenever the camera moves, since the coarser patch leaves the finer one's extra edge vertices landing on nothing. WHY A DISTANCE RAMP IS THE WRONG MEASURE: it answers "how far away is it" when the question is "can anyone SEE the difference", and those come apart the moment anything else changes. new render/screenSpaceError.js implements the standard formula instead -- pixels = e*h / (2*d*tan(t/2)), the same one Cesium and the OGC 3D Tiles spec use -- and it is checked against a number derived independently of the implementation: a feature exactly as tall as the view frustum must fill the viewport EXACTLY, which is a fact about perspective rather than an echo of the code. MEASURED, at one voxel of error 100 units out: 6.93 px on the Steam Deck's 800-line panel, 9.35 px at 1080p, 18.71 px at 4K, and 30.62 px at 1080p zoomed to a 20-degree field of view. A distance ramp returns the same level for all four. levelFor() picks the COARSEST level that still fits the pixel target rather than the nearest, and an unanswerable measurement returns the FINEST -- the failure direction is the whole point, since a broken metric must cost frames and never correctness. Every refusal is NaN rather than a plausible number, including a 180-degree field of view where tan(t/2) diverges and Infinity would read as "infinite detail needed": the most expensive possible answer produced by a division that failed rather than by a scene that needed it. *** AND THEN THE THING THIS ROUND IS ACTUALLY FOR: THE VETO IT FEEDS CANNOT FIRE AT THIS ENGINE'S SCALE, WHICH IS MEASURED AND ASSERTED RATHER THAN LEFT TO BE DISCOVERED. *** world/DynamicGridRadius.js steers view distance from the FRAME RATE, a lagging signal that can only shrink after frames have already dropped, so it now also asks whether a ring it is about to add is resolvable at all -- growth only, never shrinking, because a veto that could force a shrink would be a second controller on one actuator and two controllers oscillate. It is optional, so an engine supplying no screen metrics behaves exactly as it has since round 291. But maxRadius caps at 12 and chunks are 16 voxels, so the furthest ring a grow can ever add sits 208 world units out, where a whole chunk still subtends 25 pixels on a Deck and 67 at 4K; the one-pixel crossover is at d=5196, TWENTY-FIVE TIMES FURTHER THAN THIS ENGINE HAS EVER DRAWN. So the veto is real, correct, wired, and inert -- and section 6 of the gate says so with the numbers in it, because a feature that never fires and is described as working is worse than no feature. It becomes live the day the draw distance grows by an order of magnitude, or the day a per-chunk mesh level of detail exists and the error fed in is a MESH STEP's rather than a whole chunk's. THAT LOD DOES NOT EXIST: world/chunkMesherCore.js meshes every chunk at one voxel step, WebGL2 has no tessellation stage to port a control shader onto at all, and meshing coarsely is a real feature with a real cost that is NOT snuck in here under the name of a heuristic. New tools/ship/screenSpaceError-selfcheck.mjs takes the tree to 1240 gates, including the inertness measurement above. Full changelog on docs/CHANGELOG.md.
+## Since v4148 -- a source tree, walked as ground: treemap terrain, data as water, language as biome
+
+v4149 -- *** A SOURCE TREE, WALKED AS GROUND. *** Keith: "What about github into a terrain view? I have seen github into buildings, which was almost cool... I have at times described my VBA programming as mountains of code. maybe 3 mountains." Then, on the first map: "data-storage as water" and "we have a fairly healthy biome selection." THIS BUILDS NO RENDERER. world/realTerrainStamp.js already voxelizes a height grid with biome-aware materials and main.js already flies a cinematic arrival onto it; both take { heights, grid, min, max } and neither cares whether the numbers came from Open-Meteo or from counting files. So the feature is one pure module (world/repoHeightfield.js), one counting bridge (ai-bridge/repoTerrainBridge.js), and window.repoTerrain.load(), which hands the result to the same stamp and the same flight. LAYOUT IS A SQUARIFIED TREEMAP (Bruls, Huizing & van Wijk 2000), not a grid of bars: every directory gets one contiguous rectangle and recurses inside it, so a directory is a LANDMASS and its files are the peaks on it. *** AREA IS LINEAR AND THE SKYLINE IS LOGARITHMIC, AND THAT IS A CHOICE, NOT A MEASUREMENT. *** A leaf's area is linear in its line count so the map is a fair map (half the code covers half the ground -- gated by 4,000 sampled points each landing in exactly one rectangle, and by an area ratio matching a line ratio to within 1% on the real tree); its height is log1p(lines) because linear height on top of linear area makes volume grow like size squared, and one 30,000-line file would tower a hundredfold over its neighbours and flatten everything else into foothills. Each leaf is also lifted by 0.45*log1p(its PARENT directory's total) so a big directory rises bodily into a plateau -- parent only, never the ancestor chain, or depth rather than size would make the mountains. *** DATA-STORAGE IS WATER, WHICH IS KEITH'S ANSWER AND IT IS BETTER THAN THE ONE THIS SHIPPED FIRST. *** Run over this engine's own tree with every file treated alike, the tallest thing on the map is es-universe.json at 208,406 lines -- 18% of the repository, generated star data nobody wrote. The first version EXCLUDED data files and named them in a footnote: that fixed the skyline and broke the map, since a fifth of the repository then covered none of the ground. Now a data file keeps its true treemap footprint and is laid down as a LAKE -- still visibly a fifth of the tree, no longer competing for the summit, and main.js (30,066 lines) is the peak instead. LANGUAGE DRIVES BIOME: world/worleyBiomes.js already ships eight biomes and biomeTerrain.js already turns one into surface materials, terrain amplitude and moss, so a new opts.biome on biomeColumnMaterials plus a _biomeOverride hook in world.js (mirroring the _heightOverride that has been there since v1096) paints a directory of shaders as jungle and a folder of C headers as tundra. This tree comes out forest:7676 plains:1343 savanna:651 shrubland:142 desert:135 taiga:102 tundra:39 jungle:4. *** THE ASSIGNMENT IS A LEGEND, NOT A MEASUREMENT -- no property of C makes it tundra -- and it is exported so the page can print it rather than leave somebody guessing why their Rust is snowing. *** THREE DEFECTS FOUND AND FIXED IN THIS ROUND'S OWN CODE, ALL THREE ONLY VISIBLE AGAINST THE REAL TREE. (1) The shore: the treemap is inset by a 6% margin so the repo comes up as an island, and the first draft expected that border to stay at zero. It does not -- three passes of a radius-3 box blur reach nine cells, more than the margin is wide at any sane grid, so the border filled in and the lowest ground came out at 4.63 against a maximum of 16.45. The sea was already a third of the way up the mountains and there was no coastline anywhere. The falloff is now applied AFTER the blur, over the same border, so it shapes only the spill and never the data; the sabotage that removes it is gated. (2) The stamper silently drops any water body whose bounding box exceeds 20,000 world units squared -- a cap written for an OSM query that catches an open bay -- and es-universe.json's lake is big enough to trip it and vanish with no error, so lakePolys() splits a rect into pieces that survive the cap. No hand-written fixture has a file that is a fifth of its repository, which is why every measurement in the gate is taken against this repository. (3) The scanner's allowlist was the folders that CONTAIN repositories, and the parent of this one is $HOME -- so ?dir=/home/user/Documents resolved inside an allowed root and would have been walked, in a file whose own header says a listing of every filename under $HOME is closer to a secret than it looks. The allowlist is now the REPOSITORIES themselves. The bridge returns counts and never contents. Also fixed: a dotfile was classified by its whole name including the dot, so every .gitignore in every repo was counted as binary at bytes/80. AND THE BIOME LAYER WOULD HAVE DONE NOTHING SILENTLY: useWorleyBiomes defaults OFF in world.js and the override is only consulted on that path, so the stamp forces it on while an override is installed and clearRealTerrain restores the previous value -- without that the terrain would have been right, the ground cover would have been the noise's, and no error anywhere would have said so. New tools/ship/repoTerrain-selfcheck.mjs takes the tree to 1239 gates, and checks all of the above against the live tree: 4,665 files and 1.14M lines scanned in 248ms, field built in 79ms, 8,476 water voxels actually painted through the real applyRealTerrain. NOT DONE, and asked rather than guessed: repos as orbiting planets, streams and waterfalls, "lava is data in", and a kaiju keyed to a repo's AI dependency. Full changelog on docs/CHANGELOG.md.
+## Since v4148 -- the clone button had not worked since v4133, and the error named a line that was fine
+
+Keith tried to pull from GitHub and got:
+
+    [chain] cloning HowdyKeith/SweK_Engine...
+    [chain] clone FAILED: Cannot access '_run' before initialization
+
+*** THE BUG WAS AT THE BOTTOM OF THE FUNCTION AND THE CRASH WAS AT THE TOP. *** githubBridge.js declares `function _run(cmd, args, opts)` at module level -- the thing that actually runs git. v4133 added three good lines near the BOTTOM of cloneEngineSource to compare the cloned version against the running one, and named the local for what it holds: `const _run = engineVersion()`.
+
+A `const` shadows its outer name for the WHOLE enclosing block, not from its own line downward. So the very first `await _run("git", ["--version"])` -- the version probe, a hundred lines ABOVE the declaration -- resolved to that const, hit its temporal dead zone and threw before git was ever invoked. Nothing about cloning was broken. The function simply could no longer reach the tool that does its job, and the thrown message points at the CALL while the defect is the DECLARATION, which is why it reads as nonsense.
+
+REPRODUCED BEFORE FIXING rather than deduced: calling cloneEngineSource() directly threw the exact message Keith saw. Re-run after the rename it returns ok:true, version v4147, running v4147, auth token -- a real clone of the real repository.
+
+THE RENAME WENT ON THE LOCAL, NOT THE HELPER. `_running` is what the variable holds and is what the `running:` field beside it is already called. Renaming the module helper instead would have moved the collision rather than removed it, and every other caller of the git runner would have had to move with it.
+
+*** AND THE CLASS IS WORTH A GATE, BECAUSE THE MESSAGE CANNOT LEAD ANYONE TO IT. *** New tools/ship/shadowedHelper.mjs looks for the conjunction that actually crashes: a scoped const/let that shadows a module-level function AND is called earlier in the SAME BLOCK. Shadowing alone is legal and common -- the tree has thirteen instances and twelve are harmless, because they declare before they use. Reporting those would be twelve false positives and a list nobody reads.
+
+*** ITS OWN FIRST DRAFT CRIED WOLF, WHICH IS WHY IT COUNTS BRACES INSTEAD OF INDENTATION. *** That draft approximated the enclosing scope as "the nearest column-zero function" and reported a second hit: deviceBridge.js, makeCaller called at line 161 and shadowed at line 270, both inside handle(). By that rule it was a crash. IT IS NOT ONE: 161 sits inside `if (route === "/start")` and 270 inside `if (route === "/bench/start")` -- SIBLING BLOCKS -- and `const` is block-scoped, so a declaration in one branch shadows nothing in another. Shipping it would have put a non-bug at the top of a list whose entire value is that it is short. The scope is found now by walking braces back from the declaration over codeOnly() source, so a brace inside a string or a comment cannot move the boundary.
+
+Tree-wide, across eleven roots: ZERO. That is a floor, so the next one reddens the line the round it lands.
+
+The gate proves itself three ways rather than asserting it works. SABOTAGE ONE rebuilds the actual v4133 defect from the shipped file -- not a toy fixture -- and the detector catches it, naming the call that would throw. SABOTAGE TWO is the sibling-block case the first draft got wrong, which must stay silent. SABOTAGE THREE is the same-block case, which must still fire -- because a fix for a false positive that quietly disarmed the true positive would be worse than the false positive was.
+
+NOT RUN IN THE GATE: a live clone. It was run by hand against the real repository after the fix; a gate that clones GitHub on every ship is a gate somebody switches off, which is the argument grdpwasm's gate already makes about its Go build.
+
+Verified: shadowedHelper-selfcheck all checks pass, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
+## Since v4147 -- a Steam Deck peer button, and the guard that had to be fixed before it could be honest
+
+Keith asked whether a "Steam Deck Peer" button could LEGITIMATELY go after the iOS Peer button. The honest answer turned out to be that it outranks both phones, and he moved it: "I had thought Android would be King. I am pleasantly surprised. We could put the Steam Deck button before Android."
+
+*** THE ORDER IS THE CLAIM, WHICH IS WHY THE GATE CHECKS THE ORDER. *** The three buttons now read in descending capability, and the reason is architectural rather than a matter of degree. iOS runs the portable subset inside Safari; Android runs a subset under Termux with partial Node; a Steam Deck runs ai-bridge/server.js ITSELF -- the same file the desktop runs. The first two are guests in a browser or a sandbox. The third is the host.
+
+*** AND JUSTIFYING THE BUTTON FOUND A REAL GAP. *** server.js skipped mDNS whenever the runtime was Bun. v1147's own comment names the cause exactly -- a Bun-on-WINDOWS panic on node:dgram multicast that takes the whole process down -- but the condition only ever tested the runtime, never the platform. And start-steamdeck.sh PREFERS Bun. So a Steam Deck peer was giving up `.local` discovery to dodge a Windows bug it can never hit. The UDP 47474 beacon still worked, so the box still joined the fleet by IP; it was quietly a weaker peer than the hardware allows, for a reason that did not apply to it.
+
+MEASURED BEFORE NARROWING, rather than argued from the comment: Bun 1.3.11 on Linux x64 was made to require the real mdnsDiscovery.js and mdnsAdvertise.js and call start() on both. Discovery came up browsing 9 service types, the advertiser started, neither threw, and the process was alive 25 seconds later with no panic in the log. The guard now requires win32 as well, and the Windows half is left exactly as it was -- it is a real crash, this box cannot test it, so the platform that reported it keeps its workaround and the platforms that never had it get their discovery back.
+
+steamdeck-peer.html carries the capability table in the same shape as its two neighbours, and its whole point is the half that is NOT proven. **No physical Steam Deck has ever run any of this.** Rows marked MEASURED were measured on generic x86_64 Linux -- which is architecturally what a Deck is, and is why they are worth something: the server booting, the beacon, mDNS, the port takeover. Rows marked NOT VERIFIED depend on something this box does not have -- an RDNA2 GPU, SteamOS's read-only root, Distrobox, Game Mode -- and are reasoned from Valve's documentation, which is not measurement. The gate checks that BOTH kinds of row exist, because a page carrying only one kind is either selling or apologising.
+
+**Keith then asked whether the Deck's resolution could be read when the page loads.** It can, and it is the only signal a Deck in Desktop Mode volunteers: it runs ordinary Chromium on ordinary Linux and has no user-agent token of its own. deviceKind gains a `steamdeck` kind with TWO independent routes:
+
+  - THE PANEL: 1280x800, a 16:10 ratio, IDENTICAL on the LCD and the OLED (7" vs 7.4", 225 vs 255 PPI, same pixels) -- checked against Valve's published specs rather than remembered. Read in PHYSICAL pixels, so a Deck with SteamOS scaling on still reports the panel it has: 1024x640 at devicePixelRatio 1.25 is recognised.
+  - THE GPU, which answers Keith's follow-up about whether it reports itself elsewhere: it does. render/glBootstrap.js already probes UNMASKED_RENDERER_WEBGL, and the Deck's APU is a specific part -- Van Gogh, AMD Custom GPU 0405 -- that Mesa's RADV names in that string. *** THIS ROUTE SURVIVES DOCKING AND THE PANEL ROUTE DOES NOT, *** which is why both are here rather than the better one replacing the other.
+
+*** A DOCKED DECK IS DELIBERATELY NOT DETECTED BY THE PANEL ROUTE, AND READS AS `desktop`. *** That is correct twice over: it is driving an external display, and it is being used as a desktop. A resolution is a hint and never an identity, so three signals must agree before the panel route fires -- Linux, the exact panel, and a touchscreen -- because 1280x800 alone is a resolution other hardware has had for twenty years. The gate drives the refusals as hard as the recognitions: an ordinary Linux workstation, a 1280x800 Linux box with no touchscreen, a docked Deck with no GPU string, and a Linux box with no screen info at all must every one of them come back `desktop`.
+
+The detector still only highlights a link that was already there, and never navigates -- v3704's contract, unchanged. The GPU token list is unverified and is one of two routes precisely so that being wrong about it costs a highlight rather than a claim.
+
+AND THE GATE'S OWN FIRST DRAFT SHIPPED A commentFalsePass, one round after v4145 paid that exact debt down to its baseline. It matched "9 service types" against raw source, and the phrase spans a comment line break, so it could never match however true the sentence was. The target is a comment, so it reads through prose() now -- the same helper crtPass and galaxyProfile were given at v4145. Writing the bug again while the fix was still warm is the argument for the helper existing rather than for remembering the rule.
+
+Verified: steamdeckPeer-selfcheck all checks pass (including a live headless render of the page and every detector refusal), deviceKind-selfcheck all pass, steamdeckLaunch, poller, fetchCap, notifyDoor, phonePeerTransfer and pageSections all pass, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
+## Since v4146 -- thirty pollers that were not polling, and the gate that counted them said they were fine
+
+fetchCap-selfcheck went red on Keith's rig with a single finding: one unguarded fetching poller, sharpLoad at 1500ms, against a baseline of ZERO. That poller is mine, added at v4104 for the ml-sharp install panel, and the gate's own line said it plainly -- THE GUARD ALREADY EXISTS AND THEY WALK PAST IT.
+
+Converting it to swekTick was the right fix and it took four characters. *** AND IT BROKE THE PANEL. *** sharpPanel-selfcheck, which drives the whole install loop in a real headless browser against a status stub that advances its own answer call over call, went from all-passed to 2 FAILED: the job never appeared to finish and the button never re-enabled. Stashing the one-line change and re-running confirmed the cause was mine rather than a coincidence.
+
+*** THE CONVERSION WAS NOT THE BUG. IT WAS THE INSTRUMENT THAT FOUND ONE. ***
+
+server.html assigned window.swekTick TWICE. Near the top, the polling guard: `function (key, fn)`, which routes fn through SwekPoller.guardedTick so it obeys the hidden-page rule, the in-flight rule, the backoff and the shared socket cap. Two thousand lines later, in the ticker's own IIFE, a completely different function with the same name: `function (msg)`, which pushes a log line into the scrolling ticker.
+
+The second assignment runs later, so it WON. Every one of the thirty `swekTick("key", poll)` call sites in the file was calling the FEEDER -- which takes one argument. It wrote the KEY STRING into the ticker as a log line and NEVER CALLED THE POLL FUNCTION AT ALL. The second argument was dropped on the floor. Thirty pollers that looked guarded, read as guarded to the gate that greps for them, and did nothing after whatever manual first call their panel happened to make.
+
+MEASURED IN A REAL BROWSER RATHER THAN REASONED ABOUT. Driving server.html headless and instrumenting it showed window.swekTick reporting arity 1 and the feeder's source; the interval firing twice in 4500ms and throwing nothing; the key "sharp-install" arriving twice in the ticker's own call list; and ZERO matching /sharp/status fetches in the same window. After the fix: arity 2, and the fetches appear -- two became four. Every step of that was a reading, not an inference, and one of the readings corrected me mid-diagnosis: an early grep made the tick list look EMPTY when it was actually a multi-line array the filter had truncated, which sent me hunting a scope-shadowing theory that was never true.
+
+THE FIX PUTS THE NAME WHERE THE WEIGHT IS. The feeder is renamed swekTickerSay -- it had exactly ONE call site, the tunnel-is-live notice -- and the polling guard keeps the name, which had thirty. Nothing else in the tree references either.
+
+*** AND poller-selfcheck ALREADY CARRIED A CHECK LABELLED "the tick predicate is defined ONCE". *** It never checked that. What it asserted was that the first definition appears before the first use -- which is perfectly TRUE of a file that defines the name twice, so it passed the entire time the second definition was winning. A label claiming more than its assertion proves is the most expensive kind of green, because it reads as the question having been asked. The right question is a COUNT, it costs one regex, and it is asserted now and sabotage-confirmed: restoring the clobber takes the count to 2 and fails the check.
+
+WHAT THIS CHANGES AT RUNTIME, STATED PLAINLY RATHER THAN LEFT TO BE DISCOVERED: thirty pollers that were silently inert are now live. That is what they were always meant to be, and it is also a real increase in request volume on a page whose socket pool has been the subject of several rounds. The cap, the backoff and the in-flight guard are exactly the machinery for that, and they now apply to thirty callers that were bypassing them by accident rather than obeying them. If the pool proves tight, the dial and the live pool chip that v3269's arc added are the instruments to turn on it -- and unlike before, the number they show will be about traffic that actually exists.
+
+Verified: fetchCap-selfcheck all checks pass (0 unguarded, 32 guarded), poller-selfcheck all pass including the new count, sharpPanel-selfcheck all passed again, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
+## Since v4145 -- six red gates from the rig, and a patch series whose first commit was already obsolete
+
+Keith ran gates on his rig and sent six failures. Three more arrived while the first three were being worked. Every one is answered below, and two of them were mine.
+
+**cflBind -- STALE AGAIN, NOT A REGRESSION.** The failing text ("STEPPED FAR PAST THE LIMIT THE FIXTURE REACHES 8.8e8", maxSpeed 1.20e+2) does not exist anywhere in the current file -- checked by grep, not assumed. v4137 replaced that assertion precisely because a chaotic runaway's magnitude is not portable across machines, and that fix is on main. The rig is running code from before it. The answer is a pull, not an edit.
+
+**conservationReach -- THE GATE'S OWN PREDICTION FIRED.** "and EVERY ONE OF THEM IS A SCALAR" went red on both machines. Section 4 had named this event in advance and said what to do: "REWRITTEN TO COUNT HOW MANY DO -- NOT WEAKENED, AND NOT DELETED." What landed is mpmrefine's comDrift, an array in both its modes -- a real conserved quantity, since centre-of-mass drift is momentum conservation, and a real series.
+
+*** BUT THE ANTIDOTE'S EXPECTATION WAS WRONG, AND THAT IS RECORDED RATHER THAN QUIETLY SATISFIED. *** It said such a series would be "the first evidence criterion five could ever run". It is not, twice over. Two samples against auditConservation's floor of four -- and, mattering far more, mpmRefineBind builds `rows` as `c.levels.map(...)`, so comDrift is ONE VALUE PER GRID REFINEMENT LEVEL, not per timestep. auditConservation compares "the worst excursion in the FIRST half of the run against the worst in the SECOND" and reads growth as an accumulating scheme; across refinement levels that comparison measures CONVERGENCE, not drift. Each element is already a collapsed scalar. A name-and-shape match that is not the thing -- the keyword probe's failure mode in a new costume, which this file's own history counts four times already.
+
+A SECOND DECLARATION OF THE SAME NOW-FALSE FACT was found while fixing it: the shared module's report line also said "every one of those is a SCALAR". Both now read one derivation, nonScalarShaped(), instead of each asserting it separately -- which is the exact defect the whole file is about. Both new checks sabotage-tested.
+
+**THE PATCH SERIES -- 11 commits from another lineage, and its first commit was already superseded.** Keith uploaded a bundle from claude/tier-2-keys-patch-4lwhzk whose base commit is not in this repository. Ten applied; one was skipped and one hand-resolved.
+
+Patch 0001 claimed to restore a deafness discriminator that main "had independently rebuilt but left incomplete". *** MAIN ALREADY HAD IT, AND MORE. *** Every conflict hunk showed the same thing: main carries sawEcho and echoed exactly as the patch proposes, PLUS an echoUnconfirmed field the patch lacks, PLUS unusedInMode as a separately counted list. Applying it would have DELETED echoUnconfirmed -- a regression dressed as a restoration. Skipped, and the reasoning checked hunk by hunk rather than taken from the README.
+
+Patch 0002 was genuinely new -- main had no refusedOnly and no error capture, so a knob that CRASHED its device read as a working knob -- and was hand-resolved to keep both lineages: main's echoUnconfirmed and the patch's refusal tracking, verified present after the merge.
+
+**AND THEN knobLiveness-selfcheck WENT RED, WHICH IS THE MOST USEFUL THING IN THIS ROUND.** Its check "A KNOB THAT REFUSES A VALUE IS LIVE, NOT DEAD" was pinned to powder.checkTo -- and held only because that knob CRASHED. It sizes an array from the knob's value, nothing checked the value was a whole number, every probe rung threw, the census recorded a refusal, a refusal counts as live, and the knob read healthy. Patch v4064 fixed exactly that with a derived integer clamp, so checkTo now reads live in `friedel` by moving something real, and the assertion failed. *** THE GATE WAS PUNISHING THE REPAIR. *** A fixture that is another module's defect has precisely this lifetime: it passes until somebody does the right thing. The property is sound and stays, tested now against a synthetic device that refuses by construction, where no real device has to stay broken for it to keep meaning something. The patch series' README claims none of its commits was left red; this one was, because fixing a device broke a gate in a section the patch never touched.
+
+**gateQuality -- 8 prose-on-source offenders, THREE OF THEM MINE, all paid down.** Matching a sentence against raw source cannot tell a live string from a comment discussing it, and stops matching the moment somebody re-wraps the line. I wrote three fresh instances of it shipping v4143 and v4144. All eight fixed at the site with the reader that fits what each actually targets -- prose() for the two that really do read a comment, noComments() for string literals, whitespace-flattening for HTML body text where noComments would eat the `//` in a URL. The count went to exactly the baseline of 40: DEBT PAID DOWN, BASELINE NOT RAISED.
+
+*** AND THE FIRST DRAFT OF MY OWN FIX-NOTE QUOTED THE BROKEN CALL VERBATIM, WHICH PUT IT BACK. *** gateQuality finds a prose regex and then looks for where it is applied anywhere in the file, comments included -- so a comment demonstrating the wrong form recreated an offender the code no longer contained, and the count went 8 -> 7 instead of 8 -> 6. The same shape as v4139, where the note removing five frozen decimals quoted all five. The rule that falls out: DESCRIBE the broken form, never spell it.
+
+**gateReach 471 -> 472.** Counted with populationCensus.compare() before anything was edited: GREW, 1 added, 0 removed, reconciles true. simulation/carrySpawn.js, from v4082, the drag-to-place spawn button -- imported by ui/assetSpawnPanel.js and main.js, with its own selfcheck. Growth only, in live work, which is what the pin exists to wave through once somebody has looked. Re-recorded after the diff was read, never before.
+
+**definitionGates 209 -> 211, closed back to 209 by COVERING the exports.** The ratchet ratchets down, never up, so neither one was waved through. nonScalarShaped (mine, an hour old) is now called by name in its gate rather than reached only through a field on another function's return value -- which is also the stronger test. OPTICS_KNOB_CHOICES had been exported since v3192 with no gate naming it; opticsBind-selfcheck now grades what it actually claims, that the probe ladder is derived from each mode's own natural scale -- slit 4*lambda/a, converge 3*lambda/a, airy 4*lambda/D -- with a sabotage confirming a mode-blind ladder fails the same assertion.
+
+**graveyard 90 -> 92, raised with the movement counted in BOTH directions.** The net +2 hides that five appeared and three were resolved, and the three resolved -- manifoldCensus, bounces, reconQuality -- were wired by this very patch series. Of the five, four are honestly gate-only (tscResolve, refusalExpiry, artifactCensus, and ui/avatarExpression.js, which v4112 built and shipped a gate for and never wired into the live path). *** THE FIFTH IS NOT AN ORPHAN AT ALL: *** ai-bridge/server.js execFile()s tools/ship/bunNative.mjs by path to answer a live route. It is a door of a shape this census cannot see, because it reads the import graph. Named as a fifth door shape with instructions to teach the scanner and TIGHTEN the baseline back down -- a list with false positives in it is a list people learn to skim.
+
+Verified: conservationReach, knobLiveness, opticsBind, definitionGates, gateQuality, gateReach, graveyard, crtPass, galaxyProfile, localModelProbe, ntfsMounter, and every gate for the devices the patch series touched (freeRotation, powder, reconQuality, strokeMorph, structureFactor, manifoldCensus) all pass. tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
+## Since v4144 -- an install button whose exposure could not be narrowed, so it is disclosed instead
+
+Keith pasted a research dump comparing Android remote-control projects and, asked which shape to build, chose the browser-based one.
+
+TWO CANDIDATES COMPARED BEFORE PICKING, not assumed. NetrisTV/ws-scrcpy is MIT, 492 commits, dependabot-patched, last commit 2026-08-24, 2.5k stars, multiple contributors. Its fork bilbospocketses/ws-scrcpy-web looked more modern -- WebCodecs, a proper installer, better default network hardening -- and is the wrong choice on two counts that matter more: it is GPL-3.0-only, which would reach this engine's own integrating code if vendored or linked, and its 134-of-136 commits come from one person, with a Rust tray/service layer and an auto-updater that downloads and runs new code after install. Built the MIT original.
+
+*** THE WHOLE BUILD WAS RUN BY HAND RATHER THAN READ OFF THE README, WHICH IS WHY install() HAS FIVE STAGES AND NOT ONE. *** Clone, checkout the pinned commit, `npm install` (measured: 41 seconds, 681 packages; node-pty is a native module and compiled cleanly through node-gyp, so a C/C++ toolchain is a real prerequisite), `npm run dist` (~20 seconds of webpack, emitting the prebuilt Genymobile scrcpy-server.jar completely unmodified -- so no JDK is ever needed), and then A SECOND `npm install` INSIDE dist/ (~4 seconds). That last stage is the one a README-only reading would have missed: webpack marks dist/'s runtime dependencies as external and ships dist/ with its own package.json, so a build that stops after the webpack step leaves a dist/ that cannot start at all.
+
+Then the built server was STARTED for real. It printed its own listening banner on four addresses including a non-loopback one, answered HTTP 200 on /, and reported `spawn adb ENOENT` -- exactly right on a box with no adb, and the reason status() reports adbAvailable as its own separate field rather than letting a missing adb look like a broken install.
+
+*** SO THE ALL-INTERFACES BINDING IS A MEASUREMENT, NOT AN INFERENCE -- AND IT CANNOT BE FIXED FROM OUTSIDE THEIR CODE. *** v4138's grdpwasm page can honestly say "started on loopback" because upstream's proxy has a `-listen` flag this engine points at 127.0.0.1: their code unmodified, just a different argument. ws-scrcpy has no such flag. src/server/services/HttpServer.ts calls `server.listen(port, callback)` with no host argument anywhere, and Config.ts's ServerItem type has no host field to route one through -- read out of their source, not assumed. Their default build config ships SCRCPY_LISTENS_ON_ALL_INTERFACES: true, used here unmodified. And there is no authentication of any kind, by design, as upstream's own README states.
+
+Patching any of that would mean editing their TypeScript and running a fork of their behaviour, which every install button on this shelf refuses to do. So Keith was asked directly rather than having a default chosen for him, and chose auto-start on all interfaces with a warning every time.
+
+WHAT "EVERY TIME" ACTUALLY MEANT IN CODE, since a banner rendered once at page load is not that -- it scrolls away, and a person clicking Start twenty minutes later never sees it. start() ALWAYS returns a warning, never conditionally: grdpwasm's start() correctly returns no warning when it is genuinely on loopback, but here there is no safe case, so a ternary would eventually evaluate to "no warning" and that is a bug waiting to be introduced. The page confirm()s BEFORE the start call, naming all three consequences -- all interfaces, no login, view AND control -- and says plainly that no loopback-only option exists upstream, so a reader does not assume the engine merely forgot to offer one. A live banner then stays up the entire time it runs, and disappears when stopped so it never lies in the other direction either.
+
+Gated by tools/ship/wsScrcpy-selfcheck.mjs, 33 checks. FOUR LOAD-BEARING SAFETY CHECKS WERE SABOTAGE-TESTED rather than trusted: making the warning conditional, copying grdpwasm's (here false) loopback claim onto the page, removing the confirm gate, and spawning the child detached so it outlives the engine. All four sabotages were caught. The page was also driven in a real headless browser: provenance renders, the refused list renders all six entries, the start button is disabled before install, and -- the one that matters -- dismissing the confirm dialog genuinely suppresses the start request.
+
+Verified: wsScrcpy-selfcheck all checks pass, pageSections-selfcheck all checks pass, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
+## Since v4143 -- an install button for a Lean4-verified polygon demo, and a Node-wide proxy gap found along the way
+
+Keith pointed at https://github.com/schildep/verified-polygon-intersection, asking "we may have looked already." We hadn't -- checked by grep across the tree and git history, not assumed. It is a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo already hosted at schildep.github.io/verified-polygon-intersection.
+
+RESEARCHED FIRST BY CLONING FOR REAL, not trusted from a summarized read: pinned commit 26f5110a5b22cd1493d6a0ec5ce106f1e10cac1e on main, real MIT LICENSE text read (1067 bytes, "Copyright (c) 2026 P Schilde"), and the docs/ folder's four prebuilt static files with their exact measured sizes -- index.html 17182, coi-serviceworker.min.js 3009, lean_app.js 81370, lean_app.wasm 1167066.
+
+Built vpi.html + ai-bridge/verifiedPolygonIntersectionBridge.js as the install-and-run button, on the same non-vendoring shelf as grdpwasm and galaxy-profile but LOWER RISK than either: no build step, no subprocess, no port of its own. The four files GitHub Pages already serves are fetched onto the user's own machine, outside this tree, and served back through /vpi/app/<name>, path-safety mirroring /voxtral/engine/<name>'s established pattern -- the requested name is matched against a fixed list inside the bridge, never joined onto a filesystem path.
+
+*** THE WASM NEEDS SharedArrayBuffer, WHICH NEEDS REAL CROSS-ORIGIN-ISOLATION HEADERS. *** Confirmed by reading build.sh and emcc-wasm.sh: both pass Emscripten's -pthread flag. Upstream ships a service worker (coi-serviceworker.min.js) that fakes Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy client-side, because GitHub Pages can't set real HTTP headers. This server can, so /vpi/app sets them directly on every response under the route -- more robust than a service worker (nothing to register, nothing that can silently fail to activate before first paint) and without touching a single byte of upstream's files; their service worker still ships and still runs, just redundant here instead of load-bearing.
+
+A FIRST DRAFT'S FETCH FAILED, MEASURED RATHER THAN GUESSED AT: using Node's built-in require("https").get() to pull the four files produced "socket connection was closed unexpectedly." Node's http/https modules have never honored HTTP_PROXY/HTTPS_PROXY -- a Node-wide gap, not a defect specific to this sandbox's own outbound agent proxy. A user's machine behind a real corporate or office proxy would hit the identical silent failure. curl DOES read those env vars (confirmed: curl -sS on the same URL succeeded, byte-exact), and it is already the tool every install script in this tree shells out to for downloads -- install-mac.sh, install-steamdeck.sh's Bun install line. Rewritten to shell out to curl instead; re-verified against the real fetch, all four files landing byte-exact.
+
+VERIFIED END TO END IN A REAL HEADLESS BROWSER, not just that a WASM file loaded without throwing: window.crossOriginIsolated === true, the Lean runtime initialized, and two real pointer-drawn overlapping unit squares -- (0,0)-(4,0)-(4,4)-(0,4) and (2,2)-(6,2)-(6,6)-(2,6) -- produced an actual Lean-proved intersection ("Intersection: 1 boundary component"), with the computed result rendered in green on the canvas.
+
+Gated by tools/ship/verifiedPolygonIntersection-selfcheck.mjs: byte-exact verification of all four fetched files against the sizes measured by cloning upstream directly (catching a truncated-but-still-large fetch that built()'s minBytes threshold alone would miss), the COOP/COEP headers confirmed as real HTTP response headers via a plain fetch with zero JavaScript execution (independent of any service worker), path-safety on the artefact route, and the same real-browser draw-and-compute proof driven against a live server instance. One false failure in the gate's own first draft caught and fixed before shipping: a REFUSED-list check scoped to the whole bridge file matched the header comment's own explanation of why there is no bind-address risk ("no port of its own to bind"), the exact prose-vs-structure trap this tree has paid for before -- rescoped to just the REFUSED array's own text.
+
+Verified: verifiedPolygonIntersection-selfcheck all checks pass, tools/check.mjs syntax OK (1465 files), verify.mjs ALL GREEN.
+## Since v4142 -- the Deck gets adb, and the installer learns the difference between required and optional
+
+Keith asked whether the Deck could show the SweK remote panel for a Roku or a Shield/Android TV. Roku needed nothing extra -- ui/rokuRemotePanel.js talks plain ECP over HTTP (port 8060) through a Node-only proxy in ai-bridge/server.js, no external binary, so it already worked the moment install-steamdeck.sh finished at v4140.
+
+Shield/Android TV is different: ui/shieldDebugPanel.js drives it through ai-bridge/server.js's /shield/exec route, which shells out to a real `adb` binary on whichever machine's ai-bridge handles the request, and install-steamdeck.sh never installed one.
+
+Added an adb step to install-steamdeck.sh, offering Distrobox first -- same read-only-root reasoning as the Node.js step, and the same container -- with Google's platform-tools zip as a second path, since unlike Node.js it needs no package manager or Distrobox at all, just unzip and PATH.
+
+THE PART THAT MATTERED WAS NOT THE INSTRUCTIONS, IT WAS THE CONTROL FLOW. adb is genuinely optional -- the engine, and the Roku panel specifically, work fully without it -- so this step must never call the script's own fail(), which exits 1 and aborts the whole install. Copying the Node.js block's fail-if-missing shape here would have been wrong: Node is not optional, adb is.
+
+steamdeckLaunch-selfcheck's new section 7 proves this rather than trusting a read of the source: it isolates the adb-missing block from the shipped file and asserts the word "fail" never appears in it, then goes further and RUNS install-steamdeck.sh FOR REAL with adb kept off PATH -- a real gap on this sandbox, not a simulated one (`command -v adb` genuinely exits 1 here) -- and confirms the script still reaches "Setup complete." A sabotage check (inserting a real fail() call into a throwaway copy of the block) confirmed the isolation regex actually catches it, rather than trivially passing.
+
+Verified: steamdeckLaunch-selfcheck all checks pass (24 checks across 7 sections), tools/check.mjs syntax OK (1464 files), install-steamdeck.sh run for real twice -- once with adb genuinely absent (prints the Distrobox/platform-tools instructions, continues, reaches Setup complete) and once with a stubbed adb on PATH (reports its version, no instructions printed). verify.mjs ALL GREEN.
+## Since v4141 -- rig.html sorts by measured time, and a repaint that would have hidden its own results
+
+Keith: "for rig.html, could we have an option to sort the tests by short time first, instead of alphabetical?" Added a sort dropdown (A-Z / shortest first) next to Run all and Stop.
+
+Shortest-first orders by each check's own expectedMs -- the same server-measured number the exp column already prints -- and sinks never-timed checks to the BOTTOM rather than the top. That is not the obvious default: a blank time could easily read as "nothing to wait for", but the exp column's own tooltip already states the opposite -- "unmeasured is not quick -- a blank here is missing evidence, not a fast gate" -- so nulls sort last, after every measured check, alphabetically among themselves.
+
+THE HARDER PART WAS NOT THE SORT. rig.html's rows carry their run state (pass/fail text, output, hash chip) on live DOM elements built once at load. A naive re-sort rebuilds the row list from scratch, which would have blanked every already-run result back to "not run" the instant someone switched sort order -- reporting a check hadn't run when it had, which is exactly the kind of confident wrong answer this page's own exit-code rule exists to refuse for pass/fail itself. Fixed by moving the outcome off the DOM and onto the check object (c._result), independent of whichever row currently represents it, and having every repaint -- including the one a sort triggers -- restore it before deciding a row is blank.
+
+VERIFIED against the real page, not just read: a headless Chromium run (Playwright) against the live ai-bridge server confirmed all 1234 checks sort correctly -- expectedMs strictly non-decreasing through the measured portion (43, 43, 43, 43, 43, 44, 44, 44, 44, 45...) with every never-timed check trailing after the last measured one, the identical SET of checks in both orders, and a check run before switching sort back to A-Z still showing its real pass/fail afterward rather than reverting. The sort control also disables itself while Run all is running, same reason Stop exists for: that loop indexes `checks` by array position, and reordering the array mid-loop would run the wrong row at every step after the swap, not just reorder what's on screen.
+
+Verified: tools/check.mjs syntax OK (1464 files), inline-script parse OK, Playwright end-to-end pass, verify.mjs ALL GREEN. 1234 gates.
+## Since v4140 -- a Steam Deck peer, and the relaunch that looked like it worked and didn't
+
+Keith asked "can we have a steam deck swek peer?" after a side question about whether the Deck has WebGPU (it does, via Mesa RADV/Vulkan). RESEARCHED FIRST rather than assumed: assetDiscovery.js's UDP beacon, /net/info, /lighthouse, and server.js's GPU-detect and browser-open code already carry real, tested Linux branches. The only actual gap was the launcher trio macOS already has -- install-mac.sh, start-mac.sh, brain/start-brain-mac.sh -- with no Linux/SteamOS equivalent.
+
+Built install-steamdeck.sh, start-steamdeck.sh, and brain/start-brain-steamdeck.sh as that mirror, diverging from the mac trio only where the platform genuinely differs. SteamOS's root filesystem is READ-ONLY and resets on every system update, so `pacman -S nodejs` -- the obvious Arch-native answer -- vanishes on the next update; the installer steers to Distrobox instead, which is SteamOS's own documented answer for persistent command-line tools, not Flatpak (GUI-only, no node story) and not a bare pacman install. The brain script pins WGPU_BACKEND=vulkan, but that is not a guess parallel to START_BRAIN.bat's Windows Pascal pin -- the Deck's actual GPU, an AMD RDNA2 APU, has one unambiguously best-supported backend on Linux: Mesa's RADV, a native Vulkan ICD and the same path Proton itself runs games through.
+
+*** A REAL BUG SURFACED ONLY BY LIVE TWO-INSTANCE TESTING, NOT BY READING THE CODE. *** The port-takeover logic tries `ss -ltnp` first and falls back to walking /proc/net/tcp when `ss` is absent -- which this sandbox genuinely is, not a hypothetical. The first draft of that fallback found the busy port's socket inode and stopped there, never resolving it to a PID, with a comment calling that "good enough to know something is listening; not good enough to report a PID." Launching a second instance against a port the first one owned proved that wrong: it printed a warning, skipped the kill, and tried to bind anyway while the first instance kept running -- a relaunch that looks like it worked and does not.
+
+FIXED by walking the rest of the way: every process's open file descriptors under /proc/$pid/fd/* are symlinks that read socket:[INODE] for a socket fd, and matching that against the port's inode needs no root for the caller's own processes -- which is exactly what a takeover is ever asked to find. Re-verified with two real overlapping `bun ai-bridge/server.js` instances: the second launch now prints the first instance's real PID, kills it, waits for the port to clear, and exactly one server survives.
+
+install-steamdeck.sh was ALSO FIRST PLACED WRONG. It was written at the repository root by analogy, on the assumption install-mac.sh lives there -- it does not; install-mac.sh lives beside start-mac.sh inside WebGLEngine/. rootLayout-selfcheck.mjs, an existing gate not yet run this round, caught it: a broken reference to Start_Everything.bat (moved to Root Utils/ in an earlier round, invisible to a file sitting outside the root) and an unjustified new root file. Moved to WebGLEngine/install-steamdeck.sh and every internal relative path -- ai-bridge/node_modules, start-steamdeck.sh, brain/start-brain-steamdeck.sh -- corrected to match a sibling-file location instead of a project-root one.
+
+Gated by tools/ship/steamdeckLaunch-selfcheck.mjs: sources the real shipped port_owner_pid() verbatim into a live bash subprocess and runs it against a real net.createServer() listener, asserting the resolved PID matches the listening process and that an unused port resolves empty; then SABOTAGES the function back to the original no-PID stub and confirms that stub fails against the very same real listener, proving the gate would have caught the bug it was written for. Further checks confirm the installer never executes pacman as a command (only names it in prose as what not to do), that start-steamdeck.sh never calls xdg-open itself (server.js already does, on its own Linux branch -- one opener, not two racing), and that the brain script's Vulkan pin and CPU fallback detection match what actually ships.
+
+NOT verified on real Steam Deck hardware: no Deck, no AMD RDNA2 GPU, no Distrobox available here to run against. What IS proven: the takeover mechanism against a real listener and a real two-instance server, script syntax, and every source claim the gate itself makes.
+
+Verified: steamdeckLaunch-selfcheck all checks pass, rootLayout-selfcheck all checks pass (2 real failures before the relocation fix), tools/check.mjs syntax OK across the tree. 1234 gates.
+## Since v4139 -- a sentence that refused frozen readings, and then froze five of them
+
+Keith's rig: claimTrace's ratchet went red on one row -- stabilityBind, untraceable claims 3 -> 5.
+
+*** THE FILE HAD NOT CHANGED SINCE v3845, SO THE CLAIMS WERE NOT NEW. *** What changed was whether the device could still produce them. Its header ended with five decimals -- visc 0.1 -> 2.734 and four more -- inside the very sentence that says the numbers are "RE-DERIVED EVERY RUN rather than sitting in MEASURED_V3542 as readings somebody once took". A sentence refusing frozen readings, immediately freezing five.
+
+MEASURED BEFORE DECIDING ANYTHING. claimTrace reads a gate's header for numbers with two or more decimals and asks whether any DECLARED mode of the named device still emits them, at a generous two-percent tolerance. Here, two of the five do: the device's default modes give the visc-0.47 ratio, and its deafknob mode gives the visc-0.1 one. The other three come from CONFIG overrides rather than modes, which is exactly the baseline of three. ON KEITH'S RIG NEITHER OF THE TWO MATCHED, which is the whole of the 3 -> 5.
+
+*** THEY ARE NOT PORTABLE NUMBERS, AND THAT IS NOT A DEFECT IN HIS RIG. *** This fixture is DELIBERATELY UNSTABLE: a ratio above one means the solver is inventing energy, which is the entire point of the key it exists to state. An unstable SPH run's energy ratio after many steps is set by how the divergence develops, and last-bit differences move that. Bit-identical here under Node 20 and Node 22 -- so nothing on this box is flaky -- and his Node 24 Windows rig disagreed by more than two percent. THE SAME SHAPE AS v4137's cflBind RUNAWAY, ONE FILE OVER, and finding it twice in two rounds is the finding: a gate that re-derives a number from a divergent simulation and compares it to a written one is comparing machines, not code.
+
+THE READINGS ARE NOT DELETED. They sit below the imports now -- out of the region claimTrace reads as CLAIMS and into the region that holds CONTEXT -- labelled with the box that took them and with a line saying another machine will not reproduce them exactly. That is not hiding a number from the ratchet. A header states what a gate PROVES; one machine's reading of a divergent run is not that, and the assertions below never compared against those literals anyway: they re-derive and test INEQUALITIES (ratio > 2, createsEnergy === true), which is what makes the key portable in the first place.
+
+AND THE FIRST DRAFT OF THE NOTE EXPLAINING ALL THIS QUOTED THE FIVE DECIMALS IT WAS REMOVING, plus the two Node measurements, and took the header from five numeric claims to EIGHT. The file explaining the trap became an instance of it -- the same prose-as-code shape that broke my own arrival gate at v4134. The note carries no decimals of its own now, and says why.
+
+RE-FROZEN WITH THE DOCUMENTED SWITCH, and the diff checked rather than trusted: total 141 -> 135, untraceable 64 -> 61, the stabilityBind row GONE rather than zeroed (a header with no numeric claims is skipped, not counted), and NOTHING ELSE MOVED. The gate's own text calls an unrecorded shrink "headroom", so recording it is the point; its reason is written into the baseline's note.
+
+Verified: claimTrace-selfcheck all checks pass, stabilityBind-selfcheck all checks pass. 1233 gates.
+## Since v4138 -- an install button for an RDP client, and the 110 lines of it that decided how the button works
+
+Keith pasted https://github.com/nakagami/grdpwasm and asked for the galaxy-profile treatment: install it, run it, credit them, vendor nothing.
+
+The licensing half is v4124's argument unchanged. GPL-3.0's obligations are about DISTRIBUTING code or LINKING it into your own program, not about automating the `git clone` a person would type themselves onto their own machine. Nothing of theirs enters this tree, nothing is imported into this engine's process, their LICENSE is untouched -- which was READ, not inferred from a badge: 35146 bytes off the master branch, GPLv3 FSF boilerplate. Pinned to e10016ba. The branch is `master` and raw.githubusercontent 404s on `main`, which is exactly the detail that turns a clone into a baffling failure six months from now, so it is recorded rather than left to be rediscovered.
+
+*** AND THEN I READ proxy/main.go, WHICH IS WHY THIS BUTTON IS NOT SHAPED LIKE ITS NEIGHBOURS. *** It is 110 lines and does three things that are each entirely reasonable:
+
+    listen := flag.String("listen", ":8080", ...)          // ALL interfaces
+    upgrader.CheckOrigin = func(r) bool { return true }    // any origin
+    target := r.URL.Query().Get("target"); dialer.Dial("tcp", target)   // caller picks the destination
+
+Jointly, on a machine that sits on a network, they are an unauthenticated OPEN TCP RELAY: anything that can reach the port can have that process dial any host and port the machine can see, including hosts behind its own firewall. THIS IS NOT A BUG IN THEIR PROJECT. Their README says `make serve` and browse to localhost, and for a tool you run on your own desktop for five minutes those are the right defaults. It becomes a problem only when a button starts it unattended on a box that lives on a LAN -- which is precisely what was being asked for.
+
+SO IT IS LAUNCHED ON LOOPBACK, AND THAT IS AN ARGUMENT RATHER THAN A PATCH: `-listen 127.0.0.1:PORT` uses THEIR OWN FLAG, the one they wrote for this. Their source is unmodified, unpatched, unforked -- this bridge simply declines to pass the value that publishes the socket. Choosing a flag value is not forking somebody's project, and forking a GPL work would be a far larger claim than declining to publish a port. It is overridable, because it is Keith's machine and refusing to let him decide would be its own dishonesty -- but never by default, and start() returns a warning whenever the host is not loopback.
+
+*** THE LOOPBACK CLAIM IS PROVEN ON A SOCKET, NOT READ OUT OF THE SOURCE. *** A regex confirming "127.0.0.1" appears in a file is the check that passes while the thing it describes is wrong. The gate binds a listener, reaches it on loopback, FAILS to reach it on this machine's own non-loopback address (192.0.2.2), and then binds 0.0.0.0 AS A CONTROL and confirms that one IS reachable -- because without the control the first result could mean the network is broken rather than the bind is narrow. Measured: loopback reachable, LAN refused; 0.0.0.0 reachable.
+
+MEASURED RATHER THAN TAKEN FROM THE README, twice. go.mod declares `go 1.26.3`, not the 1.24 the README claims, so the Go toolchain downloads itself. The build was RUN: 10.5 MB static/main.wasm, 9.4 MB proxy/proxy, exit 0. The bridge was then driven against that real build -- started on 127.0.0.1:8088, served their page with their own no-cache header, status reported running, stop cleared it. Three sabotages redden the checks that name them: defaulting to 0.0.0.0, dropping the bind refusal, and detaching the child.
+
+*** AND FILING IT FOUND A DRAWER THAT HAD ALREADY OVERFLOWED. *** pageSections' System Tools drawer holds a cap of 15 and was at SIXTEEN before this page existed -- a red gate that verify does not run. Adding grdpwasm would have made it 17. It is not fixed by bending the cap: v4115, v4118, v4124 and v4125 had each written "JOINS, same rule again" about a page that is an opt-in front door to somebody else's work, and four notes repeating one sentence is a category the file kept documenting without creating. Those five pages now sit in an "Opt-in: somebody else's work" SUB-drawer -- one slot, no chip of its own, because they are System Tools rather than a peer of the rig, and because v4127 is on record that gtab wiring is where that row breaks. System Tools drops to 12 and pageSections-selfcheck goes green for the first time in this session.
+
+Gate: tools/ship/grdpwasm-selfcheck.mjs, source and live. 1233 gates.
+## Since v4137 -- a check that pinned the size of a chaotic runaway, which is not a portable number
+
+Keith's rig: cflBind-selfcheck FAILED with "maxSpeed 1.20e+2" against the 8.8e8 written into the check's own name.
+
+*** IT IS NOT FLAKY HERE AND IT IS NOT RANDOM. *** Measured before touching anything: 6.76e+8, identical across five consecutive runs and identical again under Node 20 and Node 22. No unseeded randomness, no timing dependence. His rig runs Node 24 on Windows and produced 120 from the same code.
+
+WHY THOSE TWO NUMBERS CAN BOTH BE HONEST. A scheme stepped past its stability limit grows EXPONENTIALLY, so how big it is after a fixed number of steps is set by WHEN the instability takes hold -- and that onset is set by perturbations in the last bit, which ECMAScript expressly permits Math to implement differently between engines. Nine orders of magnitude apart is not two machines disagreeing about arithmetic; it is two machines agreeing about arithmetic and disagreeing about a chaotic trajectory. Asserting `maxSpeed > 1e4` was asserting that they would not.
+
+AND ALL THREE CONJUNCTS WERE ONE CONJUNCT. The check read `finiteButBroken === true && allFinite === true && maxSpeed > 1e4`, and cflBind.mjs line 98 defines finiteButBroken as `allFinite && maxSpeed > 1e4`. The same condition, three times, every spelling of it resting on the unportable half.
+
+*** THE CLAIM SURVIVES WITHOUT THE MAGNITUDE, BECAUSE IT NEVER RESTED ON IT. *** The point is that a run stepped far past its limit produces NO NaN, so a NaN-only check waves a completely broken run through. "Far past its limit" is the ACOUSTIC COURANT, and that is soundSpeed*dt/h -- three fixture values and a literal, 3.0 exactly, the same on every machine that will ever run it. So the check now asserts acousticCourant > 1 AND allFinite, and REPORTS maxSpeed as a measurement of the host it ran on. Reporting a measurement is not the same as requiring one.
+
+SABOTAGE-CONFIRMED THREE WAYS, including the one that matters most: forcing the acoustic courant below 1 reddens it, forcing allFinite false reddens it, and FEEDING IT KEITH'S OWN 120 PASSES -- so the fix demonstrably resolves his failure without hollowing out the check that failed.
+
+WHAT IS DELIBERATELY NOT CHANGED. finiteButBroken still carries the 1e4 threshold inside the device, and lab-results-baseline.json pins that row true -- so that baseline row is host-dependent as well. The observable is a MEASUREMENT and the baseline is a RECORD of one; rewriting either to make a gate portable would be editing the evidence instead of the check that misused it. It is reported in the gate's own output so the next reader meets it as a known property rather than a surprise.
+
+Also noted while here and left alone: the runaway mode reports `dt` as the config's 0.002 while it actually runs at 0.02. The acoustic courant it reports is computed from the dt it RAN, so the check is unaffected; the reported dt is misleading and belongs to whoever changes the device next. 1232 gates.
+## Since v4136 -- a gate that has hard-crashed since v4055, and a timeout report that named the culprit while calling it something else
+
+Two rig failures from Keith, and neither was the thing it looked like.
+
+*** blackbodyBind HAS BEEN CRASHING FOR EIGHTY VERSIONS AND NOTHING NOTICED. *** It died on `v.exitanceQuarticRel.toExponential(3)` -- TypeError, undefined. The observable is not missing by accident: v4055 DELETED IT ON PURPOSE, and its note is the argument. exitance(T) is sigma*T^4, so exitance(tHi)/exitance(tLo) IS pow(tHi/tLo,4) algebraically -- sigma cancels, and so does the exponent, because the 4 is on both sides. What was left graded IEEE754 rather than physics, so the observable went and tLo/tHi went with it. THE SELFCHECK KEPT TWO REFERENCES. One threw; that is the crash Keith saw.
+
+THE SECOND REFERENCE IS WORSE THAN THE CRASH. A list of seven observables asserted BIT-IDENTICAL under the plant still carried the dead name, and `h.exitanceQuarticRel === p.exitanceQuarticRel` is `undefined === undefined` -- TRUE. A check advertising seven was really asserting six and taking a free pass on the seventh. A crash announces itself; a vacuous pass does not. The list is now checked to EXIST before it is checked to MATCH, so deleting an observable can never again quietly hollow out the check that named it. The dead check is NOT re-implemented: restoring the observable would restore the tautology v4055 spent a round arguing away.
+
+AND NOTHING CAUGHT IT. gate-timings.json records blackbodyBind at 560ms -- so it HAS been run and timed -- while its failingAt table, 19 entries of known-red gates, does not list it. That snapshot predates v4055. A gate can therefore hard-crash for eighty versions with a plausible runtime on file and an absence from the red list, and the first thing to notice is a person clicking it on rig.html.
+
+*** AND THE assumptionMap TIMEOUT REPORT POINTED AT THE RIGHT DEVICE WHILE SAYING THE OPPOSITE ABOUT IT. *** The run died at 557s ending on "classified 80/129 ... (last: twof)". `n` in that line is the device ABOUT TO BE BUILT, not the one just finished -- so a line reading "twof is done, 49 to go" actually meant "we are starting twof now". Timed per device: 250.9s total and TWOF ALONE IS 178.1s, 71% of the whole gate. kh is 20.6s, stability 16.4s, the top five are 90.4%, and the remaining 124 devices share under 10% between them. The one label anybody reads at a timeout had named the culprit and mislabelled it as already past.
+
+So the line now says what FINISHED and what is STARTING, any device costing over five seconds is announced the moment it lands, and every run ends with where the time went. v3923 added progress because "you cannot choose between a longer budget and a smaller fixture from an empty report"; a position is still not enough when one device is most of the cost. Re-run with it: the projection reads ~69s at 80/129 and ~340s at 90/129, and the line between them says `twof took 177.8s`.
+
+NOT ACTED ON, DELIBERATELY: twof's fixture is not shrunk. It would change what assumptionMap classifies, and the classification IS this gate's verdict -- a round must not move a verdict it is not about, which is gateBudget's own rule at the configContract entry. The measurement is recorded beside the budget so the choice is informed. The budget entry is also LEFT ALONE at 278482ms: this box measured 250.7s, BELOW it, and v4075 faced exactly this and refused to move it, because a table only ever revised upward drifts toward never failing.
+
+Verified: blackbodyBind all checks pass; assumptionMap all checks pass in 250.7s. 1232 gates.
+## Since v4135 -- the launcher fix was right and the polish I bundled with it was not
+
+Keith, on the v4134 clone: "it opened and then all consoles closed. now nothing is running."
+
+*** THE PORT FIX WAS CORRECT. THE THING I ADDED ALONGSIDE IT, IN THE SAME UNTESTABLE FILE, WAS NOT. *** v4134 gave swek_free_port.bat the port argument its two siblings always had -- that is the actual fix and it stays. It ALSO "tightened" both of its netstat loops from `findstr :%PORT%` to `findstr /C:":%PORT% "`, on reasoning that is perfectly sound: a bare `:8787` also matches `:87870`. THE REASONING WAS RIGHT AND THE PLACE WAS WRONG. swek_ask_exit.bat uses that quoted form on a PLAIN command line; these two sit inside `for /f ('...')`, where nested quotes are fragile. A loop that yields nothing leaves SWEK_HOLDER unset, a genuinely held port never gets freed, the server that follows dies on EADDRINUSE, and the launcher window closes -- taking the KPop Listener and the GPU Brain with it, which is this file's own documented failure mode from v3850.
+
+WHAT MADE IT REACH THE RIG: this box runs Linux and cannot execute a .bat, so portAgreement-selfcheck reads source and says so in its own output. It could see that the form CHANGED; it could not see that the new form stops matching. A gate that reads is not a gate that runs, and I treated a source check as if it were a run.
+
+THE RULE I BROKE IS ONE THIS TREE ALREADY STATES: don't bundle optional polish into a fix you cannot execute. The port argument is a substitution in positions that already worked. The quoting was a behaviour change to a matching expression, in a file no gate on this machine can run, shipped in the same commit -- so when it broke, the blast radius was the whole launcher rather than one improvement. The substring concern is REAL and PRE-EXISTING and it is not fixed here; it is recorded, and portAgreement now asserts the quoted form is NOT reintroduced inside a for /f, so nobody re-applies it from the same correct reasoning.
+
+VERIFIED, since verifying is the point: the server itself was never the problem. ai-bridge/server.js boots clean on this box under an arbitrary PORT (51999), binds it, and answers /health with ok:true -- so v4133's githubBridge changes and v4134's main.js layer imports are not implicated. The fault was entirely in the batch helper.
+
+AND THE CLOTH JOB WAS FINE. Keith: "it showed running for maybe a minute and then returned to normal. so maybe it ran okay, but maybe it did not?" It ran. Measured here, pure Node exactly as its registry entry promises: 3.9 SECONDS, exit 0, full verdict printed -- the honest radius r <= h/2 = 0.15 set by coherence rather than feasibility, the whole window swept, and v3603's compliance anomaly retracted. The minute is rigJobBridge's declared `minutes: 1` UPPER BOUND, which that entry's own comment calls an upper bound rather than an estimate; it is not the runtime and never was. The job's output lives in server memory at /rigjob/log, which is why it vanished with the consoles rather than because anything failed. 1232 gates.
+## Since v4134 -- two ports that disagreed, and an arrival that never went high enough to have layers
+
+Three things Keith asked for, and each one turned out to be a measurement before it was a fix.
+
+*** THE LAUNCHER GUARDED 8787 WHILE THE SERVER BOUND SOMETHING ELSE. *** ai-bridge/server.js has honoured PORT since v1238 -- `parseInt(process.env.PORT, 10) || 8787` -- and START_NODE_Engine.bat never read it: 8787 was written literally at a dozen places. With PORT inherited, which is exactly what a side-by-side launch does, the server bound the inherited port while every guard fought over 8787. The worst was `swek_ask_exit.bat 8787`, which POSTs /sys/exit: it asked THE RUNNING PRODUCTION SERVER to shut down on behalf of a launch that was never going to use 8787. Keith met the far end of that as "Failed to fetch" and a browser opened on a port with nothing behind it. One derivation now matches server.js's own rule, and the three helpers are all TOLD which port. swek_free_port.bat was the only one of the three that could not be told -- its siblings have taken an argument all along -- and its netstat match was tightened while there, because `findstr :8787` also matches :87870 and a port from the ephemeral range makes that collision far likelier than 8787 ever did. Four other launchers call it bare and still work.
+
+*** THE BRAIN READ THE PORT BEACON ONCE, AT STARTUP, INTO A const. *** "GPU Brain says offline but the GPU brain is started and running" -- it was running, and it was right. It resolved 8787 at boot, the engine came up on 63698, and it dialled a dead address for the rest of its life. The beacon file is REWRITTEN every time the server binds, so the fact was on disk the whole time and nothing looked again. BRIDGE is a `let` now and the beacon is re-read WHEN A POLL FAILS -- not on a timer, because a working connection is evidence the address is right. BRAIN_BRIDGE still always wins, and a move is announced, because the symptom was in server.html while the cause sat in a variable nobody printed.
+
+*** AND THE FLY-IN NEVER WENT HIGH ENOUGH TO HAVE A SATELLITE LAYER. *** Keith: "we would fly into the satellite layer briefly, then see the adsblayer, and then if we have 3d plane models would show those planes instead of simple plane." Measured before building anything: the first leg opened at distance 4000 but pitch 0.05, and 4000*sin(0.05) is an ALTITUDE OF 200 -- while adsbLayer puts a 40,000 ft airliner at world Y 190. The "fly in from space" was a low flat approach skimming the top of the airliners. Adding satellites without checking would have put them where the camera never goes: a feature that looks built and never appears.
+
+ONE OF THE THREE PIECES WAS ALREADY BUILT. adsbLayer has carried a models3D flag and a window.planeMesh.sync(list) call since v1447; nothing during an arrival ever switched it on. So this round adds a 4s leg above the aircraft, ui/orbitPassLayer.js for the satellites, and ui/arrivalLayers.js for the handover -- and the handover is keyed on the camera's own ALTITUDE rather than a clock, because a schedule that says "four seconds in, turn on the planes" is right exactly once and silently wrong after any retime.
+
+THE SATELLITES ARE DELIBERATELY NOT THE ONES ALREADY IN THE TREE. simulation/SatelliteFleet.js is a COMBAT system -- cities launching armed satellites with cooldowns, lasers and kaiju targeting, wired to damage numbers. Reusing it would have given a scenic descent a fleet that wants to shoot at something. The new layer is scenery, seeded so two arrivals look alike, and it reuses planeMeshLayer's own spawn path rather than inventing a second way to move a mesh.
+
+*** AND THEN A REAL FLIGHT FOUND A BUG NO PURE FUNCTION COULD. *** layersAt(y) is monotone in altitude and a gate proves it. THE CAMERA IS NOT MONOTONE IN TIME: the dive leg interpolates distance and pitch independently, so d*sin(p) dips to about 228, climbs back to 440, and only then lands -- a hump ORIGINAL to the shot, not added here. Following the bands frame by frame measured satellites going 5 -> 0 -> 5 -> 0: a visible flicker. Fixed two ways, because either alone is luck: each layer is LATCHED to one transition per arrival (an arrival descends, whatever the arithmetic does in the middle), and the satellite edge sits at the aircraft ceiling itself, below the hump's trough, so they survive it rather than being dismissed and leaving fifteen seconds of empty orbital sky. Measured after: orbital with 5 satellites, handover, atmospheric, one clean transition.
+
+MY OWN GATES WERE WRONG THREE TIMES AND EACH ONE IS RECORDED. The arrival gate matched its own prose -- orbitPassLayer EXPLAINS why it avoids SatelliteFleet and QUOTES hitBurst's "uses no Math.random" -- so both checks went red on correct code; codeOnly then broke the opposite check because it blanks strings and "entity:spawnMesh" IS one, which is the split boundaryLint wrote down at v3107. The leg reader took only literals and silently missed the landing legs, which are written `distance: SETTLE`, reporting a real number about a subset. And the flicker check counted RISING EDGES and allowed one -- so the sabotage that removes the latch produced exactly one rise and the check said PASS. It counts RETURNS now, and the same sabotage reddens it.
+
+Verified live in a real browser: 26.0s flight, 89 distinct camera positions, bands orbital -> handover -> atmospheric, 5 satellites spawned, 0 returns after dismissal, zero page errors. NOT verified here: the launcher and the brain, which are Windows batch and Deno -- both gates say so in their own output rather than implying coverage. 1232 gates.
+## Since v4133 -- which branch, asked out loud: the clone took the default and never said so
+
+Keith: "are we able to detect that a feature branch exists and give us the option of choosing the branch?"
+
+*** THE ANSWER TO WHY FOUR DAYS OF GATE RESULTS COULD NOT BE REPRODUCED. *** His rig ran gate after gate against v4116 and sent failures; this tree was at v4132 and two of them did not exist here. origin/main is v4116. Every version from v4117 to v4132 lives on a feature branch, and the clone button takes the DEFAULT branch.
+
+NOTHING WAS BROKEN, WHICH IS WHY IT LASTED. cloneEngineSource has always honoured a `ref`, and it has always read the version out of the CLONED TREE rather than guessing -- so it cloned main, found v4116 in it, and correctly named the folder SweK_Engine_v4116. A correct fetcher and a correct namer. The defect was that nobody was ASKED which branch, and that the result never mentioned the copy it handed back was OLDER than the engine asking for it -- with BOTH numbers already sitting in its own return value (`version` and `running`) and _verLt defined forty lines below, doing that exact comparison for three other callers.
+
+So: the clone now compares them and leads with the warning when the copy is older, naming the branch it actually used and what to do instead. A new listSourceBranches returns the branches with their head-commit dates, and the panel grows a picker that passes the chosen ref.
+
+THE VERSION IN THAT DROPDOWN IS A GUESS AND IS NAMED ONE. Reading a branch's true ENGINE_VERSION means fetching main.js, which is 2.5 MB, and doing that per branch to fill a dropdown is a lot of bytes for a label. So it is parsed from the head commit's SUBJECT and returned as `versionGuess` with `versionSource: "commit subject"`, and the UI prints it with a tilde. The authoritative version is still the one read out of the tree after the clone, exactly as before. A picker that guesses well and a namer that knows is the right split; a picker that guessed and then got BELIEVED is this same bug coming back wearing a dropdown. A branch whose subject carries no version reports EMPTY rather than inventing one.
+
+THE DEFAULT BRANCH IS FLAGGED, NOT FLOATED TO THE TOP. On this repo it is the stale one, and a list that always shows main first is the same wrong default in a new costume. The list sorts by commit date.
+
+AND A ROTTEN TOKEN NO LONGER BLOCKS A PUBLIC READ, which was found by the feature failing on the box that wrote it: this sandbox's saved PAT is rejected and the branch list came back "Bad credentials" for a repo that needs no credentials at all. cloneEngineSource already makes that argument in its own words -- "Failing the whole clone on an expired PAT is refusing to do something that needs no permission at all" -- and nobody had carried it to the REST side. The retry is SCOPED TO READS: _api is shared by createRepo, putFile, createRelease and deleteRepo, and a WRITE retried anonymously turns "your token expired" into a 404 nobody can read.
+
+VERIFIED BY RUNNING IT, NOT BY READING IT. cloneSource-selfcheck gains two sections: one over the source, and one that stubs fetch and runs the REAL listSourceBranches against Keith's own arrangement -- a stale default at v4116 and a feature branch at v4132. It confirms the feature branch sorts above the default, both commit-subject spellings parse, an unlabelled branch yields empty, the default is flagged not floated, and the 401 really does drive an anonymous retry. Three sabotages checked: sorting default-first, dropping the retry, and the UI ceasing to pass the ref each redden the checks that name them, and all restored byte-identical. One bug was caught this way before it shipped -- the first draft passed the repo as a fourth "query" argument to api(), whose signature is (op, body, method), so it would have been silently dropped and the repo would never have arrived.
+
+HONEST LIMIT, PRINTED BY THE GATE ITSELF: the live GitHub listing is NOT exercised here. This box is rate-limited on a shared IP, so listSourceBranches was confirmed to REACH GitHub anonymously -- the reply changed from "Bad credentials" to a rate-limit notice, which only an unauthenticated request receives -- but never returned a real branch list. The shape is checked from source, the logic is checked against a stub, and the live call wants a run on the rig. 1230 gates.
+## Since v4132 -- eighteen rounds of changelog that belonged to no version, and the write that now refuses them
+
+Keith ran the rig's gates and sent five failures. One of them had been right for eighteen rounds and nobody had read it.
+
+*** THE RECORD WAS BEING WRITTEN AND FILED UNDER NOTHING. *** changelogCurrency-selfcheck said "marker v4131, newest entry v4113". The entries for v4114..v4131 were all there -- every word of them -- with NO `## Since vNNNN` heading. changelog.mjs used ENTRY_HEAD to find the INSERTION POINT and never once to check the text arriving, so an entry opening with prose was inserted happily. And because the insertion point is the newest heading, which stayed `## Since v4113` the whole time, each headless round landed BELOW the previous one: an OLDEST-FIRST run of eighteen blocks sitting inside a newest-first file. namesVersion() answered false for every one of them; newestVersion() read straight past to v4113.
+
+THE REPAIR IS FROM GIT, NOT FROM MEMORY. Each of the eighteen commits that touched docs/CHANGELOG.md gave up its version and its headline, the headline was confirmed to occur EXACTLY ONCE in the file before anything was inserted, and the run was then reversed into newest-first. Line count unchanged, and a multiset diff against the previous commit shows every original line still present with nothing added but the eighteen headings and their blank lines. The unattributed-version gap this gate reports drops from 64 to 62.
+
+THE HOLE IS CLOSED AT THE WRITE. changelog.mjs now REFUSES an entry with no heading, naming the fix and what went wrong; it also takes an optional --version and refuses a heading that names a different round, because filing work under someone else's version is worse than filing it under none. Both refusals were exercised and both wrote nothing.
+
+FOUR MORE, EACH READ BEFORE IT WAS TOUCHED. bfcache: cat-reactions.html and gesture-vfx.html tore down their camera tracker on pagehide with no persisted check. The fix is deliberately NOT the `if (e.persisted) return` the GL pages use -- releasing the camera on a freeze is RIGHT, since a live getUserMedia keeps the indicator light on while the page sits frozen. What was missing was the other half: the restored page came back reading "running" with Start disabled and nothing behind it. A freeze now goes through the page's own Stop path, which releases the camera AND says so. budgetEvidence: blobulatorSkins-selfcheck (v4128) had no recorded runtime -- measured at 11725 ms and recorded, and the first attempt at recording it went in at the WRONG NESTING LEVEL and reordered the whole file, which git caught and a one-line insertion replaced. boundaryLint: 84 -> 85 sites, all five changes read. Three are same-origin status polls inside a try whose catch reports "unreachable" -- the loud-is-legitimate design this rule's own text declines to fail. The fourth is pairlaneBridge.stop(), where the handle IS kept and _spawnJob DOES install child.on("exit") setting job.done, 40 lines away where the regex cannot see it; stop() was still over-claiming with a bare {ok:true} and now returns signalled/done/verifyWith. The code was made honest, not reshaped to dodge a regex. One tell is GONE (skyrim.html) and that win is recorded. The reasoning is written into the baseline file itself, so the next reader sees a judgement rather than a number.
+
+AND ONE THING WORTH SAYING PLAINLY: the rig was running v4116 while this tree is at v4131, so two of the five numbers Keith sent could not be reproduced here and were already fixed in versions his clone did not have. 1230 gates.
+## Since v4131 -- pick how many ships fight, restart the fight, and name the pages for what they are
+
+Pick how many ships fight, restart the fight, and stop naming the pages after when they were built.
+
+Keith, on es-box3d-fly3d.html: "i think this needs a 'Reset Battle'" and "cam we actuily also pick the number of space ships fighting each other?"
+
+NEITHER NEEDED NEW SIMULATION, AND THAT IS THE WHOLE POINT. newBattle() was ALREADY a full teardown-and-rebuild -- hulls cleared, a fresh box3d world, the trail mesh disposed and rebuilt at the new strand count, shots and clock zeroed. It was called from exactly one place: frame(), when one side is wiped out. What was missing was not a rebuild. It was a way to ASK for one, and a count that was not the literal 6 written TWICE inside it.
+
+THE ASYMMETRY BETWEEN THE TWO CONTROLS IS DELIBERATE AND IS THE ONE THING WORTH ARGUING ABOUT. Changing the fleet size CLEARS the battle tally; a plain reset KEEPS it. "battles A:3 B:1" that counts some 2v2s and some 20v20s is a score for two different games added together. A reset is the next round of the same game. Both halves are pinned in the gate, because "make these two consistent" is exactly the tidy-up that would quietly break it.
+
+SPAWNENEMIES TREATS ZERO AS "USE MY DEFAULT THREE". ev/combat.js reads `const n = opts.count || 3`, so a count arriving as 0 or NaN does not fail loudly -- it quietly spawns three ships and looks like it worked. Both paths into it now clamp, and the gate PROVES THE TRAP IS REAL by calling spawnEnemies(count: 0) and asserting it returns 3.
+
+THE GATE READS THE PICKER'S OWN OPTIONS OUT OF THE PAGE. It spawns real fleets at every size the HUD offers, through the real ev/combat.js, and checks each fleet is the right size, that all ids are distinct (hulls are keyed by id -- a collision would share a mesh between two ships), and that neither fleet spills across the midline. A hardcoded list of sizes here would go stale the first time the HUD changed; adding "40 v 40" to the page exercises 40 v 40 whether or not anyone remembers this file.
+
+AND THE LIVE HALF, BECAUSE SOURCE CANNOT TELL "WIRED" FROM "WIRED TO SOMETHING THAT THROWS". The page boots in a real browser, the real select is changed and the real button clicked, and the answer is read out of the RUNNING SIM. The one thing the HUD text cannot distinguish is the important one: "restarted at 2 v 2" looks exactly like "was already 2 v 2 and the click did nothing" -- so the reset check is that the SIM CLOCK WENT BACKWARDS. Measured: default 6 v 6, picking 20 gives 20 v 20 with all 40 alive, picking 2 gives 2 v 2, and reset takes the clock from 1.03s to 0.20s. Zero page errors.
+
+EVERY LOAD-BEARING CHECK SABOTAGE-CONFIRMED. Leaving one side on the old literal 6 reddens two; making reset clear the tally reddens one; dropping the clamp reddens one; making reset not call newBattle() takes the live clock from "1.03 -> 0.20" to "1.03 -> 1.53" (it just kept running); making the picker set fleetSize without rebuilding reads 6 v 6 while the HUD says 20. All restored, diff-confirmed.
+
+ROUND A AND ROUND B SAID WHEN THE WORK HAPPENED, NOT WHAT THE PAGE IS. Keith: "These pages mention Round A / Round B. That could be named as what they are instead of Round A/B." So the titles, link text, tooltips and demo:descs now say the actual difference: es-box3d-3d.html is THE PLANAR FIGHT GIVEN A 3D VIEW (the sim is unchanged, only the camera is), and es-box3d-fly3d.html is THE FIGHT ITSELF IN 3D (ships gain a pitch axis and an altitude). server.html's two links say the same thing in one line each. WHAT IS NOT RENAMED: the source header comments and the module headers -- ev/flightModel3d.js is still stamped "v3826 (Long Silence, Round B)" and should be, because rewriting history was not the ask and those stamps are what four hundred versions of changelog cite. Each page carries ONE "formerly labelled Round A/B" bridge in its desc for a reader arriving from that changelog, and the gate CAPS IT AT ONE so the bridge cannot become the loophole.
+
+AND THE ANSWER TO KEITH'S OTHER QUESTION, WHICH IS NOT THE PAGE I FIRST WENT LOOKING AT. He asked whether the fly-in-from-space page has "a couple satellites / Planes flying by as we get to planet". realterrain.html is a form, not a flight -- it has no sky in it at all. The fly-in is window.realTerrain.flyIn() (v4058) on index.html, and it has NO flyby objects: it is a camera move over stamped terrain through the cloud deck. But the parts are already in this tree and not wired to it -- ui/adsbLayer.js (v1113, the live ADS-B aircraft overlay), ui/planeMeshLayer.js (v1447, 3D aircraft meshes) and simulation/SatelliteFleet.js. NOT BUILT THIS ROUND, because which of those three should cross a descent is a look decision and guessing at it costs more than asking.
+
+Gate: ev/esFleetSize-selfcheck.mjs, 62 checks, source and live, 9.6s.
+## Since v4130 -- label the merged tree so it can be cloned as a version
+
+The tier-2 census branch merged, and the number the two branches disagreed about was settled by re-running it.
+
+Keith handed over a 58-commit patch series (v4027..v4061) from claude/tier-2-keys-patch-4lwhzk with "full merge, that patch has been running since v4027 until just now -- I expect the items are all valid, if not duplicated from current". Both halves were right, and the duplication is what made it tractable.
+
+THE ZIP WAS NOT THE WAY IN. The series shipped as 58 .patch files against a base the tree had passed 102 commits earlier; applied that way only 12 of 58 went on cleanly. The branch itself was still on origin at the exact head the README named, so the merge was done with git's own three-way machinery instead -- 43 files, 46 conflict hunks across 9, resolved per file rather than by picking a side.
+
+WHAT THE TREE WAS ACTUALLY MISSING, and it was already pointing at it: costRecord.mjs exported a COST_BASELINE path to device-cost-baseline.json AND THAT FILE WAS NOT THERE, while knobLiveness.mjs and corroborationCensus-selfcheck.mjs both name reports that were also absent. A partial merge had taken the code and dropped the data. All three arrive: 484 measured build costs, 116 sweep costs, and the two reports that explain them -- about twelve hours of measurement on Keith's rig, which is not the kind of thing to regenerate for want of a merge.
+
+THE RESOLUTIONS THAT WERE NOT SIDE-PICKS. twoFBind.mjs kept BOTH: our v4073/v4080 notes are unique, and our note already endorses their implementation by name ("falls back to that measured record"), so taking either side alone would have deleted half of one argument. Their costHint replaces a hand-calibrated 4.8 ms/step with the measured record. costRecord.mjs kept our newer header but took THEIR portability paragraph, because theirs carries a repeatability measurement ours lacked -- quantum re-measured at 100264 ms against a frozen 100481, 0.2% apart, which is what makes the file's larger discrepancies diagnosable rather than merely noisy. knobLiveness.mjs took their echo/deafness machinery as one coherent set, since its output format is literally what the census report prints, but kept OUR unaffordable-budget note: theirs parseInts a "~N s" string and silently reads 0 for a decimal.
+
+TWO BUGS THE MERGE ITSELF INTRODUCED, both caught before the commit. Hunk boundaries left sameValue and choicesFor DEFINED TWICE -- a SyntaxError, caught by node --check. And taking the branch's import line for corroborationCensus-selfcheck.mjs dropped costVsCalls, WHICH IS STILL CALLED at line 347: a ReferenceError at RUN time that no syntax check can see, and the reason the import is now the union of both sides rather than either.
+
+AND ONE CLAIM I TOOK ON TRUST AND THEN CHECKED. tidalBind-selfcheck.mjs arrived byte-identical from both branches except for a measured runtime: 0.85s here, ~6s there. I took theirs during the merge and said I would re-measure rather than leave an unverified number in a header. Measured on the applying machine: 840 ms -- this side's figure was right. The ~6s is NOT deleted, because v4038a's rule is that a cost hint is machine-local and load-local, so a box seven times slower is a plausible box rather than a mistake; it is kept as the wider bound, the same way twoFBind.mjs keeps its own disagreeing rows.
+
+VERSION NUMBERS COLLIDE, DELIBERATELY. v4027..v4061 now describe two different bodies of work from two parallel branches -- their v4061 is KNOB_CENSUS.md, this branch's was "the fly-in, actually watched". Renumbering either lineage would falsify commit messages that the branch's own gates and reports cite by version, so the collision is recorded here instead of hidden.
+
+Verified on the merged tree: knobLiveness-selfcheck 55 checks all pass, tidalBind-selfcheck all pass, tools/check.mjs syntax OK across 1461 files, and verify.mjs ALL GREEN. corroborationCensus-selfcheck runs a real census and is too slow for this box -- NOT RUN, and said so rather than implied.
+## Since v4129 -- Nebula stars stop being flat blocks; rig.html loses its human-only panel
+
+The nebula's stars stop being blocks, and rig.html loses a panel after its links were checked rather than assumed.
+
+Keith: "the stars in Escape velocity Nebula are square voxels, can they be stars?" -- on es-box3d-fly3d.html, whose backdrop is a baked cubemap from render/nebulaSkybox.js. NOTHING WAS DRAWING A SQUARE. The generator quantises a direction onto a lattice and, if that cell holds a star, added the SAME full brightness for every direction inside it. A flat-topped cell magnified across a skybox face is exactly what a voxel looks like. The fix is a radial falloff from the cell centre, computed from the same direction the cell test already uses -- so the seamlessness the lattice exists for is untouched: two faces meeting at an edge evaluate the same direction and still get the same value.
+
+THE VALUE WAS MEASURED, AND MY FIRST ONE WAS WRONG. I picked 0.42 cells first, on the reasoning that a star should not touch its neighbour. Measured at the page's real bake size of 256, that shrinks a star BELOW one texel: lit texels fall from 2313 to 659 and almost no adjacent lit pairs survive. That is not a rounder star, it is a thinner sky -- a different look sold as a fix. Swept properly, 1.0 keeps the ORIGINAL footprint (2313 lit texels) and takes the fraction of adjacent lit pairs that DIFFER from 11% to 99%: the same stars, now shaded centre to edge. It also reaches exactly zero at the cell boundary, so a star cannot spill into its neighbour and there is no rim to read as an edge.
+
+The gate compares the two settings against each other rather than against a number I chose: starRadius 0 restores the old behaviour exactly, so the falloff has to earn the difference. It also pins the FOOTPRINT, because a "fix" that shades stars by deleting most of them would otherwise pass.
+
+WRITING THAT GATE FOUND A SECOND BUG. Asking for the shipped default by passing starRadius: undefined produced the flat squares again -- makeParams spreads opts over DEFAULTS, and a spread copies an explicitly undefined key, so the default was being wiped by the absence of a value. Any caller building options from an optional field would have hit it. null and undefined now mean "not specified" while zero still means zero.
+
+rig.html: "Only a human at the rig can do these" is removed at Keith's request. His one condition was not losing the pages it linked to, so that was checked rather than assumed: all ten distinct links appear on at least one other page, and nine of the ten also carry a topic in pageSections.mjs. models.html -- the one he named as the one he was unsure about -- is linked from server.html AND has a topic, so it is reachable twice over. The LIST ITSELF IS NOT DELETED: RIG_ONLY still lives in ai-bridge/rigRunner.js and is still served on /rig/list, because fourteen items of recorded reasoning about what each chore unblocks is expensive to write and impossible to reconstruct. Removing the panel takes it off the page; it does not throw the record away.
+
+Gate: render/nebulaSkybox-selfcheck.mjs, 17 checks, all pass.
+## Since v4128 -- Fix two blobulator bugs reachable only from a non-default control
+
+Two blobulator bugs that only a non-default control could reach, and round embers.
+
+Keith clicked "skin: lava" on blobulator.html and got no render, with the console filling at 60 Hz: "Cannot access 'wLY' before initialization". The river's frame read wLY and cs eight lines ABOVE the const that declares them. A const is hoisted but not initialised, so reading it earlier in the same scope is a temporal-dead-zone ReferenceError rather than undefined.
+
+IT SHIPPED BECAUSE IT SAT BEHIND A SHORT-CIRCUIT. The guard is `if (SKIN_CYCLE[skinIdx] !== "native")`, and native is the DEFAULT skin, so the expression after it was never evaluated until somebody picked another one. Every page-load check this tree has was looking at the one state that could not crash. That is the generalisable lesson, and it is what the new gate is built around: it cycles EVERY skin and fails on any page error, because the default is the state already proven.
+
+The same line carried a second, quieter bug: `wLY * cs * 0.4`, where wLY is already LY * cs. Multiplying by the cell size twice would have put the colour ramp's centre far above the fluid -- invisible until the crash was fixed, which is the kind of thing that gets "fixed" once and then reported again. riverDims is now destructured ONCE at the top of the block instead of twice below it.
+
+THE HAMBURGER WAS NOT A DRAG HANDLE AND WAS NOT INERT -- IT WAS A SYNTAX ERROR. Keith: the menu icon "does not move/drag/activate". The HUD's show/hide control was written onclick="this.closest(\'#hud\').classList.toggle(\'min\')". A backslash-escaped quote is invalid inside an HTML attribute, so the handler did not parse at all; blobulator-gpu.html reported it as "Uncaught SyntaxError: Invalid or unexpected token" on load. The same broken line had been copied into blobulator.html, blobulator-gpu.html and box3d-blobs.html.
+
+Keith also asked whether the title line itself could minimise the panel and restore it. #hud.min already hides every child except the h1, so only the pressable area had to widen: the h1 now toggles, skipping clicks on the hamburger (which has its own handler, and would otherwise toggle twice and look dead) and on any <a>, since blobulator.html's title contains the WebGPU-version link and that must navigate. Verified in a real browser: hamburger collapses, title click restores, and the link still navigates rather than collapsing the panel.
+
+THE GATE'S FIRST VERSION WOULD HAVE BROKEN THREE WORKING PAGES. Checking for \' inside an on*= attribute flagged petfbi.html, server.html and webtorrent.html -- all three ASSEMBLE markup by concatenating JavaScript strings, where \' is correct and required. The characters are identical; only their context differs. The check now strips script blocks first and tests what is actually parsed as HTML, and it keeps those three as a NEGATIVE CONTROL: they still contain the sequence, and if the test ever goes naive again they light up.
+
+Finally, the embers are round. Keith: "can we make the float particles round or roundish?" A THREE.PointsMaterial with no map draws each point as a flat square -- that is simply what an untextured point sprite is -- so the flaming river was throwing off little orange tiles. The sprite is generated on a canvas rather than shipped as a PNG, since a binary nobody can review in a diff is what this tree avoids adding, and it is white so vertexColors still decides the colour and this only decides the shape.
+
+Gate: tools/ship/blobulatorSkins-selfcheck.mjs, 12 checks, all pass, including cycling all five skins in a real browser with zero page errors.
+## Since v4127 -- Topic row re-filed; chipOrder gate stops hardcoding its members
+
+The topic row, re-filed at Keith's direction -- and a gate that had been grading three of five without anyone noticing.
+
+Keith, reading the row: four service chips "do not get their own button on Server.html and can go in the alphabetized section" (Roundhouse, Terrain WASM, Cross-Arch, Policy Mass); "this goes in System Tools" (Render QA, Rig Jobs); "'Homebrew formula' goes in Mac System"; and two renames, "Fluid -- verify the GPU" to "PL: Fluids" and "Matter & Chaos" to "PL: Matter & Chaos".
+
+Every one of these went through a mechanism that already existed, which is the whole reason the round is small. My first attempt did not: I started hiding the seven gtab buttons and hand-rolling chip rows in the destination panels, which would have been a second, worse copy of two features this page already has. Keith's follow-up -- "we dont want to put the panels in the alphabet sections, just the button links" -- and then a screenshot of the actual row is what corrected it. The screenshot showed what no amount of reading the DOM order would have: the row is SORTED AT RUNTIME, so the markup order I was studying is not the order anybody sees.
+
+So: unpinning is how a chip joins the alphabetised run. CHIP_PINNED exists precisely to name the chips that keep a hand-set order, so the four leave that list and nothing else about them changes -- they keep their chip, their panel, their live state span. And CHIP_GROUPS is how a chip moves INTO another panel, with the exact precedent sitting in it already: "'Rig Verify' should be part of System Tools" was the same request, one round earlier, implemented as a one-line entry. Render QA and Rig Jobs join that entry; Homebrew formula gets a Mac System entry beside it. The grouper MOVES the node, so each chip's click listener and its live-state span travel with it -- rebuilding a copy in the destination would have dropped both silently, which is what my first attempt was about to do.
+
+The renames are visible-label-only: data-tab and data-panel stay as they were, so every selector, every pageSections id and every placements JSON key keeps pointing at the same panel. pageSections.mjs's own label for each section was renamed in the same edit, because a name declared in two places that disagree is this tree's most repeated defect and there was no reason to add another instance of it.
+
+*** AND THE RENAMES BROKE A GATE, WHICH TURNED OUT TO BE THE MOST USEFUL THING IN THE ROUND. *** chipOrder-selfcheck asserts that the "PL: " prefix pays off by making the Physics Lab drawers sort into one run. It did that against a hardcoded list of three: optics, cosmic, em. By v4034 there were FIVE -- "PL: Boundaries & Reconstruction" and "PL: Discretisation & Meshes" carried the prefix and were never added to the list -- so the gate had been grading three of five for several rounds AND STILL PASSING, because the two it did not know about happened to sort adjacent to the three it did. It only failed now because two more joined and finally spread the known three apart. A check that names its members by hand goes stale the next time somebody joins, and this one proved it by quietly grading a shrinking fraction of the thing it defends. The set is now DERIVED from the row -- every chip whose label carries the prefix, however many that is -- and the assertion is the property actually worth defending: not "these three are adjacent" but "the prefix collects ALL of them into one run". Seven now, consecutive, and a new PL drawer cannot silently escape the check.
+
+Verified in a real browser against the real server rather than by reading the markup: the group mover reports "moved 8 chips into 3 group slot(s)", the System Tools slot holds verify/renderqa/rigjob, the Mac System slot holds brew, the four unpinned chips land in alphabetical position (Cross-Arch at 10, Policy Mass 25, Roundhouse 26, Terrain WASM 29), all seven PL: drawers occupy positions 18 through 24 with nothing between them, and the page logs no script error.
+## Since v4126 -- Generated .command launcher for the NTFS mounter
+
+A double-clickable Terminal launcher for the NTFS mounter, which dissolves the password problem rather than working around it.
+
+Keith, after v4125 shipped: "can we generate a .sh file to run? can that be a created terminal file that will double click and run in terminal? can that terminal file be executed by SweK and then we approve it?" Yes to all three, and the third one is the interesting part.
+
+v4125's mount button keeps a strong promise -- this server never handles a macOS admin password -- by running `sudo -n`, which refuses to prompt and fails closed. Correct, but it means the button does not work until you have gone and run `sudo -v` in a Terminal first, somewhere else. A generated .command file fixes that without weakening anything: Finder hands a .command to Terminal.app, so TERMINAL asks for the password, exactly as if the command had been typed by hand. The password still never reaches the server. The homework disappears. Same guarantee, better feature, which is why the page now names the launcher the recommended path rather than offering two equal options.
+
+It also removes a risk the mount route had to actively defend against. mount() computes a numeric menu selection, feeds it to the script on stdin, and then has to verify the script echoed back the volume it meant -- because a disk list can change between listing and mounting. The launcher feeds nothing: upstream's own menu prints in a real Terminal and the person picks from it. There is no index to go stale, and the confirmation is the script's own prompt rather than one this tree bolted on. A volume selected in SweK is passed through only to be echoed ("you picked X, choose that below"), never to drive the choice.
+
+The approval Keith asked about is real and happens twice, both times outside this server: Terminal asks for the password, and the generated script itself asks "Continue? [y/N]" before touching a disk. Pressing a button in SweK is what OFFERS the action; it is not what performs it. Verified behaviourally rather than asserted: answering n cancels without sudo ever being reached (checked with a sudo stub that creates a marker file if it runs -- it did not), answering y reaches it, and a missing ntfs-3g exits with a diagnosis before the prompt.
+
+A volume name is not trusted input, and that is the check worth keeping. Anyone can name a USB stick, and that string is written into a bash script -- `'; rm -rf ~ #` is a legal volume name on macOS. Names are POSIX single-quoted with embedded quotes escaped, and the gate proves it as BEHAVIOUR rather than by eyeballing the quoting: it generates a script embedding a name that tries to `touch` a marker file, runs it under real bash, and asserts the name was printed as text and the marker never appeared.
+
+The launchd PATH fix is carried over rather than rediscovered. "Check this Mac matches the fleet.command" already records it: a .command double-clicked in Finder is started by launchd, not by your shell, so ~/.zprofile is never sourced and Homebrew's bin is not on PATH. ntfs-3g is a Homebrew binary, so without that block the launcher would report it missing on a Mac where it works perfectly in Terminal -- the exact false negative that made a Mac look broken for two rounds.
+
+One thing deliberately NOT copied from the existing pattern: sysadminBridge.js strips com.apple.quarantine before opening its launcher, because that one was extracted from a downloaded zip and the flag is set by whatever did the downloading. This launcher is written by fs.writeFileSync in a local process, which does not set the attribute at all, so running xattr here would be a fix for a condition that cannot occur -- and would quietly mask it if the provenance ever changed. The difference is written down beside the code rather than left as an unexplained absence.
+
+Gate: tools/ship/ntfsMounter-selfcheck.mjs grows to 37 checks, all pass, including the injection sabotage and a live headless-browser run confirming the new card renders and both new routes refuse cleanly on this non-Mac box.
+## Since v4125 -- Install button for zavierferodova/Mac-NTFS-Mounter, no licence, macOS-only
+
+A second install button for somebody else's work, this one with no licence at all and a real disk on the line.
+
+Keith: the free NTFS mounters on the Mac App Store either lie about being free or do not work well, and the paid one he already has fails often enough that he has to remount by hand -- so a small, readable, free script he can audit himself is worth a button, the same shape as galaxy-profile's. He then made the design call directly rather than have it picked for him: listing volumes needs no privilege and runs freely, but actually mounting one requires a separate, explicit confirmation naming the exact volume first. Nothing here fully automates the privileged step.
+
+zavierferodova/Mac-NTFS-Mounter has no licence file at all -- checked directly against raw.githubusercontent.com (404 on LICENSE/LICENSE.md/LICENSE.txt/COPYING, both main and master) and by a full clone, which shows exactly three files: README.md, .gitignore, ntfsmounter. No licence file means all rights reserved by default, the same finding this tree already recorded for bisqwit/crt-filter. That does not block cloning it onto the user's own machine and running it as its own process, for the same reason GPL does not -- but with no permission on file at all, the more conservative choice is to run the script UNMODIFIED rather than re-derive its diskutil/ntfs-3g invocation, even though that invocation is just standard documented flags.
+
+The real difference from voxtral, webrtx and galaxy-profile: this one needs root and touches a real external disk. Installing MacFUSE (a macOS system extension Apple requires the user to approve by hand in System Settings, which no script can click through) and ntfs-3g-mac (a Homebrew tap) are automated; the mount step is not. ai-bridge/ntfsMounterBridge.js never receives, prompts for, or stores a password anywhere -- every privileged call uses `sudo -n`, which fails closed rather than prompting if the caller has not already authenticated `sudo` in a real terminal. That is a stronger rule than "ask first": this server can never become a place a macOS admin password gets typed into, over HTTP or otherwise.
+
+Listing volumes ports the script's own get_external_volumes() algorithm (read from its source, not guessed) so a volume can be shown without running anything privileged. Mounting one re-lists fresh rather than trusting an earlier response, computes the same numeric selection the script's own interactive menu would ask for, feeds it on stdin, and then checks the script's own echoed "Selected volume ..." line against what was intended -- a mismatch is reported as a failure rather than assumed to be a success, because a stale index pointing at the wrong disk is exactly the failure mode a numeric selection over a possibly-changed disk list can produce.
+
+Filed in System Tools beside galaxy-profile.html (its real home), and also surfaced in the Mac System panel Keith asked for directly -- a VIEW via pagePlacements.mjs's macPages(), not a second claim, the same shape external-linalg.html already uses for "Mac-only by construction."
+
+Gate: tools/ship/ntfsMounter-selfcheck.mjs, 24 checks, all pass, including driving the real platform guard (this box is Linux, so install/status/listVolumes/mount all refuse cleanly and say why) and a real headless-browser run of the page itself showing the correct "macOS only" banner with zero script errors. The privileged half -- MacFUSE install, an actual mount -- cannot be verified in this sandbox at all, stated plainly rather than guessed at, the same honesty sharpBridge's own header already uses for a feature nothing here can run.
+## Since v4124 -- Install button for vinimlo/galaxy-profile (GPL-3.0), never vendored
+
+An install button for somebody else's GPL-3.0 repo, with nothing of theirs vendored.
+
+Keith pointed at vinimlo/galaxy-profile -- a generator for animated GitHub-profile SVG banners -- and asked directly: is it allowed to not vendor it, but offer to install and run it for the user, without taking credit or hiding who wrote it? Yes, and the reasoning is the one this tree already uses for voxtral's engine and webrtx's build: GPL's obligations are about DISTRIBUTING the code or LINKING it into your own program, not about automating a git clone of a PUBLIC repo onto the user's own machine and running it as its own process. That is what a package manager does all day. galaxy-profile.html and ai-bridge/galaxyProfileBridge.js never copy the repo into this tree or a release zip, never import its Python into this engine's own process, and never strip or rewrite its LICENSE.
+
+Pinned to a reviewed commit, which this tree has not done for an install button before. voxtral pins two artefact digests because it verifies bytes it did not build; webrtx pins nothing because it publishes no build to pin. galaxy-profile is neither -- it is source that gets git-cloned and then executed, so what needs pinning is which commit runs. Cloning main and running whatever is there today would mean upstream's next push runs unreviewed on a real machine tomorrow. The bridge clones full history (not shallow, since checkout <sha> needs it), checks out the pinned commit explicitly, then builds a real venv and pip-installs into it.
+
+The venv was not optional. A bare pip install on this box tried to upgrade the system's apt-managed PyYAML and failed with "RECORD file not found" -- pip correctly refusing to touch a package it did not install. Upstream's own README documents exactly this step ("Create and activate a virtual environment") for exactly this reason; skipping it, the way this tree's ml-sharp bridge does for a plain pip install, is what produced the failure here. The venv is what makes it reliable on a real machine with its own system Python.
+
+config.yml is never guessed at. The Quick Start upstream documents is copy config.example.yml, edit it by hand; the page's textarea is pre-filled with that exact file, read live off the checkout, and the person edits their own username, name, tagline, tech stack and projects. This bridge does not invent a persona on anyone's behalf. A GitHub token is optional and, if supplied, lives only in the one subprocess call's environment -- never written to config.yml, never logged, sabotage-verified by walking the entire checkout after a real run with a fake secret and asserting it appears nowhere.
+
+Driven for real rather than described: a live gate clones, checks out the pin, builds the venv, pip-installs, generates all four SVGs in demo mode, and confirms the checkout really landed on the pinned commit rather than main's tip. A second live section drives the actual page in a real headless browser against the real server -- Install through to four rendered <img> tags -- with zero script errors. Gate: tools/ship/galaxyProfile-selfcheck.mjs, 24 checks, all pass, including the token-leak sabotage check.
+
+Filed beside webrtx.html and voxtral.html under System Tools, by the same rule: an opt-in front door to somebody else's work, installed only when asked.
+## Since v4123 -- Type-checking opted in file-by-file via // @ts-check + tsc --noEmit
+
+Type-checking, opted into file by file, not a TypeScript conversion.
+
+Keith asked whether the tree should use any TypeScript, and the honest answer is that a compiled-output workflow does not fit it: there is no build step anywhere in this tree, and a-Shell's jsc runs portableSuite.mjs directly on iOS with no Node and no bundler at all. What does fit is type-checking the JSDoc this tree already writes -- 188 files use it informally -- so a file opts in with a leading "// @ts-check" comment and tsc --noEmit checks it against real JSDoc types, with no change to how anything runs.
+
+Five files were annotated as the first round of adoption, picked for exactly the kind of bug type-checking catches and a runtime test might not: render/crtModel.js and render/crtPass.js cross a JS/GLSL boundary where a mismatched shape would be silent, ui/domToTexture.js crosses a DOM API boundary, and ui/voxtralBrowser.js and ui/webrtxBrowser.js are state machines. Real bugs turned up rather than being invented to justify the round: crtPass.js's compile() used a possibly-null createShader() result without checking it; domToTexture.js called cloneNode(), typed Node rather than the Element the code immediately needs, and called canvas.getContext("2d") without a null guard before drawing into it; voxtralBrowser.js's sha256Hex/verifyArtefact accepted an ArrayBufferLike that includes SharedArrayBuffer where crypto.subtle.digest needs a real ArrayBuffer, fixed with an ArrayBuffer.isView() guard, and a byteLength-or-length fallback in verifyArtefact turned out to be dead code once the parameter type was declared precisely. ui/webrtxBrowser.js type-checked clean on the first pass.
+
+tsconfig.json is the one declaration of the compiler options: target ES2022, allowJs true, checkJs FALSE at the project level (so tsc never tries the other roughly 3260 .js/.mjs files that never opted in), strict, noEmit. A local ambient tools/ship/typeshim/webgpu-ambient.d.ts declares only the narrow WebGPU surface the three touched files actually reference, checked against their source rather than guessed from the spec, chosen over adding @webgpu/types as a dependency for the same reason this tree already priced on webrtx this session: an external package on its own release schedule, taken on for a handful of symbols.
+
+tools/ship/tscResolve.mjs resolves the tsc binary by trying a list of known paths, mirroring playwrightResolve.mjs's own reasoning that one hardcoded guess is a bug in disguise on the next box.
+
+The gate, tools/ship/typecheck-selfcheck.mjs, does not run "tsc -p tsconfig.json": measured, project mode with no include/files restriction auto-discovers and PARSES every .js under the root regardless of checkJs, and this tree ships non-standard files under a .js extension -- shaders/voxel.frag.glsl.js is GLSL wearing a .js name -- which hard-fails parsing with TS1005/TS1434 and has nothing to do with type-checking. Instead the gate walks the tree itself for files whose opening line is literally "// @ts-check", skipping the packager's own SKIP_DIRS (imported, not retyped), and passes that explicit list to tsc with every compiler option translated from tsconfig.json's own compilerOptions into a CLI flag -- read from the one declaration rather than hardcoded a second time, and with --ignoreConfig since tsc refuses to mix an explicit file list with a tsconfig.json sitting in the working directory. Sabotage-verified: the gate writes a scratch file with a deliberate type error, confirms tsc reports it (TS2345, non-zero exit), then deletes it -- proof the gate can actually fail rather than being wired to always pass. Auto-discovered by tools/ship/selfchecks.mjs, which walks the tree for *selfcheck*.mjs rather than working from a hand-maintained list.
+## Since v4122 -- SPH: direct-indexed spatial grid, crossover 1000 -> 128
+
+The SPH spatial grid was rewritten, and the old "grids lose below 1000 particles" number turned out to be measuring the wrong thing.
+
+physics/sph/spatialGrid.js dated to v2536 and its own header already recorded a crossover: below roughly 1000 particles the grid cost more than the O(N^2) walk it was meant to replace, so sph.js only turned it on above that count. What actually cost the time was never the grid itself -- it was a Map keyed on cell coordinates, so every neighbour query paid a Map.get() and a closure per cell on top of the bucket walk. Rewritten with a direct-indexed path: Int32Array head/next linked lists addressed by arithmetic over the cloud's own bounding box, no Map, no per-cell closure. The old hash-Map path is kept as a fallback for pathological or effectively-unbounded extents, capped at 1<<22 cells, and rebuild() picks direct vs hash by whether the bounding box fits under that cap.
+
+Re-measured rather than assumed: 200 particles went from a 0.4x loss under the old grid to a 2.6x win under the direct-indexed one; 6000 particles went from 5.1x to 19.5x. GRID_CROSSOVER in sph.js dropped from 1000 to 128 with both sets of numbers recorded beside it, so a future reader sees what changed and why rather than a bare constant.
+
+The harder half of this round was not the grid, it was the answer-key fixtures that were built on top of it. Several of this tree's SPH gates pin their expected trajectory to ONE specific neighbour-search implementation, because these are chaotic systems: two neighbour orderings that agree to float-noise tolerance on a well-posed comparison can diverge by 1e-14 in summation order and have that amplified into an assertion-breaking difference a few hundred steps later. A new exported REFERENCE_WALK = { useGrid: false } constant now pins that choice explicitly, and materialKnobs.mjs and stability.mjs were updated to use it at their createSphWorld() call sites -- both had gone from a passing, pinned-by-accident state to a genuine regression once the crossover moved, caught by re-testing against the untouched tree via git stash rather than assumed from the fix pattern.
+
+physics/sph/poolFixture.mjs needed a different, more careful fix, and the first attempt at it was wrong. Blanket-pinning REFERENCE_WALK there looked like the same fix as the other two files, but poolFixture-selfcheck.mjs's own "eightfold depth" test calls settlePool with a particle count that was ALREADY on the grid path under the OLD crossover of 1000 -- so forcing brute force for that call was itself a regression, not a fix, and it was the reason levelClaim-selfcheck failed with a sub-cell term whose own error message already warned "the last bits of a float decide whether the sub-cell term sees it." settlePool() now computes useGrid from the real particle count against the OLD crossover of 1000, reproducing exactly what the pristine tree decided, rather than pinning REFERENCE_WALK at all.
+
+physics/sph/spatialGrid-selfcheck.mjs gained a fourth section: it asserts the direct and hash paths return identical neighbour sets, and a policy guard that reads materialKnobs.mjs, stability.mjs, poolFixture.mjs and hydrostatic.mjs from disk and asserts each still contains the string REFERENCE_WALK (or, for poolFixture, its own precise crossover computation), so a later edit cannot silently drop the pin.
+
+All six SPH gates verified individually against the final code: spatialGrid-selfcheck, materialKnobs-selfcheck, hydrostatic-selfcheck, stability-selfcheck, poolFixture-selfcheck (87s, matching the pristine tree's own 90s baseline measured the same way) and levelClaim-selfcheck, all pass.
+## Since v4121 -- CRT on the ES/EV pages as ONE toggle, and a survey of mine that was wrong
+
+The CRT on the ES/EV pages, as one toggle rather than a fourth and fifth copy -- and a survey of my own that was wrong.
+
+Keith asked to wire the CRT into the two 2D-canvas ES pages as a toggle and to flip preserveDrawingBuffer on ev.html so it could join them.
+
+ui/crtToggle.js owns the button, the overlay, the resize tracking and the requestAnimationFrame loop exactly once, and the three pages carry a call each. pipboy-models.html and fallout.html needed bespoke plumbing because their pipelines genuinely differ -- one filters a texture source, the other rasterises a DOM -- but the ES and EV pages do not differ from each other at all, and writing the same overlay into each would have been the second-copy defect this session has watched land repeatedly.
+
+My earlier survey of those pages was wrong, and checking is what found it. I had reported ev.html as a WebGL page that needed the flag; grepping ev.html for getContext finds only 2d, six times over. The WebGL is in ev/systemView.js, ev/flightView.js, ev/galaxyMap.js and ev/esShipLabels.js, which the page imports. A grep of a page is not a survey of what that page renders with. The flag went into all four modules.
+
+The cost of preserveDrawingBuffer is stated beside it with its number rather than described as free: a 1000 by 588 WebGL2 canvas over 90 frames measured 26.99 milliseconds a frame with the flag against 28.90 without, which is inside the noise -- on this container's software rasteriser, which is not proof about a real GPU, and the comment says so.
+
+The proof that it worked is a read rather than a diff. Before the flag, probing ev.html measured zero lit pixels, which briefly looked like an empty page rather than an unreadable buffer. After it, readPixels on the live context returns between a third and half a percent lit with a peak brightness of 637 out of 765 -- so the low fraction is the scene, because the EV system view is black space with stars in it, and not a failed read. The gate asserts both numbers, because a sampled-but-empty buffer and a genuinely dark scene are indistinguishable unless something checks peak brightness as well as coverage. It also asserts the flag against getContextAttributes on the live context rather than against the source line that requests it: a browser is free to refuse an attribute, and reading the file back would never notice.
+
+The default preset is trinitron deliberately. The overlay is pointer-events:none so input still reaches the game underneath and these stay playable, but barrel distortion moves what you see away from what you click, and trinitron curves at 0.04 against arcade's 0.18. Inverse-mapping pointer coordinates through the barrel function is possible and is not done, and the module says so rather than leaving it to be discovered.
+
+Also evaluated at Keith's link: vinimlo/galaxy-profile, GPL-3.0, Python, which generates animated SVG banners for a GitHub profile README from GitHub stats. There is nothing in it to lift into an engine, and the licence would be contagious for a tree that publishes public release zips -- the same reasoning the APK README already recorded for InstallerX-Revived. Recorded and parked.
+
+Gate: tools/ship/crtToggle-selfcheck.mjs, 30 checks, all pass.
+## Since v4120 -- CRT on the other Pip-Boy: DOM into a texture, and a bug found by looking
+
+CRT on the other Pip-Boy: turning a live DOM into a texture, and a bug I shipped into the browser and found by looking.
+
+v4119 put the CRT shader on pipboy-models.html, whose screen is a canvas the pass could sample directly. fallout.html is the other Pip-Boy and it is HTML and CSS, so there was nothing to sample. ui/domToTexture.js is the missing step: it rasterises a live DOM subtree through SVG foreignObject, which is native, needs no dependency, and asks the browser's own renderer to do the work rather than re-implementing layout and painting in JavaScript the way html2canvas and dom-to-image do.
+
+The fact the whole approach rests on was measured before anything was built on it: it does not taint. On fallout.html's real DOM, getImageData succeeds and texImage2D succeeds, so render/crtPass.js can consume the result. A tainted canvas can be neither read back nor uploaded as a texture, and would have killed the idea outright. The cost was measured too, at about ten milliseconds to serialise and two to draw, which is why callers drive it on a 250 millisecond timer rather than requestAnimationFrame, and why the module says so in as many words: twelve milliseconds a frame is fine for a dashboard and hopeless for an animation, and a caller has to be told which.
+
+What it cannot draw is measured rather than assumed. A canvas filled solid magenta inside the subtree rasterised to zero magenta pixels, while ordinary text and gradients in the same subtree came through -- the serializer copies the element, and a canvas's pixels are not part of its markup. Cross-origin images, fonts and stylesheets are refused because anything fetched across an origin would taint the canvas, and external stylesheets are not followed at all, so a subtree styled from a css file rasterises unstyled rather than failing. Every one of those failures produces a picture rather than an error, which is the worst shape a failure can take, and is why they are recorded as structured data rather than prose.
+
+And a bug shipped into the browser, found by looking at the render rather than by any check. The CRT mode hides the page with a class so the shader output can take its place, and then rasterised document.body -- capturing the hidden page. The CRT view came out black except for its own toggle button. The display state and the captured state are two different things. The fix is on the clone, which is ours to edit: rasterize gained exclude and stripClasses, so the elements that must not appear inside the picture are removed and the class that hides the page for the viewer is undone, without toggling the live DOM and forcing a flash and a layout pass every frame. The gate now reproduces the failure directly -- zero lit pixels while hidden against 2969 with the strip applied -- so it cannot return quietly.
+
+One more interaction worth recording: the CSS scanlines are switched off while the shader ones are on. body::before draws gradient scanlines and body::after a vignette, and the rasteriser captures both into the texture; the shader then lays its own scanlines over them at a different pitch, and two grids at slightly different periods is a moire pattern that reads as a broken shader rather than as two effects stacking.
+
+Gate: tools/ship/domToTexture-selfcheck.mjs, 27 checks, all pass.
+## Since v4119 -- the CRT filter, written twice so it can be graded
+
+The CRT filter, written twice so it can be graded -- and the gate caught a bug both implementations agreed on.
+
+Keith listed four CRT-filter repositories back on 2026-08-23 and said the crt i would like to come back to later. This is coming back to it, on the Pip-Boy screen.
+
+All four licences were checked by reading the actual file rather than inferring one from the repository's reputation. gingerbeardman/webgl-crt-shader, Ichiaka/CRTFilter and stefanlegg/crt-fx are MIT. bisqwit/crt-filter has no LICENSE file at all, which makes it all-rights-reserved and unusable in a tree that publishes public release zips -- the same finding as sileo two rounds ago, and the reason the check gets run every time instead of assumed. The three MIT ones were read and contain nothing non-obvious: the standard parameter set of scanlines, bloom, curvature, vignette and rgb shift, and gingerbeardman's is bound to Three.js besides. What a CRT does is optics and raster geometry, which nobody owns, so this is written from that rather than lifted.
+
+The real reason not to lift one is that a borrowed fragment shader can only ever be looked at, and in this tree that means it cannot be judged at all. So the transfer function exists twice: render/crtModel.js in plain JavaScript, render/crtPass.js in GLSL, the same operations in the same order. The gate renders a deliberately busy image -- gradients in every channel plus hard edges -- through the real GPU pass in a real browser and through the CPU model, and requires them to agree. Measured: worst case 0 to 1 levels out of 255 across the pipboy, arcade and trinitron presets, and the off preset is a passthrough at 0 out of 255 through the shader as well as on the CPU, which is the check that would catch a stray gamma, a colour-space conversion or a premultiplied alpha step sneaking into the pass. Sampling is texelFetch with NEAREST filtering throughout, deliberately: with bilinear filtering the hardware interpolates at a precision JavaScript cannot reproduce, and the comparison would have to slacken into close enough, which is where a real disagreement would hide.
+
+Then the part that mattered most. The shadow test passed while both sides were wrong. A separate section counts the dark bands that actually appear, and at the most natural setting of all -- 240 scanlines on 480 rows, exactly two rows per line -- it found 144 bands with a brightness range of 178 to 179, where it should have found 240 bands ranging 102 to 255. The cause is that sampling the scanline cosine at the pixel centre makes the phase (y+0.5) times pi, whose cosine is exactly zero for every integer y. The scanlines vanished into a uniform dim, and the GPU reproduced that faithfully because the shader is a faithful mirror of the model. Two implementations agreeing is evidence that they are the same, and never evidence that they are right. Fixed by taking the scanline phase at the row edge instead, which aligns the raster grid to the pixel grid: cos(y times pi) alternates plus one and minus one, so one row is beam and the next is gap, which is what two rows per line is supposed to look like.
+
+Every parameter is a measurement rather than a taste knob, which is what makes that section possible at all. scanlines is a line count, so the gate counts the bands. curvature is a barrel coefficient, so the gate checks that the centre is a fixed point, that a mid-radius point moves outward by a measurable amount, that the edge maps outside the tube and yields a hard black rather than a clamp, and that zero curvature is exactly the identity. maskPitch is a phosphor triad pitch in output pixels, so the gate checks that the pattern repeats at that pitch, that each column boosts a different channel, and that the three weights average to exactly one so the mask conserves light rather than quietly changing brightness for the gain to compensate.
+
+Wired into pipboy-models.html between the screen canvas and its CanvasTexture, which is the only place it belongs: every screen mode already lands in that canvas, so gauges, map, avatar, dashboard and video all get the effect at once instead of each drawing routine learning about scanlines. Toggling is a swap of the texture's image pointer rather than a second render path, so there is no material rebuild and no reupload for a boolean. It is off by default, remembers its preset, and makeCrtPass returns null instead of throwing where WebGL2 is missing, so a box that cannot have the effect still gets its Pip-Boy.
+
+Gate: tools/ship/crtPass-selfcheck.mjs, 26 checks, all pass.
+## Since v4118 -- the origin is a browser feature: a secure-context bug I shipped, the iOS WKWebView row, and webrtx opt-in
+
+The origin is a browser feature: a secure-context bug I shipped, an iOS row that stops the next mistake, and webrtx as an opt-in page.
+
+Keith asked whether there were useful capabilities a browser-only node could add beyond the GPU. Measuring that found something larger than the question. navigator.gpu, crypto.subtle, VideoEncoder, getUserMedia and navigator.storage.estimate are all secure-context only, and SweK's primary origin is http://<lan-ip>:8787, which is neither https nor localhost. Measured in Chromium, one server, two origins: from 127.0.0.1 isSecureContext is true and every one of those APIs exists; from a LAN IP isSecureContext is false and every one of them is undefined. So the real gate on what any browser node can contribute is not its hardware, it is the address it was opened on.
+
+That exposed a defect in my own v4115 work. voxtral.html's digest check called crypto.subtle.digest directly, so on the LAN origin it threw a TypeError into an un-caught promise and the Load the engine button did nothing at all, with no message. The worst failure shape there is. And voxtralBrowser-selfcheck could not see it, because the gate served the page from localhost, which is a secure context: a probe run on the wrong origin measures a different browser than the one anybody uses. Fixed four ways. verifyArtefact now refuses with a reason rather than throwing. An insecure origin is a blocker that returns early, because reporting no WebGPU adapter there would blame the machine for what the URL did. The page says so on load rather than offering controls that cannot work. And the gate drives a non-loopback address, which is the change that stops this recurring. ui/codecProbe.mjs recorded exactly this rule for WebCodecs at v3735, so the tree already knew and I did not carry it across; that is the real failure here.
+
+ios-peer.html gains the row that stops the next obvious mistake. After v4117 gave the Android wrapper leanback and D-pad support, the symmetric move is a WKWebView wrapper for iOS, and it would be a capability downgrade. WebKit feature flags apply to Safari, not to WebKit generally, so a WKWebView receives a feature only once it is enabled by default for the OS, which for WebGPU means iOS 26. Below that a wrapper app is worse than simply opening Safari: it would take the magmap GPU audition, the one thing an Apple device is best at here, from a check to a dash. On Android the same wrapper is a win because a WebView has no secure-origin rule on the LAN. Same idea, opposite sign, written down rather than left to be rediscovered.
+
+And webrtx ships as an opt-in page. codedhead/webrtx, MIT, implements Vulkan's ray tracing pipeline -- raygen, closest-hit, miss, a shader binding table, a BVH -- as pure WebGPU compute, needing no hardware ray tracing cores. I expected bit-rot and measuring disproved it twice. The claim that it is a single-commit code drop needed a git fetch --unshallow to mean anything, because a depth-1 clone reports one commit for every repository on earth; unshallowed, it genuinely is one commit from July 2023. And its four unpinned git dependencies looked fatal until the committed Cargo.lock files turned up, which make it reproducible -- and are then exactly what blocks the build, because Rust 1.94 hard-refuses wasm-bindgen below 0.2.88. It builds after four routine dependency bumps and one config line, with no code changes, and each of those steps is recorded with the error that made it necessary. In headless Chromium it patched requestDevice, exposed the ray tracing pipeline API, and built a bottom-level acceleration structure from real triangle vertices, which is what proves the BVH WebAssembly executed rather than merely loaded.
+
+The page is deliberately shaped differently from voxtral's. Upstream publishes no build at all, so there is no digest to pin: every consumer compiles their own and two builds differ, which means a digest of mine would refuse everybody else's. What is pinned instead is the measured recipe, and the result is verified by behaviour through a smoke test on the page. Safari and iOS support is refused rather than claimed, with the specific reason: upstream is Chrome-only-tested and its WGSL is generated glslang to SPIR-V to naga to WGSL by a 2023 naga, which is precisely the kind of shader Safari's newer and stricter validator rejects first. And the page states that no image was ever rendered here, because the pipeline existing and the thing drawing are two claims and only the first was tested.
+
+Gates: tools/ship/voxtralBrowser-selfcheck.mjs, 83 checks including a new section that serves the page from a non-loopback address, and tools/ship/webrtxBrowser-selfcheck.mjs, 31 checks. All pass.
+## Since v4117 -- Android TV support for the WebView wrapper: leanback visibility, and a D-pad that is driven
+
+Android TV support for the WebView wrapper: leanback visibility and a D-pad that is driven rather than asserted.
+
+Keith asked whether an APK for the Shield running the browser-only node would do anything useful, and then: "add the leanback + D-pad TV support".
+
+Three manifest lines decide whether the APK is even visible on a television, and every one of them fails silently -- the app installs, or does not, and simply is not there. touchscreen required=false is the one that blocks the install outright, because Android assumes an app needs a touchscreen unless told otherwise and a TV has none. LEANBACK_LAUNCHER is the one that decides whether it appears on the TV home screen, which lists only that category; a plain LAUNCHER app installs and can then be started only by adb or a sideloaded file manager. And a banner is required for a leanback entry, written here as a drawable rather than a checked-in PNG, because a binary in a repo is a file nobody can review in a diff and nobody can regenerate. leanback itself stays required=false rather than true, because true would mean TV-only and would strand every phone already running this wrapper.
+
+The settings gesture was unreachable on a television, which is this project's own recorded bug arriving a second time on a different device. The server address sits behind a long-press on the page background, and a D-pad remote cannot long-press a background because it has no pointer. MainActivity already describes exactly that failure about the action bar -- an engine on the wrong IP with no way to say so is a brick -- and the fix at the time was to a symptom, moving the menu, rather than to the rule, which is that every setting needs a path on every input device the app can meet. On a TV the same dialog is now bound to a long-press of OK, and both entry points share one dialog rather than two copies.
+
+The D-pad navigation is JavaScript on purpose, for two reasons. Chromium's own spatial navigation is not exposed by WebSettings, and the flag that enables it needs adb to write into /data/local/tmp, which an app cannot do for itself. And writing it as an injected script means the hard half of TV support -- whether pressing Right lands on the control actually to the right -- can be driven in headless Chromium against this tree's real pages with real arrow-key events, so the half that cannot be built in this container is the small half.
+
+That gate immediately caught a real bug in the first draft. Ranking candidates by along plus twice the cross-axis offset chose a control sitting diagonally up and to the left, scoring 170, over one sitting exactly to the left, scoring 200. The instinct is to raise the multiplier, and that is wrong: no fixed constant expresses "the same row", it only moves where the failure happens. Candidates are now partitioned by rectangle overlap on the perpendicular axis first, so anything in the same row beats anything merely near, which is how a person reads a remote and needs no tuned constant at all.
+
+There are two modes because arrow keys already mean something on many of these pages -- flight demos, es-*, chess3d, and every canvas that steers a camera. Navigation mode moves focus between controls; capture mode, entered by pressing OK on a canvas, hands the page every key untouched; BACK returns. BACK asks the page whether it consumed the press by reading the answer off evaluateJavascript's return value, rather than adding an addJavascriptInterface bridge, which would be a new attack surface bought for one boolean. Text fields are passthrough in both modes, because a D-pad is the only caret a television has.
+
+What is still not done, stated plainly: no APK has ever been built from this tree, including this round. There is no Android SDK here and dl.google.com is blocked, measured at 403. What was verified instead: every XML file parses, including against the rule that XML forbids a double hyphen inside a comment -- which this tree's prose style uses constantly, and which broke the new banner on the first try. javac reports 101 errors of which zero are syntax errors, every one being a missing android.* resolution failure. And the D-pad script runs for real against voxtral.html and webgpu-llm.html.
+
+This is also the first gate the APK has ever had; v4043 shipped it ungated. Gate: tools/ship/androidTvNav-selfcheck.mjs, 33 checks, sabotage-verified four ways -- removing the row partition, dropping LEANBACK_LAUNCHER, hijacking text fields, and introducing a real Java syntax error.
+## Since v4116 -- an install button for voxtral's engine, and where it refuses to put things
+
 An install button for voxtral's engine -- and the interesting part is where it refuses to put things.
 
 Keith, reading the two shell lines v4115 shipped as the setup: "we have a button to do the install?" A feature whose setup is paste-this-into-a-terminal is a feature most people will not use. ai-bridge/voxtralBridge.js now shallow-clones upstream, verifies both SHA-256s, and stages the two artefacts, with /voxtral/status, /voxtral/install and /voxtral/engine/<name> on the server and an Install button on the page.
@@ -51,6 +1421,38 @@ Verified end to end against the real server in real Chromium, not inferred from 
 The bridge is a convenience and never a requirement. It is required lazily, so a tree without the file still boots, and a missing bridge reads as normal in the page rather than as an error -- because the page's whole claim is that it needs no bridge, no local server and no Windows.
 
 Gate: tools/ship/voxtralBrowser-selfcheck.mjs, 76 checks, all pass.
+## Since v4115 -- voxtral wired as an opt-in page, with the opt-in proven rather than promised
+
+Voxtral wired as an opt-in page: a 2.5 GB third-party speech model in the tab, where the opt-in is proven rather than promised.
+
+Keith asked to wire the voxtral browser build after last round's prototype. voxtral.html is the front door to TrevorS/voxtral-mini-realtime-rs, Apache-2.0 with a real LICENSE file that was read rather than inferred from a badge -- unlike sileo the round before, which had none. It is Mistral's Voxtral Mini 4B Realtime compiled to WebAssembly, running its own WGSL compute shaders through WebGPU, entirely client-side.
+
+Nothing large is vendored. The wasm is 9.4 MB and the largest asset otherwise vendored in this tree is 3.5 MB, so copying it in would have made one opt-in curiosity the biggest single file in a repo that publishes public release zips. Instead the page accepts bytes the user supplies -- a staged directory or a file picker -- and verifies them against a pinned SHA-256 before executing a single one, then hands the verified buffer directly to wasm-bindgen so that no remote URL is ever trusted. Consent is two gates rather than one, because 9.4 MB of verifiable engine and 2.5 GB of unverifiable weights are not the same decision.
+
+Both properties are proven rather than described. Four hundred and five combinations of facts and states cannot make the state machine name a download from idle, including states that falsely claim the module and weights are already loaded. One flipped bit is refused rather than warned about, and a wrong length is reported as a wrong length because that is what tells a person they grabbed the wrong file. And because no amount of source reading can prove a page downloads nothing, the last section drives real Chromium and intercepts every request it makes: the only three on load are the page and its two modules, consenting alone adds zero, and pressing the engine button reaches for the engine and nothing else.
+
+Three defects came from rendering the page, not from reading it. First, codeOnly() applied to an HTML file collapsed 15852 characters to 3030 and dropped the entire script block; one positive assertion failed and gave it away while three negative assertions beside it passed against the wreckage, which is the worst possible outcome because a vacuous check looks exactly like a passing one. The page's module is now extracted before codeOnly is applied, and every absence check is preceded by an assertion that its haystack is real text. Second, gb() rendered the 9.4 MB engine as "0.01 GB", flattening the three orders of magnitude that are the whole argument for having two gates. Third, blockersFrom() read facts.webgpu, a key localModelProbe has never emitted, so that blocker could never fire on real data -- and the gate fuzzed the same invented key, so the code and its test agreed with each other while both were wrong. The page printing "WebGPU namespace absent" directly above "adapter granted" is what exposed it, and the gate now pins those key names against a real probe result rather than against memory.
+
+The honesty is graded as well as the behaviour. Every speed figure on the page is upstream's, measured on an NVIDIA DGX Spark, and carries measuredHere:false so nothing can quietly promote a citation to evidence. estimateWallClock() cannot return a bare number: the hardware it came from and a note that it is a floor rather than a forecast travel in the same object. MEASURED_HERE states out loud that the module loading in 260 ms is a small result and that no transcription was ever run here, because without that line a reader would take it as proof the thing works. Text-to-speech is refused with its number, RTF 104, and the refusal names piper as the thing already doing that job faster than real time.
+
+Filed beside webgpu-llm.html under System Tools, by the same rule: it answers what this box can do rather than showing a phenomenon. Gate: tools/ship/voxtralBrowser-selfcheck.mjs, 62 checks, all pass, sabotage-verified four ways -- removing consent, pre-fetching on load, downgrading the digest check, and reintroducing the wrong fact key.
+## Since v4114 -- spring-physics toasts: one shared integrator, graded against the ratio that predicts its overshoot
+
+Spring-physics toasts: one shared integrator for both toast surfaces, graded against the damping ratio that predicts its overshoot.
+
+Keith pointed at hiaaryan/sileo -- "an opinionated, physics-based toast component" -- and asked whether our rendered toasts could move like that. None of sileo's code is used and none could be: it is a React component library (this tree ships no React) and its repository carries no LICENSE file, checked and 404, which makes it all-rights-reserved and unusable in a tree that publishes public release zips. What is adopted is the idea, which is not sileo's to own anyway -- a damped harmonic oscillator is how iOS, react-spring and framer-motion have all animated for years.
+
+New ui/springMotion.js holds the physics once. This tree already had two in-engine toast surfaces (ui/toast.js centre-top, ui/toaster.js top-right) and writing the integrator into whichever one was upgraded first and then again into the second is the second-copy defect this session has watched land repeatedly. Because step(state, dt) -> state is pure -- no DOM, no rAF, no timers -- the gate settles thousands of frames headlessly and measures the overshoot against exp(-pi*z/sqrt(1-z^2)), a closed form the integrator is never told: gentle 8.9% against 9.9% predicted, snappy 9.2% against 10.1%, stiff critically damped at 0.0%. Agreement is evidence rather than a restatement of the constants.
+
+The first tuning was measured and rejected. At zeta 0.81 it overshot 0.6-0.8% of travel -- under three pixels on a 380px slide. It was a correct spring that was visually indistinguishable from an ease, which is the whole feature failing quietly while every correctness check passes. Retuned to zeta 0.59.
+
+Then the same mistake hid a second time inside the gate written to catch it. The visibility check hardcoded 380, toaster.js's travel, and so graded both presets against the longer of the two surfaces. ui/toast.js shipped a 14px rise, and a fraction of a small number is a smaller number: Chromium measured its overshoot at 1.27px, sub-pixel on a non-retina display. The check now reads each surface's travel constant out of its own source and grades in real pixels. RISE_PX is 32 and measures 2.93px.
+
+Driving both surfaces in real Chromium then found two defects no headless property could reach. Opacity derived as 1 - abs(x)/TRAVEL looks right and reverses during an overshoot, because past the target abs(x) grows again: the toast dimmed to opacity 0.909 at the peak of its own bounce, a flicker that only exists because the motion became springy. It is now measured as travel from the start, which rises monotonically inward and falls monotonically outward so both overshoots clamp harmlessly. And toast.js caps its stack at four and evicts with a bare .remove() that never stopped the running rAF: nine live loops for four visible toasts, each still writing transform and opacity to a detached node until its duration ran out. toaster.js had that guard from the start; toast.js did not, and it is now a gated rule for both.
+
+Retargeting is why both surfaces use one spring rather than two animations. Clicking a toast mid-entrance flips the existing spring's target instead of starting a second animation, so it reverses from where it actually is and carries its velocity out. The old CSS pair restarted from the element's committed style rather than its rendered position and the toast jumped; the browser trace of a mid-entrance click now shows a continuous turnaround.
+
+Sabotage-verified rather than assumed: reverting to the rejected tuning fails four checks, removing the substepping diverges the stiff preset to x = -2030 (the toast literally launched off screen), and dropping the snap-on-rest fails three. Gate: tools/ship/springMotion-selfcheck.mjs, 45 checks, all pass.
 ## Since v4113 -- the storage quota is a promise, not a reservation
 
 Found while running the measurement Keith asked for: does voxtral (2.5-9 GB) clear `localModelProbe`'s quota

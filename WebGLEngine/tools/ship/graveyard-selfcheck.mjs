@@ -358,7 +358,44 @@ function isAnalysisRecord(full) {
 //     and Keith's rig read 88 at v3995, so two arrived in between from rounds this one did not touch. The
 //     names are recoverable by diffing the ACTIONABLE list against a v3674 checkout; that was not done here,
 //     so the raise carries two reasons and an admission instead of four reasons.
-const ORPHAN_UTIL_BASELINE = 90;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90).
+// *** v4145 -- RAISED FROM 90 TO 92, AND THE MOVEMENT WAS COUNTED IN BOTH DIRECTIONS RATHER THAN NETTED. ***
+// The net +2 hides more than it shows: FIVE appeared and THREE were RESOLVED. The three that were resolved --
+// physics/mesh/manifoldCensus.mjs, physics/render/bounces.mjs, physics/tomography/reconQuality.mjs -- were
+// wired by the v4062-v4071 patch series landing this round, which is the list working exactly as intended.
+//
+// THE FIVE THAT APPEARED, EACH LOOKED AT RATHER THAN COUNTED:
+//   tools/ship/tscResolve.mjs        gate-only, honestly. Only typecheck-selfcheck imports it.
+//   tools/roundhouse/refusalExpiry.mjs  gate-only. instruments.mjs names its SELFCHECK, not the module.
+//   tools/ship/artifactCensus.mjs    gate-only. packagerBridge.js mentions it in a COMMENT, not an import.
+//   ui/avatarExpression.js           gate-only, and the sharpest of the five: v4112 BUILT the classifier-to-
+//                                    model resolver and shipped its gate, and nothing in the live path ever
+//                                    imported it. main.js names it only inside a changelog comment.
+//   tools/ship/bunNative.mjs         *** NOT AN ORPHAN AT ALL -- A DOOR SHAPE THIS SCANNER CANNOT SEE. ***
+//                                    ai-bridge/server.js execFile()s it BY PATH at line ~18311 to answer a
+//                                    live route. It is as wired as anything in the tree; it simply is not
+//                                    STATICALLY IMPORTED, and this census reads the import graph.
+//
+// *** THE ANTIDOTE, NAMED IN ADVANCE. *** graveyard already knows four door shapes -- a tools.html row, an
+// MCP server called from another process, an unwiredRegister entry, an analysis record. bunNative is a FIFTH:
+// a script the RUNNING SERVER spawns by path. Calling it an orphan is a false positive, and a list with false
+// positives in it is a list people learn to skim. THE NEXT ROUND TO TOUCH THIS FILE SHOULD TEACH THE SCANNER
+// THAT SHAPE (scan ai-bridge/ for execFile/spawn of a tools/ path) and TIGHTEN this baseline back down by one
+// -- NOT raise it again. A baseline that only ever rises is the plaque this tree keeps warning about.
+// *** RAISED FROM 92 TO 93 AT v4153, AND THE ONE ENTRY IS ui/avatarExpression.js. *** It surfaced in TWO
+// registers on the same day -- here as ACTIONABLE, and independently in tools/ship/orphan-baseline.json as a
+// new orphan -- which is the cross-check working rather than a duplicate.
+//
+// THE REASON IT IS DEBT AND NOT A FORGOTTEN IMPORT: v4112 built it as the one owner joining
+// ui/faceExpressionSet.js (a named expression read off a face) to face/avatarStage.js's setMorph(), and THE
+// TWO HALVES HAVE NEVER BEEN ON THE SAME PAGE. attachAvatarExpression(stage, reader, getSnap) needs both.
+// Measured: the four pages carrying an avatar stage -- krbn-compare, pipboy-models, avatarstage, phone --
+// track no face at all, and face-mirror.html, the one page with the expression reader, has no avatar stage.
+// So wiring it means putting a GLB stage on the mirror page or a camera tracker on a stage page: a real
+// feature needing a webcam and a GPU to look at, not an import somebody dropped.
+//
+// TIGHTEN IT BACK BY ONE the round either of those pages gains the other half. That is a smaller job than it
+// sounds and it is the whole of the outstanding work -- both modules exist, are gated, and are correct.
+const ORPHAN_UTIL_BASELINE = 93;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93, see above).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

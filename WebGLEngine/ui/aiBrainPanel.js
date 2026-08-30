@@ -1,7 +1,13 @@
 // FILE: ui/aiBrainPanel.js
 // VERSION: v1 - round 51
 //
-// Mini "AI Brain" dashboard for the VBA <-> Node <-> WebGL bridge.
+// Mini "Excel AI Brains" dashboard for the VBA <-> Node <-> WebGL bridge.
+//
+// v4159 -- RENAMED FROM "AI Brain", which was the one name on the render page that said nothing about WHOSE
+// brain it is. Every number in this panel arrives from a workbook: modEngineBridge.BridgeTick POSTs the
+// entity state from Excel and drains the directives these buttons queue. A page carrying LLM consoles,
+// GPU brains and a physics-lab roster has several things a reader could reasonably call "the AI brain",
+// and exactly one of them is Excel. The plural is deliberate: the workbook runs a brain PER ENTITY.
 //
 // What it does:
 //   - Subscribes to bridge:state WS messages (every tick from VBA)
@@ -40,8 +46,8 @@ export class AIBrainPanel {
         tab.style.top = "auto";
         tab.style.left = "auto";
         tab.style.bottom = "auto";
-        tab.textContent = "◀ AI Brain";
-        tab.title = "VBA bridge state + directive sender";
+        tab.textContent = "◀ Excel AI Brains";
+        tab.title = "Excel AI Brains -- state posted by the VBA workbook over the bridge, and directives sent back to it";
         document.body.appendChild(tab);
 
         const panel = document.createElement("div");
@@ -65,7 +71,7 @@ export class AIBrainPanel {
         const header = document.createElement("div");
         header.className = "lcars-panel-header";
         const title = document.createElement("div");
-        title.textContent = "AI Brain";
+        title.textContent = "Excel AI Brains";
         header.appendChild(title);
         const close = document.createElement("div");
         close.className = "lcars-panel-header-id";

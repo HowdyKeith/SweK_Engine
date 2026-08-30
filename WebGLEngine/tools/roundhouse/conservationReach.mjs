@@ -20,6 +20,12 @@
 //     sweeps and parameter lists: dispersionRatios, orderRatioSeq, predictedZ, raSweep, temps, tourPeriods.
 //   - 78 conservation-SHAPED field names across 55 pairs and 30 devices -- energyDriftFrac, momentumErr,
 //     massDrift, angularMomentumErr, closureErr, unitarityErr, normDrift -- AND EVERY ONE IS A SCALAR.
+//     *** v4145 -- THAT LAST CLAUSE EXPIRED, WHICH IS THE ROUND WORKING RATHER THAN A DEFECT. *** mpmrefine
+//     now emits comDrift as an ARRAY, so "every one is a scalar" is a reading of the corpus AS IT WAS, not a
+//     standing property. It is DERIVED at nonScalarShaped() below and read from there by this file's own
+//     report and by the gate, because two files separately asserting one fact is what this file is about.
+//     The arrays are two samples long against auditConservation's floor of four, and they are indexed by
+//     REFINEMENT LEVEL rather than by time -- see the gate's section 2 for why that second fact matters more.
 //
 // *** SO CONSERVATION IS ALREADY BEING CHECKED IN THIRTY OF SEVENTY-FOUR DEVICES, AND EVERY ONE OF THEM
 // COLLAPSES ITS OWN SERIES TO A SCALAR INSIDE THE BIND, BY HAND, BEFORE ANYTHING SHARED CAN SEE IT. ***
@@ -74,6 +80,26 @@ export function shapedCandidates(P = pairs()) {
         for (const field of Object.keys(row.outputs || {})) if (SHAPED.test(field)) out.push({ key, field });
     }
     return out;
+}
+
+/**
+ * *** v4145 -- THE THING THIS FILE SAID COULD NOT HAPPEN HAS HAPPENED, SO IT IS DERIVED HERE ONCE. ***
+ *
+ * Both this module's report and conservationReach-selfcheck asserted "every conservation-shaped field is a
+ * SCALAR". That went false on Keith's rig and here alike: mpmrefine emits comDrift as an ARRAY. Two separate
+ * statements of one fact is the defect this whole file is about, so the fact is computed HERE and read by
+ * both, rather than fixed twice and left to drift apart again.
+ *
+ * `auditable` is NOT merely "long enough". auditConservation compares the worst excursion in the FIRST HALF
+ * OF A RUN against the SECOND -- its own words -- which presumes the index is TIME. A series indexed by
+ * something else can satisfy the length floor and still be a category error to audit, so length is reported
+ * as `samples` and the time-ordering question is left to the caller rather than assumed away by a number.
+ */
+export function nonScalarShaped(P = pairs()) {
+    return shapedCandidates(P)
+        .map(({ key, field }) => ({ key, field, value: (P[key].outputs || {})[field] }))
+        .filter((x) => Array.isArray(x.value))
+        .map(({ key, field, value }) => ({ key, field, samples: value.length, longEnough: value.length >= MIN_SAMPLES }));
 }
 
 /**
@@ -145,6 +171,7 @@ export function reach() {
         seriesPairs: [...new Set(series.map((s) => s.key))].sort(),
         shaped,
         devicesShaped,
+        nonScalar: nonScalarShaped(P),   // v4145 -- was assumed empty by two files; it is not, so it is derived
         handRolled: handRolled(),
         audited: auditedSeries(),
     };
@@ -162,7 +189,17 @@ export function reportLines() {
     L.push("  CANDIDATES (name scan, NOT a verdict): " + r.shaped.length + " fields across " +
            r.devicesShaped.length + " devices");
     L.push("      " + r.devicesShaped.join(", "));
-    L.push("  every one of those is a SCALAR: the series was collapsed inside the bind before anything shared saw it");
+    // v4145 -- THIS LINE USED TO READ "every one of those is a SCALAR" AND THAT IS NO LONGER TRUE. It is
+    // derived now instead of asserted, so it cannot go stale a second time.
+    if (!r.nonScalar.length) {
+        L.push("  every one of those is a SCALAR: the series was collapsed inside the bind before anything shared saw it");
+    } else {
+        const ok = r.nonScalar.filter((n) => n.longEnough);
+        L.push("  NO LONGER ALL SCALAR: " + r.nonScalar.length + " conservation-shaped field(s) are ARRAYS -- " +
+               r.nonScalar.map((n) => n.key + "." + n.field + " [" + n.samples + "]").join(", "));
+        L.push("    of those, " + ok.length + " reach auditConservation's floor of " + MIN_SAMPLES + " samples" +
+               (ok.length ? "" : " -- so none can be audited yet, length alone still blocks criterion five"));
+    }
     L.push("  HAND-ROLLED first/second-half comparisons in binds: " + r.handRolled.length);
     for (const h of r.handRolled) {
         L.push("      " + h.file + (h.importsSharedModule ? "  (imports the shared module)" :

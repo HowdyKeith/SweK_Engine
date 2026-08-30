@@ -11,8 +11,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.">
-<title>SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)</title>
+<meta name="demo:desc" content="3D FLIGHT (the fight leaves the plane; formerly labelled Round B): the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and the planar-fight 3D VIEW page (es-box3d-3d.html) are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.">
+<title>SweK &middot; Endless Sky on Box3D &mdash; 3D flight</title>
 <style>
   html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
   #hud { position:fixed; top:8px; left:10px; right:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; }
@@ -29,7 +29,9 @@
   <b style="color:#2fd6b0">&#128640; ES on Box3D &mdash; 3D flight</b>
   <span id="mode" class="fallback">detecting&hellip;</span>
   <span id="stat" style="color:#7d8fa8"></span>
-  <a href="/es-box3d-3d.html" title="Round A: the same fight, planar sim, 3D view">Round A &#8599;</a>
+  <select id="fleetSize" title="Ships PER SIDE (v4131). Changing it starts a fresh battle at the new size and clears the battle tally, because a tally that mixes 2v2 with 20v20 is counting two different games." style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;font:11px ui-monospace,monospace;padding:2px 4px;"><option value="2">2 v 2</option><option value="4">4 v 4</option><option value="6" selected>6 v 6</option><option value="8">8 v 8</option><option value="12">12 v 12</option><option value="20">20 v 20</option></select>
+  <button id="resetBtn" title="Restart the fight now: fresh random spawn at the current fleet size. The battle tally is KEPT (same game, next round) -- only the fleet-size picker clears it." style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#8635; Reset battle</button>
+  <a href="/es-box3d-3d.html" title="the same fight, planar sim, 3D view">Planar fight, 3D view &#8599;</a>
   <a href="/es-box3d.html" title="the original 2D view">2D &#8599;</a>
   <button id="modelsBtn" title="assign downloadable .glb models per ship class" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128374; Ship models</button>
   <button id="aeBtn" title="sqrt-mean auto-exposure: adapt exposure to scene luminance" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9788; Auto-exposure</button>
@@ -449,6 +451,11 @@ const shipModels = mountShipModels({ makeProcedural: makeHull, onChange: clearHu
 function ensureHull(e) { let h = hulls.get(e.id); if (!h) { h = shipModels.hullFor(e, e.team); scene.add(h); hulls.set(e.id, h); } return h; }
 
 let A = [], B = [], shots = [], t = 0, esbx = null, ready = false, wins = { A: 0, B: 0 };
+// v4131 -- SHIPS PER SIDE. Was a hard 6 written twice inside newBattle(). It lives here because newBattle() is
+// called from frame() too (on a wipeout), and a DOM read per battle would make the picker the source of truth
+// for something the sim needs even when the HUD has not booted. `booted` guards the buttons: they exist in the
+// document from parse time, but newBattle() builds a box3d world, and box3d.init() has not resolved yet.
+let fleetSize = 6, booted = false;
 function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, 0, 0] }) : planarFallbackWorld(); }
 // v3834 -- SWEPT-SPINE ENGINE TRAILS (technique from Noniv/snowflow_demo's wake, reimplemented, nothing vendored).
 // ONE mesh, ONE draw, ONE data texture holds every ship's spine as a block of 3 rows; a dead/idle strand is zeroed
@@ -598,7 +605,8 @@ let foldTunnel = null;
 function newBattle() {
   clearHulls();
   const rng = makeRng((Math.random() * 1e9) | 0);
-  A = makeFleet("A", { x: -1300, y: 0 }, 6, rng); B = makeFleet("B", { x: 1300, y: 0 }, 6, rng);
+  const n = Math.max(1, fleetSize | 0);   // v4131 -- was a hard 6; the HUD picker owns it now
+  A = makeFleet("A", { x: -1300, y: 0 }, n, rng); B = makeFleet("B", { x: 1300, y: 0 }, n, rng);
   esbx = createESBox3D(makeWorld(), { shipHalf: 60, fly3d: true, ownCollision: true });   // *** Round B: fly3d; v3832: slab collider owns collision ***
   for (const e of A.concat(B)) e._bx = esbx.add(e, e.stats);
   const all = A.concat(B);                                   // v3834 -- one strand per ship
@@ -779,6 +787,21 @@ document.getElementById("starBtn").onclick = (e) => {
 document.getElementById("jumpBtn").onclick = (e) => {
   if (foldTunnel) foldTunnel.play();   // one-shot; flash the button while it runs
   e.target.style.background = "#4a3f6c"; setTimeout(() => { e.target.style.background = "#2a2140"; }, 2500);
+};
+// v4131 -- RESET BATTLE and SHIPS PER SIDE. newBattle() was already a full teardown-and-rebuild (hulls cleared,
+// a new box3d world, trails disposed and re-sized to the new strand count, shots and clock zeroed), so both of
+// these are the same one call -- there was nothing to write, only a way to ask for it. The two differ in ONE
+// thing and it is deliberate: changing the fleet size CLEARS the tally, because "battles A:3 B:1" that counts
+// some 2v2s and some 20v20s is a score for two different games added together. A plain reset keeps it.
+document.getElementById("resetBtn").onclick = (e) => {
+  if (!booted) return;                                     // box3d.init() has not resolved; there is no world yet
+  newBattle();
+  e.target.style.background = "#2f5a44"; setTimeout(() => { e.target.style.background = "#152136"; }, 400);
+};
+document.getElementById("fleetSize").onchange = (e) => {
+  fleetSize = Math.max(1, (+e.target.value | 0) || 6);
+  wins.A = 0; wins.B = 0;
+  if (booted) newBattle();
 };
 document.getElementById("labelsBtn").onclick = (e) => {
   labelsOn = !labelsOn; labels.setEnabled(labelsOn);
@@ -1177,6 +1200,15 @@ window.swekDescentProbe = () => {
            fov: camera.fov, controlsEnabled: controls.enabled };
 };
 
+  // v4131 -- what ev/esFleetSize-selfcheck.mjs reads to watch a reset HAPPEN rather than infer it from the HUD.
+  // The fleet counts alone cannot tell "restarted at 2 v 2" from "was already 2 v 2 and nothing was called":
+  // the sim CLOCK going back to zero can, and the tally says which of the two controls was used.
+  window.swekBattleProbe = () => ({
+    fleetSize, a: A.length, b: B.length,
+    aliveA: A.filter((e) => !e.dead).length, aliveB: B.filter((e) => !e.dead).length,
+    t, wins: { A: wins.A, B: wins.B }, strands: A.length + B.length,
+  });
+  booted = true;   // v4131 -- from here the Reset button and the fleet-size picker have a world to rebuild
   newBattle();
   try { buildCloudDeck(CLOUD_ORDER[0]); cloudsBtn.textContent = "\u2601 " + CLOUD_ORDER[0]; } catch (e) {}   // v4055 -- a deck to arrive through
   try { window.swekMoss(); } catch (e) {}   // v4076 -- ground cover on the same arrival face

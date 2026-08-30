@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- steamdeck-peer.html -- v4147
+     The Steam Deck / SteamOS peer. *** THIS IS THE ONE THAT RUNS THE ACTUAL ENGINE. *** iOS runs a portable
+     subset in Safari; Android runs a subset under Termux and auditions its GPU. A Deck is an x86_64 Linux box,
+     so it runs ai-bridge/server.js ITSELF -- the same file the desktop runs, not a reduced sibling -- joins the
+     UDP 47474 fleet beacon, answers /health and /lighthouse, and can host the GPU brain.
+
+     Keith expected Android to be king and it is not; the ladder is iOS -> Android -> Steam Deck, and the reason
+     is architectural rather than a matter of degree: the first two are guests in a browser or a sandbox, and
+     this one is a peer in the ordinary sense.
+
+     *** AND THE HONEST HALF, WHICH IS THE POINT OF THE PAGE: NOTHING HERE HAS EVER RUN ON A PHYSICAL DECK. ***
+     Everything claimed as measured was measured on generic x86_64 Linux -- which is what a Deck is -- and
+     everything specific to the Deck ITSELF (the RDNA2 GPU, SteamOS's read-only root, Game Mode) is reasoned
+     from Valve's own documentation and the hardware, not verified. The table says which is which per row, and
+     the page is registered in pageSections' UNPLACED as owing a verdict only Keith's hardware can give. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Steam Deck Peer (SteamOS / Linux)</title>
+<meta name="demo:title" content="Steam Deck Peer">
+<meta name="demo:desc" content="The Steam Deck as a full SweK peer: an x86_64 Linux box that runs ai-bridge/server.js itself rather than a subset, joins the UDP 47474 fleet beacon and can host the GPU brain. Honest about the half that has never been verified -- no physical Deck has ever run this, so the RDNA2 GPU rows, SteamOS's read-only root and Game Mode are reasoned from Valve's documentation rather than measured, while the server, beacon, mDNS and port-takeover rows were measured on generic x86_64 Linux.">
+<meta name="demo:cats" content="tools">
+<meta name="demo:swatch" content="D">
+<style>
+  :root { --bg:#0a0e0c; --ink:#cfe9d8; --dim:#7fa78e; --line:#224a36; --go:#6fe39a; --warn:#ffd166; --err:#ff7a76; }
+  body { font: 15px/1.55 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); color: var(--ink); margin: 0; padding: 18px; max-width: 900px; }
+  h1 { font-size: 19px; margin: 0 0 4px; } h2 { font-size: 15px; color: var(--go); border-bottom: 1px solid var(--line); padding-bottom: 4px; margin: 24px 0 10px; }
+  .sub { color: var(--dim); font-size: 12px; } code, pre { background: #0f1712; border: 1px solid var(--line); border-radius: 5px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { text-align: left; padding: 5px 10px 5px 0; vertical-align: top; border-bottom: 1px solid #14251c; } th { color: var(--dim); font-weight: normal; }
+  .yes { color: var(--go); } .no { color: var(--err); } .part { color: var(--warn); } a { color: var(--go); }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #0d1410; margin: 10px 0; }
+  .unverified { border:1px solid #5a4a22; background:#221c10; border-radius:9px; padding:11px 13px; margin:12px 0; }
+  .ladder td { border-bottom: 1px solid #14251c; }
+</style>
+</head>
+<body>
+<h1>&#127918; SweK Steam Deck Peer &mdash; SteamOS / Linux desktop</h1>
+<div class="sub">A Steam Deck is an x86_64 Linux computer. It does not run a <i>subset</i> of the engine the way a phone does &mdash;
+it runs <b>the engine</b>. This page says what that buys, and is equally plain about the part nobody has ever verified on real hardware.</div>
+
+<h2>where it sits against the other two peers</h2>
+<table class="ladder">
+  <tr><th>peer</th><th>what it actually runs</th></tr>
+  <tr><td>&#127823; iOS</td><td>the portable physics subset <b>in the page</b>, plus a GPU audition. No Node, no daemon &mdash; a guest in Safari</td></tr>
+  <tr><td>&#129302; Android</td><td>a subset under Termux with partial Node, a real ballot and a GPU audition &mdash; a guest in a sandbox</td></tr>
+  <tr><td>&#127918; <b>Steam Deck</b></td><td><b>ai-bridge/server.js itself</b> &mdash; the same file the desktop runs. A peer in the ordinary sense, not a guest</td></tr>
+</table>
+<div class="sub">The jump from Android to Deck is not a matter of degree. The first two are as capable as their host lets them be;
+the third has no host in the way &mdash; it is the host.</div>
+
+<h2>what a Steam Deck can and cannot be</h2>
+<table>
+  <tr><th>capability</th><th>Deck</th><th>why, and whether it was measured</th></tr>
+  <tr><td>the real ai-bridge server</td><td class="yes">&#10003; full</td><td><b>MEASURED</b> on x86_64 Linux (what a Deck is): <code>bun ai-bridge/server.js</code> boots, <code>/health</code> answers <code>ok:true</code>, autoPull checks the peer roster. Not a port, not a subset &mdash; the same file</td></tr>
+  <tr><td>LAN fleet beacon (UDP 47474)</td><td class="yes">&#10003; full</td><td><b>MEASURED</b>: <code>[assetDiscovery] LAN beacon ON (UDP 47474)</code> on a real Linux boot. The box appears to other peers and answers <code>/net/info</code> and <code>/lighthouse</code></td></tr>
+  <tr><td>mDNS <code>.local</code> discovery</td><td class="yes">&#10003; full</td><td><b>MEASURED, and fixed to get here.</b> server.js skipped mDNS whenever the runtime was Bun &mdash; a workaround for a Bun-on-<i>Windows</i> panic, gated on the runtime and not the platform, and <code>start-steamdeck.sh</code> prefers Bun. v4147 narrowed the guard to Windows after driving mDNS under Bun on Linux: 9 service types browsed, advertiser up, no panic in 25s</td></tr>
+  <tr><td>full spawning suite (<code>child_process</code>)</td><td class="yes">&#10003; full</td><td>real Linux Node/Bun &mdash; the 38-check suite iOS cannot host and Android hosts only partly</td></tr>
+  <tr><td>browser front-end (WebGL2)</td><td class="yes">&#10003; full</td><td>Desktop Mode ships Chromium; the console, hub and every page are same-origin</td></tr>
+  <tr><td>port takeover on relaunch</td><td class="yes">&#10003; full</td><td><b>MEASURED</b>, and it is where this round's real bug was: the <code>/proc</code> fallback found the socket inode and never resolved a PID, so a relaunch silently did not relaunch. Fixed by walking <code>/proc/$pid/fd/*</code>, proven against two overlapping live servers</td></tr>
+  <tr><td>Roku remote panel</td><td class="yes">&#10003; full</td><td>plain ECP over HTTP through a Node-only proxy &mdash; no external binary, so it worked the moment the launcher did</td></tr>
+  <tr><td>Shield / Android TV control</td><td class="part">~ needs adb</td><td>the panel shells out to a real <code>adb</code>. v4142's installer offers it (Distrobox, or Google's platform-tools zip) and <b>never fails the install over it</b> &mdash; it is optional, and Roku needs nothing</td></tr>
+  <tr><td>Node.js / Bun on the box</td><td class="part">~ via Distrobox</td><td><b>NOT VERIFIED ON HARDWARE.</b> SteamOS's root filesystem is read-only and reverts on every OS update, so <code>pacman -S nodejs</code> is a trap that vanishes silently. Distrobox is the platform's own documented answer; the installer steers there. Reasoned from Valve's docs, not run on a Deck</td></tr>
+  <tr><td>GPU brain (Deno + WebGPU)</td><td class="part">~ unproven</td><td><b>NOT VERIFIED ON HARDWARE.</b> <code>start-brain-steamdeck.sh</code> pins <code>WGPU_BACKEND=vulkan</code> because the Deck's RDNA2 APU's best-supported Linux backend is Mesa RADV &mdash; the path Proton itself uses. That is hardware-matched reasoning, <i>not</i> a measurement. It falls back to the CPU exact-Dijkstra brain if no hardware adapter answers, so a brain runs either way</td></tr>
+  <tr><td>WebGPU in the Deck's own browser</td><td class="part">~ unproven here</td><td><b>NOT VERIFIED ON HARDWARE.</b> Treat it as an open question until a Deck reports in. Note the same secure-origin rule the iOS page states: <code>navigator.gpu</code> needs a secure context, so the https tunnel rather than the LAN IP</td></tr>
+  <tr><td>Game Mode as the working surface</td><td class="no">&#183; use Desktop Mode</td><td>the launchers are shell scripts and want a terminal. Game Mode is for playing; switch to Desktop Mode to install and run. Reasoned, not verified</td></tr>
+</table>
+<div class="sub">Bottom line: a Deck is a <b>full compute-and-fleet peer</b> &mdash; the only one of the three that runs the engine rather than a subset of it.
+Its <b>GPU story is the unproven half</b>, and the CPU fallback means an unproven GPU costs capability, never a working brain.</div>
+
+<div class="unverified">
+  <b>&#9888; What has never been verified, stated once and plainly.</b><br>
+  <b>No physical Steam Deck has ever run any of this.</b> Every row above marked MEASURED was measured on generic
+  x86_64 Linux &mdash; which is architecturally what a Deck is, and is why those rows are worth something. Every row
+  marked NOT VERIFIED depends on something this box does not have: an AMD RDNA2 GPU, SteamOS's read-only root,
+  Distrobox, or Game Mode. Those are reasoned from Valve's own documentation and from the hardware, and reasoning
+  is not measurement.
+  <br><br>
+  <code>tools/ship/steamdeckLaunch-selfcheck.mjs</code> makes the same disclosure at the bottom of its own run,
+  so the gate and this page cannot drift apart on it. <b>The first real Deck to run <code>./install-steamdeck.sh</code>
+  settles the unproven rows</b> &mdash; and until one does, they stay marked.
+</div>
+
+<h2>how to make this Deck a peer</h2>
+<div class="card">
+  <div class="sub">Switch to <b>Desktop Mode</b> first &mdash; these are shell scripts and want a terminal. Then, from the engine folder:</div>
+<pre>./install-steamdeck.sh     # OS + Node check, deps, chmod. Offers adb (optional) and Distrobox guidance
+./start-steamdeck.sh       # runs the bridge in the foreground; Ctrl-C stops it</pre>
+  <div class="sub">The installer <b>never installs anything behind your back</b>: when Node.js is missing it prints the Distrobox route and stops,
+  rather than running <code>pacman</code> itself &mdash; a package installed into a read-only root would disappear on the next SteamOS update, silently.
+  The launcher opens no browser of its own, because <code>server.js</code> already calls <code>xdg-open</code> on Linux; two openers racing was a real bug once.
+  The GPU brain starts alongside the bridge and falls back to CPU on its own.</div>
+</div>
+
+<h2>once it is running</h2>
+<div class="card">
+  <div class="sub">Nothing special to register &mdash; that is the point of the ladder above. The Deck answers the same routes every peer does,
+  so it shows up wherever peers show up: the fleet console, the <code>/lighthouse</code> roster, the version-check sources on this page's header.
+  Open <a href="/lighthouse">/lighthouse</a> from any box on the LAN and it should be listed by name.
+  <br><br>If it is reachable by IP but not by <code>.local</code>, that is the mDNS row above &mdash; and as of v4147 that guard no longer
+  fires on Linux at all, so a Deck on a recent build should advertise itself normally.</div>
+</div>
+
+<p class="sub"><a href="/server.html">&larr; back to the server console</a> &middot;
+  <a href="/android-peer.html">Android Peer</a> &middot;
+  <a href="/ios-peer.html">iOS Peer</a></p>
+</body>
+</html>

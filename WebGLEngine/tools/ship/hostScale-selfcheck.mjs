@@ -68,6 +68,72 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
        "MECHANISM CONVERGES rather than needing the right number typed in once");
 }
 
+// ---- 4b. *** ...BUT A LOWER BOUND MAY NOT OVERRIDE A PILE OF FINISHED RUNS -------------------------------
+//
+// *** THIS RAN ON KEITH'S RIG AND SPENT AN HOUR AND A HALF OF IT. *** Section 4 above is right that a killed
+// run teaches something, and its arithmetic is sound: a gate killed at E did not do `base` of work in E, so
+// the true ratio exceeds E/base. WHAT IT DOES NOT SAY IS WHOSE FAULT THAT IS -- E/base conflates a slow host
+// with a gate that is simply slower than its MEASURED entry, one that has grown, hangs, or was measured on a
+// smaller tree. AND IT FEEDS ITSELF: a killed run records elapsed == its budget, the budget is
+// base * TAIL_HEADROOM * scale, so each timeout returns TAIL_HEADROOM * scale and the next is granted twice
+// as long. 1 -> 2 -> 4 -> 8, ceiling. Section 4's own comment calls that convergence.
+//
+// The refutation was sitting in the rig's own header: "median of 39 completed run(s) = 2.05x, raised by 4
+// timeout lower-bound(s) to 8.63x -- CLAMPED at the ceiling". THIRTY-NINE FINISHED RUNS SAY 2.05x. A box that
+// were truly 8.63x slower could not have produced them. A LOWER BOUND IS WHAT YOU USE IN THE ABSENCE OF A
+// MEASUREMENT, NOT SOMETHING THAT OVERRIDES ONE.
+{
+    const f = tmp();
+    // The rig, reproduced. REAL MEASURED KEYS, because a synthetic gate name is SKIPPED by design ("not in
+    // MEASURED: no trustworthy reference") -- the first draft of this section used `GATE + "?done" + i` and
+    // every one of its 43 fixture runs was silently ignored, so it read 1.00x and looked like the fix had
+    // failed. A FIXTURE THE CODE UNDER TEST DISCARDS PROVES NOTHING, and it fails loudly here rather than
+    // quietly passing, which is the only reason it was caught.
+    const keys = Object.keys(MEASURED);
+    const done = keys.slice(0, 39), killed = keys.slice(39, 43);
+    for (const k of done) recordRun(k, MEASURED[k] * 2.05, true, f);
+    for (const k of killed) recordRun(k, MEASURED[k] * 8.63, false, f);
+    const h = hostScale(f);
+    ok("!! *** 39 FINISHED RUNS AT 2.05x OUTWEIGH 4 TIMEOUTS CLAIMING 8.63x ***",
+       Math.abs(h.scale - 2.05) < 1e-6 && h.disputedBounds === killed.length,
+       "scale " + h.scale.toFixed(2) + "x from " + done.length + " finished runs, " + h.disputedBounds +
+       " bound(s) not applied. BEFORE THE FIX THIS " +
+       "WAS 8.00x (clamped), so every budget on that box was ~4x too generous and every timeout took ~4x " +
+       "longer to fire -- one sweep spent 7098s to report nothing where 2.05x would have taken ~2290s");
+
+    ok("   ...and the disputed bounds are REPORTED rather than silently dropped",
+       /NOT APPLIED/.test(h.why) && /8\.63x/.test(h.why),
+       h.why + " -- the reading is real and the claim is only that it is about those GATES rather than this " +
+       "BOX. A fix that hid the number would have replaced a wrong attribution with no evidence at all");
+}
+
+// ---- 4c. AND THE BOUND STILL CARRIES THE SCALE ALONE WHEN IT IS ALL THERE IS --------------------------------
+//
+// The v3923 case this whole module was written for: a box so mismatched that its slow gates never finish, so
+// no completed run ever teaches the scale anything. NARROWING THE BOUND MUST NOT COST THAT -- a fix that made
+// the estimator inert would have passed 4b perfectly while switching the mechanism off.
+{
+    const f = tmp();
+    recordRun(GATE, REF * 3, false, f);
+    const h = hostScale(f);
+    ok("!! *** WITH NO FINISHED RUNS, A TIMEOUT IS STILL THE WHOLE EVIDENCE AND STILL SETS THE SCALE ***",
+       Math.abs(h.scale - 3) < 1e-9 && h.disputedBounds === 0,
+       "one killed run at 3x, no completed runs -> scale " + h.scale.toFixed(2) + "x. THIS IS THE CASE THE " +
+       "MODULE EXISTS FOR and it is unchanged");
+
+    // and the handover is at a stated count rather than at "some"
+    const g = tmp();
+    const ks = Object.keys(MEASURED);
+    for (const k of ks.slice(0, 7)) recordRun(k, MEASURED[k] * 1, true, g);
+    recordRun(ks[7], MEASURED[ks[7]] * 5, false, g);
+    const few = hostScale(g);
+    ok("   ...and the handover point is a STATED count, not a feeling",
+       Math.abs(few.scale - 5) < 1e-9,
+       "7 completed runs is still under the threshold, so the bound applies: scale " + few.scale.toFixed(2) +
+       "x. AT EIGHT IT WOULD NOT. A rule that switched over at an unstated 'enough' would be untestable, and " +
+       "this line is what makes the number a decision somebody can argue with");
+}
+
 // ---- 5. THE CEILING IS A REPORT, NOT A SILENT GRANT ---------------------------------------------------------
 {
     const f = tmp();

@@ -148,15 +148,55 @@ export function hostScale(file = LOCAL) {
     }
     const fromDone = done.length ? median(done) : null;
     const fromBounds = bounds.length ? Math.max(...bounds) : null;
-    let scale = Math.max(fromDone ?? SCALE_FLOOR, fromBounds ?? 0, SCALE_FLOOR);
+
+    // *** v4166 -- A TIMEOUT'S LOWER BOUND IS ARITHMETICALLY VALID AND WAS BEING ATTRIBUTED TO THE WRONG
+    // THING, AND ON KEITH'S RIG IT HAD RUN THE SCALE TO THE CEILING. ***
+    //
+    // The bound itself is sound: a gate killed at E did NOT do `base` worth of work in E, so the true ratio
+    // exceeds E/base. What it does NOT say is WHOSE fault that is. E/base conflates a slow HOST with a gate
+    // that is simply slower than its MEASURED entry -- one that has grown, or hangs, or was measured on a
+    // smaller tree. AND IT IS SELF-FEEDING: a killed run records elapsed == its budget, and the budget is
+    // base * TAIL_HEADROOM * scale, so each timeout returns TAIL_HEADROOM * scale and the next is granted
+    // twice as long. 1 -> 2 -> 4 -> 8, ceiling. Section 4 of the selfcheck asserted this "CONVERGES".
+    //
+    // *** THE RIG'S OWN HEADER CARRIES THE REFUTATION, AND IT IS THE WHOLE ARGUMENT. *** It reads
+    // "median of 39 completed run(s) = 2.05x, raised by 4 timeout lower-bound(s) to 8.63x -- CLAMPED at the
+    // ceiling". THIRTY-NINE RUNS THAT ACTUALLY FINISHED SAY 2.05x. If the box were really 8.63x slower, those
+    // thirty-nine would have said so. They are a direct measurement of the host; the four bounds are not.
+    //
+    // So the rule is the ordinary one for evidence: A LOWER BOUND IS WHAT YOU USE WHEN YOU HAVE NO
+    // MEASUREMENT, NOT SOMETHING THAT OVERRIDES ONE. Bounds still carry the scale alone on a box where
+    // nothing slow ever completes -- the v3923 case this module was written for, and the reason they exist at
+    // all -- but once enough runs have finished, the finished ones decide, and a bound that contradicts them
+    // is reported as a suspect GATE instead of being spent on every other gate's budget.
+    //
+    // MEASURED COST OF NOT DOING THIS: at the ceiling of 8 against a true 2.05, every budget on that rig was
+    // ~4x too generous, so every timeout took ~4x longer to fire. One sweep -- corroborationCensus,
+    // labResults, libmSensitivity, responseCensus -- spent 7098s of wall clock to report nothing, where
+    // 2.05x would have killed the same four in ~2290s. The estimator was spending the time it exists to save.
+    const BOUNDS_YIELD_AT = 8;   // completed runs after which a lower bound no longer overrides the median
+    const boundsTrusted = done.length < BOUNDS_YIELD_AT;
+    const disputed = (!boundsTrusted && fromBounds !== null && fromDone !== null && fromBounds > fromDone)
+        ? bounds.filter((b) => b > fromDone).length : 0;
+    let scale = Math.max(fromDone ?? SCALE_FLOOR, (boundsTrusted ? fromBounds : null) ?? 0, SCALE_FLOOR);
     scale = Math.min(scale, SCALE_CEILING);
     const why = (!done.length && !bounds.length)
         ? "no local runs against a MEASURED gate yet, so the table stands as measured"
         : "median of " + done.length + " completed run(s)" +
           (fromDone !== null ? " = " + fromDone.toFixed(2) + "x" : "") +
-          (bounds.length ? ", raised by " + bounds.length + " timeout lower-bound(s) to " + fromBounds.toFixed(2) + "x" : "") +
+          (bounds.length && boundsTrusted
+              ? ", raised by " + bounds.length + " timeout lower-bound(s) to " + fromBounds.toFixed(2) + "x"
+              : "") +
+          // A DISPUTED BOUND IS REPORTED, NEVER SILENTLY DROPPED: it is a real reading, and the claim here is
+          // that it is about the gate rather than the box. Saying so is what lets somebody check that.
+          (disputed
+              ? ", and " + disputed + " timeout lower-bound(s) up to " + fromBounds.toFixed(2) +
+                "x NOT APPLIED -- with " + done.length + " completed runs the finished ones are the better " +
+                "evidence about this host, so those gates are suspect rather than this box"
+              : "") +
           (scale === SCALE_CEILING ? " -- CLAMPED at the ceiling" : "");
-    return { scale, samples: done.length + bounds.length, completed: done.length, bounds: bounds.length, why };
+    return { scale, samples: done.length + bounds.length, completed: done.length, bounds: bounds.length,
+         disputedBounds: disputed, why };
 }
 
 /** A budget already read from the table, adjusted for this host. */

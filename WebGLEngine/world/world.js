@@ -815,7 +815,12 @@ export class VoxelWorld {
                 let midLayer = VOXEL.DIRT;
                 if (this.useWorleyBiomes) {
                     // v2780 - 2-axis Worley biome drives surface + subsurface materials (with elevation overrides)
-                    const bm = biomeColumnMaterials(wx, wz, this.biomeSeed, height, { slope, waterLevel: WATER_LEVEL });
+                    // v4149 - _biomeOverride(wx,wz) lets a stamp name the biome per column instead of the noise
+                    // choosing it, the same way _heightOverride already names the height. Returning a falsy value
+                    // (which is what everywhere outside the stamped region returns) leaves the noise in charge,
+                    // so the border between a stamped repo and the procedural world needs no special case.
+                    const forcedBiome = this._biomeOverride ? this._biomeOverride(wx, wz) : null;
+                    const bm = biomeColumnMaterials(wx, wz, this.biomeSeed, height, { slope, waterLevel: WATER_LEVEL, biome: forcedBiome || undefined });
                     surfaceType = bm.surface;
                     midLayer    = bm.sub;
                 } else if (kind === "desert") {

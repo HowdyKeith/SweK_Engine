@@ -147,6 +147,15 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          writeCensus() after compare() had been read, and the diff is reproducible by anyone who doubts
     //          this line. The number lives in data rather than in source precisely so that updating it is an
     //          act somebody has to perform on purpose.
+    //   472 -> v4145. The smallest possible instance of this pin doing its job, counted the same way rather
+    //          than raised until it passed: populationCensus.compare() reports GREW, 1 ADDED, 0 REMOVED,
+    //          reconciles:true. The one module is simulation/carrySpawn.js, from v4082 -- the "Spawn (drag to
+    //          place)" button Keith asked for, hanging an asset off the cursor with sway. It is real live
+    //          work, it is imported by ui/assetSpawnPanel.js and main.js, and it already carries its own
+    //          carrySpawn-selfcheck.mjs. GROWTH ONLY, IN AN AREA THAT IS OBVIOUSLY LIVE, which is exactly the
+    //          case this pin exists to wave through ONCE SOMEBODY HAS LOOKED. A removal, or a diff that failed
+    //          to reconcile, would have been the other kind and is the reason the pin is worth its noise.
+    //          Re-recorded with writeCensus() AFTER compare() had been read, never before.
     ok("!! the default population is ACCOUNTED FOR -- it may grow, but not silently",
         p.roots.join(",") === "physics,simulation,fluid" && p.total === EXPECTED_POPULATION,
         "expected " + EXPECTED_POPULATION + " (from the recorded census) and found " + p.total + ". A tool that silently changed what it counts would make every " +

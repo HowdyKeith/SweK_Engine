@@ -1,3 +1,4 @@
+// @ts-check
 // WebGLEngine/ui/voxtralBrowser.js -- v4115
 //
 // THE OPT-IN GATE FOR RUNNING VOXTRAL (SPEECH RECOGNITION) ENTIRELY IN A BROWSER TAB.
@@ -110,13 +111,48 @@ export const REFUSED = [
     },
 ];
 
-/** Bytes -> "2.50 GB". Kept here so the page and the gate format the same number the same way. */
+/**
+ * *** THE SINGLE FACT THAT DECIDES WHETHER ANY OF THIS PAGE WORKS, AND I SHIPPED v4115 WITHOUT IT. ***
+ *
+ * WebCrypto's `crypto.subtle` is SECURE-CONTEXT ONLY, and so is `navigator.gpu`. SweK's primary origin is
+ * http://<lan-ip>:8787 -- neither https nor localhost -- so on the address the engine actually ships as, BOTH
+ * ARE UNDEFINED. Measured in Chromium, same server, two origins: on 127.0.0.1 isSecureContext is true and
+ * navigator.gpu, crypto.subtle, VideoEncoder, getUserMedia and navigator.storage.estimate all exist; on
+ * 192.0.2.2 isSecureContext is false and EVERY ONE of them is undefined.
+ *
+ * *** THE BUG THAT CAUSED: *** verifyArtefact() called sha256Hex(), which reached straight into
+ * crypto.subtle.digest and threw a TypeError into an un-caught promise -- so on the LAN the "Load the engine"
+ * button did NOTHING AT ALL, with no message. And the gate could not see it, because the gate served the page
+ * from localhost, WHICH IS A SECURE CONTEXT. The right lesson is not "add a try/catch": it is that a probe run
+ * on the wrong ORIGIN measures a different browser. The gate now drives a non-loopback address too.
+ *
+ * ui/codecProbe.mjs recorded exactly this rule at v3735 for WebCodecs and I did not carry it across.
+ */
+export const INSECURE_WHY =
+    "this page is on an INSECURE ORIGIN (" +
+    (typeof location !== "undefined" ? location.origin : "unknown") + "). WebCrypto's crypto.subtle and " +
+    "navigator.gpu are both secure-context only, so on http://<lan-ip> they do not exist at all -- the digest " +
+    "cannot be checked and WebGPU cannot be reached. Open this page over the https tunnel, or on localhost.";
+
+/** Is there a usable WebCrypto? The one place that question is asked, so the answer cannot drift. */
+export function hasSubtleCrypto() {
+    return !!(typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.subtle);
+}
+
+/** Is this a secure context? Reported rather than assumed, because the LAN origin is the DEFAULT here. */
+export function isSecure(win = typeof window !== "undefined" ? window : null) {
+    return win ? !!win.isSecureContext : null;
+}
+
+/** Bytes -> "2.50 GB". Kept here so the page and the gate format the same number the same way.
+ * @param {number} [n] @returns {string} */
 export function gb(n) { return typeof n === "number" && isFinite(n) ? (n / 1e9).toFixed(2) + " GB" : "unknown"; }
 
 /**
  * Bytes at a SENSIBLE SCALE -- and this exists because rendering the page caught gb() calling the 9.4 MB engine
  * "0.01 GB". That is not a rounding nit: the whole design is two gates of visibly different size, and a reader
  * comparing "0.01 GB" with "2.50 GB" cannot see the three orders of magnitude that make them two decisions.
+ * @param {number} [n] @returns {string}
  */
 export function humanBytes(n) {
     if (typeof n !== "number" || !isFinite(n)) return "unknown";
@@ -132,6 +168,7 @@ export function humanBytes(n) {
  * The returned object always carries `isFloor` and `hardware`, because upstream's RTF was measured on a part
  * that is almost certainly faster than the reader's. A caller that wants "how long will this take" gets an
  * answer it cannot render without also rendering where the figure came from.
+ * @param {number} audioSeconds @param {number} [rtf]
  */
 export function estimateWallClock(audioSeconds, rtf = UPSTREAM_BENCH.asrWasm.rtf) {
     const a = Math.max(0, +audioSeconds || 0);
@@ -146,7 +183,8 @@ export function estimateWallClock(audioSeconds, rtf = UPSTREAM_BENCH.asrWasm.rtf
     };
 }
 
-/** Seconds -> a short human string. Exact at the boundaries so the gate can pin it. */
+/** Seconds -> a short human string. Exact at the boundaries so the gate can pin it.
+ * @param {number} s @returns {string} */
 export function humanDuration(s) {
     const n = Math.max(0, Math.round(+s || 0));
     if (n < 60) return n + "s";
@@ -156,10 +194,23 @@ export function humanDuration(s) {
     return (m % 60) ? h + "h " + (m % 60) + "m" : h + "h";
 }
 
+/**
+ * @typedef {{ stage: string, consented: boolean, moduleReady: boolean, weightsReady: boolean,
+ *             error: string | null }} State
+ *
+ * The shared probe result this module reads FACTS off (from ui/localModelProbe.js) -- typed loosely and
+ * marked optional throughout, because v3103's rule applies here as much as to the values inside it: a probe
+ * that never ran hands back `null` for the whole object, and a probe that ran but could not read one field
+ * hands back `null` for THAT field, and neither is a "no".
+ * @typedef {{ secureContext?: boolean | null, gpuNamespace?: boolean | null, adapter?: boolean | null,
+ *             quotaBytes?: number | null, softwareRenderer?: boolean | null }} Facts
+ */
+
 /** The ordered stages. Nothing leaves `idle` without a person saying so. */
 export const STAGES = ["idle", "consented", "module", "weights", "ready"];
 
-/** A fresh, inert state. Constructing this must never start anything. */
+/** A fresh, inert state. Constructing this must never start anything.
+ * @returns {State} */
 export function initialState() {
     return { stage: "idle", consented: false, moduleReady: false, weightsReady: false, error: null };
 }
@@ -174,6 +225,7 @@ export function initialState() {
  *
  * Consent is deliberately TWO gates, not one: the module is 9.4 MB and verifiable, the weights are 2.5 GB and
  * are not. Agreeing to look at the thing is not agreeing to spend two and a half gigabytes.
+ * @param {State} [state] @param {Facts | null} [facts]
  */
 export function nextStep(state = initialState(), facts = null) {
     const s = state || initialState();
@@ -202,10 +254,20 @@ export function nextStep(state = initialState(), facts = null) {
  * Burn/wgpu with its own WGSL kernels, so an absent adapter is a real "no" rather than a slow path.
  * A software adapter is NOT a blocker -- it is how the prototype ran -- but it is a warning, because RTF 14
  * came from a GB10 and swiftshader is a CPU pretending.
+ * @param {Facts | null} [facts] @returns {string[]}
  */
 export function blockersFrom(facts) {
+    /** @type {string[]} */
     const out = [];
     if (!facts) return out;                        // unknown is not a "no" -- v3103's rule, both ways
+    // *** THIS OUTRANKS EVERY HARDWARE FACT BELOW IT. *** On an insecure origin there is no navigator.gpu to
+    // ask about an adapter and no crypto.subtle to check a digest with, so reporting "no WebGPU adapter" there
+    // would blame the machine for what the URL did.
+    if (facts.secureContext === false) {
+        out.push("this is an INSECURE ORIGIN -- navigator.gpu and crypto.subtle are both secure-context only, " +
+                 "so neither exists here. Use the https tunnel or localhost");
+        return out;
+    }
     // *** THE KEY IS `gpuNamespace`, AND GETTING IT WRONG WAS SILENT. *** This read `facts.webgpu` first, which
     // localModelProbe has never emitted, so the strict `=== false` was never true and THIS BLOCKER COULD NOT
     // FIRE ON REAL DATA. Nothing failed: the gate fuzzed the same invented key, so code and test agreed with
@@ -221,8 +283,10 @@ export function blockersFrom(facts) {
     return out;
 }
 
-/** Warnings that must be SHOWN but must never silently stop anything. */
+/** Warnings that must be SHOWN but must never silently stop anything.
+ * @param {Facts | null} [facts] @returns {string[]} */
 export function warningsFrom(facts) {
+    /** @type {string[]} */
     const out = [];
     if (!facts) return out;
     if (facts.softwareRenderer) {
@@ -239,9 +303,16 @@ export function warningsFrom(facts) {
 /**
  * SHA-256 of bytes, hex. Uses WebCrypto, which exists in both the browser and Node, so the digest the page
  * enforces is computed by the same code the gate exercises rather than by a second implementation.
+ * @param {ArrayBuffer | ArrayBufferView} bytes @returns {Promise<string>}
  */
 export async function sha256Hex(bytes) {
-    const buf = bytes instanceof ArrayBuffer ? bytes : (bytes && bytes.buffer ? bytes.buffer : bytes);
+    if (!hasSubtleCrypto()) throw new Error(INSECURE_WHY);
+    // ArrayBuffer.isView() is a real type guard (unlike the truthy `bytes.buffer` check this replaced), so TS
+    // can prove `buf` is a genuine ArrayBuffer below rather than the wider ArrayBufferLike a view's `.buffer`
+    // is typed as (which also admits SharedArrayBuffer -- never constructed here, but not provable from the
+    // type alone).
+    const buf = bytes instanceof ArrayBuffer ? bytes
+        : ArrayBuffer.isView(bytes) ? /** @type {ArrayBuffer} */ (bytes.buffer) : bytes;
     // *** `globalThis.crypto`, NOT A BARE `crypto`, AND THE TREE'S OWN GATE ASKED FOR THAT. *** unboundBuiltin
     // treats a bare `crypto.` as Node's crypto module used without importing it -- and its v3678 note predicted
     // this exact collision, observing that `crypto` is "a legitimate BROWSER global" while measuring that no
@@ -256,10 +327,18 @@ export async function sha256Hex(bytes) {
  * Verify supplied bytes against a pinned artefact. Returns a RESULT rather than throwing, so the page can
  * render exactly what went wrong -- and note that a size mismatch is reported as its own reason, because
  * "wrong length" is a far more useful message to a person than "digest differs".
+ * @param {ArrayBuffer | ArrayBufferView | null} bytes
+ * @param {{ name: string, bytes: number, sha256: string }} [artefact]
  */
 export async function verifyArtefact(bytes, artefact = ARTEFACTS.wasm) {
-    const len = bytes ? (bytes.byteLength ?? bytes.length ?? 0) : 0;
-    if (!len) return { ok: false, reason: "no bytes were supplied", expected: artefact.sha256, got: null };
+    // An insecure origin is a REFUSAL with a reason, never an exception: the caller renders `reason`, and a
+    // thrown TypeError rendered nothing at all.
+    if (!hasSubtleCrypto()) return { ok: false, reason: INSECURE_WHY, expected: artefact.sha256, got: null, insecure: true };
+    // Both halves of this check together prove `bytes` non-null for every line below -- ArrayBuffer and
+    // ArrayBufferView both guarantee byteLength, so unlike the old `?? bytes.length` fallback there is nothing
+    // left for a "length" property to catch that this does not already.
+    if (!bytes || !bytes.byteLength) return { ok: false, reason: "no bytes were supplied", expected: artefact.sha256, got: null };
+    const len = bytes.byteLength;
     if (len !== artefact.bytes) {
         return { ok: false, reason: "wrong size: expected " + artefact.bytes + " bytes, got " + len,
                  expected: artefact.sha256, got: null, bytes: len };
