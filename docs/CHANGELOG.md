@@ -8,6 +8,54 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4181 -- an odometer, and a rule this tree had already written down
+
+Ported from coderitual/bounty (MIT (c) 2017 coderitual): a number that rolls to its new value on a strip of
+digits, blurred in proportion to how fast the strip is moving.
+
+*** THE FIRST THING I FOUND WAS THAT MY REASONING WAS ALREADY SOMEBODY ELSE'S. *** I worked out that an
+odometer must not drive the FPS gauge, wrote it into the module as a finding, and then found ui/morphDigits.js
+had settled it at v3531 -- after Keith asked whether server.html's CPU gauge could count with the morph. Its
+rule, now quoted rather than restated: A NUMBER MAY MORPH ONLY IF A READER WOULD NEVER NEED TO TRUST IT
+MID-TRANSITION. Arriving independently at a rule this tree had already decided is corroboration, not a
+discovery, and the citation belongs in the file. The gate now asserts the citation is there.
+
+*** AND IT IS NOT A DUPLICATE OF THAT MORPH, THOUGH IT SERVES THE SAME CLASS OF NUMBER. *** morphDigits
+interpolates GLYPH STROKES -- a 3 bends into a 7 -- so its intermediate frames show shapes that are not valid
+digits, which is exactly the objection its own header raises. An odometer scrolls a strip of REAL digits, so
+every intermediate frame is a valid digit that happens to be moving. Siblings with different things to say:
+420ms of reveal against three and a half seconds of "this counted up to here".
+
+Which means they must not fight over one element. morphDigits has owned [data-morph-stat] since v3531; the
+odometer claims [data-odometer], the gate asserts the two selectors are DIFFERENT and that no element in any
+page carries both. Two initialisers on one element would both write to it, the later would win, and the loss
+would be invisible -- the same shape as the draw-in overwriting a dashed edge's stroke-dasharray at v4180.
+
+*** THE CHECK THAT EARNS THE PORT: THE BLUR FORMULA IS PROVEN EQUIVALENT, NOT BELIEVED. *** The original
+writes it as three nested absolutes -- |( |(|v - origin| - origin)| - S )| / 100 -- which nobody can read and
+therefore nobody can check. Worked out it is a TRIANGLE: zero at both ends of the travel, peaking at
+(T - S) / 2 / 100 exactly half way. This ships the triangle, keeps the original expression beside it, and the
+gate asserts they agree over five travels by 401 samples: WORST DIFFERENCE EXACTLY 0. A rewrite that
+simplifies a formula and is subtly wrong is the failure this tree finds most often, so the original is kept as
+the thing to measure against rather than deleted once it "looks right". Sabotage-tested by replacing the
+triangle with a plausible linear ramp: off by 15.6 at its worst, and four checks go red.
+
+The other artifact kept on purpose is the ELEVEN-cell strip for ten digits -- 0..9 and then 0 again. The
+repeat is what makes the modulo wrap seamless; with ten cells the strip would visibly jump from 9 back to 0.
+
+And the stagger runs RIGHT TO LEFT, because on a real odometer the units wheel drives the tens, so units must
+lead. Reversed it is not subtly wrong, it is the difference between a counter and a slot machine -- sabotaged,
+three checks red.
+
+Two things dropped from the original deliberately: its ES7 `::` bind operator, a 2017 proposal that never
+reached the language and needs a transform to run at all (nothing about the effect is lost -- the operator was
+styling); and its assumption of a laid-out document for font metrics, replaced by a stated monospace advance,
+because measuring glyphs needs the very thing this file is trying not to require.
+
+New odometer.html demonstrates it, including the case worth seeing on its own: a value that GAINS a digit
+rolls its new leading wheel up from 0 rather than popping it in.
+
+Gate count 1264 gates.
 ## v4180 -- measuring a path, and being careful about what was actually missing
 
 The self-drawing line, from merri-ment/lazy-line-painter (MIT (c) 2019 Cam O'Connell) and lcdsantos/jquery-drawsvg
