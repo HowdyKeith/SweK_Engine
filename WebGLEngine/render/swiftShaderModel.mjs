@@ -147,11 +147,20 @@ export function bcsHeatShimmer(img, { time = 0, amplitude = 4, frequency = 20, s
 //     clamp(abs(fmod(c.x * 6.0h + half3(0,4,2), 6.0h) - 3.0h) - 1.0h, 0, 1)
 //
 // GLSL has no fmod; the reflex is to write `mod`. Here that is CORRECT FOR EVERY SHIPPED CALLER AND WRONG IN
-// GENERAL, which is the worst shape a difference can have. Both callers pass a hue through `fract()`, so
+// GENERAL, which is the worst shape a difference can have. Every caller passes a hue through `fract()`, so
 // c.x >= 0, so `c.x*6 + {0,4,2}` >= 0, and fmod and mod agree on non-negative inputs. THE GUARANTEE LIVES AT
-// THE CALL SITE AND NOT IN THE HELPER: pass a negative hue -- which nothing does today and any later shader
-// might -- and mod returns the wrong branch of the colour wheel while fmod does not. So the port keeps fmod's
-// semantics, and costs nothing for it.
+// THE CALL SITE AND NOT IN THE HELPER. So the port keeps fmod's semantics, and costs nothing for it.
+//
+// *** BATCH 7 CORRECTED THIS NOTE'S OWN EXAMPLE, AND THE CORRECTION IS WORTH MORE THAN THE ORIGINAL CLAIM. ***
+// It first read: "pass a negative hue and mod returns the wrong branch of the colour wheel". The INTERMEDIATE
+// certainly differs -- at hue -0.1, fmod(-0.6, 6) is -0.6 where mod gives 5.4 -- but that is not the same as
+// the COLOUR differing, because `clamp(abs(m - 3) - 1, 0, 1)` can saturate both to the same answer. MEASURED
+// over 4001 hues in [-2, 2]: THE FINAL COLOUR DIFFERS FOR 45.8% OF THEM, and NOT AT -0.1, where both give
+// exactly (1.000, 0.000, 0.648). The honest example is hue -2.0: fmod gives WHITE and mod gives PURE RED.
+//
+// So the trap is real, common, and dramatic -- and the first example chosen to illustrate it happened to be
+// one of the 54% where it makes no difference at all. An intermediate value diverging is not yet a defect;
+// what it does downstream is the claim, and that has to be measured rather than assumed.
 // =============================================================================================================
 
 /** bcs_hash: fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). The upstream constants, unchanged -- a
@@ -609,6 +618,102 @@ export function bcsTopographic(img, { time = 0, lineCount = 12, lineWidth = 0.05
         res = res.map((v, k) => mix(v, [0.05, 0.04, 0.03][k], toHalf(majorLine * 0.9)));
         const paper = bcsValueNoise(uvx * 200, uvy * 200) * 0.06 - 0.03;
         for (let k = 0; k < 3; k++) out[i + k] = res[k] + paper;
+        out[i + 3] = img.data[i + 3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+
+// =============================================================================================================
+// BATCH 7 (v4164) -- THE POINTS TRAP INSIDE A CONVOLUTION KERNEL, AND THE hsb2rgb AUDIT COMPLETED.
+//
+// *** bcs_neonEdge's SOBEL USES step_x = step_y = 1.0, AND THAT 1.0 IS ONE POINT. *** On a 2x display the
+// original compares neighbours TWO DEVICE PIXELS APART; a port that reads gl_FragCoord compares them ONE apart.
+// For an offset that is a visible shift; FOR A CONVOLUTION KERNEL IT CHANGES WHAT COUNTS AS AN EDGE -- fine
+// detail that the original smooths over becomes an edge, and the picture gains a wiry crawl that looks like
+// sharpening rather than like a bug.
+//
+// AND ITS Y FLIP CHANGES THE COLOUR OF EDGES RATHER THAN THEIR POSITION. gy is built as bottom-minus-top in a
+// y-down frame; flip it and gy's sign inverts, atan2(gy, gx) rotates, and `hue` -- which is derived from that
+// angle -- lands somewhere else on the wheel. The edges appear in the right places, glowing the wrong colours,
+// which is the kind of wrong nobody reports as a bug.
+//
+// *** AND THE hsb2rgb AUDIT IS NOW COMPLETE. *** Batch 2 found that fmod is safe there because the hue is
+// non-negative, and that the guarantee lives at the CALL SITE. All four call sites in the upstream file were
+// then checked: duochrome (two of them), aurora, and neonEdge -- and EVERY ONE passes its hue through fract(),
+// which returns [0,1) even for the negative angle atan2 hands neonEdge. So the helper is UNSAFE BY
+// CONSTRUCTION AND SAFE BY CONVENTION, and the convention is kept everywhere. The gate asserts that property of
+// THIS tree's ports, so a fifth caller that skips fract is caught here rather than on somebody's screen.
+// =============================================================================================================
+
+/** The thermal palette: six bands, at upstream's breakpoints. Black -> blue -> purple -> red -> orange ->
+ *  yellow -> white, which is the ironbow ramp a thermal camera actually uses. */
+export function thermalColor(heat) {
+    const M = (a, b, t) => a.map((v, k) => mix(v, b[k], clamp(toHalf(t), 0, 1)));
+    if (heat < 0.15) return M([0, 0, 0], [0, 0, 0.3], heat / 0.15);
+    if (heat < 0.35) return M([0, 0, 0.3], [0.5, 0, 0.5], (heat - 0.15) / 0.2);
+    if (heat < 0.55) return M([0.5, 0, 0.5], [1, 0, 0], (heat - 0.35) / 0.2);
+    if (heat < 0.75) return M([1, 0, 0], [1, 0.6, 0], (heat - 0.55) / 0.2);
+    if (heat < 0.9) return M([1, 0.6, 0], [1, 1, 0], (heat - 0.75) / 0.15);
+    return M([1, 1, 0], [1, 1, 1], (heat - 0.9) / 0.1);
+}
+
+/**
+ * bcs_thermal -- heat-haze displacement, then the image's luminance read as temperature.
+ *
+ * The displacement carries a "rising bias": `- shimmer * 0.3` on y. THAT IS THE THIRD SHADER IN THIS FILE
+ * WHOSE COMMENT ONLY MAKES SENSE Y-DOWN -- a negative y offset samples from higher up, so the content appears
+ * to rise. Unflipped it sinks.
+ */
+export function bcsThermal(img, { time = 0, intensity = 1, shimmer = 4, noiseSpeed = 1, paletteShift = 0,
+                                  pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const sh = shimmer * pointScale;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5, i = (y * w + x) * 4;
+        const uvx = px / w, uvy = py / h;
+        const stx = uvx * 8, sty = uvy * 8;
+        const n1 = bcsValueNoise(stx, sty + time * noiseSpeed * 2);
+        const n2 = bcsValueNoise(stx * 1.3 + time * noiseSpeed * 1.5, sty * 1.3);
+        const dx = (n1 - 0.5) * sh;
+        const dy = (n2 - 0.5) * sh * 0.6 - sh * 0.3;      // the rising bias: negative y = from above
+        const c = s(clamp(px + dx, 0, w), clamp(py + dy, 0, h));
+        let heat = luma(c[0], c[1], c[2]);
+        heat += (bcsValueNoise(uvx * 20 + time * 0.5, uvy * 20 + time * 0.5) - 0.5) * 0.05;
+        heat = clamp(heat + paletteShift * 0.3, 0, 1);
+        const t = thermalColor(heat);
+        for (let k = 0; k < 3; k++) out[i + k] = mix(c[k], t[k], toHalf(intensity));
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_neonEdge -- a Sobel magnitude, coloured by the edge's DIRECTION.
+ *
+ * `stepPoints` is upstream's 1.0 and is in POINTS; see the note above for why a convolution kernel is the
+ * worst place for that to be assumed equal to a pixel.
+ */
+export function bcsNeonEdge(img, { time = 0, edgeStrength = 4, glowAmount = 1, colorCycle = 1,
+                                   mixOriginal = 0.3, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const st = 1.0 * pointScale;                          // ONE POINT, not one pixel
+    const L = (c) => luma(c[0], c[1], c[2]);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5, i = (y * w + x) * 4;
+        const tl = L(s(px - st, py - st)), tc = L(s(px, py - st)), tr = L(s(px + st, py - st));
+        const ml = L(s(px - st, py)), mr = L(s(px + st, py));
+        const bl = L(s(px - st, py + st)), bc = L(s(px, py + st)), br = L(s(px + st, py + st));
+        const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+        const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;   // bottom minus top, in a y-DOWN frame
+        const edgeMag = clamp(Math.hypot(gx, gy) * edgeStrength, 0, 1);
+        const edgeAngle = atan2(gy, gx);
+        const raw = edgeAngle / 6.2832 + time * colorCycle * 0.3 + (py / h) * 0.5;
+        const hue = raw - Math.floor(raw);                 // fract -- and THIS is what makes hsb2rgb's fmod safe
+        const neon = bcsHsb2rgb(toHalf(hue), 1, 1);
+        const bloom = Math.pow(edgeMag, 0.7) * glowAmount;
+        const orig = [img.data[i], img.data[i + 1], img.data[i + 2]];
+        for (let k = 0; k < 3; k++) out[i + k] = orig[k] * toHalf(mixOriginal * 0.5) + neon[k] * toHalf(edgeMag + bloom);
         out[i + 3] = img.data[i + 3];
     }
     return { w, h, data: out, premultiplied: img.premultiplied };

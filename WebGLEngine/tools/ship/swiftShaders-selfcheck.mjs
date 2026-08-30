@@ -18,7 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
-         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -168,10 +168,32 @@ console.log("\n7. batch 2 -- the helper layer every later shader needs");
     ok("!! on the SHIPPED domain fmod and mod agree, which is why `mod` would have passed review", shipped,
         "both callers pass the hue through fract(), so c.x >= 0 -- and the guarantee lives at the CALL SITE, " +
         "not in the helper");
-    ok("!! *** and on a NEGATIVE hue they give different COLOURS ***",
+    // *** CORRECTED IN BATCH 7. *** This first asserted that a negative hue gives different COLOURS and cited
+    // -0.1. The INTERMEDIATE differs there -- fmod(-0.6, 6) is -0.6 against mod's 5.4 -- but the clamp absorbs
+    // it and both give exactly (1.000, 0.000, 0.648). Measured over 4001 hues in [-2, 2]: the final colour
+    // differs for 45.8% of them, and -0.1 is in the other 54%. AN INTERMEDIATE DIVERGING IS NOT YET A DEFECT.
+    ok("!! and on a negative hue the INTERMEDIATE diverges at once",
         negative.some(([f, g]) => Math.abs(f - g) > 1e-9),
-        "hue -0.1, red channel: fmod " + negative[0][0].toFixed(2) + " against mod " + negative[0][1].toFixed(2) +
-        " -- a different branch of the colour wheel. Nothing passes a negative hue today; any later shader might");
+        "hue -0.1, red channel: fmod " + negative[0][0].toFixed(2) + " against mod " + negative[0][1].toFixed(2));
+    {
+        const hsbWith = (h, rem) => [0, 4, 2]
+            .map((k) => clamp(Math.abs(rem(h * 6 + k, 6) - 3) - 1, 0, 1))
+            .map((v) => v * v * (3 - 2 * v));
+        let nDiff = 0, total = 0, worst = 0, worstH = null;
+        for (let h = -2; h <= 2; h += 0.001) {
+            const a = hsbWith(h, fmod), b = hsbWith(h, glmod);
+            const d = Math.max(...a.map((v, k) => Math.abs(v - b[k])));
+            total++; if (d > 1e-9) { nDiff++; if (d > worst) { worst = d; worstH = h; } }
+        }
+        const at01 = [hsbWith(-0.1, fmod), hsbWith(-0.1, glmod)];
+        ok("!! *** ...and the COLOUR differs for 45.8% of negative hues -- but NOT at -0.1 ***",
+            nDiff / total > 0.4 && nDiff / total < 0.5 && worst > 0.9 &&
+            at01[0].every((v, k) => Math.abs(v - at01[1][k]) < 1e-9),
+            (100 * nDiff / total).toFixed(1) + "% of " + total + " hues differ, worst " + worst.toFixed(3) +
+            " at hue " + worstH.toFixed(2) + " (WHITE under fmod, PURE RED under mod). At -0.1 the clamp " +
+            "saturates both to the same colour -- SO THE FIRST EXAMPLE CHOSEN TO ILLUSTRATE THIS TRAP WAS ONE " +
+            "OF THE 54% WHERE IT MAKES NO DIFFERENCE. What an intermediate does downstream is the claim");
+    }
     ok("!! the port keeps fmod's semantics in BOTH halves",
         /export function bcsHsb2rgb/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
         /const m = fmod\(h \* 6 \+ k, 6\)/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
@@ -499,6 +521,80 @@ console.log("\n12. batch 6 -- \"negative Y = pull up = melt down\"");
            "points \"pixels\", and melt explains a downward drip that is only downward one way up. THE COMMENTS " +
            "IN THAT FILE ARE WRITTEN IN SwiftUI'S FRAME, and reading them as GLSL is how a port goes wrong " +
            "while agreeing with its own documentation.");
+}
+
+// ---- 13. BATCH 7: A CONVOLUTION MEASURED IN POINTS, AND THE hsb2rgb AUDIT CLOSED -----------------------------------
+console.log("\n13. batch 7 -- a kernel is not an offset");
+{
+    const W = 24, H = 24;
+    const square = (() => { const data = new Float32Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;
+            const v = (x >= 8 && x < 16 && y >= 8 && y < 16) ? 1 : 0;
+            data[i] = data[i+1] = data[i+2] = v; data[i+3] = 1; }
+        return { w: W, h: H, data, premultiplied: true }; })();
+    const bright = (im, x, y) => { const i = (y * W + x) * 4; return im.data[i] + im.data[i+1] + im.data[i+2]; };
+
+    // THE SOBEL ITSELF: a flat region has no gradient, so it must be EXACTLY dark with the background off.
+    const n = bcsNeonEdge(square, { edgeStrength: 4, mixOriginal: 0 });
+    let interior = 0, border = 0;
+    for (let y = 10; y < 14; y++) for (let x = 10; x < 14; x++) interior = Math.max(interior, bright(n, x, y));
+    for (const [x, y] of [[8, 12], [15, 12], [12, 8], [12, 15]]) border = Math.max(border, bright(n, x, y));
+    ok("!! the Sobel finds the border and nothing in the flat middle",
+        interior < 1e-9 && border > 1,
+        "interior " + interior.toFixed(4) + " (flat = no gradient) against border " + border.toFixed(4));
+    // *** THE POINTS TRAP INSIDE A KERNEL. *** For an offset a wrong scale is a shift; here it changes WHICH
+    // gradients register as edges at all.
+    const lit = (im) => { let c = 0; for (let i = 0; i < im.data.length; i += 4)
+        if (im.data[i] + im.data[i+1] + im.data[i+2] > 0.3) c++; return c; };
+    ok("!! *** the kernel step is ONE POINT, so its scale changes what counts as an edge ***",
+        lit(bcsNeonEdge(square, { edgeStrength: 4, mixOriginal: 0, pointScale: 1 })) !==
+        lit(bcsNeonEdge(square, { edgeStrength: 4, mixOriginal: 0, pointScale: 2 })),
+        lit(bcsNeonEdge(square, { edgeStrength: 4, mixOriginal: 0, pointScale: 1 })) + " lit at 1 point against " +
+        lit(bcsNeonEdge(square, { edgeStrength: 4, mixOriginal: 0, pointScale: 2 })) + " at 2. On a 2x display " +
+        "the ORIGINAL compares neighbours two device pixels apart; a port that reads gl_FragCoord compares them " +
+        "one apart, and fine detail the original smooths over becomes an edge -- a wiry crawl that reads as " +
+        "sharpening rather than as a bug");
+    ok("...gy is bottom-minus-top, so an unflipped port would recolour every edge",
+        /float gy = -tl - 2\.0 \* tc - tr \+ bl \+ 2\.0 \* bc \+ br;/.test(pass.SHADERS.neonEdge) &&
+        /atan\(gy, gx\)/.test(pass.SHADERS.neonEdge),
+        "the edges would appear in the right places glowing the wrong colours, which nobody reports as a bug");
+
+    // *** THE hsb2rgb AUDIT, CLOSED. *** Batch 2 found fmod is safe there only because the hue is non-negative,
+    // and that the guarantee lives at the CALL SITE. All four call sites in the upstream file were then read:
+    // duochrome (twice), aurora, neonEdge -- every one passes its hue through fract(), which returns [0,1) even
+    // for the negative angle atan2 hands neonEdge. UNSAFE BY CONSTRUCTION, SAFE BY CONVENTION, everywhere.
+    const modelSrc = fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8");
+    const callers = (modelSrc.match(/bcsHsb2rgb\(/g) || []).length;
+    ok("!! *** every hue this tree hands to hsb2rgb is fract()ed first ***",
+        callers >= 3 && /const hue = raw - Math\.floor\(raw\);/.test(modelSrc) &&
+        /const animHue1 = fract\(/.test(modelSrc) &&
+        /float hue = fract\(atan\(gy, gx\)/.test(pass.SHADERS.neonEdge) &&
+        /fract\(uHue1 \+ sin/.test(pass.SHADERS.duochrome),
+        callers + " call sites in the model, all fed a value in [0,1). Upstream's four do the same -- checked, " +
+        "not assumed -- so a fifth caller that skips fract is caught HERE rather than on somebody's screen");
+    ok("...and section 7 now carries the measured version of that claim, not the assumed one",
+        _hsb(0.5, 1, 1).length === 3,
+        "the colour differs for 45.8% of negative hues and NOT at the -0.1 first cited -- see section 7");
+
+    // THERMAL: the ironbow ramp, and the third shader whose comment only holds y-down.
+    ok("!! the thermal palette walks black -> blue -> purple -> red -> orange -> yellow -> white",
+        thermalColor(0)[2] === 0 && thermalColor(0.15)[2] === 0.3 && thermalColor(0.35)[0] === 0.5 &&
+        thermalColor(0.55)[0] === 1 && thermalColor(0.75)[1] === 0.6 && thermalColor(1)[2] === 1,
+        "six bands at upstream's breakpoints -- the ironbow ramp a thermal camera actually uses");
+    ok("!! thermal's 'rising bias' is a NEGATIVE y offset, which only rises in a y-down frame",
+        /- sh \* 0\.3/.test(modelSrc) && /- sh \* 0\.3\)/.test(pass.SHADERS.thermal),
+        "the third shader in this file to depend on that, after heatShimmer and melt");
+    ok("...intensity 0 gives the (displaced) picture back rather than the palette", (() => {
+        const t = bcsThermal(square, { intensity: 0, shimmer: 0 });
+        for (let i = 0; i < square.data.length; i++) if (Math.abs(t.data[i] - square.data[i]) > 1e-6) return false;
+        return true; })());
+    for (const [name, keys] of [["thermal", ["uShimmer", "uNoiseSpeed", "uPaletteShift"]],
+                                ["neonEdge", ["uEdgeStrength", "uGlowAmount", "uColorCycle"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED: 14 of 41. THREE SHADERS HAVE NOW DOCUMENTED THEIR OWN TRAP -- chromaticSplit calls points " +
+           "\"pixels\", melt explains a drip that is only downward one way up, and thermal's \"rising bias\" only " +
+           "rises the same way. And the hsb2rgb audit is closed: unsafe by construction, safe by convention, at " +
+           "all four upstream sites and all of ours.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

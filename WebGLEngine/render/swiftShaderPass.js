@@ -333,7 +333,64 @@ void main() {
     fragColor = vec4(res, original.a);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG };
+
+// ---- BATCH 7 (v4164): a convolution kernel measured in points ---------------------------------------------
+// *** neonEdge's SOBEL STEP IS 1.0 AND THAT IS ONE POINT. *** At 2x the original compares neighbours TWO
+// device pixels apart. For an offset that is a shift; FOR A KERNEL IT CHANGES WHAT COUNTS AS AN EDGE, and the
+// picture gains a wiry crawl that reads as sharpening rather than as a bug. And gy is bottom-minus-top in a
+// y-down frame, so an unflipped port inverts it, rotates atan2(gy,gx), and the edges glow the WRONG COLOURS in
+// the right places.
+const THERMAL_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uIntensity, uShimmer, uNoiseSpeed, uPaletteShift, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec2 st = uv * 8.0;
+    float sh = uShimmer * uPointScale;
+    float n1 = bcs_valueNoise(st + vec2(0.0, uTime * uNoiseSpeed * 2.0));
+    float n2 = bcs_valueNoise(st * 1.3 + vec2(uTime * uNoiseSpeed * 1.5, 0.0));
+    // The rising bias is a NEGATIVE y offset: it samples from higher up, so the content appears to rise --
+    // true only in a y-down frame, which is the third shader in this file to depend on that.
+    vec2 heatDisp = vec2((n1 - 0.5) * sh, (n2 - 0.5) * sh * 0.6 - sh * 0.3);
+    vec4 original = layerSample(clamp(p + heatDisp, vec2(0.0), uSize));
+    float heat = luma601(original.rgb);
+    heat += (bcs_valueNoise(uv * 20.0 + uTime * 0.5) - 0.5) * 0.05;
+    heat = clamp(heat + uPaletteShift * 0.3, 0.0, 1.0);
+    vec3 t = (heat < 0.15) ? mix(vec3(0.0), vec3(0.0, 0.0, 0.3), toHalf(heat / 0.15))
+           : (heat < 0.35) ? mix(vec3(0.0, 0.0, 0.3), vec3(0.5, 0.0, 0.5), toHalf((heat - 0.15) / 0.2))
+           : (heat < 0.55) ? mix(vec3(0.5, 0.0, 0.5), vec3(1.0, 0.0, 0.0), toHalf((heat - 0.35) / 0.2))
+           : (heat < 0.75) ? mix(vec3(1.0, 0.0, 0.0), vec3(1.0, 0.6, 0.0), toHalf((heat - 0.55) / 0.2))
+           : (heat < 0.90) ? mix(vec3(1.0, 0.6, 0.0), vec3(1.0, 1.0, 0.0), toHalf((heat - 0.75) / 0.15))
+                           : mix(vec3(1.0, 1.0, 0.0), vec3(1.0), toHalf((heat - 0.9) / 0.1));
+    fragColor = vec4(mix(original.rgb, t, toHalf(uIntensity)), original.a);
+}`;
+
+const NEON_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uEdgeStrength, uGlowAmount, uColorCycle, uMixOriginal, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec4 original = layerSample(p);
+    float st = 1.0 * uPointScale;                 // ONE POINT -- a kernel, not an offset
+    float tl = luma601(layerSample(p + vec2(-st, -st)).rgb);
+    float tc = luma601(layerSample(p + vec2(0.0, -st)).rgb);
+    float tr = luma601(layerSample(p + vec2( st, -st)).rgb);
+    float ml = luma601(layerSample(p + vec2(-st, 0.0)).rgb);
+    float mr = luma601(layerSample(p + vec2( st, 0.0)).rgb);
+    float bl = luma601(layerSample(p + vec2(-st,  st)).rgb);
+    float bc = luma601(layerSample(p + vec2(0.0,  st)).rgb);
+    float br = luma601(layerSample(p + vec2( st,  st)).rgb);
+    float gx = -tl - 2.0 * ml - bl + tr + 2.0 * mr + br;
+    float gy = -tl - 2.0 * tc - tr + bl + 2.0 * bc + br;    // bottom minus top, y-DOWN
+    float edgeMag = clamp(sqrt(gx * gx + gy * gy) * uEdgeStrength, 0.0, 1.0);
+    // fract() here is what makes bcs_hsb2rgb's fmod safe -- atan() returns [-PI, PI] and fract lands it in
+    // [0,1). All four call sites in the upstream file do this; the gate asserts ours do too.
+    float hue = fract(atan(gy, gx) / 6.2832 + uTime * uColorCycle * 0.3 + (p.y / uSize.y) * 0.5);
+    vec3 neon = bcs_hsb2rgb(vec3(toHalf(hue), 1.0, 1.0));
+    float bloom = pow(edgeMag, 0.7) * uGlowAmount;
+    fragColor = vec4(original.rgb * toHalf(uMixOriginal * 0.5) + neon * toHalf(edgeMag + bloom), original.a);
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
@@ -349,6 +406,8 @@ const KNOBS = {
     glitch: { time: "uTime", intensity: "uIntensity", blockSize: "uBlockSize", scanLines: "uScanLines", colorShift: "uColorShift", pointScale: "uPointScale" },
     melt: { time: "uTime", meltAmount: "uMeltAmount", dripScale: "uDripScale", speed: "uSpeed", heat: "uHeat", pointScale: "uPointScale" },
     topographic: { time: "uTime", lineCount: "uLineCount", lineWidth: "uLineWidth", colorize: "uColorize", animate: "uAnimate" },
+    thermal: { time: "uTime", intensity: "uIntensity", shimmer: "uShimmer", noiseSpeed: "uNoiseSpeed", paletteShift: "uPaletteShift", pointScale: "uPointScale" },
+    neonEdge: { time: "uTime", edgeStrength: "uEdgeStrength", glowAmount: "uGlowAmount", colorCycle: "uColorCycle", mixOriginal: "uMixOriginal", pointScale: "uPointScale" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG };
