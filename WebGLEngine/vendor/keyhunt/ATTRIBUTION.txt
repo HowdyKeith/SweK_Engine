@@ -1,0 +1,5 @@
+gpu-keyhunt (tongriyaotxt) -- MIT.
+Technique reference only for physics/crypto/secp256k1.mjs: windowed scalar
+multiplication in Jacobian coordinates, Montgomery batch inversion, and the
+key -> k*G -> HASH160 -> address pipeline. NO CODE WAS COPIED (that project is
+Python/GPU; this is BigInt on the CPU) and the KEY SEARCH IS NOT PORTED.

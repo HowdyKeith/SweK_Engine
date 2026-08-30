@@ -8,6 +8,97 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4172 -- grass, and the half of Bitcoin this engine never had
+
+Two ports from repos Keith sent. Both MIT, both wired on arrival, and the grass one found the session's
+recurring lesson for a third time.
+
+### Grass, from `boona13/threejs-grass-water-shaders`
+
+three.js 0.170+, WebGL2, GLSL3 -- this tree's exact stack. Wind-swept instanced blades: a two-octave
+hash-lattice sway, a bend that arcs the blade, a push field for footsteps, slope culling with a stochastic
+shoulder, and a grow-in from `birthTime`.
+
+**The water half is deliberately not ported.** `shaders/waterReflectRefract.frag.glsl` already exists, and a
+second water shader is two declarations of one thing -- the defect this tree finds more often than any other,
+and one that bit the holofoil pair only three rounds ago.
+
+### The risk was not the lighting, it was thirty-two bits -- and only one of the two traps was real
+
+`windHash` is a Wang-style integer hash. Two candidates, both plausible, both silent:
+
+| | | |
+|---|---|---|
+| **`h >> 6u`** is a **logical** shift in GLSL because `h` is unsigned; JS `>>` sign-extends | **REAL** | **12809 of 14641 lattice points differ -- 87.5%** |
+| **`h + (h << 15u)`** wraps at 2^32 in GLSL; JS `+` promotes to float64 and keeps going | **no-op** | **0 of 14641 differ** |
+
+The second one looks like exactly the same class of bug. It is not: every addition in this hash is
+immediately consumed by `^` or by `Math.imul`, and **both coerce to int32** -- so the wrap still happens, one
+operation later than it was written. Verified at the mechanism, not just the outcome: `(2**33 + 5) ^ 0` is 5,
+and `Math.imul(2**33 + 5, 1)` is 5.
+
+The real one has no such rescue, and it is invisible: a sign-extended shift puts **ones** into the top bits,
+the XORs carry them through, and the wrong values are still in `[0,1)` and still look exactly like wind.
+
+**That is the third time this session a trap that fit the reasoning turned out to be a no-op once measured**
+-- after the `fmod` hue example that saturated to one colour anyway, and the hash collisions that were *zero*
+on the config whose numbers moved furthest. The argument for a bug is not the bug.
+
+Also gated: the root of a blade **never moves**, whatever the wind does (every offset is scaled by
+`tipWeight = gradient^2`, which is 0 at the base) -- the one error here that would read as broken rather than
+merely wrong. And the gust octave is offset in **space and rate**, so it is not a scaled copy of the base
+wind; correlation 0.407 over 40 samples. Sampling one lattice twice at one rate would make the whole field
+breathe in lockstep instead of gusting.
+
+### The curve half of Bitcoin, which this engine had none of
+
+A grep for `secp256k1`, `Jacobian`, `pointAdd` or `scalarMult` across the whole tree returned **nothing**.
+`demos_code/bitcoin_miner.js` does double-SHA-256 over block headers -- the **hashing** half, and the one the
+VBA port is byte-identical to. How a private key becomes an address was simply absent.
+
+Technique from `tongriyaotxt/gpu-keyhunt` (MIT): windowed scalar multiplication in Jacobian coordinates,
+Montgomery batch inversion, `key -> k*G -> HASH160 -> address`. BigInt rather than 256-bit limbs, which is a
+decision and not a shortcut -- the limbs were a GPU hardware detail, the coordinates and the batch inversion
+are the algorithmic content.
+
+**The answer key is OpenSSL, not a table I typed.** node's crypto exposes an independent secp256k1, and every
+`k*G` agrees to the digit across **12 chosen keys** -- 1 and 2 (no window yet), 255/256 (a carry across a
+window boundary), 2^128 (a long run of zero bits), `n-1` and `n-2` -- and **24 random ones**, which a fixture
+cannot be fitted to.
+
+Three checks worth naming:
+
+- **`n*G` is the point at infinity.** The strongest self-check a ladder has, because a subtly wrong double or
+  add produces a point that is still *on the curve* and still looks fine.
+- **The equal-x branch, gated both ways.** `P + P` must double; `P + (-P)` must vanish. Confusing them is the
+  classic EC bug and it yields a **valid curve point**, so an on-curve test passes and only an identity
+  catches it.
+- **Base58's leading zeros.** A leading `0x00` contributes nothing to the *number*, so the base conversion
+  drops it -- and a mainnet address starts with a `0x00` version byte. Without re-adding them as literal
+  `1`s, every address would be one character short **and would still decode to the right hash**, so a
+  round-trip test would pass on a wrong string.
+
+Addresses match vectors older than this tree: privkey 1 gives `1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH`
+compressed and `1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm` uncompressed -- and **the two differing is a property of
+Bitcoin**, not a bug here.
+
+### What was not built, and why
+
+**The key search.** gpu-keyhunt's subject is scanning private keys against a database of funded addresses,
+and its own README puts the expected value at negative: *"you will burn more electricity than the
+astronomical-unlikely hit pays"*. This computes an address from a key you supply and has no notion of a key
+space, a database, or a hit. The pipeline was the part worth having.
+
+**Constant time is not claimed** -- the ladder branches on scalar bits and BigInt is variable-time. Said in
+the module header and again in the gate, because a reader reaching for a signing primitive will not read the
+header.
+
+And the address pipeline **injects** its hashes rather than importing one. That keeps it browser-loadable
+(v4169's lesson), keeps node's crypto on **one** side of the gate's comparison rather than both -- otherwise
+the gate would be grading a thing against itself -- and let the miner's own SHA-256 be exported and reused
+instead of this tree growing a second one. Checked: it agrees with OpenSSL byte for byte.
+
+Tree at 1254 gates.
 ## v4171 -- budget hygiene before the next rig run, because v4166 made the margins tighter and that is my doing
 
 Correcting the host scale at v4166 -- from a runaway 8 down to the honest 2.05 -- **cut every budget on Keith's
