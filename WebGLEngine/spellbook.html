@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK &middot; The Spell Book</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#ff6b5e; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .wrap { max-width:1000px; margin:0 auto; padding:32px 22px 70px; }
+  h1 { font-size:20px; color:var(--amber); margin:0 0 6px; letter-spacing:1px; }
+  .lede { color:var(--dim); margin:0 0 20px; font-size:12.5px; max-width:78ch; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin:0 0 16px; }
+  h2 { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:right; color:var(--dim); font-weight:400; padding:4px 9px 7px 0; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  td { padding:5px 9px 5px 0; text-align:right; border-bottom:1px solid rgba(28,63,46,0.4); }
+  tr.cast td { background:rgba(255,204,102,0.10); }
+  .num { color:var(--amber); }
+  .el { color:var(--cyan); }
+  button { background:transparent; border:1px solid var(--line); color:var(--amber); border-radius:8px; padding:4px 12px; cursor:pointer; font:inherit; font-size:11.5px; }
+  button:hover { border-color:var(--amber); }
+  button:disabled { color:var(--dim); border-color:rgba(28,63,46,0.5); cursor:not-allowed; }
+  canvas { width:100%; height:320px; display:block; background:#040d08; border:1px solid var(--line); border-radius:10px; }
+  .bar { height:9px; background:rgba(28,63,46,0.6); border-radius:5px; overflow:hidden; margin-top:7px; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--amber)); }
+  .note { color:var(--dim); font-size:11.5px; margin:10px 0 0; }
+  .sha { color:var(--cyan); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>THE SPELL BOOK</h1>
+  <p class="lede">Every cost here is <b>derived</b>, not typed. A spell's price is the work it actually does &mdash;
+  particles built, voxels fractured, frames ray-marched &mdash; times a unit price measured by doing that work.
+  There is no <code>cost:</code> field anywhere in the book. Make a spell cheaper to render and it becomes cheaper
+  to cast, with nothing edited.</p>
+
+  <div class="card">
+    <h2>the book</h2>
+    <table id="book"><thead><tr>
+      <th>spell</th><th>element</th><th>particles</th><th>fracture</th><th>march</th>
+      <th>cost &micro;s</th><th>mana</th><th>sound</th><th></th>
+    </tr></thead><tbody></tbody></table>
+    <p class="note" id="units">&nbsp;</p>
+  </div>
+
+  <div class="card">
+    <h2>cast</h2>
+    <canvas id="stage" width="1900" height="620"></canvas>
+    <div class="bar"><i id="energybar" style="width:100%"></i></div>
+    <p class="note" id="cast">energy <span class="num" id="energy">100</span> / 100 &mdash; pick a spell above.</p>
+  </div>
+</div>
+
+<script type="module">
+import { SPELLS, SPELL_NAMES, COST_UNITS, ENERGY_POOL, burstFor, workOf, costFor, manaFor,
+         byCost, unmeasuredFeatures, soundFor } from "./world/spellBook.mjs";
+import { SfxPlayer } from "./audio/sfxPlay.js";
+import { carveSphere, looseFragments } from "./physics/voxel/fracture.js";
+
+const S = (id) => document.getElementById(id);
+const player = new SfxPlayer();
+const cv = S("stage"), ctx = cv.getContext("2d");
+let energy = ENERGY_POOL, live = [], t0 = 0, casting = null, castSeed = 1;
+
+S("units").innerHTML = `unit prices &mdash; particle <span class="num">${COST_UNITS.particle.us}</span>&micro;s ` +
+    `(${COST_UNITS.particle.measuredBy}), fractured voxel <span class="num">${COST_UNITS.fractureVoxel.us}</span>&micro;s ` +
+    `(${COST_UNITS.fractureVoxel.measuredBy}), ray-marched frame <span class="num">${COST_UNITS.raymarchFrame.us}</span>&micro;s ` +
+    `(<b style="color:var(--red)">${COST_UNITS.raymarchFrame.measuredBy}</b> &mdash; node has no GPU to time it, so it is reported unmeasured rather than folded in quietly)`;
+
+const tb = S("book").querySelector("tbody");
+for (const name of byCost()) {
+    const s = SPELLS[name], w = workOf(name);
+    const tr = document.createElement("tr");
+    tr.id = "row-" + name;
+    tr.innerHTML = `<td>${name}</td><td class="el">${s.element}</td><td class="num">${w.particles}</td>` +
+        `<td class="num">${w.fractureVoxels || "&mdash;"}</td><td class="num">${w.raymarchFrames || "&mdash;"}</td>` +
+        `<td class="num">${costFor(name).toFixed(0)}</td><td class="num">${manaFor(name)}</td><td>${s.sound}</td>` +
+        `<td><button data-spell="${name}">cast</button></td>`;
+    tb.appendChild(tr);
+}
+
+async function sha(list) {
+    const bytes = new TextEncoder().encode(JSON.stringify(list));
+    const d = await window.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(d)].slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** The real fracture, on a grid the size the spell asks for. Reports what actually came loose. */
+function crack(name) {
+    const f = SPELLS[name].fracture;
+    if (!f) return null;
+    const g = f.grid, n = g * g * g;
+    const grid = new Uint8Array(n).fill(1);
+    const t = performance.now();
+    const removed = carveSphere(grid, g, g, g, g / 2, g / 2, g / 2, f.carveRadius);
+    const frag = looseFragments(grid, g, g, g);
+    return { grid: g, removed, pieces: frag.loose.length + frag.anchored.length, loose: frag.loose.length, ms: performance.now() - t };
+}
+
+async function cast(name) {
+    const mana = manaFor(name);
+    if (mana > energy) { S("cast").innerHTML = `<b style="color:var(--red)">not enough energy</b> &mdash; ${name} costs ${mana}, you have ${energy}.`; return; }
+    energy -= mana;
+    for (const tr of tb.children) tr.classList.toggle("cast", tr.id === "row-" + name);
+    castSeed++;
+    live = burstFor(name, castSeed, { x: 0, y: 0, z: 0 });
+    t0 = performance.now();
+    casting = name;
+    const snd = soundFor(name);
+    player.play(snd.preset, Object.keys(snd.over).length ? snd.over : null);
+    const cr = crack(name);
+    const h = await sha(live);
+    S("energy").textContent = energy;
+    S("energybar").style.width = (energy / ENERGY_POOL * 100) + "%";
+    const um = unmeasuredFeatures(name);
+    S("cast").innerHTML = `<b>${name}</b> &mdash; ${mana} mana, ${live.length} particles, burst sha <span class="sha">${h}</span>` +
+        (cr ? ` &mdash; cracked a ${cr.grid}-cube: <span class="num">${cr.removed}</span> voxels carved, ` +
+              `<span class="num">${cr.pieces}</span> pieces, <span class="num">${cr.loose}</span> came loose, ${cr.ms.toFixed(1)} ms` : "") +
+        (um.length ? ` &mdash; <span style="color:var(--red)">unmeasured here: ${um.join(", ")}</span>` : "");
+}
+for (const b of tb.querySelectorAll("button")) b.onclick = () => cast(b.dataset.spell);
+
+function frame() {
+    requestAnimationFrame(frame);
+    ctx.fillStyle = "rgba(4,13,8,0.30)"; ctx.fillRect(0, 0, cv.width, cv.height);
+    if (!live.length) return;
+    const age = (performance.now() - t0) / 1000;
+    const cx = cv.width / 2, cy = cv.height * 0.62, scale = 16;
+    let alive = 0;
+    for (const p of live) {
+        if (age > p.ttl) continue;
+        alive++;
+        const x = cx + (p.x + p.vx * age) * scale;
+        const y = cy - (p.y + p.vy * age + 0.5 * p.gravity * age * age) * scale;
+        const a = p.a * (1 - age / p.ttl);
+        ctx.fillStyle = `rgba(${p.r * 255 | 0},${p.g * 255 | 0},${p.b * 255 | 0},${a.toFixed(3)})`;
+        ctx.fillRect(x, y, Math.max(1, p.size * scale), Math.max(1, p.size * scale));
+    }
+    if (!alive && casting) { casting = null; live = []; }
+}
+requestAnimationFrame(frame);
+window.spellbook = { cast, get energy() { return energy; }, refill: () => { energy = ENERGY_POOL; S("energy").textContent = energy; S("energybar").style.width = "100%"; } };
+</script>
+</body>
+</html>

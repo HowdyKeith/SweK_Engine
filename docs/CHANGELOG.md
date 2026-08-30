@@ -8,6 +8,52 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4192 -- the spell book, where the cost is measured and not typed
+
+Keith: the spell recipes should hinge on real render costs, with a ray-traced nuclear detonation that cracks
+the world as the max spell.
+
+**There is no `cost:` field anywhere in the book.** A spell says what it *does* -- how many particles, what
+carve radius, how many marched frames -- and the price falls out of that, times a unit price measured by
+doing the work. tools/ship/spellCost.mjs builds real bursts and carves and flood-fills a real voxel grid with
+physics/voxel/fracture.js. Make a spell cheaper to render and it gets cheaper to cast, with nothing edited.
+
+**And I typed the unit prices on the first draft, which is the exact sin this design exists to remove.**
+particle 0.42us and fractureVoxel 0.055us, because they looked like plausible microsecond figures. Measured:
+0.83 and 0.77. **The fracture price was out by fifteen times.** It is a gate fixture now: the recorded units
+are re-measured on every run, and a 15x gap fails while a merely slower machine does not.
+
+**The mana scale was measured too, not preferred.** The book spans 27,869x, because cataclysm is the only
+spell that ray-marches and 84% of its price is those 90 frames. Scaled linearly the book prices out as
+[0, 0, 0, 0, 2, 100] -- four spells cost nothing at all and the energy pool stops meaning anything. On a log
+curve it reads 1, 12, 17, 22, 62, 100, and the gate checks that the curve may compress but never **reorder**.
+
+**Nothing here is new physics.** cataclysm is dearest because it is the only spell that runs both of the two
+most expensive systems in the engine: a 48-cube fracture and 90 ray-marched frames. Measured live in the
+browser, its carve removes 11,513 voxels in 35.6 ms. Every piece already existed and was already gated --
+render/voxelRaymarchPass.js, physics/voxel/fracture.js, and v4190's sfx presets. The ray-march price is the
+one thing node cannot time, so it is **reported** as unmeasured rather than quietly folded in as though it
+had been checked.
+
+Bursts are **seeded**. Both existing spawn sites -- AsteroidsDemo.js and DungeonDemo.js's _explodeGrenade --
+call Math.random() inline, so the same cast never looks the same twice and no gate can hold it. Seeded, a
+cast is byte-identical and checkable by hash. The directions are also spread evenly over the sphere rather
+than bunched; sabotaging that to a naive pick gives octiles 28/150/384/684/619/378/136/21, a visible bell.
+
+**And Keith asked whether the spells had sound, which found a gap.** They did -- but six spells share four
+presets, so cataclysm and quake rendered the *same bytes*: the world-cracking spell arriving with the same
+noise as the one that chips a wall, and ember and causticSpray likewise. v4190 gave sfx presets overrides
+with their own cache key, so each is now bent away from its neighbour and all six render to different audio.
+The max spell is 1.79s against quake's 0.50s. The gate no longer asks whether a spell *names* a preset; it
+hashes the PCM, and the control shows that without the overrides they collapse to four.
+
+Two fixtures in this round were my own wrong physics, both worth keeping: a wall with a hole punched through
+it is still **one** connected piece, and a solid cube with a sphere carved out of its middle is still one
+piece standing on the floor. The fracture shows its teeth when the carve *disconnects* something from the
+ground -- so the gate's fixture is a pillar with its base shot out, and the top comes loose.
+
+90 new checks in tools/ship/spellBook-selfcheck.mjs, 8 sabotages all red and all files restored
+byte-identical. The tree now carries 1274 gates.
 ## v4191 -- the DOM is a source too: the dirty flag could not see 86 animations
 
 From gibbok/animatelo (MIT), which ports animate.css to the Web Animations API. The half worth having is not
