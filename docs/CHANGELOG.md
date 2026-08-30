@@ -8,6 +8,61 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4179 -- VR, and the guide's answer does not apply to this engine
+
+Asked whether SweK has VR. It did not, and the first finding was that MY OWN ANSWER WAS WRONG.
+
+*** EVERY WEBXR GUIDE SAYS renderer.xr.enabled = true AND renderer.setAnimationLoop(fn). THOSE ARE three.js
+WebGLRenderer METHODS, AND main.js NEVER IMPORTS three. *** The engine draws through render/voxelrenderer.js,
+a VoxelRenderer over raw WebGL2 (main.js:8633), so there is no renderer.xr to enable. I had written the plan
+around setAnimationLoop before checking what the renderer actually was. The real path is the raw one:
+navigator.xr, XRWebGLLayer over the engine's own context, session.requestAnimationFrame, one draw per eye.
+The three-based pages in this tree -- glb_viewer, scene-view, splat_viewer, aquarelle -- are a separate and
+much easier story, and are not touched here.
+
+*** WHAT MADE IT TRACTABLE IS THAT THE ENGINE COULD ALREADY DRAW TWICE. *** VoxelRenderer.render(chunks,
+camera, opts) accepts opts.viewport = [x, y, w, h] and asks the camera only for getViewProjMatrix(). That
+exists for the TV wall, and it is exactly stereo's requirement: per eye, a viewport from
+XRWebGLLayer.getViewport(view) and a camera-shaped object carrying that eye's matrix. NO RENDERER CHANGE WAS
+NEEDED, which is why this is a module rather than a rewrite.
+
+*** THE FIX IS ONE LINE AND IT IS THE CLOCK. *** In an XR session the display's frame callback comes from the
+XRSession, not the window. A plain requestAnimationFrame keeps firing at the monitor's rate and the headset
+never receives a frame -- THE DESKTOP LOOKS PERFECTLY FINE AND THE HEADSET STAYS BLACK, which is what makes it
+easy to get wrong and hard to diagnose. Both scheduling sites now go through the manager, which picks the
+session's clock while a session runs and the window's otherwise, so one call site serves both and v1674's
+self-healing property (schedule the next frame FIRST, so a thrown frame cannot kill the loop) is preserved.
+
+New engine/xrSession.mjs holds everything that can be reasoned about: the matrix work, the lifecycle, the
+clock switch. No GL, no navigator.xr at module scope, requestSession injected -- so 70 checks drive the whole
+thing in node against XRView-shaped fixtures with no headset.
+
+*** TWO SILENT TRAPS, PINNED WITH NON-COMMUTING FIXTURES SO A COINCIDENCE CANNOT PASS THEM. *** The camera
+matrix is projection * transform.INVERSE.matrix. Using transform.matrix instead makes the world move WITH your
+head instead of staying put; reversing the order turns it inside out. Neither throws, both render something,
+and in a headset a wrong one is not merely incorrect -- it is nauseating.
+
+*** AND A THIRD INTERACTION BETWEEN TWO FEATURES BUILT FIVE ROUNDS APART: THE DIRTY FLAG MUST NOT SKIP IN VR.
+*** engine/frameDirty.js (v4174) skips a frame when the scene has not changed, which is right on a monitor and
+wrong in a headset: the display keeps its rate regardless and REPROJECTS the last frame. A skipped frame in VR
+is not a saved frame, it is a stale one, and stale reprojection is precisely what makes people ill. Entering a
+session disables it and remembers the previous setting; leaving restores it.
+
+Other things the gate pins because each fails quietly: makeXRCompatible must be awaited BEFORE the session is
+requested and nothing on the desktop notices if it is not; the framebuffer is cleared ONCE for both eyes, not
+per eye, which would erase the first while drawing the second; a frame with no pose draws NOTHING rather than
+the previous pose; a session ended by the DEVICE (headset removed, system button) returns the manager to idle;
+and a FAILED request returns to idle rather than sticking in "requesting", which would be a dead button for
+the life of the page. Sabotage-tested: reverting the loop to a bare requestAnimationFrame goes red on two
+checks, and moving makeXRCompatible after the session goes red on one. Restored byte-identical.
+
+WHAT THIS DOES NOT DO, STATED RATHER THAN IMPLIED: the desktop render block is SKIPPED in a session, not
+half-applied. It runs shadow cascades, the post chain and the HUD, every one of which assumes a single camera
+and a full-screen quad, and running it with an XR camera would not fail -- it would draw one eye's worth of
+post across both. Two-eye post is its own piece of work. What a headset shows today is the world, twice,
+correctly placed.
+
+Gate count 1262 gates.
 ## v4178 -- the DOOM fire, and two artifacts kept on purpose
 
 Ported from filipedeschamps/doom-fire-algorithm (MIT (c) 2019 Filipe Deschamps), from its plain-JavaScript
