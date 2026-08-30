@@ -8,6 +8,89 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4202 -- spark-liquefy: a displacement that remembers, and a primitive I said the tree did not have
+
+Shape from positlabs/spark-liquefy (MIT), a Meta Spark effect that smudges the camera texture under a finger.
+Written here rather than ported, because a Spark project file is not something this tree can run.
+
+*** I ASSESSED THAT REPO BY GREPPING FOR sdSegment AND sdLine, FINDING NEITHER, AND WRITING DOWN THAT THIS
+TREE HAD ZERO POINT-TO-SEGMENT DISTANCES. *** physics/soft/boneField.js has had one since v2523 -- private,
+3D, unexported, and carrying the same comment about the clamp that the new file carries. The names were
+wrong, not the tree. A grep for the spelling I expected is not a search for the idea.
+
+So math/segment.mjs is the ONE copy before there are two: closestT2, distToSegment2, closestT3,
+distToSegment3, and distToLine2 kept deliberately unclamped so the gate can show what the clamp buys.
+boneField.js imports distToSegment3 under its old local name and declares nothing -- the shape v4165 removed
+for Ashima noise and v4199 removed for stagger.
+
+THE REFACTOR IS BYTE-IDENTICAL, and that is a measured fact rather than a hope. A fingerprint recipe was run
+against the pre-refactor file kept aside before the edit: a 15x16x8 fitted grid over four bones, one of them
+degenerate, sums to exactly 860.2220349703275 with min -0.21394360065460205, max 1.533807635307312 and 88
+cells inside the surface. The new file reproduces all five numbers. The gate also proves the fingerprint grid
+STRADDLES the clamp -- its 1920 cells split between cells whose closest point is a cap and cells on the
+segment's interior -- because a fingerprint that never leaves the segment proves only that arithmetic is
+deterministic.
+
+THE CLAMP IS THE WHOLE FUNCTION. Clamped and unclamped agree to 0.0e+0 everywhere BETWEEN the endpoints,
+which is exactly why the bug hides; 92 px past the end one reads 92 and the other reads 0. A 40px stroke with
+a 30px radius touches 5228 cells clamped and 24000 unclamped -- 4.6x, the full width of the field, 10x the
+stroke's own length. boneField's own comment already said what that costs there: "limbs that reach out of the
+room."
+
+THE STROKE IS A SWEPT SEGMENT, NOT TWO DOTS, AND THE GAPS ARE MEASURED RATHER THAN ASSERTED. A 600 px swipe
+in 0.2 s arrives as 24 pointer samples at 120 Hz, 12 at 60 Hz and 6 at 30 Hz -- 25, 50 and 100 px apart.
+Stamping a disc at each sample leaves 21 cells of the swipe's centre line at EXACTLY zero displacement at
+60 Hz and 281 at 30 Hz: visible craters with untouched gaps between them. Stamping the segment leaves 0 at
+every rate and holds the same 11.477 px floor at 50, 100 and 150 px apart. Even in the best case -- 25 px
+between samples, a 120 Hz pointer -- discs already dip to 1.121 px against the segment's 12.425.
+
+THE STATE IS THE NEW THING, NOT THE SMUDGE. touchRipple, liveRipple, shockwave, gravityWells and refractLens
+-- the five radial shaders of v4196 -- each recompute their whole displacement from `time` every frame.
+Nothing carries over. Liquefy's field IS its state, so it is the first displacement in this tree that
+engine/frameDirty.js has to be able to call QUIET.
+
+AND AN EXPONENTIAL DECAY NEVER REACHES ZERO. Measured: after five minutes of frames the peak is 1.121e-44 px
+and still falling. A dirty flag waiting for exact zero waits forever; one assuming quiet after a fixed delay
+is guessing. frameDirty's rule (v4174) is that clean is PROVEN, never assumed, so isQuiet proves it at half a
+pixel -- a threshold with a stated meaning, verified in both directions: a field just under it changes not
+one pixel of the image, and just over it pixels move.
+
+The decay is pow(rate, dt * 60), not a per-frame multiply. 30, 60, 120 and 144 fps agree to 1.1e-7 relative
+after one second -- about four float32 ULPs of accumulated rounding, not a rate dependence -- against a
+per-frame multiply that lands 41x apart over the same second. A 60-second dt from a backgrounded tab is
+clamped to maxStep, so a stall does not teleport the field to zero, and a negative dt decays by nothing
+rather than AMPLIFYING it.
+
+The field is SUBTRACTED in warp, which is not a sign convention: a uniform +2 px displacement moves content
+to index 4, along the push, where adding it would move the same pixel to index 0, backwards.
+
+New ui/domLiquefy.js is the browser half -- rasterise through ui/domToTexture.js (v4120, the module that
+refused html2canvas by name), pointer listeners that stamp from the last position to the new one, and a loop
+that stops itself. probe() is exactly !isQuiet(field), the level-triggered source FrameDirty.addSource wants.
+destroy() removes every listener it added, so the loop cannot outlive the node -- the defect #76 is filed
+against. Wired as domFx.liquefy(el) beside v4199's domFx.disintegrate.
+
+TWO OF MY OWN CHECKS WERE WRONG BEFORE THEY WERE RIGHT.
+
+The first asserted exact equality on frame-rate independence. pow(rate, dt*60) applied n times is
+mathematically independent of n, but the field is a Float32Array and every step rounds; the answers differ in
+the last four ULPs. My earlier scratch measurement printed six decimal places and looked identical, which is
+how I came to believe it was exact.
+
+The second was a bounding-box check that was BLIND. Sabotaging stampStroke's box to floor(max + radius) - 1
+left the gate GREEN, because with integer endpoints and an integer radius the right edge lands on 125.0, the
+last column holding a cell centre inside the radius is 124, and the column the shrunken box drops is empty.
+The boundary column is load-bearing only when the edge falls in a fractional band -- and a real pointer
+produces essentially nothing but fractional coordinates, so the blind case was the only case I had tested.
+Four strokes now, fractional and diagonal, plus an assertion that the set actually reaches a column a one-off
+box would drop.
+
+Gate: tools/ship/liquefy-selfcheck.mjs, 72 checks, all pass. Ten sabotages, all red: unclamping closestT2,
+unclamping closestT3 (which moves the bone fingerprint to 614.6296016579727), restoring boneField's private
+copy, decaying per frame, adding instead of subtracting in warp, stamping a disc instead of the segment,
+raising QUIET_PX to 2, two bounding-box off-by-ones, dropping domLiquefy's listener removal, and stamping at
+the pointer instead of from the last position. All four touched files restored byte-identical afterwards.
+The build now stands at 1283 gates.
 ## v4201 -- Invert any pure function, and the tree was already computing the hard part and throwing it away
 
 Idea from `bijection/g9` (MIT), whose trick is that a **draw** function becomes draggable: drag a shape and
