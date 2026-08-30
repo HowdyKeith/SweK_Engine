@@ -8,6 +8,54 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4190 -- sound effects as data, and the first sound in this engine that can be tested
+
+From loov/jsfx (MIT, sfxr's lineage) -- the idea, written here rather than vendored.
+
+**Every sound in this tree was a live Web Audio node graph.** world/ProceduralMusic.js and
+world/RoomAmbience.js call ctx.createOscillator() and wire nodes together. That plays, and it can never be
+tested: there is no artefact to look at, nothing to compare between runs, and nothing a headless gate can
+hold. A parameter block that *renders to samples* has all three -- the envelope is a function you can plot,
+the buffer is bytes you can hash, and "the same spell always sounds the same" becomes a claim with a number
+behind it.
+
+**It uses the strict sine, which is the one real departure from jsfx, and the cost was measured rather than
+assumed.**
+
+    Math.sin    one second of audio   4.48 ms
+    strictSin   one second of audio  10.18 ms   (2.3x)
+    worst per-sample difference      1.11e-16
+    one 16-bit PCM step              3.05e-5
+
+jsfx's own README claims about 10 ms for a second of audio, so the strict core lands exactly on its
+performance target anyway -- and the difference from Math.sin is four thousand times smaller than a single
+quantisation step of 16-bit audio. Inaudible by construction. Math.sin is not specified to the last bit
+across JavaScript engines, so a jsfx-style renderer makes subtly different audio on different machines: fine
+for a game, fatal for a hash. Verified end to end -- all six presets hash identically in node and in headless
+Chromium (coin is 657cd7bf0e437a40 in both). That is two runtimes rather than two engines; the cross-engine
+claim is earned by using no library trig at all, not by this comparison.
+
+**The defect the gate exists for is the click.** A sound whose last sample is not zero yanks the speaker cone
+back to rest in one sample -- a step function, which is broadband noise. It is the most common defect in
+generated audio and it is completely invisible in the parameter block: every number looks reasonable and
+every playback pops. The envelope runs to zero and the final sample is forced to silence; removing that one
+line turns six checks red.
+
+Clipping is **reported** rather than silently normalised (a renderer that quietly normalises hides a broken
+preset, and then a later envelope change alters the sound for a reason nobody can find), an unknown preset
+**throws** rather than playing the silence nobody notices, and the frequency slide is per **second** so a
+preset sounds like itself at any sample rate.
+
+That last one is worth its own note: the first version of the rate check compared duration and sample count,
+both of which are rate-correct by arithmetic and say nothing about the sound. Changing the slide from
+per-second to per-sample left every check green. Counting **zero crossings** catches it -- 462 against 462
+with correct code, 3948 against 2164 once the slide goes per-sample.
+
+The presets are a frozen table, which is the whole point: a spell, a pickup and a hit are three parameter
+blocks rather than three functions, so they can be listed, diffed, hashed, tuned in sfx.html, and handed to
+the dungeon's spell book as one more field beside cost and element. 126 new checks in
+tools/ship/sfx-selfcheck.mjs, 8 sabotages all red, both files restored byte-identical. The tree now carries
+1272 gates.
 ## v4189 -- the git log is the universe's seed, and a gas giant bug that 419 checks never saw
 
 Keith asked for the ES planets in the github demos, "as processes determined on a github log" -- run the
