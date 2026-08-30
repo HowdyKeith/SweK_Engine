@@ -101,7 +101,11 @@ export const fieldNavDevice = {
     // `excessFrac` -- the quantity the header insists on ("EXCESS COST, not arrival -- arrival alone would pass
     // a walk that took six times the necessary route"). `arrived` and `looped` are booleans and are
     // bit-identical under this plant anyway: the walker does not know its score changed.
-    plantMode: "crowflight", plantFlips: "excessFrac", plantKind: "method",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // method path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, excessFrac
+    // 0.0437 -> 5.354 under mode "crowflight".
+    plantMode: "crowflight", plantFlips: "excessFrac", plantKind: "mode",
     plantIdeal: 0, plantIdealWhy:
         "excessFrac is the walked path's excess over the OPTIMAL cost, so a policy that matches the optimum has 0; crowflight substitutes a straight-line lower bound that ignores obstacles and the excess blows to 5.35 against a path that did not change",
 };

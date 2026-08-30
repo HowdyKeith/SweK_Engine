@@ -179,5 +179,14 @@ export const fluidDevice = {
     // file's own default plus every mode its own build() branches on, both verified DISTINCT.
     // "balance" stays FIRST: it owns the identity, and the plant runs its geometry.
     modes: FLUID_MODES,
+    // v4129 -- LEFT AS "reader". This looked like the same mislabel found across eight other devices this
+    // round (a plantMode/plantFlips mechanism labeled something other than "mode") and was relabeled that way
+    // first -- but fluidBind-selfcheck.mjs asserts fluidDevice.plantKind === "reader" LITERALLY, as part of its
+    // own passing gate, and the header above spends a full paragraph arguing this IS a reader plant BY DESIGN
+    // (the physics is untouched; only the measurement routine is corrupted, and "there is no channel you can
+    // hand this solver that makes a correct momentum-exchange sum come out wrong"). Unlike the other eight,
+    // this device's semantic label is load-bearing for an existing gate, not an accidental leftover -- so it
+    // stays "reader" even though plantedCoverage.mjs's declaredPlantMode() path grades it as a mode-plant
+    // regardless of what this field says. MEASURED unchanged: balanceErr 0.2813 -> 1.0000 under "sourceconfusion".
     plantMode: "sourceconfusion", plantFlips: "balanceErr", plantKind: "reader",
     name: "lbm-wind-tunnel", observables: FLUID_OBSERVABLES, build: buildFluid, defaults: fluidDefaults };

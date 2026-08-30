@@ -239,5 +239,9 @@ export const thermalDevice = {
     // string in one array.
     // "diffuse" stays FIRST: it owns alphaErrFrac, and the contract compares the plant against modes[0].
     modes: THERMAL_MODES,
-    plantMode: "onedmoment", plantFlips: "alphaErrFrac", plantKind: "reader",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // reader path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, alphaErrFrac
+    // 1.75e-5 -> 1.0000 under mode "onedmoment", matching the header's own quoted 1.754e-5 -> 1.0000.
+    plantMode: "onedmoment", plantFlips: "alphaErrFrac", plantKind: "mode",
     name: "thermal-convection", observables: THERMAL_OBSERVABLES, build: buildThermal, defaults: thermalDefaults };

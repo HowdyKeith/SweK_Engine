@@ -117,6 +117,10 @@ export const pulsarDevice = {
     // 5.0134e-1) which is what probeModePlant requires -- `predicted` and `ratio` move too, but `error` is the
     // one the device already treats as its verdict. `curvature` and `recoveredFdot` are BIT-IDENTICAL across
     // the plant and would have been a dead declaration: the fit never sees the key.
-    plantMode: "twof0", plantFlips: "error", plantKind: "method",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // method path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, error
+    // 8.90e-4 -> 0.5013 under mode "twof0", matching the header's own quoted 8.9009e-4 -> 5.0134e-1.
+    plantMode: "twof0", plantFlips: "error", plantKind: "mode",
 };
 export default pulsarDevice;

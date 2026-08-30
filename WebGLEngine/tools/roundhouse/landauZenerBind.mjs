@@ -72,6 +72,13 @@ export const landauZenerDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4129 -- NAMED, THE SAME COMPLETION v3851/v4088-v4128 gave the rest of this family. MEASURED, curve mode
+    // (default) both arms: relWorst 0.00617 -> 0.8087 (errMean 0.00206 -> 0.3614). corner mode's cornerP moves
+    // too (0.02822 -> 0.000385) but is explicitly NOT a graded claim (graded: false, per this device's own
+    // header on the finite-window integrator's validity range), so the declaration points at the curve mode's
+    // relWorst instead.
+    planted: { knob: "planted", observable: "relWorst",
+               note: "swaps in couplingWRONG, a wrong coupling law upstream of the diabatic-transition probability, so every point on the graded curve (P from about 0.5 to 0.99, the module's own validated window) is measured against the correct 1932 closed form while sampled from the wrong physics" },
     modes: ["curve", "corner"],
     name: "landau-zener-crossing", observables: LZ_OBSERVABLES, build: buildLZ,
     defaults: ({ mode } = {}) => ({ mode: mode || "curve", config: { ...DEF } }),
