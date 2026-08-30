@@ -13,7 +13,7 @@
 //
 // Run: node engine/frameDirtyCensus-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
-import { tickersIn, census, report, coveredIn, VERDICTS, ANIMATES, REACTIVE, INERT, UNEXAMINED, UNEXAMINED_BASELINE, UNGUARDED_BASELINE } from "./frameDirtyCensus.mjs";
+import { tickersIn, census, report, coveredIn, VERDICTS, ANIMATES, REACTIVE, INERT, UNEXAMINED, UNEXAMINED_BASELINE, UNGUARDED_BASELINE, STILL_UNGUARDED_REASON } from "./frameDirtyCensus.mjs";
 import { FrameDirty } from "./frameDirty.js";
 import { readFileSync } from "node:fs";
 import { codeOnly } from "../tools/ship/sourceScan.mjs";
@@ -221,6 +221,49 @@ const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8
 
     // the ones still unguarded are named, so the remaining work is a list rather than a feeling
     ok(c.unguarded.length === 0 || c.unguarded.every((n) => typeof n === "string"), "and the remainder is reported by name");
+}
+
+// 10) *** THE RATCHETS MOVED, AND THE ONE THAT DID NOT REACH ZERO SAYS WHY. ***
+{
+    const covered = coveredIn(MAIN);
+    const c = census(MAIN, covered);
+    ok(UNEXAMINED_BASELINE === 14, "UNEXAMINED came down from 25 to 14 -- the HUD and panel cluster settled as ONE decision, because they write DOM and the flag guards the GL draw");
+    ok(UNGUARDED_BASELINE === 1, "and UNGUARDED from 8 to 1");
+    ok(c.unguarded.length <= 1, "which the live census agrees with");
+
+    // *** THE LAST ONE IS NAMED AND EXPLAINED, RATHER THAN CLOSED BY INVENTING A FIELD. ***
+    ok(c.unguarded.length === 0 || Object.keys(STILL_UNGUARDED_REASON).includes(c.unguarded[0]),
+        "the animator still unguarded carries a written reason for being so");
+    ok(/writing the probe rather than finding it/.test(JSON.stringify(STILL_UNGUARDED_REASON)),
+        "*** and the reason is the honest one: a baseline of zero reached by adding a field to the thing being measured is not the same as a baseline of zero ***");
+    ok(UNGUARDED_BASELINE > 0, "so the baseline is one, not zero");
+
+    // the emitters are covered by the system they emit INTO, not by probes of their own
+    ok(covered.includes("torchLighter") && covered.includes("memoryShimmer"),
+        "torchLighter and memoryShimmer are covered");
+    ok(/three particle streams per torch|EMITTERS/.test(MAIN),
+        "by the particles probe, because they draw nothing themselves -- a third category after 'animates' and 'writes DOM': systems that animate THROUGH a system already guarded");
+}
+
+// 11) *** THE HUD READOUT IS OUTSIDE THE DRAW GUARD, WHICH IS THE DEFECT THIS ROUND FOUND IN v4174. ***
+//     The guard exists to skip the GL draw. hud.update() writes textContent -- fps, chunk count, position,
+//     weather, time of day -- and drawing nothing on the canvas, it has no business being skipped with it.
+//     Inside the guard, a static 3D scene froze a LIVE DIAGNOSTIC, which is exactly what morphDigits' v3531
+//     rule forbids: a reader must never be shown a number they cannot trust. It was inside the non-XR branch
+//     too, so a headset froze it as well.
+{
+    const iGuardClose = MAIN.indexOf("close the dirty-flag draw guard");
+    const iHud = MAIN.indexOf('profStart("hudUpdate")');
+    const iDecision = MAIN.indexOf("frameDirty.shouldRender()");
+    ok(iGuardClose > 0 && iHud > 0 && iDecision > 0, "the three positions are findable");
+    ok(iHud > iGuardClose, "*** hudUpdate runs AFTER the guard closes, so a skipped frame still refreshes the readouts ***");
+    ok(iDecision < iGuardClose, "while the decision is still made before the draw");
+
+    // and the panels were already outside it, which is why only one of the twelve had to move
+    const iPanels = MAIN.indexOf('profStart("hudPanels")');
+    ok(iPanels > 0 && iPanels < iDecision, "the DOM panels were already ticked BEFORE the guard, so only hud.update was on the wrong side");
+    ok(/MOVED OUT OF THE DIRTY-FLAG GUARD/.test(MAIN), "and the move is explained where it happened");
+    ok(/my own mistake at v4174|MY OWN/i.test(MAIN), "including whose mistake it was");
 }
 
 console.log(`frameDirtyCensus-selfcheck: ${pass} passed, ${fail} failed`);

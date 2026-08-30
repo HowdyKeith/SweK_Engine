@@ -8,6 +8,56 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4184 -- using the instrument, and what it found in my own v4174 wiring
+
+v4183 built the census and left 8 animators unguarded and 25 tickers unexamined. This round used it rather
+than starting another port, and the instrument immediately found something the guard's author had not.
+
+*** THE HUD READOUT WAS INSIDE THE DIRTY-FLAG GUARD, WHICH IS MY OWN MISTAKE FROM v4174. *** The guard skips
+the GL DRAW. hud.update() draws no pixels at all -- it writes textContent into DOM elements: fps, chunk
+count, position, weather, time of day. Sitting inside the guard, a static 3D scene FROZE A LIVE DIAGNOSTIC,
+which is precisely what ui/morphDigits.js's v3531 rule forbids: a reader must never be shown a number they
+cannot trust. FPS keeps changing on a still scene, and so does the clock. It was inside the non-XR branch
+too, so a headset froze it as well. Moved out; it costs nothing it was not already costing, having throttled
+itself to 10Hz since round 314.
+
+FOUND BY DOING THE CENSUS, NOT BY READING THE GUARD. Asking what each of the twelve HUD and panel tickers
+could do to the picture is what surfaced that ONE of them was on the wrong side of it -- the other eleven
+were already outside.
+
+*** AND THE HUD CLUSTER SETTLED AS ONE DECISION RATHER THAN TWELVE, WHICH IS WHY UNEXAMINED FELL FROM 25 TO
+14. *** They write DOM; the flag guards the GL canvas; a DOM overlay is a separate surface a skipped draw
+does not touch. Reading two of them -- hud.js setting textContent, cameraPanel.js refreshing thumbnails on
+its own 250ms and 700ms timers -- answered all twelve.
+
+*** A THIRD CATEGORY TURNED UP, AFTER "ANIMATES" AND "WRITES DOM": SYSTEMS THAT ANIMATE THROUGH A SYSTEM
+ALREADY GUARDED. *** TorchLighter pushes three particle streams per torch into the particle system;
+MemoryShimmerEmitter spawns motes into it. Neither draws anything itself, so the existing particles probe
+already answers for them, and giving each its own probe would have asked the same question twice.
+
+Five more animators guarded through state they ALREADY expose, verified by reading each module rather than
+guessing at a name: EjectSequence.isActive() (stage !== idle && !== done), KaijuMode.isActive(),
+KaijuSandbox.isActive(), csRoundManager.isActive() -- which this loop was already calling twice -- and
+HitReactionSystem's Map of in-flight reactions. UNGUARDED fell from 8 to 1.
+
+*** THE LAST ONE IS LEFT UNGUARDED ON PURPOSE AND THE BASELINE STAYS AT ONE. *** fpsAutopilot exists to move
+the camera when the player does not, so it is unambiguously an animator, and simulation/FPSAutopilot.js
+exposes no state saying whether it is currently driving. Adding an isActive() to close the number would be
+WRITING the flag a probe rather than finding one, and a probe reporting what a new field was set to says
+nothing about what the module does. A baseline of zero reached by adding a field to the thing being measured
+is not the same as a baseline of zero.
+
+Both ratchets lowered and re-sabotaged: UNEXAMINED_BASELINE 25 -> 14, UNGUARDED_BASELINE 8 -> 1, and putting
+hudUpdate back inside the guard goes red on the new positional check.
+
+*** AND I DESTROYED THIS ROUND'S OWN WORK MID-WAY THROUGH IT. *** After sabotage-testing the guard placement
+I ran `git checkout -- main.js` to undo the sabotage, which restored main.js from HEAD and discarded every
+edit this round had made to it -- the move, both probes, and the emitter coverage. Caught immediately because
+the gate went red on four checks, and redone from the same scripted edits. A destructive command reached for
+casually, on a file with an hour of unshipped work in it: the sabotage should have been reverted from the
+copy taken before it, the way every other sabotage this session was.
+
+Gate count 1266 gates.
 ## v4183 -- the census v4174 said it was waiting for, and two instruments that read low
 
 v4174 shipped the dirty flag DISABLED with four probes and an honest note that four is not a census of a

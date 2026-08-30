@@ -65,6 +65,29 @@ export const VERDICTS = Object.freeze({
     torchLighter:    { verdict: ANIMATES, why: "torch flicker is time-driven" },
     remotePlayers:   { verdict: ANIMATES, why: "another player's avatar moves with no local input at all -- the case a local-only census would miss" },
 
+    // --- ANIMATES, and each of these now has a probe (v4184) ---
+    // --- THE HUD AND PANEL CLUSTER, SETTLED AS ONE DECISION AT v4184 ---
+    //
+    // *** THESE WRITE DOM, NOT PIXELS ON THE GL CANVAS, AND THAT IS WHAT THE DIRTY FLAG GUARDS. *** Twelve of
+    // the twenty-five unexamined entries were HUD and panel tickers, and reading two of them settled all
+    // twelve: hud.update() sets textContent on DOM elements, cameraPanel.update() refreshes DOM thumbnails.
+    // The flag skips the GL DRAW; a DOM overlay is a separate surface that a skipped draw does not touch.
+    //
+    // THEY ARE INERT WITH RESPECT TO THIS FLAG, AND THAT IS ONLY TRUE BECAUSE THEY RUN OUTSIDE THE GUARD.
+    // hud.update was INSIDE it until v4184 -- my own mistake at v4174 -- which froze a live diagnostic
+    // whenever the 3D scene happened to be still. The verdict and the guard placement are one fact, not two.
+    hud:              { verdict: INERT, why: "writes textContent into DOM readouts; draws nothing on the GL canvas, and now runs outside the draw guard" },
+    cameraPanel:      { verdict: INERT, why: "refreshes DOM thumbnails on its own 250ms and 700ms timers, outside the guard" },
+    civilizationPanel:{ verdict: INERT, why: "a DOM panel, ticked before the guard" },
+    kaijuPanel:       { verdict: INERT, why: "a DOM panel, ticked before the guard" },
+    kaijuStaminaHud:  { verdict: INERT, why: "a DOM readout, ticked after the guard in postRenderTicks" },
+    perfDashboard:    { verdict: INERT, why: "a DOM dashboard, ticked after the guard" },
+    playerEnergyHUD:  { verdict: INERT, why: "a DOM readout, ticked after the guard" },
+    csHud:            { verdict: INERT, why: "a DOM readout" },
+    ogreHUD:          { verdict: INERT, why: "a DOM readout" },
+    ogreBuyPanel:     { verdict: INERT, why: "a DOM panel" },
+    mechCockpit:      { verdict: INERT, why: "a DOM cockpit overlay" },
+
     // --- INERT: cannot change the picture by itself ---
     systemPerf:      { verdict: INERT, why: "measures frame time and heap; it reads, it does not draw" },
     audio:           { verdict: INERT, why: "sound has no pixels" },
@@ -140,7 +163,7 @@ export function report(source, registered = []) {
  * unexamined, pushes the count above the baseline, and the gate goes red until somebody writes a verdict --
  * which is the whole mechanism by which this census stays a census instead of becoming a stale list.
  */
-export const UNEXAMINED_BASELINE = 25;
+export const UNEXAMINED_BASELINE = 14;   // v4184: 25 -> 14, the HUD and panel cluster settled as one decision
 
 /**
  * Every ticker declared as covered by some probe, read out of main.js's own `covers:` lists.
@@ -167,4 +190,21 @@ export function coveredIn(source) {
  * flag believes the scene is still -- a frozen screen. This number may only go DOWN, and it is what stands
  * between the flag and being enabled by default.
  */
-export const UNGUARDED_BASELINE = 8;
+export const UNGUARDED_BASELINE = 1;   // v4184: 8 -> 1
+
+/**
+ * *** THE ONE ANIMATOR STILL UNGUARDED, AND WHY IT IS STILL UNGUARDED. ***
+ *
+ * fpsAutopilot exists to move the camera when the player does not, so it is unambiguously an animator -- and
+ * simulation/FPSAutopilot.js exposes NO state that says whether it is currently driving. Every other probe
+ * this round reads something the module already had: EjectSequence.isActive(), KaijuMode.isActive(),
+ * csRoundManager.isActive() (already called twice in the loop), HitReactionSystem's Map of in-flight entries.
+ *
+ * Inventing an isActive() on FPSAutopilot to close the number would be writing the flag a probe rather than
+ * finding one, and a probe that reports what a new field was set to says nothing about what the module does.
+ * So it stays on the list, by name, and the baseline stays at one rather than zero. A baseline of zero
+ * reached by adding a field to the thing being measured is not the same as a baseline of zero.
+ */
+export const STILL_UNGUARDED_REASON = Object.freeze({
+    fpsAutopilot: "no existing state says whether it is currently driving the camera; adding one to close the number would be writing the probe rather than finding it",
+});
