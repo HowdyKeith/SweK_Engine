@@ -1,7 +1,7 @@
 {
- "note": "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1. *** v4132 RE-FREEZE, 84 -> 85 sites, and every change was READ before it was frozen. *** ADDED, all four judged legitimate rather than waved through: node-bun.html, report.html and server.html gained UNCHECKED_JSON_BODY sites that are same-origin status polls, each INSIDE a try whose catch reports the subsystem 'unreachable' -- exactly the loud-is-legitimate design this rule's own text declines to fail. ai-bridge/pairlaneBridge.js gained KILL_NOT_VERIFIED at stop(): the handle is KEPT (never nulled) and _spawnJob installs child.on('exit') setting job.done, which status(id) exposes -- so the verification path exists and the rule cannot see it because the listener is in a different function. stop() was still over-claiming with a bare {ok:true} and now returns signalled/done/verifyWith instead; the code was made honest, NOT reshaped to dodge the regex. REMOVED: skyrim.html :: UNCHECKED_JSON_BODY -- a real win, recorded.",
- "sites": 85,
- "total": 233,
+ "note": "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.",
+ "sites": 87,
+ "total": 235,
  "tally": {
   "agenda.html :: UNCHECKED_JSON_BODY": 2,
   "ai-bridge/agentCookieBridge.js :: KILL_NOT_VERIFIED": 1,
@@ -20,6 +20,7 @@
   "ai-bridge/frugonBridge.js :: KILL_NOT_VERIFIED": 3,
   "ai-bridge/gcloudBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/go2rtcBridge.js :: KILL_NOT_VERIFIED": 1,
+  "ai-bridge/grdpwasmBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/hostingBridge.js :: KILL_NOT_VERIFIED": 3,
   "ai-bridge/humanizerBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/keepAwakeBridge.js :: KILL_NOT_VERIFIED": 1,
@@ -51,6 +52,7 @@
   "ai-bridge/webwrightBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/winCredBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/workbookBridge.js :: KILL_NOT_VERIFIED": 1,
+  "ai-bridge/wsScrcpyBridge.js :: KILL_NOT_VERIFIED": 1,
   "android-peer.html :: UNCHECKED_JSON_BODY": 3,
   "asset-studio.html :: UNCHECKED_JSON_BODY": 10,
   "avatar-push.html :: UNCHECKED_JSON_BODY": 2,

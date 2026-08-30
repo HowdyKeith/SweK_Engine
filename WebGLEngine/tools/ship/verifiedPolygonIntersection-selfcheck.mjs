@@ -28,6 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { noComments } from "./sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -37,6 +38,13 @@ const report = (m) => console.log("  ....  " + m);
 console.log("verifiedPolygonIntersection-selfcheck -- an install button for somebody else's MIT repo, never vendored\n");
 
 const bridgeSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "verifiedPolygonIntersectionBridge.js"), "utf8");
+// v4151 -- comments dropped, string literals KEPT. tools/ship/commentFalsePass-selfcheck.mjs found the one
+// genuine case in the tree here: a check below asserts that the bridge's MAINTENANCE record names the command
+// the measurement was taken with, and it was reading unprocessed source -- where the bridge ALSO discusses that
+// same measurement in a header comment. The assertion is true today for the right reason, and would have stayed
+// true after somebody deleted the field it is about, which is the whole failure this class describes.
+// noComments and not codeOnly: the thing being asserted IS a string's contents, and codeOnly blanks strings.
+const bridgeCode = noComments(bridgeSrc);
 const pageSrc = fs.readFileSync(path.join(ENG, "vpi.html"), "utf8");
 const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
 
@@ -48,7 +56,7 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
     const m = bridgeSrc.match(/PINNED_COMMIT\s*=\s*"([0-9a-f]{40})"/);
     ok("!! *** PINNED_COMMIT is a real 40-char SHA, not a branch name ***", !!m, m ? m[1] : "no match");
     ok("   ...and MAINTENANCE.howChecked names git, proving activity was measured rather than guessed",
-        /howChecked:.*git clone \(unshallowed\)/.test(bridgeSrc));
+        /howChecked:.*git clone \(unshallowed\)/.test(bridgeCode));
 }
 
 // ---- 2. REFUSED LIST NAMES THE REAL PROPERTIES, NOT A COPY-PASTE OF grdpwasm's -------------------------------
