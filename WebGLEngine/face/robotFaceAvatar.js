@@ -16,6 +16,7 @@
 // of headroom for jump / dance clips that lift the character.
 
 import { GLBParser } from "../gpu/GLBParser.js";
+import { loadGlb, routeFor } from "../gpu/glbLoad.js";   // v4174 -- picks the loader by what the file contains
 import { SkeletalAnimator } from "../gpu/SkeletalAnimator.js";
 import { buildAmplitudeCurve, sampleWithJitter } from "./PhonemeMouth.js";  // Round 271
 import { ACCESSORY_CATALOG } from "./accessoryGeometry.js";   // v864 — Phase 2 costuming
@@ -430,7 +431,25 @@ async function loadRobot() {
         const buf = await res.arrayBuffer();
         // v729 — pass baseUrl so multi-file .gltf (with separate .bin and
         // texture files) can resolve relative URIs against the source URL.
-        const parsed = await GLBParser.parse(buf, { baseUrl: new URL(url, location.href).href });
+        // *** v4174 -- ROUTED, BECAUSE A DRACO FILE USED TO ARRIVE HERE AND THROW. *** GLBParser is the right
+        // parser for an ordinary GLB and cannot read KHR_draco_mesh_compression; it said so in a thrown
+        // message naming gpu/gltfDraco.js, and NOTHING acted on that sentence -- this call site included.
+        // glbLoad peeks first and hands the buffer to whichever loader the file actually needs; the Draco
+        // decoder is imported lazily and ONLY on the branch that needs it, so an ordinary avatar still pays
+        // nothing for a format it does not use.
+        const _base = new URL(url, location.href).href;
+        const _r = await loadGlb(buf, {
+            parsePlain: (b) => GLBParser.parse(b, { baseUrl: _base }),
+            parseDraco: async (b) => {
+                const [{ parseGlb }, three] = await Promise.all([
+                    import("../gpu/gltfDraco.js"),
+                    import("/vendor/three/jsm/loaders/GLTFLoader.js"),
+                ]);
+                return parseGlb(b, three.GLTFLoader, { path: _base });
+            },
+        });
+        if (!_r.ok) throw new Error("avatar GLB (" + (_r.route || "unrouted") + "): " + _r.error);
+        const parsed = _r.result;
         _parsedRef = parsed;   // v884 — for on-demand head-box measurement
 
         if (!parsed.skin || !parsed.animations?.length) {

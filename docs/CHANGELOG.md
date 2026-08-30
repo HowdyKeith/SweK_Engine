@@ -8,6 +8,78 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4174 -- three things that skip work, and two of them were wrong in a way that still passed
+
+Draco routing, dirty-flag rendering, and sprite slicing -- the three Keith asked to finish before the orrery.
+
+*** THE DRACO ROUTER'S COMMENT AND ITS CODE DISAGREED, AND THE FIXTURE IS WHAT FORCED THE FINER RULE. *** New
+gpu/glbLoad.js decides between the plain parser and the Draco path from what a GLB actually declares, and the
+case that matters is a file listing KHR_draco_mesh_compression in extensionsUsed while compressing NONE of its
+primitives -- informational, not required, and routing it to the decoder would fail a file the plain parser
+reads fine. extensionsRequired is the opposite: unloadable without it. Wired into face/robotFaceAvatar.js, whose
+parseDraco branch imports the decoder DYNAMICALLY so the router itself pulls in neither three nor draco.
+
+*** THE DIRTY FLAG IS BUILT AROUND THE FACT THAT ITS TWO FAILURE MODES ARE NOT WORTH THE SAME. *** A frame drawn
+that nobody needed costs a frame. A change MISSED freezes the screen, and a frozen screen looks exactly like a
+crash. So new engine/frameDirty.js never assumes clean: a frame is skipped only when EVERY registered source
+affirmatively reports itself static, a source it was never told about cannot vote for quiet, and a probe that
+THROWS renders the frame rather than being read as silence. On top of that a heartbeat caps consecutive skips,
+so a total logic failure degrades to a slow screen instead of a dead one. The subtle rule is the falling edge:
+the frame where an animation STOPS carries the state it settled into and has never been drawn, so a source going
+active->inactive draws one final frame. All probes run every frame even once one has voted to render, because
+short-circuiting would freeze the others' last-seen state and lose exactly those falling edges.
+
+*** THE WATER PROBE'S OBVIOUS FORM WOULD HAVE MADE THE WHOLE FEATURE INERT WITHOUT FAILING ANYTHING. *** main.js
+assigns window.waterField unconditionally at startup, so a probe asking whether water EXISTS is true in every
+scene forever -- the flag would have voted active on every frame of every world and skipped nothing, while every
+check still passed. WaterRenderer.render() already answers the real question by early-returning when both
+instance counts are zero. Pinned in the gate, with the premise (that main.js does assign it unconditionally)
+checked too, so the check cannot rot into a tautology.
+
+It ships DISABLED, and that is the honest setting rather than a timid one. Four probes -- camera pose compared
+against the LAST DRAWN pose, a playing demo, live particles, water on screen -- are not a census of a 30000-line
+main.js. The module's safety argument holds only while something else is voting active, which is guaranteed
+while the default is off and not once it is on.
+
+*** SPRITE SLICING FOUND SOMETHING IN A REAL ASSET THAT NO FIXTURE OF MINE WOULD HAVE. *** New
+render/spriteSlice.mjs finds frames by connected components instead of cutting a grid, and mattes the backdrop
+in four passes. Run against textures/sprites/effects/torch_sheet.png -- 128x48, in this tree, described by
+nothing -- it finds four flames at x = 9, 43, 74, 107, all 11px wide, and the fourth is 44px tall where the
+others are 42. A 4-across grid cuts four identical 32x48 cells: it splits no flame, so it LOOKS correct, and
+then carries 70 percent padding, seats every flame at a different offset inside its cell, and cannot express a
+taller frame at all. The gate decodes that PNG with node's own zlib in forty lines rather than reaching for
+pngjs, because a real-asset check that skips itself when a package is missing is the thing this tree keeps
+having to go back and un-skip.
+
+The matting is four passes because three of the four ways backdrop removal goes wrong all produce a picture that
+looks nearly right. Background is what is REACHABLE FROM THE BORDER, not what matches the key, so a magenta gem
+inside a sprite on a magenta backdrop survives -- the fill is 4-connected on purpose, since an 8-connected one
+leaks diagonally through a one-pixel outline and eats the interior. An antialiased edge is a MIXTURE, so solving
+C = a*F + (1-a)*K recovers a translucent edge instead of leaving the pink fringe; widening the tolerance instead
+erodes the sprite, and the gate proves both. And transparent pixels get foreground colour bled into them,
+because alpha can be perfect and bilinear filtering will still put the halo back.
+
+*** THE ESTIMATOR'S FIRST DRAFT FAILED ON A WHOLE CLASS OF REAL SPRITES. *** It required an INTERIOR neighbour
+to estimate the foreground from, which anything two pixels or thinner -- a rope, an antenna, a spark -- does not
+have, because every one of its pixels touches the backdrop. It fell back to the pixel's own colour, which made
+the solve read a = 1, which left the fringe exactly as it found it. Interior neighbours when they exist, any
+visible neighbour when they do not.
+
+Not a duplicate of tools/ship/spriteSheetImport.mjs but the other half of it: that one validates sheets that
+arrive WITH a JSON, this one finds frames when nothing describes them. toSheetMeta() emits that module's exact
+schema and the gate runs found frames through its validator, so a found sheet and a declared one are the same
+thing downstream -- including the out-of-bounds refusal, controlled against a rect that runs off the edge.
+Wired into render/spriteAtlas.js as atlasFromSheet(), which is a separate entry and not a second constructor
+path, because the procedural atlas is a fixed 4x2 grid of 64px cells and forcing artist frames through
+getCellUV() would quietly return the wrong rect for every one of them.
+
+Also: the wiring gate for the dirty flag went red on its first run because it read main.js with codeOnly(),
+which blanks string literals -- and profStart("renderPrep") and addSource("water") ARE string literals. The file
+was wired correctly and every positional check said otherwise. noComments for string anchors, codeOnly for code
+shapes; all positions now taken from one text so the offsets are comparable. Both wiring checks sabotage-tested
+(inert water probe, decision hoisted above the ticks) and restored byte-identical.
+
+Gate count 1256 gates.
 ## v4173 -- a regression I introduced at v4166, found before the rig ran into it
 
 Keith is about to re-run the rig, so the useful work is whatever will still be red. The census gates were the
