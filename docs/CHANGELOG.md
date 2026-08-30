@@ -8,6 +8,63 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4199 -- Three gaps closed with what was already here, and none of them vendored a byte
+
+### 1. Disintegrate is thirty lines, because two earlier rounds did the work
+
+`ZachSaucier/Disintegrate` (MIT) turns a DOM element into canvas particles via html2canvas. Its one hard step
+was already solved: `ui/domToTexture.js` (v4120) rasterises a live subtree through SVG `<foreignObject>`, and
+**its header names html2canvas as the alternative it rejected** -- three rounds before this file needed it.
+`ui/gestureVfx.js` already owns a pure particle system. So `ui/domDisintegrate.js` is the loop between them.
+
+It emits into gestureVfx's **own** particle shape plus one field: the pixel's colour. `stepParticles` spreads
+`...p` when it advances a particle, so **r/g/b ride through a stepper that has never heard of them** and the
+existing gravity and fade apply unchanged. Asserted rather than assumed -- sabotaging that spread reddens the
+gate, and a disintegration would silently turn grey.
+
+The alpha floor is the whole difference between a disintegrating **shape** and a disintegrating **rectangle**.
+Measured on a disc: **45 particles kept, 200 grid points total** -- the rest transparent, and without the
+floor every one would be an invisible particle still costing a step each frame and still holding the frame
+dirty. An empty result names its cause, too, because the inherited limitation is silent: domToTexture
+**measured** that a nested `<canvas>` rasterises to zero pixels, so disintegrating an element containing one
+gives a plausible cloud with a rectangular hole.
+
+### 2. Elastic is Penner's, not codrops'
+
+`simulation/easing.js` already cited Penner. `codrops/ElasticProgress` only pointed at the gap, so no bespoke
+licence is involved and nothing was taken from it. `easeOutBack` overshoots **once** -- 1 target crossing --
+where `easeOutElastic` **oscillates**, at 7. Different motion, different meaning.
+
+The more interesting half: that file had **twelve curves, seven consumers and no gate at all**. Elastic was
+the occasion, not the reason.
+
+**And the obvious easing invariant is false, and was already false.** A `[0,1]` assertion would have blocked
+`easeOutBack`, which has overshot above 1 since it shipped. My first draft asserted **exact** endpoints and
+immediately reddened on `easeOutBack(0) = 2.22e-16` -- one ULP of cancellation residue from `1 - c3 + c1`,
+algebraically exactly zero. That is **twelve orders of magnitude** below elastic's raw `4.883e-4`, which is a
+formula genuinely missing its endpoint and leaves an animated property permanently short of target -- a fade
+that never quite reaches opaque. Flattening the two into one assertion would either excuse the real miss or
+condemn arithmetic for being arithmetic, so the family check uses float precision and the elastic guards are
+checked for exactness separately.
+
+### 3. The progress round found a defect in shipped code
+
+`ui/localModelRun.js`'s `progressLine()` already refuses to invent a percentage when `Content-Length` is
+absent, and its own comment cites this tree's "flag that lies". It is **wrong about a compressed one**:
+`Content-Length` counts bytes on the wire, `response.body.getReader()` yields bytes after decoding.
+
+Measured in headless Chromium against a local server: **200000 bytes served gzip carry `Content-Length: 235`
+-- a factor of 851.** `progressLine` clamps with `Math.min(100, ...)`, so it would show **100% on the first
+chunk and hold it there for the entire download** -- precisely the failure its own comment warns against,
+arrived at from the other direction.
+
+`net/fetchProgress.mjs` reports the total as **unknown** whenever any content-encoding is present -- not a
+list of known ones, which would start lying the day a new encoding ships -- and routes into the path
+`progressLine` already handles correctly. It feeds that reporter rather than growing a second one.
+`window.splat.load` now reports progress; it reported **nothing at all** before, on files routinely tens of
+megabytes.
+
+149 new checks across three gates, 4 sabotages all red. The tree carries 1281 gates.
 ## v4198 -- The register of what was read and not taken, and #59 was wrong about its own premise
 
 `world/orrery.mjs` models a **vendored** dependency: it walks `vendor/`, finds licence files, and reports
