@@ -8,6 +8,79 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4173 -- a regression I introduced at v4166, found before the rig ran into it
+
+Keith is about to re-run the rig, so the useful work is whatever will still be red. The census gates were the
+answer, and looking at them found something worse than a slow gate: **my own correction had made one of them
+fail sooner.**
+
+### Correcting the host scale cut this gate's budget in half
+
+v4166 fixed a runaway host-scale estimator, from a clamped 8 down to the honest 2.05. That was right. It also
+cut `corroborationCensus`'s granted budget from `309 x 4.31 = 1334 s` to `309 x 2.05 = 634 s`.
+
+Keith's last run did **1270 s of device work inside that 1334 s and timed out by a whisker**. At 634 s it
+would have managed half.
+
+**The inflated scale had been quietly rescuing a gate whose real cost is four times the 309 s default.**
+Correcting the scale did not break it -- it *revealed* it. Both of those are true, and the effect on the next
+run is the same either way, so it is fixed here rather than argued about.
+
+Measured to completion for the first time: **1140363 ms, exit 0, all checks passing** -- 87 devices, 306
+modes, every one built. Moved out of `UNRESOLVED` into `MEASURED`, which is exactly what that table's header
+instructs. The budget is 2281 s now, 4675 s on a 2.05x box.
+
+### My first diagnosis was wrong, and my own model refuted it
+
+The obvious story was the cost hint. `costRecord`'s header has said since v4038a that a frozen cost is
+"milliseconds on the machine that froze it", and the census compares that straight against a deadline being
+spent on whatever box is running. Two clocks, no conversion -- a real defect, fixed here as `scaledCostFor`.
+
+But modelled at the point the sweep actually reaches `twof` -- position 82 of 87, roughly 327 s spent of 1335
+-- **over 1000 s remain**, so even the *scaled* hint of 436 s is comfortably under it and the decline
+correctly does not fire. It was never the cause.
+
+### And the evidence I offered for it was a coincidence, which only the measurement exposed
+
+This one is worth stating precisely, because the numbers were perfect:
+
+| | |
+|---|---|
+| cost record prices `twof` | **458.9 s** |
+| Keith's rig measured | **943.1 s** |
+| ratio | **2.055** |
+| his measured host scale | **2.05** |
+
+That looked like proof. Then the census ran here to completion and measured `twof` at **712.7 s** -- **on the
+machine that froze the record**. So:
+
+- the record is **stale by 1.55x on its own machine**, and
+- Keith's box is **1.32x** slower than this one for that device, and
+- **1.55 x 1.32 = 2.05.**
+
+**Two errors compounding landed exactly on the host factor by luck.** That is the fourth time this session a
+story fitting every number was refuted by measuring it -- after the `fmod` hue that saturated to one colour,
+the hash collisions that were zero where the numbers moved most, and the uint32 wrap that `^` truncated
+anyway -- and the first time the coincidence was numerically perfect.
+
+The conversion is still correct and stays. **The bigger defect is that the frozen record is stale**, and no
+amount of scaling fixes a hint that was already wrong about its own machine before it travelled.
+
+### Also
+
+The two gates shipped at v4172 carried no runtime evidence, which `budgetEvidence` caught on the very next
+run -- the same debt v4171 had just finished clearing for twenty-four other gates. Timed individually, median
+of three: `grassField` 686 ms (686/382/822), `secp256k1` 593 ms (457/593/703).
+
+### Still open
+
+`plantedCoverage`, `responseCensus` and `libmSensitivity` are the other three device sweeps on the default
+budget, and the same halving applies to them. They are being measured now. Unlike the census they were
+**already failing at the larger budget** -- both censuses timed out at 2475 s on Keith's rig -- so the
+correction makes them fail sooner rather than newly fail, which costs less rig time for the same answer. That
+is a mitigation, not a fix, and they need real budgets.
+
+Tree at 1254 gates.
 ## v4172 -- grass, and the half of Bitcoin this engine never had
 
 Two ports from repos Keith sent. Both MIT, both wired on arrival, and the grass one found the session's

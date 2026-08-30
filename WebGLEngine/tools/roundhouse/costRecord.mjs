@@ -68,6 +68,8 @@
 //   carries no assertion at all: a device getting slower is news about the device, not a regression in the
 //   record, and pinning costs with === would fire on every machine that is not the one that froze it.
 
+// v4173 -- the host scale, imported rather than re-estimated. See scaledCostFor below.
+import { hostScale } from "../ship/hostScale.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +92,39 @@ export function costFor(device, mode, rec = null) {
     const r = rec || readCostRecord();
     const v = r && r.costs && r.costs[device + "." + mode];
     return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * *** THE SAME COST, IN THE UNITS OF THE MACHINE THAT IS ABOUT TO SPEND THE TIME. ***
+ *
+ * v4173. This file's own header has said since v4038a that a frozen cost is "milliseconds on the machine that
+ * froze it", and corroborationCensus compares that number against a deadline being consumed on WHATEVER BOX
+ * IS RUNNING. Those are different clocks, and nothing was converting between them.
+ *
+ * *** AND THE EVIDENCE I FIRST GAVE FOR THIS WAS A COINCIDENCE, WHICH MEASURING IT PROPERLY EXPOSED. ***
+ * The record prices twof's three modes at 458.9 s; Keith's run took 943.1 s; 943.1/458.9 = 2.055, and the
+ * measured host scale for his box is 2.05. That looked like proof. It was not. Running the census here TO
+ * COMPLETION for the first time measured twof at 712.7 s ON THE MACHINE THAT FROZE THE RECORD -- so the
+ * record is STALE BY 1.55x locally, and Keith's box is 1.32x slower than this one for that device. 1.55 x
+ * 1.32 = 2.05. TWO ERRORS COMPOUNDING LANDED EXACTLY ON THE HOST FACTOR BY LUCK.
+ *
+ * So the conversion below is still right -- a frozen cost and a live deadline genuinely are different clocks
+ * -- but the number that seemed to prove it was measuring something else. THE BIGGER DEFECT IS THAT THE
+ * RECORD IS STALE, and no scaling fixes a hint that was wrong about its own machine before it travelled.
+ *
+ * hostScale() is already the tree's answer to "how much slower is this machine", and it has been sitting one
+ * directory away being used by the budget system and by nothing else. A SECOND ESTIMATE OF HOST SPEED WOULD
+ * HAVE BEEN THE WRONG FIX: this reads the one that exists.
+ *
+ * Falls back to the unscaled cost if the scale cannot be read, because a missing scale is 1.0 by that
+ * module's own definition and an unscaled hint is exactly what the caller had before.
+ */
+export function scaledCostFor(device, mode, rec = null, scale = null) {
+    const base = costFor(device, mode, rec);
+    if (base === null) return null;
+    let s = scale;
+    if (!Number.isFinite(s)) { try { s = hostScale().scale; } catch { s = 1; } }
+    return base * (Number.isFinite(s) && s > 0 ? s : 1);
 }
 
 /**

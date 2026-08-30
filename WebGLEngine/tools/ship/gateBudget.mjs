@@ -102,6 +102,17 @@ export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
  * 3x on a 280s gate would stall a suite for fourteen minutes before admitting anything was wrong.
  */
 export const MEASURED = {
+    // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
+    // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
+    // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.
+    //
+    // *** AND IT HAD TO BE MEASURED BECAUSE v4166 WAS ABOUT TO MAKE IT WORSE -- MY OWN DOING. *** Correcting
+    // the runaway host scale from 8 to the honest 2.05 cut this gate's granted budget from 309*4.31 = 1334 s
+    // to 309*2.05 = 634 s. Keith's last run did 1270 s of device work inside that 1334 s and still timed out
+    // by a whisker; at 634 s it would have managed HALF. The inflated scale had been quietly rescuing a gate
+    // whose real cost is four times the default, and correcting the scale did not break that -- IT REVEALED
+    // IT. Both are true and the effect on the next run is the same, so it is fixed here rather than argued.
+    "tools/roundhouse/corroborationCensus-selfcheck.mjs": 1140363,
     // *** v4171 -- MOVED OUT OF UNRESOLVED, WHICH IS WHAT THAT TABLE'S OWN HEADER INSTRUCTS. *** Both were
     // listed as "exceeded a 150s cap at v3924" and both have since been MEASURED TO COMPLETION in
     // gate-timings.json -- 255.9s and 288.0s, far above a skip's ~0.05s, and selfchecks excludes skipped runs
@@ -423,8 +434,6 @@ export const UNRESOLVED = {
     // moved out of this list to MEASURED at 195s on the same round, which is what that traffic should look like.
     // v4090 -- stability's line WAS HERE and is DELETED rather than edited, exactly as the paragraph above this
     // table instructs. It is measured to completion in MEASURED now (260224ms, all checks passing, two runs).
-    "tools/roundhouse/corroborationCensus-selfcheck.mjs":
-        "exceeded a 150s cap at v3924. A census over the device registry, so it grows with the lab -- the same shape as labResults, whose entry records that it will outrun any number written down",
     "tools/roundhouse/libmSensitivity-selfcheck.mjs":
         "exceeded a 150s cap at v3924; never timed before that. RE-ATTEMPTED with a 2400s (40 minute) budget " +
         "on a device registry that has since grown to 129 devices (up from whatever count v3924 measured " +
