@@ -77,6 +77,14 @@ export const inspiralDevice = { name: "gw-inspiral-peters",
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4126 -- NAMED, THE SAME COMPLETION v3851/v4088-v4125 gave the rest of this family. MEASURED, merger mode
+    // (default) both arms: mergerErrFrac 6.41e-9 -> 1.70e-8 and worstBulkErrFrac 1.53e-7 -> 3.22e-7 -- SAME ORDER
+    // both arms, confirming the header's own claim that these are tautologically blind (the wrong power law is
+    // graded against its own matching closed form). a0Exponent is the one observable that compares nothing
+    // analytic at all -- it is measured purely from two independent integrator runs at a0 and 2a0 -- and it
+    // moves cleanly and exactly: 4 -> 5 (ratePower+1, an integer both arms, not an approximation).
+    planted: { knob: "planted", observable: "a0Exponent",
+               note: "a wrong power law (plantedPower, default 4, in place of Peters' 3) drives the shrink rate da/dt ~ -K/a^p -- and it comes with its OWN matching closed form, so mergerErrFrac and worstBulkErrFrac stay tautologically small under the plant (same order as honest: the integrator is graded against the very law it used). a0Exponent alone compares two measured runs to each other with no closed form in the loop, and reads the true power directly: 4 under Peters, 5 under the plant" },
     // v3190 -- EXPORTED so the census does not have to GUESS. A probed list is a LOWER BOUND: you can only
     // ask about a mode you already thought of, and this device's own names were not in anyone's candidate
     // list, so it under-reported as one-moded until it said so itself.

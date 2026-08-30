@@ -115,6 +115,13 @@ export const poissonDevice = {
     // product rule rather than an antisymmetric pairing. It perturbs the DEFINITION, so every mode that uses a
     // bracket is graded through it, and the two that do not are blind BY CONSTRUCTION and say so.
     plantKind: "knob",
+    // v4122 -- NAMED, THE SAME COMPLETION v3851/v4088-v4121 gave the rest of this family. MEASURED, canonical
+    // mode (default) both arms: antisymmetry 0 -> 0.99999999999645, matching the header's own "exactly 0
+    // against exactly 1" claim, while qp and canonicalErr stay bit-identical -- the plant drops the bracket's
+    // second term, which happens to vanish for the pair (q,p) specifically, so {q,p} reads correct even under
+    // the plant and only {q,p}+{p,q} shows the missing antisymmetry.
+    planted: { knob: "planted", observable: "antisymmetry",
+               note: "the bracket drops its second term, reading the definition as a product rule instead of an antisymmetric pairing -- invisible on {q,p} itself because that term vanishes there by coincidence, and caught only by checking {q,p} + {p,q} = 0, which the broken bracket cannot satisfy" },
     modes: POISSON_MODES, name: "poisson-brackets-and-symplecticity",
     observables: POISSON_OBSERVABLES, build, defaults,
 };

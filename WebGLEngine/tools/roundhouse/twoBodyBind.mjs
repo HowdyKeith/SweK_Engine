@@ -47,7 +47,7 @@ function buildTwoBody({ mode = "orbit", config = {} } = {}) {
         const r = integrateTwoBody(c);
         return {
             ratioMeasured: r.ratioMeasured, ratioExact: r.ratioExact, ratioErrFrac: r.ratioErrFrac,
-            m1: c.m1, m2: c.m2, massRatio: c.m2 / c.m1, periods: r.periods, planted: plantedFlag, planted: plantedFlag,
+            m1: c.m1, m2: c.m2, massRatio: c.m2 / c.m1, periods: r.periods, planted: plantedFlag,
         };
     }
 
@@ -81,6 +81,13 @@ function twoBodyDefaults({ mode } = {}) {
 export const twoBodyDevice = {
     // v3401 -- KNOB PLANT: a wrong CLOSED FORM (Kepler III with the primary mass) upstream of the comparison.
     plantKind: "knob",
+    // v4125 -- NAMED, THE SAME COMPLETION v3851/v4088-v4124 gave the rest of this family. MEASURED, orbit mode
+    // (default) both arms: periodErrFrac 0.000197 -> 0.1338 (Kepler III graded against the primary mass instead
+    // of the total mass, m1=3 vs m1+m2=4). ratioErrFrac and barycentreDriftFrac are correctly blind -- neither
+    // the a1/a2 ratio nor the barycentre-fixity check depends on which mass the period closed form uses, so both
+    // stay bit-identical across arms (3.03e-13 and 9.52e-14 respectively).
+    planted: { knob: "planted", observable: "periodErrFrac",
+               note: "Kepler III is graded against the PRIMARY mass (m1) instead of the TOTAL mass (m1+m2) -- exactly right for a test particle around a fixed centre and wrong for a real two-body system. ratioErrFrac and barycentreDriftFrac never see it: neither the mass ratio nor the barycentre-fixity check touches the period closed form" },
     name: "two-body-barycentric",
     // v3190 -- EXPORTED so the census does not have to GUESS. A probed list is a LOWER BOUND: you can only
     // ask about a mode you already thought of, and this device's own names were not in anyone's candidate

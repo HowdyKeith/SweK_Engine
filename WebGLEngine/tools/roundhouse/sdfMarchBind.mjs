@@ -146,6 +146,18 @@ export const sdfMarchDevice = {
     // estimate -- it substitutes the stepping RULE rather than moving a knob or misreading one, which is
     // seismic's third kind (v3400) and compliance.mjs's shape (v3460).
     plantKind: "method",
+    // v4124 -- NAMED, THE SAME COMPLETION v3851/v4088-v4123 gave the rest of this family, and MEASURED across
+    // all five modes rather than assumed from modes[0]. *** sphere mode (the default) IS NOT THE RIGHT
+    // OBSERVABLE, AND IT LOOKS LIKE ONE AT FIRST GLANCE. *** Under the plant raysTraced falls from 24 to 0 --
+    // the raw-step marcher misses every sphere it is aimed at within maxSteps -- so worstAgainstClosedForm
+    // reads 9.5e-8 honest and EXACTLY 0 planted: a max over an empty set, which is a vacuous improvement, not
+    // a pass. raysTraced is already reported beside it, so nothing hides this, but a declaration naming
+    // worstAgainstClosedForm alone would have pointed at a number moving the WRONG direction. `ball` mode
+    // carries the clean signal instead: ballOvershoot 2.76e-3 -> 0.309, ballMeasuredT 2.844 -> 3.150 against a
+    // FIXED analytic 2.841 (ballAnalyticT does not move -- it is the closed form, computed independent of the
+    // marcher).
+    planted: { knob: "planted", observable: "ballOvershoot",
+               note: "the marcher steps by the raw field value instead of the Newton/gradient distance estimate -- a plausible-looking shortcut that stops converging reliably. ball mode's closed-form intersection catches the resulting overshoot cleanly; sphere mode's closed-form check goes vacuous instead (see the caveat above), and is not what this declaration points at" },
     modes: SDFMARCH_MODES, name: "implicit-field-ray-march",
     observables: SDFMARCH_OBSERVABLES, build, defaults,
 };

@@ -125,6 +125,14 @@ export const freeRotationDevice = {
     // KNOB PLANT: `planted` deletes the GYROSCOPIC TERM -- the whole right-hand side of Euler's equations, and
     // the exact omission a real solver makes. Not a nudged constant.
     plantKind: "knob",
+    // v4120 -- NAMED, THE SAME COMPLETION v3851/v4088-v4119 gave the rest of this family. MEASURED, stability
+    // mode (default) both arms: sigmaRelErr 1.39e-5 -> 1 (saturates: with the gyroscopic term gone, w is
+    // constant, so the measured growth rate collapses to exactly 0 against a nonzero predicted rate). Note the
+    // spelling: this device reads `planted` as a SIBLING of config (build({mode, config, planted})), not
+    // config.planted -- plantedCoverage.mjs's probeLiveness turns both spellings (v3685's fix) so this is
+    // covered either way, but a caller declaring the knob by name should use the field this file actually reads.
+    planted: { knob: "planted", observable: "sigmaRelErr",
+               note: "the gyroscopic term -w x (Iw), the whole right-hand side of Euler's equations, is deleted -- not a hypothetical fault, but the exact omission a stiff real-time solver makes when the term is left opt-in. Every conservation observable (driftE, driftL) is worse than blind to it: with the term gone w is constant, so drift reads EXACTLY ZERO against the honest solver's ~1e-14 of integrator error, and a device graded on conservation alone would rate the plant a superior model" },
     modes: FR_MODES, name: "torque-free-rigid-rotation",
     observables: FR_OBSERVABLES, build, defaults,
 };
