@@ -8,6 +8,80 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4164 -- six more shader batches, and the file that documents its own traps
+
+Six batches on top of v4163's two, taking `krispuckett/SwiftUIShaders` (MIT) from 2 ported to **14 of 41**:
+`emboss`, `heatShimmer`, `solarize`, `duochrome`, `vortex`, `kaleidoscope`, `chromaticSplit`, `plasma`,
+`echo`, `glitch`, `melt`, `topographic`, `thermal`, `neonEdge` -- plus the shared helper layer
+(`bcs_hash`, `bcs_valueNoise`, `bcs_fbm`, `bcs_hsb2rgb`, `bcs_fmod`, `luma601`) that the remaining 27
+are built on. Each ports as a GLSL pass in `render/swiftShaderPass.js` and a CPU reference in
+`render/swiftShaderModel.mjs`, and the gate compares them.
+
+None of that is the interesting part. Three things came out of the batches that are worth more than the
+ports.
+
+### 1. Three shaders explain, in their own comments, a thing that is only true in SwiftUI's frame
+
+Upstream's comments are accurate -- about Metal. Read as GLSL they are instructions for a bug, and the port
+then *agrees with its own documentation* while being wrong.
+
+- `chromaticSplit` documents its knob as `"0-30: pixel distance between channels"`. Position is in
+  **points**, not pixels. On a Retina canvas a direct port is silently half strength.
+- `melt` writes `"negative Y = pull up = melt down"`. That is downward only where y grows down. And its
+  `gravity = uv.y * uv.y` -- commented `"bottom melts more"` -- inverts too, so **the two errors compound
+  rather than cancel**: unflipped, the top melts most *and* it melts upward.
+- `thermal`'s `"rising bias"` is a negative y offset. It only rises the same way.
+
+A comment is evidence about the frame it was written in, never about ours.
+
+### 2. The fmod trap cuts both ways inside one file
+
+`bcs_hsb2rgb` **needs** `fmod`: a hue can be negative and `mod` takes the wrong branch.
+`bcs_kaleidoscope` **needs** `mod`: its fold comes from `atan2`, which returns `[-PI, PI]`, and `fmod`
+would put half of every image outside the segment. Upstream wrote the flooring form longhand rather than
+calling `fmod`, which was correct and is exactly the kind of thing a tidy-up turns into a bug.
+
+Which remainder is right is decided by **the sign at each call site**, never by preference. There is no
+house style available here.
+
+### 3. Batch 7 corrected batch 2's own worked example, and the correction is worth more than the claim
+
+Batch 2 said a negative hue makes `fmod` and `mod` "give different colours", and cited hue `-0.1`. The
+*intermediate* does differ there -- `fmod(-0.6, 6) = -0.6` against `mod`'s `5.4` -- but
+`clamp(abs(m - 3) - 1, 0, 1)` can saturate both to one answer, and at `-0.1` **it does**: both give exactly
+`(1.000, 0.000, 0.648)`.
+
+Swept 4001 hues. The final colour differs for **45.8%** of them, worst at hue `-2.0`, where `fmod` gives
+**white** and `mod` gives **pure red**. So the trap is real, common and dramatic -- and the example chosen
+to illustrate it was one of the 54% where it makes no difference at all.
+
+**An intermediate diverging is not yet a defect.** What it does downstream is the claim, and that has to be
+measured. The claim shipped in v4163's changelog unmeasured; it is corrected here.
+
+The hsb2rgb audit is closed with it: all four upstream call sites pass their hue through `fract()`, so the
+helper is **unsafe by construction and safe by convention**. The gate now asserts that convention of our
+ports, so a fifth caller that skips `fract` is caught here rather than on someone's screen.
+
+### All six Metal-to-GLSL traps now have a worked case
+
+The last outstanding one was edge behaviour, and `bcs_glitch` supplies it: it **clamps and then un-clamps
+itself**, adding the channel shift *after* the clamp, so the taps leave the layer at every border. Harmless
+in Metal. In GL without `CLAMP_TO_EDGE` the left edge appears on the right, **which looks deliberate**.
+`bcs_echo` is the counter-example in the same file and clamps before every sample.
+
+Two further measured details:
+
+- `neonEdge`'s Sobel step is **one point**. For a convolution a wrong scale changes *what counts as an
+  edge* rather than merely shifting the result: 64 lit pixels at one point against 128 at two.
+- `melt`'s specular lip is not scaled by `melt_amount`, so "melt off" still adds light. Measured:
+  **8.1e-6** at 8x8 and **2.8e-4** at 32x32 -- below one 8-bit level. Structural, not visible, and that is
+  the honest way to state it rather than calling it a visible bug.
+
+### Gate
+
+`swiftShaders` grew with each batch: knob coverage, the CPU/GLSL agreement checks, the `fract`-before-hue
+assertion, the clamp-before-sample assertion, and the corrected batch-2 example pinned as a
+regression. Tree at 1252 gates.
 ## v4163 -- two effects ported from MIT sources, and neither port is the interesting part
 
 ### SwiftUIShaders: the first two, and the machinery for the other 39
