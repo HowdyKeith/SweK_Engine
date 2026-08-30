@@ -8,6 +8,94 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4165 -- the tier-2 census branch landed, and the interesting part is how the conflicts were settled
+
+Twenty-seven commits merged from `claude/tier-2-keys-patch-4lwhzk`, which had been running on its own since
+v4061 and finished at v4087. Twenty-six files merged clean; six conflicted.
+
+### What the branch itself did
+
+`v4082` through `v4087` are a registry-wide sweep for **undeclared observables**: device binds that return
+keys their own declaration never lists. Around twenty binds were found and corrected -- `beamBind`,
+`kerrBind`, `thermalBind`, `emBind`, `probeBind`, `splatBind`, `lensBind`, `tidalBind` and the rest.
+
+This is the same defect `v3850` fixed once, and that `v4080`, `v4082` and `v4084` each re-found locally on a
+different device. **A defect found four times in four places was never one bug; it was a missing sweep.**
+The branch ran the sweep.
+
+### And six rounds of it never wrote a changelog entry
+
+`v4082` .. `v4087` appear nowhere in this file. That is exactly the failure `changelogCurrency-selfcheck`
+exists to catch -- rounds landing with the record unchanged -- recurring on a branch where the gate was not
+being run. **This entry is the branch's record, written by the round that merged it**, because the work is on
+`main` now and an unrecorded round is indistinguishable from one that never happened.
+
+### The six conflicts, resolved six ways on purpose
+
+A merge is a set of small judgements, and treating them uniformly is how a merge loses something.
+
+| file | resolution |
+|---|---|
+| `knowledge-index.json` | **regenerated.** A generated file has no correct merge, only a correct regeneration. |
+| `costRecord.mjs` | **both sides.** The branch's paragraph bounds the *relative* order of costs; this side's bound the *absolute* numbers. Different quantities, not rival versions. |
+| `tidalBind-selfcheck.mjs` | **this side's note** -- itself the record of an *earlier* tier-2 merge disagreeing about the same cost hint. |
+| `corroborationCensus-selfcheck.mjs` | **both accounts**, bridged. |
+| `knobLiveness.mjs` | **this side**, after measuring the one real difference. |
+| `knobLiveness-selfcheck.mjs` | **this side, plus two things the branch had right.** |
+
+### Both accounts of one bug, because it was found from both ends
+
+The two sides each carry a write-up of the same block-scoping defect -- a `const` declared inside one
+section's block and read in the next. This side found it from a **full unbudgeted sweep** that ran every
+assertion and then died on the last one. The branch found it from a **two-minute partial** at
+`--budget 5000`, 82 of 484 device/modes.
+
+Neither was deleted. That one defect was reachable from a two-minute partial *and* from a complete sweep is
+evidence about how exposed it was, and either account alone hides that.
+
+### The one real code disagreement was measured, not judged
+
+Stripping comments from both versions of `knobLiveness.mjs` reduced a 494-line diff to **23 lines of actual
+code**, and all but one of those were this side being a superset -- `echoUnconfirmed`, a third state the
+branch lacks, and richer list detail.
+
+The exception: the branch guards its echo filter with an extra `!sameValue(base[o], out[o])`. That guard is
+redundant **exactly if** `probeValues` can never return a probe value equal to the default. So that was
+swept -- 287 probe pairs across numbers, booleans, arrays, all-zero arrays, `1e308` and declared-choice sets:
+
+```
+probe pairs examined: 287
+alt === def collisions: 0
+```
+
+Zero. The guard is a no-op and dropping it changes no behaviour. **A merge preference became a merge
+measurement**, which is the only way one side "winning" means anything.
+
+### And the branch was right about two things this side had wrong
+
+1. Its synthetic ladder keys `b` to the *used* gain. This side's was `[{a:1},{a:2}]` -- constant in **both**
+   modes, so it only ever exercised the identity trap and never the discrimination the check claims to make.
+2. Its assertion is two-sided, `!Object.is(x, y) && sameValue(x, y)`, where this side checked only the second
+   half. **`sameValue` alone is satisfied by a device returning a cached array** -- identical values *and*
+   identical identity -- in which case the reference-comparison trap is not armed and the check passes
+   without testing anything. A vacuous pass, inside the file that names vacuous passes.
+
+### The expensive assertion was kept behind a flag, not dropped
+
+The branch replaced a `report()` -- prose quoting a run nobody in the process made -- with two live
+`probeKnob` calls on the **real** `stability` device. Strictly better evidence, and about two minutes of
+builds on a gate whose default run is already over its 309 s budget.
+
+Deleting it would have been the easy merge and the wrong one. It runs under `KNOB_REAL_PLANT=1`, and it was
+run once so it is not shipping untested: **PASSES -- `response: live (moved ratio), deafknob: still`.** The
+default path prints a skip that names itself rather than staying silent.
+
+**Cost is a reason to gate a check. It is not a reason to go back to prose.**
+
+Gates green after the merge: `tidalBind`, `boundKeys`, `labDevices`, `knobLiveness` both ways.
+`corroborationCensus` fails only its complete-sweep assertion under a 60 s budget -- budget-caused and
+pre-existing, confirmed by a comment-stripped comparison showing the merge changed **no code at all** in that
+file. Tree at 1252 gates.
 ## v4164 -- six more shader batches, and the file that documents its own traps
 
 Six batches on top of v4163's two, taking `krispuckett/SwiftUIShaders` (MIT) from 2 ported to **14 of 41**:
