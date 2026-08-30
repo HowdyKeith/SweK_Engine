@@ -30,6 +30,8 @@
 // v4163 -- EXPORTED so the READER can use the same three numbers the WRITER does. gpu/glbPeek.mjs needs the
 // container layout to look for a Draco extension without decoding anything, and a second spelling of "glTF"
 // somewhere else in the tree is exactly how a writer and a reader start disagreeing about a file format.
+import { weld, DEFAULT_EPSILON as WELD_EPSILON } from "./weldVertices.mjs";   // v4169
+
 export const MAGIC = 0x46546C67;        // "glTF"
 export const JSON_CHUNK = 0x4E4F534A;   // "JSON"
 export const BIN_CHUNK  = 0x004E4942;   // "BIN\0"
@@ -64,8 +66,24 @@ export function vec3Bounds(a) {
  * @returns Uint8Array -- a complete .glb
  */
 export function writeGlb(meshes, opts = {}) {
-    const list = (meshes || []).filter((m) => m && m.positions && m.positions.length >= 9);
+    let list = (meshes || []).filter((m) => m && m.positions && m.positions.length >= 9);
     if (!list.length) throw new Error("writeGlb: nothing to write (a mesh needs at least one triangle)");
+
+    // *** v4169 -- OPTIONAL VERTEX WELDING, WIRED TO THE ONE WRITER THAT SPEAKS THESE ARRAYS. ***
+    // weldVertices.mjs was written at v4162 against glb-shrink's approach and its own header already says it
+    // "takes and returns the flat arrays voxelGlb.writeGlb speaks" -- a seam declared on one side and never
+    // joined, so nothing but its gate ever called it. OFF BY DEFAULT: welding DISCARDS a distinction the mesh
+    // is currently making (two vertices at one position with different normals are a hard edge), so it is a
+    // request rather than a default, and the caller says epsilon.
+    if (opts.weld) {
+        const eps = typeof opts.weld === "number" ? opts.weld : (opts.weldEpsilon ?? WELD_EPSILON);
+        list = list.map((m) => {
+            const w = weld(m, { epsilon: eps, keyOn: opts.weldKeyOn || null });
+            // the report travels with the mesh so a caller can SEE what was removed rather than infer it
+            return { ...m, positions: w.positions, normals: w.normals, colors: w.colors, uvs: w.uvs,
+                     indices: w.indices, weld: { before: w.before, after: w.after, removed: w.removed, ratio: w.ratio } };
+        });
+    }
 
     const views = [], accessors = [], gmeshes = [], nodes = [];
     const chunks = [];        // {bytes, byteOffset}

@@ -205,6 +205,11 @@ export const centrifugeDevice = {
     // KNOB PLANT: `planted` replaces the FIELD LAW (omega^2 r -> omega^2 refR), so the whole path from the wrong
     // derivation to every reported number is graded. Not a nudged constant.
     plantKind: "knob",
+    // v4119 -- NAMED, THE SAME COMPLETION v3851/v4088-v4118 gave the rest of this family. MEASURED, rate mode
+    // (default) both arms: recoveredVsContinuous 2.00e-4 -> 0.852, and logFitR2 1.0000000000 -> 0.9610261 --
+    // matching the header's own quoted "falls from 1.0000000000 to 0.9610" exactly.
+    planted: { knob: "planted", observable: "recoveredVsContinuous",
+               note: "the centrifugal field is evaluated at a FIXED reference radius instead of the particle's own -- the plausible slip you get by reasoning from uniform-field gravitational settling. The trajectory turns from exponential into linear growth, which looks nearly identical over a short run and diverges over a decade of growth" },
     modes: CF_MODES, name: "centrifuge-sedimentation",
     observables: CF_OBSERVABLES, build, defaults,
 };

@@ -20,6 +20,8 @@
 // plugin works when you test it in a terminal and shows nothing at all in the menubar. The generator writes
 // the ABSOLUTE interpreter path it was run with, so the plugin runs in the environment it will actually meet.
 import path from "node:path";
+import fs from "node:fs";
+import { pathToFileURL, fileURLToPath } from "node:url";   // v4169 -- the CLI guard below
 
 /**
  * *** THE RUNNER'S OWN GLYPHS CONTAINED THE SEPARATOR, AND THE GATE CAUGHT IT BY LOOKING AT THE OUTPUT. ***
@@ -140,4 +142,54 @@ export function describePlugin(o = {}) {
         mustBeExecutable: "chmod +x -- a plugin without the bit set is skipped silently",
         note: "the interval is the FILENAME; changing it means renaming the file, not editing it",
     };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// *** v4169 -- THE CLI, BECAUSE A GENERATOR NOBODY CAN RUN IS A FUNCTION NOBODY CALLS. ***
+//
+// This module builds an xbar/SwiftBar plugin and, until now, nothing invoked it but its own gate --
+// referenceKind counted it among the orphans held out of the census by a sentence. A generator's natural
+// caller is a person at a shell, so it gets the entry point it always needed.
+//
+// The main-module guard is the standard ESM one. It is deliberately NOT `process.argv[1].endsWith(...)`:
+// that reads true for any path merely ending in the name, and on Windows the separators differ from the URL
+// form -- the same class of path bug that ate every backslash in shadowedHelper's node -e string at v4166.
+//
+//   node tools/mac/xbarPlugin.mjs --out ~/Library/Application\ Support/xbar/plugins
+//   node tools/mac/xbarPlugin.mjs --json cpuPct --label cpu --refresh 3s --print
+//
+// It writes NOTHING without --out, and prints the plugin to stdout instead: a tool whose default action
+// installs a file into somebody's menubar directory is a tool that surprises its first user.
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+    const argv = process.argv.slice(2);
+    const flag = (name, dflt = null) => {
+        const i = argv.indexOf("--" + name);
+        return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : (argv.includes("--" + name) ? true : dflt);
+    };
+    const engineRoot = String(flag("engine-root", path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")));
+    const label = String(flag("label", "cpu"));
+    const refresh = String(flag("refresh", "3s"));
+    const body = buildPlugin({
+        engineRoot, label,
+        url: String(flag("url", "http://127.0.0.1:8787/sync/load")),
+        jsonPath: String(flag("json", "cpuPct")),
+        min: Number(flag("min", 0)), max: Number(flag("max", 100)),
+        curve: String(flag("curve", "linear")),
+        title: String(flag("title", "SweK " + label)),
+        open: String(flag("open", "")),
+    });
+    const outDir = flag("out", null);
+    if (!outDir || outDir === true) {
+        process.stdout.write(body);
+        process.stderr.write("\n[xbarPlugin] printed to stdout. Pass --out <xbar plugins dir> to install as "
+            + pluginFilename(label, refresh) + " (chmod 755).\n");
+    } else {
+        const file = path.join(String(outDir), pluginFilename(label, refresh));
+        fs.mkdirSync(String(outDir), { recursive: true });
+        fs.writeFileSync(file, body);
+        // THE EXECUTABLE BIT IS THE WHOLE INSTALL: xbar skips a plugin without it, silently and with no error
+        // anywhere, which is the single most common way one of these appears not to work.
+        fs.chmodSync(file, 0o755);
+        process.stderr.write("[xbarPlugin] wrote " + file + " (mode 755). xbar picks it up on its next scan.\n");
+    }
 }

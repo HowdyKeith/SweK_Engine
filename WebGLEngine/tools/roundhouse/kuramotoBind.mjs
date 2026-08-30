@@ -112,6 +112,13 @@ export const kuramotoDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4127 -- NAMED, THE SAME COMPLETION v3851/v4088-v4126 gave the rest of this family. MEASURED, curve mode
+    // (default) both arms: superErrMean 0.0054 -> 0.60, the same order-of-magnitude jump the header quotes from
+    // the module's own default sweep (0.0138 -> 0.4057, 29x). onset mode's onsetDetected also flips true ->
+    // false under the plant, but as a boolean it is outside probeLiveness's finite-number sweep, so superErrMean
+    // is the observable that actually carries the coverage signal.
+    planted: { knob: "planted", observable: "superErrMean",
+               note: "couplingWRONG replaces the correct mean-field coupling term with an already-written wrong one -- above the critical coupling Kc the measured order parameter r diverges from the closed form exactR by an order of magnitude, while the sub-critical branch (physics, not error -- finite-N random alignment) is comparatively undisturbed" },
     // v3287 -- modes are DECLARED, not left to be probed. modesOf() reports source "exported" for a device that
     // lists its own and "probed" for one that had to be guessed at against CANDIDATE_MODES, and v3191 records
     // what probing costs: lbm came back as a 29-mode device because checkMode answers ok to any string when

@@ -217,6 +217,14 @@ export const refScanDevice = {
     // sampling scheme rather than misreading a knob or moving a value, which is seismic's third kind (v3400)
     // and compliance.mjs's shape (v3460).
     plantKind: "method",
+    // v4123 -- NAMED, THE SAME COMPLETION v3851/v4088-v4122 gave the rest of this family. MEASURED across all
+    // five modes rather than assumed: `furnace` (the default/modes[0]) and `sign` are BOTH BLIND -- the
+    // furnace albedo check and the sign check never depend on which RNG stream feeds a pixel. `crop` carries
+    // the strongest signal and is what the header itself calls out: worstCropDiff 0 -> 0.316, a bit-exact
+    // identity broken outright. `roulette` also moves (meanShiftFrac 2.6e-3 -> 1.4e-2); `decision` barely
+    // shifts (0.0719 -> 0.0718) and reads as RNG-stream noise rather than a real signal.
+    planted: { knob: "planted", observable: "worstCropDiff",
+               note: "sets pathTracer's streamRng. Under a CONSTANT sky (furnace's) every sample carries the same radiance, so which random numbers a pixel drew cannot change what it reads -- the plant is invisible there by construction. crop mode renders under a GRADIENT sky (tiltedSky), which is what exposes it: a scanned rectangle must equal that rectangle cut from the full frame bit-for-bit, and under the plant it stops matching" },
     modes: REFSCAN_MODES, name: "reference-region-scan",
     observables: REFSCAN_OBSERVABLES, build, defaults,
 };

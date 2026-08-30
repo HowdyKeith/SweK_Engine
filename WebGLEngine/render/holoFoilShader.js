@@ -12,7 +12,16 @@
 "use strict";
 
 /** The wavelengths, spelled once and shared with the model. */
-const LAMBDA = "vec3(600.0, 550.0, 450.0)";
+// *** v4169 -- DERIVED FROM THE MODEL RATHER THAN TYPED A SECOND TIME. ***
+// This read `vec3(600.0, 550.0, 450.0)` and holoFoil.mjs reads `LAMBDA_NM = [600, 550, 450]`: the same three
+// wavelengths declared twice, along with the IOR (1.4) and the film thickness (380nm) below. TWO DECLARATIONS
+// OF ONE THING THAT NOBODY EVER COMPARED is this tree's most repeated defect, and it is worse than usual here
+// because holoFoil-selfcheck GRADES THIS SHADER AGAINST THAT MODEL -- had either copy drifted, the gate would
+// have compared a shader sampling one film against a model of a different one and reported agreement or
+// disagreement about the wrong thing entirely. One declaration, one place, imported.
+import { LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM } from "./holoFoil.mjs";
+
+const LAMBDA = "vec3(" + LAMBDA_NM.map((n) => n.toFixed(1)).join(", ") + ")";
 
 const HOLO_GLSL = `
 uniform float uThicknessNm, uIor, uFilmStrength, uGratingStrength, uFlakeStrength;
@@ -66,7 +75,9 @@ vec3 holoFoil(vec3 base, float ci, vec2 uvSurf) {
 `;
 
 const DEFAULTS = {
-    uThicknessNm: 380, uIor: 1.4, uFilmStrength: 0.6, uGratingStrength: 0.35, uFlakeStrength: 0.8,
+    // the two the model also declares come FROM the model; the rest are this shader's own and live only here
+    uThicknessNm: DEFAULT_THICKNESS_NM, uIor: DEFAULT_IOR,
+    uFilmStrength: 0.6, uGratingStrength: 0.35, uFlakeStrength: 0.8,
     uGratingNm: 1200, uFlakeDensity: 40, uFlakeCoverage: 0.12, uFlakeSeed: 1,
 };
 
@@ -102,4 +113,9 @@ function applyHoloFoil(material, opts = {}) {
     return uniforms;
 }
 
-module.exports = { HOLO_GLSL, DEFAULTS, LAMBDA, applyHoloFoil };
+// *** v4169 -- ESM, BECAUSE THIS FILE'S WHOLE JOB HAPPENS IN A BROWSER AND IT COULD NOT BE LOADED BY ONE. ***
+// It ended in `module.exports`, which is a ReferenceError in a browser ES module, so applyHoloFoil() -- a
+// three.js onBeforeCompile patch, which by definition runs against a live WebGL material in a page -- was
+// reachable only from Node's createRequire. Same defect as swiftShaderPass.js, same round, and the same
+// reason neither was caught: the gate loaded it the one way that works and never the way it ships.
+export { HOLO_GLSL, DEFAULTS, LAMBDA, applyHoloFoil };

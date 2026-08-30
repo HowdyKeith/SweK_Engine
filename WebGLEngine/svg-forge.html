@@ -42,8 +42,11 @@
     <div class="row"><label>metal</label><input id="metal" type="range" min="0" max="1" step="0.01" value="0.85"></div>
     <div class="row"><label>rough</label><input id="rough" type="range" min="0" max="1" step="0.01" value="0.35"></div>
     <div class="row"><label>color</label><input id="color" type="color" value="#d9b45a"></div>
+    <div class="row"><label>foil</label><input id="foil" type="checkbox"></div>
+    <div class="row"><label>film nm</label><input id="filmnm" type="range" min="150" max="700" step="5" value="380"></div>
+    <div class="row"><label>flakes</label><input id="flakes" type="range" min="0" max="1" step="0.01" value="0.35"></div>
     <div class="row" style="gap:6px;"><button class="primary" id="forge">Forge</button><button id="spin">spin: on</button></div>
-    <div class="sub" style="margin-top:auto;">Parses M/L/H/V/C/S/Q/T/Z + A. Transforms/CSS are ignored &mdash; flatten them first. Gate: svgExtrudeCore-selfcheck.</div>
+    <div class="sub" style="margin-top:auto;">Parses M/L/H/V/C/S/Q/T/Z + A. Transforms/CSS are ignored &mdash; flatten them first. Gates: svgExtrudeCore-selfcheck, holoFoil-selfcheck (the foil).</div>
   </div>
   <div id="view"><canvas id="c"></canvas><div id="hint">drag to orbit &middot; scroll to zoom</div></div>
 </div>
@@ -55,6 +58,10 @@
 import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 import { forgeFromSvg } from "/render/svgExtrude.js";
+// v4169 -- the holofoil, wired to the geometry it was written for. holoFoilShader.js is a three.js
+// onBeforeCompile patch, so it MUST be applied to a material before that material first compiles, which is
+// why this happens inside forge() on the freshly-built medal rather than once at startup.
+import { applyHoloFoil } from "/render/holoFoilShader.js";
 
 const PRESETS = {
   star: '<svg viewBox="0 0 100 100"><path d="M50 5 L61 39 L97 39 L68 61 L79 95 L50 74 L21 95 L32 61 L3 39 L39 39 Z"/></svg>',
@@ -83,6 +90,20 @@ function forge() {
     if (medal) { scene.remove(medal); medal.traverse((n) => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); }); }
     medal = forgeFromSvg(svg.value, opts());
     if (!medal.children.length) errEl.textContent = "No <path>/<polygon> found (transforms are ignored).";
+    // THE FOIL GOES ON HERE, ON MATERIALS THAT HAVE NEVER COMPILED. onBeforeCompile is consulted once, at
+    // first compile; setting it on an already-drawn material does nothing until something forces a rebuild,
+    // and "nothing happened" would read as a broken shader rather than a missed hook.
+    if (foil.checked) {
+      medal.traverse((n) => {
+        if (!n.material) return;
+        for (const m of (Array.isArray(n.material) ? n.material : [n.material])) {
+          // THE KEYS ARE THE UNIFORM NAMES, and getting that wrong is silent: applyHoloFoil spreads
+          // { ...DEFAULTS, ...opts }, so `thicknessNm` would add a key nothing reads and leave uThicknessNm
+          // at its default -- two live-looking sliders that move nothing. holoFoil-selfcheck asserts this.
+          applyHoloFoil(m, { uThicknessNm: +filmnm.value, uFlakeStrength: +flakes.value });
+        }
+      });
+    }
     scene.add(medal);
   } catch (e) { errEl.textContent = "Forge error: " + (e.message || e); }
 }
@@ -90,9 +111,12 @@ function resize() { const w = view.clientWidth, h = view.clientHeight; renderer.
 addEventListener("resize", resize);
 for (const b of document.querySelectorAll(".presets button")) b.onclick = () => { svg.value = PRESETS[b.dataset.preset]; forge(); };
 document.getElementById("forge").onclick = forge;
-for (const id of ["thick", "bevel", "metal", "rough", "color"]) document.getElementById(id).oninput = forge;
+for (const id of ["thick", "bevel", "metal", "rough", "color", "filmnm", "flakes"]) document.getElementById(id).oninput = forge;
+// the foil is a COMPILE-TIME patch, so toggling it re-forges rather than flipping a uniform
+document.getElementById("foil").onchange = forge;
 document.getElementById("spin").onclick = (e) => { spin = !spin; e.target.textContent = "spin: " + (spin ? "on" : "off"); };
-const thick = document.getElementById("thick"), bevel = document.getElementById("bevel"), metal = document.getElementById("metal"), rough = document.getElementById("rough"), color = document.getElementById("color"), svg = document.getElementById("svg");
+const thick = document.getElementById("thick"), bevel = document.getElementById("bevel"), metal = document.getElementById("metal"), rough = document.getElementById("rough"), color = document.getElementById("color"), svg = document.getElementById("svg"),
+      foil = document.getElementById("foil"), filmnm = document.getElementById("filmnm"), flakes = document.getElementById("flakes");
 
 svg.value = PRESETS.star; resize(); forge();
 (function loop() { if (spin && medal) medal.rotation.y += 0.01; controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();

@@ -8,6 +8,96 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4169 -- the modules nothing but their gates imported, and two of them could not have loaded in a browser
+
+Task: wire the v4159-v4165 modules `referenceKind` had flagged as orphans held out of its census by a
+sentence. The wiring was the easy half.
+
+### Two files were unloadable by the thing that was supposed to run them
+
+`render/swiftShaderPass.js` and `render/holoFoilShader.js` both ended in `module.exports`, which is a
+**`ReferenceError` in a browser ES module**. So the fourteen SwiftUIShaders ports, and a three.js
+`onBeforeCompile` patch whose entire job happens in a page, ran in exactly one place: their own gates, through
+Node's `createRequire` -- the single environment where CommonJS works.
+
+Every check passed. Measured directly, evaluating the file in a scope with no `module`:
+
+```
+THROWS in a browser-shaped scope: ReferenceError: module is not defined
+```
+
+**A gate that loads the code differently from production is testing a different file.** That is this session's
+fourth instance of one shape, after the host-scale estimator, the Windows path in a string literal, and the
+bash-less box.
+
+### ...and one of them had no runtime at all, while claiming it did
+
+`swiftShaderPass.js`'s header read *"Shaped like `crtPass.js`"*. `crtPass` exports `makeCrtPass()`, which
+builds a real GL pass; this exported **GLSL strings**. There was nothing to call, which is the honest reason
+nothing called it. It now has `makeSwiftShaderPass()` in crtPass's shape line for line -- own canvas and
+WebGL2 context, one full-screen triangle, NEAREST + `CLAMP_TO_EDGE` matching `layerSample()`,
+`UNPACK_FLIP_Y_WEBGL` false, `readPixels` flipped once on the way out -- and `main.js` exposes
+`window.swiftShader.list / knobs / render / cpu / pixels / dispose`.
+
+### My own knob defaults were wrong twice, and the gates caught both
+
+**A flat `DEFAULT_KNOBS` map is wrong by construction**, and my first draft was flat. The same knob name
+carries different defaults in different shaders: `speed` is 2 in heatShimmer and 1 in vortex and melt,
+`spread` is 12 in echo and 8 in chromaticSplit, `intensity` is 0.5 in glitch and 1 in three others. Mine was
+missing **eighteen** knobs outright and would have shipped **seven more with confident wrong values** --
+duochrome's two hues swapped, solarize's `clampOutput` and emboss's `premultiplied` both inverted.
+
+Now keyed per shader, read off the CPU model's own signature defaults, and **pinned against that model digit
+for digit** so the GPU pass and the CPU reference start from the same place.
+
+Then the same mistake in a second place: `svg-forge.html`'s foil call passed `thicknessNm`, where
+`applyHoloFoil` merges `{ ...DEFAULTS, ...opts }` keyed by **uniform** name. A wrong key there adds something
+nothing reads and leaves the uniform at its default -- **two sliders that move, report, and change nothing**,
+with no error at runtime. Gated now: every option the page passes must be a real key of `DEFAULTS`.
+
+### The holofoil pair was typing the same physics twice
+
+`[600, 550, 450]`, `ior 1.4` and `380nm` were declared in **both** `holoFoil.mjs` and `holoFoilShader.js` --
+two declarations of one thing that nobody ever compared, this tree's most repeated defect, in my own v4163
+code. Worse here than usual, because the gate **grades the shader against that model**: had either copy
+drifted, it would have compared a shader sampling one film against a model of a different one and reported
+agreement about the wrong thing. One declaration now, imported; the emitted GLSL is byte-identical.
+
+### The rest of the wiring
+
+- `writeGlb` takes an opt-in `weld` -- **660 -> 636 bytes measured** on two triangles sharing an edge. **Off
+  by default**, because welding discards a distinction: two vertices at one position with different normals
+  are a hard edge, so it is a request and the caller sets the epsilon.
+- `xbarPlugin.mjs` gains the CLI a generator needs. It **writes nothing without `--out`**, printing to stdout
+  instead -- a tool whose default action installs a file into somebody's menubar directory surprises its
+  first user. Verified end to end: the generated plugin runs and emits valid xbar grammar.
+- `window.runner.show()` builds the gauge **on demand**, because its constructor starts a poller and a rAF
+  loop -- one created at load would poll forever on every page.
+
+By the census's own resolver, seven of the eight now have a real non-gate importer. The eighth,
+`xbarPlugin.mjs`, is a CLI and has none by design.
+
+### The ratchet, stated honestly, including a correction
+
+`referenceKind` reads **190 against a ceiling of 181**. I said earlier that "the growth is mine", and that is
+only partly true: Keith's v4148 rig already read **187** -- six over the ceiling, before any of these modules
+existed. My rounds took it to 193; this round removes 3.
+
+**The -3 rather than -7 is itself the finding.** The census skips any file with no `^export` line, so both
+CommonJS files were never counted as orphans -- they were **invisible to it**. Converting them to ESM made
+them countable and wiring them removed them again: net zero. The remaining gap is mostly older than this work,
+and closing it is a different job from this one.
+
+### Also merged
+
+The tier-2 branch's final round, `v4119-v4127`, nine more devices, zero conflicts. Two real subtleties in it:
+`invariants`' `naive` mode is **blind** to its own plant (both formulas pass through the identical wrong
+boost, so their ratio is untouched), and `sdfMarch`'s `sphere` mode is a **vacuous-pass trap** --
+`worstAgainstClosedForm` goes to exactly 0 under the plant, which looks like an improvement, but `raysTraced`
+collapses 24 -> 0 in the same run, so the 0 is a max over an empty set. Declared against `ball` mode instead,
+with the trap written into the comment.
+
+Tree at 1252 gates.
 ## v4168 -- eighteen more device plants, and the one deletion in the merge was the only thing worth checking
 
 The tier-2 branch kept running through a container restart and pushed two more rounds, `v4101-v4118`:

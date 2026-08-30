@@ -154,6 +154,16 @@ export const invariantsDevice = {
     // breaks the invariance and the mass shell together. The whole path from the wrong transform to every
     // reported number is graded.
     plantKind: "knob",
+    // v4121 -- NAMED, THE SAME COMPLETION v3851/v4088-v4120 gave the rest of this family. MEASURED before
+    // declaring: `naive` mode looked like a second route to the same plant (it calls the same boost) but is
+    // BLIND -- both the naive Ecm and root-s pass through the identical wrong boost, so the ratio between them
+    // is untouched (a mirror, v3201's trap). The real target is `invariance` mode (the default), which uses a
+    // COMPUTED KEY NAME rather than a value swap: honest returns sDriftWorst (7.1e-15) and planted returns
+    // sDriftWorstWrong (559.2) instead -- sDriftWorst is simply ABSENT (undefined, not present) under the
+    // plant. probeLiveness still catches this correctly (a number turning into undefined counts as moved),
+    // which is why sDriftWorst is the declared observable despite never taking a large value itself.
+    planted: { knob: "planted", observable: "sDriftWorst",
+               note: "the boost is E' = gamma*E instead of gamma*(E - beta*p) -- exactly right at beta=0, which is why it survives casual testing, and wrong everywhere else. Under the plant this device renames its own drift observable to sDriftWorstWrong rather than reporting a corrupted number under the honest name, so the plant's signature is the KEY going missing, not a value changing" },
     modes: INV_MODES, name: "relativistic-invariants",
     observables: INV_OBSERVABLES, build, defaults,
 };

@@ -198,6 +198,33 @@ console.log("\n6. what was refused, asserted so a later round cannot quietly add
            "pass. Two of seven, and the other five are refused on the record.");
 }
 
+console.log("\n*** WELDING IS REACHABLE FROM THE WRITER, NOT ONLY FROM THIS GATE ***");
+{
+    // v4169 -- weldVertices.mjs shipped at v4162 with a header saying it "takes and returns the flat arrays
+    // voxelGlb.writeGlb speaks". THE SEAM WAS DECLARED ON ONE SIDE AND NEVER JOINED: nothing but this gate
+    // ever called weld(), so referenceKind counted it among the orphans. writeGlb now takes `weld`.
+    const square = { positions: [0,0,0, 1,0,0, 1,1,0,  0,0,0, 1,1,0, 0,1,0] };   // 6 vertices, 4 distinct
+    const plain = writeGlb([square]);
+    const welded = writeGlb([square], { weld: true });
+    ok("!! *** writeGlb({ weld: true }) actually removes the duplicate vertices ***",
+        welded.byteLength < plain.byteLength,
+        "two triangles sharing an edge: " + plain.byteLength + " bytes -> " + welded.byteLength +
+        " welded. THE SAVING IS THE WHOLE POINT of the glb-shrink idea, and a wiring that changed nothing " +
+        "would look identical to one that was never called");
+
+    ok("!! ...and it is OFF by default, because welding DISCARDS a distinction",
+        writeGlb([square]).byteLength === plain.byteLength,
+        "two vertices at one position with different normals are a HARD EDGE. Welding them is a request, " +
+        "never a default -- a writer that quietly smoothed every exported mesh would be losing geometry " +
+        "the caller built on purpose");
+
+    // and the epsilon is the caller's, not a constant hidden in the writer
+    const coarse = writeGlb([square], { weld: 0.5 });
+    ok("   ...and the caller sets the epsilon", coarse.byteLength <= welded.byteLength,
+        "weld: 0.5 -> " + coarse.byteLength + " bytes against " + welded.byteLength + " at the default " +
+        "epsilon. WHAT COUNTS AS 'THE SAME VERTEX' IS A DECISION and it belongs to whoever is exporting");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
             "\nunchecked here: an actual Draco-compressed GLB decoded end to end. No such file exists in this " +
             "tree and this round wrote no encoder -- draco.js DECODES ONLY, and neither it nor glb-shrink " +
