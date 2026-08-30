@@ -6,12 +6,16 @@
 // landing. ***
 //
 // *** AND THE PLANT IS A FIXTURE MISTAKE RATHER THAN A CODE CHANGE, WHICH IS A SHAPE THIS ARC HAS NOT USED.
-// Put the floor ONE cell from the domain edge instead of three and the SAME CODE loses 99.9% of the horizontal
-// momentum -- 3.750000 down to 0.003025 -- on a boundary that exerts no horizontal force at all.
+// Put the floor ONE cell from the domain edge instead of three and the SAME CODE loses 95.3% of the horizontal
+// momentum -- 3.750000 down to 0.175012 -- on a boundary that exerts no horizontal force at all.
 // THE REASON: a quadratic stencil reaches ONE CELL EACH WAY, so a particle resting a fraction above y=0 has a
 // stencil base of -1. THAT NODE ROW DOES NOT EXIST, and both p2g and g2p SKIP IT: the weights stop summing to
 // one and the gather silently loses whatever share those nodes carried. THE PHYSICS IS INNOCENT; THE MATERIAL
-// WAS STANDING ON THE EDGE OF THE GRID. ***
+// WAS STANDING ON THE EDGE OF THE GRID.
+// v4133 -- CORRECTED. This comment previously quoted "99.9%... 3.750000 down to 0.003025", which does not
+// match this device's own reproducible build() output (pxErrFrac 0.9533, pxEnd 0.175012, checked twice for
+// determinism). The dedicated selfcheck's own assertion is threshold-based (pxErrFrac > 0.5) and dynamically
+// printed, so it never carried the stale figure; only this header comment did. ***
 
 import { makeGrid } from "../../physics/mpm/transfer.mjs";
 import { lame } from "../../physics/mpm/constitutive.mjs";
