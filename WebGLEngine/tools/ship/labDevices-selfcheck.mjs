@@ -20,6 +20,9 @@ import { buildThermal, thermalDevice } from "../roundhouse/thermalBind.mjs";
 import { buildMelt, meltDevice } from "../roundhouse/meltBind.mjs";            // v3850 - the thermal four join section 7
 import { buildFreeze, freezeDevice } from "../roundhouse/freezeBind.mjs";
 import { buildVaporize, vaporizeDevice } from "../roundhouse/vaporizeBind.mjs";
+// v4082 -- "the thermal four" (see v3850 below) only ever seated three rows in section 7; crystallize was the
+// missing fourth, and it carried the exact defect the comment describes: undeclared observables, found once added.
+import { buildCrystallize, crystallizeDevice } from "../roundhouse/crystallizeBind.mjs";
 import { buildPipe, pipeDevice } from "../roundhouse/pipe3dBind.mjs";
 import { buildGeometry, geometryDevice } from "../roundhouse/geometryBind.mjs";
 import { buildKH, khDevice } from "../roundhouse/khBind.mjs";
@@ -456,7 +459,12 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     // them declared.
                     ["melt", buildMelt, meltDevice, ["front", "stall", "naive"]],
                     ["freeze", buildFreeze, freezeDevice, ["control", "reversibility", "slowfreeze"]],
-                    ["vaporize", buildVaporize, vaporizeDevice, ["ratio", "key", "trilemma", "celsius"]]];
+                    ["vaporize", buildVaporize, vaporizeDevice, ["ratio", "key", "trilemma", "celsius"]],
+                    // v4082 -- THE FOURTH OF "the thermal four" NAMED ABOVE BUT NEVER SEATED. Adding it found
+                    // the same shape v3850 found in its three siblings: kind/note on every mode, mode/fitPoints
+                    // on exponent, continuous/ns/seeds on spread, gap/satSd/conSd/satErr/conErr on discrimination
+                    // -- all undeclared until fixed alongside this row.
+                    ["crystallize", buildCrystallize, crystallizeDevice, ["exponent", "spread", "discrimination"]]];
     for (const [n, build, dev, modes] of checks) {
         let undeclared = [];
         for (const mode of modes) {
