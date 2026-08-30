@@ -8,6 +8,55 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4183 -- the census v4174 said it was waiting for, and two instruments that read low
+
+v4174 shipped the dirty flag DISABLED with four probes and an honest note that four is not a census of a
+thirty-thousand-line main.js. This is the census. THE COUNT IS SIXTY per-frame tickers, extracted from the
+loop mechanically rather than listed by hand, so a new one cannot enter unexamined in silence.
+
+*** AND THE FIRST THING IT ESTABLISHED IS THAT main.js'S OWN COMMENTS ARE NOT EVIDENCE FOR IT. *** Seventeen
+of the sixty carry a nearby comment calling themselves cheap or a no-op when idle. None of that answers the
+question a dirty flag asks. dayNightCycle's tick is microseconds of work AND it advances the sun every frame,
+so it ANIMATES: cheap and static are different claims, and a census built from the cost comments would have
+been confidently wrong rather than honestly partial. The gate asserts no verdict argues from cost, and proves
+the two questions differ by finding a ticker that calls itself cheap and animates anyway.
+
+Verdicts: 30 ANIMATES, 3 REACTIVE, 2 INERT, and 25 UNEXAMINED. *** MOST ENTRIES BEING UNEXAMINED IS THE POINT
+RATHER THAN A SHORTCOMING. *** Deciding whether wadVisualPolish can move a pixel on its own needs its source
+read. What changed is that the question is now ASKED for all sixty, by name, with the answers that exist
+written down and the ones that do not visibly absent -- instead of four probes and a hope.
+
+*** I HAD ALSO BEEN QUIETLY MAKING THE DEBT WORSE. *** doomFire.isBurning() (v4178) and odometer.isRolling()
+(v4181) were both written BY ME as frameDirty probes and neither had a consumer -- the same
+orphan-in-anticipation I criticised myself for in v4182's SNOISE2, committed twice more since, in the rounds
+either side of it.
+
+*** TWO MEASURING INSTRUMENTS READ LOW THIS ROUND, AND AN INSTRUMENT READING LOW IS WORSE THAN NONE BECAUSE
+IT LOOKS LIKE DATA. ***
+1. The census first matched probe NAMES against ticker names. Probes are named for their ROLE ("agents")
+   while the census counts TICKERS (aiManager, botManager, remotePlayers), so a probe guarding three systems
+   was credited with NONE of them: it reported 29 unguarded animators when the true figure after wiring was
+   8. addSource now takes { covers: [...] } and the flag exposes covered(), which is deliberately a different
+   list from sources().
+2. The gate then checked that at least five probes declared a covers list. Deleting one probe's declaration
+   entirely left five others and THE GATE STAYED GREEN -- a system silently became unguarded inside the very
+   gate meant to prevent that. Coverage is now read out of main.js's own covers lists and ratcheted:
+   UNGUARDED_BASELINE = 8, may only go down. Re-sabotaged, it goes red at 13.
+
+A third slip, caught by reading: a regex stamped a covers list onto the XRSessionManager CONSTRUCTOR -- a
+second argument that constructor ignores, so it was syntactically valid, silently meaningless, and
+node --check said nothing. The gate now asserts every covers list sits on an addSource call.
+
+Five new probes wired, covering 23 of the 30 animators between them, which took unguarded from 29 to 8. The
+remaining eight are named rather than summarised: csRoundManager, ejectSequence, fpsAutopilot,
+hitReactionSystem, kaijuMode, kaijuSandbox, memoryShimmer, torchLighter.
+
+*** THE FLAG IS STILL OFF, AND THE GATE ASSERTS THAT TOO. *** A census does not license enabling a feature;
+it measures the distance. window.frameDirty.census() fetches main.js and prints how many animators are still
+unguarded -- source-derived at call time, because a list baked in at build would describe a file that no
+longer exists.
+
+Gate count 1266 gates.
 ## v4182 -- the signal failing, and the near-miss from four rounds ago measured
 
 felixturner/bad-tv-shader ported (MIT (c) Felix Turner): horizontal tearing from a tracking error, plus
