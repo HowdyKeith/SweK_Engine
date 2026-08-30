@@ -146,6 +146,12 @@ export const kineticsDevice = {
     // from the wrong assumption to the reported number is graded -- plantedError's "perturb the physics, not the
     // number" in its ordinary form.
     plantKind: "knob",
+    // v4106 -- NAMED, THE SAME COMPLETION v3851/v4088-v4105 gave the rest of this family. MEASURED, period
+    // mode (the default) both arms: inhourVsRk4 2.50e-14 -> 2.92e-3 -- the two independent routes (the inhour
+    // closed form and an RK4 integration) that agree to machine precision honestly come apart once the
+    // generation time is zeroed.
+    planted: { knob: "planted", observable: "inhourVsRk4",
+               note: "the neutron generation time is set to zero, the one assumption the whole point-kinetics equation rests on -- everything downstream still returns plausible numbers, and only the disagreement between the closed-form inhour roots and a direct RK4 integration shows it" },
     modes: KINETICS_MODES,
     name: "point-reactor-kinetics", observables: KINETICS_OBSERVABLES, build: buildKinetics,
     defaults: ({ mode } = {}) => ({ mode: KINETICS_MODES.includes(mode) ? mode : "period", config: { ...DEF } }),

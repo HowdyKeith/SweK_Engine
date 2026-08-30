@@ -99,6 +99,13 @@ export const fragmentRotationDevice = {
     knobChoices: { axis: [[1, 2, 3], [0, 0, 1], [1, 0, 0], [1, 1, 0]] },
 
     plantKind: "method",
+    // v4102 -- NAMED, THE SAME COMPLETION v3851/v4088-v4101 gave the rest of this family. MEASURED, both arms:
+    // rotatedBoxWorstErr 3.55e-15 -> 1.090, matching the header exactly. traceResidual stays bit-identical
+    // (15.0 both) and spectrumPhysical stays valid (1) under the plant, which the header names as the whole
+    // reason this device exists -- a body carrying only the two structural checks would certify a fragment
+    // whose principal moments are wrong by 36% as physically admissible.
+    planted: { knob: "planted", observable: "rotatedBoxWorstErr",
+               note: "products of inertia discarded before diagonalising, so every tensor is read as though its principal axes were the coordinate axes -- exactly what a fracture fragment violates, since the break leaves its axes wherever it likes" },
     modes: FRAGMENTROTATION_MODES,
     name: "fracture-fragments-intermediate-axis",
     observables: FRAGROT_OBSERVABLES,

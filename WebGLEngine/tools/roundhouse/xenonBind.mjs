@@ -126,6 +126,13 @@ const XENON_MODES = ["pit"];   // v4074 -- the single source `modes` and `defaul
 
 export const xenonDevice = {
     plantKind: "method",
+    // v4101 -- NAMED, THE SAME COMPLETION v3851/v4088-v4100 gave the rest of this family. MEASURED, both arms:
+    // peakRatio 1.903 -> 1.0 (peakHours 8.38 -> 0, pitThresholdClosed a real flux -> null/Infinity) -- matching
+    // the header's own "peak collapses from 8.38 h at 1.90x to no pit at all" exactly. peakRatio is the target
+    // because it stays a finite bounded number in both arms; the threshold observables correctly go to null
+    // under the plant, which IS the finding, not a missing value.
+    planted: { knob: "planted", observable: "peakRatio",
+               note: "the iodine yield is moved into the direct xenon yield with the TOTAL yield preserved, so a running reactor is bit-identical (equilibrium depends only on the sum) -- only the shutdown transient can tell, and there the pit vanishes entirely rather than merely shrinking" },
     modes: XENON_MODES,
     name: "xenon-135-iodine-pit",
     observables: XENON_OBSERVABLES,

@@ -258,6 +258,12 @@ export const emDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4105 -- NAMED, THE SAME COMPLETION v3851/v4088-v4104 gave the rest of this family. MEASURED, vacuum mode
+    // both arms: indexSpeedProduct 2.998e8 -> 4.497e8, matching the header's own quoted numbers exactly, while
+    // cComputed/cErrFrac/z0 stay bit-identical (v4072's structureFactor-shape finding: vacuum mode has no knob
+    // that reaches MU0/EPS0 at all).
+    planted: { knob: "planted", observable: "indexSpeedProduct",
+               note: "n = eps_r instead of sqrt(eps_r mu_r) -- a plausible, dimensionless, positive refractive index that even survives the seismic cross-check (both routes share the same wrong n). What it cannot survive is n*v_phase = c, because phaseSpeed keeps the square root the reported index dropped" },
     modes: EM_MODES,
     name: "maxwell-electromagnetism", observables: EM_OBSERVABLES, build: buildEm,
     // v3424 -- *** em WAS ONE OF THE 21 DEVICES THAT ACCEPTED ANY STRING AS A MODE, AND IT WAS FIRST ON THAT

@@ -184,6 +184,11 @@ export const laneEmdenDevice = {
     // KNOB PLANT: the perturbation replaces the GEOMETRY upstream of every observable, so the whole path from a
     // wrong number of dimensions to the reported numbers is graded.
     plantKind: "knob",
+    // v4108 -- NAMED, THE SAME COMPLETION v3851/v4088-v4107 gave the rest of this family. MEASURED, profile
+    // mode (default n=1) both arms: xi1 pi -> 2.4048 (the Bessel J0 zero, cylindrical geometry's own correct
+    // answer), surfaceVsExact 1.09e-11 -> 0.235.
+    planted: { knob: "planted", observable: "surfaceVsExact",
+               note: "the equation is solved in cylindrical rather than spherical geometry -- (d-1)/xi with d=2 instead of d=3. Every solution is a genuine solution of a genuine problem (n=1 lands exactly on Bessel J0's first zero), which is why it survives every 'is this a sensible stellar profile' check and only a comparison against the SPHERICAL closed form catches it" },
     modes: LANE_EMDEN_MODES,
     name: "lane-emden-polytrope", observables: LANE_EMDEN_OBSERVABLES, build: buildLaneEmden,
     defaults: ({ mode } = {}) => ({ mode: LANE_EMDEN_MODES.includes(mode) ? mode : "profile", config: { ...DEF } }),
