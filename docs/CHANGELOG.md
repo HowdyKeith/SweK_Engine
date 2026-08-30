@@ -8,6 +8,87 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4162 -- the equation of state pinned, and three gates that asserted a stopwatch
+
+### The file the list forgot
+
+`physics/sph/kernels.js` made the whole argument at v2546:
+
+> IEEE 754 pins +, -, *, / and sqrt EXACTLY: correctly rounded, bit-identical on any conforming hardware. It
+> pins NOTHING about pow ... an arm64 Mac joins this fleet tomorrow, and every other box is x86_64.
+
+It converted the kernels to explicit multiplication and built `portableMath-selfcheck.mjs` to enforce it, with a
+`DETERMINISTIC` list of files that may use only arithmetic the standard pins:
+
+```
+physics/sph/kernels.js, physics/sph/spatialGrid.js, physics/soft/boneField.js,
+physics/soft/fleshDynamics.js, simulation/tomo/nullspace.js
+```
+
+**`physics/sph/sph.js` is not on it, and it holds the equation of state.** The kernels were made portable and
+the pressure was not. At v4161 Keith's rig and this box produced different knob rankings from the same commit --
+every ideal-EOS number identical to the printed digit, every Tait number diverging from the third decimal,
+because only the Tait branch went through `Math.pow`.
+
+New `ipow(x, n)` does `x^n` by squaring using nothing but IEEE multiplication. **Measured:** `Math.pow` and
+`ipow` disagree on **65.8%** of the density ratios a column visits, worst relative difference **6.571e-16** --
+about 3 ulp, the same order as the 6.09e-16 v2546 measured for `h^9`.
+
+Two more sites pinned: the shadow amplitude's `h^3` becomes `h*h*h`, and the shadow kernel's `x^3.5` becomes
+`x^3 * sqrt(x)`. **A half power is pinnable**, which is the part that looks impossible and is not, because
+`sqrt` is one of the five.
+
+`sph.js` joins the gate under a **marker rule** rather than a frozen count: every unpinned call must carry
+`UNPINNED-OK` and a reason on its own line, so a new one fails until somebody writes down why. Three remain, all
+argued at the call site -- one `Math.pow` for a non-integer gamma (the knob census sweeps 8.4, and a real
+exponent has no pinned decomposition) and `cos`/`sin` for a CT scan angle in a diagnostic `step()` never calls.
+The pinned path is asserted **by running `pressureOf`**, because no source scan can say which branch took the
+call.
+
+### The sweep that justified it found the round's real subject
+
+14 SPH gates re-run: 12 green.
+
+`neighbourBakeoff` was **red before this change** -- proven by running it at v4161 in a clean worktree. It is a
+v4122 regression of mine (`gridCellTouches` reads 0 because the gate reaches into `grid.map`, the hash fallback
+my dense path replaced) and is left for its own round.
+
+`rh-hydrostatic` went red and **was** mine. So a third spelling of the same power settled whether that mattered:
+`exp(gamma*log r)`, mathematically identical, about three ulp apart.
+
+| arm | c=8 | c=15 | c=25 | settled rows |
+|---|---|---|---|---|
+| `Math.pow` | 11.0% | 0.8% | 0.1% | 2 |
+| `ipow` | 6.6% | 2.5% | 1.1% | **0** |
+| `exp(g*log r)` | 2.5% | 0.7% | 0.5% | 2 |
+
+**The three arms put the settled-row count at 2, 0 and 2 with the physics unchanged.** c=8's spread moves by a
+factor of 4.4 and c=25's by a factor of 11, on a last-bit difference -- and every recorded value still brackets
+in all three. So `settled.length > 0` made the gate's verdict turn on a coin toss.
+
+The guard's **purpose** is kept -- a physics change must not buy an exemption by making rows less settled -- and
+its mechanism replaced: the **tightest** row must reproduce its record, whatever its absolute spread. One 2%
+claim is always made, it does not care where the bar fell, and the gamma plant still fails it. c=25 now
+reproduces a v2881 measurement to **0.95% of a 2% tolerance**, four hundred versions and one equation of state
+later.
+
+### twoFBind: the same disease in a third lab
+
+It required `costHint(default) > 100000` and `costHint(short) < 10000`. `costHint` is `base * (steps/24000)`
+where `base` is **read from a frozen cost record** -- this box's says **212479**, so 212479/20 = **10623.95**,
+six percent over a ceiling written against another machine. Its own note already recorded the same build timing
+117.0s, 205.0s and 207.7s under contention, a 1.8x spread; 212s sits inside that band.
+
+The claim was never the absolute cost but that **the knobs move it**, which is a ratio of exactly **20** because
+`base` cancels. And its failure text quoted 115,200 and 5,760 -- figures that record has not produced since it
+was re-frozen -- so a reader of the failing line was told numbers nobody measured. It prints the computed ones
+now.
+
+### The shape of the round
+
+`materialKnobs` (v4161), `rh-hydrostatic` and `twoFBind` were one bug in three labs: **a gate asserting a number
+that depends on whose stopwatch it was.** Two of the three said so in their own comments before they failed.
+Four new gates this session -- petfbiGallery, dracoWeld, runnerGauge and xbarPlugin -- take the tree to 1250 gates.
 ## v4161 -- two machines disagreed about the fluid, and the gate was asserting the fragile half of its own sentence
 
 Keith's rig went red on a check that passes here, on the same commit:
