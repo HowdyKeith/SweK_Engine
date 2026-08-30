@@ -202,5 +202,10 @@ export const vibrationsDevice = {
     // change N and the key follows (24->64->32 and 70->190->94), so the ERROR stays at zero and the device is
     // still right. A mode that moves an observable is not a plant; a mode that moves the observable AWAY FROM
     // ITS KEY is. That distinction is the whole reason the contract names the observable rather than the mode.
-    plantMode: "sixNplus6", plantFlips: "sumW4ErrRel", plantKind: "method",
+    // v4128 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // method path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED,
+    // sumW4ErrRel 0 -> 0.1025641025641026 under mode "sixNplus6". "method" was the label for a mechanism this
+    // device does not use.
+    plantMode: "sixNplus6", plantFlips: "sumW4ErrRel", plantKind: "mode",
 };

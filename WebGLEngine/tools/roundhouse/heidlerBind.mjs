@@ -137,7 +137,11 @@ export const heidlerDevice = {
     // CONTROL -- it drives peakErrFrac to its ideal and catches nothing -- and `noroot` is the PLANT, which
     // drives the same observable away from it. The census counts them apart, and until now this device had
     // only the half that proves the apparatus.
-    plantMode: "noroot", plantFlips: "peakErrFrac", plantKind: "knob",
+    // v4128 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, peakErrFrac
+    // 0.0667 -> 4.957 under mode "noroot". "knob" was the label for a mechanism this device does not use.
+    plantMode: "noroot", plantFlips: "peakErrFrac", plantKind: "mode",
     observables: HEIDLER_OBSERVABLES,
     build: buildHeidler,
     defaults: heidlerDefaults,

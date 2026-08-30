@@ -245,5 +245,10 @@ export const plasticDevice = {
     // *** THE OTHER THREE MODES COULD NOT CARRY THIS. *** creep, cap and creepFree report their findings in
     // observables that read -1 -- the NONE sentinel -- in every other mode, so a cross-mode comparison against
     // them measures a sentinel turning into a number, which is not an observable getting worse.
-    plantMode: "tensiononly", plantFlips: "yieldWorstErrAbs", plantKind: "reader",
+    // v4128 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // reader path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED,
+    // yieldWorstErrAbs 2.78e-16 -> 0.70 under mode "tensiononly". "reader" was the label for a mechanism this
+    // device does not use.
+    plantMode: "tensiononly", plantFlips: "yieldWorstErrAbs", plantKind: "mode",
 };

@@ -126,7 +126,11 @@ export const frictionDevice = {
     name: "coulomb-friction-bifurcation",
     // "critical" stays FIRST: it owns criticalErrFrac, and the contract compares the plant against modes[0].
     modes: FRICTION_MODES,
-    plantMode: "constantbound", plantFlips: "criticalErrFrac", plantKind: "knob",
+    // v4128 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, criticalErrFrac
+    // 4.35e-5 -> 7.00 under mode "constantbound". "knob" was the label for a mechanism this device does not use.
+    plantMode: "constantbound", plantFlips: "criticalErrFrac", plantKind: "mode",
     // *** AND THE CONTROL IS DECLARED SEPARATELY AND COUNTED SEPARATELY, ON travelHalfMu AND NOT ON
     // zeroMuRatio -- WHICH I GOT WRONG FIRST AND THE CONTRACT CAUGHT. *** I read "mu = 0 must recover FULL
     // travel" as an observable REACHING 1 and declared zeroMuRatio with ideal 1. It is the opposite: the

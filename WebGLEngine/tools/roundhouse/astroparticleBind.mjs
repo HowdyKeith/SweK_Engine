@@ -342,6 +342,16 @@ export const astroparticleDevice = {
     // v3501 -- KNOB PLANT: the perturbation replaces a derived PHYSICS CONSTANT (the oscillation coefficient)
     // upstream of every observable, so the whole path from the wrong derivation to the reported number is graded.
     plantKind: "knob",
+    // v4128 -- NAMED, THE SAME COMPLETION v3851/v4088-v4127 gave the rest of this family. This device is unusual
+    // in carrying SIX independent plants under one config.planted flag, one per mode (already fully documented
+    // in the comments above each mode's key function: friedmann's a^-2 matter dilution, lensing's wrong 2GM/c^2
+    // Einstein-radius factor, jeans' flipped gravity sign, halo's dropped-radius shell integrand, desitter's
+    // matter-like Lambda dilution). MEASURED, oscillation mode (default) both arms: coeffErr 5.36e-7 -> 0.2107,
+    // matching the header's quoted 5e-7 -> 2e-1 to the digit, while unitarityErr stays exactly 0 and
+    // amplitudeErr/phaseErr barely move (~1e-8/~1e-4 both arms) -- all three deliberately blind by construction,
+    // per the header's own point that a suite checking only those three would pass a neutrino sector wrong by 27%.
+    planted: { knob: "planted", observable: "coeffErr",
+               note: "drops the derived oscillation coefficient (OSC_COEFF, never typed) to 1 -- the only one of this mode's four keys that can see it, since unitarity is a pure identity, and amplitude/phase are set by the mixing angle and the constant's OWN value respectively, both blind to the constant being wrong. Five more independently-documented plants live in this device's other modes (friedmann, lensing, jeans, halo, desitter), gated by the same flag" },
     // v3502 -- FRIEDMANN added. The matter/radiation/Lambda regimes fail differently (beam's static/vibration/
     // buckling structure), so a third regime is not a restatement. closureErr is a DEFINITIONAL identity (Ok is
     // the remainder) and is on the exact-zero register; the flat matter-only age = 2/3 is the one key a wrong
