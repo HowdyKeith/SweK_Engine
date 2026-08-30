@@ -8,6 +8,112 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4205 -- shells that fall, and the three lines that had kept battleship3d.html black since it was written
+
+Keith said he had never seen his own naval demo render, and could not think why it was listed as a portfolio
+piece.
+
+Loaded headless: the main canvas held 0 lit pixels and exactly 1 distinct colour. One page error:
+
+    TypeError: Cannot assign to read only property 'position' of object '#<Mesh>'
+      at mkBridge (battleship3d.html:325)
+
+Three lines in mkBridge() do Object.assign(mesh, {position: new THREE.Vector3(...)}), which tries to REPLACE
+Object3D.position -- a read-only accessor in three.js since r15x. It threw inside
+init() -> newGame() -> placeFleet() -> makeShipMesh() -> buildShipBody() -> decorateSegment() -> mkBridge(),
+before a single frame was drawn. Every other mesh in the file uses .position.set(). These three now do too,
+and the page is a working 3D naval game: ships with bridges and turrets, a deployment grid, fleet rosters,
+fish swimming past.
+
+A note on measuring it: after the fix the pixel probe still read 0 lit pixels, and reporting "still broken"
+on that would have been wrong. Reading a WebGL canvas from outside its draw call returns a cleared buffer
+unless preserveDrawingBuffer is set. The screenshot is the evidence; the probe cannot see WebGL content.
+The BEFORE screenshot is the control and shows exactly what Keith described -- chrome and ocean, no ships,
+empty rosters, the deploy button reading "-- -- --".
+
+THEN THE SHELLS, BECAUSE THE ONE PLACE IN THE TREE ADVERTISING BALLISTICS WAS A LERP.
+
+battleship3d's cannon button says "arcing shell - single cell". The code was:
+
+    shell.position.lerpVectors(from,target,u); shell.position.y += Math.sin(u*Math.PI)*peak;
+
+A straight line with a sine hump added on top, with peak=14 and dur=1.05 as CONSTANTS. Identical arc height
+and identical flight time whether the target was one cell away or across the board. No launch angle, so no
+lob-versus-flat choice -- which is the entire tactical content of a gun. It could not miss, could not be
+intercepted, could not be dodged. ev/shots.js, the only other projectile system in the tree, is 2D
+straight-line or homing with NO GRAVITY ANYWHERE IN IT.
+
+New physics/ballistics.mjs. The launch solution is a quadratic in tan(theta), derived rather than looked up
+because it INCLUDES the height difference that the commonly quoted R = v^2 sin(2t)/g drops -- a naval gun
+firing across water is the flat case, a mortar on a hill is not. Its discriminant is exactly the in-range
+test, so "no elevation whatsoever reaches" is a real answer rather than a shrug at 45 degrees.
+
+Graded by firing the shell. launchAngles() solves algebra; flyShell() integrates step by step; they share no
+code. At 50, 300, 700 and 1000 m both roots land within 0.05 m of the target. On flat ground the two
+elevations sum to exactly 90 degrees -- a closed-form identity the integrator knows nothing about, so it
+grades the algebra and not the arithmetic. Max range is v^2/g to 1e-9, the roots have all but met there, and
+one metre beyond returns null.
+
+DRAG IS WHERE math/inverseSolve.mjs EARNS ITS KEEP. There is no closed form once air is in the problem.
+MEASURED at drag 0.002: the vacuum angle lands 27.1% short at 300 m, 45.3% at 700 m, 55.4% at 1000 m.
+v4201's solver -- which needs nothing but evaluations of a function, and "fire at this elevation, see where
+it lands" is an evaluation -- recovers the right elevation in 2 to 3 iterations to within 0.04 m, seeded by
+the vacuum answer, which is what makes it converge that fast instead of wandering.
+
+It also refuses honestly. At 500 m it returns ok:false, why "no downhill step exists from here -- a local
+minimum, or f is not smooth", residual 54.2 m. That is not a solver failure: 500 m is unreachable. Drag cuts
+this gun's envelope from 1019.7 m to 445.8 m -- 56.3% of its reach -- and moves the optimum elevation from
+45 degrees to 38.71, because a shell that hangs longer loses more speed to drag. Two independent methods
+agree on that peak: golden section 445.76 m at 38.713 deg, brute sweep 445.80 m at 38.75 deg. reachable()
+exists because an AI checking reachability with the closed form will confidently order a shot its gun
+physically cannot make.
+
+AND leadMoving() CLOSES A GAP FOUND WHILE LOOKING FOR THIS ONE. physics/predict/predict.js has a working
+firing lead -- a quadratic in time, one square root -- and NOTHING but its own demo and its own gate calls
+it. Meanwhile ev/shots.js correctly adds the ship's velocity to every shot it spawns, and then aims with
+aimHeading(), a plain bearing to where the target is RIGHT NOW. So the tree has a lead solver and every
+turret in it shoots behind moving targets.
+
+leadIntercept also takes the shooter as a stationary POINT, which is right for a fixed gun and wrong for a
+ship. Solving in the shooter's rest frame fixes it in one line: subtract the shooter's velocity from the
+target's. MEASURED miss 2.27e-13 m, where leadIntercept on the same shot misses by 40.1 m. With a stationary
+shooter it reduces to leadIntercept EXACTLY (t identical to 1e-12), which is what makes it a generalisation
+rather than a second implementation.
+
+MY OWN BUG, found by the uphill case and worth writing down. Firing 500 m onto ground 200 m up, the solved
+angle is right -- hand-checked, y = 200.000 at x = 500 -- but flyShell reported the shell landing at 138 m,
+and at one point at x = -6429 m and t = -82.47 SECONDS from a shell fired forwards. The apex of that shot
+clears the target plane by four millimetres, so the step that trips the ground test has both endpoints
+within 1e-7 of the ground and the interpolation (s.y - groundY) / (s.y - n.y) is a tiny number over a tiny
+number. Clamping the step fraction to [0,1] is not papering over it: the crossing is always inside the step,
+so a fraction outside [0,1] is arithmetic noise by definition. The gate keeps that grazing case with an
+explicitly wider tolerance and an assertion that it does NOT meet the tight one, because the near-tangent
+shot is genuinely less precise and a tolerance that hid that would be lying.
+
+Three of the gate's first-draft tolerances were mine and too tight, and are now stated with the measured
+value beside them rather than quietly widened: the dt spread is 1.42 m on 881.7 m (0.16%), the analytic
+agreement is 2.2e-2 m on 881.7 m, and the two roots at 99.9999% of max range are 0.28 degrees apart.
+
+The battleship cannon now solves its elevation per shot. With the page's own GUN_V=22, at range 20 the flat
+root arrives in 0.92 s peaking at 0.8 board units and the lob takes 4.42 s peaking at 23.6 -- the same
+target, two genuinely different shots. Flight time for the flat root varies 13x across the board where it
+was 1.05 s for everything.
+
+Wired as shells.solve / .fire / .envelope / .lead.
+
+Gate: tools/ship/ballistics-selfcheck.mjs, 104 checks, all pass. Eight sabotages, all red: dropping the
+height term from launchAngles, linear drag instead of quadratic, un-clamping the ground interpolation (which
+gives a 361.78 m error on the grazing shot), leadMoving forgetting to subtract the shooter's velocity, an
+altitude fuse that fires climbing as well as descending, battleship3d reverting to the lerp arc, mkBridge
+reverting to Object.assign, and unwiring window.shells. All three touched files restored byte-identical, and
+battleship3d re-checked in a browser afterwards.
+
+Filed, not fixed: the robot dock's compact scene does not span its own canvas. MEASURED, #demoChrome is
+286x96 and its canvas 278x88 at style 100%/100% -- the canvas IS filling its box, so this is not a CSS
+width fix. The backdrop geometry in face/avatarStage.js's _compact branch stops short of both canvas edges.
+That file is shared by five pages, so it needs before/after shots on all five rather than a change made
+during a ballistics round.
+The build now stands at 1285 gates.
 ## v4204 -- the GL Transition spec, taken as a contract and not as 100 shaders
 
 Spec and validator idea from gl-transitions/gl-transitions and gre/gl-transition-libs. Both carry real MIT
