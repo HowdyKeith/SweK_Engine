@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Aquarelle Dissolve</title>
+<meta name="demo:title"  content="Aquarelle Dissolve">
+<meta name="demo:desc"   content="Mask-driven watercolour dissolve: one image bleeds into another along a noise-warped mask edge, like ink through paper. Port of Ramotion/aquarelle (MIT).">
+<meta name="demo:cats"   content="shader,post,transition">
+<meta name="demo:swatch" content="🎨">
+<style>
+  html,body{margin:0;height:100%;background:#0a0b12;color:#bcd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #bar{display:flex;gap:14px;padding:10px 14px;background:rgba(12,16,30,0.92);border-bottom:1px solid rgba(120,180,220,0.25);align-items:center;flex-wrap:wrap}
+  #bar h1{margin:0;font-size:14px;color:#cdf;flex:1;min-width:120px}
+  label{font-size:12px;display:flex;align-items:center;gap:6px}
+  input[type=range]{width:130px}
+  button{padding:6px 12px;border-radius:6px;border:1px solid rgba(120,180,220,0.4);background:rgba(12,18,30,0.85);color:#cdf;font-size:12px;cursor:pointer}
+  #host{flex:1;position:relative}
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #note{position:absolute;left:12px;bottom:12px;font-size:11px;color:#89a;background:rgba(6,8,16,0.6);padding:7px 11px;border-radius:6px;max-width:70%;line-height:1.5}
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div id="bar">
+    <h1>🎨 Aquarelle Dissolve</h1>
+    <label>Amplitude <input id="amp" type="range" min="0" max="200" value="50"><span id="ampv">50</span></label>
+    <label>Frequency <input id="freq" type="range" min="1" max="60" value="10"><span id="freqv">10</span></label>
+    <label>Sweep <input id="sweep" type="range" min="0" max="100" value="50"><span id="sweepv">0.50</span></label>
+    <button id="play">▶ Auto</button>
+    <button id="back">← Back</button>
+  </div>
+  <div id="host"><canvas id="c"></canvas>
+    <div id="note">The <b>mask</b> is warped about 3&times; further than the image &mdash; that asymmetry is what makes the edge read as ink in paper rather than a crossfade. Both textures are generated here, so nothing is fetched.</div>
+  </div>
+</div>
+<script type="module">
+// v4177 -- the consumer for render/aquarellePass.js. Both textures are drawn procedurally on a canvas so the
+// page needs no assets and no network: the SOURCE is a warm gradient with rings, and the MASK is a soft
+// horizontal ramp whose alpha the sweep slider moves. The pass warps that ramp's edge into a ragged bleed.
+import * as THREE from "three";
+import { makeAquarellePass } from "/render/aquarellePass.js";
+import { DEFAULTS, maxReach } from "/render/aquarelleModel.mjs";
+
+const $ = (id) => document.getElementById(id);
+$("back").addEventListener("click", () => location.href = "/page-index.html");
+
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+
+/** A warm painted-looking source, drawn rather than fetched. */
+function makeSourceTexture() {
+    const cv = document.createElement("canvas"); cv.width = cv.height = 512;
+    const g = cv.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 512, 512);
+    grd.addColorStop(0, "#f2c14e"); grd.addColorStop(0.5, "#e07a5f"); grd.addColorStop(1, "#3d405b");
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+    g.globalAlpha = 0.25; g.strokeStyle = "#fff"; g.lineWidth = 3;
+    for (let r = 20; r < 420; r += 26) { g.beginPath(); g.arc(256, 256, r, 0, Math.PI * 2); g.stroke(); }
+    const t = new THREE.CanvasTexture(cv);
+    // CLAMP, deliberately: the pass reaches up to maxReach() UV outside the pixel it shades, so with REPEAT
+    // the left edge would wrap in the right edge's colour. The original sets neither and inherits whatever
+    // the textures happened to have, which is how one shader looks different in two apps.
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    return t;
+}
+
+/** The mask: alpha ramps 0 -> 1 across a moving front. Only its ALPHA is read. */
+const maskCanvas = document.createElement("canvas"); maskCanvas.width = maskCanvas.height = 512;
+const maskTex = new THREE.CanvasTexture(maskCanvas);
+maskTex.wrapS = maskTex.wrapT = THREE.ClampToEdgeWrapping;
+function drawMask(front) {
+    const g = maskCanvas.getContext("2d");
+    g.clearRect(0, 0, 512, 512);
+    const w = 90;                                  // a soft edge, so the noise has something to feather
+    const grd = g.createLinearGradient(front * 512 - w, 0, front * 512 + w, 0);
+    grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+    maskTex.needsUpdate = true;
+}
+
+const aq = makeAquarellePass(THREE, makeSourceTexture(), maskTex, DEFAULTS);
+drawMask(0.5);
+
+function resize() {
+    const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+    if (canvas.width !== w || canvas.height !== h) renderer.setSize(w, h, false);
+}
+
+let auto = false, t0 = performance.now();
+$("play").addEventListener("click", () => { auto = !auto; $("play").textContent = auto ? "⏸ Auto" : "▶ Auto"; t0 = performance.now(); });
+const bind = (id, label, fn) => $(id).addEventListener("input", (e) => { const v = +e.target.value; $(label).textContent = fn(v); });
+bind("amp", "ampv", (v) => { aq.set("Amplitude", v); return v; });
+bind("freq", "freqv", (v) => { aq.set("Frequency", v); return v; });
+bind("sweep", "sweepv", (v) => { drawMask(v / 100); return (v / 100).toFixed(2); });
+
+function loop(t) {
+    requestAnimationFrame(loop);
+    resize();
+    if (auto) {
+        const f = (Math.sin((t - t0) * 0.0004) * 0.5 + 0.5);
+        drawMask(f); $("sweep").value = Math.round(f * 100); $("sweepv").textContent = f.toFixed(2);
+    }
+    renderer.setClearColor(0x0a0b12, 1);
+    renderer.clear();
+    aq.render(renderer, null);
+}
+requestAnimationFrame(loop);
+console.log("[aquarelle] reach:", JSON.stringify(maxReach()), "-- the mask is warped further than the image, which is the look");
+</script>
+</body>
+</html>

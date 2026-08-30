@@ -8,6 +8,67 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4177 -- the consolidation that corrected its own premise, and a nine-year-old pass with four dead APIs
+
+Aquarelle first, in the agreed order. It needs Ashima's simplex, so the shared-noise work is the first step of
+the same job rather than a detour.
+
+*** THE PREMISE FOR CONSOLIDATING THE NOISE WAS WRONG, AND CHECKING ONE CONSTANT IS WHAT SHOWED IT. *** The
+plan said three ports carry "the same forty lines". They do not:
+
+  physics/fire/fireMesh.js   float snoise(vec3)   max(0.6 - ...)   return 42.0 * dot(...)
+  Ramotion/aquarelle         float snoise(vec3)   max(0.6 - ...)   return 42.0 * dot(...)   identical
+  felixturner/bad-tv         float snoise(vec2)   max(0.5 - ...)                            A DIFFERENT FUNCTION
+
+2D and 3D simplex are not variants of one another and 0.5 against 0.6 is not a discrepancy -- each falls out
+of its own dimension's geometry. Had the first plan been acted on, bad-tv would have been "consolidated" onto
+the 3D function and ITS LOOK WOULD HAVE CHANGED SILENTLY, which is the exact hazard the consolidation existed
+to prevent. So shaders/ashimaNoise.js exports SNOISE3 and SNOISE2 as separately named chunks -- snoise and
+snoise2, never one entry point with a dimension argument, because a module that blurred them would re-create
+the bug by inviting the caller to treat them as interchangeable.
+
+*** THE EXTRACTION IS PROVED BYTE-IDENTICAL, WHICH IS THE ONLY WAY IT CAN GO WRONG WITHOUT ANYTHING FAILING.
+*** fireMesh's assembled fragment shader hashes to sha256 42bca5fb before and after, same 84 lines and 2925
+characters -- the same standard packGlb's extraction was held to at v4176, and captured BEFORE the edit rather
+than justified after it.
+
+*** AND THE CPU TRANSLATION FOUND THAT THE TEXTBOOK RANGE IS WRONG FOR THIS FUNCTION. *** shaders/ashimaNoise.mjs
+translates the GLSL line by line so the shader can be graded at all. Its output is NOT [-1, 1]: measured over
+126,665 samples the range is about [-4.13, +4.20] with an RMS of 0.69. That was chased as a translation bug
+and is not one -- the translation is CONTINUOUS (largest delta over a 1e-4 step is 8.3e-3, an implied slope of
+83, where a wrong permute chain or corner selection puts a real discontinuity at every simplex face and reads
+near 1e4) and ZERO-MEAN (-3.3e-4). Both are properties a mis-translation fails; the expectation was what was
+wrong, and the gate now RECORDS the range as a measurement rather than asserting the figure that is not true.
+
+It matters downstream and is not a curiosity: aquarelle computes an angle as snoise(...) * 3.14, plainly
+written for a [-1, 1] noise so the angle would span one turn. At this amplitude it spans about +/-13 radians
+and wraps twice. Recorded, not "corrected" -- upstream ships it this way and changing it would change the look.
+
+*** THE PORT ITSELF HAD FOUR DEAD APIs, AND TWO OF THEM FAIL SILENTLY. *** Not one bit of housekeeping:
+  - var THREE = window.THREE -- a global namespace patch; THREE is a parameter here, as in makeSwiftShaderPass
+  - THREE.Pass.call(this) + Object.create(THREE.Pass.prototype) -- the pre-class Pass idiom
+  - new THREE.PlaneBufferGeometry(2, 2) -- MEASURED at zero occurrences in our vendored three. That line throws.
+  - renderer.render(scene, camera, readBuffer, clear) -- the target and clear arguments were removed years ago.
+    Passing them today draws TO THE SCREEN and ignores the target, which reads as "the pass does nothing".
+The gate asserts all four as ABSENCES, because an absence is what has to be true.
+
+The shader is GENERATED from the CPU model's constants rather than typed out beside them, and the gate checks
+that 0.07 appears nowhere in the pass as a literal -- a second hand-written copy is how a shader and its
+reference start disagreeing while both look reasonable. The two warps stay asymmetric on purpose: the image is
+nudged 0.05 UV and the mask is warped 0.09, three times further, and that asymmetry is the whole look. Tidying
+them into one shared amplitude would dissolve evenly and stop looking like paper.
+
+New aquarelle.html draws both its textures on a canvas, so the page fetches nothing, and sets ClampToEdge
+deliberately -- the pass reaches up to 0.09 UV outside the pixel it shades, and with REPEAT the left edge
+would wrap in the right edge's colour. The original sets neither and inherits whatever the textures happened
+to carry, which is how one shader looks different in two applications.
+
+Honest gap, stated in both gates rather than skipped: the CPU model and the GLSL are not checked against each
+other NUMERICALLY, because that needs a GPU and npm could not install playwright here. What is settled is the
+byte-identical extraction, the continuity and zero-mean of the translation, and that the shader is built from
+the same constants the model exports so the two cannot drift.
+
+Gate count 1260 gates.
 ## v4176 -- a scene has a viewpoint, a model does not, and that is the whole difference
 
 Keith: export a rendered scene as an object, load it on the Shield TV in a browser. The reason it is worth
