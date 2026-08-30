@@ -257,7 +257,16 @@ export const multigridGPUDevice = {
     // plant is measured against the number this device already stakes itself on. NOT innerFine/innerCoarse:
     // those move together under a change of test vector and their AGREEMENT is the property, which is exactly
     // why `window` mode's pair could not be declared.
-    plantMode: "narrowwindow", plantFlips: "adjointWorst", plantKind: "knob",
+    // *** v4078 -- plantKind WAS "knob", AND THIS DEVICE NEVER READS config.planted ANYWHERE IN ITS BODY. ***
+    // An observable census flagged codeRel and widerExact (window mode) as moved by neither knob nor plant --
+    // correctly, since window mode carries no plant at all (see the comment above: innerFine/innerCoarse move
+    // together under any change of test vector, so a plant there is indistinguishable from noise). Chasing why
+    // led here instead: narrowwindow, the mode THIS declaration already names as plantMode, IS the plant, and
+    // plantIdealWhy already has the numbers for it. Line 240 reads `const narrow = h.mode === "narrowwindow"`
+    // -- the plant is a MODE NAME, mpmstepBind's exact shape (plantMode: "continuous", plantFlips: "errY",
+    // plantKind: "mode"), not a config flag. The label was simply wrong, which is why generic tooling reading
+    // this lab's own plantKind vocabulary -- this census included -- found no plant here to compare against.
+    plantMode: "narrowwindow", plantFlips: "adjointWorst", plantKind: "mode",
     plantIdeal: 0, plantIdealWhy:
         "adjointWorst is the worst restriction/prolongation adjoint defect over the level pairs, identically 0 for a matched pair; narrowing the window takes it 7.19e-16 -> 2.93e-1",
 };
