@@ -98,8 +98,8 @@
       <button id="stop" disabled>Stop</button>
       <label style="font-size:11px;display:flex;align-items:center;gap:5px;color:var(--dim)">sort
         <select id="sortMode" style="font:inherit;font-size:11px;background:#0e2036;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px">
-          <option value="name">A-Z</option>
           <option value="time">shortest first</option>
+          <option value="name">A-Z</option>
         </select>
       </label>
       <span id="tally" class="tot"></span>
@@ -111,7 +111,16 @@
 
 <script>
 (function () {
-  var checks = [], rawChecks = [], sortMode = "name", stopped = false;
+  // v4170 -- SHORTEST EXPECTED FIRST IS THE DEFAULT, at Keith's request, and the machinery for it already
+  // existed as an opt-in nobody would think to pick before their first slow run. The argument is the same one
+  // corroborationCensus makes about its own sweep: a run that is going to be cut short should spend its budget
+  // where it buys the most COVERAGE, and a rig session that ends early has still answered the most questions.
+  // It also puts the fast, cheap, most-likely-to-be-broken checks in front of a person who is watching, rather
+  // than behind twof at 943 seconds.
+  //
+  // The `time` order is NOT "quick gates only": unmeasured gates SINK rather than float (see sortChecks), so a
+  // blank stays what it is -- missing evidence, not a fast gate -- and still runs, just last.
+  var checks = [], rawChecks = [], sortMode = "time", stopped = false;
 
   function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
 

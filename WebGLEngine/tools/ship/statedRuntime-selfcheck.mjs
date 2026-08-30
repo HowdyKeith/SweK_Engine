@@ -1,6 +1,10 @@
 // WebGLEngine/tools/ship/statedRuntime-selfcheck.mjs
 //
-// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~176ms MEASURED, median of 153/188/176 at v4171 --
+//   superseding a stated ~2s that ALSO said MEASURED, and which this file caught in ITSELF the moment it
+//   first had a recorded time to compare against. It had none until v4171, so the one gate whose whole
+//   job is comparing stated runtimes to measured ones had never been able to run that comparison on its
+//   own header.)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3213 -- EIGHTY-ONE GATES STATE HOW LONG THEY TAKE. NOTHING HAS EVER COMPARED THAT TO HOW LONG THEY TAKE.

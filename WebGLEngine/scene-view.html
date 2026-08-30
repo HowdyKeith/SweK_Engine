@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Scene Viewer</title>
+<meta name="demo:title"  content="Scene Viewer">
+<meta name="demo:desc"   content="Open a .glb exported by swekExport.scene() on a phone, tablet or TV. Uses the file's own camera and applies the sun/fog recipe from scene.extras. Gamepad and D-pad aware.">
+<meta name="demo:cats"   content="viewer,3d,export">
+<meta name="demo:swatch" content="📺">
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#06070c;color:#bcd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 14px;background:rgba(12,16,30,0.92);border-bottom:1px solid rgba(120,180,220,0.25);align-items:center;flex-wrap:wrap}
+  #topbar h1{margin:0;font-size:15px;font-weight:600;color:#cdf;flex:1;min-width:130px}
+  /* TV-sized hit targets: a Shield remote moves focus, it does not point, so everything must be big and must
+     show focus clearly. A 12px button that looks fine on a desktop is unusable from a sofa. */
+  #topbar button,#topbar label.btn{padding:10px 16px;border-radius:7px;border:1px solid rgba(120,180,220,0.4);background:rgba(12,18,30,0.85);color:#cdf;font-size:14px;cursor:pointer}
+  #topbar button:focus,#topbar label.btn:focus-within{outline:3px solid #6cf;outline-offset:2px}
+  #topbar input[type=text]{background:rgba(8,8,18,0.9);color:#cde;border:1px solid rgba(120,180,220,0.3);border-radius:6px;padding:9px 10px;font-size:13px;min-width:180px;flex:1}
+  #host{flex:1;position:relative;overflow:hidden}
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #hud{position:absolute;left:12px;top:12px;font-size:13px;color:#9ab;background:rgba(6,8,16,0.6);padding:9px 12px;border-radius:7px;pointer-events:none;max-width:70%;line-height:1.6}
+  #msg{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:13px;color:#9ab;background:rgba(6,8,16,0.65);padding:7px 12px;border-radius:7px;text-align:center;max-width:80%}
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>📺 Scene Viewer</h1>
+    <label class="btn" tabindex="0">📂 File<input id="file" type="file" accept=".glb,.gltf" style="display:none"></label>
+    <input id="url" type="text" placeholder="…or a scene .glb URL" autocomplete="off">
+    <button id="btnUrl">⬇ Load</button>
+    <button id="btnView">🎥 File camera</button>
+    <button id="btnFog">🌫 Fog</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host">
+    <canvas id="c"></canvas>
+    <div id="hud">drag / left stick: look · wheel or triggers: move</div>
+    <div id="msg">Load a scene exported with <b>swekExport.scene()</b></div>
+  </div>
+</div>
+<script type="module">
+// v4176 -- THE FAR END OF swekExport.scene().
+//
+// *** THIS PAGE EXISTS BECAUSE THE SHIELD CANNOT RUN THE ENGINE AND CAN EASILY DRAW THE RESULT. *** main.js is
+// thirty thousand lines with hundreds of subsystems ticking every frame. An Android TV browser will not run
+// that and no amount of tuning will change it. A baked scene is triangles, and the same browser draws those
+// without effort. server.html has treated "phones / Shield / TV" as LAN clients on 8787 all along -- the
+// transport was there and only the payload was missing.
+//
+// *** IT APPLIES THE RECIPE RATHER THAN INVENTING A LOOK. *** The exporter cannot bake sun, fog or water --
+// they are shader uniforms in raw WebGL, not meshes -- so it writes the numbers it used into scene.extras and
+// this page applies THOSE, not defaults that would look arbitrary and be wrong in a way nobody could trace.
+// If a file carries no extras, the page says so instead of quietly making something up.
+import * as THREE from "three";
+import { GLTFLoader } from "/vendor/three/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+
+const $ = (id) => document.getElementById(id);
+const msg = (t) => { $("msg").innerHTML = t || ""; };
+const hud = (t) => { $("hud").innerHTML = t || ""; };
+$("btnBack").addEventListener("click", () => location.href = "/phone.html");
+
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06070c);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 5000);
+camera.position.set(20, 20, 40);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x2a2620, 1.1);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(0.4, 1, 0.5);
+scene.add(sun);
+
+let current = null, fileCam = null, fogOn = true, sceneEnv = null;
+
+function resize() {
+    const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+    if (canvas.width !== w || canvas.height !== h) {
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+}
+
+/** Frame the whole scene, for a file with no camera of its own. */
+function frameAll(obj) {
+    const box = new THREE.Box3().setFromObject(obj);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    const r = Math.max(size.x, size.y, size.z) || 1;
+    camera.position.set(c.x + r * 0.9, c.y + r * 0.7, c.z + r * 0.9);
+    camera.far = Math.max(1000, r * 8); camera.updateProjectionMatrix();
+    controls.target.copy(c); controls.update();
+}
+
+/** Apply scene.extras.swek.environment -- the numbers the engine actually used. */
+function applyEnvironment(env) {
+    sceneEnv = env || null;
+    if (!env) { scene.fog = null; return; }
+    if (Array.isArray(env.sunDir) && env.sunDir.length === 3) sun.position.set(env.sunDir[0], env.sunDir[1], env.sunDir[2]).normalize();
+    if (Array.isArray(env.sunColor) && env.sunColor.length === 3) sun.color.setRGB(env.sunColor[0], env.sunColor[1], env.sunColor[2]);
+    if (Array.isArray(env.fogColor) && env.fogColor.length === 3) {
+        const col = new THREE.Color(env.fogColor[0], env.fogColor[1], env.fogColor[2]);
+        scene.background = col;
+        // THE SAME near/far THE ENGINE USED, not a guess scaled off the bounding box. A viewer that invents
+        // fog distances produces a picture that is plausible and does not match what was exported.
+        if (fogOn && Number.isFinite(env.fogNear) && Number.isFinite(env.fogFar)) scene.fog = new THREE.Fog(col, env.fogNear, env.fogFar);
+        else scene.fog = null;
+    }
+}
+
+function describe(gltf, bytes) {
+    const g = gltf.scene;
+    let meshes = 0, tris = 0, nodes = 0;
+    g.traverse((o) => { nodes++; if (o.isMesh) { meshes++; const p = o.geometry?.index?.count ?? o.geometry?.attributes?.position?.count ?? 0; tris += p / 3; } });
+    const mb = bytes ? (bytes / 1048576).toFixed(2) + " MB · " : "";
+    const env = sceneEnv
+        ? `sun ${sceneEnv.sunDir ? sceneEnv.sunDir.map((n) => n.toFixed(2)).join(", ") : "—"}` +
+          (Number.isFinite(sceneEnv.hour) ? ` · ${String(Math.floor(sceneEnv.hour)).padStart(2, "0")}:${String(Math.round((sceneEnv.hour % 1) * 60)).padStart(2, "0")}` : "") +
+          (sceneEnv.weather ? ` · ${sceneEnv.weather}` : "") +
+          (Number.isFinite(sceneEnv.fogFar) ? ` · fog ${Math.round(sceneEnv.fogNear)}–${Math.round(sceneEnv.fogFar)}` : "")
+        : "no environment recorded — this file did not come from swekExport.scene()";
+    hud(`${mb}${Math.round(tris).toLocaleString()} triangles · ${meshes} meshes · ${nodes} nodes<br>${env}` +
+        (fileCam ? "<br>file camera available — 🎥 to use it" : "<br>no camera in file — framed to fit"));
+}
+
+const loader = new GLTFLoader();
+
+async function loadBuffer(buf, label) {
+    msg("parsing " + label + "…");
+    try {
+        const gltf = await loader.parseAsync(buf, "");
+        if (current) { scene.remove(current); current.traverse((o) => { o.geometry?.dispose?.(); }); }
+        current = gltf.scene; scene.add(current);
+        // the exporter writes extras on the SCENE, which three surfaces as userData on the scene object
+        const ex = gltf.scene?.userData?.swek || gltf.parser?.json?.scenes?.[gltf.parser?.json?.scene ?? 0]?.extras?.swek;
+        applyEnvironment(ex?.environment || null);
+        fileCam = (gltf.cameras && gltf.cameras.length) ? gltf.cameras[0] : null;
+        if (fileCam) useFileCamera(); else frameAll(current);
+        describe(gltf, buf.byteLength);
+        msg("");
+    } catch (e) {
+        msg("could not load: " + (e?.message || e));
+    }
+}
+
+/** Put the orbit camera where the exported one stood, looking the way it looked. */
+function useFileCamera() {
+    if (!fileCam) { msg("this file carries no camera"); return; }
+    fileCam.updateMatrixWorld(true);
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+    fileCam.matrixWorld.decompose(pos, quat, scl);
+    camera.position.copy(pos);
+    // -Z is the glTF camera's look direction, which is the convention the exporter's lookRotation() writes to.
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
+    controls.target.copy(pos.clone().add(fwd.multiplyScalar(30)));
+    if (fileCam.isPerspectiveCamera && fileCam.fov) { camera.fov = fileCam.fov; camera.updateProjectionMatrix(); }
+    controls.update();
+}
+
+$("btnView").addEventListener("click", useFileCamera);
+$("btnFog").addEventListener("click", () => { fogOn = !fogOn; applyEnvironment(sceneEnv); msg("fog " + (fogOn ? "on" : "off")); });
+$("file").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    loadBuffer(await f.arrayBuffer(), f.name);
+});
+async function loadUrl(u) {
+    msg("fetching…");
+    try { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); loadBuffer(await r.arrayBuffer(), u.split("/").pop()); }
+    catch (e) { msg("fetch failed: " + (e?.message || e)); }
+}
+$("btnUrl").addEventListener("click", () => { const u = $("url").value.trim(); if (u) loadUrl(u); });
+$("url").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnUrl").click(); });
+
+// A ?src= parameter, so the PC can hand the TV a link rather than the TV typing a URL with a remote --
+// which is the actual reason this page needs one.
+{ const p = new URLSearchParams(location.search).get("src"); if (p) { $("url").value = p; loadUrl(p); } }
+
+// Gamepad: the Shield ships with one, and a sofa has no mouse. Left stick looks, triggers dolly.
+let pad = null;
+window.addEventListener("gamepadconnected", (e) => { pad = e.gamepad.index; msg("gamepad connected"); });
+window.addEventListener("gamepaddisconnected", () => { pad = null; });
+function pollPad(dt) {
+    if (pad === null || !navigator.getGamepads) return;
+    const g = navigator.getGamepads()[pad]; if (!g) return;
+    const dead = (v) => Math.abs(v) < 0.15 ? 0 : v;
+    const lx = dead(g.axes[0] || 0), ly = dead(g.axes[1] || 0);
+    if (lx || ly) {
+        const off = camera.position.clone().sub(controls.target);
+        const sph = new THREE.Spherical().setFromVector3(off);
+        sph.theta -= lx * dt * 1.6;
+        sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi + ly * dt * 1.2));
+        camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+    }
+    const dolly = (g.buttons[7]?.value || 0) - (g.buttons[6]?.value || 0);
+    if (dolly) {
+        const dir = controls.target.clone().sub(camera.position).normalize();
+        camera.position.add(dir.multiplyScalar(dolly * dt * 40));
+    }
+}
+
+let last = performance.now();
+function loop(t) {
+    requestAnimationFrame(loop);
+    const dt = Math.min((t - last) / 1000, 0.1); last = t;
+    resize(); pollPad(dt); controls.update();
+    renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

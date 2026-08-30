@@ -189,4 +189,54 @@ export class SpatialGrid {
         }
         return { cells, mean: cells ? total / cells : 0, max, direct: this._direct };
     }
+
+    /**
+     * *** HOW MANY OCCUPIED CELLS ONE QUERY ACTUALLY TOUCHES -- AN INSTRUMENT ON THE GRID, NOT A GUESS FROM
+     * OUTSIDE IT. ***
+     *
+     * v4170. neighbourBakeoff-selfcheck measured this by reaching into `grid.map` and counting keys, which was
+     * correct until v4122 gave this class a dense path. `map` is not dead -- it is still the hash FALLBACK for
+     * a domain too large to allocate -- but on the dense path it is simply EMPTY, so the gate's
+     * `grid.map.has(k)` was false every time and the count read 0 for three straight configs.
+     *
+     * *** AND THE EMPTINESS IS WHY IT WAS SILENT. *** Had v4122 deleted the field, `grid.map.has` would have
+     * thrown and the gate would have gone red on the round that caused it. Instead a real, plausible, wrong
+     * number -- zero -- was pinned against an answer key and reported as a mismatch nobody could interpret.
+     * A VESTIGIAL FIELD IS WORSE THAN A MISSING ONE, because the reader gets an answer instead of an error.
+     *
+     * It counts what forEachNear WALKS, on whichever path is live: on the dense path the CLAMPED 3x3x3 range
+     * (a query at the boundary genuinely visits fewer cells), on the hash path the deduped 27 keys. Occupied
+     * only -- an empty cell is visited but costs nothing, and the number exists to explain candidate counts.
+     */
+    cellsTouched(x, y, z) {
+        const c = this.cell;
+        let touched = 0;
+        if (this._direct) {
+            const nx = this._dim[0], ny = this._dim[1], nz = this._dim[2], head = this._head;
+            const cx = Math.floor((x - this._min[0]) / c), cy = Math.floor((y - this._min[1]) / c),
+                  cz = Math.floor((z - this._min[2]) / c);
+            const ax = cx - 1 < 0 ? 0 : cx - 1, bx = cx + 1 >= nx ? nx - 1 : cx + 1;
+            const ay = cy - 1 < 0 ? 0 : cy - 1, by = cy + 1 >= ny ? ny - 1 : cy + 1;
+            const az = cz - 1 < 0 ? 0 : cz - 1, bz = cz + 1 >= nz ? nz - 1 : cz + 1;
+            for (let iz = az; iz <= bz; iz++)
+                for (let iy = ay; iy <= by; iy++) {
+                    const row = (iz * ny + iy) * nx;
+                    for (let ix = ax; ix <= bx; ix++) if (head[row + ix] >= 0) touched++;
+                }
+            return touched;
+        }
+        // the hash path dedupes because two of the 27 keys CAN collide -- same reason forEachNear does
+        const cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);
+        const seen = this._seen;
+        let n = 0;
+        for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const k = this._key(cx + dx, cy + dy, cz + dz);
+            let dup = false;
+            for (let q = 0; q < n; q++) if (seen[q] === k) { dup = true; break; }
+            if (dup) continue;
+            seen[n++] = k;
+            if (this.map.has(k)) touched++;
+        }
+        return touched;
+    }
 }

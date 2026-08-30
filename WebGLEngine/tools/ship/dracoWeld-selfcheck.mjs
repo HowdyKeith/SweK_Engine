@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeGlb } from "../export/voxelGlb.mjs";
+import { routeFor, loadGlb } from "../../gpu/glbLoad.js";
 import { peekGlb, needsDraco, extensionsOf, DRACO_EXT, MAX_JSON } from "../../gpu/glbPeek.mjs";
 import { describeGlb } from "../../gpu/gltfDraco.js";
 import { weld, weldIsLossless, DEFAULT_EPSILON } from "../export/weldVertices.mjs";
@@ -198,9 +199,169 @@ console.log("\n6. what was refused, asserted so a later round cannot quietly add
            "pass. Two of seven, and the other five are refused on the record.");
 }
 
+console.log("\n*** THE ROUTE, BECAUSE A HELPFUL ERROR IS NOT A ROUTE ***");
+{
+    // v4174. GLBParser.js meets a Draco file and throws a genuinely good message -- "Load it through three's
+    // GLTFLoader instead ... gpu/gltfDraco.js attaches the decoder only for files that need it." Every caller
+    // had to read that sentence and implement the fallback itself, and none of face/robotFaceAvatar.js,
+    // face/miniAvatar.js or face/avatarStage.js did. gltfDraco was imported by NOTHING but this gate.
+    //
+    // *** AND MY OWN v4169 ORPHAN SWEEP CLEARED IT AS WIRED, BY THE EXACT DEFECT THAT SWEEP WAS FIXING. ***
+    // A grep for the string "gltfDraco.js" hit GLBParser.js -- inside the error message above. A MENTION
+    // COUNTED AS A WIRE, in the round whose subject was that a sentence is not a wire.
+    const flag = (buf, { used = true, required = true, onPrimitive = true } = {}) => {
+        const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+        const jl = dv.getUint32(12, true);
+        const json = JSON.parse(new TextDecoder().decode(u8.subarray(20, 20 + jl)));
+        if (used) json.extensionsUsed = ["KHR_draco_mesh_compression"];
+        if (required) json.extensionsRequired = ["KHR_draco_mesh_compression"];
+        if (onPrimitive) for (const m of json.meshes || []) for (const pr of m.primitives || [])
+            pr.extensions = { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } };
+        let t = JSON.stringify(json); while (t.length % 4) t += " ";
+        const jb = new TextEncoder().encode(t), bin = u8.subarray(20 + jl);
+        const out = new Uint8Array(20 + jb.length + bin.length), o = new DataView(out.buffer);
+        o.setUint32(0, 0x46546C67, true); o.setUint32(4, 2, true); o.setUint32(8, out.length, true);
+        o.setUint32(12, jb.length, true); o.setUint32(16, 0x4E4F534A, true);
+        out.set(jb, 20); out.set(bin, 20 + jb.length); return out;
+    };
+    const plainGlb = writeGlb([{ name: "t", positions: [0,0,0, 1,0,0, 0,1,0], indices: [0,1,2] }]);
+
+    ok("!! an ordinary GLB routes to the cheap parser and never fetches a decoder",
+        routeFor(plainGlb).route === "plain", routeFor(plainGlb).why);
+    ok("!! a compressed one routes to Draco", routeFor(flag(plainGlb)).route === "draco");
+
+    // *** THE TWO CASES THAT DISAGREE, WHICH IS WHERE THE RULE ACTUALLY LIVES. ***
+    const declaredOnly = flag(plainGlb, { required: false, onPrimitive: false });
+    ok("!! *** declared but compressing NOTHING routes to PLAIN -- no 256 KB fetch to decode nothing ***",
+        routeFor(declaredOnly).route === "plain",
+        routeFor(declaredOnly).why + ". needsDraco() returns the CONSERVATIVE verdict (true if declared at " +
+        "all) and reports declaredButUnused separately; this is what that finer signal is for");
+
+    const requiredButEmpty = flag(plainGlb, { required: true, onPrimitive: false });
+    ok("!! *** ...unless extensionsRequired says so, which OVERRIDES what we could otherwise parse ***",
+        routeFor(requiredButEmpty).route === "draco",
+        "glTF says a file listing an extension in extensionsRequired cannot be loaded without it. GLBParser " +
+        "would read every accessor here quite happily, and a conformant loader still must not. THE FIRST " +
+        "DRAFT OF glbLoad.js GOT THIS WRONG IN A COMMENT -- it claimed declaredButUnused routed to plain " +
+        "while the code tested needsDraco first and never reached that branch. The fixture is what forced " +
+        "the rule out; a comment describing behaviour the code does not have is this tree's commonest defect");
+
+    // The failure mode when no decoder is supplied must name the CAUSE, not a symptom three levels down.
+    // *** AWAITED, NOT FIRED AND FORGOTTEN. *** The first draft wrapped this in a bare `(async () => {...})()`
+    // and the gate reached process.exit before the promise resolved, so the assertion never ran and never
+    // said it had not run -- a check that is absent and silent, which is worse than one that is red.
+    // Top-level await is available in an .mjs gate; there was never a reason to detach it.
+    const noDecoder = await loadGlb(flag(plainGlb), { parsePlain: () => "x" });
+    ok("!! a Draco file with no decoder says WHAT is missing, not 'accessor has no bufferView'",
+        !noDecoder.ok && /needs a Draco decoder/.test(noDecoder.error) && /gltfDraco/.test(noDecoder.hint || ""),
+        noDecoder.error + " | " + (noDecoder.hint || ""));
+
+    // ...and the plain route really does call the parser it was handed
+    const plainRan = await loadGlb(plainGlb, { parsePlain: () => "PARSED" });
+    ok("   ...and the plain route actually invokes the parser, rather than merely deciding to",
+        plainRan.ok && plainRan.route === "plain" && plainRan.result === "PARSED",
+        "route " + plainRan.route + ", result " + plainRan.result);
+
+    // AND THE ROUTE IS TAKEN BY A REAL CALLER, not only by this gate.
+    const avatar = codeOnly(fs.readFileSync(path.join(ENG, "face", "robotFaceAvatar.js"), "utf8"));
+    ok("!! *** face/robotFaceAvatar.js ROUTES rather than calling GLBParser blind ***",
+        /import\s*\{[^}]*loadGlb[^}]*\}\s*from/.test(avatar) && /loadGlb\s*\(/.test(avatar)
+        && /parseDraco\s*:/.test(avatar),
+        "it supplies BOTH branches -- parsePlain for the ordinary case and a parseDraco that imports the " +
+        "decoder lazily. Before this the call site went straight to GLBParser.parse and a Draco avatar threw");
+
+    ok("   ...and the decoder import stays inside the draco branch, so an ordinary avatar pays nothing",
+        /parseDraco[\s\S]{0,400}?import\(/.test(avatar),
+        "the dynamic import sits in the branch, not at the top of the module -- which is the entire reason " +
+        "gltfDraco was written lazy in the first place");
+
+    const src = codeOnly(fs.readFileSync(path.join(ENG, "gpu", "glbLoad.js"), "utf8"));
+    ok("   ...and the router imports neither three nor the decoder, so it stays the seam and not the merge",
+        !/["']three["']/.test(src) && !/gltfDraco/.test(src) && !/DRACOLoader/.test(src),
+        "loaders arrive as parameters -- a router that pulls in every destination is the merged module with " +
+        "extra steps, and it is also what lets this gate drive both branches with no three.js and no GL");
+}
+
+console.log("\n*** WELDING IS REACHABLE FROM THE WRITER, NOT ONLY FROM THIS GATE ***");
+{
+    // v4169 -- weldVertices.mjs shipped at v4162 with a header saying it "takes and returns the flat arrays
+    // voxelGlb.writeGlb speaks". THE SEAM WAS DECLARED ON ONE SIDE AND NEVER JOINED: nothing but this gate
+    // ever called weld(), so referenceKind counted it among the orphans. writeGlb now takes `weld`.
+    const square = { positions: [0,0,0, 1,0,0, 1,1,0,  0,0,0, 1,1,0, 0,1,0] };   // 6 vertices, 4 distinct
+    const plain = writeGlb([square]);
+    const welded = writeGlb([square], { weld: true });
+    ok("!! *** writeGlb({ weld: true }) actually removes the duplicate vertices ***",
+        welded.byteLength < plain.byteLength,
+        "two triangles sharing an edge: " + plain.byteLength + " bytes -> " + welded.byteLength +
+        " welded. THE SAVING IS THE WHOLE POINT of the glb-shrink idea, and a wiring that changed nothing " +
+        "would look identical to one that was never called");
+
+    ok("!! ...and it is OFF by default, because welding DISCARDS a distinction",
+        writeGlb([square]).byteLength === plain.byteLength,
+        "two vertices at one position with different normals are a HARD EDGE. Welding them is a request, " +
+        "never a default -- a writer that quietly smoothed every exported mesh would be losing geometry " +
+        "the caller built on purpose");
+
+    // and the epsilon is the caller's, not a constant hidden in the writer
+    const coarse = writeGlb([square], { weld: 0.5 });
+    ok("   ...and the caller sets the epsilon", coarse.byteLength <= welded.byteLength,
+        "weld: 0.5 -> " + coarse.byteLength + " bytes against " + welded.byteLength + " at the default " +
+        "epsilon. WHAT COUNTS AS 'THE SAME VERTEX' IS A DECISION and it belongs to whoever is exporting");
+}
+
+// ---- 7. A REAL DRACO GLB FROM KHRONOS, WHICH THIS GATE PREVIOUSLY HAD TO SAY IT DID NOT HAVE ------------------
+//
+// v4174 shipped the router and closed with a stated gap: "an actual Draco-compressed GLB decoded end to end.
+// No such file exists in this tree." Sections 1-3 above route files OUR OWN WRITER produced, which means the
+// router had only ever been shown declarations this tree wrote itself. gpu/khronosSamples.mjs found eighteen
+// models published in a Draco variant; ABeautifulGame's is a self-contained .glb, and BOTH ITS ENCODINGS ARE
+// PUBLISHED -- the same fifteen primitives, Draco and plain -- which makes it a matched pair rather than a
+// single example.
+//
+// The fixtures are HEADER-ONLY: the genuine 12-byte header and JSON chunk of each, with the BIN chunk removed
+// (22 KB and 32 KB, against 12 MB and 43 MB). That is not a shortcut around the check -- routeFor reads the
+// JSON chunk and NOTHING ELSE, so the fixture is byte-for-byte what the router actually looks at. It does mean
+// this section proves ROUTING and not DECODING, which the closing note still says, because a routing pass that
+// was allowed to read as a decode pass would be worse than the gap it replaced.
+// Licence: CC-BY-4.0, credit carried in gpu/fixtures/PROVENANCE.md. See there for why that had to be checked.
+{
+    const fx = (n) => { const b = fs.readFileSync(path.join(ENG, "gpu", "fixtures", n)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
+    const draco = fx("ABeautifulGame-draco.header.glb");
+    const plain = fx("ABeautifulGame-plain.header.glb");
+
+    const rd = routeFor(draco), rp = routeFor(plain);
+    ok("a REAL Draco-compressed GLB routes to the decoder", rd.ok && rd.route === "draco", rd.why);
+    ok("   ...because the file REQUIRES the extension, not merely uses it", rd.verdict.inRequired === true,
+        "extensionsRequired is the spec's word and overrides what we think we could otherwise parse");
+    ok("   ...and every one of its primitives is compressed",
+        rd.verdict.dracoPrimitives === 15 && rd.verdict.totalPrimitives === 15,
+        rd.verdict.dracoPrimitives + " of " + rd.verdict.totalPrimitives + " primitives carry the extension");
+    ok("   ...so it is not the declared-but-unused case", rd.verdict.declaredButUnused === false,
+        "a real compressed file and the informational-declaration case must not land in the same branch");
+
+    ok("THE SAME MODEL's plain encoding routes to the plain parser", rp.ok && rp.route === "plain", rp.why);
+    ok("   ...with the same primitive count, so the pair differs ONLY in encoding",
+        rp.verdict.totalPrimitives === rd.verdict.totalPrimitives,
+        "both 15 primitives -- the router is separating them on the extension and not on some other difference");
+    ok("   ...and claims no Draco at all", rp.verdict.inUsed === false && rp.verdict.dracoPrimitives === 0,
+        "a false positive here would send a readable file to a 256 KB decoder for nothing");
+
+    // the loader dispatch, not just the verdict
+    const seen = [];
+    await loadGlb(draco, { parsePlain: async () => { seen.push("plain"); }, parseDraco: async () => { seen.push("draco"); } });
+    await loadGlb(plain, { parsePlain: async () => { seen.push("plain"); }, parseDraco: async () => { seen.push("draco"); } });
+    ok("   ...and loadGlb actually CALLS the loader each one routed to", seen.join(",") === "draco,plain",
+        "dispatched: " + seen.join(", "));
+
+    // and the size difference the extension exists for, measured on the real files these were cut from
+    report("the full files these fixtures were cut from are 12,105,252 bytes Draco against 42,977,928 plain " +
+           "-- 3.55x, measured by fetching both, not quoted from the extension's documentation");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-            "\nunchecked here: an actual Draco-compressed GLB decoded end to end. No such file exists in this " +
-            "tree and this round wrote no encoder -- draco.js DECODES ONLY, and neither it nor glb-shrink " +
-            "ships an encoder we could vendor. The decode path is upstream's, unmodified, and the detection " +
-            "that routes files to it is what is gated above.");
+            "\nunchecked here: an actual Draco-compressed GLB DECODED end to end. Section 7 closes half of what this " +
+            "note used to say -- a real Khronos Draco GLB now routes here, correctly, alongside the same model's " +
+            "plain encoding -- but ROUTING IS NOT DECODING, and the decode still needs the full 12 MB and a " +
+            "browser. This round wrote no encoder either: draco.js DECODES ONLY, and neither it nor glb-shrink " +
+            "ships an encoder we could vendor. The decode path is upstream's, unmodified.");
 process.exit(fails ? 1 : 0);

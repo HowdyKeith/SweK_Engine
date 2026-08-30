@@ -44,25 +44,43 @@ function bruteNear(ps, i, r) {
     return out;
 }
 // grid cells actually touched by a query (dedupe of the 27, matching forEachNear), for a fair traversal count.
-function gridCells(grid, p) {
+// *** v4170 -- THIS ASKS THE GRID INSTEAD OF REACHING INSIDE IT, AND THE OLD VERSION READ ZERO FOR THREE
+// STRAIGHT CONFIGS WITHOUT SAYING SO. ***
+//
+// It used to walk `grid._key(...)` and count hits in `grid.map` -- correct until v4122 gave SpatialGrid a
+// dense path. `map` is not dead: it is still the hash FALLBACK for a domain too large to allocate. On the
+// dense path it is simply EMPTY, so `grid.map.has(k)` was false every time and this returned 0 always.
+//
+// *** THE EMPTINESS IS EXACTLY WHY IT WAS SILENT. *** Had v4122 deleted the field, `grid.map.has` would have
+// thrown and this gate would have gone red on the round that caused it. Instead it produced a real,
+// plausible, wrong number and pinned it against an answer key, and the failure read as "the counts moved"
+// rather than "the instrument stopped working". A VESTIGIAL FIELD IS WORSE THAN A MISSING ONE.
+//
+// grid.cellsTouched() lives on the class, sees whichever path is live, and cannot go quietly out of date the
+// way a copy of the traversal out here did.
+function gridCells(grid, p) { return grid.cellsTouched(p.x, p.y, p.z); }
+
+/** How many of one query's 27 cell keys COLLIDE under the hash -- the number that explains the re-pin below. */
+function hashCollisions(grid, p) {
     const c = grid.cell, cx = Math.floor(p.x / c), cy = Math.floor(p.y / c), cz = Math.floor(p.z / c);
-    const keys = []; let touched = 0;
+    const keys = []; let dup = 0;
     for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const k = grid._key(cx + dx, cy + dy, cz + dz);
-        if (keys.indexOf(k) >= 0) continue; keys.push(k); if (grid.map.has(k)) touched++;
+        if (keys.indexOf(k) >= 0) dup++; else keys.push(k);
     }
-    return touched;
+    return dup;
 }
 
 function run(cfg) {
     const rng = mulberry32(cfg.seed), ps = makeParticles(cfg.n, cfg.box, cfg.clumps, rng), r = cfg.r;
     const grid = new SpatialGrid(r); grid.rebuild(ps);
     const bvh = buildBvh(ps, r);
-    let bvhChecks = 0, bvhCands = 0, gridCands = 0, gridCellTouches = 0, totalExact = 0, mism = 0;
+    let bvhChecks = 0, bvhCands = 0, gridCands = 0, gridCellTouches = 0, totalExact = 0, mism = 0, keyCollisions = 0;
     const exactOf = new Array(cfg.n);
     for (let i = 0; i < cfg.n; i++) {
         const p = ps[i];
         const g = grid.near(p.x, p.y, p.z); gridCands += g.length; gridCellTouches += gridCells(grid, p);
+        keyCollisions += hashCollisions(grid, p);
         const bv = bvhNear(bvh, p.x, p.y, p.z, r); bvhChecks += bv.checks; bvhCands += bv.hits.length;
         const eG = exactFilter(ps, i, g, r), eB = exactFilter(ps, i, bv.hits, r), eBrute = bruteNear(ps, i, r).sort((a, b) => a - b);
         if (!eqArr(eG, eB) || !eqArr(eG, eBrute)) mism++;
@@ -70,7 +88,7 @@ function run(cfg) {
     }
     // 2b) the exact relation must be symmetric: j near i  <=>  i near j
     let asym = 0; for (let i = 0; i < cfg.n; i++) for (const j of exactOf[i]) if (!exactOf[j].has(i)) asym++;
-    return { ...cfg, bvhChecks, bvhCands, gridCands, gridCellTouches, totalExact, mism, asym, bvhBuilt: bvh.built, gridBuilt: grid.built, nodes: bvh.nodes.length };
+    return { ...cfg, bvhChecks, bvhCands, gridCands, gridCellTouches, totalExact, mism, asym, keyCollisions, bvhBuilt: bvh.built, gridBuilt: grid.built, nodes: bvh.nodes.length };
 }
 
 const CONFIGS = [
@@ -83,11 +101,37 @@ const CONFIGS = [
 // on any machine -- which is exactly what makes them a fair comparison and a regression tripwire. Change either
 // structure and a count moves; this gate then fails and forces the number (and its reason) to be re-recorded,
 // rather than the measurement silently drifting.
+//
+// *** v4170 RE-PIN -- THE GRID NUMBERS DESCRIBED A LATTICE THAT NO LONGER RUNS FOR THESE CONFIGS. ***
+//
+// v4122 gave SpatialGrid a dense path. It is not merely a faster spelling of the hash path: THE TWO USE
+// DIFFERENT LATTICES. The hash partitions on absolute coordinates, `floor(x / c)`. The dense path partitions
+// relative to the bounding-box minimum, `floor((x - _min) / c)`, and `_min` is wherever the particles happen
+// to start -- measured on a 3-particle case, `_min = -0.3` with `c = 1`, so the cell boundaries sit 0.3 of a
+// cell away from the hash's. Particles therefore group DIFFERENTLY, and both the occupied-cell count and the
+// candidate count move with the offset. Neither lattice is wrong: a neighbour search needs cells at least h
+// wide, never a particular origin.
+//
+// *** WHAT DID NOT MOVE IS THE ONLY THING THAT WAS EVER A CORRECTNESS CLAIM. *** totalExact is IDENTICAL on
+// all three configs -- 622, 27564, 1344 -- and mism and asym are still 0, so grid == bvh == brute-force and
+// the relation is still symmetric. The counts that moved are EFFICIENCY, not truth.
+//
+// *** AND THE FIRST EXPLANATION I WROTE FOR THIS WAS WRONG, WHICH IS WHY keyCollisions IS REPORTED BELOW. ***
+// The obvious story was hash collisions: a collision makes the hash path skip a genuine cell as a duplicate
+// (fewer candidates) while `map.has()` reads true for a cell the query never needed (more "touched"), and
+// both directions fit. Then it was measured per config: 42 collisions on uniform-400, 96 on uniform-800, and
+// ZERO on clumped-400 -- the config whose cell count moved furthest by a wide margin, 3061 -> 2247. A STORY
+// THAT FITS THE DIRECTION OF EVERY NUMBER CAN STILL BE THE WRONG CAUSE, and only the per-config measurement
+// separated it from the lattice offset that actually explains it.
 const EXPECTED = {
-    "uniform-400": { totalExact: 622,   bvhChecks: 52082,  bvhCand: 7814,  gridCand: 3872,  gridCellTouches: 3126 },
-    "clumped-400": { totalExact: 27564, bvhChecks: 97922,  bvhCand: 45004, gridCand: 38702, gridCellTouches: 3061 },
-    "uniform-800": { totalExact: 1344,  bvhChecks: 123932, bvhCand: 17476, gridCand: 8230,  gridCellTouches: 6411 },
+    "uniform-400": { totalExact: 622,   bvhChecks: 52082,  bvhCand: 7814,  gridCand: 3864,  gridCellTouches: 3108 },
+    "clumped-400": { totalExact: 27564, bvhChecks: 97922,  bvhCand: 45004, gridCand: 38946, gridCellTouches: 2247 },
+    "uniform-800": { totalExact: 1344,  bvhChecks: 123932, bvhCand: 17476, gridCand: 8274,  gridCellTouches: 6435 },
 };
+
+/** Hash-key collisions per config, REPORTED not asserted -- they are a real property of _key and they are
+ *  NOT the cause of the re-pin above. Kept because the next reader will reach for the same wrong answer. */
+const COLLISIONS_MEASURED = { "uniform-400": 42, "clumped-400": 0, "uniform-800": 96 };
 
 console.log("  config        N   exact  |  bvhChecks  bvhCand  bvhBuilt  |  gridCand  gridCells  gridBuilt");
 const results = {};
@@ -98,6 +142,15 @@ for (const cfg of CONFIGS) {
     ok(R.bvhCands >= R.totalExact && R.gridCands >= R.totalExact, `[${cfg.name}] both structures return a superset of the exact neighbours`);
     ok(R.nodes === 2 * cfg.n - 1 && R.bvhBuilt === 2 * cfg.n - 1, `[${cfg.name}] bvh is a full binary tree (2N-1 nodes)`);
     ok(R.gridBuilt === cfg.n, `[${cfg.name}] grid rebuild cost == N inserts`);
+    // *** THE GUARD THAT WOULD HAVE CAUGHT v4122 ON THE ROUND THAT CAUSED IT. *** gridCellTouches read 0 for
+    // three configs for many rounds because the old instrument counted keys in `grid.map`, which the dense
+    // path leaves EMPTY rather than absent -- so it produced a real, plausible, wrong number instead of
+    // throwing. A count of candidates with NO cells touched is arithmetically impossible: every candidate
+    // comes out of some cell. This is the cheap invariant that turns a silent zero into a red line.
+    ok(R.gridCands === 0 || R.gridCellTouches > 0,
+        `[${cfg.name}] cells touched is non-zero wherever candidates were found (${R.gridCands} candidates, ${R.gridCellTouches} cells)`);
+    ok(R.keyCollisions === COLLISIONS_MEASURED[cfg.name],
+        `[${cfg.name}] hash-key collisions unchanged (${R.keyCollisions}) -- reported because it is the WRONG explanation for the re-pin, and the next reader will reach for it`);
     const E = EXPECTED[cfg.name];
     ok(R.totalExact === E.totalExact && R.bvhChecks === E.bvhChecks && R.bvhCands === E.bvhCand && R.gridCands === E.gridCand && R.gridCellTouches === E.gridCellTouches,
         `[${cfg.name}] counts match the pinned answer key`);

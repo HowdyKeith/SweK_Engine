@@ -250,6 +250,32 @@ console.log("\n5. *** THE REAL PAGE, IN A REAL BROWSER ***");
     }
 }
 
+console.log("\n*** SHORTEST EXPECTED FIRST IS THE DEFAULT ORDER ***");
+{
+    // v4170 -- Keith asked for this and the machinery already existed as an opt-in nobody would think to pick
+    // before their first slow run. Pinned here because a DEFAULT is exactly the kind of thing that reverts
+    // silently: nothing breaks, the page still works, and the only symptom is a rig session that spends its
+    // first fifteen minutes on twof and answers fewer questions than it could have.
+    ok("!! rig.html sorts by expected time on load, not alphabetically",
+        /sortMode\s*=\s*"time"/.test(PAGE),
+        "the initial paint calls sortChecks(sortMode), so this variable IS the default order");
+
+    // AND THE DROPDOWN MUST AGREE WITH IT, which is a separate failure with no error of its own: a <select>
+    // with no `selected` attribute displays its FIRST option, so leaving A-Z first would show "A-Z" over a
+    // list that is actually sorted by time. A CONTROL THAT MISREPORTS THE STATE IT CONTROLS is worse than one
+    // that is merely wrong, because the reader trusts it.
+    const opts = [...PAGE.matchAll(/<option value="(\w+)"/g)].map((m) => m[1]);
+    ok("!! ...and the dropdown's first option is that same order, so the control does not lie",
+        opts[0] === "time",
+        "options in markup order: " + opts.join(", ") + " -- a select with no `selected` shows the first");
+
+    // and the unmeasured rule is what keeps "shortest first" honest
+    ok("   ...and unmeasured gates still SINK rather than float to the front",
+        /if \(ae == null\) return 1;/.test(PAGE) && /if \(be == null\) return -1;/.test(PAGE),
+        "a blank expected time is MISSING EVIDENCE, not a fast gate. Floating nulls would put every " +
+        "never-timed gate at the head of a shortest-first run and call it quick");
+}
+
 srv.close();
 console.log("\n" + (fails ? `${fails} FAILED` : "ALL PASS"));
 process.exit(fails ? 1 : 0);

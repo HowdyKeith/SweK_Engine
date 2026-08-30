@@ -10,14 +10,17 @@
 // change and what must not. A gradient passes a screenshot and fails every one of them.
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { holoFoil, thinFilmRGB, diffractionRGB, opticalPathDifference, refractionCos, flakeAt, fresnel,
          hash2, clamp01, LAMBDA_NM, DEFAULT_IOR, DEFAULT_THICKNESS_NM } from "../../render/holoFoil.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const require = createRequire(import.meta.url);
-const shader = require("../../render/holoFoilShader.js");
+// v4169 -- IMPORTED AS AN ES MODULE, THE ONLY WAY A PAGE COULD LOAD IT. The old createRequire line is why
+// `module.exports` survived in a file whose entire purpose is a three.js onBeforeCompile patch running in a
+// browser: CommonJS works in Node and throws in a page, so this gate ran the shader in the one environment it
+// could never ship in. Section "browser-loadable" below asserts it stays that way.
+import * as shader from "../../render/holoFoilShader.js";
+import { codeOnly } from "./sourceScan.mjs";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
@@ -149,6 +152,41 @@ console.log("\n5. the GLSL, and where it is injected");
         /#ifdef USE_UV/.test(fs.readFileSync(path.join(ENG, "render/holoFoilShader.js"), "utf8")));
     report("svg-forge.html already parses an SVG into THREE.Shape and bevel-extrudes it; this is a MATERIAL on " +
            "geometry that already existed, which is why it is one module and not a page.");
+}
+
+console.log("\n*** BROWSER-LOADABLE, AND ACTUALLY ON SOMETHING ***");
+{
+    // v4169 -- this file is a three.js onBeforeCompile patch, so a browser is the ONLY place it does its job,
+    // and it shipped as CommonJS: `module.exports` is a ReferenceError in an ES module, so a page could not
+    // load it at all. It ran in exactly one environment -- this gate, through createRequire -- and every
+    // check passed. A GATE THAT LOADS THE CODE DIFFERENTLY FROM PRODUCTION IS TESTING A DIFFERENT FILE.
+    const src = fs.readFileSync(path.join(ENG, "render", "holoFoilShader.js"), "utf8");
+    const code = codeOnly(src);
+    ok("!! *** no CommonJS in the shipped shader -- a page must be able to load it ***",
+        !/\bmodule\s*\.\s*exports\b/.test(code) && !/\brequire\s*\(/.test(code),
+        "codeOnly'd, so the paragraph above that NAMES module.exports while explaining its removal cannot " +
+        "satisfy the check describing it");
+
+    // AND THE WIRING, because a material patch nothing applies is the state this round started in.
+    const page = fs.readFileSync(path.join(ENG, "svg-forge.html"), "utf8");
+    ok("!! *** svg-forge.html imports it AND applies it to the forged material ***",
+        /import\s*\{[^}]*applyHoloFoil[^}]*\}\s*from/.test(page) && /applyHoloFoil\s*\(/.test(page),
+        "the SVG forge is the geometry this was written for. referenceKind counted the pair as orphans held " +
+        "out of its census by a sentence in main.js's changelog -- A SENTENCE IS NOT A WIRE");
+
+    // *** AND THE PAGE'S KNOBS MUST BE SPELLED AS THE UNIFORMS, WHICH IS A SILENT FAILURE IF WRONG. ***
+    // applyHoloFoil merges { ...DEFAULTS, ...opts }, and DEFAULTS is keyed by UNIFORM name (uThicknessNm,
+    // uFlakeStrength). An option spelled `thicknessNm` therefore adds a key nothing reads and leaves the
+    // uniform at its default: a slider that moves, reports, and changes nothing. The first draft of this
+    // page's call site did exactly that, and only reading DEFAULTS caught it.
+    const opts = [...page.matchAll(/applyHoloFoil\s*\([^,]+,\s*\{([^}]*)\}/g)]
+        .flatMap((m) => [...m[1].matchAll(/(\w+)\s*:/g)].map((x) => x[1]));
+    const unknown = opts.filter((k) => !(k in shader.DEFAULTS));
+    ok("!! *** every option the page passes is a REAL uniform name, not a plausible one ***",
+        opts.length > 0 && unknown.length === 0,
+        opts.length === 0 ? "no options passed -- nothing to check, which is itself suspicious"
+            : "passed: " + opts.join(", ") + (unknown.length ? " | NOT IN DEFAULTS: " + unknown.join(", ") : "") +
+              ". A wrong key here is invisible at runtime: no error, no warning, just a dead control.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

@@ -410,4 +410,166 @@ const KNOBS = {
     neonEdge: { time: "uTime", edgeStrength: "uEdgeStrength", glowAmount: "uGlowAmount", colorCycle: "uColorCycle", mixOriginal: "uMixOriginal", pointScale: "uPointScale" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG, PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG };
+/**
+ * Default knob values, PER SHADER, taken from render/swiftShaderModel.mjs's own parameter defaults -- the CPU
+ * reference each GLSL pass is graded against, so the two agree by construction rather than by my memory.
+ *
+ * *** IT IS KEYED BY SHADER BECAUSE A FLAT MAP IS WRONG BY CONSTRUCTION, AND THE FIRST DRAFT HERE WAS FLAT. ***
+ * The same knob NAME carries different defaults in different shaders: `speed` is 2 in heatShimmer and 1 in
+ * vortex and melt; `spread` is 12 in echo and 8 in chromaticSplit; `intensity` is 0.5 in glitch and 1 in
+ * duochrome, plasma and thermal. One table for all fourteen cannot hold those at once, and the gate caught the
+ * flat version -- both for the eighteen knobs it had no entry for at all, and it would have shipped seven more
+ * with plausible WRONG values (duochrome's two hues swapped, solarize's clampOutput inverted, emboss's
+ * premultiplied inverted). A GUESS THAT LOOKS LIKE A MEASUREMENT IS THE THING THIS TREE KEEPS FINDING.
+ *
+ * Booleans in the model are 0/1 here, because every GLSL uniform in these shaders is a float.
+ * `pointScale` is 1 throughout and IS THE ONE A RETINA CALLER MUST SET: a point is not a pixel, and a default
+ * cannot know the device ratio.
+ */
+const DEFAULT_KNOBS = {
+    emboss:         { strength: 1, angle: 0, mixAmount: 1, pointScale: 1, premultiplied: 1 },
+    heatShimmer:    { time: 0, amplitude: 4, frequency: 20, speed: 2, verticalBias: 0, pointScale: 1 },
+    solarize:       { time: 0, threshold: 0.5, curveIntensity: 1, colorSeparation: 0, animate: 0, clampOutput: 0 },
+    duochrome:      { time: 0, intensity: 1, hue1: 0.6, hue2: 0.1, contrast: 1 },
+    vortex:         { time: 0, twistAmount: 3, radius: 0.5, speed: 1, falloff: 2 },
+    kaleidoscope:   { time: 0, segments: 6, rotation: 0, zoom: 1, animateSpeed: 0 },
+    chromaticSplit: { spread: 8, angle: 0, edgeOnly: 0, time: 0, animate: 0, pointScale: 1 },
+    plasma:         { time: 0, intensity: 1, scale: 4, speed: 1, colorMode: 0, clampOutput: 0 },
+    echo:           { time: 0, echoCount: 4, spread: 12, direction: 0, fade: 0.6, pointScale: 1 },
+    glitch:         { time: 0, intensity: 0.5, blockSize: 12, scanLines: 0.5, colorShift: 6, pointScale: 1 },
+    melt:           { time: 0, meltAmount: 30, dripScale: 6, speed: 1, heat: 0.5, pointScale: 1 },
+    topographic:    { time: 0, lineCount: 12, lineWidth: 0.05, colorize: 1, animate: 0 },
+    thermal:        { time: 0, intensity: 1, shimmer: 4, noiseSpeed: 1, paletteShift: 0, pointScale: 1 },
+    neonEdge:       { time: 0, edgeStrength: 4, glowAmount: 1, colorCycle: 1, mixOriginal: 0.3, pointScale: 1 },
+};
+
+/* eslint-disable no-undef */
+/** Compile one shader stage, throwing with the log rather than returning a silently-null shader. */
+function compile(gl, type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        const log = gl.getShaderInfoLog(sh);
+        gl.deleteShader(sh);
+        throw new Error("swiftShaderPass compile: " + log);
+    }
+    return sh;
+}
+
+/**
+ * *** v4169 -- THE RUNTIME THIS FILE'S OWN HEADER ALREADY CLAIMED IT HAD. ***
+ *
+ * The header says "Shaped like crtPass.js". It was not: crtPass exports `makeCrtPass()`, which builds a real
+ * GL pass, and this file exported nothing but GLSL STRINGS through `module.exports`. So the fourteen ports
+ * had no way to run, and -- worse -- `module.exports` at top level is a ReferenceError in a browser ES
+ * module, SO THE FILE COULD NOT BE LOADED BY A PAGE AT ALL. It ran in exactly one place: the gate, through
+ * Node's createRequire, which is the single environment where CommonJS works. A SHADER CHECKED ONLY WHERE IT
+ * CANNOT SHIP IS CHECKED IN THE WRONG PLACE, and referenceKind is what noticed, by counting the file as an
+ * orphan held out of the census by a sentence in main.js's changelog.
+ *
+ * This is crtPass's factory, deliberately line-for-line in its shape: its own canvas and WebGL2 context, one
+ * full-screen triangle, NEAREST + CLAMP_TO_EDGE so the GPU result can be compared exactly against the CPU
+ * model, UNPACK_FLIP_Y_WEBGL false so texel row 0 is the source's first row, and readPixels flipped once on
+ * the way out so callers get image order.
+ *
+ * @param {string} name one of SHADERS' keys
+ * @param {number} width @param {number} height
+ * @param {{ canvas?: HTMLCanvasElement }} [opts]
+ */
+function makeSwiftShaderPass(name, width, height, opts = {}) {
+    const frag = SHADERS[name];
+    if (!frag) throw new Error("swiftShaderPass: no shader named " + name + " (have: " + Object.keys(SHADERS).join(", ") + ")");
+    const canvas = opts.canvas || (typeof document !== "undefined" ? document.createElement("canvas") : null);
+    if (!canvas) return null;
+    canvas.width = width; canvas.height = height;
+    const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, preserveDrawingBuffer: true });
+    if (!gl) return null;
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, frag));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("swiftShaderPass link: " + gl.getProgramInfoLog(prog));
+
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, "aPos");
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    // NEAREST and CLAMP_TO_EDGE, matching layerSample() in the PREAMBLE. Both are load-bearing: nearest so
+    // the CPU model can be compared exactly, clamped because Metal's layer sampling has defined edges and GL
+    // wraps unless told otherwise -- the sixth of the six traps, and the one bcs_glitch walks into.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const knobMap = KNOBS[name] || {};
+    const defaults = DEFAULT_KNOBS[name] || {};
+    const U = { uTex: gl.getUniformLocation(prog, "uTex"), uSize: gl.getUniformLocation(prog, "uSize") };
+    for (const uni of Object.values(knobMap)) U[uni] = gl.getUniformLocation(prog, uni);
+
+    const GL = gl, CV = canvas;
+
+    /** @param {TexImageSource | Uint8Array | Uint8ClampedArray} source @param {Record<string, number>} [knobs] */
+    function render(source, knobs = {}) {
+        GL.bindTexture(GL.TEXTURE_2D, tex);
+        GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
+        if (source instanceof Uint8Array || source instanceof Uint8ClampedArray) {
+            GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, CV.width, CV.height, 0, GL.RGBA,
+                          GL.UNSIGNED_BYTE, source instanceof Uint8Array ? source : new Uint8Array(source));
+        } else {
+            GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, source);
+        }
+        GL.viewport(0, 0, CV.width, CV.height);
+        GL.useProgram(prog);
+        GL.bindVertexArray(vao);
+        GL.uniform1i(U.uTex, 0);
+        GL.uniform2f(U.uSize, CV.width, CV.height);
+        // EVERY knob the shader declares is written on every draw, from DEFAULT_KNOBS where the caller gave
+        // none. An unwritten uniform is 0 in GL, and 0 is a meaningful value for most of these -- a caller
+        // who set only `time` would silently get pointScale 0 and a shader that samples one texel forever.
+        for (const [knob, uni] of Object.entries(knobMap)) {
+            const v = (typeof knobs[knob] === "number" && Number.isFinite(knobs[knob]))
+                ? knobs[knob] : defaults[knob];
+            GL.uniform1f(U[uni], typeof v === "number" ? v : 0);
+        }
+        GL.drawArrays(GL.TRIANGLES, 0, 3);
+        return CV;
+    }
+
+    /** Read back in IMAGE ORDER (top row first) -- readPixels is bottom-up, so it is flipped here once. */
+    function readPixels() {
+        const w = CV.width, h = CV.height;
+        const raw = new Uint8Array(w * h * 4);
+        GL.readPixels(0, 0, w, h, GL.RGBA, GL.UNSIGNED_BYTE, raw);
+        const out = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y++) out.set(raw.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+        return out;
+    }
+
+    return {
+        name, canvas, gl,
+        knobs: Object.keys(knobMap),
+        render, readPixels,
+        resize(w, h) { CV.width = w; CV.height = h; },
+        dispose() { try { GL.getExtension("WEBGL_lose_context")?.loseContext(); } catch (e) {} },
+    };
+}
+
+/** The shaders this file can build, for a caller that wants to offer a list without importing SHADERS. */
+function swiftShaderNames() { return Object.keys(SHADERS); }
+
+export {
+    makeSwiftShaderPass, swiftShaderNames, DEFAULT_KNOBS,
+    VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA,
+    EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
+    PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
+};

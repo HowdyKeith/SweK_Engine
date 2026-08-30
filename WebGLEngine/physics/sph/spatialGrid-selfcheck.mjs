@@ -230,5 +230,40 @@ const OPTS = { h: 0.35, mass: 1000 * 0.13 ** 3, restDensity: 1000, gravity: [0, 
     }
 }
 
+console.log("\n*** cellsTouched() -- THE INSTRUMENT, ON BOTH PATHS ***");
+{
+    // v4170. neighbourBakeoff measured "cells touched" by walking grid._key and counting hits in grid.map.
+    // That was right until v4122 added the dense path, which leaves `map` EMPTY rather than absent -- so the
+    // count read 0 for three configs, for many rounds, WITHOUT THROWING. The measurement now lives on the
+    // class, where it can see whichever path is live, and it is checked on BOTH here because a method that
+    // only works on the path this box happens to take is the same defect one level down.
+    const dense = new SpatialGrid(1);
+    dense.rebuild([{ x: 0, y: 0, z: 0 }, { x: 0.5, y: 0, z: 0 }, { x: 5, y: 5, z: 5 }]);
+    ok("!! the dense path is the one taken here", dense.stats().direct === true, "direct=" + dense.stats().direct);
+    ok("!! ...and cellsTouched counts the OCCUPIED cells a query walks",
+        dense.cellsTouched(0, 0, 0) === 1,
+        "two particles share one cell at the origin and the third is five cells away -> " + dense.cellsTouched(0, 0, 0));
+    ok("!! ...and a query far outside the box touches NOTHING, matching forEachNear's own clamp note",
+        dense.cellsTouched(50, 50, 50) === 0 && dense.near(50, 50, 50).length === 0,
+        "cells " + dense.cellsTouched(50, 50, 50) + ", candidates " + dense.near(50, 50, 50).length);
+
+    // the hash fallback: a domain too large to allocate densely, which is the case `map` still exists for
+    const hash = new SpatialGrid(1e-3);
+    hash.rebuild([{ x: 0, y: 0, z: 0 }, { x: 0.0005, y: 0, z: 0 }, { x: 1000, y: 1000, z: 1000 }]);
+    ok("!! the hash fallback is still reachable, and cellsTouched works there too",
+        hash.stats().direct === false && hash.cellsTouched(0, 0, 0) === 1,
+        "direct=" + hash.stats().direct + ", map size " + hash.map.size + ", touched " + hash.cellsTouched(0, 0, 0));
+
+    // *** THE INVARIANT THAT MAKES A SILENT ZERO IMPOSSIBLE. *** Every candidate comes out of some cell, so
+    // candidates > 0 with cells == 0 is arithmetically impossible -- it can only mean the instrument stopped
+    // reading. Asserted on both paths rather than left to the caller that happened to notice.
+    for (const [label, g, x] of [["dense", dense, 0], ["hash", hash, 0]]) {
+        ok("!! *** " + label + ": candidates > 0 implies cells touched > 0 ***",
+            g.near(x, 0, 0).length === 0 || g.cellsTouched(x, 0, 0) > 0,
+            g.near(x, 0, 0).length + " candidates from " + g.cellsTouched(x, 0, 0) + " cells -- THE SHAPE " +
+            "v4122's silent zero took, now impossible to hold without this line going red");
+    }
+}
+
 console.log(fails ? "\nspatialGrid-selfcheck: " + fails + " FAILED" : "\nspatialGrid-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

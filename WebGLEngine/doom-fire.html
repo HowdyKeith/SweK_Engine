@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DOOM Fire</title>
+<meta name="demo:title"  content="DOOM Fire">
+<meta name="demo:desc"   content="The PSX DOOM fire: a cellular automaton on a grid of bytes against a fixed 37-colour palette. Seeded, so the same seed gives the same fire frame for frame. Port of filipedeschamps/doom-fire-algorithm (MIT).">
+<meta name="demo:cats"   content="effect,retro,2d">
+<meta name="demo:swatch" content="🔥">
+<style>
+  html,body{margin:0;height:100%;background:#07070a;color:#c9b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #bar{display:flex;gap:12px;padding:10px 14px;background:rgba(18,10,10,0.94);border-bottom:1px solid rgba(220,120,60,0.3);align-items:center;flex-wrap:wrap}
+  #bar h1{margin:0;font-size:14px;color:#fc9;flex:1;min-width:110px}
+  label{font-size:12px;display:flex;align-items:center;gap:6px}
+  input[type=range]{width:110px}
+  input[type=number]{width:70px;background:rgba(8,6,6,0.9);color:#fc9;border:1px solid rgba(220,120,60,0.35);border-radius:4px;padding:4px 6px;font-size:12px}
+  button{padding:6px 12px;border-radius:6px;border:1px solid rgba(220,120,60,0.45);background:rgba(30,14,10,0.9);color:#fc9;font-size:12px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+  #c{image-rendering:pixelated;max-width:100%;max-height:100%;box-shadow:0 0 60px rgba(255,120,40,0.18)}
+  #note{position:absolute;left:12px;bottom:10px;font-size:11px;color:#a88;background:rgba(10,6,6,0.7);padding:7px 11px;border-radius:6px;max-width:74%;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="bar">
+    <h1>🔥 DOOM Fire</h1>
+    <label>seed <input id="seed" type="number" value="24173"></label>
+    <label>scale <input id="scale" type="range" min="1" max="12" value="8"><span id="scalev">8</span></label>
+    <button id="src">Cut source</button>
+    <button id="stoke">Stoke</button>
+    <button id="damp">Damp</button>
+    <button id="reset">Reset</button>
+    <button id="back">← Back</button>
+  </div>
+  <div id="host"><canvas id="c"></canvas>
+    <div id="note">A grid of bytes, one rule: copy the cell below, lose a random 0&ndash;2, and drift left by that same amount. The leftward lean <b>is</b> the decay. Cut the source and watch it rise and die rather than switch off.</div>
+  </div>
+</div>
+<script type="module">
+// v4178 -- the consumer for render/doomFire.mjs. Deliberately a plain 2D canvas: the whole argument for this
+// effect over physics/fire/fireMesh.js is that it costs almost nothing, so putting it through a GL pipeline
+// to prove it works would be answering a question nobody asked. toRGBA() writes straight into the ImageData
+// the canvas already owns, so a frame allocates nothing.
+import { DoomFire, PALETTE } from "/render/doomFire.mjs";
+
+const $ = (id) => document.getElementById(id);
+$("back").addEventListener("click", () => location.href = "/page-index.html");
+
+const W = 120, H = 70;
+const canvas = $("c"), ctx = canvas.getContext("2d");
+canvas.width = W; canvas.height = H;
+const image = ctx.createImageData(W, H);
+
+let fire = null, lit = true;
+function reset() {
+    fire = new DoomFire({ width: W, height: H, seed: (+$("seed").value | 0) >>> 0 });
+    lit = true; $("src").textContent = "Cut source";
+}
+reset();
+
+function applyScale() {
+    const s = +$("scale").value;
+    $("scalev").textContent = s;
+    canvas.style.width = (W * s) + "px";
+    canvas.style.height = (H * s) + "px";
+}
+applyScale();
+$("scale").addEventListener("input", applyScale);
+$("seed").addEventListener("change", reset);
+$("reset").addEventListener("click", reset);
+$("stoke").addEventListener("click", () => { fire.stoke(); lit = true; $("src").textContent = "Cut source"; });
+$("damp").addEventListener("click", () => fire.damp());
+$("src").addEventListener("click", () => {
+    lit = !lit;
+    if (lit) { fire.light(); $("src").textContent = "Cut source"; }
+    else { fire.extinguish(); $("src").textContent = "Relight"; }
+});
+
+// ~20fps, which is the original's 50ms interval. Faster is not better here: the decay is one palette step
+// per frame at most, so a 60fps fire climbs three times as fast and looks like a jet rather than a flame.
+let last = 0;
+function loop(t) {
+    requestAnimationFrame(loop);
+    if (t - last < 50) return;
+    last = t;
+    fire.step();
+    fire.toRGBA(image.data);
+    ctx.putImageData(image, 0, 0);
+}
+requestAnimationFrame(loop);
+console.log("[doomFire] " + PALETTE.length + " colours, " + W + "x" + H + " cells. Same seed gives the same fire frame for frame -- window seed field.");
+</script>
+</body>
+</html>

@@ -195,6 +195,11 @@ function renderPanel() {
         </div>`;
 }
 
+// v4172 -- EXPORTED so physics/crypto can reuse it instead of the tree growing a SECOND SHA-256. The demo
+// owns this implementation (it is the one the VBA port is byte-identical to); the address pipeline INJECTS a
+// hasher rather than importing one, so this is the natural thing to inject in a page.
+export { sha256 };
+
 export default {
     id:    "bitcoin_miner",
     label: "BITCOIN MINER (CROSS-RUNTIME PORT)",

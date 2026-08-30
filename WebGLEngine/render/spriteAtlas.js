@@ -16,6 +16,8 @@
 //   6 — Halo ring (bright ring + dim core)
 //   7 — Magic rune (circle with inscribed shape)
 
+import { sliceSheet, toSheetMeta } from "./spriteSlice.mjs";   // v4174 -- finding frames in a sheet nobody described
+
 const ATLAS_DIM = 256;
 const CELL_DIM  = 64;
 const COLS = 4;
@@ -235,6 +237,33 @@ export class SpriteAtlas {
         ctx.fillStyle = grd;
         ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
     }
+}
+
+/**
+ * v4174 -- build an atlas from a sheet an artist drew, rather than from the eight shapes this file draws.
+ * Takes ImageData (or any { width, height, data } RGBA), removes the backdrop, finds the frames by
+ * connected components, and uploads the matted pixels. Returns { texture, frames, meta, key } -- meta in
+ * tools/ship/spriteSheetImport.mjs's schema, so a found sheet and a declared one are the same thing
+ * downstream.
+ *
+ * A separate function and not a second constructor path: the procedural atlas is a fixed 4x2 grid of
+ * 64px cells and getCellUV() computes from those constants. A sheet has frames of whatever size the
+ * artist drew, so its rects come back as PIXELS in the returned frames and the caller converts -- rather
+ * than being forced through getCellUV, which would quietly return the wrong rect for every one of them.
+ */
+export function atlasFromSheet(gl, img, opts = {}) {
+    const { frames, matted, key } = sliceSheet(img, opts);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, matted.width, matted.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, matted.data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return { texture: tex, frames, meta: toSheetMeta(matted, frames, opts.prefix), key };
 }
 
 // Sprite indices — exposed as named constants so emitters don't

@@ -15,15 +15,23 @@
 // and it is what is available; the day this tree grows a headless GL, the honest upgrade is to run both.
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const require = createRequire(import.meta.url);
-const pass = require("../../render/swiftShaderPass.js");
+// v4169 -- IMPORTED AS AN ES MODULE, WHICH IS THE ONLY WAY A PAGE COULD EVER LOAD IT. The old line here was
+// createRequire + require(), and it was the reason this file's `module.exports` survived: CommonJS works in
+// Node and is a ReferenceError in a browser, so the gate ran the shaders in the ONE environment they could
+// not ship in and reported them green. Section 9 below now asserts the file stays browser-loadable.
+import * as pass from "../../render/swiftShaderPass.js";
+// v4169 -- THE TREE'S OWN STRIPPERS, because the hand-rolled ones in this section were WRONG AND THE GATE
+// SAID SO. A naive /\*...\*/ pass is greedy across a `/*` that lives inside a STRING or a regex literal, and
+// main.js has plenty; it blanked the very import line the check was looking for and reported the wiring
+// missing when it was present. noComments() keeps string literals and drops comments; codeOnly() drops both.
+// "noComments for string literals, codeOnly for code shapes" -- and an import statement is a code shape.
+import { codeOnly } from "./sourceScan.mjs";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
@@ -595,6 +603,93 @@ console.log("\n13. batch 7 -- a kernel is not an offset");
            "\"pixels\", melt explains a drip that is only downward one way up, and thermal's \"rising bias\" only " +
            "rises the same way. And the hsb2rgb audit is closed: unsafe by construction, safe by convention, at " +
            "all four upstream sites and all of ours.");
+}
+
+console.log("\n14. *** THE FILE MUST BE LOADABLE BY THE THING THAT IS SUPPOSED TO RUN IT ***");
+{
+    // *** THIS SECTION EXISTS BECAUSE EVERY CHECK ABOVE IT PASSED WHILE THE SHADERS COULD NOT SHIP. ***
+    // swiftShaderPass.js ended in `module.exports = {...}` and this gate reached it through Node's
+    // createRequire. CommonJS is fine in Node and is a ReferenceError in a browser ES module, so the fourteen
+    // ports were verified in the ONE environment they could never run in, and nothing said so. referenceKind
+    // is what noticed, and only indirectly: it counted the file as an orphan held out of its census by a
+    // sentence in main.js's changelog. A GATE THAT LOADS THE CODE DIFFERENTLY FROM PRODUCTION IS TESTING A
+    // DIFFERENT FILE.
+    const src = fs.readFileSync(path.join(ENG, "render", "swiftShaderPass.js"), "utf8");
+    // codeOnly-style: blank comments AND string bodies, so the prose above (which names `module.exports`
+    // while explaining why it is gone) cannot rescue the thing it warns about -- v3449's founding defect.
+    const code = codeOnly(src);
+    ok("!! *** no CommonJS in the shipped shader file -- it must load in a browser, not only in Node ***",
+        !/\bmodule\s*\.\s*exports\b/.test(code) && !/\brequire\s*\(/.test(code) && !/\bexports\s*\./.test(code),
+        "checked against comment- and string-stripped source, so the paragraph above that NAMES module.exports " +
+        "cannot satisfy the check it is describing");
+
+    ok("   ...and it really does evaluate in a scope with no `module`, `require` or `exports`",
+        (() => {
+            try {
+                // the shape a browser gives an ES module: those three identifiers simply do not exist
+                new Function("module", "require", "exports",
+                    "'use strict';" + src.replace(/^\s*(import|export)[\s\S]*?;\s*$/gm, ""))(undefined, undefined, undefined);
+                return true;
+            } catch (e) { return !/is not defined|is not a function/.test(String(e && e.message)); }
+        })(),
+        "evaluated with module/require/exports bound to undefined -- BEFORE the fix this threw " +
+        "'module is not defined', which is exactly what a page would have got");
+
+    ok("!! *** ...and it exports a RUNTIME, not only shader source ***",
+        typeof pass.makeSwiftShaderPass === "function" && typeof pass.swiftShaderNames === "function",
+        "makeSwiftShaderPass + swiftShaderNames. THE HEADER SAID 'Shaped like crtPass.js' WHILE THE FILE " +
+        "EXPORTED NOTHING BUT STRINGS -- crtPass exports makeCrtPass(), which builds a real GL pass, and a " +
+        "claim of shape is checkable rather than decorative");
+
+    ok("   ...and every shader it lists has a knob map, so a caller can drive it without reading the GLSL",
+        pass.swiftShaderNames().every((n) => pass.KNOBS[n] && Object.keys(pass.KNOBS[n]).length > 0),
+        pass.swiftShaderNames().length + " shaders, all with knobs -- a shader in SHADERS with no KNOBS entry " +
+        "would build and then ignore everything the caller set");
+
+    const missingDefault = pass.swiftShaderNames().flatMap((n) => Object.keys(pass.KNOBS[n])
+        .filter((k) => typeof (pass.DEFAULT_KNOBS[n] || {})[k] !== "number").map((k) => n + "." + k));
+    ok("!! every knob of every shader has a DEFAULT, or an unset uniform silently reads 0",
+        missingDefault.length === 0,
+        "an unwritten GL uniform is 0, and 0 is MEANINGFUL for most of these -- a caller who set only `time` " +
+        "would get pointScale 0 and a shader sampling one texel forever. " +
+        (missingDefault.join(", ") || "all covered"));
+
+    // *** AND THE DEFAULTS MUST BE THE MODEL'S, NOT PLAUSIBLE-LOOKING NUMBERS. *** The first draft of
+    // DEFAULT_KNOBS was a single FLAT map, which cannot be right: `speed` is 2 in heatShimmer and 1 in vortex
+    // and melt, `spread` is 12 in echo and 8 in chromaticSplit, `intensity` is 0.5 in glitch and 1 in three
+    // others. It was missing eighteen knobs outright AND would have shipped seven more with confident wrong
+    // values -- duochrome's two hues swapped, solarize's clampOutput and emboss's premultiplied both inverted.
+    // Keyed per shader and read off the CPU model's own parameter defaults, the two now agree BY CONSTRUCTION.
+    const modelSrc = fs.readFileSync(path.join(ENG, "render", "swiftShaderModel.mjs"), "utf8");
+    const mismatched = [];
+    for (const shader of pass.swiftShaderNames()) {
+        const fn = "bcs" + shader[0].toUpperCase() + shader.slice(1);
+        const sig = new RegExp("export function " + fn + "\\([^)]*?\\{([^}]*)\\}", "s").exec(modelSrc);
+        if (!sig) continue;
+        for (const [, k, v] of sig[1].matchAll(/(\w+)\s*=\s*([-\d.]+|true|false)/g)) {
+            const want = v === "true" ? 1 : v === "false" ? 0 : Number(v);
+            const got = (pass.DEFAULT_KNOBS[shader] || {})[k];
+            if (got !== want) mismatched.push(shader + "." + k + " model=" + want + " pass=" + got);
+        }
+    }
+    ok("!! *** ...and each one MATCHES the CPU model's own signature default, digit for digit ***",
+        mismatched.length === 0,
+        mismatched.join("; ") || "all " + pass.swiftShaderNames().length + " shaders agree with " +
+        "swiftShaderModel.mjs. THE GPU PASS AND THE CPU REFERENCE START FROM THE SAME PLACE, so a comparison " +
+        "between them is about the shader rather than about two different sets of knobs");
+
+    // AND THE WIRING ITSELF, because a runtime nobody calls is the state this round started in.
+    const mainSrc = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    // codeOnly blanks string BODIES but keeps the quotes, so a module specifier reads as "" -- match the
+    // import by its BINDINGS rather than by its path, which is the part codeOnly preserves.
+    const mainCode = codeOnly(mainSrc);
+    ok("!! *** main.js IMPORTS the pass, so the shaders are reachable from the running engine ***",
+        /import\s*\{[^}]*makeSwiftShaderPass[^}]*\}\s*from/.test(mainCode)
+            && /makeSwiftShaderPass\s*\(/.test(mainCode),
+        "imported AND called, both checked against codeOnly(main.js) so neither the ENGINE_VERSION changelog " +
+        "-- which names this file at length, and is exactly what held it out of referenceKind's orphan census " +
+        "while nothing imported it -- nor any string literal can satisfy it. A SENTENCE IS NOT A WIRE, and " +
+        "an import with no call site is not much better.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

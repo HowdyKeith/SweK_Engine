@@ -25,7 +25,7 @@
 // is a ReferenceError at RUN time that no syntax check would have caught.
 import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS,
          measurePortabilitySampled, costVsCalls } from "./corroborationCensus.mjs";
-import { writeCostRecord, readCostRecord, dearest, COST_BASELINE } from "./costRecord.mjs";
+import { writeCostRecord, readCostRecord, dearest, COST_BASELINE, costFor, scaledCostFor } from "./costRecord.mjs";
 import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
@@ -311,6 +311,36 @@ console.log("\n3c. *** rawCalls MEASURES A KIND OF WORK, NOT AN AMOUNT OF TIME *
 }
 
 // ---- 3d. v4041 -- THE MEASURED RECORD -------------------------------------------------------------------------------
+console.log("\n3e. *** A FROZEN COST IS IN THE UNITS OF THE MACHINE THAT FROZE IT ***");
+{
+    // v4173. costRecord's header has said since v4038a that these are "milliseconds on the machine that froze
+    // it", and the census compared them STRAIGHT against a deadline being spent on whatever box is running.
+    // Two clocks, no conversion. scaledCostFor does the conversion; costFor is left alone because a caller
+    // that wants the raw frozen number should still be able to have it.
+    const raw = costFor("twof", "inlet");
+    ok("!! the raw record is unchanged, so nothing that wanted the frozen number lost it",
+        raw === 212479, "twof.inlet " + raw + " ms, as frozen");
+    ok("!! *** and the scaled hint multiplies by the host factor, which is what the decline needed ***",
+        scaledCostFor("twof", "inlet", null, 2.05) === raw * 2.05,
+        "at 2.05x -> " + Math.round(raw * 2.05) + " ms. A frozen cost and a live deadline are different " +
+        "clocks and converting between them is right -- but see the note below for what the evidence I first " +
+        "offered for it actually turned out to be.");
+    ok("   ...and a missing scale falls back to 1.0, which is what the caller had before",
+        scaledCostFor("twof", "inlet", null, NaN) === raw && scaledCostFor("nosuch", "mode") === null,
+        "an unreadable scale must not turn a working hint into a wrong one, and an unknown device stays null");
+
+    report("*** AND THIS IS NOT WHAT CAUSED KEITH'S TIMEOUT -- TWICE OVER, WHICH TWO MEASUREMENTS SHOWED. ***",
+        "FIRST: the obvious story was that the understated hint let twof through. Modelled at the point the " +
+        "sweep actually reaches twof -- position 82 of 87, ~327 s spent of 1335 -- over 1000 s remain, so even " +
+        "the SCALED hint of 436 s is comfortably under and the decline correctly does not fire. " +
+        "SECOND, and worse: the ratio that seemed to prove the scaling story was a COINCIDENCE. Keith's 943.1 s " +
+        "against the record's 458.9 s is 2.055, which matches his 2.05x host scale exactly. Running this census " +
+        "to completion HERE for the first time measured twof at 712.7 s -- so the record is stale by 1.55x ON " +
+        "ITS OWN MACHINE and his box is 1.32x slower, and 1.55 x 1.32 = 2.05. TWO ERRORS COMPOUNDING LANDED ON " +
+        "THE HOST FACTOR BY LUCK. The conversion is still correct; the number I read as proving it was " +
+        "measuring something else, and the real defect is that THE FROZEN RECORD IS STALE.");
+    }
+
 console.log("\n3d. *** WHAT EACH BUILD COST, KEPT, BECAUSE THE PROXY DID NOT WORK ***");
 {
     // *** THE FREEZE IS OPT-IN AND THE GATE READS BY DEFAULT, WHICH IS corroborationReach's CONVENTION

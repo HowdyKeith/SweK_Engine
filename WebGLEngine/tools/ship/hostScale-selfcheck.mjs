@@ -59,11 +59,20 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
 // ---- 4. THE CASE THAT PRODUCED THIS: A TIMEOUT IS A LOWER BOUND ---------------------------------------------
 {
     const f = tmp();
-    recordRun(GATE, 568000, false, f);          // Keith's run, killed at the budget
+    // *** v4171 -- DERIVED FROM REF, NOT TYPED. *** This was the literal 568000 -- Keith's real killed run --
+    // asserted against `scale >= 2` because 568000/278482 was 2.04. v4171 re-measured assumptionMap's basis
+    // from gate-timings.json (278482 -> 296688, the budget having been set from a number the gate's own
+    // recorded runtime already exceeded), and the fixture went red at 1.91 WITHOUT ANYTHING BEING WRONG WITH
+    // THE MECHANISM IT TESTS. A FIXTURE PINNED TO A CONSTANT THAT DESCRIBES A NUMBER SOMEWHERE ELSE BREAKS
+    // WHEN THAT NUMBER IS CORRECTED, and reads as a regression in the code under test. It is expressed as a
+    // multiple of REF now, so re-measuring the basis moves both sides together and only a real change in
+    // hostScale can redden this line.
+    const KILLED_AT = Math.round(REF * 2.04);   // the ratio Keith's 568s run actually represented
+    recordRun(GATE, KILLED_AT, false, f);       // a run killed at its budget, on a box ~2x this one
     const s = scaled(budgetFor(GATE), f);
     ok("!! *** a KILLED run still teaches the scale, or a box that times out on everything learns nothing ***",
        s.scale >= 2 && s.ms > budgetFor(GATE),
-       "killed at 568000ms against a MEASURED " + REF + "ms -> scale " + s.scale.toFixed(2) + ", budget " +
+       "killed at " + KILLED_AT + "ms against a MEASURED " + REF + "ms (2.04x, the ratio Keith's 568s run represented) -> scale " + s.scale.toFixed(2) + ", budget " +
        budgetFor(GATE) + " -> " + s.ms + "ms. If that is still short the next timeout raises it again: THE " +
        "MECHANISM CONVERGES rather than needing the right number typed in once");
 }
@@ -198,13 +207,24 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
     // CONVERGES ONLY IF ITS TWO HALVES AGREE ON A KEY, AND A GATE THAT ONLY EVER SPELLS THE KEY ONE WAY.
     const f = tmp();
     const WIN = GATE.replace(/\//g, "\\");
-    recordRun(WIN, 557100, false, f);           // Keith's run again, spelled the way HIS runner spells it
+    // v4171 -- derived from REF and asserted as an EQUIVALENCE, which is what this check is actually about.
+    // It used to record a literal 557100 and assert `scale >= 2`; that threshold was incidental (it happened
+    // to hold against the old basis) and it went red when v4171 corrected the basis, reporting a path-
+    // normalisation failure that had not happened. THE CLAIM HERE IS THAT TWO SPELLINGS OF ONE PATH GIVE THE
+    // SAME ANSWER, so the check is now that comparison itself -- stronger than any threshold, and immune to
+    // the basis moving underneath it.
+    const KILLED = Math.round(REF * 2.0);
+    recordRun(WIN, KILLED, false, f);           // Keith's run again, spelled the way HIS runner spells it
     const h = hostScale(f), s = scaled(budgetFor(WIN), f);
+    const g2 = tmp();
+    recordRun(GATE, KILLED, false, g2);         // the identical run under the POSIX spelling
+    const hPosix = hostScale(g2);
     ok("!! *** a WINDOWS-SHAPED key teaches the scale exactly as a POSIX one does ***",
-       h.samples === 1 && s.scale >= 2 && s.ms > budgetFor(GATE),
-       "recorded as " + WIN + " -> " + h.samples + " sample, scale " + h.scale.toFixed(2) + ", budget " +
-       budgetFor(GATE) + " -> " + s.ms + "ms. BEFORE THE FIX THIS WAS 0 SAMPLES AND 1.00x -- the same run, the " +
-       "same number, a different spelling of the same path");
+       h.samples === 1 && Math.abs(h.scale - hPosix.scale) < 1e-9 && s.ms > budgetFor(GATE),
+       "recorded as " + WIN + " -> " + h.samples + " sample, scale " + h.scale.toFixed(2) + "; the same run " +
+       "under the POSIX spelling -> " + hPosix.samples + " sample, scale " + hPosix.scale.toFixed(2) +
+       ". BEFORE THE FIX THIS WAS 0 SAMPLES AND 1.00x -- the same run, the same number, a different spelling " +
+       "of the same path");
     ok("...and the key is stored CANONICALLY, so the file does not accumulate two spellings of one gate",
        Object.keys(JSON.parse(fs.readFileSync(f, "utf8")).runs).every((k) => !k.includes("\\")),
        "normalised on write as well as on read: on read so a box that has been recording backslashes since " +

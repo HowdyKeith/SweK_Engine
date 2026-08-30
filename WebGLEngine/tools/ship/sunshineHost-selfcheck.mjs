@@ -178,9 +178,23 @@ console.log("sunshineHost-selfcheck -- the host half, and the one surface the cl
         measured >= 4 && not >= 3, measured + " measured, " + not + " not verified");
     ok("!! it says why this is a host button and not a Moonlight plugin", /Moonlight is a client/i.test(flat));
     ok("...and that the Lua files are dissectors rather than a plugin surface", /Wireshark protocol dissectors/i.test(flat));
+    // *** v4171 -- DERIVED FROM THE BRIDGE'S OWN LIST, NOT KEYED ON A SENTENCE I TYPED OUT. ***
+    // This asserted `!/store or forward Sunshine's web-UI credentials/.test(page)` -- one English sentence,
+    // copied by hand into a regex. gateQuality flags that as prose-matching debt and it is right, but the
+    // NEGATIVE form is the worse half: reword the page even slightly and the test still passes while a second
+    // copy sits there in different words. A NEGATIVE CHECK KEYED ON EXACT PROSE CAN ONLY EVER BE VACUOUS --
+    // it fails on the one wording it knows and blesses every other.
+    // Read from REFUSED itself, every `what` is checked, and adding a refusal to the bridge extends this
+    // check automatically instead of leaving it one sentence behind.
+    const refusedWhats = [...noComments(fs.readFileSync(path.join(ENG, "ai-bridge", "sunshineBridge.js"), "utf8"))
+        .matchAll(/\{\s*what:\s*"([^"]+)"/g)].map((m) => m[1]);
+    const copied = refusedWhats.filter((w) => page.includes(w));
     ok("!! it renders the refusals from the BRIDGE rather than restating them in HTML",
-        /s\.refused/.test(page) && !/store or forward Sunshine's web-UI credentials/.test(page),
-        "a second copy of that list in the page is the one that would go stale");
+        /s\.refused/.test(page) && refusedWhats.length >= 3 && copied.length === 0,
+        refusedWhats.length + " refusals read from the bridge's own REFUSED list, " + copied.length +
+        " of them copied into the page" + (copied.length ? ": " + copied.join("; ") : "") +
+        ". A second copy in the page is the one that would go stale, and the LIST is what says which sentences " +
+        "those are -- so a refusal added to the bridge is covered here without anyone remembering to add it");
     ok("!! the page consults res.ok before parsing a body", /if\s*\(\s*!r\.ok/.test(page),
         "boundaryLint's rule, and an unmounted route returns HTML that .json() would throw on");
     ok("pairing is described as a human typing a PIN into Sunshine's own UI", /four-digit PIN|four digit PIN/i.test(flat) || /PIN/.test(flat));

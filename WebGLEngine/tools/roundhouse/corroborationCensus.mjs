@@ -32,7 +32,7 @@
 import { getDevice, DEVICE_NAMES } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";   // v3211: DERIVED. MODES never existed here -- see deviceModes.mjs
 import { preRegister } from "./corroborate.mjs";
-import { readCostRecord, costFor } from "./costRecord.mjs";
+import { readCostRecord, costFor, scaledCostFor } from "./costRecord.mjs";
 
 /**
  * WHY THIS CENSUS DOES NOT USE measurePortabilityAsync, AND WHAT THAT COST TO FIND OUT.
@@ -253,7 +253,20 @@ export async function corroborationCensus({ modes = null, verbose = false,
                 if (typeof dev.costHint === "function") {
                     try { hint = dev.costHint({ mode, config: {} }); } catch { hint = null; }
                 }
-                if (!Number.isFinite(hint)) hint = costFor(name, mode, costRec);
+                // *** v4173 -- THE HINT IS CONVERTED INTO THIS MACHINE'S MILLISECONDS BEFORE IT IS COMPARED
+                // TO THIS MACHINE'S REMAINING TIME. *** costRecord's own header has said since v4038a that a
+                // frozen cost is "milliseconds on the machine that froze it", and this line compared that
+                // straight against a deadline being spent HERE. Two clocks, no conversion.
+                //
+                // MEASURED on Keith's rig: the record prices twof's three modes at 458.9 s and his run took
+                // 943.1 s -- a ratio of 2.055 against a measured host scale of 2.05. THE HINT WAS RIGHT ABOUT
+                // THE WRONG BOX, understating by exactly the host factor, so the decline below fired far too
+                // late and one device at position 82 of 87 took 73% of the entire sweep.
+                //
+                // A DECLARED costHint (above) is NOT scaled: a device that computes its own cost is measuring
+                // itself HERE, on this box, this run. Only the FROZEN record needs converting, because only
+                // the frozen record came from somewhere else.
+                if (!Number.isFinite(hint)) hint = scaledCostFor(name, mode, costRec);
                 const remaining = deadline - Date.now();
                 //
                 // *** AND A DECLINE DOES NOT END THE SWEEP, WHICH THE FIRST DRAFT OF THIS GOT WRONG. ***
