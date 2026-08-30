@@ -309,4 +309,16 @@ export const probeDevice = {
     // needs the observable to be finite in BOTH arms, and `precession` (the primary) does not report
     // closureResidual at all. A self-contained control is invisible to the census for the same reason splat's
     // self-contained sabotage was: the contract compares ACROSS modes.
-    plantMode: "halfadvance", plantFlips: "precessionErrFrac", plantKind: "method" };
+    //
+    // *** v4080 -- plantKind WAS "method" -- WRONG BUCKET, RIGHT INSTINCT. *** The comment above is correct that
+    // measuredPrecession() is untouched and the sabotage is in which formula forms the key -- but plantedCoverage
+    // .mjs's own vocabulary for "a deliberate wrong method delivered as a MODE you select rather than a flag you
+    // set" is `plantKind: "mode"`, its exact words (declaredPlantMode's doc comment). "method" in this lab is
+    // reserved for the OTHER mechanism: a `config.planted` flag substituting the algorithm within one mode --
+    // sdfMarchBind's rawStep swap and refScanBind's streamed-generator swap, both of which read `planted`
+    // in their body and declare no plantMode/plantFlips at all. probeBind reads `planted` NOWHERE (grepped), and
+    // its plant is 100% mode selection (`h.mode === "halfadvance"`), so plantedCoverage.mjs's own
+    // declaredPlantMode/probeModePlant already grades it as a mode plant regardless of this label -- the
+    // mismatch cost nothing there, but capabilityCard.mjs publishes plantKind verbatim, and "method" disagreed
+    // with what the actual census does with this exact device.
+    plantMode: "halfadvance", plantFlips: "precessionErrFrac", plantKind: "mode" };
