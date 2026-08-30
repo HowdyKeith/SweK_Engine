@@ -33,11 +33,16 @@
   <div>
     <button id="start">start camera</button>
     <button id="test">self-test (no camera)</button>
+    <button id="clip">load the stage clip</button>
   </div>
   <div>
     <button id="bKey">chroma key</button>
     <button id="bClose">chuck close</button>
     <button id="bMirror" class="on">mirror</button>
+  </div>
+  <div id="cliprow" style="display:none">
+    <label>clip frame <span id="vFrame">0</span></label>
+    <input type="range" id="frame" min="0" max="59" step="1" value="0" />
   </div>
   <label>similarity <span id="vSim">0.08</span></label>
   <input type="range" id="sim" min="0" max="0.4" step="0.005" value="0.08" />
@@ -54,6 +59,7 @@
 
 <script type="module">
 import { CameraTexture, coverUV, mirrorUV, frameProbe } from "./render/cameraTexture.js";
+import { AfPlayer } from "./media/afDecode.js";
 import { makeCameraEffectsPass } from "./render/cameraEffectsPass.js";
 import { keyAlpha, despill, DEFAULTS as KEY_DEFAULTS } from "./render/chromaKeyModel.mjs";
 import { closeGrid, cellAverage, punch } from "./render/chuckCloseModel.mjs";
@@ -64,6 +70,10 @@ const S = (id) => document.getElementById(id);
 if (!gl) { S("status").innerHTML = '<span class="bad">WebGL2 unavailable</span>'; }
 
 let pass = null, cam = null, probe = null, tex = null, texW = 0, texH = 0;
+// *** THE THIRD SOURCE, AND THE ONE THAT WAS MISSING. *** A synthetic image is deterministic but painted; a
+// camera is real but different every run and absent from CI. A clip is real footage that yields the SAME
+// FRAME EVERY TIME, so a claim about the keyer can be re-decoded and hashed by anyone.
+let clip = null, clipFrame = 0;
 let keyOn = false, closeOn = false, mirror = true, mark = 1;
 const KEY = [0.05, 0.75, 0.15];
 
@@ -186,7 +196,38 @@ function selfTest() {
 }
 window.__selfTest = selfTest;
 
+async function loadClip() {
+    cam && cam.stop(); cam = null;
+    clip = new AfPlayer();
+    try { await clip.loadUrl("./media/stage.af"); }
+    catch (e) { S("status").innerHTML = '<span class="bad">' + e.message + "</span>"; clip = null; return; }
+    S("frame").max = String(clip.frameCount - 1);
+    S("cliprow").style.display = "block";
+    await showClipFrame(0);
+    S("status").innerHTML = "clip &mdash; <b>" + clip.summary + "</b>";
+}
+
+async function showClipFrame(i) {
+    if (!clip) return;
+    const frame = await clip.setFrame(i);
+    if (!tex) tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // a VideoFrame goes into texImage2D exactly like a video element does -- render/cameraTexture.js's path
+    // needed no change of shape to take one
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    texW = frame.displayWidth; texH = frame.displayHeight;
+    clipFrame = i;
+    S("vFrame").textContent = String(i);
+}
+
 async function startCamera() {
+    clip && clip.close(); clip = null; S("cliprow").style.display = "none";
     cam = new CameraTexture(gl);
     const ok = await cam.start();
     if (!ok) { S("status").innerHTML = '<span class="bad">camera: ' + cam.error + "</span>"; cam = null; return; }
@@ -194,7 +235,7 @@ async function startCamera() {
     tex = null;
     S("status").innerHTML = "camera running &mdash; <b>every pass in the tree can read this texture</b>";
 }
-addEventListener("pagehide", () => { try { cam && cam.stop(); } catch {} });
+addEventListener("pagehide", () => { try { cam && cam.stop(); } catch {} try { clip && clip.close(); } catch {} });
 
 function frame() {
     requestAnimationFrame(frame);
@@ -213,7 +254,12 @@ function frame() {
 requestAnimationFrame(frame);
 
 S("start").onclick = startCamera;
-S("test").onclick = () => { cam && cam.stop(); cam = null; uploadTestImage(); selfTest(); S("status").innerHTML = "self-test image &mdash; <b>no camera opened</b>"; };
+S("clip").onclick = loadClip;
+S("frame").addEventListener("input", () => { showClipFrame(Number(S("frame").value)); });
+window.__clipFrame = (i) => showClipFrame(i);
+window.__clipInfo = () => (clip ? { summary: clip.summary, frames: clip.frameCount, decodes: clip.decodes, seeks: clip.seeks, at: clipFrame } : null);
+window.__loadClip = loadClip;
+S("test").onclick = () => { cam && cam.stop(); cam = null; clip && clip.close(); clip = null; S("cliprow").style.display = "none"; uploadTestImage(); selfTest(); S("status").innerHTML = "self-test image &mdash; <b>no camera opened</b>"; };
 S("bKey").onclick = (e) => { keyOn = !keyOn; e.target.classList.toggle("on", keyOn); };
 S("bClose").onclick = (e) => { closeOn = !closeOn; e.target.classList.toggle("on", closeOn); };
 S("bMirror").onclick = (e) => { mirror = !mirror; e.target.classList.toggle("on", mirror); };

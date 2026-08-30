@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4193 -- a clip as a reproducible input, and the one thing about it that is not reproducible
+
+From activetheory/activeframe (MIT): encoded samples plus a JSON manifest, decoded through WebCodecs for
+frame-accurate random access. Written here rather than vendored, because what this tree wants from it is not
+playback.
+
+**camera-effects.html could be driven by exactly two things.** A synthetic test image, which is deterministic
+but is a rectangle I painted; or a live webcam, which is real but different on every run and absent from CI.
+A clip is the missing third: real footage that yields the same frame every time. It turns "the chroma key
+handles a shadowed fold" from a claim about a painted rectangle into a claim anyone can re-decode and hash.
+
+**The hard part is the seek, and it is pure.** You cannot decode frame 47 by handing the decoder sample 47 --
+an inter-frame codec makes most frames a *difference* from the one before, so showing frame 47 means feeding
+every sample from the last keyframe through 47. That is a function of the sample table alone, so 244 checks
+reason about it with no codec anywhere in the process, including exhaustively over every frame of a 60-frame
+GOP-15 table. The browser confirms the rest: seeking to frame 47 and playing forward to it give the identical
+picture (33f75fe3), at 3 decodes against 48. Keying clip frame 11, jumping to 50, and returning gives the
+identical keyed output (b14b6a1e) -- the whole reproducibility claim, through the real keyer, on real footage.
+
+Out-of-range seeks **throw** rather than clamping: clamping turns "show me frame 500 of a 90-frame clip" into
+a picture of frame 89, which looks like a working seek. And the container reports what seeking *costs* --
+a keyframe every N frames makes the file smaller and the seek slower, at (N+1)/2 decodes on average, measured
+and checked at five GOP lengths.
+
+**The clip is the engine's own output, which is a licence posture rather than a preference.** Stock
+green-screen footage is exactly the asset that arrives with no provenance (v4186), so
+tools/media/makeStageClip.mjs draws the scene: a lit cloth, a shadowed fold of the same cloth, a blown
+highlight on it, a walking subject with dark eyes and a green spill rim. Those are precisely the pixels
+render/chromaKeyModel.mjs was designed around and could previously only be shown a rectangle of.
+
+**And the honesty this round turned on, which is the exact opposite of v4190.** A sound can be thrown away
+and re-derived byte-for-byte, because SweK computes it. A video encoder cannot: two runs of the generator
+over the *same 60 drawn frames* produced 32,996 and 32,957 bytes, differing in **98.2% of them**. VP8's rate
+control is not deterministic. So the committed clip decodes identically forever -- verified twice in separate
+processes -- but `--write` **replaces** the fixture rather than refreshing it. The file is the artefact, not
+the generator, and both halves of that are recorded rather than glossed.
+
+Three API lessons the round paid for: `flush()` **ends** a decode sequence, so the next chunk must be a
+keyframe and forward play cannot flush (the first version threw on the second frame of ordinary playback);
+ESM ignores NODE_PATH, so a globally installed package is not importable by name; and playwright is CommonJS,
+so `import()` hides its exports behind `.default`.
+
+244 new checks in tools/ship/afContainer-selfcheck.mjs, 6 sabotages all red -- five as clean failures and one
+as an exit-1 crash from the container's own "no keyframe at or before" guard. The tree now carries 1275 gates.
 ## v4192 -- the spell book, where the cost is measured and not typed
 
 Keith: the spell recipes should hinge on real render costs, with a ray-traced nuclear detonation that cracks
