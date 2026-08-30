@@ -78,6 +78,11 @@ export const bonefieldDevice = {
     // v3522 -- METHOD PLANT: the perturbation removes the segment clamp, a one-line method change that turns every
     // capsule into an infinite cylinder upstream of the cap measurement.
     plantKind: "method",
+    // v4104 -- NAMED, THE SAME COMPLETION v3851/v4088-v4103 gave the rest of this family. MEASURED, both arms:
+    // capErr 1e-8 -> 1.0, matching the header exactly, while segmentErr and unionErr (which never leave the
+    // clamped interval) stay green.
+    planted: { knob: "planted", observable: "capErr",
+               note: "the segment clamp (t held to [0,1]) is removed, so t runs off the ends and every capsule becomes an infinite cylinder -- a point 0.7 outside the flesh, one unit beyond the endpoint, reads as -0.3, INSIDE" },
     modes: ["capsule"],
     name: "capsule-bone-field",
     observables: BONEFIELD_OBSERVABLES,

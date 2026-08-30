@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4168 -- eighteen more device plants, and the one deletion in the merge was the only thing worth checking
+
+The tier-2 branch kept running through a container restart and pushed two more rounds, `v4101-v4118`:
+`planted` metadata for eighteen further devices -- `bell`, `bonefield`, `cartPole`, `clocks`, `csg`, `em`,
+`fragmentRotation`, `kinetics`, `laneEmden`, `manifoldCensus`, `powder`, `reconQuality`, `renderBounce`,
+`strokeMorph`, `structureFactor`, `whiteDwarf`, `xenon`, `xpbd`. **Zero conflicts.**
+
+Each plant was measured in both arms before being declared, and each matches its own file's header to the
+digit: `structureFactor` 9.8e-16 -> 1.176, `powder` 2.739 -> 0, `renderBounce` 2.33e-3 -> 1.291,
+`reconQuality` 0.841 -> 1.0, `strokeMorph` 0 -> 40, `clocks` 0 -> 2.0 exactly.
+
+### The one deletion, checked rather than taken on trust
+
+Seventeen of the eighteen files are purely additive. One is not: `manifoldCensus` had a bare
+`plantFlips: "bowtieClosed"` -- added at v4069 -- and the branch **removed** it in favour of the canonical
+`planted:{}` object, on the claim that the old field had no reader.
+
+**A commit message is not evidence, and removing a field something reads is a regression**, so that was
+verified two ways:
+
+1. `plantedCoverage.mjs:70`'s `declaredPlantMode` returns `null` unless **both** `plantMode` and `plantFlips`
+   are strings -- and `manifoldCensusBind` declares no `plantMode` at all. The census could never have read
+   it.
+2. No `manifoldCensus`-specific gate names the field either.
+
+So the claim holds. **v4069 named the right observable in a field nothing consumed** -- a fix that looks done
+and does nothing -- and it took a third spot-check round to notice. The replacement is read by
+`labDevices-selfcheck` and the per-device gates, so the device moves from an inert declaration to a live one.
+
+### xpbd: a blind mode proven blind is a result, not a gap
+
+`xpbd`'s plant had been flagged earlier in that branch's session as investigated-but-unfixed. Direct
+measurement across all four structurally reachable modes confirms **`hooke` and `substep` are genuinely
+blind**: PBD and XPBD converge to the same equilibrium stretch, and only sweeping the **iteration count**
+separates them -- which is exactly what the `iteration` mode does and `substep` does not. Declared against
+`iteration`'s `iterSpread`, 0 -> 0.948.
+
+The other half of the old concern was the `planted` boolean echoed in all eighteen modes' returns. Confirmed
+harmless: `probeLiveness`'s finite-number filter excludes booleans, so it never reads as claimed coverage on
+a mode the plant does not reach.
+
+### What ran, and what did not
+
+Green: fourteen device selfchecks (`bell`, `bonefield`, `cartPole`, `csg`, `fragmentRotation`, `kinetics`,
+`laneEmden`, `manifoldCensus`, `powder`, `reconQuality`, `renderBounce`, `strokeMorph`, `structureFactor`,
+`xenon`) plus `capabilityCard`.
+
+**Not established here:** `plantDirection` and `plantedCoverage` both exceeded local ceilings with no output.
+Those are **timeouts, not passes**, and they are the same class as the census gates already filed under the
+sweep-cost item -- a heavy device-wide sweep that no short budget can finish.
+
+Tree at 1252 gates.
 ## v4167 -- the other branch, read rather than assumed
 
 Four branches sit on the remote besides this one. Checking them turned out to be worth more than merging

@@ -174,6 +174,12 @@ const RECONQUALITY_MODES = ["blindspot"];   // v4074 -- the single source `modes
 
 export const reconQualityDevice = {
     plantKind: "method",
+    // v4113 -- NAMED, THE SAME COMPLETION v3851/v4088-v4112 gave the rest of this family. MEASURED, both arms:
+    // structureScaled 0.841270 -> 1.000000, matching the header's own table exactly (ssimScaled and
+    // edgesScaled move the same way). scoreRecon/absoluteFidelity stay bit-identical, correctly -- they work
+    // on the fields and never render a pixel, so a per-image windowing bug cannot reach them.
+    planted: { knob: "planted", observable: "structureScaled",
+               note: "each rendered image is windowed by its OWN min/max instead of a shared range -- a single line of normalisation turns the only metrics that could see a 30%-too-bright reconstruction into a second copy of the affine-invariant score that could not, reading a flawless 1.0 for an image with the wrong densities" },
     modes: RECONQUALITY_MODES,
     name: "what-the-ct-score-cannot-see",
     observables: RECONQ_OBSERVABLES,

@@ -151,6 +151,13 @@ export const cartPoleDevice = {
     // KNOB PLANT: the perturbation replaces THE MODEL THE CONTROLLER IS DESIGNED ON, upstream of every gain and
     // every observable, so the whole path from a wrong equilibrium to a fallen pole is graded.
     plantKind: "knob",
+    // v4109 -- NAMED, THE SAME COMPLETION v3851/v4088-v4108 gave the rest of this family. MEASURED, regulate
+    // mode (default) both arms: poleFellAtSeconds -1 (stable, no fall) -> 1.3628, matching the header's own
+    // quoted "1.36 seconds" exactly, with trueClosedLoopStable flipping 1 -> 0. Every OTHER observable --
+    // areResidual, both Hurwitz/Lyapunov design-stability routes, the Kalman margin -- passes on the planted
+    // design's own (wrong) model, which is the whole point this device exists to make.
+    planted: { knob: "planted", observable: "poleFellAtSeconds",
+               note: "the controller is linearised about the HANGING equilibrium instead of the upright one -- a correct linearisation of a different, perfectly real problem. Every self-consistency check (ARE residual, closed-loop stability, the Kalman return-difference inequality, predicted-vs-simulated cost) passes on the model it was designed for; only running the TRUE nonlinear plant shows the pole hitting the ground" },
     modes: CART_POLE_MODES,
     name: "cart-pole-lqr",
     observables: CART_POLE_OBSERVABLES,

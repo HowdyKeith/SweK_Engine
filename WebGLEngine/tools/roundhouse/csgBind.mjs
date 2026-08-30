@@ -83,6 +83,11 @@ export const csgDevice = {
     // v3519 -- METHOD PLANT: the perturbation swaps the exact box for the cheap max() box, a whole-method
     // substitution upstream of the corner measurement.
     plantKind: "method",
+    // v4103 -- NAMED, THE SAME COMPLETION v3851/v4088-v4102 gave the rest of this family. MEASURED, both arms:
+    // cornerErr 1.1e-16 -> 0.29, matching the header exactly, while eikonalErr/crossingErr/idempotenceErr stay
+    // green (the plant is in the box alone).
+    planted: { knob: "planted", observable: "cornerErr",
+               note: "the box SDF is built from max() alone instead of the exact rounded-corner distance formula; outside a corner max() underestimates the true Euclidean distance, and nothing that never queries a box corner can see it" },
     modes: ["tree"],
     name: "csg-exact-signed-distance",
     observables: CSG_OBSERVABLES,

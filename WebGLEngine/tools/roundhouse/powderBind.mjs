@@ -171,6 +171,13 @@ const POWDER_MODES = ["friedel"];   // v4074 -- the single source `modes` and `d
 
 export const powderDevice = {
     plantKind: "method",
+    // v4111 -- NAMED, THE SAME COMPLETION v3851/v4088-v4110 gave the rest of this family. MEASURED, both arms:
+    // breakNonCentroHalf 2.739 -> 0, matching the header's own quoted "2.739 <- zincblende, and it breaks
+    // LOUDLY" exactly. breakCentroTwo stays indistinguishable from zero both ways (1.78e-15 -> 0) -- the
+    // centrosymmetric control this device's header calls "THE CELL THAT CANNOT FIRE", carried on purpose
+    // because a device holding only it would report the law intact and the plant unfound.
+    planted: { knob: "planted", observable: "breakNonCentroHalf",
+               note: "anomalous scattering (f'' as a phase) is replaced with extra scattering POWER (f'' as a real weight) -- every atom keeps a real form factor, the two Friedel sums stay complex conjugates, and Friedel's law holds everywhere, including the one non-centrosymmetric cell where a real experiment relies on it breaking to determine absolute structure" },
     modes: POWDER_MODES,
     name: "powder-friedel-and-the-test-that-could-not-fire",
     observables: POWDER_OBSERVABLES,

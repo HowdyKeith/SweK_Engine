@@ -132,6 +132,12 @@ export const bellDevice = {
     // from a wrong state to the reported numbers is graded -- plantedError's "perturb the physics, not the
     // number" in its ordinary form.
     plantKind: "knob",
+    // v4107 -- NAMED, THE SAME COMPLETION v3851/v4088-v4106 gave the rest of this family. MEASURED, chsh mode
+    // (the default) both arms: tsirelsonGap 4.4e-16 -> 0.0515, matching the header's own quoted "short of
+    // 2*sqrt(2) by 0.051" exactly, while violatesClassical stays true both ways -- the plant still violates
+    // Bell, which is the entire reason this state was chosen.
+    planted: { knob: "planted", observable: "tsirelsonGap",
+               note: "the singlet is replaced with partialSinglet(0.65) instead of pi/4 -- still normalised, still entangled, still violating the classical bound of 2 -- and only saturation of the QUANTUM (Tsirelson) bound, not the classical one, can tell it from the real singlet" },
     modes: BELL_MODES,
     name: "chsh-bell-inequality", observables: BELL_OBSERVABLES, build: buildBell,
     defaults: ({ mode } = {}) => ({ mode: BELL_MODES.includes(mode) ? mode : "chsh", config: { ...DEF } }),
