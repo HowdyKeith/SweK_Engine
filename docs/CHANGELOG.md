@@ -8,6 +8,53 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4185 -- the orrery's data model, and two vendored bodies with no paperwork
+
+Keith asked for this first and it has waited three rounds behind the three things he wanted done before it --
+Draco routing, the dirty flag and sprite slicing, all shipped at v4174. His design, in his words: "swek at
+center, and repos place into orbit with swek... some big, some small... some energetic, some we just crush
+other projectiles into them, so it ejects what we want." And then: "over time".
+
+*** THIS ROUND IS THE DATA MODEL AND NOT THE VIEW, DELIBERATELY. AN ORRERY WHOSE BODIES ARE INVENTED IS A
+SCREENSAVER. *** Every field comes from something already in the tree and checkable: the directories under
+vendor/, the licence files inside them, and the date git says each first appeared. A renderer written against
+this is graded against the same facts; written the other way round, the picture would decide what was true.
+
+*** THE CAPTURE STATE IS THE LICENCE, WHICH IS THE WHOLE POINT OF THE METAPHOR. *** "Crush other projectiles
+into them, so it ejects what we want" is vendoring exactly: you cannot take the whole body, so you take the
+fragment you are permitted to take. CAPTURED means vendored with provenance in the tree; REACHED means used
+but not taken (streamed or linked -- the same line gpu/khronosSamples.mjs draws); UNPAPERED means the bytes
+are here and nothing says they may be.
+
+*** AND THE SCAN FOUND TWO UNPAPERED BODIES: vendor/box3d AND vendor/htmx. *** Twelve of the fourteen carry
+provenance. Those two carry none -- no LICENSE, no NOTICE, no attribution, no copyright line in any file.
+That is not a rendering problem; it is something this repository ships without saying it may. UNPAPERED_BASELINE
+is 2 and may only go down.
+
+*** THE PART THAT KEPT GOING WRONG IS FINDING THE LICENCE, AND IT WENT WRONG THREE TIMES THIS SESSION. ***
+A scan of mine for "a licence file" missed a real one in three separate places: jeromeetienne/fireworks.js's
+MIT-LICENSE.txt (does not start with "licen"), vendor/fonts's IBMPlexSerif-OFL.txt (the SIL Open Font Licence
+under the font's own name), and vendor/wasm's LICENSE nested under quickjs/. Each time the first answer was
+"no licence" -- which in this model is the difference between CAPTURED and UNPAPERED, a false accusation
+against a dependency that is properly licensed. The matcher here is recursive, matches the licence word
+anywhere in the filename, knows OFL/APACHE/GPL/BSD/MPL/NOTICE/ATTRIBUTION, and prefers a root-level licence
+over a nested one while REPORTING the depth, because those are different qualities of evidence. All three
+files are fixtures in the gate, and sabotaging the matcher back to "starts with licen" turns six checks red.
+
+*** THE ORBIT CARRIES MEANING RATHER THAN BEING DECORATION. *** Keith's "some energetic" is the recent
+arrivals: the semi-major axis grows with AGE, and the period follows Kepler's third law FROM that axis rather
+than being a second free parameter that could drift from it -- the same law physics/orbits/kepler.js
+integrates, so a placed body and a simulated one agree. Measured on the real tree: draco, grass and keyhunt,
+all captured TODAY, orbit innermost and fastest; three, jolt and slug from the 19th sit furthest out. Size is
+a cube root of byte count, so a body a thousand times larger is ten times wider.
+
+Two of my own checks were wrong and failed against correct code. One compared radiusFor(1000) with
+radiusFor(1e9) expecting exactly 100x -- but 1000 bytes lands under the minimum size and clamps, so the real
+ratio was 40. It also contained "Math.abs(x - 1000) > 900 === false", which parses as (comparison) === false
+and is not the claim it appears to be. Split into two honest claims: the cube-root ratio tested above the
+floor, and the floor tested on its own.
+
+Gate count 1267 gates.
 ## v4184 -- using the instrument, and what it found in my own v4174 wiring
 
 v4183 built the census and left 8 animators unguarded and 25 tickers unexamined. This round used it rather
