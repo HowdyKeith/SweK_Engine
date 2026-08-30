@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Orrery &mdash; the tree as a system</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#ff6b5e; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; overflow:hidden; }
+  #stage { position:absolute; inset:0; display:block; cursor:grab; }
+  #stage.zoomed { cursor:zoom-out; }
+  .card { position:absolute; background:rgba(11,29,21,0.92); border:1px solid var(--line); border-radius:12px; padding:12px 14px; backdrop-filter:blur(6px); }
+  #hud { top:14px; left:14px; max-width:340px; }
+  #hud h1 { margin:0 0 6px; font-size:15px; color:var(--amber); letter-spacing:1px; }
+  #hud p { margin:0 0 8px; color:var(--dim); font-size:12px; line-height:1.5; }
+  #scale { color:var(--cyan); font-size:12px; }
+  #scale b { color:var(--amber); }
+  #legend { bottom:74px; left:14px; font-size:11.5px; max-width:300px; }
+  #legend div { margin:3px 0; color:var(--dim); }
+  #legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; font-style:normal; }
+  #ratchet { top:14px; right:14px; max-width:280px; font-size:12px; }
+  #ratchet h2 { margin:0 0 6px; font-size:12px; color:var(--red); letter-spacing:1px; text-transform:uppercase; }
+  #ratchet p { margin:0; color:var(--dim); line-height:1.5; }
+  #time { bottom:14px; left:50%; transform:translateX(-50%); width:min(620px,calc(100% - 28px)); display:flex; gap:12px; align-items:center; }
+  #time input[type=range] { flex:1; accent-color:var(--amber); }
+  #time button { background:transparent; border:1px solid var(--line); color:var(--amber); border-radius:8px; padding:5px 12px; cursor:pointer; font:inherit; font-size:12px; }
+  #time button:hover { border-color:var(--amber); }
+  #tlabel { color:var(--cyan); min-width:132px; font-size:12px; }
+  #info { bottom:74px; right:14px; max-width:320px; font-size:12px; display:none; }
+  #info h2 { margin:0 0 6px; font-size:13px; color:var(--amber); }
+  #info dl { margin:0; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; }
+  #info dt { color:var(--dim); }
+  #info dd { margin:0; }
+  .warn { color:var(--amber); }
+  a { color:var(--cyan); }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="card" id="hud">
+  <h1>SweK ORRERY</h1>
+  <p>Everything <code>vendor/</code> holds, in orbit around the engine that took it in. Distance is how long ago it arrived; the period follows from that distance through <code>physics/orbits/kepler.js</code>, so the picture cannot drift from the physics. Colour is licence posture.</p>
+  <p>Scroll to zoom, click a body to follow it. <span class="warn">Keep zooming</span> and it becomes a micro planet, then its own file tree as ground.</p>
+  <div id="scale">scale: <b id="lvl">system</b> <span id="lvlpx"></span></div>
+</div>
+
+<div class="card" id="legend">
+  <div><i style="background:#9fe6c0"></i>captured &mdash; licence found</div>
+  <div><i style="background:#ff6b5e"></i>unpapered &mdash; vendored, none found</div>
+  <div><i style="background:#33ccff"></i>reached &mdash; never copied in</div>
+  <div><i style="border:1.5px dashed #ffcc66;background:none"></i>undated &mdash; inner orbit is a default</div>
+</div>
+
+<div class="card" id="ratchet"><h2>ratchet</h2><p id="rtext">reading&hellip;</p></div>
+
+<div class="card" id="info"><h2 id="iname"></h2><dl id="idl"></dl></div>
+
+<div class="card" id="time">
+  <button id="play">&#9208; pause</button>
+  <input type="range" id="scrub" min="0" max="1000" value="0" />
+  <span id="tlabel">t = 0.0 d</span>
+</div>
+
+<script type="module">
+import { buildOrrery, UNPAPERED_BASELINE, UNPAPERED } from "./world/orrery.mjs";
+import { positionAt, apparentPx, levelFor, extentOf, slowestPeriod,
+         ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "./world/orreryView.mjs";
+import { drawSystem, drawPlanet, drawTerrain, fieldFor } from "./ui/orreryDraw.js";
+
+const cv = document.getElementById("stage"), ctx = cv.getContext("2d");
+let system = null, hits = [], focus = null, hover = null;
+let t = 0, playing = true, last = performance.now();
+
+// pxPerUnit is the ONE camera number. The zoom level is read off it rather than set beside it, so there is no
+// second variable that could say "planet" while the body on screen is four pixels wide.
+let pxPerUnit = 40;
+let SPAN = 1;   // days per second of wall clock, set from the system so a scrub crosses it in a sane time
+
+function resize() {
+    const d = window.devicePixelRatio || 1;
+    cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d);
+    cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", resize); resize();
+
+// The browser builds the system from the BAKED SCAN against its own today -- see tools/ship/orreryBake.mjs for
+// why the finished orrery is not what is baked.
+const raw = await fetch("./orrery.json").then((r) => r.json()).catch(() => null);
+if (!raw) {
+    document.getElementById("rtext").textContent = "orrery.json not found -- run: node tools/ship/orreryBake.mjs --write";
+} else {
+    system = buildOrrery(raw.bodies);
+    const far = extentOf(system);
+    pxPerUnit = Math.min(innerWidth, innerHeight) * 0.42 / Math.max(1e-6, far);
+    SPAN = slowestPeriod(system) / 24;                 // one slow orbit in about 24 seconds
+    document.getElementById("scrub").max = String(Math.round(slowestPeriod(system) * 10));
+    const bad = system.unpapered;
+    document.getElementById("rtext").innerHTML = bad.length
+        ? `<b class="warn">${bad.length}</b> of ${system.bodies.length} bodies carry no licence provenance in the tree &mdash; ${bad.join(", ")}. The baseline is ${UNPAPERED_BASELINE} and may only go down.`
+        : `every body carries licence provenance. Baseline ${UNPAPERED_BASELINE}.`;
+}
+
+function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (playing && system) { t += dt * SPAN; document.getElementById("scrub").value = String(Math.round((t % slowestPeriod(system)) * 10)); }
+    ctx.fillStyle = "#06120b"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    if (system) draw();
+    requestAnimationFrame(frame);
+}
+
+function draw() {
+    const level = focus ? levelFor(apparentPx(focus, pxPerUnit)) : ZOOM_SYSTEM;
+    const px = focus ? apparentPx(focus, pxPerUnit) : 0;
+    document.getElementById("lvl").textContent = ZOOM_NAMES[level];
+    document.getElementById("lvlpx").textContent = focus
+        ? `— ${focus.name} is ${px.toFixed(0)}px across (planet at ${PLANET_PX}, terrain at ${TERRAIN_PX})`
+        : "— no body followed";
+    cv.className = focus ? "zoomed" : "";
+
+    if (level === ZOOM_TERRAIN) {
+        const field = fieldFor(focus);
+        const size = Math.min(innerWidth, innerHeight) * 0.86;
+        drawTerrain(ctx, field, innerWidth / 2, innerHeight / 2, size);
+        caption(`${focus.name} — ${(focus.files || []).length} files as ground. Peaks are the largest files; lakes are data.`);
+        return;
+    }
+    if (level === ZOOM_PLANET) {
+        const field = fieldFor(focus);
+        // the planet turns on ITS OWN period, the same number that moves it around SweK
+        const spin = focus.period > 0 ? (2 * Math.PI * t) / focus.period : 0;
+        drawPlanet(ctx, focus, field, innerWidth / 2, innerHeight / 2, px / 2, spin);
+        caption(`${focus.name} — micro planet. Its surface IS its file tree; it turns once per orbit.`);
+        return;
+    }
+
+    // SYSTEM: if a body is followed, keep it on screen by centring on it rather than on SweK
+    let cx = innerWidth / 2, cy = innerHeight / 2;
+    if (focus) { const p = positionAt(focus, t); cx -= p.x * pxPerUnit; cy -= p.y * pxPerUnit; }
+    hits = drawSystem(ctx, system, t, { cx, cy, pxPerUnit }, { hover });
+}
+
+function caption(s) {
+    ctx.fillStyle = "rgba(207,230,218,0.9)"; ctx.font = "12px ui-monospace, monospace"; ctx.textAlign = "center";
+    ctx.fillText(s, innerWidth / 2, innerHeight - 96); ctx.textAlign = "left";
+}
+
+cv.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    pxPerUnit = Math.max(4, Math.min(4e5, pxPerUnit * Math.exp(-e.deltaY * 0.0016)));
+}, { passive: false });
+
+cv.addEventListener("mousemove", (e) => {
+    hover = null;
+    for (const h of hits) if (Math.hypot(e.clientX - h.x, e.clientY - h.y) <= h.r + 8) { hover = h.body; break; }
+    cv.style.cursor = hover ? "pointer" : (focus ? "zoom-out" : "grab");
+});
+
+cv.addEventListener("click", (e) => {
+    for (const h of hits) if (Math.hypot(e.clientX - h.x, e.clientY - h.y) <= h.r + 8) { follow(h.body); return; }
+    // clicking empty space at a zoomed-in scale backs out one level rather than teleporting to the system view
+    if (focus) {
+        const lvl = levelFor(apparentPx(focus, pxPerUnit));
+        if (lvl === ZOOM_SYSTEM) follow(null);
+        else pxPerUnit = (lvl === ZOOM_TERRAIN ? PLANET_PX : PLANET_PX - 1) / (2 * focus.radius) * 0.98;
+    }
+});
+
+function follow(b) {
+    focus = b;
+    const info = document.getElementById("info");
+    if (!b) { info.style.display = "none"; return; }
+    // zoom in far enough that the click visibly does something -- just into planet scale
+    if (apparentPx(b, pxPerUnit) < PLANET_PX) pxPerUnit = (PLANET_PX * 1.15) / (2 * b.radius);
+    info.style.display = "block";
+    document.getElementById("iname").textContent = b.name;
+    const rows = [
+        ["state", b.state],
+        ["licence", b.licence ? `${b.licence}${b.licenceDepth > 0 ? ` (depth ${b.licenceDepth})` : ""}` : "none found"],
+        ["arrived", b.ageKnown ? `${b.arrived} — ${b.ageDays} d ago` : "git cannot say"],
+        ["size", `${(b.bytes / 1024).toFixed(0)} KiB in ${(b.files || []).length} files`],
+        ["orbit", `a = ${b.a.toFixed(2)}, T = ${b.period.toFixed(1)}`],
+    ];
+    document.getElementById("idl").innerHTML = rows.map(([k, v]) =>
+        `<dt>${k}</dt><dd${k === "state" && b.state === UNPAPERED ? ' style="color:#ff6b5e"' : ""}>${v}</dd>`).join("");
+}
+
+// A handle on the view, in the same spirit as window.repoTerrain in main.js: it lets a headless run drive the
+// zoom to a named body and read back which scale it landed at, which is the only way to check that the three
+// magnifications actually render rather than that the code for them parses.
+window.orrery = {
+    get system() { return system; },
+    get focus() { return focus; },
+    get pxPerUnit() { return pxPerUnit; },
+    get level() { return focus ? levelFor(apparentPx(focus, pxPerUnit)) : ZOOM_SYSTEM; },
+    body: (name) => (system ? system.bodies.find((b) => b.name === name) : null),
+    follow: (name) => { follow(name ? window.orrery.body(name) : null); },
+    zoomTo: (px) => { if (focus) pxPerUnit = px / (2 * focus.radius); },
+    setTime: (days) => { t = days; },
+    pause: () => { playing = false; document.getElementById("play").innerHTML = "&#9654; play"; },
+};
+
+document.getElementById("play").addEventListener("click", (e) => {
+    playing = !playing;
+    e.target.innerHTML = playing ? "&#9208; pause" : "&#9654; play";
+});
+document.getElementById("scrub").addEventListener("input", (e) => {
+    playing = false; document.getElementById("play").innerHTML = "&#9654; play";
+    t = Number(e.target.value) / 10;
+});
+setInterval(() => { document.getElementById("tlabel").textContent = `t = ${t.toFixed(1)} d`; }, 100);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

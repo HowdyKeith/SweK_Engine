@@ -16,6 +16,7 @@
 import { isLicenceFile, licenceFor, orbitFor, radiusFor, buildOrrery, report,
          CAPTURED, UNPAPERED, REACHED, UNPAPERED_BASELINE } from "../../world/orrery.mjs";
 import { scan, listFiles, dirBytes, firstSeen } from "./orreryScan.mjs";
+import { period as keplerPeriod } from "../../physics/orbits/kepler.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,14 +61,24 @@ const REPO = path.resolve(ENG, "..");
     const fresh = orbitFor(0), old = orbitFor(100);
     ok(old.a > fresh.a, "a body that arrived long ago sits further out");
     ok(old.period > fresh.period, "and therefore moves slower -- Keith's 'some energetic' is the recent ones");
+    // *** THE PERIOD MUST BE kepler.js'S, NOT A SECOND SPELLING OF THE LAW. *** v4185 wrote sqrt(a^3) and
+    // claimed it agreed with physics/orbits/kepler.js. It did not -- kepler's period is 2*PI*sqrt(a^3/mu), so
+    // the two differed by exactly 2*PI (96.2 against 604.7 at a = 21), and a renderer driven by kepler's
+    // integrator would have had every body lag by a factor of six. THE OLD CHECK DID NOT CATCH IT: it asserted
+    // T^2 = a^3, which is true of the wrong constant as well. Checking against the FUNCTION is what catches it.
     for (const d of [0, 1, 7, 30, 365]) {
         const o = orbitFor(d);
-        ok(Math.abs(o.period * o.period - o.a * o.a * o.a) < 1e-9,
-            `T^2 = a^3 holds exactly at ${d} days (T=${o.period.toFixed(3)}, a=${o.a.toFixed(3)})`);
+        ok(Math.abs(o.period - keplerPeriod(o.a)) < 1e-9,
+            `the period at ${d} days IS kepler.period(a) (${o.period.toFixed(3)}), not a restatement of the law`);
+        ok(Math.abs(o.period * o.period - (2 * Math.PI) ** 2 * o.a ** 3) < 1e-6,
+            "and still satisfies T^2 proportional to a^3, with kepler's constant rather than an invented one");
     }
+    // the control: the constant this replaced would have passed the old check and been wrong
+    ok(Math.abs(Math.sqrt(orbitFor(30).a ** 3) - orbitFor(30).period) > 1,
+        "control: the bare sqrt(a^3) v4185 shipped differs from the real period by more than a rounding error");
     ok(orbitFor(-5).a === orbitFor(0).a, "a negative age (a clock skew, a bad date) clamps rather than producing an orbit inside the star");
-    // the same law physics/orbits/kepler.js integrates, so a placed body and a simulated one agree
-    ok(orbitFor(10).period === Math.sqrt(orbitFor(10).a ** 3), "and the period is derived, never a second free parameter that could drift from the axis");
+    // the same function physics/orbits/kepler.js integrates, so a placed body and a simulated one agree
+    ok(orbitFor(10).period === keplerPeriod(orbitFor(10).a), "and the period is derived from a alone, never a second free parameter that could drift from the axis");
 }
 
 // 4) SIZE is a cube root, so a body a thousand times larger is ten times wider rather than a thousand.

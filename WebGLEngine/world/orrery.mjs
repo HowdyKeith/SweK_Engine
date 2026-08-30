@@ -1,4 +1,4 @@
-// FILE: world/orrery.mjs -- v4185
+// FILE: world/orrery.mjs -- v4186
 //
 // SweK at the centre, the things it has taken in orbit around it.
 //
@@ -32,6 +32,15 @@
 // UNPAPERED -- a false accusation against a dependency that is properly licensed. So the search here is
 // recursive, matches the licence word anywhere in the filename, and knows the common licence-name suffixes.
 "use strict";
+
+// *** THE PERIOD COMES FROM kepler.js RATHER THAN BEING RESTATED HERE, AND v4185 GOT THAT WRONG. *** That
+// round wrote period = sqrt(a^3) and claimed in as many words that "a placed body and a simulated one agree"
+// with physics/orbits/kepler.js. They did not: kepler's period(a, mu) is 2*PI*sqrt(a^3/mu), so the two
+// differed BY EXACTLY 2*PI -- 96.2 against 604.7 at a = 21. A renderer animating with kepler's integrator
+// would have had every body lag its stated period by a factor of six, and the gate would not have noticed
+// because it checked T^2 = a^3, which is true of the WRONG constant too. Restating a law is how two modules
+// end up describing different universes; importing the function is how they cannot.
+import { period as keplerPeriod } from "../physics/orbits/kepler.js";
 
 /** A body's relationship to SweK. Frozen so a caller can compare against these rather than retype them. */
 export const CAPTURED = "captured";
@@ -83,9 +92,8 @@ export function orbitFor(days, opts = {}) {
     const a0 = opts.innerRadius ?? 3;          // the closest a body can sit
     const perDay = opts.spreadPerDay ?? 0.6;   // how fast the orbit widens with age
     const a = a0 + Math.max(0, days) * perDay;
-    // T^2 = a^3 with GM = 1: the same law physics/orbits/kepler.js integrates, so a body placed here and a
-    // body simulated there agree instead of drifting apart.
-    return { a, period: Math.sqrt(a * a * a) };
+    // The tree's own function, not a second spelling of Kepler's third law. See the note at the top.
+    return { a, period: keplerPeriod(a) };
 }
 
 /** Size from the body's byte count. Cube root, so a library a thousand times larger is ten times wider. */
@@ -101,17 +109,42 @@ export function radiusFor(bytes, opts = {}) {
  * @param opts.today  the date to measure ages against, so a gate is not at the mercy of the clock
  */
 export function buildOrrery(bodies = [], opts = {}) {
-    const today = opts.today ? new Date(opts.today + "T00:00:00Z") : new Date();
+    // A string is a calendar day; a Date is an instant. Both are accepted because a gate wants the first
+    // (so it is not at the mercy of the clock) and a browser has only the second.
+    const today = opts.today instanceof Date ? opts.today
+                : opts.today ? new Date(opts.today + "T00:00:00Z") : new Date();
     const out = bodies.map((b) => {
-        const lic = b.reached ? { found: false, path: null, depth: -1 } : licenceFor(b.paths);
+        // *** THE PATH LIST MAY ARRIVE UNDER EITHER NAME, AND GETTING THIS WRONG IS A FALSE ACCUSATION. ***
+        // The scanner hands over `paths`; the baked orrery.json carries `files` ([{path, bytes}]) and no
+        // `paths`, because storing both would be the same list twice. Reading only `paths` meant every body
+        // loaded from the bake had licenceFor(undefined) -> found: false -> UNPAPERED, so the browser drew all
+        // fourteen in the ratchet's red while the node gate read twelve as CAPTURED. Nothing threw and the
+        // page looked fine; it was simply accusing twelve properly licensed dependencies of having no licence.
+        const paths = Array.isArray(b.paths) ? b.paths
+                    : Array.isArray(b.files) ? b.files.map((f) => (f && f.path) || "") : [];
+        const lic = b.reached ? { found: false, path: null, depth: -1 } : licenceFor(paths);
         const state = b.reached ? REACHED : (lic.found ? CAPTURED : UNPAPERED);
         const arrived = b.arrived ? new Date(b.arrived + "T00:00:00Z") : null;
-        const days = arrived ? Math.max(0, Math.round((today - arrived) / 86400000)) : 0;
+        // *** FLOOR, NOT ROUND, AND THE DIFFERENCE IS VISIBLE. *** "Days since it arrived" is 0 all through
+        // the day it arrived and 1 all through the next. Math.round made it tick over at NOON instead: the
+        // node gate, which passes a midnight date, read krbn at a = 9.6 while the browser -- running at
+        // 18:00 on the same day, against the same orrery.json -- drew it at a = 10.20 with a period a whole
+        // 18 units longer. Two readings of one tree that disagreed because one of them was half a day early.
+        const days = arrived ? Math.max(0, Math.floor((today - arrived) / 86400000)) : 0;
         const orb = orbitFor(days, opts);
+        // *** ageKnown, BECAUSE THE SCANNER IS RIGHT AND THE FIRST VERSION OF THIS WAS NOT. ***
+        // tools/ship/orreryScan.mjs says of a null date: "a real answer (a shallow clone, or a path never
+        // committed) and is NOT the same as 'arrived today'". This function then put both on day 0, which is
+        // the innermost, fastest orbit -- so a body git simply could not date was drawn as the newest arrival
+        // in the system. It still has to be drawn SOMEWHERE, and the inner orbit is the least-committal
+        // placement; what was missing is that the picture never said which it was. A renderer can now mark it.
         return {
             name: b.name, state, licence: lic.path, licenceDepth: lic.depth,
-            arrived: b.arrived || null, ageDays: days,
+            arrived: b.arrived || null, ageDays: days, ageKnown: !!arrived,
             a: orb.a, period: orb.period, radius: radiusFor(b.bytes, opts),
+            bytes: Math.max(0, Number(b.bytes) || 0),
+            // carried through for the TERRAIN scale -- world/orreryView.mjs turns these into heightfield entries
+            files: Array.isArray(b.files) ? b.files : null,
             parent: b.parent || "SweK",
         };
     });

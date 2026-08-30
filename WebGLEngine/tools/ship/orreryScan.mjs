@@ -1,4 +1,4 @@
-// FILE: tools/ship/orreryScan.mjs -- v4185
+// FILE: tools/ship/orreryScan.mjs -- v4186
 //
 // Feeds world/orrery.mjs from the real tree: what is under vendor/, what licence provenance each body has,
 // how large it is, and when git says it arrived. Node-only (fs and git), which is why it lives here and not
@@ -32,6 +32,20 @@ export function dirBytes(dir) {
 }
 
 /**
+ * Every file with its own size. This is what makes the MICRO PLANET scale real rather than decorative:
+ * world/repoHeightfield.js builds a terrain from per-file sizes, so without this a body could only be drawn
+ * as a smooth ball with invented relief. A file whose size cannot be read is reported at 0 rather than
+ * dropped -- it is in the tree, and a map of the tree that silently omits files is not a map of the tree.
+ */
+export function listFileSizes(dir) {
+    return listFiles(dir).map((rel) => {
+        let bytes = 0;
+        try { bytes = fs.statSync(path.join(dir, rel)).size; } catch {}
+        return { path: rel, bytes };
+    });
+}
+
+/**
  * The date git says a path first appeared. Returns null when git cannot say -- which is a real answer
  * (a shallow clone, or a path never committed) and is NOT the same as "arrived today".
  */
@@ -53,12 +67,19 @@ export function scanVendor(engineRoot, repoRoot) {
     const vendorDir = path.join(engineRoot, "vendor");
     let names = [];
     try { names = fs.readdirSync(vendorDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; }
-    return names.sort().map((name) => ({
-        name,
-        paths: listFiles(path.join(vendorDir, name)),
-        bytes: dirBytes(path.join(vendorDir, name)),
-        arrived: firstSeen(repoRoot, path.posix.join("WebGLEngine", "vendor", name)),
-    }));
+    return names.sort().map((name) => {
+        // ONE walk of the directory, and both the total and the per-file list come out of it. Two walks could
+        // disagree -- a file written between them would be in one and not the other -- and then the planet's
+        // size and its terrain would describe different trees.
+        const files = listFileSizes(path.join(vendorDir, name));
+        return {
+            name,
+            files,
+            paths: files.map((f) => f.path),
+            bytes: files.reduce((n, f) => n + f.bytes, 0),
+            arrived: firstSeen(repoRoot, path.posix.join("WebGLEngine", "vendor", name)),
+        };
+    });
 }
 
 /** The whole job: scan and build. */

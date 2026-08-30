@@ -8,6 +8,46 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4186 -- the orrery's view: micro planet to terrain, and two wrong answers that rendered
+
+Last round shipped the orrery's data model and deliberately left the view unbuilt. This is the view, built on
+the zoom axis Keith described: **micro planet -> github terrain view.** Three magnifications of one dataset --
+SYSTEM (everything under vendor/ in orbit around SweK), PLANET (one body as a micro planet whose surface is
+its own file tree), TERRAIN (that same tree as ground, through the world/repoHeightfield.js built at v4126).
+
+**The level is read off the magnification, never set beside it.** levelFor(apparentPx(body, pxPerUnit))
+returns which of the three you are at, so there is no mode flag that could say "planet" while the body on
+screen is four pixels wide. The thresholds are 120px and 900px, both chosen from what the scale can show:
+under 120px a micro planet is a dot with no readable surface, and vendor/krbn's 233 files are under 4px each
+at 900px across.
+
+**Both bugs this round were false accusations that looked completely fine on screen.**
+
+1. buildOrrery read only `b.paths`. The baked orrery.json carries `files` and no `paths`, so every body loaded
+   in the browser got licenceFor(undefined), came back UNPAPERED, and the page drew all 14 dependencies in the
+   ratchet's red -- at the same moment the node gate read 12 as CAPTURED. Nothing threw.
+2. ui/orreryDraw.js indexed `field.water[idx]` as a per-cell wet mask. repoHeightfield's `water` is
+   { areas, ways } -- polygons -- so that index is undefined for every cell and every lake would have been
+   painted as dry ground. The per-cell tell that does exist is biome id 0. vendor/krbn really does have 5607
+   wet cells from 116 Karabiner .json configs.
+
+**And a third, caught by the screenshots disagreeing with the gate.** ageDays used Math.round on a fractional
+day count, so a body aged a day at NOON: node read krbn at a = 9.60 while a browser running that same evening
+drew it at a = 10.20 off the same orrery.json. Now Math.floor, and checked at eight hours of the day rather
+than only at midnight -- which is the one instant where round and floor agree, and is all the old checks ever
+looked at.
+
+orrery.json is baked by tools/ship/orreryBake.mjs and holds the **raw scan, not the built system**: every age
+in a built orrery is measured against the day it was baked, so a baked orrery would begin lying the next
+morning. drift() compares the bake against a live scan and names which body changed rather than saying
+"something differs".
+
+Measured: 14 bodies, 12 CAPTURED, box3d and htmx UNPAPERED against a baseline of 2. Eight bodies are
+co-orbital at a = 9.60 -- they arrived on the day vendor/ was first committed, so they share an axis exactly,
+share a period exactly, and never separate; they are drawn on one labelled ring at different phases, and their
+LABELS are decluttered rather than their positions, which are the measurement. 78 new checks in
+tools/ship/orreryView-selfcheck.mjs, 8 sabotages all red and all files restored byte-identical. The tree
+now carries 1268 gates.
 ## v4185 -- the orrery's data model, and two vendored bodies with no paperwork
 
 Keith asked for this first and it has waited three rounds behind the three things he wanted done before it --
