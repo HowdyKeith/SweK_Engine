@@ -20,7 +20,7 @@
 // NOT PLATFORM-SPECIFIC.
 "use strict";
 import http from "node:http";
-import { shutdownServer, liveHandles } from "./serverShutdown.mjs";
+import { shutdownServer, liveHandles, drainChildren } from "./serverShutdown.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -130,6 +130,48 @@ console.log("\n4. *** IT CANNOT HANG, BECAUSE A TEARDOWN THAT HANGS IS WORSE THA
         "then names, instead of the gate simply never returning");
     await new Promise((r) => stuck.close(r));
     await spin();
+}
+
+// ---- 5. *** A CHILD PROCESS IS NOT A SOCKET, AND LOOP TURNS CANNOT REAP ONE *** ----------------------------
+{
+    console.log("\n5. *** drainChildren WAITS ON A REAL TIMER, BECAUSE kill() ASKS ANOTHER PROGRAM TO DIE ***");
+    const { spawn } = await import("node:child_process");
+    // A child that ignores nothing and simply sleeps: killing it is a real OS round trip, not a microtask.
+    const child = spawn(process.execPath, ["-e", "setTimeout(()=>{}, 60000)"], { stdio: "ignore" });
+    await new Promise((r) => setTimeout(r, 120));
+    ok("!! a spawned child really is a live handle", liveHandles().includes("ChildProcess"),
+        liveHandles().join(", ") || "none");
+    // Loop turns alone do NOT clear it -- the exact reason this helper exists beside the turn drain.
+    child.kill();
+    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
+    const afterTurns = liveHandles().includes("ChildProcess");
+    const r = await drainChildren(4000);
+    ok("!! *** drainChildren clears what the turn drain left behind ***", r.drained && !liveHandles().includes("ChildProcess"),
+        "after kill + 20 loop turns the ChildProcess was " + (afterTurns ? "STILL LIVE" : "already gone") +
+        "; after drainChildren: gone in " + r.ms + "ms");
+    if (!afterTurns) {
+        console.log("  ....  ON THIS BOX the turn drain happened to be enough, so the line above did not have to do the work. " +
+            "That is a fact about Linux timing, NOT evidence the helper is unnecessary: the gate it was written " +
+            "for reported a live ChildProcess on a Windows rig after exactly that turn drain.");
+    }
+}
+
+// ---- 6. AND IT GIVES UP RATHER THAN HANGING ------------------------------------------------------------------
+{
+    console.log("\n6. A TEARDOWN THAT HANGS IS WORSE THAN ONE THAT REPORTS");
+    const { spawn } = await import("node:child_process");
+    const stubborn = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{}, 1000);"], { stdio: "ignore" });
+    await new Promise((r) => setTimeout(r, 120));
+    stubborn.kill();                                   // ignored on purpose
+    const t0 = Date.now();
+    const r = await drainChildren(300, 25);
+    const ms = Date.now() - t0;
+    ok("!! *** it returns on its budget instead of spinning on a child that will not die ***",
+        r.drained === false && ms < 2000, ms + "ms against a 300ms budget");
+    ok("...and NAMES what outlasted it, so the caller can assert on something", r.still.includes("ChildProcess"),
+        r.still.join(", ") || "nothing reported");
+    stubborn.kill("SIGKILL");
+    await drainChildren(3000);
 }
 
 console.log("\n" + (fails ? `${fails} FAILED` : "ALL PASS"));
