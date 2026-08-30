@@ -195,4 +195,13 @@ export const splatDevice = {
     // mode-plant contract compares an observable ACROSS two arms, so a self-contained sabotage that reports
     // only its own numbers is invisible to it however load-bearing it is. That is why the plant is a new mode
     // MIRRORING `integral` rather than the sabotage this device already had.
-    plantMode: "detnotsqrt", plantFlips: "integralErrFrac", plantKind: "method" };
+    //
+    // *** v4081 -- plantKind WAS "method" -- probeBind's exact mistake (fixed v4080), same reasoning here. ***
+    // The block comment above is right that the rasteriser is untouched and only the comparison constant is
+    // wrong -- but that makes it a plant delivered by MODE SELECTION (`h.mode === "detnotsqrt"`), which is
+    // plantedCoverage.mjs's `plantKind: "mode"` by definition (declaredPlantMode/probeModePlant already grades
+    // it that way, hardcoded, regardless of this label). "method" in this lab means a `config.planted` flag
+    // swapping the algorithm within one mode -- sdfMarchBind, refScanBind -- and this file reads "planted"
+    // nowhere. capabilityCard.mjs publishes plantKind verbatim, so the mislabel was a real report/census
+    // disagreement, not just an inside-the-file inconsistency.
+    plantMode: "detnotsqrt", plantFlips: "integralErrFrac", plantKind: "mode" };
