@@ -72,6 +72,14 @@ const BEC_MODES = ["condensation"];   // v4074 -- the single source `modes` and 
 
 export const becDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, condensation
+    // mode (only mode) both arms: exponentRel 1.48e-16 -> 0.3333 (condensateAtHalf 0.6464 -> 0.5000, matching
+    // the header's own quoted 0.646447 vs 0.500000). condensateAtZero/condensateAtTc stay bit-identical BY
+    // CONSTRUCTION -- every exponent gives exactly 1 at T=0 and exactly 0 at Tc, so only the interior of the
+    // curve can see the plant, which is exactly why the exponent is RECOVERED from the curve rather than read
+    // off the endpoints.
+    planted: { knob: "planted", observable: "exponentRel",
+               note: "replaces the condensate fraction's 3/2 exponent (from the 3D density of states) with 1 -- both endpoints (fully condensed at T=0, none at Tc) stay exact under any exponent, so the defect is invisible there and shows only in the curve's interior" },
     modes: BEC_MODES,
     name: "bose-einstein-condensation-and-the-2d-divergence",
     observables: BEC_OBSERVABLES,

@@ -70,6 +70,16 @@ export const langevinDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. UNUSUAL SIGNATURE:
+    // `jarzynski` mode reads config.planted STRICTLY ("work" or "noise", selecting workIncrementWRONG or
+    // ouStepNoiseWRONG), so an ordinary `planted: true` probe leaves it BLIND -- MEASURED, dFerr stays exactly
+    // 0.002899 under config.planted=true, but moves to 0.3614 ("work") or 0.0881 ("noise") when the string is
+    // passed explicitly. `fluctuation` mode reads config.planted as an ordinary TRUTHY flag, so it is the one a
+    // standard true/false probe actually reaches -- MEASURED, equipartitionErr 0.01470 -> 0.50735 under
+    // config.planted=true (msdErr stays blind: ouStepNoiseWRONG only corrupts the OU step equipartitionRun
+    // uses, not the free-particle msdRun path).
+    planted: { knob: "planted", observable: "equipartitionErr",
+               note: "in fluctuation mode, a plain truthy planted flag swaps in ouStepNoiseWRONG, a noise step that no longer agrees with the drag coefficient on a temperature (a fluctuation-dissipation violation) -- the stationary distribution settles to the wrong width and no amount of sampling fixes it. jarzynski mode carries the stronger pair of plants (workIncrementWRONG and ouStepNoiseWRONG) but only responds to the literal strings 'work'/'noise', not to planted:true" },
     modes: ["jarzynski", "fluctuation"],
     name: "stochastic-thermodynamics", observables: LANGEVIN_OBSERVABLES, build: buildLangevin,
     defaults: ({ mode } = {}) => ({ mode: mode || "jarzynski", config: { ...DEF } }),

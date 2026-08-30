@@ -73,6 +73,13 @@ export const rmtDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, repulsion
+    // mode (default) both arms: rGoe 0.5342 -> 0.3691, matching the header's own quoted measurements exactly --
+    // the planted ensemble does not merely move off the GOE value, it lands on the OTHER textbook number
+    // (Poisson, 0.386294), which is why the header calls this "the sharpest plant in the lab": a device that
+    // only checked "is <r> in a plausible range" would pass it.
+    planted: { knob: "planted", observable: "rGoe",
+               note: "diagonalWRONG replaces the GOE ensemble's off-diagonal coupling with a diagonal (uncoupled) construction, destroying level repulsion -- the r-statistic does not drift, it lands on the OTHER exact textbook value (Poisson, integrable systems), the strongest form of a plant this lab has" },
     modes: ["repulsion", "semicircle"],
     name: "random-matrix-spectra", observables: RMT_OBSERVABLES, build: buildRmt,
     defaults: ({ mode } = {}) => ({ mode: mode || "repulsion", config: { ...DEF } }),

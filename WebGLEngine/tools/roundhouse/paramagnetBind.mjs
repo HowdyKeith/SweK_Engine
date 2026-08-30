@@ -82,6 +82,13 @@ const PARAMAGNET_MODES = ["spins"];   // v4074 -- the single source `modes` and 
 
 export const paramagnetDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, spins mode
+    // (only mode) both arms: slopeHighJRel 0 -> 1.1429 at J=5/2, matching the header's own quoted "reads
+    // 1.000000 instead of 0.466667". bHalf/tanhY/halfIsTanhRel stay near-identical BY CONSTRUCTION -- the plant
+    // is exact at spin-half, which is the whole reason it is worth having -- and every Schottky/entropy
+    // observable is blind too, since a two-level system has no J for the plant to corrupt.
+    planted: { knob: "planted", observable: "slopeHighJRel",
+               note: "treats every spin as spin-half (tanh) regardless of the actual quantum number J -- exact at J=1/2 and catastrophically wrong elsewhere. At J=5/2 the Curie slope reads 1.000000 instead of the correct (J+1)/(3J)=0.466667" },
     modes: PARAMAGNET_MODES,
     name: "brillouin-paramagnet-and-the-schottky-anomaly",
     observables: PARAMAGNET_OBSERVABLES,

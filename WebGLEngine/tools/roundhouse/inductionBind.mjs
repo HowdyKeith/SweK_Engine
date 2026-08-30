@@ -188,7 +188,12 @@ export const inductionDevice = {
     // gone" looks like as a ratio rather than "the answer is wrong". The 2x2 table in the header is the same
     // fact from the other side: each field is annihilated by the OTHER's integral, and this plant simply
     // applies the wrong one of the two to the induced field.
-    plantMode: "radialdot", plantFlips: "circulationWorstErr", plantKind: "reader",
+    // v4130 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // reader path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED,
+    // circulationWorstErr 1.68e-13 -> 1.0000 under mode "radialdot", matching the header's own quoted figures
+    // exactly.
+    plantMode: "radialdot", plantFlips: "circulationWorstErr", plantKind: "mode",
     modes: INDUCTION_MODES,
     name: "induction-integral-forms",
     observables: INDUCTION_OBSERVABLES,

@@ -77,6 +77,14 @@ const DEBYE_MODES = ["capacity"];   // v4074 -- the single source `modes` and `d
 
 export const debyeDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, capacity
+    // mode (only mode) both arms: lowTSlopeRel 2.20e-14 -> 1.0000, the T^3 law collapsing to an exponential
+    // freeze-out four orders of magnitude too small at low T. dulongPetitRel stays deliberately near-blind
+    // (2.00e-5 -> 3.33e-5, both tiny), matching the header's own point that the high-T classical limit is the
+    // BLIND PARTNER -- Einstein and Debye agree there, and a plant a classical-limit check could catch would be
+    // a much weaker plant.
+    planted: { knob: "planted", observable: "lowTSlopeRel",
+               note: "swaps Debye's spectrum of frequencies for Einstein's 1907 single-frequency model -- a real historical wrong answer. Both models agree at high T (Dulong-Petit), so that check stays blind by design; they diverge only in the cold, where Einstein's capacity freezes out exponentially instead of following the correct T^3 law" },
     modes: DEBYE_MODES,
     name: "debye-heat-capacity-vs-einstein",
     observables: DEBYE_OBSERVABLES,

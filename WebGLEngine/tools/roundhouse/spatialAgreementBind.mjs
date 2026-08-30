@@ -120,7 +120,11 @@ export const spatialAgreementDevice = {
     // carried and which the census cannot grade; NOT `boxMissingPairs`, which stays EXACTLY 0 under this plant
     // because a superset misses nothing -- and a declaration pointed at an observable that does not move is
     // the dead declaration v3849 and v3852 each cost a round to.
-    plantMode: "supersetbox", plantFlips: "boxExtraPairs", plantKind: "knob",
+    // v4130 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, boxExtraPairs
+    // 0 -> 10168 under mode "supersetbox", matching the plantIdealWhy comment below exactly.
+    plantMode: "supersetbox", plantFlips: "boxExtraPairs", plantKind: "mode",
     plantIdeal: 0, plantIdealWhy:
         "boxExtraPairs counts pairs the box query returns that the accounted corner set does not explain, so an agreeing broadphase has exactly 0; supersetbox leaves 10168 unaccounted while boxMissingPairs stays 0 -- the plant adds false pairs rather than losing true ones",
 };
