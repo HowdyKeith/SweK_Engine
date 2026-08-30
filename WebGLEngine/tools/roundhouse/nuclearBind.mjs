@@ -26,6 +26,33 @@ export const NUCLEAR_OBSERVABLES = [
     "peakA", "peakPerNucleon", "predictedZ", "predictedZCorrect", "fissionQ", "planted",
 ];
 
+// *** v4183 -- THIS DEVICE DECLARED NO MODES AT ALL, AND ONE MISSING FIELD BROKE THREE THINGS. ***
+// The header above has listed three modes since v3383 and build() branches on exactly those three -- but
+// `nuclearDevice` carried no `modes:` field, so every consumer that reads one was working from nothing:
+//
+//   1. THE PLANT WAS UNGRADEABLE. plantedCoverage's probeLiveness iterates `device.modes || []`, so its loop
+//      never ran: MEASURED, probeLiveness returned {live:[], inert:[], broke:[]} -- not "inert", EMPTY. The
+//      planted:{} object v4090 added to this file has therefore never been gradeable by the census that
+//      object exists to feed.
+//   2. THE MODE COUNT WAS FICTION. deviceModes' modesOf() falls back to PROBING a 29-name candidate list when
+//      a device declares nothing -- and this device's defaults() echoed any string back, so every probe
+//      returned ok and the census recorded nuclear as a TWENTY-NINE MODE DEVICE. That is v3191's lbm finding
+//      exactly ("probing lbm returned THE WHOLE CANDIDATE LIST and it appeared as a 29-mode device"), landing
+//      a second time on a different device.
+//   3. deviceModes-selfcheck WAS RED FOR IT. Its "NOTHING IS PROBED ANY MORE -- every device that can declare,
+//      exports" assertion requires zero probed devices; nuclear was the only one left, so that line failed.
+//
+// THE MODES ARE NOT INVENTED: they are this file's own default plus every mode its own build() branches on --
+// `equilib` and `binding` return early, `chain` is the fallthrough -- and each was verified to give a DISTINCT
+// answer before being declared, which is the standard this tree applies (a branch that changed nothing would
+// be a mode in name only). MEASURED, the three return disjoint finite-key sets: chain gives chainWorstDiff /
+// conservationResidual / integratedConservationResidual / nA / nB / nC, equilib gives activityRatio /
+// equilibDeparture, binding gives peakA / peakPerNucleon / fissionQ.
+//
+// ONE DECLARATION, HONOURED BY BOTH FIELDS -- the v4074 idiom from debye/fermi/sackurTetrode, so a mode added
+// later cannot reach `modes:` and miss the guard, or the reverse.
+export const NUCLEAR_MODES = ["chain", "equilib", "binding"];
+
 const DEF = { N0: 1, l1: 0.07, l2: 0.31, t: 20, A: 56, Z: 26 };
 const KNOWN = [[4, 2], [16, 8], [56, 26], [238, 92]];
 
@@ -124,6 +151,19 @@ export const nuclearDevice = {
     // it moves the peak somewhere the physics forbids. MEASURED, both arms: peakA 58 -> 2.
     planted: { knob: "planted", observable: "peakA",
                note: "deleting the SEMF's A^(2/3) surface term leaves binding energy still rising with A and still MeV-plausible, but with no competing term to stop it -- the peak collapses to the smallest A rather than sitting near iron" },
+    // v4183 -- DECLARED. See NUCLEAR_MODES above for what was broken by their absence and how they were derived.
+    modes: NUCLEAR_MODES,
     name: "nuclear-decay-and-binding", observables: NUCLEAR_OBSERVABLES, build: buildNuclear,
-    defaults: ({ mode } = {}) => ({ mode: mode || "chain", config: { ...DEF } }),
+    // v4183 -- AND IT REFUSES AN UNDECLARED MODE INSTEAD OF ECHOING IT BACK. `mode: mode || "chain"` returns
+    // ANY truthy name as though this device offered it, so checkMode -- built at v3144 precisely to refuse an
+    // undeclared mode -- refused nothing here, which is both why the probe accepted 29 names and why this
+    // device sat on deviceModes-selfcheck's UNGUARDED_BASELINE. Its name is removed from that baseline in the
+    // same change, as that gate's own comment instructs ("when either learns to refuse an undeclared mode,
+    // DELETE its name") -- a baseline entry whose reason has expired is a ratchet holding nothing (v3195).
+    //
+    // The tree's standing reason for NOT guarding these was that "making one validate means knowing WHICH
+    // modes it means to offer, and guessing that would declare an interface on somebody else's behalf". No
+    // guess was needed here: the set is this file's own header, its own build() branches, and three measured
+    // distinct answers.
+    defaults: ({ mode } = {}) => ({ mode: NUCLEAR_MODES.includes(mode) ? mode : NUCLEAR_MODES[0], config: { ...DEF } }),
 };
