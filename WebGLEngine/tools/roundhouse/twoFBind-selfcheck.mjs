@@ -97,15 +97,41 @@ console.log("\nv4038. THE DEAD KNOB THAT MADE THIS THE MOST EXPENSIVE DEVICE IN 
     // *** THE CENSUS COULD NOT HAVE FOUND THIS, AND SAID SO IN ITS OWN NOTE. *** The last full sweep printed
     // "twof: OVER BUDGET at 300000 ms -- probed 1 of 2 declared knobs". The one it never reached was `steps`.
     // A dead knob that makes a device slow, hidden by the device being slow.
+    // *** v4162 -- THIS ASSERTED TWO ABSOLUTE MILLISECOND THRESHOLDS AND WENT RED WHEN THE BASELINE MOVED. ***
+    // It required costHint(default) > 100000 and costHint(short) < 10000. costHint is `base * (steps/24000)`
+    // where base is READ FROM THE FROZEN COST RECORD -- so both numbers move with whatever machine last froze
+    // it. This box's record now holds twof.inlet = 212479 ms, not the 115200 the prose below was written
+    // against, and 212479/20 = 10623.95 -- SIX PERCENT OVER A CEILING OF 10000, so the check failed on a
+    // perfectly good record. The gate's own note already said the same build timed 117.0 s, 205.0 s and
+    // 207.7 s under contention, a 1.8x spread; 212 s sits inside that band. IT WROTE DOWN THE REASON IT WOULD
+    // FAIL AND THEN ASSERTED AGAINST IT ANYWAY.
+    //
+    // *** THE CLAIM WAS NEVER ABOUT THE ABSOLUTE COST. *** It is that THE KNOBS MOVE IT -- that is what makes
+    // the device schedulable, and it is what the dead `steps` knob at v4038 failed to do. That property is a
+    // RATIO, and the ratio is exactly (settle+record) / (300+900) because `base` cancels: 24000/1200 = 20.
+    // Machine-independent, baseline-independent, and it fails for the one reason worth failing for -- a knob
+    // that stops being read. THE SAME CORRECTION AS v4161's, in a different lab: assert what does not depend
+    // on whose stopwatch it was.
+    const hintDefault = twoFDevice.costHint({ mode: "inlet" });
+    const hintShort = twoFDevice.costHint({ mode: "inlet", config: { settle: 300, record: 900 } });
+    const knobRatio = (hintDefault != null && hintShort) ? hintDefault / hintShort : null;
     ok("!! and the real knobs move the cost, which is what makes the device schedulable at all",
-        twoFDevice.costHint({ mode: "inlet" }) > 100000 &&
-        twoFDevice.costHint({ mode: "inlet", config: { settle: 300, record: 900 } }) < 10000,
-        "costHint 115,200 ms at the default against 5,760 ms at settle 300 / record 900 -- good to a few " +
-        "percent against ~115 s and ~6.0 s ON AN IDLE MACHINE, and the qualifier is measured: the same " +
-        "24,000-step build timed 117.0 s, 205.0 s and 207.7 s under contention, a 1.8x spread. The anchor is " +
-        "the fast end deliberately, so a busy machine UNDER-estimates -- which lets a build start that does " +
-        "not fit (the pre-v4037 behaviour, costing time) rather than declining work that would have fitted. " +
-        "The hint is a SCHEDULING AID: a wrong one can never change a reported number.");
+        knobRatio !== null && Math.abs(knobRatio - 20) < 1e-6,
+        knobRatio === null
+            ? "costHint returned null -- THIS BOX HAS NO FROZEN COST RECORD for twof.inlet, which is a " +
+              "missing baseline and not a dead knob. Freeze one (SWEK_FREEZE_DEVICE_COST=1) rather than " +
+              "loosening this line."
+            : "costHint " + Math.round(hintDefault).toLocaleString() + " ms at the default against " +
+              Math.round(hintShort).toLocaleString() + " ms at settle 300 / record 900 = " +
+              knobRatio.toFixed(2) + "x, against 24000/1200 = 20x BY CONSTRUCTION. *** THE NUMBERS ARE " +
+              "PRINTED RATHER THAN REMEMBERED: the old text quoted 115,200 and 5,760, which this record has " +
+              "not said since it was re-frozen, so a reader of the FAILING line was told figures nobody " +
+              "measured. *** The hint is a SCHEDULING AID and a wrong one can never change a reported " +
+              "number; what it must not do is stop responding to the knobs.");
+    ok("...and the base it scales is a real frozen measurement, not a guess",
+        hintDefault !== null && hintDefault > 0,
+        hintDefault === null ? "no record" : "twof.inlet base " + Math.round(hintDefault).toLocaleString() +
+        " ms, read from the cost record -- an ABSOLUTE cost stays reportable, it is just not assertable");
     ok("...and `envelope` declares nil, because it runs no lattice at all",
         twoFDevice.costHint({ mode: "envelope" }) === 0,
         "it returns numbers recorded at v2862. A cost hint that charged for a replay would push a free mode " +
