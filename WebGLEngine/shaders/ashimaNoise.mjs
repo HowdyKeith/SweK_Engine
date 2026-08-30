@@ -121,3 +121,51 @@ export const SNOISE3_SCALE = 42;
 /** The 2D constants, for the same reason -- and to make plain that they are DIFFERENT numbers, not a variant. */
 export const SNOISE2_FALLOFF = 0.5;
 export const SNOISE2_SCALE = 130;
+
+/**
+ * 2D simplex noise, translated line by line from the SNOISE2 chunk in ashimaNoise.js beside this file.
+ *
+ * *** THIS IS A DIFFERENT FUNCTION FROM snoise3, NOT A VARIANT OF IT, AND THE CONSTANTS SAY SO. *** Falloff
+ * 0.5 and output scale 130, against three dimensions' 0.6 and 42. Each pair belongs to its own dimension's
+ * simplex geometry. v4177 nearly consolidated the two on the belief they were one function; checking the one
+ * constant that separates them is what stopped it, and keeping them visibly separate here is the fix.
+ *
+ * Added at v4182 for the bad-tv port, which is the caller SNOISE2 was extracted for -- until then the GLSL
+ * chunk had NO CONSUMER AT ALL, which is the orphan shape referenceKind exists to catch, created by me one
+ * round earlier in anticipation.
+ */
+export function snoise2(vx, vy) {
+    const C = [0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439];
+    const v = [vx, vy];
+    const dCy = v[0] * C[1] + v[1] * C[1];
+    let i = [Math.floor(v[0] + dCy), Math.floor(v[1] + dCy)];
+    const dCx = i[0] * C[0] + i[1] * C[0];
+    const x0 = [v[0] - i[0] + dCx, v[1] - i[1] + dCx];
+    const i1 = x0[0] > x0[1] ? [1, 0] : [0, 1];
+    // x12 = x0.xyxy + C.xxzz, then x12.xy -= i1
+    const x12 = [x0[0] + C[0] - i1[0], x0[1] + C[0] - i1[1], x0[0] + C[2], x0[1] + C[2]];
+    i = [mod289s(i[0]), mod289s(i[1])];
+
+    // p = permute(permute(i.y + [0, i1.y, 1]) + i.x + [0, i1.x, 1])
+    const py = permute([i[1] + 0, i[1] + i1[1], i[1] + 1, 0]);
+    const p = permute([py[0] + i[0] + 0, py[1] + i[0] + i1[0], py[2] + i[0] + 1, 0]).slice(0, 3);
+
+    let m = [0.5 - (x0[0] * x0[0] + x0[1] * x0[1]),
+             0.5 - (x12[0] * x12[0] + x12[1] * x12[1]),
+             0.5 - (x12[2] * x12[2] + x12[3] * x12[3])].map((n) => Math.max(n, 0));
+    m = m.map((n) => n * n);
+    m = m.map((n) => n * n);
+
+    const x = p.map((n) => 2 * (n * C[3] - Math.floor(n * C[3])) - 1);
+    const h = x.map((n) => Math.abs(n) - 0.5);
+    const ox = x.map((n) => Math.floor(n + 0.5));
+    const a0 = x.map((n, k) => n - ox[k]);
+    m = m.map((n, k) => n * (1.79284291400159 - 0.85373472095314 * (a0[k] * a0[k] + h[k] * h[k])));
+
+    const g = [
+        a0[0] * x0[0] + h[0] * x0[1],
+        a0[1] * x12[0] + h[1] * x12[1],
+        a0[2] * x12[2] + h[2] * x12[3],
+    ];
+    return 130 * (m[0] * g[0] + m[1] * g[1] + m[2] * g[2]);
+}

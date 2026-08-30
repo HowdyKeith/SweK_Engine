@@ -8,6 +8,48 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4182 -- the signal failing, and the near-miss from four rounds ago measured
+
+felixturner/bad-tv-shader ported (MIT (c) Felix Turner): horizontal tearing from a tracking error, plus
+vertical roll.
+
+*** IT DOES NOT OVERLAP render/crtModel.js AND THE SPLIT IS WHY BOTH ARE WORTH HAVING. *** crtModel does
+OPTICS -- curvature, scanline count, aperture mask, vignette, bleed, tint -- which is what the TUBE does to a
+signal that arrived intact. This does SIGNAL, which is the broadcast failing before the glass ever sees it.
+SweK's CRT until now was a perfect picture on a bad tube, which is why it read as a filter rather than a set.
+
+They compose in one order and it is physical, not a preference: SIGNAL DAMAGE FIRST, TUBE OPTICS SECOND. A
+tube cannot un-tear a torn signal, and it cannot scan a line it never received. The other way round lays
+scanlines on an undistorted image and then smears them sideways, which no CRT has ever done. COMPOSE_ORDER is
+exported as frozen DATA rather than described in a comment, so a caller can check it.
+
+*** THIS CLOSES AN ORPHAN I CREATED FOUR ROUNDS AGO. *** v4177 extracted Ashima's 2D simplex into a shared
+chunk specifically for this port, which left SNOISE2 with NO CONSUMER for four versions -- exactly the shape
+referenceKind exists to catch, made in anticipation rather than by neglect, which is not much of a defence.
+The pass consumes it now, and the CPU snoise2 the gate needs was added alongside.
+
+*** AND IT MEASURES THE NEAR-MISS v4177 AVOIDED, WHICH TURNS OUT TO BE WORSE THAN IT LOOKED. *** That round
+set out to consolidate "three copies of the same forty lines" and was stopped by checking one constant: the
+2D and 3D functions are different, not variants. Measured now: 2D peaks at 0.9739 -- the textbook [-1, 1] --
+and this tree's 3D peaks at 4.1681. A ratio of 4.28. And the coarse offset in this shader is CUBED, so a
+single shared entry point built on the 3D function would have scaled the tear by 4.28 cubed: SEVENTY-EIGHT
+TIMES. Not a subtle drift, a picture torn clean off the screen. Sabotage-tested by actually substituting one
+for the other, which fails even harder than that -- the arities differ, so it goes NaN before it gets a chance
+to be 78x wrong.
+
+*** THE CUBE IS THE CHARACTER AND IT IS THE MOST INVITING THING HERE TO SIMPLIFY. *** The original writes
+`offset = offset*distortion * offset*distortion * offset`, a five-term product that looks like a typo. It is
+offset^3 * distortion^2, and cubing is what makes the picture sit nearly still and then tear hard: measured,
+1374 of 2000 rows are displaced under 0.005 UV while 233 others pass it. Linear it would wobble constantly and
+never tear -- a different effect wearing the same knob names. Sabotaged to `offset * distortion`: four checks
+red, including that doubling the knob then gives exactly 2.0x the tear where the real one gives 3.73x.
+
+Also pinned: fract, not %. GLSL's fract returns a POSITIVE fraction for a negative input and JavaScript's %
+returns a negative one, which would sample outside the texture and read as a black band rolling through the
+picture. Sabotaged: two checks red. And the distortion is ROW-ONLY -- offsetAt does not even take a column, so
+a warp is not expressible by accident, which is what makes the artifact tearing rather than a swirl.
+
+Gate count 1265 gates.
 ## v4181 -- an odometer, and a rule this tree had already written down
 
 Ported from coderitual/bounty (MIT (c) 2017 coderitual): a number that rolls to its new value on a strip of
