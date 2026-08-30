@@ -8,6 +8,51 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4178 -- the DOOM fire, and two artifacts kept on purpose
+
+Ported from filipedeschamps/doom-fire-algorithm (MIT (c) 2019 Filipe Deschamps), from its plain-JavaScript
+putImageData implementation rather than the PixiJS or wasm variants, which differ only in bundler and renderer
+plumbing.
+
+*** IT DOES NOT DUPLICATE physics/fire/fireMesh.js AND THE DIFFERENCE IS CATEGORICAL. *** fireMesh is
+mattatz/THREE.Fire: a ray-marched volumetric fire, twenty iterations of three-octave noise through a 3D box,
+which is what makes toppling buildings burn. This is a cellular automaton on a grid of bytes -- copy the cell
+below, lose a random 0-2, drift left by that same amount, against a fixed 37-colour palette. One is optics
+through a volume; the other is a rule on a grid. The second costs almost nothing, which is why it belongs on a
+Pip-Boy screen, a CRT inside a scene, or the Shield TV, none of which should be ray-marching anything.
+
+*** THE RNG IS A CONSTRUCTOR PARAMETER, AND THAT IS THE ONLY REASON ANY OF THIS IS CHECKABLE. *** The original
+calls Math.random() twice per cell per frame, so a direct port is unseeded and the only available quality
+argument is that fire looks like fire. Injected from the start, "same seed, same field, frame for frame" is
+exact and every check rests on it -- 44 of them.
+
+*** TWO ARTIFACTS ARE REPRODUCED ON PURPOSE, AND BOTH LOOK LIKE BUGS. ***
+1. THE WIND IS AN UNCLAMPED 1D INDEX. The rule writes to pixels[current - decay] where the index is
+   column + width*row, so at column 0 with a decay of 1 or 2 it lands at the END OF THE ROW ABOVE. Measured:
+   4 of 40 writes cross a row on an 8-wide grid. That is the leftward lean, and the wrap is why a wisp turns
+   up on the far side. What is NOT kept is a negative destination wrapping to the array's end -- that would
+   paint hot cells into the bottom corner from the top-left, which is a real bug rather than a charming one.
+2. THE UPDATE IS SINGLE-BUFFERED AND COLUMN-MAJOR, so a write lands in a column already processed this frame.
+   Double-buffering is the obvious tidy-up; the gate runs it as a CONTROL and shows it gives a different
+   field with the same seed, so the in-place update is part of the algorithm rather than an implementation
+   detail.
+Both were sabotage-tested: clamping the wind into its row goes red on two checks, and dropping the palette's
+duplicated 13/14 pair goes red on two more. Restored byte-identical.
+
+*** AND THE GATE'S FIRST DRAFT ASSERTED THE WIND AWAY. *** A check read at(5, 2) expecting MAX - decay -- that
+the cooled value lands in the SAME column. It does not, and cannot: the whole rule is that it lands `decay`
+columns to the left. The origin column read 0 and the check went red against correct code. It now asserts both
+halves, that the value is at 5 - decay AND that it is not where it started. A second check tested /clamp/i over
+the whole file and matched Uint8ClampedArray in toRGBA -- a gate red on a type name -- now scoped to step().
+
+toRGBA writes into a caller's buffer when given one, so a frame allocates nothing, and isBurning() is a real
+level-triggered probe for engine/frameDirty.js: cutting the source does not stop the fire, it rises and dies
+over about 51 frames on a 40-cell grid and reaches genuinely zero.
+
+New doom-fire.html runs it at the original's 50ms interval deliberately -- the decay is at most one palette
+step per frame, so a 60fps fire climbs three times as fast and reads as a jet rather than a flame.
+
+Gate count 1261 gates.
 ## v4177 -- the consolidation that corrected its own premise, and a nine-year-old pass with four dead APIs
 
 Aquarelle first, in the agreed order. It needs Ashima's simplex, so the shared-noise work is the first step of
