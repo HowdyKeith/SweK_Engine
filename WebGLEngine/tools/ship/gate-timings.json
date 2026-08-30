@@ -503,7 +503,7 @@
   "simulation/lbm/inflow-selfcheck.mjs": 109804,
   "simulation/lbm/liftPersistence-selfcheck.mjs": 72,
   "simulation/lbm/onsetTrend-selfcheck.mjs": 56916,
-  "simulation/lbm/settleCurve-selfcheck.mjs": 88041,
+  "simulation/lbm/settleCurve-selfcheck.mjs": 131779,
   "simulation/lbm/shaderConstants-selfcheck.mjs": 69,
   "simulation/lbm/sheddingDesign-selfcheck.mjs": 61,
   "simulation/lbm/tonePresence-selfcheck.mjs": 383,
@@ -1261,9 +1261,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 494,
+  "timedThisRun": 495,
   "totalInRecord": 1256,
-  "at": "2026-08-30T22:06:17Z"
+  "at": "2026-08-30T22:08:29Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
