@@ -146,8 +146,16 @@ export const ctDevice = {
     // 74.55 across 30 / 60 / 120 / 240) where the honest run is flat to 1.68e-3.
     modes: ["parallel", "fan", "gain", "unweighted"], name: "ct-reconstruction-bench",
     plantMode: "unweighted", plantFlips: "absoluteGain", plantKind: "mode",
+    // v4134 -- CORRECTED. This text previously said the unweighted arm "drops the ramp filter" and that
+    // "fbpCorr stops being computable at all" -- neither is true of this mode. The ramp filter is applied in
+    // both arms (filteredBackProjection's fourth argument is `true` either way); the plant strips only the
+    // backProject scale = pi/angles.length, per this file's own code comment above ("the angular weight
+    // removed"). fbpCorr is not even among this mode's observables (gain/unweighted return gainAtViews and
+    // corrAtViews, never fbpCorr), and MEASURED, corrAtViews stays bit-identical across both arms at every
+    // view count -- correlation is invariant to a pure gain, which is the whole reason absoluteGain and not
+    // corrAtViews is what this plant is declared against.
     plantIdeal: 1, plantIdealWhy:
-        "absoluteGain is a RATIO of reconstructed to true attenuation, so correct absolute scaling is exactly 1 -- not 0. The unweighted arm drops the ramp filter and the gain runs to 37.2, and fbpCorr stops being computable at all",
+        "absoluteGain is a RATIO of reconstructed to true attenuation, so correct absolute scaling is exactly 1 -- not 0. The unweighted arm drops the angular integration weight (scale = pi/angles.length) and the gain tracks the view count linearly instead of staying flat: 0.9746 -> 37.2258 at 120 views, while corrAtViews (a correlation, blind to any pure gain) stays bit-identical",
     observables: CT_OBSERVABLES, build: buildCT, defaults: ctDefaults };
 
 /** Least-squares gain and offset of a reconstruction against the truth we own: recon ~ gain*truth + offset. */

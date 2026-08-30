@@ -208,6 +208,10 @@ export const GALAXY_OBSERVABLES = [
 export const galaxyDevice = {
     // "traces" stays FIRST: it owns triangleErr, and the contract compares the plant against modes[0].
     modes: MODES, name: "cosmic-map-spectral", observables: GALAXY_OBSERVABLES, build, defaults,
-    plantMode: "unorderedtri", plantFlips: "triangleErr", plantKind: "method",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // method path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, triangleErr
+    // 0 -> 1380 under mode "unorderedtri". "method" was the label for a mechanism this device does not use.
+    plantMode: "unorderedtri", plantFlips: "triangleErr", plantKind: "mode",
 };
 export default galaxyDevice;

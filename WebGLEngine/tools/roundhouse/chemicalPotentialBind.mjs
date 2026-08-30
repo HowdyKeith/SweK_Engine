@@ -82,6 +82,13 @@ const CHEMICALPOTENTIAL_MODES = ["fugacity"];   // v4074 -- the single source `m
 
 export const chemicalPotentialDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, fugacity
+    // mode (only mode) both arms: crossoverSpread 1.8472 -> 0 (crossoverOrdered and fugacityOrdered also flip
+    // 1 -> 0, but the spread is the sharper numeric key). sommerfeldCoeff/sommerfeldJoinRel and the
+    // mu-vs-Sommerfeld cross-module join stay blind BY CONSTRUCTION -- the coefficient is a typed constant
+    // rather than a computed occupancy, so it survives the plant while the thing it is joined to is wrong.
+    planted: { knob: "planted", observable: "crossoverSpread",
+               note: "substitutes Maxwell-Boltzmann statistics for all three gases -- classical statistics see neither the Bose ceiling nor the Fermi floor, so all three crossover densities collapse to exactly 1 and the strict ordering (Bose > classical > Fermi) that IS the statistics degenerates into equality. The spread between the Bose and Fermi crossovers goes from 1.85 to exactly 0" },
     modes: CHEMICALPOTENTIAL_MODES,
     name: "chemical-potential-three-gases-one-constraint",
     observables: CHEMPOT_OBSERVABLES,

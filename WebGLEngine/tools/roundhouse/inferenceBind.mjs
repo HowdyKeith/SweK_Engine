@@ -110,5 +110,9 @@ export const inferenceDevice = {
     // which is the header's "confidently wrong" in one number, and the second device this round (geometry's
     // volume key was the other) whose obvious observable ENDORSES the defect rather than missing it.
     // `coverage` is NULL in `posterior`, so it cannot carry the declaration however well it describes this.
-    plantMode: "overconfident", plantFlips: "sigmaErr", plantKind: "knob",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, sigmaErr
+    // 7.47e-4 -> 6.37e-2 under mode "overconfident", matching the comment's own quoted 7.4704e-4 -> 6.3739e-2.
+    plantMode: "overconfident", plantFlips: "sigmaErr", plantKind: "mode",
 };

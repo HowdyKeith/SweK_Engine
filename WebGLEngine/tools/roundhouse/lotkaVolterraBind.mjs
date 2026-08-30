@@ -206,6 +206,14 @@ export const lotkaVolterraDevice = {
     // KNOB PLANT: sigma perturbs the MODEL upstream of every observable, so the whole path from a different
     // ecology to the reported numbers is graded -- not a number nudged at the end.
     plantKind: "knob",
+    // v4128 -- NAMED, THE SAME COMPLETION v3851/v4088-v4127 gave the rest of this family. MEASURED, cycle mode
+    // (default) both arms: firstIntegralDrift 3.456e-4 -> 3.781e-2 (109x, matching the header's quoted "109x"
+    // exactly) and amplitudeRatio 1.0000030 -> 0.004243 (236x) -- both move in every mode, per the header's own
+    // design ("the two observables every mode owes"). Declared against firstIntegralDrift as the sharper of the
+    // two: amplitudeRatio can be near 1 by coincidence on a short run, while the first integral is the closed
+    // orbit's own conserved quantity and stops being conserved the instant the logistic term enters.
+    planted: { knob: "planted", observable: "firstIntegralDrift",
+               note: "adds a logistic self-limitation -sigma*x^2 to the prey equation -- the standard, more realistic textbook refinement of this exact model, not a corrupted one. It leaves the prey fixed point and Volterra's principle untouched (both are bit-identical or unshifted-in-direction under the plant) and destroys the closed orbit instead: the first integral stops being integral, and the longer the run, the better the plant hides (the time-average theorem converges back onto the planted system as cycles grow)" },
     modes: LOTKA_VOLTERRA_MODES,
     name: "lotka-volterra-predator-prey",
     observables: LOTKA_VOLTERRA_OBSERVABLES,

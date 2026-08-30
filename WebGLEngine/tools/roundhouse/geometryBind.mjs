@@ -163,4 +163,9 @@ export const geometryDevice = {
     // `surfaceDeviation` (8.6035e-3 -> 1.7953e-1) and emphatically NOT `volumeErrFrac`, which IMPROVES under
     // this plant (8.5203e-3 -> 2.9779e-3), nor `watertight`/`triangles`/`vertices`, which are bit-identical
     // because the topology never moves -- only the vertex positions along the crossing edges do.
-    plantMode: "midpoint", plantFlips: "surfaceDeviation", plantKind: "knob" };
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED,
+    // surfaceDeviation 8.60e-3 -> 0.1795 under mode "midpoint", matching the header's own quoted 8.6035e-3 ->
+    // 1.7953e-1.
+    plantMode: "midpoint", plantFlips: "surfaceDeviation", plantKind: "mode" };

@@ -77,6 +77,16 @@ const SACKURTETRODE_MODES = ["classical"];   // v4074 -- the single source `mode
 
 export const sackurTetrodeDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, classical
+    // mode (only mode) both arms: spuriousOverNln2 0 -> 1.0000000000, exactly one unit of the textbook Gibbs
+    // term appearing where none should be. extensivityRel also moves (0 -> 0.0824) but is the weaker of the two
+    // -- spuriousOverNln2 is declared because the header explicitly designed it to invert cleanly rather than
+    // read as a small number in both arms (the earlier draft it replaced, rel(spurious, 2N ln2), read 1.0 with
+    // NO defect present and 6e-16 with one -- an inverted trap this device's own comment calls out by name).
+    // Every per-particle single-density observable (sackurAtUnity, the EOS pair, the BEC-threshold comparison)
+    // is blind BY CONSTRUCTION: the Gibbs paradox is about how entropy SCALES, not about any one measurement.
+    planted: { knob: "planted", observable: "spuriousOverNln2",
+               note: "drops Stirling's 1/N! from the entropy, so it reads ln V instead of ln(V/N) and stops being extensive -- doubling the box and the atoms together gains a spurious N k ln 2 of 'mixing entropy' with nothing having mixed. Invisible to any single-box measurement (the 5/2 constant, the zero-crossing, the exchange EOS all read identically under the plant); only comparing two box sizes reveals it" },
     modes: SACKURTETRODE_MODES,
     name: "sackur-tetrode-and-the-gibbs-paradox",
     observables: SACKUR_OBSERVABLES,

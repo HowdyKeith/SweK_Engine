@@ -26,7 +26,8 @@ import { stressForces, stencilGradientSum } from "../../physics/mpm/forces.mjs";
 
 export const MPMFORCE_OBSERVABLES = [
     "netForce", "thirdLawHolds", "gradientSum", "weightSum", "stencilHolds",
-    "maxForceCoarse", "maxForceFine", "scaleRatio", "scalesWithH", "h",
+    "maxForceCoarse", "maxForceFine", "scaleRatio", "scalesWithH",
+    "maxForceCoarsePlanted", "maxForceFinePlanted", "scaleRatioPlanted", "scalesWithHPlanted", "h",
 ];
 
 export const MPMFORCE_MODES = ["thirdlaw", "scaling", "stencil", "brokenstencil"];
@@ -71,12 +72,28 @@ export async function buildMpmForce(hyp, base = {}) {
 
     if (h.mode === "scaling") {
         // *** THE KEY THE THIRD LAW CANNOT PROVIDE: force magnitude must DOUBLE when the cell HALVES. ***
-        const maxOf = (cellH) => { const { g, ps } = rig(c, cellH);
-                                   return Math.max(...stressForces(ps, g, stressOf, {}).fx); };
-        out.maxForceCoarse = maxOf(c.h);
-        out.maxForceFine = maxOf(c.h / 2);
+        //
+        // v4132 -- BOTH ARMS, WHERE ONLY THE HONEST ONE EVER RAN. physics/mpm/forces.mjs implements
+        // skipChainRule -- a real, self-tested plant (its own module-scope run block exercises it directly) --
+        // and its own comment there is explicit that this is "the WRONG plant" for the third-law identity,
+        // because scaling every gradient by the same constant leaves a sum of zero at zero. But THIS device's
+        // own header spends its whole second half arguing the opposite claim for the SCALING key: "the third
+        // law cannot see it... ONLY THE SCALING KEY CATCHES IT." That claim was never wired to a measurement --
+        // scaling mode called stressForces with `{}` always, so skipChainRule never ran here at all, and the
+        // header's numbers (a ratio of 1 instead of 2, invisible at h=1 by arithmetic) were prose with nothing
+        // behind them. Verified directly against forces.mjs before wiring this: honest ratio 2.0000000000,
+        // skipChainRule ratio 1.0000000000 -- the claim was true and simply never measured here.
+        const maxOf = (cellH, opts) => { const { g, ps } = rig(c, cellH);
+                                   return Math.max(...stressForces(ps, g, stressOf, opts).fx); };
+        out.maxForceCoarse = maxOf(c.h, {});
+        out.maxForceFine = maxOf(c.h / 2, {});
         out.scaleRatio = out.maxForceFine / out.maxForceCoarse;
         out.scalesWithH = Math.abs(out.scaleRatio - 2) < 0.05;
+
+        out.maxForceCoarsePlanted = maxOf(c.h, { skipChainRule: true });
+        out.maxForceFinePlanted = maxOf(c.h / 2, { skipChainRule: true });
+        out.scaleRatioPlanted = out.maxForceFinePlanted / out.maxForceCoarsePlanted;
+        out.scalesWithHPlanted = Math.abs(out.scaleRatioPlanted - 2) < 0.05;
         return out;
     }
 

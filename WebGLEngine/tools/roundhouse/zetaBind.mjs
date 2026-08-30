@@ -118,5 +118,10 @@ export const zetaDevice = {
     // The declaration points at `errAbs`, computed against the same pi^2/6 in both arms. NOT `correctionGain`
     // and NOT `errNoCorrection`: those live only inside `corrections` and read -1 everywhere else, so either
     // would have been a declaration on a sentinel -- a number that changes without meaning anything.
-    plantMode: "nocorrection", plantFlips: "errAbs", plantKind: "knob",
+    // v4128 -- RELABELED to "mode". The comment above argued knob-over-method on what CHANGES (the computation,
+    // not the key), but plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE either
+    // the knob or method path ever runs, regardless of that distinction -- MEASURED, errAbs 2.44e-15 -> 9.63e-5
+    // under mode "nocorrection".
+    plantMode: "nocorrection", plantFlips: "errAbs", plantKind: "mode",
 };

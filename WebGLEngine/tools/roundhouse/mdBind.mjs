@@ -369,7 +369,12 @@ export const mdDevice = {
     name: "md-force-field",
     // "madelung" stays FIRST: it owns madelungErrFrac, and the contract compares the plant against modes[0].
     modes: MD_MODES,
-    plantMode: "noselfenergy", plantFlips: "madelungErrFrac", plantKind: "knob",
+    // v4128 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED,
+    // madelungErrFrac 3.16e-7 -> 1.291 under mode "noselfenergy". "knob" was the label for a mechanism this
+    // device does not use.
+    plantMode: "noselfenergy", plantFlips: "madelungErrFrac", plantKind: "mode",
     observables: MD_OBSERVABLES,
     build: buildMd,
     defaults: mdDefaults,

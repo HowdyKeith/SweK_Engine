@@ -91,6 +91,14 @@ const FERMI_MODES = ["degenerate"];   // v4074 -- the single source `modes` and 
 
 export const fermiDevice = {
     plantKind: "method",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, degenerate
+    // mode (only mode) both arms: sommerfeldLinearityRel 0 -> 0.5 (cvLow also moves, 4.93e-3 -> 1.5, but is a
+    // raw magnitude rather than an error ratio, so the linearity check is the sharper declared key). The
+    // ground-state fractions (groundFraction, pressureFraction, polytropeExponent) and the one-sign mirror
+    // (mirrorRatio/mirrorRel) are blind BY CONSTRUCTION -- pure T=0 fractions and a quadrature identity, neither
+    // touched by a heat-capacity plant.
+    planted: { knob: "planted", observable: "sommerfeldLinearityRel",
+               note: "replaces Fermi-Dirac statistics with classical equipartition ((3/2)k per electron) -- the pre-quantum belief that measurement refused. The Sommerfeld linear-in-T law (doubling T doubles Cv exactly) becomes constant under the plant, so the ratio that should read 1 collapses to 0.5" },
     modes: FERMI_MODES,
     name: "degenerate-fermi-gas-vs-equipartition",
     observables: FERMI_OBSERVABLES,

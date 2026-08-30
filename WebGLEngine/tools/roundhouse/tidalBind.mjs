@@ -263,6 +263,13 @@ export const tidalDevice = {
     // because plantedCoverage holds UNDECLARED AT A WALL OF ZERO -- a plant nobody can name the kind of is a
     // plant nobody can reason about, and the census caught this one missing the moment it was added.
     plantKind: "knob",
+    // v4130 -- NAMED, THE SAME COMPLETION v3851/v4088-v4129 gave the rest of this family. MEASURED, deviation
+    // mode (default) both arms: deviationErrFrac 8.879e-4 -> 1.5762 -- the exact two-geodesic integration and
+    // the linearised tidal equation, which agree to sub-permille when the radial term carries its correct
+    // factor of 2, diverge by three orders once it is dropped. roche mode is blind BY CONSTRUCTION (it measures
+    // the tidal field from two exact geodesics directly, never calling fallLinear at all).
+    planted: { knob: "planted", observable: "deviationErrFrac",
+               note: "drops the factor of 2 from the radial tidal term (+2GM/r^3 along the fall vs -GM/r^3 across it) -- the standard wrong derivation you get from differentiating the Newtonian potential once and forgetting the reference point is itself falling. Dimensionally right, has the correct 1/r^3 scaling, and still stretches the pair without bound, so only the exact two-geodesic comparison catches it" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a

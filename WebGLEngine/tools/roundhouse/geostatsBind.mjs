@@ -220,6 +220,11 @@ export const geostatsDevice = {
     // unbiased answer is provably the arithmetic mean. THE DEFAULT IS UNTOUCHED: defaults() still returns
     // "bridge". Declaring against worstValueErr would have shipped a DECLARED BUT DEAD device.
     modes: MODES, name: "kriging-screen-effect", observables: GEOSTATS_OBSERVABLES, build, defaults,
-    plantMode: "noconstraint", plantFlips: "valueErr", plantKind: "knob",
+    // v4129 -- RELABELED. plantMode/plantFlips are both declared and plantMode is in this device's own modes
+    // list, so plantedCoverage.mjs's declaredPlantMode()/probeModePlant() path takes this device BEFORE the
+    // knob path ever runs and grades it as a mode-plant regardless of the label here -- MEASURED, valueErr
+    // 0 -> 0.325 under mode "noconstraint" (probed at nugget mode's default probe point). "knob" was the label
+    // for a mechanism this device does not use.
+    plantMode: "noconstraint", plantFlips: "valueErr", plantKind: "mode",
 };
 export default geostatsDevice;
