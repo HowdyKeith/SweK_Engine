@@ -3102,10 +3102,34 @@ A password fetches a token from the list server; an unregistered callsign needs 
     var hr = document.getElementById("hdrRuntime");
     if (hr) hr.textContent = " (" + name + ")";
   }).catch(function(){});
+  // v4158 -- *** READOUTS MORPH; THE TICKER DOES NOT. *** ui/textMorph.js animates the graphemes that SURVIVE
+  // a change to their new positions and fades only the ones that actually differ, so "v4157" -> "v4158" reads
+  // as one digit turning over rather than as a different string appearing. That is worth something exactly
+  // where old and new SHARE STRUCTURE, which is true of every readout on this page and false of the ticker --
+  // consecutive log lines share almost nothing, so a morph there would fade every glyph out and in, slower to
+  // read than the scroll it replaced. The measurement behind that decision is in textMorph's own header and is
+  // asserted by its gate, so if the ticker is ever retimed the question gets asked again.
+  //
+  // PROGRESSIVE, AND THE FALLBACK IS THE POINT: the module is fetched once, lazily; until it lands (and for
+  // ever, if it fails) every call is a plain textContent assignment. A readout that stopped updating because
+  // an animation module 404'd would be a strictly worse page than one that never animated.
+  var _morphFn = null, _morphAsked = false;
+  function morphText(el, txt){
+    if (!el) return;
+    if (!_morphAsked){
+      _morphAsked = true;
+      import("./ui/textMorph.js").then(function(m){ _morphFn = m.morph; }).catch(function(){ _morphFn = false; });
+    }
+    // The FIRST paint always falls through to textContent, which is correct rather than a limitation: there is
+    // nothing to morph FROM until a value has been shown once.
+    if (_morphFn){ try { _morphFn(el, txt); return; } catch(e){} }
+    el.textContent = txt;
+  }
+
   // v1796/v1823 — engine version straight after the SweK Engine link
   fetch("/package/info", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
     var ev = document.getElementById("hdrEngineVer");
-    if (ev && j && j.version) ev.textContent = " v" + String(j.version).replace(/^v/i, "");
+    if (ev && j && j.version) morphText(ev, " v" + String(j.version).replace(/^v/i, ""));
   }).catch(function(){});
 
   // controls
@@ -3404,7 +3428,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
   function auSync(on, st){
     auCb.checked = !!on;
     var note = on ? "Auto-update from Downloads: ON" : "Auto-update from Downloads: OFF";
-    if (st && st.current){ var _ev = document.getElementById("hdrEngineVer"); if (_ev) _ev.textContent = " v" + String(st.current).replace(/^v/i, ""); if (st.found && st.found > st.current) note += "  ·  v" + st.found + " waiting"; }
+    if (st && st.current){ var _ev = document.getElementById("hdrEngineVer"); if (_ev) morphText(_ev, " v" + String(st.current).replace(/^v/i, "")); if (st.found && st.found > st.current) note += "  ·  v" + st.found + " waiting"; }
     auTxt.textContent = note;
     _updLocal = !!(st && st.found && st.found > st.current); try{ _syncUpdBtn(); }catch(e){}
   }

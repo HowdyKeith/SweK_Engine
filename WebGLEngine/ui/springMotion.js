@@ -56,6 +56,93 @@ export const PRESETS = {
     stiff:  { stiffness: 210, damping: 29, mass: 1 },   // zeta 1.001, MEASURED 0.0% overshoot, settles 0.72s -- for edges that must not be crossed
 };
 
+// ---------------------------------------------------------------------------------------------------------------
+// v4158 -- THE SAME SPRING, SOLVED RATHER THAN STEPPED, AS A CSS easing FUNCTION
+// ---------------------------------------------------------------------------------------------------------------
+//
+// *** WHY BOTH FORMS EXIST, BECAUSE THEY ARE NOT ALTERNATIVES. *** step() above is a NUMERICAL integrator: it
+// takes a state and a dt and can be RETARGETED MID-FLIGHT, which is what a toast that gets interrupted needs.
+// It also runs on the main thread, one call per frame. springToCssLinear solves the same differential equation
+// IN CLOSED FORM and samples it into a CSS `linear(...)` easing, so the browser animates it ON THE COMPOSITOR
+// and a busy main thread cannot make it stutter -- at the cost of being a BAKED CURVE that cannot be
+// interrupted or retargeted. Fire-and-forget motion wants this one; anything that can change its mind wants
+// step(). The idea is lochie/torph's (MIT), which packages a spring as an easing string; the damped harmonic
+// oscillator itself is textbook, and this file's own header already makes that argument about sileo.
+//
+// *** THE PARAMETERS ARE THE SAME PRESETS, ON PURPOSE. *** A CSS transition and a JS toast that disagree about
+// what "snappy" means is the second-declaration defect this module was created to end, arriving by a new door.
+//
+// *** AND THE CRITICAL BAND IS HANDLED SEPARATELY, WHICH THE OBVIOUS IMPLEMENTATION GETS WRONG. *** The
+// overdamped solution divides by (r2 - r1), and those roots COINCIDE at zeta == 1 -- so the general form is a
+// division by zero exactly at critical damping and loses precision to catastrophic cancellation on either side
+// of it. THIS TREE'S `stiff` PRESET IS zeta 1.001, which is inside that band, so it is not a hypothetical edge:
+// it is the preset meant for surfaces where overshoot would look like a bug.
+const CRITICAL_BAND = 1e-3;
+
+/** Exact position of a unit-step spring at time t (seconds), starting at rest. Returns 0..~1. */
+export function springPosition(t, omega0, zeta) {
+    if (!(t > 0)) return 0;
+    if (Math.abs(zeta - 1) < CRITICAL_BAND) {                       // critically damped: the closed form, no division
+        return 1 - (1 + omega0 * t) * Math.exp(-omega0 * t);
+    }
+    if (zeta < 1) {                                                  // underdamped: oscillates, overshoots
+        const wd = omega0 * Math.sqrt(1 - zeta * zeta);
+        return 1 - Math.exp(-zeta * omega0 * t) * (Math.cos(wd * t) + (zeta * omega0 / wd) * Math.sin(wd * t));
+    }
+    const sq = Math.sqrt(zeta * zeta - 1);                           // overdamped: two real roots, no overshoot
+    const r1 = -omega0 * (zeta + sq), r2 = -omega0 * (zeta - sq);
+    const B = -r1 / (r2 - r1), A = 1 - B;
+    return 1 - A * Math.exp(r1 * t) - B * Math.exp(r2 * t);
+}
+
+/**
+ * How long until it is settled, in ms.
+ *
+ * *** SETTLED MEANS "STAYED INSIDE THE TOLERANCE", NOT "TOUCHED IT". *** An underdamped spring crosses its
+ * target on every oscillation, so a test that stops at the first crossing reports a spring as finished while it
+ * is still visibly ringing. step() above does not need this rule because it has a VELOCITY to consult and
+ * checks both; a closed-form position has no velocity to hand, so the dwell is what replaces it.
+ */
+export function springDuration(omega0, zeta, precision = 0.001, { step: dt = 0.001, max = 10, dwell = 0.1 } = {}) {
+    let inside = 0;
+    for (let t = 0; t < max; t += dt) {
+        if (Math.abs(springPosition(t, omega0, zeta) - 1) > precision) inside = 0;
+        else { inside += dt; if (inside > dwell) return Math.ceil((t - inside + dt) * 1000); }
+    }
+    return Math.ceil(max * 1000);
+}
+
+const _linearCache = new Map();
+
+/**
+ * A preset (or raw {stiffness, damping, mass}) as a CSS `linear()` easing plus its duration in ms.
+ *
+ * @returns { easing, durationMs, zeta, points }  -- `easing` drops straight into a transition-timing-function
+ */
+export function springToCssLinear(preset = "snappy", { precision = 0.001, maxPoints = 100 } = {}) {
+    const p = (typeof preset === "string" ? PRESETS[preset] : preset) || PRESETS.snappy;
+    const mass = p.mass || 1;
+    const key = p.stiffness + ":" + p.damping + ":" + mass + ":" + precision + ":" + maxPoints;
+    const hit = _linearCache.get(key);
+    if (hit) return hit;
+
+    const omega0 = Math.sqrt(p.stiffness / mass);
+    const zeta = dampingRatio(p);                                    // the SHARED helper, not a second formula
+    const durationMs = springDuration(omega0, zeta, precision);
+    const n = Math.min(maxPoints, Math.max(32, Math.round(durationMs / 15)));
+    const points = [];
+    for (let i = 0; i < n; i++) {
+        // The LAST point is pinned to exactly 1. Sampling it would leave a curve that ends a fraction short,
+        // and CSS would then animate to that fraction and stop -- an element resting a hair off its target,
+        // which is the same defect step()'s snap-on-rest exists to prevent, in the other engine.
+        const v = i === n - 1 ? 1 : springPosition((i / (n - 1)) * (durationMs / 1000), omega0, zeta);
+        points.push(Math.round(v * 10000) / 10000);
+    }
+    const out = { easing: "linear(" + points.join(", ") + ")", durationMs, zeta, points };
+    _linearCache.set(key, out);
+    return out;
+}
+
 /** Rest thresholds. Both must be met: a spring at the target still MOVING is not at rest. */
 const REST_X = 0.001, REST_V = 0.01;
 
