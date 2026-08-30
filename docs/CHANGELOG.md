@@ -8,6 +8,101 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4204 -- the GL Transition spec, taken as a contract and not as 100 shaders
+
+Spec and validator idea from gl-transitions/gl-transitions and gre/gl-transition-libs. Both carry real MIT
+LICENSE files, read this round -- (c) 2017-present gl-transitions contributors, (c) 2016-present Gaetan
+Renaudeau. Neither is vendored and neither needs to be: the CONTRACT is the thing worth having, and 100
+transitions written against it are worth nothing without something that can check one.
+
+THE CONTRACT IS FOUR NAMES AND ONE SIGNATURE. A conforming file declares `vec4 transition(vec2 uv)` and may
+use, without declaring them, `progress` (0 to 1), `ratio` (viewport width/height), `getFromColor(uv)` and
+`getToColor(uv)`. The host supplies all four. That is the whole portability story: the shader never binds a
+texture, never learns what it is transitioning between, and cannot know whether it is running over two
+videos, two DOM rasterisations or two framebuffers.
+
+Nothing in this tree parsed a GLSL uniform out of source before today. The 14 shaders in
+render/swiftShaderPass.js declare uniforms and nothing checks their shape.
+
+THE SPEC STATES A LAW AND NOTHING ENFORCES IT. "When progress is 0.0, exclusively the from texture must be
+rendered. When progress is 1.0, exclusively the to texture." A GLSL compiler cannot check that. A text
+scanner cannot check that. It is a property of the FUNCTION, so the three shipped transitions exist twice --
+GLSL in shaders/transitions/ and JS in render/transitionModel.mjs -- which is the crtModel.js / crtPass.js
+discipline of v4119 applied to a law instead of to a look. A transition that fails it POPS at the start or
+the end of every single play, which reads as a dropped frame and is one.
+
+IT CAUGHT MY OWN SHADER ON THE FIRST RUN. swekWipe returned all `to` at progress 0 and all `from` at
+progress 1 -- an error of 1.0, the maximum possible, at every aspect ratio tested -- because its smoothstep
+edges were ordered the wrong way round. The factor must be 1 where the wipe has ALREADY passed, so the wider
+edge comes first; I had written smoothstep(front - softness, front + softness, 1.0 - t), which is inverted
+twice and cancels to exactly the wrong answer. swekIris was written minutes earlier and uses the correct
+reversed form, which is why it passed. Two shaders, one mistake, and only a measurement told them apart.
+The comment above the broken line asserted the property the line did not have.
+
+THEN THE VALIDATOR WAS GRADED AGAINST REALITY RATHER THAN AGAINST MY IDEA OF IT. Run over all 100 published
+transitions -- fetched to a scratch directory outside the tree, none vendored -- it reported four
+non-conforming files, and THREE OF THOSE FOUR WERE BUGS IN THE VALIDATOR.
+
+1. It banned `uniform sampler2D` outright, on the reasoning that a transition reads through
+   getFromColor/getToColor and needs no sampler of its own. That rejected luma.glsl and displacement.glsl,
+   and luma.glsl is by gre, who wrote the spec. Both take a THIRD texture as a parameter -- a luminance
+   mask, a displacement map -- and still read from and to only through the provided functions. The rule is
+   narrower than I wrote it: do not sample the FROM AND TO textures directly. sampler2D is now a parameter
+   type, exempt from the default requirement because no literal names an image.
+
+2. It expected the inline block-comment default AFTER the semicolon. Real files put it before:
+   `uniform vec3 color /* = vec3(0.9, 0.4, 0.2) */;`. So the comment fell into the NAMES capture and the
+   comma-split turned ONE real uniform into THREE FICTIONAL ONES called "color /* = vec3(0.9", "0.4" and
+   "0.2) */" -- each reported as a spec violation against the author. A parser that invents uniforms is
+   worse than one that misses them.
+
+3. It flagged FilmBurn.glsl for calling `texture(`. That is a local `vec4 texture(vec2 p)` blur helper,
+   perfectly legal in GLSL ES 1.0 where the builtin is texture2D. Matching a NAME where the rule is about a
+   SHAPE: a texture fetch takes a SAMPLER as its first argument, and this one takes a vec2.
+
+After the fixes: 100/100 conform, 164 parameters parsed across the corpus, 162 with a spec default, and the
+2 without are exactly the two sampler2D parameters.
+
+AND A LICENCE FINDING WHILE READING THEM. 98 of the 100 files declare MIT in their `// License:` header, one
+declares BSD 3 Clause (author: Hewlett-Packard, InvertedPageCurl) and one BSD 2 Clause (Ted Schundler,
+StereoViewer) -- in a repository whose LICENSE file is MIT. The per-file comment header is the only place
+that difference is written down, which is exactly why parseMetadata reads licences out of comments. Same
+shape as v4203's DesignTheWay entry: a repo-level licence and a file-level one that do not agree.
+
+TWO MORE OF MY OWN ERRORS, both caught by checks written this round.
+
+hasEntryPoint accepted a PROTOTYPE. `vec4 transition(vec2 uv);` satisfies every word of the spec's signature
+and has nothing to run, and validateTransition returned ZERO PROBLEMS on a file with no implementation --
+the worst kind of green. Fixed by requiring the brace that follows.
+
+And I wrote down a limitation this module does not have. LIMITS said "the entry-point signature must be on
+one line"; \s matches newlines and a split signature is found. The gate's section 6 tests that each STATED
+limit is REAL, and it went red on the claim immediately. An invented limitation is as misleading as a hidden
+one. The three limits now recorded are all demonstrated true by that section.
+
+RATIO CORRECTION, MEASURED. On 1920x1080 the iris boundary is 200.9 x 200.9 px at progress 0.2 -- exactly
+circular, ratio 1.000000. The same shader told ratio=1, which is what a transition authored against a square
+preview does, is 237.0 x 133.3 px: ratio 1.7778, exactly 16/9, a 77.8% horizontal stretch. My first attempt
+at this probed at progress 0.5, where the iris radius already exceeds half the frame height, so the vertical
+probe returned the FRAME EDGE and the ratio read 1.0199 -- a number that looks like a small shader error and
+is entirely an artefact of the measurement.
+
+render/transitionPass.js validates BEFORE compiling, which is the point of having a validator: a shader that
+samples its own texture or shadows `progress` COMPILES FINE and then renders wrong. A compile error is a
+message; a wrong picture is a bug report from a person three weeks later. It returns the driver's log rather
+than swallowing it, because conformance is not compilation and transitionSpec.mjs says so in its limits.
+
+Three transitions of this tree's own, written from the spec: swekCrossfade (the control -- if IT ever failed
+the endpoint law the harness would be the thing that is wrong), swekWipe and swekIris. Wired as
+transitions.check(glsl) / .make(gl, glsl) / .describe(glsl).
+
+Gate: tools/ship/transitionSpec-selfcheck.mjs, 114 checks, all pass. Nine sabotages, all red: restoring the
+wipe's inverted smoothstep in the JS model only, dropping the iris ratio correction (which fails the
+circularity check AND the endpoint law at extreme ratios, two independent checks on one bug), reverting
+parseParams to the after-the-semicolon assumption, banning sampler2D again, accepting a prototype again,
+compiling without validating, dropping getToColor from assemble(), placing a corpus shader in
+shaders/transitions/, and unwiring window.transitions. All six touched files restored byte-identical.
+The build now stands at 1284 gates.
 ## v4203 -- the register quoted three things wrong, in the file whose purpose is quoting licences verbatim
 
 Keith sent five repositories to assess. One of them, projapati66/Svg-IsometricCityAnimation, carries an MIT
