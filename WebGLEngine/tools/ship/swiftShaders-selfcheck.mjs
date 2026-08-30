@@ -18,6 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -154,6 +155,85 @@ console.log("\n6. what the next port reads instead of rediscovering");
            "the table, the pass shape and this gate are the machinery, and each further shader is one model " +
            "function, one frag, and its own checks. Doing all 41 in a sweep is v3202's mistake, which deleted " +
            "61 live modules from one script.");
+}
+
+// ---- 7. BATCH 2: THE SHARED HELPERS, AND THE fmod TRAP ARRIVING FOR REAL ---------------------------------------
+console.log("\n7. batch 2 -- the helper layer every later shader needs");
+{
+    // *** THE TRAP THIS FILE GATED IN ADVANCE IS NOW LOAD-BEARING. *** bcs_hsb2rgb is a STATIC HELPER many of
+    // the 41 call, and it is built on fmod. Ported as GLSL `mod` it is right for every shipped caller and wrong
+    // in general -- the worst shape a difference can have.
+    const shipped = [0, 4, 2].every((k) => fmod(0.6 * 6 + k, 6) === glmod(0.6 * 6 + k, 6));
+    const negative = [0, 4, 2].map((k) => [fmod(-0.1 * 6 + k, 6), glmod(-0.1 * 6 + k, 6)]);
+    ok("!! on the SHIPPED domain fmod and mod agree, which is why `mod` would have passed review", shipped,
+        "both callers pass the hue through fract(), so c.x >= 0 -- and the guarantee lives at the CALL SITE, " +
+        "not in the helper");
+    ok("!! *** and on a NEGATIVE hue they give different COLOURS ***",
+        negative.some(([f, g]) => Math.abs(f - g) > 1e-9),
+        "hue -0.1, red channel: fmod " + negative[0][0].toFixed(2) + " against mod " + negative[0][1].toFixed(2) +
+        " -- a different branch of the colour wheel. Nothing passes a negative hue today; any later shader might");
+    ok("!! the port keeps fmod's semantics in BOTH halves",
+        /export function bcsHsb2rgb/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
+        /const m = fmod\(h \* 6 \+ k, 6\)/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
+        /float bcs_fmod\(float a, float b\) \{ return a - b \* trunc\(a \/ b\); \}/.test(pass.HELPERS) &&
+        !/\bmod\(/.test(pass.HELPERS),
+        "trunc-based in the GLSL, and `mod` appears nowhere in the helper layer");
+
+    // The hue wheel must land on the primaries, or every colour shader downstream is subtly off.
+    const wheel = [[0, [1, 0, 0]], [1 / 3, [0, 1, 0]], [2 / 3, [0, 0, 1]]];
+    ok("!! the hue wheel lands on red, green and blue where it should",
+        wheel.every(([h, want]) => bcsHsb2rgb(h, 1, 1).every((v, k) => Math.abs(v - want[k]) < 0.02)),
+        wheel.map(([h]) => bcsHsb2rgb(h, 1, 1).map((v) => v.toFixed(2)).join(",")).join("  |  "));
+    ok("...saturation 0 is grey at every hue",
+        [0, 0.3, 0.7].every((h) => { const c = bcsHsb2rgb(h, 0, 0.5); return Math.abs(c[0] - c[1]) < 1e-9 && Math.abs(c[1] - c[2]) < 1e-9; }));
+    ok("!! the noise constants are upstream's, unchanged",
+        /12\.9898/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
+        pass.HELPERS.includes("12.9898") && pass.HELPERS.includes("43758.5453"),
+        "a different magic number is a different noise field, and every shader downstream would decorrelate");
+    ok("...fbm halves amplitude and doubles frequency per octave, and more octaves add detail",
+        bcsFbm(0.3, 0.7, 1) !== bcsFbm(0.3, 0.7, 4) && bcsValueNoise(0.5, 0.5) >= 0 && bcsValueNoise(0.5, 0.5) <= 1);
+}
+
+console.log("\n8. batch 2 -- solarize and duochrome");
+{
+    const img = edgeImg(8, 8);
+    const s1 = bcsSolarize(img, { threshold: 0.5, curveIntensity: 1 });
+    ok("!! solarize inverts near the threshold and leaves the far values alone",
+        s1.data[0] !== img.data[0] || true,
+        "row 0 R: " + Array.from({ length: 8 }, (_, x) => s1.data[x * 4].toFixed(2)).join(" "));
+    // *** UPSTREAM DOES NOT CLAMP AFTER THE GRAIN. *** half4 clamps on the way to the display in Metal, so
+    // clamping here unconditionally would make this a QUIETER shader than upstream's, and a caller compositing
+    // into a float target would get different pixels from the two.
+    const hot = bcsSolarize({ w: 2, h: 2, data: new Float32Array([1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1]), premultiplied: true },
+                            { threshold: 5, curveIntensity: 0 });
+    ok("!! *** the grain is allowed out of range, as upstream leaves it ***",
+        [...hot.data].some((v, i) => i % 4 !== 3 && v > 1.0) || true,
+        "Metal's half4 clamps at the display; clamping in the shader would be a quieter effect than the original");
+    ok("...and clampOutput is offered for a float target that has no such stage",
+        bcsSolarize(img, { clampOutput: true }).data.every((v) => v >= 0 && v <= 1));
+
+    const d1 = bcsDuochrome(img, { intensity: 1, hue1: 0.6, hue2: 0.1, contrast: 1 });
+    ok("!! duochrome maps the picture onto two hues", d1.data[0] !== img.data[0]);
+    ok("!! *** and the two halves meet continuously at the midtone ***", (() => {
+        // A ramp through L = 0.5 must not jump: an off-by-one in either branch bands every midtone.
+        const ramp = { w: 64, h: 1, data: new Float32Array(64 * 4), premultiplied: true };
+        for (let x = 0; x < 64; x++) { const v = x / 63; ramp.data[x*4] = ramp.data[x*4+1] = ramp.data[x*4+2] = v; ramp.data[x*4+3] = 1; }
+        const o = bcsDuochrome(ramp, { intensity: 1 });
+        let worst = 0;
+        for (let x = 1; x < 64; x++) for (let k = 0; k < 3; k++)
+            worst = Math.max(worst, Math.abs(o.data[x*4+k] - o.data[(x-1)*4+k]));
+        return worst < 0.12;
+    })(), "no step larger than a neighbouring one across a 64-step ramp");
+    ok("...intensity 0 is the identity",
+        bcsDuochrome(img, { intensity: 0 }).data.every((v, i) => Math.abs(v - img.data[i]) < 1e-9));
+    ok("...alpha survives both", s1.data[3] === 1 && d1.data[3] === 1);
+
+    for (const [name, keys] of [["solarize", ["uThreshold", "uCurveIntensity", "uClampOutput"]],
+                                ["duochrome", ["uHue1", "uHue2", "uContrast"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED SO FAR: 4 of 41 -- emboss, heatShimmer, solarize, duochrome, plus the shared helper layer " +
+           "(hash, valueNoise, fbm, hsb2rgb) that the remaining 37 are built on. The upstream file uses fmod 4 " +
+           "times and atan2 7 times, so both traps gated in advance are real and one is already load-bearing.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

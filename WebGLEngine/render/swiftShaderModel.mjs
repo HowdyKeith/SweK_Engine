@@ -137,6 +137,116 @@ export function bcsHeatShimmer(img, { time = 0, amplitude = 4, frequency = 20, s
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+
+// =============================================================================================================
+// BATCH 2 (v4164) -- THE SHARED HELPER LAYER, AND THE TWO PURE-COLOUR SHADERS THAT NEED IT.
+//
+// *** THE fmod TRAP THIS FILE GATED IN ADVANCE IS REAL, AND IT IS IN THE MOST LOAD-BEARING PLACE IN THE
+// UPSTREAM FILE. *** bcs_hsb2rgb -- a static helper many shaders call -- is:
+//
+//     clamp(abs(fmod(c.x * 6.0h + half3(0,4,2), 6.0h) - 3.0h) - 1.0h, 0, 1)
+//
+// GLSL has no fmod; the reflex is to write `mod`. Here that is CORRECT FOR EVERY SHIPPED CALLER AND WRONG IN
+// GENERAL, which is the worst shape a difference can have. Both callers pass a hue through `fract()`, so
+// c.x >= 0, so `c.x*6 + {0,4,2}` >= 0, and fmod and mod agree on non-negative inputs. THE GUARANTEE LIVES AT
+// THE CALL SITE AND NOT IN THE HELPER: pass a negative hue -- which nothing does today and any later shader
+// might -- and mod returns the wrong branch of the colour wheel while fmod does not. So the port keeps fmod's
+// semantics, and costs nothing for it.
+// =============================================================================================================
+
+/** bcs_hash: fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). The upstream constants, unchanged -- a
+ *  different magic number is a different noise field and every shader downstream would decorrelate. */
+export function bcsHash(x, y) {
+    const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+}
+
+/** Value noise on the integer lattice, smoothstepped. */
+export function bcsValueNoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    const a = bcsHash(ix, iy), b = bcsHash(ix + 1, iy), c = bcsHash(ix, iy + 1), d = bcsHash(ix + 1, iy + 1);
+    return mix(mix(a, b, ux), mix(c, d, ux), uy);
+}
+
+/** Fractional Brownian motion, upstream's octave schedule (amplitude 0.5 halving, frequency doubling). */
+export function bcsFbm(x, y, octaves = 4) {
+    let value = 0, amplitude = 0.5, frequency = 1;
+    for (let i = 0; i < octaves; i++) {
+        value += amplitude * bcsValueNoise(x * frequency, y * frequency);
+        frequency *= 2; amplitude *= 0.5;
+    }
+    return value;
+}
+
+/** HSB to RGB, with fmod's semantics rather than mod's -- see the note above. */
+export function bcsHsb2rgb(h, s, b) {
+    const rgb = [0, 4, 2].map((k) => {
+        const m = fmod(h * 6 + k, 6);
+        return clamp(Math.abs(m - 3) - 1, 0, 1);
+    }).map((v) => v * v * (3 - 2 * v));
+    return rgb.map((v) => b * mix(1, v, s));
+}
+
+/**
+ * bcs_solarize -- per channel, invert where the value is near a threshold.
+ *
+ * *** UPSTREAM DOES NOT CLAMP AFTER THE GRAIN, AND THE PORT DOES NOT EITHER. *** `result += half3(grain)` can
+ * push a channel outside [0,1]; in Metal the half4 return clamps on the way to the display, so the overflow is
+ * invisible there. Clamping here would be a QUIETER shader than upstream's, and a caller compositing into a
+ * float target would then get different pixels from the two. The clamp belongs at the output, where Metal puts
+ * it, so `clampOutput` is offered and defaults to matching upstream.
+ */
+export function bcsSolarize(img, { time = 0, threshold = 0.5, curveIntensity = 1, colorSeparation = 0,
+                                   animate = 0, clampOutput = false } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const animOffset = Math.sin(time * 1.5 + uvx * 3.0) * animate * 0.15;
+        const t = threshold + animOffset;
+        for (let ch = 0; ch < 3; ch++) {
+            const channelThreshold = t + ch * colorSeparation * 0.08;
+            const val = img.data[i + ch];
+            const dist = Math.abs(val - channelThreshold);
+            const curve = clamp(1 - Math.pow(dist * curveIntensity, 2), 0, 1);
+            out[i + ch] = toHalf(mix(val, 1 - val, curve));
+        }
+        const tf = time * 0.1;
+        const grain = (bcsHash(uvx * 500 + (tf - Math.floor(tf)), uvy * 500 + (tf - Math.floor(tf))) - 0.5) * 0.04;
+        for (let ch = 0; ch < 3; ch++) {
+            const v = out[i + ch] + grain;
+            out[i + ch] = clampOutput ? clamp(v, 0, 1) : v;
+        }
+        out[i + 3] = img.data[i + 3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_duochrome -- luma, contrast-curved, mapped onto two hues through black. */
+export function bcsDuochrome(img, { time = 0, intensity = 1, hue1 = 0.6, hue2 = 0.1, contrast = 1 } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    const fract = (v) => v - Math.floor(v);
+    const animHue1 = fract(hue1 + Math.sin(time * 0.3) * 0.02);
+    const animHue2 = fract(hue2 + Math.cos(time * 0.25) * 0.02);
+    const shadow = bcsHsb2rgb(toHalf(animHue1), 0.85, 0.4);
+    const highlight = bcsHsb2rgb(toHalf(animHue2), 0.7, 1.0);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        let L = luma(img.data[i], img.data[i + 1], img.data[i + 2]);
+        L = clamp((L - 0.5) * contrast + 0.5, 0, 1);
+        // The midtone pivot is at 0.5 and BOTH halves are linear in it, so the curve is continuous there --
+        // an off-by-one in either branch shows as a visible band across every midtone in the image.
+        const duo = L < 0.5
+            ? [0, 1, 2].map((k) => mix(0.02, shadow[k], toHalf(L * 2)))
+            : [0, 1, 2].map((k) => mix(shadow[k], highlight[k], toHalf((L - 0.5) * 2)));
+        for (let k = 0; k < 3; k++) out[i + k] = mix(img.data[i + k], duo[k], toHalf(intensity));
+        out[i + 3] = img.data[i + 3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",

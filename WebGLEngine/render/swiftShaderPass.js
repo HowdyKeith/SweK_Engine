@@ -66,12 +66,84 @@ void main() {
     fragColor = layerSample(d);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG };
+
+// ---- BATCH 2 (v4164): the shared helper layer -----------------------------------------------------------
+// *** GLSL HAS NO fmod AND THE REFLEX IS `mod`. HERE THAT IS RIGHT FOR EVERY SHIPPED CALLER AND WRONG IN
+// GENERAL. *** bcs_hsb2rgb is fmod(hue*6 + {0,4,2}, 6); both callers pass the hue through fract() so it is
+// non-negative and the two agree. Pass a negative hue -- nothing does today, any later shader might -- and at
+// hue -0.1 fmod gives -0.60 where mod gives 5.40, which is a different colour entirely. The guarantee lives at
+// the CALL SITE, so the helper keeps fmod's semantics and costs nothing for it.
+const HELPERS = `
+float bcs_fmod(float a, float b) { return a - b * trunc(a / b); }
+float bcs_hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float bcs_valueNoise(vec2 st) {
+    vec2 i = floor(st), f = fract(st), u = f * f * (3.0 - 2.0 * f);
+    float a = bcs_hash(i), b = bcs_hash(i + vec2(1.0, 0.0));
+    float c = bcs_hash(i + vec2(0.0, 1.0)), d = bcs_hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float bcs_fbm(vec2 st, int octaves) {
+    float value = 0.0, amplitude = 0.5, frequency = 1.0;
+    for (int i = 0; i < 8; i++) { if (i >= octaves) break;
+        value += amplitude * bcs_valueNoise(st * frequency); frequency *= 2.0; amplitude *= 0.5; }
+    return value;
+}
+vec3 bcs_hsb2rgb(vec3 c) {
+    vec3 rgb = clamp(abs(vec3(bcs_fmod(c.x * 6.0 + 0.0, 6.0),
+                              bcs_fmod(c.x * 6.0 + 4.0, 6.0),
+                              bcs_fmod(c.x * 6.0 + 2.0, 6.0)) - 3.0) - 1.0, 0.0, 1.0);
+    rgb = rgb * rgb * (3.0 - 2.0 * rgb);
+    return c.z * mix(vec3(1.0), rgb, c.y);
+}
+float luma601(vec3 c) { return dot(c, ${LUMA}); }
+`;
+
+const SOLARIZE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uThreshold, uCurveIntensity, uColorSeparation, uAnimate, uClampOutput;
+void main() {
+    vec2 p = swPos();
+    vec4 original = layerSample(p);
+    vec2 uv = p / uSize;
+    float t = uThreshold + sin(uTime * 1.5 + uv.x * 3.0) * uAnimate * 0.15;
+    vec3 result;
+    for (int ch = 0; ch < 3; ch++) {
+        float channelThreshold = t + float(ch) * uColorSeparation * 0.08;
+        float val = original[ch];
+        float d = abs(val - channelThreshold);
+        float curve = clamp(1.0 - pow(d * uCurveIntensity, 2.0), 0.0, 1.0);
+        result[ch] = toHalf(mix(val, 1.0 - val, curve));
+    }
+    // Upstream does NOT clamp after the grain: half4 clamps on the way to the display instead. Clamping here
+    // unconditionally would make this a quieter shader than upstream's.
+    float ft = fract(uTime * 0.1);
+    result += vec3((bcs_hash(uv * 500.0 + ft) - 0.5) * 0.04);
+    fragColor = vec4(uClampOutput > 0.5 ? clamp(result, 0.0, 1.0) : result, original.a);
+}`;
+
+const DUOCHROME_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uIntensity, uHue1, uHue2, uContrast;
+void main() {
+    vec4 original = layerSample(swPos());
+    float L = clamp((luma601(original.rgb) - 0.5) * uContrast + 0.5, 0.0, 1.0);
+    float animHue1 = fract(uHue1 + sin(uTime * 0.30) * 0.02);
+    float animHue2 = fract(uHue2 + cos(uTime * 0.25) * 0.02);
+    vec3 shadowColor = bcs_hsb2rgb(vec3(toHalf(animHue1), 0.85, 0.4));
+    vec3 highlightColor = bcs_hsb2rgb(vec3(toHalf(animHue2), 0.7, 1.0));
+    // Both halves are linear in L and meet at 0.5, so the curve is continuous there -- an off-by-one in either
+    // branch shows as a band across every midtone in the picture.
+    vec3 duo = (L < 0.5) ? mix(vec3(0.02), shadowColor, toHalf(L * 2.0))
+                         : mix(shadowColor, highlightColor, toHalf((L - 0.5) * 2.0));
+    fragColor = vec4(mix(original.rgb, duo, toHalf(uIntensity)), original.a);
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     heatShimmer: { time: "uTime", amplitude: "uAmplitude", frequency: "uFrequency", speed: "uSpeed", verticalBias: "uVerticalBias", pointScale: "uPointScale" },
+    solarize: { time: "uTime", threshold: "uThreshold", curveIntensity: "uCurveIntensity", colorSeparation: "uColorSeparation", animate: "uAnimate", clampOutput: "uClampOutput" },
+    duochrome: { time: "uTime", intensity: "uIntensity", hue1: "uHue1", hue2: "uHue2", contrast: "uContrast" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, LUMA, EMBOSS_FRAG, SHIMMER_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG };
