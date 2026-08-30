@@ -181,9 +181,53 @@ export const PRESETS = Object.freeze({
     step:      { wave: "noise",  seed: 83, volume: { attack: 0.001, sustain: 0.01, punch: 0.3, decay: 0.06, gain: 0.18 }, frequency: { start: 180, slide: -120, min: 40 }, lowPass: 0.25 },
 });
 
+/**
+ * *** THEMES: ONE TRANSFORM OVER THE WHOLE TABLE. ***
+ *
+ * Idea from rexa-developer/tiks (MIT), which ships soft/crisp/arcade/glass and alters the character of every
+ * sound at once. The presets above are six independent blocks, so retuning a whole interface meant editing
+ * six of them -- and v4192's spell book was already doing this job by hand, with a per-spell `soundOver`.
+ * A theme is the general form of that: ONE function from a parameter block to a parameter block.
+ *
+ * Multiplicative rather than absolute on purpose. A theme that SET decay to 0.4 would flatten the difference
+ * between a 0.06s step and a 0.55s explosion, which is the difference the presets exist to carry; scaling
+ * keeps their relative shape and changes their character.
+ */
+export const THEMES = Object.freeze({
+    plain:  { gain: 1.0, decay: 1.0, lowPass: 1.0, freq: 1.0, punch: 1.0 },
+    soft:   { gain: 0.8, decay: 1.4, lowPass: 0.45, freq: 0.85, punch: 0.5 },   // muffled, slower to fade
+    crisp:  { gain: 1.0, decay: 0.7, lowPass: 1.0, freq: 1.15, punch: 1.3 },    // short, bright, snappy
+    arcade: { gain: 1.1, decay: 1.1, lowPass: 1.0, freq: 1.5, punch: 1.6 },     // high and loud
+    glass:  { gain: 0.9, decay: 1.8, lowPass: 1.0, freq: 1.9, punch: 0.7 },     // very high, long ring
+});
+
+export const THEME_NAMES = Object.freeze(Object.keys(THEMES));
+
+/** Apply a theme to a parameter block. Unknown theme names throw -- a silently unthemed UI is a bug. */
+export function themed(params, theme = "plain") {
+    const t = THEMES[theme];
+    if (!t) throw new Error(`sfx: no theme "${theme}" (have: ${THEME_NAMES.join(", ")})`);
+    const p = Object.assign({}, DEFAULTS, params);
+    const vol = Object.assign({}, DEFAULTS.volume, params.volume);
+    const freq = Object.assign({}, DEFAULTS.frequency, params.frequency);
+    return Object.assign({}, p, {
+        lowPass: Math.max(0.02, Math.min(1, (p.lowPass ?? 1) * t.lowPass)),
+        volume: Object.assign({}, vol, {
+            gain: vol.gain * t.gain,
+            decay: vol.decay * t.decay,
+            punch: vol.punch * t.punch,
+        }),
+        frequency: Object.assign({}, freq, {
+            start: freq.start * t.freq,
+            slide: freq.slide * t.freq,      // the slide scales with the pitch, or a themed sweep lands wrong
+        }),
+    });
+}
+
 /** Render a named preset. Unknown names throw rather than playing silence nobody notices. */
-export function renderPreset(name, over = {}) {
+export function renderPreset(name, over = {}, theme = "plain") {
     const p = PRESETS[name];
     if (!p) throw new Error(`sfx: no preset "${name}" (have: ${Object.keys(PRESETS).join(", ")})`);
-    return renderSfx(Object.assign({}, p, over, { volume: Object.assign({}, p.volume, over.volume), frequency: Object.assign({}, p.frequency, over.frequency) }));
+    const merged = Object.assign({}, p, over, { volume: Object.assign({}, p.volume, over.volume), frequency: Object.assign({}, p.frequency, over.frequency) });
+    return renderSfx(theme === "plain" ? merged : themed(merged, theme));
 }

@@ -8,6 +8,48 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4194 -- the accessibility defect I shipped in v4191, and two ideas from tiks
+
+rexa-developer/tiks (MIT) generates ten UI sounds from live Web Audio node graphs. That is the architecture
+v4190 deliberately replaced -- a node graph plays and can never be hashed, compared between runs, or held by
+a headless gate -- so its code was not taken. Three of its ideas were, and the first is a bug of mine.
+
+**prefers-reduced-motion. This tree already knew, in six files, two of them gated.** ui/stateOrb.js "renders
+a STATIC REPRESENTATIVE FRAME rather than nothing -- the state still reads"; ui/textMorph.js sets the element
+to the final text and reports why. And ui/domAnimate.js, which I shipped yesterday with twelve animations and
+an infinite spin, ignored it entirely.
+
+**The obvious repair is wrong, and worth spelling out.** Returning early leaves a fadeIn at its *first*
+keyframe, which is opacity 0: the reader gets an invisible element rather than a calm one. So the animation
+still runs -- in zero time, with `fill: forwards` so the end state sticks, and `iterations` forced to 1. That
+last one is also a **performance** fix: an infinite animation holds engine/frameDirty.js open forever, so
+honouring reduced motion makes the page cheaper as well as calmer.
+
+**And my first gate for it was decoration.** Sabotaging play() to `return null` under reduced motion left
+every check green -- they proved the query and the helper were *mentioned*, not that play used them. An
+element only needs an `.animate` method to be animated and matchMedia can be stubbed, so the real behaviour
+is testable in node: a fake element, a forced-reduced query, and an assertion that play still animates with
+duration 0 and fill forwards. Now the sabotage goes red.
+
+**Themes are one transform over the whole table.** soft, crisp, arcade, glass -- and multiplicative rather
+than absolute, because a theme that *set* decay would flatten a 0.07s step and a 0.65s explosion into each
+other, which is exactly the difference the presets exist to carry. Thirty theme/preset combinations, all
+rendering to different audio, none clipping, all still ending at silence. v4192's spell book was already
+doing this job by hand with a per-spell `soundOver`; a theme is the general form.
+
+**And the mute the comment already claimed.** SfxPlayer.play() said "returns ... or null if muted" while the
+class had no mute at all -- a comment describing a feature that does not exist, which is worse than no
+comment because a reader stops looking. It is real now, beside a throttle keyed per **sound** (so a click
+straight after a hover still lands) whose decision is a pure function of two numbers, and where a `lastAt` of
+0 is a real timestamp rather than "never played". Reduced motion is honoured for sound too -- while saying
+plainly that it is a **proxy**: there is no standard preference for less sound, tiks infers it from the
+motion query, and this follows it one flag away from being switched off.
+
+41 new checks across tools/ship/domAnimation-selfcheck.mjs and tools/ship/sfx-selfcheck.mjs, 6 sabotages all
+red and all four files restored byte-identical. Two of the round's own gate failures were the same trap for
+the fourth time this session: `codeOnly()` blanks string literals, so a check for the
+"(prefers-reduced-motion: reduce)" query -- and one for a "@" in a cache key -- went red against correct code.
+The rule is noComments for anything quoted, codeOnly for code shapes. The tree carries 1275 gates.
 ## v4193 -- a clip as a reproducible input, and the one thing about it that is not reproducible
 
 From activetheory/activeframe (MIT): encoded samples plus a JSON manifest, decoded through WebCodecs for

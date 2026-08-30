@@ -18,7 +18,8 @@
 // Run: node tools/ship/domAnimation-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import { KEYFRAMES, TIMING, NAMES, timingFor, isAnimating, isEndless, quietStateOf, nameOf,
-         validateKeyframes } from "../../ui/domAnimation.mjs";
+         validateKeyframes, reducedTiming } from "../../ui/domAnimation.mjs";
+import { play } from "../../ui/domAnimate.js";
 import { noComments, codeOnly, prose } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -165,7 +166,69 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
         "a missing element or API returns null rather than a fake object a caller would await");
 }
 
-// 8) PURITY AND WIRING.
+// 8) *** prefers-reduced-motion, WHICH v4191 SHIPPED WITHOUT AND THIS TREE ALREADY KNEW. ***
+{
+    // six files here honoured it before this module existed, and TWO of them are gated
+    const already = ["ui/stateOrb.js", "ui/textMorph.js", "ui/deviceKind.mjs"];
+    for (const f of already) ok(/prefers-reduced-motion/.test(read(f)), `${f} already honoured it`);
+    ok(/prefers-reduced-motion/.test(read("tools/ship/stateOrb-selfcheck.mjs")), "and stateOrb's gate holds it");
+
+    // *** noComments, NOT codeOnly: "(prefers-reduced-motion: reduce)" IS A STRING LITERAL. *** codeOnly()
+    // blanks strings, so the query vanishes and the check goes red against code that honours it perfectly.
+    // Fourth time in this session -- the rule is: noComments for anything quoted, codeOnly for code SHAPES.
+    ok(/prefers-reduced-motion/.test(noComments(read("ui/domAnimate.js"))),
+        "*** ui/domAnimate.js honours it too now -- v4191 added twelve animations to a tree that already knew better in six files ***");
+    ok(/reducedMotion\(\)/.test(codeOnly(read("ui/domAnimate.js"))) && /reducedTiming/.test(codeOnly(read("ui/domAnimate.js"))),
+        "play() asks, and uses the pure decision rather than a second copy of the rule");
+
+    // *** THE END STATE, NOT NOTHING. *** The naive repair leaves a fadeIn at opacity 0.
+    const t = reducedTiming(timingFor("fadeIn"));
+    ok(t.duration === 0, "reduced motion runs the animation in zero time rather than skipping it");
+    ok(t.fill === "forwards", "*** and the result STICKS -- with fill 'none' a fadeIn would snap back to invisible ***");
+    ok(t.iterations === 1, "and it runs once");
+    ok(reducedTiming(timingFor("spin")).iterations === 1,
+        "*** an ENDLESS animation becomes finite -- which is also a performance fix, since an infinite one holds frameDirty open forever ***");
+    ok(TIMING.spin.iterations === Infinity, "control: spin really is endless when motion is not reduced");
+    ok(reducedTiming(timingFor("pulse")).easing === timingFor("pulse").easing, "the rest of the timing is left alone");
+    ok(reducedTiming({ duration: 5, iterations: 3, fill: "none", easing: "linear" }).duration === 0, "it is a pure transform over any timing");
+    ok(/force/.test(read("ui/domAnimate.js")), "and there is an escape for the case where the motion IS the information");
+
+    // *** AND THE BEHAVIOUR, NOT JUST THE WORDS. *** Sabotaging play() to `return null` under reduced motion
+    // left every check above GREEN: they proved the query and the helper were MENTIONED, not that play uses
+    // them. An element only needs an .animate method to be animated, and matchMedia can be stubbed, so the
+    // real thing is testable here -- and the failure this catches is a fadeIn left at opacity 0.
+    const fakeEl = () => ({ calls: [], animate(frames, timing) { this.calls.push({ frames, timing }); return { frames, timing, playState: "finished" }; } });
+    const hadMM = "matchMedia" in globalThis, savedMM = globalThis.matchMedia;
+    try {
+        globalThis.matchMedia = () => ({ matches: true });            // this reader wants less movement
+        const el = fakeEl();
+        const a = play(el, "fadeIn");
+        ok(a !== null, "*** play() still ANIMATES under reduced motion -- returning null leaves a fadeIn at opacity 0 ***");
+        ok(el.calls.length === 1, "and it reaches the element exactly once");
+        ok(el.calls[0].timing.duration === 0, "in zero time");
+        ok(el.calls[0].timing.fill === "forwards", "with the end state made to stick");
+        ok(el.calls[0].frames === KEYFRAMES.fadeIn, "using the real keyframes, so the end state is the animation's own");
+
+        const spun = fakeEl();
+        play(spun, "spin");
+        ok(spun.calls[0].timing.iterations === 1, "and the endless one is made finite");
+
+        const forced = fakeEl();
+        play(forced, "spin", { force: true });
+        ok(forced.calls[0].timing.duration > 0 && forced.calls[0].timing.iterations === Infinity,
+            "while force:true still gets the real animation, for when the motion IS the information");
+
+        globalThis.matchMedia = () => ({ matches: false });           // and this reader does not
+        const normal = fakeEl();
+        play(normal, "fadeIn");
+        ok(normal.calls[0].timing.duration === TIMING.fadeIn.duration,
+            "control: with motion allowed the animation runs at its own duration, so the reduced path is really conditional");
+    } finally {
+        if (hadMM) globalThis.matchMedia = savedMM; else delete globalThis.matchMedia;
+    }
+}
+
+// 9) PURITY AND WIRING.
 {
     const modelC = codeOnly(read("ui/domAnimation.mjs"));
     ok(!/\bdocument\b|\bwindow\b/.test(modelC), "the model touches no DOM, so a gate and a browser read the same rules");
@@ -174,6 +237,8 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     ok(!/playState ===/.test(codeOnly(read("ui/domAnimate.js"))),
         "*** and decides nothing itself -- one owner for what counts as moving ***");
     ok(/77|@keyframes/.test(prose(read("ui/domAnimation.mjs"))), "the model records the gap it was written to close");
+    ok(/invisible|opacity 0/i.test(prose(read("ui/domAnimation.mjs"))),
+        "and records why returning early would have been the WRONG repair for reduced motion");
     ok(/proven|cannot prove/i.test(prose(read("ui/domAnimation.mjs"))), "and restates frameDirty's rule that clean is proven");
 }
 

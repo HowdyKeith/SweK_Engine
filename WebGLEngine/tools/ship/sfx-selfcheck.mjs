@@ -15,7 +15,9 @@
 // Run: node tools/ship/sfx-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import { renderSfx, renderPreset, envelopeAt, durationOf, waveAt, lowPassStep, rng, toPCM16,
+         themed, THEMES, THEME_NAMES,
          PRESETS, WAVES, DEFAULTS, TAU, DEFAULT_RATE } from "../../audio/sfxModel.mjs";
+import { throttleAllows } from "../../audio/sfxPlay.js";
 import { strictSin } from "../../tools/strictTrig.mjs";
 import { noComments, codeOnly, prose } from "./sourceScan.mjs";
 import fs from "node:fs";
@@ -214,6 +216,66 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) < e;
     ok(Object.isFrozen(WAVES) && Object.isFrozen(DEFAULTS), "and so are the waveform list and the defaults");
     const seeds = Object.values(PRESETS).map((p) => p.seed);
     ok(new Set(seeds).size === seeds.length, "every preset has its OWN seed, so two noise presets are not the same noise");
+}
+
+// 11) *** THEMES: ONE TRANSFORM OVER THE WHOLE TABLE. ***
+{
+    ok(THEME_NAMES.length >= 4, `${THEME_NAMES.length} themes ship`);
+    ok(Object.isFrozen(THEMES), "the theme table is frozen");
+    ok(THEME_NAMES.includes("plain"), "there is an identity theme");
+    const bare = hash(renderPreset("coin").samples);
+    ok(hash(renderPreset("coin", {}, "plain").samples) === bare, "*** the plain theme changes nothing -- it is the identity ***");
+
+    const all = [];
+    for (const t of THEME_NAMES) for (const p of Object.keys(PRESETS)) {
+        const r = renderPreset(p, {}, t);
+        ok(r.samples.length > 0 && r.peak > 0.005, `${t}/${p} still makes a sound`);
+        ok(r.samples[r.samples.length - 1] === 0, `${t}/${p} still ends at silence -- a theme must not reintroduce the click`);
+        ok(r.clipped === 0, `${t}/${p} does not clip`);
+        all.push(hash(r.samples));
+    }
+    ok(new Set(all).size === all.length,
+        `*** all ${all.length} theme/preset combinations render to DIFFERENT audio (${new Set(all).size} distinct) ***`);
+
+    // *** MULTIPLICATIVE, NOT ABSOLUTE. *** A theme that SET decay would flatten the table it is decorating.
+    const step = renderPreset("step", {}, "glass"), boom = renderPreset("explosion", {}, "glass");
+    ok(boom.seconds > step.seconds * 5,
+        `*** under one theme a 0.07s step and a 0.65s explosion stay far apart (${step.seconds.toFixed(2)}s vs ${boom.seconds.toFixed(2)}s) -- a theme scales, it does not flatten ***`);
+    const plainRatio = renderPreset("explosion").seconds / renderPreset("step").seconds;
+    ok(Math.abs(boom.seconds / step.seconds - plainRatio) < 0.5, "and the ratio between them is preserved");
+
+    let threw = false;
+    try { themed(PRESETS.coin, "no-such-theme"); } catch { threw = true; }
+    ok(threw, "an unknown theme THROWS rather than silently leaving the interface untuned");
+    ok(themed(PRESETS.coin, "soft").volume.gain < PRESETS.coin.volume.gain, "soft is quieter");
+    ok(themed(PRESETS.coin, "arcade").frequency.start > PRESETS.coin.frequency.start, "and arcade is higher");
+    ok(themed(PRESETS.coin, "soft").lowPass <= 1 && themed(PRESETS.coin, "soft").lowPass > 0, "the filter stays in range");
+}
+
+// 12) *** THE THROTTLE AND THE MUTE. *** The mute is the one the comment already claimed existed.
+{
+    ok(throttleAllows(null, 1000, 200) === true, "*** never played allows -- null is not 'zero milliseconds ago' ***");
+    ok(throttleAllows(0, 100, 200) === false, "and 0 is a REAL timestamp, not a missing one");
+    ok(throttleAllows(1000, 1100, 200) === false, "inside the window is refused");
+    ok(throttleAllows(1000, 1200, 200) === true, "at the window it is allowed");
+    ok(throttleAllows(1000, 1000, 0) === true, "and with no throttle set, everything plays");
+    ok(throttleAllows(1000, 999, 200) === false, "a clock that went backwards refuses rather than allowing a flood");
+
+    const src = codeOnly(read("audio/sfxPlay.js"));
+    ok(/this\.muted/.test(src) && /setMuted/.test(src), "*** the player has a real mute now ***");
+    ok(/suppressed/.test(src), "and counts what it refused, rather than swallowing it");
+    ok(/_lastAt/.test(src) && /\.set\(name, now\)/.test(src),
+        "*** the throttle is keyed per SOUND -- a click straight after a hover still lands ***");
+    ok(/prefers-reduced-motion/.test(read("audio/sfxPlay.js")), "and it honours reduced motion");
+    ok(/proxy/i.test(prose(read("audio/sfxPlay.js"))),
+        "*** while saying plainly that reduced-MOTION is a proxy for a sound preference, not one the reader expressed ***");
+    ok(/respectReducedMotion/.test(src), "so it is one flag away from being switched off");
+    ok(/this\.cache\.clear\(\)/.test(src), "*** and changing the theme clears the cache -- serving the old buffers would retune nothing ***");
+    // the cache key concatenates the string "@" -- a literal, so this reads the source with comments stripped
+    // rather than codeOnly, which would have blanked it
+    ok(/\+ "@" \+ this\.theme/.test(noComments(read("audio/sfxPlay.js"))), "the theme is part of the cache key");
+    ok(!/or null if muted\/unavailable/.test(read("audio/sfxPlay.js")),
+        "and the comment that described a mute which did not exist is gone");
 }
 
 console.log(`sfx-selfcheck: ${pass} passed, ${fail} failed`);

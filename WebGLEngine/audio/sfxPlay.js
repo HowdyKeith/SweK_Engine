@@ -4,7 +4,22 @@
 // Everything that decides what a sound IS lives in the model; this file only moves bytes.
 "use strict";
 
-import { renderSfx, renderPreset, PRESETS, DEFAULT_RATE } from "./sfxModel.mjs";
+import { renderSfx, renderPreset, PRESETS, THEMES, THEME_NAMES, DEFAULT_RATE } from "./sfxModel.mjs";
+
+/**
+ * *** THE THROTTLE DECISION, PURE, SO IT CAN BE GATED WITHOUT WAITING. ***
+ *
+ * A hover sound wired to pointermove fires per pointer sample -- dozens a second across a list, which is not
+ * a sound but a texture, and an unpleasant one. tiks throttles exactly this. Keeping the decision separate
+ * from the clock means a gate checks it with two numbers instead of sleeping.
+ *
+ * `lastAt` of null means it has never played, which always allows -- never "0 milliseconds ago".
+ */
+export function throttleAllows(lastAt, now, ms) {
+    if (!(ms > 0)) return true;
+    if (lastAt === null || lastAt === undefined) return true;
+    return (now - lastAt) >= ms;
+}
 
 /**
  * *** AN AudioContext CANNOT BE CREATED BEFORE A GESTURE, AND PRETENDING OTHERWISE IS THE CLASSIC BUG. ***
@@ -19,9 +34,45 @@ export class SfxPlayer {
         this.gain = null;
         this.volume = opts.volume ?? 0.8;
         this.rate = opts.sampleRate || DEFAULT_RATE;
-        this.cache = new Map();      // name/key -> AudioBuffer, so a sound renders once and plays many times
+        this.cache = new Map();      // key -> AudioBuffer, so a sound renders once and plays many times
         this.rendered = 0;           // how many renders actually happened, for the page to show
         this.played = 0;
+        this.suppressed = 0;         // plays refused by the throttle or the mute, so a page can see them
+
+        this.theme = opts.theme || "plain";
+        this.muted = !!opts.muted;
+        this.throttleMs = opts.throttleMs ?? 0;     // 0 = every call plays
+        this._lastAt = new Map();                   // per SOUND, so a click right after a hover still lands
+
+        // *** prefers-reduced-motion IS A PROXY HERE, AND THAT IS WORTH SAYING. *** There is no standard
+        // "prefers-reduced-sound" query. tiks uses the motion one, on the reading that both are about sensory
+        // load, and this follows it -- but it is an inference about what a reader wants, not a preference they
+        // expressed, so it is one flag away from being switched off.
+        this.respectReducedMotion = opts.respectReducedMotion !== false;
+    }
+
+    /** Does this reader want less? The same query ui/stateOrb.js, ui/textMorph.js and ui/domAnimate.js ask. */
+    get reducedMotion() {
+        try { return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches; }
+        catch { return false; }
+    }
+
+    /** Whether a play would be heard at all, and why not. Reported rather than silently swallowed. */
+    wouldPlay(name, now = (typeof performance !== "undefined" ? performance.now() : Date.now())) {
+        if (this.muted) return { ok: false, why: "muted" };
+        if (this.respectReducedMotion && this.reducedMotion) return { ok: false, why: "prefers-reduced-motion" };
+        if (!throttleAllows(this._lastAt.has(name) ? this._lastAt.get(name) : null, now, this.throttleMs)) {
+            return { ok: false, why: `throttled (${this.throttleMs}ms)` };
+        }
+        return { ok: true };
+    }
+
+    setMuted(v) { this.muted = !!v; return this.muted; }
+    setTheme(t) {
+        if (!THEMES[t]) throw new Error(`SfxPlayer: no theme "${t}" (have: ${THEME_NAMES.join(", ")})`);
+        // a theme change makes every cached buffer wrong -- serving the old ones would retune nothing
+        this.theme = t; this.cache.clear();
+        return t;
     }
 
     get ready() { return !!this.ctx && this.ctx.state === "running"; }
@@ -50,15 +101,27 @@ export class SfxPlayer {
         return buf;
     }
 
-    /** Render (or reuse) and play a named preset. Returns the AudioBufferSourceNode, or null if muted/unavailable. */
+    /**
+     * Render (or reuse) and play a named preset.
+     *
+     * *** THE MUTE IS REAL NOW. *** This comment used to say "or null if muted" while the class had no mute
+     * at all -- a comment describing a feature that did not exist, which is worse than no comment because a
+     * reader stops looking.
+     *
+     * @returns the AudioBufferSourceNode, or null when muted, throttled, or the audio device is unavailable
+     */
     play(name, over = null) {
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const verdict = this.wouldPlay(name, now);
+        if (!verdict.ok) { this.suppressed++; return null; }
         const ctx = this._ensure();
         if (!ctx) return null;
-        // an override makes a DIFFERENT sound, so it must not be served from the preset's cache slot
-        const key = over ? name + ":" + JSON.stringify(over) : name;
+        this._lastAt.set(name, now);
+        // an override or a theme makes a DIFFERENT sound, so neither may be served from the preset's slot
+        const key = (over ? name + ":" + JSON.stringify(over) : name) + "@" + this.theme;
         let buf = this.cache.get(key);
         if (!buf) {
-            const r = over ? renderPreset(name, over) : renderPreset(name);
+            const r = renderPreset(name, over || {}, this.theme);
             buf = this._buffer(r.samples, r.sampleRate);
             if (!buf) return null;
             this.cache.set(key, buf);

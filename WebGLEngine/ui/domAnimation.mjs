@@ -82,6 +82,32 @@ export function timingFor(name, over = {}) {
 }
 
 /**
+ * *** prefers-reduced-motion: ARRIVE AT THE END STATE, DO NOT SKIP THE EFFECT. ***
+ *
+ * This tree already knew the rule in six files before this module existed, and two of them are gated:
+ * ui/stateOrb.js "RENDERS A STATIC REPRESENTATIVE FRAME rather than nothing -- the state still reads", and
+ * ui/textMorph.js sets the element to the final text and reports why. v4191 shipped twelve animations without
+ * honouring it, which is the defect this function repairs.
+ *
+ * The naive repair -- return without animating -- is WRONG and worth spelling out: a fadeIn that never runs
+ * leaves the element at its first keyframe, which is opacity 0. The reader gets an invisible element rather
+ * than a calm one. So the animation still RUNS; it runs in zero time and its result STICKS:
+ *
+ *   duration 0     the end state is reached immediately
+ *   fill forwards  and stays -- with the default "none" the element would snap back to where it started
+ *   iterations 1   *** and this is the half that is also a performance fix ***
+ *
+ * That last one matters beyond taste. An infinite animation holds engine/frameDirty.js open forever by
+ * design; forcing iterations to 1 lets the document actually go quiet, so honouring reduced motion makes the
+ * page cheaper as well as calmer. Leaving iterations at Infinity with duration 0 is the worst of both.
+ *
+ * Pure, so the gate can check the DECISION without a browser; ui/domAnimate.js does the detecting.
+ */
+export function reducedTiming(timing) {
+    return Object.assign({}, timing, { duration: 0, iterations: 1, fill: "forwards" });
+}
+
+/**
  * *** WHETHER ONE ANIMATION IS A REASON TO REDRAW. ***
  *
  * The playStates WAAPI defines are idle, running, paused and finished. Only `running` changes pixels:

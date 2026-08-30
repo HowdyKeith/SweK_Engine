@@ -4,10 +4,24 @@
 // DOM is moving. Everything that DECIDES anything lives in the model; this file touches elements.
 "use strict";
 
-import { KEYFRAMES, TIMING, NAMES, timingFor, quietStateOf, nameOf } from "./domAnimation.mjs";
+import { KEYFRAMES, TIMING, NAMES, timingFor, reducedTiming, quietStateOf, nameOf } from "./domAnimation.mjs";
+
+/**
+ * Does this reader want less movement? The same query ui/stateOrb.js and ui/textMorph.js already ask.
+ * Wrapped, because matchMedia is absent in a headless context and a throw here would take the page with it.
+ */
+export function reducedMotion() {
+    try { return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches; }
+    catch { return false; }
+}
 
 /**
  * Play a named animation on an element.
+ *
+ * *** UNDER prefers-reduced-motion IT STILL RUNS -- in zero time, and the result sticks. *** See
+ * reducedTiming() for why returning early would be the wrong repair (a fadeIn that never runs leaves the
+ * element invisible). Pass `force: true` to override, for the rare case where the motion IS the information.
+ *
  * @returns the Animation, or null when the element or the API is missing (never a fake object -- a caller
  *          that gets an object back is entitled to await its `finished`)
  */
@@ -15,13 +29,17 @@ export function play(el, name, over = {}) {
     if (!el || typeof el.animate !== "function") return null;
     const frames = KEYFRAMES[name];
     if (!frames) throw new Error(`domAnimate: no animation "${name}" (have: ${NAMES.join(", ")})`);
-    return el.animate(frames, timingFor(name, over));
+    const t = timingFor(name, over);
+    return el.animate(frames, (reducedMotion() && over.force !== true) ? reducedTiming(t) : t);
 }
 
 /** Play and resolve when it ends. An endless animation never resolves, so it is refused rather than hanging. */
 export function playAndWait(el, name, over = {}) {
     const t = timingFor(name, over);
-    if (t.iterations === Infinity) return Promise.reject(new Error(`domAnimate: "${name}" never finishes -- do not await it`));
+    // an endless animation is refusable only when it will actually be endless: under reduced motion it is not
+    if (t.iterations === Infinity && !(reducedMotion() && over.force !== true)) {
+        return Promise.reject(new Error(`domAnimate: "${name}" never finishes -- do not await it`));
+    }
     const a = play(el, name, over);
     if (!a) return Promise.resolve(null);
     return a.finished.catch(() => null);
@@ -60,4 +78,4 @@ export function domAnimationStatus(doc) {
     return quietStateOf(list, present);
 }
 
-export { KEYFRAMES, TIMING, NAMES, nameOf };
+export { KEYFRAMES, TIMING, NAMES, nameOf, reducedTiming };
