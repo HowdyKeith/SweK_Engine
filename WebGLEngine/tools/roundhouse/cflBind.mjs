@@ -27,6 +27,10 @@ export const CFL_OBSERVABLES = [
     "acousticCourant", "advectiveCourant", "optimismFactor", "maxSpeed", "soundSpeed",
     "breakDt", "lastGoodDt", "breakOverHOverC", "scalesWithC", "allFinite", "finiteButBroken",
     "h", "dt", "steps", "particles",
+    // v4085 -- COMPLETED: ratioSpread -- the device's OWN plantFlips target -- and ladder (the per-regime
+    // sweep table it is computed from) were returned by sweep/advectiveonly and never declared. Same defect
+    // as v3850/v4082/v4084.
+    "ratioSpread", "ladder",
 ];
 
 export const CFL_MODES = ["sweep", "acoustic", "runaway", "advectiveonly"];

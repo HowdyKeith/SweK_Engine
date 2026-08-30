@@ -142,7 +142,10 @@ export function build({ mode = "exponent", config = {} } = {}) {
 
 export const BEAM_OBSERVABLES = ["exponent", "points", "exponentError", "closedFormAtUnitL", "worstResidual",
     "relative", "nodes", "dij", "dji", "relGap", "reciprocityIsFiner",
-    "pcr", "pcrExact", "pcrRelErr", "oddSquare2", "oddSquare3", "refineRatio", "buckleNodes"];
+    "pcr", "pcrExact", "pcrRelErr", "oddSquare2", "oddSquare3", "refineRatio", "buckleNodes",
+    // v4085 -- COMPLETED: `rows` (conditioning's per-epsilon sweep table) was returned and never declared.
+    // Same defect as v3850/v4082/v4084.
+    "rows"];
 // *** THE EXPIRY, AS A PREDICATE RATHER THAN AN ABSENCE. *** The refusal above says reciprocity does not
 // SELECTIVELY catch the free-end asymmetry, and points at the `conditioning` mode for the data. What it never
 // said is what would change its mind -- and a refusal with no stated expiry is PERMANENT BY DEFAULT, which is

@@ -30,6 +30,9 @@ export const VOXELIZE_OBSERVABLES = [
     "analyticVolume", "meshVolumeAt", "deficit", "order", "orderRatios", "secondOrder",
     "voxelVolumeAt", "voxelAgreement", "voxelMonotone", "voxelBounded", "closed", "boundaryEdges", "nonManifoldEdges",
     "radius", "segments", "gridN",
+    // v4085 -- COMPLETED: `ladder` (the per-resolution sweep table order/agreement/oneaxis compute from) was
+    // returned and never declared. Same defect as v3850/v4082/v4084.
+    "ladder",
 ];
 
 export const VOXELIZE_MODES = ["order", "agreement", "closure", "oneaxis"];

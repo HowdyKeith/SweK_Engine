@@ -52,6 +52,9 @@ export const MGGPU_OBSERVABLES = [
     "n", "cells", "levels", "pairs", "adjointWorst", "innerFine", "innerCoarse",
     "narrowInner", "narrowRel", "codeInner", "codeRel", "shippedRel", "widerRel", "widerExact",
     "refWorst", "fieldMax", "wgslGraded",
+    // v4085 -- COMPLETED: `kind` is returned by every mode and was never declared. Same defect as
+    // v3850/v4082/v4084.
+    "kind",
 ];
 
 const DEF = { n: 32, seed: 991 };

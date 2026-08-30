@@ -51,6 +51,10 @@ export const VIBRATIONS_OBSERVABLES = [
     "traceProbed", "traceProbedErrRel",
     "ringSumW2", "ringSumW4", "ringSecondMomentGap", "ringFirstMomentGap", "ringRelativeGap",
     "dispersionRatios", "dispersionExponent",
+    // v4085 -- COMPLETED: `config` (the nested, deliberately non-numeric echo the comment above explains --
+    // runRecord ignores it by construction) was returned by every mode and never declared. Same defect as
+    // v3850/v4082/v4084, just with a non-numeric value instead of a numeric one.
+    "config",
 ];
 
 export const VIBRATIONS_MODES = ["moments", "trace", "ring", "dispersion", "sixNplus6"];

@@ -27,6 +27,10 @@ export const BH_OBSERVABLES = [
     "iscoOutside", "photonSphereOutside", "escapeFrac",
     "captured", "rMin", "rMax", "precessionPerOrbit", "energyDriftFrac", "orbits", "captureOnsetR",
     "escapeV", "escapeErrFrac",
+    // v4085 -- COMPLETED: these keys were returned by the builder and never declared -- `kind` and `r0` on
+    // every mode, `captureOnsetRBracket`/`iscoTheory` on `onset`, `escapeVBracket`/`escapeTheory` on `escape`.
+    // Same defect as v3850/v4082/v4084.
+    "kind", "r0", "captureOnsetRBracket", "iscoTheory", "escapeVBracket", "escapeTheory",
 ];
 
 // v0Frac 0.999 for orbit runs (visible eccentricity -> clean apoapsis detection). Onset runs override to 0.99999:

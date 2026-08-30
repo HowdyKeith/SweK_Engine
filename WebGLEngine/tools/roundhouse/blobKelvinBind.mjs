@@ -31,6 +31,9 @@ import { SCENARIOS, kelvinOfWarmth, warmthOfKelvin, SLIP_DRAG } from "../../phys
 
 export const KELVIN_OBSERVABLES = [
     "kelvinAtD", "warmthAtT", "roundTripErrFrac", "boilingKelvin", "roomTravelFrac", "stylisedKelvinAtMax",
+    // v4085 -- COMPLETED: `kind` on both modes and `scenario` (convert's echo of the committed scenario name)
+    // were returned and never declared. Same defect as v3850/v4082/v4084.
+    "kind", "scenario",
 ];
 
 const D_MAX = 0.02;   // the slider's full travel, per the module docs

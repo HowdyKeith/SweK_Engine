@@ -55,6 +55,9 @@ export const PROBE_OBSERVABLES = [
     // radius; the device releases the probe at the target with that L and measures what orbit it actually got.
     // A proposer for this mode needs no words -- a policy's weights can sit in the seat (see policyPilot.mjs).
     "pilotEcc", "pilotSide", "pilotPlunged", "pilotL", "pilotExactL", "pilotLErrFrac", "pilotTargetR", "pilotTurns",
+    // v4085 -- COMPLETED: tourPeriods (the per-station orbital periods `place` returns, null on `tour`) was
+    // returned and never declared. Same defect as v3850/v4082/v4084.
+    "tourPeriods",
 ];
 
 const DEF = {

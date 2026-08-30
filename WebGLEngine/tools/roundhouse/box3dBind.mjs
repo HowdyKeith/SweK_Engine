@@ -55,6 +55,10 @@ const readV = (e, i) => {
 export const B3D_OBSERVABLES = [
     "fallDistance", "fallErrFrac", "apexHeight", "apexErrFrac",
     "speedAfter", "momentumErrFrac", "deterministic", "stateHash",
+    // v4085 -- COMPLETED: these keys were returned by the builder and never declared, the same defect
+    // v3850/v4082/v4084 found -- `kind` on every mode, plus the closed-form ideals each mode grades against
+    // and the hash-repeat witness `deterministic` compares.
+    "kind", "fallIdeal", "apexIdeal", "speedIdeal", "massImplied", "stateHashRepeat",
 ];
 
 const DEF = { g: 9.8, seconds: 1, h0: 10, v0: 7, j: 5, density: 1, half: 0.5, dt: 1 / 60, sub: 4, hashTicks: 600 };
