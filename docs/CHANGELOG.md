@@ -8,6 +8,81 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4170 -- my own v4122 regression, and the interesting part is that it never threw
+
+`neighbourBakeoff-selfcheck` had been red since v4122 with `gridCellTouches` reading **0** for three straight
+configs. The cause is small; the shape of it is the round.
+
+### A vestigial field is worse than a missing one
+
+The gate measured "cells touched" by walking `grid._key(...)` and counting hits in `grid.map`. That was
+correct until v4122 gave `SpatialGrid` a dense path -- and **the dense path leaves `map` empty rather than
+absent**. So `grid.map.has(k)` was false every time and the instrument returned 0, forever.
+
+**Had v4122 deleted the field, `grid.map.has` would have thrown and the gate would have gone red on the round
+that caused it.** Instead it produced a real, plausible, wrong number, pinned it against an answer key, and
+the failure read as *"the counts moved"* rather than *"the instrument stopped working"* -- which is why it sat
+unexplained for many rounds.
+
+`map` is not dead either: it is still the hash **fallback** for a domain too large to allocate densely, so
+deleting it was never an option. The measurement now lives on the class as `cellsTouched()`, sees whichever
+path is live, and is gated on **both**.
+
+### My first explanation of the re-pin was wrong, and only a per-config measurement caught it
+
+The grid counts had to be re-pinned, and the obvious story was **hash collisions**: a collision makes the hash
+path skip a genuine cell as a duplicate (**fewer candidates**) while `map.has()` reads true for a cell the
+query never needed (**more touched**). Both directions fit every number:
+
+| config | candidates | cells touched |
+|---|---|---|
+| uniform-400 | 3872 -> 3864 (fewer) | 3126 -> 3108 (fewer) |
+| clumped-400 | 38702 -> 38946 (**more**) | 3061 -> 2247 (**far fewer**) |
+| uniform-800 | 8230 -> 8274 (more) | 6411 -> 6435 (more) |
+
+Then it was measured per config: **42** collisions on uniform-400, **96** on uniform-800, and **zero** on
+clumped-400 -- the config whose cell count moved furthest by a wide margin.
+
+**A story that fits the direction of every number can still be the wrong cause.**
+
+### The real cause: the two paths use different lattices
+
+The hash path partitions on absolute coordinates, `floor(x / c)`. The dense path partitions relative to the
+bounding-box minimum, `floor((x - _min) / c)`, and `_min` is wherever the particles happen to start --
+measured on a three-particle case, `_min = -0.3` with `c = 1`, so the cell boundaries sit a third of a cell
+away from the hash's. Particles group differently, and both counts move with the offset.
+
+Neither lattice is wrong: a neighbour search needs cells at least `h` wide, never a particular origin.
+
+### What did not move is the only thing that was ever a correctness claim
+
+`totalExact` is **identical** on all three configs -- 622, 27564, 1344 -- and `mism` and `asym` are still 0,
+so grid == bvh == brute force and the relation is still symmetric. **The counts that moved are efficiency, not
+truth**, and saying so is the difference between a re-pin and a rubber stamp.
+
+### The guard that would have caught it, sabotage-verified
+
+Every candidate comes out of some cell, so **candidates > 0 with cells == 0 is arithmetically impossible** --
+it can only mean the instrument stopped reading. That invariant is now asserted in both gates. Restoring the
+old instrument reddens three lines that say exactly what is wrong:
+
+```
+FAIL  [uniform-400] cells touched is non-zero wherever candidates were found (3864 candidates, 0 cells)
+```
+
+`neighbourBakeoff` goes from **15 pass / 3 fail to all 24 pass**, with six new checks.
+
+### Also: the rig defaults to shortest expected first
+
+At Keith's request. The machinery already existed as an opt-in nobody would think to pick before their first
+slow run. Two details make it honest: the dropdown's first option was reordered to match, because a `<select>`
+with no `selected` attribute displays its **first** option and would otherwise have shown "A-Z" over a
+time-sorted list -- **a control that misreports the state it controls is worse than one that is merely
+wrong** -- and unmeasured gates still **sink** rather than float, because a blank expected time is missing
+evidence, not a fast gate. Pinned in `rigProgress-selfcheck`, since a default reverts silently: nothing
+breaks, and the only symptom is a rig session that spends its first quarter-hour on `twof`.
+
+Tree at 1252 gates.
 ## v4169 -- the modules nothing but their gates imported, and two of them could not have loaded in a browser
 
 Task: wire the v4159-v4165 modules `referenceKind` had flagged as orphans held out of its census by a
