@@ -117,6 +117,11 @@ export const clocksDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4117 -- NAMED, THE SAME COMPLETION v3851/v4088-v4116 gave the rest of this family. MEASURED, rates
+    // mode (default) both arms: crossoverErrOrder 0 -> 2.000000000000009, matching the header's own
+    // "2.000000000000 under the planted error and 0 without it" exactly.
+    planted: { knob: "planted", observable: "crossoverErrOrder",
+               note: "the orbiting clock's dilation is computed by naively multiplying the gravitational and special-relativistic factors instead of the correct composition -- the naive form is wrong by exactly 2*M^2/r^2, an ORDER rather than a size, which is what makes the error the same everywhere instead of shrinking away with radius" },
     modes: ["rates", "spin", "signal", "epicyclic"],
     name: "relativistic-clocks", observables: CLOCK_OBSERVABLES, build: buildClocks,
     defaults: ({ mode } = {}) => ({ mode: mode || "rates", config: { ...DEF } }),

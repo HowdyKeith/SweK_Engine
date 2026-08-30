@@ -152,6 +152,18 @@ export const whiteDwarfDevice = {
     // v3400 -- KNOB PLANT: `planted` swaps the mass-radius LAW for the plausible non-relativistic one, so the
     // whole path from the wrong derivation to every reported exponent is graded. Not a nudged constant.
     plantKind: "knob",
+    // v4118 -- NAMED, THE SAME COMPLETION v3851/v4088-v4117 gave the rest of this family, and MEASURED across
+    // all four modes rather than assumed from the header. `limitOrder` is the real target: limitSlope 0.500 ->
+    // 9.5e-7 (the Chandrasekhar collapse just disappears -- the naive law has no singular behaviour near the
+    // limit at all), limitSlopeErrAbs 7.2e-7 -> 0.500. `exponent` mode does NOT catch it -- and, measured, the
+    // naive law's far-field slope fit is actually SLIGHTLY CLEANER (slopeErrAbs 2.9e-4 -> 4.1e-15), because
+    // dropping the relativistic (M/Mch)^(4/3) factor removes a small curvature from an otherwise pure -1/3
+    // power law. That is not an inconsistency: the header's own design note says an error in one factor is
+    // invisible to the OTHER exponent, and this is that property showing up as an improvement rather than a
+    // wash. `muScaling` and `accretion` are effectively unmoved (shapeInvariantSpread stays at float noise;
+    // accretion is bit-identical).
+    planted: { knob: "planted", observable: "limitSlopeErrAbs",
+               note: "the mass-radius law is swapped for the plausible non-relativistic power law, which has no Chandrasekhar limit to collapse toward -- only the exponent measured AT the limit (M_ch - M)^(1/2) can see this; the far-field -1/3 exponent cannot, because that regime never touches the relativistic factor the plant removes" },
     modes: WD_MODES, name: "white-dwarf-degeneracy",
     observables: WD_OBSERVABLES, build, defaults,
 };

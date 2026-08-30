@@ -173,6 +173,12 @@ const RENDERBOUNCE_MODES = ["series"];   // v4074 -- the single source `modes` a
 
 export const renderBounceDevice = {
     plantKind: "method",
+    // v4112 -- NAMED, THE SAME COMPLETION v3851/v4088-v4111 gave the rest of this family. MEASURED, both arms:
+    // identityResidual (blocking a sphere must lose exactly what emitting it gains) 2.33e-3 -> 1.291.
+    // seriesWorstRel and neeRel move too (0.0046->0.333, 2.5e-4->6.47); kResidual stays bit-identical, the
+    // geometry being blind to all three faults as the header asserts.
+    planted: { knob: "planted", observable: "identityResidual",
+               note: "two of the three module-provided faults fire together: loseThroughput drops albedo on the recursive bounce, wrongPdf pairs the cone sampler with the hemisphere pdf -- both corrupt the SAME solid-angle identity from opposite ends (occlusion loses less than it should, emission gains more), so the cross-file check that they must sum back to the unoccluded furnace is what catches it" },
     modes: RENDERBOUNCE_MODES,
     name: "interreflection-and-direct-the-same-solid-angle-twice",
     observables: RENDERBOUNCE_OBSERVABLES,

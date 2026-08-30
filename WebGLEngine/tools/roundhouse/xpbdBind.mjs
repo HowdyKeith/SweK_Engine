@@ -295,6 +295,18 @@ export const xpbdDevice = {
     // seismic (v3400) is the precedent for this third kind; declared here because plantedCoverage's wall is at
     // ZERO undeclared and a plant nobody has classified is a plant nobody can reason about.
     plantKind: "method",
+    // v4116 -- NAMED, THE SAME COMPLETION v3851/v4088-v4115 gave the rest of this family, and MEASURED across
+    // all four modes that structurally receive plantPBD (hooke, iteration, substep, grains) rather than
+    // assumed from the mode list. Only two actually respond: iteration (iterSpread 0 -> 0.948, iterWorstErrFrac
+    // 5.9e-6 -> 0.948) and grains (coneErr ~0 -> 0.075). hooke and substep are genuinely BLIND -- PBD and XPBD
+    // converge to the same equilibrium stretch given enough solve steps, so a single settled measurement (hooke)
+    // or a substep sweep (which is not the axis PBD's stiffness depends on) cannot separate them; only sweeping
+    // ITERATION count can, which is why that mode exists. `planted` is echoed as a boolean in the return of all
+    // eighteen modes (the blank object's universal convention in this codebase, same as every other device),
+    // but that costs nothing here: probeLiveness's finite-number filter excludes booleans, so it never reads as
+    // claimed coverage on modes the plant does not reach.
+    planted: { knob: "planted", observable: "iterSpread",
+               note: "plantPBD swaps xpbdSubstep for pbdSubstepOneLink, the exact historical mistake XPBD's compliance term exists to fix -- PBD's effective stiffness depends on iteration count and XPBD's does not, so sweeping iterations from 1 to 16 is the only axis that separates them" },
     modes: ["hooke", "iteration", "substep", "volume", "pressure", "damping", "friction", "kernel", "density", "muscle", "weave", "tear", "modulate", "sampled", "fluid", "attach", "clothloop", "grains"],
     name: "xpbd-compliance", observables: XPBD_OBSERVABLES, build: buildXpbd,
     defaults: ({ mode } = {}) => ({ mode: mode || "hooke", config: { ...DEF } }),

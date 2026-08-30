@@ -124,6 +124,12 @@ export const structureFactorDevice = {
     knobChoices: { lattice: Object.keys(BASES) },
 
     plantKind: "knob",
+    // v4110 -- NAMED, THE SAME COMPLETION v3851/v4088-v4109 gave the rest of this family. MEASURED, absences
+    // mode (default) both arms: closedVsSumWorst 9.80e-16 -> 1.176, forbiddenLitUp 0 -> 484. worstAbsent and
+    // the other absenceSweep-derived fields stay bit-identical -- correctly, per the v4066 comment above: that
+    // sweep computes its own reference basis and the displacement plant never reaches it.
+    planted: { knob: "planted", observable: "closedVsSumWorst",
+               note: "one basis atom (the FCC face-centre) is displaced off its true site, so the destructive interference behind a systematic absence stops being exact and forbidden reflections light up -- the closed-form parity rule never touches an atom and stays blind, which is how the disagreement is localised to the direct sum" },
     modes: STRUCTUREFACTOR_MODES,
     name: "systematic-absences-exact-zero-by-law",
     observables: SF_OBSERVABLES,

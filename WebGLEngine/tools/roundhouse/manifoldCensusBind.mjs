@@ -215,7 +215,13 @@ export const manifoldCensusDevice = {
     // to 0 -- it makes a NON-MANIFOLD BOWTIE REPORT AS A CLOSED MANIFOLD, which is this device's whole
     // subject ("watertight-is-not-manifold") sabotaged at exactly the point it grades. bowtieClosed is named
     // rather than bowtieNmVertices because it is the CLAIM: a boolean going falsely true.
-    plantFlips: "bowtieClosed",
+    // v4114 -- COMPLETED TO THE CANONICAL SHAPE v3851/v4088-v4113 gave the rest of this family: a bare
+    // plantFlips with no plantMode is not the mode-plant mechanism (declaredPlantMode requires both fields,
+    // per plantedCoverage.mjs) and had no functional reader anywhere in this tree -- v4069's fix named the
+    // right observable in a field nothing consumed. planted:{} is what labDevices-selfcheck.mjs and the
+    // dedicated per-device selfchecks (born, chaos, blobBodies, blobKelvin, blobThermal) actually check for.
+    planted: { knob: "planted", observable: "bowtieClosed",
+               note: "a manifold-vertex test is dropped from the census, so a bowtie vertex (two cones meeting at a point, non-manifold by definition) reports as a closed, valid manifold instead of failing" },
     modes: MANIFOLDCENSUS_MODES,
     name: "watertight-is-not-manifold",
     observables: MANIFOLD_OBSERVABLES,

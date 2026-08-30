@@ -210,6 +210,12 @@ const STROKEMORPH_MODES = ["morph"];   // v4074 -- the single source `modes` and
 
 export const strokeMorphDevice = {
     plantKind: "method",
+    // v4115 -- NAMED, THE SAME COMPLETION v3851/v4088-v4114 gave the rest of this family. MEASURED, both
+    // arms: morphOneMismatch 0 -> 40, matching the header's own "wrong at t=1 in FORTY of them" exactly, while
+    // morphZeroMismatch and pathStringDiffPairs stay bit-identical -- the plant is one-sided (t=0 still
+    // shortcuts correctly) and invisible in the rendered path string, which is the header's other headline.
+    planted: { knob: "planted", observable: "morphOneMismatch",
+               note: "morphAt's t===0/t===1 short-circuits are dropped, letting the lerp place the endpoints -- a+1*(b-a) rounds to something other than b in IEEE-754 even though a+0*(b-a) is exact at a, so the drift appears only at the t=1 endpoint and only in the floats, not in the four-decimal rendered path string" },
     modes: STROKEMORPH_MODES,
     name: "the-identity-that-was-half-true-and-invisible-in-the-output",
     observables: STROKEMORPH_OBSERVABLES,
