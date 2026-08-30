@@ -8,6 +8,66 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4176 -- a scene has a viewpoint, a model does not, and that is the whole difference
+
+Keith: export a rendered scene as an object, load it on the Shield TV in a browser. The reason it is worth
+doing is not file size -- main.js is thirty thousand lines with hundreds of subsystems ticking every frame and
+an Android TV browser will not run that, ever, however it is tuned. A baked scene is triangles, and the same
+browser draws those without effort. server.html has treated "phones / Shield / TV" as LAN clients on 8787 all
+along, with a firewall button whose whole purpose is letting them reach the PC -- THE TRANSPORT WAS ALREADY
+BUILT AND ONLY THE PAYLOAD WAS MISSING.
+
+*** GLB AND NOT three's Scene.toJSON(), AND THE REASON IS NOT TASTE. *** toJSON writes geometry as JSON NUMBER
+ARRAYS -- several times the size of the same floats in a binary chunk -- and it encodes three's OWN schema, so
+the TV would be pinned to whatever three version wrote the file and ObjectLoader would be the only thing able
+to read it. GLB is a format every loader on that device already speaks, and it inherits gpu/glbLoad.js's Draco
+route for free, which v4175 measured at 3.55x on a real Khronos file.
+
+*** GEOMETRY IS BAKED, ATMOSPHERE IS DESCRIBED, AND SAYING SO IS BETTER THAN A FLATTENED GUESS. *** Grass,
+water, particles, sky and the post chain are not geometry -- they are shaders running in raw WebGL against
+per-frame uniforms, with no scene graph to traverse. There is nothing to bake without re-rendering them into
+meshes, which would be expensive, lossy, and wrong the moment anything moved. So the un-bakeable state is
+WRITTEN DOWN instead, in scene.extras: sun direction, fog colour and its actual near and far, the hour, the
+water plane's height, the weather. scene-view.html applies those numbers rather than scaling a guess off the
+bounding box -- a viewer that invents fog distances produces a picture that is plausible and does not match
+what was exported. A file with no environment carries NO extras rather than a block of defaults that would
+read as real.
+
+*** INSTANCING IS WHY THIS IS NOT writeGlb WITH MORE MESHES. *** A scene has one tree mesh and four hundred
+trees. voxelGlb emits one node per mesh, so four hundred trees is four hundred copies of the same vertices.
+Here a NODE carries a transform and REFERENCES a mesh, which is what glTF nodes are for: measured at 400
+placements of a 6-vertex mesh, 6 vertices stored against 2400 flattened -- 99.8 percent fewer -- and 21,392
+bytes against a flattened 136,716, which is 6.4x. On a real scene that is the difference between a file the
+TV opens and one it does not.
+
+The container is SHARED, not respelled: packGlb was extracted out of voxelGlb.mjs for this, and the gate
+asserts sceneGlb imports it and never writes a twelve-byte header of its own. Two writers spelling one format
+is how a file starts opening in one viewer and not another. The extraction was proved byte-identical --
+sha256 f60bb4ef on the same fixture before and after -- before anything was built on top of it.
+
+*** THREE WAYS A SCENE EXPORT IS WRONG AND STILL PRODUCES A FILE THAT LOADS, all three gated by reading the
+bytes back rather than trusting the writer:
+  - ORIENTATION. lookRotation is its own function precisely because a wrong axis convention opens the scene
+    facing a wall and nothing throws. Its contract is checked by APPLYING the quaternion to -Z and recovering
+    the forward vector, for eight directions including straight up and straight down where the up-vector cross
+    product collapses. Sabotaged by flipping the camera basis: two checks went red.
+  - INDEX WIDTH. Past 65535 vertices a 16-bit index silently wraps -- 69999 truncates to 4463 -- and every
+    triangle after it points at the wrong vertex. Writing 32-bit always would inflate every small mesh
+    instead. Sabotaged by forcing 16-bit: caught.
+  - INSTANCING FLATTENING, which turns the file the TV was supposed to open into one it cannot.
+
+Read back by gpu/GLBParser.js, which walks the scene graph: one 6-vertex mesh under two nodes returns 12
+vertices with the second instance offset by exactly 5 in x, so the node transforms are real and not decoration.
+
+Wired both ends: window.swekExport.scene() beside the existing .glb(), deriving the forward vector the way the
+rest of main.js already does (fx = sin(yaw)cos(pitch), fy = sin(pitch), fz = -cos(yaw)cos(pitch)) -- which at
+yaw = pitch = 0 is (0, 0, -1), ALSO the direction a glTF camera looks by default, so the two conventions
+already agree and nothing rotates anything. New scene-view.html at the far end: TV-sized hit targets and
+visible focus rings because a Shield remote moves focus rather than pointing, gamepad look and dolly because a
+sofa has no mouse, and a ?src= parameter so the PC can hand the TV a link instead of the TV typing a URL with
+a remote.
+
+Gate count 1258 gates.
 ## v4175 -- not every Khronos sample asset is free, and two of the famous ones are not
 
 Keith asked what else we can stream from Khronos, because it could change the Little Prince view. Answering it

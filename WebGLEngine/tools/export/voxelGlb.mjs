@@ -136,6 +136,21 @@ export function writeGlb(meshes, opts = {}) {
         buffers: [{ byteLength: binLen }],
     };
 
+    return packGlb(gltf, chunks, binLen);
+}
+
+/**
+ * *** THE CONTAINER, EXTRACTED AT v4176 SO A SECOND WRITER CANNOT RE-SPELL IT. *** sceneGlb.mjs needs the same
+ * twelve-byte header and the same two padded chunks, and the header of THIS file already warns what happens
+ * when a writer and a reader end up with two spellings of the same format. Two WRITERS is the same hazard with
+ * one more way to go wrong: the alignment rules below are exactly the sort of detail a second implementation
+ * gets subtly different, producing a file that opens in one viewer and not another.
+ *
+ * @param gltf    the glTF JSON object, already complete
+ * @param chunks  [{ bytes, byteOffset }] to place inside the BIN chunk, offsets relative to the BIN payload
+ * @param binLen  the unpadded BIN payload length
+ */
+export function packGlb(gltf, chunks, binLen) {
     const jsonBytes = new TextEncoder().encode(JSON.stringify(gltf));
     const jsonLen = pad4(jsonBytes.length);
     const binPadded = pad4(binLen);
@@ -152,6 +167,9 @@ export function writeGlb(meshes, opts = {}) {
     for (const c of chunks) out.set(c.bytes, binStart + 8 + c.byteOffset);   // BIN pads with ZEROS (already 0)
     return out;
 }
+
+/** The 4-byte alignment rule, exported for the same reason packGlb is: one spelling. */
+export { pad4 };
 
 /** Bytes, triangles and vertices a call to writeGlb would produce -- for a caller that wants to warn first. */
 export function glbStats(meshes) {

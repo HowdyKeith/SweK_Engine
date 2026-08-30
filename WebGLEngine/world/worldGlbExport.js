@@ -84,3 +84,53 @@ export function exportWorldGlb(world, opts = {}) {
     const bytes = writeGlb(meshes, { generator: opts.generator || "SweK Engine world export" });
     return { ok: true, bytes, stats: { ...stats, byteLength: bytes.length, skippedEmptyChunks: meshes._skippedEmpty || 0 } };
 }
+
+// v4176 -- *** THE SCENE EXPORT, WHICH IS THE WORLD EXPORT PLUS THE TWO THINGS A VIEWER ON ANOTHER DEVICE
+// *** CANNOT GUESS: WHERE YOU WERE STANDING, AND WHAT THE AIR LOOKED LIKE.
+//
+// exportWorldGlb above answers "give me this world as a model" -- geometry, origin, no viewpoint. That is the
+// right answer for printing it or importing it into Blender, and the wrong one for opening it on a Shield TV,
+// where the file arrives and the viewer has no idea which way to face in a world that may be a kilometre
+// across. A model has no viewpoint; a SCENE does.
+//
+// The environment travels as a RECIPE rather than as baked geometry, and that split is deliberate: sun, fog
+// and water level are shader uniforms in this engine, not triangles, so the honest thing is to send the same
+// numbers the engine used and let the far end apply them. See tools/export/sceneGlb.mjs for why nothing tries
+// to bake grass, water or particles into meshes.
+import { writeSceneGlb, sceneStats, lookRotation } from "../tools/export/sceneGlb.mjs";
+
+/**
+ * @param opts.camera       { position:[x,y,z], forward?:[x,y,z], yfov?, znear?, zfar? } -- forward, not
+ *                          yaw/pitch, because the caller already computes it for the view matrix and two
+ *                          derivations of where the camera points is one too many.
+ * @param opts.environment  { sunDir?, sunColor?, fogColor?, fogNear?, fogFar?, hour?, waterLevel?, weather? }
+ * @param opts.props        [{ mesh:{name,positions,...}, placements:[{name?,translation?,rotation?,scale?}] }]
+ *                          repeated geometry, written ONCE and referenced per placement
+ */
+export function exportSceneGlb(world, opts = {}) {
+    const meshes = worldMeshes(world, opts);
+    const nodes = meshes.map((m, i) => ({ name: m.name || ("chunk" + i), mesh: i }));
+
+    // props are appended AFTER the chunk meshes, so the chunk indices above stay valid -- appending in the
+    // other order would silently renumber every chunk node's mesh reference.
+    for (const p of (opts.props || [])) {
+        if (!p || !p.mesh || !p.mesh.positions) continue;
+        meshes.push(p.mesh);
+        const mi = meshes.length - 1;
+        for (const pl of (p.placements || [{}])) nodes.push({ ...pl, mesh: mi, name: pl.name || (p.mesh.name || "prop") });
+    }
+
+    if (!meshes.length) {
+        return { ok: false, error: "nothing to export -- no loaded chunk produced any geometry", stats: sceneStats({ meshes: [], nodes: [] }) };
+    }
+
+    const scene = { meshes, nodes, environment: opts.environment || null };
+    if (opts.camera && Array.isArray(opts.camera.position)) {
+        scene.camera = { position: opts.camera.position, yfov: opts.camera.yfov, znear: opts.camera.znear, zfar: opts.camera.zfar,
+                         rotation: opts.camera.forward ? lookRotation(opts.camera.forward, opts.camera.up) : undefined };
+    }
+    const stats = sceneStats(scene);
+    const bytes = writeSceneGlb(scene, { generator: opts.generator || "SweK Engine scene export" });
+    return { ok: true, bytes, stats: { ...stats, byteLength: bytes.length,
+             hasCamera: !!scene.camera, hasEnvironment: !!scene.environment } };
+}
