@@ -8,6 +8,56 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4187 -- the dungeon monsters stopped cheating, and did not start stalling
+
+Keith remembered heroes walking through walls in the dungeon demo. It was real, and it had been there since
+v1400. simulation/DungeonAI.js wrote a monster's position in exactly **two** places and only **one** of them
+checked isWall: the flee branch wrapped it in tryMove() and even slid along the wall when blocked, while the
+chase branch did `m.x += ...` with no test at all. Worse, its "no path found" fallback was a straight line at
+the player -- which fires *precisely* when a wall is in the way. Measured before the fix: a monster crossed a
+solid stone column with no door and spent **17 frames standing inside it**.
+
+**The obvious fix was the wrong one, and Keith said so.** Refusing the move only trades a monster that cheats
+for a monster standing at the wall waiting to be killed. So when the path is gone it now puts a hand on the
+wall and walks: simulation/wallFollow.mjs, the right-hand rule, four cell lookups per step.
+
+**Three things the rule got wrong, each found by running it rather than reading it.**
+
+1. In **open space**, "turn right" every step walks a 2x2 circle -- four steps and back to the start. A
+   monster that lost its path mid-room would spin on the spot and trip its own loop detector. With nothing
+   adjacent to touch it now walks straight until a wall turns up.
+2. Walking east into a north-south wall, the wall is dead **ahead**. Locking the hand to RIGHT turned it
+   south and left the wall on its LEFT, so the next step dutifully turned away and it peeled back into the
+   room -- it reached the wall, took one step along it, and left. The hand now locks only when the wall is
+   genuinely on a side.
+3. A free-standing pillar defeats the right-hand rule entirely. That is its known limit, stated rather than
+   hidden, and the loop is **detected** on a repeated (cell, **facing**) state. Keyed on the cell alone, an
+   ordinary corridor -- which doubles back constantly -- would read as a loop and the monster would give up
+   in a hallway.
+
+**Keith's second idea was built, measured, and left off.** "Extend left and right, then choose": probe each
+way out of a junction and take the one that lands nearest the player. Four scoring rules over four mazes,
+steps to reach the goal:
+
+    fixture                            hand only   dist to goal   dist minus run   longest run
+    split room, door at the bottom            13          never               11         never
+    door at the TOP instead                   21          never            never         never
+    S-bend corridor                           21             21               21            21
+    alcove trap near the goal                 15             23               23            23
+
+The plain hand is the only rule that arrives every time, and is fastest or tied on three of the four. This is
+not a tuning failure: every score there is a **distance**, and a distance is blind to the wall between you and
+the goal. On the split room it probes one cell north -- a dead end, but plainly "closer" to a player who is
+east -- over three cells south, which is the run that holds the door. extend() and chooseTurn() ship as
+primitives because the probe is genuinely useful and because the next person to have this idea should find
+the numbers rather than repeat the experiment; chooseTurn refuses to act without a goal, and DungeonAI passes
+none.
+
+Behaviour now: a wall with no door stops them and they give up rather than orbiting it; a wall **with** a door
+does not stop them -- they follow the wall, find it, come through, and BFS picks the chase back up on the far
+side; an open room is still just a straight chase, with no follower ever allocated. 60 new checks in
+tools/ship/dungeonWalls-selfcheck.mjs, 4 sabotages all red, both files restored byte-identical. DungeonAI had
+no gate at all before this round. The tree now carries 1269 gates.
 ## v4186 -- the orrery's view: micro planet to terrain, and two wrong answers that rendered
 
 Last round shipped the orrery's data model and deliberately left the view unbuilt. This is the view, built on
