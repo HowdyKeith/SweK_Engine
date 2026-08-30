@@ -39,6 +39,12 @@ import {
 export const CRYSTALLIZE_OBSERVABLES = [
     "exponent", "predicted", "exponentErr", "mean", "sd", "spreadMin", "spreadMax",
     "effectOverNoise", "populationMargin", "marginInSigma", "separated", "satMean", "conMean",
+    // *** v4082 -- COMPLETED, THE SAME DEFECT v3850 FIXED IN THE OTHER FOUR THERMAL DEVICES AND MISSED HERE.
+    // *** These keys were RETURNED BY THE BUILDER AND NEVER DECLARED: `kind` and `note` on every mode, plus
+    // `mode` (the Avrami case label) and `fitPoints` on `exponent`, `continuous`/`ns`/`seeds` on `spread`, and
+    // `gap`/`satSd`/`conSd`/`satErr`/`conErr` on `discrimination`. An undeclared observable is invisible to
+    // every consumer that reads the list rather than the code, which is the whole reason the list exists.
+    "kind", "mode", "fitPoints", "note", "continuous", "ns", "seeds", "gap", "satSd", "conSd", "satErr", "conErr",
 ];
 
 const num = (v, d) => (Number.isFinite(+v) ? +v : d);
@@ -80,7 +86,12 @@ function spreadRun(c) {
 }
 
 function discriminationRun(c) {
-    const d = discriminationPower({ L: c.L, nNuclei: c.nNuclei, tMax: 12, seeds: seedList(c.seeds) });
+    // *** v4082 -- WAS MISSING periodic: !c.planted, THE ONE LINE exponentRun AND spreadRun BOTH CARRY.
+    // *** probeLiveness builds every mode twice, `config: { planted: true }` on the second arm, and this
+    // mode read 0 of 10 observables moved -- not because discrimination is plant-blind by design (nothing
+    // in the header says so; the opposite: "the gate asserts BOTH HALVES") but because the flag never reached
+    // discriminationPower. MEASURED once wired: satErr 0.038 -> 0.265, conErr 0.080 -> 0.469 (L=32, 4 seeds).
+    const d = discriminationPower({ L: c.L, nNuclei: c.nNuclei, tMax: 12, seeds: seedList(c.seeds), periodic: !c.planted });
     const worstSd = Math.max(d.saturated.sd, d.continuous.sd);
     return {
         gap: MODE_GAP, satMean: d.saturated.mean, conMean: d.continuous.mean,
