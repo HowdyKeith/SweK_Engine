@@ -8,6 +8,66 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4201 -- Invert any pure function, and the tree was already computing the hard part and throwing it away
+
+Idea from `bijection/g9` (MIT), whose trick is that a **draw** function becomes draggable: drag a shape and
+it minimises a cost over the **data** to find values that put it where you let go. New `math/inverseSolve.mjs`
+takes the inversion and leaves the dragging.
+
+### The gap is sharper than "there is no solver"
+
+`physics/hmc/inference.js` already recovers parameters, graded against a closed-form posterior. Its own
+header says why it cannot help here: *"Gradients are ANALYTIC throughout (HMC's requirement)."* It inverts
+only models somebody differentiated **by hand** -- which is exactly why `physics/reaction/brusselator.js`
+carries an analytic `jacobian(A, B)`. Every procedural planet, spell cost and material knob in this tree has
+no derivative written anywhere, and nobody is going to write hundreds of them.
+
+### And knobLiveness perturbs every knob and discards the magnitude
+
+`tools/roundhouse/knobLiveness.mjs` probes each knob and asks whether any observable moved, returning
+`{ state, moved: string[] }` -- *which* ones, compared with `sameValue()`. **That is a one-sided finite
+difference rounded to a boolean.**
+
+Keep the number and liveness becomes **sensitivity**; collect it over every input and it is a **Jacobian**;
+and a Jacobian is what inverts a function. The same measurement, kept rather than rounded, is the whole of
+this module. The two ideas meet exactly: a knob knobLiveness calls "moves nothing" is a **zero column** here,
+and a zero column is what makes the normal equations singular -- so the Levenberg-Marquardt damping is what
+turns a dead knob from an explosion into an input the solver simply never moves.
+
+### Graded against algebra, not against itself
+
+Finite differences match brusselator's exact analytic Jacobian to **4.5e-11**, at three parameter settings.
+No numerical method is graded against another run of itself when a closed form exists.
+
+### The step size fails in both directions, and both were measured
+
+**4.0e-2** error at `h=1e-1` (measuring curvature instead of slope) and **2.9e-3** at `h=1e-13` (lost to
+float noise), against **1.7e-10** at the default -- a clean U with the shipped value at the bottom. The step
+is also **relative**: at `x=1e11` an absolute step is **100% wrong**, because `x + h === x` in float and the
+difference reads as a dead input.
+
+### Three ways to stop, and only one is success
+
+`ok` is decided by the **residual**, never by how the loop exited. Reached-the-target, local-minimum and
+iteration-cap are three different endings, and a solver returning `ok: true` whenever its loop finished would
+be confidently wrong on the two a caller most needs to know about. A **refused probe is NaN and not zero**,
+too: "f is undefined here" is the opposite of "this input moves nothing", and writing 0 would say the second
+when the first happened.
+
+**And solving `f(x) = y` does not recover the `x` that produced `y`** -- gated explicitly, because the solver
+found `a = 0.297` for a target generated at `a = 1.3`, and both are correct. The inverse of a function is not
+unique, and a caller reading the answer as "the original parameters" will be wrong on any system with more
+than one solution.
+
+### My own bug, found by replaying one iteration by hand
+
+The Gauss-Jordan back-substitution read `row[i][i]` -- which indexes a **number**, yields `undefined`, and
+produces NaN. Every solve returned NaN, every step was rejected as uphill, and the solver confidently
+reported **a local minimum on a linear function**. Reading it again would not have found it; replaying one
+iteration with the numbers printed did.
+
+46 new checks, 5 sabotages all red -- one of which found my relative-step assertion too gentle to detect its
+own sabotage, because at `x=1e6` an absolute step still works fine. The tree carries 1282 gates.
 ## v4200 -- ENCUMBERED: the one posture where reading the licence gives you the wrong answer
 
 Keith asked whether SweK's flight sims could use TIE fighter models, and the answer needed a category
