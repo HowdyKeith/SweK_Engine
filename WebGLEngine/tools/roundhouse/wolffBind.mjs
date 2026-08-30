@@ -71,6 +71,11 @@ export const wolffDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4093 -- NAMED, THE SAME COMPLETION v3851/v4088-v4092 gave the rest of this family. MEASURED, magnetisation
+    // mode both arms: absM 0.9109 -> 0.0426, magErr 4.50e-4 -> 0.869 -- matching the header's own quoted 0.911
+    // -> 0.043 exactly.
+    planted: { knob: "planted", observable: "magErr",
+               note: "pAdd = 1 - exp(-J/T) instead of 1 - exp(-2J/T) is one character of difference from the value detailed balance requires; the algorithm still builds clusters, still flips them, still runs to completion, and samples the wrong distribution the whole time" },
     modes: ["magnetisation", "efficiency"],
     name: "wolff-cluster-ising", observables: WOLFF_OBSERVABLES, build: buildWolff,
     defaults: ({ mode } = {}) => ({ mode: mode || "magnetisation", config: { ...DEF } }),

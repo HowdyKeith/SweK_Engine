@@ -67,6 +67,10 @@ export const percolationDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4098 -- NAMED, THE SAME COMPLETION v3851/v4088-v4097 gave the rest of this family. MEASURED, crossing
+    // mode both arms: sigmaOff 0.85 -> 63.2, matching the header's own quoted "63 sigma" exactly.
+    planted: { knob: "planted", observable: "sigmaOff",
+               note: "neighborsWRONG breaks the bond neighbour rule, destroying connectivity rather than shifting the threshold -- crossing probability collapses to exactly 0 instead of drifting near the exact P=1/2 self-duality result" },
     modes: ["crossing", "exponent"],
     name: "bond-percolation", observables: PERCOLATION_OBSERVABLES, build: buildPercolation,
     defaults: ({ mode } = {}) => ({ mode: mode || "crossing", config: { ...DEF } }),

@@ -63,8 +63,13 @@ console.log("\n3. THE TWO-ROUTE AGREEMENTS HOLD, WHICH IS WHAT MAKES THE OBSERVA
         "rel " + v.bose4Rel.toExponential(3) + " -- zeta from physics/zeta.js and Gamma from md/maxwellSpeed.mjs, "
         + "so THREE MODULES meet on a number none of them alone computes");
     ok("!! ...and at s=3, Apery's constant", v.bose3Rel < 1e-10, "rel " + v.bose3Rel.toExponential(3));
-    ok("!! the T^4 law is exact, and the ratio needs NO constant (sigma cancels)", v.exitanceQuarticRel < 1e-12,
-        "rel " + v.exitanceQuarticRel.toExponential(3) + " -- a statement about the EXPONENT, not about sigma");
+    // v4100 -- FIXED: this asserted v.exitanceQuarticRel, an observable v4055 DELETED from the bind for being a
+    // tautology (pow(a,4)/pow(b,4) == pow(a/b,4), which cannot fail) and replaced with sigmaFromBoseRel -- "put
+    // where the tautology was", per that round's own comment. This selfcheck was never updated to match, so it
+    // has thrown TypeError: Cannot read properties of undefined (reading 'toExponential') on every run since.
+    ok("!! sigma (typed as the closed form) meets the Bose integral by a different route", v.sigmaFromBoseRel < 1e-10,
+        "rel " + v.sigmaFromBoseRel.toExponential(3) + " -- 2 pi k^4/(h^3 c^2) times Gamma(4)zeta(4) against the "
+        + "closed form, so a wrong power of pi or a zeta returning the wrong argument moves it off zero");
     report("not one reference value is typed in the bind. The selfcheck beside it owns the CODATA comparison; a "
         + "device carrying its own copy of 5.670374419e-8 would be a second declaration of a number.");
 }
@@ -93,7 +98,7 @@ console.log("\n4. *** THE PLANT MOVES EXACTLY THREE OBSERVABLES, AND THE OTHER T
     ok("!! EXACTLY THREE observables move -- a plant that moved everything would localise nothing",
         moved.length === 3, "moved: " + moved.join(", "));
     ok("!! ...and sigma, Wien's b and BOTH Bose integrals are BIT-IDENTICAL under it",
-        ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad", "exitanceQuarticRel"]
+        ["sigma", "wienB", "bose4Rel", "bose3Rel", "bose4Quad", "bose3Quad", "sigmaFromBoseRel"]
             .every((k) => h[k] === p[k]),
         still.length + " of " + BLACKBODY_OBSERVABLES.length + " unchanged. sigma and b are built from the "
         + "WAVELENGTH root alone and the integrals touch neither peak -- THIS IS A PROPERTY, NOT A GAP, and it "

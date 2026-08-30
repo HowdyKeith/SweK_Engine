@@ -132,6 +132,12 @@ export const kerrDevice = {
     // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
     // rule ("perturb the physics, not the number") in its ordinary form.
     plantKind: "knob",
+    // v4092 -- NAMED, THE SAME COMPLETION v3851/v4088-v4091 gave the rest of this family. MEASURED, spin mode
+    // both arms: horizonProductErr 5.55e-17 -> 0.48, while horizonSumErr stays exactly 0 in both -- the v3392
+    // comment above already explains why (the linearised-discriminant plant reaches the horizon PRODUCT and
+    // nothing else).
+    planted: { knob: "planted", observable: "horizonProductErr",
+               note: "a linearised discriminant in the horizon formula moves r+*r- away from a^2 while leaving r+ + r- = 2M exactly alone -- one invariant is structurally blind to this plant and the other is not" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a

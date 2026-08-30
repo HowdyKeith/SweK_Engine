@@ -106,6 +106,10 @@ const BLACKBODY_MODES = ["spectrum"];   // v4074 -- the single source `modes` an
 
 export const blackbodyDevice = {
     plantKind: "reader",
+    // v4095 -- NAMED, THE SAME COMPLETION v3851/v4088-v4094 gave the rest of this family. MEASURED, both arms:
+    // peakProductRatio 0.5683 -> 1.0, matching the header's own quoted numbers exactly.
+    planted: { knob: "planted", observable: "peakProductRatio",
+               note: "the frequency Wien root is READ as the wavelength root (lambda*nu = c misapplied to a peak location, which the Jacobian between d(lambda) and d(nu) reshapes) -- the spectrum itself is untouched and the two solvers still agree with each other perfectly" },
     modes: BLACKBODY_MODES,
     name: "blackbody-wien-and-the-bose-identity",
     observables: BLACKBODY_OBSERVABLES,
