@@ -8,6 +8,88 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4163 -- two effects ported from MIT sources, and neither port is the interesting part
+
+### SwiftUIShaders: the first two, and the machinery for the other 39
+
+`krispuckett/SwiftUIShaders` (MIT -- *"Use them, ship them, remix them. Attribution's appreciated, never
+required."*). Ported `bcs_emboss` and `bcs_heatShimmer`, both `layerEffect` form:
+
+```metal
+[[stitchable]] half4 bcs_emboss(float2 position, SwiftUI::Layer layer, float2 size,
+                                float strength, float angle, float mix_amount)
+```
+
+which is a screen-space pass over a source image -- the same shape as `crtPass` and `phosphorPass`, and paired
+with a CPU reference the way `crtPass` is paired with `crtModel`.
+
+**The maths of an emboss is four lines and none of the risk is in the four lines.** A shader that fails to
+compile gets fixed. The six differences between Metal and GLSL do not fail to compile, and five change the
+picture in silence:
+
+| trap | what it does |
+|---|---|
+| **y axis flips** | SwiftUI's `position.y` grows *down*, `gl_FragCoord.y` grows *up*. `heatShimmer`'s `vertical_bias` is built on `1.0 - uv.y`, so an unflipped port fades the wrong way: **a shader that compiles, animates, and is upside down.** |
+| **premultiplied alpha** | `rgb += emboss` never touches alpha -- a different operation against a straight-alpha texture. Invisible on an opaque photo, wrong on anything cut out. |
+| **points, not pixels** | the `1.5` offset is 1.5 *points*; on a 2x canvas a direct port halves the effect |
+| **`half` is mediump** | `half(x)` quantises on purpose: `toHalf(0.1)` = 0.0999755859375 |
+| **`fmod` is not `mod`** | disagree on **every** negative input -- `fmod(-0.25,1) = -0.25` against `mod(-0.25,1) = 0.75` |
+| **edges wrap** | the one that at least *looks* wrong |
+
+The flip is done **once**, in a named helper, which is the choice `crtPass.js` already made for the same reason.
+The alpha convention is now something the **caller declares** rather than a default nobody reads. And all six
+are recorded **as data** in `METAL_TO_GLSL`, with which are silent -- so the next port reads them instead of
+rediscovering them, and the other 39 shaders are one model function and one frag each.
+
+### Holosticker: a material, on geometry that already existed
+
+`jal-co/holosticker` (MIT). None of their code is here -- three is vendored and `svg-forge.html` already parses
+an SVG into `THREE.Shape` and bevel-extrudes it, so what was missing was a **material**, and a material is
+arithmetic.
+
+**A holofoil and a picture of a rainbow are indistinguishable in a screenshot.** The whole difference is what
+happens when the thing turns, so nearly every check moves the view angle. A hue ramp passes a screenshot and
+fails all of them.
+
+It is the real interference, because the real one is barely harder: `OPD = 2*n*d*cos(theta_t)` with Snell inside
+the film and a pi shift on the external reflection, sampled at 600/550/450nm.
+
+```
+cos 1.0  OPD 1064nm  RGB 0.43,0.04,0.83   violet
+cos 0.7  OPD  915nm  RGB 0.99,0.76,0.01   gold
+cos 0.3  OPD  779nm  RGB 0.65,0.93,0.56   green
+cos 0.1  OPD  749nm  RGB 0.49,0.82,0.76   cyan
+```
+
+**My own comment got the visible consequence wrong first, and the correction is the round's best line.** It
+said the colour *"walks toward blue"* at grazing. Measured at a 380nm film: blue-minus-red runs **0.40** head-on
+and **0.21** grazing -- *less* blue. **The hue does not walk anywhere, it cycles.**
+
+What is monotonic is the **path**: OPD falls 1064 to 749nm across cos 1.0 down to 0.1 and never doubles back, at
+200, 380 and 700nm alike. So the gate asserts **the monotonic path and not a colour** -- the colour is a
+consequence, the path is the physics. And that is precisely the tell: a hue wheel cycles whichever way its
+author wired it and reverses as often as not, which reads as "cheap sticker" without a viewer being able to say
+why.
+
+Two more decisions worth their own lines. **Flakes are keyed on surface coordinates, never the screen** --
+seeded from `gl_FragCoord` they crawl as the object turns and the surface appears to slide under its own
+sparkle; each carries its own tilt so they fire one at a time instead of the field flashing together. And
+**everything clamps**, because three additive layers over a base are spectacular on a dark logo and a white blob
+on a light one, which is the failure that gets blamed on the artwork.
+
+It **patches** `MeshStandardMaterial` through `onBeforeCompile` rather than replacing it -- the medal already has
+metalness, roughness, a colour and the page's lights, and a bespoke `ShaderMaterial` throws all of that away and
+then has to re-earn it. The patch is **driven** in the gate against a three-shaped fragment shader, not read for.
+
+### What neither port verifies
+
+The GLSL executing. There is no GL context on this box, so both shaders are read for **correspondence** against
+models that *are* exercised -- same constants, same expressions, same traps at the same places. That is weaker
+than `crtPass`'s bit-identical comparison and is stated rather than implied.
+
+Physics can be gated; taste cannot.
+
+Two new gates -- `swiftShaders` and `holoFoil` -- take the tree to 1252 gates.
 ## v4162 -- the equation of state pinned, and three gates that asserted a stopwatch
 
 ### The file the list forgot
