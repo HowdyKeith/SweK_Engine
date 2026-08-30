@@ -18,7 +18,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
-         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome,
+         bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -234,6 +234,59 @@ console.log("\n8. batch 2 -- solarize and duochrome");
     report("PORTED SO FAR: 4 of 41 -- emboss, heatShimmer, solarize, duochrome, plus the shared helper layer " +
            "(hash, valueNoise, fbm, hsb2rgb) that the remaining 37 are built on. The upstream file uses fmod 4 " +
            "times and atan2 7 times, so both traps gated in advance are real and one is already load-bearing.");
+}
+
+// ---- 9. BATCH 3: THE TRAP CUTS BOTH WAYS -----------------------------------------------------------------------
+console.log("\n9. batch 3 -- the polar warps, and the remainder that must NOT be tidied");
+{
+    // *** THE CENTREPIECE. *** batch 2 found a helper where fmod is right and mod is wrong. The kaleidoscope is
+    // the mirror image, IN THE SAME FILE. Its fold is written longhand as the FLOORING remainder because atan2
+    // returns [-PI, PI] -- negative for half of every image. Fold with fmod and that half lands outside the
+    // segment, fails the mirror test, and samples the wrong place.
+    const seg = (Math.PI * 2) / 6;
+    const negatives = [-3.0, -1.2, -0.3];
+    ok("!! *** atan2 GOES NEGATIVE, AND fmod PUTS THAT HALF OUTSIDE THE SEGMENT ***",
+        negatives.every((a) => fmod(a, seg) < 0 && glmod(a, seg) >= 0 && glmod(a, seg) < seg),
+        "angle -1.20: mod " + glmod(-1.2, seg).toFixed(3) + " (inside) against fmod " + fmod(-1.2, seg).toFixed(3) +
+        " (outside). Upstream wrote the flooring form BY HAND rather than calling fmod, which was right and is " +
+        "easy to 'tidy' into a bug");
+    ok("!! ...and on positive angles they agree, so a spot check would not catch it",
+        [0.4, 2.1].every((a) => Math.abs(fmod(a, seg) - glmod(a, seg)) < 1e-12));
+    ok("!! the model folds with glmod and the shader spells the flooring form out",
+        /angle = glmod\(angle, segAngle\)/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")) &&
+        /angle = angle - segAngle \* floor\(angle \/ segAngle\)/.test(pass.SHADERS.kaleidoscope) &&
+        !/bcs_fmod\(angle/.test(pass.SHADERS.kaleidoscope),
+        "SO THE SAME FILE NEEDS BOTH REMAINDERS, and which one is decided by the SIGN AT EACH SITE -- never by preference");
+    ok("...atan2 becomes atan(y,x), the one trap that is purely a rename",
+        /atan\(delta\.y, delta\.x\)/.test(pass.SHADERS.kaleidoscope));
+
+    const img = (() => { const w = 16, h = 16, data = new Float32Array(w * h * 4);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4;
+            data[i] = x / w; data[i + 1] = y / h; data[i + 2] = 0.5; data[i + 3] = 1; }
+        return { w, h, data, premultiplied: true }; })();
+    ok("!! vortex with no twist and no time is the identity",
+        bcsVortex(img, { twistAmount: 0, speed: 0 }).data.every((v, i) => Math.abs(v - img.data[i]) < 1e-9),
+        "a warp that cannot be turned off cannot be checked against anything");
+    ok("!! ...and a real twist moves most of the picture",
+        (() => { const v = bcsVortex(img, { twistAmount: 3, speed: 0 }); let n = 0;
+                 for (let i = 0; i < img.data.length; i += 4) if (Math.abs(v.data[i] - img.data[i]) > 1e-6) n++;
+                 return n > img.w * img.h * 0.5; })());
+    // ASPECT CORRECTION: on a NON-SQUARE image, dropping it makes the vortex an ellipse. The check is that a
+    // wide image and a tall one of the same content warp to mirrored radii rather than to the same one.
+    ok("!! the aspect ratio is applied and undone around the polar step",
+        /rotated\.x \/= aspect/.test(pass.SHADERS.vortex) && /kal\.x \/= aspect/.test(pass.SHADERS.kaleidoscope) &&
+        /rx \/= aspect/.test(fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")),
+        "drop it and a vortex on a non-square image is an ellipse");
+    ok("!! kaleidoscope samples stay inside the image",
+        bcsKaleidoscope(img, { segments: 6 }).data.every((v) => v >= 0 && v <= 1));
+    ok("...more segments is a different picture, so the knob is live",
+        (() => { const a = bcsKaleidoscope(img, { segments: 4 }), b = bcsKaleidoscope(img, { segments: 9 });
+                 for (let i = 0; i < a.data.length; i++) if (Math.abs(a.data[i] - b.data[i]) > 1e-9) return true; return false; })());
+    for (const [name, keys] of [["vortex", ["uTwistAmount", "uRadius", "uFalloff"]],
+                                ["kaleidoscope", ["uSegments", "uRotation", "uZoom"]]])
+        ok("..." + name + "'s knobs all reach the GLSL", keys.every((k) => pass.SHADERS[name].includes(k)));
+    report("PORTED: 6 of 41. THE TWO REMAINDERS NOW HAVE A CASE EACH IN THE GATE -- hsb2rgb needs fmod, the " +
+           "kaleidoscope needs mod, and choosing wrong in either direction breaks half a picture apiece.");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

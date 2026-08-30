@@ -136,7 +136,46 @@ void main() {
     fragColor = vec4(mix(original.rgb, duo, toHalf(uIntensity)), original.a);
 }`;
 
-const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG };
+
+// ---- BATCH 3 (v4164): the polar warps ------------------------------------------------------------------
+// *** THE SAME FILE NEEDS BOTH REMAINDERS. *** batch 2's bcs_hsb2rgb needs fmod (trunc) because its hue is
+// guaranteed non-negative and mod would still be wrong in general. THE KALEIDOSCOPE NEEDS mod (floor), because
+// its angle comes from atan2 and atan2 returns [-PI, PI] -- negative for half of every image, and fmod would
+// put that half OUTSIDE the segment. Upstream wrote the flooring form out by hand rather than calling fmod,
+// which was the right call and is easy to "tidy" into a bug.
+const VORTEX_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uTwistAmount, uRadius, uSpeed, uFalloff;
+void main() {
+    vec2 uv = swPos() / uSize;
+    float aspect = uSize.x / uSize.y;
+    vec2 delta = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+    float dist = length(delta);
+    float angle = uTwistAmount * exp(-(dist / uRadius) * uFalloff) + uTime * uSpeed;
+    float ca = cos(angle), sa = sin(angle);
+    vec2 rotated = vec2(delta.x * ca - delta.y * sa, delta.x * sa + delta.y * ca);
+    rotated.x /= aspect;                                  // aspect undone, or a vortex is an ellipse
+    fragColor = layerSample(clamp((rotated + 0.5) * uSize, vec2(0.0), uSize));
+}`;
+
+const KALEIDO_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uSegments, uRotation, uZoom, uAnimateSpeed;
+void main() {
+    vec2 uv = swPos() / uSize;
+    float aspect = uSize.x / uSize.y;
+    vec2 delta = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+    float angle = atan(delta.y, delta.x) + uRotation + uTime * uAnimateSpeed;   // atan2 -> atan(y,x)
+    float dist = length(delta);
+    float segAngle = 6.283185307179586 / uSegments;
+    // FLOORING, spelled out as upstream spells it. bcs_fmod here would put every negative angle outside the
+    // segment, and atan() returns [-PI, PI].
+    angle = angle - segAngle * floor(angle / segAngle);
+    if (angle > segAngle * 0.5) angle = segAngle - angle;
+    vec2 kal = vec2(cos(angle), sin(angle)) * dist / uZoom;
+    kal.x /= aspect;
+    fragColor = layerSample(clamp((kal + 0.5) * uSize, vec2(0.0), uSize));
+}`;
+
+const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG };
 
 /** The uniform each knob writes to, so a caller need not know the GLSL naming. */
 const KNOBS = {
@@ -144,6 +183,8 @@ const KNOBS = {
     heatShimmer: { time: "uTime", amplitude: "uAmplitude", frequency: "uFrequency", speed: "uSpeed", verticalBias: "uVerticalBias", pointScale: "uPointScale" },
     solarize: { time: "uTime", threshold: "uThreshold", curveIntensity: "uCurveIntensity", colorSeparation: "uColorSeparation", animate: "uAnimate", clampOutput: "uClampOutput" },
     duochrome: { time: "uTime", intensity: "uIntensity", hue1: "uHue1", hue2: "uHue2", contrast: "uContrast" },
+    vortex: { time: "uTime", twistAmount: "uTwistAmount", radius: "uRadius", speed: "uSpeed", falloff: "uFalloff" },
+    kaleidoscope: { time: "uTime", segments: "uSegments", rotation: "uRotation", zoom: "uZoom", animateSpeed: "uAnimateSpeed" },
 };
 
-module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG };
+module.exports = { VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA, EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG };

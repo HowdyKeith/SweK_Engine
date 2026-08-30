@@ -247,6 +247,86 @@ export function bcsDuochrome(img, { time = 0, intensity = 1, hue1 = 0.6, hue2 = 
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+
+// =============================================================================================================
+// BATCH 3 (v4164) -- THE POLAR WARPS, AND THE TRAP CUTTING BOTH WAYS.
+//
+// *** batch 2 FOUND A HELPER WHERE fmod IS RIGHT AND mod IS WRONG. bcs_kaleidoscope IS THE MIRROR IMAGE. ***
+// Its fold into a segment is written out by hand:
+//
+//     angle = angle - segAngle * floor(angle / segAngle);   // mod into segment
+//
+// That is the FLOORING remainder -- GLSL's `mod`, not Metal's `fmod` -- and the author wrote it longhand rather
+// than calling fmod, which was the right call: `angle` comes from atan2 and atan2 RETURNS [-PI, PI], so it is
+// negative for half of every image. Fold with fmod and that half lands in the wrong segment. So a porter who
+// "tidied" this into the bcs_fmod helper batch 2 just added would break exactly half the picture, and a porter
+// who used mod in hsb2rgb would break negative hues. THE SAME FILE NEEDS BOTH, AND WHICH ONE IS DECIDED BY THE
+// SIGN OF THE INPUT AT EACH SITE -- never by preference.
+//
+// AND THE Y FLIP DECIDES WHICH WAY A VORTEX SPINS. Both shaders build `delta` from a y that grows DOWNWARD, so
+// a positive angle turns one way in SwiftUI and the other in GL. Because the pass flips once at the top, delta
+// is already in SwiftUI's convention and the handedness carries over -- but a port that skipped the flip would
+// have a vortex spinning backwards and a kaleidoscope mirrored, both of which look plausible.
+//
+// ASPECT CORRECTION IS NOT DECORATION EITHER: delta.x is scaled by size.x/size.y before the polar step and
+// divided back afterwards. Drop it and a vortex on a non-square image is an ellipse.
+// =============================================================================================================
+
+/** atan2 -> GLSL's atan(y, x). A rename, and the only one of the six traps that is purely cosmetic. */
+export const atan2 = (y, x) => Math.atan2(y, x);
+
+/**
+ * bcs_vortex -- rotate around the centre by an angle that decays with radius.
+ *
+ * `speed * time` is added to the angle UNCONDITIONALLY, so the whole field turns even where the twist has
+ * decayed to nothing. That is upstream's behaviour and it is what makes it read as a vortex rather than a
+ * pinch, so it is kept rather than "fixed".
+ */
+export function bcsVortex(img, { time = 0, twistAmount = 3, radius = 0.5, speed = 1, falloff = 2 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        let dx = (uvx - 0.5) * aspect, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const twistFalloff = Math.exp(-(dist / radius) * falloff);
+        const angle = twistAmount * twistFalloff + time * speed;
+        const ca = Math.cos(angle), sa = Math.sin(angle);
+        let rx = dx * ca - dy * sa, ry = dx * sa + dy * ca;
+        rx /= aspect;
+        const sx = clamp((rx + 0.5) * w, 0, w), sy = clamp((ry + 0.5) * h, 0, h);
+        const c = s(sx, sy), i = (y * w + x) * 4;
+        out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_kaleidoscope -- fold the angle into one mirrored segment.
+ *
+ * *** THE FOLD USES glmod AND NOT fmod, AND THAT IS THE POINT OF THIS BATCH. *** See the note above: atan2
+ * returns [-PI, PI].
+ */
+export function bcsKaleidoscope(img, { time = 0, segments = 6, rotation = 0, zoom = 1, animateSpeed = 0 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const segAngle = (Math.PI * 2) / segments;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const dx = (uvx - 0.5) * aspect, dy = uvy - 0.5;
+        let angle = atan2(dy, dx) + rotation + time * animateSpeed;
+        const dist = Math.hypot(dx, dy);
+        angle = glmod(angle, segAngle);                       // FLOORING -- atan2 goes negative
+        if (angle > segAngle * 0.5) angle = segAngle - angle; // the mirror
+        let kx = Math.cos(angle) * dist / zoom, ky = Math.sin(angle) * dist / zoom;
+        kx /= aspect;
+        const sx = clamp((kx + 0.5) * w, 0, w), sy = clamp((ky + 0.5) * h, 0, h);
+        const c = s(sx, sy), i = (y * w + x) * 4;
+        out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",
