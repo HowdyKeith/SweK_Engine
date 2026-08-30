@@ -2626,6 +2626,7 @@ const shipBridge = require("./shipBridge.js");            // v2807 - ship-ritual
 const deviceBridge = require("./deviceBridge.js");        // v2813 - roundhouse DEVICE front door at /device (pick a lab, watch the loop crystallise round by round).
 const repoTerrainBridge = require("./repoTerrainBridge.js");  // v4149 - count a source tree so world/repoHeightfield.js can make ground out of it.
 const sunshineBridge = require("./sunshineBridge.js");        // v4154 - the HOST half Moonlight dials, plus the one am-start surface that client exposes.
+const iosDeviceBridge = require("./iosDeviceBridge.js");      // v4155 - adb-for-iOS via doronz88/pymobiledevice3, allowlisted and read-only.
 const policyMassBridge = require("./policyMassBridge.js");
 const moduleHistoryBridge = require("./moduleHistoryBridge.js");
 const frugonBridge = require("./frugonBridge.js");    // v3039 - LLM call-log cost front door at /frugon (drives frugon, never parses it).// v2856 - mass-vs-merit front door at /policymass.
@@ -4967,6 +4968,13 @@ const server = http.createServer((req, res) => {
     // noticing the declaration is at 4961 and the mount was at 4707, then DRIVEN: a live POST against a real
     // server returned the bridge's own JSON rather than a 500. The bridges above pass only sendJson (declared
     // at the top), which is why none of them had to care.
+    if (iosDeviceBridge.owns(req.url)) {
+        // /iosdev - pymobiledevice3, through an ALLOWLIST. Mounted here, below readJson, for the reason the
+        // sunshine mount above records: a reference to it any earlier sits in its temporal dead zone.
+        Promise.resolve(iosDeviceBridge.handle(req, res, { sendJson, readJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "iosdev", message: String(e && e.message || e) }, 500); } catch {} });
+        return;
+    }
     if (sunshineBridge.owns(req.url)) {
         // /sunshine - install/start/stop the Sunshine HOST, and launch Moonlight V+ on a phone over adb.
         Promise.resolve(sunshineBridge.handle(req, res, { sendJson, readJson }))

@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="adb for iOS: install and drive doronz88/pymobiledevice3 through a read-only allowlist. Lists devices and apps, reads crash names and battery, over a normal pairing with no jailbreak.">
+<title>SweK iOS Device Tools</title>
+<style>
+:root{--bg:#0e1116;--fg:#dfe6f0;--dim:#8e9bb0;--line:#26303d;--card:#151b24;--ok:#8fe0ae;--warn:#ffd479;--bad:#ff9d9d;--acc:#9ec9ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px}
+h1{font-size:19px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px;color:var(--acc)}
+a{color:var(--acc)}.sub{color:var(--dim);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.unverified{border-color:#6a5320;background:#1d1808}
+.danger{border-color:#6a2c2c;background:#1d0c0c}
+button{font:inherit;padding:5px 12px;background:#1a2230;color:var(--fg);border:1px solid #33455c;border-radius:5px;cursor:pointer;margin:2px 4px 2px 0}
+button:hover{background:#22304a}
+input{font:inherit;padding:5px 8px;background:#0b0f15;color:var(--fg);border:1px solid #33455c;border-radius:5px;margin:2px 6px 2px 0}
+table{border-collapse:collapse;width:100%;margin:6px 0}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top;font-size:13px}
+th{background:#111722;color:var(--dim);font-weight:600}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+pre{background:#0b0f15;border:1px solid var(--line);border-radius:6px;padding:9px;overflow:auto;max-height:260px}
+.m{color:var(--ok);font-weight:700}.n{color:var(--warn);font-weight:700}
+ul{margin:6px 0;padding-left:20px}li{margin:4px 0}
+</style></head><body>
+
+<h1>&#63743; SweK iOS Device Tools</h1>
+<p class="sub"><b>adb, for iOS.</b> <a href="https://github.com/doronz88/pymobiledevice3" target="_blank" rel="noopener">doronz88/pymobiledevice3</a> (GPL-3.0) speaks the protocols an iPhone already speaks to a trusted computer &mdash; usbmux, lockdown, AFC. <b>No jailbreak</b>, and nothing is installed on the phone: it needs a device paired the ordinary way, by tapping <i>Trust This Computer</i>.</p>
+
+<div class="card unverified">
+  <b>&#9888;&#65039; No iPhone has ever been attached to this bridge.</b><br>
+  The box it was written on has no USB device and no pymobiledevice3 installed. <b>Detection, the allowlist and
+  every refusal are gated and run</b> &mdash; those are the paths that must behave with nothing plugged in, which
+  is this box's actual state. Everything past &ldquo;the CLI answered&rdquo; is unverified and marked below.
+</div>
+
+<div class="card">
+  <b>This does not promote the iOS peer, and saying so is the point.</b>
+  An iPhone still cannot run node or host <code>ai-bridge/server.js</code>, so <a href="/ios-peer.html">ios-peer.html</a>'s
+  &ldquo;a subset in Safari&rdquo; stands and the peer ladder is unchanged. What changes is the <b>host's</b> grip
+  on the phone: a management channel iOS has never had here.
+</div>
+
+<h2>1 &middot; The tool</h2>
+<div class="card">
+  <button onclick="stat()">Status</button>
+  <button onclick="post('/iosdev/install')">Install (pip)</button>
+  <pre id="out">press Status</pre>
+</div>
+
+<h2>2 &middot; Ask the phone something</h2>
+<div class="card">
+  <input id="udid" placeholder="UDID (blank = the only device)" size="30">
+  <div id="verbs" class="sub">press Status to load the allowlist</div>
+  <pre id="rout">&mdash;</pre>
+</div>
+
+<h2>What this refuses to do</h2>
+<div class="card danger"><ul id="ref"><li class="sub">press Status</li></ul></div>
+
+<h2>What is measured, and what is only read</h2>
+<table>
+<tr><th>Row</th><th>Status</th><th>On what evidence</th></tr>
+<tr><td>No jailbreak is required</td><td class="m">MEASURED</td><td>Read from the project: it implements lockdown/usbmux against a normally paired device. Nothing is installed on the phone.</td></tr>
+<tr><td>The iOS 17+ tunnel needs root on Linux and Windows, and <b>not</b> on macOS</td><td class="m">MEASURED</td><td>Its own <code>docs/guides/ios17-tunnels.md</code>: every Linux/Windows invocation is <code>sudo &hellip; remote tunneld</code>, and the macOS line says no sudo &mdash; it publishes Apple's own remoted tunnel.</td></tr>
+<tr><td>Commands are allowlisted, not denylisted</td><td class="m">MEASURED</td><td>The gate drives it: <code>restore</code> and an invented verb are both refused, and no caller-supplied argv reaches the CLI.</td></tr>
+<tr><td>A bad UDID is refused before the tool is reached</td><td class="m">MEASURED</td><td>Driven with shell punctuation in the value.</td></tr>
+<tr><td>Detection answers on a box with nothing installed</td><td class="m">MEASURED</td><td>That is this box. Both invocation spellings are tried and reported.</td></tr>
+<tr><td>The CLI actually lists a device</td><td class="n">NOT VERIFIED</td><td>No iPhone here. Never run against hardware.</td></tr>
+<tr><td>Apps, crash names and battery come back</td><td class="n">NOT VERIFIED</td><td>Same &mdash; the commands are transcribed from the project's CLI, not executed.</td></tr>
+<tr><td><code>pip install</code> succeeds</td><td class="n">NOT VERIFIED</td><td>Not installed here; the command is the project's own documented line.</td></tr>
+</table>
+
+<p class="sub"><a href="/server.html">&larr; back to the server page</a> &middot; <a href="/ios-peer.html">the iOS peer page</a></p>
+
+<script>
+const $=(i)=>document.getElementById(i);
+const show=(el,o)=>{$(el).textContent=typeof o==="string"?o:JSON.stringify(o,null,1);};
+async function jget(u){const r=await fetch(u);let b=null;try{b=await r.json();}catch{b=null;}
+  if(!r.ok||!b)throw new Error((b&&b.error)||("HTTP "+r.status+" "+r.statusText));return b;}
+async function jpost(u,d){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d||{})});
+  let b=null;try{b=await r.json();}catch{b=null;}
+  if(!b)throw new Error("HTTP "+r.status+" "+r.statusText);return b;}
+async function stat(){try{const s=await jget("/iosdev/status");show("out",s);
+  const v=$("verbs");v.innerHTML="";
+  for(const a of (s.allowed||[])){const btn=document.createElement("button");
+    btn.textContent=a.name;btn.title=a.runs+"  —  "+a.reads;
+    btn.onclick=()=>ask(a.name);v.appendChild(btn);}
+  const ul=$("ref");ul.innerHTML="";
+  for(const r of (s.refused||[])){const li=document.createElement("li");
+    li.innerHTML="<b>"+r.what+"</b> &mdash; <span class='sub'>"+r.why+"</span>";ul.appendChild(li);} }
+  catch(e){show("out","status failed: "+e.message);}}
+async function ask(name){try{show("rout",await jpost("/iosdev/run",{name:name,udid:$("udid").value.trim()}));}
+  catch(e){show("rout",name+" failed: "+e.message);}}
+async function post(u){try{show("out",await jpost(u));}catch(e){show("out",u+" failed: "+e.message);}setTimeout(stat,900);}
+stat();
+</script>
+</body></html>

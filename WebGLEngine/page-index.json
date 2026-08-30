@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 423,
+ "count": 424,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1470,6 +1470,13 @@
    "f": "ios-peer.html",
    "t": "SweK iOS Peer (iPhone / iPad)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ios-tools.html",
+   "t": "SweK iOS Device Tools",
+   "d": "adb for iOS: install and drive doronz88/pymobiledevice3 through a read-only allowlist. Lists devices and apps, reads crash names and battery, over a normal pairing with no jailbreak.",
    "g": "",
    "p": 0
   },

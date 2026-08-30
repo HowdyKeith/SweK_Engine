@@ -127,14 +127,43 @@ console.log("\n  invisible: " + r.invisible.length + " / " + r.total + " pages (
 // now AT THEIR TEN-PAGE CAP, so the rest sit in Arriving with a reason recorded in UNPLACED. THE RATCHET IS
 // SUPPOSED TO GO DOWN AGAIN when a new section is named -- and naming it is Keith's call, because it decides
 // what the panel is ABOUT rather than merely where things go.
-const ARRIVING_BASELINE = 30;   // MEASURED ON THE RENDERED ROW (was 96, counting the source). MAY SHRINK, MAY NEVER GROW.   // v3226 -- MEASURED, and it is already too many. MAY SHRINK, MAY NEVER GROW.
+// *** v4155 -- THIS CHECK WAS A COUNT WEARING A RATIO'S SENTENCE, AND IT FIRED ON CORRECT BEHAVIOUR. ***
+// Keith: "is a gate going to error every time we get new arriving pages that dont have a folder? This error
+// doesnt sound like a problem." He is right, and THIS FILE'S OWN HISTORY ALREADY AGREED WITH HIM -- v3254, on
+// raising 15 to 16: "Arriving exists to hold new work before it settles; A GENUINELY NEW PAGE LANDING THERE IS
+// THE MECHANISM, NOT A LEAK."
+//
+// The mismatch is between the headline and the arithmetic. The headline says A CURATED FRONT CANNOT HOLD A
+// THIRD OF THE TREE -- a PROPORTION -- and the check compared an absolute count to a frozen number. So it had
+// to be raised every time the tree grew, even while the proportion was falling, and the raise notes above
+// (14 -> 15 -> 16 -> 30) are four rounds of somebody doing exactly that. MEASURED NOW: 41 of 424 pages is 9.7%.
+// The crisis that produced this check was 96 of 316, which is 30.4%. The check was failing three times further
+// from the failure than it was when it was written.
+//
+// So it asserts the ratio its own sentence names. The cap is 15%: comfortably under the 30% that started this,
+// comfortably over today's 9.7%, and it does not move when a page is added or when the tree grows -- ONLY when
+// the front actually starts filling again, which is the thing worth catching. THE RAW COUNT IS STILL PRINTED,
+// so nothing is hidden and a reader can still see the row growing.
+//
+// *** WHAT THIS DELIBERATELY GIVES UP: *** the old check would eventually force a trim by attrition, since
+// every new page reddened it. This one will not, and that is the trade -- a gate that cries wolf on the correct
+// action teaches people to raise its baseline without reading it, which is precisely what the four raises above
+// are. Nothing has EVER left this row; if the ratio climbs back toward the cap the answer is to trim rather
+// than to widen, and that sentence is the ratchet now.
+const ARRIVING_RATIO_CAP = 0.15;      // MAY SHRINK, MAY NEVER GROW.
+const ARRIVING_WATCH = 30;            // not a failure -- the count at which the report starts saying "look at this"
 
-    ok("!! *** the Arriving row has not grown -- a curated front cannot hold a third of the tree ***",
-        arriving <= ARRIVING_BASELINE,
-        arriving + " links against a baseline of " + ARRIVING_BASELINE + ", out of " + r.total +
-        " pages in the tree. ITS OWN COMMENT SAYS \"when a page stops being recent it drops off here\" AND " +
-        "NOTHING EVER HAS. Trimming is a judgement per page -- which pages have stopped being recent is not " +
-        "derivable -- so this holds the line rather than drawing one somebody has to obey");
+    const arrivingRatio = r.total ? arriving / r.total : 0;
+    ok("!! *** the Arriving row is not filling up -- a curated front cannot hold a third of the tree ***",
+        arrivingRatio <= ARRIVING_RATIO_CAP,
+        arriving + " links of " + r.total + " pages = " + (arrivingRatio * 100).toFixed(1) + "%, cap " +
+        (ARRIVING_RATIO_CAP * 100).toFixed(0) + "%. The crisis this check was written for was 96 of 316 (30.4%). " +
+        (arriving > ARRIVING_WATCH
+            ? "OVER THE WATCH LINE of " + ARRIVING_WATCH + " in absolute terms: nothing has ever LEFT this row, " +
+              "and its own comment says \"when a page stops being recent it drops off here\". Which pages have " +
+              "stopped being recent is Keith's judgement and is not derivable here, so this reports it rather " +
+              "than failing on it."
+            : "under the watch line of " + ARRIVING_WATCH + " as well."));
 }
 
 console.log(fails ? "\npageReach-selfcheck: " + fails + " FAILED" : "\npageReach-selfcheck: all checks pass");
