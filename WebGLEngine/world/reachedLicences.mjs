@@ -52,56 +52,63 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     {
-        repo: "codrops/ElasticProgress", licenceExists: true, publisher: "Codrops", year: 2015,
+        repo: "codrops/ElasticProgress", grantorHoldsRights: true, licenceExists: true, publisher: "Codrops", year: 2015,
         spdx: null, licence: CODROPS_2015, redistributable: false, posture: POSTURE.REACHED,
         taken: null, takenPaths: [],
+        // *** CITED, WHICH IS THE OPPOSITE OF TAKEN, AND THE SCAN CANNOT TELL THEM APART BY ITSELF. ***
+        // tools/ship/easingCurves-selfcheck.mjs names this repo in order to assert that elastic easing comes
+        // from PENNER and not from here -- a refusal being written down. Found by the byte-scan flagging it,
+        // the same way that scan found render/chuckCloseModel.mjs crediting kamend one round earlier. Two
+        // legitimate reasons to name a source, and neither is a leak: one took an idea and says so, the other
+        // took nothing and says that.
+        citedPaths: ["tools/ship/easingCurves-selfcheck.mjs"],
         why: "Needs GSAP, which this tree does not carry, and its SVG-morph half is already ui/svgPath.mjs. " +
              "The one transferable piece is an elastic easing curve, which simulation/easing.js lacks -- " +
              "a damped sinusoid, where easeOutBack overshoots exactly once.",
     },
     {
-        repo: "codrops/RainEffect", licenceExists: true, publisher: "Codrops", year: 2015,
+        repo: "codrops/RainEffect", grantorHoldsRights: true, licenceExists: true, publisher: "Codrops", year: 2015,
         spdx: null, licence: CODROPS_2015, redistributable: false, posture: POSTURE.REACHED,
-        taken: null, takenPaths: [],
+        taken: null, takenPaths: [], citedPaths: [],
         why: "Rain on glass -- droplets as refractive lenses over a background, with trails that merge. " +
              "Genuinely absent here: the tree's `raindrop` hits are hydraulic erosion and `droplet` is a " +
              "kaiju attack. Reachable as an idea; the bytes cannot be taken.",
     },
     {
-        repo: "codrops/HeatDistortionEffect", licenceExists: true, publisher: "Codrops", year: 2016,
+        repo: "codrops/HeatDistortionEffect", grantorHoldsRights: true, licenceExists: true, publisher: "Codrops", year: 2016,
         // *** NOT QUOTED, BECAUSE IT WAS NOT READ VERBATIM. *** The README points at the Codrops licence page
         // rather than restating it, and recording a paraphrase in a field the gate treats as a quotation is
         // how a register starts lying. Same publisher, same posture, text uncaptured -- said plainly.
         spdx: null, licence: null, licenceNote: "Codrops site licence, referenced by link rather than restated",
-        redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [],
+        redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
         why: "Already present by another route: bcs_heatShimmer shipped at v4164 from krispuckett/SwiftUIShaders " +
              "(MIT), CPU-modelled and verified bit-exact against the GPU at v4196.",
     },
     {
-        repo: "codrops/ParticleEffectsButtons", licenceExists: true, publisher: "Codrops", year: 2018,
+        repo: "codrops/ParticleEffectsButtons", grantorHoldsRights: true, licenceExists: true, publisher: "Codrops", year: 2018,
         spdx: null, licence: CODROPS_2018, redistributable: false, posture: POSTURE.REFUSED,
-        taken: null, takenPaths: [],
+        taken: null, takenPaths: [], citedPaths: [],
         why: "Refusable twice over. It depends on anime.js, which v4197 refused by name because its own rAF " +
              "loop is invisible to document.getAnimations() and therefore to engine/frameDirty.js. And its " +
              "effect is the element-to-particles idea of ZachSaucier/Disintegrate, which is MIT and needs no " +
              "dependency at all.",
     },
     {
-        repo: "ZachSaucier/Asset-Loading-Effects", licenceExists: false, publisher: "Zach Saucier", year: null,
+        repo: "ZachSaucier/Asset-Loading-Effects", grantorHoldsRights: true, licenceExists: false, publisher: "Zach Saucier", year: null,
         spdx: null, licence: null, licenceNote: "no LICENSE file and no licence section -- UNPAPERED",
-        redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [],
+        redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
         why: "No licence means no permission, so nothing can be taken regardless of merit -- the same posture " +
              "as Gixxern/JS---Webcam-effects. It does name a real gap: splat.load, realTerrain.load and " +
              "schematic.load fetch large assets and report no progress at all.",
     },
     {
-        repo: "gre/beez", licenceExists: true, publisher: "Zengularity", year: 2014,
-        spdx: "AGPL-3.0", licence: null, redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [],
+        repo: "gre/beez", grantorHoldsRights: true, licenceExists: true, publisher: "Zengularity", year: 2014,
+        spdx: "AGPL-3.0", licence: null, redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
         why: "AGPL-3.0's network clause makes it the strictest copyleft here; archived in 2022. And the idea " +
              "-- a phone as an XY-pad controller -- is already phone.html's joysticks sending movevec/lookvec.",
     },
     {
-        repo: "kamend/ChuckClose-SparkAR", licenceExists: false, publisher: "kamend", year: null,
+        repo: "kamend/ChuckClose-SparkAR", grantorHoldsRights: true, licenceExists: false, publisher: "kamend", year: null,
         spdx: null, licence: null, licenceNote: "a Spark AR project file with no licence shown",
         redistributable: false, posture: POSTURE.REACHED,
         taken: "render/chuckCloseModel.mjs -- the effect written from its description, with nothing copied",
@@ -109,7 +116,7 @@ export const REACHED_SOURCES = Object.freeze([
         // A module that took an IDEA must credit where it came from -- that is the provenance discipline
         // working, not a leak. The gate's byte-scan reads this list rather than a hardcoded allowance, so
         // crediting a source and smuggling one stay distinguishable.
-        takenPaths: ["render/chuckCloseModel.mjs"],
+        takenPaths: ["render/chuckCloseModel.mjs"], citedPaths: [],
         why: "The technique is decades older than any repository. Recorded because REACHED-with-something-taken " +
              "is the posture most likely to be mistaken for CAPTURED later.",
     },
@@ -131,8 +138,17 @@ export function validateEntry(e) {
     if (typeof e.licenceExists !== "boolean") {
         p.push(`${e.repo}: does not say whether a licence EXISTS -- distinct from whether we quoted it`);
     }
+    // *** REQUIRED, AND THAT IS THE WHOLE MECHANISM. *** A severity level nobody remembers to apply is a
+    // comment. Making the question mandatory at record time is what turns "did the grantor own this?" from
+    // something you think of when it occurs to you into something you cannot file an entry without answering.
+    // There is no null: an asset whose provenance has not been established is not yet an entry.
+    if (typeof e.grantorHoldsRights !== "boolean") {
+        p.push(`${e.repo}: does not say whether the GRANTOR HELD THE RIGHTS they licensed -- ` +
+               `a permissive licence from someone who did not own the work grants nothing`);
+    }
     if (!("taken" in e)) p.push(`${e.repo}: does not say what was taken (null is a real answer)`);
     if (!Array.isArray(e.takenPaths)) p.push(`${e.repo}: no takenPaths list -- the files allowed to name it`);
+    if (!Array.isArray(e.citedPaths)) p.push(`${e.repo}: no citedPaths list -- files that name it to record that nothing was taken`);
     else if (!e.taken && e.takenPaths.length) p.push(`${e.repo}: took nothing, yet lists files that took something`);
     if (!e.why) p.push(`${e.repo}: no reason recorded -- the reason is the whole point of the register`);
     // A source that may not be redistributed may not be vendored, so it cannot be VENDORABLE.
@@ -188,12 +204,32 @@ export function codropsDrift() {
  *   1 unpapered   no licence at all. No grant, but no terms either -- inert rather than hostile.
  *   2 no-redist   a bespoke licence permitting use and forbidding movement of the bytes (Codrops).
  *   3 reciprocal  strong copyleft, and AGPL's network clause reaches your own work even unshipped.
+ *   4 encumbered  a licence that EXISTS, reads as permissive, and was granted by someone who did not hold
+ *                 the rights they were granting.
  *
- * All of 1-3 come to the same practical answer for this tree -- do not vendor -- and they get there for
- * completely different reasons, which is exactly why one number beats one boolean. An AGPL body is the most
- * formidable not because it forbids the most but because its terms follow you home.
+ * All of 1-4 come to the same practical answer for this tree -- do not vendor -- and they get there for
+ * completely different reasons, which is exactly why one number beats one boolean.
+ *
+ * *** ENCUMBERED RANKS HIGHEST, AND NOT BECAUSE IT FORBIDS THE MOST. *** Every other posture announces
+ * itself: you read the licence and you know where you stand, and AGPL in particular is loud and honest about
+ * following your work home. Encumbrance is the one case where READING THE LICENCE GIVES YOU THE WRONG
+ * ANSWER, because the restriction reaches from OUTSIDE the agreement -- from a party who licensed you
+ * nothing, never agreed to anything, and whose rights no document in your possession can settle. It is the
+ * only posture you can walk into while doing everything right.
+ *
+ * *** THE WORKED CASE, WHICH IS WHY THIS CATEGORY EXISTS. *** Keith asked whether SweK's flight sims could
+ * use TIE fighter models. Fan-made ones are everywhere and many carry CC-BY from the modeller, sincerely
+ * meant. That licence is real and it covers what the modeller MADE -- the mesh, the topology, the texture
+ * work. It cannot cover Lucasfilm's design, because the modeller never held that. So the file reads
+ * licenceExists: true, redistributable: true by its own terms, and is still not vendorable.
+ *
+ * The practical answer was yes anyway, and for a reason this scale makes precise: ev/esShipModels.js (v3827)
+ * assigns models per ship class from a local file or URL and keeps the assignment as a string in
+ * localStorage. GPU_Assets/ships/ holds one README and no models. Nothing is redistributed when the bytes
+ * never leave the machine -- so encumbrance bites on VENDORING and not on USE, which is the distinction the
+ * rest of this register was already built on.
  */
-export const SEVERITY = Object.freeze({ OPEN: 0, UNPAPERED: 1, NO_REDISTRIBUTION: 2, RECIPROCAL: 3 });
+export const SEVERITY = Object.freeze({ OPEN: 0, UNPAPERED: 1, NO_REDISTRIBUTION: 2, RECIPROCAL: 3, ENCUMBERED: 4 });
 
 export function severityOf(e) {
     // *** THIS ASKED WHETHER THE LICENCE WAS QUOTED, NOT WHETHER ONE EXISTS. *** codrops/HeatDistortionEffect
@@ -201,6 +237,8 @@ export function severityOf(e) {
     // terms instead of restating them. "We did not copy the text" and "there is no text" are opposite facts,
     // and world/orrery.mjs draws exactly that line for vendored code. `licenceExists` is the field that
     // carries it, so a gap in OUR record can never be reported as a gap in THEIRS.
+    // Checked BEFORE the licence itself, because an encumbered file's licence is exactly what misleads.
+    if (e.grantorHoldsRights === false) return SEVERITY.ENCUMBERED;
     if (/^(AGPL|GPL|LGPL)/i.test(e.spdx || "")) return SEVERITY.RECIPROCAL;
     if (e.licenceExists === false) return SEVERITY.UNPAPERED;
     if (e.redistributable === false) return SEVERITY.NO_REDISTRIBUTION;

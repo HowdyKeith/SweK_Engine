@@ -8,6 +8,56 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4200 -- ENCUMBERED: the one posture where reading the licence gives you the wrong answer
+
+Keith asked whether SweK's flight sims could use TIE fighter models, and the answer needed a category
+`world/reachedLicences.mjs` did not have. It knew **UNPAPERED** (no licence) and **NO_REDISTRIBUTION** (a
+licence that forbids). It had no name for a licence that **exists**, reads as permissive, is sincerely meant,
+and is void as to the underlying rights.
+
+A fan-made `.glb` under CC-BY is exactly that. The modeller can license what they **made** -- the mesh, the
+topology, the texture work -- and cannot license Lucasfilm's design, because they never held it. So the file
+reads `licenceExists: true`, `redistributable: true` by its own terms, `spdx: CC-BY-4.0`, and is still not
+vendorable.
+
+### It ranks above AGPL, and not because it forbids more
+
+Every other posture announces itself: you read the licence and you know where you stand, and AGPL in
+particular is loud and honest about following your own work home. Encumbrance reaches from **outside the
+agreement** -- from a party who licensed you nothing, agreed to nothing, and whose rights no document in your
+possession can settle. It is the only posture you can walk into while doing everything right.
+
+### The mechanism is a required field, not a severity level
+
+A rank nobody remembers to apply is a comment. `grantorHoldsRights` is now **mandatory on every entry**, and
+`null` is not an answer -- an asset whose provenance is unestablished is not yet an entry. All seven existing
+sources answer it, and **zero are encumbered**. The category is defined before it was needed, which is the
+only time it can be defined calmly.
+
+`severityOf` checks it **before** the licence, because an encumbered file's licence is precisely what
+misleads. The gate's control is the assertion that matters: the same entry with that one field flipped
+classifies OPEN, so the classification is decided by whether the grantor held the rights and **not** by
+anything the licence text says.
+
+### And the practical answer was yes, for a reason the scale makes precise
+
+`ev/esShipModels.js` (v3827) assigns models per ship class from a local file or URL and keeps the assignment
+as a string in **localStorage**. `GPU_Assets/ships/` holds one README and no models; `ev/spriteHull.js` says
+of the Endless Sky art it lofts, *"GPLv3, nothing bundled"*. Nothing is redistributed when the bytes never
+leave the machine -- so **encumbrance bites on vendoring and not on use**, which is the distinction the rest
+of this register was already built on.
+
+### The gate found a second legitimate reason to name a source, having found the first one round ago
+
+Its byte-scan flagged `tools/ship/easingCurves-selfcheck.mjs` for containing the word "codrops" -- which it
+contains in order to assert that elastic easing comes from **Penner** and *not* from codrops. A refusal being
+written down. v4198's scan flagged `render/chuckCloseModel.mjs` for crediting what it took.
+
+Two opposite claims about a file, neither of them a leak: one took an idea and says so, the other took
+nothing and says that. So `citedPaths` now sits beside `takenPaths`, the allowance reads both, and the gate
+asserts **no path may be listed as both** -- they are contradictory claims about the same file.
+
+15 new checks, 4 sabotages all red. The tree carries 1281 gates.
 ## v4199 -- Three gaps closed with what was already here, and none of them vendored a byte
 
 ### 1. Disintegrate is thirty lines, because two earlier rounds did the work

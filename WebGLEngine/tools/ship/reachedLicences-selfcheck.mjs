@@ -79,7 +79,8 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     // took an IDEA must credit its origin, and that credit is the discipline working rather than a leak.
     // Derived from the register, so a new taking cannot quietly widen the allowance.
     const ALLOWED = new Set(["world/reachedLicences.mjs", "tools/ship/reachedLicences-selfcheck.mjs", "main.js",
-                             ...REACHED_SOURCES.flatMap((e) => e.takenPaths || [])]);
+                             ...REACHED_SOURCES.flatMap((e) => e.takenPaths || []),
+                             ...REACHED_SOURCES.flatMap((e) => e.citedPaths || [])]);
     const EXT = /\.(js|mjs|glsl|html|css|json)$/;
     const SKIP = /(^|\/)(node_modules|\.git|vendor)(\/|$)/;
     const files = [];
@@ -108,6 +109,17 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     ok(/ChuckClose-SparkAR/.test(read("render/chuckCloseModel.mjs")),
         "*** control: the one module that TOOK something names the source it took from -- the allowance above " +
         "is exercised, not merely declared ***");
+    // *** AND THE OTHER LEGITIMATE REASON TO NAME A SOURCE: TO RECORD THAT NOTHING WAS TAKEN. ***
+    // tools/ship/easingCurves-selfcheck.mjs names codrops/ElasticProgress in order to assert that elastic
+    // easing comes from PENNER instead. The byte-scan flagged it, exactly as it flagged the attribution case
+    // one round earlier -- two legitimate reasons to name a source, neither of them a leak.
+    const cited = REACHED_SOURCES.flatMap((e) => e.citedPaths || []);
+    ok(cited.length >= 1, `${cited.length} file(s) cite a source without taking from it: ${cited.join(", ")}`);
+    ok(cited.every((f) => fs.existsSync(path.join(ENG, f))), "and every cited path exists");
+    ok(/ElasticProgress/.test(read("tools/ship/easingCurves-selfcheck.mjs")),
+        "the citing file really does name it, so this allowance is exercised too");
+    ok(REACHED_SOURCES.every((e) => !(e.takenPaths || []).some((f) => (e.citedPaths || []).includes(f))),
+        "*** and no path is both TAKEN-from and CITED -- they are opposite claims about the same file ***");
     // A vendor directory for any of them would be the loudest possible failure.
     for (const e of nr) {
         const dir = path.join(ENG, "vendor", e.repo.split("/").pop().toLowerCase());
@@ -136,8 +148,56 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     const bodies = asBodies();
     ok(bodies.length === REACHED_SOURCES.length && bodies.every((b) => b.vendored === false),
         "the register hands the orrery bodies, every one of them un-vendored by definition");
-    ok(bodies.every((b) => Number.isInteger(b.severity) && b.severity >= 0 && b.severity <= 3),
+    ok(bodies.every((b) => Number.isInteger(b.severity) && b.severity >= 0 && b.severity <= 4),
         "and each carries a severity the orrery can draw as heft -- a restrictive licence should be a bigger planet");
+}
+
+// 4b) *** ENCUMBERED: THE ONE POSTURE WHERE READING THE LICENCE GIVES THE WRONG ANSWER. ***
+{
+    ok(SEVERITY.ENCUMBERED === 4 && SEVERITY.ENCUMBERED > SEVERITY.RECIPROCAL,
+        `encumbrance outranks even AGPL (${SEVERITY.ENCUMBERED} vs ${SEVERITY.RECIPROCAL}) -- not because it ` +
+        "forbids more, but because every other posture ANNOUNCES itself and this one does not");
+
+    // The worked case: a fan model under a real, sincerely-meant CC-BY from someone who made the mesh and
+    // did not own the design.
+    const fanModel = { repo: "(a fan-made .glb of someone else's design)", spdx: "CC-BY-4.0",
+                       licenceExists: true, redistributable: true, grantorHoldsRights: false };
+    ok(severityOf(fanModel) === SEVERITY.ENCUMBERED,
+        "*** an SPDX id, licenceExists true and redistributable true, and it still classifies ENCUMBERED -- " +
+        "the modeller can license the mesh and topology they made, never the design they did not ***");
+
+    // *** THE CONTROL, AND IT IS THE ASSERTION THAT MATTERS. *** The same entry, one field flipped, is OPEN.
+    // So the classification is decided by whether the grantor held the rights, and NOT by anything the
+    // licence file says -- which is the entire claim this category makes.
+    const owned = { ...fanModel, grantorHoldsRights: true };
+    ok(severityOf(owned) === SEVERITY.OPEN,
+        "control: flip that one field and the identical licence is OPEN -- so the licence text is not what decides");
+
+    // The question is REQUIRED, which is the mechanism. A severity nobody remembers to apply is a comment.
+    const noAnswer = { repo: "x", posture: POSTURE.REACHED, licenceExists: true, redistributable: false,
+                       taken: null, takenPaths: [], citedPaths: [], why: "because", spdx: "MIT" };
+    ok(validateEntry(noAnswer).some((p) => /GRANTOR HELD THE RIGHTS/.test(p)),
+        "*** an entry that does not answer it is INVALID -- the question cannot be skipped at record time ***");
+    ok(validateEntry({ ...noAnswer, grantorHoldsRights: true }).length === 0,
+        "and answering it makes the same entry valid, so the requirement is the only thing it was missing");
+    ok(validateEntry({ ...noAnswer, grantorHoldsRights: null }).some((p) => /GRANTOR/.test(p)),
+        "null is not an answer either -- an asset whose provenance is unestablished is not yet an entry");
+
+    // And the state of the tree: nothing recorded is encumbered.
+    const enc = REACHED_SOURCES.filter((e) => severityOf(e) === SEVERITY.ENCUMBERED);
+    ok(enc.length === 0,
+        `no source in the register is encumbered${enc.length ? ": " + enc.map((e) => e.repo).join(", ") : ""} -- ` +
+        "the category is defined before it was needed, which is the only time it can be defined calmly");
+    ok(REACHED_SOURCES.every((e) => typeof e.grantorHoldsRights === "boolean"),
+        `and all ${REACHED_SOURCES.length} existing entries answer the question, rather than it applying only to new ones`);
+
+    // The worked case is written down, including the half that says USE is fine.
+    const pr = prose(read("world/reachedLicences.mjs"));
+    ok(/TIE fighter/.test(pr), "the module records the case that produced the category");
+    ok(/esShipModels|localStorage/.test(pr),
+        "*** and the half that matters practically: encumbrance bites on VENDORING, not on USE -- " +
+        "ev/esShipModels.js keeps a model assignment as a string in localStorage and the repo ships no model ***");
+    ok(/never leave the machine|not redistributed/i.test(pr), "stated as a principle, not just as one product's behaviour");
 }
 
 // 5) PURITY, AND THE REGISTER IS DATA.
