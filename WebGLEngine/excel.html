@@ -50,8 +50,9 @@ became SweK. This page is where that work attaches to this install.</p>
 
 <h2>2 &middot; The four parts</h2>
 <div class="card">
-  <p style="margin-top:0"><small>A folder is recognised by <b>module name, not folder name</b> &mdash; yours can be called anything. A part needs <b>two decisive markers</b>, modules only it has. <b><code>Shared/Net/</code> in this repository is the trap this is built around:</b> it carries three of the transmitter's Winsock modules because its README says they were extracted from it, so those three <i>corroborate</i> and never decide. A folder with no decisive marker is reported <b>unclassified</b>, not guessed at.</small></p>
-  <table><thead><tr><th>part</th><th>what it is</th><th>here?</th><th>modules</th><th>the fragment already in this tree</th></tr></thead><tbody id="parts"><tr><td colspan="5" class="n">press Scan</td></tr></tbody></table>
+  <p style="margin-top:0"><small>A folder is recognised by <b>module name, not folder name</b> &mdash; yours can be called anything. A part needs <b>two decisive markers</b>, modules only it has. <b><code>Shared/Net/</code> in this repository is the trap this is built around:</b> it carries three of the transmitter's Winsock modules because its README says they were extracted from it, so those three <i>corroborate</i> and never decide. A folder with no decisive marker is reported <b>unclassified</b>, not guessed at &mdash; and a VBA folder sitting <i>inside</i> a linked part is listed as that part's <b>sub-folder</b>, not as a stranger.</small></p>
+  <p><small><b>Corrected against a real archive at v4160.</b> <code>SweK_VBA_v3499</code>: transmitter <b>195</b>, engine <b>263</b>, connector <b>64</b>, sync core <b>4</b>, plus 69 more in <code>VBAEngine/addons/VBAOpenGL_Demos</code>. v4159's guessed markers linked <b>two</b> of the four &mdash; the transmitter on 9 of 9 and the connector on 2 of 2 &mdash; and missed the other two <b>by exactly one marker each</b>. The threshold was not moved; the markers were widened from the listing. Two guesses were wrong: the render engine declares GL in <code>GLConstants.bas</code>, <b>not</b> the voxel workbook's <code>modGLConstants.bas</code>, so the two workbooks share nothing and the tie v4159 built a branch for does not exist here; and three of <code>VBASyncCore</code>'s four names had already been deleted &mdash; by the very changelog entry v4159 copied them out of.</small></p>
+  <table><thead><tr><th>part</th><th>what it is</th><th>here?</th><th>modules</th><th>sub-folders</th><th>the fragment already in this tree</th></tr></thead><tbody id="parts"><tr><td colspan="6" class="n">press Scan</td></tr></tbody></table>
   <div id="uncl"></div>
 </div>
 
@@ -95,11 +96,11 @@ became SweK. This page is where that work attaches to this install.</p>
   no copy of the archive. <b>What is measured:</b> the recogniser and the refusals &mdash; scanning this whole
   repository links <b>zero of four</b> parts and calls <code>Shared/Net/</code> unclassified, which is the
   correct answer and is asserted by <code>tools/ship/vbaArchive-selfcheck.mjs</code>. <b>What is not:</b>
-  everything past &ldquo;Excel answered&rdquo; &mdash; assembling a workbook, running a macro, and the marker
-  lists themselves. Those names were read out of this tree's changelog and notes, not out of a directory
-  listing of the archive, so the manifest reports itself <code>provisional</code> until a real archive has been
-  scanned. If a part classifies wrong, the fix is to widen its markers from that listing &mdash; never to lower
-  the threshold until something matches.
+  everything past &ldquo;Excel answered&rdquo; &mdash; assembling a workbook and running a macro. <b>The marker
+  lists are no longer among the unverified:</b> at v4159 they came from this tree's changelog and notes and the
+  manifest reported itself <code>provisional</code>; at v4160 a real archive was scanned, two of the four
+  marker sets were found wrong, and both were widened <b>from its listing</b>. The threshold was never lowered.
+  If a future archive classifies badly, that is still the only correct move.
 </div>
 
 <p><a href="/server.html">&larr; back to the front door</a></p>
@@ -124,8 +125,12 @@ function render(s) {
             "<td><small>" + esc(p.what) + "</small></td>" +
             "<td>" + (p.present ? '<span class="y">linked</span><br><small>' + esc(p.dir) + "</small>" : '<span class="n">not linked</span>') + "</td>" +
             "<td>" + (p.present ? p.sources : "&mdash;") +
-                (p.modulesRecorded != null ? '<br><small>recorded: ' + p.modulesRecorded +
+                (p.present && p.importable !== p.sources ? '<br><small>' + p.importable + " importable</small>" : "") +
+                (p.modulesRecorded != null ? '<br><small>archive: ' + p.modulesRecorded +
                     (p.countsAgree === false ? ' <span class="w">(differs)</span>' : "") + "</small>" : "") + "</td>" +
+            "<td><small>" + ((p.subFolders || []).length
+                ? p.subFolders.map((f) => esc(f.name) + " (" + f.sources + ")").join("<br>")
+                : '<span class="n">&mdash;</span>') + "</small></td>" +
             "<td><small>" + (p.inTreeFragment ? esc(p.inTreeFragment) : '<span class="n">none</span>') + "</small></td></tr>").join("");
     }
     const u = s.unclassified || [];

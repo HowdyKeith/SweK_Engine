@@ -29,8 +29,9 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { PARTS, PART_IDS, MIN_DECISIVE, PROVISIONAL, VBA_EXT, DOC_MODULE,
-         classifyFolder, linkReport, moduleKey, isVbaSource, nameHint, scorePart } from "../../vba/archiveManifest.mjs";
+import { PARTS, PART_IDS, MIN_DECISIVE, PROVISIONAL, READ_AGAINST, VBA_EXT, DOC_MODULE,
+         classifyFolder, linkReport, moduleKey, isVbaSource, nameHint, scorePart,
+         importableCount } from "../../vba/archiveManifest.mjs";
 import { noComments, codeOnly } from "./sourceScan.mjs";
 
 const ENG  = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -54,21 +55,29 @@ ok("!! no marker is both decisive AND shared for one part",
     PARTS.every((p) => !(p.decisive || []).some((d) => (p.shared || []).map(moduleKey).includes(moduleKey(d)))),
     "a module cannot both decide and merely corroborate");
 {
-    // A DECISIVE MARKER MUST NOT BE DECISIVE FOR TWO PARTS AT THE SAME SCORE-BREAKING WEIGHT... except one is,
-    // deliberately: modGLConstants belongs to both workbooks, which is the tie the classifier reports as
-    // low-confidence rather than resolving by coin toss. Asserted as an EXACT SET so a second overlap cannot
-    // be added silently and inherit that excuse.
+    // *** v4160 -- THIS WAS "EXACTLY ONE OVERLAP, AND IT IS modGLConstants". THE REAL ARCHIVE SAYS ZERO. ***
+    // v4159 put modGLConstants in BOTH workbooks' decisive lists on the reasoning that a GL renderer must
+    // declare GL, and built a low-confidence tie branch to handle the collision it had just created. The
+    // renderer declares GL in `GLConstants.bas`; only the voxel workbook has `modGLConstants.bas`. Checked
+    // across all five folders of SweK_VBA_v3499. So the parts are cleanly separable and the correct assertion
+    // is that NOTHING is shared -- which is strictly stronger, and would have caught the original mistake.
     const seen = new Map();
     for (const p of PARTS) for (const d of (p.decisive || [])) {
         const k = moduleKey(d); seen.set(k, (seen.get(k) || []).concat(p.id));
     }
     const overlaps = [...seen.entries()].filter(([, ids]) => ids.length > 1).map(([k, ids]) => k + " -> " + ids.join("+"));
-    ok("!! exactly one decisive marker is shared between parts, and it is modGLConstants",
-        overlaps.length === 1 && overlaps[0] === "modglconstants -> engine+connector", overlaps.join("; ") || "none");
+    ok("!! NO decisive marker is shared between parts", overlaps.length === 0, overlaps.join("; ") || "none -- the four parts are cleanly separable");
+    ok("!! and the two GL constants modules are genuinely different names",
+        moduleKey("GLConstants.bas") !== moduleKey("modGLConstants.bas"),
+        "GLConstants (render engine) vs modGLConstants (voxel workbook) -- v4159 assumed one module, there are two");
 }
-ok("!! the manifest still declares itself provisional",
-    PROVISIONAL === true,
-    "no real archive has been scanned here; take this down only against a directory listing");
+ok("!! the manifest is no longer provisional, because a real archive was read",
+    PROVISIONAL === false && READ_AGAINST === "SweK_VBA_v3499",
+    "corrected against " + READ_AGAINST + " -- markers widened from its listing, threshold untouched");
+ok("!! document modules do not inflate a folder's module count",
+    importableCount(["modGL.bas", "ThisWorkbook.cls", "Sheet2.cls", "OpenGLWindow.cls"]) === 2,
+    "VBASyncCore holds 4 .bas/.cls and TWO are ThisWorkbook/Sheet2 -- reporting 4 overstates the smallest " +
+    "part by a factor of two, and two markers out of two importable modules is a far stronger reading");
 ok("!! document modules are excluded by pattern, not by hope",
     DOC_MODULE.test("ThisWorkbook") && DOC_MODULE.test("Sheet3") && !DOC_MODULE.test("modGPUBrain"),
     "ThisWorkbook/Sheet* cannot be imported, only pasted -- so they are never markers");
@@ -126,14 +135,19 @@ console.log("\n4. the recogniser");
 {
     // Written out module-by-module ON PURPOSE. Deriving a fixture from PARTS would make this section pass for
     // any marker list at all, including an empty one -- the gate would co-vary with the thing it checks.
+    // *** EVERY MODULE NAME BELOW WAS READ OUT OF SweK_VBA_v3499 AND VERIFIED EXCLUSIVE TO ITS FOLDER
+    // ACROSS ALL FIVE. *** v4159's version of this list was written from changelog prose and got two of the
+    // four wrong -- the engine's GL module and three of VBASyncCore's four names, which a changelog entry the
+    // manifest itself cited had already recorded as deleted.
     const cases = [
         ["transmitter", "VBATransmitter", ["WinsockDeclares.bas", "WinsockUtils.bas", "modTaskerHost.bas",
                                            "BonjourUtils.bas", "clsMQTTClient.cls", "clsStringBuilder.cls"]],
-        ["engine",      "VBAEngineCore",  ["Demo_BridgeFPS.cls", "modGLConstants.bas", "modInit.bas",
+        ["engine",      "VBAEngine",      ["GLConstants.bas", "OpenGLRenderer.cls", "OpenGLWindow.cls",
+                                           "modWGLContext.bas", "Demo_BridgeFPS.cls", "modInit.bas",
                                            "modHAInstall.bas", "ThisWorkbook.cls"]],
         ["connector",   "VBAVoxelEngine", ["modGLConstants.bas", "modOllamaInit.bas", "modEngineBridge.bas"]],
-        ["smaller",     "VBASyncCore",    ["VBASyncImport.cls", "VBASyncECS.bas", "VBASyncEngine.bas",
-                                           "VBASyncGitHub.bas"]],
+        ["smaller",     "VBASyncCore",    ["VBASyncEngine.bas", "VBASyncBootstrap.bas",
+                                           "ThisWorkbook.cls", "Sheet2.cls"]],
     ];
     for (const [want, name, modules] of cases) {
         const c = classifyFolder({ name, modules });
@@ -146,12 +160,16 @@ console.log("\n4. the recogniser");
     // A FOLDER THE NAME ALONE WOULD CONVICT.
     const named = classifyFolder({ name: "VBATransmitter", modules: ["Readme.bas"] });
     ok("!! the folder name alone never decides", named.part === null, named.reason);
-    // THE GENUINE TIE, reported as one.
-    const tie = classifyFolder({ name: "workbook", modules: ["modGLConstants.bas", "Demo_BridgeFPS.cls", "modOllamaInit.bas"] });
-    ok("!! engine vs connector ties are reported, not coin-tossed",
+    // A TIE, CONSTRUCTED RATHER THAN FOUND -- and that change is itself the v4160 finding. In v4159 this case
+    // was a real overlap between the two workbooks; the archive showed there is none, so a folder that ties
+    // now has to be BUILT by mixing two parts' markers. The branch is still exercised, because an archive
+    // somebody merges by hand could still produce one, but it is no longer claimed to exist in this archive.
+    const tieMods = ["GLConstants.bas", "Demo_BridgeFPS.cls", "modGLConstants.bas", "modOllamaInit.bas"];
+    const tie = classifyFolder({ name: "workbook", modules: tieMods });
+    ok("!! a folder mixing two parts' markers is reported as a tie, not coin-tossed",
         tie.part !== null && tie.confidence === "low" && tie.runnerUp && tie.runnerUp.score === tie.score,
         tie.part + " over " + (tie.runnerUp || {}).id + " -- " + tie.reason);
-    const tieNamed = classifyFolder({ name: "VBAVoxelEngine", modules: ["modGLConstants.bas", "Demo_BridgeFPS.cls", "modOllamaInit.bas"] });
+    const tieNamed = classifyFolder({ name: "VBAVoxelEngine", modules: tieMods });
     ok("!! and the folder name breaks that tie toward the connector", tieNamed.part === "connector", tieNamed.reason);
     // AN EMPTY FOLDER SAYS SO IN ITS OWN WORDS rather than sharing the generic refusal.
     const empty = classifyFolder({ name: "docs", modules: ["README.md", "notes.txt"] });
@@ -167,20 +185,40 @@ console.log("\n5. a fixture archive, on disk");
         fs.mkdirSync(d, { recursive: true });
         for (const n of names) fs.writeFileSync(path.join(d, n), "Attribute VB_Name = \"x\"\n");
     };
+    // LAID OUT LIKE THE REAL ARCHIVE: the four parts as siblings, plus a stray. VBASyncCore is its own
+    // top-level folder in SweK_VBA_v3499 -- v4159's fixture buried it under VBAEngine/addons/, which is where
+    // the DEMOS live, and that mistake is why the nesting rule below had to be discovered from the real thing.
     put("VBATransmitter", ["WinsockDeclares.bas", "modWebGLEngineHost.bas", "modControlPanelHost.bas", "clsWebsocketClient.cls"]);
-    put("VBAEngineCore",  ["Demo_BridgeFPS.cls", "modGLConstants.bas", "modInit.bas"]);
+    put("VBAEngine",      ["GLConstants.bas", "OpenGLRenderer.cls", "modWGLContext.bas", "Demo_BridgeFPS.cls"]);
     put("VBAVoxelEngine", ["modOllamaInit.bas", "modGLConstants.bas", "modEngineBridge.bas"]);
-    put("VBAEngine/addons/VBAOpenGL_Demos", ["VBASyncImport.cls", "VBASyncECS.bas", "VBASyncEngine.bas", "VBASyncGitHub.bas"]);
+    put("VBASyncCore",    ["VBASyncEngine.bas", "VBASyncBootstrap.bas", "ThisWorkbook.cls", "Sheet2.cls"]);
+    put("VBAEngine/addons/VBAOpenGL_Demos", ["AntColonyVisualizer.cls", "ComputeBoidSystem.cls", "CameraEffectSystem.cls"]);
     put("notes", ["scratch.bas"]);
     const r = await bridge.scan(tmp);
     ok("!! all four parts link", r.present === 4 && r.linked === true, r.summary);
     ok("!! and the stray folder is unclassified, not forced into a bucket",
         r.unclassified.length === 1 && r.unclassified[0].rel === "notes", (r.unclassified[0] || {}).reason);
-    ok("!! the nested addons folder is reached at depth 3", r.parts.find((p) => p.id === "smaller").present === true,
+    // *** v4160 -- THE NESTING RULE, WHICH THE REAL ARCHIVE TAUGHT. *** VBAEngine/addons/VBAOpenGL_Demos holds
+    // 69 modules and carries no decisive marker of its own, so v4159 reported it "unclassified" -- true in the
+    // narrow sense and useless in every other, since it sits INSIDE the engine folder linked directly above
+    // it. Three such folders came back as strangers on the first real scan and buried the one folder that
+    // genuinely was unrecognised. Containment is by DIRECTORY, so a name cannot fool it.
+    const eng = r.parts.find((p) => p.id === "engine");
+    ok("!! a VBA folder inside a linked part is reported as that part's sub-folder, not a stranger",
+        eng.subFolders.length === 1 && /VBAOpenGL_Demos$/.test(eng.subFolders[0].rel) &&
+        !r.unclassified.some((u) => /VBAOpenGL_Demos/.test(u.rel)),
+        "engine sub-folders: " + eng.subFolders.map((f) => f.rel + " (" + f.sources + ")").join(", "));
+    ok("!! the nested folder is reached at depth 3 at all",
+        eng.subFolders.length === 1,
         "an archive nests addons/VBAOpenGL_Demos/, so MAX_DEPTH " + bridge.MAX_DEPTH + " is not decoration");
+    ok("!! and document modules are excluded from the importable count",
+        r.parts.find((p) => p.id === "smaller").sources === 4 &&
+        r.parts.find((p) => p.id === "smaller").importable === 2,
+        "VBASyncCore: 4 files, 2 of them ThisWorkbook/Sheet2 -- so TWO importable modules, both of them markers");
     ok("!! a count that disagrees with the recorded one is REPORTED, not judged",
         r.parts.find((p) => p.id === "transmitter").countsAgree === false && r.ok === true,
-        "fixture has 4 modules against 189 recorded -- the archive is the authority on its own size");
+        "fixture has 4 modules against 195 recorded -- the archive is the authority on its own size, and " +
+        "SweK_VBA_v3499 already disagreed with this tree's notes in both directions (189->195, 73->64)");
     ok("!! each linked part carries the folder it was found in", r.parts.filter((p) => p.present).every((p) => p.dir && fs.existsSync(p.dir)));
     // TWO COPIES: the fuller one wins, so a half-extracted zip beside a whole one does not win by being first.
     put("old/VBATransmitter", ["modWebGLEngineHost.bas", "modTaskerHost.bas"]);

@@ -45,11 +45,28 @@
 //   modEngineBridge.bas .......................................... Shared/ -- IN THIS TREE, hence shared
 //   VBASyncImport.cls, VBASyncECS.bas, VBASyncEngine.bas, VBASyncGitHub.bas .. docs/CHANGELOG.md 10643
 //
-// *** AND THE MANIFEST IS PROVISIONAL UNTIL A REAL ARCHIVE HAS BEEN READ. *** These names are every name this
-// tree records; they are not a directory listing of a folder anyone has opened here. `provisional: true` says
-// so in the data rather than in a comment, the page prints it, and the honest response to a real archive that
-// classifies badly is to widen the markers from ITS listing -- not to loosen the threshold until something
-// matches.
+// *** v4160 -- A REAL ARCHIVE HAS NOW BEEN READ, AND IT CORRECTED THIS FILE ON A POINT v4159 ASSERTED. ***
+// SweK_VBA_v3499.zip, scanned through the bridge: VBATransmitter 195 modules, VBAEngine 263,
+// VBAVoxelEngine 64, VBASyncCore 4, plus VBAEngine/addons/VBAOpenGL_Demos at 69. v4159's markers linked TWO of
+// the four -- the transmitter on 9 of 9 guesses, the connector on 2 of 2 -- and MISSED the other two, each by
+// exactly one marker. The threshold was not the problem and was not moved. The markers were widened from the
+// listing, which is what v4159 said the honest response would be.
+//
+// *** THE CORRECTION: THE TWO WORKBOOKS DO NOT SHARE A GL CONSTANTS MODULE, AND v4159 SAID THEY DID. ***
+// NOTES.md 7358 counted 81 Public Const in `modGLConstants.bas` while verifying THE VOXEL WORKBOOK, and v4159
+// generalised that to the render engine on the reasoning that a GL renderer must declare GL. The renderer does
+// -- in `GLConstants.bas`, a DIFFERENT MODULE. Verified across all five folders: `modGLConstants` appears only
+// in VBAVoxelEngine, `GLConstants` only in VBAEngine. So the deliberate tie v4159 built the low-confidence
+// branch around DOES NOT EXIST in this archive, and the gate now asserts that no decisive marker is shared at
+// all. The tie-breaking code stays -- it is still the right behaviour if an archive ever does tie -- but it is
+// no longer asserted as a fact about this one.
+//
+// AND VBASyncCore HAD LOST THREE OF ITS FOUR MARKERS ALREADY: docs/CHANGELOG.md 10643 records VBASyncImport,
+// VBASyncECS and VBASyncGitHub being deleted as stale, and v4159 read that line and copied the names out of it
+// anyway. What survives is VBASyncEngine plus VBASyncBootstrap, which that entry never mentioned.
+//
+// The counts below are now THE ARCHIVE'S, not the tree's older notes (189 and 73). Where those disagree the
+// archive wins: it is the thing being described.
 
 /** VBA source extensions. `.frm` brings a `.frx` binary companion, which is not source and is not imported. */
 export const VBA_EXT = new Set([".bas", ".cls", ".frm"]);
@@ -61,8 +78,11 @@ export const DOC_MODULE = /^(ThisWorkbook|Sheet\d+|Workbook|UserForm\d*)$/i;
  *  copying a single module out of the transmitter to read it would otherwise relabel the folder it landed in. */
 export const MIN_DECISIVE = 2;
 
-/** The archive is provisional until a real one has been read. See the header. */
-export const PROVISIONAL = true;
+/** No longer provisional: SweK_VBA_v3499 has been scanned and the markers below come from its listing. */
+export const PROVISIONAL = false;
+
+/** The archive this manifest was corrected against, so a later reader knows which one the counts describe. */
+export const READ_AGAINST = "SweK_VBA_v3499";
 
 export const PARTS = [
     {
@@ -70,8 +90,9 @@ export const PARTS = [
         title: "VBA transmitter",
         what: "Winsock, and the HTTP / WebSocket / MQTT servers built on top of it. The one part that can HOST: " +
               "it serves the panels itself, so the bridge works with Node down.",
-        // Shared/Net/README.md: "The full transmitter (189 modules ...)". Recorded, not counted here.
-        modulesRecorded: 189,
+        // COUNTED in SweK_VBA_v3499. Shared/Net/README.md says 189; the archive holds 195, and the archive
+        // is the authority on its own size. All nine markers below were verified present in it.
+        modulesRecorded: 195,
         folderHints: ["vbatransmitter", "transmitter", "vbasmarttransmitter", "smarttransmitter"],
         decisive: ["modWebGLEngineHost", "modControlPanelHost", "modTaskerHost", "BonjourUtils",
                    "clsMQTTClient", "clsWebsocketClient", "clsWebsocketCore", "clsStringBuilder", "JSONParser"],
@@ -88,9 +109,15 @@ export const PARTS = [
         title: "VBA OpenGL render engine",
         what: "The workbook that renders through real OpenGL/D3D11 from VBA. Declares its own GL entry points, " +
               "which is why it stays a separate project from the connector workbook.",
-        modulesRecorded: null,
+        modulesRecorded: 263,
         folderHints: ["vbaengine", "vbaenginecore", "openglengine", "vbaopengl"],
-        decisive: ["Demo_BridgeFPS", "modGLConstants"],
+        // *** WIDENED FROM SweK_VBA_v3499's LISTING, AND EVERY ONE WAS CHECKED AGAINST ALL FIVE FOLDERS. ***
+        // v4159 guessed `modGLConstants` here and scored 1 -- one short of the threshold, so the largest part
+        // of the archive went unclassified. These eight are the renderer's actual GL surface: the WGL context
+        // it creates, the declares it makes, the FreeGLUT it binds, and its own GLConstants (NOT the voxel
+        // workbook's modGLConstants -- see the header).
+        decisive: ["GLConstants", "OpenGLFacade", "OpenGLRenderer", "OpenGLWindow",
+                   "modWGLContext", "modGL_Declares", "modFreeGLUT", "Demo_BridgeFPS"],
         shared: ["modInit", "modHAInstall", "modEngineBridge"],
         port: null,
         role: "render",
@@ -101,8 +128,9 @@ export const PARTS = [
         title: "VBA -> SweK Engine connector workbook",
         what: "The workbook wired to THIS engine: it POSTs entity state to /bridge/game_tick each tick and " +
               "drains the directives the browser queued. What the Excel AI Brains panel is reading.",
-        // WebGLEngine/NOTES.md 7358, verified there against the real workbook: "73 .bas/.cls (was 74)".
-        modulesRecorded: 73,
+        // NOTES.md 7358 verified 73 against a LATER workbook; SweK_VBA_v3499 holds 64. Both markers below
+        // were found in it, and both are exclusive to it across the whole archive.
+        modulesRecorded: 64,
         folderHints: ["vbavoxelengine", "voxelengine", "connector", "swekconnector"],
         decisive: ["modOllamaInit", "modGLConstants"],
         shared: ["modEngineBridge", "modInit"],
@@ -115,9 +143,16 @@ export const PARTS = [
         title: "smaller VBA parts",
         what: "The sync tool that explodes a workbook to source and back, and the demo addons. Deliberately " +
               "kept OUT of the engine workbooks -- its exports share names with theirs.",
-        modulesRecorded: null,
+        // Four files, two of them ThisWorkbook/Sheet2 document modules -- so TWO importable modules, and both
+        // are markers. The smallest part in the archive and the one with the least room for a coincidence.
+        modulesRecorded: 4,
         folderHints: ["vbasynccore", "vbasync", "addons", "vbaopengl_demos", "demos"],
-        decisive: ["VBASyncImport", "VBASyncECS", "VBASyncEngine", "VBASyncGitHub"],
+        // *** THREE OF v4159'S FOUR NAMES WERE ALREADY DELETED WHEN IT COPIED THEM. *** docs/CHANGELOG.md
+        // 10643 records VBASyncImport, VBASyncECS and VBASyncGitHub being removed as stale -- the same line
+        // v4159 cited as the source for them. VBASyncBootstrap is what took their place and that entry never
+        // named it, which is precisely why a manifest built from changelog prose had to be checked against a
+        // listing before it could stop calling itself provisional.
+        decisive: ["VBASyncEngine", "VBASyncBootstrap"],
         shared: [],
         port: null,
         role: "tooling",
@@ -138,6 +173,19 @@ export function moduleKey(name) {
 export function isVbaSource(name) {
     const m = /\.([a-z]+)$/i.exec(String(name || ""));
     return !!m && VBA_EXT.has("." + m[1].toLowerCase());
+}
+
+/**
+ * How many of these are modules you could actually IMPORT.
+ *
+ * v4160 -- ADDED BECAUSE THE REAL ARCHIVE MADE THE PLAIN COUNT MISLEADING AT ITS SMALLEST PART. VBASyncCore
+ * holds four .bas/.cls, and two of them are ThisWorkbook.cls and Sheet2.cls -- document modules, which the VBE
+ * cannot import and which every workbook has. Reporting "4 modules" for a part with TWO of its own overstates
+ * the smallest folder by a factor of two, and it is the one folder where that matters, since two markers out of
+ * two importable modules is a much stronger reading than two out of four.
+ */
+export function importableCount(moduleNames) {
+    return (moduleNames || []).filter((n) => isVbaSource(n) && !DOC_MODULE.test(String(n).replace(/\.[a-z]+$/i, ""))).length;
 }
 
 /** Does the folder NAME look like this part? Corroboration only -- never decides, see the header. */
@@ -172,9 +220,10 @@ export function classifyFolder({ name = "", modules = [] } = {}) {
                         .sort((a, b) => (b.score - a.score) || ((b.hint ? 1 : 0) - (a.hint ? 1 : 0)));
     const top = scored[0], next = scored[1];
     const sources = (modules || []).filter(isVbaSource).length;
+    const importable = importableCount(modules);
     if (!top || top.score < MIN_DECISIVE) {
         return { part: null, score: top ? top.score : 0, decisive: top ? top.decisive : [], shared: top ? top.shared : [],
-                 hint: !!(top && top.hint), confidence: "none", sources, runnerUp: null,
+                 hint: !!(top && top.hint), confidence: "none", sources, importable, runnerUp: null,
                  reason: sources === 0 ? "no VBA source files here"
                        : "no part reached " + MIN_DECISIVE + " decisive markers (best: " +
                          (top ? top.id + " with " + top.score : "none") + ")" };
@@ -185,7 +234,7 @@ export function classifyFolder({ name = "", modules = [] } = {}) {
     const confidence = tied ? "low" : (winner.score >= 3 || winner.hint ? "high" : "medium");
     return {
         part: winner.id, score: winner.score, decisive: winner.decisive, shared: winner.shared,
-        hint: winner.hint, confidence, sources,
+        hint: winner.hint, confidence, sources, importable,
         runnerUp: tied ? { id: (winner === top ? next : top).id, score: next.score } : null,
         reason: tied
             ? "tied with " + (winner === top ? next : top).id + " on " + winner.score + " decisive marker(s)" +
@@ -217,13 +266,33 @@ export function linkReport(found = []) {
             id: p.id, title: p.title, what: p.what, role: p.role, port: p.port,
             modulesRecorded: p.modulesRecorded, inTreeFragment: p.inTreeFragment,
             present: !!hit, dir: hit ? hit.dir : null, sources: hit ? hit.sources : 0,
+            importable: hit ? hit.importable : 0, rel: hit ? hit.rel : null,
             confidence: hit ? hit.confidence : null,
             // A count that disagrees with the recorded one is REPORTED, not judged: the archive is the
             // authority on its own size and this tree's note may simply be older than the folder.
             countsAgree: (hit && p.modulesRecorded != null) ? (hit.sources === p.modulesRecorded) : null,
         };
     });
-    const unclassified = found.filter((f) => f && !f.part && (f.sources || 0) > 0);
+    // *** v4160 -- A FOLDER INSIDE A LINKED PART IS THAT PART'S, NOT A STRANGER. ***
+    // The real archive made this obvious the first time it was scanned: VBAEngine/addons/VBAOpenGL_Demos (69
+    // modules), VBAVoxelEngine/graphics and VBAVoxelEngine/wad all came back "unclassified", which is true in
+    // the narrow sense that none carries a decisive marker and useless in every other sense -- they are parts
+    // OF the folders sitting linked directly above them. Reporting them as strangers buried the ONE folder in
+    // that archive that genuinely was unrecognised. Containment is by directory, so it cannot be fooled by a
+    // name; a sub-folder is listed under its parent part and never counted as a miss.
+    const inside = (child, parent) => {
+        if (!child || !parent) return false;
+        const c = String(child).replace(/\\/g, "/"), p = String(parent).replace(/\\/g, "/");
+        return c !== p && c.startsWith(p.replace(/\/+$/, "") + "/");
+    };
+    for (const p of parts) {
+        p.subFolders = !p.dir ? [] : found.filter((f) => f && !f.part && (f.sources || 0) > 0 && inside(f.dir, p.dir))
+                                        .map((f) => ({ rel: f.rel || f.name, name: f.name, sources: f.sources,
+                                                       importable: f.importable, sample: f.sample || [] }));
+    }
+    const nested = new Set(parts.flatMap((p) => (p.subFolders || []).map((s2) => s2.rel)));
+    const unclassified = found.filter((f) => f && !f.part && (f.sources || 0) > 0 &&
+                                             !nested.has(f.rel || f.name));
     const present = parts.filter((p) => p.present).length;
     return {
         ok: true, provisional: PROVISIONAL, parts, unclassified,

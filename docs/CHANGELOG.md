@@ -8,6 +8,70 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4160 -- the archive arrived, and corrected the manifest built to receive it
+
+`SweK_VBA_v3499.zip`, extracted and scanned through v4159's own bridge:
+
+| folder | modules | importable | v4159 verdict |
+|---|---|---|---|
+| `VBATransmitter` | 195 | 193 | **linked**, 9 of 9 guessed markers present |
+| `VBAEngine` | 263 | 261 | **missed** -- scored 1, one short |
+| `VBAVoxelEngine` | 64 | 61 | **linked**, 2 of 2 |
+| `VBASyncCore` | 4 | 2 | **missed** -- scored 1, one short |
+| `VBAEngine/addons/VBAOpenGL_Demos` | 69 | 67 | reported unclassified |
+
+**Two of four linked, and both misses were by exactly one marker.** The threshold was not moved -- v4159 wrote
+in advance that the honest response to a bad classification is to widen the markers from the archive's listing,
+never to lower the bar until something matches. That is what happened.
+
+#### Wrong guess 1: the two workbooks do not share a GL constants module
+
+`NOTES.md` 7358 counted 81 `Public Const` in `modGLConstants.bas` while verifying **the voxel workbook**, and
+v4159 generalised that to the render engine on the reasoning that a GL renderer must declare GL. It does -- in
+**`GLConstants.bas`**, a different module. Checked across all five folders: `modGLConstants` appears only in
+`VBAVoxelEngine`, `GLConstants` only in `VBAEngine`.
+
+So the deliberate tie v4159 built its low-confidence branch around **does not exist**. The parts are cleanly
+separable, and the gate now asserts **zero** shared decisive markers -- strictly stronger than "exactly one, and
+it is modGLConstants," and it would have caught the original mistake. The tie-breaking code stays, since a
+hand-merged archive could still produce one, but the tie is now *constructed* in the fixture rather than claimed
+as a fact about this archive.
+
+The engine's real markers are its OpenGL surface: `GLConstants`, `OpenGLFacade`, `OpenGLRenderer`,
+`OpenGLWindow`, `modWGLContext`, `modGL_Declares`, `modFreeGLUT`, `Demo_BridgeFPS` -- all eight verified present
+in `VBAEngine` and absent from every other folder.
+
+#### Wrong guess 2: three of `VBASyncCore`'s four names were already deleted
+
+`docs/CHANGELOG.md` 10643 records `VBASyncImport`, `VBASyncECS` and `VBASyncGitHub` being removed as stale --
+and that is **the same line v4159 cited as the source for those names**. What survives is `VBASyncEngine` plus
+`VBASyncBootstrap`, which the entry never mentions.
+
+A manifest built from changelog prose had to be checked against a directory listing before it could stop calling
+itself provisional, and this is exactly why. `provisional` is now `false`, and `READ_AGAINST` names the archive
+that corrected it.
+
+#### Two things the real archive taught that no fixture had
+
+**A VBA folder inside a linked part is that part's sub-folder, not a stranger.** `VBAOpenGL_Demos` (69 modules),
+`VBAVoxelEngine/graphics` and `VBAVoxelEngine/wad` all came back "unclassified" on the first scan. True in the
+narrow sense that none carries a decisive marker; useless in every other, since each sits inside a folder linked
+directly above it -- and it buried the one folder that genuinely was unrecognised. Containment is by **directory**,
+so a name cannot fool it.
+
+**Document modules must not inflate a count.** `VBASyncCore` holds four `.bas/.cls`, two of them `ThisWorkbook.cls`
+and `Sheet2.cls`. Reporting "4 modules" overstates the smallest part by a factor of two -- and *two markers out of
+two importable modules* is a far stronger reading than two out of four. `importableCount` is now reported beside
+`sources` wherever they differ.
+
+#### The counts disagreed with this tree, in both directions
+
+`Shared/Net/README.md` says the transmitter is 189 modules; the archive holds **195**. `NOTES.md` verified 73 for
+the voxel workbook; this archive holds **64**. Both were reported by `countsAgree` rather than judged, because the
+archive is the authority on its own size. The recorded figures are now the archive's.
+
+After the correction: **4 of 4 parts linked at high confidence, zero unclassified folders.** Gate count unchanged
+at 1246 gates.
 ## v4159 -- the VBA half, linked into the install rather than copied into the tree
 
 Keith: *"i want to get the vba achives linked into the SweK install. I have the last vba archive, which connects
