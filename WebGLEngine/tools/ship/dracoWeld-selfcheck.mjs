@@ -309,9 +309,59 @@ console.log("\n*** WELDING IS REACHABLE FROM THE WRITER, NOT ONLY FROM THIS GATE
         "epsilon. WHAT COUNTS AS 'THE SAME VERTEX' IS A DECISION and it belongs to whoever is exporting");
 }
 
+// ---- 7. A REAL DRACO GLB FROM KHRONOS, WHICH THIS GATE PREVIOUSLY HAD TO SAY IT DID NOT HAVE ------------------
+//
+// v4174 shipped the router and closed with a stated gap: "an actual Draco-compressed GLB decoded end to end.
+// No such file exists in this tree." Sections 1-3 above route files OUR OWN WRITER produced, which means the
+// router had only ever been shown declarations this tree wrote itself. gpu/khronosSamples.mjs found eighteen
+// models published in a Draco variant; ABeautifulGame's is a self-contained .glb, and BOTH ITS ENCODINGS ARE
+// PUBLISHED -- the same fifteen primitives, Draco and plain -- which makes it a matched pair rather than a
+// single example.
+//
+// The fixtures are HEADER-ONLY: the genuine 12-byte header and JSON chunk of each, with the BIN chunk removed
+// (22 KB and 32 KB, against 12 MB and 43 MB). That is not a shortcut around the check -- routeFor reads the
+// JSON chunk and NOTHING ELSE, so the fixture is byte-for-byte what the router actually looks at. It does mean
+// this section proves ROUTING and not DECODING, which the closing note still says, because a routing pass that
+// was allowed to read as a decode pass would be worse than the gap it replaced.
+// Licence: CC-BY-4.0, credit carried in gpu/fixtures/PROVENANCE.md. See there for why that had to be checked.
+{
+    const fx = (n) => { const b = fs.readFileSync(path.join(ENG, "gpu", "fixtures", n)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
+    const draco = fx("ABeautifulGame-draco.header.glb");
+    const plain = fx("ABeautifulGame-plain.header.glb");
+
+    const rd = routeFor(draco), rp = routeFor(plain);
+    ok("a REAL Draco-compressed GLB routes to the decoder", rd.ok && rd.route === "draco", rd.why);
+    ok("   ...because the file REQUIRES the extension, not merely uses it", rd.verdict.inRequired === true,
+        "extensionsRequired is the spec's word and overrides what we think we could otherwise parse");
+    ok("   ...and every one of its primitives is compressed",
+        rd.verdict.dracoPrimitives === 15 && rd.verdict.totalPrimitives === 15,
+        rd.verdict.dracoPrimitives + " of " + rd.verdict.totalPrimitives + " primitives carry the extension");
+    ok("   ...so it is not the declared-but-unused case", rd.verdict.declaredButUnused === false,
+        "a real compressed file and the informational-declaration case must not land in the same branch");
+
+    ok("THE SAME MODEL's plain encoding routes to the plain parser", rp.ok && rp.route === "plain", rp.why);
+    ok("   ...with the same primitive count, so the pair differs ONLY in encoding",
+        rp.verdict.totalPrimitives === rd.verdict.totalPrimitives,
+        "both 15 primitives -- the router is separating them on the extension and not on some other difference");
+    ok("   ...and claims no Draco at all", rp.verdict.inUsed === false && rp.verdict.dracoPrimitives === 0,
+        "a false positive here would send a readable file to a 256 KB decoder for nothing");
+
+    // the loader dispatch, not just the verdict
+    const seen = [];
+    await loadGlb(draco, { parsePlain: async () => { seen.push("plain"); }, parseDraco: async () => { seen.push("draco"); } });
+    await loadGlb(plain, { parsePlain: async () => { seen.push("plain"); }, parseDraco: async () => { seen.push("draco"); } });
+    ok("   ...and loadGlb actually CALLS the loader each one routed to", seen.join(",") === "draco,plain",
+        "dispatched: " + seen.join(", "));
+
+    // and the size difference the extension exists for, measured on the real files these were cut from
+    report("the full files these fixtures were cut from are 12,105,252 bytes Draco against 42,977,928 plain " +
+           "-- 3.55x, measured by fetching both, not quoted from the extension's documentation");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-            "\nunchecked here: an actual Draco-compressed GLB decoded end to end. No such file exists in this " +
-            "tree and this round wrote no encoder -- draco.js DECODES ONLY, and neither it nor glb-shrink " +
-            "ships an encoder we could vendor. The decode path is upstream's, unmodified, and the detection " +
-            "that routes files to it is what is gated above.");
+            "\nunchecked here: an actual Draco-compressed GLB DECODED end to end. Section 7 closes half of what this " +
+            "note used to say -- a real Khronos Draco GLB now routes here, correctly, alongside the same model's " +
+            "plain encoding -- but ROUTING IS NOT DECODING, and the decode still needs the full 12 MB and a " +
+            "browser. This round wrote no encoder either: draco.js DECODES ONLY, and neither it nor glb-shrink " +
+            "ships an encoder we could vendor. The decode path is upstream's, unmodified.");
 process.exit(fails ? 1 : 0);

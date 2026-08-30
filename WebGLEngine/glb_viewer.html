@@ -33,6 +33,7 @@
     <input id="url" type="text" placeholder="…or a GLB URL" autocomplete="off">
     <button id="btnUrl">⬇ Load</button>
     <button id="btnFox" title="Load the Khronos Fox sample (skinned, 3 animations)">🦊 Fox</button>
+    <select id="khronos" title="Khronos glTF sample assets — streamed from Khronos, not stored here"><option value="">Khronos sample…</option></select>
     <select id="clip" title="Animation clip"></select>
     <button id="btnPlay">⏸ Pause</button>
     <button id="btnLoop" title="Loop">🔁 Loop</button>
@@ -53,7 +54,12 @@ import { GLTFLoader } from "/vendor/three/jsm/loaders/GLTFLoader.js";
 import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 
-const FOX_URL = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
+import { models, model, urlFor, licenceFor, mayVendor } from "/gpu/khronosSamples.mjs";
+
+// v4175 -- the Fox button used to be the only Khronos model this viewer could reach, as a URL pasted inline,
+// and its provenance was invisible: nothing in the tree said where that fox came from or what its licence
+// was. gpu/khronosSamples.mjs carries all 150, and the URL is now BUILT rather than written out.
+const FOX_URL = urlFor("Fox", "glTF-Binary").url;
 const $ = (id) => document.getElementById(id);
 const msg = (t) => { $("msg").textContent = t || ""; };
 $("btnBack").addEventListener("click", () => location.href = "/phone.html");
@@ -200,6 +206,37 @@ tick();
 $("file").addEventListener("change", async (e) => { const f = e.target.files?.[0]; if (!f) return; await loadArrayBuffer(await f.arrayBuffer(), f.name); });
 $("btnUrl").addEventListener("click", () => loadUrl($("url").value.trim()));
 $("btnFox").addEventListener("click", () => { $("url").value = FOX_URL; loadUrl(FOX_URL); });
+
+// v4175 -- only the SELF-CONTAINED variants are offered. A .gltf variant is a manifest whose buffers and
+// textures are separate files beside it, so loading one by URL fetches the JSON and none of the model --
+// urlFor() reports that as kind "needs-siblings" rather than leaving it to fail at parse time.
+{
+    const sel = $("khronos");
+    const entries = [];
+    for (const name of models()) {
+        for (const v of model(name).variants) {
+            const u = urlFor(name, v);
+            if (u.ok && u.kind === "self-contained") { entries.push({ name, variant: v, url: u.url }); break; }
+        }
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const e of entries) {
+        const o = document.createElement("option");
+        o.value = e.url; o.textContent = e.name;
+        // *** THE LICENCE IS ON THE OPTION, BECAUSE "KHRONOS PUBLISHED IT" IS NOT A LICENCE AND FOR TWO OF
+        // *** THESE IT IS NOT EVEN CLOSE. BrainStem is under a Poser EULA and Duck under Sony's SCEA licence.
+        // Streaming either into this viewer is fine -- the browser fetches it, nothing is redistributed --
+        // but somebody reading this list should not have to find that out later.
+        const l = licenceFor(e.name), v = mayVendor(e.name);
+        o.title = e.name + " (" + e.variant + ")\n" +
+                  (l.read ? "licence: " + l.spdx.join(", ") + (l.who ? " -- " + l.who : "") : "licence: not read yet") +
+                  "\nstream: yes. vendor: " + (v.ok ? "yes" + (v.needsAttribution ? ", with attribution" : "") : "NO -- " + v.why);
+        if (l.posture === "restricted") o.textContent = e.name + " \u26a0";
+        sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => { const u = sel.value; if (u) { $("url").value = u; loadUrl(u); } });
+    msg(entries.length + " Khronos samples available (streamed from Khronos, none stored here)");
+}
 $("clip").addEventListener("change", (e) => playClip(parseInt(e.target.value, 10)));
 $("btnPlay").addEventListener("click", () => { playing = !playing; if (action) action.paused = !playing; $("btnPlay").textContent = playing ? "⏸ Pause" : "▶ Play"; });
 $("btnLoop").addEventListener("click", () => { loopOn = !loopOn; $("btnLoop").style.opacity = loopOn ? "1" : "0.5"; if (current != null) playClip(current); });

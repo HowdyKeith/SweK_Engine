@@ -8,6 +8,62 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4175 -- not every Khronos sample asset is free, and two of the famous ones are not
+
+Keith asked what else we can stream from Khronos, because it could change the Little Prince view. Answering it
+properly meant fetching the catalogue rather than recalling it, and the catalogue had a finding in it.
+
+*** THE ASSUMPTION EVERYONE MAKES ABOUT THESE MODELS IS FALSE, AND IT IS FALSE FOR TWO OF THE BEST-KNOWN. ***
+BrainStem is licensed LicenseRef-Poser-EULA -- Smith Micro Software's Poser EULA, not an open licence at all.
+Duck is SCEA Shared Source License 1.0, Sony's, from 2006. Both are in the CORE set, both appear in every glTF
+tutorial ever written, and "Khronos published it as a sample, so it must be free" is wrong about both. Read from
+each model's own metadata.json, not inferred.
+
+New gpu/khronosSamples.mjs carries all 150 models with their variants and tags, taken from the repository's own
+Models/model-index.json. Sixteen have had their licence actually read; the other 134 have not, AND THE MODULE
+SAYS SO BY NAME rather than guessing from the pattern of the ones that were. mayVendor() FAILS CLOSED in both
+directions, which is two different mistakes and not one: treating UNREAD as permitted would wave through 134
+models nobody looked at, and treating READ as permitted would wave through BrainStem and Duck. It clears 14 of
+150 where a not-known-bad rule would clear 148 -- the gate pins both numbers so the closed default cannot
+quietly become the open one.
+
+The distinction the whole module is organised around is STREAM versus VENDOR, and it is the same one the orrery
+draws between a body SweK reaches and a body SweK has captured. Streaming is a fetch the user's own browser
+makes: nothing is redistributed, and it stays permitted for all 150 including the restricted two. Vendoring puts
+the bytes in this repository and ships them to everyone who clones it.
+
+*** THE GATE CAUGHT A REAL BUG IN MY OWN URL BUILDER, ON EXACTLY THE TWO MODELS DESIGNED TO CATCH IT. *** The
+first draft encoded the two directory segments and not the filename. Two models here have names that are not
+URL-safe -- "Box With Spaces", whose entire purpose is to be awkward, and a unicode one -- and their filenames
+repeat the model name, so the URL came out with the directory escaped and raw spaces left in the file part.
+Both now resolve: fetched live, HTTP 200.
+
+*** AND IT CLOSED HALF OF WHAT v4174'S DRACO GATE HAD TO ADMIT IT COULD NOT CHECK. *** That gate's closing note
+said, in as many words, that no actual Draco-compressed GLB existed in this tree to test the router against --
+so the router had only ever been shown declarations this tree wrote itself. Eighteen of these models publish a
+Draco variant. ABeautifulGame publishes BOTH encodings of the same fifteen primitives, Draco and plain, which
+makes it a matched pair rather than one example: 12,105,252 bytes against 42,977,928, a 3.55x reduction
+measured by fetching both. The real Draco file routes to the decoder on extensionsRequired with 15 of 15
+primitives compressed; the plain one routes to the plain parser with the same 15 primitives, so the router is
+separating them on the extension and not on some other difference.
+
+The fixtures committed are HEADER-ONLY -- the genuine header and JSON chunk with the BIN chunk removed, 22 KB
+and 32 KB instead of 12 MB and 43 MB. That is not a shortcut around the check: routeFor reads the JSON chunk and
+nothing else, so the fixture is byte-for-byte what the router looks at. It does mean the section proves ROUTING
+and not DECODING, and the closing note now says which half is closed instead of quietly dropping the caveat.
+ABeautifulGame is CC-BY-4.0, so the credit ships with the bytes in gpu/fixtures/PROVENANCE.md -- MaterialX
+Project (ASWF), glTF conversion by Ed Mackey -- verified by reading its LICENSE.md rather than assumed.
+
+glb_viewer.html could reach exactly ONE Khronos model before this, as a URL pasted inline, which is why nobody
+could remember where its fox came from. It now offers 119 -- every model with a self-contained variant, because
+a .gltf variant is a manifest whose buffers sit in separate files beside it and loading one by URL fetches the
+JSON and none of the model. Each entry carries its licence in the tooltip and the restricted two are marked,
+so nobody has to find out afterwards.
+
+The Fox itself, since it started this: PixelMannen's model is CC0, the rig and animation are tomkranis's under
+CC-BY-4.0, and the glTF conversion is @AsoboStudio and @scurest's. Vendorable, with the credit attached.
+
+Gate count 1257 gates.
 ## v4174 -- three things that skip work, and two of them were wrong in a way that still passed
 
 Draco routing, dirty-flag rendering, and sprite slicing -- the three Keith asked to finish before the orrery.
