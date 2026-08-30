@@ -8,6 +8,384 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4189 -- the git log is the universe's seed, and a gas giant bug that 419 checks never saw
+
+Keith asked for the ES planets in the github demos, "as processes determined on a github log" -- run the
+simulation twice and get the same result unless the repository changed.
+
+**The planets turned out to be free.** world/procPlanet.js has zero Math.random, is mulberry32-seeded, its own
+header already claimed "same seed -> byte-identical planet", and it already carried 419 checks. Proven here:
+seed 12345 bakes to 6aedfe21ec2f0a5c twice. So the round was about the *seed*.
+
+**The SHA alone is not it, and that is a fact about this repository.** Nine of the fourteen vendored bodies
+share one first commit -- 66db97c45b52, where vendor/ was first added -- so seeding on the hash would hand
+box3d, fonts, gifenc, htmx, jolt, krbn, slug, three and wasm the same planet. The name is folded in with it,
+and all fourteen now seed distinctly. **All forty characters are folded**, not the first eight:
+`sha.slice(0, 8)` is the obvious one-liner, throws away 128 of 160 bits, and is exactly the abbreviation git
+prints -- so two commits that look different in a log could seed identically.
+
+**The claim is gated, not promised.** Two builds of an unchanged repository are identical field for field, and
+all fourteen planet surfaces are byte-identical. Change one commit hash and **exactly one** planet changes,
+while every orbit stays put -- because orbits come from dates and worlds come from hashes.
+
+**Then the seeded planets found a real bug in procPlanet.** Two bodies with different seeds wore an identical
+world. Gas giants had `seaLevel: 1.0`, and surfaceColor asks `height < seaLevel` -- true for every pixel -- so
+the latitudinal banding it had just computed was overwritten with flat sea on every one. Both gas giants
+painted the same featureless brown disc, byte-identical at 64x32, 128x64 *and* 256x128, despite different
+noise seeds and frequencies. A gas giant has no sea: the level is 0, the band ramp covers the whole range, and
+a meridian now shows 9 distinct latitude colours instead of one. procPlanet's own 419 checks never looked at
+what a gas giant painted.
+
+A generated surface is never allowed to pass for a measured one. A micro planet wears either its real file
+tree (every ridge a file, every lake a data file) or a world generated from its commit, and the caption names
+which, plus the commit and the seed.
+
+**And Keith's next question found a regression v4187 had just shipped.** He asked whether the GPU brain would
+benefit from the dungeon's escape clause. It could not: PATCH-B14's flow-field hook read
+`if (!m.step && window.sampleBrainPlayerFlow)`, and v4187's new `if (!m.step) ... continue` above it meant
+m.step was always set by that line. Dead code that still read as wired, and nothing went red. The hook now
+lives where the wall-follower is built -- which *is* the "BFS found no path" branch it was written for -- and
+steers the opening direction only. Per-step steering would abandon the wall and lose the hand rule's
+guarantee, the same lesson v4187 measured and rejected for extend-and-choose; a one-time hint costs at worst
+the long way round.
+
+62 new checks across tools/ship/orrerySeed-selfcheck.mjs and the dungeon gate, 7 sabotages all red and all
+files restored byte-identical. The tree now carries 1271 gates.
+## v4188 -- a live camera frame as a GL texture, and the keyer the tree never had
+
+Keith sent eight webcam-effect repositories. **The recommendation was to port none of them.**
+
+Two of the eight state a licence at all: positlabs/spark-hypersampler and EvanBacon/Expo-Crossy-Road, both
+MIT. The other six show none, which under v4186's posture makes them REACHED and not CAPTURED -- readable,
+not vendorable. Of the two that are licensed, one is a Spark AR project file and the other is a game rather
+than an effect. So the round took the ideas and wrote the parts this tree actually lacked.
+
+**The survey found something better than any of the eight.** getUserMedia appears in *twelve* files here --
+MediaPipe face and hand tracking, speech, avatarstage, gesture-vfx -- and video-as-a-GL-texture appeared in
+none of them, only inside vendored three.js. The engine's whole shader chain (bad-TV v4182, aquarelle v4177,
+the DOOM fire v4178, phosphor, swiftShader) had never been pointed at a webcam. render/cameraTexture.js is
+about thirty lines of texImage2D-per-frame and makes every one of them a live effect without writing a new
+effect. It also reports honestly to engine/frameDirty.js: a 30fps camera on a 60Hz display has nothing new to
+say every other frame, and a *missing* camera reports dirty rather than quiet, which is the direction that
+rule has to fail in.
+
+**And there was no chroma key.** All fifteen occurrences of "chroma" in the tree were chromatic *aberration*,
+plus one comment about chroma subsampling. The only real one is main.js:29871, where `window._stageBackdrop`
+is documented as "(e.g. green/blue for chroma)" and used as the clear colour. The engine could **produce** a
+green screen and could not **key one out** -- it had the source side and not the keying side. Now the round
+trip closes on itself, which is a thing none of the eight repos can do.
+
+**The algorithm was measured, not chosen.** Fourteen labelled pixels against a real cloth green
+[0.05, 0.75, 0.15] -- wrong answers: RGB distance 3, YCbCr 2, chromaticity 1, and the minimum of the last two
+**0**. That is not tuning, it is two failures at opposite ends of the light:
+
+- a **shadowed fold** keeps its hue and loses its chroma, so YCbCr calls it a different colour and leaves a
+  green hole in the matte. Chromaticity has divided brightness out and gets it right.
+- a **blown highlight** loses its hue -- light floods every channel and it drifts toward white -- so
+  chromaticity says "not green". Its absolute chroma is still large, so YCbCr gets it right.
+
+Plus a **dark floor**, which is a rule and not a fudge: chromaticity divides by brightness, so a near-black
+pixel has arbitrary hue, and without the floor every pupil, nostril and hair shadow whose noise lands on the
+key is punched transparent. Holes in the middle of a face. Below the floor a pixel is declared subject: an
+unlit pixel is not a green screen, whatever its ratios say.
+
+**The shader is compared to the model, not trusted to resemble it.** Two implementations of one rule drift,
+and the drift is silent -- the CPU gate stays green while the screen shows something else. So
+camera-effects.html uploads a known image, runs the *real* fragment shader, reads the pixels back, and diffs
+against the CPU model. Measured in headless Chromium: **0.0000 on all five probe pixels**, identical at 8-bit
+readback, shadowed fold and blown highlight included.
+
+Chuck Close is the one effect in the eight repos this tree has in no form (kamend/ChuckClose-SparkAR shows no
+licence, so the technique was derived from its description and nothing copied). The thing a naive version
+gets wrong is point-sampling the cell instead of averaging it: that is one line shorter and gives a mosaic of
+*noise* that crawls as the subject breathes. The model averages every pixel of the cell; the shader takes 5x5
+taps because a camera texture is NPOT with no mipmaps and there is no textureLod to average with. Measured
+gap between the two: median **0.0000**, worst 0.1020, and only **12 of 256** cells over 0.02 -- all of them
+cells a hard edge crosses, where 25 taps quantise a step edge into fifths. Interior cells are exact.
+
+90 new checks in tools/ship/cameraEffects-selfcheck.mjs, 8 sabotages all red and all files restored
+byte-identical. One of those sabotages passed on the first attempt: the gate asked whether the pass file
+contained "throw new Error" anywhere, so replacing the shader-COMPILE throw with a console.warn left it green
+because the LINK throw still matched. A check that one of two guards exists is not a check that both do. The
+tree now carries 1270 gates.
+## v4187 -- the dungeon monsters stopped cheating, and did not start stalling
+
+Keith remembered heroes walking through walls in the dungeon demo. It was real, and it had been there since
+v1400. simulation/DungeonAI.js wrote a monster's position in exactly **two** places and only **one** of them
+checked isWall: the flee branch wrapped it in tryMove() and even slid along the wall when blocked, while the
+chase branch did `m.x += ...` with no test at all. Worse, its "no path found" fallback was a straight line at
+the player -- which fires *precisely* when a wall is in the way. Measured before the fix: a monster crossed a
+solid stone column with no door and spent **17 frames standing inside it**.
+
+**The obvious fix was the wrong one, and Keith said so.** Refusing the move only trades a monster that cheats
+for a monster standing at the wall waiting to be killed. So when the path is gone it now puts a hand on the
+wall and walks: simulation/wallFollow.mjs, the right-hand rule, four cell lookups per step.
+
+**Three things the rule got wrong, each found by running it rather than reading it.**
+
+1. In **open space**, "turn right" every step walks a 2x2 circle -- four steps and back to the start. A
+   monster that lost its path mid-room would spin on the spot and trip its own loop detector. With nothing
+   adjacent to touch it now walks straight until a wall turns up.
+2. Walking east into a north-south wall, the wall is dead **ahead**. Locking the hand to RIGHT turned it
+   south and left the wall on its LEFT, so the next step dutifully turned away and it peeled back into the
+   room -- it reached the wall, took one step along it, and left. The hand now locks only when the wall is
+   genuinely on a side.
+3. A free-standing pillar defeats the right-hand rule entirely. That is its known limit, stated rather than
+   hidden, and the loop is **detected** on a repeated (cell, **facing**) state. Keyed on the cell alone, an
+   ordinary corridor -- which doubles back constantly -- would read as a loop and the monster would give up
+   in a hallway.
+
+**Keith's second idea was built, measured, and left off.** "Extend left and right, then choose": probe each
+way out of a junction and take the one that lands nearest the player. Four scoring rules over four mazes,
+steps to reach the goal:
+
+    fixture                            hand only   dist to goal   dist minus run   longest run
+    split room, door at the bottom            13          never               11         never
+    door at the TOP instead                   21          never            never         never
+    S-bend corridor                           21             21               21            21
+    alcove trap near the goal                 15             23               23            23
+
+The plain hand is the only rule that arrives every time, and is fastest or tied on three of the four. This is
+not a tuning failure: every score there is a **distance**, and a distance is blind to the wall between you and
+the goal. On the split room it probes one cell north -- a dead end, but plainly "closer" to a player who is
+east -- over three cells south, which is the run that holds the door. extend() and chooseTurn() ship as
+primitives because the probe is genuinely useful and because the next person to have this idea should find
+the numbers rather than repeat the experiment; chooseTurn refuses to act without a goal, and DungeonAI passes
+none.
+
+Behaviour now: a wall with no door stops them and they give up rather than orbiting it; a wall **with** a door
+does not stop them -- they follow the wall, find it, come through, and BFS picks the chase back up on the far
+side; an open room is still just a straight chase, with no follower ever allocated. 60 new checks in
+tools/ship/dungeonWalls-selfcheck.mjs, 4 sabotages all red, both files restored byte-identical. DungeonAI had
+no gate at all before this round. The tree now carries 1269 gates.
+## v4186 -- the orrery's view: micro planet to terrain, and two wrong answers that rendered
+
+Last round shipped the orrery's data model and deliberately left the view unbuilt. This is the view, built on
+the zoom axis Keith described: **micro planet -> github terrain view.** Three magnifications of one dataset --
+SYSTEM (everything under vendor/ in orbit around SweK), PLANET (one body as a micro planet whose surface is
+its own file tree), TERRAIN (that same tree as ground, through the world/repoHeightfield.js built at v4126).
+
+**The level is read off the magnification, never set beside it.** levelFor(apparentPx(body, pxPerUnit))
+returns which of the three you are at, so there is no mode flag that could say "planet" while the body on
+screen is four pixels wide. The thresholds are 120px and 900px, both chosen from what the scale can show:
+under 120px a micro planet is a dot with no readable surface, and vendor/krbn's 233 files are under 4px each
+at 900px across.
+
+**Both bugs this round were false accusations that looked completely fine on screen.**
+
+1. buildOrrery read only `b.paths`. The baked orrery.json carries `files` and no `paths`, so every body loaded
+   in the browser got licenceFor(undefined), came back UNPAPERED, and the page drew all 14 dependencies in the
+   ratchet's red -- at the same moment the node gate read 12 as CAPTURED. Nothing threw.
+2. ui/orreryDraw.js indexed `field.water[idx]` as a per-cell wet mask. repoHeightfield's `water` is
+   { areas, ways } -- polygons -- so that index is undefined for every cell and every lake would have been
+   painted as dry ground. The per-cell tell that does exist is biome id 0. vendor/krbn really does have 5607
+   wet cells from 116 Karabiner .json configs.
+
+**And a third, caught by the screenshots disagreeing with the gate.** ageDays used Math.round on a fractional
+day count, so a body aged a day at NOON: node read krbn at a = 9.60 while a browser running that same evening
+drew it at a = 10.20 off the same orrery.json. Now Math.floor, and checked at eight hours of the day rather
+than only at midnight -- which is the one instant where round and floor agree, and is all the old checks ever
+looked at.
+
+orrery.json is baked by tools/ship/orreryBake.mjs and holds the **raw scan, not the built system**: every age
+in a built orrery is measured against the day it was baked, so a baked orrery would begin lying the next
+morning. drift() compares the bake against a live scan and names which body changed rather than saying
+"something differs".
+
+Measured: 14 bodies, 12 CAPTURED, box3d and htmx UNPAPERED against a baseline of 2. Eight bodies are
+co-orbital at a = 9.60 -- they arrived on the day vendor/ was first committed, so they share an axis exactly,
+share a period exactly, and never separate; they are drawn on one labelled ring at different phases, and their
+LABELS are decluttered rather than their positions, which are the measurement. 78 new checks in
+tools/ship/orreryView-selfcheck.mjs, 8 sabotages all red and all files restored byte-identical. The tree
+now carries 1268 gates.
+## v4185 -- the orrery's data model, and two vendored bodies with no paperwork
+
+Keith asked for this first and it has waited three rounds behind the three things he wanted done before it --
+Draco routing, the dirty flag and sprite slicing, all shipped at v4174. His design, in his words: "swek at
+center, and repos place into orbit with swek... some big, some small... some energetic, some we just crush
+other projectiles into them, so it ejects what we want." And then: "over time".
+
+*** THIS ROUND IS THE DATA MODEL AND NOT THE VIEW, DELIBERATELY. AN ORRERY WHOSE BODIES ARE INVENTED IS A
+SCREENSAVER. *** Every field comes from something already in the tree and checkable: the directories under
+vendor/, the licence files inside them, and the date git says each first appeared. A renderer written against
+this is graded against the same facts; written the other way round, the picture would decide what was true.
+
+*** THE CAPTURE STATE IS THE LICENCE, WHICH IS THE WHOLE POINT OF THE METAPHOR. *** "Crush other projectiles
+into them, so it ejects what we want" is vendoring exactly: you cannot take the whole body, so you take the
+fragment you are permitted to take. CAPTURED means vendored with provenance in the tree; REACHED means used
+but not taken (streamed or linked -- the same line gpu/khronosSamples.mjs draws); UNPAPERED means the bytes
+are here and nothing says they may be.
+
+*** AND THE SCAN FOUND TWO UNPAPERED BODIES: vendor/box3d AND vendor/htmx. *** Twelve of the fourteen carry
+provenance. Those two carry none -- no LICENSE, no NOTICE, no attribution, no copyright line in any file.
+That is not a rendering problem; it is something this repository ships without saying it may. UNPAPERED_BASELINE
+is 2 and may only go down.
+
+*** THE PART THAT KEPT GOING WRONG IS FINDING THE LICENCE, AND IT WENT WRONG THREE TIMES THIS SESSION. ***
+A scan of mine for "a licence file" missed a real one in three separate places: jeromeetienne/fireworks.js's
+MIT-LICENSE.txt (does not start with "licen"), vendor/fonts's IBMPlexSerif-OFL.txt (the SIL Open Font Licence
+under the font's own name), and vendor/wasm's LICENSE nested under quickjs/. Each time the first answer was
+"no licence" -- which in this model is the difference between CAPTURED and UNPAPERED, a false accusation
+against a dependency that is properly licensed. The matcher here is recursive, matches the licence word
+anywhere in the filename, knows OFL/APACHE/GPL/BSD/MPL/NOTICE/ATTRIBUTION, and prefers a root-level licence
+over a nested one while REPORTING the depth, because those are different qualities of evidence. All three
+files are fixtures in the gate, and sabotaging the matcher back to "starts with licen" turns six checks red.
+
+*** THE ORBIT CARRIES MEANING RATHER THAN BEING DECORATION. *** Keith's "some energetic" is the recent
+arrivals: the semi-major axis grows with AGE, and the period follows Kepler's third law FROM that axis rather
+than being a second free parameter that could drift from it -- the same law physics/orbits/kepler.js
+integrates, so a placed body and a simulated one agree. Measured on the real tree: draco, grass and keyhunt,
+all captured TODAY, orbit innermost and fastest; three, jolt and slug from the 19th sit furthest out. Size is
+a cube root of byte count, so a body a thousand times larger is ten times wider.
+
+Two of my own checks were wrong and failed against correct code. One compared radiusFor(1000) with
+radiusFor(1e9) expecting exactly 100x -- but 1000 bytes lands under the minimum size and clamps, so the real
+ratio was 40. It also contained "Math.abs(x - 1000) > 900 === false", which parses as (comparison) === false
+and is not the claim it appears to be. Split into two honest claims: the cube-root ratio tested above the
+floor, and the floor tested on its own.
+
+Gate count 1267 gates.
+## v4184 -- using the instrument, and what it found in my own v4174 wiring
+
+v4183 built the census and left 8 animators unguarded and 25 tickers unexamined. This round used it rather
+than starting another port, and the instrument immediately found something the guard's author had not.
+
+*** THE HUD READOUT WAS INSIDE THE DIRTY-FLAG GUARD, WHICH IS MY OWN MISTAKE FROM v4174. *** The guard skips
+the GL DRAW. hud.update() draws no pixels at all -- it writes textContent into DOM elements: fps, chunk
+count, position, weather, time of day. Sitting inside the guard, a static 3D scene FROZE A LIVE DIAGNOSTIC,
+which is precisely what ui/morphDigits.js's v3531 rule forbids: a reader must never be shown a number they
+cannot trust. FPS keeps changing on a still scene, and so does the clock. It was inside the non-XR branch
+too, so a headset froze it as well. Moved out; it costs nothing it was not already costing, having throttled
+itself to 10Hz since round 314.
+
+FOUND BY DOING THE CENSUS, NOT BY READING THE GUARD. Asking what each of the twelve HUD and panel tickers
+could do to the picture is what surfaced that ONE of them was on the wrong side of it -- the other eleven
+were already outside.
+
+*** AND THE HUD CLUSTER SETTLED AS ONE DECISION RATHER THAN TWELVE, WHICH IS WHY UNEXAMINED FELL FROM 25 TO
+14. *** They write DOM; the flag guards the GL canvas; a DOM overlay is a separate surface a skipped draw
+does not touch. Reading two of them -- hud.js setting textContent, cameraPanel.js refreshing thumbnails on
+its own 250ms and 700ms timers -- answered all twelve.
+
+*** A THIRD CATEGORY TURNED UP, AFTER "ANIMATES" AND "WRITES DOM": SYSTEMS THAT ANIMATE THROUGH A SYSTEM
+ALREADY GUARDED. *** TorchLighter pushes three particle streams per torch into the particle system;
+MemoryShimmerEmitter spawns motes into it. Neither draws anything itself, so the existing particles probe
+already answers for them, and giving each its own probe would have asked the same question twice.
+
+Five more animators guarded through state they ALREADY expose, verified by reading each module rather than
+guessing at a name: EjectSequence.isActive() (stage !== idle && !== done), KaijuMode.isActive(),
+KaijuSandbox.isActive(), csRoundManager.isActive() -- which this loop was already calling twice -- and
+HitReactionSystem's Map of in-flight reactions. UNGUARDED fell from 8 to 1.
+
+*** THE LAST ONE IS LEFT UNGUARDED ON PURPOSE AND THE BASELINE STAYS AT ONE. *** fpsAutopilot exists to move
+the camera when the player does not, so it is unambiguously an animator, and simulation/FPSAutopilot.js
+exposes no state saying whether it is currently driving. Adding an isActive() to close the number would be
+WRITING the flag a probe rather than finding one, and a probe reporting what a new field was set to says
+nothing about what the module does. A baseline of zero reached by adding a field to the thing being measured
+is not the same as a baseline of zero.
+
+Both ratchets lowered and re-sabotaged: UNEXAMINED_BASELINE 25 -> 14, UNGUARDED_BASELINE 8 -> 1, and putting
+hudUpdate back inside the guard goes red on the new positional check.
+
+*** AND I DESTROYED THIS ROUND'S OWN WORK MID-WAY THROUGH IT. *** After sabotage-testing the guard placement
+I ran `git checkout -- main.js` to undo the sabotage, which restored main.js from HEAD and discarded every
+edit this round had made to it -- the move, both probes, and the emitter coverage. Caught immediately because
+the gate went red on four checks, and redone from the same scripted edits. A destructive command reached for
+casually, on a file with an hour of unshipped work in it: the sabotage should have been reverted from the
+copy taken before it, the way every other sabotage this session was.
+
+Gate count 1266 gates.
+## v4183 -- the census v4174 said it was waiting for, and two instruments that read low
+
+v4174 shipped the dirty flag DISABLED with four probes and an honest note that four is not a census of a
+thirty-thousand-line main.js. This is the census. THE COUNT IS SIXTY per-frame tickers, extracted from the
+loop mechanically rather than listed by hand, so a new one cannot enter unexamined in silence.
+
+*** AND THE FIRST THING IT ESTABLISHED IS THAT main.js'S OWN COMMENTS ARE NOT EVIDENCE FOR IT. *** Seventeen
+of the sixty carry a nearby comment calling themselves cheap or a no-op when idle. None of that answers the
+question a dirty flag asks. dayNightCycle's tick is microseconds of work AND it advances the sun every frame,
+so it ANIMATES: cheap and static are different claims, and a census built from the cost comments would have
+been confidently wrong rather than honestly partial. The gate asserts no verdict argues from cost, and proves
+the two questions differ by finding a ticker that calls itself cheap and animates anyway.
+
+Verdicts: 30 ANIMATES, 3 REACTIVE, 2 INERT, and 25 UNEXAMINED. *** MOST ENTRIES BEING UNEXAMINED IS THE POINT
+RATHER THAN A SHORTCOMING. *** Deciding whether wadVisualPolish can move a pixel on its own needs its source
+read. What changed is that the question is now ASKED for all sixty, by name, with the answers that exist
+written down and the ones that do not visibly absent -- instead of four probes and a hope.
+
+*** I HAD ALSO BEEN QUIETLY MAKING THE DEBT WORSE. *** doomFire.isBurning() (v4178) and odometer.isRolling()
+(v4181) were both written BY ME as frameDirty probes and neither had a consumer -- the same
+orphan-in-anticipation I criticised myself for in v4182's SNOISE2, committed twice more since, in the rounds
+either side of it.
+
+*** TWO MEASURING INSTRUMENTS READ LOW THIS ROUND, AND AN INSTRUMENT READING LOW IS WORSE THAN NONE BECAUSE
+IT LOOKS LIKE DATA. ***
+1. The census first matched probe NAMES against ticker names. Probes are named for their ROLE ("agents")
+   while the census counts TICKERS (aiManager, botManager, remotePlayers), so a probe guarding three systems
+   was credited with NONE of them: it reported 29 unguarded animators when the true figure after wiring was
+   8. addSource now takes { covers: [...] } and the flag exposes covered(), which is deliberately a different
+   list from sources().
+2. The gate then checked that at least five probes declared a covers list. Deleting one probe's declaration
+   entirely left five others and THE GATE STAYED GREEN -- a system silently became unguarded inside the very
+   gate meant to prevent that. Coverage is now read out of main.js's own covers lists and ratcheted:
+   UNGUARDED_BASELINE = 8, may only go down. Re-sabotaged, it goes red at 13.
+
+A third slip, caught by reading: a regex stamped a covers list onto the XRSessionManager CONSTRUCTOR -- a
+second argument that constructor ignores, so it was syntactically valid, silently meaningless, and
+node --check said nothing. The gate now asserts every covers list sits on an addSource call.
+
+Five new probes wired, covering 23 of the 30 animators between them, which took unguarded from 29 to 8. The
+remaining eight are named rather than summarised: csRoundManager, ejectSequence, fpsAutopilot,
+hitReactionSystem, kaijuMode, kaijuSandbox, memoryShimmer, torchLighter.
+
+*** THE FLAG IS STILL OFF, AND THE GATE ASSERTS THAT TOO. *** A census does not license enabling a feature;
+it measures the distance. window.frameDirty.census() fetches main.js and prints how many animators are still
+unguarded -- source-derived at call time, because a list baked in at build would describe a file that no
+longer exists.
+
+Gate count 1266 gates.
+## v4182 -- the signal failing, and the near-miss from four rounds ago measured
+
+felixturner/bad-tv-shader ported (MIT (c) Felix Turner): horizontal tearing from a tracking error, plus
+vertical roll.
+
+*** IT DOES NOT OVERLAP render/crtModel.js AND THE SPLIT IS WHY BOTH ARE WORTH HAVING. *** crtModel does
+OPTICS -- curvature, scanline count, aperture mask, vignette, bleed, tint -- which is what the TUBE does to a
+signal that arrived intact. This does SIGNAL, which is the broadcast failing before the glass ever sees it.
+SweK's CRT until now was a perfect picture on a bad tube, which is why it read as a filter rather than a set.
+
+They compose in one order and it is physical, not a preference: SIGNAL DAMAGE FIRST, TUBE OPTICS SECOND. A
+tube cannot un-tear a torn signal, and it cannot scan a line it never received. The other way round lays
+scanlines on an undistorted image and then smears them sideways, which no CRT has ever done. COMPOSE_ORDER is
+exported as frozen DATA rather than described in a comment, so a caller can check it.
+
+*** THIS CLOSES AN ORPHAN I CREATED FOUR ROUNDS AGO. *** v4177 extracted Ashima's 2D simplex into a shared
+chunk specifically for this port, which left SNOISE2 with NO CONSUMER for four versions -- exactly the shape
+referenceKind exists to catch, made in anticipation rather than by neglect, which is not much of a defence.
+The pass consumes it now, and the CPU snoise2 the gate needs was added alongside.
+
+*** AND IT MEASURES THE NEAR-MISS v4177 AVOIDED, WHICH TURNS OUT TO BE WORSE THAN IT LOOKED. *** That round
+set out to consolidate "three copies of the same forty lines" and was stopped by checking one constant: the
+2D and 3D functions are different, not variants. Measured now: 2D peaks at 0.9739 -- the textbook [-1, 1] --
+and this tree's 3D peaks at 4.1681. A ratio of 4.28. And the coarse offset in this shader is CUBED, so a
+single shared entry point built on the 3D function would have scaled the tear by 4.28 cubed: SEVENTY-EIGHT
+TIMES. Not a subtle drift, a picture torn clean off the screen. Sabotage-tested by actually substituting one
+for the other, which fails even harder than that -- the arities differ, so it goes NaN before it gets a chance
+to be 78x wrong.
+
+*** THE CUBE IS THE CHARACTER AND IT IS THE MOST INVITING THING HERE TO SIMPLIFY. *** The original writes
+`offset = offset*distortion * offset*distortion * offset`, a five-term product that looks like a typo. It is
+offset^3 * distortion^2, and cubing is what makes the picture sit nearly still and then tear hard: measured,
+1374 of 2000 rows are displaced under 0.005 UV while 233 others pass it. Linear it would wobble constantly and
+never tear -- a different effect wearing the same knob names. Sabotaged to `offset * distortion`: four checks
+red, including that doubling the knob then gives exactly 2.0x the tear where the real one gives 3.73x.
+
+Also pinned: fract, not %. GLSL's fract returns a POSITIVE fraction for a negative input and JavaScript's %
+returns a negative one, which would sample outside the texture and read as a black band rolling through the
+picture. Sabotaged: two checks red. And the distortion is ROW-ONLY -- offsetAt does not even take a column, so
+a warp is not expressible by accident, which is what makes the artifact tearing rather than a swirl.
+
+Gate count 1265 gates.
 ## v4181 -- an odometer, and a rule this tree had already written down
 
 Ported from coderitual/bounty (MIT (c) 2017 coderitual): a number that rolls to its new value on a strip of

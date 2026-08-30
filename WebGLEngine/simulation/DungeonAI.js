@@ -17,6 +17,8 @@
 //   ai.update(dt);                       // each first-person tick
 //   ai.clear();                          // on teardown / descend
 
+import { WallFollower, dirToward } from "./wallFollow.mjs";   // v4187 -- a hand on the wall when the path is gone
+
 const KINDS = {
     chaser: { aggro: 14, speed: 3.6, atkR: 1.7, dmg: 6,  cool: 0.8, flees: true },
     lurker: { aggro: 7,  speed: 3.0, atkR: 1.6, dmg: 5,  cool: 1.0, flees: true },
@@ -197,27 +199,65 @@ export function makeDungeonAI(opts) {
             // chase — BFS a step toward the player, advance toward that cell centre
             m.repath -= dt;
             const [mgx, mgz] = worldToCell(m.x, m.z);
-            if (m.repath <= 0 || !m.step) { m.step = bfsStep(mgx, mgz, pgx, pgz); m.repath = 0.35; }
-            let tx = p.x, tz = p.z;   // fall back to straight-line if no path
-            if (m.step) { const w = cellToWorld(m.step[0], m.step[1]); tx = w[0]; tz = w[1]; }
-            let ddx = tx - m.x, ddz = tz - m.z, dd = Math.hypot(ddx, ddz) || 1;
-            // PATCH-B14 -- GPU Brain phase 11. When the local BFS found no
-            // path (the straight-line case above), blend the brain's
-            // player-seeking flow field 60/40 into the heading -- dungeon
-            // walls are voxels, so the terrain-cost field routes corridors
-            // the 8x8 BFS grid can't see. No brain -> no change, exactly
-            // like the kaiju planner-failed hook (PATCH-B3).
-            if (!m.step && typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
-                const f = window.sampleBrainPlayerFlow(m.x, m.z);
-                if (f) {
-                    const bx = 0.6 * f.x + 0.4 * (ddx / dd);
-                    const bz = 0.6 * f.z + 0.4 * (ddz / dd);
-                    const bn = Math.hypot(bx, bz);
-                    if (bn > 1e-4) { ddx = bx / bn; ddz = bz / bn; dd = 1; }
+            if (m.repath <= 0 || !m.step) {
+                m.repath = 0.35;
+                m.step = bfsStep(mgx, mgz, pgx, pgz);
+                if (m.step) {
+                    // the path is back: take the hand off the wall. The follower is DISCARDED rather than
+                    // kept, or the next time the path is lost it would inherit this hunt's visited states
+                    // and cry loop on its first honest step.
+                    m.follow = null;
+                } else {
+                    // *** NO PATH. PUT A HAND ON THE WALL AND WALK. *** This is where a straight line at the
+                    // player used to be -- a beeline that fired PRECISELY when a wall was in the way, which
+                    // is how a monster ended up 17 frames deep inside solid stone. Refusing the move instead
+                    // would only trade a monster that cheats for one standing at the wall waiting to be
+                    // killed. Right-hand rule: turn right if you can, else straight, else left, else back.
+                    if (!m.follow) {
+                        // *** THE BRAIN PICKS WHICH WAY TO SET OFF, AND THEN THE HAND RULE WALKS. *** This is
+                        // where PATCH-B14's flow field belongs now: the brain's terrain-cost field routes
+                        // corridors the flat BFS grid cannot see, and this is exactly the "BFS found no path"
+                        // case it was written for. But it steers the OPENING DIRECTION ONLY. Blending it into
+                        // every step would be the same mistake v4187 measured and rejected for
+                        // extend-and-choose: a heading that is re-chosen each step abandons the wall, and the
+                        // hand rule's guarantee goes with it. A one-time hint cannot break the guarantee -- at
+                        // worst the follower goes the long way round. No brain -> dirToward, exactly as before.
+                        let openDir = dirToward(dxp, dzp);
+                        if (typeof window !== "undefined" && window.sampleBrainPlayerFlow) {
+                            const f = window.sampleBrainPlayerFlow(m.x, m.z);
+                            if (f && (Math.abs(f.x) > 1e-4 || Math.abs(f.z) > 1e-4)) openDir = dirToward(f.x, f.z);
+                        }
+                        m.follow = new WallFollower(openDir);
+                    }
+                    const nx = m.follow.next(mgx, mgz, isWall);
+                    if (nx) m.step = [nx.gx, nx.gz];
+                    else {
+                        // Walled in on all four sides, or the follower PROVED it is going in circles -- the
+                        // right-hand rule's known limit, a detached pillar. Losing the player is a better
+                        // answer than orbiting a column forever.
+                        m.step = null; m.follow = null; m.aggroed = false; continue;
+                    }
                 }
             }
+            // *** AND THERE IS NO STRAIGHT-LINE TARGET ANY MORE. *** With no step there is nothing legitimate
+            // to walk toward; holding still for one frame is honest, and the next repath supplies one.
+            if (!m.step) { if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw); continue; }
+            const _wc = cellToWorld(m.step[0], m.step[1]);
+            let tx = _wc[0], tz = _wc[1];
+            let ddx = tx - m.x, ddz = tz - m.z, dd = Math.hypot(ddx, ddz) || 1;
+            // *** PATCH-B14 USED TO SIT HERE AND v4187 KILLED IT WITHOUT NOTICING. *** It read
+            // `if (!m.step && window.sampleBrainPlayerFlow)` -- blend the brain's flow field in when BFS found
+            // no path. v4187 added an earlier `if (!m.step) ... continue`, so by this line m.step is ALWAYS
+            // set and the condition could never be true again. Dead code that still looked wired. The hook is
+            // not gone; it MOVED, to where the wall-follower is created above, which is now the branch that
+            // means "BFS found no path". It steers the OPENING DIRECTION only -- see the note there.
             const adv = Math.min(dd, m.spec.speed * (m._slowT > 0 ? 0.5 : 1) * (enr ? 1.5 : 1) * dt);
-            m.x += (ddx / dd) * adv; m.z += (ddz / dd) * adv;
+            // *** THE MOVE IS COLLISION-TESTED, THE SAME WAY THE FLEE BRANCH ALREADY DID IT. *** This file
+            // wrote a monster's position in exactly two places and only ONE of them checked isWall: fleeing
+            // was careful, chasing was not. Move if the destination is open, else slide along the wall.
+            const _ax = (ddx / dd) * adv, _az = (ddz / dd) * adv;
+            const tryMove = (sx, sz) => { const [ngx, ngz] = worldToCell(sx, sz); if (!isWall(ngx, ngz)) { m.x = sx; m.z = sz; return true; } return false; };
+            if (!tryMove(m.x + _ax, m.z + _az)) { if (!tryMove(m.x + _az, m.z - _ax)) tryMove(m.x - _az, m.z + _ax); }
             if (dd < 0.3) m.step = null;   // reached the step cell -> repath
             m.yaw = Math.atan2(ddx, -ddz);
             if (moveEntity) moveEntity(m.id, m.x, floorY + 1, m.z, m.yaw);

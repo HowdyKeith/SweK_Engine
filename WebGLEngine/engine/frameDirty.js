@@ -69,6 +69,7 @@ export class FrameDirty {
         this._dirty = true;             // first frame always draws
         this._reason = "init";
         this._sources = new Map();      // name -> probe fn
+        this._covers = new Map();       // name -> [ticker names this probe guards]
         this._wasActive = new Map();    // name -> truthiness last seen, for the falling edge
         this._skipRun = 0;              // consecutive frames skipped
         this._frames = 0;
@@ -98,9 +99,15 @@ export class FrameDirty {
      * of quiet wrong answer this module must not have.
      * Returns an unregister function.
      */
-    addSource(name, probe) {
+    addSource(name, probe, opts = {}) {
         if (typeof probe !== "function") throw new TypeError("FrameDirty.addSource: probe must be a function");
         const key = String(name);
+        // v4183 -- WHAT THIS PROBE GUARDS, by the names the census knows them under. A probe is named for its
+        // ROLE ("agents") while the census counts TICKERS (aiManager, botManager, remotePlayers), so without
+        // this a probe covering three systems is credited with none of them and the census permanently
+        // under-reports its own progress -- a measuring instrument reading low, which is worse than no
+        // instrument because it looks like data.
+        if (Array.isArray(opts.covers) && opts.covers.length) this._covers.set(key, opts.covers.slice());
         this._sources.set(key, probe);
         this._wasActive.delete(key);
         // A newly registered source is a change by itself: whatever it is
@@ -111,6 +118,17 @@ export class FrameDirty {
 
     /** Names of every registered source, for diagnostics and for the gate. */
     sources() { return Array.from(this._sources.keys()); }
+
+    /**
+     * Every TICKER name guarded by some probe. This is what engine/frameDirtyCensus.mjs counts against, and
+     * it is deliberately not the same list as sources(): one probe can guard several tickers, and the census
+     * is asking which SYSTEMS are covered, not how many probes exist.
+     */
+    covered() {
+        const out = new Set();
+        for (const list of this._covers.values()) for (const n of list) out.add(n);
+        return [...out].sort();
+    }
 
     /**
      * Called once per frame, after the ticks and before the draw. Returns
