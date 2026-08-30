@@ -8,6 +8,63 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4188 -- a live camera frame as a GL texture, and the keyer the tree never had
+
+Keith sent eight webcam-effect repositories. **The recommendation was to port none of them.**
+
+Two of the eight state a licence at all: positlabs/spark-hypersampler and EvanBacon/Expo-Crossy-Road, both
+MIT. The other six show none, which under v4186's posture makes them REACHED and not CAPTURED -- readable,
+not vendorable. Of the two that are licensed, one is a Spark AR project file and the other is a game rather
+than an effect. So the round took the ideas and wrote the parts this tree actually lacked.
+
+**The survey found something better than any of the eight.** getUserMedia appears in *twelve* files here --
+MediaPipe face and hand tracking, speech, avatarstage, gesture-vfx -- and video-as-a-GL-texture appeared in
+none of them, only inside vendored three.js. The engine's whole shader chain (bad-TV v4182, aquarelle v4177,
+the DOOM fire v4178, phosphor, swiftShader) had never been pointed at a webcam. render/cameraTexture.js is
+about thirty lines of texImage2D-per-frame and makes every one of them a live effect without writing a new
+effect. It also reports honestly to engine/frameDirty.js: a 30fps camera on a 60Hz display has nothing new to
+say every other frame, and a *missing* camera reports dirty rather than quiet, which is the direction that
+rule has to fail in.
+
+**And there was no chroma key.** All fifteen occurrences of "chroma" in the tree were chromatic *aberration*,
+plus one comment about chroma subsampling. The only real one is main.js:29871, where `window._stageBackdrop`
+is documented as "(e.g. green/blue for chroma)" and used as the clear colour. The engine could **produce** a
+green screen and could not **key one out** -- it had the source side and not the keying side. Now the round
+trip closes on itself, which is a thing none of the eight repos can do.
+
+**The algorithm was measured, not chosen.** Fourteen labelled pixels against a real cloth green
+[0.05, 0.75, 0.15] -- wrong answers: RGB distance 3, YCbCr 2, chromaticity 1, and the minimum of the last two
+**0**. That is not tuning, it is two failures at opposite ends of the light:
+
+- a **shadowed fold** keeps its hue and loses its chroma, so YCbCr calls it a different colour and leaves a
+  green hole in the matte. Chromaticity has divided brightness out and gets it right.
+- a **blown highlight** loses its hue -- light floods every channel and it drifts toward white -- so
+  chromaticity says "not green". Its absolute chroma is still large, so YCbCr gets it right.
+
+Plus a **dark floor**, which is a rule and not a fudge: chromaticity divides by brightness, so a near-black
+pixel has arbitrary hue, and without the floor every pupil, nostril and hair shadow whose noise lands on the
+key is punched transparent. Holes in the middle of a face. Below the floor a pixel is declared subject: an
+unlit pixel is not a green screen, whatever its ratios say.
+
+**The shader is compared to the model, not trusted to resemble it.** Two implementations of one rule drift,
+and the drift is silent -- the CPU gate stays green while the screen shows something else. So
+camera-effects.html uploads a known image, runs the *real* fragment shader, reads the pixels back, and diffs
+against the CPU model. Measured in headless Chromium: **0.0000 on all five probe pixels**, identical at 8-bit
+readback, shadowed fold and blown highlight included.
+
+Chuck Close is the one effect in the eight repos this tree has in no form (kamend/ChuckClose-SparkAR shows no
+licence, so the technique was derived from its description and nothing copied). The thing a naive version
+gets wrong is point-sampling the cell instead of averaging it: that is one line shorter and gives a mosaic of
+*noise* that crawls as the subject breathes. The model averages every pixel of the cell; the shader takes 5x5
+taps because a camera texture is NPOT with no mipmaps and there is no textureLod to average with. Measured
+gap between the two: median **0.0000**, worst 0.1020, and only **12 of 256** cells over 0.02 -- all of them
+cells a hard edge crosses, where 25 taps quantise a step edge into fifths. Interior cells are exact.
+
+90 new checks in tools/ship/cameraEffects-selfcheck.mjs, 8 sabotages all red and all files restored
+byte-identical. One of those sabotages passed on the first attempt: the gate asked whether the pass file
+contained "throw new Error" anywhere, so replacing the shader-COMPILE throw with a console.warn left it green
+because the LINK throw still matched. A check that one of two guards exists is not a check that both do. The
+tree now carries 1270 gates.
 ## v4187 -- the dungeon monsters stopped cheating, and did not start stalling
 
 Keith remembered heroes walking through walls in the dungeon demo. It was real, and it had been there since

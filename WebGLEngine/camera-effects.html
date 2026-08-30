@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK &middot; Camera Effects</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#ff6b5e; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; overflow:hidden; }
+  #view { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .card { position:absolute; background:rgba(11,29,21,0.93); border:1px solid var(--line); border-radius:12px; padding:12px 14px; backdrop-filter:blur(6px); }
+  #panel { top:14px; left:14px; width:290px; max-height:calc(100% - 28px); overflow:auto; }
+  #panel h1 { margin:0 0 8px; font-size:14px; color:var(--amber); letter-spacing:1px; }
+  #panel p { margin:0 0 10px; color:var(--dim); font-size:11.5px; line-height:1.5; }
+  label { display:block; margin:8px 0 2px; color:var(--dim); font-size:11px; }
+  input[type=range] { width:100%; accent-color:var(--amber); }
+  button { background:transparent; border:1px solid var(--line); color:var(--amber); border-radius:8px; padding:6px 11px; cursor:pointer; font:inherit; font-size:11.5px; margin:2px 2px 2px 0; }
+  button:hover { border-color:var(--amber); }
+  button.on { background:var(--amber); color:#06120b; font-weight:700; }
+  #status { bottom:14px; left:14px; right:14px; font-size:11.5px; color:var(--dim); }
+  #status b { color:var(--cyan); }
+  .ok { color:var(--green); } .bad { color:var(--red); }
+  #selftest { white-space:pre; font-size:11px; line-height:1.45; max-height:190px; overflow:auto; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div class="card" id="panel">
+  <h1>CAMERA EFFECTS</h1>
+  <p>A live frame as a GL texture &mdash; the piece the tree was missing. Twelve files here open a camera and none of them ever handed the pixels to a shader.</p>
+  <div>
+    <button id="start">start camera</button>
+    <button id="test">self-test (no camera)</button>
+  </div>
+  <div>
+    <button id="bKey">chroma key</button>
+    <button id="bClose">chuck close</button>
+    <button id="bMirror" class="on">mirror</button>
+  </div>
+  <label>similarity <span id="vSim">0.08</span></label>
+  <input type="range" id="sim" min="0" max="0.4" step="0.005" value="0.08" />
+  <label>smoothness <span id="vSmo">0.06</span></label>
+  <input type="range" id="smo" min="0" max="0.4" step="0.005" value="0.06" />
+  <label>grid <span id="vGrid">48</span></label>
+  <input type="range" id="grid" min="8" max="160" step="1" value="48" />
+  <label>mark</label>
+  <div><button class="mk on" data-m="1">lozenge</button><button class="mk" data-m="0">square</button><button class="mk" data-m="2">disc</button><button class="mk" data-m="3">rings</button></div>
+  <div id="selftest"></div>
+</div>
+
+<div class="card" id="status">initialising&hellip;</div>
+
+<script type="module">
+import { CameraTexture, coverUV, mirrorUV, frameProbe } from "./render/cameraTexture.js";
+import { makeCameraEffectsPass } from "./render/cameraEffectsPass.js";
+import { keyAlpha, despill, DEFAULTS as KEY_DEFAULTS } from "./render/chromaKeyModel.mjs";
+import { closeGrid, cellAverage, punch } from "./render/chuckCloseModel.mjs";
+
+const cv = document.getElementById("view");
+const gl = cv.getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
+const S = (id) => document.getElementById(id);
+if (!gl) { S("status").innerHTML = '<span class="bad">WebGL2 unavailable</span>'; }
+
+let pass = null, cam = null, probe = null, tex = null, texW = 0, texH = 0;
+let keyOn = false, closeOn = false, mirror = true, mark = 1;
+const KEY = [0.05, 0.75, 0.15];
+
+function resize() {
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d);
+    gl.viewport(0, 0, cv.width, cv.height);
+}
+addEventListener("resize", resize); resize();
+try { pass = makeCameraEffectsPass(gl); } catch (e) { S("status").innerHTML = '<span class="bad">' + e.message + "</span>"; }
+
+/** A deterministic test image: a green-screen field with lit / shadowed / blown patches, and a subject. */
+function testImage(w = 256, h = 256) {
+    const px = new Uint8Array(w * h * 4);
+    const put = (x, y, c) => { const i = (y * w + x) * 4; px[i] = c[0] * 255; px[i + 1] = c[1] * 255; px[i + 2] = c[2] * 255; px[i + 3] = 255; };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let c = KEY;                                                   // lit screen
+        if (y > h * 0.55) c = [0.02, 0.30, 0.06];                       // a shadowed fold of the same cloth
+        if (x > w * 0.75 && y < h * 0.30) c = [0.20, 0.95, 0.32];       // a blown highlight on the cloth
+        if (x > w * 0.30 && x < w * 0.60 && y > h * 0.25 && y < h * 0.80) c = [0.85, 0.68, 0.60];  // subject: skin
+        if (x > w * 0.38 && x < w * 0.45 && y > h * 0.38 && y < h * 0.45) c = [0.03, 0.03, 0.035]; // a pupil
+        put(x, y, c);
+    }
+    return { px, w, h };
+}
+
+function uploadTestImage() {
+    const { px, w, h } = testImage();
+    if (!tex) tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    texW = w; texH = h;
+    return { px, w, h };
+}
+
+/**
+ * *** THE SELF-TEST: THE SHADER IS COMPARED TO THE MODEL, NOT TRUSTED TO RESEMBLE IT. ***
+ * Two implementations of one rule drift, and the drift is silent -- the CPU gate stays green while the
+ * screen shows something else. So: upload a known image, run the real fragment shader, read the pixels back,
+ * and run render/chromaKeyModel.mjs over the same input on the CPU. The largest disagreement is reported.
+ */
+function selfTest() {
+    const out = [];
+    const img = uploadTestImage();
+    const probes = [
+        ["lit screen",        Math.round(img.w * 0.10), Math.round(img.h * 0.10)],
+        ["shadowed fold",     Math.round(img.w * 0.10), Math.round(img.h * 0.80)],
+        ["blown highlight",   Math.round(img.w * 0.85), Math.round(img.h * 0.12)],
+        ["subject skin",      Math.round(img.w * 0.50), Math.round(img.h * 0.55)],
+        ["pupil (near black)",Math.round(img.w * 0.41), Math.round(img.h * 0.41)],
+    ];
+    // render at the image's own size, 1:1, no cover crop, no mirror -- so pixel (x,y) is comparable
+    cv.width = img.w; cv.height = img.h; gl.viewport(0, 0, img.w, img.h);
+    pass.draw(tex, { cover: { sx: 1, sy: 1, ox: 0, oy: 0 }, key: KEY, keyOn: true, closeOn: false,
+                     backdrop: [0, 0, 0], similarity: 0.08, smoothness: 0.06, darkFloor: 0.12, despill: 1.0 });
+    const buf = new Uint8Array(img.w * img.h * 4);
+    gl.readPixels(0, 0, img.w, img.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+
+    let worst = 0, worstName = "";
+    out.push("GPU vs CPU  (composited over black)");
+    for (const [name, x, y] of probes) {
+        const si = (y * img.w + x) * 4;
+        const src = [img.px[si] / 255, img.px[si + 1] / 255, img.px[si + 2] / 255];
+        const a = keyAlpha(src, KEY, KEY_DEFAULTS);
+        const kept = a > 0 ? despill(src, KEY, KEY_DEFAULTS) : src;
+        const cpu = [kept[0] * a, kept[1] * a, kept[2] * a];        // mix(backdrop=0, col, a)
+        // *** NO FLIP HERE, AND THE FIRST VERSION HAD ONE. *** The texture is uploaded from a byte array with
+        // no UNPACK_FLIP_Y, so data row 0 is t=0; vUv.y=0 is the framebuffer BOTTOM; and readPixels row 0 is
+        // also the bottom. Those cancel: readback row R is image row R. Flipping it read SKIN where the pupil
+        // is and reported a 0.82 disagreement against a shader that was correct -- and every other probe
+        // passed anyway, because they sit in bands that are symmetric about the middle. Only the small
+        // off-centre pupil could catch it.
+        const gi = (y * img.w + x) * 4;
+        const gpu = [buf[gi] / 255, buf[gi + 1] / 255, buf[gi + 2] / 255];
+        const d = Math.max(Math.abs(gpu[0] - cpu[0]), Math.abs(gpu[1] - cpu[1]), Math.abs(gpu[2] - cpu[2]));
+        if (d > worst) { worst = d; worstName = name; }
+        out.push(`  ${name.padEnd(19)} cpu ${cpu.map((v) => v.toFixed(3)).join(" ")}  gpu ${gpu.map((v) => v.toFixed(3)).join(" ")}  d ${d.toFixed(4)}`);
+    }
+    // 1/255 is one 8-bit step: the readback is quantised, so exact equality is not available to ask for
+    const tol = 2 / 255;
+    out.push(worst <= tol ? `  PASS  worst ${worst.toFixed(4)} <= ${tol.toFixed(4)} (2 of 255) at "${worstName}"`
+                          : `  FAIL  worst ${worst.toFixed(4)} at "${worstName}"`);
+
+    // and the Chuck Close mean: the shader samples 5x5, the model averages every pixel. Measure the gap.
+    const gridN = 16;
+    const model = closeGrid(img.px, img.w, img.h, { grid: gridN, contrast: 1.0 });
+    cv.width = img.w; cv.height = img.h; gl.viewport(0, 0, img.w, img.h);
+    pass.draw(tex, { cover: { sx: 1, sy: 1, ox: 0, oy: 0 }, key: KEY, keyOn: false, closeOn: true,
+                     grid: gridN, gap: 0.0, contrast: 1.0, mark: 0, backdrop: [0, 0, 0] });
+    gl.readPixels(0, 0, img.w, img.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    // *** CHARACTERISE THE ERROR, DO NOT JUST TAKE ITS MAXIMUM. *** A worst-case number alone cannot tell you
+    // whether a method is fine with a few bad cells or bad everywhere, and moving a threshold until the
+    // maximum fits under it is not a measurement. So: the spread, and how many cells are actually affected.
+    const diffs = [];
+    for (let cy = 0; cy < gridN; cy++) for (let cx = 0; cx < gridN; cx++) {
+        const px = Math.round((cx + 0.5) * img.w / gridN), py = Math.round((cy + 0.5) * img.h / gridN);
+        const gi = (py * img.w + px) * 4;      // same cancellation as above
+        const g = [buf[gi] / 255, buf[gi + 1] / 255, buf[gi + 2] / 255];
+        const m = model.cells[cy][cx];
+        diffs.push(Math.max(Math.abs(g[0] - m[0]), Math.abs(g[1] - m[1]), Math.abs(g[2] - m[2])));
+    }
+    diffs.sort((a, b) => a - b);
+    const cworst = diffs[diffs.length - 1];
+    const median = diffs[diffs.length >> 1];
+    const over = diffs.filter((d) => d > 0.02).length;
+    out.push("");
+    out.push(`Chuck Close cell mean, 5x5 taps vs EVERY pixel  (${gridN * gridN} cells)`);
+    out.push(`  median ${median.toFixed(4)}   worst ${cworst.toFixed(4)}   cells over 0.02: ${over}`);
+    out.push(`  the error lives on cells a hard EDGE crosses: 25 taps split a step edge into fifths,`);
+    out.push(`  so a cell half skin and half backdrop lands on the nearest 1/5. Interior cells are exact.`);
+    out.push(over <= gridN * 2 ? "  PASS  confined to edge cells; interior cells track the exact mean"
+                               : "  FAIL  the sampled mean is off away from edges too, which taps cannot explain");
+    S("selftest").innerHTML = out.join("\n").replace(/PASS/g, '<span class="ok">PASS</span>').replace(/FAIL/g, '<span class="bad">FAIL</span>');
+    resize();
+    return { worst, cworst };
+}
+window.__selfTest = selfTest;
+
+async function startCamera() {
+    cam = new CameraTexture(gl);
+    const ok = await cam.start();
+    if (!ok) { S("status").innerHTML = '<span class="bad">camera: ' + cam.error + "</span>"; cam = null; return; }
+    probe = frameProbe(cam);
+    tex = null;
+    S("status").innerHTML = "camera running &mdash; <b>every pass in the tree can read this texture</b>";
+}
+addEventListener("pagehide", () => { try { cam && cam.stop(); } catch {} });
+
+function frame() {
+    requestAnimationFrame(frame);
+    if (!pass || !gl) return;
+    let t = tex, w = texW, h = texH;
+    if (cam) { cam.update(); t = cam.texture; w = cam.width; h = cam.height; }
+    if (!t || !w) return;
+    let cover = coverUV(w, h, cv.width, cv.height);
+    if (mirror) cover = mirrorUV(cover);
+    pass.draw(t, {
+        cover, key: KEY, keyOn, closeOn, backdrop: [0.02, 0.06, 0.04],
+        similarity: Number(S("sim").value), smoothness: Number(S("smo").value),
+        grid: Number(S("grid").value), mark, contrast: 1.15, gap: 0.06, despill: 1.0,
+    });
+}
+requestAnimationFrame(frame);
+
+S("start").onclick = startCamera;
+S("test").onclick = () => { cam && cam.stop(); cam = null; uploadTestImage(); selfTest(); S("status").innerHTML = "self-test image &mdash; <b>no camera opened</b>"; };
+S("bKey").onclick = (e) => { keyOn = !keyOn; e.target.classList.toggle("on", keyOn); };
+S("bClose").onclick = (e) => { closeOn = !closeOn; e.target.classList.toggle("on", closeOn); };
+S("bMirror").onclick = (e) => { mirror = !mirror; e.target.classList.toggle("on", mirror); };
+for (const b of document.querySelectorAll(".mk")) b.onclick = () => {
+    mark = Number(b.dataset.m);
+    for (const o of document.querySelectorAll(".mk")) o.classList.toggle("on", o === b);
+};
+for (const [id, out] of [["sim", "vSim"], ["smo", "vSmo"], ["grid", "vGrid"]])
+    S(id).addEventListener("input", () => { S(out).textContent = S(id).value; });
+if (gl && pass) { uploadTestImage(); S("status").innerHTML = 'ready &mdash; <b>start camera</b>, or run the self-test with no camera'; }
+</script>
+</body>
+</html>
