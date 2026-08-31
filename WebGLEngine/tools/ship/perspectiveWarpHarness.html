@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>perspective warp harness</title>
+<canvas id="c" width="64" height="48"></canvas>
+<script type="module">
+import * as W from "/render/perspectiveWarp.mjs";
+import * as EM from "/render/effectMerge.mjs";
+import { mat3Inv } from "/vision/homography.mjs";
+
+const gl = document.getElementById("c").getContext("webgl2", { antialias: false });
+
+function compile(vs, fs) {
+    const p = gl.createProgram();
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(t);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + "\n" + src);
+        gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+const vao = gl.createVertexArray();
+
+/**
+ * Render the warp. `forward` deliberately uploads H instead of H inverse -- the mistake the gate measures,
+ * so that "the shader needs the inverse" is a number rather than a note in a header.
+ */
+window.__warp = (quad, w, h, forward = false) => {
+    // the same source image the gate builds on the CPU, byte for byte
+    const bytes = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        bytes[i] = Math.round(255 * x / (w - 1));
+        bytes[i + 1] = Math.round(255 * y / (h - 1));
+        bytes[i + 2] = ((x + y) % 8) < 4 ? Math.round(255 * 0.85) : Math.round(255 * 0.15);
+        bytes[i + 3] = 255;
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+    for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST);
+    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+
+    const out = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, out);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out, 0);
+
+    // the merge machinery builds the program, so the effect is exercised the way a caller would use it
+    const run = EM.mergeChain([W.WARP_EFFECT])[0];
+    const prog = compile(EM.VERT, run.frag);
+    const H = W.cornerHomography(w, h, quad);
+    const M = forward ? H : mat3Inv(H);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog);
+    const u = run.uniforms.perspectiveWarp;
+    gl.uniformMatrix3fv(gl.getUniformLocation(prog, u.hinv), false, W.toColumnMajor(M));
+    gl.uniform2f(gl.getUniformLocation(prog, u.size), w, h);
+    gl.uniform4f(gl.getUniformLocation(prog, u.background), 0, 0, 0, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let covered = 0, finite = true;
+    for (let p = 0; p < w * h; p++) {
+        if (px[p * 4 + 3] > 0) covered++;
+        for (let c = 0; c < 4; c++) if (!Number.isFinite(px[p * 4 + c])) finite = false;
+    }
+    return { px: Array.from(px), covered, finite };
+};
+
+window.__ready = true;
+</script>

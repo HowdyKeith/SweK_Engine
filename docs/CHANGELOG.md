@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4238 -- The pass v4226 never got, and the second projective solver nobody knew about
+
+*** THE BACKLOG ITEM SAID vision/homography.mjs HAS "NO RENDERING CONSUMER", AND THE HALF OF THAT WHICH IS
+WRONG IS THE INTERESTING HALF. *** v4226 shipped a DLT plus RANSAC with 40 checks, and nothing in the tree
+renders with it: grep for perspectiveWarp / homographyWarp across render/ and mesh/ returns nothing. True.
+What is ALSO true is that pipboy-models.html has warped a canvas onto a screen quad since long before v4226,
+through a hand-rolled adj() / mm() / mv() / basis() construction emitted as a CSS matrix3d -- and it does not
+import the module, and the module does not know it exists. That is the shape of #78 (three copies of
+stagger), #96 (two copies of Moller-Trumbore) and #51 (three copies of simplex noise), found again.
+
+*** SO THE FIRST THING THIS ROUND DOES IS HOLD THE TWO SOLVERS TO EACH OTHER, AND THEY AGREE TO 2.2e-14. ***
+A 2n-by-9 eigenproblem and a projective basis built from three points and scaled by the fourth, landing on
+the same matrix -- over forty random quads, worst 4.01e-14, not the one quad that happened to be typed first.
+Worth knowing before anyone deletes either one. The duplication is RECORDED and LEFT: pipboy's version works,
+it is CSS rather than GL, and swapping a page's working transform for an import is a risk nobody asked for.
+
+*** THE TRAP, AND IT IS THE ONLY ONE THAT MATTERS: A FRAGMENT SHADER WARPS BY THE INVERSE. *** H takes SOURCE
+corners to DESTINATION corners, which is the direction a person thinks in and the direction the DLT solves.
+A fragment shader runs at a DESTINATION pixel and must ask which source texel lands there, which is H
+inverse. Using H itself compiles, runs, and produces a perfectly convincing perspective effect pointing the
+wrong way: measured, it differs at 100% of pixels on the CPU reference and 85% of subpixels on the GPU. The
+uniform is named uHinv because of that.
+
+*** AND IT IS THE FIRST REAL EFFECT WRITTEN AGAINST v4236's TAXONOMY, WHICH PUT IT WHERE IT BELONGS WITHOUT
+BEING TOLD. *** The warp classifies as SAMPLING -- derived from its body, not declared -- so warp-then-grade
+plans to ONE draw and grade-then-warp plans to TWO. It also exercises the merge's typed knobs for the first
+time, emitting `uniform mat3` and `uniform vec2` rather than nine floats.
+
+On a real WebGL2 context the shader agrees with the CPU reference at 5 subpixels of 9216 over 2 levels
+(0.05%), and the disagreements are on the QUAD'S EDGE where a source coordinate lands within a rounding of
+the boundary test and the two sides take different branches -- the same texel-boundary signature the shader
+port classifies vortex under. Coverage: 2024 CPU pixels against 2026 GPU.
+
+SEVEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED, SIX RED. Mapping forward instead of backward,
+dropping the perspective divide (58.5% of subpixels), unbounding the source rectangle (coverage 2024 -> 3072),
+transposing the matrix on upload (coverage to ZERO -- the whole quad lands outside the source rectangle,
+which is what a transposed projective matrix does), losing the four-point scaling, and returning a colour
+instead of sampling. *** THE SEVENTH STAYS GREEN AND IS LABELLED DEFENSIVE RATHER THAN COUNTED: ***
+homographyDelta's scale normalisation, because both producers already divide through by h22 --
+vision/homography.mjs:174 and fourPointHomography's last line -- so nothing in this tree ever hands it an
+unnormalised matrix.
+
+New: render/perspectiveWarp.mjs, tools/ship/perspectiveWarp-selfcheck.mjs (18 checks),
+tools/ship/perspectiveWarpHarness.html.
+
+NOT done: bilinear sampling, since both sides here are NEAREST so the comparison measures the warp rather
+than two different filters; and glfx.js's other filters, which between the twelve render/*Pass*.js files, the
+28 ported SwiftUIShaders, gl-transitions, aquarelle and badTv the tree already has in some form. This was the
+one that was not a duplicate.
+
+The build now stands at 4238 gates.
+
 ## v4237 -- A sky with closed forms: the tree had no scattering model of any kind, and now it has a graded one
 
 *** THE ARGUMENT FOR TAKING BRUNETON'S MODEL RATHER THAN ANY OTHER SKY SHADER WAS THAT IT CAN BE HELD TO A
