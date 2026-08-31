@@ -8,6 +8,79 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4255 -- the sculptor img2threejs's judge has been waiting for, and how little it proves
+
+v3337 lifted img2threejs's rule that a hard gate cannot be averaged away by soft signals, built
+render/perceptual.mjs and render/silhouette.mjs around it, and explicitly refused their thresholds as numbers
+nobody here had measured. It never built the other half. Grepped before starting: ev/spriteHullCore.js takes
+a bitmap to a 2D outline, mesh/extrudePolygon.mjs takes an outline to a prism, and NOTHING LATHES. That is
+the wrong gap to have, because the objects a single photograph is most often of -- a bottle, a cup, a wheel,
+a column, a bowl -- are solids of revolution, and a prism is exactly the wrong answer for all of them.
+
+New mesh/lathe.mjs: an occupancy mask to a radius-per-row profile, revolved into a closed shell, with the
+volume, the silhouette and the symmetry all measurable.
+
+*** THE LATHE IS EXACT, AND THE DISCRETISATION IS A CLOSED FORM RATHER THAN A TOLERANCE. *** A lathe with N
+segments builds an INSCRIBED N-gon, whose area is exactly (N/2pi)*sin(2pi/N) of the circle's. So there is a
+number to hit at every N, and the measured volume matches it to 3.71e-8 from N=3 to N=1024 -- including N=3,
+where the "cylinder" is a triangular prism and a tolerance-based check would have had to excuse a 17% miss.
+The 1e-8 floor rather than 1e-16 is the Float32Array positions, which is v4253's float32 story in a third
+place.
+
+*** TWO BUGS THE MEASUREMENTS CAUGHT, AND ONE OF THEM WAS IN THIS FILE'S OWN HEADER. ***
+
+The end caps were wound backwards. The divergence theorem sums SIGNED tetrahedra, so a reversed cap does not
+merely point the wrong way -- it SUBTRACTS its cone of volume: the caps contributed -1084033 against the
+sides' +2168066 and a cylinder measured EXACTLY one third of pi*r^2*h. The header had said a winding flip
+"is a bug about normals, not about how much space the object takes up", which is false, and taking Math.abs
+at the end hides the direction of the error and none of its magnitude.
+
+*** AND A SPHERE COULD NOT HAVE FOUND IT: *** a sphere's first and last rings have radius ~0, so a reversed
+cap subtracts nothing, and the sphere read 0.3% out while the cylinder read 67% out. The fixture has to have
+the feature the bug lives in. Separately, one gate check was written as ok(..., true, ...) -- an assertion
+that cannot fail, printed as a PASS among checks that can -- and was caught by reading the diff.
+
+*** THE HONEST RESULT: A LATHE DOES NOT RECOVER A SHAPE FROM A PHOTOGRAPH. IT ASSUMES ONE. ***
+
+The front view of a revolved profile IS the profile mirrored, so the front-view IoU is high nearly by
+construction. Measured: 0.9888 for a circle and 0.9877 for a wavy vase -- and still 0.64 for an L-bracket and
+0.61 for a crescent, neither of which is a solid of revolution in any sense and both of which lathe into
+objects that are simply wrong. Most of that number was never at risk. Adopting img2threejs's IoU < 0.85
+would have rejected the crescent only by luck of where it landed.
+
+The number that does carry information is MIRROR ASYMMETRY about the fitted axis: exactly 0.0000 for both
+revolvable shapes against 0.9063 and 0.9439 for the two that are not -- a gap of the whole range, where IoU
+gave 0.99 against 0.62. A lathe assumes rotational symmetry, and asymmetry is the cheapest evidence the
+assumption was false; unlike the IoU it is not answered by the very construction being tested.
+
+Rotational invariance is exact where it can be: spun a quarter turn the silhouette is PIXEL-IDENTICAL, IoU
+1.000000, because a 90 degree turn maps the pixel lattice onto itself. At an arbitrary yaw it reads 0.991,
+and that residual is DIAGNOSED rather than assumed: (1-IoU)*radius is 0.75, 0.69, 0.70, 0.68, 0.68 at radii
+from 20 to 320 px -- constant across a 16x range, the signature of a one-pixel boundary band whose area grows
+with the perimeter while the shape's grows with the area. Two explanations were tested and killed first:
+faceting, because the residual is identical at 32, 128 and 2048 segments, and a mesh fault, because a mesh
+fault would not scale with the perimeter. "Faceting" was written into the gate before the sweep was run.
+
+The score is taken from render/silhouette.mjs ITSELF -- 0.988783, through a converter to the RGBA buffers it
+takes -- rather than from a private copy of IoU that would have agreed with itself and proved nothing.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(620d1ecb6dc78445298876967b69a433). Reversed caps: 3 red. Caps dropped entirely: 4 red, and note the shape --
+an open surface has no enclosed volume and the theorem does not complain, it just returns the lateral term.
+Asymmetry hard-coded to 0: 1 red, which is the point of that number. And the axis taken as the frame's
+midpoint: 1 RED ON THE FIRST RUN, WHICH WAS TOO FEW -- every fixture happened to be centred at exactly w/2,
+so the axis fit was almost untested. An off-centre fixture was added, the fit recovers 120.00 against a true
+centre of 120, and the sabotage now goes 2 red.
+
+UNCHECKED, and named in the gate: a REAL PHOTOGRAPH. Every mask here is drawn by a formula, so nothing has
+met the segmentation problem, which is what img2threejs's first two stages spend most of their effort on.
+And even a perfect score would not show the subject is round: a flat cardboard cutout of a vase photographs
+identically to a vase. What is proven is that the OUTPUT is a solid of revolution, never that the SUBJECT
+was -- that gap needs a second view. Nothing in the engine calls mesh/lathe.mjs; judge and sculptor are
+joined in this gate and nowhere else.
+
+The build now stands at 4255 gates.
+
 ## v4254 -- the staircase has a closed form, and pulling it straight is a net loss in tight geometry
 
 worker/botPathfinder.worker.js has been this tree's navigation since round 216 -- a real A* over a heightmap
