@@ -303,6 +303,51 @@ export class MeshBVH {
         return false;
     }
 
+    /**
+     * v4235 -- THE THIRD QUERY. Which triangles could a BOX touch?
+     *
+     * *** THIS FILE'S OWN HEADER ARGUES THAT A SINGLE "raycast" WOULD HAVE BEEN THE WRONG UNIFICATION: one
+     * KERNEL, several QUERIES. THIS IS THE CASE THAT ARRIVED. *** A BSP boolean does not cast a ray at all --
+     * it asks which polygons a blast's bounding box can reach, so that the rest of the wall is never handed to
+     * the boolean. Measured in physics/mesh/meshCSG.mjs: twelve blasts on one wall cost 2154 ms whole-wall and
+     * 362 ms localised, and the localised mesh is 2.3x SMALLER as well as 5.9x faster, because clipping a
+     * polygon through a BSP splits it along planes it lies nowhere near.
+     *
+     * The test is AABB-vs-AABB, which is CONSERVATIVE ON PURPOSE: it can return a triangle the box does not
+     * actually touch, and it can never miss one it does. That is the only direction a boolean can tolerate --
+     * a false positive costs a wasted split, a false negative silently leaves solid geometry where a hole
+     * should be, and nothing downstream would notice.
+     */
+    trianglesInBox(lo, hi) {
+        const out = [];
+        if (!this.count) return out;
+        const stack = [0];
+        while (stack.length) {
+            const node = stack.pop(), o = node * 6;
+            if (this.bounds[o] > hi[0] || this.bounds[o + 3] < lo[0] ||
+                this.bounds[o + 1] > hi[1] || this.bounds[o + 4] < lo[1] ||
+                this.bounds[o + 2] > hi[2] || this.bounds[o + 5] < lo[2]) continue;
+            const left = this.meta[node * 3];
+            if (left < 0) {
+                const start = this.meta[node * 3 + 1], n = this.meta[node * 3 + 2];
+                for (let s = start; s < start + n; s++) {
+                    const t = this.order[s], b = t * 9;
+                    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+                    for (let c = 0; c < 3; c++) {
+                        const x = this.tris[b + c * 3], y = this.tris[b + c * 3 + 1], z = this.tris[b + c * 3 + 2];
+                        if (x < x0) x0 = x; if (x > x1) x1 = x;
+                        if (y < y0) y0 = y; if (y > y1) y1 = y;
+                        if (z < z0) z0 = z; if (z > z1) z1 = z;
+                    }
+                    if (x0 <= hi[0] && x1 >= lo[0] && y0 <= hi[1] && y1 >= lo[1] && z0 <= hi[2] && z1 >= lo[2]) out.push(t);
+                }
+                continue;
+            }
+            stack.push(left); stack.push(this.meta[node * 3 + 1]);
+        }
+        return out;
+    }
+
     stats() { return { triangles: this.count, nodes: this.nodes, leaves: this.leaves, depth: this.depth, maxLeaf: this.maxLeaf }; }
 }
 

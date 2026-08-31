@@ -8,6 +8,85 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4235 -- Destructible environments: an exact hole in a wall, and what "gap-free" turns out to mean
+
+*** THE REQUEST WAS "SUBTRACT A JAGGED EXPLOSION SHAPE FROM A CONCRETE WALL IN REAL TIME TO CREATE REALISTIC,
+GAP-FREE RUBBLE AND HOLES", AND MEASURING IT BEFORE BUILDING IT CHANGED THE SHAPE OF THE ROUND THREE TIMES. ***
+The tree had no triangle-level boolean of any kind -- no BSP, no splitPolygon, no coplanar handling anywhere.
+The only CSG was physics/mesh/csg.mjs, which is exact in the FIELD and then samples it on a grid, so a jagged
+rim is smoothed toward the cell size. What BSP buys is a rim on the wall's OWN plane at any angle with no grid,
+and that is the reason to carry a second CSG at all. Neither replaces the other and both are kept.
+
+*** "IN REAL TIME" HOLDS FOR THE FIRST HOLE AND FAILS BY THE THIRD, AND THE COST IS NOT THE BOOLEAN. *** A
+six-polygon wall minus a 256-triangle blast is 561 polygons in 11.6 ms -- one frame, fine. Twelve overlapping
+blasts on the same wall: shot 1 costs 12.7 ms, SHOT 12 COSTS 318.8 ms, and the wall is 20,647 polygons where it
+began as 6. The cause is that clipping a polygon through B's BSP splits it along B's planes even where it lies
+nowhere near B, and B's planes are INFINITE: measured, a blast FIFTY UNITS AWAY still takes a 2,648-polygon
+wall to 3,310. Localised to the polygons a blast's box can reach: 2154 ms to 362 ms over twelve shots, and
+20,647 polygons to 8,979. The localised result is the BETTER MESH, not merely the faster one.
+
+*** WHICH FORCED THE RULE THE GATE IS BUILT AROUND: A BOOLEAN IS GRADED ON THE SOLID, NOT ON THE MESH. *** The
+two paths produce different polygon lists for the same cut. A gate that diffed them would be red on a correct
+optimisation, and the fix would then be to make the fast path reproduce the slow path's waste. So what is
+asserted is V(A - B) + V(A AND B) = V(A), which comes back at a residual of 9.7e-14, and V(A OR B) = V(A) +
+V(B) - V(A AND B) at 1.8e-14.
+
+*** THE LOCALISATION NEEDED A QUERY THE BVH DID NOT HAVE, AND meshBVH.mjs's OWN HEADER HAD ALREADY ARGUED FOR
+IT. *** That file says a single "raycast" would have been the wrong unification -- one KERNEL, several QUERIES
+-- and it shipped with two, raycastFirst and intersectsSegment. A boolean casts no ray at all; it asks which
+polygons a box can reach. trianglesInBox is the third query, and #96 shipping the BVH is what unblocked this.
+
+*** "GAP-FREE" IS TWO CLAIMS AND ONLY ONE OF THEM WAS TRUE OF THE RAW BOOLEAN. *** Of 3,239 directed edges
+after one blast, 803 (24.8%) have no exact opposite -- and every single one is FULLY COVERED by shorter edges
+running the other way. Zero uncovered. So the surface really does bound the solid; what it is NOT is WELDED. A
+long edge meeting two short ones is a T-junction: mathematically closed, and a hairline crack of background
+colour once a rasteriser interpolates the two sides. Neither the volume check nor a screenshot would show it.
+weldTJunctions inserts the covering vertices, and ONE BLAST SETTLES TO 100.0% MATCHED EDGES, ZERO T-JUNCTIONS,
+ZERO GAPS. The coplanar merge makes T-junctions WORSE first (24.8% to 55.8%), so the order is snap, merge,
+weld, and weld is last.
+
+*** OVER TWELVE BLASTS IT DOES NOT REACH 100%, AND THREE EXPLANATIONS WERE PROPOSED AND ALL THREE MEASURED AND
+REFUTED. *** 15 of 12,847 edges (0.117%) survive settle() and they are UNCOVERED -- real cracks. (1) "splitPolygon
+drops slivers under three vertices": a counter says 0 of 100,987 splits. (2) "the weld tolerance is too tight":
+identical at every tolerance from 1e-9 to 1e-7 and WORSE loosened to 1e-5. (3) "the same corner is spelled two
+ways" -- the cracks do come in equal-length PAIRS, which is what that looks like, but snapVertices closes none
+at any tolerance from 1e-12 to 1e-6. The volume is unaffected either way, 20.112588161 to the last digit across
+every combination of snap, merge and weld. So the solid is right and a hairline of its surface is not sewn, and
+that is written down with its measurements rather than rounded off.
+
+*** TWO PASSES ARE ONLY SOUND WHERE THEY ARE PUT, AND PUTTING THEM WRONG WAS MEASURED, NOT REASONED. *** blast()
+first ran cut -> merge -> weld every shot: 5546 ms over twelve against 656 ms, and merging an ALREADY-WELDED
+mesh exposed a lossy edge index that produced FIFTEEN CONCAVE POLYGONS up to 0.3 units deep on an 8-unit wall
+-- faces the fan triangulator would have drawn wrong. Merging only the freshly cut PATCH is faster and also
+wrong: the patch is an OPEN surface, mergeCoplanar's shared-edge test assumes every edge has a partner, and it
+left 36 uncovered edges. So blast() cuts and nothing else; settle() snaps, merges and welds once, on a closed
+mesh, when the shooting stops.
+
+*** AND HALF THE REQUEST IS NOT A BOOLEAN. *** "Gap-free rubble and holes" is two problems. A BSP subtraction
+returns ONE CONNECTED MESH WITH A HOLE IN IT. Rubble is pieces, and a piece needs a mass, a centre of mass and
+an inertia tensor -- physics/voxel/fracture.js, which already holds a voxel summation to the analytic box
+tensor including each voxel's own-centre term. Not duplicated here, and the gate asserts the boundary: meshCSG
+contains no connected-components pass and fracture.js does.
+
+SEVENTEEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Twelve turned something red: inverting the
+vertices without the plane (837 concave faces), the plane without the vertices (2.262 volume residual),
+forgetting the subtree swap (28.21), dropping subtract's final invert (54.16), a back-facing coplanar polygon
+in the front bucket (two boxes union to 12 polygons instead of 10, keeping a wall inside the solid), a
+localisation that misses grazing polygons, an exclusive BVH box test (2.491% uncovered edges), losing the
+convexity refusal in the merge, and volume() forgetting its 1/6. FIVE WENT GREEN AND THREE OF THOSE WERE THE
+GATE'S FAULT AND ARE NOW FIXED -- the BVH check asserted the WRONG DIRECTION, claiming the BVH set is a
+SUPERSET of the polygon-box set when it is TIGHTER (2,377 against 2,378, correctly, because it bounds each
+triangle); it passed only because a six-polygon wall has no case where it could fail. TWO REMAIN GREEN AND ARE
+LABELLED AS DEFENSIVE RATHER THAN COUNTED: the weld's iteration inserts nothing on the second pass at every
+maxRounds from 1 to 8, and the merge's multimap is unobservable now that blast() no longer merges. The comment
+claiming the iteration was load-bearing was FALSE and has been corrected in place.
+
+New: physics/mesh/meshCSG.mjs (BSP booleans, method from evanw/csg.js, MIT, code rewritten),
+physics/mesh/meshCSG-selfcheck.mjs (42 checks), destructible.html (blast a slab, watch it settle), and
+trianglesInBox on mesh/meshBVH.mjs. Consumed by a page, which is the same way physics/mesh/csg.mjs is reached.
+
+The build now stands at 4235 gates.
+
 ## v4234 -- SwiftUIShaders batch 11: 28 of 41, the alpha hole closed by sabotage, and a branch that was dead code
 
 *** THE HOLE v4233's SABOTAGE FOUND IS CLOSED, AND CLOSING IT IS WORTH MORE THAN THE FOUR SHADERS. *** Last
