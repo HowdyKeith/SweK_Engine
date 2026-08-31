@@ -8,6 +8,99 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4207 -- a WGSL conformance check, and it found three shipped shaders that cannot run on a default device
+
+Same mould as v4204's GL Transition check: read the shader, check it against the contract, refuse it BEFORE a
+compile is spent on it. Sharper here than for GLSL. A GLSL shader can be compiled by any GL context; WGSL
+needs a live WebGPU device, and the build box has none. So the twenty-odd places this tree writes WGSL -- ten
+.wgsl files plus inline shaders in fluid, mpm, blackhole, nebula, anime4k, blobulator, cell-tracking, gauges
+and the brain's transport kernels -- were, statically, unchecked by anything.
+
+THE FINDING. brain/transport/shaders/scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl each
+declare @compute @workgroup_size(1024). That is four times WebGPU's default maxComputeInvocationsPerWorkgroup
+of 256, and it also exceeds the default maxComputeWorkgroupSizeX of 256 on its own.
+
+MEASURED across 3,956 .js/.mjs/.html files, node_modules excluded: 27 requestDevice() call sites, and
+`requiredLimits` appears ZERO times. So the defaults are not a conservative floor for this tree -- they are
+exactly what every device in it gets. Those three pipelines cannot be created here.
+
+And the failure lands somewhere unhelpful: a workgroup size over the limit is rejected at
+createComputePipeline, not at createShaderModule. The shader "compiles" fine and the error arrives later,
+attached to the pipeline rather than to the shader that caused it.
+
+The other seven .wgsl files validate clean, which is what makes the three mean something rather than being a
+checker that rejects everything.
+
+WHERE THE IDEA CAME FROM. dantiicu/dawn-switch -- BSD-3-Clause, LICENSE read directly, "Copyright 2017-2023
+The Dawn & Tint Authors" -- a fork of Chromium's Dawn with a branch adding Nintendo Switch support. Dawn is
+the native WebGPU implementation underneath navigator.gpu, ~25,700 commits of C++ compiled against
+D3D12/Metal/Vulkan with GN/Bazel and a depot_tools checkout. The licence is properly permissive and none of
+it is vendorable into a browser JS tree -- vendoring it would mean shipping a browser. What transfers is that
+WGSL HAS A CHECKABLE SHAPE, which is what Tint, the WGSL compiler inside it, exists to exploit.
+
+THE LIMITS ARE A PARAMETER AND CARRY THEIR PROVENANCE. This is v4203's lesson applied before the mistake
+instead of after it. w3.org and gpuweb.github.io are both blocked by this sandbox's egress proxy, and the
+headless shell here exposes no navigator.gpu, so DEFAULT_LIMITS was written from knowledge and could be
+verified against NEITHER the specification nor a live device. LIMITS_PROVENANCE says so in the record:
+verifiedAgainstSpec false, verifiedAgainstDevice false, and why.
+
+Every entry point takes a `limits` argument, so a caller with a real device passes device.limits and gets an
+answer about that device. New tools/ship/wgslDeviceLimits.mjs reads the real limits from a browser and
+reports any disagreement -- a TOOL and not a gate, for the same reason tools/ship/verifyLicenceTexts.mjs is
+one: a gate that needs a GPU silently passes on every box without one. Run in this sandbox it prints
+UNVERIFIED and exits 2, which proves nothing and says so.
+
+MY BARRIER CHECK WAS WRONG TWICE BEFORE IT WAS RIGHT, AND BOTH FAILURES WERE ON CORRECT CODE.
+
+A barrier in WGSL must be reached by every invocation in the workgroup; anything else is undefined behaviour,
+and it is the commonest way a compute shader works on one vendor and hangs on another. The first draft
+flagged any barrier inside any if/for/while and fired twice on the very first real shader it read.
+scan.wgsl's first barrier is the opening statement of `for (var d = 1024u >> 1u; d > 0u; d >>= 1u)`, whose
+trip count is identical for every invocation, so it IS uniform control flow and the code is correct. The
+second sits at plain function scope; walking back through braces to find the enclosing block simply landed on
+the wrong one.
+
+The rule is not "not in a conditional", it is "in UNIFORM control flow". So the question is not whether there
+is an `if` but whether its predicate depends on WHICH INVOCATION IS ASKING -- and that is tractable. The
+check now collects names bound to invocation builtins (@builtin(local_invocation_id) and friends), propagates
+one hop through `let thid = lid.x;`, and flags only barriers reached under a predicate mentioning one.
+
+The second draft then captured that predicate with [\s\S]* and matched from an `if (` far above, through a
+whole block, to a later `)` -- reporting conditions like "gid.x < n) { shared_data[thid] = ...; } el" and
+flagging correct code on that basis. A condition cannot contain a brace.
+
+After both fixes: ZERO false positives across all ten .wgsl files, and it still catches a hand-written
+barrier under `if (t < 32u)` where t comes from local_invocation_id, naming the predicate in the report. A
+validator that fires on correct code teaches people to ignore it, which is worse than not having one.
+
+TWO MORE OF MY OWN, both caught by the gate rather than by review.
+
+The gate's first run reported "requiredLimits appears 3 times" and went red against a claim that is true.
+All three hits were in the files this round added -- a variable name, a regex literal, and a comment inside a
+template literal, none of which codeOnly() strips. A checker that counts itself measures the checker. The
+scan now excludes the three v4207 files and says why.
+
+And the first draft of the changelog entry said "eight requestDevice() call sites". That was a `head -8` on a
+grep, read as a total. There are 27. A number taken from a truncated listing is not a measurement, and the
+module comment carried the same error until the gate made me count properly.
+
+Also gated: vec3<f32> sizes to 16 bytes and not 12, because WGSL aligns it like a vec4 and under-counting it
+would clear a shader that overflows workgroup storage; sizeOf() returns null and never zero for a struct or a
+runtime-sized array, because an UNKNOWN size is not a zero size; a workgroup size built from a template hole
+(`@workgroup_size(${WG})`, which much of this tree uses) is not a violation, because it cannot be judged
+until the string is assembled; and a duplicate (group, binding) pair is refused, which the shader compiler
+will not catch.
+
+Wired as wgsl.check(src[, limits]), wgsl.parse(src), wgsl.limits() -- which prints the provenance as a
+warning next to the numbers -- and wgsl.cannotDo().
+
+Gate: tools/ship/wgslSpec-selfcheck.mjs, 69 checks, all pass. Nine sabotages, all red: removing the
+invocations-per-workgroup check so the finding goes unseen, restoring the flag-any-conditional barrier rule
+so the false positives return, sizing vec3 as 12 bytes, making sizeOf return 0 instead of null for an unknown
+type, having LIMITS_PROVENANCE claim it was verified, treating a template hole as a violation, dropping the
+duplicate-binding check, letting the device tool launch a browser on import (a bug v4204 shipped once), and
+unwiring window.wgsl. All three touched files restored byte-identical.
+The build now stands at 1287 gates.
 ## v4206 -- two gunnery brains, one ocean, and the round's headline is a negative result about its own centrepiece
 
 brain/navalPolicy.mjs scores every unknown cell with a weight vector, the same shape brain/csTacticsPolicy.js
