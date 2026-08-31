@@ -8,6 +8,82 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4246 -- The JS and the GLSL simplex were never the same function, and the mechanism v4243 blamed was the wrong one
+
+*** THIS TREE GRADES SHADERS BY COMPARING A JS MODEL AGAINST THE GPU PASS. FOR ANY SHADER BUILT ON SIMPLEX
+NOISE THAT COMPARISON WAS IMPOSSIBLE, AND NOBODY HAD NOTICED BECAUSE NOBODY HAD TRIED. ***
+
+The convention is everywhere: render/crtModel.js graded against render/crtPass.js, swiftShaderModel against
+swiftShaderPass, each reporting a worst channel difference of 0 or 1 of 255. It rests on one assumption --
+that the two implementations compute the same function. v4243 tried to apply it to a procedural texture,
+found snoise3 and the GLSL snoise agreeing to 1e-3 at only 23.5% of 9,216 points with a worst disagreement of
+4.17 on a range of about +/-3.6, watched three instruments fail to separate a correct shader from a
+deliberately broken one, and shipped a section saying no agreement check was available.
+
+*** THE CAUSE IS ONE TRUNCATED DECIMAL, AND IT IS NOT WHERE v4243 SAID IT WAS. ***
+
+Ashima writes 1/7 as a literal:
+
+    const float n_ = 0.142857142857;      // 1/7
+
+and then takes floor(j * n_) to choose which gradient a corner gets. That literal is BELOW 1/7 in float64 and
+ABOVE it in float32 -- fround(0.142857142857) = 0.14285714924335480. So:
+
+    float64:  7 * 0.142857142857  = 0.999999999999   ->  floor = 0
+    float32:  7 * 0.1428571492... = 1.0000000447     ->  floor = 1
+
+Every multiple of 7 sits exactly on that boundary and falls the other way. MEASURED: of the 289 possible
+permute outputs, 41 select a different gradient index and 5 give a different j. That is 14% per lookup; four
+corners are summed per evaluation and octaves are stacked on top, which is how it becomes 76% per pixel.
+
+*** v4243 BLAMED mod289 CROSSING A FLOOR BOUNDARY, AND TWO SABOTAGES PROVED THAT WRONG. *** Removing the
+32-bit rounding from mod289 changed nothing. Removing it from the ENTIRE permute chain changed nothing
+either. It could never have mattered: that chain produces integers below 2^24, and integer arithmetic is
+exact in 32-bit float. The story was plausible, it was measured -- mod289 flips really do occur at a rate of
+0.06% -- and it was not the cause. A MECHANISM NO SABOTAGE CAN BREAK IS A STORY, NOT A DIAGNOSIS. Removing
+the rounding from the gradient index alone, one line, drops agreement from 9216 to 4146 of 9216, which is
+what turns the new account from an argument into a measurement.
+
+THE FIX IS NOT TO WRITE THE JS MORE CAREFULLY. It is to write JS that makes the SAME ROUNDING DECISIONS.
+shaders/ashimaNoise.mjs now also exports snoise3f32: the same algorithm with Math.fround after every
+arithmetic operation, which is what the hardware does. It reproduces the GPU at ALL 9,216 measured points,
+worst deviation 1.3e-6 -- the 24-bit readback's own resolution rather than a disagreement.
+
+BOTH ARE KEPT AND BOTH ARE EXPORTED. snoise3 is the mathematically clean answer and is what a caller doing
+noise on the CPU for its own sake wants. snoise3f32 is what a GATE grading a GLSL shader must use. Picking
+the wrong one is precisely the defect that cost v4243 a round, so neither is removed and the header says
+which is which.
+
+*** THE PAYOFF IS IMMEDIATE AND IS THE POINT. *** v4243's solidTexture gate contained a section that reported
+"no CPU/GPU agreement check is available here" and pinned three failed instruments rather than inventing a
+threshold. That section now makes a PER-PIXEL comparison: worst 1 of 255 over 9,216 pixels, 9,215 of them
+bit-identical, with the f64 reference kept alongside as a control and still reading 67. The difference is not
+a better tolerance; it is the right function.
+
+THE COST TO THE TREE WAS COUNTED RATHER THAN FEARED, AND IT IS SMALLER THAN THE BACKLOG ITEM CLAIMED. Of 69
+gates that drive a real GPU, NONE was grading a noise-based shader against the wrong function -- because none
+was grading one at all. render/aquarelle-selfcheck.mjs, named at v4243 as a pair at risk, drives no browser
+and says so in its own closing note: "unchecked here: the pass RENDERING. That needs a GL context and a GPU."
+It compares source text. So the defect was a MISSING CAPABILITY, not a wrong result in a shipped gate, and
+that is the claim the evidence supports. What remains true is that any FUTURE gate comparing a noise shader
+to a JS model would have been silently ungradeable. It no longer is.
+
+CORRECTED IN PLACE: shaders/ashimaNoise.mjs's header, which now carries the real mechanism instead of the
+plausible one; shaders/ashimaNoise-selfcheck.mjs's closing note, which has said "a GPU shadow check is the
+honest next step" since v4177 and now carries the answer that step produced; and
+tools/ship/solidTexture-selfcheck.mjs, which carried v4243's wrong mechanism in a check of its own.
+
+New: tools/ship/noisePrecision-selfcheck.mjs (10 checks).
+
+NOT done, and stated in the gate: whether OTHER GPUs agree with swiftshader. Everything here is measured on
+one software rasteriser, and while float32 is a standard, the order a compiler evaluates an expression in is
+not -- a driver that contracts a multiply-add differently could land on the other side of a boundary
+somewhere else. snoise3f32 is the right reference for THIS harness and a hypothesis about any other. Also not
+done: snoise2, whose 2D chain has the same shape at smaller magnitudes and has never been measured against a
+GPU at all.
+
+The build now stands at 4246 gates.
+
 ## v4245 -- A ragdoll derived from a skeleton, and #116's own premise corrected by the gate that checked it
 
 *** #116 CAME FROM sunag/Oimo.js-Lab AND THE ASSESSMENT FOUND NOTHING TO TAKE. *** Its two headline features

@@ -106,8 +106,16 @@ const src = (p) => readFileSync(new URL(p, import.meta.url).pathname, "utf8");
 }
 
 console.log(`ashimaNoise-selfcheck: ${pass} passed, ${fail} failed`);
-console.log("unchecked here: that the CPU translation and the GLSL agree NUMERICALLY. That needs a GPU, and\n" +
-            "npm could not install playwright in this environment. What IS settled is that the shader fireMesh\n" +
-            "ships is byte-identical to before the extraction, and that the CPU model is continuous and\n" +
-            "zero-mean -- the properties a mis-translation breaks. A GPU shadow check is the honest next step.");
+// *** THIS NOTE'S "HONEST NEXT STEP" WAS TAKEN AT v4246, AND THE ANSWER WAS NO. ***
+console.log("checked ELSEWHERE, and the answer is worth carrying here: tools/ship/noisePrecision-selfcheck.mjs\n" +
+            "asked a real GPU whether the CPU translation and the GLSL agree NUMERICALLY, which this file has\n" +
+            "always listed as its own gap. THEY DO NOT. snoise3 and the GLSL snoise agree to 1e-3 at only 23.5%\n" +
+            "of 9,216 points, worst disagreement 4.17 on a range of about +/-3.6 -- not drift, but a DIFFERENT\n" +
+            "GRADIENT, because Ashima's literal for 1/7 (0.142857142857) sits below 1/7 at 64 bits and above it\n" +
+            "at 32, so floor(7 * n_) is 0 one way and 1 the other. 41 of the 289 possible permute outputs pick a\n" +
+            "different gradient. snoise3 is NOT WRONG -- it is the mathematically clean answer, and it is the\n" +
+            "wrong thing to grade a shader against. shaders/ashimaNoise.mjs now also exports snoise3f32, which\n" +
+            "rounds to 32 bits after every operation and reproduces the GPU at every one of those 9,216 points.\n" +
+            "STILL unchecked here: snoise2, whose 2D chain has the same shape at smaller magnitudes and has\n" +
+            "never been measured against a GPU at all.");
 process.exit(fail ? 1 : 0);

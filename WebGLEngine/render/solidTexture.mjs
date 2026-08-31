@@ -47,16 +47,24 @@
 // the axis crossings, so it is measured here (band width and doubling, off a rendered image) rather than set
 // to whatever number a tutorial used.
 "use strict";
-import { snoise3 } from "../shaders/ashimaNoise.mjs";
+import { snoise3, snoise3f32 } from "../shaders/ashimaNoise.mjs";
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const mix = (a, b, t) => a + (b - a) * t;
 
-/** Fractal noise: octaves of snoise3, each finer and quieter. A plain function of the point, like everything here. */
-export function fbm3(x, y, z, octaves = 4, lacunarity = 2.0, gain = 0.5) {
+/**
+ * Fractal noise: octaves of simplex, each finer and quieter. A plain function of the point.
+ *
+ * *** WHICH SIMPLEX MATTERS, AND v4243 LEARNED THAT THE HARD WAY. *** Pass snoise3 and you get the
+ * mathematically clean answer; pass snoise3f32 and you get the answer a GPU gets, because that one rounds to
+ * 32 bits after every operation the way the hardware does. They are not close: v4243 measured them agreeing
+ * at 23.5% of points. A GATE comparing this file's JS against its GLSL must use the f32 one, and v4246 is
+ * the round that made that possible -- before it, the comparison could not be made at all.
+ */
+export function fbm3(x, y, z, octaves = 4, lacunarity = 2.0, gain = 0.5, noise = snoise3) {
     let f = 1, a = 1, sum = 0, norm = 0;
     for (let i = 0; i < octaves; i++) {
-        sum += a * snoise3(x * f, y * f, z * f);
+        sum += a * noise(x * f, y * f, z * f);
         norm += a;
         f *= lacunarity; a *= gain;
     }
@@ -89,11 +97,14 @@ export const CONCRETE = Object.freeze({
 export function concreteAt(x, y, z, opts = {}) {
     const o = { ...CONCRETE, ...opts };
     const s = o.scale;
-    const agg = fbm3(x * s, y * s, z * s, 3);
-    const fine = fbm3(x * s * 9, y * s * 9, z * s * 9, 2);
+    // opts.f32 selects the GPU-faithful simplex. A caller rendering on the CPU wants the default; a GATE
+    // comparing against the GLSL wants this, and using the wrong one is the defect v4243 spent a round on.
+    const nz = opts.f32 ? snoise3f32 : snoise3;
+    const agg = fbm3(x * s, y * s, z * s, 3, 2, 0.5, nz);
+    const fine = fbm3(x * s * 9, y * s * 9, z * s * 9, 2, 2, 0.5, nz);
     const isStone = agg > o.aggregate;
     // A stone's own shade varies stone to stone, so the aggregate does not read as one flat grey.
-    const shade = isStone ? o.stoneLight * (0.5 + 0.5 * fbm3(x * s * 2.3 + 11, y * s * 2.3, z * s * 2.3, 2)) : 0;
+    const shade = isStone ? o.stoneLight * (0.5 + 0.5 * fbm3(x * s * 2.3 + 11, y * s * 2.3, z * s * 2.3, 2, 2, 0.5, nz)) : 0;
     const base = isStone ? o.stone : o.cement;
     const g = fine * o.grain;
     const out = [
@@ -103,7 +114,7 @@ export function concreteAt(x, y, z, opts = {}) {
     ];
     if (opts.weathered) {
         // Streaks run DOWN, so the noise is stretched in y -- gravity is the only direction a stain knows.
-        const w = clamp01(fbm3(x * s * 1.7, y * s * 0.4, z * s * 1.7, 3) * 0.5 + 0.5);
+        const w = clamp01(fbm3(x * s * 1.7, y * s * 0.4, z * s * 1.7, 3, 2, 0.5, nz) * 0.5 + 0.5);
         for (let i = 0; i < 3; i++) out[i] = clamp01(mix(out[i], o.weather[i], w * 0.55));
     }
     return out;

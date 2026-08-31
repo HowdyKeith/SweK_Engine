@@ -202,7 +202,7 @@ console.log("\n4. the interior is not the exterior, which is the other half of w
 //      two agree" into "no agreement check is available here", and the three instruments tried are recorded
 //      there with their numbers rather than the one that flattered the result being kept.
 //
-console.log("\n5. *** ON A REAL GPU -- and the per-pixel comparison this tree always makes is NOT AVAILABLE ***");
+console.log("\n5. *** ON A REAL GPU -- the comparison v4243 could not make, and v4246 made possible ***");
 const require_ = createRequire(import.meta.url);
 const { chromium, from: pwFrom } = resolvePlaywright(require_);
 const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
@@ -264,32 +264,25 @@ if (skip) {
             (sumN / (N * N)).toFixed(3) + "). That SHAPE is the diagnosis: a drifting precision error would " +
             "be small everywhere, and a wrong translation would be wrong everywhere. Exact agreement at many " +
             "points with total disagreement at others is a DIFFERENT GRADIENT being chosen.");
-        // *** AND THE MECHANISM, WHICH IS INHERENT AND NOT FIXABLE BY WRITING THE JS MORE CAREFULLY. ***
-        // Ashima's permute chain ends in mod289(x) = x - floor(x * (1/289)) * 289 with x reaching ~1.1e7.
-        // 1/289 is not exact in binary, so in 32-bit float the product lands on the other side of an integer
-        // boundary for a small fraction of inputs; floor then differs by one, mod289 differs by 289, and a
-        // different gradient vector is selected. The JS runs in float64 and gets the other answer.
-        const f = Math.fround;
-        const m32 = (x) => f(x - f(f(Math.floor(f(f(x) * f(1 / 289)))) * 289));
-        const m64 = (x) => x - Math.floor(x * (1 / 289)) * 289;
-        let flips = 0, tried = 0;
-        for (let k = 0; k < 60000; k++) {
-            const xv = 1 + k * 0.173;
-            const v = ((xv * 34) + 1) * xv;
-            if (v > 1.2e7) break;
-            tried++;
-            if (Math.abs(m64(v) - m32(v)) > 1) flips++;
-        }
-        ok("!! *** AND THE MECHANISM IS float32 mod289 CROSSING A floor BOUNDARY, MEASURED DIRECTLY ***",
-            flips > 0,
-            flips + " of " + tried + " permute-chain values (" + (100 * flips / tried).toFixed(2) + "%) land " +
-            "on a DIFFERENT integer under 32-bit mod289 than under 64-bit. One flip is 289, which is a whole " +
-            "different gradient. So this is a property of evaluating Ashima's noise at two precisions, not a " +
-            "mistranslation -- and no amount of care in the JS removes it.");
-        report("*** WHAT THAT COSTS THIS TREE, STATED RATHER THAN FIXED HERE: the CPU-model-against-GPU-pass " +
-               "convention cannot grade any shader whose output passes through simplex noise. That reaches " +
-               "further than this round -- render/aquarelleModel.mjs and render/aquarellePass.js are exactly " +
-               "such a pair. Filed; NOT investigated here, because it is a bigger question than one texture.");
+        // *** THE MECHANISM THIS ROUND GAVE HERE WAS WRONG, AND v4246 CORRECTED IT. *** v4243 blamed
+        // Ashima's mod289 crossing a floor boundary at 32 bits. It is a real effect and it is NOT the cause:
+        // two sabotages at v4246 removed the 32-bit rounding from mod289 and then from the entire permute
+        // chain and changed nothing, because that chain produces integers below 2^24, which are exact at both
+        // precisions. The actual cause is the literal Ashima writes for 1/7 -- `0.142857142857`, which is
+        // BELOW 1/7 at 64 bits and ABOVE it at 32 -- so floor(7 * n_) is 0 one way and 1 the other and the
+        // gradient index moves. 41 of the 289 possible permute outputs pick a different gradient.
+        // Measured in full by tools/ship/noisePrecision-selfcheck.mjs; kept short here and NOT restated as
+        // the old story, because a wrong mechanism repeated in two files is worse than one.
+        const f = Math.fround, LIT = 0.142857142857;
+        ok("!! *** AND THE MECHANISM IS ONE TRUNCATED DECIMAL: the literal for 1/7, rounded two ways ***",
+            LIT < 1 / 7 && f(LIT) > 1 / 7 && Math.floor(7 * LIT) === 0 && Math.floor(f(7 * f(LIT))) === 1,
+            "0.142857142857 is below 1/7 at 64 bits and above it at 32, so floor(7 * n_) is 0 there and 1 " +
+            "here -- a different gradient from one multiply. v4243 named mod289 instead; that was a plausible " +
+            "mechanism no sabotage could break, which is a story rather than a diagnosis.");
+        report("*** AND THAT WAS FIXED AT v4246 RATHER THAN LIVED WITH: *** shaders/ashimaNoise.mjs now also " +
+               "exports snoise3f32, which rounds to 32 bits after every operation and reproduces the GPU " +
+               "exactly. The two checks below are the payoff -- this section reported 'no agreement check is " +
+               "available here' for one round and now makes a per-pixel one.");
 
         // WHAT CAN STILL BE COMPARED: the statistics. A mistranslation, a dropped constant or a swapped
         // falloff moves these; a per-point gradient flip does not, because both sides draw from the same
@@ -339,33 +332,51 @@ if (skip) {
         const sdA = Math.sqrt(Math.max(0, sxx / nn - (sx / nn) ** 2));
         const sdB = Math.sqrt(Math.max(0, syy / nn - (sy / nn) ** 2));
         const corr = sdA > 0 && sdB > 0 ? cov / (sdA * sdB) : 0;
-        // *** THREE INSTRUMENTS WERE TRIED AND NONE OF THEM SEPARATES A CORRECT SHADER FROM A BROKEN ONE.
-        // THAT IS THE RESULT, AND IT IS REPORTED RATHER THAN THRESHOLDED UNTIL IT LOOKS LIKE A PASS. ***
+        // *** v4243 REPORTED THAT NO CPU/GPU AGREEMENT CHECK WAS AVAILABLE HERE. v4246 MADE ONE. ***
         //
-        // The reference defect throughout was multiplying the GLSL's frequency by 1.6 -- precisely the
-        // "a constant drifted between the two copies" failure this section exists to catch.
+        // That round tried three instruments against a deliberately broken shader (the GLSL's frequency
+        // multiplied by 1.6) and none separated it from a correct one: mean brightness moved 0.009 against a
+        // 0.02 tolerance, pixel correlation read 0.199 correct against 0.096 broken, and block correlation
+        // did not improve on it. The cause was not the instruments. It was that snoise3 and the GLSL snoise
+        // ARE NOT THE SAME FUNCTION -- they agree at 23.5% of points, because Ashima's mod289 crosses a floor
+        // boundary differently at 32 bits than at 64.
         //
-        //   MEAN BRIGHTNESS   correct 0.626 vs JS 0.615; DEFECTIVE 0.623. The defect moved it 0.009 and any
-        //                     tolerance loose enough to pass the correct build passes the broken one too.
-        //                     Simplex noise is STATIONARY, so changing its frequency barely touches its
-        //                     histogram -- no distribution test can see a frequency error.
-        //   PIXEL CORRELATION correct r = 0.199, DEFECTIVE r = 0.096. Real separation, far too little of it.
-        //                     concreteAt thresholds the noise, so each of the 76% of samples where the two
-        //                     precisions choose different gradients becomes a FULL-MAGNITUDE pixel flip.
-        //   BLOCK CORRELATION correct r = 0.193 over 8x8 means. Averaging was meant to suppress isolated
-        //                     flips; it did not move the number, which says the disagreement is pervasive
-        //                     rather than sparse.
-        //
-        // So the honest statement is that THIS TREE CANNOT CURRENTLY GRADE A NOISE-BASED SHADER AGAINST ITS
-        // JS MODEL AT ALL, and inventing a threshold around r = 0.15 would be manufacturing a pass out of a
-        // gap. What is asserted below is only what was actually established.
-        ok("!! *** NO CPU/GPU AGREEMENT CHECK IS AVAILABLE HERE, AND THAT IS THE MEASUREMENT, NOT A GAP ***",
-            corr > 0 && corr < 0.5 && Math.abs(gmean - jmean) < 0.05,
-            "block correlation r = " + corr.toFixed(4) + " over " + nn + " blocks with BOTH SIDES CORRECT, " +
-            "against r = 0.096 for a deliberately broken shader -- a separation too small to gate on. Means " +
-            gmean.toFixed(4) + " / " + jmean.toFixed(4) + ". The assertion here is deliberately weak and " +
-            "says so: it pins the numbers this round measured so a future change to the noise, the shader " +
-            "or the precision moves them visibly, and it claims nothing about correctness.");
+        // shaders/ashimaNoise.mjs now exports snoise3f32, which rounds to 32 bits after every operation the
+        // way the hardware does, and reproduces the GPU EXACTLY. So the comparison this tree makes for every
+        // other shader is finally available for this one, and it is a per-pixel equality rather than a
+        // statistic.
+        let worst = 0, worstAt = null, sum = 0, exactPx = 0;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const p = ptAt(x, y);
+            const c = st.concreteAt(p[0], p[1], p[2], { f32: true });
+            let px = 0;
+            for (let ch = 0; ch < 3; ch++) {
+                const d = Math.abs(Math.round(c[ch] * 255) - got.px[(y * N + x) * 4 + ch]);
+                sum += d; px = Math.max(px, d);
+                if (d > worst) { worst = d; worstAt = [x, y, ch]; }
+            }
+            if (px === 0) exactPx++;
+        }
+        ok("!! *** THE GLSL AND THE f32 JS AGREE PER PIXEL -- the check v4243 could not make ***",
+            worst <= 1,
+            "worst " + worst + " of 255 over " + (N * N) + " pixels, mean " + (sum / (N * N * 3)).toFixed(4) +
+            ", " + exactPx + " pixels (" + (100 * exactPx / (N * N)).toFixed(1) + "%) bit-identical" +
+            (worstAt ? ", worst at " + JSON.stringify(worstAt) : "") + ". Against the f64 reference the same " +
+            "comparison read 67 of 255. The difference is not a better tolerance; it is the right function.");
+        // *** AND THE CONTROL THAT MATTERS MOST: THE OLD REFERENCE MUST STILL FAIL. *** If both agreed, the
+        // f32 path would be decoration rather than the fix, and the 23.5% would have been something else.
+        let worst64 = 0;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const p = ptAt(x, y);
+            const c = st.concreteAt(p[0], p[1], p[2]);
+            for (let ch = 0; ch < 3; ch++) {
+                worst64 = Math.max(worst64, Math.abs(Math.round(c[ch] * 255) - got.px[(y * N + x) * 4 + ch]));
+            }
+        }
+        ok("!! *** THE CONTROL: the f64 reference STILL disagrees, so the f32 path is the fix and not decoration ***",
+            worst64 > 20 && worst64 > worst * 10,
+            "worst " + worst64 + " of 255 for snoise3 against " + worst + " for snoise3f32 on the same pixels " +
+            "and the same shader. Two references, one GPU, and only one of them is what the GPU computes.");
         ok("!! *** THE CONTROL: the rendered image is not flat ***",
             ch2 - cl > 20, "red channel spans " + cl + ".." + ch2 + " (" + (ch2 - cl) + " levels). An " +
             "agreement between two constant functions is not evidence of anything, so the range is asked for.");
