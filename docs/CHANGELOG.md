@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4222 -- the tree's own 82 animations, read as data at last
+
+*** v4191 MEASURED THE CORPUS THAT MOTIVATED IT AND CONVERTED NONE OF IT. *** ui/domAnimation.mjs took the
+animatelo half of gibbok's idea -- a hand-written KEYFRAMES table plus quietStateOf(), so engine/frameDirty.js
+could be told about DOM animation at all -- and its header cited the tree's own @keyframes rules as the whole
+reason for existing. Those rules were still CSS-only: readable by a browser, invisible to a test, and beyond
+anything frameDirty could reason about except through a runtime document.getAnimations().
+
+fx/cssKeyframes.mjs is the other half, from gibbok/keyframes-tool (MIT). Written rather than vendored: the tool
+is a Node CLI built on the `css` parser and Ramda, and the transform worth having is about thirty lines once
+those dependencies go.
+
+*** THE RESULT, OVER THE TREE'S REAL RULES RATHER THAN A FIXTURE: 82 blocks, 80 distinct names, 32 files, and
+ALL 82 CONVERT TO SOMETHING THE BROWSER WOULD ACCEPT. *** 71 of the 82 also pass
+ui/domAnimation.mjs's validateKeyframes, and the 11-rule gap is the interesting part rather than a failure:
+
+    @keyframes spin { to { transform:rotate(360deg) } }
+
+is ONE frame at offset 1. That is legal CSS and legal WAAPI -- the browser fills the start from the element's
+current value, which is how you spin something from wherever it happens to be. validateKeyframes is a stricter
+HOUSE RULE for hand-authored tables, where an implicit endpoint hides the author's intent, and it is right to
+be stricter. So waapiProblems() and validateKeyframes() are kept as two separate questions; conflating them
+would have condemned eleven working animations as broken.
+
+This also CORRECTS v4191's own number. Its header says "86 DISTINCT @keyframes RULES ACROSS 34 FILES". That was
+a text scan, and a text scan counts prose: several of those 86 are the words `@keyframes RULES` and
+`@keyframes NAME { ... }` inside comments -- including domAnimation.mjs's own header. Parsed rather than
+grepped, and excluding the files that DOCUMENT keyframes instead of declaring them, it is 82 blocks under 80
+distinct names across 32 files.
+
+*** THE DEFECT keyframes-tool SHIPS, AND IT IS SILENT. *** Its camelCase is
+str.replace(/[-_]([a-z])/g, m => m[1].toUpperCase()), which has no case for a LEADING dash -- so
+`-webkit-transform` comes out `WebkitTransform`, with a capital W. WAAPI ignores a key it does not recognise,
+so the property simply does not animate, with no error anywhere. This tree carries 41 -webkit- declarations.
+
+*** AND THE DEFECT I SHIPPED IN THE FIRST DRAFT, WHICH IS v4219'S OVER AGAIN. *** stripComments ran across the
+whole file before searching it. In demos_code/home_assistant_control.js the line comment "Talks to the bridge's
+/ha/* proxy (token stays server-side)" contains `/ha/*` -- which opens a CSS comment that then runs to the next
+`*/` THIRTEEN THOUSAND NINE HUNDRED AND TWENTY-FIVE CHARACTERS LATER, swallowing two real @keyframes rules on
+the way. Five blocks were missing from the corpus in total. Comments are now stripped PER BLOCK, after the
+match, so an unrelated `/*` upstream cannot reach a rule. THE TRADE IS STATED RATHER THAN HIDDEN: a genuinely
+commented-out rule is now reported. That is the safe direction for a module whose job is to report what
+animations exist -- a false positive is visible in the output, a false negative is silent -- and the gate
+counts them, so the number is known.
+
+*** TWO OF MY OWN CHECKS PASSED FOR THE WRONG REASON, AND SABOTAGE IS WHAT FOUND THEM. ***
+
+  * The -webkit- test could not reach the branch it was supposed to be testing. Slicing the leading dash off
+    before the hyphen regex already leaves a lower-case `w`, so lower-casing the first character afterwards is
+    a no-op for every prefix anyone actually writes. Removing that branch left the whole file green. It is now
+    pinned on `-Webkit-transform`, which is the only input that distinguishes it.
+  * The home_assistant file stopped being a discriminating test the moment stripComments became string-aware:
+    the apostrophe in "the bridge's" is read as a string opener, which accidentally rescues that particular
+    file. The property is now pinned on a synthetic input that isolates it -- a block comment outside any
+    string, with a rule inside it -- so the check fails when the design is reverted, which is the only reason
+    to have it.
+
+Gate tools/ship/cssKeyframes-selfcheck.mjs, six sabotages all red, run against the tree's own 82 rules.
+
+WHAT THIS DOES NOT CLAIM: that the converted animations look the same. It reads offsets, properties and timing
+functions; it does not resolve var(), does not expand shorthands, and does not know an element's current value,
+so a partial animation converts faithfully and still needs the live element to mean anything. Nothing is
+rewired either -- all 82 rules still run as CSS. What exists now is the ability to READ them.
+
+The build now stands at 1302 gates.
 ## v4221 -- one ray-triangle kernel and a tree, replacing two brute-force loops that had never met
 
 *** MEASURED BEFORE BUILDING: THE TREE RAYCAST TRIANGLES BY BRUTE FORCE, IN TWO SEPARATE PLACES, WITH NO
