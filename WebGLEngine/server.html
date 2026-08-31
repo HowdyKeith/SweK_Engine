@@ -3194,8 +3194,25 @@ A password fetches a token from the list server; an unregistered callsign needs 
   (function(){
     // v4039 -- pfFabric/pfWasm/pfGpuBrain/pfBox3d REMOVED from this map along with their buttons above; see the
     // v4039 comment there for why each one's link still exists elsewhere rather than being lost.
-    var pf = { pfPhone:"/phone.html" };
-    Object.keys(pf).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open(pf[id], "_blank"); }; });
+    // v4210 -- *** "PHONE MODE" OPENED THE PHONE UI ON THE PC, THE ONE DEVICE THAT DOES NOT NEED IT. ***
+    // Keith: "what should phone button do on server.html really? i remember, show a qr code so the phone can
+    // open it." window.open("/phone.html") put a touch UI -- sticks, big tap targets, a picker sized for a
+    // thumb -- in a desktop tab, and left the actual phone still needing someone to type an IP by hand.
+    // ui/phoneConnectQR.js already builds exactly the right thing and this page never reached it: it resolves
+    // the LAN address via /net/info (so the code does not encode "localhost", which a phone resolves to its
+    // OWN loopback) and renders a scannable QR of <lan>/phone.html. v4210 exported its modal so this button
+    // raises THE SAME one the engine's left rail does, rather than this page growing a second copy.
+    var pfPhoneBtn = document.getElementById("pfPhone");
+    if (pfPhoneBtn) pfPhoneBtn.onclick = function(){
+        import("/ui/phoneConnectQR.js")
+            .then(function(m){ return m.togglePhoneQR(); })
+            .catch(function(e){
+                // The QR is the point, but a phone that cannot get one still needs the address, so the
+                // fallback hands over the URL rather than silently doing nothing.
+                console.warn("[server] phone QR failed:", e && e.message);
+                window.open("/phone.html", "_blank");
+            });
+    };
     // Resume FX + ABYSS Battleship are engine DEMO MODES, launched via the ?go=<id> deep-link (index.html
     // boots straight into that demo). Open in a new tab so the server console stays put.
     var pfDemo = { pfResumeFx:"resume_fx" };

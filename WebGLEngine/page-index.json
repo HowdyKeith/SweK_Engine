@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 424,
+ "count": 433,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -91,6 +91,13 @@
    "f": "anime4k.html",
    "t": "Anime4K Upscaler",
    "d": "Anime4K's classic real-time upscaler, reimplemented natively in SweK: bilinear 2x then a DoG deblur (overshoot-clamped) and line-darkening. WebGPU compute on a rig, CPU reference here. Compare nearest / bilinear / Anime4K side by side; upload your own image.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "aquarelle.html",
+   "t": "Aquarelle Dissolve",
+   "d": "Mask-driven watercolour dissolve: one image bleeds into another along a noise-warped mask edge, like ink through paper. Port of Ramotion/aquarelle (MIT).",
    "g": "",
    "p": 0
   },
@@ -522,6 +529,13 @@
    "p": 0
   },
   {
+   "f": "camera-effects.html",
+   "t": "SweK &middot; Camera Effects",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "camoufox.html",
    "t": "Camoufox — install & detect",
    "d": "Install and detect Camoufox (anti-detect scraping browser) in a dedicated venv. Runs on the PC bridge.",
@@ -893,6 +907,13 @@
    "p": 0
   },
   {
+   "f": "doom-fire.html",
+   "t": "DOOM Fire",
+   "d": "The PSX DOOM fire: a cellular automaton on a grid of bytes against a fixed 37-colour palette. Seeded, so the same seed gives the same fire frame for frame. Port of filipedeschamps/doom-fire-algorithm (MIT).",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "doorbell.html",
    "t": "Doorbell",
    "d": "",
@@ -1023,6 +1044,13 @@
    "t": "🛰️ EVE — SweK Engine",
    "d": "Live EVE Online pilot telemetry via ESI + SSO (pilot, ship, system, online, ISK) with a 3D ship view. Cloud API — register an app at developers.eveonline.com and log in once. Runs on the PC bridge.",
    "g": "gametheory",
+   "p": 0
+  },
+  {
+   "f": "excel.html",
+   "t": "SweK Excel &mdash; the VBA half",
+   "d": "The Excel half: link the VBA archive (transmitter, OpenGL render engine, connector workbook) into this install, assemble a workbook from its modules, and run one allowlisted macro.",
+   "g": "",
    "p": 0
   },
   {
@@ -1887,6 +1915,13 @@
    "p": 0
   },
   {
+   "f": "odometer.html",
+   "t": "Odometer",
+   "d": "Numbers that roll to their new value with motion blur, like a mechanical counter. Port of coderitual/bounty (MIT). For values that change occasionally -- not for live gauges.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "office-floor.html",
    "t": "Office floor - who is working on what",
    "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
@@ -1903,6 +1938,13 @@
   {
    "f": "orbs.html",
    "t": "State orbs (v3357)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "orrery.html",
+   "t": "SweK Orrery &mdash; the tree as a system",
    "d": "",
    "g": "",
    "p": 0
@@ -2314,6 +2356,13 @@
    "p": 0
   },
   {
+   "f": "scene-view.html",
+   "t": "Scene Viewer",
+   "d": "Open a .glb exported by swekExport.scene() on a phone, tablet or TV. Uses the file's own camera and applies the sun/fog recipe from scene.extras. Gamepad and D-pad aware.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "schrodinger.html",
    "t": "Schrodinger 1D - levels and tunnelling",
    "d": "",
@@ -2353,6 +2402,13 @@
    "t": "Settings",
    "d": "One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, plus tool readiness.",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "sfx.html",
+   "t": "SweK &middot; Sound Effects as Data",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {
@@ -2470,6 +2526,13 @@
   {
    "f": "spectator.html",
    "t": "Engine Spectator",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "spellbook.html",
+   "t": "SweK &middot; The Spell Book",
    "d": "",
    "g": "",
    "p": 0

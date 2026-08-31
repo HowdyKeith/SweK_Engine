@@ -22,7 +22,7 @@ function controlURL() {
 // the original origin URL if not localhost (e.g. user opened the engine via
 // LAN IP already) or if the bridge can't tell us a LAN IP. Same /net/info the
 // HA panel uses to detect "phones can't reach localhost".
-async function controlURLForPhone() {
+export async function controlURLForPhone() {
     const base = controlURL();
     try {
         const host = (location.hostname || "").toLowerCase();
@@ -43,22 +43,24 @@ async function controlURLForPhone() {
     } catch { return base; }
 }
 
-export async function initPhoneConnectQR() {
-    if (typeof document === "undefined") return;
 
-    // v703 — replaced the bottom-right floating button with a
-    // miniIconStack entry (left rail). Auto-positions; expands on hover
-    // to "📱 LINK PHONE"; click toggles the QR modal exactly as before.
-    let card = null;
-    let btn = null;
-    async function toggle() {
-        if (card) { card.remove(); card = null; return; }
-        // v637 — resolve a LAN-reachable URL FIRST. If the engine is opened via
-        // http://localhost:8787/ the raw origin would put "localhost" into the
-        // QR — which the phone can't reach. controlURLForPhone() asks the
-        // bridge's /net/info for the right LAN IP.
-        const url = await controlURLForPhone();
-        card = document.createElement("div");
+// v4210 -- *** THE MODAL WAS SEALED INSIDE initPhoneConnectQR'S CLOSURE, SO ONLY THE ENGINE COULD RAISE IT. ***
+// Keith, on server.html's "Phone Mode" button: "what should phone button do on server.html really? i remember,
+// show a qr code so the phone can open it." That button did window.open("/phone.html") -- which opens the phone
+// UI ON THE PC, the one device that does not need it. The QR is the whole point and it already existed here,
+// reachable only from the engine's left rail. Lifted to module scope and exported so server.html raises THE
+// SAME modal rather than growing a second copy of it, and controlURLForPhone() is exported with it because the
+// localhost -> LAN substitution (v637) is the part that makes the code scannable at all.
+let _card = null;
+export function closePhoneQR() { if (_card) { _card.remove(); _card = null; } }
+export function isPhoneQROpen() { return !!_card; }
+export async function showPhoneQR() {
+    if (typeof document === "undefined") return null;
+    closePhoneQR();
+    // v637 -- resolve a LAN-reachable URL FIRST. If the host page is opened via http://localhost:8787/ the raw
+    // origin would put "localhost" into the QR, and a phone scanning that resolves it to its OWN loopback.
+    const url = await controlURLForPhone();
+    const card = _card = document.createElement("div");
         Object.assign(card.style, { position: "fixed", inset: "0", zIndex: "10031", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(4,6,10,0.72)" });
         const inner = document.createElement("div");
         Object.assign(inner.style, { background: "#0e131b", border: "1px solid #2c3a4f", borderRadius: "16px", padding: "22px", textAlign: "center", maxWidth: "320px", boxShadow: "0 12px 50px rgba(0,0,0,.6)", font: "14px system-ui,sans-serif", color: "#cfe0f5" });
@@ -69,7 +71,7 @@ export async function initPhoneConnectQR() {
             '<div style="margin-top:13px;font-size:12px;word-break:break-all;color:#9fb6e8">' + url + '</div>' +
             '<div style="margin-top:10px;font-size:11px;color:#7e93ad">tap anywhere to close</div>';
         card.appendChild(inner);
-        card.addEventListener("click", (e) => { if (e.target === card) { card.remove(); card = null; } });
+        card.addEventListener("click", (e) => { if (e.target === card) { closePhoneQR(); } });
         document.body.appendChild(card);
 
         try {
@@ -86,7 +88,18 @@ export async function initPhoneConnectQR() {
             if (slot) slot.innerHTML = '<div style="color:#333;font-size:12px;padding:24px 8px">QR couldn\'t render — open the URL above on your phone instead.</div>';
             console.warn("[phoneQR]", e?.message);
         }
-    }
+    return card;
+}
+export function togglePhoneQR() { if (_card) { closePhoneQR(); return Promise.resolve(null); } return showPhoneQR(); }
+
+export async function initPhoneConnectQR() {
+    if (typeof document === "undefined") return;
+
+    // v703 — replaced the bottom-right floating button with a
+    // miniIconStack entry (left rail). Auto-positions; expands on hover
+    // to "📱 LINK PHONE"; click toggles the QR modal exactly as before.
+    let btn = null;
+    const toggle = () => togglePhoneQR();
     try {
         const { mountMiniIcon } = await import("./miniIconStack.js");
         btn = mountMiniIcon({
@@ -96,7 +109,7 @@ export async function initPhoneConnectQR() {
             color: "blue",
             title: "Scan a QR to control the engine from your phone",
             onClick: toggle,
-            getActive: () => !!card,
+            getActive: () => isPhoneQROpen(),   // v4210 -- `card` moved to module scope; reading it here would now throw
         });
     } catch (e) {
         console.warn("[phoneQR] miniIconStack failed; falling back to floating button:", e?.message);

@@ -8,6 +8,41 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4210 -- the Phone Mode button opened the phone UI on the PC, and the QR it needed was already in the tree
+
+*** server.html's "PHONE MODE" BUTTON OPENED THE PHONE UI ON THE PC, THE ONE DEVICE THAT DOES NOT NEED IT. ***
+Keith: "what should phone button do on server.html really? i remember, show a qr code so the phone can open
+it." It ran window.open("/phone.html"), putting a touch UI -- sticks, thumb-sized targets, a picker sized for
+a finger -- into a desktop tab, while the actual phone was still left needing someone to read an IP off the
+screen and type it in by hand.
+
+THE QR ALREADY EXISTED AND THIS PAGE COULD NOT REACH IT. ui/phoneConnectQR.js builds exactly the right thing:
+it asks the bridge's /net/info for the LAN address and renders a scannable code of <lan>/phone.html. But its
+modal was SEALED INSIDE initPhoneConnectQR'S CLOSURE, mountable only from the engine's left rail via
+miniIconStack -- so a page without that rail had no way in. The modal is now lifted to module scope and
+exported (showPhoneQR, closePhoneQR, togglePhoneQR, isPhoneQROpen, controlURLForPhone), and server.html
+raises THE SAME modal rather than growing a second copy of a thing the tree already had.
+
+THE LOCALHOST SUBSTITUTION IS THE WHOLE FEATURE, not a detail, so it is asserted rather than assumed. A QR
+encoding "http://localhost:8787/phone.html" is WORSE THAN NO QR: a phone scanning it resolves localhost to
+its OWN loopback and shows a broken page with no hint why. v637 solved that by asking /net/info for the first
+non-virtual NIC; the gate stubs /net/info with 192.168.50.41:8787 and reads the rendered URL back out of the
+DOM, so the substitution is checked end to end rather than trusted.
+
+*** THE LIFT BROKE THE ORIGINAL CALLER, AND THE GATE CAUGHT IT BEFORE IT SHIPPED. *** The rail mount's
+`getActive: () => !!card` still read the binding that had just moved to module scope, which throws on every
+hover of the button it belongs to. That is why the gate drives BOTH entry points and not only the new one: a
+refactor that serves a new caller by breaking the old one is not a refactor. An ABSENCE is a code shape, so
+the check for it reads codeOnly rather than raw source -- the same rule v4208 got wrong in its other
+direction.
+
+Gate: tools/ship/phoneQR-selfcheck.mjs, 24 checks, all pass. Three sabotages, all red: restoring the old
+window.open behaviour on server.html (4 checks red), putting back the stale `card` read, and dropping the
+localhost -> LAN substitution. Both touched files restored byte-identical. Measured in headless Chromium
+against the real server.html: no modal before the click, a 152px QR image after it, zero window.open calls,
+the encoded URL reading http://192.168.50.41:8787/phone.html, and a second click closing it.
+
+The build now stands at 1290 gates.
 ## v4209 -- the shell is the firework, and three phone.html defects Keith photographed
 
 The shell IS the firework, and three phone.html defects Keith photographed. New world/fireworkShell.mjs takes
