@@ -753,6 +753,224 @@ export function bcsNeonEdge(img, { time = 0, edgeStrength = 4, glowAmount = 1, c
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+/* ============================================================================================================
+ * BATCH 10 (v4233) -- THE FIVE REMAINING SHADERS THAT USE NO HASH, WHICH IS WHY THIS BATCH IS THESE FIVE.
+ *
+ * *** THE SELECTION IS THE FIRST DECISION AND IT WAS MADE FROM THE UPSTREAM SOURCE, NOT FROM THE NAMES. ***
+ * Of the 22 unported shaders, 7 call bcs_hash and 8 call bcs_fbm (which calls bcs_hash through valueNoise).
+ * v4196 established that a sin-hash shader CANNOT be verified against a CPU reference -- one float32 ULP into
+ * sin() times 43758 is a different random number, measured up to 0.68 divergence on a 0..1 value. Those 15 can
+ * be ported, but they can only ever be checked by SHAPE. These five touch neither, so every one of them is
+ * gradeable to the pixel, and a batch of gradeable shaders is worth more than a batch of pretty ones.
+ *
+ * *** AND ONE OF THEM FINALLY USES fmod. *** The header's trap 5 has said since v4163 that "neither of the two
+ * shaders here uses it -- the upstream file does elsewhere -- so the helper exists and is gated BEFORE a
+ * shader that needs it arrives." bcs_geometricWarp is that shader, and it does not use fmod incidentally: it
+ * folds an angle that comes from atan2, so the argument is NEGATIVE across half the image, which is the only
+ * region where fmod and mod differ at all. Porting it with GLSL's mod would mirror one half of the picture.
+ * ========================================================================================================= */
+
+/**
+ * bcs_wavePool -- N sine waves from evenly spaced directions, each displacing PERPENDICULAR to its own travel.
+ *
+ * Note `int waves = int(complexity)` in the Metal: the knob is a float and it TRUNCATES. complexity 2.9 is two
+ * waves, not three, and the CPU reference truncates the same way rather than rounding to the nearer count.
+ */
+export function bcsWavePool(img, { time = 0, amplitude = 10, wavelength = 20, speed = 2, complexity = 3,
+                                   pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const waves = Math.max(0, Math.trunc(complexity));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        let ox = 0, oy = 0;
+        for (let i = 0; i < waves; i++) {
+            const angle = i * 3.14159 / waves;             // 3.14159, not Math.PI -- upstream's constant
+            const dx = Math.cos(angle), dy = Math.sin(angle);
+            const wave = Math.sin((uvx * dx + uvy * dy) * wavelength + time * speed + i * 1.5);
+            // perpendicular to the direction of travel: (-dy, dx)
+            ox += -dy * wave * amplitude * pointScale / waves;
+            oy += dx * wave * amplitude * pointScale / waves;
+        }
+        const c = s(clamp(px + ox, 0, w), clamp(py + oy, 0, h)), i4 = (y * w + x) * 4;
+        out[i4] = c[0]; out[i4 + 1] = c[1]; out[i4 + 2] = c[2]; out[i4 + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_pulse -- a heartbeat that pushes pixels outward, plus an additive edge glow.
+ *
+ * *** THE GLOW IS ANOTHER `rgb +=` ON A PREMULTIPLIED SAMPLE -- TRAP 2, THE ONE bcs_emboss ALREADY PAID. ***
+ * Upstream writes `color.rgb += half3(...)` on the value layer.sample returned, which is premultiplied. On a
+ * straight-alpha texture the same line brightens by a different amount everywhere alpha < 1. Modelled the same
+ * way emboss is: the caller declares which kind of image it handed over.
+ *
+ * `pow(abs(beat), 1/sharpness) * sign(beat)` is an odd-symmetric sharpening. sign(0) is 0 in both languages,
+ * so the beat is exactly 0.5 at the zero crossing and no special case is needed.
+ */
+export function bcsPulse(img, { time = 0, amplitude = 15, bpm = 70, sharpness = 4, glowIntensity = 0.5,
+                                pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const beatFreq = bpm / 60;
+    const raw = Math.sin(time * beatFreq * 3.14159 * 2);
+    const sharp = Math.pow(Math.abs(raw), 1 / sharpness) * Math.sign(raw);
+    const beat = sharp * 0.5 + 0.5;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const dx = uvx - 0.5, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const disp = beat * amplitude * pointScale * smoothstep(0, 0.3, dist);
+        let sx = px, sy = py;
+        if (dist > 0.001) { sx += (dx / dist) * disp; sy += (dy / dist) * disp; }
+        const c = s(clamp(sx, 0, w), clamp(sy, 0, h)), i = (y * w + x) * 4;
+        const edgeDist = Math.min(Math.min(uvx, 1 - uvx), Math.min(uvy, 1 - uvy));
+        const edgeGlow = (1 - smoothstep(0, 0.15, edgeDist)) * beat * glowIntensity;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        out[i]     = c[0] + toHalf(edgeGlow * 0.5) * k;
+        out[i + 1] = c[1] + toHalf(edgeGlow * 0.3) * k;
+        out[i + 2] = c[2] + toHalf(edgeGlow * 0.6) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_holographic -- three phase-offset sines make a rainbow, gated by the source's own luminance.
+ *
+ * *** THE CONSTANTS ARE `half` LITERALS (trap 4), AND I FIRST WROTE THAT PORTING THE EXACT THIRDS INSTEAD
+ * WOULD SHIFT THE PHASE. CHECKED, AND IT WOULD NOT. *** toHalf(2.094) and toHalf(2*PI/3) are the SAME number,
+ * 2.09375, and toHalf(4.189) and toHalf(4*PI/3) are both 4.1875: the rounding to half swallows the difference
+ * between upstream's decimal literal and the exact constant. Even unrounded the gap is 0.000645 rad, worth
+ * 0.08 levels of 255 at the steepest point of the sine -- BELOW the quantisation floor, so it could not show
+ * on an 8-bit output whatever was chosen.
+ *
+ * So this is a trap that is NOT one here, and saying so is worth more than implying a danger that measurement
+ * does not support. The same shape as the hsb2rgb audit: unsafe by construction, safe on the shipped domain.
+ * The toHalf calls stay because the `h` suffix is real and a future constant might not be so forgiving.
+ *
+ * The final `mix(half3(gray), rgb, 1.1h)` EXTRAPOLATES past 1, which is a saturation boost and not a blend.
+ */
+export function bcsHolographic(img, { time = 0, intensity = 0.6, scale = 8, speed = 1, angleOffset = 0.785,
+                                      premultiplied = true } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    const ca = Math.cos(angleOffset), sa = Math.sin(angleOffset);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const phase = (uvx * ca + uvy * sa) * scale + time * speed;
+        const rb = toHalf(toHalf(Math.sin(phase)) * toHalf(0.5) + toHalf(0.5));
+        const gb = toHalf(toHalf(Math.sin(phase + toHalf(2.094))) * toHalf(0.5) + toHalf(0.5));
+        const bb = toHalf(toHalf(Math.sin(phase + toHalf(4.189))) * toHalf(0.5) + toHalf(0.5));
+        const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2], a = img.data[i + 3];
+        const lum = luma(r, g, b);
+        const mask = smoothstep(0.3, 0.8, lum);
+        const k = premultiplied || a === 0 ? 1 : a;
+        const gain = toHalf(intensity * mask);
+        let rr = r + rb * gain * k, gg = g + gb * gain * k, bbv = b + bb * gain * k;
+        const gray = toHalf(luma(rr, gg, bbv));
+        // mix(gray, c, 1.1) = gray + (c - gray) * 1.1 -- an extrapolation, on purpose
+        out[i]     = gray + (rr - gray) * toHalf(1.1);
+        out[i + 1] = gray + (gg - gray) * toHalf(1.1);
+        out[i + 2] = gray + (bbv - gray) * toHalf(1.1);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_geometricWarp -- a log-polar spiral folded into kaleidoscope segments. *** THE fmod SHADER. ***
+ *
+ * spiralAngle = theta + log(r)*tight + ... , and theta is atan2's [-PI, PI]. Both folds run on that:
+ *
+ *     kAngle = fmod(spiralAngle, seg)                       -- NEGATIVE wherever spiralAngle is
+ *     if (fmod(floor(spiralAngle / seg), 2.0) > 0.5) ...    -- mirror every other segment
+ *
+ * With GLSL's mod the first is always in [0, seg) and the second never sees a negative input, so the mirror
+ * flips on the wrong segments over the half of the image where the angle is negative. Neither version fails to
+ * compile and both look like a kaleidoscope, which is trap 5 exactly: it changes the picture silently.
+ *
+ * `6.28` is upstream's approximation of 2*PI and is kept verbatim -- 6.283185 would rotate the segment
+ * boundaries by 0.03% of a turn per segment, which is visible where the mirrored seams meet.
+ */
+export function bcsGeometricWarp(img, { time = 0, spiralTight = 3, zoomRepeat = 1, rotation = 0, blend = 0.5,
+                                        premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const SEG = 6.28 / 6.0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const dx = uvx - 0.5, dy = uvy - 0.5;
+        const r = Math.hypot(dx, dy);
+        const theta = Math.atan2(dy, dx);
+        const logR = Math.log(Math.max(r, 0.0001));
+        const spiralAngle = theta + logR * spiralTight + time * 0.5 + rotation;
+        const zp = logR * zoomRepeat + time * 0.2;
+        const zoomPhase = zp - Math.floor(zp);                      // fract
+        const repeatedR = Math.exp(zoomPhase / zoomRepeat);
+        let kAngle = fmod(spiralAngle, SEG);                        // *** fmod, NOT glmod ***
+        if (fmod(Math.floor(spiralAngle / SEG), 2.0) > 0.5) kAngle = SEG - kAngle;
+        const finalAngle = mix(spiralAngle, kAngle, blend);
+        let wx = 0.5 + Math.cos(finalAngle) * repeatedR * 0.3;
+        let wy = 0.5 + Math.sin(finalAngle) * repeatedR * 0.3;
+        wx -= Math.floor(wx); wy -= Math.floor(wy);                 // fract
+        const c = s(clamp(wx * w, 0, w), clamp(wy * h, 0, h));
+        const centerGlow = Math.exp(-r * r * 8.0) * 0.15;
+        const bphase = zp - Math.floor(zp);
+        const boundary = 1.0 - smoothstep(0, 0.02, Math.abs(bphase - 0.5) - 0.48);
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        out[i]     = c[0] + (toHalf(centerGlow * 0.5) + toHalf(boundary * 0.05)) * k;
+        out[i + 1] = c[1] + (toHalf(centerGlow * 0.7) + toHalf(boundary * 0.02)) * k;
+        out[i + 2] = c[2] + (toHalf(centerGlow)       + toHalf(boundary * 0.08)) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_blackHole -- gravitational lensing, frame dragging, and an accretion ring.
+ *
+ * The aspect correction is applied to delta.x and UNDONE before sampling, the same shape bcsVortex uses, or a
+ * round hole is an ellipse on a non-square canvas. `bendStrength` is capped at 5 upstream, which matters: at
+ * dist -> 0 the unclamped term is schwarzschild/0.001 and the sample would fly off the image.
+ */
+export function bcsBlackHole(img, { time = 0, mass = 0.2, spin = 1, distortion = 60, ringBrightness = 1,
+                                    premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const schwarzschild = mass * 0.3;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const dx = (uvx - 0.5) * aspect, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const bend = Math.min(schwarzschild / Math.max(dist * dist, 0.001), 5.0);
+        let wx = dx, wy = dy;
+        if (dist > 0.001) { wx += (dx / dist) * bend * 0.1; wy += (dy / dist) * bend * 0.1; }
+        const drag = spin * schwarzschild / Math.max(dist, 0.01) * time;
+        const cd = Math.cos(drag), sd = Math.sin(drag);
+        const rx = wx * cd - wy * sd, ry = wx * sd + wy * cd;
+        const c = s(clamp((rx / aspect + 0.5) * w, 0, w), clamp((ry + 0.5) * h, 0, h));
+        const horizon = smoothstep(schwarzschild * 0.5, schwarzschild * 1.5, dist);
+        const ringDist = Math.abs(dist - schwarzschild * 2.5);
+        let ring = Math.exp(-ringDist * ringDist / (schwarzschild * schwarzschild * 0.3));
+        let rp = Math.sin(angle * 8.0 - time * spin * 3.0) * 0.5 + 0.5;
+        rp = rp * rp;
+        ring *= 0.5 + rp * 0.5;
+        const ringPos = smoothstep(schwarzschild * 1.5, schwarzschild * 4.0, dist);
+        const rc = [mix(toHalf(0.7), toHalf(1.0), toHalf(ringPos)),
+                    mix(toHalf(0.85), toHalf(0.6), toHalf(ringPos)),
+                    mix(toHalf(1.0), toHalf(0.2), toHalf(ringPos))];
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const gain = toHalf(ring * ringBrightness);
+        for (let ch = 0; ch < 3; ch++) out[i + ch] = c[ch] * toHalf(horizon) + rc[ch] * gain * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",

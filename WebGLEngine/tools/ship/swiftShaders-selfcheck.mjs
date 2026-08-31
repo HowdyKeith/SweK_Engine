@@ -30,7 +30,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
-         bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, smoothstep,
+         bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens,
+    bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 import http from "node:http";
@@ -123,6 +124,24 @@ console.log("\n3. layer.sample returns premultiplied; a WebGL texture usually do
         (() => { const z = bcsEmboss(zero, { strength: 5, premultiplied: false });
                  for (let i = 0; i < z.data.length; i += 4) if (Math.abs(z.data[i] - zero.data[i]) > 1e-9) return false; return true; })(),
         "there is no colour there to move");
+
+    // *** BATCH 10 ADDED FOUR MORE SHADERS THAT ADD INTO A SAMPLE, AND SABOTAGE SHOWED THE GPU SECTION CANNOT
+    // SEE THEM. *** Deleting the premultiplied handling from PULSE_FRAG entirely left the whole gate green,
+    // because the GPU comparison image is fully opaque (alpha 255) and `k` is 1 either way. That is a real
+    // hole in the GPU section and it is stated in the closing note rather than papered over. What CAN be
+    // checked without a GPU is that each new shader's CPU reference actually branches on the flag, on an image
+    // that is half transparent -- which is what this does, the same way emboss's check above does.
+    for (const [name, fn, knobs] of [["pulse", bcsPulse, { time: 0.42 }],
+                                     ["holographic", bcsHolographic, { time: 0.6 }],
+                                     ["geometricWarp", bcsGeometricWarp, { time: 0.7 }],
+                                     ["blackHole", bcsBlackHole, { time: 0.55 }]]) {
+        const a = fn(half, { ...knobs, premultiplied: true });
+        const b = fn(half, { ...knobs, premultiplied: false });
+        let differs = false;
+        for (let i = 0; i < a.data.length; i++) if (Math.abs(a.data[i] - b.data[i]) > 1e-9) { differs = true; break; }
+        ok("   " + name.padEnd(14) + " branches on the alpha convention rather than ignoring it", differs,
+            "half-transparent input, and the two conventions give different colour");
+    }
     ok("...and the shader carries the same branch rather than assuming one",
         /uPremultiplied > 0\.5/.test(pass.SHADERS.emboss));
 }
@@ -733,7 +752,7 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 19 of 41 ported", pass.swiftShaderNames().length === 19, pass.swiftShaderNames().length + " shaders");
+    ok("!! 24 of 41 ported", pass.swiftShaderNames().length === 24, pass.swiftShaderNames().length + " shaders");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -873,13 +892,17 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
             melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
             touchRipple: bcsTouchRipple, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
-            gravityWells: bcsGravityWells, refractLens: bcsRefractLens };
+            gravityWells: bcsGravityWells, refractLens: bcsRefractLens,
+            wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
+            geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole };
         const CASES = { emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
             duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
             chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
             melt: { time: 1 }, topographic: { time: 1 }, thermal: { time: 1 }, neonEdge: { time: 1 },
             touchRipple: { touchX: 30, touchY: 8, touchAge: 0.4 }, liveRipple: { time: 1.3 },
-            shockwave: { time: 0.35 }, gravityWells: { time: 0.9 }, refractLens: { touchX: 24, touchY: 12 } };
+            shockwave: { time: 0.35 }, gravityWells: { time: 0.9 }, refractLens: { touchX: 24, touchY: 12 },
+            wavePool: { time: 0.8 }, pulse: { time: 0.42 }, holographic: { time: 0.6 },
+            geometricWarp: { time: 0.7 }, blackHole: { time: 0.55 } };
         // The five that call the sin-hash. Determined from the SHADER SOURCE, not from a list I typed.
         const HASHED = pass.swiftShaderNames().filter((n) => {
             const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
@@ -905,10 +928,13 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             }
             results[name] = { worst, off, nan, black: gpu.filter((v, i) => i % 4 !== 3 && v === 0).length };
         }
-        ok("!! the page loaded and ran 19 shaders with no script error", errs.length === 0, errs.join(" | "));
+        ok("!! the page loaded and ran 24 shaders with no script error", errs.length === 0, errs.join(" | "));
 
         // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
-        const EXACTISH = pass.swiftShaderNames().filter((n) => !HASHED.includes(n) && n !== "vortex");
+        // vortex was already excluded for landing on texel boundaries; batch 10's three displacing shaders do the
+        // same thing for the same reason, and are graded by the one-texel bound below instead of by <= 2.
+        const TEXEL_EXEMPT = ["vortex", "wavePool", "geometricWarp", "blackHole"];
+        const EXACTISH = pass.swiftShaderNames().filter((n) => !HASHED.includes(n) && !TEXEL_EXEMPT.includes(n));
         for (const n of EXACTISH) {
             ok("   " + n.padEnd(15) + " GPU matches the CPU model", results[n].worst <= 2,
                 "worst " + results[n].worst + " levels, " + results[n].off + " pixels over 2");
@@ -918,6 +944,86 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
                 .every((n) => results[n].worst === 0),
             ["touchRipple", "liveRipple", "shockwave", "gravityWells", "refractLens"]
                 .map((n) => n + " " + results[n].worst).join(", "));
+
+        // *** BATCH 10 WAS CHOSEN SO THAT IT COULD BE GRADED, AND THIS IS THE GRADE, INCLUDING THE PART I
+        // EXPECTED TO BE ZERO AND WHICH IS NOT. *** Of the 22 still unported, 15 call the sin-hash directly or
+        // through fbm and can only ever be checked by shape. These five touch neither. Two of them came back
+        // exact; THREE DID NOT, and the three are exactly the three that DISPLACE THE SAMPLE COORDINATE.
+        //
+        // The test image is a gradient, and one texel of it is worth 255/(48-1) = 5.4 levels horizontally and
+        // 255/(24-1) = 11.1 vertically. The measured worsts are 5, 5 and 11. That is ONE TEXEL, in the axis
+        // each shader displaces along, at two to four pixels of 1152 -- the identical signature vortex was
+        // classified under earlier, where a rotation lands on a texel boundary and float32 and float64 round
+        // across it under NEAREST sampling. It is not a port error and it is not exactness either, so it is
+        // asserted as what it is: bounded by one texel of the gradient, not by zero.
+        let B10_FMOD = null;
+        const BATCH10 = ["wavePool", "pulse", "holographic", "geometricWarp", "blackHole"];
+        const TEXEL_G = 255 / (H - 1);      // 11.1 -- the coarser axis, and the bound that has to hold
+        const B10_EXACT = ["pulse", "holographic"], B10_DISPLACING = ["wavePool", "geometricWarp", "blackHole"];
+        ok("!! the two batch-10 shaders that do NOT move the sample coordinate are exact",
+            B10_EXACT.every((n) => results[n].worst <= 1),
+            B10_EXACT.map((n) => n + " " + results[n].worst).join(", "));
+        ok("!! *** and the three that DO differ by at most ONE TEXEL of the test gradient, at a handful of pixels ***",
+            B10_DISPLACING.every((n) => results[n].worst <= Math.ceil(TEXEL_G) && results[n].off <= 8),
+            B10_DISPLACING.map((n) => n + " " + results[n].worst + " levels/" + results[n].off + "px").join(", ") +
+            "  -- one texel is " + (255 / (W - 1)).toFixed(1) + " levels in R and " + TEXEL_G.toFixed(1) + " in G");
+        ok("...and every one of them is finite -- no NaN reached the buffer",
+            BATCH10.every((n) => results[n].nan === 0));
+        ok("...and none of batch 10 is a sin-hash shader, which is why they could be graded at all",
+            BATCH10.every((n) => !HASHED.includes(n)));
+
+        // *** A TRAP I ASSERTED AND THEN MEASURED AWAY. *** The holographic port's first comment said that
+        // using the exact 2*PI/3 instead of upstream's 2.094h would shift the green phase. It would not:
+        // toHalf collapses them onto the same half. Pinned so the claim cannot drift back.
+        ok("!! holographic's half-rounded thirds are INDISTINGUISHABLE from the exact ones, measured",
+            toHalf(2.094) === toHalf(2 * Math.PI / 3) && toHalf(4.189) === toHalf(4 * Math.PI / 3),
+            "toHalf(2.094) = toHalf(2pi/3) = " + toHalf(2.094) + "; unrounded the gap is 0.000645 rad = 0.08 levels of 255, under the quantisation floor");
+
+        // *** TRAP 5 FINALLY HAS A LOAD-BEARING CASE, AFTER SITTING IN THE HEADER SINCE v4163. ***
+        // That header said: "Neither of the two shaders here uses it -- the upstream file does elsewhere -- so
+        // the helper exists and is gated BEFORE a shader that needs it arrives." bcs_geometricWarp is the
+        // shader that arrived. It folds an angle taken from atan2, so the argument is negative across most of
+        // the image, which is the only region where fmod and mod differ at all.
+        const gw = pass.SHADERS.geometricWarp;
+        ok("!! geometricWarp uses bcs_fmod and NOT mod, in both folds",
+            (gw.slice(gw.indexOf("void main")).match(/bcs_fmod\(/g) || []).length === 2 &&
+            !/[^_a-z]mod\(/.test(gw.slice(gw.indexOf("void main"))),
+            "kAngle = bcs_fmod(spiralAngle, seg), and the mirror test on floor(spiralAngle / seg)");
+        // *** AND THE FIRST DRAFT OF THIS CHECK CLAIMED geometricWarp WAS THE FIRST SHADER TO CALL bcs_fmod,
+        // WHICH IS FALSE -- shockwave has called it since v4196, AND THIS GATE CAUGHT ME. *** The true claim is
+        // narrower and is the one that matters: shockwave passes bcs_fmod(uTime, uRepeatRate), and uTime is a
+        // CLOCK, so the argument is never negative and fmod and mod agree on every value it will ever see --
+        // the same "safe by the call site, not by the helper" reasoning the hsb2rgb audit reached. geometricWarp
+        // passes an angle from atan2, which is negative over most of the image, so it is the first shader in
+        // this port where CHOOSING WRONG CHANGES THE PICTURE.
+        const fmodUsers = pass.swiftShaderNames().filter((n) => {
+            const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
+            return /bcs_fmod\(/.test(body);
+        });
+        ok("!! two shaders call the helper, and only one of them can pass it a negative",
+            fmodUsers.join(",") === "shockwave,geometricWarp",
+            "shockwave: bcs_fmod(uTime, uRepeatRate) -- a clock, so >= 0 and the two functions agree");
+        ok("!! *** geometricWarp is the first port where fmod vs mod CHANGES THE PICTURE, and by how much is measured ***",
+            (() => {
+                // Recompute the fold both ways over the same grid the GPU rendered, and count the disagreement.
+                let differ = 0, negative = 0, total = 0;
+                const SEG = 6.28 / 6.0;
+                for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                    const dx = (x + 0.5) / W - 0.5, dy = (y + 0.5) / H - 0.5;
+                    const r = Math.hypot(dx, dy);
+                    const sa = Math.atan2(dy, dx) + Math.log(Math.max(r, 0.0001)) * 3 + 0.7 * 0.5;
+                    total++;
+                    if (sa < 0) negative++;
+                    const byFmod = sa - SEG * Math.trunc(sa / SEG);
+                    const byMod = sa - SEG * Math.floor(sa / SEG);
+                    if (Math.abs(byFmod - byMod) > 1e-9) differ++;
+                }
+                B10_FMOD = { differ, negative, total };
+                return differ === negative && differ > total * 0.5;
+            })(),
+            "the fold differs at " + B10_FMOD.differ + " of " + B10_FMOD.total + " pixels (" +
+            (100 * B10_FMOD.differ / B10_FMOD.total).toFixed(1) + "%), which is EXACTLY the count where the angle is negative -- " +
+            "the two figures agreeing is what says the mechanism is understood rather than the number merely observed");
 
         // B) refractLens is the regression: it was FOUR BLACK PIXELS before the toHalf fix.
         ok("!! *** refractLens renders no black pixel -- the toHalf NaN regression ***",
@@ -950,7 +1056,13 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
             "\nunchecked here: whether these effects look GOOD, and whether the five sin-hash shaders match " +
             "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What is " +
-            "checked is that 19 of 41 are ported, that 13 of them agree with their CPU reference on a real " +
-            "WebGL2 context and 5 provably cannot, that a knob which is a coordinate needs the same flip a " +
+            "checked is that 24 of 41 are ported, that 15 of them agree with their CPU reference on a real " +
+        "WebGL2 context to within 2 levels, that 4 more (vortex and batch 10's three displacing shaders) " +
+        "agree to within ONE TEXEL of the test gradient, and 5 provably cannot agree at all. *** AND ONE " +
+        "HOLE, FOUND BY SABOTAGE AND NOT CLOSED: the GPU comparison image is fully OPAQUE, so deleting the " +
+        "premultiplied branch from a fragment shader leaves this gate green. The CPU references are checked " +
+        "against a half-transparent image in section 3; the GLSL is not, and closing that needs a second " +
+        "comparison image with alpha, which is a round of its own. *** " +
+            " that a knob which is a coordinate needs the same flip a " +
             "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero.");
 process.exit(fails ? 1 : 0);
