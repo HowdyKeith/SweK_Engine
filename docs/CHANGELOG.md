@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4214 -- the Sunshine bridge had never called the Sunshine API, and the control panel is not a way in
+
+*** MEASURED: ai-bridge/sunshineBridge.js HAD NEVER CALLED THE SUNSHINE API ONCE. *** All four of its
+references to port 47990 were string interpolation into a link. The bridge installed Sunshine, started it, and
+handed the user a URL to click. That was the whole integration, and it had been that way since v4154.
+
+Keith sent qiin2333/sunshine-control-panel (MIT). *** THE FIRST FINDING IS A NEGATIVE ONE, RECORDED SO NOBODY
+RE-EVALUATES IT: ITS AXUM PROXY IS TAURI-IPC-ONLY. *** It listens on 48081 but only inside the Tauri desktop
+application, reachable through Tauri's IPC bridge -- it is a CORS shim for a Vue frontend, not a headless
+service. And what it proxies TO is port 47990, which this tree already reaches directly. Taking a dependency
+on a desktop app in order to get at a port we already have would be strictly worse than what we have.
+
+WHAT IT DID PROVE IS THAT THE 47990 API IS RICH ENOUGH TO DRIVE AN ENTIRE APPLICATION -- app list, config,
+pairing, clients, covers, restart. So the answer is not to integrate their panel. It is to stop treating ours
+as a link.
+
+New ai-bridge/sunshineApi.mjs. THE ENDPOINT LIST COMES FROM LizardByte/Sunshine's OWN docs/api.md, not from
+reading the control panel's frontend: an endpoint table inferred from a UI is a table of what one client
+happened to call, which is a different and smaller thing than the API.
+
+Three hazards carry most of the assertions, because each produces a WRONG RESULT rather than an error.
+
+1. *** DELETE /api/apps/{index} ADDRESSES AN APPLICATION BY ITS POSITION IN THE LIST, AND POSITIONS ARE NOT
+   IDENTITY. *** Read the list, let anything add or remove an app between the read and the delete -- the
+   Sunshine UI in another tab, a config reload, another client -- and index 3 is now a different program. The
+   call SUCCEEDS, reports success, and removes something the caller never named. So a delete is not allowed to
+   travel on an index alone: verifyAppIndex takes the listing the index came from AND the name the caller
+   believes is there, and refuses when they no longer agree, saying what is actually at that position so the
+   caller can re-read and retry. It is a check the API itself cannot perform, because by the time the request
+   arrives the name is gone.
+
+2. A MUTATING CALL WITH NO CSRF TOKEN IS REJECTED IN A WAY THAT READS AS AN AUTH FAILURE -- which sends the
+   reader off to re-check a password that was right all along. buildRequest refuses by name before a request
+   exists, and the gate asserts EVERY mutating endpoint refuses, not merely the one that happened to be
+   sampled. The mutates flag is checked against the method too, so the rule cannot be skipped by mislabelling
+   one endpoint.
+
+3. *** SUNSHINE'S CONFIG SERVER USES A SELF-SIGNED CERTIFICATE, AND THE USUAL FIX FOR THAT IS A PROCESS-WIDE
+   HOLE. *** NODE_TLS_REJECT_UNAUTHORIZED=0 -- what most snippets reach for -- disables certificate
+   verification for every request the process makes for the rest of its life, including any carrying
+   credentials somewhere else entirely. The exception here is scoped to ONE https.request against one
+   known-local host, and the gate asserts the module sets neither that variable nor rejectUnauthorized, and
+   performs no request at all: it describes them. That check reads codeOnly, because the warning text quotes
+   the very variable it warns against -- an absence is a code shape, v4208's lesson in its other direction.
+
+MEASURED END TO END AGAINST A REAL SELF-SIGNED HTTPS SERVER stood up for the purpose, because classifying
+failures by name is worthless if the classes are not actually told apart in practice: correct credentials
+return the app list through the scoped exception ({"ok":true,"count":3,"apps":["Desktop","Steam","Firefox"]});
+WRONG credentials come back kind:"auth" with the fix named; and nothing listening on the port comes back
+kind:"down". Three distinct failure modes, three distinct answers. My first attempt at that test was badly
+built -- the fake server accepted any Basic prefix, so a wrong password appeared to succeed -- and it was
+rebuilt to actually validate before the result was believed.
+
+Every endpoint needs basic auth, which is the reason "here is a URL" was the only integration that could ever
+have worked: an unauthenticated call to any of them returns 401, and a 401 from a self-signed HTTPS host is
+easy to misread as a TLS problem. Credentials come from SUNSHINE_USER / SUNSHINE_PASS in the environment and
+never from the tree -- a default admin password in a repository is a default in everybody's repository.
+
+New route: GET /sunshine/apps. Gate: tools/ship/sunshineApi-selfcheck.mjs, 51 checks, all pass. Five
+sabotages, all red: building a mutating call with no CSRF token, checking only the bounds of an app index
+rather than the name at it, collapsing 401 and 403 into one answer, leaving an unfilled path placeholder in
+the URL, and having the module itself set the process-wide TLS switch. sunshineApi.mjs restored
+byte-identical.
+
+The build now stands at 1294 gates.
 ## v4213 -- haptics: the tree had none, and the two APIs that play them cannot express each other
 
 *** MEASURED BEFORE BUILDING ANYTHING: THIS TREE CONTAINED ZERO HAPTICS. *** No navigator.vibrate, no
