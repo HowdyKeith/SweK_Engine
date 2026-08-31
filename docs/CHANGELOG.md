@@ -8,6 +8,67 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4224 -- solving x(t) = u where the slope will not help, and a first draft that was worse than what it replaced
+
+*** EASING IS AN INVERSE PROBLEM, AND THAT IS WHY IT HAS A FAILURE MODE AT ALL. *** A CSS timing function is a
+curve x(t), y(t). Progress arrives as x and the answer wanted is y, so t has to be recovered by solving
+x(t) = u. Newton-Raphson does that quickly and needs dx/dt -- and dx/dt is EXACTLY ZERO at t=0 whenever x1 is
+0, which `cubic-bezier(0, ...)` is, and which is one of the most common curves anyone writes.
+
+rig/RigSystem.js's entire answer to that was:
+
+    if (Math.abs(dx) < 1e-6) break;      // ...returning whatever t happened to be at that moment
+
+So the first instants of such an animation were solved by giving up. MEASURED against a 200-iteration
+bisection of the same curve, over the whole legal control-point grid:
+
+    ordinary sampling   1.7e-4      invisible
+    the small-u tail    2.2e-1      22% of the output range, at cubic-bezier(0, 1, 0, 1)
+
+New ui/bezierEasing.mjs adds what was missing, from gre/bezier-easing (MIT): a precomputed sample table for
+the initial guess, Newton where the slope can be trusted, and BINARY SUBDIVISION where it cannot -- bisection
+needs no derivative at all, so a flat region costs it nothing; it halves the bracket every step regardless.
+The two errors become 6.2e-15 and 1.0e-5. The tail improves by a factor of 20,957.
+
+*** MY FIRST DRAFT WAS WORSE THAN WHAT IT REPLACED, IN THE COMMON CASE, AND ONLY A FULL SWEEP FOUND IT. *** It
+fixed the tail and REGRESSED ordinary sampling from 1.7e-4 to 6.2e-4. Had I measured only the case the round
+was about, I would have shipped a regression while celebrating an improvement.
+
+The cause is a departure this round now makes deliberately. gre/bezier-easing takes Newton's answer whenever
+the slope at the guess clears 0.001, with no test of what came back. On cubic-bezier(1, 0, 0, 1) at u = 0.501
+that slope is 1.166e-2 -- comfortably over the line -- and four Newton steps still land 4.2e-4 away in t,
+where bisection over the same interval manages 5.2e-9. A shallow-but-not-flat curve is exactly where a fixed
+iteration count runs out, and THE SLOPE ALONE CANNOT TELL YOU THAT IT HAS. So the shipped solver runs eight
+steps and then VERIFIES THE RESIDUAL, falling back to bisection when |x(t) - u| is too large. One extra
+evaluation, and no guesswork about whether the answer is good.
+
+RigSystem now imports the solver and its own Newton loop is gone, leaving exactly one file in the tree that
+computes the bezier basis.
+
+The properties an easing function has to have, each asserted rather than assumed:
+  * the endpoints return EXACTLY 0 and 1 rather than being solved -- every solver here is iterative, so
+    without the shortcut a curve ends at 0.9999999 and the animation never quite arrives;
+  * a monotone y gives a monotone easing, over the whole grid;
+  * `linear` is the exact identity, returned without sampling anything;
+  * an OVERSHOOT curve still overshoots. y is unconstrained in CSS -- that is how ease-out-back is written --
+    so clamping it to [0,1] would be wrong, and the gate checks that it both overshoots and undershoots;
+  * an x outside [0,1] THROWS, because x must be monotonic for the curve to be invertible at all.
+
+TWO OF MY OWN GATE CHECKS FAILED AGAINST CORRECT CODE AND WERE REWRITTEN. One asserted gre/bezier-easing's
+FOUR-iteration behaviour while calling my shipped EIGHT-iteration function -- so it failed against the very
+code it was written to justify, and now reproduces the library's constant explicitly. The other counted the
+gate's own deliberate copy of the old solver as a second owner of the bezier basis; it is excluded by name,
+with the reason stated, because keeping that copy is what lets section 3 assert the improvement instead of
+remembering it.
+
+Gate tools/ship/bezierEasing-selfcheck.mjs, five sabotages all red.
+
+*** WHAT THIS DOES NOT CLAIM: THAT ANYTHING WAS VISIBLY BROKEN. *** The 22% error needs u below about 0.0025,
+which is inside the first frame of any animation, on curves with x1 = 0. At ordinary sampling the old error
+was 1.7e-4 and nobody could see it. This is a correctness hole that was not hurting anything, and saying so
+is more useful than inventing a symptom for it.
+
+The build now stands at 1304 gates.
 ## v4223 -- a listener that stops when its element does, and the crude number that pointed the wrong way
 
 *** THE 619-VS-22 FIGURE THAT MOTIVATED THIS WAS MISLEADING. *** ui/ has 619 addEventListener calls against 22

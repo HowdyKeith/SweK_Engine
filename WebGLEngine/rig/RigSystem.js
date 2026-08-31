@@ -28,28 +28,20 @@ export const EASING = {
 };
 
 const _bezierCache = new Map();
+
+// v4224 -- *** THE SOLVER THAT USED TO LIVE HERE HAD NO FALLBACK, AND ITS BAIL-OUT WAS THE BUG. ***
+// It ran eight Newton-Raphson steps against x(t) and then `if (Math.abs(dx) < 1e-6) break;` -- returning
+// whatever t happened to be at that moment. But dx/dt is EXACTLY ZERO at t=0 whenever x1 is 0, and
+// `cubic-bezier(0, ...)` is one of the most common curves anyone writes, so the first instants of such an
+// animation were solved by giving up. MEASURED against a 200-iteration bisection over the whole legal
+// control-point grid: worst error 1.7e-4 at ordinary sampling, but 2.2e-1 in the small-u tail -- 22% of the
+// output range, inside the first frame. ui/bezierEasing.mjs adds the binary-subdivision fallback (the idea is
+// gre/bezier-easing's, MIT) and takes those to 6.2e-15 and 1.0e-5 respectively.
 function _parseCubicBezier(name) {
-    const m = name.match(/cubic-bezier\s*\(\s*([\d.\-]+)\s*,\s*([\d.\-]+)\s*,\s*([\d.\-]+)\s*,\s*([\d.\-]+)\s*\)/);
-    if (!m) return null;
-    const [x1, y1, x2, y2] = [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])];
-    // Returns a function u → eased u. Implemented via Newton-Raphson to invert x.
-    return (u) => {
-        if (u <= 0) return 0;
-        if (u >= 1) return 1;
-        // Solve for t such that bezierX(t) = u
-        let t = u;
-        for (let i = 0; i < 8; i++) {
-            const ct = 1 - t;
-            const x = 3 * ct * ct * t * x1 + 3 * ct * t * t * x2 + t * t * t;
-            const dx = 3 * ct * ct * (x1) + 6 * ct * t * (x2 - x1) + 3 * t * t * (1 - x2);
-            if (Math.abs(dx) < 1e-6) break;
-            const next = t - (x - u) / dx;
-            if (Math.abs(next - t) < 1e-6) { t = next; break; }
-            t = Math.max(0, Math.min(1, next));
-        }
-        const ct = 1 - t;
-        return 3 * ct * ct * t * y1 + 3 * ct * t * t * y2 + t * t * t;
-    };
+    const p = parseCubicBezier(name);
+    if (!p) return null;
+    // CSS requires x in [0,1]; bezierEasing throws rather than return something that is not a timing curve.
+    try { return bezierEasing(p[0], p[1], p[2], p[3]); } catch { return null; }
 }
 
 /** Apply easing to u ∈ [0,1]. Accepts string name, "cubic-bezier(...)", or function. */
@@ -150,6 +142,7 @@ export { _catmullRomVec3 as catmullRomVec3 };
 //   * Single-bone-per-splat weights (rigid skinning). Weighted multi-bone
 //     blending is wired but auto-bind only emits weight=1 for nearest bone.
 
+import { bezierEasing, parseCubicBezier } from "../ui/bezierEasing.mjs";   // v4224 -- one solver, with a fallback
 import { _mat4Identity, _mat4Multiply, _mat4Translate,
          _mat4FromQuat, _vec3Lerp, _quatSlerp,
          _quatFromMat4, _quatMul } from "./rigMath.js";
