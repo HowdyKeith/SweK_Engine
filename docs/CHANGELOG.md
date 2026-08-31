@@ -8,6 +8,78 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4249 -- Every ragdoll this tree can derive fights itself, and the fix cannot be asked for
+
+*** v4248 FILED THE LAST POSSIBILITY FOR v4245's ANCHOR FIX: that its argument was about COLLISION VOLUME
+rather than the constraint, and that contacts had become available in the artifact without anyone using
+them. *** Used here, they found something neither earlier round was looking for.
+
+THE JOINTED NEIGHBOURS OVERLAP, IN BOTH DERIVATIONS, BY CONSTRUCTION. A bone's box runs to its child's head
+and the child's box STARTS at that head, and each is inflated by a radius on top of that. Pure geometry,
+before any solver runs:
+
+    enclosing (shipped)   14 overlapping pairs, deepest pelvis/thigh at 0.270 m
+    naive head-to-tail    10 overlapping pairs, deepest thigh/shin  at 0.238 m
+
+And the solver agrees. Hanging in EMPTY SPACE -- pelvis pinned, no ground anywhere in the world -- the
+ragdoll still produces 32 contact rows carrying real normal impulse. Every one of them is the body colliding
+with ITSELF while its own joints hold it together.
+
+*** AND THAT IS THE COST OF v4245's FIX THAT v4248 WENT LOOKING FOR A BENEFIT FROM AND DID NOT FIND. THE
+ENCLOSING BODIES FIGHT THEMSELVES 148 TIMES HARDER. ***
+
+    summed |normal impulse|    14,025 enclosing    against    94 naive
+
+The pair count differs by only 40%; the force differs by a factor of 148, because contact impulse grows with
+PENETRATION DEPTH and growing the chest out to reach the shoulder anchors buries each arm 0.241 m inside it.
+The fix remains geometrically right about the anchors -- v4245's measurement of 4 of 10 lying outside their
+body stands -- and it is no longer free.
+
+EVERY RAGDOLL IMPLEMENTATION SOLVES THIS THE SAME WAY: disable collision between jointed neighbours. A
+shoulder and an upper arm are SUPPOSED to occupy the same space; that is what a shoulder is, and no amount of
+careful box fitting changes it.
+
+*** THIS TREE CANNOT ASK FOR THAT. *** physics/box3d/box3d_shim.c exposes no collision filtering of any kind:
+no collideConnected on any joint def, no category or mask bits, no groups, no filter setter. The three joint
+constructors set bodyIdA, bodyIdB and two local frames and nothing else, so there is no argument a caller
+could pass to say "these two are meant to overlap".
+
+*** AND THE CHANGE CANNOT BE WRITTEN FROM HERE, WHICH IS WHY THIS ROUND MEASURES AND REFUSES TO REPAIR. ***
+vendor/box3d/ holds box3d.js and box3d.wasm and no headers at all, so the shim's `#include "box3d/box3d.h"`
+resolves only on a machine where build-box3d-wasm-clang.sh has fetched the library. Writing a
+collideConnected parameter against an API that cannot be read here would be guessing at a signature and
+shipping the guess as a fix. The repair is a shim change plus a wasm rebuild, which is rig work, and
+PENDING_REBUILD in box3dNode.mjs is the hand-off mechanism that already exists for exactly that.
+
+AND SHRINKING THE BOXES IS NOT THE WORKAROUND IT LOOKS LIKE. It does clear the overlap -- at 0.2x, which
+takes the forearm's collider radius from 0.058 m to 0.012 m, a limb about a centimetre thick. The overlap is
+gone because there is almost nothing left to overlap, and a ragdoll that thin falls through things and no
+longer matches any visual mesh. *** The first version of that check asserted "shrinking NEVER clears it" and
+was simply wrong; the gate caught the overclaim on its first run. ***
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Making bodiesFromSegments ignore its attach points
+turns 3 checks red -- 14 pairs collapse to 10 against 10 and the impulse ratio to 1 -- so both comparisons are
+load-bearing. A commented-out collideConnected line added to the shim turns the filtering check red, which is
+the right sensitivity: the claim is that no such argument exists anywhere in that file.
+
+*** AND THE FIRST SABOTAGE TOOK THREE ATTEMPTS TO LAND, WITH TWO WORTHLESS GREEN RUNS ON THE WAY. *** The
+first aimed at ragdollFromSkeleton's wiring, which this gate does not use -- it constructs both derivations
+itself, deliberately -- so it hit a path under no test. The second was a sed whose `|` delimiter collided
+with the `||` in the line it was matching: it printed an error, changed nothing, and the gate went green.
+That is v4248's lesson arriving one round later, and it is the same lesson: A SABOTAGE MUST BE CONFIRMED
+APPLIED BEFORE ITS RESULT IS READ.
+
+New: tools/ship/ragdollSelfCollide-selfcheck.mjs (9 checks).
+
+NOT done, and stated in the gate: what the self-collision actually COSTS in behaviour. This round establishes
+that the overlap exists, that the solver does real work about it, and that the fix cannot be requested. It
+does NOT show the ragdoll behaving wrongly because of it -- and after v4248 found three instruments unable to
+separate two derivations, that distinction is worth keeping. A ragdoll that fights itself may still look
+fine. Also not established: whether box3d supports collideConnected AT ALL. The claim is about the SHIM and
+about what can be read from this repository, not about the library, which only the rig can answer.
+
+The build now stands at 4249 gates.
+
 ## v4248 -- The derived ragdoll, stepped in a real solver, and v4245's anchor fix is not confirmed
 
 *** v4245 CLOSED BY SAYING THE ONE THING IT COULD NOT DO WAS RUN THE THING IT BUILT. *** Its gate: "unchecked
