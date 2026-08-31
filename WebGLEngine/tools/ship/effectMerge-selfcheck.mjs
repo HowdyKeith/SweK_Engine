@@ -296,9 +296,13 @@ console.log("\n5. *** THE REAL PAGE, THROUGH THE TREE'S OWN RECORDER -- what the
         ok("!! ...and the loop runs far more often than it draws, which is #60's question in one number",
             rafs > main.draws / 6 * 2,
             rafs + " rAF callbacks against " + (main.draws / 6) + " render cycles in the same 5 s -- " +
-            (100 * (1 - (main.draws / 6) / rafs)).toFixed(0) + "% of callbacks drew nothing. NOT a claim that " +
-            "they were skippable: this is swiftshader, where a render cycle is slow enough that other rAF " +
-            "consumers get many turns in between. It is recorded as a measurement, not read as a verdict.");
+            (100 * (1 - (main.draws / 6) / rafs)).toFixed(0) + "% of callbacks drew nothing. *** THE CAUTION " +
+            "HERE WAS RIGHT AND THE DIAGNOSIS WAS WRONG, AND v4250 IS THE ROUND THAT SAYS SO. *** This line " +
+            "used to read 'this is swiftshader, where a render cycle is slow enough that other rAF consumers " +
+            "get many turns in between' -- a race. Driven by a deterministic rAF, where every frame is one " +
+            "step and every consumer gets exactly one turn, the figure is STILL 85%: the page has nine rAF " +
+            "consumers and exactly one of them renders. It was never about speed, it is the architecture, and " +
+            "the render cycle draws on 100% of frames rather than being outrun.");
         report("framebuffer binds in the window: " + main.binds + " for " + main.draws + " draws (" +
                (main.binds / Math.max(1, main.draws)).toFixed(1) + " per draw)");
         report("redundant state: " + (main.redundant || []).join(", "));

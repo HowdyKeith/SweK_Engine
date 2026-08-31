@@ -8,6 +8,69 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4250 -- A frame you cause, not a frame you wait for, and v4242's explanation of its own 89% was wrong
+
+*** THIS TREE HAS MEASURED requestAnimationFrame TWICE AND CORRECTLY REFUSED TO CONCLUDE ANYTHING BOTH
+TIMES. *** #60, open since v4232: frameDirty found 0.0% of frames skippable. v4242: 143 rAF callbacks against
+16 render cycles in five seconds, 89% of callbacks drawing nothing, written up as "NOT a claim that they were
+skippable: this is swiftshader, where a render cycle is slow enough that other rAF consumers get many turns
+in between. It is recorded as a measurement, not read as a verdict."
+
+Both are observations of a race, and a race cannot be read. With the clock in the gate's hand they become
+experiments.
+
+New tools/ship/deterministicRaf.mjs replaces requestAnimationFrame, performance.now and Date.now with a
+single counter the gate drives: step(n) runs exactly n frames, at times the gate chose. The idea is
+FormidableLabs/mock-raf (MIT, 2015-2016), not vendored -- twenty lines and unmaintained, so what travels is
+the shape rather than the package.
+
+*** THE ONE THING A NAIVE MOCK GETS WRONG IS THE ONLY THING THAT MATTERS. *** Every animation loop is
+`function frame() { ...; requestAnimationFrame(frame); }`, so a callback that registers another must run on
+the NEXT step. The queue has to be TAKEN before it is walked; a shim that walks the live array either runs
+the whole animation in one step or spins forever. The naive version is shipped alongside as a CONTROL and
+runs away to 10,000 invocations in a single step, so the correct one is not merely asserted correct.
+
+*** THE REAL ENGINE BOOTS UNDER IT WITH ZERO PAGE ERRORS, AND EVERY SINGLE FRAME DRAWS. ***
+
+    step(1)  -> +6 draws        step(10) -> +60 draws        step(50) -> +300 draws
+
+Six draws per frame in every batch, and all six draw sites firing identical counts across 243 frames. The
+render cycle does not skip frames -- it runs on all of them -- and no pass inside it is conditionally skipped
+either.
+
+*** AND THE 89% SURVIVES A CLOCK WITH NO RACE IN IT AT ALL. *** Under deterministic stepping, where every
+frame is one step and every consumer gets exactly one turn, 2,012 callbacks over 303 frames is 6.6 per frame,
+with NINE rAF consumers queued in steady state and exactly ONE of them rendering. 85% of callbacks draw
+nothing -- the same figure, with the race removed.
+
+So it was never about swiftshader being slow. It is the architecture: several consumers share the loop and
+one of them draws. v4242's caution was right and its diagnosis was not, and the sentence is corrected where
+it still lives, in tools/ship/effectMerge-selfcheck.mjs.
+
+*** WHICH CONFIRMS #60 RATHER THAN OVERTURNING IT, AND SHARPENS IT. *** The render cycle runs on 100% of
+frames, so there are no frames to skip. What frameDirty would have to skip is not a FRAME but the WORK INSIDE
+one, and that is a different question from the one v4232 was asking. The 0.0% was correct and was answering
+a question whose premise the deterministic clock has now changed.
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Walking the live queue turns the self-perpetuating
+loop check red at 50,000 invocations over five steps -- the same defect the control ships deliberately, which
+is not a duplication: the control proves the property is real and the sabotage proves the check on the
+correct implementation is load-bearing. Freezing the clock while frames still count turns the timestamp check
+red, and NOTHING ELSE MOVES: the loop check, the cancel check and the pending check are all about the queue.
+A shim that steps frames perfectly and lies about the time would pass every structural check in the file,
+which is why the timestamp is asked about directly.
+
+New: tools/ship/deterministicRaf.mjs, tools/ship/deterministicRaf-selfcheck.mjs (10 checks).
+
+NOT done, and stated in the gate: what the other consumers DO with their turns. This round establishes that
+all but one never draw; it does not say whether they compute anything worth computing, and "does not draw" is
+not "does nothing" -- which is exactly the conflation this file exists to undo, so it is not committed again
+in the other direction. Also not done: the NETWORK is still real. Asset fetch and decode run on wall time, so
+boot interleaves controlled steps with real waits, and only the FRAME COUNT is the gate's to choose. A fully
+hermetic page would need the fetches stubbed too, which is a bigger harness than this question needed.
+
+The build now stands at 4250 gates.
+
 ## v4249 -- Every ragdoll this tree can derive fights itself, and the fix cannot be asked for
 
 *** v4248 FILED THE LAST POSSIBILITY FOR v4245's ANCHOR FIX: that its argument was about COLLISION VOLUME
