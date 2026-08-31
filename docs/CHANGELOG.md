@@ -8,6 +8,75 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4213 -- haptics: the tree had none, and the two APIs that play them cannot express each other
+
+*** MEASURED BEFORE BUILDING ANYTHING: THIS TREE CONTAINED ZERO HAPTICS. *** No navigator.vibrate, no
+hapticActuator, on any surface, in any file. Meanwhile v4212 had shipped engine/xrInput.mjs one round earlier
+with careful edge detection on trigger and squeeze -- reporting exactly one event per press -- AND NOTHING TO
+ANSWER A PRESS WITH. And phone.html is a touch UI on a device that has had a vibrator since 2010.
+
+Idea from lochie/web-haptics (MIT), taken the way ui/springMotion.js took sileo's and ui/domAnimation.mjs took
+animatelo's: THE VOCABULARY IS THE VALUABLE PART, NOT THE LIBRARY. web-haptics ships React, Vue and Svelte
+bindings; this tree ships none of those frameworks. What survives the translation is the observation that
+"success", "warning" and "impact" are named reusable patterns rather than magic numbers at call sites.
+
+*** THE FINDING THAT MAKES THIS MORE THAN A TABLE OF NUMBERS: THE TWO PLAYBACK APIS DO NOT AGREE ABOUT WHAT A
+HAPTIC IS, AND NEITHER CAN EXPRESS THE OTHER. ***
+
+    navigator.vibrate(pattern)            an array of milliseconds alternating on, off, on, off.
+                                          IT HAS NO INTENSITY. Every buzz is full strength.
+    hapticActuator.pulse(intensity, ms)   one buzz with an intensity in 0..1.
+                                          IT HAS NO RHYTHM. One call is one buzz.
+
+So a single vocabulary has to survive being flattened in two DIFFERENT lossy directions, and the gate proves
+what each one loses rather than the loss being discovered on a device.
+
+TOWARD vibrate, THE INTENSITIES ARE DISCARDED. That is not a bug awaiting a fix -- the Vibration API has no
+intensity -- and it has a consequence the table has to respect: a light and a heavy impact MUST ALSO DIFFER IN
+DURATION or they are indistinguishable on a phone. Asserted, 12ms against 26ms.
+
+TOWARD pulse, THE RHYTHM MUST BE REBUILT AS A SCHEDULE, because *** A LOOP OF pulse() CALLS DOES NOT QUEUE:
+each supersedes the one before, so firing three pulses in a row plays exactly ONE buzz and the pattern is
+silently gone. *** This is the direction where the naive implementation is not merely lossy but produces a
+plausible wrong result -- it runs, it buzzes, and it is wrong -- so it carries the most assertions. Two
+distinct collapses are pinned separately: scheduling everything at t=0 (all pulses overlap), and scheduling
+only the gap while ignoring the buzz that precedes it (the same collapse in slower motion).
+
+THREE WAYS OF MEASURING AN EFFECT ARE ASSERTED TO AGREE: durationOf, the sum of the vibrate pattern, and the
+end of the last scheduled pulse. If any two disagreed, one of them is lying about the effect's length and the
+caller cannot tell which.
+
+INDEX PARITY IS PINNED AS PARITY, NOT AS A LITERAL. Even indices buzz, odd indices pause. A pattern built one
+element out of phase does not fail -- it plays the rhythm INSIDE OUT, the gaps buzzing and the buzzes silent,
+which on a device reads as "the haptics feel wrong" and is close to impossible to debug by feel.
+
+THE STRENGTH SCALE TOUCHES INTENSITY AND NOT DURATION. Shortening a buzz to weaken it changes what it MEANS --
+a short heavy tap and a long light one are different signals -- and on the vibrate path, which has no
+intensity, duration is the ONLY visible quantity, so scaling it would silently turn a strength slider into a
+speed slider. The gate asserts the vibrate pattern is byte-identical at any strength.
+
+EVERY PLAY PATH REPORTS WHY, BECAUSE EVERY BROWSER HAPTIC API FAILS SILENTLY. iOS Safari has never shipped the
+Vibration API -- no error, the function is simply absent. Where it exists it returns FALSE before the page's
+first user gesture, and that return value is the platform's only signal that nothing happened. A real XR
+controller without motors exposes hapticActuators as a PRESENT BUT EMPTY array. And pulse() returns a Promise
+that can reject when a controller goes away mid-buzz. All four are handled and named.
+
+WIRED, not left as a module its gate imports. VR trigger and squeeze buzz THE CONTROLLER THAT FIRED THEM
+(e.source, not "the controller" -- a buzz in the wrong hand is worse than none), and a session ending cancels
+anything still scheduled, because a timer outliving its controller is a buzz with no owner. phone.html gets
+ONE delegated pointerdown listener rather than per-button binding, because that page BUILDS CONTROLS
+DYNAMICALLY from a schema that arrives over the WS and per-button binding would silently miss everything
+created after load. The effect is chosen by CONSEQUENCE rather than by widget type -- if every button feels
+identical the feedback carries no information beyond "registered" -- and that was MEASURED live in headless
+Chromium with a stubbed vibrator: a plain toggle sends [10], "Restart pipes" sends [18], and nothing at all
+fires before the first tap.
+
+Gate: tools/ship/haptics-selfcheck.mjs, 45 checks, all pass. Six sabotages, all red: inverting the pattern
+parity, scheduling every pulse at t=0, scheduling only the gap, making the strength scale touch duration,
+swallowing vibrate()'s false return, and making the light and heavy impacts the same length. Both modules
+restored byte-identical.
+
+The build now stands at 1293 gates.
 ## v4212 -- VR part two: the post chain in stereo, the controllers, and the pages where the guide was right
 
 v4179 got the engine into a headset and said in its own comment what it was leaving behind: "Two eyes through

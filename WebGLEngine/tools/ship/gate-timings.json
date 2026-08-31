@@ -764,8 +764,8 @@
   "tools/roundhouse/perfSync-selfcheck.mjs": 93,
   "tools/roundhouse/physicsBaselineCoverage-selfcheck.mjs": 2696,
   "tools/roundhouse/pipeFlowKey-selfcheck.mjs": 91719,
-  "tools/roundhouse/plantDirection-selfcheck.mjs": 817117,
-  "tools/roundhouse/plantedError-selfcheck.mjs": 4973,
+  "tools/roundhouse/plantDirection-selfcheck.mjs": 839022,
+  "tools/roundhouse/plantedError-selfcheck.mjs": 4889,
   "tools/roundhouse/plasmaKrbn-selfcheck.mjs": 96,
   "tools/roundhouse/plastic-selfcheck.mjs": 281,
   "tools/roundhouse/poissonDevice-selfcheck.mjs": 253,
@@ -1272,9 +1272,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 751,
+  "timedThisRun": 753,
   "totalInRecord": 1267,
-  "at": "2026-08-31T02:13:20Z"
+  "at": "2026-08-31T02:32:34Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,

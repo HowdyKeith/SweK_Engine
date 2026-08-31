@@ -5690,5 +5690,32 @@
   });
 })();
 </script>
+<script type="module">
+// v4213 -- *** THIS IS A TOUCH UI ON A DEVICE THAT HAS HAD A VIBRATOR SINCE 2010, AND IT HAS NEVER USED IT.
+// *** Measured before this round: the whole tree contained zero navigator.vibrate. On a phone the tap target
+// IS the interface -- no hover, no cursor, no click -- so a button that gives no sensation gives no
+// confirmation at all, which is why every native mobile UI does this.
+//
+// Delegated from the document rather than bound per button, for two reasons: this page BUILDS CONTROLS
+// DYNAMICALLY (the PC-settings panel renders its rows from a schema that arrives over the WS), so per-button
+// binding would silently miss everything created after load; and one listener cannot leak.
+//
+// THE EFFECT IS CHOSEN BY WHAT THE CONTROL DOES, NOT BY WHAT IT IS. A destructive or authoritative action
+// (Listener OFF, Restart pipes) gets a heavier tap than a toggle, because the point of haptics is to encode
+// CONSEQUENCE -- if every button feels identical the feedback carries no information beyond "registered".
+import * as haptics from "/ui/hapticsPlay.js";
+const HEAVY = /restart|reload|off\b|disable|stop|clear|delete|reset/i;
+document.addEventListener("pointerdown", (e) => {
+    const el = e.target && e.target.closest ? e.target.closest("button, .act, .ic, .gtab") : null;
+    if (!el || el.disabled) return;
+    const label = (el.textContent || "") + " " + (el.id || "") + " " + (el.title || "");
+    haptics.play(HEAVY.test(label) ? "impactMedium" : "selection");
+}, { passive: true });
+// The Vibration API returns false until the page has had a user gesture, so the FIRST tap of a session is
+// silent whatever this file does. That is the platform, not a defect -- said out loud so the next reader does
+// not go hunting for a bug here.
+window.swekHaptics = haptics;
+console.log("[haptics] " + haptics.supported().reason);
+</script>
 </body>
 </html>
