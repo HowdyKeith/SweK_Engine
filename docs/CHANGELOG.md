@@ -8,6 +8,75 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4253 -- name a point and solve for the rotations: the tree had no IK of any kind
+
+v4244 built anim/retarget.mjs, so a clip can drive a skeleton it was not authored for. v4245 built
+physics/ragdollFromSkeleton.mjs, so a skeleton can be handed to a solver and fall over. Both push rotations
+FORWARD down a chain. Nothing anywhere solved the inverse. Grepped for FABRIK, ccdIK, solveIK and
+inverseKinematic across the whole tree before writing a line: no hits.
+
+New anim/ik.mjs: FABRIK, CCD, the analytic two-bone case, and an angle clamp. It reuses the tree's own
+quaternion multiply rather than forking a fifth copy -- which turned out to matter more than expected.
+
+*** IK IS GRADEABLE BECAUSE IT HAS CLOSED FORMS, AND THE SECOND ONE IS THE SHARP ONE. ***
+
+- The solved joint angle matches acos((l1^2 + l2^2 - D^2) / (2*l1*l2)) at every distance, worst 2.84e-6 rad.
+  FABRIK never computes an angle -- it places points -- so agreeing with the law of cosines is a result
+  rather than a restatement.
+- Beyond the chain's reach the error is EXACTLY D - L, to twelve decimals: D=4.5 gives 0.500000000000 on a
+  4 m chain, D=10 gives 6.000000000000. A solver that stretched bones would report a SMALLER error than the
+  geometry permits and one that gave up would report a larger one. There is one right number and it is not
+  tunable.
+
+*** THE CONTROL IS BONE LENGTH, AND IT PRODUCED THE ROUND'S REAL FINDING. *** Every check above is passed
+trivially by a "solver" that drags the end effector onto the target and lets the joints stretch -- a rubber
+band, not a skeleton. FABRIK preserves every length to 3.3e-16. CCD, on the same chain and the same targets,
+drifts 9.08e-7: eight orders worse.
+
+That is not a bug in CCD. FABRIK is pure vector arithmetic and never builds a rotation; CCD composes
+quaternions. Rotating a vector by the IDENTITY quaternion through anim/retarget.mjs's own qMul changes
+0.7810249675906655 into 0.7810249924659729 -- EXACTLY Math.fround of it -- because qMul returns through a
+Float32Array. And it is a FLOOR rather than accumulation: one CCD iteration costs 1.78e-7 and nine cost
+3.26e-7, less than four times the drift for nine times the work. So the number to quote for any
+quaternion-path solver in this tree is a representation limit no tuning removes. This is v4246's lesson in a
+third subsystem, and it surfaced the same way: by asserting an EXACT invariant instead of a plausible one.
+
+*** TWO CHECKS I NEARLY SHIPPED THAT THE MEASUREMENTS KILLED. ***
+
+1. "The two solvers agree." True on a two-bone chain -- worst point disagreement 1.24e-6 m -- and FALSE on a
+   four-bone chain, where they land 2.11 m apart. Both are right: four joints reaching a point in 3D is
+   REDUNDANT, so there are infinitely many solutions and no reason two mechanisms should pick the same one.
+   What is actually shared is that both REACH, and that is what the gate asserts.
+
+2. "It converges." FABRIK's convergence COLLAPSES approaching full extension: 6 iterations at 87.5% of reach,
+   42 at 97.5%, 84 at 98.75%, and no convergence in 200 at 99.75%. The chain is near-singular there. A
+   bent-start control degrades identically (7, 59, 148, none), which is what says it is the geometry rather
+   than a fixture that happened to start collinear. Reported rather than avoided: a gate that only tested
+   comfortable targets would have shipped a limb that locks up exactly when a character stretches for
+   something.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read, restored md5-identical. The rubber
+band (place points where they already are): 4 red, the length control reading 4.3e-1. Measuring the
+unreachable error to a moved target: 1 RED AND ONLY ONE -- every configuration still legal, every length
+still right, only the closed form caught it. clampJointAngle doing nothing: 2 red, including a drift of
+exactly 0.00e+0, which is why "the bones survived" is never asserted on its own.
+
+*** AND ONE SABOTAGE SURVIVED. *** Removing the clamp inside twoBoneAngles, so an impossible distance yields
+NaN, left the gate ALL GREEN: nothing had ever called it out of range, so its whole safety branch was
+unexercised. An exported branch with no exercise is untested whatever the coverage around it looks like. A
+check was added -- D=5.0 on a 1.8 m chain now must give PI and D=0.05 must give 0, both flagged clamped --
+and the sabotage now goes red. Recorded rather than quietly fixed, because the hole was in the gate and only
+the sabotage found it.
+
+UNCHECKED, and named in the gate: any of this ON A SKELETON. Every chain here is a bare list of points, not
+the node hierarchy retarget.mjs and ragdollFromSkeleton.mjs pass around, and nothing converts a solved point
+chain back into the LOCAL rotations a skeleton is posed with. The footSlide this was built to remove has not
+been removed, only made removable. Also unchecked: what the float32 qMul costs RETARGETING, which composes
+world rotations down a whole hierarchy through that same multiply and has never been measured at the end of
+a twenty-bone chain.
+
+The build now stands at 4253 gates.
+
 ## v4252 -- #60's wall was not a wall, and the pixel test that found it almost told me the opposite
 
 v4232 measured 0.0% of frames skippable in four scenarios and named the last holder: "domAnimation -- a CSS
