@@ -142,7 +142,15 @@ $("load").onclick = async () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    // v4219 -- *** THE LAST THREE-BASED PAGE WITHOUT VR. *** glb_viewer, scene-view and aquarelle were all
+    // wired at v4212 and this one was not, which is what #88 named. Same pattern, and the same reason for it:
+    // setAnimationLoop REPLACES the rAF rather than joining it, so ui/threeVR.js installs the loop and the
+    // fallbacks below install it only when threeVR did not -- a second installer would run the loop twice per
+    // frame, which on a monitor merely looks fast and in a headset is double work at half the rate.
+    const tick = () => { controls.update(); renderer.render(scene, camera); };
+    import("/ui/threeVR.js").then((m) => m.enableThreeVR({ renderer, loop: tick, label: "\u{1F97D} Enter VR" }))
+      .then((r) => { if (!r || !r.loopInstalled) renderer.setAnimationLoop(tick); })
+      .catch(() => { renderer.setAnimationLoop(tick); });   // import failed outright
     setState("rendering", "ok");
   } catch (e) {
     setState("failed", "hot");

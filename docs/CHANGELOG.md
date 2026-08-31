@@ -8,6 +8,90 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4219 -- VR part three: the sticks move you, and the comment that said so for seven versions
+
+*** v4212 READ THE THUMBSTICKS AND NOTHING CONSUMED THEM. *** engine/xrInput.mjs has had moveVector() since
+that round -- deadzoned, per-hand, gated -- and main.js's XR frame carried the comment "so a locomotion vector
+is applied to the camera this frame". That was an intention, not a description: nothing called it. In a
+room-scale session the absence is invisible, because you can walk and the world answers; the sticks simply do
+nothing, which reads as a headset quirk rather than as a missing feature.
+
+New engine/xrLocomotion.mjs. Left stick walks on the floor plane, right stick snap-turns.
+
+*** LOCOMOTION IS NOT MOVING THE CAMERA, AND THAT IS THE WHOLE DESIGN. *** The per-eye cameras come from
+frame.getViewerPose() once per eye per frame, so anything written to them is overwritten on the next one. The
+player is moved by REPLACING THE REFERENCE SPACE -- XRReferenceSpace.getOffsetReferenceSpace -- which moves the
+head, both eye views AND the controller poses together. Move the camera instead and only what we drew moves,
+so the hands stay behind in the old space: your arms detach from your body.
+
+The offset is the player's pose INVERTED, and that is worth stating rather than assuming. For
+S' = S.getOffsetReferenceSpace(T), a point at p in S is reported at T^-1 . p in S'. We want a viewer standing
+physically at v to be reported at P . v, where P is where the player has walked to. So T^-1 = P, hence
+T = P^-1. Rather than trust that derivation, the gate asserts the invariant it implies: applying the offset to
+the player's own world position must land on the origin. Worst over four poses, 0.00e+0 m.
+
+*** FIVE FAILURE MODES, EVERY ONE OF WHICH PRODUCES A SESSION THAT RUNS AND IS WRONG TO BE INSIDE. ***
+
+  1. FULL HEAD ORIENTATION INSTEAD OF YAW. "Forward" for locomotion is the head's forward vector projected
+     onto the floor. Rotate (0,0,-1) by a head pitched up and it has a large +y, and moving along it leaves
+     the ground -- you look up and fly. moveDelta returns a 2-vector with no y term at all, so there is no way
+     to express leaving the floor, and a head pitched 51 degrees up produces movement identical to a level one.
+
+  2. A SNAP TURN ADDED TO THE YAW SWINGS YOU AROUND THE ORIGIN. Turning must pivot about the HEAD. A head
+     physically at h is at R(yaw).h + t in the world, so holding it still through a turn of a means
+     t' = t + R(yaw).h - R(yaw+a).h. MEASURED: a head 2.24 m from the reference origin is thrown 4.47 m by 180
+     degrees of naive turning; pivoting about the head leaves it within 4.97e-16 m over the same six turns.
+
+  3. ONE THRESHOLD INSTEAD OF TWO AND THE STICK TURNS EVERY FRAME. A bare `if (|x| > t) turn()` fires 30 times
+     in 30 frames -- 900 degrees, and at 72 Hz it is 2160 degrees a second. That does not feel fast, it feels
+     broken. Fire at 0.7, re-arm only below 0.4: exactly one turn per push, asserted both ways (a stick
+     returned to halfway between the two thresholds must NOT re-arm).
+
+  4. *** COMPOSING THE OFFSET ONTO THE CURRENT SPACE APPLIES THE WHOLE TOTAL AGAIN EVERY FRAME. *** Locomotion
+     accumulates an ABSOLUTE pose, so its transform is relative to where the session started -- it must be
+     applied to the BASE space. Offset the already-offset space and the player accelerates away from the world
+     exponentially, which looks like tracking failing rather than like a bug. XRSessionManager now keeps
+     baseRefSpace beside refSpace, and the gate drives 120 frames through a fake reference space that records
+     its own chain: depth 1, not 120.
+
+  5. AN UNCLAMPED dt TELEPORTS YOU. A tab-switch, a GC pause or a headset set down and picked up gives a dt of
+     seconds. Five seconds at 2.5 m/s is 12.5 m in one step; clamped to maxDt it is 0.25 m.
+
+*** AND THE GATE CAUGHT ME COMMITTING v4218'S OWN DEFECT, ONE ROUND LATER. *** The first draft had rotateY at
+one handedness and basisFor at the other, so yawOf(quatFromYaw(a)) came back as -a -- two copies of the
+heading, exactly what the driving env spent a round on. Everything now derives from a single rotation, and the
+gate counts the sin/cos pairs in the file. Three more of mine, all found by the same gate rather than by
+reading: _teardown dropped refSpace but not baseRefSpace, leaving a handle to a dead runtime object; the snap
+confirmation asked for a haptic effect named "tick", which is not in the EFFECTS table, so play() would have
+returned {ok:false, reason:"unknown effect: tick"} and buzzed nothing, silently, forever (the detent effect is
+"selection"); and my hand-rolled comment stripper -- a lazy /*...*/ over 30,000 lines of main.js -- ate from a
+`/*` inside a string to the next `*/` and swallowed the very import line it was checking for, failing against
+correctly wired code. Replaced with tools/ship/sourceScan.mjs's codeOnly, which is what it exists for. A fourth
+check overreached rather than broke: it asserted that NOWHERE in main.js moves a camera, in a file with a
+perfectly legitimate non-VR flycam. It is now brace-matched to _renderXRFrame -- brace-matched, not sliced at a
+flat character count, which is the defect v4179's gate shipped and v4212 had to rewrite.
+
+splat_viewer.html was the last three-based page with no VR button; glb_viewer, scene-view and aquarelle were
+wired at v4212 and it was missed. Same pattern, including the reason for it: setAnimationLoop REPLACES the rAF
+rather than joining it, so the fallback installers are guarded on threeVR's loopInstalled or the loop runs
+twice per frame.
+
+*** WHAT THIS ROUND DOES NOT CLAIM, PRINTED BY THE GATE EVERY RUN. *** That any of it feels right in a headset.
+Comfort is the whole subject of locomotion design and is not decidable from here -- whether 30 degrees is the
+right snap step, whether 2.5 m/s induces sickness, whether head-relative beats controller-relative are
+questions for a person wearing the thing. Two sandbox limits are stated so their absence is not mistaken for
+coverage: there is no navigator.xr here, so no page adds an Enter VR button and the gate checks the CALL rather
+than the button; and vendor/spark/spark.module.js is absent, so splat_viewer reports "renderer unavailable" and
+never reaches the loop this round wired. glb_viewer, wired since v4212, loads on the same box -- so that is
+Spark being unvendored here, not this change. Gate tools/ship/xrLocomotion-selfcheck.mjs, 6 sabotages all red,
+the entire session lifecycle driven on injected fakes.
+
+Next: #95, the GPU Brain painter, as Keith asked. ondras/primitive.js (MIT) is the take for it -- the analytic
+optimal colour (target-current)/alpha + current averaged over the covered pixels, so colour is SOLVED rather
+than searched, and bbox-local scoring that makes a candidate cost O(shape area) rather than O(image).
+render/perceptual.mjs is whole-image only and has neither.
+
+The build now stands at 1299 gates.
 ## v4218 -- the GPU Brain learns to drive, and four ways to build a task that runs and is not the task
 
 Keith, on v4217: "and the GPU Brain could learn to drive. It may already be learning from it's interactions
