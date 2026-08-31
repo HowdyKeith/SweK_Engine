@@ -8,6 +8,88 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4245 -- A ragdoll derived from a skeleton, and #116's own premise corrected by the gate that checked it
+
+*** #116 CAME FROM sunag/Oimo.js-Lab AND THE ASSESSMENT FOUND NOTHING TO TAKE. *** Its two headline features
+are ragdolls and a BVH; this tree has ragdoll.html's eleven bodies and ten box3d joints, simulation/
+RagdollDismember.js on the kaiju's particle skeleton, and a BVH from #96 that grew a third query at v4235.
+Its LICENSE is upstream's -- "Copyright (c) 2012-2014 authors saharan / js version loth" -- carried by the
+fork, which is worth recording precisely rather than as "MIT by sunag".
+
+What the assessment found instead was a grep result, AND #116 STATED IT WRONG. It said ragdoll.html is the
+only file in the tree that calls the box3d joint API. The gate written to check that claim found:
+
+    flesh.html, physics/backendConformance.mjs, ragdoll.html
+
+*** TWO PAGES, NOT ONE -- AND THE SECOND ONE MAKES THE ARGUMENT STRONGER RATHER THAN WEAKER. *** flesh.html
+("skin that follows the skeleton") carries THE SAME ELEVEN BONES AT THE SAME COORDINATES as ragdoll.html,
+identical row for row including every half-extent, plus its own ten-joint table. One creature, typed out
+twice, in two files, with nothing keeping them in step -- move a bone in one and the other silently
+disagrees -- while inside EACH file eleven box centres and ten joint anchors have to be kept consistent by
+hand. The third hit is backendConformance.mjs, which calls jointWeld to check that a backend claiming joints
+does not throw: a probe, not a rig. Everything else that mentions those names is a stub returning -1
+(planarFallbackWorld, freeSpaceWorld, joltLoader) or a comment.
+
+Meanwhile gpu/SkeletalAnimator.js holds real bone hierarchies from real GLBs, and nothing connects them.
+
+NEW physics/ragdollFromSkeleton.mjs derives the whole graph from a hierarchy, reusing anim/retarget.mjs's
+hierarchy walk from v4244. A body per bone spanning its SEGMENT -- head to child's head, which is why a
+ragdoll body sits between two joints rather than at one -- and a joint per parent link ANCHORED AT THE
+CHILD'S HEAD. That anchor is what makes this a derivation instead of a transcription: both bodies were
+measured from that point, so it is the same number rather than two numbers that agree. Type and limits are
+read off the bone name against a small deliberate table; an unrecognised bone gets a WELD, the conservative
+answer, because a joint that is too stiff looks wrong and one that is too free puts a knee through a shin.
+
+On the same creature it produces 11 bodies and 10 joints, the same five joint answers the hand table gives
+(shoulder spherical, elbow revolute, hip spherical, knee revolute, spine weld), knee [-145, 0] and hip cone
+60 included, and every anchor exact to 0.
+
+*** AND THE OBVIOUS DERIVATION IS WRONG, MEASURED BEFORE IT WAS FIXED. *** A box spanning head to tail is the
+natural answer and it puts
+
+    4 OF 10 JOINT ANCHORS OUTSIDE THE BODY THEY ATTACH TO
+
+-- both shoulders and both hips. The cause is that a bone with several children has only ONE tail: the
+pelvis's segment runs to the spine, so the hips, which hang off its sides, are nowhere near the box. The
+solver would pull on a point the body does not contain, which is a lever arm nobody chose. Fixed by making a
+body the box enclosing every point it must REACH -- its head, its tail, and the head of every child. 4 of 10
+becomes 0 of 10; the pelvis grows from 0.112 to 0.332 half-width while childless bones do not change at all.
+That is exactly why ragdoll.html's chest and pelvis are wide, done there by typing the numbers.
+
+THE ONE THING THAT CANNOT BE DERIVED IS DECLARED RATHER THAN HIDDEN. A leaf -- a head, a hand, a foot -- has
+no child, so it has no segment and no measurable length, and no amount of hierarchy walking produces one.
+Those five bones come from LEAF_FACTOR = 0.5 of the parent's length, named as a constant and measured by the
+gate, because a guess that is measured is a different thing from a guess that is baked in. Mass follows box
+volume, so a thigh outweighs a forearm 20.8 to 1 without anyone choosing a number.
+
+AND THE CONVERSE, WHICH IS THE HALF THAT MAKES IT USEFUL. "Switch to ragdoll" is not a hit reaction; a hit
+reaction is a per-bone weight ramping from the animated pose toward the simulated one and back, so a
+character staggers and recovers rather than dropping like a bag. blendPose is that: endpoints BIT-IDENTICAL
+(no slerp is run at 0 or 1, so a character standing still cannot drift), monotone all the way across, and
+SLERPED -- worst |q| - 1 of 4e-8 against 3.7e-2 for a lerp of the same two poses. A non-unit quaternion fed
+to a rotation matrix shortens the bone, which is the scale dip SkeletalAnimator's own round-292 note records
+for its matrix lerp.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Dropping the attach points on the REAL path (not
+just in the gate's side-by-side) turns 2 red; anchoring at the parent's tail turns 2 red at 0.888 -- a
+sabotage invisible on a chain and obvious on a humanoid, which is why the test creature has a pelvis with
+three children. *** AND THE LERP SABOTAGE LEFT BOTH THE ENDPOINTS AND THE MONOTONICITY GREEN: *** a blend can
+be monotone, exact at both ends, and still shorten every bone in the middle.
+
+Also corrected in passing: two endpoint checks were written with qAngle, whose 2*acos(dot) returns about 1e-8
+on two bit-identical float-normalised quaternions because |q| is not exactly 1. They failed on a pose that
+was already identical. An ANGLE cannot express an equality; the components can, and now do.
+
+New: physics/ragdollFromSkeleton.mjs, tools/ship/ragdollFromSkeleton-selfcheck.mjs (17 checks).
+
+NOT done, and stated in the gate: any of this INSIDE box3d. Nothing here creates a world, adds a body or
+makes a joint -- it derives the description that would be handed to those calls and checks the description. A
+graph box3d rejects, or that explodes on the first step, would pass every check above, and the two pages
+remain the only callers. Also not done: what DRIVES the blend weights, since blendPose takes them and nothing
+produces them; and the segment DIRECTION for a multi-child bone, which is still its first child's.
+
+The build now stands at 4245 gates.
+
 ## v4244 -- A clip authored for one skeleton, played on another, and the test #115 asked for that proves nothing
 
 *** #115 SAID THE RETARGETING WAS THE HALF OF sunag/three.js-tba WORTH TAKING, AND PROPOSED THREE CHECKS. TWO
