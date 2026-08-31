@@ -809,6 +809,14 @@ export class HeartbeatAvatar {
                 startTop:  parseInt(root.style.top  || "0", 10) || root.getBoundingClientRect().top,
             };
             dragged = false;
+            // v4223 -- *** THE DRAG HANDLERS LIVE FOR THE DRAG, NOT FOR THE PAGE. *** They used to be installed
+            // on `document` here at construction and never removed, so every mousemove ANYWHERE on the page
+            // ran onDragMove for the life of the tab -- it returned immediately on `if (!dragStart) return`,
+            // which is why nothing ever looked wrong. Attaching on mousedown and removing on mouseup is the
+            // same behaviour with none of the idle cost. Both use the SAME function references, because
+            // removeEventListener matches on identity and a fresh wrapper would remove nothing at all.
+            document.addEventListener("mousemove", onDragMove);
+            document.addEventListener("mouseup", onDragUp);
             // Suppress the state-cycle click that would otherwise fire
             // on mouseup; only suppress if we actually drag.
             e.stopPropagation();
@@ -851,11 +859,12 @@ export class HeartbeatAvatar {
                 this._justDragged = true;
             }
             dragStart = null;
+            // v4223 -- released, so stop listening. See the note on mousedown.
+            document.removeEventListener("mousemove", onDragMove);
+            document.removeEventListener("mouseup", onDragUp);
         };
-        // Note: install on document so drag continues even when cursor
-        // leaves the small avatar.
-        document.addEventListener("mousemove", onDragMove);
-        document.addEventListener("mouseup", onDragUp);
+        // Installed on `document` rather than on the avatar, so a drag continues when the cursor leaves the
+        // small target -- but only BETWEEN mousedown and mouseup, which is the whole of v4223's point.
         // Expose getter for PipAvatar to read screen position
         this._undockedGetter = () => this._undocked;
 

@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4223 -- a listener that stops when its element does, and the crude number that pointed the wrong way
+
+*** THE 619-VS-22 FIGURE THAT MOTIVATED THIS WAS MISLEADING. *** ui/ has 619 addEventListener calls against 22
+removals, which sounds alarming and mostly is not: a listener attached TO an element dies with that element,
+so a panel that is dropped takes its own button handlers with it. Narrowing to the ones that outlive their
+panel -- window and document -- gives the number that matters: 71 adds against 8 removals, and 27 modules that
+add a global listener and remove none.
+
+And the retained memory is the smaller half. THE HANDLER KEEPS RUNNING. A dismissed panel still answers
+resize, still answers keydown, still recomputes a layout nobody can see.
+
+MEASURED IN A REAL BROWSER, which is the only place a MutationObserver can be shown to notice a real removal:
+
+    naive listener:  1 fire attached  ->  2 after the element is removed
+    bound listener:  1 attached  ->  1 detached  ->  2 re-attached
+
+The re-attachment half is not decoration. This tree REPARENTS panels rather than rebuilding them --
+HeartbeatAvatar calls document.body.appendChild(root) in the middle of a drag to undock itself -- so a binding
+that only ever tore down would leave a docked panel deaf.
+
+New ui/boundListener.mjs takes the RULE from mutant (a binding should only listen while its element is
+attached) and not the framework, since mutant is a template-binding library and this tree has no templates.
+ONE MutationObserver for the whole page, not one per binding: an observer on document.body with subtree:true
+fires for every DOM change anywhere, so N observers do N pieces of work to discover that nothing moved. It
+disconnects itself when the last binding goes -- the module must not commit the leak it exists to prevent.
+
+*** TWO REAL CUSTOMERS REWIRED, RATHER THAN A MECHANISM NOBODY CALLS. ***
+
+  * ui/HeartbeatAvatar.js installed onDragMove and onDragUp on `document` AT CONSTRUCTION and never removed
+    them, so every mousemove anywhere on the page ran a drag handler for the life of the tab. It returned
+    immediately on `if (!dragStart) return`, which is exactly why nothing ever looked wrong and why it
+    survived this long. They are now added on mousedown and removed on mouseup: a drag handler should live
+    for the drag, not for the page.
+  * ui/kaggleLab.js hand-rolled a whole MutationObserver, for one panel, to clear one interval, under a
+    comment calling itself "a safety net for that case" -- which is the tell that the idea was general and
+    the code was not. It is one whenDetached() registration now. The cost was never the duplication: it is
+    that every copy observed document.body with subtree:true on its own.
+
+*** THE SILENT FAILURE THE WHOLE MODULE IS BUILT AROUND. *** removeEventListener matches on IDENTITY. Hand it
+a fresh wrapper -- a bind(), an arrow, anything constructed at call time -- and it removes NOTHING, returns
+undefined, and reports no error at all. The listener stays, the cleanup looks done, and the bug surfaces later
+as a handler firing twice. So the module registers the caller's own function, and the gate sabotages that line
+specifically to prove the check bites rather than trusting the comment.
+
+TWO OF MY OWN ERRORS, BOTH FOUND BY THE GATE RATHER THAN BY READING:
+
+  * I asserted `addEventListener("mousemove", onDragMove)` against sourceScan's codeOnly(), which BLANKS
+    STRING LITERALS as well as comments -- so the call became addEventListener("", onDragMove) and the check
+    failed against correctly fixed code. The tree's rule is that an ABSENCE is a code shape and belongs to
+    codeOnly; a PRESENCE containing a string argument needs noComments().
+  * A throwing teardown escaped the sweep and crashed the gate outright, with no line saying which check had
+    died. In a browser it would have escaped the MutationObserver callback and stopped EVERY OTHER binding on
+    the page from being swept -- one panel's bad cleanup silencing all the others. Guarded, and the gate now
+    reports it as a FAIL instead of dying.
+
+Gate tools/ship/boundListener-selfcheck.mjs: five sabotages all red, sections 1-6 driving the same code with a
+fake target so the logic is gated with or without a browser, and section 7 doing the decisive half in real
+headless Chromium.
+
+WHAT THIS DOES NOT CLAIM: that the other 25 modules are fixed. Two are. The rest are left deliberately,
+because each carries its own OWNER question -- which element governs this listener -- and answering it wrong
+makes a panel deaf, which is worse than making it wasteful. The mechanism is here and gated; the case-by-case
+judgement is not something a gate can supply.
+
+The build now stands at 1303 gates.
 ## v4222 -- the tree's own 82 animations, read as data at last
 
 *** v4191 MEASURED THE CORPUS THAT MOTIVATED IT AND CONVERTED NONE OF IT. *** ui/domAnimation.mjs took the
