@@ -8,6 +8,106 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4257 -- the ledger recorded what was read and not taken; nothing recorded what was taken
+
+world/reachedLicences.mjs says it in its own docstring: "sources read during assessment rounds and NOT
+vendored". It is a careful, well-gated record of eleven repositories whose bytes never entered the tree. The
+asymmetry is that the bytes which DID enter had no register at all. #61 filed that as "box3d and htmx", and a
+census says the shape is bigger and stranger than two names.
+
+*** COUNTING BY FILENAME IS WRONG IN BOTH DIRECTIONS, AND HERE IS BY HOW MUCH. *** Asking which directories
+lack a file called LICENSE flags FOUR -- and three of the four answers are wrong:
+
+- vendor/fonts IS papered. The grant is IBMPlexSerif-OFL.txt, the SIL Open Font License 1.1, sitting there
+  under a name no LICENSE pattern matches. A census keyed on filenames finds only the licences somebody
+  named conventionally.
+- vendor/keyhunt needs no grant, because NOTHING IS VENDORED. Its ATTRIBUTION.txt records gpu-keyhunt as a
+  technique reference for physics/crypto/secp256k1.mjs and states "NO CODE WAS COPIED".
+- vendor/wasm needs none either, because it is OURS: sha256.wasm and graphlayout.wasm are AssemblyScript
+  output from .ts files in the same directory. First-party build output filed under a directory named for
+  its format rather than its origin.
+- And ui/vendor is a SECOND vendor directory, which a census pointed at the first one never sees. It is
+  papered in the file header -- "Licensed under the MIT license" atop qrcode.mjs -- with no licence file at
+  all.
+
+So the naive count says four and the true answer is ONE. htmx really did carry no grant, and its minified
+bundle has no banner to recover one from: grepping htmx.2.0.10.min.js for a licence word returns ten hits and
+ALL TEN are the substring "submit". The grant had to come from upstream at the pinned tag. It is Zero-Clause
+BSD, which drops even attribution -- *** SO NOTHING WAS EVER AT RISK AND THE GAP WAS PURELY PAPERWORK, ***
+which is exactly when to close one.
+
+New world/vendoredLicences.mjs is the register, with a taxonomy that asks what a directory IS before asking
+for its grant: THIRD_PARTY needs one, FIRST_PARTY has nobody to ask, NOT_VENDORED is a reachedLicences-shaped
+note that happens to live under vendor/. Fifteen entries, thirteen third-party, zero unpapered. The gate
+requires the register and the disk to agree in BOTH directions -- an undeclared dependency and a stale record
+are different failures and both are silent.
+
+*** #121 IS CLOSED IN THE SAME ROUND, AND ITS PREMISE CHECKED OUT STRONGER THAN FILED. *** The reached
+register held exactly TWO distinct spdx values, MIT and AGPL-3.0, and the strings "Apache" and "BSD"
+appeared NOWHERE in the file. Now: Apache-2.0 and BSD-3-Clause, with three entries.
+
+And the first Apache-2.0 entry is one that has been load-bearing in shipped code for nine hundred rounds:
+img2threejs. v3337 built render/perceptual.mjs and render/silhouette.mjs around its hard-gate rule and cited
+it in both; v4255 built mesh/lathe.mjs against the judge they provide. An Apache-2.0 source shaped this tree
+while the register that exists to record such things did not contain it. Amagine3D is recorded for its patent
+grant, which MIT has no equivalent of; shadertoy-render for BSD-3's non-endorsement clause, a constraint on
+what may be SAID rather than on what may be copied -- a category this ledger had no entry for.
+
+*** AND THE ROUND FOUND WHY SUCH THINGS GO UNNOTICED. *** tools/ship/affected.mjs walks the IMPORT GRAPH and
+says so in its own header. The licence gate does not import the tree, it SCANS it -- 4,059 files -- so its
+real inputs are invisible to the filter. Measured: of four files that all mention registered repositories --
+ui/gazeDwell.mjs, main.js, render/perceptual.mjs, mesh/lathe.mjs -- exactly ZERO reach the gate through
+--affected, while world/reachedLicences.mjs, which it imports, does. verify.mjs does not name it either.
+
+That is not hypothetical. v4247 added a mention of kamend/ChuckClose-SparkAR to ui/gazeDwell.mjs, shipped ALL
+GREEN, and left the licence gate RED -- 123 passed, 1 failed at HEAD before this round touched anything. It
+was found by running the gate by hand and fixed by recording the citation, which is the shape this register
+already documents: cited is the opposite of taken, and a byte-scan cannot tell them apart and is right not to
+try. A round can currently make this register wrong and be told nothing.
+
+FOUR SABOTAGES, each grep-confirmed applied and restored md5-identical
+(89f4e6683bff0bd05973be195c18621e). Deleting vendor/jolt from the register: 1 red. Marking htmx unpapered
+again: 2 red, and the naive-census check moves BOTH its numbers rather than a bare count. Reclassifying
+vendor/wasm as third-party -- the misclassification a filename census makes by default: 1 red. Naming draco's
+grant file COPYING when LICENSE is what is on disk: 2 red, because a register that names a licence file which
+is not there reads as diligence and is not.
+
+*** AND A SECOND DISCOVERABILITY FAILURE, FOUND FROM THE OPPOSITE DIRECTION, BY THIS ROUND'S OWN GATE NOT
+EXISTING. *** After adding it, the knowledge index still read 1332. staleness.mjs's SKIP pattern was
+/node_modules|[\/]\.git|[\/]vendor|GPU_Assets|demos_code/, and `[\/]vendor` has no trailing separator, so
+it matches any path segment BEGINNING with "vendor" -- including tools/ship/vendoredLicences-selfcheck.mjs.
+The gate existed, passed when run by hand, and WOULD NEVER HAVE RUN ON A SHIP: gateFiles() feeds the
+knowledge index, countGateFiles() and the affected filter alike. Measured before the fix: exactly ONE file on
+disk was wrongly excluded, and it was that one -- the hole has been there for hundreds of rounds and never
+bitten, because no gate had ever been named vendor-anything. `[\/]\.git` carried the identical hole and
+would have eaten a .gitsomething path the same way. Both are now anchored to a separator, the count reads
+1333, and no gate from inside a real vendor directory is swept in.
+
+Two independent discoverability failures in one round, from opposite directions: one is a gate that RUNS and
+cannot see its inputs, the other a gate that cannot be FOUND. Neither shows up as a red check anywhere -- the
+first reports green on stale data, the second reports nothing at all. A suite's coverage is not what its
+gates assert; it is what its discovery and filtering let them assert.
+
+*** AND RUNNING THE SUITE FOUND THAT FIVE GATES ARE RED AT HEAD, WHICH IS THE FINDING AT A SCALE THIS ROUND
+DID NOT EXPECT. *** Before v4257 touched anything: reachedLicences (fixed here), gateReach (472 recorded, 479
+found), referenceKind (201 against a ceiling of 181), statedRuntime (new drifted headers under
+tools/roundhouse/ and physics/em/), proseAudit. Six rounds shipped ALL GREEN across them this session, for
+exactly the two reasons above -- verify.mjs names one selfcheck path and --affected is an import-graph filter.
+
+THE FOUR RATCHET BASELINES ARE DELIBERATELY NOT BUMPED. They exist to make a person confirm that a population
+grew for a good reason, and confirming twenty unrelated additions is not a side effect of a licence round.
+Accounted precisely so the round that does it need not redo the work: gateReach reads 479 with AND without
+this round, so v4257 adds ZERO to it; referenceKind goes 201 -> 202, so twenty are pre-existing and exactly
+one is this round's own new gate. Logged as backlog #134 with both numbers.
+
+NOT DONE, deliberately and stated in the gate: widening --affected to model byte-scanning gates, or adding
+this one gate to verify.mjs's list. The first changes the filter every gate depends on and wants its own
+round and its own measurement of the cost; the second fixes one gate and leaves the class. Also unchecked:
+whether the recorded SPDX identifiers are RIGHT -- nothing verifies that the text under vendor/<x>/LICENSE is
+the licence it is labelled with, so a mislabelled MIT would pass every check here.
+
+The build now stands at 4257 gates.
+
 ## v4256 -- the fix v4249 said could not be asked for was the default, and the work was never rig work
 
 v4249 measured a derived ragdoll self-colliding at 148x its neighbours' impulse, concluded the repair was

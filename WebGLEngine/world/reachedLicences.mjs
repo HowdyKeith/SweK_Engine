@@ -148,6 +148,64 @@ export const POSTURE = Object.freeze({
  * `taken` says what actually entered the tree, and null is a real and common answer.
  */
 export const REACHED_SOURCES = Object.freeze([
+    // =========================================================================================================
+    // v4257 -- *** THREE ENTRIES THAT ARE THE FIRST OF THEIR LICENCE SHAPE IN THIS LEDGER. ***
+    //
+    // Censused before writing: every `spdx` field in this file held exactly TWO distinct values, "MIT" and
+    // "AGPL-3.0", and the string "Apache" and the string "BSD" appeared nowhere in it at all. So the two most
+    // common permissive licences after MIT had never been recorded, and the machinery around them -- the
+    // severity scale, the redistributable flag, the posture -- had never been exercised on either.
+    // =========================================================================================================
+    {
+        // *** THE ONE THAT WAS ALREADY LOAD-BEARING, WHICH IS WHY IT GOES FIRST. *** v3337 built
+        // render/perceptual.mjs and render/silhouette.mjs around this repository's hard-gate rule and cited
+        // it by name in both; v4255 built mesh/lathe.mjs against the judge those two provide. So an
+        // Apache-2.0 source has been shaping shipped code for nine hundred rounds while the ledger that
+        // exists to record such things did not contain it. The gap was not a risk -- Apache-2.0 grants far
+        // more than an idea -- it was a RECORD that did not match the tree.
+        repo: "img2threejs/img2threejs", sourceUrl: "https://github.com/img2threejs/img2threejs",
+        grantorHoldsRights: true, licenceExists: true, publisher: "img2threejs", year: 2025,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "Apache License 2.0, stated in the repository. NOT quoted verbatim here: it is 11 KB of " +
+             "standard text, and unlike the codrops prose it is a named licence a reader can look up, which " +
+             "is exactly the distinction the spdx field exists to draw.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The rule that a HARD gate cannot be averaged away by soft signals -- from their stage-4 " +
+             "evaluator. An idea, not bytes.",
+        takenPaths: ["render/perceptual.mjs", "render/silhouette.mjs"],
+        citedPaths: ["render/perceptual-selfcheck.mjs", "physics/imagePair.mjs", "main.js", "mesh/lathe.mjs",
+                     "tools/ship/lathe-selfcheck.mjs"],
+        why: "*** AND WHAT WAS REFUSED IS RECORDED IN THE CODE ITSELF: their NUMBERS. *** IoU < 0.85 and " +
+             "scale delta > 0.08 are tuned on photographs of knives by a different rasteriser, so " +
+             "silhouette.mjs ships null defaults and makes a caller earn a threshold from a measured floor. " +
+             "Apache-2.0 would have permitted taking the thresholds; measurement is why they were not taken.",
+    },
+    {
+        repo: "amagine-ai/Amagine3D", sourceUrl: "https://github.com/amagine-ai/Amagine3D",
+        grantorHoldsRights: true, licenceExists: true, publisher: "amagine-ai", year: 2024,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "Apache License 2.0. *** ITS PATENT GRANT IS THE PART MIT DOES NOT HAVE, *** and it is " +
+             "the reason this shape deserved recording rather than being filed as 'MIT-ish': section 3 grants " +
+             "patent rights and terminates them for anyone who sues over the work. Nothing here turns on that " +
+             "today, and a ledger that only records what currently matters is a ledger that learns too late.",
+        redistributable: true, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Reached in the assessment round that also looked at shadertoy-render and mock-raf. Nothing was " +
+             "taken; it is recorded because the LICENCE SHAPE was new to this ledger, which is a reason to " +
+             "file an entry independent of whether anything was used.",
+    },
+    {
+        repo: "Makio64/shadertoy-render", sourceUrl: "https://github.com/Makio64/shadertoy-render",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Makio64", year: 2016,
+        spdx: "BSD-3-Clause", licence: null,
+        licenceNote: "BSD 3-Clause. The third clause is the one MIT lacks: the contributors' names may not be " +
+             "used to endorse derived work without permission. A NON-ENDORSEMENT clause is a constraint on " +
+             "what may be SAID rather than on what may be copied, which is a category this ledger had no " +
+             "entry for -- every previous non-redistributable entry constrains the bytes.",
+        redistributable: true, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Renders a Shadertoy shader to video off-screen. The tree already records frames " +
+             "(webgl-recorder, v4102) and already runs headless GL, so the mechanism is duplicate. Recorded " +
+             "for the licence shape and for the refusal.",
+    },
     {
         repo: "codrops/ElasticProgress", sourceUrl: "https://github.com/codrops/ElasticProgress", grantorHoldsRights: true, licenceExists: true, publisher: "Codrops", year: 2015,
         spdx: null, licence: CODROPS_2015, licenceId: "codrops-2015", redistributable: false, posture: POSTURE.REACHED,
@@ -220,7 +278,17 @@ export const REACHED_SOURCES = Object.freeze([
         // A module that took an IDEA must credit where it came from -- that is the provenance discipline
         // working, not a leak. The gate's byte-scan reads this list rather than a hardcoded allowance, so
         // crediting a source and smuggling one stay distinguishable.
-        takenPaths: ["render/chuckCloseModel.mjs"], citedPaths: [],
+        takenPaths: ["render/chuckCloseModel.mjs"], citedPaths: [
+            // v4257 -- ADDED, AND THE GATE FOUND IT RATHER THAN A READER. v4247's ui/gazeDwell.mjs names this
+            // repository to say that vr-menu-demo's refusal is recorded ALONGSIDE it -- a citation of a
+            // refusal, which is the shape this register's ElasticProgress entry already documents as "the
+            // opposite of taken". The byte-scan cannot tell the two apart and is right not to try: it flags
+            // the mention and a person decides. This one is a mention.
+            "ui/gazeDwell.mjs",
+            // ...and this gate's own prose names it while explaining the citation above, which is the scan
+            // being consistent rather than fussy: a mention is a mention wherever it is written.
+            "tools/ship/vendoredLicences-selfcheck.mjs",
+        ],
         why: "The technique is decades older than any repository. Recorded because REACHED-with-something-taken " +
              "is the posture most likely to be mistaken for CAPTURED later.",
     },
