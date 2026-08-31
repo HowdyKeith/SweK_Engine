@@ -834,7 +834,7 @@
   "tools/roundhouse/twoBody-selfcheck.mjs": 399,
   "tools/roundhouse/twoBodyPlanted-selfcheck.mjs": 805,
   "tools/roundhouse/twoF-selfcheck.mjs": 177771,
-  "tools/roundhouse/twoFBind-selfcheck.mjs": 502820,
+  "tools/roundhouse/twoFBind-selfcheck.mjs": 506311,
   "tools/roundhouse/twoKeyPlants-selfcheck.mjs": 253,
   "tools/roundhouse/updatePolicy-selfcheck.mjs": 76,
   "tools/roundhouse/valueMatch-selfcheck.mjs": 853634,
@@ -1274,9 +1274,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 819,
+  "timedThisRun": 820,
   "totalInRecord": 1269,
-  "at": "2026-08-31T02:52:34Z"
+  "at": "2026-08-31T03:01:00Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,

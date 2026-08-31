@@ -8,6 +8,89 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4217 -- the raycast vehicle: wheels as rays, and why a turret on the roof rolls a tank
+
+*** MEASURED BEFORE BUILDING: physics/ CONTAINED NO VEHICLE MODEL AT ALL. *** Zero matches for wheel,
+suspension or raycastVehicle. Keith: "the wheel-and-suspension model against the existing box3d/Jolt substrate
+would be cool ... we have turrets and hard points. and some treads." All three of those are real and all three
+are at different depths, which is what this was built against:
+  * TURRETS ARE GAME LOGIC. ui/OgreBuyPanel.js has turret SLOTS taking machinegun / missile / railgun /
+    napalm / minelayer / landmine / subturret -- OGRE's hardpoints as inventory, never as mounted mass.
+  * TREADS ARE A TEXTURE THAT ROTATES. render/entityVisuals.js rolls ogre_tread about Z.
+  * AND THERE WAS NO CHASSIS UNDER EITHER OF THEM.
+
+*** THE WHOLE DESIGN IS THAT WHEELS ARE NOT BODIES. *** The intuitive model is five rigid bodies joined by
+constraints, and it is also why toy car physics jitters: a solver reconciling each wheel's ground contact AND
+its joint to the chassis, at a mass ratio of maybe 50:1, feeds the errors of each into the other. The standard
+answer -- Jolt's own VehicleConstraint works this way, and so does every driving game that feels solid -- is
+that THE VEHICLE IS ONE RIGID BODY. Wheels are not simulated at all. Each is a downward RAY from an attachment
+point, and what the ray finds becomes a force applied to that single body.
+
+So physics/vehicle.mjs produces FORCES and owns no world: it never imports a box3d or Jolt loader, creates no
+body and holds no handle -- the discipline physics/esBox3d.js already states for itself ("Wraps a box3d WORLD
+HANDLE (never imports the loader) so it runs headless against a mock"). That is what lets 56 checks drive it
+in node against no world at all, and the gate asserts those absences rather than trusting them.
+
+Five defects, every one of which produces a vehicle that RUNS and DRIVES BADLY rather than one that errors:
+
+1. THE RAY MUST REACH restLength + maxTravel + RADIUS. One term short and it ends at the hub, finds no ground,
+   reports every wheel airborne, produces no suspension force, and the car falls through the world while every
+   individual formula in the file stays correct. It has its own function and its own assertions for that
+   reason.
+
+2. A SUSPENSION PUSHES AND NEVER PULLS. A fast-extending damper makes the force term negative; unclamped that
+   sucks the chassis onto the ground over every bump. The gate asserts the clamp is doing work by checking the
+   unclamped arithmetic really would have gone negative.
+
+3. *** GRIP IS PROPORTIONAL TO LOAD, AND THIS IS THE LINE THAT MAKES IT A CAR. *** The friction a tyre can
+   produce is mu times the normal force, which for a raycast vehicle IS the suspension force -- so a wheel in
+   the air has zero grip. Give every wheel a constant friction instead and the vehicle drives on air: it
+   steers and accelerates with a wheel over a crest, and nothing reports a problem. Measured: lifting one
+   wheel of four takes total load to exactly 75% and that wheel's grip to exactly zero.
+
+4. ONE CONTACT PATCH, ONE BUDGET. Forces are clamped to the friction CIRCLE, not to two independent axes, so
+   the same steering input yields monotonically less cornering force as braking rises. With separate limits a
+   car brakes and corners at full strength simultaneously -- the arcade feel people then try to tune away
+   rather than fix.
+
+5. STATIC LOAD IS A LEVER-ARM SPLIT. A rear-mounted turret genuinely loads the rear wheels; an equal-share
+   model cannot express a loadout change at all.
+
+AND THE TURRET QUESTION, AS A NUMBER. Lateral load transfer is m*a*h/track, so a roof mount rolls a tank
+because it is HIGH, not because it is heavy: the same 300 kg mounted at 2.10 m instead of 0.30 m raises the
+combined CoG and transfers proportionally more load in the same corner. The inner wheels lift at the
+closed-form a = g*track/(2h), and by (3) their grip goes to zero at that moment -- which is the instant before
+it goes over. So "this loadout tips" becomes a computed fact about a build rather than something found by
+driving it.
+
+Treads get differentialDrive, because they are a different vehicle and not a setting: counter-rotating tracks
+PIVOT ON THE SPOT -- zero forward speed, non-zero yaw -- which no steering angle can ever produce. Modelling
+them as "wheels that steer a bit" gets a vehicle that cannot do the one thing treads are for.
+
+dampingRatio is IMPORTED from ui/springMotion.js rather than reimplemented, and the gate asserts the import
+line and that no second sqrt-based ratio hides in the file. The import direction is odd -- physics reaching
+into ui, with no precedent in this tree -- and the alternative was a duplicate constant, which is the defect
+v4192 named as "One Ashima simplex noise, not three copies of it".
+
+*** FOUR OF MY OWN TEST FIXTURES WERE WRONG WHILE THE MODEL WAS RIGHT, AND ONE OF THE CORRECTIONS IS A BETTER
+CHECK THAN WHAT IT REPLACED. *** restLength is the UNLOADED rest height, so asserting a wheel should carry
+load while sitting exactly at it was a wrong test; the replacement asserts that at the SETTLED ride height the
+force comes back as EXACTLY the corner weight -- 2943 N for 1200 kg on four wheels -- so the spring law and the
+static load have to agree. I also asserted a roll threshold at a=12 when the closed form for that build is
+12.58 m/s^2, and asserted a 40% cornering loss under braking when the real figure for those inputs is 10%:
+the clamp scales the whole force vector, so there is no single percentage to assert, and the sweep (2800 ->
+2419 N across rising brake demand, monotone) is the property that is actually true.
+
+Gate: tools/ship/vehicle-selfcheck.mjs, 56 checks, all pass. Seven sabotages, all red: casting only the rest
+length, letting the damper pull, constant per-wheel friction, two independent friction limits, equal-share
+static loads, treads that cannot pivot, and reimplementing dampingRatio instead of importing it.
+physics/vehicle.mjs restored byte-identical.
+
+Next: #94, pointing brain/rl at it. Note for that round -- BZFlag did NOT teach the brain to drive.
+brain/bzTacticsPolicy.js learns TARGET SELECTION from [1, near, ahead, exposed, airborne]; nothing in it has
+ever emitted a throttle.
+
+The build now stands at 1297 gates.
 ## v4216 -- a drawing surface at last, and the optimisation that was faster and wrong
 
 *** MEASURED: THIS TREE HAD NO DRAWING SURFACE AT ALL. *** No painting page, no brush, no stroke model -- an
