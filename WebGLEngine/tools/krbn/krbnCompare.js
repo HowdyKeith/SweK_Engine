@@ -13,6 +13,8 @@
 // flattening is one-way.
 
 // The Krbn camera, copied from portfolio/krbn/swek-splat.krbn.ts.
+import { MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";   // v4221 -- one traversal, not a second copy
+
 export const KRBN_CAM = { eye: [7.5, 5.5, 4.0], target: [0, 0, 0], up: [0, 0, 1], scale: Math.PI / 4.2, viewport: { width: 720, height: 560 } };
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -81,17 +83,13 @@ export function rayThroughScreen(sx, sy, cam = KRBN_CAM) {
     return { origin: cam.eye.slice(), dir };
 }
 
-// Moller-Trumbore ray-triangle intersection: returns the ray parameter t of the hit, or null.
-function rayTri(o, d, a, b, c) {
-    const e1 = sub(b, a), e2 = sub(c, a), p = cross(d, e2), det = dot(e1, p);
-    if (Math.abs(det) < 1e-9) return null;
-    const inv = 1 / det, tv = sub(o, a), u = dot(tv, p) * inv;
-    if (u < -1e-6 || u > 1 + 1e-6) return null;
-    const q = cross(tv, e1), v = dot(d, q) * inv;
-    if (v < -1e-6 || u + v > 1 + 1e-6) return null;
-    const t = dot(e2, q) * inv;
-    return t > 1e-6 ? t : null;
-}
+// v4221 -- *** THE SECOND MOLLER-TRUMBORE KERNEL USED TO LIVE HERE AND IS GONE. *** It was one of two in the
+// tree (the other was multiplayer/wadLevelHost.js) and they disagreed on epsilon: this one allowed 1e-6 of
+// slack on the barycentric tests and 1e-9 on the determinant, the other used 1e-6 for both. Both now go
+// through mesh/meshBVH.mjs. The first draft of this change KEPT the function, with a comment claiming the
+// selfcheck drove it as a reference -- it did not: nothing called it and nothing exported it, so it was dead
+// code justified by a sentence I had not checked. meshBVH-selfcheck counts the determinant expression across
+// the whole tree and expects exactly one file, which is what caught it.
 
 // BACK-PROJECT a flat 2D point onto the 3D mesh: cast the ray and take the nearest surface hit. This is the "ingest back
 // to 3D" -- the flat stroke lifted onto the surface it was drawn from. It works BECAUSE we have the geometry and camera;
@@ -115,19 +113,26 @@ export function backProject(sx, sy, mesh, cam = KRBN_CAM) {
  *
  * @returns {{point:number[], tri:number, bary:number[]}|null}
  */
+// v4221 -- *** THE BVH IS BUILT ONCE PER MESH AND CACHED ON A WeakMap. *** backProjectHit is called once per
+// stroke POINT, and a stroke has hundreds; walking every triangle each time was the whole cost. The cache is
+// keyed on the mesh object and holds nothing else, so a mesh that goes away takes its tree with it. Rebuilt
+// automatically if the triangle count changes, which is the only mutation this module performs on a mesh.
+const _bvhCache = new WeakMap();
+function bvhFor(mesh) {
+    const got = _bvhCache.get(mesh);
+    if (got && got.n === mesh.triangles.length) return got.bvh;
+    const bvh = new MeshBVH(trianglesFrom(mesh.positions, mesh.triangles));
+    _bvhCache.set(mesh, { bvh, n: mesh.triangles.length });
+    return bvh;
+}
+
 export function backProjectHit(sx, sy, mesh, cam = KRBN_CAM) {
     const { origin, dir } = rayThroughScreen(sx, sy, cam);
-    let best = Infinity, hit = null;
-    for (let n = 0; n < mesh.triangles.length; n++) {
-        const [i, j, k] = mesh.triangles[n];
-        const A = mesh.positions[i], B = mesh.positions[j], C = mesh.positions[k];
-        const t = rayTri(origin, dir, A, B, C);
-        if (t === null || t >= best) continue;
-        best = t;
-        const p = [origin[0] + t * dir[0], origin[1] + t * dir[1], origin[2] + t * dir[2]];
-        hit = { point: p, tri: n, bary: baryOf(p, A, B, C) };
-    }
-    return hit;
+    const h = bvhFor(mesh).raycastFirst(origin[0], origin[1], origin[2], dir[0], dir[1], dir[2]);
+    if (!h) return null;
+    const [i, j, k] = mesh.triangles[h.tri];
+    const A = mesh.positions[i], B = mesh.positions[j], C = mesh.positions[k];
+    return { point: h.point, tri: h.tri, bary: baryOf(h.point, A, B, C) };
 }
 
 /** Barycentric coordinates of p within triangle ABC, by the area (cross-product) method. */

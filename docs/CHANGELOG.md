@@ -8,6 +8,76 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4221 -- one ray-triangle kernel and a tree, replacing two brute-force loops that had never met
+
+*** MEASURED BEFORE BUILDING: THE TREE RAYCAST TRIANGLES BY BRUTE FORCE, IN TWO SEPARATE PLACES, WITH NO
+ACCELERATION STRUCTURE ANYWHERE. *** multiplayer/wadLevelHost.js walked every wall triangle for each
+line-of-sight query, and losClear gates every bot engagement and every shot. tools/krbn/krbnCompare.js walked
+every triangle for each stroke POINT, and a stroke has hundreds. Two independent Moller-Trumbore
+implementations of the same intersection, disagreeing in three ways that each matter:
+
+  * DATA LAYOUT -- a flat 9-floats-per-triangle buffer, against arrays of [x,y,z] plus an index triple.
+  * EPSILON     -- 1e-6 on the determinant, against 1e-9 with a separate 1e-6 on the barycentrics.
+  * THE QUERY   -- ANY hit within a SEGMENT with an early out, against the NEAREST hit along an infinite ray.
+
+The third is why a single "raycast" function would have been the wrong unification: an occlusion test that
+computes the nearest hit does strictly more work than it needs, and a nearest-hit query that early-outs is
+simply wrong. So mesh/meshBVH.mjs is ONE KERNEL and TWO QUERIES over it. The binned-SAH build and the
+near-child-first traversal are from gkjohnson/three-mesh-bvh (MIT); the three.js binding is not taken, because
+neither call site is a three.js mesh.
+
+RESULT: identical triangle AND identical t against brute force on every ray at 500, 4000 and 20000 triangles,
+and 11.6x / 49.7x faster. Both call sites rewired, and all four krbn selfchecks produce BYTE-IDENTICAL output
+afterwards -- which is the evidence that the swap changed nothing but the time.
+
+*** AN ACCELERATION STRUCTURE IS A SPECIAL THING TO TEST, BECAUSE ITS ONLY JOB IS TO RETURN THE SAME ANSWER
+FASTER. *** A wrong one is not visibly wrong. It is fast and quietly missing geometry, which reads as a content
+bug -- a wall you can shoot through, a stroke that will not stick.
+
+*** THE BUG I ACTUALLY WROTE: THE RIGHT CHILD IS NOT AT left+1. *** In a depth-first build the left call
+allocates its ENTIRE SUBTREE before returning, so the right child sits at whatever the node counter reached
+afterwards -- adjacent for only 359 of 718 interior nodes in a 4000-triangle tree. With the assumption in place
+the traversal descended into arbitrary interior nodes and the whole tree MISSED EVERYTHING: 0 hits where brute
+force found 227, while reporting itself "63x faster" because it was traversing nonsense and finding nothing. A
+speed number is not a result until the answers match.
+
+*** AND THE TEST DATA FOOLED ME BEFORE THE CODE DID. *** The mesh generator used an LCG,
+s = (s * 1103515245 + 12345) & 0x7fffffff. In JS doubles that product exceeds 2^53 and the generator
+degenerates: it repeated with period 10466, so a "20000 triangle" mesh was 9534 real triangles plus exact
+duplicates. Every apparent BVH/brute-force mismatch was the two picking different members of an IDENTICAL pair
+-- both right, the data broken, and the differences all exactly 10466 apart, which is what gave it away.
+mulberry32 now, and the gate checks its own fixture for repeats before trusting anything built on it.
+
+*** TWO GUARDS TURNED OUT TO BE DEFENSIVE RATHER THAN LOAD-BEARING, AND THE GATE SAYS SO INSTEAD OF
+PRETENDING. *** I wrote in the module that the slab test's 0 * Infinity = NaN made the box "silently MISSED".
+That is false, and worth correcting rather than deleting: every comparison against NaN is false and the only
+early-out is `t0 > t1`, so a NaN can never trigger it -- the box comes back HIT, conservatively, and the
+triangle test still decides. Removing the guard entirely gave the SAME 2874 hits on 3000 axis-aligned rays
+against 20000 triangles, in 57ms against 41ms. It is worth about 28% and nothing at all in correctness. The
+determinant epsilon is the same story: a ray almost in a triangle's plane produces u = 1000000.25 and is thrown
+out by the barycentric range test anyway. Both guards are kept, and both are asserted by PRESENCE, with the
+measurements printed -- because a gate that cannot distinguish a guard's removal has to say that rather than
+claim a coverage it does not have.
+
+DEAD CODE REMOVED, AND THE REASON IT ALMOST SURVIVED: krbnCompare's rayTri was left in place by the first draft
+of this change, with a comment saying the selfcheck drove it directly as a reference. It did not -- nothing
+called it and nothing exported it. It was dead code justified by a sentence I had not checked, and what caught
+it was the gate counting the Moller-Trumbore determinant expression across the whole tree and expecting exactly
+one file.
+
+Gate tools/ship/meshBVH-selfcheck.mjs. Three sabotages red: the left+1 assumption (0 hits of 227), the
+equal-centroid split fallback (a RangeError from recursing off the end of the node arrays, now reported as a
+FAIL rather than crashing the gate), and the segment query's far bound -- which needed a deliberately
+constructed case, because culling boxes at maxT already covers a segment that ends before a whole box, and only
+a segment ending INSIDE a box with its triangle beyond distinguishes the two.
+
+WHAT THIS DOES NOT CLAIM: a refit cost. The tree is built once and cached against the buffer it came from, so a
+mesh that DEFORMS every frame would rebuild every frame and be slower than brute force. three-mesh-bvh has
+refit() for exactly that and it is not taken here, because neither call site deforms -- wall triangles are per
+level, and krbn's mesh is the rest pose the strokes are lifted onto. If a deforming caller appears, refit is
+the work.
+
+The build now stands at 1301 gates.
 ## v4220 -- the GPU Brain paints: a colour that is solved, a score that is local, and a metric of mine that was wrong
 
 Keith: "We could have our own GPU Brain painter?" v4216 gave the tree a brush and render/perceptual.mjs already
