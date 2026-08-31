@@ -158,29 +158,39 @@ console.log("\n2. *** AND THE OVERLAP IS REAL TO THE SOLVER: it generates contac
 }
 
 // =============================================================================================================
-console.log("\n3. *** THE FIX IS NOT AVAILABLE, AND THAT IS A FACT ABOUT THE SHIM RATHER THAN AN OPINION ***");
+console.log("\n3. *** THE FIX WAS AVAILABLE ALL ALONG, AND THIS SECTION USED TO ASSERT THE OPPOSITE ***");
 {
     const shim = fs.readFileSync(path.join(ENG, "physics/box3d/box3d_shim.c"), "utf8");
-    const filtering = /collideConnected|enableCollision|categoryBits|maskBits|b3Filter|swk_body_set_filter/.test(shim);
-    ok("!! *** box3d_shim.c EXPOSES NO COLLISION FILTERING OF ANY KIND ***",
-        !filtering,
-        "no collideConnected on any joint def, no category or mask bits, no groups, no filter setter. The " +
-        "three joint constructors set bodyIdA, bodyIdB and the two local frames and nothing else, so there is " +
-        "no argument a caller could pass to say 'these two are meant to overlap'.");
-    // *** AND IT CANNOT BE ADDED FROM HERE. *** The shim compiles against a header this repository does not
-    // contain, so the signature of any such field is unreadable. Guessing one and calling it a fix is the
-    // failure this session has spent several rounds learning to avoid.
-    const vendored = fs.readdirSync(path.join(ENG, "vendor/box3d"));
-    ok("!! *** AND THE HEADER IT WOULD NEED IS NOT VENDORED, so the change cannot be written here ***",
-        !vendored.some((f) => /\.h$/.test(f)) && /#include "box3d\/box3d\.h"/.test(shim),
-        "vendor/box3d/ holds " + JSON.stringify(vendored) + " -- the built artifact and its glue, no headers. " +
-        "The shim's #include resolves only where build-box3d-wasm-clang.sh has fetched the library. Writing a " +
-        "collideConnected parameter against an API that cannot be read here would be guessing at a signature " +
-        "and shipping it as a fix.");
-    report("SO THIS ROUND MEASURES AND REFUSES TO REPAIR. The repair is a shim change plus a wasm rebuild, " +
-           "which is rig work: physics/box3d/build-box3d-wasm-clang.sh on a machine with the toolchain and " +
-           "the library. PENDING_REBUILD in box3dNode.mjs is the mechanism that already exists for exactly " +
-           "that hand-off, and it is empty because nothing is currently waiting on a rebuild.");
+    // v4256 -- THIS CHECK IS INVERTED, AND THE MEASUREMENT ABOVE IS UNTOUCHED. The 148x in section 2 is a
+    // real number about a real geometry and it still stands; what was wrong was this section's DIAGNOSIS.
+    ok("!! *** box3d_shim.c NOW EXPOSES COLLISION FILTERING -- and v4249 asserted it never could ***",
+        /swk_body_set_filter/.test(shim) && /b3Filter/.test(shim) && /groupIndex/.test(shim),
+        "v4249 wrote 'no collideConnected on any joint def, no category or mask bits, no groups, no filter " +
+        "setter' and it was true of the shim. It was NOT true that it could not be added: box3d is C17, the " +
+        "shim is ordinary C, and cc and cmake were present the whole time. See tools/ship/box3dFilter-selfcheck.mjs.");
+    const vendored = fs.readdirSync(path.join(ENG, "vendor/box3d/include/box3d"));
+    ok("!! *** AND THE HEADER IS VENDORED, which v4249 named as the reason the change could not be written ***",
+        vendored.filter((f) => /\.h$/.test(f)).length >= 8,
+        "vendor/box3d/include/box3d now holds " + vendored.length + " headers with a LICENSE and a recorded " +
+        "commit. v4249's caution was right in form -- guessing a signature against an unreadable API is the " +
+        "failure this session spent rounds learning to avoid -- and the answer was to GO AND READ IT rather " +
+        "than to defer.");
+    // *** AND THE DIAGNOSIS ITSELF WAS WRONG, WHICH MATTERS MORE THAN THE AVAILABILITY. ***
+    // *** THIS WAS AN ok() WITH `/re/.test("") === false` AS ITS CONDITION -- WHICH IS ALWAYS TRUE. *** An
+    // assertion that cannot fail, printed as a PASS beside ones that can, written ONE ROUND after v4255
+    // caught the same shape in its own gate. It is a report(), because the claim is real but it is asserted
+    // in tools/ship/box3dFilter-selfcheck.mjs against the vendored header and measured against the running
+    // library; restating it here as a check would be this file grading a fact it does not read.
+    report("*** 'DISABLE COLLISION BETWEEN JOINTED NEIGHBOURS' WAS ALREADY THE DEFAULT. *** " +
+        "b3DefaultJointDef() is `{ 0 }` and never sets collideConnected, so box3d has NEVER collided jointed " +
+        "neighbours. Measured natively at v4256: three overlapping boxes give 24 contacts, and jointing two " +
+        "of the three pairs leaves exactly 8 -- the pair nothing joints. So the self-collision section 2 " +
+        "measured is between NON-ADJACENT parts, and the repair is a negative groupIndex, which is what " +
+        "box3d's own header prescribes for ragdolls.");
+    report("SO THIS SECTION'S OLD CONCLUSION -- 'measures and refuses to repair, the repair is rig work' -- " +
+           "was wrong in its second half and the round that wrote it could have checked. What survives is the " +
+           "MEASUREMENT: 148x is still the cost of the enclosing bodies, and nothing in the engine yet calls " +
+           "swk_body_set_filter for a derived ragdoll, so the fix is available and not yet applied.");
 }
 
 // =============================================================================================================

@@ -138,6 +138,16 @@ export const PENDING_REBUILD = [
     //
     // The list stays as a mechanism rather than being deleted: the next shim function added without a rebuild
     // belongs here, and `unexplained` goes red until somebody says so.
+    //
+    // v4256 -- AND HERE IS THAT NEXT ONE. Four collision-filtering functions were added to box3d_shim.c and
+    // the vendored artifact predates them, because this sandbox has no emcc. They are written down rather
+    // than discovered: a caller asking for self-collision filtering on the current artifact gets `false` from
+    // has() and must degrade, and the day someone runs build-box3d-wasm.sh this list empties and
+    // `manifestStale` says so.
+    "swk_body_set_filter",
+    "swk_body_get_filter",
+    "swk_joint_set_collide_connected",
+    "swk_joint_get_collide_connected",
 ];
 
 

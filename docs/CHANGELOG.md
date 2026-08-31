@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4256 -- the fix v4249 said could not be asked for was the default, and the work was never rig work
+
+v4249 measured a derived ragdoll self-colliding at 148x its neighbours' impulse, concluded the repair was
+"disabling collision between jointed neighbours", and recorded that box3d_shim.c had no way to request it.
+Backlog #125 filed the follow-up as RIG WORK. Both halves were wrong, and the second is why the first
+survived four rounds.
+
+*** IT WAS NEVER RIG WORK. *** box3d is C17 with no dependency beyond libm, box3d_shim.c is ordinary C, and
+cc 13.3 and cmake 3.28 are present in this sandbox. The library builds, the shim compiles against it with
+zero warnings, and the physics RUNS AND CAN BE MEASURED here. Only the WASM packaging needs emsdk. The task
+was not blocked on a machine; it was blocked on nobody trying.
+
+*** AND ONCE IT RUNS, THE HEADER ANSWERS THE QUESTION OUTRIGHT. *** b3JointDef.collideConnected is a bool on
+the shared base def -- declared exactly once in the whole header -- and b3DefaultJointDef() is `{ 0 }` and
+never sets it. Jointed neighbours have NEVER collided in box3d. Measured natively, with the arithmetic doing
+the arguing:
+
+    three mutually overlapping boxes, no joints      24 contacts   = 3 pairs x 8
+    the same three, two pairs jointed                 8 contacts   = 1 pair  x 8
+
+The 16 that vanish are exactly the two jointed pairs; the 8 that remain are the pair nothing joints. So the
+self-collision v4249 saw cannot have been the jointed neighbours, because those contribute exactly zero. It
+was NON-adjacent contact -- a limb folded back onto a part two joints away.
+
+box3d's own header names that case and prescribes the fix: "you may want ragdolls to collide with other
+ragdolls but you don't want ragdoll self-collision. In this case you would give each ragdoll a unique
+negative group index and apply that group index to all shapes on the ragdoll." v4249 reached for the joint
+flag; the library had already written down that the filter is the answer.
+
+New in box3d_shim.c: swk_body_set_filter / swk_body_get_filter and
+swk_joint_set_collide_connected / swk_joint_get_collide_connected. Measured:
+
+    folded chain, no filter        8 contacts   peak impulse 0.0442
+    group = -1                     0 contacts   peak impulse 0.0000
+    group = +1  (THE CONTROL)      8 contacts   peak impulse 0.0442   -- unchanged
+
+The control is the load-bearing row: a positive group index means ALWAYS collide, so the filter was set and
+did nothing. Without it, "we set a filter and the self-collision stopped" would not distinguish the mechanism
+from any other perturbation of the shape definition. *** IT IS THE SIGN THAT DOES THE WORK. ***
+
+THE HEADER IS NOW VENDORED, which is the other half of #125 and the box3d half of #61. vendor/box3d/ held
+box3d.js and box3d.wasm and NOTHING saying where they came from. It now carries the MIT LICENSE, a
+PROVENANCE.md naming tag v0.1.0 and commit 8441b4a06d6d09dcfb0b0f704df4d847d1437b92, and the whole public
+include closure -- eight headers, 268 KB. Two headers is not the closure: box3d.h includes base.h, and
+vendoring only the obvious two left the shim uncompilable, which a compile caught and reading did not. The
+shim now compiles offline, so a field renamed upstream is a gate failure here instead of a build failure on
+whichever machine next runs the wasm script.
+
+*** THE GATE FOUND A LATENT DEFECT THAT WAS NOTHING TO DO WITH THIS ROUND. *** The two build scripts disagree
+about how exports are chosen: build-box3d-wasm-clang.sh SCANS the compiled module for /^swk_/, while
+build-box3d-wasm.sh -- the default -- lists them by hand. Checking the hand list against the shim found FIVE
+functions missing, all pre-existing: swk_body_set_friction, swk_body_set_restitution, and
+swk_contact_count, swk_contacts, swk_contact_stride. The last three are the contact API that v4249's own 148x
+measurement runs on. Anyone rebuilding with the default script would have produced an artifact without them.
+All five added, and the check is now a permanent seam.
+
+THREE SABOTAGES, each grep-confirmed applied with the shim rebuilt each time, restored md5-identical
+(edea6fe180c2f9d7e65ce0eaf408cd3e). Removing the groupIndex assignment: 1 red. Applying the filter to only
+the first shape: ALL GREEN and it stays that way -- every body here owns exactly one hull, so that branch is
+untested and is recorded as a hole rather than papered over.
+
+*** AND THE THIRD SABOTAGE CAUGHT A VACUOUS CHECK OF MY OWN. *** Setting invokeContacts=false left the gate
+green, which looked like the flag being inert. It was not: the late-filter check waited 60 frames before
+filtering, and the boxes have pushed apart by then -- contacts hold at 8 through step 25 and read 0 by 60 --
+so it was filtering a world with nothing to filter and "0 after" was free. Moved to step 20 and made to
+ASSERT its precondition, the sabotage now goes red with 8 contacts before and 8 AFTER. The flag really does
+decide whether already-paired shapes are re-evaluated, and a sabotage surviving was the cheapest way to find
+a check that could not fail.
+
+UNCHECKED, and named in the gate: the RAGDOLL. Section 4 folds a three-link chain by hand; it is not
+ragdollFromSkeleton's output, nothing calls swk_body_set_filter for a derived ragdoll, and v4249's 148x is
+neither re-measured nor fixed in the engine -- only made fixable, waiting on the WASM rebuild this sandbox
+cannot do. The four names are on box3dNode.mjs's PENDING_REBUILD so exportReport() grades the gap rather than
+a caller discovering it. Also undecided: whether a negative group is the RIGHT policy, since it kills all
+self-collision within a ragdoll and a hand may then pass through its own thigh.
+
+The build now stands at 4256 gates.
+
 ## v4255 -- the sculptor img2threejs's judge has been waiting for, and how little it proves
 
 v3337 lifted img2threejs's rule that a hard gate cannot be averaged away by soft signals, built

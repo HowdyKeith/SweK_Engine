@@ -1,0 +1,9 @@
+
+# v4256 -- NATIVE box3d build artifacts, for tools/ship/box3dFilter-selfcheck.mjs.
+# Deliberately NOT committed, unlike vendor/box3d/box3d.wasm. The .wasm is
+# architecture-independent and the ENGINE needs it at runtime; these are an
+# x86_64 Linux .a and .o that only a gate uses, and shipping them would put a
+# binary in the tree that is wrong on every other machine. Produce them with
+# physics/box3d/build-box3d-native.sh; without them the gate skips that section
+# and says so.
+vendor/box3d/native/
