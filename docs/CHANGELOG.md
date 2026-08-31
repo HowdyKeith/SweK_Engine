@@ -8,6 +8,80 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4208 -- the three shaders v4207 found are fixed, and the obvious fix would have been worse than the bug
+
+brain/transport/shaders/scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl each declared
+@compute @workgroup_size(1024). That is four times WebGPU's default maxComputeInvocationsPerWorkgroup of
+256, on a tree whose 27 requestDevice() calls never pass requiredLimits, so createComputePipeline rejects all
+three -- and the rejection lands on the pipeline, not the shader, so the shader appears to compile and the
+error surfaces somewhere unrelated.
+
+WRITING 256 IN PLACE OF 1024 WOULD HAVE SHIPPED SILENTLY WRONG DATA.
+
+All three assumed ONE ELEMENT PER THREAD. The Blelloch up-sweep guards each level with `if (thid < d)`, and
+the widest level of a 1024-element scan needs 512 invocations. MEASURED, by replaying the original body at
+different thread counts against primeTransport.js's serial exclusiveScan: correct at 1024, correct at 512,
+and at 256 it gets 507 of 1024 offsets WRONG, the first at index 512 -- exactly where a level ran out of
+threads.
+
+A pipeline that will not build is visible. A scan that quietly returns wrong offsets is not. The naive fix
+would have traded a loud failure for a silent one.
+
+The real fix is the strided loop: `for (var i = thid; i < d; i += WG)`. Every invocation takes its share of
+each level whatever WG is, and it reduces to the original when WG >= d. Element capacity is UNCHANGED at
+N = 1024; only the invocation count moved. That is the whole difference between fixing the shader and quietly
+scanning a quarter of the data, and the gate checks the N constant and the shared array length as well as the
+workgroup size for exactly that reason.
+
+THIS BOX HAS NO GPU, SO THE ALGORITHM IS VERIFIED IN A TWIN.
+
+New brain/transport/scanTwin.mjs runs the same loops in JS with barriers as phase boundaries. A workgroup
+barrier means every invocation finishes the phase before any begins the next, which in JS is exactly "loop
+over all threads, then move on" -- so the simulation reproduces the read-write hazards a barrier exists to
+prevent, and a missing barrier is a wrong answer here rather than a vendor-specific glitch later.
+
+Graded against the serial reference, which did not move to meet the shaders:
+  - Blelloch exclusive scan matches at workgroup sizes 1, 2, 4, 16, 64, 128, 256, 512 and 1024.
+  - Hillis-Steele block bases match at 1, 4, 64, 256 and 1024.
+  - The fused filter + scan + scatter is BYTE-IDENTICAL to exclusiveScan + scatter at every size.
+
+TWO THINGS THE STRIDE COSTS, BOTH LOAD-BEARING.
+
+Hillis-Steele reads s[i - off] and then writes s[i], with a barrier between so no invocation reads a slot
+another has already advanced. At one element per thread a single scalar held that read across the barrier. At
+four elements per thread there are four reads to hold, so it becomes array<u32, 4>. Collapsing it back to one
+scalar reintroduces exactly the hazard the barrier is there to prevent -- gated by showing that the collapsed
+version produces a different answer.
+
+And the fused shader now carries its filter verdict PER ELEMENT from the filter phase, past two scan
+barriers, to the scatter. Re-evaluating the predicate at the scatter instead would make the write depend on a
+SECOND evaluation rather than on the one the scan counted, and any disagreement between them puts a survivor
+in a slot nothing reserved.
+
+v4207's GATE WENT RED, WHICH IS IT WORKING IN BOTH DIRECTIONS.
+
+tools/ship/wgslSpec-selfcheck.mjs asserted that three shipped files exceed the limit. It now asserts zero,
+and the entry says why the number moved rather than the number being quietly edited. It also gained a check
+that the validator can STILL see a 1024-wide workgroup, so a clean corpus is a fact about the tree and not
+about the checker. Four of its assertions moved in total, including one that read scan.wgsl's workgroup size
+as [1024,1,1] and one that expected global_invocation_id in a shader that no longer needs it -- with one
+workgroup the global index IS the element index, so the strided loop uses `i` directly.
+
+MY OWN SLIP, and it is the sourceScan rule again in its other direction. Three checks looked for the ABSENCE
+of `if (thid < d)` and `@workgroup_size(1024)`, and went red against correct code -- because the fixed files
+QUOTE those idioms in their headers while explaining what was wrong. The rule this tree already wrote down is
+noComments for anything quoted and codeOnly for code shapes; an absence is a shape. The gate now reads
+codeOnly for those, and separately asserts that scan.wgsl's header still quotes the old idiom, so the record
+is kept while the code is not.
+
+The pre-existing brain/transport/primeTransport-selfcheck.mjs still passes unchanged, which matters: the CPU
+twin it grades is the same reference the new shaders are graded against, and it did not move.
+
+Gate: tools/ship/scanLimits-selfcheck.mjs, 71 checks, all pass. Five sabotages, all red: restoring the three
+original shaders (30 checks go red), applying the naive 1024 -> 256 with no restructure, quietly shrinking N
+to 256, removing the stride from the twin's Blelloch, and collapsing Hillis-Steele's per-thread array to one
+scalar. All four touched files restored byte-identical.
+The build now stands at 1288 gates.
 ## v4207 -- a WGSL conformance check, and it found three shipped shaders that cannot run on a default device
 
 Same mould as v4204's GL Transition check: read the shader, check it against the contract, refuse it BEFORE a

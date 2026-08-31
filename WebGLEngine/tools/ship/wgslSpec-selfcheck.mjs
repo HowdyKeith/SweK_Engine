@@ -48,8 +48,10 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     const p = parseWgsl(scan);
     ok(p.entryPoints.length === 1 && p.entryPoints[0].stage === "compute" && p.entryPoints[0].name === "main",
         "scan.wgsl: one @compute entry point called main");
-    ok(JSON.stringify(p.entryPoints[0].workgroupSize) === "[1024,1,1]",
-        "and its workgroup size reads as [1024,1,1] -- a bare X fills Y and Z with 1, as the spec says");
+    // v4208 fixed this shader, so the number moved. The SHAPE of the check is what matters: a bare X fills
+    // Y and Z with 1, which is what the spec says and what the parser must do.
+    ok(JSON.stringify(p.entryPoints[0].workgroupSize) === "[256,1,1]",
+        "and its workgroup size reads as [256,1,1] -- a bare X fills Y and Z with 1, as the spec says");
     ok(p.entryPoints[0].workgroupSizeIsLiteral, "recognised as a literal, so it can be checked");
     ok(p.bindings.length === 2 && p.bindings.every((b) => b.addressSpace === "storage" && b.access === "read_write"),
         `both bindings parse as storage,read_write: ${p.bindings.map((b) => `${b.group}/${b.binding} ${b.name}`).join(" ")}`);
@@ -74,12 +76,21 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
 // 2) *** THE FINDING: THREE SHIPPED SHADERS EXCEED THE DEFAULT DEVICE LIMITS. ***
 {
     const results = WGSL_FILES.map((f) => [path.relative(ENG, f), validateWgsl(fs.readFileSync(f, "utf8"))]);
+    // *** THIS ASSERTED 3 WHEN v4207 SHIPPED, AND v4208 FIXED THEM, SO IT ASSERTS 0 NOW. *** That is the
+    // gate doing its job in both directions: it recorded a real finding, the finding was acted on, and the
+    // number moved because the tree moved. scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl
+    // were each restructured with strided loops and dropped from @workgroup_size(1024) to 256 --
+    // tools/ship/scanLimits-selfcheck.mjs is where that fix is proven correct against a serial reference.
     const over = results.filter(([, p]) => p.some((x) => /invocations per workgroup, over the limit/.test(x)));
-    ok(over.length === 3, `${over.length} shipped .wgsl files declare more invocations per workgroup than a default device allows`);
-    for (const [f] of over) ok(/scan|fused-single-workgroup/.test(f), `  ${f}`);
+    ok(over.length === 0,
+        `${over.length} shipped .wgsl files exceed the default invocations-per-workgroup limit ` +
+        `(three did when this gate was written; v4208 fixed them)`);
     const clean = results.filter(([, p]) => p.length === 0);
-    ok(clean.length === WGSL_FILES.length - 3,
-        `and the other ${clean.length} validate clean -- the check is not simply rejecting everything`);
+    ok(clean.length === WGSL_FILES.length,
+        `all ${clean.length} of ${WGSL_FILES.length} .wgsl files validate clean`);
+    // And the checker must still be ABLE to see the fault, or a green corpus proves nothing.
+    ok(validateWgsl("@compute @workgroup_size(1024)\nfn m() {}").some((x) => /over the limit/.test(x)),
+        "and the check still fires on a 1024-wide workgroup, so the clean corpus is a fact about the tree and not about the checker");
     // *** requiredLimits APPEARS NOWHERE, SO THE DEFAULTS ARE NOT A CONSERVATIVE FLOOR -- THEY ARE THE FACT. ***
     // *** THE SCAN MUST EXCLUDE THE THREE FILES THIS ROUND ADDED, OR IT COUNTS ITS OWN DETECTOR. ***
     // First run reported "requiredLimits appears 3 times" and went red against a true claim: every one of
@@ -107,7 +118,11 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
 {
     const scan = stripComments(read("brain/transport/shaders/scan.wgsl"));
     const nu = nonUniformNames(scan);
-    ok(nu.has("lid") && nu.has("gid"), `invocation builtins found: ${[...nu].filter((x) => ["lid", "gid"].includes(x)).join(", ")}`);
+    // v4208 dropped gid from this shader: with one workgroup the global index IS the element index, so the
+    // strided loop uses `i` directly and there is nothing for global_invocation_id to do.
+    ok(nu.has("lid"), `invocation builtins found: ${[...nu].filter((x) => ["lid", "gid"].includes(x)).join(", ") || "none"}`);
+    ok(nonUniformNames("fn m(@builtin(global_invocation_id) g: vec3<u32>) { let a = g.x; }").has("g"),
+        "and global_invocation_id is still recognised where it appears");
     ok(nu.has("thid"), "and one hop of propagation: `let thid = lid.x;` makes thid non-uniform too");
     // *** THE REGRESSION. *** scan.wgsl's barriers are CORRECT: one is the first statement of a for loop
     // whose trip count is the same for every invocation, and the other sits at plain function scope. The

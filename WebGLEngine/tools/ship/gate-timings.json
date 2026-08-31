@@ -602,10 +602,10 @@
   "tools/roundhouse/cartPoleBind-selfcheck.mjs": 10653,
   "tools/roundhouse/census-selfcheck.mjs": 761728,
   "tools/roundhouse/centrifugeDevice-selfcheck.mjs": 275,
-  "tools/roundhouse/cflBind-selfcheck.mjs": 2205,
-  "tools/roundhouse/chemicalPotentialBind-selfcheck.mjs": 1975,
-  "tools/roundhouse/cherenkov-selfcheck.mjs": 62,
-  "tools/roundhouse/claimTrace-selfcheck.mjs": 801219,
+  "tools/roundhouse/cflBind-selfcheck.mjs": 2109,
+  "tools/roundhouse/chemicalPotentialBind-selfcheck.mjs": 2158,
+  "tools/roundhouse/cherenkov-selfcheck.mjs": 60,
+  "tools/roundhouse/claimTrace-selfcheck.mjs": 808879,
   "tools/roundhouse/clocksPlanted-selfcheck.mjs": 246,
   "tools/roundhouse/codemapBridge-selfcheck.mjs": 405,
   "tools/roundhouse/compose-selfcheck.mjs": 131765,
@@ -764,7 +764,7 @@
   "tools/roundhouse/perfSync-selfcheck.mjs": 173,
   "tools/roundhouse/physicsBaselineCoverage-selfcheck.mjs": 2949,
   "tools/roundhouse/pipeFlowKey-selfcheck.mjs": 92926,
-  "tools/roundhouse/plantDirection-selfcheck.mjs": 559532,
+  "tools/roundhouse/plantDirection-selfcheck.mjs": 817117,
   "tools/roundhouse/plantedError-selfcheck.mjs": 3654,
   "tools/roundhouse/plasmaKrbn-selfcheck.mjs": 94,
   "tools/roundhouse/plastic-selfcheck.mjs": 228,
@@ -1261,9 +1261,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 591,
+  "timedThisRun": 595,
   "totalInRecord": 1256,
-  "at": "2026-08-31T00:30:51Z"
+  "at": "2026-08-31T00:44:24Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
