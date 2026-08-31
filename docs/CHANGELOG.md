@@ -8,6 +8,85 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4244 -- A clip authored for one skeleton, played on another, and the test #115 asked for that proves nothing
+
+*** #115 SAID THE RETARGETING WAS THE HALF OF sunag/three.js-tba WORTH TAKING, AND PROPOSED THREE CHECKS. TWO
+OF THEM ARE GOOD. THE FIRST ONE IS NOT A TEST AT ALL. ***
+
+gpu/SkeletalAnimator.js is 1,216 lines with TRS composition, quaternion slerp, look-at, two-bone IK and
+FABRIK -- a deep animation stack. What it cannot do is play a clip authored against skeleton A on skeleton B.
+rig/RigSystem.js:752 uses the word "retargeted", but attachEntityRig binds a rig to a MESH (it needs
+JOINTS_0/WEIGHTS_0 and a skin) and does not map one skeleton's channels onto another's. There is no bone-name
+table anywhere in the tree.
+
+New anim/retarget.mjs. It reuses rig/rigMath.js's exported quaternion primitives rather than writing a fourth
+private copy -- rigMath, RigSystem, SkeletalAnimator and autoSpineRig already each carry one, which is the
+#51 "one Ashima noise, not three copies" shape and is noted here rather than fixed.
+
+*** THE MECHANISM, WHICH IS WHY THE OBVIOUS ANSWER FAILS: A CLIP DOES NOT STORE WHERE THE ARM IS. *** It
+stores a bone's LOCAL rotation, and a local rotation means nothing without the rest pose it was authored
+against. Copy a T-pose clip's quaternions onto an A-pose rig and every bone is wrong by the angle between the
+two rest poses. Measured rather than described: the naive copy puts the shoulder
+
+    0.9000 rad -- 51.57 degrees -- from where it belongs
+
+against a rest-pose difference of exactly 0.9. That is not a coincidence, it is the whole mechanism: the
+A-pose's arm drop is added on top of the animation. And nothing in the output looks malformed -- the
+quaternions are unit, the hierarchy is intact, and the arms are simply below the floor.
+
+THE FIX IS TO TRANSFER THE DELTA FROM REST, IN WORLD SPACE:
+
+    D(b)        = Ws_anim(b) * inverse(Ws_rest(b))          what the source bone actually did
+    Wt_anim(b)  = D(b) * Wt_rest(b)                         the same thing, done to the target's rest
+    Rt_local(b) = inverse(Wt_anim(parent)) * Wt_anim(b)     back to the frame the animator wants
+
+World space rather than local is what makes it survive bones whose LOCAL AXES differ -- the usual case
+between rigs from different tools, and invisible in the local-space formulation. Retargeted, every bone moves
+exactly as far from its own rest as the source did: worst discrepancy 5.7e-7 rad over 9 bones.
+
+*** AND NOW THE PART THAT MATTERS MOST. #115 PROPOSED "A CLIP RETARGETED A -> B -> A RETURNS TO THE ORIGINAL"
+AS THE CHECK. IT CANNOT SEE THE DEFECT. *** The naive algorithm round-trips to exactly 0.00e+0 as well:
+
+    correct   A -> B -> A     worst bone error  0.00e+0 rad
+    NAIVE     A -> B -> A     worst bone error  0.00e+0 rad     -- for an algorithm 51.57 degrees wrong
+
+A round trip applies a transform and then its inverse, so ANYTHING COMMON TO BOTH DIRECTIONS CANCELS -- and a
+systematically wrong transform is common to both directions. This is v4236's vertex stage, v4241's fragment
+shader and v4243's constant texture arriving a fourth time, in a fourth shape. The check is kept and
+labelled: it would catch a NON-INVERTIBLE error and cannot catch a wrong-but-consistent one. What does catch
+it is an EXTERNAL reference -- the source's own rest-relative motion -- and running the naive pose back
+through the correct algorithm exposes it at 0.9000 rad, because two DIFFERENT transforms do not cancel.
+
+BONE LENGTHS: ROTATIONS CARRY OVER, ROOT TRANSLATION DOES NOT. An elbow bent 40 degrees is bent 40 degrees on
+any arm; a stride is not. Unscaled, the 0.7x skeleton covers the tall one's ground at 0.0500 per frame --
+identical to the source, feet dragging. Scaled by the rest-height ratio it moves 0.0350, and that ratio
+matches the LEG-LENGTH ratio 0.6090 / 0.8700 measured off the skeletons rather than asserted from the 0.7
+they were built with.
+
+THE BONES THE MAP DOES NOT COVER, which are two different problems and get two different answers. A source
+bone with no target is DROPPED, and dropping it is correct -- there is nowhere to put it. A target bone with
+no source KEEPS ITS REST ROTATION rather than collapsing to identity; collapsing is the quiet version of the
+defect, where the rig still animates and one bone is limp. Both are reported BY NAME, because "3 bones
+unmapped" is not something a rigger can act on. And the matcher does not guess: it normalises prefixes, case
+and separators so mixamorig:UpperArm_L, upperArm.L and UPPERARML land on one key, and it will not pair
+"Hand.L" with "wrist_left". A mapper that guesses is worse than one that reports what it could not match.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Dropping the rest-delta turns 2 checks red at
+exactly 0.900 rad; collapsing an unmapped bone turns 1 red; neutering the root scale turns all 3 of section 4
+red together, which is what a shared cause should look like. *** AND SABOTAGE A LEFT THE ROUND TRIP PERFECTLY
+GREEN -- which is not a remark about the sabotage but the evidence for the paragraph above. ***
+
+New: anim/retarget.mjs, tools/ship/retarget-selfcheck.mjs (14 checks).
+
+NOT done, and stated in the gate: any of this on a REAL GLB. The skeletons are built in the gate, which makes
+the rest-pose difference exact and the arithmetic checkable, and means nothing here has met a twist chain, a
+non-uniform scale, or a bone whose local axes are rotated relative to its parent's -- the world-space
+formulation is chosen to survive that last one and has not been tested against it. Also not done: TRANSLATION
+channels on non-root bones, which some rigs animate and this file does not transfer at all; and wiring it to
+SkeletalAnimator, which is reached by this gate and by nothing else.
+
+The build now stands at 4244 gates.
+
 ## v4243 -- Texturing a face that did not exist when the mesh was unwrapped, and a CPU/GPU check that turned out to be unavailable
 
 *** #114 ASKED FOR SOLID TEXTURING BECAUSE v4235's CSG CUT FACES HAVE NO UVs. THEY GOT IT, AND THE ROUND ALSO
