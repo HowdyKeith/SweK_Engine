@@ -247,10 +247,46 @@ const S = (s) => { const m = mat4Identity(); m[0] = m[5] = m[10] = s; return m; 
         "and the session is given an XRWebGLLayer over the engine's own context, which is what a headset draws into");
 
     // (f) the framebuffer is cleared ONCE for both eyes, not per eye
-    const rx = code.slice(code.indexOf("function _renderXRFrame"), code.indexOf("function _renderXRFrame") + 900);
-    ok(/bindFramebuffer\(gl\.FRAMEBUFFER, layer\.framebuffer\)/.test(rx), "the stereo draw binds the headset's framebuffer");
-    ok((rx.match(/gl\.clear\(/g) || []).length === 1, "and clears it ONCE -- clearing per eye would erase the first eye while drawing the second");
+    //
+    // *** v4212 -- THIS USED TO SLICE A FLAT 900 CHARACTERS FROM THE FUNCTION, AND THAT WENT RED AGAINST
+    // CORRECT CODE THE MOMENT THE FUNCTION GREW. *** v4212 gave _renderXRFrame a second branch (the post
+    // chain per eye) and pushed the framebuffer bind past character 900, so a check about WHERE THE FRAME
+    // GOES failed because of HOW LONG THE FUNCTION IS. A positional window is not a property. The function is
+    // now delimited by matching its braces, and each branch is asserted separately -- which is strictly more
+    // than the old check did, because there are now two ways to reach the headset and both have to.
+    const fnStart = code.indexOf("function _renderXRFrame");
+    let depth = 0, fnEnd = fnStart;
+    for (let i = code.indexOf("{", fnStart); i < code.length; i++) {
+        if (code[i] === "{") depth++;
+        else if (code[i] === "}") { depth--; if (depth === 0) { fnEnd = i + 1; break; } }
+    }
+    const rx = code.slice(fnStart, fnEnd);
+    ok(fnEnd > fnStart && rx.length > 900, "the whole of _renderXRFrame is read, not a fixed-length guess at it");
+
+    // Two paths reach the headset now. The post path hands bloomPass the layer's framebuffer as its output;
+    // the fallback binds it directly. A frame that reached NEITHER would be a headset showing nothing.
+    const postPath = /bloomPass\.outputFBO = layer\.framebuffer/.test(rx);
+    const rawPath  = /bindFramebuffer\(gl\.FRAMEBUFFER, layer\.framebuffer\)/.test(rx);
+    ok(postPath && rawPath,
+        "the stereo draw reaches the headset's framebuffer on BOTH paths -- the post chain through " +
+        "bloomPass.outputFBO, the fallback by binding it directly");
+
+    // The clear rule is per BRANCH, not per file: each branch must clear exactly once, because the eyes share
+    // one framebuffer and clearing per eye would erase the first while drawing the second. Counting over the
+    // whole function would now read 2 and say nothing about either branch.
+    const branches = rx.split(/\}\s*else\s*\{/);
+    ok(branches.length === 2, "the function has exactly the two branches this check knows about", branches.length + " found");
+    for (let i = 0; i < branches.length; i++) {
+        ok((branches[i].match(/gl\.clear\(/g) || []).length === 1,
+            "branch " + (i + 1) + " clears the shared framebuffer exactly ONCE, not per eye");
+    }
     ok(/if \(!views\.length\) return false/.test(rx), "and a frame with no pose draws nothing rather than repeating the last one");
+
+    // v4212 -- the post path must put the rect back. The eye rect is sticky state on bloomPass, so a desktop
+    // frame after a VR frame would otherwise render into half a frame with an off-centre vignette.
+    ok(/bloomPass\.setEyeRect\(null\)/.test(rx),
+        "!! the post path RESETS the eye rect before returning -- it is sticky, and a leftover half-frame rect " +
+        "would follow the engine back out onto the monitor");
 }
 
 console.log(`xrSession-selfcheck: ${pass} passed, ${fail} failed`);

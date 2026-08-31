@@ -211,13 +211,20 @@ function pollPad(dt) {
 }
 
 let last = performance.now();
+// v4212 -- *** setAnimationLoop REPLACES THE rAF; IT DOES NOT JOIN IT. *** three drives this from its own
+// scheduler (window rAF when no session is running, the XRSession's clock when one is), so a leftover
+// requestAnimationFrame in here would run the loop TWICE PER FRAME -- which on a monitor just looks like the
+// animation sped up, and in a headset is double the work for half the rate. ui/threeVR.js installs the loop.
+// The timestamp three passes to a setAnimationLoop callback is the same shape rAF gives, so `t` keeps
+// working -- but in an XR session it comes from the XRFrame, which is what makes the delta correct in VR.
 function loop(t) {
-    requestAnimationFrame(loop);
-    const dt = Math.min((t - last) / 1000, 0.1); last = t;
+    const dt = Math.min(((t || performance.now()) - last) / 1000, 0.1); last = (t || performance.now());
     resize(); pollPad(dt); controls.update();
     renderer.render(scene, camera);
 }
-requestAnimationFrame(loop);
+import("/ui/threeVR.js").then((m) => m.enableThreeVR({ renderer, loop, label: "\u{1F97D} Enter VR" }))
+  .then((r) => { if (!r || !r.loopInstalled) renderer.setAnimationLoop(loop); })
+  .catch(() => { renderer.setAnimationLoop(loop); });   // import failed outright
 </script>
 </body>
 </html>

@@ -2709,7 +2709,7 @@
    "f": "torrents.html",
    "t": "SweK Torrents — Voxel View",
    "d": "A 3D voxel render of BiglyBT torrents: each tower is a download, lit cubes are progress, color is state, glow is speed.",
-   "g": "",
+   "g": "nearshare",
    "p": 0
   },
   {
@@ -2961,7 +2961,7 @@
    "f": "webtorrent.html",
    "t": "SweK P2P Share",
    "d": "Seed SweK output folders (cell-tracking runs, exports) as torrents and fetch them from peers. Native WebRTC/TCP P2P — no central server; magnets broadcast on the peer bus.",
-   "g": "",
+   "g": "nearshare",
    "p": 0
   },
   {

@@ -99,8 +99,12 @@ bind("amp", "ampv", (v) => { aq.set("Amplitude", v); return v; });
 bind("freq", "freqv", (v) => { aq.set("Frequency", v); return v; });
 bind("sweep", "sweepv", (v) => { drawMask(v / 100); return (v / 100).toFixed(2); });
 
+// v4212 -- *** setAnimationLoop REPLACES THE rAF; IT DOES NOT JOIN IT. *** three drives this from its own
+// scheduler (window rAF when no session is running, the XRSession's clock when one is), so a leftover
+// requestAnimationFrame in here would run the loop TWICE PER FRAME -- which on a monitor just looks like the
+// animation sped up, and in a headset is double the work for half the rate. ui/threeVR.js installs the loop.
 function loop(t) {
-    requestAnimationFrame(loop);
+    t = t || performance.now();
     resize();
     if (auto) {
         const f = (Math.sin((t - t0) * 0.0004) * 0.5 + 0.5);
@@ -110,7 +114,9 @@ function loop(t) {
     renderer.clear();
     aq.render(renderer, null);
 }
-requestAnimationFrame(loop);
+import("/ui/threeVR.js").then((m) => m.enableThreeVR({ renderer, loop, label: "\u{1F97D} Enter VR" }))
+  .then((r) => { if (!r || !r.loopInstalled) renderer.setAnimationLoop(loop); })
+  .catch(() => { renderer.setAnimationLoop(loop); });   // import failed outright
 console.log("[aquarelle] reach:", JSON.stringify(maxReach()), "-- the mask is warped further than the image, which is the look");
 </script>
 </body>

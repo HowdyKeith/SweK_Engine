@@ -8,6 +8,80 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4212 -- VR part two: the post chain in stereo, the controllers, and the pages where the guide was right
+
+v4179 got the engine into a headset and said in its own comment what it was leaving behind: "Two eyes through
+a full-screen post pass is its own piece of work." This is that work, plus the input half it never had.
+
+*** THE POST-CHAIN FINDING IS NOT "IT DOES NOT RUN IN VR". *** It is that EVERY UV-SPACE EFFECT SILENTLY
+MEANS SOMETHING ELSE when an XRWebGLLayer hands both eyes ONE framebuffer with two viewports side by side. A
+shader written in "vUV of the whole target" -- which is every post shader ever written, correctly, for a
+monitor -- is now addressing a double-wide image whose middle is the bridge of your nose. Three consequences,
+each of which renders fine and looks wrong, all measured rather than described:
+
+1. THE BLUR READS ACROSS THE SEAM. bloomPass's BLUR_FS is a 9-tap Gaussian sampling +/-4 texels, run at HALF
+   resolution, so at the left eye's inner border it reaches 4 texels = 8 FULL-RESOLUTION PIXELS into the right
+   eye. A bright window on one side glows on the other side's inner border, where there is no light.
+   *** SCISSORING CANNOT FIX THIS: A SCISSOR RESTRICTS WRITES AND THIS IS A READ. *** GL_CLAMP_TO_EDGE cannot
+   either -- it guards the edge of the TEXTURE, and this boundary is the middle of it.
+
+2. THE VIGNETTE CENTRES ON THE SEAM. The composite does vUV minus 0.5, the centre of the TARGET. Two eyes side
+   by side put UV 0.5 exactly on the boundary, so each eye came out brightest at its inner edge and darkest at
+   its outer one. MEASURED at 0.25 in UV from each eye's real centre -- a quarter of the framebuffer's width.
+
+3. SCREEN-SPACE SOURCES PROJECT THROUGH ONE CAMERA. The god-ray pass takes a single uSunPosUV and the heat
+   sources are projected through whichever camera was passed last. One screen position cannot be right for two
+   eyes looking from different places; that is what stereo IS. This one is REPORTED as a warning rather than
+   silently handled, because a plan that drops what it cannot do turns a known defect into an unknown one.
+
+New engine/xrPost.mjs is the eye-rect arithmetic behind all three. No GL in it, so 30 checks drive it in node
+against XRView-shaped fixtures -- the posture engine/xrSession.mjs took at v4179 and scanTwin.mjs at v4208.
+render/bloomPass.js gains a uEyeRect uniform: the blur CLAMPS every tap into its own eye (inset by half a
+texel, so it lands on the last texel CENTRE rather than the boundary where linear filtering would coin-flip
+into the neighbour) and the vignette centres on the eye. *** FOR THE FULL-FRAME RECT A MONITOR PASSES, BOTH
+REDUCE ALGEBRAICALLY TO THE OLD LINES *** -- the clamp becomes the identity and the vignette becomes
+(vUV - 0.5) / 1.0 -- and the gate asserts that over 101 sampled points, because a stereo fix that changed the
+desktop would be a regression on the path 99% of frames take.
+
+New engine/xrInput.mjs is controllers. *** CONTROLLER BUGS ARE ALMOST NEVER POSE BUGS. THEY ARE EDGE BUGS,
+AND AN EDGE CANNOT BE SEEN IN ONE FRAME. *** `if (button.pressed)` fires sixty times for one trigger pull and
+looks like it works while you test it on something harmless, so every input assertion here drives a SEQUENCE:
+held for 60 frames, the trigger reports 0 further events. Three traps pinned: a controller that DISAPPEARS
+mid-press synthesises its release (otherwise the button is held for the life of the page, and the release is
+emitted BEFORE the removal so a listener still knows what it refers to); state is keyed on the inputSource
+OBJECT, not on handedness, because two sources can both report "none" and keying on handedness merges two
+devices into one; and the deadzone is RADIAL and rescaled, not per-axis -- a diagonal push of 0.1/0.1 has
+magnitude 0.1414 and is live, where a per-axis deadzone squares off a round stick and returns nothing. The
+thumbstick is axes 2/3; 0/1 are the touchpad, an off-by-two a lot of code has.
+
+New ui/threeVR.js is the EASY half. v4179's finding was that the guides' renderer.xr.enabled +
+setAnimationLoop answer does not apply to main.js, which never imports three -- but glb_viewer, scene-view and
+aquarelle DO use three, and for them it is exactly right and was never applied. *** setAnimationLoop REPLACES
+THE rAF, IT DOES NOT JOIN IT: *** a loop driven by both runs TWICE PER FRAME, which on a monitor merely reads
+as "the animation got faster" and in a headset is double the work for half the rate. MEASURED in headless
+Chromium by counting GL calls, against the unconverted files as controls: glb_viewer 119/s vs 120/s,
+aquarelle 42/s vs 44/s, scene-view 60/s vs 61/s -- matched, not doubled.
+
+TWO THINGS MY OWN MEASUREMENTS NEARLY GOT WRONG, BOTH CAUGHT BY RUNNING A CONTROL. A canvas-screenshot diff
+reported aquarelle FROZEN after conversion; the same probe against the ORIGINAL file reported it frozen too,
+so the probe was wrong, not the change. And scene-view showed 0 draw calls -- also 0 before conversion, because
+it is a viewer with no scene loaded; counting gl.clear instead showed its loop running at 60/s either way.
+
+AND I BROKE v4179's OWN GATE, WHICH IS WHY IT EXISTS. Its framebuffer check sliced a flat 900 characters from
+_renderXRFrame; giving that function a second branch pushed the bind past character 900, so a check about
+WHERE THE FRAME GOES failed because of HOW LONG THE FUNCTION IS. A positional window is not a property. It now
+delimits the function by matching braces and asserts BOTH paths reach the headset, each branch clears exactly
+once, and the post path resets the sticky eye rect on the way out -- strictly more than it checked before.
+
+Gate: tools/ship/xrStereo-selfcheck.mjs, 71 checks, all pass. Five sabotages, all red: dropping the clamp,
+restoring the target-centred vignette, reporting levels instead of edges, keying controller state on
+handedness, and putting a requestAnimationFrame back into a converted page. All touched files restored
+byte-identical. engine/xrSession-selfcheck.mjs 74 passed, 0 failed.
+
+WHAT THIS DOES NOT CLAIM: that any of it looks right in a headset. Nobody here has one. The rect arithmetic,
+the clamp, the edge detection and the loop rates are settled; comfort wants a person and a device.
+
+The build now stands at 1292 gates.
 ## v4211 -- the droplets were square, and the fix was already written in the file next to it
 
 *** Keith, on fluid-webgpu.html: "does water droplets need to be square?" *** They were, and they did not need
