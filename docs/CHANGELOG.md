@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4248 -- The derived ragdoll, stepped in a real solver, and v4245's anchor fix is not confirmed
+
+*** v4245 CLOSED BY SAYING THE ONE THING IT COULD NOT DO WAS RUN THE THING IT BUILT. *** Its gate: "unchecked
+here: any of this INSIDE box3d. Nothing in this gate creates a world, adds a body or makes a joint -- it
+derives the description that would be handed to those calls and checks the description. A derived graph that
+box3d rejects, or that explodes on the first step, would pass every check above."
+
+That was a limit of the GATE, not of the tree. physics/box3d/box3dNode.mjs loads the box3d WASM outside a
+browser -- it exists precisely because box3dLoader.js is a browser loader whose fetch cannot reach a file:
+URL -- and several gates already step worlds through it. So this round hands ragdollFromSkeleton's output to
+the calls it was designed for.
+
+WHAT IS NOW ESTABLISHED, and none of it could be said before: box3d ACCEPTS the derived graph -- eleven bodies
+plus a ground, ten joints, zero refused, zero unmapped. It stays finite over 300 steps. It falls from 6 m and
+settles at 0.14 m. It hangs stably from a pinned pelvis. The derivation produces a well-posed articulated
+body rather than a plausible-looking description.
+
+*** AND THE THING THIS ROUND WENT TO PROVE CAME BACK NEGATIVE. ***
+
+v4245 found 4 of 10 joint anchors lying outside the body they attach to, fixed it by enclosing every child
+head, and justified the fix with a sentence: "the solver then pulls on a point the body does not contain."
+THREE INSTRUMENTS NOW FAIL TO SEPARATE THE FIXED GRAPH FROM THE NAIVE ONE.
+
+    joint separation      the NAIVE graph is TIGHTER at rest -- 0.035 m against 0.073 m
+    drop asymmetry        0.770 m against 0.017 m, but the chaos floor is 0.455 m: a factor of 1.7
+    hanging asymmetry     0.0285 m against 0.0286 m, against a floor of 9.5e-7 m: INDISTINGUISHABLE
+
+The hanging experiment is the one that settles it. Pin the pelvis, delete the ground, and let the limbs hang:
+no tumbling, no impact, one stable equilibrium, and the noise floor collapses from 0.455 m to 9.5e-7 m -- so a
+difference of a centimetre would be four orders of magnitude above the noise. There is no such difference.
+
+The fix is NOT shown to be wrong. The anchors really are inside the bodies now, and that is a geometric fact
+this round does not disturb. What is no longer supported is that it makes the ragdoll BEHAVE better, and that
+is a smaller claim than v4245 made. Corrected in both places it was made: physics/ragdollFromSkeleton.mjs's
+header and tools/ship/ragdollFromSkeleton-selfcheck.mjs's check message.
+
+What would actually test the argument: it is about the COLLISION VOLUME, not the constraint. A body that does
+not reach its own joint leaves that region uncovered, so limbs pass through where a torso should be. That is
+a CONTACT question, and contacts turn out to be available (see below) and unused.
+
+*** AND THE ROUND NEARLY SHIPPED "48 TIMES THE CHAOS FLOOR" ON A FLOOR MEASURED ONCE. *** The first version of
+the noise-floor section took a single 1 mm perturbation and got 0.000 m, so section 4 hard-coded 0.016 as the
+floor and the naive result read as a factor of 48. A later run of the SAME check produced 0.145. Five
+perturbations give 0.129, 0.455, 0.246, 0.000, 0.067 -- a worst of 0.455, and the factor becomes 1.7. A NOISE
+FLOOR MEASURED ONCE IS A SAMPLE, NOT A BOUND, and a multiple quoted against a lucky sample is how a modest
+result gets reported as a large one.
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED.
+
+  * Every joint pointed at bone 999. This exposed TWO defects and neither was in the module. FIRST, the check
+    could not see it: idx.get(999) returns undefined, emscripten coerces undefined to 0, and box3d welds the
+    limb to the GROUND -- a perfectly valid body pair -- so "refused === 0" stayed green on a graph that was
+    nonsense. An `unmapped` counter exists because of that. SECOND, THE SABOTAGE ITSELF DID NOT APPLY THE
+    FIRST TWO TIMES: the sed pattern assumed the field began a line and the source has it mid-line after
+    `name:`. Two green runs were reported from a sabotage that had never been made, which is the same failure
+    as a badly built sabotage proving a gate sound.
+  * The knee rule given a zero axis and a [0, 0] limit. Three checks red, including the hanging comparison.
+    Note what stayed GREEN: finiteness, and the hang itself. A ragdoll with a degenerate joint axis does not
+    explode -- it hangs quietly and wrong, which is exactly why section 4 needed a deterministic experiment
+    rather than a stability check.
+
+ALSO CORRECTED: box3dNode.mjs's header, which describes a vendored wasm missing swk_contacts,
+swk_contact_count and swk_contact_stride. All three have been present since v3569; PENDING_REBUILD below them
+was emptied at v3571 with a note saying the rebuild had happened. The MECHANISM was updated and the PROSE was
+not, so a file whose entire purpose is catching a stale record carried one for six hundred versions. The
+artifact today exports 45 swk_* functions and the declared-minus-built difference is empty.
+
+New: tools/ship/ragdollStep-selfcheck.mjs (11 checks).
+
+NOT done, and stated in the gate: whether the ragdoll looks RIGHT. It is accepted, finite, falling and
+symmetric; nothing renders it, and a rig that settles symmetrically can still have its knees bending the
+wrong way -- the limits are checked as values by v4245 and never as behaviour. Also not done: the two
+hand-typed pages. ragdoll.html and flesh.html still carry their own copies of these eleven bones and neither
+consumes ragdollFromSkeleton, so the duplication v4245 measured is untouched; this round proves the
+derivation runs, not that anything has adopted it.
+
+The build now stands at 4248 gates.
+
 ## v4247 -- Selecting by looking, and the one design number that decides whether a human can use it
 
 *** VR PARTS ONE, TWO AND THREE SHIPPED CONTROLLERS, STICK LOCOMOTION AND HAPTICS, AND EVERY ONE OF THOSE

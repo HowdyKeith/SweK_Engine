@@ -114,6 +114,15 @@ function rotateX(q) {
  * So a body is the box enclosing every point it must REACH: its own head, its tail, and the head of EVERY
  * child. That is what makes ragdoll.html's chest and pelvis wide, done there by typing the numbers.
  *
+ * *** AND v4248 RAN THE SIMULATION THIS ARGUMENT IS ABOUT, AND DID NOT CONFIRM IT. *** Three instruments
+ * were tried against the naive bodies in a real box3d world: joint separation (the naive graph is TIGHTER
+ * at rest), settling asymmetry after a drop (1.7x a chaos floor of 0.46 m, which is not a signal), and
+ * settling asymmetry hanging from a pinned pelvis, where the floor is 9.5e-7 m and the two derivations
+ * come out 0.0285 against 0.0286 -- indistinguishable. The enclosing box is not shown to be WRONG, and
+ * it is no longer shown to be BETTER either. What the argument actually describes is a COLLISION VOLUME:
+ * a body that does not reach its own joint leaves that region uncovered, so limbs pass through where a
+ * torso should be. That is a contact question and nothing has measured it.
+ *
  * Mass is proportional to VOLUME, so a thigh outweighs a forearm without anyone choosing a number.
  */
 export function bodiesFromSegments(segs, density = 1000, attach = null) {

@@ -144,7 +144,11 @@ console.log("\n3. *** THE OBVIOUS DERIVATION IS WRONG, AND THIS IS THE NUMBER TH
         outF.length === 0,
         "a body is the box containing every point it must REACH -- its head, its tail, and the head of every " +
         "child. That is exactly what makes ragdoll.html's chest and pelvis wide, done there by typing the " +
-        "numbers and here by deriving them.");
+        "numbers and here by deriving them. *** THIS IS A GEOMETRIC FACT AND NOT A SIMULATION RESULT, AND " +
+        "v4248 IS THE ROUND THAT LEARNED TO SAY SO: *** it stepped both versions in a real box3d world and " +
+        "three instruments failed to separate them. The anchors really are inside the bodies now; that this " +
+        "makes the ragdoll BEHAVE better is unmeasured, and the sentence justifying it (the solver pulls on a " +
+        "point the body does not contain) is an argument the solver has so far declined to confirm.");
     const pelvis = fixed[0], pelvisN = naive[0];
     ok("   ...and it is the multi-child bones that grew, which is the mechanism showing up in the sizes",
         pelvis.half[0] > pelvisN.half[0] * 1.5 && fixed[4].half[0] <= naive[4].half[0] + 1e-9,
