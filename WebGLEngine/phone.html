@@ -49,6 +49,19 @@
   .tab > section:first-child { padding-top:6px; margin-top:0; }
   .tab > section:first-child > .label:first-child { margin-bottom:4px; }
   .tab { margin-top:0; }
+  /* v4209 -- *** THE `.row` CLASS WAS USED 30 TIMES ON THIS PAGE AND DEFINED ZERO TIMES. *** A bare div element
+     with no matching rule is `display:block`, so every one of those rows was a HARD LINE BREAK -- which is
+     exactly what Keith photographed: "Raw on / Raw off" on one line, "Event on / Event off" on the next,
+     "Restart pipes" alone on a third, each button at its natural width against the left edge.
+     THE INTENT IS NOT IN DOUBT AND WAS NOT GUESSED: 24 of the 30 rows set inline `flex:2` / `flex:1` /
+     `flex:0` on their CHILDREN (measured, line by line), and `flex` is inert on a child of a block box. Those
+     ratios were written for a flex parent that never existed. Nine sibling pages in this tree -- server.html,
+     home.html, govee.html, fallout.html, shield-display.html, pulsar.html, ev-sprites.html,
+     diorama-composer.html, board.html -- each define their own `.row`; this page is the one that missed it.
+     The declaration below is server.html's, verbatim, because server.html is this page's sibling dashboard.
+     Adding the rule REVIVES those 24 inline ratios rather than overriding them: an inline `flex` beats a
+     stylesheet rule, so every hand-tuned row keeps the proportions its author wrote. */
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
   .grid.three { grid-template-columns:1fr 1fr 1fr; }
   .grid.four  { grid-template-columns:1fr 1fr 1fr 1fr; }
@@ -536,18 +549,14 @@
     <!-- v1226 — engine -> listener control (writes KPopShimControl.txt via /kpop/control) -->
     <section id="listenerCtl" style="margin:6px 14px 0;">
       <div class="label">🎛 Listener control</div>
-      <div class="row" style="margin-top:0;">
+      <!-- v4209 -- ONE group, not four stacked pairs. These seven controls are all "tell the listener to
+           do something now"; splitting them across four block rows put a hard return after every pair. -->
+      <div class="grid three" style="margin-top:0;">
         <button class="act" id="lcRawOn" title="Raw pipe stream on">Raw on</button>
         <button class="act" id="lcRawOff" title="Raw pipe stream off">Raw off</button>
-      </div>
-      <div class="row">
         <button class="act" id="lcEvtOn" title="RaiseEvent mode on">Event on</button>
         <button class="act" id="lcEvtOff" title="RaiseEvent mode off">Event off</button>
-      </div>
-      <div class="row">
         <button class="act" id="lcRestart" title="Restart the pipe listener">♻ Restart pipes</button>
-      </div>
-      <div class="row">
         <button class="act" id="lcSpeakTest" title="Make the listener speak a test phrase">🔊 Speak test</button>
         <button class="act" id="lcReload" title="Re-apply listener runtime settings">♲ Reload config</button>
       </div>
@@ -560,11 +569,10 @@
     <!-- v1230 — engine authority over the listener (writes the policy the listener obeys via /kpop/policy) -->
     <section id="listenerPolicy" style="margin:10px 14px 0;">
       <div class="label">👑 Engine authority</div>
-      <div class="row" style="margin-top:0;">
+      <!-- v4209 -- ONE group, same reason as the listener-control block above. -->
+      <div class="grid" style="margin-top:0;">
         <button class="act" id="lpEnable" title="Let the listener run">Listener ON</button>
         <button class="act" id="lpDisable" title="Make the listener go dormant">Listener OFF</button>
-      </div>
-      <div class="row">
         <button class="act" id="lpQuietOn" title="Suppress spoken audio">Quiet on</button>
         <button class="act" id="lpQuietOff" title="Allow speech again">Quiet off</button>
       </div>
@@ -2937,6 +2945,8 @@
     var pendingSets = new Map();// correlation by tabId+ctrlId → previousValue
     var lastFetchAt = 0;
     var refreshTimer = null;
+    var describeSeq = 0;        // v4209 -- monotonic id per settings:describe, so a stale reply cannot
+    var awaitingSchema = 0;     // clear a newer request's watchdog (and vice versa)
 
     function setStatus(msg, color){
       statusEl.textContent = msg;
@@ -2956,11 +2966,20 @@
       }
       setStatus("requesting schema…", "#9bf");
       lastFetchAt = Date.now();
+      // *** v4209 -- THE WATCHDOG COULD NOT FIRE ONCE A SCHEMA HAD EVER ARRIVED. *** Its guard was
+      // `!schema` -- a module-level var holding the LAST schema received, not the state of THIS request.
+      // So the very first fetch reported "no reply from PC" correctly, and every Refresh after a success
+      // was unguarded: the reply never came, `schema` was still truthy from before, the branch was skipped
+      // and the panel sat on "requesting schema…" in blue FOREVER, with no error and no timeout. That is
+      // the failure Keith photographed. The question the watchdog has to ask is "did THIS request get an
+      // answer", so it asks that: a token is stamped per request and cleared by the reply handler.
+      var token = ++describeSeq;
+      awaitingSchema = token;
       try { ws.send(JSON.stringify({ type: "settings:describe" })); } catch(e) {}
-      // Watchdog — if no reply in 4s, surface
       setTimeout(function(){
-        if (Date.now() - lastFetchAt >= 3800 && !schema) {
-          setStatus("✗ no reply from PC (is the engine running?)", "#f88");
+        if (awaitingSchema === token) {
+          awaitingSchema = 0;
+          setStatus("\u2717 no reply from PC (is the engine running?)", "#f88");
         }
       }, 4000);
     }
@@ -3216,6 +3235,7 @@
 
     // Incoming handlers — called by ws.onmessage dispatcher
     window._pcsOnSchema = function(payload){
+      awaitingSchema = 0;   // v4209 -- a reply ARRIVED; whether it is good or bad, the watchdog is answered
       if (!payload || !payload.ok || !Array.isArray(payload.schema)) {
         setStatus("✗ " + (payload?.error || "bad schema response"), "#f88");
         return;

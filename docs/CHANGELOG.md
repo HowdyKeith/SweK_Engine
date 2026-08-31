@@ -8,6 +8,40 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4209 -- the shell is the firework, and three phone.html defects Keith photographed
+
+The shell IS the firework, and three phone.html defects Keith photographed. New world/fireworkShell.mjs takes
+the one idea worth taking from the three fireworks repos: a shell is a BALLISTIC BODY with a fuse, and the
+stars are what it becomes -- not a particle emitter that happens to be shaped like an arc. It reuses
+physics/ballistics.mjs (v4205) for the lift, so a shell and a naval round are the same object with different
+fuses. Six patterns (peony, chrysanthemum, willow, palm, ring, crossette) and a secondary break that fires
+inside the same step rather than a frame later. *** SPHERE SAMPLING IS THE PART THAT IS EASY TO GET WRONG AND
+LOOKS FINE: *** normalising a random cube vector piles stars onto the eight corners -- MEASURED, chi-squared
+27996 against 143 for the Marsaglia z-then-angle method, with the fullest cell holding 2.92x the emptiest
+versus 1.13x. Velocity inheritance measured too: a burst keeps the shell's motion, so stars drift 8.80 m
+downrange after 1 s where an un-inherited burst drifts -0.45 m. Ring planarity 2.22e-16 with gaps exactly
+2pi/72; crossette breaks 24 stars into 96 at step 108; willow leaves 140 stars alive at 3 s where peony has 0.
+58 checks, 6 sabotages all red. *** TWO OF MY OWN BUGS, BOTH FOUND BY THE GATE: *** shortOfFuse fired at
+y=39.9 for a 40 m fuse -- a discretisation artefact, fixed to test the apex rather than the sampled height;
+and the crossette test read (stars[0]?.t || 99), which treats t===0 as missing, and a freshly-born star has
+exactly t=0 -- the falsy-zero trap for the second time this month, in my TEST rather than the module.
+phone.html: *** THE `.row` CLASS WAS USED 30 TIMES AND DEFINED ZERO TIMES. *** A bare div with no rule is
+display:block, so every one of those rows was a hard line break -- which is what Keith photographed: "Raw on
+/ Raw off" on one line, "Event on / Event off" the next, "Restart pipes" alone on a third, each button 68px
+wide against the left edge. The intent was not guessed: 24 of the 30 rows set inline flex:2 / flex:1 / flex:0
+on their CHILDREN, and flex is inert on a child of a block box, so those ratios were written for a flex
+parent that never existed. Nine sibling pages in this tree each define their own .row; this page missed it.
+Adding server.html's declaration verbatim revives the 24 inline ratios rather than overriding them, because
+an inline flex beats a stylesheet rule. MEASURED before and after in headless Chromium at a 412px phone
+viewport: all 30 rows computed display:block with buttons at 68px and 69px; all 24 remaining rows now compute
+flex. The Listener control and Engine authority button stacks became ONE group each, using the page's own
+.grid three / .grid idiom rather than a bespoke rule. And the settings panel: *** ITS WATCHDOG COULD NOT FIRE
+ONCE A SCHEMA HAD EVER ARRIVED. *** The guard was `!schema` -- the last schema received, not the state of the
+request in flight -- so the first fetch reported "no reply from PC" correctly and every Refresh after a
+success sat on "requesting schema..." in blue forever, with no error and no timeout. That is the second thing
+Keith photographed. A per-request token replaces it, cleared by the reply handler on both the ok and the
+error path. Gate count 1289 gates.
+The build now stands at 1289 gates.
 ## v4208 -- the three shaders v4207 found are fixed, and the obvious fix would have been worse than the bug
 
 brain/transport/shaders/scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl each declared
@@ -3318,6 +3352,7 @@ comes down and the markers come from its listing. If a part classifies wrong, th
 from that listing, never to lower the threshold until something matches.
 
 New `tools/ship/vbaArchive-selfcheck.mjs` takes the tree to 1246 gates.
+
 ## Since v4157 -- two solutions to one spring, and a readout that changes instead of being replaced
 
 v4158 -- Keith asked for lochie/torph's text morphing on the ticker. *** IT IS DELIBERATELY NOT ON THE TICKER, AND THE ARITHMETIC IS THE REASON. *** server.html's ticker is a marquee: 0.9px per frame at 60fps is 54px/s across a 220px clip, so a message sits on screen for 6.0s at 80px wide and 17.5s at 700px, against a queue that caps at 40 -- ABOUT FIVE AND A HALF MINUTES OF BACKLOG. Its problem is THROUGHPUT, which no transition fixes. And morphing only earns anything when the two strings SHARE STRUCTURE: consecutive log lines share almost nothing, so every glyph would fade out and every glyph fade in -- a crossfade with extra machinery, slower to read than the scroll it replaced. The measurement is now ASSERTED BY THE GATE against the ticker's own scroll constant, so if it is ever retimed the decision is revisited rather than inherited. Pointed at the READOUTS instead, where old and new always share structure. *** THE FOUNDATION IS A SECOND SOLUTION TO A SPRING THIS TREE ALREADY HAD, AND THAT IS WHAT MAKES THE GATE STRONG. *** ui/springMotion.js's step() INTEGRATES the damped harmonic oscillator numerically -- retargetable mid-flight, which an interruptible toast needs, and one call per frame on the main thread. New springToCssLinear() SOLVES THE SAME EQUATION IN CLOSED FORM and samples it into a CSS linear() easing, so the browser runs it ON THE COMPOSITOR and a busy main thread cannot make it stutter, at the cost of being a baked curve nothing can interrupt. Two independent answers to one question can be pointed at each other, and the agreement is asserted AS CONVERGENCE RATHER THAN AS A TOLERANCE: semi-implicit Euler is first order, so halving dt must halve the error. MEASURED at dt 1/480, 1/960 and 1/1920: errors 1.31e-2, 6.54e-3, 3.26e-3, ratios 2.01 and 2.00. *** A WRONG CLOSED FORM CANNOT DO THAT -- it would plateau at whatever constant it disagrees by, and a tolerance-based check would have passed it. *** The parameters are the SHARED PRESETS read through the shared dampingRatio(), so a CSS transition and a JS toast cannot disagree about what "snappy" means. *** AND THE CRITICAL BAND IS A SEPARATE BRANCH, WHICH THE OBVIOUS IMPLEMENTATION DIVIDES BY ZERO IN: *** the overdamped solution divides by (r2 - r1) and those roots COINCIDE at zeta 1, and this tree's `stiff` preset is zeta 1.0006 -- inside that band, and it is the preset meant for surfaces where overshoot would look like a bug. The last sampled point is pinned to EXACTLY 1, because a curve ending at 0.9997 makes CSS animate to 0.9997 and stop, which is the same defect step()'s snap-on-rest exists to prevent arriving in the other engine. New ui/textMorph.js diffs by LCS AND NOT BY A PREFIX/SUFFIX TRIM: "3 peers" -> "13 peers" keeps ALL SEVEN survivors and inserts one, where a trim sees a changed first character and rewrites the whole string -- saying "different value" when the truth is "one digit arrived". *** AND IT SEGMENTS BY GRAPHEME, WHICH THIS TREE'S UI MAKES NECESSARY RATHER THAN TIDY: *** the gear in server.html's own header is U+2699 followed by U+FE0F, and [...str] splits that into two, the second an invisible modifier that renders as a stray box on its own -- so a naive morph does not animate badly, IT CORRUPTS THE TEXT. Flags, ZWJ families and surrogate pairs are all gated. Segmentation, the diff and the plan are pure, so every number is settled in node; only the FLIP touches the DOM. Wired into the engine version in server.html through morphText(), at BOTH write sites -- boot and the update check -- since morphing one and not the other would make the animation depend on which path last ran. The module is fetched lazily and every failure falls back to textContent, because a readout that stopped updating when an animation module 404'd would be a strictly worse front door than one that never animated. New tools/ship/textMorph-selfcheck.mjs takes the tree to 1245 gates. Full changelog on docs/CHANGELOG.md.
@@ -14242,3 +14277,4 @@ flat field panel (Demo_FieldViewer) · petri dish (Demo_PetriViewer) · arcade p
 - Discovery table aligned to the **real** payload: EngineCore sends `{tick, entities:[{x,y,z,hp,alive}]}` (the voxel bridge may send `{tick,t_ms,player,enemies,events}`) — both accepted. `Entities`/`Entities Alive` replace the guessed `Enemies`. **fps/scene/solar are NOT in the engine payload** and stay unavailable until your transmitter sends them (solar normally comes from HA's own inverter integration).
 - Fixed the slimmer's `engineRoot` path; dry run = 232 files / ~2.7 MB.
 - Add-on repo now has `PUBLISHING.md` (GitHub steps + one-click badge) and `.github/workflows/ci.yml` (lints config + sanity-builds/serves the image).
+
