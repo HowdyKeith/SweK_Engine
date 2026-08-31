@@ -8,6 +8,59 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4211 -- the droplets were square, and the fix was already written in the file next to it
+
+*** Keith, on fluid-webgpu.html: "does water droplets need to be square?" *** They were, and they did not need
+to be. Each particle is drawn as a 6-vertex QUAD (two triangles) and the fragment stage returned
+`vec4(i.col, 1.0)` for EVERY pixel of it. The quad is the right primitive -- an instanced billboard is how you
+draw a hundred thousand particles -- but a quad with no mask is a square, which is exactly what rendered.
+
+THE FIX WAS ALREADY IN THE TREE, ONE FILE OVER. fluid-webgpu-3d.html is the same simulation in 3D and already
+carries the sphere-impostor idiom: `let r2 = dot(i.uv,i.uv); if(r2>1.0){ discard; }` plus a reconstructed
+normal. So this round is that idiom applied to the 2D view, not a new invention, and the gate checks BOTH
+files -- the interesting property is that the tree stops holding two answers to one question.
+
+*** THE MISSING HALF WAS IN THE OTHER STAGE FROM WHERE THE SYMPTOM SHOWED. *** The 2D file could not have had
+a mask: its vertex stage never passed the quad corner to the fragment stage, so the fragment shader had no way
+to know where in the quad it was. Adding a discard to the fragment stage alone would not have compiled against
+anything. The vertex half is the fix as much as the fragment half is.
+
+*** THIS BOX HAS NO navigator.gpu, SO THE MASK IS PROVEN IN A TWIN RATHER THAN ASSERTED FROM THE SOURCE. ***
+Same posture as brain/transport/scanTwin.mjs at v4208: a shader nobody can run is a shader nobody has checked,
+and reading a discard out of the source proves only that somebody typed one. The mask is a pure function of
+the corner, so it is re-implemented in JS and INTEGRATED over the quad. A correct disc covers pi/4 =
+0.785398 of its bounding square; measured 0.785419 on a 2000x2000 grid. THE UNMASKED QUAD THIS REPLACED
+INTEGRATES TO EXACTLY 1.000000, so one number separates fixed from broken with no ambiguity. The four corners
+are asserted discarded by name, because the corners are the square's giveaway. The impostor normal is checked
+to be a unit vector across the whole disc: max deviation 2.22e-16.
+
+AND THE SERVER CONSOLE. Keith: "I think we have a file transfer button, and that would be better served as a
+'Peer 2 Peer' button and we can put the p2p options in that panel. nearshare maybe. We have a torrent re-skin
+app with voxels i think." He is right that it exists -- torrents.html is "Torrents -- Voxel View", where each
+tower is a download, lit cubes are progress and glow is speed, driven by ai-bridge/biglybtBridge.js, with
+webtorrent.html its browser-side sibling on webtorrentBridge.js.
+
+*** BOTH TORRENT PAGES WERE IN NO PANEL AT ALL, AND THE REASON WAS THAT NEITHER HAD AN ANCHOR ON server.html.
+*** They are present in the GENERATED indexes (launch-index.json, page-index.json) and so are not orphans by
+orphanScan's definition -- reachable by URL, unreachable by browsing, which is the v3011 defect ("shipping a
+module nobody can reach") in its subtler form. pageSections-selfcheck stated the rule and caught the attempt
+in the same run: "A SECTION ENTRY IS NOT A LINK: the renderer moves an existing <a> and cannot invent one, so
+a page filed into a drawer with no anchor gives an EMPTY DRAWER THAT LOOKS DELIBERATE." Filing them without
+adding the two anchors would have produced precisely that.
+
+The label is now the honest one. v4109 had already conceded that this panel's header "is narrower than its
+real membership" and deferred the wider regroup as "a bigger reorg ... that nobody has asked for yet". The ask
+arrived, so the deferral ends. The id and data-tab stay "nearshare" for the same reason they did at v4109:
+the id is load-bearing in server.html's selectors, in pageSections' id, and in the placements JSON, and only
+the visible label moves.
+
+Gate: tools/ship/dropletMask-selfcheck.mjs, 15 checks, all pass. Three sabotages, all red: restoring the
+original flat-square fragment shader, removing the vertex stage's corner pass-through, and inverting the mask
+so it keeps the corners and drops the middle. fluid-webgpu.html restored byte-identical. Measured live in
+headless Chromium: the renamed tab reads "Peer 2 Peer" and its panel now holds all seven peer pages
+(android-invite, remote-desktop, lan, sync-probe, pairlane, torrents, webtorrent) with no page errors.
+
+The build now stands at 1291 gates.
 ## v4210 -- the Phone Mode button opened the phone UI on the PC, and the QR it needed was already in the tree
 
 *** server.html's "PHONE MODE" BUTTON OPENED THE PHONE UI ON THE PC, THE ONE DEVICE THAT DOES NOT NEED IT. ***

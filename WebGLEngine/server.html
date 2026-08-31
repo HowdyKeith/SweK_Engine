@@ -902,6 +902,14 @@ window.addEventListener("load", function () {
             <a href="/instrument-bench.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🔬 Instrument Bench</a>
             <a href="/raycast.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🚀 Raycast Local LLM</a>
             <a href="/pairlane.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">📦 Pairlane File Drop</a>
+            <!-- v4211 -- *** THESE TWO PAGES HAD NO ANCHOR ON THIS PAGE AT ALL, WHICH IS WHY THEY BELONGED TO NO
+                 PANEL. *** pageSections-selfcheck states the rule and caught the attempt: "A SECTION ENTRY IS NOT
+                 A LINK: the renderer moves an existing <a> and cannot invent one, so a page filed into a drawer
+                 with no anchor gives an EMPTY DRAWER THAT LOOKS DELIBERATE." Filing them into the Peer 2 Peer
+                 section without these two lines would have produced exactly that. Both are real front doors with
+                 live bridges behind them -- biglybtBridge.js and webtorrentBridge.js. -->
+            <a href="/torrents.html" target="_blank" rel="noopener" title="Torrents rendered as a voxel city: each tower is a download, lit cubes are progress, colour is state and glow is speed. Front door for ai-bridge/biglybtBridge.js." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🧱 Torrents (Voxel View)</a>
+            <a href="/webtorrent.html" target="_blank" rel="noopener" title="Browser-side BitTorrent over WebRTC -- fetch and seed straight from the page, no client install. Front door for ai-bridge/webtorrentBridge.js." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🌊 WebTorrent</a>
             <a href="/cat-reactions.html" target="_blank" rel="noopener" title="Your expression, named and answered by a cat. The front door for ui/faceExpressionSet.js -- a PURE classifier over MediaPipe's blendshapes, so every recipe and every near-miss it must refuse is gated headless rather than demoed at a webcam. It shows all eight recipe scores live, not just its winner, and it says out loud that it will NOT claim a tongue: MediaPipe has no tongueOut blendshape, and faking one from an open jaw would be a detector that lies. No cat photographs ship with the engine -- the reactions are emoji, and you can point it at your own images." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">😼 Cat Reactions</a>
             <a href="/gesture-vfx.html" target="_blank" rel="noopener" title="Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures (pinch, fist, point, open palm, palms together, palms apart) read from MediaPipeHandTracker's own metrics, edge-triggered so a held gesture is ONE gesture, with a separate cooldown for threshold flicker. The judgement AND the particle simulation are both pure, so every gesture, every ambiguity, and 600 frames of physics are gated headless rather than watched. It refuses crossed fingers by name: metrics() reports finger FOLD, never the middle fingertip position, so the pose is not expressible from this input." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">✨ Gesture VFX</a>
             <a href="/box3d-contacts.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">◆ Box3D Contacts</a>
@@ -1036,8 +1044,15 @@ window.addEventListener("load", function () {
         <!-- v4109 -- Keith: "so NearShare is an app, that button could rename to File Transfer Utils, and both
              could be in there." Renamed the VISIBLE label only -- data-tab/data-panel stay "nearshare" so
              every existing selector, the pageSections id, and the pages/placements JSON key keep pointing at
-             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round. -->
-        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; File Transfer Utils</span><span class="gtabState" id="nsStat"></span></button>
+             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round.
+             v4211 -- RENAMED AGAIN, to the name that describes the whole membership. Keith: "I think we have
+             a file transfer button, and that would be better served as a 'Peer 2 Peer' button and we can put
+             the p2p options in that panel." v4109's own note had already conceded the label was too narrow --
+             "this one's own header text is narrower than its real membership" -- and deferred the wider regroup
+             as something "nobody has asked for yet". Somebody has now asked. THE VISIBLE LABEL IS AGAIN THE
+             ONLY THING THAT MOVES: data-tab stays "nearshare" for the same reason it did at v4109, because
+             the id is load-bearing in server.html's selectors, pageSections' id, and the placements JSON. -->
+        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128279; Peer 2 Peer</span><span class="gtabState" id="nsStat"></span></button>
         <!-- v3020 -- the roundhouse had NO minipanel. Seventeen tabs on this page and the thing the engine is
              actually FOR was not one of them: everything built in v3016-v3019 landed on report.html, a separate
              page you have to go to. Keith asked where the button was, which is the right question. -->
