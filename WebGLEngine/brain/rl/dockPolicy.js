@@ -60,7 +60,13 @@ function trainDockES(opts = {}) {
     const rng = mulberry32(opts.seed || 3); const history = [];
     const scratch = new Float32Array(n);
     let best = { params: theta.slice(), score: -Infinity, ev: null };   // elitism: keep the best-evaluated policy
-    const evOpts = { hidden: opts.hidden || [16, 16], envFactory: mk, obsDim };
+    // *** THE EPISODE BUDGET HAS TO REACH evaluate(), OR THE TRAINER OPTIMISES A DIFFERENT TASK. *** evOpts
+    // omitted maxSteps, so every evaluation inside this loop fell back to evaluate()'s default of 200 while
+    // the caller believed it had asked for more. MEASURED on the v4218 driving env, whose episodes need
+    // 157-267 steps to reach a goal and stop: training ran at 200 (no episode could finish) and the reported
+    // result at 400, and the trainer's own best.ev disagreed with a re-evaluation of the very same params --
+    // dockRate 0.21 against 1.0. No caller in this tree passes maxSteps, so this leaves them all at 200.
+    const evOpts = { hidden: opts.hidden || [16, 16], envFactory: mk, obsDim, maxSteps: opts.maxSteps };
     for (let it = 0; it < iters; it++) {
         // antithetic pairs: for each of pop/2 noise vectors, evaluate +noise and -noise
         const half = pop >> 1; const noises = [], rets = [];

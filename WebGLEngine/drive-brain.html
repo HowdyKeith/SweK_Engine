@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="GPU Brain: Learn to Drive">
+<meta name="demo:desc" content="A car learns to drive to a goal and stop there, on the real vehicle model: wheels as rays, grip proportional to the load each wheel actually carries, and tyre forces clamped to one friction circle. Trained by evolution strategy against a hand-written driver. Bolt a 400kg turret on the roof and the same policy starts rolling it over -- the loadout, not the driving.">
+<meta name="demo:category" content="brain">
+<title>GPU Brain: Learn to Drive</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --red:#ff6b6b; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; overflow:hidden; }
+  #hud { position:fixed; top:12px; left:14px; z-index:5; max-width:360px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:7px 13px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--cyan); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.on { border-color:var(--green); color:var(--green); }
+  .stat { color:var(--dim); font-size:12px; line-height:1.6; }
+  .stat b { color:#dbe7ff; }
+  .big { color:var(--green); font-size:15px; }
+  .warn { color:var(--red); }
+  canvas { display:block; }
+  #bar { height:5px; background:#0c1526; border-radius:3px; overflow:hidden; margin-top:4px; }
+  #barf { height:100%; width:0; background:var(--cyan); transition:width .2s; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>&#9673; GPU Brain &middot; Learn to Drive</h1>
+  <div class="stat" id="status">Untrained policy &mdash; it does not know which way the goal is. Press Train, or watch the hand driver.</div>
+  <div class="row" style="margin-top:8px">
+    <button id="trainBtn">Train (evolution strategy)</button>
+    <button id="expertBtn">Hand driver</button>
+    <button id="turretBtn">Roof turret</button>
+  </div>
+  <div id="bar"><div id="barf"></div></div>
+  <div class="stat" style="margin-top:8px">arrivals <b id="arr" class="big">0</b> &middot; rolled <b id="rolls" class="warn">0</b> &middot; missed <b id="miss">0</b><br>speed <b id="spd">0.0</b> m/s &middot; slip <b id="slip">0.00</b> &middot; wheels down <b id="gnd">4/4</b></div>
+  <div class="stat" id="learned" style="margin-top:6px"></div>
+  <div class="stat" style="margin-top:8px;color:#55617a">obs: goal + velocity in the car's own frame, yaw rate, slip, wheels grounded &rarr; MLP &rarr; steer + throttle. Dynamics are physics/vehicle.mjs, the same model the vehicle gate covers.</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { FlightPolicy } from "./brain/rl/dockPolicy.js";
+import { DriveEnv, driveExpert, ROOF_TURRET, GOAL_R } from "./brain/rl/driveEnv.js";
+
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+function resize() { cvs.width = innerWidth; cvs.height = innerHeight; }
+addEventListener("resize", resize); resize();
+const $ = (id) => document.getElementById(id);
+
+const MAX_STEPS = 400;
+let turret = false, useExpert = false, trained = false;
+let policy = new FlightPolicy({ hidden: [16, 16], obsDim: 8, seed: 3 });
+let env, obs, trail = [];
+let arrivals = 0, rolls = 0, miss = 0;
+
+function makeEnv() {
+    env = new DriveEnv({ maxSteps: MAX_STEPS, mounts: turret ? ROOF_TURRET : [] });
+    obs = env.reset(Math.floor(Math.random() * 1e6));
+    trail = [];
+}
+makeEnv();
+
+function newEpisode() { obs = env.reset(Math.floor(Math.random() * 1e6)); trail = []; }
+
+$("expertBtn").onclick = () => { useExpert = !useExpert; $("expertBtn").classList.toggle("on", useExpert); newEpisode(); };
+$("turretBtn").onclick = () => {
+    turret = !turret; $("turretBtn").classList.toggle("on", turret);
+    makeEnv();
+    $("status").textContent = turret
+        ? "400 kg at 2.4 m. The car now out-tips its own grip, so hard corners roll it instead of sliding wide."
+        : "Stock road car. Grip 0.9 against a tip ratio of 1.54 — it slides wide, it does not roll.";
+};
+
+// --- training, off the main thread so the car keeps driving while it learns -----------------------------------
+$("trainBtn").onclick = () => {
+    const btn = $("trainBtn"); btn.disabled = true;
+    $("status").textContent = "Training the GPU Brain by evolution strategy… the car below keeps driving on the current policy.";
+    let worker;
+    try { worker = new Worker("./drive-brain-worker.js", { type: "module" }); }
+    catch (err) { $("status").textContent = "Could not start the training worker: " + err.message; btn.disabled = false; return; }
+    let before = null;
+    worker.onmessage = (e) => {
+        const d = e.data;
+        if (d.before) { before = d.before; return; }
+        if (d.progress) {
+            $("barf").style.width = ((d.progress.it + 1) / d.progress.iters * 100).toFixed(1) + "%";
+            $("learned").textContent = "iteration " + (d.progress.it + 1) + "/" + d.progress.iters
+                + " · arriving " + (d.progress.dockRate * 100).toFixed(0) + "% · avg "
+                + d.progress.avgDist.toFixed(1) + " m out";
+            return;
+        }
+        if (d.done) {
+            policy.setParams(Float32Array.from(d.params));
+            trained = true; useExpert = false; $("expertBtn").classList.remove("on");
+            arrivals = 0; rolls = 0; miss = 0;
+            $("status").textContent = "Trained. Arrival rate " + (before ? (before.dockRate * 100).toFixed(0) : "0")
+                + "% → " + (d.after.dockRate * 100).toFixed(0) + "% — watch it brake early and stop on the mark.";
+            $("learned").textContent = "final: avg " + d.after.avgDist.toFixed(1) + " m from the goal, return "
+                + d.after.avgReturn.toFixed(1);
+            btn.disabled = false; worker.terminate();
+            setTimeout(() => { $("barf").style.width = "0%"; }, 900);
+            newEpisode();
+        }
+    };
+    worker.onerror = (err) => { $("status").textContent = "Training worker failed: " + err.message; btn.disabled = false; };
+    worker.postMessage({ cmd: "train", turret, iters: 200, seed: 3 });
+};
+
+// --- drawing --------------------------------------------------------------------------------------------------
+function draw() {
+    ctx.fillStyle = "#04060d"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.save();
+    ctx.translate(cvs.width / 2, cvs.height / 2);
+    const sc = Math.min(cvs.width, cvs.height) / 240;
+    ctx.scale(sc, sc);
+    ctx.translate(-env.x, -env.z);                       // camera follows the car
+
+    // ground contour, so the terrain the suspension is reading is visible
+    ctx.strokeStyle = "rgba(90,120,170,0.16)"; ctx.lineWidth = 0.25;
+    const g = 20;
+    for (let i = -6; i <= 6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(env.x + i * g, env.z - 6 * g); ctx.lineTo(env.x + i * g, env.z + 6 * g);
+        ctx.moveTo(env.x - 6 * g, env.z + i * g); ctx.lineTo(env.x + 6 * g, env.z + i * g);
+        ctx.stroke();
+    }
+    // goal ring
+    ctx.strokeStyle = "#f6a623"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(env.gx, env.gz, GOAL_R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    // trail
+    ctx.strokeStyle = "rgba(89,209,255,0.4)"; ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    for (let i = 0; i < trail.length; i++) { const p = trail[i]; if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); }
+    ctx.stroke();
+    // the car, drawn on the env's own axes so what is on screen is what the policy is steering
+    const ax = env._axes();
+    ctx.save(); ctx.translate(env.x, env.z);
+    ctx.transform(ax.fx, ax.fz, ax.rx, ax.rz, 0, 0);
+    ctx.fillStyle = env.rolled ? "#ff6b6b" : (trained && !useExpert ? "#5fe08a" : "#59d1ff");
+    ctx.fillRect(-2.6, -1.6, 5.2, 3.2);
+    ctx.fillStyle = "#04060d"; ctx.fillRect(1.4, -1.1, 1.0, 2.2);   // windscreen end, so heading reads
+    if (turret) { ctx.fillStyle = "#f6a623"; ctx.beginPath(); ctx.arc(0, 0, 1.15, 0, 7); ctx.fill(); }
+    ctx.restore();
+    ctx.restore();
+}
+
+function tick() {
+    const a = useExpert ? driveExpert(obs) : policy.act(obs);
+    const r = env.step(a);
+    obs = r.obs;
+    trail.push([env.x, env.z]); if (trail.length > 400) trail.shift();
+    $("spd").textContent = r.info.speed.toFixed(1);
+    $("slip").textContent = r.info.slip.toFixed(2);
+    $("gnd").textContent = Math.round(r.info.grounded * 4) + "/4";
+    if (r.done) {
+        if (r.info.arrived) arrivals++; else if (r.info.rolled) rolls++; else miss++;
+        $("arr").textContent = arrivals; $("rolls").textContent = rolls; $("miss").textContent = miss;
+        newEpisode();
+    }
+    draw();
+    requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

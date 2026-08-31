@@ -155,6 +155,46 @@ export function lateralLoadTransfer({ mass, lateralAccel, cogHeight, trackWidth,
 }
 
 /**
+ * The most lateral acceleration the tyres can actually deliver: mu * N / m.
+ * With N taken from the suspension, a vehicle with wheels in the air can deliver LESS -- which is the whole
+ * reason grip is load-dependent two functions up.
+ */
+export function maxLateralAccel(normalForce, mass, grip) {
+    if (!(mass > 0)) return 0;
+    return frictionLimit(normalForce, grip) / mass;
+}
+
+/**
+ * *** DOES THIS VEHICLE ROLL, OR SLIDE FIRST? IT IS A COMPARISON BETWEEN TWO ACCELERATIONS, AND IT IS THE
+ * ANSWER TO KEITH'S TURRET QUESTION. ***
+ *
+ * A vehicle can only tip if its tyres can generate MORE lateral acceleration than the tip threshold needs.
+ * Otherwise the tyres saturate first, it slides wide, and it never gets near rolling -- which is why an
+ * ordinary car understeers into a hedge instead of going over.
+ *
+ *     tyres can deliver   mu * g          (on a level surface, at full load)
+ *     tipping needs       g * track / (2h)
+ *     so it ROLLS when    mu > track / (2h)
+ *
+ * Note what drops out: g cancels. Rolling over is a question of GEOMETRY AND GRIP, not of weight or speed --
+ * a heavier turret does not tip a vehicle, a HIGHER one does, and better tyres make it worse rather than
+ * safer. MEASURED for this tree's default car: mu 1.6 against track/(2h) = 1.6/1.04 = 1.54, so it just barely
+ * rolls; add a 300 kg turret at 2.1 m and the CoG rises to 0.84 m, the ratio falls to 0.95, and it rolls
+ * easily.
+ *
+ * *** THIS FUNCTION EXISTS BECAUSE brain/rl/driveEnv.js's FIRST DRAFT GOT IT BACKWARDS. *** It set the yaw
+ * rate from steering geometry alone, so lateral acceleration was unbounded by grip and the car rolled 8 times
+ * in 24 episodes at speeds where a real one would simply have slid. A vehicle that rolls instead of sliding
+ * is not a harder driving task -- it is a different and wrong one, and a policy trained against it learns to
+ * fear corners rather than to take them.
+ */
+export function rollsBeforeSliding({ grip, trackWidth, cogHeight }) {
+    if (!(cogHeight > 0) || !(trackWidth > 0)) return { rolls: false, gripRatio: 0, tipRatio: Infinity };
+    const tipRatio = trackWidth / (2 * cogHeight);
+    return { rolls: grip > tipRatio, gripRatio: grip, tipRatio, margin: grip - tipRatio };
+}
+
+/**
  * The combined centre of gravity of a chassis plus its mounted hardpoints.
  * A turret is a mass at a position; this is the weighted mean, and it is what feeds cogHeight above.
  */
@@ -240,4 +280,5 @@ export function stepSuspension(wheels, hits, opts = {}) {
 export default {
     wheel, castLength, suspensionAt, suspensionZeta, criticalDamping, frictionLimit, tyreForces,
     lateralLoadTransfer, combinedCoG, staticLoads, differentialDrive, steerAngle, stepSuspension, dampingRatio,
+    maxLateralAccel, rollsBeforeSliding,
 };

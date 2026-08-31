@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 433,
+ "count": 434,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2143,6 +2143,13 @@
    "t": "Probe Lab - a released instrument on a timelike geodesic",
    "d": "",
    "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "proc-brush.html",
+   "t": "SweK Procedural Brush",
+   "d": "Brushes that draw relationships between the points already in a stroke, rather than stamping a dab at each one. Sketchy, fur, shaded and ribbon, over a bounded neighbour search.",
+   "g": "",
    "p": 0
   },
   {

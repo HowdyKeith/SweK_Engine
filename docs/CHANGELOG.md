@@ -8,6 +8,93 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4218 -- the GPU Brain learns to drive, and four ways to build a task that runs and is not the task
+
+Keith, on v4217: "and the GPU Brain could learn to drive. It may already be learning from it's interactions
+with BZFlag driving?" *** IT WAS NOT, AND THE REASON IS WORTH RECORDING. *** brain/bzTacticsPolicy.js learns
+TARGET SELECTION. Its features are [1, near, ahead, exposed, airborne] and its own header says what trains it:
+"the pilot died (the target it chose over the runner-up was the wrong one), or the target died (it was the
+right one)". Even `ahead` is the TARGET's bearing, not a steering command. Nothing in it has ever emitted a
+throttle. What DID exist was the machinery -- rocketEnv, dockEnv, bptt, imitation, sharedEncoder -- and nothing
+with wheels to point it at. v4217 built the wheels.
+
+So brain/rl/driveEnv.js is the environment, and it runs on physics/vehicle.mjs itself: one rigid body, wheels
+as rays, grip proportional to load, forces clamped to the friction circle. A driving env with its own private
+car physics would be teaching the brain to drive something that exists nowhere else in the tree. It presents
+the same drop-in interface as rocketEnv and dockEnv -- obsDim / actDim / maxSteps / reset / step -- so
+brain/rl/dockPolicy.js's trainDockES drives it UNCHANGED. That trainer already took an envFactory and an
+obsDim, which is the whole point of a shared interface and the reason no second trainer exists here.
+
+  obs (8, in the CAR's own frame): [ relForward, relRight, velForward, velRight, yawRate, slip, grounded, dist ]
+  act (2):                        [ steer, throttle ]   throttle > 0 drives, < 0 brakes
+
+*** THE RESULT, ON SEEDS THE TRAINER NEVER EVALUATED: 0 of 24 arrivals before, 24 of 24 after. *** The learned
+policy closes to 1.2 m from the goal where the hand driver stops at 5.2 m, and it was trained only against
+seeds 5000 + k*17 while every number above comes from 900000 + k*2237.
+
+*** FOUR DEFECTS, EVERY ONE OF WHICH PRODUCED A RUNNING ENVIRONMENT AND A SILENTLY DIFFERENT TASK. *** None
+threw. Each was found by measuring the environment rather than by reading it, and the gate now watches all four:
+
+  1. NaN IN THE FIRST OBSERVATION OF EVERY EPISODE. reset() built its obs from _slip and _grounded, which only
+     step() ever assigned. So reset() returned a Float32Array carrying two NaNs, the first act() spread them
+     through the whole MLP, and EVERY learned rollout returned NaN -- while the hand expert, which reads
+     neither slot, scored normally. The symptom pointed squarely at the trainer, and the trainer was fine.
+
+  2. *** THE CHASSIS HAD NO VERTICAL DEGREE OF FREEDOM, AND THIS ONE COST THE MOST. *** Wheel rays were cast
+     from a FIXED ride height, so the car could not follow the ground: wherever the terrain dipped, the
+     suspension simply extended and the load went with it. MEASURED, at rest on a 0.15 m dip: all four wheels
+     reporting contact and carrying 0 N of an 11,772 N car. frictionLimit is mu*N, so the limit was zero, every
+     tyre force clamped to nothing, and the car sat at full throttle with slip pinned at 1 for the whole
+     episode. That was 7 of 16 expert episodes -- and it read as a driving failure, not as a car that had never
+     been put down on the road. Even the episodes that worked were carried by 64% of the car's own weight.
+     ONE heave degree of freedom fixes it, integrated from the suspension forces the model already computes
+     (pitch and roll stay out; lateralLoadTransfer covers the shift that matters here). The hand driver went
+     from 5/16 to 16/16 arrivals on that change alone, and the three "reaches the goal but too fast to count"
+     episodes turned out to be the same defect: braking force was clamped by the collapsed load too.
+
+  3. TWO COPIES OF THE HEADING. The observation rotated by -heading while the integrator pushed velocity along
+     (cos h, -sin h) -- the same angle, opposite z. The policy saw a goal that was not where the car would
+     actually go if it drove at it, and it finished its episodes 393 m away, having driven steadily off. Every
+     individual formula was defensible. Both now read _axes(), and *** THIS ROUND'S OWN GATE THEN CAUGHT ME
+     WRITING A THIRD COPY *** in the wheel-position helper I added for (2), which put the TRACK offset along
+     the forward axis. The check that caught it is a count of how many times the file turns a heading into a
+     direction, and the answer has to be one.
+
+  4. THE TRAINER MEASURED A DIFFERENT TASK FROM THE ONE IT TRAINED. In brain/rl/dockPolicy.js, trainDockES
+     built its evaluation options without maxSteps, so every evaluation inside the loop fell back to
+     evaluate()'s default of 200 while the caller believed it had asked for 400. Episodes here need 157-267
+     steps to reach a goal and stop, so no episode could finish during training. THE TELL: the trainer's own
+     best.ev disagreed with a re-evaluation of the very same params on the very same seeds -- dockRate 0.21
+     against 1.0. Fixed by forwarding one field. No caller in this tree passes maxSteps, so dock and
+     dock-hazard are unchanged, and both were re-run and still pass.
+
+*** AND THE FIRST "IT BEATS THE HAND DRIVER" WAS AN ARTEFACT OF (4) THAT I NEARLY SHIPPED. *** With training
+capped at 200 steps, no policy could ever arrive, so dockRate was 0 for every candidate and elitism selected
+purely on LOWEST DISTANCE -- a dense, well-shaped signal -- and I was then reporting that policy's score at 400
+steps, where it looked like 16/16 and better-than-expert. Once training and reporting used one budget, the
+honest number was 5 of 32, and reaching 24/24 took 200 iterations rather than 120. A measurement that flatters
+the work is the one to re-run first.
+
+ROLLING IS A PROPERTY OF THE LOADOUT, NOT OF THE DRIVING. v4217's rollsBeforeSliding is mu > track/(2h) -- g
+cancels -- so the stock road car at grip 0.9 against a tip ratio of 1.538 slides wide, which is what a road car
+does. An earlier draft used physics/vehicle.mjs's default grip of 1.6, which is racing-slick: margin 0.06, and
+the car rolled 7 of 24 episodes under two completely different drivers, which is the tell that it was the CAR
+and not the driving. Bolt on 400 kg at 2.4 m and the SAME car with the SAME driver rolls 6 times in 16. The env
+asks the model that question once, at construction, rather than per step: an earlier version decided from the
+instantaneous suspension load, and a bump spikes that load enough to tip a car whose geometry forbids it.
+
+Page drive-brain.html, with drive-brain-worker.js training off the main thread so the car keeps driving while
+it learns -- toggle the roof turret and watch the same policy start rolling it. Gate
+tools/ship/driveEnv-selfcheck.mjs: 39 checks, four sabotages, each caught by the check written for it. The
+fifth sabotage found a weak check instead: the steering-sign test asked whether the goal's bearing had shrunk,
+and passed under the flipped sign too, because at full lock the car rotates past 90 degrees either way and the
+bearing changes sign whichever way it turned. It now measures where the car actually WENT (+1.67 m along its
+own right axis, and exactly -1.67 m sabotaged), which spinning cannot satisfy.
+
+Next: #88, VR part three -- xrInput.moveVector() has been gated since v4212 and nothing consumes it.
+#95, the painter, stays last as Keith asked.
+
+The build now stands at 1298 gates.
 ## v4217 -- the raycast vehicle: wheels as rays, and why a turret on the roof rolls a tank
 
 *** MEASURED BEFORE BUILDING: physics/ CONTAINED NO VEHICLE MODEL AT ALL. *** Zero matches for wheel,
