@@ -280,11 +280,19 @@ console.log("\n5. *** THE REAL PAGE, THROUGH THE TREE'S OWN RECORDER -- what the
             (main.draws / 6) + " render cycles of 6 draws. There are twelve render/*Pass*.js files and three " +
             "of them are shadow or G-buffer producers, two export only shader SOURCE, and one is a scene " +
             "raymarcher. The backlog item's 'twelve round trips' was never true.");
-        ok("!! *** AND FIVE OF THE SIX ALREADY USE THE FULLSCREEN TRIANGLE -- ONE IS STILL A QUAD ***",
-            main.tri > 0 && main.quad > 0 && main.tri === main.quad * 5,
-            main.tri + " draws of 3 vertices and " + main.quad + " of 6, exactly 5:1. postprocessing's second " +
-            "idea is already here for five sixths of the chain; the remaining quad pays for the fragments " +
-            "rasterised twice along its diagonal, and it is one draw call to find.");
+        // *** THIS CHECK CHANGED AT v4241, AND THE OLD NUMBER IS KEPT BECAUSE IT IS THE EVIDENCE. *** When
+        // v4236 measured this window it read 5 triangles to 1 quad and said the remaining quad was "one draw
+        // call to find". v4241 went and found it -- gpu/VoxelMemoryGPU.js, which turned out not to be a post
+        // pass at all but a GPGPU decay step -- converted it to an attributeless fullscreen triangle, and
+        // proved the conversion byte-identical over 16,384 pixels. So the assertion is now the OPPOSITE
+        // one: no six-vertex draw survives anywhere in the frame. Leaving the 5:1 assertion in place would
+        // have made this gate demand the defect it asked to have fixed.
+        ok("!! *** AND NOW ALL SIX USE THE FULLSCREEN TRIANGLE -- v4236 FOUND THE LAST QUAD, v4241 REMOVED IT ***",
+            main.tri > 0 && main.quad === 0 && main.tri === main.draws,
+            main.tri + " draws of 3 vertices and " + main.quad + " of 6, against 5:1 when v4236 measured the " +
+            "same window. The quad was gpu/VoxelMemoryGPU.js's decay step, reached by stack-trace attribution " +
+            "in v4241 because a program slot cannot be mapped back to a file; converting it removed the " +
+            "fragments rasterised twice along its diagonal and changed 0 of 16,384 output pixels.");
         ok("!! ...and the loop runs far more often than it draws, which is #60's question in one number",
             rafs > main.draws / 6 * 2,
             rafs + " rAF callbacks against " + (main.draws / 6) + " render cycles in the same 5 s -- " +

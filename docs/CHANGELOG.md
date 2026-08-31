@@ -8,6 +8,66 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4241 -- What the frame actually draws: v4236's census was wrong three ways, and the one real quad is gone
+
+*** #112 SAID "SIX POST DRAWS, ONE STILL A QUAD, AND IT IS ONE DRAW CALL TO FIND". THE QUAD WAS REAL AND
+EVERYTHING ELSE ABOUT THAT SENTENCE WAS WRONG. *** v4236 measured the chain on the real page and got three
+things wrong for one reason: its classifier counted any drawArrays of six vertices or fewer as
+"fullscreen-ish", and it had no way to say WHICH FILE was calling. A program slot cannot be mapped back to a
+source file -- glCapture interns objects, and its byte budget drops the shader sources that might otherwise
+identify a pass. What CAN name a file is the CALL STACK, so this round wraps drawArrays on the real page and
+reads it. Every draw is now attributed to a file and a line.
+
+WHAT THE DEFAULT FRAME ACTUALLY DRAWS, in a five-second steady window after six seconds of boot:
+
+    16 draws  bloomPass.js:719  <- main.js:30826
+    16 draws  bloomPass.js:729  <- main.js:30826
+    16 draws  bloomPass.js:736  <- main.js:30826
+    16 draws  bloomPass.js:750  <- main.js:30826
+    16 draws  bloomPass.js:818  <- main.js:30826
+    16 draws  VoxelMemoryGPU.js:245 <- main.js:29532
+
+*** THE FIVE "SEPARATE EFFECTS" ARE FIVE CALL SITES INSIDE ONE FILE. *** They are bloomPass's downsample and
+upsample ladder, called from one line of main.js -- and bloom is the single case effectMerge's own taxonomy
+classifies as OPAQUE and forbids merging, because it needs the full previous output as a texture at every
+level. *** SO effectMerge HAS NO CALLER BECAUSE NOTHING MERGEABLE IS RUNNING, NOT BECAUSE NOBODY WIRED IT. ***
+crtPass, cameraEffectsPass, swiftShaderPass, transitionPass and phosphorPass all exist, all have gates, and
+all draw nothing at boot; SSAO, whose two quad draws would otherwise have been candidates, reports
+enabled = false. They are opt-in, and the default scene enables none of them. That is a different problem
+from the one #112 described, and naming it correctly is worth more than the wiring would have been.
+
+*** AND THE SIXTH DRAW WAS NEVER IN THE POST CHAIN. *** It is gpu/VoxelMemoryGPU.js -- a GPGPU decay step over
+a square framebuffer with depth off. It WAS a genuine fullscreen quad, so the fix #112 asked for exists; it
+was simply somewhere else entirely. Converted to an attributeless fullscreen triangle built from
+gl_VertexID, and PROVEN BYTE-IDENTICAL: 0 of 16,384 pixels differ, both paths cover every pixel, one
+primitive where there were two. The vUV expression is unchanged, so the interpolated coordinate at every
+covered pixel is unchanged, which is why this is an equality and not a tolerance. The old quad vertex stage
+is kept and exported -- not dead code: the gate compiles both and compares them.
+
+FIVE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Shrinking the triangle to the viewport leaves
+8,256 of 16,384 pixels holding the sentinel; drifting its vUV by 0.01 breaks the byte-equality; putting the
+six-vertex draw back turns the census red. *** ONE STAYED GREEN AND IT IS THE SAME LESSON v4236 LEARNED,
+ARRIVING IN A DIFFERENT FILE: *** sabotaging the decay away -- c.r *= 1.0 -- left the quad-versus-triangle
+comparison perfectly green, because the fragment shader is COMMON TO BOTH SIDES and a change to it cancels.
+Anything shared by both halves of a comparison is invisible to it. In v4236 that was the vertex stage; here
+it is the fragment stage. The decay is now asked about directly: 6 -> 5, 215 -> 187, 108 -> 94 at a decay
+of 0.87.
+
+New: tools/ship/postChain-selfcheck.mjs (16 checks) and tools/ship/postChainHarness.html. Corrected in place:
+render/effectMerge.mjs's header, which carried the wrong census, and gpu/VoxelMemoryGPU.js, which now says
+who thought its quad was somewhere else. *** AND v4236'S OWN GATE WENT RED, WHICH IS THE FIX LANDING. *** It
+asserted 5 triangles to 1 quad on the real page; with the quad converted it reads 96 to 0 and failed. The
+assertion is inverted rather than deleted, keeping v4236's number as the evidence -- a gate left demanding
+the defect it asked to have fixed is worse than no gate at all.
+
+NOT done, and stated in the gate: what the chain looks like with the optional effects ENABLED. A frame with
+three swiftShader effects switched on is exactly the mergeable chain effectMerge was built for, and turning
+them on from a gate means driving the real UI -- a harness this round does not have. Also not done: whether
+the triangle is measurably FASTER. Nothing here times it. On a 128x128 target the saving is 128 duplicated
+fragments per pass, which is real, small, and free.
+
+The build now stands at 4241 gates.
+
 ## v4240 -- Multiple scattering: the series that keeps twilight alive, and the ratio that bounds it
 
 *** v4237's CLOSING NOTE MADE A PREDICTION AND THIS ROUND MEASURED IT BEFORE WRITING A LINE. *** It said

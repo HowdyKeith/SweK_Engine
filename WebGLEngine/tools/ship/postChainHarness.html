@@ -1,0 +1,113 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>postChain harness</title>
+<canvas id="c" width="128" height="128"></canvas>
+<script type="module">
+import { QUAD_VS, TRI_VS, DECAY_FS } from "/gpu/VoxelMemoryGPU.js";
+
+const N = 128;
+const gl = document.getElementById("c").getContext("webgl2", { antialias: false });
+
+function compile(vs, fs) {
+    const p = gl.createProgram();
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(t);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + "\n" + src);
+        gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+// the source the decay pass reads: a busy field, so a coordinate that is off by a texel shows up
+const src = new Uint8Array(N * N * 4);
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = (y * N + x) * 4;
+    src[i] = (x * 2 + y) % 256;                       // .r is the channel the decay touches
+    src[i + 1] = (x ^ y) & 255;
+    src[i + 2] = ((x + y) % 16) < 8 ? 240 : 20;
+    src[i + 3] = 255;
+}
+function makeTex(bytes) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes || null);
+    for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST);
+    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+    return t;
+}
+
+// the QUAD path, exactly as the module drew it before v4241: an attribute buffer of six vertices
+function quadVao() {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const vb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, 1, 1,
+        -1, -1, 1, 1, -1, 1,
+    ]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    return vao;
+}
+
+/**
+ * Run the decay once through each vertex stage, over the same input, into the same format, and compare.
+ *
+ * The sentinel clear is magenta with alpha 0 -- a value the fragment shader cannot produce, since it copies
+ * the source alpha of 255. So a pixel that still carries it was never covered, which is the question a
+ * comparison between two identically-broken paths could not answer.
+ */
+function run(vsSrc, verts, vao) {
+    const tex = makeTex(src);
+    const out = makeTex(null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out, 0);
+    gl.viewport(0, 0, N, N);
+    gl.clearColor(1, 0, 1, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const prog = compile(vsSrc, DECAY_FS);
+    gl.useProgram(prog);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(gl.getUniformLocation(prog, "uSrc"), 0);
+    gl.uniform1f(gl.getUniformLocation(prog, "uDecay"), 0.87);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLES, 0, verts);
+    gl.bindVertexArray(null);
+    const px = new Uint8Array(N * N * 4);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let untouched = 0;
+    for (let p = 0; p < N * N; p++) {
+        if (px[p * 4] === 255 && px[p * 4 + 1] === 0 && px[p * 4 + 2] === 255 && px[p * 4 + 3] === 0) untouched++;
+    }
+    return { px, untouched };
+}
+
+window.__compare = () => {
+    const q = run(QUAD_VS, 6, quadVao());
+    const t = run(TRI_VS, 3, gl.createVertexArray());     // attributeless: gl_VertexID builds the triangle
+    let diff = 0, finite = true;
+    for (let i = 0; i < N * N * 4; i++) {
+        if (q.px[i] !== t.px[i]) diff++;
+        if (!Number.isFinite(q.px[i]) || !Number.isFinite(t.px[i])) finite = false;
+    }
+    // *** AND THE FRAGMENT SHADER IS COMMON TO BOTH SIDES, SO A CHANGE TO IT CANCELS. *** Sabotaging the
+    // decay away -- c.r *= 1.0 -- left the comparison perfectly green, because both paths then failed to
+    // decay in exactly the same way. That is the same cancellation the fullscreen-triangle sabotage exposed
+    // in v4236, arriving a second time in a different file, so the decay is asked about DIRECTLY here.
+    const probe = [];
+    for (const px of [3, 1000, 9999]) {
+        probe.push({ before: src[px * 4], after: t.px[px * 4] });
+    }
+    return { diff, pixels: N * N, untouchedQuad: q.untouched, untouchedTri: t.untouched,
+             quadVerts: 6, triVerts: 3, finite, decay: 0.87, probe };
+};
+
+window.__ready = true;
+</script>

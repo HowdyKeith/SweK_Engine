@@ -22,6 +22,25 @@
 // one count-6 draw is a quad, paying for the duplicated fragments along its diagonal that the other five
 // avoid. That is a smaller finding than the backlog item expected and it is a real one.
 //
+// *** CORRECTED AT v4241, AND ALL THREE PARTS OF THAT PARAGRAPH ARE WRONG. *** The classifier above counted
+// any drawArrays of six vertices or fewer as "fullscreen-ish" and had no way to say WHICH FILE was calling --
+// a program slot cannot be mapped back to a source file, and glCapture's byte budget drops the shader sources
+// that might otherwise identify a pass. tools/ship/postChain-selfcheck.mjs wraps drawArrays on the real page
+// and reads the CALL STACK instead, which names a file and a line. What it finds:
+//
+//   * The five triangle draws are not five effects. They are FIVE CALL SITES INSIDE bloomPass.js -- one
+//     pass's downsample and upsample ladder, called from one place in main.js.
+//   * Which is the single case the taxonomy below FORBIDS merging: bloom is OPAQUE.
+//   * The sixth draw is gpu/VoxelMemoryGPU.js, a GPGPU decay step over a square framebuffer with depth off.
+//     It was never in the post chain. It WAS a real fullscreen quad, and v4241 converted it to a triangle
+//     and proved the result byte-identical.
+//   * crtPass, cameraEffectsPass, swiftShaderPass, transitionPass and phosphorPass draw NOTHING at boot,
+//     and SSAO is disabled. They are opt-in.
+//
+// *** SO effectMerge HAS NO CALLER BECAUSE NOTHING MERGEABLE IS RUNNING, NOT BECAUSE NOBODY WIRED IT. *** The
+// machinery is right and the default scene has nothing for it to bite on. That is a different problem from
+// the one the backlog item described, and naming it correctly is worth more than the wiring would have been.
+//
 // ---- THE TAXONOMY, WHICH IS THE WHOLE OF THE CORRECTNESS ARGUMENT ------------------------------------------
 //
 // An effect can be merged with its neighbours only if what it needs is a COLOUR. Three kinds:
