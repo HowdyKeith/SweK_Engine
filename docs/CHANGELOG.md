@@ -8,6 +8,64 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4251 -- rebar and bedding planes: the structures only a solid texture can show when sliced
+
+v4243 argued that a CSG cut face wants a solid texture rather than a triplanar projection, and measured it on
+a HOMOGENEOUS material -- concrete aggregate, statistically the same everywhere. A homogeneous material is
+still arguable on taste. This round takes the case that is not arguable, because it has a closed form.
+
+*** SLICE A CYLINDER AND THE SHAPE OF THE HOLE DEPENDS ON THE ANGLE. *** Square-on, the exposed end of a rod
+is a CIRCLE of the rod's radius. Obliquely it is an ELLIPSE, semi-minor still r and semi-major r / cos(phi).
+Along the rod it is a LENGTH of bar. The gate does not have to judge the picture; it predicts the number.
+
+render/rebar.mjs is new. A rebar cage is a distance-to-nearest-line field: a rod along X is a line at fixed
+(y, z), so the distance to the nearest one is a modulus per axis -- no rod list to walk, no extent to the
+cage, it fills space, which is what a solid texture has to do. BEDDING is the second material, parallel
+layers stacked along a normal, layer index being the signed distance divided by the thickness. The closed
+forms -- sectionSemiMajor, sectionSemiMinor, sectionEccentricity, apparentSpacing -- are exported from the
+module rather than written into the gate, so the prediction and the thing being graded are one statement.
+
+MEASURED, in tools/ship/rebar-selfcheck.mjs:
+
+- The section matches r / cos(phi) at 0, 30, 45, 60 and 70 degrees. Worst semi-major error 9.49e-5 m against
+  a sample spacing of 1.00e-4 m -- the whole discrepancy is the grid it was sampled on. Aspect ratios
+  measured against predicted: 0deg 1.000 vs 1.000, 30deg 1.151 vs 1.155, 45deg 1.418 vs 1.414, 60deg 2.004
+  vs 2.000, 70deg 2.933 vs 2.924.
+- *** THE CLAIM NO PROJECTION CAN MAKE: *** rebarAt takes no normal and no angle. Nothing about the material
+  changed between those five rows. What moved was the CUT PLANE, and the shape of the intersection followed.
+- THE CONTROL: the section's WIDTH is 0.01196 at 0 degrees and 0.01196 at 60 -- only its LENGTH grows. A
+  material that simply drew bigger blobs on steeper cuts would grow in both directions.
+- Rod spacing on the cut is pitch / sin(theta) to a worst error of 3.99e-3 m across four angles, and THE SAME
+  closed form predicts bedding stripes at 0.1245 m on a completely different material.
+- A rod crossing an edge is steel on both faces, 0 disagreements of 200, with the control that says the check
+  is not vacuous: 48 of those 200 edge points are steel.
+- A cut containing the rod's own axis is steel at all 2000 points, where a perpendicular cut showed a 24 mm
+  circle. Same field, same function, only the plane.
+
+*** THE GATE CAUGHT ITS OWN PREDICTOR. *** The first bedding check read 0.1245 against a predicted 0.0622 --
+exactly 2x, because the gate divided by two on the belief that band edges are half a layer apart. They are a
+full layer apart; band alternates every layer. A wrong predictor off by an exact integer factor is the
+predictor, not noise. A second check compared distances one pitch apart with ===, which fails at 1.19e-15 m
+on a cage that is perfect, because a modulus is float arithmetic; it now sweeps six offsets by up to twenty
+pitches each way and reports the worst, per the v4248 rule that one sample is not a bound.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical. Spheres
+instead of rods: 5 red. Constant steel everywhere: 5 red, including the section-4 control at 200 of 200
+while the continuity check itself stayed green, which is the point. Bedding bands that stop alternating:
+1 red. And half-rods -- Math.round to Math.floor, so the bar is a D in section -- ONLY 1 RED: aspect ratio
+survives because both axes halve together and spacing survives because the grid is unchanged, so absolute
+size caught it alone. The width control was reached by none of the four: rebarAt receives no normal, so no
+edit to the module can make width vary with cut angle, which makes that check load-bearing against a
+projection and a statement of the signature against this implementation.
+
+UNCHECKED, and named in the gate: none of this has met a REAL CUT. Every section is sampled on an analytic
+plane, not on geometry meshCSG produced, and there is no GLSL in the file at all. Also unchecked: whether a
+rod should STOP a blast. The field says where steel is; nothing consults it when cutting, so meshCSG will
+slice a bar in half, and a wall whose rebar does not resist is a picture of reinforcement rather than
+reinforcement.
+
+The build now stands at 4251 gates.
+
 ## v4250 -- A frame you cause, not a frame you wait for, and v4242's explanation of its own 89% was wrong
 
 *** THIS TREE HAS MEASURED requestAnimationFrame TWICE AND CORRECTLY REFUSED TO CONCLUDE ANYTHING BOTH
