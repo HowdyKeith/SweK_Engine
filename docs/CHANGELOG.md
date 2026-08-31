@@ -8,6 +8,68 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4240 -- Multiple scattering: the series that keeps twilight alive, and the ratio that bounds it
+
+*** v4237's CLOSING NOTE MADE A PREDICTION AND THIS ROUND MEASURED IT BEFORE WRITING A LINE. *** It said
+single scattering would read as a sky that goes black too fast at dusk. Baseline, at 0.5 km, zenith total:
+2.832e-2 with the sun at +40 degrees, 3.933e-3 at 0, 1.515e-3 at -2, 2.972e-4 at -4. An order of magnitude
+per two degrees once the sun is down. Real twilight does not do that.
+
+*** THE APPROXIMATION IS NAMED RATHER THAN IMPLIED: ORDERS TWO AND UP ARE TREATED AS ISOTROPIC. *** That is
+what lets a 2D table over (altitude, sun cosine) stand in for Bruneton's 4D one over (r, mu, muSun, nu) --
+32x128x32x8 is a million texels; this is 24x16 and builds on the CPU in 132 ms. It is least true of the
+SECOND order, the one with the most directionality left and the largest of those being lumped together, and
+nothing here measures that error because measuring it needs the 4D table this round exists to avoid.
+
+*** AND IT IS A GEOMETRIC SERIES, WHICH IS THE PART THAT CAN BE GRADED. *** If F is the fraction of uniform
+surrounding radiance that scatters back toward a point, the whole tail is L2/(1-F), which converges if and
+only if F < 1 -- and F < 1 is a physical fact the table must EXHIBIT rather than a condition the code
+assumes. Measured: worst F over the table is 0.2758. Each order falls by a factor of 5.5, and the running sum
+after 24 orders lands on the closed form to 1e-9, while the first order alone is only 82% of it. F is largest
+in blue (0.289 against 0.123 in red), so the added light comes out BLUER than the single-scattered light it
+is added to -- which falls out of betaR and was not asked for.
+
+*** THE GROUND TERM WAS 700x TOO SMALL AND THE ALBEDO KNOB IS WHAT SAID SO. *** For a DOWNWARD ray that meets
+the planet, distanceToTop() still returns a number -- where the LINE would leave the atmosphere going
+backwards THROUGH the planet -- and the first version used T(r, mu) there, a transmittance along a path no
+light takes. The symptom was a ground albedo that moved the sky by 0.07% across its entire range. The segment
+is recovered from the multiplicative property along the REVERSED, upward ray, where both ends are well
+defined: T(x -> ground) = T(ground -> top) / T(x -> top). After the fix, albedo 0 to 0.9 raises the sky by a
+factor of 5.09.
+
+*** THE PREDICTION, ANSWERED. *** The gain over single scattering GROWS as the sun goes down: 7.70x at +40
+degrees, 5.68x at 0, 10.87x at -4, 62.88x at -6. In daylight the single order dominates and the tail is a
+correction; after sunset the single order is nearly gone and the tail is the whole sky. The collapse is
+arrested: from sunset to -6 degrees, single scattering falls 222x and the total falls 20x.
+
+*** AND WHAT LIMITS THIS TABLE IS NOT ITS RESOLUTION, WHICH IS THE OPPOSITE OF v4237's. *** The first attempt
+to measure that graded three table sizes against a reference computed with the SAME 24 directions the tables
+used, so the "truth" carried its own sampling noise and the errors came out NON-MONOTONE -- 12.27%, 8.44%,
+14.80%, 7.11% as the table grew. #86 again, and harder than last time: a reference that is not converged
+measures the difference between two samplings of one wobble. Against a converged 512-direction reference, the
+picture is clear. Direction count converges monotonically: 1.98%, 0.76%, 0.46%, 0.35% at 12, 24, 48 and 96
+directions. Table resolution barely matters: 8x6 is 0.372% and 40x24 is 0.271%, so a twentyfold increase in
+texels buys a factor of 1.4. psi is SMOOTH in altitude and sun cosine and there is almost nothing for a finer
+grid to resolve -- where the transmittance LUT gained a factor of 15 over the same range, because it bends
+hard at the horizon. THE BUDGET FOR MULTIPLE SCATTERING BELONGS IN DIRECTIONS, NOT TEXELS.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED, EIGHT RED ON THE FIRST PASS. Dropping the
+uniform phase turns F into 3.47 and the series DIVERGES, which is 12 checks at once. *** THE NINTH WAS
+REMOVING THE PLANET'S SHADOW AND IT LEFT EVERYTHING GREEN: *** every other check measures a RATIO, and a
+glowing midnight only increases those. The terminator is now asked about directly -- psi is EXACTLY zero from
+the surface to 40 km past muSun -0.3. And the first version of THAT check said "at every altitude", which is
+false at 59 km, where 1.94e-5 survives because sunlit ground is visible over the horizon from up there. A
+check that demanded zero would have been demanding the model be wrong.
+
+The GLSL reads the table too, so sky.html is no longer a shader doing less than the model beside it: a
+multiple-scattering toggle, a ground-albedo slider, and the measured gain on screen. 24x16 table in 132 ms,
+sky drawn in 0.1-0.4 ms at 720x420 on swiftshader.
+
+New: the multiple-scattering half of render/atmosphere.mjs, tools/ship/atmosphereMulti-selfcheck.mjs (26
+checks). NOT done: the isotropic error itself, and aerial perspective.
+
+The build now stands at 4240 gates.
+
 ## v4239 -- Bend a streamed world, and the one rule that keeps the seams shut
 
 *** THE BACKLOG ITEM FOR THIS ROUND MADE TWO GUESSES AND THE SECOND ONE WAS WRONG, WHICH IS WORTH MORE THAN

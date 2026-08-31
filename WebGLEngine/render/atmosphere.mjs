@@ -280,6 +280,8 @@ export const ATMOSPHERE_GLSL = `
 uniform float uRg, uRt, uHr, uHm, uBetaMe, uBetaMs, uMieG;
 uniform vec3 uBetaR;
 uniform sampler2D uTransmittance;
+uniform sampler2D uMultiScatter;   // v4240: psi, over (sun cosine, altitude). Zero-filled = single only.
+uniform float uMultiOn;
 
 float atm_distanceToTop(float r, float mu) {
     float disc = r * r * (mu * mu - 1.0) + uRt * uRt;
@@ -303,6 +305,12 @@ vec2 atm_uvFromRMu(float r, float mu) {
 vec3 atm_transmittance(float r, float mu) {
     return texture(uTransmittance, atm_uvFromRMu(r, mu)).rgb;
 }
+vec3 atm_multiScatter(float r, float muSun) {
+    // the table's own parameterisation, and it is LINEAR in both axes: psi is smooth in altitude and sun
+    // cosine, which is why 8x6 measures within a factor of 1.4 of 40x24 and the budget belongs in rays.
+    vec2 uv = vec2(clamp((muSun + 1.0) * 0.5, 0.0, 1.0), clamp((r - uRg) / (uRt - uRg), 0.0, 1.0));
+    return texture(uMultiScatter, uv).rgb;
+}
 float atm_rayleighPhase(float c) { return (3.0 / (16.0 * 3.14159265358979)) * (1.0 + c * c); }
 float atm_miePhase(float c, float g) {
     float g2 = g * g;
@@ -315,7 +323,7 @@ vec3 atm_singleScattering(float r, float mu, float muSun, float nu, int steps) {
     if (!(d > 0.0)) return vec3(0.0);
     vec3 Teye = atm_transmittance(r, mu);
     float dx = d / float(steps);
-    vec3 accR = vec3(0.0); float accM = 0.0;
+    vec3 accR = vec3(0.0), accMS = vec3(0.0); float accM = 0.0;
     for (int i = 0; i <= steps; i++) {
         float t = float(i) * dx;
         float ri = sqrt(max(uRg * uRg, r * r + t * t + 2.0 * r * mu * t));
@@ -332,7 +340,222 @@ vec3 atm_singleScattering(float r, float mu, float muSun, float nu, int steps) {
             Tsample.b > 0.0 ? min(1.0, Teye.b / Tsample.b) : 0.0);
         accR += w * Tview * Tsun * dr;
         accM += w * Tview.g * Tsun.g * dm;
+        // *** THE MULTIPLE-SCATTERING SOURCE, ADDED ISOTROPICALLY -- which is the approximation the whole
+        // 2D table rests on, and is named in the module header rather than hidden in this loop. ***
+        if (uMultiOn > 0.5) {
+            vec3 ms = atm_multiScatter(ri, muSunI);
+            accMS += w * Tview * ms * (uBetaR * dr + vec3(uBetaMs * dm));
+        }
     }
     float pr = atm_rayleighPhase(nu), pm = atm_miePhase(nu, uMieG);
-    return accR * dx * uBetaR * pr + vec3(accM * dx * uBetaMs * pm);
+    return accR * dx * uBetaR * pr + vec3(accM * dx * uBetaMs * pm) + accMS * dx;
 }`;
+
+// ============================================================================================================
+// MULTIPLE SCATTERING (v4240) -- the orders v4237 shipped without, and the series that sums them
+// ============================================================================================================
+//
+// *** v4237's CLOSING NOTE SAID SINGLE SCATTERING WOULD READ AS A SKY THAT GOES BLACK TOO FAST AT DUSK, AND
+// THE BASELINE WAS MEASURED BEFORE ANY OF THIS WAS WRITTEN. *** At 0.5 km up, total radiance at the zenith:
+//
+//     sun +40 deg  2.832e-2      sun  0 deg  3.933e-3
+//     sun +10 deg  1.396e-2      sun -2 deg  1.515e-3
+//     sun  +5 deg  1.012e-2      sun -4 deg  2.972e-4
+//
+// An order of magnitude per two degrees once the sun is down. Real twilight does not do that, and what keeps
+// it alive is light that has scattered more than once.
+//
+// ---- THE APPROXIMATION, STATED RATHER THAN IMPLIED ----------------------------------------------------------
+//
+// Orders two and up are treated as ISOTROPIC -- phase 1/(4 pi) -- which is the shape Hillaire's technique uses
+// and is why a table over (altitude, sun cosine) suffices instead of Bruneton's full 4D (r, mu, muSun, nu).
+// That is a real approximation and not a detail: multiply-scattered light HAS lost most of its directionality,
+// but not all of it, so the second order is the least isotropic of the ones being lumped together and is the
+// one this treats worst.
+//
+// What it buys is tractability. Bruneton's 4D table at 32 x 128 x 32 x 8 is a million texels; this is 32 x 32
+// and builds on the CPU in a gate. The trade is stated here so the next reader knows which of the two they
+// have.
+//
+// ---- AND IT IS A GEOMETRIC SERIES, WHICH IS THE PART THAT CAN BE GRADED ---------------------------------------
+//
+// Light that scatters once more is the same problem again with a dimmer source. If F is the fraction of
+// uniform surrounding radiance that scatters back toward a point, and L2 is the light arriving there having
+// been scattered exactly once from the sun, then the whole tail is
+//
+//     L2 * (1 + F + F^2 + ...) = L2 / (1 - F)
+//
+// *** WHICH CONVERGES IF AND ONLY IF F < 1, AND F < 1 IS A PHYSICAL FACT THAT THE TABLE MUST EXHIBIT RATHER
+// THAN A CONDITION THE CODE ASSUMES. *** A single-scattering albedo below one means every bounce loses
+// energy; if F ever reached 1 the atmosphere would be a laser. The gate asserts it over the whole table, and
+// asserts that the partial sums actually walk to the closed form rather than merely being replaced by it.
+
+/** Deterministic near-uniform directions on the sphere. A Fibonacci spiral, so the table is reproducible. */
+export function sphereDirections(n) {
+    const out = [], ga = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++) {
+        const z = 1 - (2 * i + 1) / n;
+        const rho = Math.sqrt(Math.max(0, 1 - z * z));
+        const th = i * ga;
+        out.push([rho * Math.cos(th), rho * Math.sin(th), z]);
+    }
+    return out;
+}
+
+/**
+ * At one point in the atmosphere: how much once-scattered sunlight arrives (L2), and what fraction of a
+ * uniform surrounding radiance scatters back toward it (F).
+ *
+ * Both are integrals over the whole sphere of directions, marched outward. They share every step, which is
+ * why they are computed together: F is the same walk as L2 with the sun term removed.
+ *
+ * The GROUND term is what makes albedo matter. A direction that meets the planet picks up whatever the
+ * ground reflects, Lambertian over pi, and that is the only route by which the surface lights the sky.
+ */
+export function multiScatterAt(r, muSun, p = EARTH, { lut = null, dirs = 32, steps = 24, groundAlbedo = 0.3 } = {}) {
+    const T = lut ? (rr, mm) => lookupTransmittance(lut, rr, mm) : (rr, mm) => transmittance(rr, mm, p, 128);
+    const sun = [Math.sqrt(Math.max(0, 1 - muSun * muSun)), 0, muSun];   // zenith is +z
+    const dirsList = sphereDirections(dirs);
+    const L2 = [0, 0, 0], F = [0, 0, 0];
+    const pu = 1 / (4 * Math.PI);
+    for (const w of dirsList) {
+        const mu = w[2];
+        const nu = w[0] * sun[0] + w[1] * sun[1] + w[2] * sun[2];
+        const ground = hitsGround(r, mu, p);
+        const d = ground ? distanceToGround(r, mu, p) : distanceToTop(r, mu, p);
+        if (!(d > 0) || !isFinite(d)) continue;
+        const Teye = T(r, mu);
+        const dx = d / steps;
+        for (let i = 0; i <= steps; i++) {
+            const t = i * dx;
+            const ri = Math.sqrt(Math.max(p.Rg * p.Rg, r * r + t * t + 2 * r * mu * t));
+            const muI = clamp((r * mu + t) / ri, -1, 1);
+            const muSunI = clamp((r * muSun + t * nu) / ri, -1, 1);
+            const Tsample = T(ri, muI);
+            const wt = (i === 0 || i === steps) ? 0.5 : 1.0;
+            const dr = Math.exp(-(ri - p.Rg) / p.Hr), dm = Math.exp(-(ri - p.Rg) / p.Hm);
+            const shadowed = hitsGround(ri, muSunI, p);
+            const Tsun = shadowed ? [0, 0, 0] : T(ri, muSunI);
+            for (let c = 0; c < 3; c++) {
+                const Tv = Tsample[c] > 0 ? Math.min(1, Teye[c] / Tsample[c]) : 0;
+                const sigma = p.betaR[c] * dr + p.betaMs * dm;      // SCATTERING, not extinction
+                F[c] += wt * Tv * sigma * pu * dx;
+                L2[c] += wt * Tv * sigma * pu * Tsun[c] * dx;
+            }
+        }
+        // *** THE GROUND, AND THE TRANSMITTANCE TO IT IS NOT T(r, mu). *** For a DOWNWARD ray that meets the
+        // planet, distanceToTop() returns where the line would leave the atmosphere going backwards THROUGH
+        // the planet -- a path no light takes. The first version of this used it and the ground term came out
+        // 700 times too small, which showed up as a ground albedo that moved the sky by 0.07% across its whole
+        // range. The segment is recovered from the multiplicative property along the REVERSED ray, which
+        // points up and is therefore well defined at both ends:
+        //     T(x -> ground) = T(ground -> top) / T(x -> top), both taken in the UPWARD direction.
+        if (ground && groundAlbedo > 0) {
+            const rg = p.Rg;
+            const muG = clamp((r * mu + d) / rg, -1, 1);              // still descending at the surface
+            const muSunG = clamp((r * muSun + d * nu) / rg, -1, 1);
+            if (muSunG > 0) {
+                const TgTop = T(rg, -muG), TxTop = T(r, -mu), Tsun = T(rg, muSunG);
+                for (let c = 0; c < 3; c++) {
+                    const Txg = TxTop[c] > 0 ? Math.min(1, TgTop[c] / TxTop[c]) : 0;
+                    // Lambertian: albedo/pi times the cosine of the sun at the surface
+                    L2[c] += Txg * (groundAlbedo / Math.PI) * muSunG * Tsun[c];
+                }
+            }
+        }
+    }
+    const scale = 4 * Math.PI / dirsList.length;       // the sphere measure, from a mean over directions
+    return {
+        L2: L2.map((x) => x * scale),
+        F: F.map((x) => x * scale),
+        psi: L2.map((x, c) => (F[c] * scale < 1 ? x * scale / (1 - F[c] * scale) : Infinity)),
+    };
+}
+
+/**
+ * The partial sums, written out, so the closed form can be checked against the thing it replaces.
+ * order 2 is L2; order k is L2 * F^(k-2). Returns the per-order totals and the running sum.
+ */
+export function scatteringOrders(L2, F, n = 8) {
+    const orders = [], running = [];
+    let term = L2.slice(), sum = [0, 0, 0];
+    for (let k = 0; k < n; k++) {
+        orders.push(term.slice());
+        for (let c = 0; c < 3; c++) sum[c] += term[c];
+        running.push(sum.slice());
+        term = term.map((x, c) => x * F[c]);
+    }
+    return { orders, running };
+}
+
+/** The 2D table: rows are altitude, columns are the sun's cosine. Texel CENTRES, as the transmittance one is. */
+export function buildMultiScatterLUT(p = EARTH, { w = 32, h = 32, lut = null, dirs = 32, steps = 24,
+                                                  groundAlbedo = 0.3 } = {}) {
+    const T = lut || buildTransmittanceLUT(p, { w: 128, h: 32, steps: 256 });
+    const data = new Float32Array(w * h * 3);
+    let worstF = 0;
+    for (let j = 0; j < h; j++) {
+        const r = p.Rg + (p.Rt - p.Rg) * (j + 0.5) / h;
+        for (let i = 0; i < w; i++) {
+            const muSun = -1 + 2 * (i + 0.5) / w;
+            const m = multiScatterAt(r, muSun, p, { lut: T, dirs, steps, groundAlbedo });
+            const o = (j * w + i) * 3;
+            for (let c = 0; c < 3; c++) {
+                data[o + c] = Number.isFinite(m.psi[c]) ? m.psi[c] : 0;
+                if (m.F[c] > worstF) worstF = m.F[c];
+            }
+        }
+    }
+    return { w, h, data, p, worstF, groundAlbedo };
+}
+
+/** Bilinear read of the multiple-scattering table, clamped at the edges. */
+export function lookupMultiScatter(mlut, r, muSun) {
+    const p = mlut.p;
+    const u = clamp((muSun + 1) / 2, 0, 1);
+    const v = clamp((r - p.Rg) / (p.Rt - p.Rg), 0, 1);
+    const x = clamp(u * mlut.w - 0.5, 0, mlut.w - 1), y = clamp(v * mlut.h - 0.5, 0, mlut.h - 1);
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const x1 = Math.min(x0 + 1, mlut.w - 1), y1 = Math.min(y0 + 1, mlut.h - 1);
+    const fx = x - x0, fy = y - y0;
+    const at = (xi, yi, c) => mlut.data[(yi * mlut.w + xi) * 3 + c];
+    return [0, 1, 2].map((c) =>
+        (at(x0, y0, c) * (1 - fx) + at(x1, y0, c) * fx) * (1 - fy) +
+        (at(x0, y1, c) * (1 - fx) + at(x1, y1, c) * fx) * fy);
+}
+
+/**
+ * The eye integral again, with the multiple-scattering source added at every step.
+ *
+ * Single scattering keeps its real phase functions -- that is the order whose directionality still matters.
+ * The multiple-scattering table is added isotropically, which is the approximation this whole section rests
+ * on and which is named at the top.
+ */
+export function skyRadiance(r, mu, muSun, nu, p = EARTH,
+                            { lut = null, mlut = null, steps = 96, sunIrradiance = 1.0 } = {}) {
+    const single = singleScattering(r, mu, muSun, nu, p, { lut, steps, sunIrradiance });
+    if (!mlut) return single;
+    const T = lut ? (rr, mm) => lookupTransmittance(lut, rr, mm) : (rr, mm) => transmittance(rr, mm, p, 128);
+    const ground = hitsGround(r, mu, p);
+    const d = ground ? distanceToGround(r, mu, p) : distanceToTop(r, mu, p);
+    if (!(d > 0) || !isFinite(d)) return single;
+    const Teye = T(r, mu);
+    const dx = d / steps;
+    const acc = [0, 0, 0];
+    for (let i = 0; i <= steps; i++) {
+        const t = i * dx;
+        const ri = Math.sqrt(Math.max(p.Rg * p.Rg, r * r + t * t + 2 * r * mu * t));
+        const muI = clamp((r * mu + t) / ri, -1, 1);
+        const muSunI = clamp((r * muSun + t * nu) / ri, -1, 1);
+        const Tsample = T(ri, muI);
+        const ms = lookupMultiScatter(mlut, ri, muSunI);
+        const wt = (i === 0 || i === steps) ? 0.5 : 1.0;
+        const dr = Math.exp(-(ri - p.Rg) / p.Hr), dm = Math.exp(-(ri - p.Rg) / p.Hm);
+        for (let c = 0; c < 3; c++) {
+            const Tv = Tsample[c] > 0 ? Math.min(1, Teye[c] / Tsample[c]) : 0;
+            const sigma = p.betaR[c] * dr + p.betaMs * dm;
+            acc[c] += wt * Tv * sigma * ms[c] * dx;
+        }
+    }
+    return single.map((x, c) => x + sunIrradiance * acc[c]);
+}
