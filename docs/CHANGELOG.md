@@ -8,6 +8,70 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4225 -- a line with a width in pixels, and the API call that has always done nothing
+
+*** gl.lineWidth IS CLAMPED TO 1 ON EVERY DESKTOP DRIVER, AND THIS ROUND ASKS THE DRIVER RATHER THAN QUOTING
+THE SPEC. *** ALIASED_LINE_WIDTH_RANGE comes back [1, 1]. Painting the same horizontal line at
+gl.lineWidth(1), (8) and (20) gives 2, 2 and 2 rows of pixels. The call is not deprecated and raises no error
+-- the Core Profile simply permits an implementation to support only a width of 1, and every desktop driver
+takes that option. So it succeeds, reports nothing, and does nothing.
+
+Seven call sites in five files draw gl.LINES in this tree -- ev/galaxyMap.js twice, rig/RigSystem.js twice,
+demos/p3d/p3dDemo.js, render/entityDebugRenderer.js and render/voxelhighlight.js -- and every one of them is
+one pixel wide and cannot be anything else.
+
+New render/meshLine.mjs, from Makio64/makio-meshline (MIT, THREE.MeshLine's lineage). A line is not a line
+primitive: it is a TRIANGLE STRIP, and the sideways offset is applied in the VERTEX SHADER after projection,
+so the width is a number of PIXELS that does not change with distance. Measured the same way as the premise:
+
+    requested width      1     8    20
+    gl.LINES             2     2     2      rows of painted pixels
+    meshLine             2     8    20
+
+*** WHAT THE TREE ALREADY HAD, CHECKED, BECAUSE "NOTHING" WOULD HAVE BEEN WRONG. *** render/BeamRibbonRenderer.js
+is ONE billboarded quad from source to target with a world-space width. render/sweptSpine.js is a world-space
+TUBE along a spine. Both are useful and neither is this. A single quad has no JOINT, so it never meets the
+problem below; and a world-space width thins with distance, which is exactly what gl.lineWidth was supposed to
+avoid. There was no miter or bevel anywhere in the tree, and nothing measured a width in pixels.
+
+*** THE JOINT IS WHERE THE MATHS BITES, AND IT DIVERGES. *** The outer corner of a mitered joint sits
+1/cos(theta/2) half-widths from the path:
+
+    turn      0     90      120      150      170       179      180
+    miter   1.00   1.414   2.000    3.864   11.474   114.593   Infinity
+
+A right angle needs sqrt(2) and 120 degrees needs exactly 2, but a full reversal is INFINITE -- the famous
+spike. It is not an exotic input: a trail that doubles back, a resampled curve with a cusp, or any hand-drawn
+stroke with a sharp return produces it, which is why every renderer that draws wide lines has a miter limit.
+Capped at 4 here, on the CPU and in the shader, at the same number.
+
+A repeated point is a zero-length segment whose direction is 0/0, so consecutive duplicates are dropped. And
+the ENDS extrapolate their missing neighbour backwards along the first segment rather than copying themselves
+-- a copy would reintroduce exactly the same 0/0 at both ends of every line.
+
+*** TWO OF MY OWN CHECKS WERE TOO WEAK, AND SABOTAGE IS WHAT FOUND THEM. ***
+
+  * "No NaN reaches the buffers" does not test the dedupe at all. With duplicates kept the positions are
+    still perfectly finite -- the 0/0 would only appear in the shader, which has its own zero-length guard --
+    so removing dedupe left the whole file green. What actually changes is measurable on the CPU: the strip
+    carries vertices for points that are not there, and the arc length STALLS across them, so a dash pattern
+    stops advancing while the line keeps going. That is the property, so that is what is asserted now.
+  * A naive count said six files draw gl.LINES where the module header says seven places -- because the gate
+    was counting ITSELF, and because two files draw twice. It counts call sites now, and excludes itself, with
+    the reason written down.
+
+Page mesh-line.html draws the same path both ways with a width slider: measured headless, 8,501 painted pixels
+for the mesh line against 352 for the one-pixel version of the same path.
+
+Gate tools/ship/meshLine-selfcheck.mjs, six sabotages all red, with the premise and the proof both measured in
+a real GL context rather than asserted from a specification.
+
+NOT DONE, AND STATED RATHER THAN IMPLIED: no existing call site is converted. The seven draws are debug
+wireframes, a galaxy map and a rig overlay, and each carries its own question -- whether a thicker line reads
+better or merely bigger -- that a gate cannot answer. Round joins and caps are not implemented either; the
+miter is capped by falling back to the limit, which is a bevel in effect rather than by name.
+
+The build now stands at 1305 gates.
 ## v4224 -- solving x(t) = u where the slope will not help, and a first draft that was worse than what it replaced
 
 *** EASING IS AN INVERSE PROBLEM, AND THAT IS WHY IT HAS A FAILURE MODE AT ALL. *** A CSS timing function is a
