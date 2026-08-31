@@ -8,6 +8,85 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4247 -- Selecting by looking, and the one design number that decides whether a human can use it
+
+*** VR PARTS ONE, TWO AND THREE SHIPPED CONTROLLERS, STICK LOCOMOTION AND HAPTICS, AND EVERY ONE OF THOSE
+INPUT PATHS ASSUMES A CONTROLLER IN EACH HAND. *** There is no path at all for a headset with none, a
+controller that has died mid-session, or a phone in a holder -- which is the cheapest VR there is.
+
+Ramotion/vr-menu-demo's CODE is refused and none of it is here: no LICENSE file under any of the four common
+names on master, and a README that closes with an App Store advert rather than a grant. UNPAPERED, recorded
+at #106 beside ZachSaucier/Asset-Loading-Effects and kamend/ChuckClose-SparkAR. What is taken is the
+INTERACTION, which is a published idea and needs nobody's source: look at a target, a ring fills over a hold
+time, and the fill IS the commit.
+
+New ui/gazeDwell.mjs. A ray from the head matrix and a rectangle hit test are arithmetic. THE DWELL TIMER IS
+WHERE THIS SUCCEEDS OR FAILS.
+
+*** THE OBVIOUS IMPLEMENTATION IS UNUSABLE BY A HUMAN BEING, AND THE NUMBER SAYS SO. *** A dwell that RESETS
+to zero the moment the ray leaves its target cannot be completed on a small target, because a head does not
+hold still. Measured under 2 degrees of physiological tremor against a 1.43-degree target:
+
+    35.6% of frames land off the target
+    decaying timer   fires at 3.83 s
+    resetting timer  NEVER fires, in 20 seconds of continuous staring
+
+That is not a slow dwell. It is an impossible one, and it is what anybody writes first. On a large target
+(8.5 degrees, 1 degree of tremor) both fire at 1.19 s and there is nothing to choose between them -- a gate
+that only tested the easy size would have found no reason to prefer either.
+
+*** AND THE DECAY RATE IS NOT A FEEL KNOB: IT SETS, IN CLOSED FORM, EXACTLY HOW MUCH TREMOR SURVIVES. *** On
+target the timer gains dt; off it loses decay * dt. It can only ever complete while the net rate is positive:
+
+    (1 - p) > p * decay      <=>      p < 1 / (1 + decay)
+
+Checked against the simulation at four rates, by bisecting the off-fraction to find where a timer actually
+stops completing: predicted 66.7 / 50.0 / 33.3 / 25.0 percent against simulated 66.4 / 49.8 / 33.2 / 24.9,
+worst disagreement 0.28 points. Two independent routes to one number.
+
+*** THE FIRST DEFAULT THIS FILE SHIPPED WAS decay = 3.0, WHICH TOLERATES 25%. THE MEASURED TREMOR CASE IS
+35.6%. *** So the default made the small-target case impossible, and the gate is what found that -- not a
+review, and not taste. It is now 1.0, tolerating just under half the frames being off.
+
+The other failure is a separate knob and stays separate: a menu that fires whatever you looked past on the
+way somewhere else. That is rejected by hold versus crossing time and by nothing else -- a 3 rad/s sweep
+crosses a panel in 0.099 s against a 1.2 s hold, short by a factor of twelve -- so decay could be retuned
+freely without reopening it. Two failures, two independent knobs. The honest boundary is stated too: a sweep
+slow enough to stay on a panel for the full hold is not a glance, it is a dwell, and no setting separates
+those because they are the same event.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED -- AND TWO OF THEM EXPOSED DEFECTS IN THE GATE
+RATHER THAN IN THE MODULE.
+
+  * Reset-instead-of-decay first CRASHED the gate. Section 3 formatted its fire times with .toFixed()
+    directly, and with reset that time is null, so the gate threw a TypeError from inside a MESSAGE while
+    describing a check it had correctly computed as red. A GATE THAT DIES WHILE REPORTING A FAILURE HAS
+    FAILED THE SHIP AND TOLD NOBODY WHICH CHECK WENT. Fixed, and the sabotage now turns 2 checks red by name
+    -- including the formula check, which reads a simulated boundary of 1.1% against a predicted 25-67%,
+    because a reset timer has no tolerance at any decay rate and the formula stops describing it entirely.
+  * Dropping the `t > 0` test left its own check PERFECTLY GREEN. The panel it used sat behind the viewer
+    with its normal facing the viewer -- which the FACING test rejects before t is ever computed. The check
+    credited the wrong line for its own result. Isolating t > 0 needs a panel that is front-facing to the ray
+    AND behind it, which section 1 now uses, and the sabotage turns it red.
+  * Progress as a wall-clock animation turns 2 red, including "it goes DOWN when the gaze leaves" -- the
+    property that separates a readout of the decision from a picture of one.
+
+Also fixed in the module, found by a check that encoded the intent while the code did not: the COOLDOWN ran
+concurrently with the refill, so the repeat period came out as max(hold, cooldown) rather than hold +
+cooldown -- which makes the knob do nothing whenever cooldown <= hold, the case a caller is most likely to
+configure. A held gaze re-fired every 0.5 s at hold 0.5 and cooldown 0.5.
+
+New: ui/gazeDwell.mjs, tools/ship/gazeDwell-selfcheck.mjs (18 checks).
+
+NOT done, and stated in the gate: a real headset and a real head. The tremor model is two sinusoids per axis
+placed in the physiological band -- a plausible signal, NOT a measurement of anyone -- so 35.6% is a property
+of that model rather than of a person. What the model establishes is the SHAPE, that off-target frames are
+what decides this, and the closed form holds for any off-fraction however it arises. Also not done: anything
+that DRAWS the ring, since gazeDwell returns a progress number and no renderer consumes it; and any wiring
+into engine/xrSession.mjs, so nothing feeds it a real head pose yet.
+
+The build now stands at 4247 gates.
+
 ## v4246 -- The JS and the GLSL simplex were never the same function, and the mechanism v4243 blamed was the wrong one
 
 *** THIS TREE GRADES SHADERS BY COMPARING A JS MODEL AGAINST THE GPU PASS. FOR ANY SHADER BUILT ON SIMPLEX
