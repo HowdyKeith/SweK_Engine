@@ -8,6 +8,95 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4206 -- two gunnery brains, one ocean, and the round's headline is a negative result about its own centrepiece
+
+brain/navalPolicy.mjs scores every unknown cell with a weight vector, the same shape brain/csTacticsPolicy.js
+uses for "which enemy does the brain shoot first?". brain/navalDuel.mjs fights two of them across a board
+with the real shells of v4205. Deliberately not a second idiom: counter-strike asks which enemy to shoot
+first, this asks which water to shell next, and that is the same question with a different board.
+
+THE REASON TO BUILD IT ON BALLISTICS IS THAT DISPERSION IS REAL, RANGE-DEPENDENT, AND POINTS THE WRONG WAY.
+
+A gun's aiming error is angular. The ground error it produces is dR/dtheta = 2 v^2 cos(2 theta) / g, which is
+ZERO at 45 degrees -- and 45 degrees is maximum range. So a gun is MOST accurate at the edge of its envelope
+and LEAST accurate up close, which is the opposite of the intuition. MEASURED at v=100 in vacuum: 34.90 m per
+degree at 200 m, and 1.33 m per degree at 1019 m. A 26x gradient, favouring the long shot.
+
+Two more measurements fell out. Lob and flat scatter IDENTICALLY in vacuum, agreeing to 1e-12, because the
+two roots sit symmetrically about 45 degrees and the cosine does not care which side. Add drag and the
+symmetry breaks: at 100 m the lob scatters 14.36 m/deg against the flat shot's 26.96, so the lob is 47%
+tighter, and the advantage fades with range (ratio 0.533 at 100 m, 0.956 at 440 m).
+
+THEN THE ABLATION SAID THE PHYSICS FEATURE IS WORTH NOTHING.
+
+Switching each feature off and playing the full policy against the cripple, three 40-game blocks:
+
+    density   62.5 salvos   REAL
+    hunt      21.9 salvos   REAL
+    aim        0.3 salvos   within noise
+    parity     1.2 salvos   within noise
+
+The noise floor is 8.1 salvos, and it was measured FIRST by running the same policy against itself across
+four seed blocks. Without that number the aim and parity results read like small real effects, and they are
+not.
+
+So the two information-theoretic features carry the entire result and the physically-motivated one carries
+none of it. Knowing where the ship probably is beats knowing where the shell will certainly go. Worse than
+neutral, chasing accurate cells actively FIGHTS density: the accurate cells are the far ones, and on this
+board the far ones are the low-density back row. Parity is nothing for a different reason -- it is a cheap
+SUBSTITUTE for density, not a complement, so with density switched on it is noise at best.
+
+AND THE REASON THAT CONCLUSION IS TRUSTWORTHY IS THE RESULT I ALMOST SHIPPED INSTEAD.
+
+On a deliberately terrible gun (aimError 6), one 50-game block showed wAim=1.5 beating wAim=0 by 8.6 salvos.
+6.4%. That is exactly the kind of number that gets written up as "the ballistics pays off", and it is what
+anyone who ran the experiment once would have published. Across three blocks the mean is 0.8 against a floor
+of 4.6 at that block size. One block is not a measurement.
+
+handWeights() therefore carries wAim: 0 and wParity: 0. A hand policy holding a weight the evidence does not
+support is a lie with a number in it. untunedWeights() keeps the originals so the comparison stays re-runnable,
+and both features are still computed and exported, because the brain may find a use for them that a hand
+weight cannot.
+
+The policy is strong in absolute terms, which is what makes the negative result mean anything rather than
+being a story about a weak bot. With a perfect gun it clears a 10x10 board in 43.6 salvos -- a proper
+Battleship number, near the density-plus-hunt optimum -- and beats the blind policy 50/50. A loose gun costs
+it 69.7 salvos, so dispersion is expensive; it is just not STEERABLE.
+
+Duels are bit-identical from a seed. Both sides face the same fleet layout and the same scatter draws
+shot-for-shot, so a difference in outcome cannot be blamed on luck. The scatter is a RANGE error along the
+line of fire and not a circular blob, because an elevation error makes a shell fall short or long, never
+sideways -- gated by firing sixty scattered shells from a gun due north of its target and requiring every one
+of them to stay in the firing column.
+
+CALIBRATION WAS A REAL DESIGN DECISION AND THE FIRST GUN WAS ABSURD. At v=40 the board sits so deep inside
+the envelope that cos(2 theta) is near 1 everywhere and dispersion is flat across every cell -- 5.69 cells per
+degree at range 2 and 5.68 at range 13. The physics is present and completely inert. At v=12.5 the envelope
+is 15.9 cells against a board diagonal of about 14, so the far corner sits near the accuracy minimum and the
+gradient is real: 0.55 cells/deg near, 0.32 far.
+
+TWO OF MY OWN BUGS.
+
+The first arcOptions integrated six full trajectories per CANDIDATE CELL -- a hundred cells a salvo, hundreds
+of salvos a duel -- and a 60-game series did not finish in two minutes. The vacuum case has a two-line closed
+form that this module already had the ingredients for; it is exact and free, and it agrees with the
+integrated numbers to the digit. Simulation is kept for the drag case, where no closed form exists, memoised
+by range because a square grid asks about the same distances over and over.
+
+The second was in the gate. The scatter check used aimError 40, which threw 56 of 60 shells clean off the
+board, so it was measuring the out-of-bounds branch rather than the direction of the error, and it went red
+against correct code. A one-cell sigma is loose enough to scatter and tight enough to stay on the water.
+
+Wired as naval.duel(seed), naval.series(n) and naval.ablate(n) -- the last of which prints the noise floor
+first and marks each feature REAL or within noise, because that is the shape of the finding and a console
+that hid it would be repeating the mistake.
+
+Gate: tools/ship/navalDuel-selfcheck.mjs, 54 checks, all pass. Eight sabotages, all red: dropping the
+cos(2 theta) term so the accuracy minimum at 45 degrees disappears, making the scatter a circular blob,
+removing the hunt bonus for continuing a two-hit run, letting Math.random into the duel, restoring the
+unsupported wAim weight to the hand policy, letting density ignore misses, removing the reach gate from
+score(), and unwiring window.naval. All three touched files restored byte-identical.
+The build now stands at 1286 gates.
 ## v4205 -- shells that fall, and the three lines that had kept battleship3d.html black since it was written
 
 Keith said he had never seen his own naval demo render, and could not think why it was listed as a portfolio
