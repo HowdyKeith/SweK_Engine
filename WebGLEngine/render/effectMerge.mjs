@@ -28,18 +28,36 @@
 // that might otherwise identify a pass. tools/ship/postChain-selfcheck.mjs wraps drawArrays on the real page
 // and reads the CALL STACK instead, which names a file and a line. What it finds:
 //
-//   * The five triangle draws are not five effects. They are FIVE CALL SITES INSIDE bloomPass.js -- one
-//     pass's downsample and upsample ladder, called from one place in main.js.
+//   * The five triangle draws are not five effects. They are FIVE CALL SITES INSIDE bloomPass.js, called
+//     from one place in main.js.
 //   * Which is the single case the taxonomy below FORBIDS merging: bloom is OPAQUE.
 //   * The sixth draw is gpu/VoxelMemoryGPU.js, a GPGPU decay step over a square framebuffer with depth off.
 //     It was never in the post chain. It WAS a real fullscreen quad, and v4241 converted it to a triangle
 //     and proved the result byte-identical.
-//   * crtPass, cameraEffectsPass, swiftShaderPass, transitionPass and phosphorPass draw NOTHING at boot,
-//     and SSAO is disabled. They are opt-in.
 //
-// *** SO effectMerge HAS NO CALLER BECAUSE NOTHING MERGEABLE IS RUNNING, NOT BECAUSE NOBODY WIRED IT. *** The
-// machinery is right and the default scene has nothing for it to bite on. That is a different problem from
-// the one the backlog item described, and naming it correctly is worth more than the wiring would have been.
+// *** AND v4242 CORRECTED TWO THINGS THIS PARAGRAPH USED TO SAY, BOTH OF THEM MINE. ***
+//
+//   * IT CALLED THOSE FIVE SITES "one pass's downsample and upsample ladder". There is no ladder. Line 719
+//     is the brightness extract, 729 the horizontal blur, 736 the vertical blur, 750 is SSAO, 818 the
+//     composite -- a single half-res two-tap blur, plus a draw that is not part of bloom at all.
+//   * IT SAID "SSAO IS DISABLED" AT BOOT. SSAO has been on the whole time at strength 0.85. That sentence
+//     came from a gate check reading `!!window.ssao.enabled` -- a property window.ssao has never had -- so
+//     it read undefined, coerced to false, and PASSED. `!!obj.missingProp` and `!!obj.falseProp` are the
+//     same value, which is how a typo comes back looking like a measurement.
+//
+// The frame is therefore not "six draws": it is five with SSAO off, six at boot, seven with phosphor on, and
+// eight when the sun is high enough for god rays -- a draw gated on the time of day, which no toggle forces.
+//
+// *** SO effectMerge HAS NO CALLER FOR A DEEPER REASON THAN "NOTHING MERGEABLE IS RUNNING". THERE IS NO CHAIN
+// TO MERGE. *** Of the five opt-in passes named above, three cannot enter this frame at all: swiftShaderPass
+// builds its own canvas and its own GL context and never mounts it (a pass in another context is unmergeable
+// in principle, not in practice), while crtPass and cameraEffectsPass are not imported by main.js at all.
+// window.transitions is a factory -- check, describe, make -- and nothing mounts what make() returns. Only
+// phosphor adds a draw, and it is joined to bloom by a hand-written if/else at main.js:30807-30823.
+//
+// A merger needs a SEQUENCE to merge. This tree has two named passes wired by hand, and the sequence exists
+// nowhere as data. That is a different problem from the one the backlog item described, and naming it
+// correctly is worth more than the wiring would have been.
 //
 // ---- THE TAXONOMY, WHICH IS THE WHOLE OF THE CORRECTNESS ARGUMENT ------------------------------------------
 //

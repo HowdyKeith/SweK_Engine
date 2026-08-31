@@ -8,6 +8,83 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4242 -- The optional effects, switched on: three of them cannot be, and the gate had reported a property that does not exist
+
+*** #113 ASKED WHAT THE FRAME LOOKS LIKE WITH THE OPT-IN EFFECTS ENABLED. THE ANSWER IS THAT MOST OF THEM
+CANNOT BE ENABLED, AND THAT v4241's OWN GATE MANUFACTURED ONE OF THE FACTS v4241 REPORTED. ***
+
+v4241 closed by saying its census was the DEFAULT scene, that "a frame with three swiftShader effects
+switched on is exactly the mergeable chain effectMerge was built for", and that reaching it meant driving
+the real UI. This round went looking for that frame. It does not exist, and finding out why took the
+measurement from one configuration to six.
+
+FIRST, THE FALSE PASS, AND IT IS THE ONE WORTH KEEPING. v4241's gate asked `!!window.ssao.enabled` and
+asserted the answer was false. window.ssao has never had an `enabled` property -- its keys are off, on,
+setBias, setRadius, setStrength, status. `!!undefined` is false, so the assertion PASSED, and the gate
+reported "SSAO is disabled at boot" in a line that read like a measurement. SSAO has been running the whole
+time at strength 0.85.
+
+    A PROBE FOR A BOOLEAN MUST ESTABLISH THAT THE PROPERTY EXISTS BEFORE READING IT, because
+    !!obj.missingProp and !!obj.falseProp are the same value, so a typo comes back looking like a finding.
+
+SECOND, THE FIVE bloomPass DRAWS ARE NOT "one pass's downsample and upsample ladder", which is what v4241
+called them while holding correct per-line attribution. Reading the attributed lines: 719 is the brightness
+extract, 729 the horizontal blur, 736 the vertical blur, 750 is SSAO, 818 the composite. There is no ladder --
+one half-res two-tap blur, and a draw that is not part of bloom at all. Proven on the real page rather than
+by reading: window.ssao.off() removes line 750 and only line 750, six call sites becoming five, with the
+strength read back afterwards so a setter that silently did nothing could not pose as a result.
+
+THIRD, THE FRAME IS NOT SIX DRAWS. It is five with SSAO off, six at boot, seven with phosphor on, and eight
+when the sun is high enough for god rays -- a sixth bloomPass draw at line 771 whose SETTING is already on
+(_gfxSettings.godrays = true, godRayStrength = 0.7) and which is suppressed by sunVisibility, recomputed
+from the sun's screen position every frame. So that draw is gated on the TIME OF DAY and no toggle can force
+it; it is reported as a bound rather than asserted at a number. Both v4236 and v4241 reported a property of
+one configuration as a property of the engine.
+
+*** FOURTH AND LARGEST: THREE OF THE FIVE NAMED "OPTIONAL PASSES" CANNOT ENTER THIS FRAME AT ALL, FOR THREE
+DIFFERENT STRUCTURAL REASONS. *** swiftShaderPass builds its OWN canvas and takes its OWN GL context on it
+(swiftShaderPass.js:914, :917) and never mounts it in the document -- its header says so in as many words,
+"an OFF-SCREEN pass by design, not another link in the phosphor/bloom chain" -- and a pass living in another
+GL context is unmergeable in principle, not merely unwired. crtPass and cameraEffectsPass are not imported
+by main.js at all; they are reached only from other pages. window.transitions is a FACTORY -- its whole
+surface is check, describe, make -- and nothing anywhere mounts what make() returns. Phosphor is the one
+optional pass that adds a draw, and switching it on takes the frame from six sites to seven.
+
+*** WHICH LEAVES THE REAL REASON effectMerge HAS NO CALLER, ONE LEVEL BELOW WHERE v4241 LEFT IT. *** v4241
+said "nothing mergeable is running". The stronger statement the toggles support is that THERE IS NO CHAIN TO
+MERGE: no list of enabled effects, no chain object, no order. bloom and phosphor are joined by a hand-written
+if/else at main.js:30807-30823, and every other effect is in another context, on another page, or behind a
+factory with no mount. A merger needs a SEQUENCE, and the sequence does not exist as data anywhere here.
+
+FOUR SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Reproducing this round's own setup-string bug
+turns 2 checks red; forcing bloomPass's SSAO branch false turns 2 red; neutering window.phosphor.set turns 1
+red. *** AND ONE SABOTAGE PROVED A GUARD WAS DEFENSIVE RATHER THAN LOAD-BEARING: *** dropping the strength
+read-back from the assertion left exactly the same 2 checks red, because the site comparison catches a dead
+setter on its own. So the read-back is labelled DIAGNOSTIC and not counted -- what it adds is telling "the
+toggle never fired" apart from "the toggle fired and the draw did not move", which are the same red without
+it and need different fixes.
+
+THE BUG THIS ROUND SHIPPED AND THEN FOUND, because it is the same class as the false pass above:
+page.evaluate(string) EVALUATES the string, so a setup written as "() => window.ssao.off()" becomes a
+function object and is never called. All four toggles silently did nothing, every comparison returned "no
+change", and no change is exactly what a real negative result looks like. It was indistinguishable from a
+finding until the value was read back.
+
+And one new gate check banned the phrase "downsample and upsample ladder" -- which banned its own
+correction, since a header that refutes a sentence has to quote it. Same shape as the v4239 check that
+banned the word "Cesium" inside the paragraph explaining why Cesium was refused. What a correction looks
+like in text is the refutation being PRESENT, never the mistake being absent.
+
+Rewritten: tools/ship/postChain-selfcheck.mjs, now 23 checks measuring six configurations with a noise floor
+read first. Corrected in place: render/effectMerge.mjs's header, which carried both of v4241's wrong
+sentences.
+
+NOT done, and stated in the gate: the god-ray configuration, which needs the sun moved rather than a switch
+flipped; whether the fullscreen triangle is measurably faster, which nothing times; and what a real chain
+would cost, because building one is a change to main.js rather than a measurement of it.
+
+The build now stands at 4242 gates.
+
 ## v4241 -- What the frame actually draws: v4236's census was wrong three ways, and the one real quad is gone
 
 *** #112 SAID "SIX POST DRAWS, ONE STILL A QUAD, AND IT IS ONE DRAW CALL TO FIND". THE QUAD WAS REAL AND
