@@ -8,6 +8,67 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4236 -- One draw instead of three, the arrangement that must be refused, and a chain that CLIPS
+
+*** THE BACKLOG ITEM SAID "TWELVE PASSES, TWELVE ROUND TRIPS" AND IT WAS FILED WITH A WARNING NOT TO BELIEVE
+IT, WHICH TURNED OUT TO BE THE RIGHT INSTINCT. *** Measured on the real page rather than counted from
+filenames: index.html booted headless with a capture injected ahead of main.js, six seconds to let program
+compilation finish, then a five-second steady-state window. The chain is SIX fullscreen draws per render
+cycle, not twelve. Of the twelve render/*Pass*.js files, three are shadow or G-buffer producers, two export
+only shader SOURCE, and one is a scene raymarcher.
+
+*** AND FIVE OF THE SIX ALREADY USE THE FULLSCREEN TRIANGLE. *** 90 draws of 3 vertices against 18 of 6 in
+the window, exactly 5:1. postprocessing's second idea is already here for five sixths of the chain; the
+remaining quad pays for the fragments rasterised twice along its diagonal, and it is one draw call to find.
+Also measured: 288 framebuffer binds for 108 draws (2.7 per draw), bindTexture repeated with identical
+arguments five times running, and 161 rAF callbacks against 18 render cycles -- recorded as a measurement and
+NOT read as a verdict, because this is swiftshader and a slow render cycle gives other rAF consumers many
+turns in between.
+
+*** THIS IS glCapture.mjs's FIRST REAL CONSUMER, AND THE POINT IT WAS BUILT FOR. *** v4227 shipped it saying
+that all five existing recording gates BUILD THEIR OWN CONTEXT and not one of them observes a PAGE. Nothing
+had observed a page since. The injection is a module script in <head>, because module scripts execute in
+document order and so patch getContext before main.js runs, which a deferred dynamic import could not promise.
+
+*** THE MACHINERY: render/effectMerge.mjs, AND THE WHOLE CORRECTNESS ARGUMENT IS ONE TAXONOMY. *** An effect
+is mergeable only if what it needs is a COLOUR. A COLOUR effect reads the incoming vec4 and merges anywhere.
+A SAMPLING effect reads the source texture at a uv it computes -- badTvPass's fract(p.x + offset) is one --
+and may LEAD a run and never join one, because after merging there is no texture holding the previous
+effect's output to sample: there is a vec4 in a register. An OPAQUE effect needs the full previous output and
+is never merged. The kind is DERIVED FROM THE BODY rather than declared, because a caller who mislabels a
+sampling effect gets a wrong picture and no error -- and the body is stripped of comments first, which is the
+commentFalsePass shape this tree has caught in three other gates.
+
+*** THE REFUSAL IS WORTH 65 LEVELS OF 255, MEASURED RATHER THAN ARGUED. *** Forcing a sampling effect into
+second place compiles and runs: the second sampler reads the ORIGINAL image at its offset instead of the
+first effect's output. On a real WebGL2 context that is 65 levels at 96.4% of pixels.
+
+*** AND THE THING I EXPECTED TO BE ROUNDING IS CLIPPING, WORTH SIXTY-FIVE OF ITS SIXTY-SIX LEVELS. *** I
+bounded "merged against an 8-bit chain" at 4 levels, expecting quantisation. It measured 66. An RGBA8
+intermediate does not merely round -- it CLAMPS. The chain is tear, then exposure 1.35, then a vignette that
+scales back down; in float the overshoot above 1.0 survives the exposure and the vignette brings it home,
+while through an 8-bit buffer the overshoot is gone and nothing downstream can recover it. THE CONTROL IS
+WHAT MAKES THAT A FACT: the same chain at exposure 0.8, where nothing exceeds 1.0, closes the gap from 66
+levels to 1. So the eight bits are worth a level and the clamp is worth the other sixty-five -- which means
+the reason to merge is not only the draw call. Against a FLOAT chain the merge agrees to 1 level of 255.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Eight red. *** TWO OF THEM WERE ABOUT THE GATE
+AND NOT THE CODE. *** Shrinking the fullscreen triangle to half the screen left the gate ALL GREEN, because
+the vertex stage is COMMON to both sides of every comparison, so the merged and chained paths agreed
+perfectly about the same wrong half; coverage is now asked directly against a magenta sentinel and the
+sabotage leaves exactly 1536 of 3072 pixels. And removing the uniform prefixing CRASHED the gate with a stack
+trace naming nothing, so section 4's probes are wrapped and a compile error is a named red check. One
+sabotage stays green and is LABELLED DEFENSIVE rather than counted: reversing the uniform rename order
+changes nothing, because the rewrite regex is anchored on both sides -- and the module comment originally
+claimed that sort was load-bearing.
+
+New: render/effectMerge.mjs, tools/ship/effectMerge-selfcheck.mjs (26 checks),
+tools/ship/effectMergeHarness.html. NOT done, and the closing note says so: the tree's own six passes are not
+rewritten to use any of this. The machinery exists and the chain is measured; claiming the saving has been
+taken would be claiming a saving nobody has taken.
+
+The build now stands at 4236 gates.
+
 ## v4235 -- Destructible environments: an exact hole in a wall, and what "gap-free" turns out to mean
 
 *** THE REQUEST WAS "SUBTRACT A JAGGED EXPLOSION SHAPE FROM A CONCRETE WALL IN REAL TIME TO CREATE REALISTIC,
