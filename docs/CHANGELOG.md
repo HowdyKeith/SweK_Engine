@@ -8,6 +8,74 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4254 -- the staircase has a closed form, and pulling it straight is a net loss in tight geometry
+
+worker/botPathfinder.worker.js has been this tree's navigation since round 216 -- a real A* over a heightmap
+snapshot, run off-thread by simulation/BotPathfinderPool.js so dozens of bots can plan without stalling the
+frame. NOTHING HAS EVER GATED IT. tools/ship carries requestPathSync-selfcheck and winPathGuard-selfcheck and
+neither is about paths through a world. Grepped for navmesh, funnel and portal before starting: no hits.
+
+This gate drives the REAL worker -- shimming `self` and calling its own onmessage -- rather than a
+reimplementation, so every number is the shipped code's.
+
+*** THE CLOSED FORM. *** The solver is 8-connected, so every step is a multiple of 45 degrees and the path
+length to a goal at angle t is (dx - dz) + sqrt(2)*dz. As a multiple of the straight line that is
+cos(t) + (sqrt(2)-1)*sin(t), which is a*cos + b*sin and therefore peaks at sqrt(a^2+b^2) outright:
+
+    sqrt(4 - 2*sqrt(2)) = 1.0823922, at t = arctan(sqrt(2)-1) = 22.5 degrees
+
+Measured across nine directions, the shipped A* matches that to 8.88e-16, with a peak of 1.082392 at exactly
+22.5 degrees. The control is in the same sweep: 0 and 45 degrees measure EXACTLY 1.000000, because those are
+the two directions eight neighbours CAN express -- so the 8.24% is the grid, not the implementation.
+
+New nav/funnel.mjs adds the string-pulling. Three findings, and the third reverses the round.
+
+1. *** A FUNNEL OVER A GRID PATH IS PROVABLY USELESS UNTIL A DIAGONAL IS EXPANDED. *** Two cells joined
+   diagonally share exactly one CORNER, so the portal between them has width 0.00 -- measured -- and a
+   zero-width portal pins the path to a point. The taut path through such a corridor IS the staircase.
+   Routing each diagonal through an orthogonal neighbour restores a minimum portal width of 4.00, and only
+   then is there anything to pull against.
+
+2. On open ground it recovers 38-66% of the octile excess, with corner counts falling from ~50 to 4-9 and 0
+   portals missed. It does NOT recover 100%, and that is correct: the funnel returns the shortest path
+   THROUGH THE CORRIDOR, and the corridor is a staircase band. The rest needs a navmesh.
+
+3. *** ON A WALL WITH ONE GAP THE ANSWER REVERSES. *** The staircase never enters a wall: 0 of 724 samples.
+   The funnelled path through the SAME corridor enters one at 18 of 616, while being shorter (302.20 against
+   318.39 m). Neither the solver nor the corridor builder is wrong -- A* TESTS ONLY A CELL'S CENTRE, so all
+   it ever promises is that its centre-line is walkable, and the corridor of full cells around it is not
+   guaranteed clear because the heightmap is finer than the grid. Walking centre to centre kept the staircase
+   off the edges by luck of construction; pulling the string taut cashes that luck in. Insetting the portals
+   by an agent radius buys it back, and the path is first clear of the wall at r=1.9 -- at 319.59 m, LONGER
+   than the staircase's 318.39. The whole saving was the safety margin.
+
+So the verdict for this tree is split rather than favourable: string-pulling is a real gain on open ground
+and a net loss in tight geometry. A round that had measured only the open floor would have reported a flat
+improvement and shipped characters that clip walls near doorways.
+
+*** TWO SEPARATE TIMES A LENGTH TEST RATED A BROKEN FUNNEL ABOVE THE WORKING ONE. *** My first draft returned
+the straight line -- ratio 1.000000, a perfect score, while missing 46 of 49 portals. And the sabotage that
+inverts the portal orientation reports 1.0584 -> 1.0000, a PERFECT 100% of the excess recovered, better than
+the correct code's 63%, while missing 63 portals. Both score perfectly by leaving the corridor. Only
+membership in the corridor tells a perfect result from a useless one.
+
+A third bug the open floor could not have found: the left/right orientation was inverted in the first draft
+and a STRAIGHT corridor returns the same two points under both orientations -- a taut path with no corner has
+no corner to put on the wrong side. Only an L-shaped corridor separates them, 3 points against 5. A test that
+passes under both hypotheses distinguishes nothing, which is v4236's vertex stage and v4243's constant
+texture in a fifth shape.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(ec91ff67ebc0cbe617316ca107ce8fc2). The cheat: 3 red. No diagonal expansion: 2 red. Inverted orientation:
+2 red. insetPortals returning its input: 1 red.
+
+UNCHECKED, and named in the gate: a NAVMESH -- everything here pulls a string through grid cells, which is
+why it recovers only part of the excess and why an inset is needed at all. Also unchecked: whether any of
+this is WIRED. BotPathfinderPool still receives the staircase and nothing calls nav/funnel.mjs, so no bot
+walks a shorter path today -- and given finding 3, wiring it without an inset would be a regression.
+
+The build now stands at 4254 gates.
+
 ## v4253 -- name a point and solve for the rotations: the tree had no IK of any kind
 
 v4244 built anim/retarget.mjs, so a clip can drive a skeleton it was not authored for. v4245 built
