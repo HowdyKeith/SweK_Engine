@@ -8,6 +8,70 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4252 -- #60's wall was not a wall, and the pixel test that found it almost told me the opposite
+
+v4232 measured 0.0% of frames skippable in four scenarios and named the last holder: "domAnimation -- a CSS
+animation in the page chrome". It reported that as a wall rather than a verdict, correctly, because a
+four-second window cannot separate "does not move" from "moves too slowly to see". v4250 built a
+requestAnimationFrame whose frame count is chosen rather than suffered. This round spends it.
+
+*** AND THE FIRST INSTRUMENT ALMOST GAVE ME THE OPPOSITE OF THE TRUTH. *** A screenshot-tile diff over the
+real index.html reported ZERO scene tiles changed at 120 frames and ZERO at 1200. The obvious reading --
+"the 3D picture is still for twenty seconds of engine time" -- is WRONG, and I had already said it out loud
+before checking. Reading window.dayNight.t directly instead of its pixels:
+
+    over   120 frames    t 0.540000 -> 0.546667    delta 6.667e-3
+    over  1200 frames    t 0.546667 -> 0.613333    delta 6.667e-2
+    over  6000 frames    t 0.613333 -> 0.946667    delta 3.333e-1     afternoon -> evening
+
+That is 5.5556e-5 per frame at all three counts: EXACTLY 1/18000 of a cycle, the same number every time. THE
+SUN MOVES ON EVERY FRAME. What the pixel test found is that 1/15th of a day of sun motion is still under one
+8-bit step in the tiles it sampled. A change below the display's quantisation is still a change, because it
+ACCUMULATES -- skipping those frames defers the redraw rather than saving it. So a pixel diff cannot license
+a skip, and dayNightCycle's ANIMATES verdict from the v4183 census stands.
+
+THE CONTROL, which is what stops the round being a story: paused, t moves 0.000e+0 over 6000 frames. Exactly
+zero, not merely small. So "demo stopped, day/night paused" is a genuinely static scene, and it is there that
+the interesting thing happens.
+
+*** IN THAT STATIC SCENE THE FLAG IS STILL DIRTY EVERY FRAME, HELD BY 14 RUNNING ANIMATIONS, 10 OF THEM
+ENDLESS: *** an SVG mascot (swekBob, swekDomeHalo, swekDomeCore, swekAntTip, swekBlink), a watermark fade,
+and four background-colour transitions. Not one of them is in the picture.
+
+*** THE TWO CLOCKS ARE INDEPENDENT, AND IT IS MEASURED AS A NUMBER RATHER THAN AS PIXELS: *** a CSS
+animation's currentTime advanced 999.96 ms across 1001 ms of WALL CLOCK while the engine stepped ZERO frames.
+CSS animations are driven by the compositor's own timeline; replacing requestAnimationFrame does not replace
+it. The engine cannot advance that mascot by drawing and cannot stop it by skipping -- so the frame being
+held open would not produce the movement it is being held open FOR. document.getAnimations() answers "is the
+document moving"; the flag needs "is the render stale", and those are different questions.
+
+New engine/domScope.mjs is the rule that separates them. Each animation classifies as CHROME (the compositor
+draws it), SAMPLED (inside a subtree someone rasterises into a texture), GEOMETRY (can change the canvas's
+box) or UNKNOWN -- and every uncertainty resolves towards drawing, because narrowing a probe is the one
+change that can freeze a screen. One SAMPLED animation in a list of a hundred CHROME ones still means draw.
+The asymmetry that is the whole design: a LAYOUT property on an ancestor of the canvas is GEOMETRY, while a
+TRANSFORM on that same ancestor is CHROME -- same element, same ancestry, only the property differs, because
+transforming an ancestor composites pixels the last draw already produced.
+
+It carries a registry for the one real DOM-to-scene path this tree has: v4120's ui/domToTexture.js really
+does put a live subtree into a texture and fallout.html really uses it. The registry starts EMPTY and the
+gate asserts that rather than assuming it, because an unregistered rasteriser is a frozen CRT screen.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(911757a6f8e8583962f8e6ab496951bb). Deleting the fail-safe branch: 1 red. Ignoring inSampledRoot: 2 red --
+and every live check stayed green, because index.html has no sampled subtree at all, which is why the pure
+model section exists. A majority vote instead of "any": 1 red. Adding transform to the layout list: 1 red.
+*** I WROTE "2 RED" FOR THE FIRST ONE BEFORE RUNNING IT AND THE SABOTAGE SAID 1: *** the second fail-safe
+check is caught by a different branch, so two checks that read as one guard turned out to be two guards.
+
+NOT DONE, and stated in the gate: the probe's vote is UNCHANGED and engine/frameDirty.js still ships
+DISABLED. This round measures the holder and builds the rule; it does not turn anything on, and it claims no
+saving. The saving is a number for the round that enables the flag, and that round needs the other seventeen
+sources to be as honest as dayNight turned out to be. Also unchecked: fallout.html, where domToTexture
+registers no subtree yet, so the rule would answer CHROME for something that is not.
+
+The build now stands at 4252 gates.
+
 ## v4251 -- rebar and bedding planes: the structures only a solid texture can show when sliced
 
 v4243 argued that a CSG cut face wants a solid texture rather than a triplanar projection, and measured it on
