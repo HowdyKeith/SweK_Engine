@@ -23,8 +23,13 @@
 // "compressed" voxels with quantization artifacts. They directly index
 // the original DICOM voxel grid.
 
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
 export const MTO_MAGIC = 0x214F544D;   // "MTO!" LE
-export const MTO_HEADER_BYTES = 8;
+export const MTO_MAGIC_V = versionedMagic(MTO_MAGIC);   // "MTO2" -- carries a version field
+export const MTO_VERSION = 1;          // IN THE FILE now, not only in the comment at the top of this one
+export const MTO_LEGACY_HEADER_BYTES = 8;    // magic + sample count, as written before there was a version
+export const MTO_HEADER_BYTES = VERSIONED_HEADER_BYTES + 4;   // magic + version + sample count
 export const MTO_SAMPLE_BYTES = 22;
 
 /**
@@ -49,8 +54,8 @@ export function encodeMTO(mto) {
     const total = MTO_HEADER_BYTES + count * MTO_SAMPLE_BYTES;
     const buf = new ArrayBuffer(total);
     const dv  = new DataView(buf);
-    dv.setUint32(0, MTO_MAGIC, true);
-    dv.setUint32(4, count,     true);
+    const hdr = writeVersionedHeader(dv, MTO_MAGIC, MTO_VERSION);
+    dv.setUint32(hdr, count, true);
     let off = MTO_HEADER_BYTES;
     for (let i = 0; i < count; i++) {
         dv.setInt16(off + 0,  coords[i*3],     true);
@@ -69,16 +74,18 @@ export function encodeMTO(mto) {
 }
 
 export function decodeMTO(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < MTO_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeMTO: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== MTO_MAGIC) {
-        throw new Error(`decodeMTO: magic mismatch (got 0x${magic.toString(16)}, expected 0x${MTO_MAGIC.toString(16)} = "MTO!")`);
-    }
-    const count = dv.getUint32(4, true);
-    const expected = MTO_HEADER_BYTES + count * MTO_SAMPLE_BYTES;
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeMTO", legacyMagic: MTO_MAGIC, current: MTO_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 4;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeMTO: truncated header (${buf.byteLength}B)`);
+    const count = dv.getUint32(bodyOffset, true);
+    const expected = headerBytes + count * MTO_SAMPLE_BYTES;
     if (buf.byteLength < expected) {
         throw new Error(`decodeMTO: truncated (have ${buf.byteLength}B, expected ${expected}B for ${count} samples)`);
     }
@@ -86,7 +93,7 @@ export function decodeMTO(buf) {
     const normals   = new Float32Array(count * 3);
     const intensity = new Uint8Array(count);
     const classes   = new Uint8Array(count);
-    let off = MTO_HEADER_BYTES;
+    let off = headerBytes;
     for (let i = 0; i < count; i++) {
         coords[i*3]     = dv.getInt16(off + 0, true);
         coords[i*3 + 1] = dv.getInt16(off + 2, true);
@@ -98,5 +105,5 @@ export function decodeMTO(buf) {
         classes[i]   = dv.getUint8(off + 19);
         off += MTO_SAMPLE_BYTES;
     }
-    return { count, coords, normals, intensity, classes };
+    return { count, coords, normals, intensity, classes, version };
 }

@@ -26,8 +26,13 @@
 // Total per-node = 22 bytes. A typical 32K-voxel asset = 720 KB raw,
 // no extra compression needed for transport.
 
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
 export const OVM_MAGIC = 0x214D564F;   // "OVM!" little-endian
-export const OVM_HEADER_BYTES = 8;
+export const OVM_MAGIC_V = versionedMagic(OVM_MAGIC);   // "OVM2" -- carries a version field
+export const OVM_VERSION = 1;          // IN THE FILE now, not only in the comment at the top of this one
+export const OVM_LEGACY_HEADER_BYTES = 8;    // magic + active node count, as written before there was a version
+export const OVM_HEADER_BYTES = VERSIONED_HEADER_BYTES + 4;   // magic + version + active node count
 export const OVM_NODE_BYTES = 22;       // 6 + 12 + 4
 
 /**
@@ -53,8 +58,8 @@ export function encodeOVM(asset) {
     const dv  = new DataView(buf);
 
     // Header
-    dv.setUint32(0, OVM_MAGIC, true);
-    dv.setUint32(4, count,     true);
+    const hdr = writeVersionedHeader(dv, OVM_MAGIC, OVM_VERSION);
+    dv.setUint32(hdr, count, true);
 
     // Interleaved node payload
     let off = OVM_HEADER_BYTES;
@@ -81,16 +86,18 @@ export function encodeOVM(asset) {
  * @returns {{ count, coords: Int16Array, offsets: Float32Array, materials: Uint8Array }}
  */
 export function decodeOVM(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < OVM_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeOVM: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== OVM_MAGIC) {
-        throw new Error(`decodeOVM: magic mismatch (got 0x${magic.toString(16)}, expected 0x${OVM_MAGIC.toString(16)} = "OVM!")`);
-    }
-    const count = dv.getUint32(4, true);
-    const expected = OVM_HEADER_BYTES + count * OVM_NODE_BYTES;
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeOVM", legacyMagic: OVM_MAGIC, current: OVM_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 4;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeOVM: truncated header (${buf.byteLength}B)`);
+    const count = dv.getUint32(bodyOffset, true);
+    const expected = headerBytes + count * OVM_NODE_BYTES;
     if (buf.byteLength < expected) {
         throw new Error(`decodeOVM: payload truncated (have ${buf.byteLength}B, expected ${expected}B for ${count} nodes)`);
     }
@@ -99,7 +106,7 @@ export function decodeOVM(buf) {
     const offsets   = new Float32Array(count * 3);
     const materials = new Uint8Array(count * 4);
 
-    let off = OVM_HEADER_BYTES;
+    let off = headerBytes;
     for (let i = 0; i < count; i++) {
         coords[i * 3 + 0] = dv.getInt16(off + 0,  true);
         coords[i * 3 + 1] = dv.getInt16(off + 2,  true);
@@ -113,7 +120,7 @@ export function decodeOVM(buf) {
         materials[i * 4 + 3] = dv.getUint8(off + 21);
         off += OVM_NODE_BYTES;
     }
-    return { count, coords, offsets, materials };
+    return { count, coords, offsets, materials, version };
 }
 
 /**

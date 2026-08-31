@@ -22,8 +22,13 @@
 // S=16, etc) so the renderer can pick CPK colors and Van der Waals
 // radii via lookup tables in molGenerator.js.
 
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
 export const MOL_MAGIC = 0x214C4F4D;   // "MOL!" little-endian
-export const MOL_HEADER_BYTES = 8;
+export const MOL_MAGIC_V = versionedMagic(MOL_MAGIC);   // "MOL2" -- carries a version field
+export const MOL_VERSION = 1;          // IN THE FILE now, not only in the comment at the top of this one
+export const MOL_LEGACY_HEADER_BYTES = 8;    // magic + atom count, as written before there was a version
+export const MOL_HEADER_BYTES = VERSIONED_HEADER_BYTES + 4;   // magic + version + atom count
 export const MOL_ATOM_BYTES = 24;
 
 /**
@@ -48,8 +53,8 @@ export function encodeMOL(mol) {
     const total = MOL_HEADER_BYTES + count * MOL_ATOM_BYTES;
     const buf = new ArrayBuffer(total);
     const dv  = new DataView(buf);
-    dv.setUint32(0, MOL_MAGIC, true);
-    dv.setUint32(4, count,     true);
+    const hdr = writeVersionedHeader(dv, MOL_MAGIC, MOL_VERSION);
+    dv.setUint32(hdr, count, true);
 
     let off = MOL_HEADER_BYTES;
     for (let i = 0; i < count; i++) {
@@ -69,16 +74,18 @@ export function encodeMOL(mol) {
 
 /** Decode a .mol ArrayBuffer back into typed arrays. */
 export function decodeMOL(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < MOL_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeMOL: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== MOL_MAGIC) {
-        throw new Error(`decodeMOL: magic mismatch (got 0x${magic.toString(16)}, expected 0x${MOL_MAGIC.toString(16)} = "MOL!")`);
-    }
-    const count = dv.getUint32(4, true);
-    const expected = MOL_HEADER_BYTES + count * MOL_ATOM_BYTES;
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeMOL", legacyMagic: MOL_MAGIC, current: MOL_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 4;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeMOL: truncated header (${buf.byteLength}B)`);
+    const count = dv.getUint32(bodyOffset, true);
+    const expected = headerBytes + count * MOL_ATOM_BYTES;
     if (buf.byteLength < expected) {
         throw new Error(`decodeMOL: payload truncated (have ${buf.byteLength}B, expected ${expected}B for ${count} atoms)`);
     }
@@ -87,7 +94,7 @@ export function decodeMOL(buf) {
     const fields    = new Float32Array(count * 2);
     const elements  = new Uint8Array(count * 4);
 
-    let off = MOL_HEADER_BYTES;
+    let off = headerBytes;
     for (let i = 0; i < count; i++) {
         positions[i * 3 + 0] = dv.getFloat32(off + 0,  true);
         positions[i * 3 + 1] = dv.getFloat32(off + 4,  true);
@@ -100,7 +107,7 @@ export function decodeMOL(buf) {
         elements[i * 4 + 3]  = dv.getUint8(off + 23);
         off += MOL_ATOM_BYTES;
     }
-    return { count, positions, fields, elements };
+    return { count, positions, fields, elements, version };
 }
 
 /** Compute bbox + center over atomic positions. */
