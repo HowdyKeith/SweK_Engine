@@ -8,6 +8,60 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4215 -- a timeline, and the thing a playback-only loop gets wrong the instant you scrub
+
+*** MEASURED: THIS TREE ANIMATES BUT CANNOT SEQUENCE. *** ui/domAnimation.mjs (v4191) holds WAAPI keyframes as
+data, ui/springMotion.js (v4114) integrates a spring, fx/stagger.mjs (v4198) offsets a group -- and every one
+of them animates ONE thing FROM NOW. Nothing in the tree could say "at t=2.5 start the disintegrate, at t=4
+cross-fade, at t=6 the camera arrives". ui/clipEditorDialog.js (v818) has a play/scrub pair, but it drives a
+single skeletal clip through window.rigSystem; it is a clip editor, not a sequencer.
+
+The data model is mrdoob/frame.js's (MIT), READ FROM ITS OWN Frame.js rather than from its README, which
+documents none of it -- the README is four links and the words "work in progress". An Animation there is
+{ name, start, end, layer, effect }; the timeline sorts by start then layer; and an effect receives
+update(progress, delta) where PROGRESS IS NORMALISED TO ITS OWN CLIP. That last part is the idea worth taking:
+an effect never sees absolute time, so a clip can be moved, stretched or reused without touching the effect,
+which is the entire reason a timeline beats a pile of ifs. start() and end() are EDGES, fired on the frame a
+clip becomes or stops being active -- the same distinction engine/xrInput.mjs makes about a trigger.
+
+*** AND HERE IS THE PART ITS UPDATE LOOP DOES NOT HANDLE, WHICH IS WHY THIS IS MORE THAN A TABLE OF CLIPS:
+SEEKING IS NOT PLAYING. *** That loop walks animations in start order and breaks as soon as
+`animation.start > time`. Correct while time creeps forward one frame at a time. Wrong in two separate ways
+the moment somebody drags a scrubber:
+
+1. SCRUB BACKWARDS past a clip's start and the clip is still marked active from before, but a forward-only
+   walk may never visit it to call end(). It stays "running" with nothing driving it.
+2. JUMP FORWARD OVER A SHORT CLIP ENTIRELY -- from t=1 to t=10 across a clip spanning 3..4 -- and the clip is
+   never active on any evaluated frame, so start() AND end() NEVER FIRE AT ALL. A one-shot flash, a cut, a
+   trigger: it simply does not happen, and nothing reports that it was missed.
+
+Neither throws. Neither looks wrong until you scrub. So evaluate() is written against ARBITRARY time jumps
+rather than against playback. Entered and exited are a SET DIFFERENCE against the previously-active set, and
+*** A SET DIFFERENCE DOES NOT CARE WHICH WAY TIME WENT *** -- deriving edges from "did we pass start this
+frame" is exactly what ties a timeline to playback. And `skipped` is a first-class outcome, computed on the
+INTERVAL traversed rather than on the direction, so a BACKWARDS jump over a clip reports it too. It is
+deliberately not folded into entered or exited: the caller CHOOSES whether to fire both edges instantly or
+genuinely skip, and that is a decision only the caller can make and cannot make if it is never told.
+
+Two more refusals, both by name. A ZERO-LENGTH CLIP is rejected because progress is (t - start)/(end - start),
+so it is a division by zero whose NaN propagates into whatever the effect does with it -- and progressOf
+returns 0 rather than NaN even if one reaches it anyway. And containment is HALF-OPEN, so two abutting clips
+do not both claim the boundary instant. reset() exists for a third: without it, re-running a timeline from the
+top leaves the previous run's active set in place and the first evaluate emits end() for effects the new run
+never started -- an end without a start, which is the shape of bug that leaves something switched on forever.
+"Never evaluated" is null rather than 0, so a first evaluate at t=5 reports nothing skipped instead of falsely
+claiming everything before 5 was missed.
+
+Wired as window.swekTimeline, whose clips carry a plain effect function rather than a registry key: the tree's
+existing consoles -- window.fireworks, window.domFx, window.transitions -- ARE the registry, and a second one
+would be the third copy of an idea this tree keeps warning itself about.
+
+Gate: tools/ship/timeline-selfcheck.mjs, 46 checks, all pass. Six sabotages, all red: deriving exits from the
+direction of time, dropping the skipped report entirely (which is frame.js's behaviour), computing skipped only
+for forward jumps, treating "never evaluated" as time zero, making containment inclusive at both ends, and
+letting a zero-length clip through validation. fx/timeline.mjs restored byte-identical.
+
+The build now stands at 1295 gates.
 ## v4214 -- the Sunshine bridge had never called the Sunshine API, and the control panel is not a way in
 
 *** MEASURED: ai-bridge/sunshineBridge.js HAD NEVER CALLED THE SUNSHINE API ONCE. *** All four of its
