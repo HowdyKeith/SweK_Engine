@@ -8,6 +8,63 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4239 -- Bend a streamed world, and the one rule that keeps the seams shut
+
+*** THE BACKLOG ITEM FOR THIS ROUND MADE TWO GUESSES AND THE SECOND ONE WAS WRONG, WHICH IS WORTH MORE THAN
+THE ROUND'S CODE. *** Filing dreamfold (Makio64, MIT -- fold a photorealistic city map in real time), I wrote
+that the data path had to be refused and that what the tree GENUINELY lacks is "a 3D Tiles streaming loader
+-- level-of-detail geometry arriving over the network and being swapped in while the camera moves". The
+refusal stands. The gap does not exist:
+
+  render/screenSpaceError.js (v4150)  -- the real screen-space-error metric, geometric error, level
+                                         selection, and edgeLevel(), the crack-free edge rule
+  world/ChunkStreamer.js (round 332)  -- camera-following load and unload
+
+So the only part of dreamfold left standing is the fold itself, and asking what a fold COSTS a system that
+already has level-of-detail turns out to be the question worth asking.
+
+*** THE RULE: A DEFORMATION IS SAFE FOR AN LOD SYSTEM IF AND ONLY IF IT IS A PURE FUNCTION OF WORLD POSITION,
+AND THIS IS AN IDENTITY RATHER THAN A TOLERANCE. *** Two chunks meshed at different levels meet along a
+shared edge, and they only meet because edgeLevel() made both sides use the finer level's stations there.
+That agreement is in WORLD SPACE. A deformation preserves it exactly when it maps a world point to a world
+point and consults nothing else: equal inputs, equal outputs, seam error EXACTLY ZERO. Measured, on a seam
+whose vertices the fold displaces 78 units: 0. Not below a bound -- zero, and the reason is the definition of
+a function.
+
+*** AND ONE CHUNK-LOCAL TERM OPENS THAT SEAM BY 8 UNITS. *** The obvious thing to reach for when a fold is
+authored per chunk is a coordinate measured within the chunk, which makes it a DIFFERENT function on each
+side of the boundary. It looks perfect in any single-chunk preview and cracks the moment the camera crosses
+the boundary. *** THE TWO CHECKS THAT CATCH THIS ARE NOT REDUNDANT AND NEITHER REPLACES THE OTHER: *** the
+purity probe reports that fold as PURE -- correctly, since from the outside it IS a function of position,
+just a different one per chunk -- and only the seam measurement sees the crack. A gate cannot read intent; it
+can read whether two chunks agree.
+
+*** AND edgeLevel PICKS THE FINER OF THE TWO LEVELS, NOT THE COARSER, WHICH I HAD BACKWARDS AND WHICH THAT
+FILE SAYS IN CAPITALS. *** "Numerically finer means a SMALLER step, so this is a min and not a max. Getting
+that backwards produces terrain that looks correct in a screenshot and cracks whenever the camera moves."
+Also corrected: levelFor takes an ARRAY of steps, not a count -- my first call passed 4 and got null, which
+is that function refusing a malformed question rather than guessing at it.
+
+The bend itself is a rotation about a hinge whose angle ramps with distance past it, so lengths are preserved
+at every station: worst radius change over 200 points, 2.8e-14. It turns the world rather than stretching it.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. *** TWO OF THEM WERE ABOUT THIS GATE AND ONE
+WAS ABOUT MY OWN SABOTAGE. *** Cutting seamError to the first vertex left the gate GREEN, because the
+chunk-local fold happens to be wrong by the same 8 units at every station -- a seam that opens only at its
+FAR END is the realistic failure and nothing asked about it, so now something does. My first impurity
+sabotage incremented a counter nobody read, so the fold was still pure and the gate was right to stay green:
+a badly built sabotage proves nothing about a gate. And isPurePosition's interleaving stays green and is
+LABELLED DEFENSIVE -- the probe re-asks each point after all the others anyway.
+
+New: world/foldField.mjs, tools/ship/foldField-selfcheck.mjs (23 checks).
+
+NOT done, and the gate says so: no Cesium, no tile pipeline, no API key -- dreamfold's MIT covers its own
+code and says nothing about the Google tiles it renders, which is the #82 ENCUMBERED shape. The fold is also
+not wired into ChunkStreamer: this round establishes the RULE and the cost of breaking it, and a per-vertex
+JS call is exactly the shape that would have to move into a vertex shader before anyone shipped it.
+
+The build now stands at 4239 gates.
+
 ## v4238 -- The pass v4226 never got, and the second projective solver nobody knew about
 
 *** THE BACKLOG ITEM SAID vision/homography.mjs HAS "NO RENDERING CONSUMER", AND THE HALF OF THAT WHICH IS
