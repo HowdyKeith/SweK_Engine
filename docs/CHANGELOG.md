@@ -8,6 +8,72 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4216 -- a drawing surface at last, and the optimisation that was faster and wrong
+
+*** MEASURED: THIS TREE HAD NO DRAWING SURFACE AT ALL. *** No painting page, no brush, no stroke model -- an
+engine full of shaders, fluids and simulations in which you could not draw a line.
+
+LICENCE FIRST, BECAUSE IT DECIDED HOW THIS WAS BUILT. mrdoob/harmony is GPL-3.0: "This program is free
+software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version." REACHED, NOT CAPTURED -- severity 3 RECIPROCAL, the same posture as CliWaifuTamagotchi and the same
+reason ai-bridge/sunshineBridge.js never vendors Sunshine: this tree publishes public release zips.
+
+*** SO harmony's SOURCE WAS DELIBERATELY NOT READ. *** For the MIT projects this tree has borrowed from --
+sileo at v4114, animatelo at v4191, frame.js one round ago -- reading the source and writing fresh is fine,
+and v4215 read frame.js's own Frame.js directly to get its data model. Under GPL-3.0 that is not the same act.
+What is implemented is the TECHNIQUE, publicly described since 2010 and a geometric idea rather than an
+expression of it: a conventional brush stamps something at each point, and a procedural brush of this family
+LOOKS BACK AT THE POINTS ALREADY IN THE STROKE AND DRAWS LINES BETWEEN THEM -- so the mark is made of
+relationships, and the same path drawn slowly, quickly, or doubled back over itself gives a different image.
+No harmony code, constants or structure is reproduced. The gate asserts the module still carries that
+reasoning, because a licence decision nobody can find later is one that gets quietly reversed.
+
+Three traps, and all three are worst in exactly the same place: where the hand slows down and the points bunch.
+
+1. POINTER EVENTS FIRE ON A CLOCK, NOT ON DISTANCE. Hold still for a second and the stroke gains sixty points
+   in one spot. Measured: an 80-point fixture dedupes to 21. Without that the other two guards are
+   overwhelmed, so deduping is not tidying -- it is the precondition for the rest of the file behaving.
+
+2. *** ALL-PAIRS NEIGHBOUR SEARCH IS O(n^2) -- 12,497,500 DISTANCE TESTS FOR A 5,000-POINT STROKE, DURING A
+   DRAG, ON THE MAIN THREAD. AND HERE IS WHERE MY FIRST ANSWER WAS WRONG IN A WAY ONLY MEASURING CAUGHT. ***
+   The obvious fix is a bounded lookback window, and it works: it cut that stroke to 475,344 tests, a 26x
+   saving. It was written, and it was in the first draft of this file, and the gate asserted the number.
+   THEN MEASURING WHAT IT DREW SHOWED IT HAD QUIETLY REMOVED THE POINT OF THE BRUSH. A circle of 160 points
+   produced ZERO links between its two passes, because coming back around takes more than the window allows --
+   and links that are FAR APART IN TIME BUT CLOSE IN SPACE are precisely what makes this kind of brush look
+   drawn rather than traced. A single smooth sweep links only to its own immediate neighbours, which just
+   redraws the line, which is what the first screenshot showed and what a faster number had hidden.
+   The bound was the wrong axis. A uniform grid keyed on POSITION answers "what is near here" over the WHOLE
+   stroke and wins on both: 72,400 tests for the same 5,000 points -- 173x better than all-pairs and 6.6x
+   better than the window it replaced -- AND self-crossing links at any distance in time (a 160-point circle
+   goes from 0 far links to 11). The gate asserts the grid finds EXACTLY what all-pairs finds across a
+   400-point self-crossing scribble, because a faster search that silently misses neighbours would be the same
+   defect as the window, only undetected.
+
+3. EACH LINK IS TRANSLUCENT, AND k OF THEM OVER THE SAME PIXELS ACCUMULATE TO 1-(1-a)^k. At alpha 0.12 eight
+   links already reach 0.64 opacity and twenty reach 0.92 -- black, in exactly the spot where somebody was
+   concentrating. BOTH guards are needed and the gate shows the second does something the first cannot: the
+   link count is capped, AND each link's alpha is divided by how many neighbours were FOUND rather than how
+   many were used, so a crowded region draws FAINTER lines rather than merely fewer. Capping alone would make
+   every dense area identical to a six-neighbour one.
+
+Five brushes -- line, sketchy, fur, shaded, ribbon -- each asserted to differ in the way it claims rather than
+merely to exist: fur reaches further than sketchy from the same points because it overshoots the neighbour,
+shaded varies its opacity with distance and its nearest link is stronger than its furthest, and ribbon is the
+only one that reads the timestamps, so it thins when the stroke is fast. Drawing point by point is
+byte-identical to rendering the whole stroke at once, or a picture would change the moment it was reloaded.
+
+Driven in headless Chromium against the real page: a self-crossing spiral of 342 points produced 2,025
+segments and 11,968 lit pixels, with the cross-links between adjacent turns visible -- which is the relational
+mark the whole round is about, and which the lookback version did not draw.
+
+New fx/procBrush.mjs, ui/procBrushCanvas.js and proc-brush.html. Gate: tools/ship/procBrush-selfcheck.mjs,
+40 checks, all pass. Six sabotages, all red: dropping the dedupe, uncapping the link count, dropping the
+density divisor, making the grid query only its centre cell, REINTRODUCING THE LOOKBACK WINDOW, and making fur
+stop overshooting. fx/procBrush.mjs restored byte-identical.
+
+The build now stands at 1296 gates.
 ## v4215 -- a timeline, and the thing a playback-only loop gets wrong the instant you scrub
 
 *** MEASURED: THIS TREE ANIMATES BUT CANNOT SEQUENCE. *** ui/domAnimation.mjs (v4191) holds WAAPI keyframes as

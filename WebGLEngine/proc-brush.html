@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="demo:title" content="Procedural Brush">
+<meta name="demo:desc" content="Brushes that draw relationships between the points already in a stroke, rather than stamping a dab at each one. Sketchy, fur, shaded and ribbon, over a bounded neighbour search.">
+<title>SweK Procedural Brush</title>
+<style>
+  :root { --ink:#dbe6f5; --dim:#7e93ad; --edge:#243247; --bg:#080b11; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px system-ui,sans-serif; overflow:hidden; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  h1 { margin:0; font-size:14px; font-weight:700; color:#8fd0ff; letter-spacing:.3px; }
+  .hint { color:var(--dim); font-size:11px; }
+  button { appearance:none; background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:6px 11px; font:12px system-ui,sans-serif; cursor:pointer; }
+  button.on { background:#173656; border-color:#2f628f; color:#cfe6ff; }
+  canvas { display:block; width:100%; height:calc(100vh - 46px); touch-action:none; cursor:crosshair; }
+  #stats { margin-left:auto; color:var(--dim); font:11px ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Procedural Brush</h1>
+  <span class="hint">draw &mdash; each point links to the ones already near it</span>
+  <span id="brushes"></span>
+  <button id="clear">Clear</button>
+  <span id="stats"></span>
+</header>
+<canvas id="pad"></canvas>
+<script type="module">
+import { mountProcBrush } from "/ui/procBrushCanvas.js";
+import { NAMES } from "/fx/procBrush.mjs";
+
+const pad = document.getElementById("pad");
+function size() {
+    const r = pad.getBoundingClientRect();
+    // Re-sizing a canvas CLEARS it, so this only ever runs when the size genuinely changed -- otherwise a
+    // phone's address bar sliding away would wipe the drawing.
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if (pad.width !== w || pad.height !== h) { pad.width = w; pad.height = h; }
+}
+size();
+addEventListener("resize", size);
+
+const brush = mountProcBrush(pad, { brush: "sketchy" });
+
+const bar = document.getElementById("brushes");
+for (const n of NAMES) {
+    const b = document.createElement("button");
+    b.textContent = n;
+    if (n === "sketchy") b.classList.add("on");
+    b.addEventListener("click", () => {
+        brush.setBrush(n);
+        bar.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    });
+    bar.appendChild(b);
+}
+document.getElementById("clear").addEventListener("click", () => brush.clear());
+
+const stats = document.getElementById("stats");
+setInterval(() => { const s = brush.stats(); stats.textContent = s.brush + " · " + s.strokes + " strokes · " + s.segments.toLocaleString() + " segments"; }, 300);
+
+window.swekBrush = brush;
+console.log("[procBrush] window.swekBrush.setBrush(" + JSON.stringify(NAMES) + ")");
+</script>
+</body>
+</html>
