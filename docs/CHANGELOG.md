@@ -8,6 +8,85 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4220 -- the GPU Brain paints: a colour that is solved, a score that is local, and a metric of mine that was wrong
+
+Keith: "We could have our own GPU Brain painter?" v4216 gave the tree a brush and render/perceptual.mjs already
+had reward functions. What was missing was the part that makes shape-fitting tractable at all, and it comes
+from ondras/primitive.js (MIT, Ondrej Zara and Michael Fogleman), by way of Fogleman's `primitive`. TWO ideas
+are taken and both are theorems rather than tricks, which is why both are checkable and both are checked.
+
+*** 1. THE COLOUR IS SOLVED, NEVER SEARCHED. *** The obvious way to place a shape is to try colours and keep
+the best. You never have to. Compositing a colour c at alpha a over the current canvas gives
+new = cur(1-a) + c*a, so the squared error against the target is (t - cur(1-a) - c*a)^2 -- a quadratic in c
+with exactly one minimum:
+
+    d/dc = -2a( t - cur(1-a) - c*a ) = 0    =>    c = (t - cur)/a + cur
+
+and because the total over a shape's pixels is a SUM of such quadratics, the best single colour for the whole
+shape is the MEAN of those per-pixel optima. The gate grid-searches all 256 values of every channel over four
+shape kinds and three alphas -- 9216 colours -- and finds ZERO that beat the closed form. Three of the hardest
+dimensions of the problem are removed before any search or any learning begins.
+
+*** 2. THE SCORE IS COMPUTED OVER THE SHAPE, NOT THE PICTURE. *** Adding a shape changes only the pixels it
+covers, so the change in total error is a sum over those pixels and nothing else. MEASURED: the mean random
+shape touches 99 pixels of 2304, so scoring against the whole image is 23.3x the work -- per candidate, and
+the search evaluates ninety candidates for every shape it keeps. The gate computes the delta both ways over
+39 random shapes and asserts they agree to the bit, worst disagreement 0.
+
+fx/primitiveFit.mjs is a pure scanline over typed arrays -- convex polygons by edge intersection, ellipses
+analytically -- rather than primitive.js's HTML5 canvas, because a canvas cannot run in the gate.
+
+*** THE BUG THAT COMPOUNDED, AND FIXING IT MADE THE FITTER BETTER AS WELL AS HONEST. *** differenceChange
+scored the IDEAL float composite while drawShape stored the value in a Uint8ClampedArray, and fit()
+ACCUMULATES those predictions rather than re-measuring the picture. MEASURED: the reported error drifted 0.13%
+optimistic after 10 shapes, 0.45% after 40 and 2.38% after 120 -- always in the flattering direction, and
+growing with every shape placed. Uint8ClampedArray rounds HALF TO EVEN -- (0.5) is 0 and (1.5) is 2, which the
+Math.round everyone reaches for gets wrong -- so quantise() models that exactly, and the accumulated total now
+equals the true total EXACTLY at 10, 40 and 120 shapes. It also made the pictures better: distance at 120
+shapes went 0.0327 -> 0.0310, because the search had been ranking every candidate against a model of a canvas
+it was not actually drawing on.
+
+*** A SECOND OMISSION IN trainDockES, THE SAME SHAPE AS v4218's maxSteps AND FOUND THE SAME WAY. *** The
+trainer read obsDim from the environment and did NOT read actDim, so the policy it built always emitted
+ACT_DIM (2) numbers whatever the env asked for. Every environment in this tree happened to want 2 -- dock,
+dock-hazard, drive -- so nothing was wrong until this round's painter asked for 5. Then the last three action
+components were literally `undefined`, clamped to 0 by the env, and the policy trained happily while steering
+a width, a height and an angle IT DID NOT HAVE. No caller passes actDim, so the dock gates are unchanged and
+dock-selfcheck still reports the same 93%.
+
+*** A DETERMINISTIC POLICY PROPOSED ONE SHAPE TWENTY TIMES. *** An MLP maps an observation to exactly one
+action, and painting needs a SEQUENCE of different shapes. When a shape is rejected the observation barely
+moves, so the policy proposes the same rejected rectangle again, and again: MEASURED, TWO distinct actions
+across 20 steps, 1 placed and 19 rejected, scoring below uniformly random shapes. The variation is drawn from
+the EPISODE SEED, so it is a fresh sequence per episode and identical on replay -- a Math.random() there would
+have quietly destroyed every evaluation in the gate.
+
+*** THE RESULT, AGAINST A MEASURED NOISE FLOOR RATHER THAN AGAINST NOTHING. *** Eight independent random
+painters on the same 24 held-out pictures score 0.0692 +/- 0.0014. Untrained policy: 0.0048. Trained: 0.0752,
+which is 4.4 standard deviations above the random floor, and 0.0777 averaged over three training seeds (4.5 to
+9.3 sd). The targets are generated per episode from a seed, so the policy cannot memorise one picture.
+
+*** AND THE METRIC I JUDGED IT BY WAS THE THING THAT WAS WRONG. *** The trained policy centred its shapes in
+the worst residual cell 13.3% of the time against 25% by chance, which reads as a policy that has not learned
+to aim -- so aiming was measured directly, as a heuristic that always places at the worst cell. It scored
+0.0537 against random's 0.0690: AIMING AT THE WORST CELL IS 22.3% WORSE THAN NOT AIMING. A shape's EXTENT
+matters more than its centre, and a shape centred in a corner cell falls half off-canvas. The policy was right
+and the metric was wrong, and it would have been very easy to write that up as a failure to learn.
+
+WHAT IT DOES NOT DO, stated in the changelog and printed by the gate every run: it does not beat random search
+given ninety evaluations per shape -- 0.1667 against 0.0752. What the policy buys is a better shape PER
+EVALUATION, one forward pass against ninety rasterisations, which is the comparison that matters only if
+shapes ever have to be proposed in real time. Nothing here claims the pictures are pretty.
+
+Page primitive-paint.html, which takes your own image: measured headless, 808 shapes in 3.5 s taking a sample
+picture from distance 0.2617 to 0.0181, 93.1% closer. Gate tools/ship/primitiveFit-selfcheck.mjs, 6 sabotages
+all red -- and a seventh finding that was mine rather than the code's: the gate first asserted that no colour
+beats the closed form against the QUANTISED score, and 7 of 9216 did. The theorem is about the continuous
+objective; once the composite is stored as 8 bits an adjacent integer can be a hair better. Both are now
+asserted separately: 0 of 9216 on the continuous objective, and at most 0.029% of the improvement on the
+quantised one.
+
+The build now stands at 1300 gates.
 ## v4219 -- VR part three: the sticks move you, and the comment that said so for seven versions
 
 *** v4212 READ THE THUMBSTICKS AND NOTHING CONSUMED THEM. *** engine/xrInput.mjs has had moveVector() since

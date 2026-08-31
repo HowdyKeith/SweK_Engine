@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Primitive: a picture in a few dozen shapes">
+<meta name="demo:desc" content="Approximates any image with coloured triangles, rectangles and ellipses, one at a time. The colour of each shape is never searched for -- it is solved in closed form, the exact least-squares answer -- and each candidate is scored only over the pixels it covers, which is what makes it fast enough to watch. Drop in your own picture.">
+<meta name="demo:category" content="fx">
+<title>Primitive: a picture in a few dozen shapes</title>
+<style>
+  :root { --bg:#0a0c12; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 18px 6px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  button, select, label.file { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:7px 13px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover:not(:disabled), label.file:hover { border-color:var(--cyan); }
+  button:disabled { opacity:.5; cursor:default; }
+  input[type=file] { display:none; }
+  .stat { color:var(--dim); line-height:1.7; }
+  .stat b { color:#dbe7ff; }
+  .big { color:var(--green); font-size:15px; }
+  .panes { display:flex; gap:14px; flex-wrap:wrap; padding:0 18px 18px; }
+  .pane { flex:1 1 300px; max-width:520px; }
+  .pane h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 6px; font-weight:600; }
+  canvas { width:100%; image-rendering:pixelated; border:1px solid #1c2942; border-radius:8px; background:#000; display:block; }
+  .note { padding:0 18px 24px; color:#55617a; max-width:900px; line-height:1.7; }
+  code { color:var(--cyan); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9673; Primitive &middot; a picture in a few dozen shapes</h1>
+  <div class="stat" id="status">Loading a sample picture&hellip;</div>
+  <div class="row">
+    <label class="file">&#128194; Your picture<input type="file" id="file" accept="image/*"></label>
+    <button id="run">Run</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="reset">Reset</button>
+    <select id="kinds">
+      <option value="all">all shapes</option>
+      <option value="triangle">triangles only</option>
+      <option value="ellipse">ellipses only</option>
+      <option value="rotatedRect">rotated rects only</option>
+    </select>
+  </div>
+  <div class="stat">shapes <b id="n" class="big">0</b> &middot; distance <b id="d">--</b> &middot; started at <b id="d0">--</b> &middot; <b id="pct">0%</b> closer</div>
+</header>
+<div class="panes">
+  <div class="pane"><h2>target</h2><canvas id="src"></canvas></div>
+  <div class="pane"><h2>approximation</h2><canvas id="out"></canvas></div>
+</div>
+<div class="note">
+  Two things make this fast enough to watch, and both come from Michael Fogleman&rsquo;s <code>primitive</code> by way of
+  <code>ondras/primitive.js</code> (MIT). <b>The colour is never searched for.</b> Compositing a colour <code>c</code> at
+  alpha <code>a</code> gives <code>new = cur(1-a) + c*a</code>, so the squared error is a quadratic in <code>c</code> with
+  exactly one minimum &mdash; <code>c = (target - cur)/a + cur</code>, averaged over the shape&rsquo;s pixels. That is the
+  exact least-squares answer, not a heuristic. <b>And each candidate is scored only where it lands</b>, because a shape
+  changes nothing outside itself. The gate checks both: it grid-searches all 256 values of a channel and finds none that
+  beats the closed form, and it computes the score both ways and asserts they agree to the bit.
+</div>
+<script type="module">
+import { fitStep, blank, averageColour, drawShape, difference, distanceOf, cloneImage, KINDS, mulberry32 }
+  from "./fx/primitiveFit.mjs";
+
+const $ = (id) => document.getElementById(id);
+const src = $("src"), out = $("out");
+const sctx = src.getContext("2d", { willReadFrequently: true });
+const octx = out.getContext("2d", { willReadFrequently: true });
+const MAX = 200;                       // fit at a modest resolution; it is a sketch, not a resample
+let target = null, canvas = null, diff = 0, d0 = 1, shapes = 0, running = false, rng = mulberry32(1);
+
+function setStatus(t) { $("status").textContent = t; }
+
+function loadInto(img, w, h) {
+  const scale = Math.min(1, MAX / Math.max(w, h));
+  const W = Math.max(1, Math.round(w * scale)), H = Math.max(1, Math.round(h * scale));
+  src.width = W; src.height = H; out.width = W; out.height = H;
+  sctx.drawImage(img, 0, 0, W, H);
+  const id = sctx.getImageData(0, 0, W, H);
+  target = { data: id.data, w: W, h: H };
+  reset();
+}
+
+function reset() {
+  if (!target) return;
+  canvas = blank(target.w, target.h, averageColour(target));
+  diff = difference(target, canvas);
+  d0 = distanceOf(diff, target.w * target.h);
+  shapes = 0; rng = mulberry32(1);
+  paint();
+  $("d0").textContent = d0.toFixed(4);
+  setStatus("Ready. Each shape is the best of 60 random starts, then hill-climbed.");
+  report();
+}
+
+function paint() {
+  const id = octx.createImageData(canvas.w, canvas.h);
+  id.data.set(canvas.data);
+  octx.putImageData(id, 0, 0);
+}
+
+function report() {
+  const d = distanceOf(diff, target.w * target.h);
+  $("n").textContent = shapes;
+  $("d").textContent = d.toFixed(4);
+  $("pct").textContent = (100 * (1 - d / d0)).toFixed(1) + "%";
+}
+
+function tick() {
+  if (!running) return;
+  const kinds = $("kinds").value === "all" ? KINDS : [$("kinds").value];
+  // a handful per frame, so the page stays responsive and you can watch it converge
+  for (let i = 0; i < 4 && running; i++) {
+    const step = fitStep(target, canvas, { alpha: 0.55, candidates: 60, mutations: 30, patience: 10, kinds, rng });
+    if (!step || step.delta >= 0) continue;
+    drawShape(canvas, step.spans, step.colour, 0.55);
+    diff += step.delta;
+    shapes++;
+  }
+  paint(); report();
+  requestAnimationFrame(tick);
+}
+
+$("run").onclick = () => { if (!target) return; running = true; $("run").disabled = true; $("stop").disabled = false; setStatus("Fitting… every shape's colour is solved, never searched."); tick(); };
+$("stop").onclick = () => { running = false; $("run").disabled = false; $("stop").disabled = true; setStatus("Stopped at " + shapes + " shapes."); };
+$("reset").onclick = () => { running = false; $("run").disabled = false; $("stop").disabled = true; reset(); };
+$("file").onchange = (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { running = false; $("run").disabled = false; $("stop").disabled = true; loadInto(img, img.width, img.height); URL.revokeObjectURL(img.src); };
+  img.onerror = () => setStatus("Could not decode that image.");
+  img.src = URL.createObjectURL(f);
+};
+
+// A default picture drawn here, so the page works with no network and no file chosen.
+{
+  const c = document.createElement("canvas"); c.width = 180; c.height = 180;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 180, 180);
+  g.addColorStop(0, "#1b3a6b"); g.addColorStop(1, "#0a1020");
+  x.fillStyle = g; x.fillRect(0, 0, 180, 180);
+  x.fillStyle = "#f6a623"; x.beginPath(); x.arc(120, 60, 38, 0, 7); x.fill();
+  x.fillStyle = "#5fe08a"; x.beginPath(); x.moveTo(30, 150); x.lineTo(80, 70); x.lineTo(130, 150); x.closePath(); x.fill();
+  x.fillStyle = "rgba(89,209,255,0.75)"; x.fillRect(18, 18, 54, 34);
+  loadInto(c, 180, 180);
+}
+</script>
+</body>
+</html>
