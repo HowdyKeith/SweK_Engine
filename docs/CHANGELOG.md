@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4237 -- A sky with closed forms: the tree had no scattering model of any kind, and now it has a graded one
+
+*** THE ARGUMENT FOR TAKING BRUNETON'S MODEL RATHER THAN ANY OTHER SKY SHADER WAS THAT IT CAN BE HELD TO A
+NUMBER, AND THIS ROUND HAD TO MAKE THAT GOOD. *** The gap was checked before a line was written: grep for
+atmosphericScatter / aerialPerspective / Bruneton / "precomputed atmospheric" across every .js and .mjs
+returns nothing. There is a sky, a day/night cycle and CloudVolume.js, and no Rayleigh and no Mie anywhere.
+Method from takram-design-engineering/three-geospatial (MIT, development concluded March 2025 -- a finished
+reference rather than a moving target); the code is written here because that repo is a three.js monorepo
+assuming a globe, 3d-tiles-renderer and astronomy-engine.
+
+*** FOUR CLOSED FORMS AND ONE CONVERGENCE, AND NOT ONE OF THEM IS "DOES IT LOOK LIKE A SKY". ***
+
+1. THE VERTICAL OPTICAL DEPTH IS ANALYTIC -- AND MY FIRST REFERENCE WAS THE WRONG ONE. Straight up there is
+no curvature and the integral of exp(-h/H) is elementary. But opticalDepth() stops at the TOP OF THE
+ATMOSPHERE while the closed form runs to INFINITY, and the gap between them looks like integrator error and
+is not: it is the truncated tail, H*exp(-(Rt-Rg)/H). Measured, the gap is 4.4157e-3 against a tail of
+4.4247e-3, so the tail accounts for 99.8% of it. Against the TRUNCATED closed form the integrator agrees to
+4.97e-5 relative at worst -- and the worst case is Mie, because Hm = 1.2 km is a far sharper exponential than
+Hr = 8 km. It converges too: 1.14e-3, 7.15e-5, 4.47e-6 at 64, 256 and 1024 steps.
+
+2. TRANSMITTANCE IS MULTIPLICATIVE, to 4.65e-16. T(a->b) computed as a RATIO of two whole-ray transmittances
+equals the segment integral, which is what makes singleScattering's one-integration-per-step shortcut exact
+rather than a saving with a hidden cost.
+
+3. BOTH PHASE FUNCTIONS INTEGRATE TO ONE over the sphere, at every asymmetry from g = 0 to 0.9. The
+unnormalised (1 + cos^2) integrates to 16.755 -- an eightfold brighter sky of exactly the same colour and
+shape, which is why a constant nobody checks is worth checking.
+
+4. THE SECANT LAW IS THE FLAT-PLANET LIMIT AND WHERE IT FAILS IS THE CURVATURE. At mu 0.9 the flat model is
+0.08% out; at mu 0.05 it is 32% TOO LONG, monotonically, because a curved atmosphere thins out beneath a
+grazing ray faster than a slab does.
+
+5. AND THE MEASUREMENT THE WHOLE PRECOMPUTATION EXISTS TO JUSTIFY: the table converges on the integral as it
+grows -- worst absolute error 1.46e-2, 4.09e-3, 1.00e-3 at 64x16, 128x32 and 256x64, mean 6.98e-4 to 9.45e-5.
+*** AND THE FIRST VERSION OF THAT MEASUREMENT WAS NOISE. *** It drew fresh random sample points for each
+table size and reported 2.05e-2, 6.26e-3, 1.19e-2 -- the biggest table coming out WORSE than the middle one,
+because it was being asked about different points. Three configurations compared on three different sample
+sets is not a comparison, which is #86's rule arriving somewhere new. One deterministic grid of 576 probes,
+walked by every size.
+
+*** THE SUNSET ARRIVES WITHOUT BEING ASKED FOR, AND MY FIRST TEST FOR IT ASKED THE WRONG QUESTION. *** I
+compared a HORIZON view against a ZENITH view with the sun overhead, expecting the horizon to be redder. It
+came back BLUER -- R/B 0.575 against 0.734 -- and that is correct: a long VIEW path with the sun high gathers
+more scattered light without reddening it, because the light reaching each scattering point still came down a
+short vertical path. The sunset is about the SUN's path, not the eye's. Drop the sun to 1 degree along one
+fixed view ray and R/B goes from 0.894 to 1.888 -- more than double, and CROSSING ONE, red overtaking blue.
+On sky.html the horizon reads R/B 0.924 with the sun at 30 degrees and 2.824 with it at 1.
+
+*** AND THE GLSL THAT SHIPS AGREES WITH THE MODEL IT WAS WRITTEN FROM: *** the shader reads the same table to
+within 1.74e-5 over 1024 (r, mu) samples, and the whole single-scattering integral agrees to 0.02% relative
+over 256 view directions on a real WebGL2 context.
+
+TEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Nine turned something red on the first pass.
+*** THE TENTH DID NOT, AND IT WAS A GUARD I HAD CALLED LOAD-BEARING IN A COMMENT. *** Removing the
+discriminant clamp from distanceToTop left the whole gate GREEN, because the table is built through
+rMuFromUv, which never returns r above Rt, so nothing the gate walked could reach the negative discriminant.
+The guard is real -- r a hair above Rt gives a discriminant of -2.6e-2 and sqrt returns NaN, and one NaN in a
+transmittance table is a black hole in the sky the table itself does not show -- but it was UNCHECKED, and
+the comment claiming otherwise was wrong. The gate now asks distanceToTop about r > Rt directly, over 16
+combinations of overshoot and near-zero mu.
+
+Worth noting which check caught which: using Mie's SCATTERING coefficient where the extinction belongs is
+caught by the MULTIPLICATIVE identity and by nothing else, because a single wrong coefficient still produces
+a perfectly plausible sky.
+
+New: render/atmosphere.mjs (CPU model, LUT, and the GLSL both are graded against),
+tools/ship/atmosphere-selfcheck.mjs (28 checks), tools/ship/atmosphereHarness.html, and sky.html -- a fisheye
+of the dome, 256x64 table built in 189 ms on the CPU and the sky drawn in 0.2-0.4 ms at 720x420 on
+swiftshader.
+
+NOT done, and the gate's closing note says so: MULTIPLE SCATTERING IS NOT IMPLEMENTED. This is single
+scattering, which carries a clear daytime sky and is not what carries twilight or the bright band above the
+horizon -- in the full model those are the second and later orders, and their absence will read as a sky too
+dark near the horizon that goes black too fast at dusk. An absence with a known shape rather than a mystery.
+Also not done: aerial perspective, which the same table would serve and which no caller asks for yet.
+
+The build now stands at 4237 gates.
+
 ## v4236 -- One draw instead of three, the arrangement that must be refused, and a chain that CLIPS
 
 *** THE BACKLOG ITEM SAID "TWELVE PASSES, TWELVE ROUND TRIPS" AND IT WAS FILED WITH A WARNING NOT TO BELIEVE

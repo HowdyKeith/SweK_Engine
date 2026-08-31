@@ -1,0 +1,187 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sky — precomputed atmospheric scattering</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0b0d10; color:#d6dae0; font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { padding:20px 26px 12px; border-bottom:1px solid #1c222c; }
+  h1 { margin:0 0 8px; font-size:20px; font-weight:650; letter-spacing:-0.01em; }
+  header p { margin:0; max-width:76ch; color:#98a1ad; }
+  code { background:#151a21; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .wrap { display:flex; gap:20px; padding:20px 26px; flex-wrap:wrap; align-items:flex-start; }
+  canvas { background:#000; border:1px solid #1c222c; border-radius:6px; display:block; }
+  .side { flex:1; min-width:290px; max-width:420px; }
+  .panel { background:#11161c; border:1px solid #1c222c; border-radius:6px; padding:14px 16px; }
+  .panel + .panel { margin-top:12px; }
+  h2 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:0.09em; color:#7b8593; }
+  label { display:block; margin:9px 0; color:#98a1ad; font-size:13px; }
+  input[type=range] { width:100%; }
+  pre { margin:0; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#c2c9d2; white-space:pre-wrap; }
+  .note { color:#7b8593; font-size:12.5px; margin:10px 0 0; }
+</style>
+
+<header>
+  <h1>Sky — precomputed atmospheric scattering</h1>
+  <p>Rayleigh and Mie single scattering, integrated live against a precomputed transmittance table
+     (<code>render/atmosphere.mjs</code>; method from Bruneton and Neyret as three-geospatial packages it,
+     MIT). The table is built on the CPU by the same code the gate grades against four closed forms — the
+     analytic vertical optical depth, the multiplicative property, the phase normalisations, and the
+     flat-planet secant limit. <b>Single scattering only:</b> twilight and the band just above the horizon
+     come from the second and later orders, and they are not here.</p>
+</header>
+
+<div class="wrap">
+  <div>
+    <canvas id="view" width="720" height="420"></canvas>
+    <p class="note">A fisheye of the whole sky dome, from <span id="alt">0.5</span> km up. The sun's colour
+       and the horizon's are computed, not chosen.</p>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>Sun</h2>
+      <label>elevation <input id="sun" type="range" min="-100" max="900" step="5" value="300"><span id="sunv">30.0&deg;</span></label>
+      <label>observer altitude <input id="alti" type="range" min="0" max="590" step="5" value="5"><span id="altv">0.5 km</span></label>
+      <label>Mie asymmetry g <input id="g" type="range" min="0" max="95" step="1" value="76"><span id="gv">0.76</span></label>
+      <label>exposure <input id="ex" type="range" min="5" max="80" step="1" value="22"><span id="exv">2.2</span></label>
+    </div>
+    <div class="panel">
+      <h2>Measured</h2>
+      <pre id="stats">…</pre>
+    </div>
+    <div class="panel">
+      <h2>What is not here</h2>
+      <p class="note">Multiple scattering, which is what makes twilight and the bright band above the horizon.
+         Without it the sky is too dark near the horizon and goes black too quickly at dusk — an absence with
+         a known shape rather than a mystery. The transmittance table would serve aerial perspective
+         (scattering over a finite distance, for objects inside the atmosphere) equally well; no caller asks
+         for it yet.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as A from "./render/atmosphere.mjs";
+
+const P = { ...A.EARTH };
+const cv = document.getElementById("view");
+const gl = cv.getContext("webgl2", { antialias: false });
+const $ = (id) => document.getElementById(id);
+if (!gl) { $("stats").textContent = "no WebGL2 on this browser"; throw new Error("no webgl2"); }
+gl.getExtension("OES_texture_float_linear");
+
+const VERT = `#version 300 es
+precision highp float;
+out vec2 vUv;
+void main() {
+    vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
+    vUv = p * 0.5 + 0.5;
+    gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+// A fisheye of the dome: the disc maps zenith at the centre to horizon at the rim, and outside the disc is
+// the ground. The view direction's cosine to the zenith is all the model needs.
+const FRAG = `#version 300 es
+precision highp float;
+${A.ATMOSPHERE_GLSL}
+uniform float uAlt, uSunMu, uExposure, uAspect;
+in vec2 vUv;
+out vec4 fragColor;
+void main() {
+    vec2 q = (vUv - 0.5) * vec2(2.0 * uAspect, 2.0);
+    float rad = length(q);
+    if (rad > 1.0) { fragColor = vec4(0.02, 0.02, 0.025, 1.0); return; }   // below the horizon
+    float theta = rad * 1.5707963;                       // zenith angle: 0 at centre, 90 degrees at the rim
+    float mu = cos(theta);
+    // the sun sits along +x in this projection, so nu follows from the two elevations and the azimuth
+    float phi = atan(q.y, q.x);
+    float sunTheta = acos(clamp(uSunMu, -1.0, 1.0));
+    float nu = clamp(cos(theta) * cos(sunTheta) + sin(theta) * sin(sunTheta) * cos(phi), -1.0, 1.0);
+    vec3 L = atm_singleScattering(uRg + uAlt, mu, uSunMu, nu, 48);
+    // a plain Reinhard, so the numbers on screen are the model's and not a curve's
+    vec3 c = vec3(1.0) - exp(-L * uExposure);
+    fragColor = vec4(pow(c, vec3(1.0 / 2.2)), 1.0);
+}`;
+
+function compile(vs, fs) {
+    const p = gl.createProgram();
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(t);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+const prog = compile(VERT, FRAG);
+const vao = gl.createVertexArray();
+let lut = null, lutTex = null, lutMs = 0;
+
+function rebuildLUT() {
+    const t0 = performance.now();
+    lut = A.buildTransmittanceLUT(P, { w: 256, h: 64, steps: 256 });
+    lutMs = performance.now() - t0;
+    if (!lutTex) lutTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, lutTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, lut.w, lut.h, 0, gl.RGB, gl.FLOAT, lut.data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+
+let lastMs = 0;
+function draw() {
+    const sunDeg = +$("sun").value / 10, alt = +$("alti").value / 10;
+    const g = +$("g").value / 100, exposure = +$("ex").value / 10;
+    P.mieG = g;
+    const sunMu = Math.cos((90 - sunDeg) * Math.PI / 180);
+    const t0 = performance.now();
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.useProgram(prog);
+    const u = (n) => gl.getUniformLocation(prog, n);
+    gl.uniform1f(u("uRg"), P.Rg); gl.uniform1f(u("uRt"), P.Rt);
+    gl.uniform1f(u("uHr"), P.Hr); gl.uniform1f(u("uHm"), P.Hm);
+    gl.uniform1f(u("uBetaMe"), P.betaMe); gl.uniform1f(u("uBetaMs"), P.betaMs);
+    gl.uniform1f(u("uMieG"), P.mieG);
+    gl.uniform3f(u("uBetaR"), P.betaR[0], P.betaR[1], P.betaR[2]);
+    gl.uniform1f(u("uAlt"), alt); gl.uniform1f(u("uSunMu"), sunMu);
+    gl.uniform1f(u("uExposure"), exposure);
+    gl.uniform1f(u("uAspect"), cv.width / cv.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, lutTex);
+    gl.uniform1i(u("uTransmittance"), 0);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.finish();
+    lastMs = performance.now() - t0;
+
+    // the same two directions the gate reports, computed here on the CPU so the page shows the model's own
+    // numbers rather than a screenshot of them
+    const zen = A.singleScattering(P.Rg + alt, 1.0, sunMu, sunMu, P, { lut, steps: 48 });
+    const hor = A.singleScattering(P.Rg + alt, 0.02, sunMu, 0.02 * sunMu + 0.9, P, { lut, steps: 48 });
+    $("stats").textContent =
+        "sun elevation   " + sunDeg.toFixed(1) + " deg   (mu " + sunMu.toFixed(4) + ")\n" +
+        "observer        " + alt.toFixed(1) + " km\n" +
+        "LUT 256x64      built in " + lutMs.toFixed(0) + " ms on the CPU\n" +
+        "sky draw        " + lastMs.toFixed(1) + " ms at " + cv.width + "x" + cv.height + "\n" +
+        "\nzenith  R " + zen[0].toExponential(2) + "  G " + zen[1].toExponential(2) + "  B " + zen[2].toExponential(2) +
+        "   R/B " + (zen[0] / Math.max(1e-12, zen[2])).toFixed(3) + "\n" +
+        "horizon R " + hor[0].toExponential(2) + "  G " + hor[1].toExponential(2) + "  B " + hor[2].toExponential(2) +
+        "   R/B " + (hor[0] / Math.max(1e-12, hor[2])).toFixed(3);
+    $("alt").textContent = alt.toFixed(1);
+}
+
+for (const [id, out, fmt] of [["sun", "sunv", (v) => (v / 10).toFixed(1) + "°"],
+                              ["alti", "altv", (v) => (v / 10).toFixed(1) + " km"],
+                              ["g", "gv", (v) => (v / 100).toFixed(2)],
+                              ["ex", "exv", (v) => (v / 10).toFixed(1)]]) {
+    $(id).oninput = () => { $(out).textContent = fmt(+$(id).value); draw(); };
+    $(out).textContent = fmt(+$(id).value);
+}
+rebuildLUT();
+draw();
+</script>
