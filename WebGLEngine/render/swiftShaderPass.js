@@ -682,9 +682,116 @@ void main() {
     fragColor = vec4(c.rgb * toHalf(horizon) + ringColor * toHalf(ring * uRingBrightness) * k, c.a);
 }`;
 
+/* ---- BATCH 11 (v4234): the last gradeable shader, and three that are shape-checked by necessity ---------- */
+
+const WORMHOLE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uDepth, uSpeed, uTwist, uRadius, uPremultiplied;
+void main() {
+    vec2 uv = swPos() / uSize;
+    float aspect = uSize.x / uSize.y;
+    vec2 d = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+    float dist = length(d);
+    float t = uTime * uSpeed;
+    float tunnelDepth = uRadius / max(dist, 0.001);
+    float twistAngle = atan(d.y, d.x) + uTwist * tunnelDepth * 0.3 + t * 0.5;
+    float zoomFactor = fract(tunnelDepth * uDepth * 0.1 - t * 0.3);
+    float scale = mix(0.2, 2.0, zoomFactor);
+    vec2 tunnelUV = fract(0.5 + vec2(cos(twistAngle), sin(twistAngle)) * scale * 0.3);
+    vec4 c = layerSample(clamp(tunnelUV * uSize, vec2(0.0), uSize));
+    float fog = smoothstep(0.0, uRadius * 2.0, dist);
+    float ring = exp(-pow((zoomFactor - 0.5) * 8.0, 2.0)) * 0.2;
+    float vignette = 1.0 - smoothstep(0.3, 0.7, dist);
+    float chromaAmt = (1.0 - fog) * 3.0;
+    vec2 chromaDir = dist > 0.001 ? normalize(d) * chromaAmt : vec2(0.0);
+    chromaDir.x /= aspect;                                  // undone on x, as blackHole does
+    vec4 rS = layerSample(clamp((tunnelUV + chromaDir * 0.003) * uSize, vec2(0.0), uSize));
+    vec4 bS = layerSample(clamp((tunnelUV - chromaDir * 0.003) * uSize, vec2(0.0), uSize));
+    float chromaBlend = (1.0 - fog) * 0.4;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    float fogMul = toHalf(0.3 + fog * 0.7);
+    vec3 rgb = c.rgb * fogMul + vec3(toHalf(ring * 0.5), toHalf(ring * 0.6), toHalf(ring * 1.0)) * k
+                              + vec3(toHalf(vignette * 0.05)) * k;
+    // the chromatic taps are sampled after the fog multiply and are NOT fogged themselves
+    rgb.r = mix(rgb.r, rS.r, toHalf(chromaBlend));
+    rgb.b = mix(rgb.b, bS.b, toHalf(chromaBlend));
+    fragColor = vec4(rgb, c.a);
+}`;
+
+const INKBLEED_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uWarpStrength, uScale, uSpeed, uDetail, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 st = (p / uSize) * uScale;
+    int oct = int(uDetail);
+    vec2 q = vec2(bcs_fbm(st + vec2(uTime * uSpeed * 0.1, 0.0), oct),
+                  bcs_fbm(st + vec2(5.2, 1.3 + uTime * uSpeed * 0.08), oct));
+    // the last term is a SCALAR added to a vec2 -- it broadcasts, in Metal and in GLSL alike
+    vec2 r = vec2(bcs_fbm(st + 4.0 * q + vec2(1.7, 9.2) + uTime * uSpeed * 0.05, oct),
+                  bcs_fbm(st + 4.0 * q + vec2(8.3, 2.8) + uTime * uSpeed * 0.04, oct));
+    fragColor = layerSample(clamp(p + (q + r) * uWarpStrength * uPointScale, vec2(0.0), uSize));
+}`;
+
+// *** TRAP 6, LOAD-BEARING FOR THE FIRST TIME. *** Four of the five taps upstream are layer.sample(position +
+// offset) with NO clamp, because Metal's layer sampling has defined edges. GL wraps unless told, so a literal
+// port would pull colour from the far side of the image along every border. layerSample clamps; that is what
+// makes this agree with Metal rather than with a literal reading of the Metal.
+const FROSTED_FRAG = PREAMBLE + HELPERS + `
+uniform float uFrostAmount, uGrainSize, uClearRadius, uClearSoftness, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float dist = distance(uv, vec2(0.5));
+    float mask = smoothstep(uClearRadius, uClearRadius + uClearSoftness, dist) * uFrostAmount;
+    vec2 nuv = floor(uv * uGrainSize);
+    float nx = bcs_hash(nuv) * 2.0 - 1.0;
+    float ny = bcs_hash(nuv + vec2(7.3, 3.1)) * 2.0 - 1.0;
+    float sc = mask * 8.0 * uPointScale;
+    vec4 sum = layerSample(p)
+             + layerSample(clamp(p + vec2(nx, ny) * sc, vec2(0.0), uSize))
+             + layerSample(clamp(p + vec2(-ny, nx) * sc, vec2(0.0), uSize))
+             + layerSample(clamp(p + vec2(-nx, -ny) * sc * 0.7, vec2(0.0), uSize))
+             + layerSample(clamp(p + vec2(ny, -nx) * sc * 0.7, vec2(0.0), uSize));
+    sum = vec4(toHalf(sum.r / 5.0), toHalf(sum.g / 5.0), toHalf(sum.b / 5.0), toHalf(sum.a / 5.0));
+    vec4 orig = layerSample(p);
+    float a = mix(orig.a, sum.a, toHalf(mask));
+    float k = (uPremultiplied > 0.5 || a == 0.0) ? 1.0 : a;
+    fragColor = vec4(mix(orig.rgb, sum.rgb, toHalf(mask)) + vec3(toHalf(mask * 0.05)) * k, a);
+}`;
+
+// *** THE FIRST SHADER IN THIS PORT THAT WRITES ALPHA, AND THE FIRST WITH A BRANCH THAT IGNORES THE SOURCE
+// ENTIRELY. *** The grout returns an opaque constant; the tile scales alpha by the assemble progress. The
+// premultiplied factor therefore has to come from the alpha being WRITTEN, not the one that was read.
+const MOSAIC_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uPixelSize, uBevel, uAnimateAssemble, uGap, uPremultiplied;
+void main() {
+    vec2 uv = swPos() / uSize;
+    vec2 grid = floor(uv * uSize / uPixelSize) * uPixelSize / uSize;
+    vec2 cell = fract(uv * uSize / uPixelSize);
+    if (uGap > 0.001) {
+        vec2 e = step(vec2(uGap * 0.5), cell) * step(vec2(uGap * 0.5), 1.0 - cell);
+        if (e.x * e.y < 0.5) { fragColor = vec4(toHalf(0.02), toHalf(0.02), toHalf(0.03), 1.0); return; }
+    }
+    vec2 tileCenter = grid + 0.5 * uPixelSize / uSize;
+    float ap = clamp(uTime * 0.5 - bcs_hash(grid * 100.0) * uAnimateAssemble * 2.0, 0.0, 1.0);
+    ap = ap * ap * (3.0 - 2.0 * ap);
+    vec2 scattered = tileCenter + vec2(bcs_hash(grid * 200.0) - 0.5, bcs_hash(grid * 300.0) - 0.5) * 0.5 * (1.0 - ap);
+    vec4 c = layerSample(clamp(scattered * uSize, vec2(0.0), uSize));
+    vec2 bv = (cell - 0.5) * 2.0;
+    float topLight = smoothstep(0.0, -0.8, bv.y) * uBevel;          // -0.8 is UP, because y grows down here
+    float leftLight = smoothstep(0.0, -0.8, bv.x) * uBevel * 0.5;
+    float bottomShadow = smoothstep(0.0, 0.8, bv.y) * uBevel;
+    float edgeDist = min(min(cell.x, 1.0 - cell.x), min(cell.y, 1.0 - cell.y));
+    float edgeHi = (1.0 - smoothstep(0.0, 0.08, edgeDist)) * uBevel * 0.3;
+    float a = c.a * toHalf(ap * 0.5 + 0.5);
+    float k = (uPremultiplied > 0.5 || a == 0.0) ? 1.0 : a;
+    float add = toHalf(topLight * 0.15 + leftLight * 0.1) - toHalf(bottomShadow * 0.2) + toHalf(edgeHi);
+    fragColor = vec4(c.rgb + vec3(add) * k, a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
-    geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG };
+    geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
+    wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -711,6 +818,10 @@ const KNOBS = {
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
     blackHole: { time: "uTime", mass: "uMass", spin: "uSpin", distortion: "uDistortion", ringBrightness: "uRingBrightness", premultiplied: "uPremultiplied" },
+    wormhole: { time: "uTime", depth: "uDepth", speed: "uSpeed", twist: "uTwist", radius: "uRadius", premultiplied: "uPremultiplied" },
+    inkBleed: { time: "uTime", warpStrength: "uWarpStrength", scale: "uScale", speed: "uSpeed", detail: "uDetail", pointScale: "uPointScale" },
+    frosted: { frostAmount: "uFrostAmount", grainSize: "uGrainSize", clearRadius: "uClearRadius", clearSoftness: "uClearSoftness", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    pixelateMosaic: { time: "uTime", pixelSize: "uPixelSize", bevel: "uBevel", animateAssemble: "uAnimateAssemble", gap: "uGap", premultiplied: "uPremultiplied" },
 };
 
 /**
@@ -756,6 +867,11 @@ const DEFAULT_KNOBS = {
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
     blackHole:      { time: 0, mass: 0.2, spin: 1, distortion: 60, ringBrightness: 1, premultiplied: 1 },
+    // Batch 11 -- again copied from each function's own defaults in swiftShaderModel.mjs.
+    wormhole:       { time: 0, depth: 4, speed: 1, twist: 2, radius: 0.25, premultiplied: 1 },
+    inkBleed:       { time: 0, warpStrength: 20, scale: 4, speed: 0.5, detail: 4, pointScale: 1 },
+    frosted:        { frostAmount: 0.7, grainSize: 8, clearRadius: 0.2, clearSoftness: 0.3, pointScale: 1, premultiplied: 1 },
+    pixelateMosaic: { time: 0, pixelSize: 8, bevel: 0.5, animateAssemble: 0, gap: 0.08, premultiplied: 1 },
 };
 
 /* eslint-disable no-undef */
@@ -888,4 +1004,6 @@ export {
     EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
+    WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG,
+    WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

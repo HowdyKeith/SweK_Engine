@@ -971,6 +971,196 @@ export function bcsBlackHole(img, { time = 0, mass = 0.2, spin = 1, distortion =
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+/* ============================================================================================================
+ * BATCH 11 (v4234) -- THE LAST GRADEABLE SHADER, AND THREE THAT CAN ONLY EVER BE CHECKED BY SHAPE.
+ *
+ * *** v4233's NOTE SAID TWO UNPORTED SHADERS WERE STILL GRADEABLE. RECOUNTED FROM THE BODIES: ONE. ***
+ * bcs_liquidMirror calls bcs_valueNoise, which calls bcs_hash, so it joins the fifteen that cannot be
+ * verified against a CPU reference on any two implementations. bcs_wormhole is the only one left that touches
+ * no hash at all, and after this batch there are NONE: every remaining shader is shape-checked by necessity,
+ * and that is a property of the upstream file rather than a standard being lowered here.
+ * ========================================================================================================= */
+
+/**
+ * bcs_wormhole -- a log-ish tunnel with frame-dragging twist, depth fog, ring highlights and chromatic
+ * aberration at the edges. The last shader in this port that can be graded to the pixel.
+ *
+ * THREE SAMPLES, not one, and the two chromatic ones are taken at tunnelUV BEFORE the fract() wrap is undone
+ * -- upstream adds chromaDir to the already-wrapped tunnelUV, so a sample can leave [0,1] and is then clamped
+ * to the image rather than wrapped. Reproduced exactly: clamping and wrapping differ at the seam.
+ */
+export function bcsWormhole(img, { time = 0, depth = 4, speed = 1, twist = 2, radius = 0.25,
+                                   premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const aspect = w / h;
+    const t = time * speed;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const dx = (uvx - 0.5) * aspect, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const tunnelDepth = radius / Math.max(dist, 0.001);
+        const twistAngle = angle + twist * tunnelDepth * 0.3 + t * 0.5;
+        const zf = tunnelDepth * depth * 0.1 - t * 0.3;
+        const zoomFactor = zf - Math.floor(zf);                     // fract
+        const scale = mix(0.2, 2.0, zoomFactor);
+        let tx = 0.5 + Math.cos(twistAngle) * scale * 0.3;
+        let ty = 0.5 + Math.sin(twistAngle) * scale * 0.3;
+        tx -= Math.floor(tx); ty -= Math.floor(ty);                 // fract, the "wrapping feel"
+        const c = s(clamp(tx * w, 0, w), clamp(ty * h, 0, h));
+        const fog = smoothstep(0, radius * 2.0, dist);
+        const ringPattern = zoomFactor;                             // the same fract, upstream recomputes it
+        const ring = Math.exp(-Math.pow((ringPattern - 0.5) * 8.0, 2.0)) * 0.2;
+        const vignette = 1.0 - smoothstep(0.3, 0.7, dist);
+        // chromatic aberration: the offset is built in aspect-corrected space and undone on x, like blackHole
+        const chromaAmt = (1.0 - fog) * 3.0;
+        let cdx = 0, cdy = 0;
+        if (dist > 0.001) { cdx = (dx / dist) * chromaAmt / aspect; cdy = (dy / dist) * chromaAmt; }
+        const rS = s(clamp((tx + cdx * 0.003) * w, 0, w), clamp((ty + cdy * 0.003) * h, 0, h));
+        const bS = s(clamp((tx - cdx * 0.003) * w, 0, w), clamp((ty - cdy * 0.003) * h, 0, h));
+        const chromaBlend = (1.0 - fog) * 0.4;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const fogMul = toHalf(0.3 + fog * 0.7);
+        let r = c[0] * fogMul, g = c[1] * fogMul, b = c[2] * fogMul;
+        r += (toHalf(ring * 0.5) + toHalf(vignette * 0.05)) * k;
+        g += (toHalf(ring * 0.6) + toHalf(vignette * 0.05)) * k;
+        b += (toHalf(ring * 1.0) + toHalf(vignette * 0.05)) * k;
+        // *** THE CHROMATIC TAPS ARE MIXED RAW. *** Upstream fog-multiplies `color` at step 1 and then mixes
+        // against rSamp.r / bSamp.b, which are sampled AFTER that and never touched by the fog. Multiplying
+        // them too -- which the first draft here did -- darkens the aberration by the fog a second time.
+        out[i]     = mix(r, rS[0], toHalf(chromaBlend));
+        out[i + 1] = g;
+        out[i + 2] = mix(b, bS[2], toHalf(chromaBlend));
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_inkBleed -- domain warping: fbm feeding fbm. SHAPE-CHECKED ONLY, because bcs_fbm reaches the sin-hash.
+ *
+ * `st + 4.0 * q + float2(1.7, 9.2) + time * speed * 0.05` adds a SCALAR to a float2 on the last term, which
+ * broadcasts in both Metal and GLSL. Written out per component here so the broadcast is visible rather than
+ * assumed.
+ */
+export function bcsInkBleed(img, { time = 0, warpStrength = 20, scale = 4, speed = 0.5, detail = 4,
+                                   pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const oct = Math.max(1, Math.trunc(detail));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        const stx = (px / w) * scale, sty = (py / h) * scale;
+        const qx = bcsFbm(stx + time * speed * 0.1, sty, oct);
+        const qy = bcsFbm(stx + 5.2, sty + 1.3 + time * speed * 0.08, oct);
+        const rx = bcsFbm(stx + 4 * qx + 1.7 + time * speed * 0.05, sty + 4 * qy + 9.2 + time * speed * 0.05, oct);
+        const ry = bcsFbm(stx + 4 * qx + 8.3 + time * speed * 0.04, sty + 4 * qy + 2.8 + time * speed * 0.04, oct);
+        const ox = (qx + rx) * warpStrength * pointScale, oy = (qy + ry) * warpStrength * pointScale;
+        const c = s(clamp(px + ox, 0, w), clamp(py + oy, 0, h)), i = (y * w + x) * 4;
+        out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_frosted -- a five-tap scatter blur whose offsets come from a per-cell hash. SHAPE-CHECKED ONLY.
+ *
+ * *** THE FIRST SHADER IN THIS PORT WHOSE UPSTREAM DOES NOT CLAMP ITS SAMPLES AT ALL -- TRAP 6, LOAD-BEARING
+ * RATHER THAN ANTICIPATED. *** Four of the five taps are `layer.sample(position + offset)` with no clamp
+ * anywhere, because Metal's layer sampling has DEFINED edge behaviour. GL wraps unless told otherwise, so a
+ * literal port would pull colour from the opposite side of the image along every border. This clamps, which
+ * is what makes it agree with Metal rather than with a literal reading of the source.
+ */
+export function bcsFrosted(img, { frostAmount = 0.7, grainSize = 8, clearRadius = 0.2, clearSoftness = 0.3,
+                                  pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const dist = Math.hypot(uvx - 0.5, uvy - 0.5);
+        const mask = smoothstep(clearRadius, clearRadius + clearSoftness, dist) * frostAmount;
+        const nux = uvx * grainSize, nuy = uvy * grainSize;
+        const nx = bcsHash(Math.floor(nux), Math.floor(nuy)) * 2 - 1;
+        const ny = bcsHash(Math.floor(nux) + 7.3, Math.floor(nuy) + 3.1) * 2 - 1;
+        const sc = mask * 8.0 * pointScale;
+        const taps = [[0, 0], [nx * sc, ny * sc], [-ny * sc, nx * sc],
+                      [-nx * sc * 0.7, -ny * sc * 0.7], [ny * sc * 0.7, -nx * sc * 0.7]];
+        const sum = [0, 0, 0, 0];
+        for (const [ox, oy] of taps) {
+            const c = s(clamp(px + ox, 0, w), clamp(py + oy, 0, h));
+            for (let k = 0; k < 4; k++) sum[k] += c[k];
+        }
+        for (let k = 0; k < 4; k++) sum[k] = toHalf(sum[k] / 5);
+        const orig = s(px, py);
+        const a = mix(orig[3], sum[3], toHalf(mask));
+        const k2 = premultiplied || a === 0 ? 1 : a;
+        for (let k = 0; k < 3; k++) out[i + k] = mix(orig[k], sum[k], toHalf(mask)) + toHalf(mask * 0.05) * k2;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_pixelateMosaic -- tiles, grout, a scatter-in animation and bevel lighting. SHAPE-CHECKED ONLY.
+ *
+ * *** THE FIRST SHADER IN THIS PORT THAT WRITES A VARYING ALPHA -- AND THE FIRST DRAFT OF THIS PARAGRAPH SAID
+ * "THE FIRST THAT WRITES ALPHA AT ALL", WHICH IS FALSE. *** bcs_refractLens has returned a hard alpha 1.0
+ * from its lens interior since v4196 and nobody noticed for four batches, because a constant 1.0 is
+ * invisible on the opaque test image every gate used until v4234. Measured on a flat-alpha image, exactly
+ * three of the 28 touch alpha: refractLens by 0.4 (the constant), frosted by 0.0001 (half quantisation of a
+ * mix between two equal values, i.e. not a write), and this one by 0.3.
+ *
+ * This one does `tileColor.a *= half(assembleProgress * 0.5 + 0.5)`, and the grout branch returns a fully
+ * OPAQUE constant regardless of what was underneath. That matters twice over: the premultiplied scale has to
+ * be taken from the alpha the shader is about to write rather than the one it read -- refractLens gets away
+ * with adding unscaled only because the alpha IT writes is 1, so the factor would have been 1 -- and a gate
+ * that only ever compares RGB would not see either behaviour at all.
+ *
+ * The bevel is a y-flip case: topLight = smoothstep(0.0, -0.8, bevelUV.y) is the TOP of the tile only because
+ * SwiftUI's y grows downward, which is why every coordinate here stays in the file's one convention.
+ */
+export function bcsPixelateMosaic(img, { time = 0, pixelSize = 8, bevel = 0.5, animateAssemble = 0, gap = 0.08,
+                                         premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        const gx = Math.floor(uvx * w / pixelSize) * pixelSize / w;
+        const gy = Math.floor(uvy * h / pixelSize) * pixelSize / h;
+        const cx = (uvx * w / pixelSize) - Math.floor(uvx * w / pixelSize);
+        const cy = (uvy * h / pixelSize) - Math.floor(uvy * h / pixelSize);
+        if (gap > 0.001) {
+            const ex = (cx >= gap * 0.5 ? 1 : 0) * (1 - cx >= gap * 0.5 ? 1 : 0);
+            const ey = (cy >= gap * 0.5 ? 1 : 0) * (1 - cy >= gap * 0.5 ? 1 : 0);
+            if (ex * ey < 0.5) {   // grout: an opaque constant, whatever was underneath
+                out[i] = toHalf(0.02); out[i + 1] = toHalf(0.02); out[i + 2] = toHalf(0.03); out[i + 3] = 1;
+                continue;
+            }
+        }
+        const tcx = gx + 0.5 * pixelSize / w, tcy = gy + 0.5 * pixelSize / h;
+        const tileHash = bcsHash(gx * 100, gy * 100);
+        let ap = clamp(time * 0.5 - tileHash * animateAssemble * 2.0, 0, 1);
+        ap = ap * ap * (3 - 2 * ap);
+        const sx = tcx + (bcsHash(gx * 200, gy * 200) - 0.5) * 0.5 * (1 - ap);
+        const sy = tcy + (bcsHash(gx * 300, gy * 300) - 0.5) * 0.5 * (1 - ap);
+        const c = s(clamp(sx * w, 0, w), clamp(sy * h, 0, h));
+        const bvx = (cx - 0.5) * 2, bvy = (cy - 0.5) * 2;
+        const topLight = smoothstep(0, -0.8, bvy) * bevel;
+        const leftLight = smoothstep(0, -0.8, bvx) * bevel * 0.5;
+        const bottomShadow = smoothstep(0, 0.8, bvy) * bevel;
+        const edgeDist = Math.min(Math.min(cx, 1 - cx), Math.min(cy, 1 - cy));
+        const edgeHi = (1 - smoothstep(0, 0.08, edgeDist)) * bevel * 0.3;
+        // the alpha this pixel will CARRY, which is what the premultiplied scale must use
+        const a = c[3] * toHalf(ap * 0.5 + 0.5);
+        const k = premultiplied || a === 0 ? 1 : a;
+        const add = toHalf(topLight * 0.15 + leftLight * 0.1) - toHalf(bottomShadow * 0.2) + toHalf(edgeHi);
+        for (let ch = 0; ch < 3; ch++) out[i + ch] = c[ch] + add * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 /** The traps, as data, so the gate asserts them and the next port reads them rather than rediscovering them. */
 export const METAL_TO_GLSL = [
     { id: "y-axis", metal: "position.y grows DOWNWARD", glsl: "gl_FragCoord.y grows UPWARD",

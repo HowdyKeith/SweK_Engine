@@ -31,7 +31,8 @@ import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens,
-    bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole, smoothstep,
+    bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
+    bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 import http from "node:http";
@@ -752,7 +753,7 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 24 of 41 ported", pass.swiftShaderNames().length === 24, pass.swiftShaderNames().length + " shaders");
+    ok("!! 28 of 41 ported", pass.swiftShaderNames().length === 28, pass.swiftShaderNames().length + " shaders");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -847,6 +848,214 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
 }
 
 // =========================================================================================================
+// (The numbering above restarted once at v4196 and never recovered; 15 is next in the file, not next in the
+// sequence. Left as it is rather than renumbering thirteen headings and breaking every reference to them.)
+console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, and the alpha channel at last");
+{
+    const B11 = ["wormhole", "inkBleed", "frosted", "pixelateMosaic"];
+    for (const n of B11) {
+        ok("   " + n + " is registered with a frag, knobs and defaults",
+            typeof pass.SHADERS[n] === "string" && Object.keys(pass.KNOBS[n] || {}).length >= 5 &&
+            pass.DEFAULT_KNOBS[n] && pass.swiftShaderNames().includes(n),
+            Object.keys(pass.KNOBS[n] || {}).join(", "));
+    }
+
+    // --- TRAP 6 FINALLY HAS A LOAD-BEARING CASE, AND IT IS frosted -----------------------------------------
+    // Every earlier shader that displaces a sample either stays inside the layer by construction or was
+    // clamped upstream too, so the clamps this port writes have been belt-and-braces for ten batches.
+    // *** bcs_frosted's UPSTREAM CLAMPS NOTHING. *** It samples layer at position + offset for four
+    // hash-rotated offsets of up to frostAmount * 8 POINTS, and Metal's layer sampling has defined edge
+    // behaviour, so upstream never had to think about it. GL wraps, and the frost band runs right to the
+    // border, so an unclamped port smears the far edge into the near one along the whole frame.
+    {
+        const fbody = pass.SHADERS.frosted.slice(pass.SHADERS.frosted.indexOf("void main"));
+        ok("!! *** all four displaced taps in FROSTED_FRAG are clamped, and the undisplaced one needs no clamp ***",
+            (fbody.match(/clamp\(p \+ vec2\(/g) || []).length === 4 &&
+            (fbody.match(/layerSample\(/g) || []).length === 6,
+            "five taps in the sum plus one for orig; four of the five are offset and all four are clamped");
+        // and the measurement that says the clamp is doing work rather than decorating: how many pixels
+        // actually push a tap off the edge at the default knobs.
+        const W = 48, H = 24, K = pass.DEFAULT_KNOBS.frosted;
+        let outside = 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const px = x + 0.5, py = y + 0.5, uvx = px / W, uvy = py / H;
+            const mask = smoothstep(K.clearRadius, K.clearRadius + K.clearSoftness,
+                                    Math.hypot(uvx - 0.5, uvy - 0.5)) * K.frostAmount;
+            const nx = bcsHash(Math.floor(uvx * K.grainSize), Math.floor(uvy * K.grainSize)) * 2 - 1;
+            const ny = bcsHash(Math.floor(uvx * K.grainSize) + 7.3, Math.floor(uvy * K.grainSize) + 3.1) * 2 - 1;
+            const sc = mask * 8 * K.pointScale;
+            const taps = [[nx * sc, ny * sc], [-ny * sc, nx * sc],
+                          [-nx * sc * 0.7, -ny * sc * 0.7], [ny * sc * 0.7, -nx * sc * 0.7]];
+            if (taps.some(([ox, oy]) => px + ox < 0 || px + ox > W || py + oy < 0 || py + oy > H)) outside++;
+        }
+        ok("!! ...and a THIRD of the frame pushes a tap off the edge, so the clamp is load-bearing, not decor",
+            outside > 300 && outside < 600,
+            outside + " of " + (W * H) + " pixels (" + (100 * outside / (W * H)).toFixed(1) + "%) have at " +
+            "least one tap outside the layer at the default knobs -- without the clamp every one of them " +
+            "reads a wrapped pixel from the opposite edge");
+        const model = fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8");
+        const fm = model.slice(model.indexOf("export function bcsFrosted"), model.indexOf("bcs_pixelateMosaic"));
+        ok("!! ...and the CPU reference clamps the SAME four taps, so the two cannot drift apart",
+            /s\(clamp\(px \+ ox, 0, w\), clamp\(py \+ oy, 0, h\)\)/.test(fm),
+            "one clamp inside the tap loop covers all five, the first of which is the zero offset");
+    }
+
+    // --- pixelateMosaic AND THE CLAIM I HAD TO WALK BACK ---------------------------------------------------
+    // My first draft of this said pixelateMosaic is THE FIRST SHADER IN THE PORT THAT WRITES ALPHA. It is not.
+    // *** bcs_refractLens HAS WRITTEN out[i+3] = 1.0 SINCE v4196 AND NOBODY NOTICED FOR FOUR BATCHES ***,
+    // because a constant 1.0 is invisible on the opaque test image every gate here used until this round.
+    // Measured on a FLAT-alpha image -- where a shader that merely DISPLACES a sample cannot show up, since
+    // every sample carries the same alpha -- exactly three of the 28 change the alpha at all, and the three
+    // are different in kind:
+    //     refractLens     51 px, by 0.4    -- writes the constant 1.0 inside the lens
+    //     frosted        976 px, by 0.0001 -- half quantisation of a mix between two equal values; not a write
+    //     pixelateMosaic 1152 px, by 0.3   -- the only one that SCALES the alpha it read
+    // That distinction is the whole premultiplied argument: refractLens adds its specular unscaled and is
+    // right to, because the alpha it writes is 1 and the factor would be 1. pixelateMosaic writes a varying
+    // alpha, so its factor has to come from the alpha being WRITTEN and not the one that was read.
+    {
+        const W = 48, H = 24;
+        const flat = { w: W, h: H, premultiplied: false, data: new Float32Array(W * H * 4) };
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4;
+            flat.data[i] = x / (W - 1); flat.data[i + 1] = y / (H - 1);
+            flat.data[i + 2] = ((x + y) % 7) / 6; flat.data[i + 3] = 0.6;
+        }
+        const FN = { wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
+                     pixelateMosaic: bcsPixelateMosaic, refractLens: bcsRefractLens, emboss: bcsEmboss,
+                     vortex: bcsVortex, melt: bcsMelt, glitch: bcsGlitch, heatShimmer: bcsHeatShimmer,
+                     wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
+                     geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole, kaleidoscope: bcsKaleidoscope,
+                     thermal: bcsThermal, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
+                     gravityWells: bcsGravityWells, solarize: bcsSolarize, duochrome: bcsDuochrome,
+                     chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho,
+                     topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple };
+        const moved = [], visible = [];
+        for (const n of pass.swiftShaderNames()) {
+            const o = FN[n](flat, { ...pass.DEFAULT_KNOBS[n], premultiplied: false });
+            let worst = 0;
+            for (let p = 0; p < W * H; p++) worst = Math.max(worst, Math.abs(o.data[p * 4 + 3] - 0.6));
+            if (worst > 1e-6) moved.push(n + " " + worst.toFixed(4));
+            if (worst > 1 / 255) visible.push(n);
+        }
+        ok("!! *** the map of the 28 is COVERED: every ported name has a model function here ***",
+            pass.swiftShaderNames().every((n) => typeof FN[n] === "function"),
+            "a name missing from this map would silently skip the alpha census below rather than fail it");
+        ok("!! *** only THREE of the 28 touch alpha on a flat-alpha image, and only TWO by a visible amount ***",
+            moved.length === 3 && visible.length === 2 &&
+            visible.includes("refractLens") && visible.includes("pixelateMosaic"),
+            moved.join(", ") + "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, " +
+            "which is under a level of 255 and is not a write");
+        ok("!! ...so 'the first shader that writes alpha' was WRONG: refractLens got there at v4196",
+            (() => {
+                const o = bcsRefractLens(flat, { ...pass.DEFAULT_KNOBS.refractLens });
+                let ones = 0;
+                for (let p = 0; p < W * H; p++) if (o.data[p * 4 + 3] === 1) ones++;
+                return ones > 20 && ones < W * H;
+            })(),
+            "the lens interior returns alpha 1.0 unconditionally; it is invisible on an opaque image, which " +
+            "is the only image this gate had until v4234");
+        ok("!! ...and pixelateMosaic is the first that writes a VARYING alpha, which is the one that needs care",
+            (() => {
+                const o = bcsPixelateMosaic(flat, { ...pass.DEFAULT_KNOBS.pixelateMosaic, time: 1.4,
+                                                    animateAssemble: 0.5, premultiplied: false });
+                const seen = new Set();
+                for (let p = 0; p < W * H; p++) seen.add(Math.round(o.data[p * 4 + 3] * 255));
+                return seen.size >= 8;
+            })(),
+            "eleven distinct alphas over eighteen tiles from ONE source alpha of 0.6, mid-assemble at t=1.4. " +
+            "At the comparison knobs (t=0.6) it is only three, because most tiles have not started moving " +
+            "yet -- which is why this census is taken mid-assemble and not at the knobs the GPU renders");
+    }
+
+    // --- THE GROUT BRANCH, WHICH THE COMPARISON KNOBS NEVER EXECUTE -----------------------------------------
+    // *** THE DEFAULT gap OF 0.08 DRAWS NO GROUT AT ALL ON THE 48x24 COMPARISON IMAGE. *** cell is
+    // fract((x + 0.5) / 8), so it only ever takes the eight values 0.0625, 0.1875 ... 0.9375, and the branch
+    // fires below gap * 0.5 = 0.04. The tile edges fall exactly between the samples. So the one branch in
+    // this shader that ignores the source entirely was, on the numbers the GPU section renders, DEAD CODE --
+    // found by counting the pixels that take it rather than by looking at the picture, which shows tidy tiles
+    // either way. A wider gap is used below so the branch is actually executed.
+    ok("!! *** the default gap draws ZERO grout pixels at the comparison size -- measured, not assumed ***",
+        (() => {
+            const W = 48, K = pass.DEFAULT_KNOBS.pixelateMosaic;
+            let g = 0;
+            for (let x = 0; x < W; x++) { const c = ((x + 0.5) / K.pixelSize) % 1; if (c < K.gap * 0.5 || 1 - c < K.gap * 0.5) g++; }
+            return g === 0;
+        })(),
+        "the smallest cell coordinate at pixelSize 8 is 0.0625 and the grout threshold is 0.04, so a gate " +
+        "that only ever renders the defaults never runs the branch");
+    ok("!! ...and at gap 0.3 it is 504 of 1152 pixels, so the branch below is genuinely exercised",
+        (() => {
+            const W = 48, H = 24, K = { ...pass.DEFAULT_KNOBS.pixelateMosaic, gap: 0.3 };
+            let g = 0;
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const cx = ((x + 0.5) / K.pixelSize) % 1, cy = ((y + 0.5) / K.pixelSize) % 1;
+                if (cx < K.gap * 0.5 || 1 - cx < K.gap * 0.5 || cy < K.gap * 0.5 || 1 - cy < K.gap * 0.5) g++;
+            }
+            return g === 504;
+        })(), "504 grout pixels of 1152");
+    // and the grout must not depend on what was underneath it, which is the property that makes it a branch
+    // rather than a blend.
+    {
+        const W = 16, H = 16;
+        const mk = (v) => { const d = new Float32Array(W * H * 4); for (let i = 0; i < W * H; i++) { d[i * 4] = v; d[i * 4 + 1] = v; d[i * 4 + 2] = v; d[i * 4 + 3] = i % 2 ? 1 : 0; } return { w: W, h: H, premultiplied: false, data: d }; };
+        const a = bcsPixelateMosaic(mk(0), { gap: 0.3, pixelSize: 4 });
+        const b = bcsPixelateMosaic(mk(1), { gap: 0.3, pixelSize: 4 });
+        let grout = 0, same = 0;
+        for (let p = 0; p < W * H; p++) {
+            const cx = ((p % W + 0.5) / 4) % 1, cy = (((p / W) | 0) + 0.5) / 4 % 1;
+            if (cx < 0.15 || 1 - cx < 0.15 || cy < 0.15 || 1 - cy < 0.15) {
+                grout++;
+                if (a.data[p * 4 + 3] === 1 && b.data[p * 4 + 3] === 1 &&
+                    a.data[p * 4] === b.data[p * 4]) same++;
+            }
+        }
+        ok("!! the grout is OPAQUE and IDENTICAL over a black source and a white one, alpha 0 and alpha 1 alike",
+            grout > 0 && same === grout,
+            grout + " grout pixels, all of them alpha 1 and the same colour whatever was underneath -- " +
+            "an effect that blended would show two different greys here");
+    }
+
+    // --- wormhole's wrap, which is what makes it ungradeable at the seam and nowhere else -------------------
+    ok("!! wormhole WRAPS its sample coordinate, in both copies, and that is why it has a seam at all",
+        /fract\(/.test(pass.SHADERS.wormhole.slice(pass.SHADERS.wormhole.indexOf("void main"))) &&
+        /tx -= Math\.floor\(tx\); ty -= Math\.floor\(ty\);/.test(
+            fs.readFileSync(path.join(ENG, "render/swiftShaderModel.mjs"), "utf8")),
+        "GLSL fract() and the model's x - floor(x) are the same function; the seam is the shader's shape, " +
+        "not a disagreement between them");
+// --- THE SABOTAGE RECORD FOR THIS BATCH, INCLUDING THE TWO CHECKS THAT ARE SHAPE ONLY -------------------
+// Eleven deliberate breakages, each applied, run, and restored byte-identical. All eleven turned something
+// red, but not all of them turned red for the same KIND of reason, and the difference is the useful part:
+//
+//   A  wormhole drops fract()                     -> 250 levels off-seam, 452 px          RENDERED
+//   B  wormhole fog-multiplies the chroma taps    -> 52 levels off-seam, 388 px           RENDERED
+//      (B is the real port error this batch found and fixed, replayed as a regression)
+//   C  frosted unclamps one displaced tap          -> the tap-count check only              SHAPE ONLY
+//   D  frosted drops `* k` from the additive term  -> 8 levels at pointScale 0             RENDERED
+//   E  pixelateMosaic drops `* k` from the bevel   -> 18 levels fully assembled            RENDERED
+//   F  pixelateMosaic drops the alpha write        -> 60 levels of alpha mid-assemble      RENDERED
+//   G  pixelateMosaic's grout blends the source    -> 125 levels                           RENDERED
+//   H  pixelateMosaic flips the bevel's top light  -> 14 levels                            RENDERED
+//   I  inkBleed drops uPointScale                  -> the trap 3 check only                SHAPE ONLY
+//   J  the MODEL's grout carries the source alpha  -> 3 checks, two of them rendered       RENDERED
+//   K  the MODEL's frosted stops clamping          -> the correspondence check only         SHAPE ONLY
+//
+// *** C, I AND K ARE WEAKER THAN THEY LOOK AND ARE LABELLED HERE RATHER THAN COUNTED WITH THE REST. *** A
+// shape check falls to a rewrite that means the same thing, and it can only see what it was told to look
+// for. Two of the three cannot be strengthened from this gate at all: frosted's clamp is invisible at
+// pointScale 0 (the only configuration in which frosted can be rendered against its reference, because the
+// hash cancels there) and unmeasurable above it (because the hash does not), and inkBleed's point scale is
+// invisible at devicePixelRatio 1, which is the only ratio anything here renders at. Trap 3 has been argued
+// from the source and never once measured, for eleven batches; that is the next real hole in this file, and
+// it is stated in the closing note rather than left to be rediscovered.
+    ok("!! inkBleed carries the point scale on its warp, which is trap 3 and not optional",
+        "pointScale" in pass.KNOBS.inkBleed &&
+        /uPointScale/.test(pass.SHADERS.inkBleed.slice(pass.SHADERS.inkBleed.indexOf("void main"))),
+        "warpStrength is 20 POINTS, so on a 3x display it is 60 device pixels and the bleed is three times " +
+        "as wide as the author drew it");
+}
+
+// =========================================================================================================
 console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real WebGL2 context, against the CPU model");
 {
     const require_ = createRequire(import.meta.url);
@@ -894,7 +1103,8 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             touchRipple: bcsTouchRipple, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
             gravityWells: bcsGravityWells, refractLens: bcsRefractLens,
             wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
-            geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole };
+            geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole,
+            wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic };
         const CASES = { emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
             duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
             chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
@@ -902,14 +1112,17 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             touchRipple: { touchX: 30, touchY: 8, touchAge: 0.4 }, liveRipple: { time: 1.3 },
             shockwave: { time: 0.35 }, gravityWells: { time: 0.9 }, refractLens: { touchX: 24, touchY: 12 },
             wavePool: { time: 0.8 }, pulse: { time: 0.42 }, holographic: { time: 0.6 },
-            geometricWarp: { time: 0.7 }, blackHole: { time: 0.55 } };
+            geometricWarp: { time: 0.7 }, blackHole: { time: 0.55 },
+            wormhole: { time: 0.9 }, inkBleed: { time: 0.5 }, frosted: {}, pixelateMosaic: { time: 0.6, animateAssemble: 0.5 } };
         // The five that call the sin-hash. Determined from the SHADER SOURCE, not from a list I typed.
         const HASHED = pass.swiftShaderNames().filter((n) => {
             const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
             return /bcs_(hash|valueNoise|fbm)\(/.test(body);
         });
+        // 5 at v4196, 8 at v4234: batch 11 is the first batch that is MOSTLY hash-reaching, because after
+        // wormhole there are no gradeable shaders left upstream at all.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
-            HASHED.length === 5, HASHED.join(", "));
+            HASHED.length === 8, HASHED.join(", "));
 
         const results = {};
         for (const name of pass.swiftShaderNames()) {
@@ -928,12 +1141,187 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             }
             results[name] = { worst, off, nan, black: gpu.filter((v, i) => i % 4 !== 3 && v === 0).length };
         }
-        ok("!! the page loaded and ran 24 shaders with no script error", errs.length === 0, errs.join(" | "));
+        ok("!! the page loaded and ran 28 shaders with no script error", errs.length === 0, errs.join(" | "));
 
-        // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
         // vortex was already excluded for landing on texel boundaries; batch 10's three displacing shaders do the
         // same thing for the same reason, and are graded by the one-texel bound below instead of by <= 2.
-        const TEXEL_EXEMPT = ["vortex", "wavePool", "geometricWarp", "blackHole"];
+        const TEXEL_EXEMPT = ["vortex", "wavePool", "geometricWarp", "blackHole", "wormhole"];
+
+        // *** wormhole IS THE LAST SHADER UPSTREAM THAT TOUCHES NO HASH, AND IT STILL CANNOT BE GRADED TO THE
+        // PIXEL EVERYWHERE -- FOR A DIFFERENT REASON, WHICH IS WORTH MORE THAN THE PORT ITSELF. *** It wraps
+        // its sample coordinate with fract(), so its seam is not a texel boundary but the WHOLE IMAGE: a
+        // one-ULP disagreement at tunnelUV = 0.99999 vs 1.0 moves the sample from column 47 to column 0, and
+        // on a gradient that is 255 levels. vortex's case was the same mechanism bounded by one texel; a wrap
+        // has no such bound. So the seam pixels are EXCLUDED BY ARITHMETIC rather than by widening a
+        // tolerance, and the count is asserted so the exclusion cannot quietly grow.
+        const SEAM = (() => {
+            const set = new Set(), K = pass.DEFAULT_KNOBS.wormhole, time = 0.9;
+            const t = time * K.speed, aspect = W / H;
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const dx = ((x + 0.5) / W - 0.5) * aspect, dy = (y + 0.5) / H - 0.5;
+                const dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+                const td = K.radius / Math.max(dist, 0.001);
+                const twa = ang + K.twist * td * 0.3 + t * 0.5;
+                const zf = td * K.depth * 0.1 - t * 0.3, zoom = zf - Math.floor(zf);
+                const scale = 0.2 + 1.8 * zoom;
+                let tx = 0.5 + Math.cos(twa) * scale * 0.3, ty = 0.5 + Math.sin(twa) * scale * 0.3;
+                tx -= Math.floor(tx); ty -= Math.floor(ty);
+                // within one texel of any of the four seams
+                if (Math.min(tx, 1 - tx) < 1 / W || Math.min(ty, 1 - ty) < 1 / H) set.add(y * W + x);
+            }
+            return set;
+        })();
+        // ---- THE HOLE v4233's SABOTAGE FOUND, CLOSED AT v4234 ------------------------------------------------
+        // *** DELETING THE PREMULTIPLIED BRANCH FROM PULSE_FRAG LEFT THIS WHOLE GATE GREEN. *** Every image
+        // above is fully opaque, so the alpha scale is 1 whatever the shader does with it, and the branch that
+        // makes trap 2 real was never executed on the GPU at all. The CPU references were covered in section 3
+        // against a half-transparent image from the start; the GLSL was not, for eleven batches.
+        //
+        // So: a SECOND comparison image, identical but for a diagonal alpha ramp, rendered with
+        // premultiplied = 0 and graded against the CPU model told the same thing. A shader that ignores the
+        // uniform now diverges wherever alpha < 1, which is most of the frame.
+        const asrc = new Uint8Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4;
+            asrc[i] = src[i]; asrc[i + 1] = src[i + 1]; asrc[i + 2] = src[i + 2];
+            // a ramp rather than a constant: a constant alpha can be absorbed into a knob, a ramp cannot
+            asrc[i + 3] = 40 + Math.round((x + y) * 175 / (W + H - 2));
+        }
+        const aimg = { w: W, h: H, premultiplied: false, data: Float32Array.from(asrc, (v) => v / 255) };
+        const ALPHA_AWARE = pass.swiftShaderNames().filter((n) => "premultiplied" in (pass.KNOBS[n] || {}));
+        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are eight of them",
+            ALPHA_AWARE.length === 8 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
+            ALPHA_AWARE.join(", "));
+        const alphaResults = {};
+        for (const name of ALPHA_AWARE) {
+            const knobs = { ...CASES[name], premultiplied: 0 };
+            const gpu = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                const p = window.__mk(name, W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { name, knobs, W, H, src: Array.from(asrc) });
+            const cpu = MODEL[name](aimg, { ...pass.DEFAULT_KNOBS[name], ...CASES[name], premultiplied: false });
+            let worst = 0, off = 0, alphaWorst = 0;
+            for (let i = 0; i < W * H * 4; i++) {
+                // wormhole wraps its sample, so its seam pixels are excluded here for the same arithmetic
+                // reason as in the batch-11 block: a wrap turns one ULP into the whole gradient.
+                if (name === "wormhole" && SEAM.has(Math.floor(i / 4))) continue;
+                const c = Math.max(0, Math.min(255, Math.round(cpu.data[i] * 255)));
+                const d = Math.abs(c - gpu[i]);
+                if (i % 4 === 3) { if (d > alphaWorst) alphaWorst = d; continue; }
+                if (d > worst) worst = d; if (d > 2) off++;
+            }
+            alphaResults[name] = { worst, off, alphaWorst };
+        }
+        // A hash shader cannot be graded to the pixel HERE either -- the sin-hash argument does not become
+        // reproducible because the image gained an alpha channel. Those are checked for SHAPE: the alpha the
+        // GPU writes must still track the alpha the model writes, which is what the premultiplied branch and
+        // pixelateMosaic's alpha write are actually about.
+        // *** AND MY FIRST VERSION OF THIS ASSERTED THAT THE HASH SHADERS' ALPHA STILL TRACKS THE MODEL. IT
+        // DOES NOT, AND THE GATE SAID SO. *** frosted mixes in the alpha of four HASH-DISPLACED taps, and
+        // pixelateMosaic scales alpha by an assemble progress driven straight off bcs_hash -- so for those two
+        // the alpha is as hash-dependent as the colour. They are graded in the CONFIGURATIONS where the hash
+        // cancels instead: see the three targeted checks immediately below.
+        const GRADEABLE_ALPHA = ALPHA_AWARE.filter((n) => !HASHED.includes(n));
+        const alphaBound = (n) => TEXEL_EXEMPT.includes(n) ? Math.ceil(255 / (H - 1)) : 2;
+        for (const n of GRADEABLE_ALPHA) {
+            ok("   " + n.padEnd(14) + " honours the alpha convention ON THE GPU too",
+                alphaResults[n].worst <= alphaBound(n),
+                "worst " + alphaResults[n].worst + " levels over a diagonal alpha ramp, bound " + alphaBound(n));
+        }
+        ok("!! *** trap 2 is now exercised on the GPU, not only in the CPU model ***",
+            GRADEABLE_ALPHA.every((n) => alphaResults[n].worst <= alphaBound(n)),
+            "deleting a `* k` from any of " + GRADEABLE_ALPHA.join("/") + " now turns this red");
+
+        // ---- THE TWO HASH SHADERS' ALPHA, GRADED WHERE THE HASH CANNOT REACH ----------------------------
+        // frosted and pixelateMosaic are excluded from the block above because their alpha is as hash-driven
+        // as their colour, and section 11's closing check says why that can never be graded. It does not
+        // follow that their alpha is unchecked: BOTH HAVE A CONFIGURATION IN WHICH THE HASH CANCELS, and the
+        // premultiplied factor and the alpha write survive it. Those configurations are rendered here.
+        {
+            // (i) frosted at pointScale 0. sc = mask * 8 * pointScale, so every displaced tap collapses onto
+            // the undisplaced one and nx / ny are multiplied by zero -- the hash is still COMPUTED, and still
+            // diverges, and cannot reach the output. What is left is the part trap 2 lives in:
+            // mix(orig, sum, mask) + half(mask * 0.05) * k, with k the ramp alpha. Deleting the `* k` shifts
+            // it by half(mask*0.05) * (1 - a), which is up to 7 levels where the ramp is dimmest.
+            const fk = { ...CASES.frosted, pointScale: 0, premultiplied: 0 };
+            const g = await pg.evaluate(({ knobs, W, H, src }) => {
+                const p = window.__mk("frosted", W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { knobs: fk, W, H, src: Array.from(asrc) });
+            const c = MODEL.frosted(aimg, { ...pass.DEFAULT_KNOBS.frosted, ...fk, premultiplied: false });
+            let worst = 0, aworst = 0;
+            for (let i = 0; i < W * H * 4; i++) {
+                const v = Math.max(0, Math.min(255, Math.round(c.data[i] * 255)));
+                const d = Math.abs(v - g[i]);
+                if (i % 4 === 3) { if (d > aworst) aworst = d; } else if (d > worst) worst = d;
+            }
+            ok("!! *** frosted IS gradeable on the GPU at pointScale 0, where the hash multiplies out ***",
+                worst <= 2 && aworst <= 2,
+                "worst " + worst + " levels of colour and " + aworst + " of alpha over the ramp -- the frost " +
+                "itself is switched off, the premultiplied add is not, and that is the half of the shader " +
+                "a hash cannot be blamed for");
+        }
+        {
+            // (ii) pixelateMosaic with animateAssemble 0 and time 2. ap clamps to 1, so the scatter offset
+            // (hash - 0.5) * 0.5 * (1 - ap) is EXACTLY zero and the tile samples its own centre. pixelSize 9
+            // rather than the default 8 because 8 puts that centre on an integer pixel coordinate -- a texel
+            // BOUNDARY under NEAREST -- and 9 puts it at x.5, a texel centre. gap 0.3 rather than 0.08
+            // because 0.08 draws no grout at all at this size, as section 15 measured.
+            const mk9 = { time: 2.0, animateAssemble: 0, gap: 0.3, pixelSize: 9, premultiplied: 0 };
+            const g = await pg.evaluate(({ knobs, W, H, src }) => {
+                const p = window.__mk("pixelateMosaic", W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { knobs: mk9, W, H, src: Array.from(asrc) });
+            const c = MODEL.pixelateMosaic(aimg, { ...pass.DEFAULT_KNOBS.pixelateMosaic, ...mk9, premultiplied: false });
+            let worst = 0, aworst = 0;
+            for (let i = 0; i < W * H * 4; i++) {
+                const v = Math.max(0, Math.min(255, Math.round(c.data[i] * 255)));
+                const d = Math.abs(v - g[i]);
+                if (i % 4 === 3) { if (d > aworst) aworst = d; } else if (d > worst) worst = d;
+            }
+            ok("!! *** pixelateMosaic IS gradeable on the GPU fully assembled, hash and all ***",
+                worst <= 2 && aworst <= 2,
+                "worst " + worst + " levels of colour and " + aworst + " of alpha, with the grout branch, the " +
+                "bevel and the premultiplied factor all executing -- at ap = 1 the scatter is multiplied by " +
+                "zero and the whole shader becomes deterministic");
+        }
+        {
+            // (iii) and the ALPHA WRITE itself, which (ii) cannot see: at ap = 1 the scale is half(1) = 1,
+            // so deleting `* half(ap * 0.5 + 0.5)` changes nothing there. Mid-assemble the scale is 0.608 and
+            // the scatter is live -- but on a FLAT-alpha source every sample carries the same alpha, so the
+            // written alpha is hash-free even though the colour is not. A flat alpha would be the wrong
+            // choice for the general comparison above (a constant can be absorbed into a knob); here it is
+            // exactly the instrument, because it removes the hash from alpha WITHOUT removing the write.
+            const flatSrc = new Uint8Array(W * H * 4);
+            for (let i = 0; i < W * H; i++) {
+                flatSrc[i * 4] = src[i * 4]; flatSrc[i * 4 + 1] = src[i * 4 + 1];
+                flatSrc[i * 4 + 2] = src[i * 4 + 2]; flatSrc[i * 4 + 3] = 153;   // 0.6
+            }
+            const flatImg = { w: W, h: H, premultiplied: false, data: Float32Array.from(flatSrc, (v) => v / 255) };
+            const mkh = { time: 0.6, animateAssemble: 0, gap: 0.3, pixelSize: 9, premultiplied: 0 };
+            const g = await pg.evaluate(({ knobs, W, H, src }) => {
+                const p = window.__mk("pixelateMosaic", W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { knobs: mkh, W, H, src: Array.from(flatSrc) });
+            const c = MODEL.pixelateMosaic(flatImg, { ...pass.DEFAULT_KNOBS.pixelateMosaic, ...mkh, premultiplied: false });
+            let aworst = 0; const levels = new Set();
+            for (let p = 0; p < W * H; p++) {
+                const v = Math.max(0, Math.min(255, Math.round(c.data[p * 4 + 3] * 255)));
+                levels.add(g[p * 4 + 3]);
+                const d = Math.abs(v - g[p * 4 + 3]); if (d > aworst) aworst = d;
+            }
+            ok("!! *** the alpha WRITE is graded on the GPU, mid-assemble, where (ii) is blind to it ***",
+                aworst <= 2 && levels.size === 2 && levels.has(255),
+                "worst " + aworst + " levels; the GPU wrote " + [...levels].sort((a, b) => a - b).join(" and ") +
+                " -- 93 is 0.6 * half(0.216 * 0.5 + 0.5) = 0.6 * 0.6079 on the tiles and 255 is the opaque " +
+                "grout. Deleting the scale would leave the tiles at 153, which is 60 levels out.");
+        }
+
+        // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
         const EXACTISH = pass.swiftShaderNames().filter((n) => !HASHED.includes(n) && !TEXEL_EXEMPT.includes(n));
         for (const n of EXACTISH) {
             ok("   " + n.padEnd(15) + " GPU matches the CPU model", results[n].worst <= 2,
@@ -971,6 +1359,35 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             BATCH10.every((n) => results[n].nan === 0));
         ok("...and none of batch 10 is a sin-hash shader, which is why they could be graded at all",
             BATCH10.every((n) => !HASHED.includes(n)));
+
+        // ---- BATCH 11: wormhole, graded everywhere except its own wrap seam ----------------------------------
+        {
+            const gpu = await pg.evaluate(({ W, H, src, knobs }) => {
+                const p = window.__mk("wormhole", W, H);
+                p.render(new Uint8Array(src), knobs);
+                return Array.from(p.readPixels());
+            }, { W, H, src: Array.from(src), knobs: CASES.wormhole });
+            const cpu = MODEL.wormhole(fimg, { ...pass.DEFAULT_KNOBS.wormhole, ...CASES.wormhole });
+            let onWorst = 0, offWorst = 0, offCount = 0;
+            for (let px = 0; px < W * H; px++) {
+                for (let ch = 0; ch < 3; ch++) {
+                    const i = px * 4 + ch;
+                    const c = Math.max(0, Math.min(255, Math.round(cpu.data[i] * 255)));
+                    const d = Math.abs(c - gpu[i]);
+                    if (SEAM.has(px)) { if (d > onWorst) onWorst = d; }
+                    else { if (d > offWorst) offWorst = d; if (d > 2) offCount++; }
+                }
+            }
+            ok("!! the seam set is small and derived from the shader's own arithmetic, not from the failures",
+                SEAM.size > 0 && SEAM.size < W * H * 0.4,
+                SEAM.size + " of " + (W * H) + " (" + (100 * SEAM.size / (W * H)).toFixed(1) + "%) within one texel of a seam -- " +
+                "large because the tunnel mapping concentrates samples near the wrap, which is the shader's shape and not a loose bound");
+            ok("!! *** AWAY FROM THE SEAM, wormhole IS EXACT AGAINST ITS CPU REFERENCE ***",
+                offWorst <= 2 && offCount === 0,
+                "worst " + offWorst + " levels off-seam, " + offCount + " pixels over 2");
+            ok("...and ON the seam it can differ by the full range, which is what a wrap costs",
+                onWorst > 100, "worst " + onWorst + " levels on-seam -- column 47 and column 0 of a gradient");
+        }
 
         // *** A TRAP I ASSERTED AND THEN MEASURED AWAY. *** The holographic port's first comment said that
         // using the exact 2*PI/3 instead of upstream's 2.094h would shift the green phase. It would not:
@@ -1047,22 +1464,25 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             HASHED.every((n) => results[n].off > 100) && EXACTISH.every((n) => results[n].worst <= 2),
             "bcs_hash is fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). Multiplying sin's output by 43758 " +
             "turns one float32 ULP into a DIFFERENT RANDOM NUMBER: measured divergence up to 0.68 on a 0..1 " +
-            "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. Sections 1-10 are " +
-            "what checks these five, and they check the SHAPE rather than the pixels.");
+            "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. The source-shape " +
+            "sections are what check these eight, and they check the SHAPE rather than the pixels -- plus, " +
+            "since v4234, the two configurations above in which frosted's and pixelateMosaic's hash cancels.");
         await b.close(); srv.close();
     }
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-            "\nunchecked here: whether these effects look GOOD, and whether the five sin-hash shaders match " +
-            "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What is " +
-            "checked is that 24 of 41 are ported, that 15 of them agree with their CPU reference on a real " +
-        "WebGL2 context to within 2 levels, that 4 more (vortex and batch 10's three displacing shaders) " +
-        "agree to within ONE TEXEL of the test gradient, and 5 provably cannot agree at all. *** AND ONE " +
-        "HOLE, FOUND BY SABOTAGE AND NOT CLOSED: the GPU comparison image is fully OPAQUE, so deleting the " +
-        "premultiplied branch from a fragment shader leaves this gate green. The CPU references are checked " +
-        "against a half-transparent image in section 3; the GLSL is not, and closing that needs a second " +
-        "comparison image with alpha, which is a round of its own. *** " +
-            " that a knob which is a coordinate needs the same flip a " +
-            "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero.");
+    "\nunchecked here: whether these effects look GOOD, and whether the eight sin-hash shaders match " +
+    "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What IS " +
+    "checked, on a real WebGL2 context: 28 of 41 are ported; 15 of them agree with their CPU reference to " +
+    "within 2 levels; 4 more (vortex and batch 10's three displacing shaders) agree to within ONE TEXEL of " +
+    "the test gradient; wormhole agrees exactly away from its own wrap seam and by the full range on it; and " +
+    "8 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
+    "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero. *** THE " +
+    "HOLE v4233's SABOTAGE FOUND IS CLOSED AT v4234: a second comparison image carries a diagonal alpha ramp " +
+    "and is rendered with premultiplied = 0, so deleting a `* k` from a fragment shader now turns this red " +
+    "for the six gradeable alpha-aware shaders, and the two hash ones are graded in the configurations where " +
+    "the hash cancels (frosted at pointScale 0, pixelateMosaic fully assembled and on a flat alpha). *** " +
+    "STILL OPEN: the 13 unported shaders, and the fact that NO comparison here renders at a device pixel " +
+    "ratio other than 1, so trap 3 is argued from the source and never measured.");
 process.exit(fails ? 1 : 0);

@@ -8,6 +8,89 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4234 -- SwiftUIShaders batch 11: 28 of 41, the alpha hole closed by sabotage, and a branch that was dead code
+
+*** THE HOLE v4233's SABOTAGE FOUND IS CLOSED, AND CLOSING IT IS WORTH MORE THAN THE FOUR SHADERS. *** Last
+round, deleting the premultiplied branch from PULSE_FRAG left the whole gate GREEN. The reason was
+embarrassing and structural: every image the GPU section rendered was fully OPAQUE, so the alpha scale was 1
+whatever the shader did with it, and the branch that makes trap 2 real had never once executed on a GPU in
+eleven batches. The fix is a second comparison image, identical to the first but carrying a diagonal alpha
+ramp (40 + (x + y) * 175 / (W + H - 2)), rendered with premultiplied = 0 and graded against the CPU model
+told the same thing. A ramp rather than a constant, because a constant alpha can be absorbed into a knob and
+a ramp cannot. Verified by replaying the exact v4233 sabotage: it now fails with 48 levels where it
+previously passed.
+
+*** FOUR MORE SHADERS, 24 OF 41 TO 28, AND THE FIRST OF THEM IS THE LAST ONE UPSTREAM THAT TOUCHES NO
+HASH. *** bcs_wormhole, bcs_inkBleed, bcs_frosted and bcs_pixelateMosaic. The batch was picked by
+recomputing which of the 17 remaining shaders could be graded at all, with brace-matching over the upstream
+bodies rather than from memory -- and the recount corrected the note this round inherited, which said two
+were gradeable. Only wormhole is; liquidMirror calls bcs_valueNoise.
+
+*** wormhole IS EXACT AWAY FROM ITS OWN SEAM AND 255 LEVELS OUT ON IT, AND FINDING OUT WHICH TOOK A REAL PORT
+ERROR OUT FIRST. *** The first render disagreed by 255 levels at 4 pixels. The first thing that turned up
+under it was NOT the seam: the chromatic taps were being mixed against a fog-multiplied colour, when upstream
+fog-multiplies `color` at step 1 and then mixes against rSamp.r / bSamp.b, which are sampled AFTER that and
+never touched by the fog. Fixed in both the CPU reference and the GLSL. When 255 levels persisted, the
+remaining cause was measured rather than guessed: wormhole wraps its sample coordinate with fract(), so its
+disagreement is not bounded by one texel the way vortex's is -- a one-ULP difference at tunnelUV = 0.99999
+versus 1.0 moves the sample from column 47 to column 0, which on a gradient is the entire range. 50 pixels sit
+within 0.004 of a seam and some within 6e-5. So the seam pixels are excluded BY ARITHMETIC -- recomputed from
+the shader's own tunnel mapping, not from the list of failures -- and the count is asserted so the exclusion
+cannot quietly grow. 332 of 1152 pixels, 28.8%. Off the seam: worst 2 levels, 0 pixels over 2.
+
+*** A BRANCH THAT WAS DEAD CODE ON EVERY NUMBER THIS GATE RENDERS, FOUND BY COUNTING THE PIXELS THAT TAKE IT
+RATHER THAN BY LOOKING AT THE PICTURE. *** pixelateMosaic's grout returns an opaque constant regardless of
+what was underneath, which is the only branch in 28 shaders that ignores the source entirely. At the default
+gap of 0.08 on the 48x24 comparison image it draws ZERO pixels: cell is fract((x + 0.5) / 8), which only ever
+takes the eight values 0.0625, 0.1875 ... 0.9375, and the branch fires below gap * 0.5 = 0.04. The tile edges
+fall exactly between the samples. The targeted comparisons use gap 0.3 (504 grout pixels) and pixelSize 9
+rather than 8, because 8 puts a tile centre on an integer pixel coordinate -- a texel BOUNDARY under NEAREST
+-- and 9 puts it at x.5, a texel centre.
+
+*** THE TWO NEW HASH SHADERS ARE NOT LEFT UNGRADED, THEY ARE GRADED WHERE THE HASH CANCELS. *** A sin-hash
+shader can never be checked pixel-for-pixel against a CPU reference (v4196, measured at 0.68 divergence on a
+0..1 value). It does not follow that its alpha convention is unverifiable. frosted at pointScale 0 collapses
+every displaced tap onto the undisplaced one -- the hash is still computed and still diverges and cannot
+reach the output -- leaving exactly the part trap 2 lives in. pixelateMosaic fully assembled (time 2,
+animateAssemble 0) multiplies its scatter by 1 - ap = 0 and becomes wholly deterministic, grout and bevel and
+premultiplied factor included; mid-assemble on a FLAT-alpha source, every sample carries the same alpha, so
+the written alpha is hash-free even though the colour is not. Both come back at 0 levels.
+
+*** AND MY FIRST DRAFT SAID pixelateMosaic IS THE FIRST SHADER IN THE PORT THAT WRITES ALPHA, WHICH IS FALSE,
+AND THE CENSUS I WROTE TO PROVE IT SAID SO. *** bcs_refractLens has returned a hard alpha 1.0 from its lens
+interior since v4196 and nobody noticed for four batches, because a constant 1.0 is invisible on an opaque
+image. Measured on a flat-alpha image -- where a shader that merely DISPLACES a sample cannot show up, since
+every sample carries the same alpha -- exactly three of the 28 touch alpha: refractLens by 0.4 (the
+constant), frosted by 0.0001 (half quantisation of a mix between two equal values, which is under one level
+of 255 and is not a write), and pixelateMosaic by 0.3. The corrected claim is narrower and is the one that
+matters: pixelateMosaic is the first that writes a VARYING alpha, and that is why its premultiplied factor
+has to be taken from the alpha it is about to write rather than the one it read. refractLens gets away with
+adding its specular unscaled only because the alpha IT writes is 1, so the factor would have been 1 anyway.
+
+*** TRAP 6 IS LOAD-BEARING FOR THE FIRST TIME SINCE IT WAS WRITTEN DOWN AT v4163. *** Upstream's frosted
+clamps NOTHING: it samples layer at position + offset for four hash-rotated offsets of up to frostAmount * 8
+points, because Metal's layer sampling has defined edges. GL wraps. Measured at the default knobs, 400 of
+1152 pixels -- 34.7% of the frame -- push at least one tap outside the layer, so an unclamped port smears the
+far edge into the near one along the whole border.
+
+ELEVEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND VERIFIED BY HASH, AND ALL ELEVEN TURNED SOMETHING RED --
+but the gate now labels the three that are weaker than they look rather than counting them with the rest.
+Dropping wormhole's fract: 250 levels off-seam at 452 pixels. Replaying the chroma port error: 52 levels at
+388. Deleting frosted's premultiplied factor: 8 levels. Deleting pixelateMosaic's: 18. Deleting its alpha
+write: 60 levels of alpha. Making its grout blend: 125. Flipping its bevel's top light: 14. Unclamping one
+frosted tap, dropping inkBleed's point scale, and unclamping the CPU reference are caught by SHAPE CHECKS
+ONLY -- a shape check falls to a rewrite that means the same thing -- and two of those three cannot be
+strengthened from this gate at all: frosted's clamp is invisible at pointScale 0 and unmeasurable above it,
+and inkBleed's point scale is invisible at devicePixelRatio 1, which is the only ratio anything here renders
+at. *** TRAP 3 HAS BEEN ARGUED FROM THE SOURCE AND NEVER ONCE MEASURED, FOR ELEVEN BATCHES. *** That is the
+next real hole in this file and it is written into the closing note rather than left to be rediscovered.
+
+Gate tools/ship/swiftShaders-selfcheck.mjs now runs 198 checks over 28 shaders on a real WebGL2 context: 15
+agree with their CPU reference to within 2 levels, 4 agree to within one texel of the test gradient, wormhole
+agrees exactly off its wrap seam, and 8 provably cannot agree at all. 13 remain.
+
+The build now stands at 4234 gates.
+
 ## v4233 -- SwiftUIShaders batch 10: the five that could be graded, and the fmod that finally decides something
 
 *** BATCH 10: FIVE MORE SwiftUIShaders, 19 OF 41 TO 24, AND THE FIVE WERE CHOSEN SO THAT THEY COULD BE GRADED. *** Of the 22 still unported, 7 call the sin-hash directly and 8 more reach it through fbm, and v4196 established that such a shader CANNOT be verified against a CPU reference on any two implementations -- one float32 ULP into sin() times 43758 is a different random number, measured up to 0.68 divergence on a 0..1 value. Those 15 can be ported but only ever checked by shape. bcs_wavePool, bcs_pulse, bcs_holographic, bcs_geometricWarp and bcs_blackHole touch neither, so every one is answerable to the pixel, and a batch that can be graded is worth more than a batch that merely renders. *** TRAP 5 FINALLY HAS A CASE WHERE IT DECIDES SOMETHING, AFTER SITTING IN THE HEADER SINCE v4163. *** That header said the fmod helper "exists and is gated BEFORE a shader that needs it arrives". bcs_geometricWarp folds an angle taken from atan2, so the argument is NEGATIVE over most of the image, which is the only region where Metal's truncating fmod and GLSL's flooring mod differ at all. MEASURED over the gate's own 48x24 grid: the fold differs at 1019 of 1152 pixels, 88.5%, and that is EXACTLY the count of pixels where the angle is negative -- the two figures agreeing is what says the mechanism is understood rather than the number merely observed. Sabotaged on the real GPU by swapping bcs_fmod for mod: 248 levels of 255 at 2850 subpixels, against 11 levels at 2 for the correct version. *** AND THE FIRST DRAFT OF THAT CLAIM WAS WRONG, AND THIS GATE CAUGHT ME. *** I asserted geometricWarp was the FIRST shader to call bcs_fmod. It is the second: shockwave has called it since v4196. The true claim is narrower and better -- shockwave passes bcs_fmod(uTime, uRepeatRate), and uTime is a CLOCK, so the argument is never negative and the two functions agree on every value it will ever see. That is the same "unsafe by construction, safe on the shipped domain" reasoning the hsb2rgb audit reached. geometricWarp is the first port where choosing wrong CHANGES THE PICTURE. *** THREE OF THE FIVE ARE NOT BIT-EXACT AND THE ROUND SAYS SO RATHER THAN WIDENING A TOLERANCE. *** pulse and holographic match their CPU reference exactly. wavePool, geometricWarp and blackHole do not -- and those three are precisely the three that DISPLACE THE SAMPLE COORDINATE. The test image is a gradient whose texel is worth 255/47 = 5.4 levels horizontally and 255/23 = 11.1 vertically; the measured worsts are 5, 5 and 11, at two to four pixels of 1152. That is ONE TEXEL in the axis each shader displaces along, which is the identical signature vortex was classified under earlier: a sample lands on a texel boundary and float32 and float64 round across it under NEAREST sampling. So they are graded by a one-texel bound rather than by zero, and the bound is asserted with the arithmetic that produces it. *** A TRAP I ASSERTED AND THEN MEASURED AWAY. *** The holographic port's first comment claimed that using the exact 2*PI/3 instead of upstream's 2.094h would shift the green channel's phase. It would not: toHalf(2.094) and toHalf(2*PI/3) are the SAME number, 2.09375, and the half rounding swallows the difference. Even unrounded the gap is 0.000645 rad, worth 0.08 levels of 255 at the steepest point of the sine -- BELOW the quantisation floor, so it could not show on an 8-bit output whichever was chosen. The comment now says that, and the gate pins it, because implying a danger that measurement does not support is its own kind of wrong. *** AND SABOTAGE FOUND A HOLE THIS ROUND DOES NOT CLOSE. *** Deleting the premultiplied branch from PULSE_FRAG entirely left the whole gate GREEN, because the GPU comparison image is fully opaque and the alpha scale is 1 either way. Four new CPU-side checks now drive pulse, holographic, geometricWarp and blackHole against a half-transparent image and assert each one branches on the convention -- verified by re-sabotage, which turns them red. The GLSL side stays uncovered: closing it needs a second comparison image with alpha, and that is a round of its own rather than a line here. It is written into the gate's closing note so the next reader inherits the hole rather than rediscovering it. Gate tools/ship/swiftShaders-selfcheck.mjs now grades 24 shaders: 15 agree with their CPU reference to within 2 levels, 4 agree to within one texel, and 5 provably cannot agree at all. 17 remain.
