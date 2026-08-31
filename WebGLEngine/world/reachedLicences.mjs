@@ -149,6 +149,53 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4258 -- #53's TWO NAMES, AND THEY WERE BUILT BEFORE THEY WERE RECORDED.
+    //
+    // Backlog #53 read "jsfx: sound effects as DATA, and animatelo: DOM animation the dirty flag can see".
+    // Both were BUILT -- audio/sfxModel.mjs at v4190 and ui/domAnimation.mjs at v4191, each citing its source
+    // by name in its own header -- and neither was ever entered here. The item stayed open for the paperwork
+    // while the code shipped, gated, with consumers.
+    // =========================================================================================================
+    {
+        repo: "loov/jsfx", sourceUrl: "https://github.com/loov/jsfx",
+        grantorHoldsRights: true, licenceExists: true, publisher: "loov", year: 2016,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, stated in the repository. jsfx is sfxr's lineage -- DrPetter's 2007 tool by way of " +
+             "as3sfxr -- and the IDEA of a sound effect as a parameter block predates all three.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The shape: a parameter block in, a buffer of samples out. No bytes -- audio/sfxModel.mjs is " +
+             "written here.",
+        takenPaths: ["audio/sfxModel.mjs"],
+        citedPaths: ["audio/sfxPlay.js", "audio/inputChain.mjs", "world/spellBook.mjs", "sfx.html",
+                     "tools/ship/sfx-selfcheck.mjs", "tools/media/makeStageClip.mjs"],
+        why: "*** AND THE ONE REAL DEPARTURE IS THE REASON IT IS WORTH HAVING SEPARATELY. *** Every sound in " +
+             "this engine was a live Web Audio node graph, which plays and can never be tested -- no artefact, " +
+             "nothing to hash. A renderer that returns samples is testable at every level. jsfx uses Math.sin, " +
+             "which is not specified to the last bit across JS engines, so v4190 substituted tools/strictTrig " +
+             "and MEASURED the cost: 4.48 ms per second of audio against 10.18 ms, 2.3x, worst per-sample " +
+             "difference 1.11e-16. Fine for a game, fatal for a hash -- so the same spell always sounds the same.",
+    },
+    {
+        repo: "gibbok/animatelo", sourceUrl: "https://github.com/gibbok/animatelo",
+        grantorHoldsRights: true, licenceExists: true, publisher: "gibbok", year: 2018,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT. animatelo ports animate.css to the Web Animations API; animate.css itself is " +
+             "Daniel Eden's, also MIT, and is NOT reached here -- what was read is the WAAPI port.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "Not the animations: the observation that WAAPI makes an animation an OBJECT THE PAGE CAN BE " +
+             "ASKED ABOUT. ui/domAnimation.mjs holds twelve keyframe sets written here.",
+        takenPaths: ["ui/domAnimation.mjs"],
+        citedPaths: ["ui/domAnimate.js", "fx/cssKeyframes.mjs", "fx/timeline.mjs", "engine/domScope.mjs",
+                     "tools/ship/domAnimation-selfcheck.mjs", "tools/ship/cssKeyframes-selfcheck.mjs"],
+        why: "engine/frameDirty.js had eleven sources and NOT ONE was about the DOM, while the tree carried 86 " +
+             "distinct @keyframes across 34 files -- so a spinner could turn while the flag called the frame " +
+             "quiet. document.getAnimations() covers CSS and WAAPI in one call, which is what made a DOM probe " +
+             "possible at all. *** AND v4252 THEN MEASURED THAT THE PROBE ASKS THE WRONG QUESTION: *** the DOM " +
+             "runs on the compositor's clock -- 999.96 ms of animation across 1001 ms of wall clock with the " +
+             "engine stepping ZERO frames -- so engine/domScope.mjs now separates chrome from what the render " +
+             "actually samples. The idea was right and its first application was too broad.",
+    },
+    // =========================================================================================================
     // v4257 -- *** THREE ENTRIES THAT ARE THE FIRST OF THEIR LICENCE SHAPE IN THIS LEDGER. ***
     //
     // Censused before writing: every `spdx` field in this file held exactly TWO distinct values, "MIT" and
@@ -322,6 +369,22 @@ export const REACHED_SOURCES = Object.freeze([
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
+/**
+ * *** THE DEBT, AS A NUMBER THAT MAY ONLY FALL. ***
+ *
+ * v4258 censused every `owner/repo (LICENCE)` citation in a module header and found 54 distinct sources --
+ * and NOT ONE of them was in this register, while all eleven register entries appeared in NO header. Two
+ * independent records of the same fact, grown from opposite ends: this file from assessment rounds, where
+ * the answer is usually "read it, took nothing"; the headers from BUILD rounds, where something was taken
+ * and the author wrote down whose idea it was. Nothing ever joined them.
+ *
+ * The repair is not a bulk import. Each entry needs grantorHoldsRights, licenceExists, redistributable and a
+ * `why` that says what was taken -- judgements, one source at a time, and inventing them to clear a number
+ * would be worse than the debt. So the number is a RATCHET: it may fall and it may not rise. Two are cleared
+ * at v4258 (loov/jsfx and gibbok/animatelo, both from backlog #53), leaving 52.
+ */
+export const UNREGISTERED_CITED_BASELINE = 52;
+
 export function validateEntry(e) {
     const p = [];
     if (!e || typeof e !== "object") return ["not an object"];

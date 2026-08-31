@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4258 -- #53 was built before it was recorded, and 54 sources are in the same position
+
+Backlog #53 read "jsfx: sound effects as DATA, and animatelo: DOM animation the dirty flag can see". Both
+were already built.
+
+audio/sfxModel.mjs at v4190: a parameter block in, a buffer of samples out, pure -- no AudioContext, no
+clock -- so a gate can render a sound and hash it, which nothing in this tree's audio could do before. Its
+one real departure from loov/jsfx was measured rather than assumed: Math.sin is not specified to the last
+bit across JavaScript engines, so tools/strictTrig.mjs was substituted at 10.18 ms per second of audio
+against 4.48 ms -- 2.3x -- for a worst per-sample difference of 1.11e-16. Fine for a game, fatal for a hash.
+
+ui/domAnimation.mjs at v4191, whose header already read "DOM ANIMATIONS AS DATA, AND AS SOMETHING THE DIRTY
+FLAG CAN SEE" -- backlog #53's own wording, sitting in the file, while the item stayed open. Twelve keyframe
+sets, a probe registered with frameDirty, and v4252 later measured that the probe asks too broad a question
+and split chrome from what the render samples.
+
+Each cites its source by name in its own header. NEITHER was in world/reachedLicences.mjs.
+
+*** SO THE REAL QUESTION WAS HOW GENERAL THAT IS, AND v4257's LEDGER MADE IT ASKABLE. *** Censusing every
+`owner/repo (LICENCE)` citation in a module header:
+
+    54 distinct repositories cited, across 65 files
+     0 of them in the register
+    13 register entries, appearing in NO header at all
+
+*** THE TWO SETS WERE COMPLETELY DISJOINT. *** They are two records of the same fact grown from opposite
+ends: the register is filled by ASSESSMENT rounds, where the answer is usually "read it, took nothing"; the
+headers are filled by BUILD rounds, where something WAS taken and the author wrote down whose idea it was.
+Nothing ever joined them. The register answers "what did we look at and refuse"; nothing answered "whose
+ideas are in the code".
+
+loov/jsfx and gibbok/animatelo are now entered, with what was taken, where it landed, and the consumers that
+prove it is used -- sfxModel is referenced in 10 files and domAnimation in 11, which is what separates this
+from #39's finding about modules wired to nothing but their own gates.
+
+That leaves 52, held as a ratchet the ledger owns rather than a bulk import. Each entry needs
+grantorHoldsRights, licenceExists, redistributable and a `why` that says what was taken -- judgements made
+one source at a time, and fabricating them to clear a number would be worse than owing it. Four of the cited
+sources carry GPL-3.0 or AGPL-3.0 and are named in the gate, because a taking that is fine under MIT can be a
+source-disclosure obligation under GPL and none of the four has been through that judgement.
+
+*** AND A SABOTAGE WALKED STRAIGHT THROUGH THE RATCHET. *** The debt check read `missing <= BASELINE`, so
+raising the baseline to 999 left the gate ALL GREEN -- a bound is satisfied more easily the looser it gets,
+and the number guarding the debt could be edited upward with nothing to say so. The debt is exactly
+measurable, so the assertion is now EQUALITY: the baseline must BE the debt, not bound it. Progress means
+editing it down in the same commit that clears an entry; a rise is a red check and a visible diff. With that
+change the sabotage goes red. A ratchet whose stop can be moved is not a ratchet, and the same shape is worth
+looking for in the four ratchets #134 records as red at HEAD.
+
+Two more sabotages, each grep-confirmed and restored md5-identical (261adecd9cd7e0f25f53d977ad44e240):
+emptying jsfx's takenPaths so it is registered while claiming nothing was taken (1 red -- the register's
+value is not the row, it is the row AGREEING with the tree), and renaming animatelo so it no longer matches
+its citation (2 red, and the pair is the point: the registered count falls AND the debt rises, one edit
+moving both halves, which is what says the two numbers read the same fact from opposite ends).
+
+UNCHECKED, and stated in the gate: the scan reads headers only -- the first 6 KB of each .mjs and .js -- so a
+citation further down a long file is invisible, as is any provenance in a .html page or a .md doc, or any
+mention that names a repository WITHOUT a licence in brackets. The count is a floor on the debt and never a
+ceiling. And it cannot tell a taking from a refusal: ui/gazeDwell.mjs names Ramotion/vr-menu-demo in order to
+say its code is refused, and render/silhouette.mjs names img2threejs to say its NUMBERS were not taken. The
+scan flags a mention and a person decides, which is why the gate reports a population and never files an
+entry by itself.
+
+The build now stands at 4258 gates.
+
 ## v4257 -- the ledger recorded what was read and not taken; nothing recorded what was taken
 
 world/reachedLicences.mjs says it in its own docstring: "sources read during assessment rounds and NOT
