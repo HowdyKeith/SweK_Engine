@@ -8,6 +8,92 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4243 -- Texturing a face that did not exist when the mesh was unwrapped, and a CPU/GPU check that turned out to be unavailable
+
+*** #114 ASKED FOR SOLID TEXTURING BECAUSE v4235's CSG CUT FACES HAVE NO UVs. THEY GOT IT, AND THE ROUND ALSO
+FOUND THAT THIS TREE CANNOT CURRENTLY GRADE A NOISE-BASED SHADER AGAINST ITS OWN JS MODEL. ***
+
+v4235 gave the engine mesh booleans that return POSITIONS ONLY -- toTriangleBuffer is nine floats per
+triangle and the word "uv" appears nowhere in physics/mesh/meshCSG.mjs. So a blast hole is geometrically
+perfect, watertight and gap-free, and cannot be textured: every face of the cut is a polygon that did not
+exist when the wall was authored, so no unwrap ever gave it a coordinate.
+
+New render/solidTexture.mjs writes both UV-free answers, once in JS and once in GLSL, which is how every
+shader in this tree is meant to be graded. TRIPLANAR projects a 2D image down three axes and blends by the
+normal. SOLID texturing evaluates a function of the 3D point.
+
+*** THEY ARE NOT EQUIVALENT, AND THE DIFFERENCE IS AT THE ONE PLACE THAT MATTERS. *** An original face and a
+cut face meet along an edge, and being an edge is exactly the property that their NORMALS DIFFER. Triplanar's
+weights are a function of the normal, so its output jumps across that rim while the position stands still.
+Measured on a real cut, at the 41 points where a tagged skin polygon and a tagged cut polygon share a vertex:
+
+    solid texture     0 of 255      triplanar     136 of 255
+
+*** AND THE REMEDY EVERYONE PRESCRIBES FOR TRIPLANAR MAKES IT WORSE. *** Raising the blend weights to a power
+is the standard fix for ghosting. On the real rim it takes the jump from 136 to 166 to 173 at k = 1, 4 and 8,
+because sharper weights mean a bigger swing when the normal flips. And on a PERFECTLY DIAGONAL face -- the
+worst ghosting case, the one the knob exists for -- it does nothing whatsoever: 0.333/0.333/0.333 at every
+exponent, because raising three EQUAL numbers to a power leaves them equal and normalising restores the same
+thirds. The knob works where it is least needed and cannot help where it is most.
+
+meshCSG NOW TAGS WHAT IT ALWAYS KNEW AND ALWAYS DISCARDED. subtract() returns two kinds of polygon: fragments
+of A's surface that survived clipping, and polygons of B turned inside out to cap the hole. The first is the
+object's SKIN, the second is the CUT. The tag rides through clonePolys and both halves of every splitPolygon,
+so a fragment is still what it was however many times the BSP cut it: 128 skin + 158 cut on the test wall,
+with every cut face verified to lie on one of B's planes. The converse is deliberately NOT asserted, because a
+skin face may coincidentally be coplanar with one of B's planes and demanding otherwise would be demanding a
+fact about the seed.
+
+*** THEN THE CHECK THIS TREE MAKES FOR EVERY SHADER TURNED OUT TO BE IMPOSSIBLE HERE, AND THAT IS THE ROUND'S
+LARGEST FINDING. *** crtModel is graded against crtPass, swiftShaderModel against swiftShaderPass; the
+convention rests on the two implementations computing the same function. Through Ashima simplex they do not.
+Over 9,216 points the JS snoise3 and the GLSL snoise agree to better than 1e-3 at only 23.5% of them, and the
+worst disagreement is 4.17 on a range of about +/-3.6. Exact agreement at many points with total disagreement
+at others is the signature of a DIFFERENT GRADIENT being selected -- a drifting precision error would be small
+everywhere, and a mistranslation would be wrong everywhere.
+
+The mechanism, measured rather than guessed: Ashima's permute chain ends in mod289(x) = x - floor(x*(1/289))*289
+with x reaching about 1.1e7. 1/289 is not exact in binary, so in 32-bit float the product lands on the other
+side of an integer boundary for a fraction of inputs; floor differs by one, mod289 differs by 289, and a whole
+different gradient is chosen. The JS runs in float64 and gets the other answer. No amount of care in the JS
+removes it.
+
+THREE INSTRUMENTS WERE TRIED AGAINST A DELIBERATELY BROKEN SHADER -- the GLSL's frequency multiplied by 1.6,
+exactly the "a constant drifted between the two copies" defect such a gate exists to catch -- AND NONE OF THEM
+SEPARATES IT FROM A CORRECT ONE:
+
+    mean brightness      correct 0.626, JS 0.615, BROKEN 0.623   -- a stationary field keeps its histogram,
+                                                                    so no distribution test sees a frequency error
+    pixel correlation    correct 0.199, BROKEN 0.096             -- real separation, far too little of it
+    block correlation    correct 0.193 over 8x8 means            -- averaging did not move it, so the
+                                                                    disagreement is pervasive, not sparse
+
+So section 5 says "no CPU/GPU agreement check is available here" and pins the numbers, rather than inventing a
+threshold around r = 0.15 that would manufacture a pass out of a gap. Filed as its own item, because it
+reaches much further than one texture: shaders/ashimaNoise-selfcheck.mjs, which exists precisely to guard the
+noise consolidated at v4177, checks TEXT AND CONSTANTS ONLY -- that the GLSL declares snoise(vec3), carries 0.6
+and 42.0, hashes correctly -- and has never compared a JS value to a GLSL value. render/aquarelleModel.mjs and
+render/aquarellePass.js are exactly such a pair.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Breaking the tag carry through splitPolygon turns 4
+checks red and leaves the tags on the 20 polygons that were never split. *** ONE SETTLED WHAT THE HEADLINE IS
+WORTH: *** making the solid texture a constant grey left the zero-seam check PERFECTLY GREEN, because a
+constant function also jumps zero across an edge. The CONTROL caught it. So the zero is near-circular on its
+own and is not the finding; the finding is the PAIR -- 0 against 136, both techniques asked the same question
+at the same points -- plus a control proving the zero is not the zero of a flat picture. And the third
+sabotage PASSED, which is what forced section 5 to be rewritten from "the two agree" into a measurement of why
+they cannot be compared.
+
+New: render/solidTexture.mjs, tools/ship/solidTexture-selfcheck.mjs (19 checks), tools/ship/solidTextureHarness.html.
+
+NOT done, and stated in the gate: what this costs. concreteAt is four fbm3 calls of two to three octaves, so a
+pixel is up to eleven simplex evaluations, and nothing here times it -- that number decides whether it ships as
+a shader or as a bake. Whether the aggregate READS as concrete is a judgement no gate makes; the material is
+asserted consistent and continuous, never convincing. And the SKIN/CUT tag is produced and verified but nothing
+in the engine consumes it yet: meshCSG's output still reaches the renderer as positions only.
+
+The build now stands at 4243 gates.
+
 ## v4242 -- The optional effects, switched on: three of them cannot be, and the gate had reported a property that does not exist
 
 *** #113 ASKED WHAT THE FRAME LOOKS LIKE WITH THE OPT-IN EFFECTS ENABLED. THE ANSWER IS THAT MOST OF THEM

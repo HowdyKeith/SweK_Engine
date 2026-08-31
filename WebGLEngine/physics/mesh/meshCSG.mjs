@@ -119,8 +119,9 @@ export function splitPolygon(pl, poly, coplanarFront, coplanarBack, front, back)
     }
     // A split can leave a 2-vertex sliver when the polygon only grazes the plane; those are not polygons.
     SPLIT_STATS.splits++;
-    if (fv.length >= 3) front.push({ vs: fv, pl: poly.pl }); else SPLIT_STATS.dropped++;
-    if (bv.length >= 3) back.push({ vs: bv, pl: poly.pl }); else SPLIT_STATS.dropped++;
+    // The tag rides along: a fragment of A's surface is still A's surface, however many times it was split.
+    if (fv.length >= 3) front.push({ vs: fv, pl: poly.pl, src: poly.src }); else SPLIT_STATS.dropped++;
+    if (bv.length >= 3) back.push({ vs: bv, pl: poly.pl, src: poly.src }); else SPLIT_STATS.dropped++;
 }
 
 /** A BSP node: a splitting plane, the polygons ON it, and the two subtrees. */
@@ -176,11 +177,28 @@ export class Node {
     }
 }
 
-const clonePolys = (ps) => ps.map((p) => ({ vs: p.vs.map((v) => v.slice()), pl: { n: p.pl.n.slice(), w: p.pl.w } }));
+const clonePolys = (ps) => ps.map((p) => ({ vs: p.vs.map((v) => v.slice()), pl: { n: p.pl.n.slice(), w: p.pl.w }, src: p.src }));
+
+/**
+ * *** WHICH FACES ARE THE CUT, AND WHICH WERE ALWAYS THERE. ***
+ *
+ * The BSP has always known this and always thrown it away. subtract(A, B) returns two kinds of polygon:
+ * fragments of A's original surface that survived clipping, and polygons of B turned inside out to cap the
+ * hole. The first kind is the object's SKIN -- weathered, painted, already unwrapped when the mesh was
+ * authored. The second kind is the CUT -- freshly exposed interior that did not exist a moment ago and has
+ * no texture coordinates, because nothing unwrapped a surface that had not been made yet.
+ *
+ * Tagging costs one string per polygon and is checkable by construction: every polygon tagged CUT must lie
+ * on one of B's planes, and no polygon tagged SKIN may.
+ */
+export const SKIN = "skin";      // came from A: the surface that was always on the outside
+export const CUT  = "cut";       // came from B: the face the boolean created
+
+const tag = (ps, src) => ps.map((p) => ({ ...p, src }));
 
 /** A - B. The polygons of A that lie outside B, plus the polygons of B that lie inside A, facing inward. */
 export function subtract(A, B) {
-    const a = new Node(clonePolys(A)), b = new Node(clonePolys(B));
+    const a = new Node(clonePolys(tag(A, SKIN))), b = new Node(clonePolys(tag(B, CUT)));
     a.invert(); a.clipTo(b); b.clipTo(a); b.invert(); b.clipTo(a); b.invert();
     a.build(b.allPolygons()); a.invert();
     return a.allPolygons();
