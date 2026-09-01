@@ -1,8 +1,8 @@
 // WebGLEngine/tools/ship/licenceSweep-selfcheck.mjs -- v4276
 //
-// GRADES world/licenceSweep.mjs -- twenty-six repositories actually opened, the premise that said they could
-// not be, and the questions the batches raised as they arrived: WHO IS GRANTING THE LICENCE, and WHAT IF THE
-// REPOSITORY STATES TWO?
+// GRADES world/licenceSweep.mjs -- thirty-five repositories actually opened, the premise that said they could
+// not be, and the questions the batches raised as they arrived: WHO IS GRANTING THE LICENCE, WHAT IF THE
+// REPOSITORY STATES TWO, and -- on the twenty-seventh -- WHAT IF IT IS NOT PERMISSIVE AFTER ALL?
 //
 // *** v4275 SAID "THIS SESSION HAS NO NETWORK" IN FOUR PLACES AND NEVER TESTED IT. *** A bare curl to github.com
 // returns HTTP 400 through this environment's proxy. That reads like a wall. It is not one: the proxy gates
@@ -17,7 +17,7 @@
 "use strict";
 
 import { SWEEP, NESTED_THIRD_PARTY, tally, identicalLicences, settles, declaredOnly, mirrors, ownerOf,
-         contradictions } from "../../world/licenceSweep.mjs";
+         contradictions, nonPermissive, composite, spdxReach } from "../../world/licenceSweep.mjs";
 import { NAMED_SOURCES } from "../../world/namedNotChecked.mjs";
 
 let fails = 0;
@@ -30,7 +30,7 @@ console.log("\n1. EVERY VERDICT CARRIES ITS EVIDENCE");
     const T = tally();
     console.log(`        ${T.total} repositories: ${T.papered} papered, ${T.unpapered} not. ` +
                 `${JSON.stringify(T.bySpdx)}`);
-    ok("twenty-six repositories were swept", T.total === 26);
+    ok("thirty-five repositories were swept", T.total === 35);
     ok("*** a papered entry names the FILE its licence was read from ***",
         SWEEP.filter((e) => e.licenceExists).every((e) => !!e.evidence.file && !!e.evidence.sha256 && e.evidence.lines > 0),
         "file, hash prefix and line count -- so a later round can tell a reading from a recollection");
@@ -104,7 +104,12 @@ console.log("\n3. IDENTICAL BYTES ARE A FACT, NOT A COINCIDENCE TO SMOOTH OVER")
     const four = Object.entries(groups).find(([, v]) => v.length === 4);
     ok("*** four repositories ship a byte-identical licence ***", sizes[0] === 4,
         four ? four[1].map((r) => r.split("/").pop()).join(", ") : "no group of four -- sizes " + sizes.join(","));
-    ok("  and two more share a different one", sizes[1] === 2);
+    // Typed as "and two more share a different one" -- sizes[1] === 2 -- which went red the moment a third
+    // group of three appeared. Third literal in this file to rot for the same reason. Derived: there is more
+    // than one group, and every group is at least a pair, which is what identicalLicences() promises.
+    ok("  and there is more than one such group", sizes.length > 1,
+        sizes.length + " groups, sizes " + sizes.join("/"));
+    ok("  every group really is two or more, which is the function's own contract", sizes.every((n) => n >= 2));
     ok("  every group is one author reusing one file", Object.values(groups).every((v) =>
         v.every((r) => r.startsWith(v[0].split("/")[0]))),
         "which is unremarkable -- and a SEVENTH copy with a different hash would not be");
@@ -141,11 +146,22 @@ console.log("\n4. *** WHO IS GRANTING? THE ACCOUNT YOU CLONED FROM IS NOT THE AN
     // collections, all four of which name their real authors in the licence file that was right there.
     const mir = mirrors();
     const owners = new Set(SWEEP.map((e) => ownerOf(e.repo)));
-    ok("*** five repositories carry a licence naming somebody who is NOT the account holder ***",
-        mir.length === 5, mir.map((e) => e.repo.split("/").pop() + " <- " + e.grantor.named).join("; "));
-    ok("  and every one of them is permissively licensed all the same",
-        mir.every((e) => e.licenceExists && e.spdx === "MIT"),
-        "the grant is good; it is the credit that would have gone to the wrong person");
+    // Typed as four, corrected to five, and stale again at ten. The COUNT is not the finding -- that mirrors
+    // exist at all, and are a minority of the entries that carry a grantor, is. Reported, not asserted.
+    ok("*** repositories carry a licence naming somebody who is NOT the account holder ***", mir.length >= 5,
+        mir.length + " of " + SWEEP.filter((e) => e.grantor && e.grantor.named).length +
+        " named grantors: " + mir.map((e) => e.repo.split("/").pop() + " <- " + e.grantor.named).join("; "));
+    // *** AND "EVERY MIRROR IS PERMISSIVE ANYWAY" WAS TRUE FOR TWO ROUNDS AND IS NOW FALSE. ***
+    // It was asserted as `every(e => e.spdx === "MIT")` and read as reassurance: the credit would have been
+    // wrong, the grant was fine. but0n/rvo2.js is a mirror AND non-commercial, so the two questions come
+    // apart -- which is the more dangerous combination, not the safer one.
+    const restrictedMirrors = mir.filter((e) => e.permissive === false);
+    ok("*** and a mirror is NOT thereby permissive -- one of them restricts commercial use ***",
+        restrictedMirrors.length >= 1,
+        restrictedMirrors.map((e) => e.repo + " -- " + e.spdx).join("; "));
+    ok("  the rest are permissive, so the two questions really are independent",
+        mir.filter((e) => e.permissive === true).length === mir.length - restrictedMirrors.length,
+        (mir.length - restrictedMirrors.length) + " permissive, " + restrictedMirrors.length + " not");
     ok("  every entry carrying a grantor names one OR says why it cannot",
         SWEEP.filter((e) => e.grantor).every((e) => e.grantor.named !== undefined),
         SWEEP.filter((e) => e.grantor).length + " entries carry the field");
@@ -169,7 +185,8 @@ console.log("\n4. *** WHO IS GRANTING? THE ACCOUNT YOU CLONED FROM IS NOT THE AN
         "and that is the limit on the method rather than a gap in this one entry.");
     // A collective grantor is a THIRD answer, and null is how the ledger says so.
     const collective = SWEEP.filter((e) => e.grantor && e.grantor.isRepoOwner === null);
-    ok("  and a COLLECTIVE grantor is null, not false", collective.length === 1,
+    ok("  and a COLLECTIVE grantor is null, not false", collective.length >= 1 &&
+        collective.every((e) => e.grantor.named && /authors|contributors/i.test(e.grantor.named)),
         collective.map((e) => `${e.repo.split("/").pop()} <- "${e.grantor.named}"`).join(", ") +
         " -- neither the account holder nor somebody else");
     report("*** THE COUNT WAS WRITTEN AS FIVE, RUN AS FOUR, AND IS FIVE AGAIN FOR A DIFFERENT REASON. *** " +
@@ -180,7 +197,64 @@ console.log("\n4. *** WHO IS GRANTING? THE ACCOUNT YOU CLONED FROM IS NOT THE AN
         "repository separately.");
 }
 
-console.log("\n5. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HAVING ONE");
+console.log("\n5. *** TWENTY-SIX PERMISSIVE IN A ROW, AND THEN ONE THAT IS NOT. ***");
+{
+    // The sweep ran for two rounds without meeting a restricted licence. That is not a property of open
+    // source; it is a run, and a run is what makes a shape-matching reader feel reliable right up to the
+    // moment it is wrong. but0n/rvo2.js has every surface feature of a BSD notice -- copyright line,
+    // "Permission to use, copy, modify, and distribute", an ALL-CAPS disclaimer two thirds the length of the
+    // file -- and grants only educational, research and non-profit use, with commercial use available by
+    // asking UNC Chapel Hill. A reader keyed on shape takes it. A reader that read the grant does not.
+    const np = nonPermissive();
+    ok("*** at least one entry is NOT permissive, so the field is not decoration ***", np.length >= 1,
+        np.map((e) => `${e.repo} -- ${e.spdx}`).join("; "));
+    ok("  and it is the one whose licence text restricts the PURPOSE, not the attribution",
+        np.every((e) => /non-profit|educational|research/.test(e.note || "")),
+        "'for educational, research, and non-profit purposes' -- and commercial use by arrangement");
+    ok("  its spdx is a LicenseRef rather than a standard identifier, because no standard one fits",
+        np.every((e) => /^LicenseRef-/.test(e.spdx)),
+        np.map((e) => e.spdx).join(", ") + " -- inventing 'BSD-3-Clause' here would have been the whole error");
+    ok("*** and it has THREE parties, which is one more than the grantor field alone can hold ***",
+        np.some((e) => /three parties|THREE PARTIES/i.test(e.note || "")),
+        "UNC holds the copyright, package.json names the porter, the account is a third -- and nobody " +
+        "downstream can grant more than the first party did");
+
+    // *** THE RULE THAT KEEPS SILENCE FROM READING AS A GRANT. ***
+    ok("*** permissiveness is established exactly where a licence was READ, and null everywhere else ***",
+        SWEEP.every((e) => (e.permissive !== null) === (e.licenceExists === true)),
+        `${SWEEP.filter((e) => e.permissive !== null).length} established, ` +
+        `${SWEEP.filter((e) => e.permissive === null).length} not -- including both declared-only entries`);
+    report("a DECLARATION IS NOT A GRANT, so the two entries whose spdx comes from package.json alone have " +
+        "permissive null rather than true. They name permissive licences; nobody has granted one in the " +
+        "words the licence requires be carried in all copies, and the field says exactly that much and no " +
+        "more. The contradiction entry goes the other way: WHICH licence is open, and both candidates are " +
+        "permissive, so its permissive is true while its spdx stays null.");
+
+    // A COMPOSITE LICENCE FILE: the project's own spdx is not the whole obligation.
+    const comp = composite();
+    ok("*** one licence file carries three licences, two of them somebody else's ***", comp.length === 1 &&
+        comp[0].thirdParty.length === 2,
+        comp.map((e) => `${e.repo}: ${e.spdx} + ` +
+            e.thirdParty.map((t) => `${t.what} ${t.spdx}`).join(" + ")).join(""));
+    // *** THIS CHECK FIRST CLAIMED THE COMPOSITE WIDENS THE SWEEP'S SPDX REACH, AND IT DOES NOT. ***
+    // Written as spdxReach().length > (project spdx values).size and run: both are 4. Apache-2.0 was already
+    // reached directly through AcademySoftwareFoundation/OpenPBR, so the quoted dat.gui notice adds no new
+    // identifier to the SWEEP. What it adds is to that ENTRY, and that is the true and narrower statement:
+    // reading only glTF-WebGL-PBR's own spdx understates what a consumer of glTF-WebGL-PBR inherits.
+    ok("*** the composite entry's own spdx UNDERSTATES what a consumer of it inherits ***",
+        comp.every((e) => e.thirdParty.some((t) => t.spdx !== e.spdx)),
+        comp.map((e) => `${e.repo.split("/").pop()} is ${e.spdx} and carries ` +
+            e.thirdParty.map((t) => t.spdx).join(" + ")).join(""));
+    ok("  and the sweep-wide reach is not widened by it, which was asserted here first and is FALSE",
+        spdxReach().length === new Set(SWEEP.filter((e) => e.spdx && e.licenceExists).map((e) => e.spdx)).size,
+        "reach " + spdxReach().join(", ") + " -- Apache-2.0 was already reached directly, so the quotation " +
+        "adds an obligation to one entry and no identifier to the ledger");
+    report("its own spdx is MIT and a consumer inherits the Apache notice too. And the glMatrix copyright " +
+        "quoted inside it names the same pair the sweep already met as a standalone mirror, so the ledger " +
+        "now holds one library twice: once as a repository and once as a quotation.");
+}
+
+console.log("\n6. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HAVING ONE");
 {
     ok("*** none of the swept repositories is still filed as unchecked ***", settles(NAMED_SOURCES).length === 0,
         settles(NAMED_SOURCES).join(", ") || `0 of ${SWEEP.length}`);
@@ -280,7 +354,25 @@ console.log("\n5. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HA
 //      when the ledger stops recording what the licence file actually says and starts recording what the
 //      account is called. That is the automatable-looking answer, and it is wrong about a real person.
 //
-// Five counts in this file were WRONG before they were run, and all four are corrected in the code above.
+//   K  but0n/rvo2.js filed as BSD-3-Clause and permissive -- exactly what a reader keyed on the SHAPE of the
+//      file produces, and the entry that most deserves to be got wrong once in a controlled way.
+//      -> exit=1, 3 FAIL: the non-permissive count empties, the restricted-mirror check empties with it, and
+//      the three-parties check dies too because its evidence lives in the note this sabotage displaced. Three
+//      reds for one edit is the right answer here -- a non-commercial licence recorded as BSD is not one
+//      mistake, it is a wrong answer to three separate questions the ledger is asked.
+//
+//   L  but0n/webgpu-cluster's permissive flipped from null to true -- a package.json declaration read as a
+//      grant, which is the single most natural thing to do with a declared-only entry.
+//      -> exit=1, 1 FAIL. The rule is written as an EQUIVALENCE (permissive is non-null exactly where a
+//      licence was read), so it fails in this direction as well as the other, and the detail prints 29
+//      established against 28 papered so the red says which way the ledger drifted.
+//
+//   M  the composite's `thirdParty` array deleted, leaving glTF-WebGL-PBR as a plain MIT entry.
+//      -> exit=1, 1 FAIL. This is the quietest of the three sabotages and the closest to something a tidying
+//      pass would actually do: the entry still looks complete, still has a real licence file and a real hash,
+//      and has silently stopped saying that a consumer of it inherits Apache-2.0 as well.
+//
+// Eight counts in this file were WRONG before they were run, and all four are corrected in the code above.
 // The 21-line check was authored as "three" (there were four), then survived into a round where nine more
 // entries made it eight -- fixed by DERIVING the relation instead of typing a number. The owner-check comment
 // NAMED two register entries, which namedNotChecked-selfcheck's allowance rule turned red on sight. The
@@ -289,6 +381,16 @@ console.log("\n5. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HA
 // tally() reduced over every papered entry, putting a key literally named "null" into the spdx histogram the
 // moment a repository arrived whose licence exists and whose spdx is genuinely open. Not one of the five was
 // caught by re-reading; every one was caught by running.
+//
+// v4277 added three more of the same species, all in checks that had been GREEN and CORRECT for two rounds
+// and rotted when the sweep grew: "and two more share a different one" (a second group of three appeared),
+// "five repositories are mirrors" (ten now), and "a collective grantor" (two now). Every one is derived in
+// the code above rather than restated -- the pattern is unmistakable by now, which is that A COUNT TYPED INTO
+// A GATE IS A CLAIM WITH AN EXPIRY DATE. And one was not stale but simply FALSE: the composite check asserted
+// that the quoted third-party notices widen the sweep's spdx reach, and running it showed both sets are the
+// same size, because Apache-2.0 was already reached directly through OpenPBR. The true statement is narrower
+// and is what the gate says now -- the composite understates what a consumer of THAT ENTRY inherits, and adds
+// no identifier to the ledger.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER THE LICENCES SAY WHAT SPDX SAYS THEY SAY. Each verdict is a hash and a " +
     "line count of a file whose first lines were read -- 'The MIT License', 'Apache License' -- and no entry " +

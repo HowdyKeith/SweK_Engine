@@ -8,6 +8,94 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4277 -- Twenty-six permissive licences in a row, and then one that is not
+
+The sweep ran for two rounds and thirty-odd repositories without meeting a restricted licence. That is not a
+property of open source. It is a run -- and a run is exactly what makes a reader that matches on SHAPE feel
+trustworthy right up to the moment it is wrong.
+
+*** but0n/rvo2.js CARRIES THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL'S ACADEMIC LICENCE, AND IT LOOKS
+LIKE A BSD NOTICE FROM TEN FEET AWAY. *** A copyright line. "Permission to use, copy, modify, and distribute
+this software and its documentation". An ALL-CAPS warranty disclaimer running two thirds of the file. Every
+surface feature of a permissive notice is present. The grant says "for educational, research, and non-profit
+purposes, without fee", and the paragraph immediately after it says that permission to incorporate the
+software into commercial products "may be obtained by contacting the University of North Carolina at Chapel
+Hill".
+
+That is a licence you have to ask for. Its spdx in the ledger is a LicenseRef rather than a standard
+identifier, because no standard one fits -- writing "BSD-3-Clause" there would have been the entire error in
+one field.
+
+### The field that exists because of it, and the rule that makes it safe
+
+`permissive` is now on every one of the thirty-five entries, and it is NULL wherever nothing was granted
+rather than defaulting to true. Silence must not read as a grant. So both declared-only entries -- the ones
+whose spdx comes from a package.json and whose licence text does not exist -- have permissive null, even
+though the licences they NAME are permissive ones. The contradiction entry goes the other way: which licence
+applies is open, both candidates are permissive, so its permissive is true while its spdx stays null. The gate
+asserts the equivalence in both directions, and the sabotage that flips a declared-only entry to true is
+caught by it.
+
+### Three parties, not two
+
+rvo2.js is also the first entry where the chain has three links. UNC holds the copyright (2008-10),
+package.json names Paul Wells as the author of the JavaScript port, and the account it was cloned from is a
+third party again. Nobody downstream can grant more than the first party did. Backlog #82's ENCUMBERED shape,
+with the whole chain legible inside a single repository rather than inferred.
+
+### Two more shapes from the same batch
+
+*** ONE LICENCE FILE CAN CARRY THREE LICENCES. *** but0n/glTF-WebGL-PBR's is 58 lines: the project's own MIT,
+then a "Third-Party Code" section quoting glMatrix's MIT and dat.gui's Apache-2.0 in full. Its spdx is MIT and
+that is not the whole obligation -- a consumer inherits the Apache notice too. The glMatrix copyright quoted
+inside it names Brandon Jones and Colin MacKenzie IV, the same pair the sweep already met as a standalone
+mirror, so the ledger now holds one library twice: once as a repository and once as a quotation.
+
+*** AND A PUBLIC-DOMAIN DEDICATION IS A FAMILY THE LEDGER HAD NEVER HELD. *** but0n/vixel is the Unlicense:
+"This is free and unencumbered software released into the public domain." It grants more than MIT and imposes
+no attribution condition at all -- the one case in thirty-five where this tree's paperwork discipline
+genuinely relaxes, which is worth recording precisely because it is the exception.
+
+### And the largest unpapered repository yet
+
+but0n/THREE.js-PathTracing-Renderer has 194 tracked files, a 190-line README, and not one licence word in any
+.md, .txt or .json at any depth -- no licence file, no package.json at all. Size is not paperwork, and this is
+the entry most likely to be assumed about, because everybody has seen this path tracer.
+
+Thirty-five repositories: 28 papered (24 MIT, 1 Apache-2.0, 1 Unlicense, 1 UNC academic, 1 unresolved), 7 not,
+of which 2 are declared-only.
+
+### Sabotage
+
+Three on the new section, each grep-confirmed before the result was read, exit code and FAIL summary both
+read, the file restored md5-identical.
+
+rvo2.js filed as BSD-3-Clause and permissive -- precisely what a shape-matching reader produces: 3 red. The
+non-permissive set empties, the restricted-mirror check empties with it, and the three-parties check dies too.
+Three reds for one edit is right: a non-commercial licence recorded as BSD is not one mistake, it is a wrong
+answer to three separate questions.
+
+A declared-only entry's permissive flipped from null to true -- a package.json declaration read as a grant,
+the most natural thing in the world to do: 1 red, and the detail prints 29 established against 28 papered, so
+the failure says which way the ledger drifted.
+
+The composite's third-party array deleted, leaving a plain MIT entry: 1 red. The quietest of the three and the
+closest to what a tidying pass would actually do -- the entry still has a real licence file and a real hash,
+and has silently stopped saying that a consumer inherits Apache-2.0.
+
+### *** AND THREE CHECKS THAT WERE GREEN AND CORRECT FOR TWO ROUNDS WENT RED ON CORRECT DATA ***
+
+"And two more share a different one." "Five repositories are mirrors." "A collective grantor." Every one was a
+number typed into a gate, every one was true when written, and every one rotted the moment the sweep grew. A
+COUNT TYPED INTO A GATE IS A CLAIM WITH AN EXPIRY DATE. All three are derived now, joining the line-count-
+versus-hash check that learned the same lesson a round earlier and has since survived two batches untouched.
+
+A fourth was not stale but simply false. The composite check asserted that the quoted third-party notices
+widen the sweep's spdx reach; running it showed both sets are the same size, because Apache-2.0 was already
+reached directly through OpenPBR. The true statement is narrower and is what the gate says now: the composite
+understates what a consumer of that ENTRY inherits, and adds no identifier to the ledger.
+
+This round adds no module and no gate, and the tree stands at 1350 gates.
 ## v4276 -- The licence sweep: twenty-six repositories opened, and the premise that said they could not be
 
 *** v4275 SAID "THIS SESSION HAS NO NETWORK" IN FOUR PLACES -- ITS MODULE HEADER, ITS GATE, ITS CHANGELOG AND
@@ -18426,3 +18514,5 @@ flat field panel (Demo_FieldViewer) · petri dish (Demo_PetriViewer) · arcade p
 
 
 The build now stands at 4276 gates.
+
+The build now stands at 4277 gates.
