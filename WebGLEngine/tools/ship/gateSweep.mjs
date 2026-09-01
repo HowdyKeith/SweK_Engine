@@ -90,24 +90,38 @@ export function classify(parallel, serial = null) {
 }
 
 /**
- * *** REFUSES TO PRODUCE A RED SET WHILE ANY CANDIDATE IS UNCONFIRMED. ***
+ * *** REFUSES TO PRODUCE A RED SET WHILE ANY CANDIDATE HAS NEVER BEEN RE-RUN. ***
  *
  * Not a warning and not a flag. The failure mode being prevented is a human reading a plausible number and
  * writing it down, and a plausible number is exactly what a warning still hands them.
+ *
+ * *** BUT `UNCONFIRMED` IS TWO DIFFERENT THINGS, AND THE FIRST VERSION OF THIS FUNCTION CONFLATED THEM. ***
+ *
+ * It refused on any unconfirmed candidate at all. Then the v4297 sweep produced two gates -- twoFBind and
+ * toolFrontDoor -- that were re-run ALONE on an idle box and still did not finish inside 300 s. Those have
+ * been all the way through phase 2. Their verdict is UNMEASURED, and that is a measured fact about the gate
+ * rather than a procedural failure by whoever ran the sweep.
+ *
+ * Refusing over them would have made the method unusable on this tree, and the pressure that creates is
+ * exactly wrong: the cheapest way to get an answer back would have been to delete the entry. So the two are
+ * separated. `notRun` (phase 2 skipped it) still refuses. `unmeasured` (phase 2 ran it and it did not finish)
+ * is reported, named and counted -- never folded into red, never folded into green. That is the same rule
+ * TIMEOUT states for phase 1, applied to a bucket that survives phase 2.
  */
 export function finalize(rows) {
-    const out = { green: [], red: [], falseReds: [], unconfirmed: [] };
+    const out = { green: [], red: [], falseReds: [], notRun: [], unmeasured: [] };
     for (const r of rows) {
         const c = classify(r.parallel, r.serial);
         const rec = { gate: r.gate, ...c, ms: (r.serial || r.parallel).ms };
         if (c.verdict === VERDICT.GREEN && c.from === "serial") out.falseReds.push(rec);
         if (c.verdict === VERDICT.GREEN) out.green.push(rec);
         else if (c.verdict === VERDICT.RED) out.red.push(rec);
-        else out.unconfirmed.push(rec);
+        else if (c.from === "serial") out.unmeasured.push(rec);   // ran alone, still did not finish
+        else out.notRun.push(rec);                                // phase 2 never touched it
     }
-    if (out.unconfirmed.length)
-        throw new Error("gateSweep.finalize: " + out.unconfirmed.length + " candidate(s) never re-run serially: " +
-                        out.unconfirmed.map((u) => u.gate).join(", ") +
+    if (out.notRun.length)
+        throw new Error("gateSweep.finalize: " + out.notRun.length + " candidate(s) never re-run serially: " +
+                        out.notRun.map((u) => u.gate).join(", ") +
                         " -- phase 2 is not optional, see PHASES.serial");
     return out;
 }
@@ -221,8 +235,10 @@ if (process.argv[1] && import.meta.url === new URL("file://" + path.resolve(proc
     const rows = par.map((r) => ({ gate: r.gate, parallel: r, serial: serial.get(r.gate) || null }));
     try {
         const f = finalize(rows);
-        console.log(`\nCONFIRMED RED ${f.red.length}   FALSE REDS ${f.falseReds.length}   GREEN ${f.green.length}`);
-        for (const r of f.red) console.log("  RED   " + r.gate);
-        for (const r of f.falseReds) console.log("  FALSE " + r.gate);
+        console.log(`\nCONFIRMED RED ${f.red.length}   FALSE REDS ${f.falseReds.length}   ` +
+                    `UNMEASURED ${f.unmeasured.length}   GREEN ${f.green.length}`);
+        for (const r of f.red) console.log("  RED    " + r.gate);
+        for (const r of f.falseReds) console.log("  FALSE  " + r.gate);
+        for (const r of f.unmeasured) console.log("  UNMEAS " + r.gate + "   ran alone and still did not finish");
     } catch (e) { console.log("\n" + e.message); process.exit(1); }
 }

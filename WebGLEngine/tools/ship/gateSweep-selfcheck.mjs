@@ -142,6 +142,33 @@ sec("3. finalize() REFUSES -- AND THE CONTROL RUNS FIRST, SO `IT THREW` IS NOT E
        "not a flag on the row -- the red set cannot be obtained at all");
     ok(msg.includes("b-selfcheck.mjs"), "the refusal names the gate, so the fix is one command away");
     ok(msg.includes("phase 2 is not optional"), "and says which rule was broken");
+
+    // *** UNCONFIRMED IS TWO DIFFERENT THINGS, AND CONFLATING THEM MADE THE METHOD UNUSABLE ON THIS TREE. ***
+    // The v4297 sweep produced two gates that were re-run ALONE on an idle box and still did not finish in
+    // 300 s. They have been all the way through phase 2; their verdict is UNMEASURED, which is a fact about
+    // the gate rather than a procedural failure. Refusing over them would have made the cheapest route to an
+    // answer "delete the entry", which is the incentive this whole file exists to remove.
+    const withSerialTimeout = [
+        { gate: "b-selfcheck.mjs", parallel: P(1, 20), serial: P(1, 19) },
+        { gate: "slow-selfcheck.mjs", parallel: P(124, 180000, true), serial: P(124, 300108, true) },
+    ];
+    let g2 = null, threw2 = null;
+    try { g2 = GS.finalize(withSerialTimeout); } catch (e) { threw2 = e; }
+    ok(threw2 === null,
+       "*** a candidate that RAN serially and still did not finish does NOT refuse the result ***",
+       threw2 ? threw2.message : "phase 2 was performed; the outcome is unmeasured, not skipped");
+    ok(g2 && g2.unmeasured.length === 1 && g2.unmeasured[0].gate === "slow-selfcheck.mjs",
+       "it is reported by name in its own bucket", "never folded into red, never folded into green");
+    ok(g2 && g2.red.length === 1 && g2.green.length === 0,
+       "and it is counted in neither", `${g2.red.length} red, ${g2.green.length} green`);
+    ok(g2 && g2.notRun.length === 0,
+       "CONTROL: and `notRun` stays empty, so the two buckets are not the same bucket renamed");
+    // ...while the gate that phase 2 never touched still refuses, which is the half that must not soften.
+    let msg2 = "";
+    try { GS.finalize([{ gate: "skipped-selfcheck.mjs", parallel: P(1, 20), serial: null }]); }
+    catch (e) { msg2 = e.message; }
+    ok(msg2.includes("skipped-selfcheck.mjs"),
+       "*** and a SKIPPED candidate still refuses, which is the distinction doing work in both directions ***");
 }
 
 // ---------------------------------------------------------------------------------------------------------
