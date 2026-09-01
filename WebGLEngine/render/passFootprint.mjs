@@ -98,14 +98,31 @@ export function predictedGodRayRadius(n, sunUV, px, py, { density = godRayConsta
  * Returns { radius, moved }: the greatest Chebyshev distance from the perturbed texel to a changed output
  * pixel, and how many pixels changed. radius === -1 means NOTHING changed, which is a real answer and
  * usually means the pass never reads that texel at all.
+ *
+ * *** THE POKE VALUE IS A PARAMETER BECAUSE A FIXED ONE IS INVISIBLE TO SOME SHADERS. *** The first version
+ * always drove the texel to white, and against SSAO_FS that measured a footprint of NOTHING at every radius:
+ * white reads as depth 1.0, the shader treats depth >= 0.999 as sky and `continue`s past it, so the poke
+ * landed on the one value the pass is written to ignore. A perturbation the shader discards is not evidence
+ * that the shader does not read there -- it is evidence about the poke. For a depth pass the poke must be
+ * NEARER than the base, which is dark, not white.
  */
 export async function perturbFootprint({ render, fragment, vertex, n = 32, px = null, py = null,
-                                         base = () => [40, 40, 40, 255], opts = {} }) {
+                                         base = () => [40, 40, 40, 255], poke = [255, 255, 255, 255],
+                                         opts = {} }) {
     const cx = px == null ? n >> 1 : px, cy = py == null ? n >> 1 : py;
     const a = await render({ vertex, fragment, width: n, height: n, srcSize: n, sourceTexel: base, ...opts });
     const b = await render({ vertex, fragment, width: n, height: n, srcSize: n, ...opts,
-        sourceTexel: (x, y, N) => (x === cx && y === cy ? [255, 255, 255, 255] : base(x, y, N)) });
+        sourceTexel: (x, y, N) => (x === cx && y === cy ? poke : base(x, y, N)) });
     if (!a.ok || !b.ok) return { ok: false, reason: a.reason || b.reason, radius: null, moved: 0 };
+    // *** A RADIUS FROM A RUN WITH UNRESOLVED UNIFORMS IS VOID, AND SAYING SO IS THE POINT. *** Measuring the
+    // composite's heat displacement returned "radius 0, 1 moved" while uHeatRadii and uHeatStrength had
+    // silently failed to bind -- they are float ARRAYS and the harness sets scalars and vectors. Zero was the
+    // truthful footprint of a shader whose heat was switched off by the binding failure, and it would have
+    // been read as the footprint of heat. The names come back from the harness; a caller that ignores them is
+    // measuring a different shader from the one it named.
+    const unresolved = [...new Set([...(a.unresolved || []), ...(b.unresolved || [])])];
+    if (unresolved.length) return { ok: false, void: true, unresolved, radius: null, moved: 0,
+        reason: "uniforms did not bind, so any radius would describe a different shader: " + unresolved.join(", ") };
     let radius = -1, moved = 0;
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
         const i = (y * n + x) * 4;
@@ -116,7 +133,7 @@ export async function perturbFootprint({ render, fragment, vertex, n = 32, px = 
         const sy = n - 1 - y;
         radius = Math.max(radius, Math.max(Math.abs(x - cx), Math.abs(sy - cy)));
     }
-    return { ok: true, radius, moved, at: [cx, cy] };
+    return { ok: true, radius, moved, at: [cx, cy], unresolved: [] };
 }
 
 /**
@@ -129,18 +146,30 @@ export async function perturbFootprint({ render, fragment, vertex, n = 32, px = 
  */
 export const FUSION = Object.freeze({
     bright: Object.freeze({ pass: "BRIGHT_FS", footprint: "constant", radius: 0, fusable: true,
-        why: "one texel; no neighbourhood at all" }),
+        evidence: "measured", why: "one texel; no neighbourhood at all" }),
     blur: Object.freeze({ pass: "BLUR_FS", footprint: "constant", radius: 4, fusable: true,
-        why: "a nine-tap separable kernel reaches exactly 4 texels, at any image size" }),
+        evidence: "measured", why: "a nine-tap separable kernel reaches exactly 4 texels, at 32 and at 64" }),
     ssao: Object.freeze({ pass: "SSAO_FS", footprint: "bounded-by-uniform", radius: null, fusable: true,
-        why: "eight disc samples at a screen-space radius that scales as uRadius/max(1,depth) -- data " +
-             "dependent, but capped by a uniform, so a conservative apron exists once uRadius is bounded" }),
+        evidence: "measured", why: "eight disc samples at 0.95 * uRadius / max(1,depth) texels. MEASURED at " +
+             "uRadius 2, 5, 10 -> radius 2, 5, 9, tracking the uniform; at 20 it reads 16 because the 32px " +
+             "frame clips it, not the pass. An apron exists only once somebody bounds uRadius, and at " +
+             "uRadius 10 that apron is 9 -- larger than an 8x8 tile" }),
     godRays: Object.freeze({ pass: "GODRAYS_FS", footprint: "scales-with-resolution", radius: null, fusable: false,
-        why: "marches DENSITY of the way from the pixel to the sun. The read set is a LINE across the image, " +
-             "so the apron would have to be the image, which is not an apron" }),
-    composite: Object.freeze({ pass: "COMPOSITE_FS", footprint: "bounded-by-literal", radius: null, fusable: true,
-        why: "a 3x3 depth Sobel plus reads displaced by at most 0.0035 in UV by heat distortion -- both " +
-             "capped in the source. It is fusable in itself AND it consumes god rays, which is not" }),
+        evidence: "measured", why: "15 at N=32 and 31 at N=64: the read set is a LINE across the image, so " +
+             "the apron would have to be the image, which is not an apron" }),
+    composite: Object.freeze({ pass: "COMPOSITE_FS", footprint: "bounded-by-literal", radius: 1, fusable: true,
+        evidence: "measured", why: "MEASURED per input with all five samplers bound separately: uBloom 0 and " +
+             "uSSAO 0, and uSceneDepth 1 with 8 pixels moved -- exactly the 3x3 outline Sobel -- but MINUS " +
+             "ONE with the outline switched off, because the Sobel never runs. A pass's footprint depends on " +
+             "which features are enabled, so an apron must be sized for the FEATURE SET and not the shader. " +
+             "It is fusable in itself AND it consumes god rays, which is not" }),
+});
+
+// The one path still read off source rather than measured, named so it is not mistaken for the rest.
+export const UNMEASURED = Object.freeze({
+    heatDisplacement: "COMPOSITE_FS displaces its reads by at most 0.0035 UV when uHeatCount > 0. The " +
+        "harness binds scalars and vectors, and uHeatRadii/uHeatStrength are float ARRAYS, so the run came " +
+        "back with them unresolved and perturbFootprint voided it rather than reporting the 0 it computed.",
 });
 
 /** The chain cannot be one dispatch, and this says which pass is responsible. */

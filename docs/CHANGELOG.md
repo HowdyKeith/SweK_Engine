@@ -8,6 +8,67 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4286 -- The two passes that were never unmeasurable
+
+v4285 filed SSAO and the composite as READ OFF SOURCE and gave two reasons for it. *** ONE OF THEM WAS
+SIMPLY WRONG. *** "SSAO needs a depth buffer that is not the colour buffer" -- SSAO_FS has exactly ONE
+sampler, and the harness binds one texture. It was measurable the whole time and nobody tried.
+
+The other reason was real: COMPOSITE_FS takes five samplers, and with one texture bound they all read the
+same image, so any measurement would have been a measurement of a fiction. renderGlslToPixels now takes
+`textures: {samplerName: texelFn}` and binds each to its own unit. Additive: it defaults to null and every
+existing caller keeps the single binding it had.
+
+SSAO, MEASURED. Its reach is 0.95 * uRadius / max(1,depth) texels, so the footprint should TRACK the uniform,
+and it does: uRadius 2, 5, 10 give radius 2, 5, 9. At uRadius 20 it reads 16 -- and that is the 32-pixel
+frame clipping it, not the pass. So "bounded by a uniform" is now a measurement rather than a reading, with
+an engineering consequence: *** AT uRadius 10 THE APRON IS 9 TEXELS, LARGER THAN AN 8x8 TILE. *** Fusing
+SSAO at that setting means loading 26x26 texels to produce 64 outputs.
+
+THE COMPOSITE, MEASURED PER INPUT. uBloom 0 and uSSAO 0 -- purely local. uSceneDepth 1, with exactly 8 pixels
+moved, which is the 3x3 outline Sobel ring. *** AND MINUS ONE WITH THE OUTLINE SWITCHED OFF, because the
+Sobel never runs. *** A pass's footprint depends on which features are enabled, so an apron has to be sized
+for the FEATURE SET and not for the file. A fusion measured with the outline off would be wrong the first
+time somebody turned it on.
+
+*** AND THE METHOD ITSELF HAD A DEFECT THAT REPORTED CONFIDENT NOTHING. *** perturbFootprint always drove
+its texel to WHITE. Against SSAO_FS that measured a footprint of NOTHING at every radius -- white reads as
+depth 1.0, the shader treats depth >= 0.999 as sky and skips it, so the poke landed on the one value the
+pass is written to ignore. A perturbation the shader discards is evidence about the poke, not about the
+shader's reach. The poke is a parameter now, and the white-poke result is kept as a CONTROL.
+
+A SECOND METHOD DEFECT, FOUND THE SAME WAY. Measuring the composite's heat displacement returned "radius 0,
+1 moved" while uHeatRadii and uHeatStrength had silently failed to bind -- they are float ARRAYS and the
+harness sets scalars and vectors. Zero was the truthful footprint of a shader whose heat was switched off by
+the binding failure, and it would have been read as the footprint of heat. perturbFootprint now VOIDS any run
+with unresolved uniforms rather than returning a number, and heat displacement is recorded in UNMEASURED
+rather than folded in beside the four that were measured.
+
+Every entry in the FUSION table now carries evidence: "measured", none read off source. The verdict is
+unchanged -- god rays alone forbids single-dispatch fusion -- but it now rests on measurements of all five
+passes rather than three.
+
+Six sabotages. Binding every extra sampler to unit 0 makes uBloom read radius -1: perturbing it changes
+NOTHING, because the shader reads unit 0 for everything and unit 0 is uScene. *** THAT IS EXACTLY WHAT v4285
+WOULD HAVE MEASURED, *** and the -1 is what the fiction looks like.
+
+*** AND ONE SABOTAGE WENT 0 RED BECAUSE THE GUARD IT ATTACKED WAS NEVER REACHED. *** Deleting the
+void-on-unresolved guard changed nothing, since no measurement in the file produced an unresolved uniform --
+a guard no test reaches, inside a gate. The heat path is the case the guard was written for, so the heat path
+is now run and the REFUSAL is the assertion; redone, the sabotage goes 2 red reporting "NOT voided --
+radius 0".
+
+One check was also rewritten rather than repaired: it asserted the string "0.0035" appeared in the
+composite's entry, which was true while that entry was read off source. Now the entry is measured, the 0.0035
+heat cap has moved to UNMEASURED where it belongs, and the check asks for the EVIDENCE instead of the
+literal. A check pinned to a spelling rather than a mechanism is the species this tree has committed two
+dozen times.
+
+Not done this round, and asked for: wiring the fused pass into a real WebGPU render target. That is its own
+round -- it needs a storage-texture output rather than a buffer, and its payoff is memory traffic, which this
+sandbox's software rasteriser cannot measure.
+
+This round adds no module and no gate, and the tree stands at 1358 gates.
 ## v4285 -- How far one texel's damage travels, and what that forbids
 
 v4284 fused three post passes into one compute dispatch and closed by saying the composite was "the one that

@@ -260,7 +260,13 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
  */
 export async function renderGlslToPixels({ vertex, fragment, width = 64, height = 64, srcSize = 64,
                                            uniforms = null, uniformNames = [], sourceTexel = null,
-                                           uniformVecs = null }) {
+                                           uniformVecs = null, textures = null }) {
+    // v4286 -- `textures` is {samplerName: (x,y,n) => [r,g,b,a]}, each bound to its OWN texture unit. ADDITIVE:
+    // it defaults to null and every existing caller keeps the single tDiffuse binding on unit 0. It exists
+    // because render/bloomPass.js's COMPOSITE_FS takes FIVE samplers -- scene, bloom, depth, ssao, god rays --
+    // and with one texture bound they all read the same image, which makes every measurement about a fiction.
+    // Unresolved sampler names are RETURNED for the same reason the vector uniforms are: a sampler that never
+    // got its unit reads unit 0, which is a plausible-looking wrong answer rather than an error.
     // v4284 -- `uniformVecs` is {name: [..2|3|4 numbers]}, set with uniform2f/3f/4f by array length. ADDITIVE:
     // it defaults to null and every existing caller is untouched. It exists because render/bloomPass.js's
     // BLUR_FS takes uTexel and uDir as vec2 and uEyeRect as vec4, and a uniform that is never assigned reads
@@ -278,6 +284,17 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
         const px = gen(x, y, n), i = (y * n + x) * 4;
         src[i] = px[0]; src[i + 1] = px[1]; src[i + 2] = px[2]; src[i + 3] = px[3];
+    }
+
+    // Built here, like the primary source, so the arrays the caller compares are the ones uploaded.
+    const texData = {};
+    for (const [nm, gen2] of Object.entries(textures || {})) {
+        const buf = new Uint8Array(n * n * 4);
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const px2 = gen2(x, y, n), i = (y * n + x) * 4;
+            buf[i] = px2[0]; buf[i + 1] = px2[1]; buf[i + 2] = px2[2]; buf[i + 3] = px2[3];
+        }
+        texData[nm] = Array.from(buf);
     }
 
     let browser = null;
@@ -316,6 +333,25 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
             gl.uniform1i(gl.getUniformLocation(prog, "tDiffuse"), 0);
             const unresolved = [];
+            // Extra samplers on units 1..N. Unit 0 keeps whatever the single-texture path bound.
+            let unit = 1;
+            for (const [nm, data] of Object.entries(a.textures || {})) {
+                const loc = gl.getUniformLocation(prog, nm);
+                if (!loc) { unresolved.push(nm); unit++; continue; }
+                const t = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE0 + unit);
+                gl.bindTexture(gl.TEXTURE_2D, t);
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, a.srcSize, a.srcSize, 0, gl.RGBA,
+                              gl.UNSIGNED_BYTE, new Uint8Array(data));
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.uniform1i(loc, unit);
+                unit++;
+            }
+            gl.activeTexture(gl.TEXTURE0);
             for (const [nm, v] of Object.entries(a.uniformVecs || {})) {
                 const loc = gl.getUniformLocation(prog, nm);
                 if (!loc) { unresolved.push(nm); continue; }
@@ -349,7 +385,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
                      distinctColours: seen.size };
         }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
              uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
-             uniformVecs: uniformVecs || {} });
+             uniformVecs: uniformVecs || {}, textures: texData });
         if (!out.ok) return { skipped: false, ...out };
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);

@@ -128,19 +128,113 @@ console.log("\n3. *** A FOOTPRINT THAT GROWS WITH THE IMAGE, WHICH NO APRON CAN 
     }
 }
 
-console.log("\n4. THE VERDICT, AND THE CLAIM IT CORRECTS");
+console.log("\n4. *** THE TWO PASSES v4285 COULD NOT MEASURE, NOW MEASURED ***");
+{
+    // v4285 filed SSAO and the composite as read-off-source and gave two reasons. ONE OF THEM WAS WRONG:
+    // "SSAO needs a depth buffer that is not the colour buffer" -- it has exactly ONE sampler, and the
+    // harness binds one texture. It was measurable the whole time and nobody tried.
+    const SSAO = F.shaderBetween("const SSAO_FS", "const GODRAYS_FS");
+    const rows = [];
+    for (const R of [2, 5, 10]) {
+        const r = await F.perturbFootprint({ render: renderGlslToPixels, vertex: VS, fragment: SSAO, n: 32,
+            base: () => [153, 153, 153, 255], poke: [0, 0, 0, 255],
+            opts: { uniforms: [R, 0.02], uniformNames: ["uRadius", "uBias"], uniformVecs: { uViewport: [32, 32] } } });
+        rows.push([R, r.radius]);
+    }
+    ok("*** SSAO's footprint TRACKS uRadius, which is what bounded-by-uniform has to mean ***",
+        rows.every(([R, r]) => r >= R - 1 && r <= R),
+        rows.map(([R, r]) => `uRadius ${R} -> ${r}`).join(", ") + "  (kernel reaches 0.95 * uRadius texels)");
+    ok("  so its apron at uRadius 10 is 9 texels -- LARGER THAN AN 8x8 TILE",
+        rows[2][1] >= 8, `${rows[2][1]} against a tile of ${8}: the load would be ${(8 + 2 * rows[2][1])}^2 for 64 outputs`);
+    // *** THE POKE HAD TO BE CHOSEN FOR THE SHADER, AND THE FIRST ONE MEASURED NOTHING. ***
+    const white = await F.perturbFootprint({ render: renderGlslToPixels, vertex: VS, fragment: SSAO, n: 32,
+        base: () => [153, 153, 153, 255],
+        opts: { uniforms: [5, 0.02], uniformNames: ["uRadius", "uBias"], uniformVecs: { uViewport: [32, 32] } } });
+    ok("CONTROL: the DEFAULT white poke measures nothing here, because white reads as sky",
+        white.ok && white.radius === -1,
+        `radius ${white.radius} -- SSAO skips depth >= 0.999, so the poke lands on the value it ignores`);
+    report("that pair is the finding about the METHOD rather than the shader: a perturbation the shader " +
+        "discards is evidence about the poke, not about the shader's reach. The default poke reported NO " +
+        "footprint at every radius, which is exactly the shape of a confident wrong answer.");
+
+    // The composite, with all five samplers bound to their own units for the first time.
+    const COMP = F.shaderBetween("const COMPOSITE_FS", "export class BloomPass");
+    const flat = (v) => () => [v, v, v, 255];
+    const U = (outline) => ({
+        uniforms: [1.0, 0.0, 1.0, 1.0, outline, 0.0, 0],
+        uniformNames: ["uBloomIntensity", "uVignetteStrength", "uExposure", "uSSAOStrength",
+                       "uOutlineStrength", "uGodRayStrength", "uHeatCount"],
+        uniformVecs: { uEyeRect: [0, 0, 1, 1], uTexelSize: [1 / 32, 1 / 32], uOutlineColor: [0, 0, 0] } });
+    const compFoot = async (which, poke, baseV, outline) => {
+        const tex = { uBloom: flat(20), uSceneDepth: flat(153), uSSAO: flat(255), uGodRays: flat(0) };
+        const a = await renderGlslToPixels({ vertex: VS, fragment: COMP, width: 32, height: 32, srcSize: 32,
+            sourceTexel: flat(80), textures: tex, ...U(outline) });
+        const b = await renderGlslToPixels({ vertex: VS, fragment: COMP, width: 32, height: 32, srcSize: 32,
+            sourceTexel: flat(80), ...U(outline),
+            textures: { ...tex, [which]: (x, y) => (x === 16 && y === 16 ? poke : flat(baseV)()) } });
+        if (!a.ok || !b.ok) return { ok: false, reason: a.reason || b.reason };
+        let radius = -1, moved = 0;
+        for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+            const i = (y * 32 + x) * 4;
+            if (a.pixels[i] === b.pixels[i] && a.pixels[i + 1] === b.pixels[i + 1] && a.pixels[i + 2] === b.pixels[i + 2]) continue;
+            moved++; radius = Math.max(radius, Math.max(Math.abs(x - 16), Math.abs((31 - y) - 16)));
+        }
+        return { ok: true, radius, moved, unresolved: a.unresolved };
+    };
+    const cb = await compFoot("uBloom", [255, 255, 255, 255], 20, 1.0);
+    const cd = await compFoot("uSceneDepth", [0, 0, 0, 255], 153, 1.0);
+    const cdOff = await compFoot("uSceneDepth", [0, 0, 0, 255], 153, 0.0);
+    ok("*** all five composite samplers bind to their OWN units now ***",
+        cb.ok && cb.unresolved.length === 0, `unresolved: ${JSON.stringify(cb.unresolved)}`);
+    ok("  the composite reads its colour inputs purely locally", cb.radius === 0 && cb.moved === 1,
+        `uBloom radius ${cb.radius}, ${cb.moved} pixel`);
+    ok("*** and its depth footprint is 1 with the outline on and NOTHING with it off ***",
+        cd.radius === 1 && cd.moved === 8 && cdOff.radius === -1,
+        `outline on: radius ${cd.radius}, ${cd.moved} moved (the 3x3 Sobel ring); off: radius ${cdOff.radius}`);
+    report("*** A PASS'S FOOTPRINT DEPENDS ON WHICH FEATURES ARE SWITCHED ON. *** The same shader reads a " +
+        "3x3 neighbourhood or a single texel depending on one uniform, so an apron has to be sized for the " +
+        "FEATURE SET rather than for the file. A fusion measured with the outline off would be wrong the " +
+        "first time somebody enabled it.");
+    // *** THE GUARD IS EXERCISED, NOT MERELY PRESENT. *** Removing it went 0 RED because nothing here
+    // produced an unresolved uniform -- a guard no test reaches is the graveyard's whole subject. The heat
+    // path is the case it was written for, so the heat path is run and the REFUSAL is the assertion.
+    const heat = await F.perturbFootprint({ render: renderGlslToPixels, vertex: VS, fragment: COMP, n: 32,
+        base: flat(80), opts: { ...U(0.0), uniforms: [1, 0, 1, 1, 0, 0, 1],
+            uniformVecs: { ...U(0.0).uniformVecs, uHeatSourcesUV: [0.5, 0.5],
+                           uHeatRadii: [0.9], uHeatStrength: [1.0] } } });
+    ok("*** a run whose uniforms did not bind is VOIDED, not reported as a footprint ***",
+        heat.ok === false && heat.void === true && heat.radius === null,
+        heat.void ? `refused: ${heat.unresolved.join(", ")}` : `NOT voided -- radius ${heat.radius}`);
+    ok("  and it names the float arrays specifically, so the gap is actionable",
+        heat.void && heat.unresolved.some((u) => /uHeatRadii/.test(u)),
+        "the harness sets scalars and vectors; these are float arrays and it says so rather than skipping");
+    ok("  and the one path still unmeasured is named rather than folded in",
+        Object.keys(F.UNMEASURED).length === 1 && /float ARRAYS/.test(F.UNMEASURED.heatDisplacement),
+        "heat displacement needs float-array uniforms the harness does not bind");
+}
+
+console.log("\n5. THE VERDICT, AND THE CLAIM IT CORRECTS");
 {
     const b = F.blockers();
     ok("*** exactly one pass blocks single-dispatch fusion, and it is not the composite ***",
         b.length === 1 && b[0] === "godRays", b.join(", ") || "none");
-    ok("  the composite is fusable IN ITSELF -- its reads are capped by literals in its own source",
-        F.FUSION.composite.fusable && /0\.0035/.test(F.FUSION.composite.why));
+    // v4286 -- this once asserted the string "0.0035" appeared in the composite's entry, which was true while
+    // that entry was READ OFF SOURCE. Now it is measured, the 0.0035 claim has moved to UNMEASURED where it
+    // belongs, and the check asks for the evidence instead of the literal. A check pinned to a spelling
+    // rather than a mechanism is the species this tree has committed two dozen times.
+    ok("  the composite is fusable IN ITSELF, and now on measured evidence rather than a read literal",
+        F.FUSION.composite.fusable && F.FUSION.composite.evidence === "measured" &&
+        F.FUSION.composite.radius === 1 && /0\.0035/.test(F.UNMEASURED.heatDisplacement),
+        "measured radius 1 for the outline Sobel; the 0.0035 heat cap is now filed as UNMEASURED");
     ok("  ...and still cannot be fused, because it CONSUMES the pass that cannot",
         /consumes god rays/.test(F.FUSION.composite.why),
         "fusable and reachable are different properties, and only the second one ships");
     ok("  SSAO is bounded by a uniform rather than a literal, which is a third category",
         F.FUSION.ssao.fusable && F.FUSION.ssao.footprint === "bounded-by-uniform",
         "an apron exists only once somebody bounds uRadius, so it is conditionally fusable and said so");
+    ok("*** every entry in the table is now MEASURED, none read off source ***",
+        Object.values(F.FUSION).every((v) => v.evidence === "measured"),
+        Object.entries(F.FUSION).map(([k, v]) => `${k}=${v.evidence}`).join(" "));
     ok("*** v4284's closing claim is recorded as WRONG in the module that disproved it ***",
         /THAT WAS WRONG/.test(fs.readFileSync(path.join(ENG, "render/passFootprint.mjs"), "utf8")),
         "the composite decides nothing; god rays decides, and it decides no");
@@ -180,9 +274,22 @@ console.log("\n4. THE VERDICT, AND THE CLAIM IT CORRECTS");
 //      is graded, not just the measurement that justifies it, because the two can drift apart -- a table
 //      that disagrees with its own evidence is the shape v4284's round-trip count had.
 //
-// None went 0 RED in the end. C is the one worth keeping: it did not find a bug in the module, it found a
-// SENTENCE in the gate that claimed more than the check performed, and correcting it turned up a real limit
-// of the model that nobody had looked for.
+//   E  the void-on-unresolved guard deleted, so a run whose uniforms never bound still reports a radius.
+//      -> *** 0 RED FIRST TIME. *** Nothing in the file produced an unresolved uniform, so the guard was
+//      present and unreached -- the graveyard's whole subject, inside a gate. The heat path is the case the
+//      guard was written for, so the heat path is now RUN and the refusal is the assertion. Redone: 2 red,
+//      reporting "NOT voided -- radius 0". That 0 is the honest footprint of a shader whose heat was
+//      switched off by the binding failure, and it would have been read as the footprint of heat.
+//
+//   F  every extra sampler bound to unit 0, so the composite's five inputs become one image.
+//      -> exit=1, 2 red. uBloom reads radius -1 -- perturbing it changes NOTHING, because the shader is
+//      reading unit 0 for everything and unit 0 is uScene. *** THIS IS WHAT v4285 WAS ACTUALLY DOING when it
+//      filed the composite as read-off-source: *** with one texture bound, a measurement would have been a
+//      measurement of a fiction, and the -1 here is what that fiction looks like.
+//
+// None went 0 RED in the end, and two needed a second attempt. C and E are the pair worth keeping, and they
+// are the same shape: a check that claimed more than it performed, and a guard that no test reached. Neither
+// was a bug in the module. Both were the gate believing itself.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: THE COMPOSITE AND SSAO WERE NOT PERTURBED. Both need textures this harness cannot " +
     "bind separately -- the composite takes five samplers and SSAO needs a depth buffer that is not the colour " +
