@@ -165,41 +165,167 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
     }
 }
 
-console.log("\n4. THE ORRERY ITSELF IS UNCHANGED");
+console.log("\n4. THE PAGE IS WIRED, AND THE DRAWING ITSELF IS UNTOUCHED");
 {
-    const draw = read("ui/orreryDraw.js");
-    ok("*** ui/orreryDraw.js still draws in 2D and this round did not touch it ***",
-        /getContext/.test(read("orrery.html")) && !/orreryPost/.test(draw),
-        "368 lines of arcs, gradients and labels, none of them ported");
-    ok("  and orrery.html is not yet wired to the stage", !/orreryPost/.test(read("orrery.html")),
-        "the module exists and is graded; putting a control on the page is the next round");
-    report("*** SO THIS IS A CONSUMER THAT EXISTS AND IS PROVEN AND IS NOT YET SWITCHED ON. *** That is one " +
-        "step short of the thing v4269 asked for, and saying so is better than implying the orrery has an " +
-        "effect stage on screen today. What it has is a stage that attaches, draws, and refuses correctly.");
+    const draw = read("ui/orreryDraw.js"), page = read("orrery.html");
+    ok("*** ui/orreryDraw.js still draws in 2D and no round has ported it ***",
+        !/orreryPost/.test(draw) && !/getContext\("webgl/.test(draw),
+        "368 lines of arcs, gradients and labels, none of them touched");
+    ok("*** and orrery.html NOW imports the stage -- v4273 shipped it unwired and said so ***",
+        /orreryPost\.mjs/.test(page));
+    ok("  there is an overlay canvas for it to draw into", /id="fx"/.test(page));
+    ok("  which does not steal the pointer from the orrery", /#fx[^}]*pointer-events:\s*none/.test(page),
+        "every click, drag and scroll must still reach #stage");
+    ok("  and it starts hidden, so the page is unchanged until asked", /#fx[^}]*display:\s*none/.test(page));
+    ok("  the effect runs AFTER the 2D frame is finished", /if \(system\) draw\(\);[\s\S]{0,400}fx\.draw\(t\)/.test(page),
+        "uploading mid-draw would sample a half-built system");
+    ok("*** and a failure to attach SHOWS THE REASON rather than sitting dead ***",
+        /why\.textContent = fx\.reason/.test(page) && /signal: unavailable/.test(page),
+        "v4267's subject was a built page nobody could reach; a silent dead control is the same defect");
+    ok("  the target canvas is sized to match the source exactly",
+        /fxc\.width = cv\.width; fxc\.height = cv\.height/.test(page),
+        "a mismatch would rescale through the sampler rather than error");
+}
+
+console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
+{
+    const requireFn2 = createRequire(import.meta.url);
+    const pw2 = resolvePlaywright(requireFn2);
+    if (!pw2 || !fs.existsSync(HEADLESS_SHELL)) {
+        console.log("  SKIP  no browser available here");
+        report("*** NOT A PASS. *** Section 4 reads the page's source. Only this one loads it, clicks the " +
+            "control and looks at what appears -- which is the difference between wired and working.");
+    } else {
+        const MIME2 = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html",
+                        ".json": "application/json" };
+        const srv2 = http.createServer((q, s2) => {
+            const u = decodeURIComponent(String(q.url).split("?")[0]);
+            const f = path.join(ENG, u === "/" ? "orrery.html" : u);
+            if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
+            s2.writeHead(200, { "Content-Type": MIME2[path.extname(f)] || "application/octet-stream" });
+            s2.end(fs.readFileSync(f));
+        });
+        await new Promise((r) => srv2.listen(0, "127.0.0.1", r));
+        const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const pg = await br.newPage();
+        const perr = [];
+        pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));
+        await pg.goto(`http://127.0.0.1:${srv2.address().port}/`, { waitUntil: "load" });
+        await pg.waitForTimeout(1200);            // let the orrery fetch its data and draw a few frames
+        // *** readPixels WAS THE WRONG INSTRUMENT HERE AND READ 0 ON A WORKING PAGE. ***
+        // gfx/device.js creates its context with `opts.contextAttribs || {}`, so preserveDrawingBuffer is
+        // false, and the browser discards the drawing buffer once a frame is presented. Section 3 gets away
+        // with reading pixels because it draws and reads inside one task; this section clicks a button and
+        // waits, so every read lands after a presentation and is guaranteed to be zero whatever the page did.
+        //
+        // A SCREENSHOT COMPOSITES, which is exactly what a person sees. So the measurement is: capture the
+        // page with the effect off and on, and require the two images to DIFFER. That is also a stronger
+        // claim than counting lit pixels -- it says the control changes what is on screen, not merely that
+        // something was drawn somewhere.
+        const state = async () => await pg.evaluate(() => ({
+            label: document.getElementById("fxbtn").textContent.trim(),
+            shown: getComputedStyle(document.getElementById("fx")).display,
+            why: document.getElementById("fxwhy").textContent.trim(),
+            disabled: document.getElementById("fxbtn").disabled,
+        }));
+        const shot = async () => (await pg.screenshot({ type: "png" }));
+        let r2;
+        try {
+            // *** THE ORRERY ANIMATES, SO TWO SCREENSHOTS DIFFER WHETHER OR NOT THE EFFECT IS ON. ***
+            // The first version of this check did not pause it, and sabotage A -- removing the per-frame
+            // fx.draw() entirely -- still PASSED the "screen changes" line, because the bodies had moved
+            // between the two captures. A difference test over a moving picture measures the clock.
+            // So: pause first, confirm the page is actually still by capturing twice and requiring those to
+            // MATCH, and only then attribute a difference to the effect.
+            await pg.click("#play");
+            await pg.waitForTimeout(400);
+            const still1 = await shot();
+            await pg.waitForTimeout(400);
+            const still2 = await shot();
+            const before = await state();
+            const imgOff = await shot();
+            await pg.click("#fxbtn");
+            await pg.waitForTimeout(900);
+            const after = await state();
+            const imgOn = await shot();
+            await pg.click("#fxbtn");
+            await pg.waitForTimeout(300);
+            const off = await state();
+            const imgOff2 = await shot();
+            const same = (a, b) => a.length === b.length && a.equals(b);
+            r2 = { before, after, off,
+                   paused: same(still1, still2),
+                   changed: !same(imgOff, imgOn),
+                   restored: !same(imgOn, imgOff2),
+                   bytesOff: imgOff.length, bytesOn: imgOn.length };
+        } catch (e) { r2 = { err: String(e).slice(0, 200) }; }
+        await br.close(); srv2.close();
+
+        ok("the page loads and the control starts OFF and hidden", !r2.err &&
+            /off/.test(r2.before.label) && r2.before.shown === "none",
+            r2.err || `${r2.before.label} / display:${r2.before.shown}`);
+        ok("*** clicking it attaches and turns the effect ON ***", !r2.err && !r2.after.disabled &&
+            /on/.test(r2.after.label) && r2.after.shown === "block",
+            r2.err || `${r2.after.label} / display:${r2.after.shown} / ${r2.after.why}`);
+        ok("  and it names the backend it got", !r2.err && /via /.test(r2.after.why || ""), r2.after && r2.after.why);
+        ok("CONTROL: the page is PAUSED, so a difference is the effect and not the clock", !r2.err && r2.paused === true,
+            r2.err || (r2.paused ? "two captures 400ms apart are byte-identical" :
+                       "the page is still moving -- every comparison below would pass on motion alone"));
+        ok("the composited page changes when it goes on", !r2.err && r2.changed === true,
+            r2.err || `${r2.bytesOff} vs ${r2.bytesOn} bytes of PNG, with the clock paused`);
+        ok("  and changes back when it goes off", !r2.err && r2.restored === true,
+            "so the control is reversible and not a one-way door");
+        report("*** AND THAT PAIR IS WEAKER THAN IT LOOKS, WHICH SABOTAGE A PROVED. *** Removing fx.draw() " +
+            "from the frame loop entirely still passes both lines: revealing the overlay layer at all " +
+            "perturbs compositing enough to change the PNG. Measured directly -- a never-drawn #fx captures " +
+            "at 110,787 bytes and a drawn one at 128,266, a ratio of 1.2, which is not a discriminator. " +
+            "Element screenshots do not isolate it either, because they composite what is behind. " +
+            "*** SO THE THING THAT ACTUALLY CATCHES A IS THE SOURCE CHECK IN SECTION 4, AND THE PIXEL PROOF " +
+            "LIVES IN SECTION 3, *** where the gate owns both canvases and reads in the same task. " +
+            "gfx/device.js creates its context with `opts.contextAttribs || {}`, so preserveDrawingBuffer is " +
+            "off and a read after presentation is guaranteed zero -- from outside this page, with the page " +
+            "as it ships, the overlay's CONTENT cannot be measured. Saying so beats a check that reads like " +
+            "proof and is not.");
+        ok("  clicking again turns it off and hides the overlay", !r2.err &&
+            /off/.test(r2.off.label) && r2.off.shown === "none");
+        const real = (perr || []).filter((e) => !/favicon/i.test(e));
+        ok("  and the page threw nothing on the way", real.length === 0, real.slice(0, 2).join(" | ") || "clean");
+        report("this is the step v4273 named and did not take: the module existed, attached and drew, and " +
+            "nothing on the page could ask it to. Now a person can.");
+    }
 }
 
 // =============================================================================================================
 // SABOTAGE LOG -- grep-confirmed before the result was read, exit codes read, restored md5-identical. MEASURED.
 //
 //   A  the null-backend refusal removed, so a recording device counts as success.
-//      -> exit=1, 1 red. Only the source check fires, and that is the honest result rather than a weak one:
-//      the browser sections still pass because a real browser HAS webgl2, so the recorder is never reached
-//      there. The check exists for the machine that has neither backend, which is not this one.
+//      -> exit=1, 1 red. Only the source check fires, and that is honest rather than weak: a real browser HAS
+//      webgl2, so the recorder is never reached here. The check exists for the machine that has neither.
 //
 //   B  the `source` branch removed from gfx/device.js's WebGL2 texture(), back to data-only.
-//      -> exit=1, 1 red, and it is the PIXEL count: 2031 lit texels becomes 0. Everything else stays green --
-//      the stage attaches, the pipeline builds, draw() reports drawn:true. *** A POST STAGE WITH NO SOURCE
-//      REPORTS SUCCESS AND PRODUCES AN EMPTY FRAME, *** which is exactly the failure this round found in the
-//      WebGPU backend and exactly why the gate counts pixels instead of trusting a return value.
+//      -> exit=1, 1 red, and it is the PIXEL count in section 3: 2,031 lit texels becomes 0 while the stage
+//      still attaches, the pipeline still builds and draw() still reports drawn:true. *** A POST STAGE WITH
+//      NO SOURCE REPORTS SUCCESS AND PRODUCES AN EMPTY FRAME. ***
 //
-//   C  the WebGPU texture refusal reverted to `() => {}`, the silent no-op as shipped before this round.
-//      -> exit=1, 2 red, both in section 2. Nothing in section 3 moves, because the stage asks for webgl2 and
-//      never reaches that code -- so the only thing standing between a future caller and a silently empty
-//      frame is a source check. That is thinner than it should be, and it is the argument for the next round
-//      implementing the binding rather than documenting its absence.
+//   C  the WebGPU texture refusal reverted to `() => {}`, the silent no-op as shipped before v4273.
+//      -> exit=1, 2 red, both in section 2. Nothing in section 3 moves, because the stage asks for webgl2.
 //
-// None went 0 RED. B is the one worth keeping: it is the only sabotage here whose damage is invisible to
-// every check except the one that counts what actually landed on the canvas.
+//   D  fx.draw(t) removed from orrery.html's frame loop -- the effect is switched on and never rendered.
+//      -> exit=1, 1 red, in SECTION 4's source check, and *** SECTION 5's SCREENSHOTS STILL PASS. *** That is
+//      the sabotage that taught this file its own limit. Two earlier drafts of section 5 were fooled: the
+//      first compared screenshots of an ANIMATING page, so any two differed and the check measured the clock;
+//      pausing fixed that and A still passed, because revealing the overlay layer at all perturbs
+//      compositing. Measured: a never-drawn #fx element captures at 110,787 PNG bytes against 128,266 drawn,
+//      1.2x, and element screenshots composite what is behind them so they cannot isolate it. The page ships
+//      without preserveDrawingBuffer, so a readPixels after presentation is guaranteed zero. The conclusion
+//      is not a cleverer capture: it is that section 5 proves the CONTROL works and section 3 proves the
+//      RENDER works, and neither is asked to do the other's job.
+//
+//   E  #fx given pointer-events back -> exit=1, 1 red.  F  the failure reason not shown -> exit=1, 1 red.
+//
+// None went 0 RED. B and D are the pair worth keeping: B is invisible to everything except a pixel count, and
+// D is invisible to the pixel-shaped check that looks like it would catch it. Together they are the argument
+// for keeping both a source check and a render check rather than trusting either alone.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER THE EFFECT LOOKS RIGHT ON THE ORRERY. This proves the stage attaches to a " +
     "real device, that the real drawSystem output is its source, that it draws with the effect on and nothing " +

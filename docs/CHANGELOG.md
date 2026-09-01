@@ -8,6 +8,48 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4274 -- The orrery's shader stage is switched on, and my check of it was wrong twice
+
+v4273 built `ui/orreryPost.mjs`, proved it attaches to a real device and draws, and shipped it with nothing on the
+page able to ask for it. That gap is closed.
+
+`orrery.html` now has an overlay canvas, a **signal** toggle beside the surface button, and a frame hook that runs
+the effect *after* `drawSystem` finishes -- uploading mid-draw would sample a half-built system. It is off by
+default. It ignores the pointer, so every click, drag and scroll still reaches the orrery. And when it cannot
+attach it **shows the reason**, because a control that fails silently is v4267's subject wearing a different hat.
+
+### The part worth keeping is that the check was fooled twice
+
+**Draft one** screenshotted the page before and after the toggle and required a difference. The orrery animates,
+so any two captures differ and the check measured the clock. Sabotage D -- deleting `fx.draw()` from the frame
+loop entirely, so the effect is switched on and never rendered -- passed it.
+
+**Draft two** paused the page first and proved it was still by requiring two captures 400ms apart to be
+byte-identical. D still passed, because merely revealing the overlay layer perturbs compositing enough to change
+the PNG.
+
+So I measured the thing directly instead of guessing again: *** a never-drawn `#fx` element captures at 110,787
+PNG bytes against 128,266 drawn -- a ratio of 1.2, which is not a discriminator. *** Element screenshots do not
+isolate it either; they composite what is behind them, which is why a "blank" overlay capture is 110KB of orrery.
+And `gfx/device.js` creates its context with `opts.contextAttribs || {}`, so `preserveDrawingBuffer` is off and a
+`readPixels` after presentation is guaranteed zero.
+
+*** From outside the page, as the page ships, the overlay's content cannot be measured. *** The response was to
+narrow the claim rather than invent a cleverer capture: section 5 proves the **control** works -- it attaches,
+names its backend, toggles, reverses, throws nothing -- and section 3 proves the **render** works, where the gate
+owns both canvases and reads pixels in the same task. Neither is asked to do the other's job, and the report says
+so where a reader will hit it.
+
+Sabotage A (null backend accepted) 1 red. B (`source` reverted in `device.texture`) 1 red -- 2,031 lit texels to
+0 while the stage still attaches and `draw()` still reports success. C (the WebGPU no-op restored) 2 red. D 1 red,
+**in the source check, with the screenshots still green**. E (pointer-events restored) 1 red. F (reason not shown)
+1 red.
+
+B and D are the pair worth keeping. B is invisible to everything except a pixel count; D is invisible to the
+pixel-shaped check that looks like it would catch it. Together they are the argument for keeping a source check
+and a render check rather than trusting either alone.
+
+The build now stands at 4274 gates.
 ## v4273 -- The orrery gets a shader stage, and the consumer finds three holes the counting missed
 
 `ui/orreryDraw.js` is canvas 2D -- 28 drawing calls, four of them `fillText`. Not a speed problem, a **capability
