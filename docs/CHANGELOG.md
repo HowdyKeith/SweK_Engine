@@ -8,6 +8,77 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4269 -- The tree is WebGPU-capable and can move almost nothing to it, and nobody had counted the ratio
+
+The capability is not missing. Thirteen pages call `getContext("webgpu")`, sixty files touch `navigator.gpu`,
+ten `.wgsl` files ship, `render/wgslSpec.mjs` conformance-checks WGSL without a GPU, and `ui/webgpuProbe.mjs`
+gets the hard part right -- WebGPU is gated on a SECURE CONTEXT, so the same browser on the same machine has it
+on https and none on a LAN IP, and the probe says which of those it is instead of blaming the driver.
+
+What has never been counted is REACH. `gfx/device.js` is a 117-line unified WebGL2/WebGPU device whose stated
+promise is that "a demo writes its render ONCE and runs on either runtime" -- but shaders are the one thing the
+abstraction cannot unify, and its own header says so: "a pipeline carries both `{ wgsl }` and `{ glsl }` and each
+backend takes its own". So a render only travels if it supplies both.
+
+*** Counted, over .js/.mjs/.html outside node_modules and vendor, comments stripped: 118 modules ship GLSL, 38
+ship WGSL, and FIVE ship both. 4.2%. *** And of those five, three are pages -- `gfx-device.html`,
+`nebula-device.html` and `wormhole-jump.html`. Only two are shader modules: `fx/nebula/nebulaShaders.js` and
+`fx/wormhole/wormholeNebula.js`. A page carrying both languages carries its own two shaders and lends nothing to
+anybody else, so the reach number is two out of a hundred and eighteen.
+
+That is not a criticism of the abstraction, which works. It is the difference between "the tree is WebGPU-capable"
+and "the tree can move a given render to WebGPU". The first is true; the second is true five times out of 118.
+The device also has exactly two consumers, and both of them are its own demos.
+
+### The failure was not graceful, and now it refuses by name
+
+`webgpuBackend` read `d.shaders.wgsl` bare and handed it straight to `createShaderModule`. Given that 113 of 118
+shader-bearing modules are GLSL-only, that is the COMMON path: a pipeline arriving without WGSL reached the GPU
+as `code: undefined` and failed as a driver-shaped error naming neither the pipeline nor the missing language.
+It now throws with the contract in the message -- which language is missing, which is present, and where to read
+about it.
+
+The gate proves the guard FIRES rather than that its text exists: it stubs `navigator.gpu`, an adapter, a device
+and a canvas context, brings the real `webgpuBackend` up, and calls `pipeline()` with a GLSL-only shader set. A
+source regex would have passed on the message alone.
+
+### What this means for the orrery, which is why the count was taken
+
+`ui/orreryDraw.js` is canvas 2D -- `getContext("2d")`, 28 drawing calls, four of them `fillText`. It has no
+shader stage at all, so no effect in this tree can touch it. That is a capability ceiling, not a speed problem,
+and it is the real reason to move.
+
+The route off 2D is `gfx/device.js`, and the labels need `text/slug*.js`, the tree's own GPU glyph renderer
+(`vendor/slug` holds only a LICENSE and a PROVENANCE.txt, which is why v4266 counted it paper-only -- the code
+lives in `text/`). *** And `text/slugShader.js` is 337 lines of GLSL with zero WGSL. *** It is one of the 113. A
+port of the orrery would draw on the WebGL2 backend and, on WebGPU, throw at the glyph pipeline.
+
+That is the blocker: one file, and now a number instead of a hunch.
+
+### What this round refused to do
+
+Transliterate it. `slugEval.js` lists the faithfulness rules for anyone editing that shader -- the float bit
+extraction in `calcRootCode` stays because `y < 0` is not equivalent at negative zero, the double-root fallback
+stays at exactly 1/65536, the `abs()` in `calcCoverage` stays because it is the only reason a font drawn with
+either winding convention renders at all. Three load-bearing subtleties in a 337-line transliteration, and
+NOTHING HERE CAN EXECUTE WGSL. `render/wgslSpec.mjs` would validate its structure; only a GPU can say it draws
+the same glyph. Measuring first was the honest half, and it turned the question into one file and one number.
+
+### The self-counting trap, solved by construction rather than a seventh exclusion list
+
+Seven times in seven rounds a scan here has counted itself, and every previous fix was an exclusion list that had
+to be written, argued for and kept current. A census of shader-language markers cannot use one without
+immediately needing entries for itself AND its gate. So neither file contains the markers -- they are assembled
+from fragments at run time -- and the gate asserts that as a check. Sabotage B writes one marker literally into
+the gate and produces five reds: the two self checks, `glslBearing` 118 to 119, `glslOnly` 113 to 114, and one I
+did not predict -- the gate appears as a THIRD consumer of `gfx/device.js`, because it imports the device and now
+counts as a shader module. One literal string, five wrong facts.
+
+Sabotage A (guard removed) 5 red, three of them from the behavioural test. C (comment stripping removed) 4 red,
+including `wgslBearing` 38 to 39 -- there really is one file that discusses a WGSL entry-point attribute in prose
+and ships none, and a raw scan files it as WebGPU-ready.
+
+The build now stands at 4269 gates.
 ## v4268 -- Six licence verdicts lived outside the tree, and one of them was wrong
 
 Two open items assert a licence state for six repositories:

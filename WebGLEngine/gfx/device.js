@@ -78,6 +78,18 @@ async function webgpuBackend(canvas, opts = {}) {
         backend: "webgpu", gpu, ctx, fmt,
         buffer: (d) => { const b = gpu.createBuffer({ size: d.data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }); gpu.queue.writeBuffer(b, 0, d.data); return { gpu: b, count: (d.count || (d.data.length / (d.components || 1))) }; },
         pipeline: (d) => {
+            // *** REFUSE BY NAME RATHER THAN HAND THE GPU `undefined`. *** v4269 counted what can actually take
+            // this backend: 118 modules in this tree ship GLSL, 38 ship WGSL, and 5 ship both. So a pipeline
+            // arriving here with no wgsl is the COMMON case, not a freak one, and until now it reached
+            // createShaderModule as `code: undefined` -- a driver-shaped error naming neither the pipeline nor
+            // the missing language. The abstraction's whole promise is that a render travels; when one cannot,
+            // the caller is owed the reason in the terms the contract is written in.
+            if (!d.shaders || typeof d.shaders.wgsl !== "string") {
+                throw new Error("gfx/device: this pipeline has no WGSL, so it cannot run on the WebGPU backend. " +
+                    "A pipeline must carry both { wgsl } and { glsl }; this one carries " +
+                    (d.shaders && typeof d.shaders.glsl === "string" ? "only glsl" : "neither") +
+                    ". Request the webgl2 backend, or add a WGSL path -- see render/backendParity.mjs.");
+            }
             const mod = gpu.createShaderModule({ code: d.shaders.wgsl });
             const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers: [{ arrayStride: d.stride, attributes: d.attributes.map((a, i) => ({ shaderLocation: i, offset: a.offset, format: a.wgpuFormat || ("float32x" + a.size) })) }] }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
             let ubuf = null, bind = null, uni = null;
