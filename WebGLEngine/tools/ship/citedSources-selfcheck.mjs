@@ -72,7 +72,7 @@ console.log("1. the census, and the disjointness that is the whole finding");
     ok("!! the scan finds a substantial population -- it is not looking for something rare",
         names.length >= 40, names.length + " distinct repositories cited WITH a licence in a module header, " +
         "across " + [...cited.values()].reduce((a, v) => a + v.files.size, 0) + " files");
-    ok("!! *** AND AT v4258 EXACTLY " + registered.length + " OF THEM ARE IN THE REGISTER ***",
+    ok("!! *** AND AT v4260 EXACTLY " + registered.length + " OF THEM ARE IN THE REGISTER ***",
         registered.length >= 2,
         "registered: " + (registered.join(", ") || "none") + ". Before this round it was ZERO -- the two sets " +
         "were completely disjoint, and all " + REACHED_SOURCES.length + " register entries appeared in no " +

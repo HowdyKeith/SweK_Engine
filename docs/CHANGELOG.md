@@ -8,6 +8,86 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4260 -- Frame-accurate video: reproducible is not accurate, and measuring it split the goal in two
+
+v4188 gave this tree a live camera as a GL texture and pointed the whole shader chain at it. That was a
+multiplier and it was also ungradeable: a webcam never produces the same frame twice, so no test can ever
+say "effect X on frame 47 looks like this". render/videoFrames.mjs is the input a gate can hold --
+activetheory/activeframe (MIT) for the premise that a video is a sequence of ADDRESSABLE FRAMES rather than
+a thing that plays, and none of its code. It steps a file by seek-and-wait and is wired to
+window.videoFrames.open / run / check.
+
+WHAT THE TREE HAD, COUNTED AND NOT ASSERTED. Nothing in 4,259 rounds has ever set video.currentTime -- every
+.currentTime in the source is AudioContext.currentTime. There are no video files in the tree.
+requestVideoFrameCallback was called in exactly one place, render/cameraTexture.js, and it discarded the
+metadata argument, which is where mediaTime and presentedFrames arrive. The tree asked the only question that
+identifies a frame and threw away the answer. Section 1 re-counts all of that every run.
+
+FOUR HEADLESS-CHROMIUM PROBES, AND THE THIRD AND FOURTH CHANGED WHAT THE FILE CLAIMS. Videos were recorded
+with every frame carrying its own index in binary blocks, then read back two ways.
+
+PLAY + requestAnimationFrame disagrees with ITSELF. Two identical runs, same file, same code, one immediately
+after the other: 17 of 20 ticks differ. An effect graded that way is graded against whichever frame the
+scheduler happened to hand over.
+
+SEEK AND WAIT REPEATS EXACTLY: 20 of 20 frames identical on the second run, and 20 of 20 pixel digests
+identical too.
+
+AND THAT SAME PERFECTLY-REPEATABLE RUN WAS ON THE WRONG FRAME 19 TIMES OUT OF 20. The clip was 20.3 fps and
+the plan assumed 30, so the error grew linearly: deltas 0, -1, -2, ... -21 across 64 frames. Seeking at the
+file's measured mean rate got 32/64 exact and 32/64 off by one, because the recording was variable-rate and
+no single number describes it. A round that asked only "did it repeat" would have shipped the word
+frame-accurate on the strength of a repeatability result, so the gate holds the two questions apart in
+separate sections.
+
+FRAME-ACCURATE SEEKING IS ACHIEVABLE, and the failure has a shape. Where the file's real timing matches the
+assumed rate it is exact: 47 of 47 at 10 fps, 46 of 47 at 30 fps, 39 of 48 at 25 fps. The 25 fps deltas are 0
+thirty-nine times and then -1 nine times -- THE ERROR IS A STEP, NEVER NOISE. driftProfile names the shape,
+because the shape decides the fix: a RATE error is repaired by calibrating fps and a DROP is not repaired by
+anything, so misdiagnosing one as the other sends the caller somewhere useless.
+
+A HYPOTHESIS THIS ROUND GAVE UP. I expected seeking to a frame boundary (n/fps) to be ambiguous in the
+decoder and the midpoint to be necessary to fix it. Boundary seeks came back 6 of 6 exact. The midpoint keeps
+its place for the reason that was actually measured: floor(t * fps) on exact boundary times is wrong 137
+times in 2000 at 25 fps, 45 at 29.97, 38 at 30, and ZERO at 24 fps -- the rate at which the obvious
+implementation looks perfect. On midpoint times it is wrong zero times at every rate with no epsilon at all.
+
+SO THE PIXELS ARE THE ONLY AUTHORITY. Not the plan, not currentTime, not mediaTime. rVFC's mediaTime
+disagreed with the pixels in 11 of 12 comparisons, always by exactly +1, and it did so ON THE FILE THAT
+SEEKED 47 OF 47 CORRECT -- the container's timestamps sat a few milliseconds past each nominal boundary
+because the real rate was 9.9374 and not 10. identify() therefore returns a margin, and the gate records what
+the margin can and cannot do: the four margins were 0.020, 0.070, 0.130, 0.190, GROWING, so it warns about a
+boundary and looks more confident the more wrong it gets. That correction was written after the first run of
+the gate failed the claim I had made for it.
+
+A BUG CAUGHT BEFORE IT SHIPPED. With eight data blocks and a parity block, frame 0 is all-zero with parity
+zero, so an all-black frame was a valid encoding of frame 0 -- a failed decode, an un-uploaded texture and a
+seek before the first keyframe would all have read back a confident "frame 0", while the comment above the
+function claimed the opposite. Two sync blocks fix it. Re-inserted as a sabotage it goes 4 RED and the
+0..255 round trip stays GREEN, which is why that check alone did not catch it the first time either.
+
+cameraTexture.js now reads the rVFC metadata it has discarded since v4188, which gives the live camera a
+dropped-frame count a boolean could never carry. activetheory/activeframe is registered in
+world/reachedLicences.mjs in the same round its idea was taken, taking the unregistered-citation ratchet from
+52 to 51.
+
+SABOTAGE A WENT 1 RED, WHICH WAS TOO FEW. Section 7's midpoint check swept only 30 fps and only the twenty
+indices the probe happened to use, and not one of those twenty is among the 38-in-2000 boundary times floor()
+misreads -- so a plan built entirely on boundaries satisfied it. Widened to five rates over 400 frames each
+and asserted with no epsilon, it now goes 2 RED. Five sabotages, 2/4/1/2/2 red, each grep-confirmed before
+its result was read and restored md5-identical.
+
+UNCHECKED: a real video, in this process. Every measured array is FROZEN into the gate from probes run by
+hand this round, so no browser runs during the gate and a platform change would go unnoticed until somebody
+re-runs the probe. Every clip was made by MediaRecorder from a canvas, so no camera-shot or transcoded file
+has been through this and H.264/MP4 is entirely untested -- the sandbox's Chromium offers only WebM. Whether
+the mediaTime-versus-pixels off-by-one belongs to the container's timestamps or to the canvas capture that
+wrote them cannot be separated by this probe, and the file does not guess. And the EFFECT CHAIN is still
+ungraded: this round supplies the reproducible input and nothing yet renders a pass against it, so "an effect
+can now be graded" is a capability and not a result.
+
+The build now stands at 4260 gates.
+
 ## v4259 -- Minecraft export: the door has only ever opened inwards, and the reader is what grades the writer
 
 world/schematicLoader.js has read .schem, .schematic and .litematic since v456. Nothing in 3,800 rounds has

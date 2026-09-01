@@ -196,6 +196,30 @@ export const REACHED_SOURCES = Object.freeze([
              "actually samples. The idea was right and its first application was too broad.",
     },
     // =========================================================================================================
+    // v4260 -- REGISTERED IN THE SAME ROUND IT WAS READ, which is the habit #53 said this ledger should have.
+    // =========================================================================================================
+    {
+        repo: "activetheory/activeframe", sourceUrl: "https://github.com/activetheory/activeframe",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Active Theory", year: 2018,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, stated in the repository.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The premise only: that a video is a SEQUENCE OF ADDRESSABLE FRAMES rather than a thing that " +
+             "plays, so a frame can be asked for by number. render/videoFrames.mjs is written here -- no bytes, " +
+             "and none of activeframe's own machinery.",
+        takenPaths: ["render/videoFrames.mjs"],
+        citedPaths: ["render/cameraTexture.js", "tools/ship/videoFrames-selfcheck.mjs"],
+        why: "v4188 pointed the whole shader chain at a live camera, which no gate can ever hold still -- the " +
+             "tree gained a video input and still had none a test could repeat. *** AND MEASURING IT SPLIT THE " +
+             "GOAL IN TWO. *** Seek-and-wait IS reproducible: twenty of twenty frames identical across two " +
+             "runs, with identical pixel digests. It is NOT thereby accurate: that same run was on the wrong " +
+             "frame nineteen times out of twenty, because the file was 20.3 fps and the plan assumed 30. " +
+             "Frame-accurate seeking is achievable when the timing really matches (47/47 at 10 fps) and the " +
+             "failure is always a step, never noise. So what this tree took is the premise, and what it added " +
+             "is the verification the premise needs: a frame that carries its own index, because neither " +
+             "currentTime nor rVFC's mediaTime could be trusted to say which frame had arrived.",
+    },
+    // =========================================================================================================
     // v4257 -- *** THREE ENTRIES THAT ARE THE FIRST OF THEIR LICENCE SHAPE IN THIS LEDGER. ***
     //
     // Censused before writing: every `spdx` field in this file held exactly TWO distinct values, "MIT" and
@@ -381,9 +405,11 @@ export const REACHED_SOURCES = Object.freeze([
  * The repair is not a bulk import. Each entry needs grantorHoldsRights, licenceExists, redistributable and a
  * `why` that says what was taken -- judgements, one source at a time, and inventing them to clear a number
  * would be worse than the debt. So the number is a RATCHET: it may fall and it may not rise. Two are cleared
- * at v4258 (loov/jsfx and gibbok/animatelo, both from backlog #53), leaving 52.
+ * at v4258 (loov/jsfx and gibbok/animatelo, both from backlog #53), leaving 52, and one more at v4260
+ * (activetheory/activeframe, backlog #70) -- registered in the SAME round its idea was taken, which is the
+ * habit #53 said this ledger should have -- leaving 51.
  */
-export const UNREGISTERED_CITED_BASELINE = 52;
+export const UNREGISTERED_CITED_BASELINE = 51;
 
 export function validateEntry(e) {
     const p = [];
