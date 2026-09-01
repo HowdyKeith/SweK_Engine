@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4288 -- Three ways a uniform can fail, and the third one has no symptom
+
+Two threads were left open at v4287. Both close here, and closing them found a third harness defect worse
+than either.
+
+*** THE HALF-FLOAT ASSUMPTION WAS RIGHT, AND NOBODY HAD LOOKED. *** v4287 fed the fused pass an rgba16float
+scene texture on the reasoning that an 8-bit input would clip before the shader saw it. render/bloomPass.js
+had already decided the same thing: Round 136 promoted sceneFBO from RGBA8 to RGBA16F "so emissive surfaces
+can output values > 1.0", with an RGBA8 fallback when EXT_color_buffer_half_float is missing and a warning
+that "bloom will be weaker". *** v4287 MEASURED WHAT WEAKER MEANS: *** the peak clamps 1.7480 to 1.0000 and
+all 181 samples above 1.0 are destroyed, 43% off the brightest. The fallback path IS the format v4287 clipped.
+
+AND THE FILE'S OWN OVERVIEW CONTRADICTED ITS OWN CODE. Line 5 said "sceneFBO (RGBA8, full res)" and had said
+so since Round 136 changed it. A fact written down twice with nothing reading the second copy -- the shape
+this session keeps finding. Corrected, and the gate now COMPARES the header against the texImage2D call
+rather than asserting either alone, so a future change to one that leaves the other behind reddens.
+
+*** THREE WAYS A UNIFORM CAN FAIL TO BIND, AND EACH NEEDED ITS OWN DISCOVERY. *** v4286 found the first: a
+name that does not resolve, which the harness now returns. This round found the other two. Float ARRAYS --
+uHeatRadii and uHeatStrength are float[8] and the harness set only scalars and vectors -- are now bound with
+uniform1fv/2fv/3fv/4fv. And then the one with no symptom at all: *** uHeatCount IS DECLARED `uniform int`,
+getUniformLocation SUCCEEDS FOR IT, AND uniform1f ON AN INT RAISES INVALID_OPERATION AND WRITES NOTHING. ***
+The name was never unresolved. The program linked, drew, and produced a picture. uHeatCount stayed 0, the
+entire heat block never ran, and the footprint measured 0 with a clean bill of health. A uniform that
+resolves and still does not take the value defeats the v4286 guard by construction, so the harness now
+supports uniformInts AND drains gl.getError() after every uniform write.
+
+With all three closed, heat is demonstrably LIVE: 4,792 pixels of a 256x256 frame change between heat off and
+heat on. *** AND THE PERTURBATION METHOD STILL CANNOT GIVE IT A RADIUS, WHICH IS A BETTER ANSWER THAN A
+NUMBER. *** It reports 0 at N=128, MINUS ONE at N=256, and 1 at N=512, for displacements of 0.45, 0.90 and
+1.79 texels. The minus one is the tell: perturbation measures a GATHER -- poke a source texel, see which
+pixels read it -- and that works only while every source texel is read by somebody. A displacement field
+breaks exactly that, the map from source texel to reading pixel stops being onto, and a poked texel can be
+read by NOBODY. "Nothing changed" then means the texel was skipped, and is indistinguishable from a pass that
+never reads there. So heat is recorded as EXERCISED with its cap (a literal 0.0035 of the image, about 7
+texels at 1080p) and the method's limit, rather than given the radius it happens to yield at one resolution.
+
+TWO THINGS FOUND WHILE MEASURING THE HEAT BLOCK, REPORTED AND NOT CHANGED. Its vertical bias puts the
+distortion BELOW the source in UV space -- affected source rows 0..149 with the source at v=0.5 -- while the
+comment beside it says it biases ABOVE, "rising heat, not below". And the expression is
+smoothstep(0.5, -0.5, x), which GLSL ES specifies as UNDEFINED when edge0 >= edge1. It behaves as a reversed
+smoothstep wherever the naive formula is used, which is everywhere anyone has looked, and that is not the
+same as being defined. Which way a heat plume should lean is a decision about the picture; this module
+measures.
+
+Sabotages. The stale RGBA8 header restored goes 2 red, and the CONTROL fails with it because the header and
+the code are compared rather than either asserted alone. And heat filed with evidence "measured" and a radius
+of 1 goes 1 red -- *** THE RADIUS IS GENUINELY 1 AT N=512, SO THE NUMBER IS NOT EVEN WRONG, IT IS UNEARNED. ***
+Quoting the one resolution where the method happened to work would be picking the answer that flatters the
+instrument. The check is that the entry DECLINES a radius, not that it has one.
+
+This round adds no module and no gate, and the tree stands at 1359 gates.
 ## v4287 -- Scene texture in, bloom texture out, one dispatch
 
 v4284 proved the fused bloom shader reproduces the shipping three-pass chain, and stopped short of a render

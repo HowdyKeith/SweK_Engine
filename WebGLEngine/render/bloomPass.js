@@ -2,7 +2,11 @@
 // VERSION: v1
 //
 // Real bloom post-process. Pipeline:
-//   1) Render scene into sceneFBO (RGBA8, full res, with depth buffer)
+//   1) Render scene into sceneFBO (RGBA16F when EXT_color_buffer_half_float is present, RGBA8 otherwise;
+//      full res, with depth buffer). v4288 -- THIS LINE SAID RGBA8 UNTIL NOW, and had done since Round
+//      136 promoted the target to half-float so emissive surfaces could exceed 1.0. The file's own
+//      overview contradicted its own code, which is the second-declaration defect this tree keeps
+//      finding: a fact written down twice, with nothing reading the second copy.
 //   2) Brightness extract → brightFBO (half res), keep only pixels
 //      with luminance > threshold
 //   3) Horizontal blur → blurFBO_H (half res, 9-tap Gaussian)

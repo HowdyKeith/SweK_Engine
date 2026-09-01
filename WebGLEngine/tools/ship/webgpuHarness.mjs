@@ -260,7 +260,18 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
  */
 export async function renderGlslToPixels({ vertex, fragment, width = 64, height = 64, srcSize = 64,
                                            uniforms = null, uniformNames = [], sourceTexel = null,
-                                           uniformVecs = null, textures = null }) {
+                                           uniformVecs = null, textures = null, uniformArrays = null,
+                                           uniformInts = null }) {
+    // v4288 -- `uniformInts` and the getError drain below exist because of a THIRD way a uniform can fail,
+    // and it is the one the earlier two guards cannot see. COMPOSITE_FS declares `uniform int uHeatCount`;
+    // this harness set every named scalar with uniform1f; getUniformLocation SUCCEEDS for an int uniform, so
+    // the name was never "unresolved" -- and uniform1f on an int raises INVALID_OPERATION and writes
+    // NOTHING. uHeatCount stayed 0, the heat block never ran, and the measured footprint was 0 with a clean
+    // bill of health. *** A UNIFORM THAT RESOLVES AND STILL DOES NOT TAKE THE VALUE. ***
+    // v4288 -- `uniformArrays` is {name: {stride, data}}, set with uniform1fv/2fv/3fv/4fv. It exists because
+    // render/bloomPass.js's COMPOSITE_FS declares uHeatSourcesUV as vec2[8] and uHeatRadii/uHeatStrength as
+    // float[8], and v4286 could not bind any of them: it set scalars and vectors, so the heat path came back
+    // with three unresolved names and its footprint was the last entry read off source rather than measured.
     // v4286 -- `textures` is {samplerName: (x,y,n) => [r,g,b,a]}, each bound to its OWN texture unit. ADDITIVE:
     // it defaults to null and every existing caller keeps the single tDiffuse binding on unit 0. It exists
     // because render/bloomPass.js's COMPOSITE_FS takes FIVE samplers -- scene, bloom, depth, ssao, god rays --
@@ -333,6 +344,16 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
             gl.uniform1i(gl.getUniformLocation(prog, "tDiffuse"), 0);
             const unresolved = [];
+            for (const [nm, spec] of Object.entries(a.uniformArrays || {})) {
+                const loc = gl.getUniformLocation(prog, nm);
+                if (!loc) { unresolved.push(nm); continue; }
+                const d = new Float32Array(spec.data);
+                if (spec.stride === 1) gl.uniform1fv(loc, d);
+                else if (spec.stride === 2) gl.uniform2fv(loc, d);
+                else if (spec.stride === 3) gl.uniform3fv(loc, d);
+                else if (spec.stride === 4) gl.uniform4fv(loc, d);
+                else unresolved.push(nm + " (stride " + spec.stride + ")");
+            }
             // Extra samplers on units 1..N. Unit 0 keeps whatever the single-texture path bound.
             let unit = 1;
             for (const [nm, data] of Object.entries(a.textures || {})) {
@@ -365,6 +386,16 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
                 if (!loc) unresolved.push(a.uniformNames[i]);
                 if (loc) gl.uniform1f(loc, a.uniforms[i]);
             }
+            for (const [nm, v] of Object.entries(a.uniformInts || {})) {
+                const loc = gl.getUniformLocation(prog, nm);
+                if (!loc) { unresolved.push(nm); continue; }
+                gl.uniform1i(loc, v | 0);
+            }
+            // *** DRAINED AFTER EVERY WRITE, NOT BEFORE THE DRAW. *** A type mismatch is reported here and
+            // nowhere else: the program still links, still draws, and still produces a picture computed from
+            // whatever the uniform happened to hold.
+            const uniformErrors = [];
+            for (let g = gl.getError(); g !== gl.NO_ERROR; g = gl.getError()) uniformErrors.push(g);
             const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
             gl.viewport(0, 0, a.width, a.height);
             gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -382,10 +413,11 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             const seen = new Set();
             for (let i = 0; i < px.length; i += 4) seen.add((px[i] << 16) | (px[i + 1] << 8) | px[i + 2]);
             return { ok: true, pixels: Array.from(px), renderer: gl.getParameter(gl.RENDERER), unresolved,
-                     distinctColours: seen.size };
+                     distinctColours: seen.size, uniformErrors };
         }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
              uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
-             uniformVecs: uniformVecs || {}, textures: texData });
+             uniformVecs: uniformVecs || {}, textures: texData, uniformArrays: uniformArrays || {},
+             uniformInts: uniformInts || {} });
         if (!out.ok) return { skipped: false, ...out };
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);
@@ -395,7 +427,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         }
         return { skipped: false, ok: true, pixels: Array.from(flipped), bytesPerRow: width * 4,
                  renderer: out.renderer, source: src, unresolved: out.unresolved || [],
-                 distinctColours: out.distinctColours };
+                 distinctColours: out.distinctColours, uniformErrors: out.uniformErrors || [] };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
     } finally { try { await browser?.close(); } catch {} }

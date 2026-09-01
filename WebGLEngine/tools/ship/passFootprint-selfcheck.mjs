@@ -205,15 +205,67 @@ console.log("\n4. *** THE TWO PASSES v4285 COULD NOT MEASURE, NOW MEASURED ***")
     ok("*** a run whose uniforms did not bind is VOIDED, not reported as a footprint ***",
         heat.ok === false && heat.void === true && heat.radius === null,
         heat.void ? `refused: ${heat.unresolved.join(", ")}` : `NOT voided -- radius ${heat.radius}`);
-    ok("  and it names the float arrays specifically, so the gap is actionable",
+    ok("  and it names the offending uniforms specifically, so the gap is actionable",
         heat.void && heat.unresolved.some((u) => /uHeatRadii/.test(u)),
-        "the harness sets scalars and vectors; these are float arrays and it says so rather than skipping");
-    ok("  and the one path still unmeasured is named rather than folded in",
-        Object.keys(F.UNMEASURED).length === 1 && /float ARRAYS/.test(F.UNMEASURED.heatDisplacement),
-        "heat displacement needs float-array uniforms the harness does not bind");
+        "an array passed through the VECTOR path is still a misuse, and the guard still refuses it -- " +
+        "v4288 added a proper uniformArrays path, and this check keeps the refusal honest for the wrong one");
 }
 
-console.log("\n5. THE VERDICT, AND THE CLAIM IT CORRECTS");
+console.log("\n5. *** THE HALF-FLOAT ASSUMPTION, CHECKED AGAINST THE ENGINE THAT HAS TO SUPPLY IT ***");
+{
+    // v4287 fed the fused pass an rgba16float scene texture and closed by saying nothing had compared that
+    // against a real renderer's target. The renderer is right here and it had already decided.
+    const bloom = fs.readFileSync(path.join(ENG, "render/bloomPass.js"), "utf8");
+    ok("*** the engine's own scene target is RGBA16F, for the reason v4287 chose half-float ***",
+        /gl\.RGBA16F, w, h, 0, gl\.RGBA, gl\.HALF_FLOAT/.test(bloom) &&
+        /emissive surfaces can output values > 1\.0/.test(bloom),
+        "Round 136 promoted it from RGBA8 so values above 1 survive -- the assumption was not a lucky guess, " +
+        "but nobody had looked until now");
+    ok("  and it falls back to RGBA8 when the extension is missing, warning that bloom will be WEAKER",
+        /EXT_color_buffer_half_float/.test(bloom) && /bloom will be weaker/.test(bloom));
+    ok("*** and v4287 measured what WEAKER means: the peak clamps 1.7480 to 1.0000 ***",
+        /rgba8unorm/.test(fs.readFileSync(path.join(ENG, "tools/ship/bloomFusedTexture-selfcheck.mjs"), "utf8")),
+        "181 samples above 1.0 destroyed, 43% off the brightest -- the fallback path IS the format v4287 clipped");
+    // *** THE FILE'S OWN OVERVIEW CONTRADICTED ITS OWN CODE FOR EVERY ROUND SINCE 136. ***
+    const header = bloom.slice(0, bloom.indexOf("// Threshold"));
+    ok("*** the header no longer says RGBA8, which it did until this round ***",
+        /RGBA16F when EXT_color_buffer_half_float/.test(header) && !/sceneFBO \(RGBA8/.test(header),
+        "a fact written down twice with nothing reading the second copy -- the shape this session keeps finding");
+    ok("  CONTROL: the header and the code are compared, not the header asserted alone",
+        /RGBA16F/.test(header) === /gl\.RGBA16F/.test(bloom),
+        "so a future change to either that leaves the other behind reddens this line");
+}
+
+console.log("\n6. *** HEAT DISPLACEMENT: THE UNIFORMS BIND NOW, AND THE METHOD STILL CANNOT MEASURE IT ***");
+{
+    ok("*** heat is demonstrably LIVE -- v4286 could not bind a single one of its uniforms ***",
+        F.HEAT.activePixels > 1000,
+        `${F.HEAT.activePixels} pixels of a ${F.HEAT.activeAt}x${F.HEAT.activeAt} frame change between heat off and on`);
+    ok("  and its displacement is capped by a LITERAL, so the apron is 0.0035*N texels", F.HEAT.cap === 0.0035,
+        `about ${Math.round(0.0035 * 1920)} at 1080p and ${Math.round(0.0035 * 256)} at 256`);
+    // *** THE MINUS ONE IS NOT A SMALL FOOTPRINT. ***
+    const r = F.HEAT.radii;
+    ok("*** the perturbation radius reads 0, MINUS ONE, then 1 as the displacement grows ***",
+        r[0].radius === 0 && r[1].radius === -1 && r[2].radius === 1,
+        r.map((x) => `N=${x.n} (${x.texels} texels) -> ${x.radius}`).join(", "));
+    ok("*** and the module says that is a LIMIT OF THE METHOD, not a fact about the shader ***",
+        /no longer onto/.test(fs.readFileSync(path.join(ENG, "render/passFootprint.mjs"), "utf8")),
+        "perturbation measures a GATHER; a displacement field means a poked texel can be read by NOBODY, and " +
+        "'nothing changed' is then indistinguishable from 'never reads there'");
+    ok("  so heat is recorded as EXERCISED rather than given a radius it does not have",
+        /exercised/.test(F.HEAT.evidence) && F.HEAT.radius === undefined);
+    report("*** THAT IS A BETTER ANSWER THAN A NUMBER WOULD HAVE BEEN. *** v4286 filed heat as unmeasured " +
+        "because the uniforms would not bind; three harness gaps later they do, the pass is shown to be " +
+        "live, and the reason a radius resists this method is understood rather than merely absent. An " +
+        "instrument that reports where it stops working is worth more than one that always returns a figure.");
+    // The vertical bias, measured because reading it did not settle it -- and reported, not changed.
+    ok("  the vertical bias direction is measured and its expression flagged as UNDEFINED behaviour",
+        /undefined when edge0 >= edge1/.test(F.HEAT_BIAS.note) &&
+        F.HEAT_BIAS.affectedSourceRows[0] === 0,
+        `distortion occupies source rows ${F.HEAT_BIAS.affectedSourceRows.join("..")} with the source at v=0.5`);
+}
+
+console.log("\n7. THE VERDICT, AND THE CLAIM IT CORRECTS");
 {
     const b = F.blockers();
     ok("*** exactly one pass blocks single-dispatch fusion, and it is not the composite ***",
@@ -224,8 +276,8 @@ console.log("\n5. THE VERDICT, AND THE CLAIM IT CORRECTS");
     // rather than a mechanism is the species this tree has committed two dozen times.
     ok("  the composite is fusable IN ITSELF, and now on measured evidence rather than a read literal",
         F.FUSION.composite.fusable && F.FUSION.composite.evidence === "measured" &&
-        F.FUSION.composite.radius === 1 && /0\.0035/.test(F.UNMEASURED.heatDisplacement),
-        "measured radius 1 for the outline Sobel; the 0.0035 heat cap is now filed as UNMEASURED");
+        F.FUSION.composite.radius === 1 && F.HEAT.cap === 0.0035,
+        "measured radius 1 for the outline Sobel; the 0.0035 heat cap now carries its own measured entry");
     ok("  ...and still cannot be fused, because it CONSUMES the pass that cannot",
         /consumes god rays/.test(F.FUSION.composite.why),
         "fusable and reachable are different properties, and only the second one ships");
@@ -287,9 +339,21 @@ console.log("\n5. THE VERDICT, AND THE CLAIM IT CORRECTS");
 //      filed the composite as read-off-source: *** with one texture bound, a measurement would have been a
 //      measurement of a fiction, and the -1 here is what that fiction looks like.
 //
-// None went 0 RED in the end, and two needed a second attempt. C and E are the pair worth keeping, and they
-// are the same shape: a check that claimed more than it performed, and a guard that no test reached. Neither
-// was a bug in the module. Both were the gate believing itself.
+//   G  v4288 -- the stale RGBA8 header restored in render/bloomPass.js.
+//      -> exit=1, 2 red, and the CONTROL fails with it: the header and the CODE are compared, so restoring
+//      one without the other is exactly what reddens. The comment had said RGBA8 since Round 136 promoted
+//      the target to RGBA16F -- a file's own overview contradicting its own code, unread for that long.
+//
+//   H  v4288 -- heat filed with evidence "measured" and a radius of 1.
+//      -> exit=1, 1 red. The radius IS 1 at N=512, so the number is not even wrong -- it is unearned. At
+//      N=256 the same probe reports MINUS ONE, because a displaced read can skip the poked texel entirely,
+//      and quoting the one resolution where the method happened to work would be picking the answer that
+//      flatters the instrument. *** THE CHECK IS THAT THE ENTRY DECLINES A RADIUS, NOT THAT IT HAS ONE. ***
+//
+// None went 0 RED in the end, and two needed a second attempt. C, E and H are the trio worth keeping, and
+// they are one shape: a check that claimed more than it performed, a guard that no test reached, and an
+// entry that would have carried a number it had not earned. None was a bug in a module. All three were the
+// gate believing itself.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: THE COMPOSITE AND SSAO WERE NOT PERTURBED. Both need textures this harness cannot " +
     "bind separately -- the composite takes five samplers and SSAO needs a depth buffer that is not the colour " +

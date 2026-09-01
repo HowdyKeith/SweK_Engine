@@ -165,11 +165,41 @@ export const FUSION = Object.freeze({
              "It is fusable in itself AND it consumes god rays, which is not" }),
 });
 
-// The one path still read off source rather than measured, named so it is not mistaken for the rest.
-export const UNMEASURED = Object.freeze({
-    heatDisplacement: "COMPOSITE_FS displaces its reads by at most 0.0035 UV when uHeatCount > 0. The " +
-        "harness binds scalars and vectors, and uHeatRadii/uHeatStrength are float ARRAYS, so the run came " +
-        "back with them unresolved and perturbFootprint voided it rather than reporting the 0 it computed.",
+// v4288 -- HEAT DISPLACEMENT, NOW EXERCISED BUT NOT CLEANLY MEASURABLE BY THIS METHOD, WHICH IS A DIFFERENT
+// AND MORE USEFUL ANSWER THAN "UNMEASURED".
+//
+// v4286 could not bind its uniforms at all. Three harness gaps later they bind, and the heat path is
+// demonstrably LIVE: with one source at strength 1.0 on a striped scene, 4,792 pixels of a 256x256 frame
+// change between heat off and heat on. But the perturbation method reports 0 texels at N=128, MINUS ONE at
+// N=256, and 1 at N=512, for displacements of 0.45, 0.90 and 1.79 texels.
+//
+// *** THE MINUS ONE IS THE POINT, AND IT IS A LIMIT OF THE METHOD RATHER THAN A FACT ABOUT THE SHADER. ***
+// Perturbation measures a GATHER: poke a source texel, see which output pixels read it. That works when every
+// source texel is read by at least one pixel. A DISPLACEMENT field breaks exactly that: each pixel's sample
+// point is shifted, so the map from source texel to reading pixel is no longer onto, and a poked texel can be
+// read by NOBODY. "Nothing changed" then means the texel was skipped, not that the footprint is small -- and
+// it is indistinguishable from a pass that never reads there at all.
+export const HEAT = Object.freeze({
+    pass: "COMPOSITE_FS heat displacement", footprint: "bounded-by-literal", cap: 0.0035,
+    evidence: "exercised, and the method's limit measured rather than a radius",
+    activePixels: 4792, activeAt: 256,
+    radii: Object.freeze([Object.freeze({ n: 128, texels: 0.45, radius: 0 }),
+                          Object.freeze({ n: 256, texels: 0.90, radius: -1 }),
+                          Object.freeze({ n: 512, texels: 1.79, radius: 1 })]),
+    why: "the displacement is capped by a LITERAL 0.0035 of the image, so the apron is 0.0035*N texels -- " +
+         "about 7 at 1080p and 1 at 256. That is derivable from the source and confirmed to have an effect; " +
+         "what is NOT available is a perturbation radius, because a displaced read can skip the poked texel",
+});
+
+// The heat block's vertical bias, measured because reading it did not settle it.
+export const HEAT_BIAS = Object.freeze({
+    sourceAtV: 0.5, affectedSourceRows: Object.freeze([0, 149]), n: 256,
+    note: "the distortion occupies the region BELOW the source in UV space while the comment beside it says " +
+          "it biases ABOVE ('rising heat, not below'). AND THE EXPRESSION IS UNDEFINED BEHAVIOUR: it is " +
+          "smoothstep(0.5, -0.5, x), and GLSL ES specifies results are undefined when edge0 >= edge1. It " +
+          "happens to behave as a reversed smoothstep wherever the naive formula is used, which is " +
+          "everywhere anyone has looked, and that is not the same as being defined. Reported, not changed: " +
+          "which way a heat plume should lean is a decision about the picture, and this file measures.",
 });
 
 /** The chain cannot be one dispatch, and this says which pass is responsible. */
