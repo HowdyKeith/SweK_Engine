@@ -8,6 +8,83 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4268 -- Six licence verdicts lived outside the tree, and one of them was wrong
+
+Two open items assert a licence state for six repositories:
+
+    #100  "advanced-threejs-tsl-webgpu-rendering has no licence at all, and it is the only TSL reference"
+    #132  "UNPAPERED grows to four: gi-voxels, Repo-Explainer, threejs-procedural-terrain, ar-globe, gaze-aware-3d"
+
+*** Not one of those six names appears anywhere in this repository. *** 4,572 files scanned, zero hits. Not in
+`world/reachedLicences.mjs`, whose whole job is sources read and not vendored; not in the orrery, the vendored
+register, or the copied-outside-vendor register; not in a comment, a gate, a page or a data file. So 1,342 gates
+could not see those verdicts and could not have caught them if they were wrong -- which is precisely the failure
+`tools/ship/claimCheck-selfcheck.mjs` names as the one it cannot reach: "the handoff and open-list live outside
+it, and every staleness this session actually cost a round was in those."
+
+### And the reason is structural, not forgetfulness
+
+`world/reachedLicences.mjs` has three postures -- REACHED, VENDORABLE, REFUSED -- and every one of them
+presupposes that somebody OPENED the source. `validateEntry` then rejects any entry whose `licenceExists` is not
+a boolean. There is no third value. So a repository that has been NAMED as a candidate and never opened cannot be
+filed at all: the only way in is to assert true or false about something nobody has looked at.
+
+False is an accusation, and this tree has made that mistake four times. `world/orrery.mjs` records three of its
+own scans reporting "no licence" against a dependency that had one -- fireworks.js's `MIT-LICENSE.txt`, the
+fonts' `IBMPlexSerif-OFL.txt`, a `LICENSE` nested under `quickjs/` -- and `reachedLicences.mjs` records a fourth,
+codrops/HeatDistortionEffect, which came out UNPAPERED beside three identically-licensed siblings purely because
+its README links the terms instead of restating them. That entry closes with the rule: "a gap in OUR record can
+never be reported as a gap in THEIRS." The open list wrote UNPAPERED for all six anyway, where no validator could
+reach it. The register was right to refuse them. What was missing was somewhere else to put them.
+
+`world/namedNotChecked.mjs` is that place. One state, UNCHECKED. No `spdx`, no `licence`, no `licenceExists`, no
+`redistributable` -- and `validateNamed` FAILS an entry that grows one, because an entry that can answer a licence
+question belongs in the real register. `mayTake` returns the same no an unpapered source gets and a different
+sentence, because the two facts are opposite: "we looked and found no grant" is about the source, "nobody has
+established a grant" is about our record.
+
+### #100 is answered by a source the tree already had
+
+The clause that kept #100 open is "it is the only TSL reference" -- an unpapered source is worth arguing about
+when it is the only door to something. It is not the only one. `render/solidTexture.mjs` has opened with "The
+idea is boytchev/tsl-textures (MIT, Pavel Boytchev 2024)" since v4243, and explains at length what TSL is and why
+that library's algorithm was rewritten in GLSL instead. A TSL reference, in the tree, permissively licensed, with
+a named author -- read before #100's neighbours shipped.
+
+*** And it was cited in exactly one file header and entered in no register. *** That is the shape of #137
+(ashima/webgl-noise: "used everywhere, credited in headers, registered nowhere") and of #53 (jsfx and animatelo,
+built and gated with their sources named only in their own headers). Three rounds have now found the same gap, so
+the habit is the finding. It is registered now, marked explicitly SECOND-HAND: this round had no network, did not
+open the repository, and recorded our own v4243 note rather than a fresh look at the LICENSE file. It is entered
+in the direction that cannot become a false accusation, and a round with a network should confirm it.
+
+### #132's arithmetic does not work either way
+
+The item says "grows to four" and lists five names. Two readings are available: four new names with one added
+later, or four in TOTAL -- in which case it disagrees differently, since the register carries two unpapered
+entries and `ui/gazeDwell.mjs` names a third, so five more would reach eight. The module records both readings
+and picks neither, because the text cannot settle it. What it does assert is that the number and the list cannot
+both be right, which a validator would have caught the day it was written if the item had lived in the tree.
+
+### The gate went red on its author twice
+
+The first run failed the absence scan: `world/reachedLicences.mjs` names advanced-threejs-tsl-webgpu-rendering,
+because THIS ROUND put it there. The sixth self-counting scan in six rounds, and the first one caught by the
+check rather than by me. It is handled with a named (file, repo) allowance -- one entry, asserted to be exercised
+and minimal -- rather than by widening the exclusion. The second failure was a control asserting each name
+appears in two files; four do and two do not, and the 2 was guessed rather than measured. Writing that correction
+down then named those two repositories and made the count 2, which is why the threshold is now "at least one" and
+the exact figures live only in the gate's output.
+
+Sabotage: A (scanner counts itself) 3 red, B (the round's real near-miss, a citedPath that does not name its
+source) 2 red, C (make #132's arithmetic agree) 2 red -- measured, with exit codes read. Under B,
+`reachedLicences-selfcheck` was run to see whether it caught the miscitation. It did not -- it checks that a
+cited path EXISTS, and `render/rebar.mjs` exists and talks about TSL at length without naming the repository. It
+went red for an unrelated reason, which is not the same as catching what you broke. C's first run exposed a
+defect in the gate rather than the data: its detail line held the literal "4 vs 5 names" and printed 4 while
+failing. Every number in that message is interpolated now.
+
+The build now stands at 4268 gates.
 ## v4267 -- Three buttons were asked for, two shipped, and the third is refused in writing
 
 *** orrery.html had existed since v3195 and nothing in the tree linked to it. *** The backlog asked for three big

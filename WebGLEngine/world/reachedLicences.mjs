@@ -156,6 +156,47 @@ export const REACHED_SOURCES = Object.freeze([
     // by name in its own header -- and neither was ever entered here. The item stayed open for the paperwork
     // while the code shipped, gated, with consumers.
     // =========================================================================================================
+    // =========================================================================================================
+    // v4268 -- #100 SENT THE ROUND LOOKING FOR A TSL REFERENCE, AND THE TREE ALREADY HAD ONE, UNREGISTERED.
+    //
+    // Open-list #100 reads "advanced-threejs-tsl-webgpu-rendering has no licence at all, and it is the only
+    // TSL reference". The second clause is what kept the item open, and it is false: render/solidTexture.mjs
+    // has opened with "The idea is boytchev/tsl-textures (MIT, Pavel Boytchev 2024)" since v4243.
+    //
+    // *** AND IT WAS CITED IN EXACTLY ONE FILE HEADER AND ENTERED IN NO REGISTER -- THE SHAPE OF #137. ***
+    // That round found ashima/webgl-noise "used everywhere, credited in headers, registered nowhere"; #53
+    // found jsfx and animatelo built and gated with their sources named only in their own headers. A header
+    // is where a citation goes to be read by whoever opens that file. A register is where it goes to be
+    // COUNTED. Three rounds have now found the same gap, so the habit is the finding, not the instance.
+    // =========================================================================================================
+    {
+        repo: "boytchev/tsl-textures", sourceUrl: "https://github.com/boytchev/tsl-textures",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Pavel Boytchev", year: 2024,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT with the author and year, as stated in render/solidTexture.mjs's header at v4243. " +
+             "*** THAT IS A SECOND-HAND READING AND IS RECORDED AS ONE: *** this round has no network and " +
+             "did not re-open the repository, so what is registered here is OUR OWN v4243 note, not a fresh " +
+             "look at the LICENSE file. It is entered in the direction that cannot become a false accusation " +
+             "-- affirming a grant the tree already relied on when it shipped solidTexture -- and a round " +
+             "with a network should confirm it.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The idea only: procedural texture as a function evaluated on the GPU rather than an image " +
+             "fetched from a file. No bytes. The library is TSL against a WebGPURenderer and this tree has " +
+             "neither, so the ALGORITHM was rewritten twice here, once in JS and once in GLSL, the way every " +
+             "shader in this tree is graded.",
+        takenPaths: ["render/solidTexture.mjs"],
+        // *** render/rebar.mjs IS NOT LISTED HERE AND ALMOST WAS. *** It says "Keith's TSL blueprint reached
+        // for mx_noise_vec3", which names TSL and a blueprint and NOT this repository -- a near-miss that a
+        // grep for "TSL" would have filed as a citation. The existing reachedLicences gate only checks that
+        // a cited path EXISTS, so it would have accepted the wrong file; tools/ship/namedNotChecked-selfcheck
+        // checks that each cited file actually contains the name.
+        citedPaths: ["world/namedNotChecked.mjs", "tools/ship/namedNotChecked-selfcheck.mjs"],
+        why: "It is the CONSUMER argument that #114 already won: v4235's mesh booleans return positions only " +
+             "-- the word 'uv' does not appear in meshCSG.mjs -- so a cut face is a polygon no unwrap ever " +
+             "assigned a coordinate, and a UV-based pipeline has nothing to offer it. Solid texturing is the " +
+             "answer, and this is where the tree read it. Registering it also settles #100 without needing " +
+             "the unpapered repository at all: the TSL door is open and it is MIT.",
+    },
     {
         repo: "loov/jsfx", sourceUrl: "https://github.com/loov/jsfx",
         grantorHoldsRights: true, licenceExists: true, publisher: "loov", year: 2016,
@@ -438,8 +479,14 @@ export const REACHED_SOURCES = Object.freeze([
  * at v4258 (loov/jsfx and gibbok/animatelo, both from backlog #53), leaving 52, and one more at v4260
  * (activetheory/activeframe, backlog #70) -- registered in the SAME round its idea was taken, which is the
  * habit #53 said this ledger should have -- leaving 51.
+ *
+ * v4268 clears a fourth, boytchev/tsl-textures, leaving 50. *** THAT ONE WAS FOUND BY THE OPEN LIST BEING
+ * WRONG ABOUT SOMETHING ELSE. *** Item #100 called an unpapered repository "the only TSL reference"; going to
+ * check produced render/solidTexture.mjs, which has credited boytchev/tsl-textures in its header since v4243
+ * and appeared in no register -- the same shape as #137 and #53, a third time. The debt did not shrink because
+ * anybody set out to shrink it; it shrank because a claim was checked and the check ran into a citation.
  */
-export const UNREGISTERED_CITED_BASELINE = 51;
+export const UNREGISTERED_CITED_BASELINE = 50;
 
 export function validateEntry(e) {
     const p = [];
