@@ -2,7 +2,11 @@
 // VERSION: v1
 //
 // Real bloom post-process. Pipeline:
-//   1) Render scene into sceneFBO (RGBA8, full res, with depth buffer)
+//   1) Render scene into sceneFBO (RGBA16F when EXT_color_buffer_half_float is present, RGBA8 otherwise;
+//      full res, with depth buffer). v4288 -- THIS LINE SAID RGBA8 UNTIL NOW, and had done since Round
+//      136 promoted the target to half-float so emissive surfaces could exceed 1.0. The file's own
+//      overview contradicted its own code, which is the second-declaration defect this tree keeps
+//      finding: a fact written down twice, with nothing reading the second copy.
 //   2) Brightness extract → brightFBO (half res), keep only pixels
 //      with luminance > threshold
 //   3) Horizontal blur → blurFBO_H (half res, 9-tap Gaussian)
@@ -42,6 +46,9 @@ out vec4 outColor;
 uniform sampler2D uTex;
 uniform vec2 uTexel;       // pixel size in UV
 uniform vec2 uDir;         // (1,0) horizontal, (0,1) vertical
+// v4212 -- (u0,v0,u1,v1) of the region this fragment's EYE owns. (0,0,1,1) on a monitor, which makes every
+// clamp below the identity and leaves the desktop path bit-for-bit what it was.
+uniform vec4 uEyeRect;
 
 const float W0 = 0.227027;
 const float W1 = 0.194594;
@@ -49,17 +56,30 @@ const float W2 = 0.121622;
 const float W3 = 0.054054;
 const float W4 = 0.016216;
 
+// *** v4212 -- IN STEREO THE SEAM IS THE MIDDLE OF THE TEXTURE, NOT ITS EDGE. *** An XRWebGLLayer hands both
+// eyes ONE framebuffer with two viewports side by side, so this 9-tap kernel at the left eye's inner border
+// reaches 4 texels -- 8 full-resolution pixels, since the blur runs at half res -- straight into the right
+// eye. A bright window on one side then glows on the other side's inner border, where there is no light.
+// GL_CLAMP_TO_EDGE does not help: it guards the edge of the TEXTURE, and this boundary is interior.
+// SCISSORING DOES NOT HELP EITHER -- a scissor restricts WRITES, and this is a READ.
+// The tap is clamped into the eye's own rect, inset by half a texel so it lands on the last texel CENTRE
+// rather than on the boundary between two texels, where linear filtering would coin-flip into the neighbour.
+vec3 tapClamped(vec2 uv) {
+    vec2 h = uTexel * 0.5;
+    return texture(uTex, clamp(uv, uEyeRect.xy + h, uEyeRect.zw - h)).rgb;
+}
+
 void main() {
     vec2 step = uTexel * uDir;
-    vec3 sum = texture(uTex, vUV).rgb * W0;
-    sum += texture(uTex, vUV + step * 1.0).rgb * W1;
-    sum += texture(uTex, vUV - step * 1.0).rgb * W1;
-    sum += texture(uTex, vUV + step * 2.0).rgb * W2;
-    sum += texture(uTex, vUV - step * 2.0).rgb * W2;
-    sum += texture(uTex, vUV + step * 3.0).rgb * W3;
-    sum += texture(uTex, vUV - step * 3.0).rgb * W3;
-    sum += texture(uTex, vUV + step * 4.0).rgb * W4;
-    sum += texture(uTex, vUV - step * 4.0).rgb * W4;
+    vec3 sum = tapClamped(vUV) * W0;
+    sum += tapClamped(vUV + step * 1.0) * W1;
+    sum += tapClamped(vUV - step * 1.0) * W1;
+    sum += tapClamped(vUV + step * 2.0) * W2;
+    sum += tapClamped(vUV - step * 2.0) * W2;
+    sum += tapClamped(vUV + step * 3.0) * W3;
+    sum += tapClamped(vUV - step * 3.0) * W3;
+    sum += tapClamped(vUV + step * 4.0) * W4;
+    sum += tapClamped(vUV - step * 4.0) * W4;
     outColor = vec4(sum, 1.0);
 }`;
 
@@ -188,6 +208,7 @@ uniform sampler2D uSSAO;
 uniform sampler2D uGodRays;          // round 54
 uniform float uBloomIntensity;
 uniform float uVignetteStrength;
+uniform vec4  uEyeRect;   // v4212 -- (u0,v0,u1,v1) of this eye; (0,0,1,1) on a monitor
 uniform float uExposure;
 uniform float uOutlineStrength;
 uniform vec3  uOutlineColor;
@@ -304,7 +325,14 @@ void main() {
     col = aces(col);
 
     // Vignette
-    vec2 ctr = vUV - 0.5;
+    // *** v4212 -- vUV MINUS 0.5 IS THE CENTRE OF THE TARGET, AND IN STEREO THE CENTRE OF THE TARGET IS THE
+    // BRIDGE OF YOUR NOSE. *** Two eyes side by side put UV 0.5 exactly on the seam, so each eye came out
+    // brightest at its inner edge and darkest at its outer one -- measured at 0.25 in UV from each eye's real
+    // centre, a quarter of the framebuffer's width. Normalising within the eye's own rect fixes it and, for
+    // the full-frame rect a monitor passes, REDUCES ALGEBRAICALLY TO THE OLD LINE: (vUV - 0.5) / 1.0.
+    vec2 eyeCentre = (uEyeRect.xy + uEyeRect.zw) * 0.5;
+    vec2 eyeSize   = max(uEyeRect.zw - uEyeRect.xy, vec2(1e-6));
+    vec2 ctr = (vUV - eyeCentre) / eyeSize;
     float dist2 = dot(ctr, ctr);
     float vig = 1.0 - uVignetteStrength * smoothstep(0.10, 0.55, dist2);
     col *= vig;
@@ -328,6 +356,10 @@ export class BloomPass {
         // manual exposure, unchanged behavior.
         this.autoExposureCtl = null;
         this.vignetteStrength = 0.45;
+        // v4212 -- (u0, v0, u1, v1) of the region the CURRENT pass belongs to. The whole target unless a
+        // stereo caller narrows it per eye; see setEyeRect(). Every shader that reads it reduces to its
+        // pre-v4212 form for this value, so nothing on a monitor changes.
+        this.eyeRect = [0, 0, 1, 1];
         // Round 49 — outline pass
         this.outlineStrength = 0.85;
         this.outlineColor = [0.05, 0.05, 0.08];
@@ -457,6 +489,18 @@ export class BloomPass {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         return t;
+    }
+
+    /**
+     * v4212 -- narrow the post chain to ONE EYE's sub-rectangle of a shared XR framebuffer.
+     * @param rect {u0,v0,u1,v1} in UV, or null/omitted to restore the full target.
+     * Call it per eye between bind() and apply(); call setEyeRect(null) when leaving VR, or the desktop
+     * inherits half a frame -- which is why exit() in main.js resets it rather than trusting the next entry.
+     */
+    setEyeRect(rect) {
+        this.eyeRect = rect
+            ? [rect.u0, rect.v0, rect.u1, rect.v1]
+            : [0, 0, 1, 1];
     }
 
     resize(width, height) {
@@ -646,12 +690,29 @@ export class BloomPass {
         this.heatCount = n;
     }
 
-    apply() {
+    /**
+     * @param outRect  v4212 -- optional {x,y,width,height} IN PIXELS on the output framebuffer. Stereo passes
+     *                 one eye's XRWebGLLayer viewport; a monitor passes nothing and gets the full target.
+     *                 The blur's WRITES are scissored to the matching half-res box so the two eyes' passes do
+     *                 not overwrite each other, while the clamp in the shader is what stops the READS
+     *                 crossing -- both are needed and neither substitutes for the other.
+     */
+    apply(outRect = null) {
         const gl = this.gl;
+        const eyeScissor = outRect ? {
+            half: [Math.floor(outRect.x / 2), Math.floor(outRect.y / 2),
+                   Math.ceil(outRect.width / 2), Math.ceil(outRect.height / 2)],
+            full: [outRect.x, outRect.y, outRect.width, outRect.height],
+        } : null;
+        if (eyeScissor) gl.enable(gl.SCISSOR_TEST);
+        const scissorHalf = () => { if (eyeScissor) gl.scissor(...eyeScissor.half); };
+        const scissorFull = () => { if (eyeScissor) gl.scissor(...eyeScissor.full); };
+        scissorHalf();
 
         // Pass 1 — brightness extract: scene → brightTex (half res)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.brightFBO);
         gl.viewport(0, 0, this.halfW, this.halfH);
+        scissorHalf();
         gl.useProgram(this.brightProg);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
@@ -667,6 +728,7 @@ export class BloomPass {
         gl.bindTexture(gl.TEXTURE_2D, this.brightTex);
         gl.uniform1i(gl.getUniformLocation(this.blurProg, "uTex"), 0);
         gl.uniform2f(gl.getUniformLocation(this.blurProg, "uTexel"), 1.0 / this.halfW, 1.0 / this.halfH);
+        gl.uniform4f(gl.getUniformLocation(this.blurProg, "uEyeRect"), this.eyeRect[0], this.eyeRect[1], this.eyeRect[2], this.eyeRect[3]);   // v4212
         gl.uniform2f(gl.getUniformLocation(this.blurProg, "uDir"), 1, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -674,6 +736,7 @@ export class BloomPass {
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.blurFBO_V);
         gl.bindTexture(gl.TEXTURE_2D, this.blurTexH);
         gl.uniform2f(gl.getUniformLocation(this.blurProg, "uDir"), 0, 1);
+        gl.uniform4f(gl.getUniformLocation(this.blurProg, "uEyeRect"), this.eyeRect[0], this.eyeRect[1], this.eyeRect[2], this.eyeRect[3]);   // v4212 -- re-uploaded: the vertical pass may follow a program change
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
         // Round 52 — Pass 3.5: SSAO at half-res from sceneDepth.
@@ -713,8 +776,11 @@ export class BloomPass {
         }
 
         // Pass 4 — composite scene + blur → default framebuffer (or phosphor FBO)
+        // v4212 -- in stereo the output is the XRWebGLLayer's framebuffer and the destination is ONE EYE's
+        // viewport within it, so the composite is placed rather than stretched over the whole target.
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.outputFBO || null);
-        gl.viewport(0, 0, this.width, this.height);
+        if (eyeScissor) { scissorFull(); gl.viewport(...eyeScissor.full); }
+        else gl.viewport(0, 0, this.width, this.height);
         gl.useProgram(this.compositeProg);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
@@ -726,6 +792,7 @@ export class BloomPass {
         // Round 48 — tone-mapping + vignette uniforms
         gl.uniform1f(gl.getUniformLocation(this.compositeProg, "uExposure"), this.autoExposureCtl ? this.autoExposureCtl.value : (this.exposure ?? 1.0));
         gl.uniform1f(gl.getUniformLocation(this.compositeProg, "uVignetteStrength"), this.vignetteStrength ?? 0.45);
+        gl.uniform4f(gl.getUniformLocation(this.compositeProg, "uEyeRect"), this.eyeRect[0], this.eyeRect[1], this.eyeRect[2], this.eyeRect[3]);   // v4212 -- the vignette centres on THIS eye, not on the seam
         // Round 49 — outline uniforms + depth texture binding
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, this.sceneDepth);
@@ -757,5 +824,11 @@ export class BloomPass {
         gl.bindVertexArray(null);
         gl.activeTexture(gl.TEXTURE0);
         gl.enable(gl.DEPTH_TEST);
+        // *** v4212 -- A SCISSOR LEFT ENABLED IS A STATE LEAK THAT SHOWS UP SOMEWHERE ELSE ENTIRELY. *** This
+        // is the only place that turns SCISSOR_TEST on, so it is the only place that can be sure of turning it
+        // off; leaving it set would silently clip the NEXT thing drawn -- the other eye, the HUD, or the whole
+        // desktop frame after leaving VR -- to whichever eye happened to be last. Unconditional, not guarded
+        // on eyeScissor, so that a throw partway through cannot strand the flag either.
+        gl.disable(gl.SCISSOR_TEST);
     }
 }

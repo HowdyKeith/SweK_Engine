@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Wide lines: what gl.lineWidth cannot do">
+<meta name="demo:desc" content="gl.lineWidth is clamped to 1 on every desktop driver -- it is in the spec and it silently does nothing. A wide line has to be a triangle strip, with the sideways offset applied in the vertex shader so the width is a number of PIXELS that does not change with distance. Drag the width; watch the same path drawn both ways.">
+<meta name="demo:category" content="render">
+<title>Wide lines: what gl.lineWidth cannot do</title>
+<style>
+  :root { --bg:#070a10; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 18px 8px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  label { color:var(--dim); display:flex; gap:8px; align-items:center; }
+  input[type=range] { width:170px; }
+  canvas { display:block; width:100%; max-width:900px; border:1px solid #1c2942; border-radius:8px; background:#04060b; }
+  .stat { color:var(--dim); line-height:1.7; }
+  .stat b { color:#dbe7ff; }
+  .note { padding:12px 18px 24px; color:#55617a; max-width:900px; line-height:1.7; }
+  code { color:var(--cyan); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9552; Wide lines &middot; what gl.lineWidth cannot do</h1>
+  <div class="row">
+    <label>width <input id="w" type="range" min="1" max="40" step="1" value="10"><b id="wv">10</b> px</label>
+    <label>dash <input id="d" type="range" min="0" max="20" step="1" value="0"><b id="dv">off</b></label>
+    <label><input id="spin" type="checkbox" checked> rotate</label>
+  </div>
+  <div class="stat">top: <b>gl.LINES</b> with <code>gl.lineWidth(width)</code> &mdash; <b id="glw">?</b><br>
+    bottom: the same path as a triangle strip, offset in the vertex shader</div>
+</header>
+<canvas id="c" width="900" height="420"></canvas>
+<div class="note">
+  <code>gl.lineWidth</code> is not deprecated and it is not an error &mdash; the Core Profile permits an implementation to
+  support only a width of 1, and every desktop driver takes that option. So the call succeeds, reports nothing, and does
+  nothing. The line below it is the same points expanded into a triangle strip, with the sideways offset applied
+  <em>after</em> projection so the width is measured in pixels: it stays the same thickness as the path recedes, which a
+  world-space ribbon cannot do. The joints are mitered, and a miter is capped &mdash; at a full reversal the miter length
+  is <code>1/cos(&theta;/2)</code>, which goes to infinity.
+</div>
+<script type="module">
+import { expandPolyline, MESHLINE_VS, MESHLINE_FS } from "./render/meshLine.mjs";
+
+const cvs = document.getElementById("c");
+const gl = cvs.getContext("webgl2", { antialias: true });
+const $ = (id) => document.getElementById(id);
+if (!gl) { document.querySelector(".stat").textContent = "WebGL2 unavailable."; }
+
+function compile(vs, fs) {
+  const p = gl.createProgram();
+  for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+// the path: a zig-zag with a deliberate near-reversal, so the miter cap is visible
+const PATH = [];
+for (let i = 0; i <= 24; i++) {
+  const t = i / 24;
+  PATH.push([-0.85 + t * 1.7, Math.sin(t * Math.PI * 3) * 0.30, 0]);
+}
+PATH.splice(12, 0, [PATH[12][0] + 0.06, PATH[12][1] + 0.34, 0]);   // a cusp
+
+const mesh = expandPolyline(PATH);
+const prog = compile(MESHLINE_VS, MESHLINE_FS);
+const buf = (data, target = gl.ARRAY_BUFFER) => { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW); return b; };
+const bPos = buf(mesh.position), bPrev = buf(mesh.previous), bNext = buf(mesh.next);
+const bSide = buf(mesh.side), bAlong = buf(mesh.along);
+const bIdx = buf(mesh.index, gl.ELEMENT_ARRAY_BUFFER);
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+const attach = (b, name, size) => {
+  const loc = gl.getAttribLocation(prog, name);
+  if (loc < 0) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+};
+attach(bPos, "aPosition", 3); attach(bPrev, "aPrevious", 3); attach(bNext, "aNext", 3);
+attach(bSide, "aSide", 1); attach(bAlong, "aAlong", 1);
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx);
+gl.bindVertexArray(null);
+
+// the naive comparison: gl.LINES with gl.lineWidth
+const naiveProg = compile(
+  `#version 300 es\nin vec3 aPosition; uniform mat4 uViewProj; void main(){ gl_Position = uViewProj * vec4(aPosition,1.0); }`,
+  `#version 300 es\nprecision highp float; uniform vec4 uColor; out vec4 f; void main(){ f = uColor; }`);
+const strip = [];
+for (let i = 0; i < PATH.length - 1; i++) strip.push(...PATH[i], ...PATH[i + 1]);
+const bNaive = buf(new Float32Array(strip));
+const naiveVao = gl.createVertexArray();
+gl.bindVertexArray(naiveVao);
+{ const loc = gl.getAttribLocation(naiveProg, "aPosition");
+  gl.bindBuffer(gl.ARRAY_BUFFER, bNaive); gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); }
+gl.bindVertexArray(null);
+
+const range = gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE);
+$("glw").textContent = `driver supports gl.lineWidth ${range[0]} to ${range[1]}` + (range[1] <= 1 ? " (so: one pixel, always)" : "");
+
+function mat(yShift, spin) {
+  const c = Math.cos(spin), s = Math.sin(spin);
+  // a plain rotate-about-Y then translate, column-major
+  return new Float32Array([ c,0,-s,0,  0,1,0,0,  s,0,c,0,  0,yShift,0,1 ]);
+}
+
+let t0 = performance.now();
+function frame() {
+  const width = +$("w").value, dash = +$("d").value;
+  $("wv").textContent = width; $("dv").textContent = dash ? (dash / 100).toFixed(2) : "off";
+  const spin = $("spin").checked ? (performance.now() - t0) * 0.0004 : 0;
+  gl.viewport(0, 0, cvs.width, cvs.height);
+  gl.clearColor(0.016, 0.024, 0.043, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.useProgram(naiveProg);
+  gl.uniformMatrix4fv(gl.getUniformLocation(naiveProg, "uViewProj"), false, mat(0.45, spin));
+  gl.uniform4f(gl.getUniformLocation(naiveProg, "uColor"), 0.42, 0.52, 0.68, 1);
+  try { gl.lineWidth(width); } catch (e) {}
+  gl.bindVertexArray(naiveVao);
+  gl.drawArrays(gl.LINES, 0, strip.length / 3);
+
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog, "uViewProj"), false, mat(-0.45, spin));
+  gl.uniform2f(gl.getUniformLocation(prog, "uResolution"), cvs.width, cvs.height);
+  gl.uniform1f(gl.getUniformLocation(prog, "uWidth"), width);
+  gl.uniform1f(gl.getUniformLocation(prog, "uDash"), dash / 100);
+  gl.uniform4f(gl.getUniformLocation(prog, "uColor"), 0.35, 0.88, 0.54, 1);
+  gl.bindVertexArray(vao);
+  gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_INT, 0);
+
+  requestAnimationFrame(frame);
+}
+if (gl) frame();
+</script>
+</body>
+</html>

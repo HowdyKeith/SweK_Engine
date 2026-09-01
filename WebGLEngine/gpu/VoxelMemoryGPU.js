@@ -17,10 +17,19 @@
 //     systems that don't support rendering to RGBA32F.
 //   * Two textures + two FBOs, swapped each decay pass.
 //   * Built-in vertex+fragment shaders — no caller burden.
-//   * Full-screen quad VAO created internally.
+//   * Full-screen TRIANGLE, attributeless -- see QUAD_VS/TRI_VS below (v4241).
 //   * Negative-safe coord wrap (((x % s) + s) % s).
 
-const VS = `#version 300 es
+// *** v4241 -- THIS WAS THE ONE REAL FULLSCREEN QUAD IN THE TREE, AND IT TOOK A STACK-ATTRIBUTED CENSUS TO
+// FIND IT. *** v4236 measured "six fullscreen draws a frame, five of six already using the fullscreen
+// triangle, one still a quad" and filed the quad as a post-processing pass to be tracked down. It is not a
+// post pass at all: it is this decay step, a GPGPU pass over a square framebuffer with depth off. The
+// classifier that produced that number counted any drawArrays of six vertices or fewer as fullscreen, which
+// swept in world-space billboards and missed which file was calling.
+//
+// The old quad is KEPT AND EXPORTED, because the gate's whole claim is that the triangle renders exactly
+// what the quad rendered, and that comparison needs both vertex stages to exist.
+export const QUAD_VS = `#version 300 es
 layout(location=0) in vec2 aPos;
 out vec2 vUV;
 void main() {
@@ -28,7 +37,26 @@ void main() {
     gl_Position = vec4(aPos, 0.0, 1.0);
 }`;
 
-const FS = `#version 300 es
+/**
+ * The fullscreen TRIANGLE: three vertices, no buffer, no attribute.
+ *
+ * gl_VertexID 0,1,2 becomes (-1,-1), (3,-1), (-1,3) -- a triangle that overhangs the viewport on two sides
+ * and therefore covers it with ONE primitive. A quad covers the same area with two, and every fragment along
+ * their shared diagonal is rasterised twice; the triangle has no diagonal to share. The vUV mapping is the
+ * SAME expression, so the interpolated coordinate at every covered pixel is identical -- which is why the
+ * gate can demand byte-equality rather than a tolerance.
+ */
+export const TRI_VS = `#version 300 es
+out vec2 vUV;
+void main() {
+    vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
+    vUV = p * 0.5 + 0.5;
+    gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+const VS = TRI_VS;
+
+export const DECAY_FS = `#version 300 es
 precision highp float;
 in vec2 vUV;
 uniform sampler2D uSrc;
@@ -40,6 +68,7 @@ void main() {
     if (c.r < 0.001) c.r = 0.0;
     outColor = c;
 }`;
+const FS = DECAY_FS;
 
 export class VoxelMemoryGPU {
     constructor(gl, size = 128) {
@@ -145,20 +174,11 @@ export class VoxelMemoryGPU {
         return p;
     }
 
+    // v4241 -- an EMPTY vertex array. The triangle is built from gl_VertexID, so there is no buffer to
+    // upload, no attribute to enable and no vertexAttribPointer to get wrong. The name is kept because
+    // callers and the gate refer to this.quadVAO, and renaming it would be churn for no reader's benefit.
     _createFullScreenQuad() {
-        const gl = this.gl;
-        const vao = gl.createVertexArray();
-        gl.bindVertexArray(vao);
-        const vb = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            -1, -1,   1, -1,   1,  1,
-            -1, -1,   1,  1,  -1,  1,
-        ]), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.bindVertexArray(null);
-        return vao;
+        return this.gl.createVertexArray();
     }
 
     // -------------------------------------------------------------------
@@ -222,7 +242,7 @@ export class VoxelMemoryGPU {
         gl.disable(gl.DEPTH_TEST);
 
         gl.bindVertexArray(this.quadVAO);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);      // v4241 -- one primitive, no shared diagonal
         gl.bindVertexArray(null);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);

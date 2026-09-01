@@ -17,14 +17,26 @@ import { LINEAR_DAMPING, ANGULAR_DAMPING } from "../damping.js";
 // (WASM, runs in Node AND the browser) via dynamic import, cached across worlds.
 "use strict";
 
+import { probeWasm, explainWasmFailure } from "../../engine/wasmSupport.mjs";
+
 let _Jolt = null;
 async function _load() {
     if (_Jolt) return _Jolt;
+    // v4229 -- ASK FIRST. Measured in a headless Chromium with WebAssembly deleted, this threw a bare
+    // "WebAssembly is not defined" out of init(): the try/catch below covers only the choice between the
+    // vendored copy and the npm package, and the call that actually touches WebAssembly was outside it. Every
+    // caller wraps this in try/catch (box3d-vs-jolt.html swallows it entirely), so the message IS the
+    // diagnosis, and a raw ReferenceError names the symbol rather than the situation.
+    const probe = probeWasm();
+    if (!probe.usable) throw new Error("Jolt needs WebAssembly. " + probe.reason);
     // vendored, self-contained wasm-compat build (WASM embedded) -- resolves in Node AND the browser by relative path
     let mod;
     try { mod = await import("../../vendor/jolt/jolt-physics.wasm-compat.js"); }
     catch { mod = await import("jolt-physics"); }   // fallback to the npm package if vendored copy is absent
-    const init = mod.default || mod; _Jolt = await init(); return _Jolt;
+    const init = mod.default || mod;
+    try { _Jolt = await init(); }
+    catch (e) { throw new Error(explainWasmFailure(e, "the vendored Jolt build failed to initialise")); }
+    return _Jolt;
 }
 
 const LAYER_NM = 0, LAYER_M = 1, N_OBJ = 2, N_BP = 2;

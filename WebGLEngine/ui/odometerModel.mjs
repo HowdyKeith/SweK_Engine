@@ -34,6 +34,8 @@
 // 3. THE BLUR. See blurAt() -- it is a triangle, and the original writes it as three nested absolutes.
 "use strict";
 
+import { staggerDelays } from "./stagger.mjs";
+
 export const DIGITS = 10;
 /** Whole turns before landing. The original's constant; fewer reads as a jump, more as a slot machine. */
 export const ROTATIONS = 3;
@@ -118,11 +120,16 @@ export function digitAt(tMs, digit, opts = {}) {
  * it is not subtly wrong -- it is the difference between a counter and a slot machine.
  */
 export function delaysFor(digitCount, opts = {}) {
-    const stagger = opts.letterAnimationDelay ?? DEFAULTS.letterAnimationDelay;
-    const base = opts.animationDelay ?? DEFAULTS.animationDelay;
-    const out = [];
-    for (let i = 0; i < digitCount; i++) out.push((digitCount - 1 - i) * stagger + base);
-    return out;
+    // v4197 -- the arithmetic moved to ui/stagger.mjs, which this tree had written three times (here,
+    // ui/brainTrail.js and ui/peerRadar.js) with different origins. `from: "last"` IS the rule the comment
+    // above insists on: the rightmost digit gets the smallest delay and therefore leads. Byte-identical to
+    // the loop it replaces -- asserted in tools/ship/inputChain-selfcheck.mjs against the recorded outputs,
+    // because "a refactor that changed nothing" is a claim and not a fact until something checks it.
+    return staggerDelays(digitCount, {
+        step: opts.letterAnimationDelay ?? DEFAULTS.letterAnimationDelay,
+        start: opts.animationDelay ?? DEFAULTS.animationDelay,
+        from: "last",
+    });
 }
 
 /** How long the whole roll takes, stagger included -- for a caller that must not start another over it. */

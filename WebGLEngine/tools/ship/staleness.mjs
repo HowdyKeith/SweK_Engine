@@ -29,7 +29,15 @@ import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
-const SKIP = /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/;
+// v4257 -- *** THE DIRECTORY SKIPS ARE ANCHORED TO A SEPARATOR, AND THEY WERE NOT. ***
+// The old pattern was /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/, whose `[\\/]vendor`
+// matches any path segment BEGINNING with "vendor" -- so tools/ship/vendoredLicences-selfcheck.mjs was
+// silently excluded from gateFiles(), and therefore from the knowledge index, from countGateFiles() and from
+// the affected filter. A gate that exists, passes when run by hand, and NEVER RUNS ON A SHIP.
+// Measured: exactly one file on disk is wrongly excluded, and it is that one -- the defect has been here for
+// hundreds of rounds and had never bitten because no gate was ever named vendor-anything. `[\\/]\.git`
+// had the same hole and would have eaten a .gitsomething path the same way.
+const SKIP = /node_modules|[\\/]\.git[\\/]|[\\/]vendor[\\/]|GPU_Assets|demos_code/;
 
 // v3036 -- ONE WALKER, AND IT WAS OFF BY ONE.
 //

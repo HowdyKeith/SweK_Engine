@@ -902,6 +902,14 @@ window.addEventListener("load", function () {
             <a href="/instrument-bench.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🔬 Instrument Bench</a>
             <a href="/raycast.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🚀 Raycast Local LLM</a>
             <a href="/pairlane.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">📦 Pairlane File Drop</a>
+            <!-- v4211 -- *** THESE TWO PAGES HAD NO ANCHOR ON THIS PAGE AT ALL, WHICH IS WHY THEY BELONGED TO NO
+                 PANEL. *** pageSections-selfcheck states the rule and caught the attempt: "A SECTION ENTRY IS NOT
+                 A LINK: the renderer moves an existing <a> and cannot invent one, so a page filed into a drawer
+                 with no anchor gives an EMPTY DRAWER THAT LOOKS DELIBERATE." Filing them into the Peer 2 Peer
+                 section without these two lines would have produced exactly that. Both are real front doors with
+                 live bridges behind them -- biglybtBridge.js and webtorrentBridge.js. -->
+            <a href="/torrents.html" target="_blank" rel="noopener" title="Torrents rendered as a voxel city: each tower is a download, lit cubes are progress, colour is state and glow is speed. Front door for ai-bridge/biglybtBridge.js." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🧱 Torrents (Voxel View)</a>
+            <a href="/webtorrent.html" target="_blank" rel="noopener" title="Browser-side BitTorrent over WebRTC -- fetch and seed straight from the page, no client install. Front door for ai-bridge/webtorrentBridge.js." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🌊 WebTorrent</a>
             <a href="/cat-reactions.html" target="_blank" rel="noopener" title="Your expression, named and answered by a cat. The front door for ui/faceExpressionSet.js -- a PURE classifier over MediaPipe's blendshapes, so every recipe and every near-miss it must refuse is gated headless rather than demoed at a webcam. It shows all eight recipe scores live, not just its winner, and it says out loud that it will NOT claim a tongue: MediaPipe has no tongueOut blendshape, and faking one from an open jaw would be a detector that lies. No cat photographs ship with the engine -- the reactions are emoji, and you can point it at your own images." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">😼 Cat Reactions</a>
             <a href="/gesture-vfx.html" target="_blank" rel="noopener" title="Hand gestures fire particle effects. Front door for ui/gestureVfx.js -- six gestures (pinch, fist, point, open palm, palms together, palms apart) read from MediaPipeHandTracker's own metrics, edge-triggered so a held gesture is ONE gesture, with a separate cooldown for threshold flicker. The judgement AND the particle simulation are both pure, so every gesture, every ambiguity, and 600 frames of physics are gated headless rather than watched. It refuses crossed fingers by name: metrics() reports finger FOLD, never the middle fingertip position, so the pose is not expressible from this input." style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">✨ Gesture VFX</a>
             <a href="/box3d-contacts.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">◆ Box3D Contacts</a>
@@ -1036,8 +1044,15 @@ window.addEventListener("load", function () {
         <!-- v4109 -- Keith: "so NearShare is an app, that button could rename to File Transfer Utils, and both
              could be in there." Renamed the VISIBLE label only -- data-tab/data-panel stay "nearshare" so
              every existing selector, the pageSections id, and the pages/placements JSON key keep pointing at
-             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round. -->
-        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; File Transfer Utils</span><span class="gtabState" id="nsStat"></span></button>
+             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round.
+             v4211 -- RENAMED AGAIN, to the name that describes the whole membership. Keith: "I think we have
+             a file transfer button, and that would be better served as a 'Peer 2 Peer' button and we can put
+             the p2p options in that panel." v4109's own note had already conceded the label was too narrow --
+             "this one's own header text is narrower than its real membership" -- and deferred the wider regroup
+             as something "nobody has asked for yet". Somebody has now asked. THE VISIBLE LABEL IS AGAIN THE
+             ONLY THING THAT MOVES: data-tab stays "nearshare" for the same reason it did at v4109, because
+             the id is load-bearing in server.html's selectors, pageSections' id, and the placements JSON. -->
+        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128279; Peer 2 Peer</span><span class="gtabState" id="nsStat"></span></button>
         <!-- v3020 -- the roundhouse had NO minipanel. Seventeen tabs on this page and the thing the engine is
              actually FOR was not one of them: everything built in v3016-v3019 landed on report.html, a separate
              page you have to go to. Keith asked where the button was, which is the right question. -->
@@ -2134,6 +2149,21 @@ A password fetches a token from the list server; an unregistered callsign needs 
         <button id="bUniversal" title="switch THIS window to the Universal Viewer">🗂 Universal Viewer</button>
         <button id="bShowcase" class="demospill" title="the curated front door — the distributed-OS framing, three primitives, five showcases, and a 60-second tour (this is the page to open first / link on GitHub)" style="color:#8effc4;border-color:#2a5a3a;background:#12230f;">✦ Showcase (front door)</button>
         <button id="bComics" title="switch THIS window to the PDF / comic reader">📖 PDF / Comics</button>
+        <!-- v4267 -- Keith: "SweK Orrery would get a big button on the right side of Server.html. And the
+             Github Universe and Github Terrain would also have a big button on Server.html."
+             TWO OF THE THREE ARE HERE AND THE THIRD IS NOT, and the reason is written down rather than
+             filled in with a button that goes nowhere:
+               ORRERY   -- orrery.html has existed since v3195 and NOTHING LINKED TO IT. A built page nobody
+                           can find is the failure this row's own comments record four separate times.
+               TERRAIN  -- window.repoTerrain has turned a repo into walkable land since v4114 and was
+                           reachable only by typing at a console. ?terrain=1 (main.js, v4267) is the deep
+                           link that makes a button possible, shaped like the ?go= demo-mode link beside it.
+               UNIVERSE -- HAS NO DESTINATION. There is no GitHub-universe page and no data for one;
+                           es-universe.json is the Escape Velocity dataset ev.html reads, a different
+                           universe entirely. Backlog #139 is the round that would build it, and a button
+                           pointing at a page that does not exist is worse than no button. -->
+        <button id="bOrrery" title="SweK at the centre, every vendored dependency in orbit -- licence state, size, arrival date, and (v4266) how far each one's material spread through the tree">&#128302; SweK Orrery</button>
+        <button id="bRepoTerrain" class="go-link" title="This repository as walkable terrain: files as land, directories as ranges, data files as lakes, language as biome. An engine DEPTH-LINK (?terrain=1), not a page -- it exists only while the engine is running.">&#127956; GitHub Terrain</button>
         <!-- v3552 -- ONE INDEX, THREE KINDS. These were three pills listing three DIFFERENT KINDS of thing and
              calling them all demos: 56 demos_code scripts (?go= deep-links), 58 inline DEMO_MODES (engine
              states), and 15 real .html apps. THIRTEEN OF THOSE FIFTEEN APPS WERE IN NO PANEL AT ALL -- reachable
@@ -3194,10 +3224,35 @@ A password fetches a token from the list server; an unregistered callsign needs 
   (function(){
     // v4039 -- pfFabric/pfWasm/pfGpuBrain/pfBox3d REMOVED from this map along with their buttons above; see the
     // v4039 comment there for why each one's link still exists elsewhere rather than being lost.
-    var pf = { pfPhone:"/phone.html" };
-    Object.keys(pf).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open(pf[id], "_blank"); }; });
+    // v4210 -- *** "PHONE MODE" OPENED THE PHONE UI ON THE PC, THE ONE DEVICE THAT DOES NOT NEED IT. ***
+    // Keith: "what should phone button do on server.html really? i remember, show a qr code so the phone can
+    // open it." window.open("/phone.html") put a touch UI -- sticks, big tap targets, a picker sized for a
+    // thumb -- in a desktop tab, and left the actual phone still needing someone to type an IP by hand.
+    // ui/phoneConnectQR.js already builds exactly the right thing and this page never reached it: it resolves
+    // the LAN address via /net/info (so the code does not encode "localhost", which a phone resolves to its
+    // OWN loopback) and renders a scannable QR of <lan>/phone.html. v4210 exported its modal so this button
+    // raises THE SAME one the engine's left rail does, rather than this page growing a second copy.
+    var pfPhoneBtn = document.getElementById("pfPhone");
+    if (pfPhoneBtn) pfPhoneBtn.onclick = function(){
+        import("/ui/phoneConnectQR.js")
+            .then(function(m){ return m.togglePhoneQR(); })
+            .catch(function(e){
+                // The QR is the point, but a phone that cannot get one still needs the address, so the
+                // fallback hands over the URL rather than silently doing nothing.
+                console.warn("[server] phone QR failed:", e && e.message);
+                window.open("/phone.html", "_blank");
+            });
+    };
     // Resume FX + ABYSS Battleship are engine DEMO MODES, launched via the ?go=<id> deep-link (index.html
     // boots straight into that demo). Open in a new tab so the server console stays put.
+    // v4267 -- the two new big buttons. Orrery is a real page; Terrain is an engine deep-link, which is why
+    // only the second one wears .go-link (see the palette note at the top of this file).
+    try {
+      var _orr = document.getElementById("bOrrery");
+      if (_orr) _orr.onclick = function () { window.open("/orrery.html", "_blank", "noopener"); };
+      var _rt = document.getElementById("bRepoTerrain");
+      if (_rt) _rt.onclick = function () { location.href = "/index.html?terrain=1"; };
+    } catch (e) {}
     var pfDemo = { pfResumeFx:"resume_fx" };
     Object.keys(pfDemo).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open("/index.html?forceEngine=1&go=" + pfDemo[id], "_blank"); }; });
   })();

@@ -1,0 +1,45 @@
+Ashima Arts' textureless GLSL simplex noise -- the licence notice for the copy of that
+code held in shaders/ashimaNoise.js.
+
+  Description : Array and textureless GLSL simplex noise functions.
+       Author : Ian McEwan, Ashima Arts.
+    Copyright : Copyright (C) 2011 Ashima Arts. All rights reserved.
+      License : Distributed under the MIT License.
+       Source : https://github.com/ashima/webgl-noise
+
+--- PROVENANCE OF THIS FILE, STATED BECAUSE v4203 LEARNED WHY IT MATTERS -------------
+
+The text below is the STANDARD MIT (Expat) permission notice, reproduced under the
+copyright holder named above. It was NOT fetched from the upstream repository and is
+not claimed to be a byte-for-byte copy of upstream's own LICENSE file -- this sandbox
+does not reach the network.
+
+That distinction is the point of writing it down. At v4203 three of this tree's own
+licence records turned out to be wrong in the file whose entire purpose was quoting
+licences verbatim, including one truncated to 48 words of 77 that dropped an
+attribution requirement. A licence reproduced from memory and LABELLED as such is
+honest; the same text labelled "verbatim from upstream" would be the v4203 mistake
+committed again. Anyone with network access should replace this block with upstream's
+own LICENSE and delete this paragraph.
+
+--- MIT LICENSE ---------------------------------------------------------------------
+
+Copyright (C) 2011 Ashima Arts
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

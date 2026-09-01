@@ -9,8 +9,18 @@
 //       License : Distributed under the MIT License.
 //        Source : https://github.com/ashima/webgl-noise
 //
-// The GLSL below is Ashima's, unmodified apart from whitespace. It is reproduced here under that MIT licence
-// with the attribution above kept intact, which is the licence's one requirement.
+// The GLSL below is Ashima's, unmodified apart from whitespace, so this file is a COPY and not a port.
+//
+// *** AND THIS PARAGRAPH USED TO SAY THE ATTRIBUTION ABOVE WAS "THE LICENCE'S ONE REQUIREMENT", WHICH IS
+// *** WRONG, AND WRONG IN THE DIRECTION THAT UNDERSTATES THE OBLIGATION. *** MIT requires TWO things in every
+// copy: "The above copyright notice AND THIS PERMISSION NOTICE shall be included in all copies or substantial
+// portions of the Software." The permission notice is the grant itself plus the warranty disclaimer, and this
+// file carried a POINTER to it ("Distributed under the MIT License") rather than the notice. A pointer is not
+// an inclusion.
+//
+// The notice now lives beside this file at shaders/ASHIMA-LICENSE.txt (v4263), which also records that the
+// text was reproduced from the standard MIT form rather than fetched from upstream -- a distinction v4203
+// learned the hard way. world/copiedOutsideVendor.mjs is the register that found the gap.
 //
 // ---- *** WHY THIS EXPORTS TWO FUNCTIONS AND NOT ONE WITH A DIMENSION SWITCH *** ---------------------------
 //

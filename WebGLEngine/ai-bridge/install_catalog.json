@@ -1,6 +1,6 @@
 {
  "_format": "voxelengine install catalog v2 (round 1512: +agent-skills/scanner/self-host apps/feeds)",
- "_doc": "EDITABLE. Bridge re-reads on every /install/exec call so edits take effect immediately. Entries marked 'manual': true require human steps (model downloads, code patches) \u2014 the cmds just echo instructions. v352 closes the 15+ gap between UI ITEMS and the bridge catalog. v482: comfyui install wired (idempotent, version-proof via GitHub API, never clobbers an existing C:\\VoxelBAK build); added tool-ollama (binary install), tool-git (git+git-lfs prereq), tool-7zip (ComfyUI extract prereq); py-cubvh marked CONFIRMED-BUILT (checkPath) with the verified MSVC-14.51-vs-14.44 root cause replacing the old 60s-timeout misdiagnosis. v556: added 'py-diso' (manual CUDA build recipe for SarahWeiii/diso, the dual-marching-cubes ext that makes node-comfy3d-pack's install.py fail) \u2014 verified-built (drop _WINDLL + CCBIN->MSVC 14.44.35207 + torch_python.lib), transcribed from a working build log. v559: added 'model-ultrashape' (UltraShape weight download, size-checked HF resolve URL) so the weights are installable via the panel; the UI marks them requiredIf node-ultrashape (optional until the node is installed, then a real missing dep).",
+ "_doc": "EDITABLE. Bridge re-reads on every /install/exec call so edits take effect immediately. Entries marked 'manual': true require human steps (model downloads, code patches) — the cmds just echo instructions. v352 closes the 15+ gap between UI ITEMS and the bridge catalog. v482: comfyui install wired (idempotent, version-proof via GitHub API, never clobbers an existing C:\\VoxelBAK build); added tool-ollama (binary install), tool-git (git+git-lfs prereq), tool-7zip (ComfyUI extract prereq); py-cubvh marked CONFIRMED-BUILT (checkPath) with the verified MSVC-14.51-vs-14.44 root cause replacing the old 60s-timeout misdiagnosis. v556: added 'py-diso' (manual CUDA build recipe for SarahWeiii/diso, the dual-marching-cubes ext that makes node-comfy3d-pack's install.py fail) — verified-built (drop _WINDLL + CCBIN->MSVC 14.44.35207 + torch_python.lib), transcribed from a working build log. v559: added 'model-ultrashape' (UltraShape weight download, size-checked HF resolve URL) so the weights are installable via the panel; the UI marks them requiredIf node-ultrashape (optional until the node is installed, then a real missing dep).",
  "chrome-devtools-mcp": {
   "description": "Chrome DevTools MCP (Google, ChromeDevTools/chrome-devtools-mcp, Apache-2.0) - lets an AI AGENT (Claude Code/Desktop, Cursor, Copilot, Gemini) drive and inspect a live Chrome: record performance traces, read console errors with source-mapped stacks, list network requests, take screenshots + DOM/heap snapshots, run Lighthouse, and automate clicks/typing via puppeteer. IMPORTANT: it is an MCP SERVER - an MCP CLIENT (your agent) issues the tool calls, the engine itself cannot call MCP tools. So this row warms the npx package and wires it into Claude Code (if the `claude` CLI is present); it does NOT add a SweK panel button, because SweK has no MCP client. BEST USE HERE: point your agent at SweK's own pages to catch what the headless render-qa cannot - WebGL console errors, frame-budget traces, LCARS screenshots. To attach it to the ACTUAL running engine page instead of a fresh tab, launch Chrome with --remote-debugging-port=9222 and add --browser-url=http://127.0.0.1:9222 to the MCP args. Requires Node LTS + Google Chrome (stable or newer).",
   "cmds": [
@@ -57,14 +57,14 @@
   }
  },
  "ollama": {
-  "description": "Ollama LLM server (local model host) \u2014 this row PINGS 11434 and pulls a model. To INSTALL the Ollama binary itself, run tool-ollama (winget / OllamaSetup.exe). Once installed, Ollama runs as a background service and 11434 comes up on its own.",
+  "description": "Ollama LLM server (local model host) — this row PINGS 11434 and pulls a model. To INSTALL the Ollama binary itself, run tool-ollama (winget / OllamaSetup.exe). Once installed, Ollama runs as a background service and 11434 comes up on its own.",
   "ping": "http://127.0.0.1:11434/api/tags",
   "cmds": [
    "ollama pull llama3:8b"
   ]
  },
  "comfyui": {
-  "description": "ComfyUI workflow server (image diffusion + Trellis2 image-to-3D). v482: install is now wired \u2014 idempotent download of the OFFICIAL Comfy-Org portable. SKIPS if your C:\\VoxelBAK build already exists so it NEVER clobbers your hand-tuned torch 2.11/cu126 sm_61 environment. Pings 8188 to detect a running server (the bridge can't auto-LAUNCH it \u2014 that would tie up this process; use flag-launch for the run line). Multi-GB download: best run in your own PowerShell. Needs 7-Zip (tool-7zip) to extract.",
+  "description": "ComfyUI workflow server (image diffusion + Trellis2 image-to-3D). v482: install is now wired — idempotent download of the OFFICIAL Comfy-Org portable. SKIPS if your C:\\VoxelBAK build already exists so it NEVER clobbers your hand-tuned torch 2.11/cu126 sm_61 environment. Pings 8188 to detect a running server (the bridge can't auto-LAUNCH it — that would tie up this process; use flag-launch for the run line). Multi-GB download: best run in your own PowerShell. Needs 7-Zip (tool-7zip) to extract.",
   "ping": "http://127.0.0.1:8188/system_stats",
   "timeoutMs": 1800000,
   "cmdsMac": [
@@ -86,50 +86,50 @@
   "cmds": []
  },
  "node-manager": {
-  "description": "ComfyUI-Manager \u2014 required first; installs other custom nodes",
+  "description": "ComfyUI-Manager — required first; installs other custom nodes",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI-Manager')) { git clone https://github.com/ltdrdata/ComfyUI-Manager.git } else { Write-Host 'already cloned, skipping' }"
   ]
  },
  "node-trellis2": {
-  "description": "ComfyUI-Trellis2 \u2014 main wrapper for the Trellis 2 image-to-3D pipeline. v352 added.",
+  "description": "ComfyUI-Trellis2 — main wrapper for the Trellis 2 image-to-3D pipeline. v352 added.",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI-Trellis2-main')) { git clone https://github.com/visualbruno/ComfyUI-Trellis2.git ComfyUI-Trellis2-main } else { Write-Host 'already cloned, skipping' }"
   ]
  },
  "node-essentials": {
-  "description": "ComfyUI_essentials \u2014 utility nodes pack",
+  "description": "ComfyUI_essentials — utility nodes pack",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI_essentials')) { git clone https://github.com/cubiq/ComfyUI_essentials.git } else { Write-Host 'already cloned, skipping' }"
   ]
  },
  "node-layerdiffuse": {
-  "description": "ComfyUI-layerdiffuse \u2014 alpha-channel-aware diffusion node",
+  "description": "ComfyUI-layerdiffuse — alpha-channel-aware diffusion node",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI-layerdiffuse')) { git clone https://github.com/huchenlei/ComfyUI-layerdiffuse.git } else { Write-Host 'already cloned, skipping' }",
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install -r C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes\\ComfyUI-layerdiffuse\\requirements.txt"
   ]
  },
  "node-gguf": {
-  "description": "ComfyUI-GGUF \u2014 GGUF model loader for quantized weights. v352 added.",
+  "description": "ComfyUI-GGUF — GGUF model loader for quantized weights. v352 added.",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI-GGUF')) { git clone https://github.com/city96/ComfyUI-GGUF.git } else { Write-Host 'already cloned, skipping' }"
   ]
  },
  "py-trimesh": {
-  "description": "trimesh \u2014 mesh I/O for OBJ/STL/PLY (v347)",
+  "description": "trimesh — mesh I/O for OBJ/STL/PLY (v347)",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install trimesh"
   ]
  },
  "py-pymeshlab": {
-  "description": "pymeshlab \u2014 bindings to MeshLab",
+  "description": "pymeshlab — bindings to MeshLab",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install pymeshlab"
   ]
  },
  "py-meshlib": {
-  "description": "meshlib \u2014 alternative to pymeshlab",
+  "description": "meshlib — alternative to pymeshlab",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install meshlib"
   ]
@@ -153,7 +153,7 @@
   }
  },
  "py-kiui": {
-  "description": "kiui \u2014 utility lib for 3D model trainers",
+  "description": "kiui — utility lib for 3D model trainers",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install kiui"
   ]
@@ -165,7 +165,7 @@
   ]
  },
  "py-fake-triton": {
-  "description": "Fake-Triton bypass \u2014 stub 'triton' module for Windows packages that try to import it. v352 added.",
+  "description": "Fake-Triton bypass — stub 'triton' module for Windows packages that try to import it. v352 added.",
   "cmds": [
    "$tritonDir = 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\Lib\\site-packages\\triton'",
    "if (-not (Test-Path $tritonDir)) { New-Item -ItemType Directory -Path $tritonDir | Out-Null }",
@@ -186,7 +186,7 @@
   ]
  },
  "node-flowty-crm-cuda": {
-  "description": "Flowty-CRM step 3: requirements-cuda.txt. v470: comments out the nvdiffrast git-build line (line 1 forces a source build that fails) then installs the rest. py-nvdiffrast wheel FIRST. If it dies on [WinError 5] cv2.pyd: ComfyUI is running and locking the file \u2014 close ComfyUI, run py-opencv-reset, then rerun this.",
+  "description": "Flowty-CRM step 3: requirements-cuda.txt. v470: comments out the nvdiffrast git-build line (line 1 forces a source build that fails) then installs the rest. py-nvdiffrast wheel FIRST. If it dies on [WinError 5] cv2.pyd: ComfyUI is running and locking the file — close ComfyUI, run py-opencv-reset, then rerun this.",
   "cmds": [
    "cd C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\ComfyUI\\\\custom_nodes\\\\ComfyUI-Flowty-CRM; (Get-Content requirements-cuda.txt) -replace '^(\\s*git\\+https://github\\.com/NVlabs/nvdiffrast.*)$','# $1' | Set-Content requirements-cuda.txt; & C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\python_embeded\\\\python.exe -m pip install -r requirements-cuda.txt"
   ],
@@ -198,13 +198,13 @@
   }
  },
  "py-pyhocon": {
-  "description": "pyhocon \u2014 config parser; ComfyUI-3D-Pack needs it",
+  "description": "pyhocon — config parser; ComfyUI-3D-Pack needs it",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install pyhocon"
   ]
  },
  "node-3d-pack": {
-  "description": "ComfyUI-3D-Pack \u2014 TripoSR/CRM/Hunyuan/InstantMesh",
+  "description": "ComfyUI-3D-Pack — TripoSR/CRM/Hunyuan/InstantMesh",
   "cmds": [
    "cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes; if (-not (Test-Path 'ComfyUI-3D-Pack')) { git clone https://github.com/MrForExample/ComfyUI-3D-Pack.git } else { Write-Host 'already cloned, skipping' }"
   ]
@@ -223,51 +223,51 @@
   ]
  },
  "node-hitem3d": {
-  "description": "comfyui-hitem3d \u2014 HiTem3D (Hi3D) image-to-3D wrapper (watertight OBJ/GLB). Calls the HiTem3D Open Platform API server-side. v470 added.",
+  "description": "comfyui-hitem3d — HiTem3D (Hi3D) image-to-3D wrapper (watertight OBJ/GLB). Calls the HiTem3D Open Platform API server-side. v470 added.",
   "cmds": [
    "cd C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\ComfyUI\\\\custom_nodes; if (-not (Test-Path 'comfyui-hitem3d')) { git clone https://github.com/GeekatplayStudio/comfyui-hitem3d.git } else { Write-Host 'already cloned, skipping' }",
    "C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\python_embeded\\\\python.exe -m pip install -r C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\ComfyUI\\\\custom_nodes\\\\comfyui-hitem3d\\\\requirements.txt"
   ]
  },
  "py-accelerate": {
-  "description": "accelerate \u2014 cpu_offload_with_hook for P3D! (v347)",
+  "description": "accelerate — cpu_offload_with_hook for P3D! (v347)",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install accelerate"
   ]
  },
  "py-safetensors": {
-  "description": "safetensors \u2014 safe tensor serialization (v347)",
+  "description": "safetensors — safe tensor serialization (v347)",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install safetensors"
   ]
  },
  "py-pixal3d-stack": {
-  "description": "P3D! Pixal3D low-VRAM stack \u2014 trimesh + accelerate + safetensors + numpy + scipy. v347.",
+  "description": "P3D! Pixal3D low-VRAM stack — trimesh + accelerate + safetensors + numpy + scipy. v347.",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install trimesh accelerate safetensors \"numpy==1.26.4\" scipy"
   ]
  },
  "py-mol-pipeline": {
-  "description": "MOL! AtomicFieldProcessor pipeline (v350) \u2014 biopython for PDB/CIF reading, emits .mol binary (24-byte stride). AlphaFold-3 outputs work directly. v352 added.",
+  "description": "MOL! AtomicFieldProcessor pipeline (v350) — biopython for PDB/CIF reading, emits .mol binary (24-byte stride). AlphaFold-3 outputs work directly. v352 added.",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install biopython \"numpy==1.26.4\""
   ]
  },
  "py-mto-pipeline": {
-  "description": "MTO! medical tomography pipeline (v351) \u2014 SimpleITK + nibabel + scipy.ndimage for DICOM/NIfTI reading and gradient normal computation. Emits .mto binary (22-byte stride). v352 added.",
+  "description": "MTO! medical tomography pipeline (v351) — SimpleITK + nibabel + scipy.ndimage for DICOM/NIfTI reading and gradient normal computation. Emits .mto binary (22-byte stride). v352 added.",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install SimpleITK nibabel \"numpy==1.26.4\" scipy"
   ]
  },
  "py-wnd-pipeline": {
-  "description": "WND! fluid field pipeline (v353) \u2014 netCDF4 + xarray + scipy for reading ERA5/GFS reanalysis files and emitting 3D RGBA32F texture data for the .wnd binary. v353 added.",
+  "description": "WND! fluid field pipeline (v353) — netCDF4 + xarray + scipy for reading ERA5/GFS reanalysis files and emitting 3D RGBA32F texture data for the .wnd binary. v353 added.",
   "cmds": [
    "C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install netCDF4 xarray \"numpy==1.26.4\" scipy"
   ]
  },
  "model-juggernaut": {
   "manual": true,
-  "description": "Juggernaut XL v9 \u2014 SDXL fine-tune for the initial 2D image step. Manual download (Civitai token required). v352 wired.",
+  "description": "Juggernaut XL v9 — SDXL fine-tune for the initial 2D image step. Manual download (Civitai token required). v352 wired.",
   "cmds": [
    "Write-Host '=== model-juggernaut: MANUAL DOWNLOAD REQUIRED ==='",
    "Write-Host 'Target: ComfyUI\\models\\checkpoints\\juggernaut_xl.safetensors'",
@@ -281,7 +281,7 @@
  },
  "model-sdxl": {
   "manual": true,
-  "description": "SDXL Base 1.0 \u2014 fallback if Juggernaut unavailable. Manual download. v352 wired.",
+  "description": "SDXL Base 1.0 — fallback if Juggernaut unavailable. Manual download. v352 wired.",
   "cmds": [
    "Write-Host '=== model-sdxl: MANUAL DOWNLOAD REQUIRED ==='",
    "Write-Host 'Target: ComfyUI\\models\\checkpoints\\sdxl_base_1.0.safetensors'",
@@ -293,11 +293,11 @@
  },
  "model-dinov3": {
   "manual": true,
-  "description": "DINOv3 ViT-L/16 \u2014 vision backbone Trellis2 uses to encode input images. Folder name MUST be exactly 'dinov3-vitl16-pretrain-lvd1689m'. v352 wired (closes the manual-clone gap the user hit).",
+  "description": "DINOv3 ViT-L/16 — vision backbone Trellis2 uses to encode input images. Folder name MUST be exactly 'dinov3-vitl16-pretrain-lvd1689m'. v352 wired (closes the manual-clone gap the user hit).",
   "cmds": [
    "Write-Host '=== model-dinov3: MANUAL CLONE REQUIRED ==='",
    "Write-Host 'Target: ComfyUI\\models\\facebook\\dinov3-vitl16-pretrain-lvd1689m\\'",
-   "Write-Host 'Trellis2 hard-checks the folder name \u2014 must match exactly.'",
+   "Write-Host 'Trellis2 hard-checks the folder name — must match exactly.'",
    "Write-Host '1. Open the HF mirror (no auth prompt): https://huggingface.co/PIA-SPACE-LAB/dinov3-vitl16-pretrain-lvd1689m'",
    "Write-Host '2. Run:'",
    "Write-Host '   cd C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\models\\facebook'",
@@ -315,7 +315,7 @@
    "Write-Host '  ComfyUI\\models\\trellis\\trellis-2.0\\'",
    "Write-Host '  ComfyUI\\models\\trellis\\TRELLIS.2-4B-FP8\\'",
    "Write-Host '1. Open https://huggingface.co/visualbruno/TRELLIS.2-4B-FP8/tree/main/ckpts_fp8'",
-   "Write-Host '2. Use the DOWNLOAD ARROW icon (NOT the filename link \u2014 that gives a 1KB Xet pointer).'",
+   "Write-Host '2. Use the DOWNLOAD ARROW icon (NOT the filename link — that gives a 1KB Xet pointer).'",
    "Write-Host '3. Required files (8 total):'",
    "Write-Host '   shape_dec_next_dc_f16c32_fp8.{json,safetensors}'",
    "Write-Host '   slat_flow_img2shape_dit_1_3B_512_fp8.{json,safetensors}'",
@@ -329,7 +329,7 @@
  },
  "model-totalsegmentator": {
   "manual": true,
-  "description": "MTO! TotalSegmentator pretrained 3D U-Net (~4 GB on first run). Optional \u2014 only needed for real DICOM/NIfTI segmentation. Demo + binary format work without it. v352 added.",
+  "description": "MTO! TotalSegmentator pretrained 3D U-Net (~4 GB on first run). Optional — only needed for real DICOM/NIfTI segmentation. Demo + binary format work without it. v352 added.",
   "cmds": [
    "Write-Host '=== model-totalsegmentator: OPTIONAL ==='",
    "Write-Host 'TotalSegmentator is a pretrained 3D U-Net segmenting CT scans into 100+ tissues.'",
@@ -342,7 +342,7 @@
  },
  "patch-cumesh": {
   "manual": true,
-  "description": "Code patch \u2014 Trellis2-main\\nodes.py (~line 27): wrap cumesh import in try/except. v352 wired.",
+  "description": "Code patch — Trellis2-main\\nodes.py (~line 27): wrap cumesh import in try/except. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-cumesh: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py (~line 27)'",
@@ -356,7 +356,7 @@
  },
  "patch-ovoxel": {
   "manual": true,
-  "description": "Code patch \u2014 Trellis2-main\\nodes.py: wrap o_voxel import in try/except. v352 wired.",
+  "description": "Code patch — Trellis2-main\\nodes.py: wrap o_voxel import in try/except. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-ovoxel: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py'",
@@ -365,7 +365,7 @@
  },
  "patch-nvdiffrast": {
   "manual": true,
-  "description": "Code patch \u2014 nodes.py: nvdiffrast try/except. v352 wired.",
+  "description": "Code patch — nodes.py: nvdiffrast try/except. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-nvdiffrast: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py'",
@@ -374,7 +374,7 @@
  },
  "patch-flex-gemm-nodes": {
   "manual": true,
-  "description": "Code patch \u2014 nodes.py: flex_gemm try/except. v352 wired.",
+  "description": "Code patch — nodes.py: flex_gemm try/except. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-flex-gemm-nodes: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py'",
@@ -383,7 +383,7 @@
  },
  "patch-flex-gemm-pipeline": {
   "manual": true,
-  "description": "Code patch \u2014 trellis2_image_to_3d.py: flex_gemm fallback to torch.matmul. v352 wired.",
+  "description": "Code patch — trellis2_image_to_3d.py: flex_gemm fallback to torch.matmul. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-flex-gemm-pipeline: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\trellis2_image_to_3d.py'",
@@ -392,7 +392,7 @@
  },
  "patch-triton": {
   "manual": true,
-  "description": "Code patch \u2014 comment out triton imports (triton is Linux-only). Pairs with py-fake-triton. v352 wired.",
+  "description": "Code patch — comment out triton imports (triton is Linux-only). Pairs with py-fake-triton. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-triton: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py'",
@@ -404,7 +404,7 @@
  },
  "patch-defaults": {
   "manual": true,
-  "description": "Code patch \u2014 Trellis2LoadModel defaults to fp8 + 512 resolution. Required for 8 GB Pascal cards. v352 wired.",
+  "description": "Code patch — Trellis2LoadModel defaults to fp8 + 512 resolution. Required for 8 GB Pascal cards. v352 wired.",
   "cmds": [
    "Write-Host '=== patch-defaults: MANUAL EDIT REQUIRED ==='",
    "Write-Host 'File: ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\nodes.py'",
@@ -435,7 +435,7 @@
   ]
  },
  "py-opencv-force": {
-  "description": "FORCE fix for a STUBBORN cv2.pyd lock: kills stray python.exe, deletes the locked cv2 folder, reinstalls headless. Aggressive \u2014 kills ALL python (incl. ComfyUI). Use only if py-opencv-reset still hits WinError 5.",
+  "description": "FORCE fix for a STUBBORN cv2.pyd lock: kills stray python.exe, deletes the locked cv2 folder, reinstalls headless. Aggressive — kills ALL python (incl. ComfyUI). Use only if py-opencv-reset still hits WinError 5.",
   "cmds": [
    "taskkill /f /im python.exe 2>$null; Remove-Item -Recurse -Force 'C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\python_embeded\\\\Lib\\\\site-packages\\\\cv2' -ErrorAction SilentlyContinue; Write-Host 'killed stray python.exe + cleared locked cv2 folder'; exit 0",
    "C:\\\\VoxelBAK\\\\ComfyUI_windows_portable\\\\python_embeded\\\\python.exe -m pip install --no-cache-dir opencv-python-headless==4.9.0.80 opencv-contrib-python-headless==4.9.0.80"
@@ -450,7 +450,7 @@
   ]
  },
  "model-ultrashape": {
-  "description": "UltraShape refiner weights (ultrashape_v1.pt, ~from infinith/UltraShape). REQUIRED once node-ultrashape is installed. The cmd downloads via the standard HF resolve URL built from the stated repo+filename and VERIFIES the byte size \u2014 if HF returns a small LFS/Xet pointer stub (the classic trap) or 404s, it fails loudly and tells you to grab it manually with the download-arrow icon. UltraShape wants 12GB+ VRAM; on 8GB it's experimental.",
+  "description": "UltraShape refiner weights (ultrashape_v1.pt, ~from infinith/UltraShape). REQUIRED once node-ultrashape is installed. The cmd downloads via the standard HF resolve URL built from the stated repo+filename and VERIFIES the byte size — if HF returns a small LFS/Xet pointer stub (the classic trap) or 404s, it fails loudly and tells you to grab it manually with the download-arrow icon. UltraShape wants 12GB+ VRAM; on 8GB it's experimental.",
   "timeoutMs": 1200000,
   "checkPath": "ComfyUI/models/ultrashape/ultrashape_v1.pt",
   "cmds": [
@@ -458,7 +458,7 @@
   ]
  },
  "py-cubvh": {
-  "description": "SOURCE BUILD: cubvh (ashawkey) \u2014 CUDA BVH for UltraShape's marching-cubes acceleration. No prebuilt Windows wheel. CONFIRMED BUILT on this rig (sm_61, _cubvh.cp312-win_amd64.pyd in site-packages, 'cuBVH Successfully Loaded!'). PRE-REQ: py-embed-headers FIRST (Python.h). This automated cmd does the clone + sets the env that proved necessary ($env:LIB -> python_embeded\\libs, $env:TORCH_CUDA_ARCH_LIST='6.1') then pip-builds. VERIFIED ROOT CAUSE of the earlier failures (NOT the 60s timeout, NOT a submodule drop): the portable's VS BuildTools 18 ships MSVC 14.51.36231, which CUDA 12.8 nvcc REJECTS (crt/host_config.h: only VS 2017-2022 supported); even -allow-unsupported-compiler then crashed cudafe++. THE FIX that worked: a patched setup.py that (a) forces the older MSVC toolset 14.44.35207, (b) injects the Windows SDK include + lib dirs, and (c) adds the SDK Bin\\<ver>\\x64 dir to PATH so link.exe finds rc.exe (fixes LNK1158), then 'python setup.py install'. If the pip build below dies on the MSVC-version error, use that manual setup.py recipe in your OWN PowerShell.",
+  "description": "SOURCE BUILD: cubvh (ashawkey) — CUDA BVH for UltraShape's marching-cubes acceleration. No prebuilt Windows wheel. CONFIRMED BUILT on this rig (sm_61, _cubvh.cp312-win_amd64.pyd in site-packages, 'cuBVH Successfully Loaded!'). PRE-REQ: py-embed-headers FIRST (Python.h). This automated cmd does the clone + sets the env that proved necessary ($env:LIB -> python_embeded\\libs, $env:TORCH_CUDA_ARCH_LIST='6.1') then pip-builds. VERIFIED ROOT CAUSE of the earlier failures (NOT the 60s timeout, NOT a submodule drop): the portable's VS BuildTools 18 ships MSVC 14.51.36231, which CUDA 12.8 nvcc REJECTS (crt/host_config.h: only VS 2017-2022 supported); even -allow-unsupported-compiler then crashed cudafe++. THE FIX that worked: a patched setup.py that (a) forces the older MSVC toolset 14.44.35207, (b) injects the Windows SDK include + lib dirs, and (c) adds the SDK Bin\\<ver>\\x64 dir to PATH so link.exe finds rc.exe (fixes LNK1158), then 'python setup.py install'. If the pip build below dies on the MSVC-version error, use that manual setup.py recipe in your OWN PowerShell.",
   "timeoutMs": 1200000,
   "checkPath": "python_embeded/Lib/site-packages/cubvh/__init__.py",
   "cmds": [
@@ -472,7 +472,7 @@
   }
  },
  "py-diso": {
-  "description": "SOURCE BUILD: diso (SarahWeiii) \u2014 Dual Marching Cubes CUDA extension (cumc.cu / cudualmc.cu) that ComfyUI-3D-Pack's install.py builds for fast voxel->mesh surface extraction. This is the sub-build that makes 'node-comfy3d-pack' fail. CONFIRMED BUILT MANUALLY on this rig: diso\\\\_C.pyd loaded ('Success! Loaded extension'). ROOT CAUSE (same family as py-cubvh): the portable's VS BuildTools 18 ships MSVC 14.51.36231, which CUDA 12.6 nvcc REJECTS (crt/host_config.h: only VS 2017-2022 supported). Adding --allow-unsupported-compiler bypasses the version gate but then cudafe++ crashes with 0xC0000005 (ACCESS_VIOLATION) on the v18 headers, so Option-1 (NVCC_FLAGS only) does NOT finish. The automated pip path (even via vcvars64 + DISTUTILS_USE_SDK=1 + --no-build-isolation) also does NOT work here. THE FIX that worked was a fully MANUAL x64 build: (0) open an x64 dev shell via vcvars64.bat; (1) nvcc-compile cumc.cu and cudualmc.cu to .obj with CCBIN forced to the OLDER MSVC 14.44.35207 Hostx64 x64 toolset + --allow-unsupported-compiler + -gencode arch=compute_61,code=sm_61 (Pascal / GTX 1070); (2) cl-compile src\\\\pybind.cpp WITHOUT defining _WINDLL (that macro forced __declspec(dllimport) on torch's pybind casters -> unresolved-symbol / instantiation errors); (3) link.exe the three .obj into diso\\\\_C.pyd against torch.lib torch_cpu.lib torch_cuda.lib c10.lib c10_cuda.lib cuda.lib cudart.lib AND torch_python.lib (the missing torch_python.lib was the other half of the link failure); (4) copy the built diso\\\\ folder (__init__.py + _C.pyd) into python_embeded\\\\Lib\\\\site-packages. manual:true \u2014 the cmd only ECHOES this recipe; run it yourself in an x64 Developer PowerShell. Transcribed from a verified build log; not re-verifiable from the bridge.",
+  "description": "SOURCE BUILD: diso (SarahWeiii) — Dual Marching Cubes CUDA extension (cumc.cu / cudualmc.cu) that ComfyUI-3D-Pack's install.py builds for fast voxel->mesh surface extraction. This is the sub-build that makes 'node-comfy3d-pack' fail. CONFIRMED BUILT MANUALLY on this rig: diso\\\\_C.pyd loaded ('Success! Loaded extension'). ROOT CAUSE (same family as py-cubvh): the portable's VS BuildTools 18 ships MSVC 14.51.36231, which CUDA 12.6 nvcc REJECTS (crt/host_config.h: only VS 2017-2022 supported). Adding --allow-unsupported-compiler bypasses the version gate but then cudafe++ crashes with 0xC0000005 (ACCESS_VIOLATION) on the v18 headers, so Option-1 (NVCC_FLAGS only) does NOT finish. The automated pip path (even via vcvars64 + DISTUTILS_USE_SDK=1 + --no-build-isolation) also does NOT work here. THE FIX that worked was a fully MANUAL x64 build: (0) open an x64 dev shell via vcvars64.bat; (1) nvcc-compile cumc.cu and cudualmc.cu to .obj with CCBIN forced to the OLDER MSVC 14.44.35207 Hostx64 x64 toolset + --allow-unsupported-compiler + -gencode arch=compute_61,code=sm_61 (Pascal / GTX 1070); (2) cl-compile src\\\\pybind.cpp WITHOUT defining _WINDLL (that macro forced __declspec(dllimport) on torch's pybind casters -> unresolved-symbol / instantiation errors); (3) link.exe the three .obj into diso\\\\_C.pyd against torch.lib torch_cpu.lib torch_cuda.lib c10.lib c10_cuda.lib cuda.lib cudart.lib AND torch_python.lib (the missing torch_python.lib was the other half of the link failure); (4) copy the built diso\\\\ folder (__init__.py + _C.pyd) into python_embeded\\\\Lib\\\\site-packages. manual:true — the cmd only ECHOES this recipe; run it yourself in an x64 Developer PowerShell. Transcribed from a verified build log; not re-verifiable from the bridge.",
   "manual": true,
   "timeoutMs": 1200000,
   "checkPath": "python_embeded/Lib/site-packages/diso/_C.pyd",
@@ -487,7 +487,7 @@
   }
  },
  "py-trellis2-wheels": {
-  "description": "Adaptively installs visualbruno's prebuilt native-extension wheels matching YOUR torch version (auto-detects Torch<NNN> folder). If none match (e.g. torch 2.11 / py3.12), it lists what's available \u2014 the fork still works via fallbacks.",
+  "description": "Adaptively installs visualbruno's prebuilt native-extension wheels matching YOUR torch version (auto-detects Torch<NNN> folder). If none match (e.g. torch 2.11 / py3.12), it lists what's available — the fork still works via fallbacks.",
   "cmds": [
    "$raw=(& 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -c 'import torch;print(torch.__version__)').Trim(); $tv=(($raw -split '\\+')[0] -replace '\\.',''); $base='C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes\\ComfyUI-Trellis2-main\\wheels\\Windows'; $dir=$base+'\\Torch'+$tv; Write-Host ('torch '+$raw+' -> looking for '+$dir); if (Test-Path $dir) { & 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -m pip install (Get-ChildItem ($dir+'\\*.whl') | ForEach-Object FullName) } else { Write-Host ('No prebuilt wheels for Torch'+$tv+'. Available folders:'); Get-ChildItem $base | ForEach-Object Name; Write-Host 'If none match your torch+python, the fork still runs on fallbacks, or build from source after py-embed-headers.' }"
   ]
@@ -495,7 +495,7 @@
  "py-embed-headers": {
   "description": "Fixes 'Cannot open include file: Python.h' for source builds (cubvh, native extensions). ComfyUI portable omits the Python dev headers/libs; this downloads the matching include/ + libs/ from the NuGet python package and drops them into python_embeded. Idempotent.",
   "cmds": [
-   "if (Test-Path 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include\\Python.h') { Write-Host 'Python.h already present \u2014 nothing to do'; exit 0 }; $pv=(& 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -c 'import sys;print(sys.version.split()[0])').Trim(); Write-Host ('embedded python: '+$pv); $z=$env:TEMP+'\\pyhdr_'+$pv+'.zip'; $url='https://www.nuget.org/api/v2/package/python/'+$pv; Write-Host ('fetching '+$url); Invoke-WebRequest $url -OutFile $z; $d=$env:TEMP+'\\pyhdr_'+$pv; Expand-Archive $z -DestinationPath $d -Force; Copy-Item ($d+'\\tools\\include') 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include' -Recurse -Force; Copy-Item ($d+'\\tools\\libs') 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\libs' -Recurse -Force; if (Test-Path 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include\\Python.h') { Write-Host 'OK: Python.h installed' } else { Write-Host 'FAILED: NuGet layout differed \u2014 copy include/ + libs/ from a matching Python install by hand' }"
+   "if (Test-Path 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include\\Python.h') { Write-Host 'Python.h already present — nothing to do'; exit 0 }; $pv=(& 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -c 'import sys;print(sys.version.split()[0])').Trim(); Write-Host ('embedded python: '+$pv); $z=$env:TEMP+'\\pyhdr_'+$pv+'.zip'; $url='https://www.nuget.org/api/v2/package/python/'+$pv; Write-Host ('fetching '+$url); Invoke-WebRequest $url -OutFile $z; $d=$env:TEMP+'\\pyhdr_'+$pv; Expand-Archive $z -DestinationPath $d -Force; Copy-Item ($d+'\\tools\\include') 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include' -Recurse -Force; Copy-Item ($d+'\\tools\\libs') 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\libs' -Recurse -Force; if (Test-Path 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\include\\Python.h') { Write-Host 'OK: Python.h installed' } else { Write-Host 'FAILED: NuGet layout differed — copy include/ + libs/ from a matching Python install by hand' }"
   ]
  },
  "tool-ollama": {
@@ -509,7 +509,7 @@
   ]
  },
  "tool-git": {
-  "description": "Git + Git LFS \u2014 PREREQ assumed by half the panel (every node clone, and the HF model clones like model-dinov3 need 'git lfs'). v482 added because it was silently assumed-but-not-installable. winget (Git.Git + GitHub.GitLFS), idempotent. After install run 'git lfs install' once in a fresh shell.",
+  "description": "Git + Git LFS — PREREQ assumed by half the panel (every node clone, and the HF model clones like model-dinov3 need 'git lfs'). v482 added because it was silently assumed-but-not-installable. winget (Git.Git + GitHub.GitLFS), idempotent. After install run 'git lfs install' once in a fresh shell.",
   "timeoutMs": 600000,
   "cmds": [
    "$haveGit=[bool](Get-Command git -ErrorAction SilentlyContinue); $haveLfs=$false; if ($haveGit) { & git lfs version 2>$null | Out-Null; $haveLfs=($LASTEXITCODE -eq 0) }; if ($haveGit -and $haveLfs) { Write-Host 'git + git-lfs already installed'; exit 0 }; if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Host 'winget not found - install Git for Windows (includes Git LFS) from https://git-scm.com/download/win then run: git lfs install'; exit 1 }; if (-not $haveGit) { Write-Host 'installing Git...'; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements }; if (-not $haveLfs) { Write-Host 'installing Git LFS...'; winget install -e --id GitHub.GitLFS --accept-source-agreements --accept-package-agreements }; Write-Host 'open a NEW PowerShell, then run: git lfs install'"
@@ -520,7 +520,7 @@
   ]
  },
  "tool-7zip": {
-  "description": "7-Zip \u2014 needed to extract the ComfyUI portable .7z (the comfyui row checks for it). v482 added. winget (7zip.7zip), idempotent (skips if 7z.exe is on PATH or at C:\\Program Files\\7-Zip).",
+  "description": "7-Zip — needed to extract the ComfyUI portable .7z (the comfyui row checks for it). v482 added. winget (7zip.7zip), idempotent (skips if 7z.exe is on PATH or at C:\\Program Files\\7-Zip).",
   "timeoutMs": 300000,
   "cmds": [
    "if (Get-Command 7z.exe -ErrorAction SilentlyContinue) { Write-Host '7-Zip already on PATH'; exit 0 }; if (Test-Path 'C:\\Program Files\\7-Zip\\7z.exe') { Write-Host '7-Zip present at C:\\Program Files\\7-Zip (add it to PATH if a command cannot find 7z.exe)'; exit 0 }; if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Host 'winget not found - install 7-Zip from https://www.7-zip.org/download.html'; exit 1 }; Write-Host 'installing 7-Zip via winget...'; winget install -e --id 7zip.7zip --accept-source-agreements --accept-package-agreements"
@@ -530,7 +530,7 @@
   ]
  },
  "tool-cuda-voxelizer": {
-  "description": "OPTIONAL alt voxelizer (mesh_to_vox already covers this). Downloads Forceflow's latest prebuilt cuda_voxelizer release via the GitHub API (version-proof), extracts it, and flattens the exe to C:\\VoxelBAK\\Tools\\cuda_voxelizer\\. Prebuilt binary targets an older CUDA \u2014 if the GPU path errors on cudart64_*.dll, use -cpu.",
+  "description": "OPTIONAL alt voxelizer (mesh_to_vox already covers this). Downloads Forceflow's latest prebuilt cuda_voxelizer release via the GitHub API (version-proof), extracts it, and flattens the exe to C:\\VoxelBAK\\Tools\\cuda_voxelizer\\. Prebuilt binary targets an older CUDA — if the GPU path errors on cudart64_*.dll, use -cpu.",
   "cmds": [
    "$dir='C:\\VoxelBAK\\Tools\\cuda_voxelizer'; New-Item -ItemType Directory -Force -Path $dir | Out-Null; if (Test-Path ($dir+'\\cuda_voxelizer.exe')) { Write-Host 'already installed'; exit 0 }; $h=@{ 'User-Agent'='voxelengine' }; $rel=Invoke-RestMethod 'https://api.github.com/repos/Forceflow/cuda_voxelizer/releases/latest' -Headers $h; $asset=($rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1); if (-not $asset) { Write-Host 'no zip asset in latest release'; exit 1 }; Write-Host ('downloading '+$asset.name); $zip=$dir+'\\dl.zip'; Invoke-WebRequest $asset.browser_download_url -OutFile $zip -Headers $h; Expand-Archive $zip -DestinationPath ($dir+'\\extracted') -Force; $exe=(Get-ChildItem ($dir+'\\extracted') -Recurse -Filter 'cuda_voxelizer.exe' | Select-Object -First 1); if ($exe) { Copy-Item $exe.FullName ($dir+'\\cuda_voxelizer.exe') -Force; Write-Host ('installed -> '+$dir+'\\cuda_voxelizer.exe') } else { Write-Host 'cuda_voxelizer.exe not found in archive' }"
   ],
@@ -542,7 +542,7 @@
   }
  },
  "node-comfy3d-pack": {
-  "description": "ComfyUI-3D-Pack (MrForExample) \u2014 umbrella image\u21923D suite (CRM, TripoSR, Wonder3D, LGM, etc). Clones into custom_nodes, installs requirements, runs install.py. HEAVY: needs VS Build Tools; several sub-nodes JIT-compile CUDA exts and may fail on Pascal/torch2.11 \u2014 but the node folder still detects. timeoutMs raised; best run in your own PowerShell. NOTE: install.py's 'diso' sub-build FAILS under VS18 / MSVC-14.51 + CUDA-12.6 (cudafe++ 0xC0000005) \u2014 see the 'py-diso' row for the verified MANUAL build recipe that produced a working diso\\\\_C.pyd.",
+  "description": "ComfyUI-3D-Pack (MrForExample) — umbrella image→3D suite (CRM, TripoSR, Wonder3D, LGM, etc). Clones into custom_nodes, installs requirements, runs install.py. HEAVY: needs VS Build Tools; several sub-nodes JIT-compile CUDA exts and may fail on Pascal/torch2.11 — but the node folder still detects. timeoutMs raised; best run in your own PowerShell. NOTE: install.py's 'diso' sub-build FAILS under VS18 / MSVC-14.51 + CUDA-12.6 (cudafe++ 0xC0000005) — see the 'py-diso' row for the verified MANUAL build recipe that produced a working diso\\\\_C.pyd.",
   "timeoutMs": 1200000,
   "cmds": [
    "$nd='C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes'; $pe='C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded'; $py=$pe+'\\python.exe'; $dir=$nd+'\\ComfyUI-3D-Pack'; if (Test-Path ($dir+'\\__init__.py')) { Write-Host 'ComfyUI-3D-Pack already cloned' } else { Set-Location $nd; git clone https://github.com/MrForExample/ComfyUI-3D-Pack.git; if ($LASTEXITCODE -ne 0) { Write-Host 'clone failed'; exit 1 } }; Set-Location $dir; & $py -s -m pip install -r requirements.txt; & $py install.py"
@@ -555,7 +555,7 @@
   }
  },
  "node-sparc3d": {
-  "description": "Sparc3D \u2014 HONEST PLACEHOLDER. As of now there is NO maintained ComfyUI custom node for Sparc3D. The official repo (lizhihao6/Sparc3D) is the research framework (conda + spconv + CUDA build) and does NOT fit portable embedded-python ComfyUI; there is also a HF Space demo (ilcve21/Sparc3D). This row exists so detection lights up automatically IF a community ComfyUI-Sparc3D node ships. No fabricated install command.",
+  "description": "Sparc3D — HONEST PLACEHOLDER. As of now there is NO maintained ComfyUI custom node for Sparc3D. The official repo (lizhihao6/Sparc3D) is the research framework (conda + spconv + CUDA build) and does NOT fit portable embedded-python ComfyUI; there is also a HF Space demo (ilcve21/Sparc3D). This row exists so detection lights up automatically IF a community ComfyUI-Sparc3D node ships. No fabricated install command.",
   "cmds": [
    "Write-Host 'Sparc3D has NO ComfyUI node yet.'; Write-Host 'Research repo (heavy, conda/spconv/CUDA, not portable-python): https://github.com/lizhihao6/Sparc3D'; Write-Host 'Hosted demo: HuggingFace Space ilcve21/Sparc3D'; Write-Host 'This row auto-detects a custom_nodes\\ComfyUI-Sparc3D folder if a community node lands.'"
   ],
@@ -564,7 +564,7 @@
   }
  },
  "py-gradio": {
-  "description": "Gradio web-UI framework (installs into the embedded python that holds your diso build). Framework only \u2014 pair with the diso playground app.",
+  "description": "Gradio web-UI framework (installs into the embedded python that holds your diso build). Framework only — pair with the diso playground app.",
   "cmds": [
    "& 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -m pip install gradio",
    "& 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' -c \"import gradio as gr; print('gradio', gr.__version__)\""
@@ -573,7 +573,7 @@
  "sparc3d-gradio": {
   "description": "Launch the real diso playground (DiffDMC) at 127.0.0.1:7860. Needs diso_gradio_app.py copied to C:\\diso_manual and py-gradio installed.",
   "cmds": [
-   "$app='C:\\\\diso_manual\\\\diso_gradio_app.py'; if (-not (Test-Path $app)) { Write-Host 'diso_gradio_app.py not found in C:\\diso_manual.'; Write-Host 'Copy it from the EngineProject archive: diso_tools\\diso_gradio_app.py -> C:\\diso_manual\\diso_gradio_app.py'; Write-Host 'It is a REAL diso playground (DiffDMC), NOT full Sparc3D image->3D.'; exit 1 }; Write-Host 'Launching diso playground \u2014 open http://127.0.0.1:7860 when it prints the URL...'; Set-Location C:\\diso_manual; & 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' diso_gradio_app.py"
+   "$app='C:\\\\diso_manual\\\\diso_gradio_app.py'; if (-not (Test-Path $app)) { Write-Host 'diso_gradio_app.py not found in C:\\diso_manual.'; Write-Host 'Copy it from the EngineProject archive: diso_tools\\diso_gradio_app.py -> C:\\diso_manual\\diso_gradio_app.py'; Write-Host 'It is a REAL diso playground (DiffDMC), NOT full Sparc3D image->3D.'; exit 1 }; Write-Host 'Launching diso playground — open http://127.0.0.1:7860 when it prints the URL...'; Set-Location C:\\diso_manual; & 'C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe' diso_gradio_app.py"
   ]
  },
  "kaggle-cli-classic": {
@@ -586,17 +586,17 @@
  "kaggle-legacy-key": {
   "description": "Open kaggle.com/settings/api to create a LEGACY API key (works for kernels push), then paste it into Settings -> Kaggle credentials.",
   "cmds": [
-   "Start-Process 'https://www.kaggle.com/settings/api'; Write-Host 'Opened kaggle.com/settings/api.'; Write-Host 'Under \"Legacy API Credentials\" click \"Create Legacy API Key\" (NOT the default \"Generate New Token\" \u2014 that is OAuth-style and push rejects it).'; Write-Host 'A kaggle.json downloads with your username + key.'; Write-Host 'Then in the engine: SETTINGS -> Kaggle credentials -> paste username + key -> Save.'"
+   "Start-Process 'https://www.kaggle.com/settings/api'; Write-Host 'Opened kaggle.com/settings/api.'; Write-Host 'Under \"Legacy API Credentials\" click \"Create Legacy API Key\" (NOT the default \"Generate New Token\" — that is OAuth-style and push rejects it).'; Write-Host 'A kaggle.json downloads with your username + key.'; Write-Host 'Then in the engine: SETTINGS -> Kaggle credentials -> paste username + key -> Save.'"
   ]
  },
  "tool-triposplat": {
-  "description": "TripoSplat \u2014 image-to-3D-Gaussian-Splats from VAST-AI-Research (MIT, June 2026). Standalone two-file model (triposplat.py + model.py, ~2000 LOC, near-zero deps). Outputs .ply / .splat viewable in SparkJS or SuperSplat. Cloned to C:\\VoxelBAK\\TripoSplat \u2014 independent of ComfyUI.",
+  "description": "TripoSplat — image-to-3D-Gaussian-Splats from VAST-AI-Research (MIT, June 2026). Standalone two-file model (triposplat.py + model.py, ~2000 LOC, near-zero deps). Outputs .ply / .splat viewable in SparkJS or SuperSplat. Cloned to C:\\VoxelBAK\\TripoSplat — independent of ComfyUI.",
   "cmds": [
    "$root='C:\\VoxelBAK\\TripoSplat'; New-Item -ItemType Directory -Force -Path (Split-Path $root) | Out-Null; if (-not (Test-Path ($root+'\\triposplat.py'))) { git clone https://github.com/VAST-AI-Research/TripoSplat.git $root; if ($LASTEXITCODE -ne 0) { Write-Host 'git clone failed - check git is installed and that the network reaches github.com'; exit 1 } } else { Write-Host ('already cloned at '+$root+' - skipping') }; if (Test-Path ($root+'\\triposplat.py')) { Write-Host ('OK: '+$root+'\\triposplat.py present') }"
   ]
  },
  "py-triposplat": {
-  "description": "TripoSplat Python deps (numpy safetensors pillow tqdm) installed into ComfyUI's python_embeded so torch / torchvision are shared with the existing 2.11/cu126/sm_61 build. README requires nothing more \u2014 no transformers, no diffusers.",
+  "description": "TripoSplat Python deps (numpy safetensors pillow tqdm) installed into ComfyUI's python_embeded so torch / torchvision are shared with the existing 2.11/cu126/sm_61 build. README requires nothing more — no transformers, no diffusers.",
   "cmds": [
    "& C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install numpy safetensors pillow tqdm"
   ],
@@ -615,26 +615,26 @@
   ]
  },
  "py-triposplat-gradio": {
-  "description": "Optional: install gradio so you can run TripoSplat's bundled web UI (run_gradio.py) for interactive image\u2192splat conversion.",
+  "description": "Optional: install gradio so you can run TripoSplat's bundled web UI (run_gradio.py) for interactive image→splat conversion.",
   "cmds": [
    "& C:\\VoxelBAK\\ComfyUI_windows_portable\\python_embeded\\python.exe -m pip install gradio"
   ]
  },
  "node-triposplat-workflow": {
-  "description": "ComfyUI workflow template for TripoSplat \u2014 single image \u2192 3D Gaussian splat. Fetches the official JSON from Comfy-Org/workflow_templates and drops into ComfyUI's user/default/workflows/. Requires model-dinov3 + model-triposplat-flux2-vae auxiliary models.",
+  "description": "ComfyUI workflow template for TripoSplat — single image → 3D Gaussian splat. Fetches the official JSON from Comfy-Org/workflow_templates and drops into ComfyUI's user/default/workflows/. Requires model-dinov3 + model-triposplat-flux2-vae auxiliary models.",
   "cmds": [
    "$wf='C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows'; New-Item -ItemType Directory -Force -Path $wf | Out-Null; $out=$wf+'\\3d_triposplat_image_to_gaussian_splat.json'; if (Test-Path $out) { Write-Host ('workflow already at '+$out+' - skipping'); exit 0 }; $url='https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/3d_triposplat_image_to_gaussian_splat.json'; try { Invoke-WebRequest $url -OutFile $out -UseBasicParsing; Write-Host ('OK: '+$out) } catch { Write-Host ('fetch failed: '+$_.Exception.Message); exit 1 }"
   ]
  },
  "model-triposplat-flux2-vae": {
-  "description": "FLUX.2 VAE \u2014 image-encoding VAE used by the TripoSplat ComfyUI workflow. Per runcomfy docs, the workflow needs FLUX.2 VAE for conditioning alignment. Download from the TripoSplat HF repo (the VAE ships with the model weights at VAST-AI/TripoSplat).",
+  "description": "FLUX.2 VAE — image-encoding VAE used by the TripoSplat ComfyUI workflow. Per runcomfy docs, the workflow needs FLUX.2 VAE for conditioning alignment. Download from the TripoSplat HF repo (the VAE ships with the model weights at VAST-AI/TripoSplat).",
   "cmds": [
-   "$dst='C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\models\\vae'; New-Item -ItemType Directory -Force -Path $dst | Out-Null; $out=$dst+'\\flux2_vae.safetensors'; if ((Test-Path $out) -and ((Get-Item $out).Length -gt 100000)) { Write-Host 'flux2_vae.safetensors already present'; exit 0 }; Write-Host '=== model-triposplat-flux2-vae: MANUAL ==='; Write-Host 'The FLUX.2 VAE is bundled inside the VAST-AI/TripoSplat HF repo.'; Write-Host 'After model-triposplat runs, copy the VAE file from C:\\VoxelBAK\\TripoSplat\\ckpts\\ to:'; Write-Host ('  '+$dst+'\\flux2_vae.safetensors'); Write-Host 'File name varies \u2014 look for *vae* in the ckpts/ folder.'; exit 1"
+   "$dst='C:\\VoxelBAK\\ComfyUI_windows_portable\\ComfyUI\\models\\vae'; New-Item -ItemType Directory -Force -Path $dst | Out-Null; $out=$dst+'\\flux2_vae.safetensors'; if ((Test-Path $out) -and ((Get-Item $out).Length -gt 100000)) { Write-Host 'flux2_vae.safetensors already present'; exit 0 }; Write-Host '=== model-triposplat-flux2-vae: MANUAL ==='; Write-Host 'The FLUX.2 VAE is bundled inside the VAST-AI/TripoSplat HF repo.'; Write-Host 'After model-triposplat runs, copy the VAE file from C:\\VoxelBAK\\TripoSplat\\ckpts\\ to:'; Write-Host ('  '+$dst+'\\flux2_vae.safetensors'); Write-Host 'File name varies — look for *vae* in the ckpts/ folder.'; exit 1"
   ],
   "manual": true
  },
  "sheets-googleapis": {
-  "description": "googleapis npm package \u2014 required by sheetsBridge.js for the /sheets/* endpoints. Installs into ai-bridge/node_modules. After install, you also need a service-account JSON credential file (see SHEETS_SETUP.md).",
+  "description": "googleapis npm package — required by sheetsBridge.js for the /sheets/* endpoints. Installs into ai-bridge/node_modules. After install, you also need a service-account JSON credential file (see SHEETS_SETUP.md).",
   "ping": null,
   "cmds": [
    "cd $PSScriptRoot\\..; npm install googleapis --no-save; Write-Host 'googleapis installed under ai-bridge/node_modules'"
@@ -658,7 +658,7 @@
   ]
  },
  "tool-ffmpeg": {
-  "description": "ffmpeg \u2014 needed for RTSP camera feeds (the Cameras tab transcodes rtsp:// to MJPEG) and general audio/video. winget (Gyan.FFmpeg), idempotent (skips if ffmpeg is already on PATH). Open a NEW terminal after install so PATH refreshes, then: ffmpeg -version.",
+  "description": "ffmpeg — needed for RTSP camera feeds (the Cameras tab transcodes rtsp:// to MJPEG) and general audio/video. winget (Gyan.FFmpeg), idempotent (skips if ffmpeg is already on PATH). Open a NEW terminal after install so PATH refreshes, then: ffmpeg -version.",
   "timeoutMs": 300000,
   "cmds": [
    "if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { Write-Host 'ffmpeg already on PATH'; exit 0 }; if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Host 'winget not found - install ffmpeg from https://www.gyan.dev/ffmpeg/builds/ (extract and add the bin folder to PATH)'; exit 1 }; Write-Host 'installing ffmpeg via winget...'; winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements; Write-Host 'done - open a NEW terminal so PATH refreshes, then: ffmpeg -version'"
@@ -878,25 +878,25 @@
   ]
  },
  "tool-raycast": {
-  "description": "Raycast (Mac launcher app) \u2014 v2194. Installs the Raycast BINARY via Homebrew cask (idempotent: skips if /Applications/Raycast.app already exists). Raycast is macOS software; the Windows row just points you at your Mac peer. Raycast's LOCAL MODELS feature (Ollama integration, v1.99+) is free \u2014 no Raycast Pro subscription needed; Pro is only for their cloud models. After install run 'raycast-llm' to wire it to Ollama.",
+  "description": "Raycast (Mac launcher app) — v2194. Installs the Raycast BINARY via Homebrew cask (idempotent: skips if /Applications/Raycast.app already exists). Raycast is macOS software; the Windows row just points you at your Mac peer. Raycast's LOCAL MODELS feature (Ollama integration, v1.99+) is free — no Raycast Pro subscription needed; Pro is only for their cloud models. After install run 'raycast-llm' to wire it to Ollama.",
   "checkPath": "/Applications/Raycast.app",
   "timeoutMs": 600000,
   "cmds": [
    "Write-Host 'Raycast local LLM is a macOS feature. Open the Raycast panel on your Mac SweK peer (server.html -> Raycast, or /raycast.html) and run this row THERE. (Raycast for Windows beta exists but does not carry the local-models integration this row sets up.)'; exit 1"
   ],
   "cmdsMac": [
-   "if [ -d \"/Applications/Raycast.app\" ] || [ -d \"$HOME/Applications/Raycast.app\" ]; then echo 'Raycast already installed'; exit 0; fi; if ! command -v brew >/dev/null 2>&1; then echo 'Homebrew required \u2014 install from https://brew.sh then re-run'; exit 1; fi; brew install --cask raycast && echo 'Raycast installed \u2014 launch it once to finish onboarding'"
+   "if [ -d \"/Applications/Raycast.app\" ] || [ -d \"$HOME/Applications/Raycast.app\" ]; then echo 'Raycast already installed'; exit 0; fi; if ! command -v brew >/dev/null 2>&1; then echo 'Homebrew required — install from https://brew.sh then re-run'; exit 1; fi; brew install --cask raycast && echo 'Raycast installed — launch it once to finish onboarding'"
   ]
  },
  "raycast-llm": {
-  "description": "Raycast Local LLM setup \u2014 v2194. Wires Raycast to the SAME Ollama the engine uses: installs Ollama if missing (brew), starts it as a service, pulls a small model sized for Intel Macs (llama3.2:3b \u2014 CPU-only inference on Intel is 3-8 tok/s on 7B, so small is the sweet spot; Apple Silicon can pull bigger). The ping row detects the Ollama side (11434). Final step is one manual click: Raycast -> Settings -> AI -> enable, scroll to Local Models -> sync. Free \u2014 no Raycast Pro needed for local models.",
+  "description": "Raycast Local LLM setup — v2194. Wires Raycast to the SAME Ollama the engine uses: installs Ollama if missing (brew), starts it as a service, pulls a small model sized for Intel Macs (llama3.2:3b — CPU-only inference on Intel is 3-8 tok/s on 7B, so small is the sweet spot; Apple Silicon can pull bigger). The ping row detects the Ollama side (11434). Final step is one manual click: Raycast -> Settings -> AI -> enable, scroll to Local Models -> sync. Free — no Raycast Pro needed for local models.",
   "ping": "http://127.0.0.1:11434/api/tags",
   "timeoutMs": 1200000,
   "cmds": [
    "Write-Host 'This row runs on the Mac peer (Raycast is macOS). On THIS Windows box the engine already has its own Ollama rows: tool-ollama installs the binary, ollama pulls a model.'; exit 1"
   ],
   "cmdsMac": [
-   "if ! command -v ollama >/dev/null 2>&1; then if command -v brew >/dev/null 2>&1; then echo 'installing Ollama via brew...'; brew install ollama; else echo 'Homebrew required \u2014 install from https://brew.sh then re-run'; exit 1; fi; else echo 'ollama already installed'; fi",
+   "if ! command -v ollama >/dev/null 2>&1; then if command -v brew >/dev/null 2>&1; then echo 'installing Ollama via brew...'; brew install ollama; else echo 'Homebrew required — install from https://brew.sh then re-run'; exit 1; fi; else echo 'ollama already installed'; fi",
    "if curl -sf --max-time 3 http://127.0.0.1:11434/api/tags >/dev/null; then echo 'Ollama already serving on 11434'; else (brew services start ollama >/dev/null 2>&1 || (nohup ollama serve >/dev/null 2>&1 &)); for i in $(seq 1 20); do sleep 1; curl -sf --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null && break; done; curl -sf --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null && echo 'Ollama service is up' || { echo 'Ollama did not come up on 11434'; exit 1; }; fi",
    "if ollama list 2>/dev/null | grep -q 'llama3.2:3b'; then echo 'llama3.2:3b already pulled'; else echo 'pulling llama3.2:3b (~2GB, Intel-Mac friendly)...'; ollama pull llama3.2:3b; fi",
    "echo 'DONE. Last step is manual (one time): open Raycast -> Settings -> AI -> enable AI -> Local Models -> sync models. llama3.2:3b will appear; select it for Quick AI. No Raycast Pro subscription is needed for local models.'"
@@ -909,7 +909,7 @@
   }
  },
  "jellyfin": {
-  "description": "Jellyfin \u2014 a media LIBRARY server, for recorded things: comics, documentary recap reels, music, captured demos. Metadata, resume-where-you-left-off, and native apps on Roku / Android TV / Kodi that this engine will never write. NOT for cross-sending live streams to LAN devices \u2014 go2rtc already does that with WebRTC at sub-second latency, and Jellyfin's live path is HLS with a transcode in front of it (6-20s). Installed via winget (Jellyfin.Server), idempotent. It runs its own web server on :8096 with its own auth; the engine only detects it and links to it. Point its library at your assets folder.",
+  "description": "Jellyfin — a media LIBRARY server, for recorded things: comics, documentary recap reels, music, captured demos. Metadata, resume-where-you-left-off, and native apps on Roku / Android TV / Kodi that this engine will never write. NOT for cross-sending live streams to LAN devices — go2rtc already does that with WebRTC at sub-second latency, and Jellyfin's live path is HLS with a transcode in front of it (6-20s). Installed via winget (Jellyfin.Server), idempotent. It runs its own web server on :8096 with its own auth; the engine only detects it and links to it. Point its library at your assets folder.",
   "timeoutMs": 900000,
   "cmds": [
    "if (Get-Service -Name 'JellyfinServer' -ErrorAction SilentlyContinue) { Write-Host 'Jellyfin already installed (service JellyfinServer)'; exit 0 }; if (Test-Path \"$env:ProgramFiles\\Jellyfin\\Server\\jellyfin.exe\") { Write-Host 'Jellyfin already installed'; exit 0 }; if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Host 'winget not found - install Jellyfin from https://jellyfin.org/downloads/'; exit 1 }; Write-Host 'installing Jellyfin via winget...'; winget install -e --id Jellyfin.Server --accept-source-agreements --accept-package-agreements; Write-Host 'Jellyfin installed. It serves http://localhost:8096 - finish setup there, then point a library at your assets folder.'"
@@ -959,5 +959,25 @@
    "unknown": true,
    "why": "READ v3336, CONSTRAINT REAL AND NOT YET MEASURED -- which is a THIRD state, not the read-and-unconstrained one. ARDY is tested on Ubuntu 22.04 with an RTX 4090; Galaxina is Pascal/sm_61 with 8 GB, and an 8B Llama text encoder beside a diffusion model is the open question. Declaring os/arch here would be fabricating a constraint nobody has run; declaring nothing would claim it runs. It refuses until somebody measures it, and the refusal names why."
   }
+ },
+ "node3d-gl": {
+  "description": "@node-3d native OpenGL for Node (MIT) -- a REAL DESKTOP GL WINDOW driven from Node, not a browser tab. @node-3d/core pulls webgl + glfw + image; all five packages are MIT with LICENSE files. NO COMPILER IS NEEDED: each install.js downloads a PREBUILT binary from its own GitHub Releases (measured on linux-x64: 4 packages, 3 seconds, ~7 MB, no node-gyp). *** IT IS NOT HEADLESS. *** GLFW needs a display server -- on a headless box it fails with 'GLFW Error 65550: Failed to detect any supported platform', so this does NOT replace the headless Chromium the shader gates use. Install it to open a native window, not to speed up CI. PLATFORMS: prebuilts exist for win32-x64, linux-x64, darwin-x64 and linux-arm64 ONLY -- APPLE SILICON (darwin-arm64) HAS NO BUILD and the row refuses it rather than recommending it. Packages ask for node >=24.13.0 / npm >=11.6.2 (npm warns EBADENGINE; not enforced -- it loaded on node 22). See world/nodeGlPlatforms.mjs for what was measured here versus read upstream.",
+  "timeoutMs": 600000,
+  "requires": {
+   "platforms": [
+    "win32-x64",
+    "linux-x64",
+    "darwin-x64",
+    "linux-arm64"
+   ],
+   "why": "@node-3d ships prebuilt binaries only, for four platform/arch pairs. Neither ARM desktop pair has a @node-3d prebuilt: Apple Silicon (darwin-arm64) and Windows on ARM (win32-arm64) both fall outside the map, while linux-arm64 is inside it -- so this is not 'ARM is unsupported', it is three specific OS-and-chip combinations that were built and one pair per OS that was not. Not an OS-version problem and not fixable by upgrading; the binary does not exist. Intel Macs (darwin-x64) and x64 Windows are supported."
+  },
+  "cmds": [
+   "$dir='C:\\VoxelBAK\\Tools\\node3d'; if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Host 'node not found - install Node.js 24+ from https://nodejs.org then rerun'; exit 1 }; $v=(node -p 'process.versions.node'); Write-Host \\\"node $v\\\"; $maj=[int]($v.Split('.')[0]); if ($maj -lt 24) { Write-Host \\\"WARNING: @node-3d asks for node >=24.13.0, you have $v - npm will warn EBADENGINE but this is not enforced\\\" }; New-Item -ItemType Directory -Force -Path $dir | Out-Null; Set-Location $dir; if (-not (Test-Path 'package.json')) { npm init -y | Out-Null }; npm i @node-3d/core; node -e \\\"import('@node-3d/webgl').then(m=>console.log('webgl addon loaded, getParameter is', typeof (m.webgl??m).getParameter)).catch(e=>{console.error('LOAD FAILED:', e.message); process.exit(1)})\\\""
+  ],
+  "cmdsMac": [
+   "DIR=\"$HOME/VoxelBAK/Tools/node3d\"; command -v node >/dev/null || { echo 'node not found - install Node.js 24+ (brew install node) then rerun'; exit 1; }; ARCH=$(node -p 'process.arch'); if [ \"$ARCH\" = \"arm64\" ]; then echo 'REFUSED: @node-3d has no darwin-arm64 prebuilt. Apple Silicon is not supported upstream; Intel Macs are. Nothing installed.'; exit 1; fi; mkdir -p \"$DIR\" && cd \"$DIR\" && [ -f package.json ] || npm init -y >/dev/null; npm i @node-3d/core && node -e \"import('@node-3d/webgl').then(m=>console.log('webgl addon loaded')).catch(e=>{console.error('LOAD FAILED:',e.message);process.exit(1)})\""
+  ],
+  "checkPath": "C:\\VoxelBAK\\Tools\\node3d\\node_modules\\@node-3d\\webgl\\package.json"
  }
 }

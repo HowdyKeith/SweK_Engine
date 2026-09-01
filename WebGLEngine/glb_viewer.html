@@ -193,14 +193,19 @@ async function loadAsset(id) {
 }
 
 // render loop
+// v4212 -- *** setAnimationLoop REPLACES THE rAF; IT DOES NOT JOIN IT. *** three drives this from its own
+// scheduler (window rAF when no session is running, the XRSession's clock when one is), so a leftover
+// requestAnimationFrame in here would run the loop TWICE PER FRAME -- which on a monitor just looks like the
+// animation sped up, and in a headset is double the work for half the rate. ui/threeVR.js installs the loop.
 function tick() {
-  requestAnimationFrame(tick);
   const dt = clock.getDelta();
   if (mixer && playing) mixer.update(dt * parseFloat($("speed").value || "1"));
   controls.update();
   renderer.render(scene, camera);
 }
-tick();
+import("/ui/threeVR.js").then((m) => m.enableThreeVR({ renderer, loop: tick, label: "\u{1F97D} Enter VR" }))
+  .then((r) => { if (!r || !r.loopInstalled) renderer.setAnimationLoop(tick); })
+  .catch(() => { renderer.setAnimationLoop(tick); });   // import failed outright
 
 // controls
 $("file").addEventListener("change", async (e) => { const f = e.target.files?.[0]; if (!f) return; await loadArrayBuffer(await f.arrayBuffer(), f.name); });

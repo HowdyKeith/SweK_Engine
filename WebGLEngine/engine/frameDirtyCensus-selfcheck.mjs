@@ -227,8 +227,13 @@ const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8
 {
     const covered = coveredIn(MAIN);
     const c = census(MAIN, covered);
-    ok(UNEXAMINED_BASELINE === 14, "UNEXAMINED came down from 25 to 14 -- the HUD and panel cluster settled as ONE decision, because they write DOM and the flag guards the GL draw");
-    ok(UNGUARDED_BASELINE === 1, "and UNGUARDED from 8 to 1");
+    // v4231: 14 -> 0. The remaining fourteen were read one at a time, and ELEVEN OF THEM ANIMATE -- so
+    // writing the verdicts honestly pushed UNGUARDED from 1 to 12 before six probes brought it back. That
+    // direction is the point: a census whose numbers only ever improve is not measuring anything, and the
+    // eleven were invisible precisely because nobody had looked.
+    ok(UNEXAMINED_BASELINE === 0, "UNEXAMINED reached ZERO -- 25 -> 14 (v4184) -> 0 (v4231); every ticker in the loop now carries a verdict");
+    ok(c.unexamined === 0, "...and the live census agrees, so no ticker is riding on a name instead of a reading");
+    ok(UNGUARDED_BASELINE === 1, "and UNGUARDED from 8 to 1, held there through eleven new animators");
     ok(c.unguarded.length <= 1, "which the live census agrees with");
 
     // *** THE LAST ONE IS NAMED AND EXPLAINED, RATHER THAN CLOSED BY INVENTING A FIELD. ***

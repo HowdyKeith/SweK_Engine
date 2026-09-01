@@ -22,6 +22,7 @@
 //
 // Host services for modes: host.gl, host.canvas, host.level, host.camera,
 // host.getBounds(), host.spawnPoints(n), host.castRay(), host.kpop.
+import { MeshBVH } from "../mesh/meshBVH.mjs";   // v4221 -- one traversal, not a second copy
 import { WadLevelRenderer } from "./wadLevelRenderer.js";
 import { NavGrid } from "../simulation/navGrid.js";
 import { WEAPONS, DEFAULT_LOADOUT } from "../simulation/weapons.js";
@@ -147,6 +148,7 @@ export class WadLevelHost {
   _buildWallTris() {
     this._wallSegs = this.level?.geometry?.collisionWalls || null;
     this._wallTris = null;
+    this._wallBVH = null; this._wallBVHFor = null;   // v4221 -- built lazily, keyed on the buffer it came from
     const wv = this.level?.geometry?.wallVerts;
     const triCount = this.level?.geometry?.wallTriCount || 0;
     if (!wv || !triCount) return;
@@ -177,25 +179,20 @@ export class WadLevelHost {
       }
       return true;
     }
-    // Fallback: ray vs 3D wall triangles (Moller-Trumbore).
+    // Fallback: ray vs 3D wall triangles.
+    //
+    // v4221 -- *** THIS WALKED EVERY WALL TRIANGLE, PER LINE-OF-SIGHT QUERY, AND losClear GATES EVERY BOT'S
+    // ENGAGEMENT AND EVERY SHOT. *** It was one of two independent Moller-Trumbore loops in the tree (the
+    // other was tools/krbn/krbnCompare.js) and neither had an acceleration structure. mesh/meshBVH.mjs is now
+    // the one traversal; the kernel is identical, so a level with few walls behaves exactly as before and one
+    // with many stops being quadratic. The tree is built once per level and thrown away when _wallTris is
+    // rebuilt -- see _buildWallTris.
     const tris = this._wallTris; if (!tris) return true;
-    const dx = bx-ax, dy = by-ay, dz = bz-az;
-    const EPS = 1e-6;
-    for (let i = 0; i < tris.length; i += 9) {
-      const e1x = tris[i+3]-tris[i], e1y = tris[i+4]-tris[i+1], e1z = tris[i+5]-tris[i+2];
-      const e2x = tris[i+6]-tris[i], e2y = tris[i+7]-tris[i+1], e2z = tris[i+8]-tris[i+2];
-      const px = dy*e2z - dz*e2y, py = dz*e2x - dx*e2z, pz = dx*e2y - dy*e2x;
-      const det = e1x*px + e1y*py + e1z*pz;
-      if (det > -EPS && det < EPS) continue;
-      const inv = 1/det;
-      const tx = ax-tris[i], ty = ay-tris[i+1], tz = az-tris[i+2];
-      const u = (tx*px + ty*py + tz*pz) * inv; if (u < 0 || u > 1) continue;
-      const qx = ty*e1z - tz*e1y, qy = tz*e1x - tx*e1z, qz = tx*e1y - ty*e1x;
-      const vv = (dx*qx + dy*qy + dz*qz) * inv; if (vv < 0 || u + vv > 1) continue;
-      const tHit = (e2x*qx + e2y*qy + e2z*qz) * inv;
-      if (tHit > EPS && tHit < 1 - EPS) return false;
+    if (!this._wallBVH || this._wallBVHFor !== tris) {
+      this._wallBVH = new MeshBVH(tris);
+      this._wallBVHFor = tris;
     }
-    return true;
+    return !this._wallBVH.intersectsSegment(ax, ay, az, bx, by, bz);
   }
 
   // ---- internals ----------------------------------------------------------

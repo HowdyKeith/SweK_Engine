@@ -2,3 +2,13 @@ htmx.org 2.0.10 -> htmx.2.0.10.min.js (from registry.npmjs.org, verified 2026-07
 htmx-ext-sse 2.2.4 -> htmx-ext-sse.2.2.4.min.js
 Source: npm pack htmx.org@2.0.10 / htmx-ext-sse@2.2.4
 Stable 2.x line (NOT the 4.0 beta, which rewrites SSE). Core ~14k gz, no build step, single script tag.
+
+--- licence, recorded at v4256+1 ---
+htmx is Zero-Clause BSD (0BSD). LICENSE beside this file, taken from
+https://raw.githubusercontent.com/bigskysoftware/htmx/v2.0.10/LICENSE -- the tag matching the
+bundle above. The minified bundles carry NO licence banner of their own: grepping htmx.2.0.10.min.js
+for a licence word returns ten hits and all ten are the substring "submit". So the grant could not
+have been recovered from the vendored bytes; it had to come from upstream at the pinned tag.
+0BSD is MORE permissive than MIT -- it drops even the attribution requirement -- which is worth
+recording precisely because it means nothing here was ever at risk, and the gap was in the paperwork
+rather than in the rights.

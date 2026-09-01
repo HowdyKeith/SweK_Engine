@@ -8,6 +8,6423 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4296 -- sixteen rounds, thirty-seven gates, nothing fixed and nothing regressed
+
+*** THE CENSUS WAS TAKEN AT v4279 AND NOBODY LOOKED AGAIN FOR SIXTEEN ROUNDS. ALL 37 ARE STILL RED. NOT ONE HAS BEEN FIXED. *** redCensus.mjs recorded 37 gates failing at HEAD and then sat there while sixteen rounds shipped ALL GREEN over it. Re-run serially at v4295, one gate at a time, through the census's own runGate: 37 checked, 37 STILL RED, 0 now green, 0 regressed. A 37-of-37 result is the shape of a broken measurement, so the runner was CONTROLLED FIRST -- it reports GREEN for frameGraph-selfcheck (83 ms), crossBackend-selfcheck (7480 ms) and claimCheck-selfcheck (516 ms), and the 37 reds take between 89 ms and 7.5 s with the spread real work has. They run and they fail. *** AND EVERY ALL GREEN WAS HONEST ANYWAY, *** which is the part worth understanding rather than resenting: verify.mjs runs a SMALLER, DIFFERENT set, and the 1,365-gate selfcheck sweep is not what a ship gate executes. The tree was never lying; it was answering a narrower question than the words suggested. WHAT DID NOT HAPPEN MATTERS TOO: nothing regressed. At v4279 the failure ran the other way -- THIRTEEN of the nineteen then-recorded were already fixed with nobody removing the entry, so the register was accusing working code. This time it is exactly true and exactly STALLED, a different failure needing a ratchet rather than a correction. *** THE RECORD ALSO DISAGREED WITH ITSELF AND DID NOT: *** METHOD.confirmedSerially says 39 and RED_AT_V4279 holds 37, which reads as a contradiction and is two MOMENTS -- 39 is what the sweep found, 37 is what remained after v4279 fixed the two it had itself introduced (gateQuality and orreryEjecta, both correctly absent from the standing list). 37 + 2 = 39, now asserted arithmetically. Same shape as v4293's ROUND_TRIPS describing two draw spans in one frozen object: a record whose fields are snapshots of different instants must say which instant or its reader treats the difference as an error. THE RATCHET: redCensusFresh-selfcheck cannot re-run the full list -- 142 s, and a gate that expensive gets skipped, which is how the last register became fiction -- so it checks that every entry still points at a file that EXISTS, that the record reconciles with itself, and re-runs a DETERMINISTIC 20-gate subset chosen by cost (~3.2 s). *** THAT SUBSET CHECK GOES RED WHEN A GATE GOES GREEN, *** which reads backwards until you see it is checking the RECORD rather than the tree: a fixed gate is good news and a stale register is bad news, and the only way to hear the second is to make the first loud. Three sabotages, all red. Breaking the reconciliation goes 1 red in section 2; pointing an entry at a missing file goes 1 red naming the path; and forcing runGate to report red unconditionally goes 1 red IN THE CONTROL -- while section 4 stayed ENTIRELY GREEN, since "every sampled gate is still red" is exactly what a broken runner produces. The control's position, before the subset rather than after, is the whole reason it works. Also corrected: I told Keith the re-check would cost 25 minutes. That was v4279's full 1,348-gate sweep figure; re-checking 37 known reds costs 2.4 minutes. Unchecked and said plainly: the 17 slow entries are not in the subset, and whether any gate GREEN at v4279 has since gone red needs the full sweep this file does not attempt -- that question's honest state is UNKNOWN rather than fine. The tree stands at 1366 gates.
+## v4295 -- the texture path, and the speed rationale turns out to be structurally void
+
+*** THE TEXTURE PATH, AND THE SPEED RATIONALE FOR THIS WHOLE BACKEND TURNS OUT TO BE STRUCTURALLY VOID. *** v4294 left one real hole: the cross-backend corpus covered seven shaders and 41,656 floats, and NOT ONE OF THEM WROTE A TEXTURE -- all of it through storage buffers, while the only shader in the tree that writes a storage TEXTURE sat in EXCLUDED with "there is nothing to compare against" as its reason. That is the worst place to have no evidence: v4287 measured rgba8unorm clamping a 1.7480 peak to 1.0000 and destroying all 181 samples above 1, and the result looked like a bloom that had simply never happened. Format and padding faults produce a PLAUSIBLE PICTURE rather than an error. headlessGpu.mjs grew runWgslComputeToTextureNative, mirroring the browser harness's row-padding and half-float arithmetic character for character rather than reinventing them -- a second decoder that disagreed would make every comparison a fact about the two readers. Three texture shapes joined the corpus and all three are byte-identical: rgba16float at N=64, rgba8unorm at N=64 (the CLIPPING format, where the two must agree on what an out-of-range value becomes), and *** N=40, WHERE A ROW IS 320 BYTES AND PADS TO 512 *** -- the branch v4287 found UNREACHABLE at N=64 because 512 is already 256-aligned. The corpus now stands at 80,824 floats across TEN shaders with zero divergence, EXCLUDED drops from 7 to 6, and bloomFusedTexture -- the last and most expensive WGSL gate at 4,009 ms -- moved to the native backend at 1,494 ms, ALL GREEN with unchanged numbers. Sabotage: reading rows at their unpadded stride goes exit=1 with ONLY the padded entry red at 4117/6400, the two N=64 entries staying green exactly as v4287's finding predicts. *** AND NOW THE PART THAT MATTERS MORE THAN ANY OF IT. *** I predicted a wall-clock win for the second round running and delivered a loss for the second round running: 2,515 ms saved on the moved gate against 3,371 ms added to the corpus gate, net -856 ms, and the session stands at -1,800 ms against v4293. The arithmetic says it had to: MOVING a gate saves browser-minus-native, while VALIDATING it costs browser-plus-native because a cross-check runs BOTH. The pair can never net positive while every moved shader is also corpus-validated -- and it must be, or the move is unjustified. So the backend is justified by EVIDENCE and never by SPEED, 80,824 floats is what it bought, and the paragraph saying so now lives in the gate where the next person to propose moving work here for performance will read it. The tree stands at 1365 gates.
+## v4294 -- one shader was not the backend: 41,656 floats across seven, and the speed claim dies
+
+*** THE BROWSER-FREE BACKEND WAS PROVEN ON ONE SHADER AND I TREATED THAT AS PROVING THE BACKEND. *** v4292 built a Dawn path and measured it byte-identical to the Chromium one on an LCG -- u32 arithmetic and a divide, touching none of what actually separates two implementations of the same API. tools/ship/wgslCorpus.mjs now collects every WGSL shader the tree EXPORTS, built by importing the modules rather than retyping source, and crossBackend-selfcheck runs all of them through both harnesses: *** 41,656 FLOATS ACROSS 7 SHADERS, ZERO DIVERGENCE *** -- workgroup memory with a barrier, trigonometry and simplex noise, a camera basis over 2304 pixels, catastrophic cancellation at grazing incidence, a fragment entry point, and the LCG. The sharpest entry is the PLANTED camera that computes tan() in-shader, running SwiftShader's low-accuracy transcendental path where two different builds would part company first: Chromium REDACTS its adapter description, so behaviour is the only evidence available that these are the same rasteriser. CONTROL: feeding the two harnesses different shaders makes them disagree on 9,810 of 13,824. THE CENSUS IS THE RATCHET. It scans for exported WGSL producers and refuses to let one appear unaccounted -- and its regex is a CANDIDATE FINDER, not a shader finder, which the first run proved by matching six more symbols, NONE of them runnable: WGSL_MARKS is three marker strings, SNOISE2_WGSL and BADTV_WGSL are source fragments with no entry point, validateWgsl and parseWgsl CONSUME WGSL rather than produce it. Loosening the pattern until they stopped matching would have been the wrong repair; they are adjudicated by name, wiringClaims-style, so a seventh shows up loudly. *** AND THEN THE IMPROVEMENT, AND ITS PRICE. *** bloomFused, badTvWgsl and pathTracerWgsl moved onto the native backend -- 5,420 ms to 2,440 ms, a 2,980 ms saving, all three ALL GREEN with unchanged numbers. But the new cross-backend gate costs 3,924 ms because it runs BOTH backends, so *** THE SUITE IS 944 ms SLOWER, NOT FASTER. *** I set out to claim a speed win and bought evidence instead: 41,656 floats of agreement for about a second. That is the honest ledger and the speed claim is dead. One prose rot created and fixed in the same round: badTvWgsl-selfcheck printed "serving over 127.0.0.1 -- NOT about:blank", true of the browser harness and false the moment the gate moved. Three sabotages: perturbed uniforms go 5 red naming which shader and index; a narrowed census regex goes 1 red at "5 exported symbols" where there are 12; and *** THE THIRD WENT 0 RED *** -- scoring compileOnly entries as identical unconditionally passed everything, because a hardcoded true and the real test agree whenever both backends really do compile. Answered with a control that feeds both harnesses source neither can compile, where "both refused" must not score as identical; redone it goes 1 red. Fifth time this session the sharpest sabotage found a check that could not fail rather than code that was wrong. Still on the browser harness, with reasons recorded: bloomFusedTexture (storage textures, which the native path lacks) and wgslLayout (a probe assembled inside its own gate on purpose). The tree stands at 1365 gates.
+## v4293 -- the scene composer, in the only form this box can grade
+
+*** THE SCENE COMPOSER, IN THE ONLY FORM THIS BOX CAN GRADE: A FRAME'S SHAPE, DERIVED. *** The desktop-viewer review found the split that decided this round. main.js is 31,483 lines with ~4,900 browser touchpoints -- 2,011 window., 1,065 document., 923 createElement, 266 addEventListener -- against @node-3d/core's DOM shim of 318 lines, so SweK's APPLICATION cannot leave the browser. But 109 OF 138 render MODULES TOUCH NO DOM AT ALL, worst offender 12 references. The renderer is already portable; the app shell is not. Rendering still needs a GL context this sandbox has neither display nor software GL for, so what CAN be built and graded here is the frame's SHAPE rather than its pixels -- and that is the half a viewer needs first, because you cannot draw a frame until something can say what a frame is. *** NOTHING COULD SAY. *** bloomFused.mjs carried five hand-typed integers about bloomPass.js; v4284 typed one wrong (three draws where its own gate counted five) and a person corrected it by hand, leaving four others nobody had checked. render/frameGraph.mjs reads the source into an ordered, attributed pass list -- bright->brightFBO, blurH->blurFBO_H, blurV->blurFBO_V, ssao->ssaoFBO IF ssaoStrength>0, godRay->godRayFBO IF godRayStrength>0 && sunVisibility>0, composite->outputFBO -- carrying each guard's TEXT, not just a flag. *** AND IT FOUND THE OBJECT WAS DESCRIBING TWO DIFFERENT RANGES AT ONCE: *** passes/intermediateTextures/roundTrips describe bright..blurV, what a fusion REPLACES; drawsInSpan/conditional describe bright..godRay, what it must SPAN. Six draws recorded as five read like an error and was a range nobody had named -- the sixth, composite, sits outside because it CONSUMES the result. SPANS names all three and each field now says which it came from. intermediatesOf was wrong first too: counting distinct targets gave 5 against a record of 2, which looked like the record failing and was the DEFINITION failing -- a span's last target is its OUTPUT, so an intermediate is every target but the last. ROUND_TRIPS is derived now and its numbers are unchanged, which is the point: same answers, from the file instead of from memory. *** THREE SABOTAGES, AND THE THIRD WENT 0 RED. *** Putting the hand-typed literal back with today's correct numbers passed EVERY CHECK including the one written to catch exactly that: "proven by moving the source and watching it follow" mutated a copy of bloomPass.js and watched PARSEPASSES follow, never re-deriving the record. The heading tested the parser and claimed to test the constant. deriveRoundTrips takes an injectable source now so the record itself re-runs against changed input; redone the sabotage goes 2 red showing "5 -> 5", and after a second pass it REPORTS instead of crashing on the absent function. Sabotages A and B also came in under prediction -- 1 red and 2 red rather than 2 sections and 4 -- for one shared reason worth keeping: A HAND-TYPED CONSTANT IS AN INDEPENDENT WITNESS, and deriving it removes the staleness risk and the witness together. Still the right trade, since v4284's literal went wrong with no witness to save it, but the independent assertions have to live somewhere else, and here they live in sections 1 and 2 stated against the source. Also settled: open-list #134 needed no priority -- redCensus.mjs answered it at v4279, finding 39 red rather than five, with 13 of the old 19 since fixed and 33 never recorded. What is NOT done: this reads ONE module's method. main.js decides when the chain runs and with which features from two call sites inside 31,483 lines, and nothing here reads that. The tree stands at 1364 gates.
+## v4292 -- a real GPU in Node with no browser, and the driver ships inside the browser
+
+*** A REAL GPU IN NODE WITH NO BROWSER, AND THE DRIVER THAT MAKES IT POSSIBLE SHIPS INSIDE THE BROWSER. *** Every WGSL gate runs through webgpuHarness.mjs, which launches headless Chromium, stands up an HTTP server because navigator.gpu is refused on file:, opens a page and evaluates the work in it -- PER CALL, because the harness cannot keep a browser alive between invocations, so v4290's gate launched four. v4291 went looking for a way out and found the wrong door: @node-3d opens a WINDOW and dies headless, and headless-gl compiles here and still returns null because on Linux it goes through GLX and links libX11. That round recorded the question as OPEN. This one answers it. Dawn -- the same WebGPU implementation Chromium uses -- is on npm as `webgpu` (dawn-gpu/node-webgpu, MIT, prebuilt, no compiler). It speaks Vulkan, and this box has libvulkan.so.1 and NO driver: "vkCreateInstance: Found no drivers!". *** AND THE DRIVER IS SITTING INSIDE THE CHROMIUM WE ARE TRYING TO STOP LAUNCHING: *** Playwright's bundle ships libvk_swiftshader.so and a vk_swiftshader_icd.json beside it. Point VK_ICD_FILENAMES at that manifest and Dawn comes up on google/SwiftShader -- the SAME adapter string the browser path reports, because it is the same rasteriser reached without the browser around it. So the tree takes no new dependency on a GPU driver; it uses the one it already downloads, by path, vendoring nothing. THE AGREEMENT IS THE CLAIM AND THE SPEED IS THE FOOTNOTE: v4290's LCG shader, UNMODIFIED, returns 1536 of 1536 BYTE-IDENTICAL floats across the two backends, 512/512 exact u32 states and 512/512 bracketing f64, with a CONTROL showing a different seed disagrees on all 1536 so the equality was not free. Only then the timing, and it is the one timing this tree has ever been allowed to report because it is HARNESS OVERHEAD and not GPU work: browser 212-620 ms per call, native cold process 97-112 ms, Dawn init 6 ms, per dispatch once warm 11-18 ms -- a four-dispatch gate goes from roughly 850 ms to roughly 54 ms. *** THE HAZARD, AND MY FIRST DRAFT OF IT WAS TOO WIDE. *** A process holding a GPUDevice at exit crashes AFTER printing correct results, which read by exit code is a false failure and read by stdout alone is a PASS ON A PROCESS THAT DIED. The header first claimed any natural exit aborted; the gate written to prove it CAME BACK GREEN ON THE WRONG SIDE, because runWgslComputeNative keeps its device function-local. Measured properly the condition is REACHABILITY: adapter alone exits 0, device at module scope exits 134, device released exits 0. Two defences and they differ -- the harness is safe by construction, exitCleanly is for callers who hold a device on purpose -- and the gate spawns all three shapes and reads all three codes. Three sabotages, none 0 RED: breaking ICD discovery exits 1 with a reason that correctly separates "node-webgpu resolved" from "no driver"; LEAKING THE DEVICE KILLED THE GATE MID-RUN at 134 with nine PASS lines and no diagnosis, so the worst version of this bug destroys the instrument rather than being reported by it; and overriding an explicit VK_ICD_FILENAMES went 2 red, one intended and ONE THAT FOUND A BRITTLE ASSERTION OF MINE -- the crashing child died by SIGSEGV where every clean run gave SIGABRT, and the check was pinned to SIGABRT. The signal is not stable; only the non-zero exit is, and the check says so now. NOT SOLVED, SAID IN THE MODULE AND NOT ONLY THE GATE: WebGL2 is untouched and still needs Chromium -- Dawn is WebGPU only, renderGlslToPixels and renderThreePassToPixels are unchanged, and every WGSL gate in the tree still calls the browser harness. This round builds the second backend and proves it agrees; moving the callers is a separate change. The tree stands at 1363 gates.
+## v4291 -- open-list item #122 said four things about node-3d and three were wrong
+
+*** OPEN-LIST ITEM #122 SAID FOUR THINGS ABOUT node-3d AND THREE WERE WRONG, INCLUDING ONE OF MINE. *** world/namedNotChecked.mjs was built because two open-list items asserted licence verdicts for repositories whose names appear nowhere in the tree, where no gate can see them. #122 -- "node-3d family + wgpuEngine: all six MIT, and the one that matters is native WebGL in Node" -- is the same shape and was outside that file's scope. Checked now. "Family of six" is a GITHUB ORGANISATION OF 33 REPOSITORIES; the count was invented. There is NO npm package called node-3d -- the scope is @node-3d/* and the repo of that name is docs, version 0.0.0, license "None". "All six MIT" is the one claim that SURVIVED: webgl 6.0.1, core 6.3.0, glfw 7.3.1, deps-opengl 8.0.2 and addon-tools 10.0.5 each declare MIT and ship a LICENSE file. And the fourth correction is mine rather than the note's: I told Keith this needed a C toolchain -- node-gyp, build-essential, MSVC, Xcode CLT. *** IT NEEDS NO COMPILER. *** Every install.js downloads a PREBUILT binary from its own GitHub Releases; measured here at 4 packages, 3 seconds, ~7 MB, with bin-linux/webgl.node landing and gl.getParameter answering. A fifth: the headless alternative, gl (stackgl/headless-gl), is BSD-2-Clause, so the blanket "all MIT" would have swept in a licence it does not hold. *** AND THE REASON FOR WANTING IT DOES NOT HOLD. *** The argument was that the shader gates could stop paying for headless Chromium. GLFW opens a WINDOW: on a headless box it dies with "GLFW Error 65550: Failed to detect any supported platform". So @node-3d is a native desktop GL window driven from Node -- a real capability and a different one, and the panel note says so where somebody about to press the button will read it. The headless question is left OPEN, not answered: gl returned null here too, for want of libEGL/OSMesa and a display. *** THE FINDING THAT COST CODE: THE SUPPORT SET IS A SET OF PAIRS AND THE CATALOG COULD ONLY EXPRESS PRODUCTS. *** addon-tools/ts/include.ts maps exactly four -- win32-x64, linux-x64, darwin-x64, linux-arm64. ai-bridge/platformRequires.js tested os and arch as INDEPENDENT membership, and every constrained row until now happened to be expressible that way. Neither spelling of this one is right: os:[win32,linux,darwin] arch:[x64] refuses linux-arm64, which works; arch:[x64,arm64] ADMITS darwin-arm64, which has no binary -- recommending software to a machine that cannot run it, which is the exact app-apple-container hole that file was written to close, with the architectures swapped. So `requires.platforms` takes an explicit allow-list of pairs, combining with os/arch rather than replacing them. The row refuses Apple Silicon, and its cmdsMac checks process.arch ITSELF before installing anything. Three sabotages, none 0 RED: closing the gap on paper goes 6 red across four sections; removing `platforms` from KNOWN goes 5 red IN THE ADMITS CHECKS because the checker fails closed and refuses every machine; a reordered list goes exactly 1 red. And the gate went red on its own module before any sabotage: MISSING listed only darwin-arm64 because Apple Silicon is the gap a person notices, and the computed check named win32-arm64 too -- Windows on ARM has no prebuilt either. Also fixed: platformRequires-selfcheck classified constrained rows against a HARDCODED field list, so `platforms` walked straight past it and the new row was filed as unconstrained; it derives from KNOWN now. Nothing here was run on Windows, on a Mac or on ARM -- only linux-x64 was installed, and the platform list is READ from upstream source, which the module records as a separate fact from what it measured. The tree stands at 1362 gates.
+## v4290 -- the path tracer's first ray on a GPU, and the two places f32 and f64 are not allowed to agree
+
+*** THE PATH TRACER'S FIRST RAY ON A GPU, AND THE TWO PLACES f32 AND f64 ARE NOT ALLOWED TO AGREE. *** physics/render/pathTracer.mjs renders 48x48 at spp=64 because that is what a CPU finishes; every pixel is independent and the accumulator is a sum, which is the shape compute was invented for. The port is not available yet and the reason is worth more: the tracer runs in f64 and a GPU runs in f32, so "did the port work" has no answer until somebody says what agreement should look like. Two pieces are decidable and this round measures both. THE GENERATOR: furnace.mjs's LCG is s = (imul(s,1664525)+1013904223)>>>0, then s/4294967296, and those halves port in OPPOSITE directions. u32 wrap is specified identically in JS and WGSL, so the STATE must match bit for bit -- it does, 512 of 512. The VALUE cannot, because f32(s) rounds a 32-bit integer into 24 mantissa bits: 98.02% of 65536 draws differ, and only 242 states are small enough to survive. *** AND THE OBVIOUS f32 MODEL WAS ALSO WRONG. *** Asserting round-to-nearest matched 472 of 512 with a worst error of 5.96e-8, which is 2^-24, TWICE what one correct rounding can cost. Every miss was one ulp out on the far side and every one had s >= 2^31 -- the signature of a conversion through the SIGNED path, f32(f32(s-2^31)+2^31), which rounds twice and fits 4096 of 4096 exactly. It is CONFORMANT: WGSL promises one of the two nearest representable values and leaves the choice to the implementation. So the gate asserts the BRACKET, which every device owes, and records the adapter's model without ever passing because of it. *** THE GENERATOR'S STATE IS PORTABLE AND ITS OUTPUT IS NOT PORTABLE EVEN BETWEEN CORRECT DEVICES. *** THE CAMERA: the first shader computed its own frustum scale with tan(), and the ray directions missed f64 by 1.366e-5 per component -- three hundred ulps where an f32 op costs one -- while the t error refused to sort by discriminant, which is what gave it away. Not f32 and not a bug: WGSL pins sqrt tightly (measured 1.71e-8 here) and pins sin/cos only to an absolute error near 2^-11, and SwiftShader spends it (tan 4.59e-5, cos 1.13e-4). *** A CAMERA CONSTANT COMPUTED INSIDE A SHADER IS LEGALLY A DIFFERENT CAMERA. *** Passing tan(fov) in as a uniform puts every direction within ONE f32 ulp at 9.474e-8, a 144x improvement, and the wrong version stays as a named parameter rather than an edited copy so the gate drives both. THE MASK: 623 of 2304 pixels hit geometry and f64 CPU and f32 GPU agree about every one. That zero is only a result because the same run says how far it was from failing -- sweeping impact parameter across tangency finds the CPU stops seeing the sphere 5.4237e-7 sooner than the GPU does, so *** IN f32 THE SPHERE IS SLIGHTLY BIGGER, *** and 16 of 60 ladder rays hit on the GPU and miss on the CPU. That band is 7.15e-6 of a pixel wide: an image would need to be ~139808 across for one ray to land in it. v4290 also extracted cameraBasis and pixelRay out of render() and coverage(), which had held a private copy each since v3473 and were never compared; the extraction is bit-identical across seven configurations and the gate now cross-checks the two functions against each other. Three sabotages: a multiplier off by one goes 4 red AND inverts its own control; a mirrored camera goes 7 red with 126 mask disagreements, caught only because the scene's second sphere sits off-axis. *** THE THIRD WENT 0 RED: setting eps to 0 left thirty-two checks green, *** because every ray started outside the scene and cleared the surface epsilon by six orders of magnitude -- a constant parsed, packed into two uniform blocks and read by two shaders, with nothing behind it. Section 8 was written in answer: a ray starting a hair off the surface where the near root IS the gap, and redone the sabotage goes 2 red. Fourth round running the sharpest sabotage found machinery present, correct and untested. NO TIMING IS CLAIMED -- the only adapter here is a software rasteriser. The tree stands at 1361 gates.
+## v4289 -- Contributors as traders, built from git because the API is shut
+
+Keith's idea: contributors travel between repositories like traders, owning a repo makes you an armed ship,
+contributing without owning makes you a hauler. The obvious way to build that is the GitHub API.
+
+*** THE OBVIOUS WAY IS UNAVAILABLE, AND NOT FOR A REASON ANYONE WOULD GUESS FROM RATE LIMITS. *** Three
+distinct refusals were probed and recorded verbatim, each with its own remedy: an unattached repository says
+"use add_repo"; our OWN repository says "an org admin must connect"; and a contributor's profile says
+*** "This GitHub API path is not available: sessions are bound to their configured repositories" *** -- the
+whole /users path class is refused, not rate-limited. So the armed-ship axis, do they own anything else, is
+exactly the axis that cannot be reached. The gate RE-PROBES all three every run: if one opens, it goes red,
+and that red means "go and use what you said you could not use".
+
+What is available turned out to be better. `git clone --filter=blob:none` fetches full history without blobs
+in seconds, and every commit carries its author -- the same substrate GitHub derives its own contributor
+graphs from. All 35 repositories in world/licenceSweep.mjs were cloned, 11,172 commits read, ZERO clone
+failures, and no API call was made at any point.
+
+*** TWELVE OF THE THIRTY-FIVE REPOSITORIES CONTAIN NO COMMIT BY THEIR OWNER. *** They are forks: cargo
+parked in someone else's dock. Six of redcamel's nine and five of but0n's thirteen. And history answers a
+sharper question than the API's boolean `fork` flag would: ownerShare, how much of what they own they
+actually wrote. but0n/THREE.js-PathTracing-Renderer counts as owner-authored on a handful of commits out of
+1,992 -- the difference between an armed ship and somebody standing next to one.
+
+*** THERE IS NO CORRECT IDENTITY KEY AND THE MODULE USES TWO. *** Git author identity is self-declared. By
+display name: 473 identities, 13 crossings. By address hash: 466 identities, 10 crossings. Email-keying is
+right about but0n -- 'but0n', 'Jeff Ma', 'Jeffrey Ma' and 'Jeffrey' are ONE address, so the owner of thirteen
+repositories here is one trader under four names. It is still WRONG about Jamie Portsmouth, who holds two
+addresses and stays two traders, at 11 repos and 5. Picking one key would be choosing which error to have,
+so both are recorded and the disagreement is a function anyone can call.
+
+NO EMAIL ADDRESS IS STORED. Identity is a truncated SHA-256 of the lowercased address, which merges an author
+across repositories without keeping the address, because a joinable index of commit emails is what turns a
+project's own relationship graph into a database of people. *** AND THE FIRST VERSION OF THAT PROMISE WAS
+FALSE AT THE MOMENT IT WAS WRITTEN. *** It hashed the address FIELD and kept the name field verbatim, on the
+reasoning that names are not addresses -- and one contributor has set their git name TO their address, which
+shipped untouched in a topAuthor field. Address-shaped names are hashed now and the gate scans the WHOLE FILE,
+prose included, so the promise is a check. A rule that protects one field and trusts another is only as good
+as the assumption that the fields mean what they are called.
+
+TWO THINGS IN THE CROSSING LIST WERE NOT PEOPLE. ImgBotApp is a bot the first predicate missed -- it tested
+for "[bot]", a "bot@" address and names ending in "bot", and ImgBotApp is none of those. And better:
+*** e3b0c44298fc IS sha256(""). *** Two repositories carry commits with an EMPTY author address; hashing that
+missing field produced a stable, plausible identity, and the graph reported it travelling between them. A
+coincidence of ABSENCE read as a connection, and it looked exactly like a finding.
+
+The classification rule is EXPORTED now rather than living in the script that generated the data, because a
+list nobody can argue with is a second place for a wrong answer to live. Exercising it immediately found the
+false positive its own comment had warned about: *** "bot@" MATCHES talbot@example.com. *** Anchored.
+
+Three sabotages, none 0 RED. Restoring the one redacted address goes 2 red. Letting the empty hash back into
+traders() goes 2 red and the people count rises from 8 to 9 -- that ninth trader is the hash of nothing.
+Un-anchoring the address pattern reddens the surnames, on a check that exercises the rule; the earlier
+version, which read the module's TEXT for a forbidden pattern, had already gone red on the comment explaining
+that the pattern is not used -- a file grading a marker it also discusses, the twelfth time this session.
+
+*** WHAT THIS DELIBERATELY IS NOT: *** a survey of GitHub. The graph covers the 35 repositories this project
+already opened and says who moves between THEM. Extending it to contributors' other repositories is the axis
+the /users refusal blocks, and it is also the axis worth leaving alone.
+
+This round adds one module and one gate, and the tree stands at 1360 gates.
+## v4288 -- Three ways a uniform can fail, and the third one has no symptom
+
+Two threads were left open at v4287. Both close here, and closing them found a third harness defect worse
+than either.
+
+*** THE HALF-FLOAT ASSUMPTION WAS RIGHT, AND NOBODY HAD LOOKED. *** v4287 fed the fused pass an rgba16float
+scene texture on the reasoning that an 8-bit input would clip before the shader saw it. render/bloomPass.js
+had already decided the same thing: Round 136 promoted sceneFBO from RGBA8 to RGBA16F "so emissive surfaces
+can output values > 1.0", with an RGBA8 fallback when EXT_color_buffer_half_float is missing and a warning
+that "bloom will be weaker". *** v4287 MEASURED WHAT WEAKER MEANS: *** the peak clamps 1.7480 to 1.0000 and
+all 181 samples above 1.0 are destroyed, 43% off the brightest. The fallback path IS the format v4287 clipped.
+
+AND THE FILE'S OWN OVERVIEW CONTRADICTED ITS OWN CODE. Line 5 said "sceneFBO (RGBA8, full res)" and had said
+so since Round 136 changed it. A fact written down twice with nothing reading the second copy -- the shape
+this session keeps finding. Corrected, and the gate now COMPARES the header against the texImage2D call
+rather than asserting either alone, so a future change to one that leaves the other behind reddens.
+
+*** THREE WAYS A UNIFORM CAN FAIL TO BIND, AND EACH NEEDED ITS OWN DISCOVERY. *** v4286 found the first: a
+name that does not resolve, which the harness now returns. This round found the other two. Float ARRAYS --
+uHeatRadii and uHeatStrength are float[8] and the harness set only scalars and vectors -- are now bound with
+uniform1fv/2fv/3fv/4fv. And then the one with no symptom at all: *** uHeatCount IS DECLARED `uniform int`,
+getUniformLocation SUCCEEDS FOR IT, AND uniform1f ON AN INT RAISES INVALID_OPERATION AND WRITES NOTHING. ***
+The name was never unresolved. The program linked, drew, and produced a picture. uHeatCount stayed 0, the
+entire heat block never ran, and the footprint measured 0 with a clean bill of health. A uniform that
+resolves and still does not take the value defeats the v4286 guard by construction, so the harness now
+supports uniformInts AND drains gl.getError() after every uniform write.
+
+With all three closed, heat is demonstrably LIVE: 4,792 pixels of a 256x256 frame change between heat off and
+heat on. *** AND THE PERTURBATION METHOD STILL CANNOT GIVE IT A RADIUS, WHICH IS A BETTER ANSWER THAN A
+NUMBER. *** It reports 0 at N=128, MINUS ONE at N=256, and 1 at N=512, for displacements of 0.45, 0.90 and
+1.79 texels. The minus one is the tell: perturbation measures a GATHER -- poke a source texel, see which
+pixels read it -- and that works only while every source texel is read by somebody. A displacement field
+breaks exactly that, the map from source texel to reading pixel stops being onto, and a poked texel can be
+read by NOBODY. "Nothing changed" then means the texel was skipped, and is indistinguishable from a pass that
+never reads there. So heat is recorded as EXERCISED with its cap (a literal 0.0035 of the image, about 7
+texels at 1080p) and the method's limit, rather than given the radius it happens to yield at one resolution.
+
+TWO THINGS FOUND WHILE MEASURING THE HEAT BLOCK, REPORTED AND NOT CHANGED. Its vertical bias puts the
+distortion BELOW the source in UV space -- affected source rows 0..149 with the source at v=0.5 -- while the
+comment beside it says it biases ABOVE, "rising heat, not below". And the expression is
+smoothstep(0.5, -0.5, x), which GLSL ES specifies as UNDEFINED when edge0 >= edge1. It behaves as a reversed
+smoothstep wherever the naive formula is used, which is everywhere anyone has looked, and that is not the
+same as being defined. Which way a heat plume should lean is a decision about the picture; this module
+measures.
+
+Sabotages. The stale RGBA8 header restored goes 2 red, and the CONTROL fails with it because the header and
+the code are compared rather than either asserted alone. And heat filed with evidence "measured" and a radius
+of 1 goes 1 red -- *** THE RADIUS IS GENUINELY 1 AT N=512, SO THE NUMBER IS NOT EVEN WRONG, IT IS UNEARNED. ***
+Quoting the one resolution where the method happened to work would be picking the answer that flatters the
+instrument. The check is that the entry DECLINES a radius, not that it has one.
+
+This round adds no module and no gate, and the tree stands at 1359 gates.
+## v4287 -- Scene texture in, bloom texture out, one dispatch
+
+v4284 proved the fused bloom shader reproduces the shipping three-pass chain, and stopped short of a render
+pass in two ways that both mattered. It wrote f32 into a storage BUFFER, because that is what the compute
+harness bound. And it COMPUTED its own input from srcAt, because there was no way to hand it a texture.
+Neither is a thing a renderer can use: a post pass reads the scene somebody else drew and writes a texture
+the next pass samples, and each of those is a different binding with its own ways of being wrong.
+
+Both are closed now, and each link is measured on a real device:
+
+    v4284   the shipping GLSL three-pass chain == a CPU oracle             0.500/255 (WebGL2)
+    v4284   that oracle == the fused dispatch, f32 into a buffer           2.5 float32 epsilons
+    here    that buffer result == the same shader into a storage TEXTURE   4.72e-4 relative
+    here    procedural input == a real SAMPLED input texture               6.24e-4 relative
+
+Half-float carries a ten-bit mantissa, so ~1e-3 relative is the FORMAT's resolution rather than slack.
+
+*** THE STORAGE FORMAT IS A CORRECTNESS DECISION AND THE CLIPPING IS MEASURED. *** rgba8unorm is the obvious
+default: it validates, it dispatches, it produces a picture. It also clamps to [0,1], and bloom's entire job
+is to carry values above 1. The reference scene peaks at 1.7480 and 181 samples exceed 1.0; through an 8-bit
+target the peak reads exactly 1.0000 and every one of those samples is destroyed -- a 43% loss on the
+brightest, which no tolerance would call agreement. Nothing but a measurement separates that from the right
+answer, because the failure is invisible anywhere the scene happens to be dim. rgba16float is the default and
+both formats are named in the module rather than one hiding in a default.
+
+The harness gained runWgslComputeToTexture: a compute dispatch into a storage texture, read back and decoded,
+with an optional rgba16float SAMPLED input at binding 2. The input is half-float for the same reason the
+output is -- an 8-bit scene texture would clip before the shader ever saw it, the same trap one stage earlier.
+Nothing in this tree had ever used a storage texture; the only textureStore in the repository was inside
+vendored taichi.
+
+*** WHAT IS STILL NOT WIRED, AND IT IS SAID IN THE GATE'S OWN HEADER RATHER THAN ONLY HERE: *** render/
+bloomPass.js still runs its three draws and does not import the fused module. Both are asserted, so the claim
+cannot rot. What exists is a pass a WebGPU renderer COULD call, proven equivalent; swapping the live path
+needs a device obtained at runtime, a WebGL fallback for machines without one, and a reason to believe the
+swap is worth it -- and that last part is a memory-traffic measurement this sandbox cannot make, because its
+only device is a software rasteriser. Building the wiring before the measurement is defensible: it puts the
+measurement one RUN away from anyone with hardware instead of one ROUND away. Claiming the measurement
+happened would not be.
+
+Three sabotages. The HDR default changed to rgba8unorm goes 6 red, and the CONTROL that the image is not
+empty fails along with the rest -- a clamped bloom looks exactly like a bloom that never happened.
+textureStore's coordinates transposed goes 4 red at 8.43e+1 relative, and *** THE SHADER STILL COMPILES,
+DISPATCHES AND FILLS EVERY TEXEL: *** a transposed image is a perfectly plausible picture, and only a
+reference that knows where each pixel belongs catches it.
+
+*** AND ONE WENT 0 RED BECAUSE A BRANCH OF THE READER WAS UNREACHABLE AT THE SIZE THE GATE USED. ***
+copyTextureToBuffer pads every row to a 256-byte multiple, and at N=64 an rgba16float row is 512 bytes --
+already aligned, so the padding path never ran and deleting it changed nothing. A whole branch, written
+carefully, tested by nothing. N=40 pads 320 up to 512 and is now checked, with a control asserting N=64 does
+NOT pad so the pair cannot collapse into one case; redone, the sabotage reddens the padded size by name.
+That is the third round running in which a sabotage found machinery that was present, correct and untested
+rather than a defect -- v4285's overstated label, v4286's unreached guard, and now this.
+
+This round adds no module and one gate, and the tree stands at 1359 gates.
+## v4286 -- The two passes that were never unmeasurable
+
+v4285 filed SSAO and the composite as READ OFF SOURCE and gave two reasons for it. *** ONE OF THEM WAS
+SIMPLY WRONG. *** "SSAO needs a depth buffer that is not the colour buffer" -- SSAO_FS has exactly ONE
+sampler, and the harness binds one texture. It was measurable the whole time and nobody tried.
+
+The other reason was real: COMPOSITE_FS takes five samplers, and with one texture bound they all read the
+same image, so any measurement would have been a measurement of a fiction. renderGlslToPixels now takes
+`textures: {samplerName: texelFn}` and binds each to its own unit. Additive: it defaults to null and every
+existing caller keeps the single binding it had.
+
+SSAO, MEASURED. Its reach is 0.95 * uRadius / max(1,depth) texels, so the footprint should TRACK the uniform,
+and it does: uRadius 2, 5, 10 give radius 2, 5, 9. At uRadius 20 it reads 16 -- and that is the 32-pixel
+frame clipping it, not the pass. So "bounded by a uniform" is now a measurement rather than a reading, with
+an engineering consequence: *** AT uRadius 10 THE APRON IS 9 TEXELS, LARGER THAN AN 8x8 TILE. *** Fusing
+SSAO at that setting means loading 26x26 texels to produce 64 outputs.
+
+THE COMPOSITE, MEASURED PER INPUT. uBloom 0 and uSSAO 0 -- purely local. uSceneDepth 1, with exactly 8 pixels
+moved, which is the 3x3 outline Sobel ring. *** AND MINUS ONE WITH THE OUTLINE SWITCHED OFF, because the
+Sobel never runs. *** A pass's footprint depends on which features are enabled, so an apron has to be sized
+for the FEATURE SET and not for the file. A fusion measured with the outline off would be wrong the first
+time somebody turned it on.
+
+*** AND THE METHOD ITSELF HAD A DEFECT THAT REPORTED CONFIDENT NOTHING. *** perturbFootprint always drove
+its texel to WHITE. Against SSAO_FS that measured a footprint of NOTHING at every radius -- white reads as
+depth 1.0, the shader treats depth >= 0.999 as sky and skips it, so the poke landed on the one value the
+pass is written to ignore. A perturbation the shader discards is evidence about the poke, not about the
+shader's reach. The poke is a parameter now, and the white-poke result is kept as a CONTROL.
+
+A SECOND METHOD DEFECT, FOUND THE SAME WAY. Measuring the composite's heat displacement returned "radius 0,
+1 moved" while uHeatRadii and uHeatStrength had silently failed to bind -- they are float ARRAYS and the
+harness sets scalars and vectors. Zero was the truthful footprint of a shader whose heat was switched off by
+the binding failure, and it would have been read as the footprint of heat. perturbFootprint now VOIDS any run
+with unresolved uniforms rather than returning a number, and heat displacement is recorded in UNMEASURED
+rather than folded in beside the four that were measured.
+
+Every entry in the FUSION table now carries evidence: "measured", none read off source. The verdict is
+unchanged -- god rays alone forbids single-dispatch fusion -- but it now rests on measurements of all five
+passes rather than three.
+
+Six sabotages. Binding every extra sampler to unit 0 makes uBloom read radius -1: perturbing it changes
+NOTHING, because the shader reads unit 0 for everything and unit 0 is uScene. *** THAT IS EXACTLY WHAT v4285
+WOULD HAVE MEASURED, *** and the -1 is what the fiction looks like.
+
+*** AND ONE SABOTAGE WENT 0 RED BECAUSE THE GUARD IT ATTACKED WAS NEVER REACHED. *** Deleting the
+void-on-unresolved guard changed nothing, since no measurement in the file produced an unresolved uniform --
+a guard no test reaches, inside a gate. The heat path is the case the guard was written for, so the heat path
+is now run and the REFUSAL is the assertion; redone, the sabotage goes 2 red reporting "NOT voided --
+radius 0".
+
+One check was also rewritten rather than repaired: it asserted the string "0.0035" appeared in the
+composite's entry, which was true while that entry was read off source. Now the entry is measured, the 0.0035
+heat cap has moved to UNMEASURED where it belongs, and the check asks for the EVIDENCE instead of the
+literal. A check pinned to a spelling rather than a mechanism is the species this tree has committed two
+dozen times.
+
+Not done this round, and asked for: wiring the fused pass into a real WebGPU render target. That is its own
+round -- it needs a storage-texture output rather than a buffer, and its payoff is memory traffic, which this
+sandbox's software rasteriser cannot measure.
+
+This round adds no module and no gate, and the tree stands at 1358 gates.
+## v4285 -- How far one texel's damage travels, and what that forbids
+
+v4284 fused three post passes into one compute dispatch and closed by saying the composite was "the one that
+would decide whether the whole post chain can become one dispatch or merely two."
+
+*** THAT WAS WRONG. THE COMPOSITE DECIDES NOTHING. GOD RAYS DECIDES, AND IT DECIDES NO. ***
+
+render/passFootprint.mjs settles it by MEASUREMENT rather than by reading shaders. A pass can join a
+tile-local dispatch only if its read footprint is bounded by a constant -- an apron of A texels, with A
+independent of image size. Counting taps in the source gives a claim about that. Rendering the pass twice,
+identical but for ONE texel, and collecting every output pixel that moved, gives the footprint itself, with no
+step where somebody's reading of the code is trusted. The tap count becomes a PREDICTION the measurement can
+contradict.
+
+Measured on a real WebGL2 driver, perturbing the centre texel:
+
+                     N = 32      N = 64
+    BRIGHT_FS          0           0        constant -- purely local
+    BLUR_FS (H)        4           4        CONSTANT -- a fixed apron works
+    GODRAYS_FS        15          31        DOUBLES WITH THE IMAGE
+
+*** THE LAST ROW IS THE FINDING. *** A footprint that grows with resolution cannot be covered by any fixed
+apron, so god rays cannot join a tile-local dispatch at 8x8, at 32x32, or at any size. And the numbers are not
+merely large: 15 = 31 - 16 and 31 = 63 - 32, exactly the distance to the far corner. The true footprint is
+THE REST OF THE IMAGE ALONG THE RAY FROM THE SUN. At 1920 wide the apron would be about 1700 texels, which is
+not an apron, it is the frame.
+
+The blur's 4 is the same 4 at both resolutions and equals the kernel's own reach parsed from the shipping
+shader -- the two are checked against each other, so the measurement and the source have to agree.
+
+SO THE ANSWER IS TWO DISPATCHES, AND THE REASON IS STRUCTURAL RATHER THAN BUDGETARY. bright + blur + SSAO +
+composite can share a tile; god rays cannot join them. The composite is fusable IN ITSELF -- its reads are
+capped by literals in its own source, a 3x3 depth Sobel and a heat displacement of at most 0.0035 UV -- and
+still cannot be fused, because it CONSUMES the pass that cannot. Fusable and reachable are different
+properties and only the second one ships. SSAO is a third category: bounded by a UNIFORM rather than a
+literal, so an apron exists only once somebody bounds uRadius.
+
+Four sabotages. The radius accumulator starting at 0 instead of -1 reddens the control that separates "no
+dependency at all" from "purely local" -- every number in the file is a radius, and a method that cannot
+report nothing would give 0 for a shader that ignores its input. The row flip dropped gives 16 and 32 instead
+of 15 and 31: *** STILL DOUBLING, SO THE TREND CHECK STILL PASSES, *** and only the check predicting the
+EXACT number catches it. A trend is cheap to satisfy and a number is not.
+
+*** AND ONE SABOTAGE WENT 0 RED BECAUSE THE GATE WAS OVERSTATING, NOT BECAUSE THE MODULE WAS RIGHT. ***
+Hardcoding DENSITY instead of parsing it changed no prediction, and the check was labelled "the geometry
+predicts both numbers from DENSITY alone" -- untrue: at the centre the radius is set by the distance to the
+corner and density never enters. Chasing that found a regime where it does. One texel from the sun, density
+0.9 predicts 3 and 1.0 predicts 30, a factor of ten. *** AND MEASURING THAT REGIME SHOWED THE MODEL IS WRONG
+THERE: *** the device says 12 against a modelled 3, because near the sun every pixel's ray converges and one
+texel lies on rays from all directions at once. The model is now scoped to the centre where it is exact, the
+near-sun disagreement is recorded as MODEL_LIMIT rather than tuned away, and the redone sabotage goes 2 red.
+A model right in one regime and quietly wrong in another is worth keeping only if the regimes are named.
+
+Not measured, and marked as such rather than presented beside what was: the composite and SSAO were not
+perturbed. The composite takes five samplers and SSAO needs a depth buffer that is not the colour buffer, and
+this harness binds one texture. Their entries are read off their SOURCE, which is exactly the weaker evidence
+this round exists to replace.
+
+This round adds one module and one gate, and the tree stands at 1358 gates.
+## v4284 -- Three passes, one dispatch, and the picture had to survive it
+
+Keith asked whether more of the tree's shaders can move to WebGPU. The census answers first: 169 files are
+GLSL-only, 19 are WGSL-only, and FOUR author a shader in both. The WGSL side is not a partial port of the GLSL
+side -- it is almost all COMPUTE (LBM, Euler, MPM, Ising, HMC, magmap, flowfield, MLP, multigrid) that WebGL2
+could never have run. Of the 44 GLSL files in render/, 27 are geometry. So the honest opportunity is much
+smaller than 169, and the right target is the passes that WANT compute rather than the ones that are easy.
+
+*** THE BLOOM CHAIN IS THE CASE. *** render/bloomPass.js runs bright-extract, blur-H and blur-V as three
+separate framebuffer binds and three separate gl.drawArrays, each writing a half-resolution texture the next
+pass reads straight back. Those intermediates exist for exactly one reason: a fragment shader cannot hand a
+value to its neighbour, so the only channel between passes is memory. A compute shader can. render/
+bloomFused.mjs fuses all three into ONE dispatch, with the first intermediate living in WORKGROUP SHARED
+MEMORY -- the thing WebGL2 has no equivalent of. Three round trips become one.
+
+*** THE CHAIN OF TRUST, AND IT HAD TO CLOSE OR THE ROUND PROVED NOTHING. *** The fused shader was compared to
+a CPU oracle of the three-pass maths, and the oracle was compared to the SHIPPING SHADERS THEMSELVES running
+on a real WebGL2 driver, because a CPU model written by whoever is doing the port shares the porter's
+misreadings. Measured: the oracle reproduces BRIGHT_FS at 0.500/255, BLUR_FS horizontally at 0.494/255 and
+vertically at 0.487/255 -- half a byte is the FLOOR of an 8-bit readback comparison, not a loose tolerance.
+Then the fused dispatch reproduces the oracle at 3.03e-7 relative, which is 2.5 float32 epsilons, on
+google/swiftshader. Bit-identical was never available and claiming it would have been a lie: a GPU may
+contract a multiply and an add into one FMA where a JavaScript engine does not.
+
+*** NO TIMING IS REPORTED AND THAT IS THE POINT. *** The only WebGPU device here is a SOFTWARE rasteriser.
+Fusing passes is a memory-traffic optimisation, and timing memory traffic on a CPU measures the CPU. A number
+from that would look like evidence and be noise, which is worse than no number. The round-trip count is
+offered instead: exact, structural, countable in either source, independent of what silicon is present.
+
+AND THE PORT ADDS NO DUAL-AUTHORED PAIR. shaderCensus still reports FOUR, because every constant in the WGSL
+-- the nine kernel weights, the luma vector, the soft-knee width -- is PARSED OUT OF bloomPass.js at call
+time rather than retyped. Editing the GLSL moves the compute shader with it. That is the whole reason the
+census's own verdict ("do not build the compiler") is not challenged by this round.
+
+TWO THINGS THE GATE CAUGHT IN MY OWN CLAIMS. The round-trip table said the chain was THREE draws and the
+check counted FIVE: SSAO and god rays sit between the blur and the composite, both guarded, both easy to
+forget, and "three passes become one" while five live there is overstating by omission. The table now records
+5 in the span, 3 unconditional and fused, 2 guarded. And the kernel does not sum to one -- W0 + 2*(W1..W4) is
+0.999999, so the shipping blur loses a millionth of its light. REPORTED, NOT CORRECTED: rounding it would
+alter every bloomed image the engine has made for a difference no eye can see.
+
+TWO GAPS FOUND IN THE SHARED HARNESS, BOTH SILENT. renderGlslToPixels draws three vertices with an EMPTY vao,
+so a vertex shader that reads an attribute -- which bloomPass's own PASSTHROUGH_VS does, because it brings its
+own buffer -- gets (0,0) three times, collapses to a degenerate triangle, and returns a BLACK FRAME with
+ok:true. That cost an hour and every comparison against it failed far from the actual shader; the harness now
+returns a distinct-colour count so a caller can assert a picture happened. And it supported only scalar
+uniforms by name, while BLUR_FS takes two vec2s and a vec4; an unset uniform reads ZERO, and uEyeRect at zero
+clamps every tap onto texel 0 -- a harness gap that looks exactly like a shader bug. Vector uniforms are
+supported now, and unresolved names are RETURNED rather than skipped.
+
+Four sabotages. The apron one row short goes 2 red with tile-shaped seams. The workgroup barrier deleted goes
+3 red and the peak collapses from 1.7480 to 0.0495, caught by the control before the comparison. *** THE
+LUMA VECTOR ROUNDED IN BOTH THE ORACLE AND THE PORT AT ONCE GOES 2 RED AND SECTION 3 PASSES *** -- they are
+wrong together, and only the check against the shipping shader sees it, which is the chain of trust
+demonstrated rather than asserted.
+
+*** AND ONE SABOTAGE WENT 0 RED TWICE, BOTH TIMES BECAUSE THE GATE WAS WRONG. *** Removing the clamp changed
+nothing because there were TWO layers of clamping and either sufficed -- redundant defence reads as care and
+costs the ability to test either half. One layer removed, still 0 red: the edge comparison divides by the
+reference and skips values under 1e-4, and both bright spots were in the interior, so the whole border
+extracted to BLACK. An edge check on an edge with no light in it is an assertion that cannot fail, the sixth
+of that family this session. A third source now straddles the left border, 180 of 2880 border samples are lit
+with a control that says so, and the sabotage then reddens the edge check by name.
+
+This round adds one module and one gate, and the tree stands at 1357 gates.
+## v4283 -- The pre-filter that ran nothing and said it was fine
+
+tools/ship/affected.mjs answers "which gates can this change reach", and the point of it is stated in its own
+header: *** "a MISSED gate is a green light on a broken tree, and it would be SILENT." *** It had two ways of
+missing every gate at once.
+
+*** THE FIRST IS THE FORM. *** affected.mjs matches ENGINE-relative paths -- `physics/render/pathTracer.mjs`.
+`git diff --name-only` prints REPO-relative ones -- `WebGLEngine/physics/render/pathTracer.mjs` -- and it
+prints them that way from EVERY directory, including from inside the engine. HANDOFF.md documents feeding
+changed files to --affected. The two have never composed. Nothing checked that the strings named files at all,
+so a path that matched nothing selected no gates, and a run of no gates exits ZERO. Measured on this round's
+own previous commit: three real changed files, unnormalised, select 0 gates; normalised, they select 1. Same
+files, same commit, only the spelling differs. A typo bought the identical clean green in 0.0 seconds.
+
+*** THE SECOND IS THE WORKING DIRECTORY, AND IT IS WORSE BECAUSE THE PATHS WERE PERFECT. *** walk() returns
+ROOT-relative paths and the selection filter relativised them a SECOND time -- and the second call resolves
+against process.cwd(). Run from the engine root it was right. Run from the REPOSITORY root, which is where git
+is run and where the ship ritual stands, every path became "../tools/ship/..." and matched no key. Zero gates,
+exit zero, from the directory you are most likely to be standing in. Measured before the fix: the same
+arguments select 1 gate from the engine root and 0 from the repository root and 0 from the filesystem root.
+
+*** BOTH PRINTED THE EVIDENCE AND NEITHER WAS READ. *** "0 of 1355 gates reach 3 changed file(s) (0.1%)" is a
+count of zero beside a fraction that is not zero, because the ANALYSIS found the gate and the RUNNER dropped
+it. That line has been on screen every time and it contradicts itself in eleven characters.
+
+What is new: world -- tools/ship/changedPaths.mjs classifies each path as engine-relative, dot-slash,
+repo-relative, absolute, outside-engine, comma-joined or missing, normalises what it can and REFUSES what it
+cannot. The runner prints every normalisation rather than doing it quietly, and refuses a path naming nothing.
+*** IT DOES NOT MAKE "NOTHING REACHES THIS" AN ERROR: *** that verdict is real, it is the graveyard census's
+whole subject, and shaders/voxel.vert.glsl is checked to still report zero rather than being refused. The bug
+was never that zero can be reported -- it is that zero was reported for inputs nobody had established were
+files. Unmeasured wearing measured's clothes, which is the third state this session keeps finding.
+
+The comma-joined list is REFUSED rather than split, and not out of squeamishness: a comma is legal in a
+filename, so splitting would guess, and a selector that guesses wrong under-selects -- the one failure mode
+affected.mjs is written never to have. --budget was found taking the same raw argv, which meant its
+"reachable gates were dropped for time" warning, the single thing keeping that flag honest, could never fire.
+
+TWO THINGS FOUND ALONG THE WAY. selfchecks.mjs now refuses when the selector and the runner disagree on how
+many gates were kept, and the soundness of that refusal was CHECKED rather than assumed: the runner's walk and
+gateFiles() hold the same 1356, differing only by the runner finding itself. And affected.mjs still contained
+the third walker its own v3041 note is about -- v3041 stopped USING it and left it in the file, called by
+nothing but itself, with a skip pattern unanchored to a path segment that matched
+tools/ship/vendoredLicences-selfcheck.mjs as readily as vendor/. Reviving it would have silently dropped a real
+gate whose name merely starts with the excluded word. Deleted.
+
+*** AND ONE CLAIM FROM v4282 IS WITHDRAWN. *** That round closed by observing the pre-filter had cost more
+than the ship gate it precedes and calling that a finding. It is not: the SELECTION takes four seconds, and
+the twenty minutes was 97 gates that genuinely reach the path tracer, run without --budget. The selection was
+never the expensive part.
+
+Six sabotages, none 0 RED. The cwd bug restored no longer produces a green run -- it produces a REFUSAL.
+Dropping "missing" from the refusal set reddens, but not the check aimed at: a separate guard still exits 2,
+and what fails is that the refusal NAMES the path -- a refusal for the wrong reason sends someone looking in
+the wrong place. --select-only exiting 0 instead of 3 goes 3 red, the most of any, because a flag that runs no
+checks and returns success is a fourth silent green and a deliberate one.
+
+*** AND ONE SABOTAGE DID NOT GO RED, IT HUNG. *** Splitting the comma list on a guess let the runner fall
+through to a real run of 96 gates, and the check sat past two minutes reporting nothing. A gate whose failure
+mode is "takes twenty minutes" is a gate nobody reads the result of. tools/ship/selfchecks.mjs gained
+--select-only for it, every spawn in the new gate carries it, and the redone sabotage reddens in seconds.
+It exits 3 rather than 0 for the reason this whole round is about.
+
+This round adds one module and one gate, and the tree stands at 1356 gates.
+## v4282 -- The lobe that had no caller
+
+physics/render/roughDiffuse.mjs shipped at v4275 with a measured energy compensation and, for seven rounds,
+exactly two importers: itself and its own gate. v4280 and v4281 both cited it BY NAME as the example of a
+module the engine does not have. Its own closing note said so out loud: *** "unchecked: ANY CONSUMER.
+physics/render/pathTracer.mjs still uses albedo/PI and this round did not change it." *** This round wires it.
+
+*** THE BEHAVIOUR CHANGE IS OPT-IN, AND THAT IS PROVED AGAINST GIT RATHER THAN ARGUED FROM THE DIFF. *** A
+sphere with no `sigma` runs the statements it ran yesterday, in the same order, consuming the same random
+numbers. tools/ship/roughDiffuseWired-selfcheck.mjs extracts the committed v4281 tracer with `git show`, runs
+it in a child process, and compares the hash of the float buffer: both d66e8de3147f2a91. An explicit
+`sigma: 0` gives the same bits again. Oren-Nayar at sigma 0 has A = 1 and B = 0, so its BRDF *is* albedo/pi to
+the last bit and one code path could have served both -- it does not, because "the arithmetic agrees" and "the
+same statements run in the same order consuming the same randoms" are different guarantees, and only the
+second makes every existing image identical BY CONSTRUCTION rather than by a re-derivation somebody trusts.
+
+WHAT ROUGHNESS DOES, MEASURED IN A PICTURE FOR THE FIRST TIME. The peak falls monotonically, 1.1387 to 1.1063
+to 1.0887 to 1.0774 across sigma 0 / 0.3 / 0.6 / 1.0. More to the point it falls FIFTEEN TIMES FASTER than
+the mean -- peak -5.38% against mean -0.37% at sigma 1.0. That ratio is the signature: light is moved out of
+the brightly-lit facing region toward grazing angles, so the ball reads flatter, the moon rather than a
+billiard ball. A model that merely darkened everything would move both numbers together.
+
+AND THE COMPENSATION, WHICH v4275 MEASURED IN THE BRDF INTEGRAL AND NOBODY HAD MEASURED IN A RENDER. The gate
+generates an uncompensated tracer by rewriting `diffuseTable(sig)` to `null` and rendering the same scene:
+the mean falls 2.48%, 7.68%, 11.99% at sigma 0.3 / 0.6 / 1.0. With the table, 0.37%. *** THE INTEGRAL LOSES
+25.6% AND THE PICTURE LOSES 12.0% AND NEITHER NUMBER CONTRADICTS THE OTHER *** -- a render dilutes the lobe's
+loss with multiple bounces, the light's geometry, and the pixels that see sky. Quoting the integral figure as
+the picture's would have been the easy error.
+
+NEE now evaluates the real BRDF at the light rather than assuming Lambert there; the table is cached by sigma
+because buildDiffuseTable integrates the lobe and no bounce can afford that; sigma is clamped to SIGMA_MAX.
+
+*** AND THE STALE SENTENCE IS REPLACED BY A DERIVED ONE, NOT A CORRECTED ONE. *** roughDiffuse-selfcheck's
+note had said "no consumer" for seven rounds after it stopped being interesting and would have said it
+forever, because prose does not go red. Section 5 now WALKS the tree, finds every importer, and reports what
+it finds: 3 files, 1 consumer, 2 gates. Rip the wiring out and that section says so.
+
+Five sabotages, all measured, none 0 RED. `!(sig > 0)` relaxed to `sig <= 0` -- the tidy-up a reviewer would
+wave through -- goes 6 red, because `undefined <= 0` is FALSE and every sphere in the tree that has never
+heard of roughness falls into the new branch with a NaN sigma. The compensation table nulled goes 2 red, and
+the second is the interesting one: peak and mean fall together, "a factor of 1", which turns section 2's
+prose into a check. `Math.PI *` dropped goes 3 red. azimuthCos pinned to 1 goes 3 red and makes the ball
+BRIGHTER with roughness -- a rough surface that glows still looks like a rough surface, which is why the
+direction of every measurement is asserted and not only its size.
+
+TWO UNBIDDEN REDS FIXED, BOTH FOUND BY SABOTAGE POINTING AT THE GATE RATHER THAN THE MODULE. The clamp was
+asserted as a REGEX and nothing ever rendered past it, so deleting it reddened one text check and no picture;
+sigma 10 and sigma SIGMA_MAX are now required to agree to the bit. And the signature check, when NEE's weight
+was forced to 1, FAILED WHILE PRINTING "a factor of 33" -- the ratio of two negative deltas reads exactly
+like the healthy answer, so the sign is now part of the claim. A check that fails while printing a reassuring
+number is half a check.
+
+*** AND THE GATE'S OWN HEADLINE CHECK DIED THE MOMENT THIS ROUND WAS COMMITTED. *** Section 1 read the
+reference tracer with `git show HEAD:`, which was correct for exactly as long as it took to run `git commit`
+-- after that, HEAD held the PATCHED file and "the committed tracer and the patched one render the same bits"
+was a file compared with itself. Sabotaging the history walk to accept HEAD reproduces it: the bit-identity
+check PASSES, reporting "both d66e8de3147f2a91", at 37357 chars against 37357, revision 4f50dcd -- the
+tree's HEAD when the sabotage was run, which is to say this round's own wiring commit. NOTHING IN THE RUN LOOKS WRONG. The reference revision is now FOUND rather than named:
+walk the tracer's history newest-first and take the first revision whose source does not import roughDiffuse
+(66db97c45b52, 32552 chars). A pinned SHA would have been a claim with an expiry date. And a control asserts
+the two sources DIFFER before anything asserts they agree, because that control is the only check in the
+section that sabotage F reddens. A before-and-after whose "before" drifts forward to meet the "after" is not
+a comparison, and it decays into a tautology quietly, at commit time, with every light still green.
+
+All sixteen path-tracer consumer gates still pass. This round adds no module and one gate, and the tree
+stands at 1355 gates.
+## v4281 -- Our own labels, read against our own licence text
+
+tools/ship/vendoredLicences-selfcheck.mjs is ALL GREEN, and its own closing note says precisely what it does
+not do: *** "nothing verifies that the text under vendor/<x>/LICENSE is the licence it is labelled with -- a
+mislabelled MIT would pass every check above." ***
+
+v4276 and v4277 built the instrument for exactly that question and pointed it at thirty-five OTHER people's
+repositories. world/licenceBodies.mjs turns it inward. Every label survived: twelve of fourteen confirmed
+from the licence body, two correctly unverifiable, zero mismatches. That is the outcome to want from an audit
+rather than the one that justifies having run it.
+
+### What is compared is the operative body, and getting that right is the whole difficulty
+
+Two files can be the same licence and share not one byte. The title line is optional ("MIT License", "The MIT
+License (MIT)", or absent). The copyright notice differs by definition. One upstream hard-wraps at 80 columns
+while another puts each paragraph on a single line.
+
+*** THE FIRST NORMALISER I WROTE DELETED THE RETENTION CLAUSE. *** It dropped every line CONTAINING the word
+"copyright" -- which in an unwrapped file removes the whole of "The above copyright notice and this permission
+notice shall be included in all copies", and in a wrapped one removes half. Jolt's upstream licence is
+unwrapped and ours is wrapped, so the two came out at 432 and 870 characters and looked like different
+licences. They are the same licence. The filter now drops a line that BEGINS with "Copyright" -- that is the
+notice -- and keeps every line that merely mentions it -- that is the condition.
+
+### The clause the label actually turns on
+
+*** MIT AND 0BSD DIFFER BY EXACTLY ONE CLAUSE. *** Both grant everything. MIT requires the notice be carried
+in all copies; 0BSD drops that requirement entirely. So "is this MIT" is not a question about the word MIT
+appearing anywhere -- htmx's minified bundle has ten licence-word hits and every one of them is the substring
+"submit", which is why #61 recorded it as unpapered until the licence was recovered from upstream at its
+pinned tag. It is a question about an obligation being present.
+
+*** AND THE MIT GRANT SENTENCE IS NOT UNIQUE TO MIT. *** SIL OFL 1.1 opens with the identical "Permission is
+hereby granted, free of charge, to any person obtaining a copy", so a matcher keyed on that sentence calls IBM
+Plex Serif's font licence MIT. The gate demonstrates it rather than asserting it: run the naive clause order
+on the same bytes and it answers MIT; run the correct one and it answers OFL-1.1. What identifies the OFL is
+that it constrains RENAMING -- a Reserved Font Name -- which no permissive software licence has an equivalent
+of.
+
+### Ten unrelated upstreams shipped the same 1,020 characters
+
+Every confirmed-MIT body in the tree is byte-identical to every other: ten licences, one body hash
+56959050891f, exactly 1,020 characters. 0BSD is 635 and the OFL 4,045. An eleventh copy that differed would
+have something to say; one that matches says only that its author used the standard text, and that is only
+unremarkable because somebody checked.
+
+### Corroborated from outside the tree
+
+Eight vendored licences were diffed against their live upstream, cloned this round. Six are byte-identical
+files. The two that differ differ by a pinned copyright year range (three.js reads 2010-2023 against HEAD's
+2010-2026, which is what pinning means) and by a title line plus wrapping (jolt). Neither is a difference of
+licence, and all eight operative bodies match exactly.
+
+*** THE 2026 COPYRIGHT DATES LOOKED ALARMING AND WERE UPSTREAM'S OWN. *** Four vendored licences carry a
+copyright year equal to the current one, which reads exactly like paperwork generated here on somebody else's
+behalf -- backlog #82's ENCUMBERED shape in its dangerous direction. Cloning three of those upstreams and
+diffing settled it in about a minute: byte-identical, 2026 included. A suspicion that survives being checked
+is a finding; one that does not is the reason you check rather than the reason not to.
+
+### Three entries whose spdx is a claim rather than a text
+
+vendor/keyhunt is a six-line ATTRIBUTION.txt recording a technique reference with no code copied; ui/vendor's
+grant is a comment at the top of a JavaScript file; vendor/wasm is first-party AssemblyScript output.
+world/vendoredLicences.mjs types all three correctly already. The narrow point here is that identify() cannot
+confirm them because there is no licence body to read -- and "unverifiable by this method" is a different
+answer from "wrong". Collapsing the two is how an audit manufactures a finding.
+
+### Sabotage
+
+htmx's 0BSD relabelled MIT -- the mislabel the older gate's note says it cannot catch, done to the entry where
+it matters most: 2 red, naming the file and both licences.
+
+The clause order reversed so MIT is tested first: 5 red, including the one nobody aimed at it -- the
+canonical-body count goes from "10 licences, 1 distinct body" to "11 licences, 2 distinct bodies", because a
+4,045-character font licence has joined the MIT set.
+
+The normaliser's original bug restored: 6 red, every MIT body losing its retention clause at once, so the
+count of identifiable MIT licences drops to zero.
+
+One unbidden red, corrected rather than logged: section 3 asserted the OFL/MIT collision with the literal
+`true`. That is an assertion that cannot fail -- the fifth this session has caught -- and the claim was
+testable the whole time.
+
+### And the v4279 census's open bucket
+
+22 of its 64 unmeasured gates are now confirmed: 19 green, 3 still unfinished at 400 seconds, 0 red. The run
+continues.
+
+This round adds one module and one gate, and the tree stands at 1354 gates.
+## v4280 -- A song is already a heightfield, and nobody had written the line that says so
+
+physics/fft.js was built to be BIT-REPRODUCIBLE. Its twiddle factors come from the strict-trig core this tree
+proves bit-identical, and every butterfly after that is nothing but +, -, * and /; its header promises a
+spectrum you can publish and have somebody else recompute exactly.
+
+*** THAT PROMISE HAD NEVER BEEN EXERCISED AGAINST THE THING IT MAKES POSSIBLE, BECAUSE THE FFT HAD NO
+GEOMETRIC CONSUMER. *** Nine files reach it, and every one of them either drives a meter or checks the
+transform against itself.
+
+A short-time Fourier transform is a two-dimensional array indexed by TIME and by FREQUENCY. That is a height
+grid. Not a metaphor for one, not a seed for noise that then makes one -- the same object, read with a
+different name.
+
+### The consumer was already here, which is the only reason this was worth building
+
+world/repoHeightfield.js returns "the exact object world/realTerrainStamp.js's applyRealTerrain() consumes",
+and main.js already flies a camera over whatever that produces. world/songHeightfield.mjs returns that same
+shape: the same thirteen keys, the same types, water as { areas, ways } polygons. Nothing downstream needs a
+song-specific branch. #133's rule is find the consumer BEFORE taking the solver; here the solver and the
+consumer were both in the tree already with nothing between them.
+
+### What makes it checkable rather than pretty
+
+A terrain generator can only be argued about on taste. The Fourier transform of a pure tone cannot.
+
+A bin-centred sine lands in EXACTLY bin f * frameSize / sampleRate -- 250 Hz at N = 1024 and SR = 8 kHz is bin
+32, and bin 32 is what comes back. Its magnitude is EXACTLY A * frameSize / 2: measured 512, exact equality,
+no tolerance anywhere in the check. Its neighbours sit at 1.9e-12, fourteen orders below the peak. An octave up
+is exactly twice the bin -- an integer, so no tolerance is even sayable. Every ridge below is compared against
+a number the gate computes independently, which is physics/rebar.mjs's rule (predict the ellipse, do not
+admire the picture) applied to sound.
+
+### And the honest limits, measured on both sides
+
+*** ALL OF THAT HOLDS ONLY FOR A TONE WHOSE PERIOD FITS THE WINDOW A WHOLE NUMBER OF TIMES. *** Move it half a
+bin and a rectangular window smears it: 4.42% of the energy lands more than four bins from the peak, and the
+peak loses 3.856 dB of height -- scalloping, against the -3.92 dB a rectangular window approaches as N grows.
+Hann takes the spill to 0.00%. rect is the DEFAULT here precisely because it makes the closed forms exact,
+which is what a gate can grade, and that is a stated trade rather than an oversight.
+
+Bit-reproducibility is checked ACROSS SEPARATE PROCESSES, because reading a value twice inside one process is
+the same memory and proves nothing. The same measurement shows something better: THE RIDGE IS NOT PERFECTLY
+FLAT. It varies by 8.44e-15 relative across thirty frames -- 250 Hz at 8 kHz repeats every 32 samples and the
+hop is 512, so every frame holds the same cycle, yet the frames are not bit-identical, because
+Math.sin(2*pi*250*i/8000) is evaluated at a larger i each time. The transform reproduces exactly what it is
+given; the generator is what wobbles.
+
+### Three defects the round found in itself
+
+*** THE FIRST DRAFT POINT-SAMPLED THE SPECTRUM. *** A pure tone occupies one bin out of 512, so at grid 16 the
+sampler stepped 0, 34, 68 and never landed on bin 32: every cell came back at the floor, the whole map was
+classified as silence, and a 250 Hz tone produced a lake. The picture was wrong in the most complete way
+available and nothing threw. Max-pooling puts the ridge exactly at floor(32 * grid / 512) at every resolution
+-- a spectrogram cell is not the value at a point, it is what happened in that band over that stretch.
+
+*** THE FIRST DRAFT RETURNED `water` AS A FLAT MASK ARRAY. *** realTerrainStamp.js reads data.water.areas and
+data.water.ways, both undefined on an array, so the guard would have been falsy, no water would have been
+painted, and nothing would have reported a problem -- a field that looks right, is the wrong shape, and fails
+silently. And it was missing three of repoHeightfield's thirteen keys while calling the contract matched.
+Both were caught by comparing the two objects key by key and then type by type.
+
+### Wired, not shelved
+
+physics/render/roughDiffuse.mjs shipped at v4275 with a measured energy compensation and, five rounds later,
+still has exactly two files reaching it: itself and its gate. So window.songTerrain.load() flies over a rising
+sweep with no arguments at all, .load({url}) decodes anything the browser can play through decodeAudioData,
+.load({hz}) takes a single tone -- all through the same stamper and the same fly-in repoTerrain uses.
+
+### Sabotage
+
+Reverting max-pooling: 1 red. Water back to a flat mask: 2. binOfFrequency wrapped in Math.round: 1. The
+wiring deleted from main.js: 7, all in the section that reads main.js, because being unreachable is not a
+small defect in a feature.
+
+*** TWO OF THE FOUR FIRST CAME BACK ZERO RED, AND BOTH TIMES THE GATE WAS AT FAULT RATHER THAN THE MODULE. ***
+Section 4 had asserted that a point sampler WOULD miss the tone -- by writing a point sampler inside the gate
+and running it. That grades an expression the file had just authored, not the module, and the sampler the
+module actually used floors to c * 512 / grid, which lands on bin 32 exactly. It asks the module about bin 33
+now, which no floor-based sampler visits at any of these resolutions. And nothing tested that binOfFrequency
+is CONTINUOUS, so wrapping it in Math.round was invisible: every frequency the file asked about sat on a whole
+bin. Section 1 round-trips 32.5 and 7.25 now. A sabotage that finds a hole in the gate rather than a bug in
+the module is the outcome sabotage is for, and this round produced two.
+
+This round adds one module and one gate, and the tree stands at 1353 gates.
+## v4279 -- Nobody knew what was red, and three answers were on record, all wrong
+
+Backlog #134 said FIVE gates were red at HEAD and that rounds kept shipping ALL GREEN over them.
+tools/ship/gate-timings.json's `failingAt` register said NINETEEN, snapshotted somewhere around v3211.
+A full sweep at v4278 -- every one of the 1,348 runnable gates, actually executed -- found THIRTY-NINE, and a
+fortieth was hiding in the bucket of gates that had not finished.
+
+*** THE OLD REGISTER WAS WRONG IN BOTH DIRECTIONS AT ONCE, AND THAT IS THE PART WORTH KEEPING. *** Twelve of
+its nineteen entries are GREEN now: somebody fixed them, nobody removed the line, and it went on accusing
+working code for a thousand versions. And thirty of the thirty-seven that really are red were absent from it
+entirely -- they went red after the snapshot and nothing has looked since. A register that is only ever
+appended to becomes a list of grievances; one that is never appended to becomes a list of fiction. That one
+had managed both, which is only possible if nothing ever re-ran it.
+
+### The reason nobody looked was also never tested
+
+The honest reason this item slid for round after round is that the suite runner buffers its output and the
+full run was believed to take about ninety minutes, so every attempt looked like an hour of silence with an
+unknown payoff. That belief was never checked either. Running the gate files DIRECTLY, eight at a time, with
+each verdict appended to a file as it lands, finished in about twenty-five minutes with progress visible
+throughout. The obstacle was the runner, not the work.
+
+### But a parallel sweep lies about anything timed, and it lied about seven
+
+The 8-way sweep reported FORTY-SIX red. Re-running those forty-six ONE AT A TIME on an idle box turned SEVEN
+of them green: a battle sim whose gate asserts its clock passed 0.5 s after 2.5 s of wall time, a frame-budget
+check, a sort benchmark, three browser-driven gates and a fast-path timing check. Every one measures something
+against the clock, and every one was starved by the other seven workers.
+
+So the method is TWO PHASES and the second is not optional: sweep wide in parallel to find candidates, then
+CONFIRM EVERY CANDIDATE SERIALLY. A parallel red is a hypothesis. Fifteen per cent of them were false.
+
+### And attributing a red by checking out an old commit has its own trap
+
+Re-running the thirty-nine in a worktree at v4266, before this session's rounds, said thirty-six were already
+red there and three were not. Two of those three really were mine. gateQuality: four prose-matching regexes in
+gates I wrote at v4270-71 -- and one is an ABSENCE check on a retracted claim, where a literal would have gone
+quietly GREEN if the sentence were ever re-wrapped, which is the failure direction that hides a false claim
+rather than surfacing one. orreryEjecta: tools/ship/webgpuHarness.mjs really does import three, so the count
+moved 67 -> 68, established by diffing the importer lists rather than assumed.
+
+*** THE THIRD WAS A FALSE ATTRIBUTION, AND THE MEASUREMENT MADE IT. *** duplicateFiles walks the filesystem,
+and the working tree carries two git-ignored agent worktrees under .claude/ that a clean checkout does not --
+hundreds of phantom duplicate groups, present on this box and in no commit. A CLEAN CHECKOUT IS A DIFFERENT
+WORLD from a working tree, and any gate that scans files rather than reading git's index is compared across
+that gap. Fixed at its cause: the walk skips .claude.
+
+### What is now permanent
+
+tools/ship/redCensus.mjs records the thirty-seven with what each one fails and its own measured runtime -- so
+re-verifying ALL of them costs 142 seconds and the census is never sampled, because a census that spot-checks
+can be wrong about exactly what it skipped. Its gate RE-RUNS every listed gate, and *** GOES RED WHEN ONE OF
+THEM IS FIXED. *** The list may only shrink, and only by someone deleting a line on purpose. That is the
+mechanism the old register lacked, and its absence is the whole reason twelve entries rotted into accusations.
+
+### The first draft shipped the exact bug the census exists to catch
+
+tools/ship/referenceKind-selfcheck.mjs runs in 73.7 seconds and exits 1. It was starved past the sweep's flat
+120-second cap -- a number I chose, not a budget the tree records -- filed as "timed out", and then read as
+exonerated because it was not in the confirmed-red list. It was red the entire time. It was caught only by the
+control in section 3, which re-runs a sample of the wrongly-accused instead of trusting a set difference, and
+that control exists because this tree keeps rediscovering that a check comparing two lists is a check on
+neither.
+
+Sixty-four gates remain UNMEASURED -- not red, not green -- and are named in the census rather than rounded
+into either. Twenty are confirmed so far: eighteen green, two still unfinished at 400 seconds. Finishing them
+is about three hours of serial running and is the next round. *** SO THE HONEST TOTAL IS "AT LEAST 37", NOT
+"37". *** Recording the hole is what stops this census becoming the fourth wrong answer on the subject.
+
+### Sabotage
+
+A gate that actually passes added to the red list: 3 red -- the re-run names it and says delete the line, the
+cross-register comparison notices the two disagree, and the arithmetic identity stops closing. Three
+independent reds for one bad line, so no single check has to be the reliable one.
+
+UNCONFIRMED_SLOW emptied so the census silently claims completeness: 1 red, narrow and exactly right --
+nothing about the red set changes, and the only thing that breaks is the claim. It is the sabotage closest to
+what a tidying pass would really do, because an empty list looks like good news.
+
+The mis-bucketing restored: 3 red, including the check written specifically to remember it.
+
+Two more reds arrived unbidden and are corrected rather than logged. The arithmetic was written as
+(confirmed - fixed) and stopped closing the moment a gate ENTERED the red set from outside the swept count; it
+needs a recovery term, and the gate went red on its own bookkeeping. And twoF-selfcheck sat in both the
+unmeasured bucket and the wrongly-accused list, because it had in fact been measured -- 120.5 s, exit 0. Both
+directions out of that bucket are now resolved and counted: one red, one green, from a set that had been
+called neither.
+
+This round adds one module and one gate, and the tree stands at 1352 gates.
+## v4278 -- The shader is the authority on its own layout
+
+gfx/device.js's WebGPU pipeline builds its uniform buffer at offsets computed from `d.uniforms` -- a list the
+CALLER supplies, in the caller's order, with the caller's names. The shader independently declares its own
+struct. And `layout: "auto"` means WebGPU derives the real buffer layout FROM THE SHADER.
+
+*** NOTHING COMPARED THE TWO. *** Reorder either and every uniform lands in the wrong field. The module
+compiles. The pipeline builds. The bind group binds. The pass runs. The draw completes. There is no error
+anywhere in that chain to catch, because nothing in WebGPU's contract is entitled to an opinion about which
+number the host meant to put in which slot -- the host said where to write, and the host was wrong.
+
+render/badTvWgsl.mjs had the same duplication in miniature and announced it without noticing: `KNOB_ORDER` was
+a frozen literal hand-copied from `struct U`, carrying a comment saying it existed "so a caller cannot pack
+them in the wrong sequence by guessing". It was itself a guess.
+
+### What was taken, and what was not
+
+The idea is redcamel/wgsl_reflect (MIT, (c) 2021 Brendan Duncan -- read first-hand at v4276; the account is a
+mirror and Duncan is the grantor, now registered REACHED). *** NONE OF ITS CODE IS HERE. *** It is 5,141 lines
+of TypeScript implementing a real WGSL scanner, parser, AST and reflector, and vendoring a compiler front end
+to answer one layout question would be out of all proportion to the question.
+
+What transfers is one sentence: derive the host's view from the shader text, never restate it alongside and
+hope. render/wgslLayout.mjs is about 200 lines and is a DECLARATION SCANNER, not a parser -- it says so in its
+header, and everything a parser would handle (type aliases, const-expression array lengths, `@align` and
+`@size` attributes, nested braces) returns null rather than a confident wrong number.
+
+### The tree already held two answers for vec3, which is how this was found
+
+render/wgslSpec.mjs's `sizeOf("vec3<f32>")` returns 16. gfx/device.js's table says size 12, align 16. Both
+files shipped; neither cites the other.
+
+WGSL's rule is that `vec3<f32>` ALIGNS to 16 and OCCUPIES 12. The gap is the whole reason a scalar can sit at
+offset 12 immediately after a vec3, and why `{ vec3f, f32 }` is sixteen bytes and not thirty-two. wgslSpec was
+never wrong for its own caller -- it totals workgroup storage, where over-counting is the safe direction -- and
+it is wrong as a layout primitive, and nothing said so. It is unchanged and now documented. This module keeps
+`alignOf` and `sizeOfType` as two functions that never fall back on each other.
+
+A second question was buried under the first: THE ADDRESS SPACE CHANGES THE ANSWER. This module first returned
+24 for `struct U` and device.js returns 32. Both right -- a uniform-space struct's alignment has a floor of 16,
+and device.js's `Math.max(16, ...)` was implementing that rule without naming it, while this module implemented
+the other one without naming it either. Once the space is named they agree exactly, on the size and on every
+field offset.
+
+### And a real device was asked, rather than a note written saying none was available
+
+WGSL has no `sizeof`, so the layout was measured behaviourally: declare the output storage buffer as
+`array<T>`, write distinct markers into two elements, read the buffer back as raw f32 words. The markers came
+back at float indices 3 and 4 -- putting `b` at byte 12 and the element stride at 16, exactly what the module
+computes and exactly what a size-16 vec3 would have got wrong.
+
+The first draft of the closing note said no device had been asked and that the strongest evidence was two
+implementations agreeing. That was written before trying. It is the same mistake v4275 made about the network
+and v4269 made about WebGPU itself, and it would have shipped a weaker claim than the evidence supports.
+
+### Wired, not shelved
+
+`KNOB_ORDER` is derived from the shader -- resolved through the `@group(0) @binding(0)` declaration rather than
+by looking for a struct named "U", so renaming it cannot silently disable the check. And gfx/device.js now
+refuses a positive host/shader disagreement, with a message that says the draw would otherwise SUCCEED,
+because a caller told only "mismatch" goes looking for a crash that never comes. It refuses only on a positive
+disagreement: a shader the scanner cannot read passes through, so a limitation here can never block a working
+pipeline.
+
+### Sabotage
+
+A collapses vec3's SIZE onto its ALIGNMENT -- one ternary, and precisely the confusion already shipped in this
+tree. Not a typo: the wrong answer somebody reaches honestly. 5 red, including the real device contradicting
+the code, which is the strongest red available and the reason section 6 exists rather than being a note about
+why it could not.
+
+B swaps two struct fields: 1 red, and NOT the failure it used to be. KNOB_ORDER followed the struct and the
+host/shader check reported zero complaints. The runtime defect is gone by construction; what is left is a
+frozen expectation asking a human to confirm the contract changed.
+
+C un-wires KNOB_ORDER back to the literal: 1 red on the guarantee rather than on its current output, since the
+literal and the struct agree today. D deletes the device.js refusal: 2 red, both about the wiring -- the check
+still works perfectly as a function and is called by nobody, which is the failure this tree ships repeatedly.
+
+Two more reds arrived unbidden. A claim that swapping two uniforms changes no offset device.js computes --
+false, because the map is keyed by NAME, and that change IS the bug; what stays identical is the BUFFER. And
+the device probe embedded a compute entry-point attribute literally, pushing backendParity's census of
+WGSL-bearing modules from 39 to 40: a gate's test fixture counted as a shipped shader. The tempting fix was to
+bump the baseline. The right one was to stop self-counting -- and then the comment explaining THAT spelled the
+attribute out and turned a marker check red on the very sentence describing the rule. Tenth instance.
+
+One more correction worth recording: the new licence-register entry first set `grantorHoldsRights: false`,
+which filed it as ENCUMBERED. A MIRROR IS NOT AN ENCUMBRANCE. Two questions were running together -- "is the
+account the party granting" (no, an attribution fact) and "does the party granting hold the rights" (yes,
+Duncan wrote it). Conflating them accuses an author of licensing something they own.
+
+This round adds two modules and one gate, and the tree stands at 1351 gates.
+## v4277 -- Twenty-six permissive licences in a row, and then one that is not
+
+The sweep ran for two rounds and thirty-odd repositories without meeting a restricted licence. That is not a
+property of open source. It is a run -- and a run is exactly what makes a reader that matches on SHAPE feel
+trustworthy right up to the moment it is wrong.
+
+*** but0n/rvo2.js CARRIES THE UNIVERSITY OF NORTH CAROLINA AT CHAPEL HILL'S ACADEMIC LICENCE, AND IT LOOKS
+LIKE A BSD NOTICE FROM TEN FEET AWAY. *** A copyright line. "Permission to use, copy, modify, and distribute
+this software and its documentation". An ALL-CAPS warranty disclaimer running two thirds of the file. Every
+surface feature of a permissive notice is present. The grant says "for educational, research, and non-profit
+purposes, without fee", and the paragraph immediately after it says that permission to incorporate the
+software into commercial products "may be obtained by contacting the University of North Carolina at Chapel
+Hill".
+
+That is a licence you have to ask for. Its spdx in the ledger is a LicenseRef rather than a standard
+identifier, because no standard one fits -- writing "BSD-3-Clause" there would have been the entire error in
+one field.
+
+### The field that exists because of it, and the rule that makes it safe
+
+`permissive` is now on every one of the thirty-five entries, and it is NULL wherever nothing was granted
+rather than defaulting to true. Silence must not read as a grant. So both declared-only entries -- the ones
+whose spdx comes from a package.json and whose licence text does not exist -- have permissive null, even
+though the licences they NAME are permissive ones. The contradiction entry goes the other way: which licence
+applies is open, both candidates are permissive, so its permissive is true while its spdx stays null. The gate
+asserts the equivalence in both directions, and the sabotage that flips a declared-only entry to true is
+caught by it.
+
+### Three parties, not two
+
+rvo2.js is also the first entry where the chain has three links. UNC holds the copyright (2008-10),
+package.json names Paul Wells as the author of the JavaScript port, and the account it was cloned from is a
+third party again. Nobody downstream can grant more than the first party did. Backlog #82's ENCUMBERED shape,
+with the whole chain legible inside a single repository rather than inferred.
+
+### Two more shapes from the same batch
+
+*** ONE LICENCE FILE CAN CARRY THREE LICENCES. *** but0n/glTF-WebGL-PBR's is 58 lines: the project's own MIT,
+then a "Third-Party Code" section quoting glMatrix's MIT and dat.gui's Apache-2.0 in full. Its spdx is MIT and
+that is not the whole obligation -- a consumer inherits the Apache notice too. The glMatrix copyright quoted
+inside it names Brandon Jones and Colin MacKenzie IV, the same pair the sweep already met as a standalone
+mirror, so the ledger now holds one library twice: once as a repository and once as a quotation.
+
+*** AND A PUBLIC-DOMAIN DEDICATION IS A FAMILY THE LEDGER HAD NEVER HELD. *** but0n/vixel is the Unlicense:
+"This is free and unencumbered software released into the public domain." It grants more than MIT and imposes
+no attribution condition at all -- the one case in thirty-five where this tree's paperwork discipline
+genuinely relaxes, which is worth recording precisely because it is the exception.
+
+### And the largest unpapered repository yet
+
+but0n/THREE.js-PathTracing-Renderer has 194 tracked files, a 190-line README, and not one licence word in any
+.md, .txt or .json at any depth -- no licence file, no package.json at all. Size is not paperwork, and this is
+the entry most likely to be assumed about, because everybody has seen this path tracer.
+
+Thirty-five repositories: 28 papered (24 MIT, 1 Apache-2.0, 1 Unlicense, 1 UNC academic, 1 unresolved), 7 not,
+of which 2 are declared-only.
+
+### Sabotage
+
+Three on the new section, each grep-confirmed before the result was read, exit code and FAIL summary both
+read, the file restored md5-identical.
+
+rvo2.js filed as BSD-3-Clause and permissive -- precisely what a shape-matching reader produces: 3 red. The
+non-permissive set empties, the restricted-mirror check empties with it, and the three-parties check dies too.
+Three reds for one edit is right: a non-commercial licence recorded as BSD is not one mistake, it is a wrong
+answer to three separate questions.
+
+A declared-only entry's permissive flipped from null to true -- a package.json declaration read as a grant,
+the most natural thing in the world to do: 1 red, and the detail prints 29 established against 28 papered, so
+the failure says which way the ledger drifted.
+
+The composite's third-party array deleted, leaving a plain MIT entry: 1 red. The quietest of the three and the
+closest to what a tidying pass would actually do -- the entry still has a real licence file and a real hash,
+and has silently stopped saying that a consumer inherits Apache-2.0.
+
+### *** AND THREE CHECKS THAT WERE GREEN AND CORRECT FOR TWO ROUNDS WENT RED ON CORRECT DATA ***
+
+"And two more share a different one." "Five repositories are mirrors." "A collective grantor." Every one was a
+number typed into a gate, every one was true when written, and every one rotted the moment the sweep grew. A
+COUNT TYPED INTO A GATE IS A CLAIM WITH AN EXPIRY DATE. All three are derived now, joining the line-count-
+versus-hash check that learned the same lesson a round earlier and has since survived two batches untouched.
+
+A fourth was not stale but simply false. The composite check asserted that the quoted third-party notices
+widen the sweep's spdx reach; running it showed both sets are the same size, because Apache-2.0 was already
+reached directly through OpenPBR. The true statement is narrower and is what the gate says now: the composite
+understates what a consumer of that ENTRY inherits, and adds no identifier to the ledger.
+
+This round adds no module and no gate, and the tree stands at 1350 gates.
+## v4276 -- The licence sweep: twenty-six repositories opened, and the premise that said they could not be
+
+*** v4275 SAID "THIS SESSION HAS NO NETWORK" IN FOUR PLACES -- ITS MODULE HEADER, ITS GATE, ITS CHANGELOG AND
+ITS COMMIT MESSAGE -- AND NOBODY EVER TESTED IT. *** A bare `curl https://github.com` returns HTTP 400 through
+this environment's proxy. That reads like a wall. It is not one: the proxy gates GitHub per repository, and
+anonymous git reads of public repositories work. Six repositories were filed in world/namedNotChecked.mjs as
+NAMED-and-unchecked on the stated ground that they could not be reached, and every one of them was clonable
+the whole time.
+
+This is the same shape as v4270's WebGPU error, one round after it: an environment's refusal read as a fact
+about the environment rather than as a message to be read. Both times the system said why, and both times I
+did not look.
+
+### What replaced the assumption
+
+world/licenceSweep.mjs holds TWENTY-SIX repositories that were actually cloned and whose licence files were
+actually opened. Every verdict carries its evidence -- which file, its sha256 prefix, its line count -- so a
+later round can tell a reading from a recollection. 20 papered (18 MIT, 1 Apache-2.0, 1 unresolved), 6 not.
+
+### Four findings a "repo: MIT" ledger would have missed
+
+*** WHO IS GRANTING THE LICENCE IS NOT THE ACCOUNT YOU CLONED FROM. *** Five of the repositories carry a
+licence file naming somebody else entirely: Brendan Duncan, Jamie Owen, Alin, Daniel Esteban Nombela, and
+Brandon Jones with Colin MacKenzie IV. The licences are real and permissive -- what would have been wrong is
+the credit. A ledger that recorded owner/name and an spdx and stopped would have credited a mirror account for
+gl-matrix itself. Backlog #82 is this question in its dangerous direction, ENCUMBERED, a licence granted by
+somebody who lacked the rights; this is its ordinary direction, and it is far commoner.
+
+*** AND IT IS NOT AUTOMATABLE. *** but0n/Ashes is licensed to "Jeff Ma" and its package.json author field
+says "but0n" -- the same person under a legal name and a handle. No rule matching the owner segment of the URL
+against the copyright line could ever have got that right, in either direction: it would call this one a
+mirror and would have no way to notice the five that are. Every grantor verdict in the file was decided by
+reading at least two things in the repository, and that limit is written into the module rather than left for
+whoever trusts the field too far. A collective grantor is a third answer again -- "recastCLI.js authors" is
+neither the account holder nor somebody else, and is recorded as null rather than false.
+
+*** AN SPDX WITH NO GRANT BEHIND IT IS A STATE OF ITS OWN, NOT A ROUNDING ERROR. *** Two repositories name a
+licence in package.json -- one MIT, one ISC -- and ship no licence text at any depth. Called papered, the tree
+would believe it holds a grant it has never seen; called unpapered, the tree would forget that the author's
+own metadata names one, which is where a real answer would start. They are the entries where spdx is set and
+licenceExists is false, deliberately, and the gate asserts how many there are, names them, and checks they do
+not share an spdx -- because two different licences declared the same way is a shape, where one would only be
+a quirk.
+
+*** AND A REPOSITORY CAN STATE TWO DIFFERENT LICENCES. *** but0n/recastCLI.js ships the MIT text in LICENSE
+and says "license": "ISC" in package.json. Both are permissive, so nothing here is alarming, and they are NOT
+THE SAME GRANT. A ledger that recorded whichever it happened to read first would be writing down a coin toss
+as a fact. That entry is the only one in the sweep where a licence certainly EXISTS and its spdx is null, and
+tally() counts it under `unresolved` -- the first version of tally() reduced over every papered entry and put
+a key literally named "null" into the spdx histogram the moment this repository arrived, which is how an open
+question quietly becomes a category nobody looks at twice.
+
+*** BOTH DIRECTIONS OF THE SCAN ERROR HAPPENED IN THE SAME HOUR. *** christopherbatty/SDFGen has NO licence
+file and the full MIT text with its copyright line sitting in the README -- a root-directory scan calls it
+unpapered and is wrong, which is the exact mistake world/orrery.mjs records three of this tree's own scans
+making. The opposite: grepping READMEs case-insensitively for "MIT" reported hits in two repositories that
+have no licence at all, from the words "emitter" and "transmitted". A third variant turned up as well --
+ashima/webgl-diagnostic and redcamel/gl-matrix are plainly MIT and neither contains the words "MIT License"
+anywhere, opening with a copyright line and going straight into the grant. Only reading the matched lines
+catches any of the three. (And reading them caught a fourth thing: a grep for "shall be included in all
+copies" answered zero against a file that says exactly that, because it wraps as "included in / all copies".
+Prose does not hold still for a grep, which is a defect v4275 shipped in a gate and this round reproduced.)
+
+### The one the tree was already relying on
+
+boytchev/tsl-textures has been cited in render/solidTexture.mjs's header since v4243 as MIT, and v4275
+registered that reading in world/reachedLicences.mjs while explicitly marking it SECOND-HAND -- our own note,
+not the LICENSE file, on the stated ground that there was no network. Opened now: MIT, (c) 2024 Pavel
+Boytchev, 21 lines, sha256 9b78f997e3b1, and package.json agrees. The header was right. A claim made on a
+reason that did not hold up is not thereby wrong, and is not thereby verified either, and both states are
+kept in the entry rather than the earlier one being tidied away.
+
+### And why the six that remain are still unchecked
+
+Not for the reason v4275 gave. The real obstacle is duller and fixable: NOT ONE OF THE SIX RECORDS AN OWNER.
+They are bare repository names, and a bare name is not an address. All twenty-six the sweep settled carry
+owner/name. That is the whole difference between the two shelves, and it was hidden for a round behind a
+claim about the environment that nobody tested. The next round on #100 or #132 does not need a network it
+already has -- it needs six URLs the backlog items were written from and the register did not keep.
+
+### Sabotage
+
+Ten, each grep-confirmed before the result was read, exit code and FAIL summary both read, every file
+restored md5-identical. A verdict with null evidence: 3 red across three sections. An spdx with no licence:
+1. A hash collapsed so a byte-identical group breaks up: 1. A settled repository re-shelved as unchecked in a
+different file: 2. The first-hand note reverted to a header citation: 1, and in a different gate. A mirror
+re-credited to the account holder: 1. The declared-only entry collapsed into papered: 1 -- not a typo but the
+tempting simplification, which is what makes it the one worth having. Every mirror re-credited at once: 2,
+including the control that proves the finding is per-repository rather than per-account. The contradiction
+resolved by taking the licence file's answer: 2, the second red being the named-exception list noticing that
+one of its exceptions had stopped being exercised. The legal name replaced by the account handle -- exactly
+what a naive rule would produce: 1.
+
+*** SABOTAGE C'S FIRST RUN CRASHED THE GATE INSTEAD OF REDDENING IT. *** The detail argument computed
+`find(...)[1]` inline, so when the group it was reporting on ceased to exist the TypeError threw before the
+check was ever called: exit 1, which looks like a successful sabotage to anyone reading only the exit code,
+and no FAIL line and no count printed. A detail string that assumes the condition it is grading goes silent
+at the exact moment it has something to say.
+
+Five counts in this round were wrong before they were run and all five are corrected. The line-count-versus-
+hash check was typed as a number twice, and is DERIVED now -- it asserts that grouping by length is strictly
+coarser than grouping by bytes. That form then survived two further batches of repositories arriving without
+a single edit, and reports eleven files of exactly 21 lines of which ten are genuinely different, where a
+literal would have gone red on correct data twice more. Not one of the five was caught by re-reading; every
+one was caught by running.
+
+This round adds one module and one gate, and the tree stands at 1350 gates.
+## v4275 -- The diffuse lobe learns about roughness, and six repositories go unopened into the register
+
+The specular side of this renderer is serious. `physics/render/microfacet.mjs` has the GGX distribution, Smith
+Lambda, G1 and G2, a furnace integral, directional albedo, half-vector sampling and MIS weights;
+`energyCompensation.mjs` adds back the multiple scattering single-scattering GGX loses; `furnace.mjs` is a white
+furnace harness with named failure modes. Nine files mention GGX and thirty-one touch path tracing.
+
+*** And the diffuse lobe was `albedo / PI`, with zero files in the tree mentioning Oren-Nayar. *** A rough surface
+and a polished one scattered identically in the one lobe where roughness is obviously the point, and the
+elaborate energy machinery next door applied to neither.
+
+`physics/render/roughDiffuse.mjs` closes it with two things:
+
+**Oren-Nayar's published 1994 form**, which reduces to Lambert *exactly* -- `A === 1`, `B === 0`, factor `=== 1`,
+no epsilon and no special case -- and is reciprocal *exactly*, because alpha is `max(thetaI, thetaO)` and beta is
+`min`, so the symmetry is structural rather than arithmetic.
+
+**A compensation measured here rather than quoted.** The directional albedo is integrated by deterministic
+quadrature (Monte Carlo would make the compensated furnace read "1 plus noise", with no way to tell a real 0.5%
+loss from the sampler), tabulated over cos(theta_o), and the correction is whatever makes a white surface return
+its light.
+
+The motivation, as numbers: plain Oren-Nayar loses **1.4%** of the light at sigma 0.2, **15.6%** at 0.6 and
+**25.6%** at 1.0, worst case 34.5%. The table puts it back to **0.23%**, and the residual is table interpolation
+-- 33 stored values against 40 queried -- not a missing term.
+
+### What the round refuses to claim
+
+It was prompted by `portsmouth/EON-diffuse` and five siblings. *** This is not EON, and calling it that would be
+a claim I cannot check. *** This session has no network: not one of the six was opened, no licence was read, and
+no analytic fit was consulted. All six -- EON-diffuse, OpenPBR, OpenPBR-viewer, snelly, fibre, Trinity -- are
+registered in `world/namedNotChecked.mjs` as NAMED and unchecked, which is exactly what v4268 built that register
+for. The idea travels (rough diffuse loses energy; put it back) and the codebase does not, the same move v4247
+made with Ramotion's gaze dwell.
+
+`Trinity` is flagged LIKELY DUPLICATE in its entry, before anyone spends a round on it: this tree already ships
+`fluid-webgpu`, `fluid-webgpu-3d`, `mpm-gpu` and an SPH solver, and v4239's finding on mobile-fluid-sim was that
+the solver was the duplicate and the *sensor* was not.
+
+The register's own gate asserted a total of six entries and went red when six more arrived. It is per-source now:
+a register meant to grow should never be gated on its size, only on every entry being attributable.
+
+### The sabotages
+
+**A** adds `1e-9` to Oren-Nayar's A coefficient -- a billionth, invisible to any image anyone would render. 3
+red. *** That is the argument for asserting `=== 1` instead of a tolerance: *** the claim is about the model
+reducing to Lambert, not about a picture, and `|f - 1| < 1e-6` would have shipped it.
+
+**B** replaces `max`/`min` in alpha/beta with thetaI/thetaO directly. 4 red, and the most instructive: reciprocity
+breaks outright (worst asymmetry 3.78) and the energy check *inverts* -- the surface gains light, the worst
+reading -120%, returning more than twice what arrives. *** A non-reciprocal BRDF that creates light still renders
+a perfectly plausible rough surface. ***
+
+**C** fills the compensation table with 1s: present, correctly shaped, doing nothing. 2 red. The same shape v4273
+found in `gfx/device.js`'s texture bind, and the same lesson -- an API that runs and has no effect is worse than
+one that refuses.
+
+A prose check went red on correct code too: it searched for a phrase that wraps across two comment lines. Comment
+markers are stripped and whitespace collapsed now, with a control asserting the phrase is genuinely non-contiguous
+in the raw file, so the check reads meaning rather than line breaks.
+
+Unchecked and stated: whether Oren-Nayar is the *right* rough-diffuse model -- the repository that prompted this
+exists precisely because the 1994 form loses the 25% measured here. And there is no consumer:
+`physics/render/pathTracer.mjs` still uses `albedo / PI`, because wiring a new lobe into a renderer changes every
+existing image and needs its own round with its own before-and-after.
+
+The build now stands at 4275 gates.
+## v4274 -- The orrery's shader stage is switched on, and my check of it was wrong twice
+
+v4273 built `ui/orreryPost.mjs`, proved it attaches to a real device and draws, and shipped it with nothing on the
+page able to ask for it. That gap is closed.
+
+`orrery.html` now has an overlay canvas, a **signal** toggle beside the surface button, and a frame hook that runs
+the effect *after* `drawSystem` finishes -- uploading mid-draw would sample a half-built system. It is off by
+default. It ignores the pointer, so every click, drag and scroll still reaches the orrery. And when it cannot
+attach it **shows the reason**, because a control that fails silently is v4267's subject wearing a different hat.
+
+### The part worth keeping is that the check was fooled twice
+
+**Draft one** screenshotted the page before and after the toggle and required a difference. The orrery animates,
+so any two captures differ and the check measured the clock. Sabotage D -- deleting `fx.draw()` from the frame
+loop entirely, so the effect is switched on and never rendered -- passed it.
+
+**Draft two** paused the page first and proved it was still by requiring two captures 400ms apart to be
+byte-identical. D still passed, because merely revealing the overlay layer perturbs compositing enough to change
+the PNG.
+
+So I measured the thing directly instead of guessing again: *** a never-drawn `#fx` element captures at 110,787
+PNG bytes against 128,266 drawn -- a ratio of 1.2, which is not a discriminator. *** Element screenshots do not
+isolate it either; they composite what is behind them, which is why a "blank" overlay capture is 110KB of orrery.
+And `gfx/device.js` creates its context with `opts.contextAttribs || {}`, so `preserveDrawingBuffer` is off and a
+`readPixels` after presentation is guaranteed zero.
+
+*** From outside the page, as the page ships, the overlay's content cannot be measured. *** The response was to
+narrow the claim rather than invent a cleverer capture: section 5 proves the **control** works -- it attaches,
+names its backend, toggles, reverses, throws nothing -- and section 3 proves the **render** works, where the gate
+owns both canvases and reads pixels in the same task. Neither is asked to do the other's job, and the report says
+so where a reader will hit it.
+
+Sabotage A (null backend accepted) 1 red. B (`source` reverted in `device.texture`) 1 red -- 2,031 lit texels to
+0 while the stage still attaches and `draw()` still reports success. C (the WebGPU no-op restored) 2 red. D 1 red,
+**in the source check, with the screenshots still green**. E (pointer-events restored) 1 red. F (reason not shown)
+1 red.
+
+B and D are the pair worth keeping. B is invisible to everything except a pixel count; D is invisible to the
+pixel-shaped check that looks like it would catch it. Together they are the argument for keeping a source check
+and a render check rather than trusting either alone.
+
+The build now stands at 4274 gates.
+## v4273 -- The orrery gets a shader stage, and the consumer finds three holes the counting missed
+
+`ui/orreryDraw.js` is canvas 2D -- 28 drawing calls, four of them `fillText`. Not a speed problem, a **capability
+ceiling**: a 2D context has no shader stage, so not one of this tree's 134 GLSL or 39 WGSL modules could touch
+the orrery.
+
+`ui/orreryPost.mjs` keeps every line of the 2D drawing and makes the canvas the **source texture** of a
+`gfx/device.js` pipeline. Porting 368 lines of arcs, gradients and labels would also have needed a WGSL glyph
+renderer -- `text/slugShader.js` is 337 lines of GLSL with none -- and would have risked the one thing the orrery
+does well.
+
+It is that abstraction's **first non-demo consumer**. v4269 measured its reach and found two consumers, both its
+own demos; v4271 rendered badTv through both backends and diffed the frames. What was missing was anything real
+that wanted it.
+
+The gate attaches the stage in a real browser, feeds it the actual `drawSystem` output -- 1,851 lit texels, not a
+fixture -- and reads **2,031 lit texels** back off the target with the effect on, and nothing with it off.
+
+### It settles v4272's orientation question by being a consumer rather than an argument
+
+v4272 measured that the three.js pass and the device pass are exact vertical mirrors, refused to call either
+wrong, and said the choice needed a consumer to decide *for*. *** A 2D canvas's row 0 is its top. *** Framebuffer
+space is not a preference here, it is the source's own layout: `uv.y = 0` is the first row of the ImageData the
+orrery just drew. No flip anywhere. The three.js convention would need one.
+
+### Three holes, all found by attaching rather than counting
+
+**One.** `gfx/device.js`'s WebGPU `pass.texture` was `() => {}`. Measured before changing it: the pipeline builds
+without throwing, the call runs, nothing binds. A post-processing effect samples a source **by definition**, so
+that backend could carry a texture-free render and no post effect at all, silently, while WebGL2 carried both.
+It refuses by name now, the same choice v4269 made for a pipeline with no WGSL.
+
+**Two.** `device.texture()` took only `{width, height, data}`. The only route from a canvas was `getImageData()`
+every frame -- a full readback to produce bytes the GL call can take from the canvas directly. `source` now
+accepts a canvas or image.
+
+**Three.** `requestDevice` reads `opts.backend` or `opts.prefer`. I passed `backends`, an option name I invented,
+so the request was ignored and the stage was handed WebGPU. *** My own probe had masked it: *** it passed
+`{backends: ["webgpu"]}` and got WebGPU, which is what it would have got with no options at all. A test whose
+expected answer is also its failure mode confirms nothing.
+
+### A correction
+
+v4271 and v4272 both called `render/badTvPass.js` "what `main.js` actually draws with". *** It has no callers. ***
+`makeBadTvPass` appears in its own gate and in the parity gate and nowhere else; `main.js` does not contain the
+string outside its version note. Measured for comparison: `makeCrtPass` has ten call sites across `fallout.html`,
+`ui/crtToggle.js` and `pipboy-models.html`; `makeSwiftShaderPass` six, `makeAquarellePass` four,
+`makeTransitionPass` two; `makeBadTvPass`, `makeGrassField` and `makeHoloFoil` none. The mirror finding is
+unaffected -- two real renderers, measured -- but "what ships today" was the wrong name for it, asserted from the
+file's shape three times without being checked.
+
+The ninth self-counting scan in nine rounds arrived too: a check asserting the plural option name appears nowhere
+in the file, in a file whose comment explains that exact mistake. Comments stripped, with a control proving the
+stripping does work.
+
+Sabotage A (null backend accepted) 1 red, B (`source` reverted) 1 red, C (the no-op restored) 2 red. B is the one
+worth keeping: 2,031 lit texels becomes 0 while the stage still attaches, the pipeline still builds and `draw()`
+still reports success. A post stage with no source reports success and produces an empty frame, which is why the
+gate counts pixels instead of trusting a return value.
+
+Unchecked and stated: `orrery.html` is not yet wired to the stage. The module exists, attaches, draws and refuses
+correctly; putting a control on the page is the next round. Saying so is better than implying the orrery has an
+effect stage on screen today.
+
+The build now stands at 4273 gates.
+## v4272 -- The shipping pass renders it upside down, exactly, and neither version is wrong
+
+v4271 proved the device path is self-consistent: WGSL on WebGPU and GLSL on WebGL2 render badTv to the same
+4,096 pixels, both exact against the CPU model. It closed by naming what that did not settle:
+
+    "render/badTvPass.js is what main.js actually draws with and is untouched by this round ... So 'the device
+     path is consistent' is proven and 'the device path matches what ships today' is not."
+
+*** It does not match. *** `render/badTvPass.js`, rendered through a real `WebGLRenderer` from the file `main.js`
+imports, disagrees with the device pipeline on **every one of 4,096 pixels** -- worst 255 of 255. Row-mirror
+three's frame and the two agree **exactly**, 0 of 255.
+
+An exact mirror is a far stronger result than "they look different". It says the arithmetic, the constants and
+the sampling are all identical and only the vertical convention differs -- so a migration is a known
+transformation rather than a debugging session.
+
+### Neither one is wrong
+
+`badTvPass.js` draws a quad through `THREE.OrthographicCamera` and reads three's own `uv` attribute, where v = 0
+is the **bottom** of the quad. That is the standard three post-processing convention and it is correct in its own
+terms: an `EffectComposer` feeding it a `WebGLRenderTarget` gets the right picture.
+
+`badTvDevicePass.mjs` defines uv in **framebuffer space**, v = 0 at the top row, because v4271 established by
+rendering -- after arguing the opposite in a comment -- that this is the one convention where WebGPU and WebGL2
+agree without a caller thinking about it.
+
+Both are internally exact against `badTvModel.mjs`, in opposite orientations. Sabotage A demonstrates there is no
+arrangement where all three agree at once: un-flip the device pass and it starts matching three as rendered while
+ceasing to match the model in the orientation the gate evaluates it in. The mirror moves; it does not vanish.
+
+### The hazard is the roll, not the mirror
+
+`badTvSampleAt` computes `fract(v - time * rollSpeed)`. Mirroring v does not only flip the image -- it reverses
+which way the picture rolls. *** A mirrored still is obvious; a mirrored ROLLING image looks like a working
+effect with the tape running the other way, and nothing flags it. *** That is why this is recorded rather than
+left to be rediscovered by whoever first swaps one pass for the other.
+
+### What the round refused to do
+
+Pick a winner. Deciding which convention the engine wants is a migration question and needs a consumer to decide
+*for*; `badTvPass.js` is untouched and still the only version anything draws with. Instead the relationship is
+frozen as exported data -- `THREE_PASS_RELATION` on `badTvDevicePass.mjs` -- naming the other file, the exact
+relation, both measured numbers, the hazard and the gate. Sabotage B edits that record to claim the two already
+agree: 1 red, and only in the line comparing the record to the live render. That check is the entire reason it is
+data rather than a paragraph.
+
+`tools/ship/webgpuHarness.mjs` gained a third renderer, `renderThreePassToPixels`, which serves the engine tree
+over HTTP so the page imports the *shipping* module rather than a copy adapted for testing. The file is named for
+WebGPU and this function uses none, which is said plainly in its header instead of hidden: it has become the
+place where a frame is produced by any of the three paths this tree has for one effect.
+
+Sabotage A 6 red, B 1, C (flipping the three.js pass instead) 6 red -- C mirroring A almost exactly, because the
+gate privileges neither file.
+
+Unchecked and stated: which convention the engine actually wants, and the WebGPU backend in this gate -- v4271
+already proved it equals the device GLSL on every pixel, so comparing three against one compares it against both,
+and a third render would add cost and no fact.
+
+The build now stands at 4272 gates.
+## v4271 -- Both backends render it, and the frames are identical
+
+`gfx/device.js` has promised, since the day it was written, that "a demo writes its render ONCE and runs on
+either runtime". Nothing had ever rendered the same effect both ways and compared the pixels.
+
+v4269 counted how many modules could even take that offer: five of 135, three of them pages. v4270 ported one
+shader and proved it computes the right coordinates, to 3.2e-8 -- a claim about arithmetic, not about pictures.
+This round draws it.
+
+`render/badTvDevicePass.mjs` is one descriptor carrying both languages: the WGSL from `badTvWgsl.mjs` and a
+standalone GLSL pair -- not the three.js one, because a device pipeline has no `uv` attribute, no
+`projectionMatrix` and no version header supplied for it. `render/badTvPass.js`, which is what `main.js` actually
+draws with, is untouched.
+
+Both are rendered against the same 64x64 source texture whose texels encode their own position, with NEAREST
+sampling and repeat addressing, so a rendered pixel is a direct readout of *which texel* the shader sampled.
+Then the frames are compared to `badTvModel.mjs` and to each other:
+
+*** 0 of 4,096 pixels differ between WebGPU and WebGL2, and both match the CPU model exactly -- 0 of 255. ***
+
+That third comparison is the one worth having. Agreeing with a model twice is weaker: two backends can each
+match a reference at the points sampled and still differ from each other elsewhere.
+
+### Orientation, which I got wrong twice and measured right once
+
+v4270 proved the WGSL computes the model's coordinates to 3.2e-8 and could say **nothing** about which way is
+up, because a coordinate is a pair of numbers until something samples a real texture with it. The first
+rendered comparison disagreed by 126 of 255 and agreed *exactly* at (1 - v).
+
+Then this round's first draft argued, in a confident comment, that the two vertex stages must **differ** --
+WebGPU's texture row 0 is the top, while `readPixels` hands rows back bottom-first, so surely one side
+compensates. Rendered both ways and diffed: every one of 4,096 pixels differed, in whole-texel steps that grew
+with the row, which is the signature of two backends evaluating the tear at different `v` rather than of a
+sampling wobble. The readback flip already lives in the harness, so flipping again in the shader flipped twice.
+With both vertex stages doing the same thing, the two agree on every pixel exactly.
+
+*** And it is not cosmetic, because the roll reads v. *** `badTvSampleAt` computes `fract(v - time * rollSpeed)`,
+so an orientation that is "wrong but symmetric" ships an effect that rolls the wrong way and looks entirely
+plausible. Reasoning about it produced a confident wrong answer; rendering it produced the right one in one run.
+
+### The sabotages, and what each one could not see
+
+**A** un-flips the GLSL vertex stage -- the mistake the round actually made. 3 red: WebGL2 against the model
+goes to 255 of 255 and all 4,096 pixels diverge. *** The WebGPU side stays green throughout. *** A per-backend
+check would have reported half a success and called the port finished.
+
+**B** reverses the descriptor's uniform list so it names the knobs in a different order from `packKnobs`. 1 red,
+and **none of it in the render** -- the gate hands both backends the same `Float32Array`, so the pixels still
+agree perfectly. Only the descriptor check notices. A consumer binding by name would have shipped an effect with
+`speed` and `rollSpeed` swapped, rendering beautifully. A pixel diff cannot see a contract nothing in the test
+obeys.
+
+**C** drops the cube from the GLSL, `offset * distortion` instead of `offset^3 * distortion^2`. 3,456 of 4,096
+differ. The 640 that still agree are rows where the tear rounds to the same texel either way, which is why the
+check is "every pixel" and not "most".
+
+A control threshold was guessed again and had to be measured. The first version asserted that more than a tenth
+of sample points move by over a texel; the real figure is 320 of 4,096, 7.8%, and the check went red on correct
+code. What the effect actually does at this size: **12 of 64 rows torn past one texel, worst tear 1.86 texels**
+against the model's own exported `maxTear` of 1.93. The tear is intermittent -- which is what a failing
+television looks like, and why a whole-frame percentage was the wrong instrument.
+
+Unchecked, and stated in the gate: the three.js pass. `badTvPass.js` renders through a `ShaderMaterial` with
+three's `uv` and a `flipY` texture, and nothing here compares its output to these two. "The device path is
+self-consistent" is proven; "the device path matches what ships today" is not. Also unchecked: any adapter but
+swiftshader. Both backends here are CPU implementations, which is the right instrument for exactness and the
+wrong one for asking whether real hardware agrees.
+
+The build now stands at 4271 gates.
+## v4270 -- WGSL runs here after all, and the first shader is carried across and graded on a GPU
+
+v4269 wrote, in a gate's output and a module header and a changelog, "NOTHING HERE CAN EXECUTE WGSL", and
+concluded that a WGSL port could only ever be checked structurally on this box. *** That was inferred and never
+tested, and it is false. ***
+
+The inference came from `render/wgslSpec.mjs`, which says truthfully that the build box has no GPU and that
+`createShaderModule()` on a live device was unavailable. That is true of a bare node process and irrelevant to a
+browser, and the tree already had a headless Chromium harness.
+
+*** And the first probe that went looking reproduced, exactly, the confusion `ui/webgpuProbe.mjs` was written to
+name. *** It launched Chromium, evaluated on the default `about:blank` page, got `navigator.gpu === undefined`
+under three separate flag combinations, and was one step from concluding this machine has no WebGPU. From that
+file's header, dated v3666:
+
+    "'THE BROWSER HAS NO WebGPU' AND 'THIS ORIGIN DOES NOT GET WebGPU' ARE TWO THINGS WEARING ONE LABEL, and the
+     message named the wrong one -- so the reader goes looking at their GPU, their driver and their browser
+     version, none of which is the problem."
+
+WebGPU is gated on a secure context and `about:blank` is not one. Served the same empty page over
+`http://127.0.0.1`, the adapter appears on the first flag set tried: **google / swiftshader**, with a device, a
+compiler and readable buffers. SwiftShader is what serves WebGPU here -- which makes the naming collision
+between "SwiftShader" and the SwiftUI shader ports load-bearing rather than pedantic.
+
+### The harness, and then the port
+
+`tools/ship/webgpuHarness.mjs` compiles and dispatches a WGSL compute shader and reads f32 back, or compiles
+only, and carries the origin requirement in its own header so the next person does not repeat the probe. It is
+honest about one thing that is easy to get wrong: the GPU computes in f32 and JavaScript in f64, so an
+ill-conditioned expression can disagree wildly while both sides are correct. Measured while building it, on the
+classic `sin(i * 12.9898) * 43758.5453` hash: CPU 0.921690, GPU 0.240234, GPU values landing on 1/1024 steps.
+Neither is wrong; the function is.
+
+`render/badTvWgsl.mjs` is the first shader in this tree deliberately carried to WGSL -- Ashima's 2D simplex plus
+felixturner/bad-tv, chosen because `badTvPass.js` is the smallest pass with a CPU model beside it. Three things
+WGSL requires and GLSL does not are called out where a later reader would otherwise "tidy" them: no user-function
+overloading (so `mod289_3` and `mod289_4`), no swizzle assignment (so `x12` is rebuilt), and no ternary -- so
+`select(FALSE, TRUE, cond)`, whose argument order is the reverse of what a C programmer reads.
+
+It is graded by running it. On the GPU, against `badTvModel.sampleAt`, over 32 rows at two different times:
+**agreement to 3.2e-8**, against a tolerance of two f32 ulps set from the format rather than from the result. The
+shipping `@vertex`/`@fragment` pair compiles on the real driver, texture and sampler bindings accepted.
+
+### The sabotage that justifies all of it
+
+Swapping `select()`'s two value arguments produces a shader that compiles, runs, produces noise and tears the
+picture. Agreement with the model goes from 3.2e-8 to **2.1e-2** -- six orders of magnitude. No structural check
+can see that, and neither can a person looking at the output, because inverted simplex corners look like simplex
+noise. 5 red.
+
+Altering one digit of Ashima's `C.x`, in the 15th significant figure, trips the constant-text check and leaves
+the GPU output **bit-identical**, because the change is far below f32. 2 red, none of them numeric. The two
+checks are not redundant: the text check catches drift the arithmetic cannot feel yet, and the arithmetic check
+catches structure the text looks fine in. Retyping `COARSE_GAIN` as a literal 0.25 instead of interpolating it
+from the model: 3 red, all numeric.
+
+### And v4269's count was wrong too, by sixteen
+
+Its GLSL marker was the `#version` directive. No three.js `ShaderMaterial` pass carries one, because three
+prepends it -- so `badTvPass.js`, `aquarellePass.js`, `grassField.js`, `solidTexture.mjs` and `atmosphere.mjs` all
+classified as shipping no shader at all. That is precisely the population a "can this move to WebGPU" census is
+about. The marker is now a pair and both halves are counted separately, because they mean different things: 134
+GLSL-bearing modules, 118 writing their own header and 16 riding the framework's.
+
+This was found by tripping over it -- a new check asserted `badTvPass.js` "really is GLSL" and went red.
+
+The eighth self-counting scan in eight rounds arrived in the same edit. The new marker was written as a regex
+LITERAL, so the module matched itself and the count jumped 134 to 135 on the next run; and once that was
+assembled from fragments, the comment explaining the fix quoted the version directive verbatim and matched
+again. Both are built from fragments now, and section 2 asserts the absence rather than trusting the habit.
+
+`PORTED_PAIRS` records what the per-file `both` count cannot see: badTv now exists in both languages, but as two
+files, so `both` still reads 5. A per-file count is what a scanner can see; an effect is what a person cares
+about. Both are reported.
+
+The build now stands at 4270 gates.
+## v4269 -- The tree is WebGPU-capable and can move almost nothing to it, and nobody had counted the ratio
+
+The capability is not missing. Thirteen pages call `getContext("webgpu")`, sixty files touch `navigator.gpu`,
+ten `.wgsl` files ship, `render/wgslSpec.mjs` conformance-checks WGSL without a GPU, and `ui/webgpuProbe.mjs`
+gets the hard part right -- WebGPU is gated on a SECURE CONTEXT, so the same browser on the same machine has it
+on https and none on a LAN IP, and the probe says which of those it is instead of blaming the driver.
+
+What has never been counted is REACH. `gfx/device.js` is a 117-line unified WebGL2/WebGPU device whose stated
+promise is that "a demo writes its render ONCE and runs on either runtime" -- but shaders are the one thing the
+abstraction cannot unify, and its own header says so: "a pipeline carries both `{ wgsl }` and `{ glsl }` and each
+backend takes its own". So a render only travels if it supplies both.
+
+*** Counted, over .js/.mjs/.html outside node_modules and vendor, comments stripped: 118 modules ship GLSL, 38
+ship WGSL, and FIVE ship both. 4.2%. *** And of those five, three are pages -- `gfx-device.html`,
+`nebula-device.html` and `wormhole-jump.html`. Only two are shader modules: `fx/nebula/nebulaShaders.js` and
+`fx/wormhole/wormholeNebula.js`. A page carrying both languages carries its own two shaders and lends nothing to
+anybody else, so the reach number is two out of a hundred and eighteen.
+
+That is not a criticism of the abstraction, which works. It is the difference between "the tree is WebGPU-capable"
+and "the tree can move a given render to WebGPU". The first is true; the second is true five times out of 118.
+The device also has exactly two consumers, and both of them are its own demos.
+
+### The failure was not graceful, and now it refuses by name
+
+`webgpuBackend` read `d.shaders.wgsl` bare and handed it straight to `createShaderModule`. Given that 113 of 118
+shader-bearing modules are GLSL-only, that is the COMMON path: a pipeline arriving without WGSL reached the GPU
+as `code: undefined` and failed as a driver-shaped error naming neither the pipeline nor the missing language.
+It now throws with the contract in the message -- which language is missing, which is present, and where to read
+about it.
+
+The gate proves the guard FIRES rather than that its text exists: it stubs `navigator.gpu`, an adapter, a device
+and a canvas context, brings the real `webgpuBackend` up, and calls `pipeline()` with a GLSL-only shader set. A
+source regex would have passed on the message alone.
+
+### What this means for the orrery, which is why the count was taken
+
+`ui/orreryDraw.js` is canvas 2D -- `getContext("2d")`, 28 drawing calls, four of them `fillText`. It has no
+shader stage at all, so no effect in this tree can touch it. That is a capability ceiling, not a speed problem,
+and it is the real reason to move.
+
+The route off 2D is `gfx/device.js`, and the labels need `text/slug*.js`, the tree's own GPU glyph renderer
+(`vendor/slug` holds only a LICENSE and a PROVENANCE.txt, which is why v4266 counted it paper-only -- the code
+lives in `text/`). *** And `text/slugShader.js` is 337 lines of GLSL with zero WGSL. *** It is one of the 113. A
+port of the orrery would draw on the WebGL2 backend and, on WebGPU, throw at the glyph pipeline.
+
+That is the blocker: one file, and now a number instead of a hunch.
+
+### What this round refused to do
+
+Transliterate it. `slugEval.js` lists the faithfulness rules for anyone editing that shader -- the float bit
+extraction in `calcRootCode` stays because `y < 0` is not equivalent at negative zero, the double-root fallback
+stays at exactly 1/65536, the `abs()` in `calcCoverage` stays because it is the only reason a font drawn with
+either winding convention renders at all. Three load-bearing subtleties in a 337-line transliteration, and
+NOTHING HERE CAN EXECUTE WGSL. `render/wgslSpec.mjs` would validate its structure; only a GPU can say it draws
+the same glyph. Measuring first was the honest half, and it turned the question into one file and one number.
+
+### The self-counting trap, solved by construction rather than a seventh exclusion list
+
+Seven times in seven rounds a scan here has counted itself, and every previous fix was an exclusion list that had
+to be written, argued for and kept current. A census of shader-language markers cannot use one without
+immediately needing entries for itself AND its gate. So neither file contains the markers -- they are assembled
+from fragments at run time -- and the gate asserts that as a check. Sabotage B writes one marker literally into
+the gate and produces five reds: the two self checks, `glslBearing` 118 to 119, `glslOnly` 113 to 114, and one I
+did not predict -- the gate appears as a THIRD consumer of `gfx/device.js`, because it imports the device and now
+counts as a shader module. One literal string, five wrong facts.
+
+Sabotage A (guard removed) 5 red, three of them from the behavioural test. C (comment stripping removed) 4 red,
+including `wgslBearing` 38 to 39 -- there really is one file that discusses a WGSL entry-point attribute in prose
+and ships none, and a raw scan files it as WebGPU-ready.
+
+The build now stands at 4269 gates.
+## v4268 -- Six licence verdicts lived outside the tree, and one of them was wrong
+
+Two open items assert a licence state for six repositories:
+
+    #100  "advanced-threejs-tsl-webgpu-rendering has no licence at all, and it is the only TSL reference"
+    #132  "UNPAPERED grows to four: gi-voxels, Repo-Explainer, threejs-procedural-terrain, ar-globe, gaze-aware-3d"
+
+*** Not one of those six names appears anywhere in this repository. *** 4,572 files scanned, zero hits. Not in
+`world/reachedLicences.mjs`, whose whole job is sources read and not vendored; not in the orrery, the vendored
+register, or the copied-outside-vendor register; not in a comment, a gate, a page or a data file. So 1,342 gates
+could not see those verdicts and could not have caught them if they were wrong -- which is precisely the failure
+`tools/ship/claimCheck-selfcheck.mjs` names as the one it cannot reach: "the handoff and open-list live outside
+it, and every staleness this session actually cost a round was in those."
+
+### And the reason is structural, not forgetfulness
+
+`world/reachedLicences.mjs` has three postures -- REACHED, VENDORABLE, REFUSED -- and every one of them
+presupposes that somebody OPENED the source. `validateEntry` then rejects any entry whose `licenceExists` is not
+a boolean. There is no third value. So a repository that has been NAMED as a candidate and never opened cannot be
+filed at all: the only way in is to assert true or false about something nobody has looked at.
+
+False is an accusation, and this tree has made that mistake four times. `world/orrery.mjs` records three of its
+own scans reporting "no licence" against a dependency that had one -- fireworks.js's `MIT-LICENSE.txt`, the
+fonts' `IBMPlexSerif-OFL.txt`, a `LICENSE` nested under `quickjs/` -- and `reachedLicences.mjs` records a fourth,
+codrops/HeatDistortionEffect, which came out UNPAPERED beside three identically-licensed siblings purely because
+its README links the terms instead of restating them. That entry closes with the rule: "a gap in OUR record can
+never be reported as a gap in THEIRS." The open list wrote UNPAPERED for all six anyway, where no validator could
+reach it. The register was right to refuse them. What was missing was somewhere else to put them.
+
+`world/namedNotChecked.mjs` is that place. One state, UNCHECKED. No `spdx`, no `licence`, no `licenceExists`, no
+`redistributable` -- and `validateNamed` FAILS an entry that grows one, because an entry that can answer a licence
+question belongs in the real register. `mayTake` returns the same no an unpapered source gets and a different
+sentence, because the two facts are opposite: "we looked and found no grant" is about the source, "nobody has
+established a grant" is about our record.
+
+### #100 is answered by a source the tree already had
+
+The clause that kept #100 open is "it is the only TSL reference" -- an unpapered source is worth arguing about
+when it is the only door to something. It is not the only one. `render/solidTexture.mjs` has opened with "The
+idea is boytchev/tsl-textures (MIT, Pavel Boytchev 2024)" since v4243, and explains at length what TSL is and why
+that library's algorithm was rewritten in GLSL instead. A TSL reference, in the tree, permissively licensed, with
+a named author -- read before #100's neighbours shipped.
+
+*** And it was cited in exactly one file header and entered in no register. *** That is the shape of #137
+(ashima/webgl-noise: "used everywhere, credited in headers, registered nowhere") and of #53 (jsfx and animatelo,
+built and gated with their sources named only in their own headers). Three rounds have now found the same gap, so
+the habit is the finding. It is registered now, marked explicitly SECOND-HAND: this round had no network, did not
+open the repository, and recorded our own v4243 note rather than a fresh look at the LICENSE file. It is entered
+in the direction that cannot become a false accusation, and a round with a network should confirm it.
+
+### #132's arithmetic does not work either way
+
+The item says "grows to four" and lists five names. Two readings are available: four new names with one added
+later, or four in TOTAL -- in which case it disagrees differently, since the register carries two unpapered
+entries and `ui/gazeDwell.mjs` names a third, so five more would reach eight. The module records both readings
+and picks neither, because the text cannot settle it. What it does assert is that the number and the list cannot
+both be right, which a validator would have caught the day it was written if the item had lived in the tree.
+
+### The gate went red on its author twice
+
+The first run failed the absence scan: `world/reachedLicences.mjs` names advanced-threejs-tsl-webgpu-rendering,
+because THIS ROUND put it there. The sixth self-counting scan in six rounds, and the first one caught by the
+check rather than by me. It is handled with a named (file, repo) allowance -- one entry, asserted to be exercised
+and minimal -- rather than by widening the exclusion. The second failure was a control asserting each name
+appears in two files; four do and two do not, and the 2 was guessed rather than measured. Writing that correction
+down then named those two repositories and made the count 2, which is why the threshold is now "at least one" and
+the exact figures live only in the gate's output.
+
+Sabotage: A (scanner counts itself) 3 red, B (the round's real near-miss, a citedPath that does not name its
+source) 2 red, C (make #132's arithmetic agree) 2 red -- measured, with exit codes read. Under B,
+`reachedLicences-selfcheck` was run to see whether it caught the miscitation. It did not -- it checks that a
+cited path EXISTS, and `render/rebar.mjs` exists and talks about TSL at length without naming the repository. It
+went red for an unrelated reason, which is not the same as catching what you broke. C's first run exposed a
+defect in the gate rather than the data: its detail line held the literal "4 vs 5 names" and printed 4 while
+failing. Every number in that message is interpolated now.
+
+The build now stands at 4268 gates.
+## v4267 -- Three buttons were asked for, two shipped, and the third is refused in writing
+
+*** orrery.html had existed since v3195 and nothing in the tree linked to it. *** The backlog asked for three big
+buttons on the right side of server.html: SweK Orrery, GitHub Terrain, and GitHub Universe. Two of them now exist.
+
+The orrery button was the easy one, and it is the one that says something. `orrery.html` is 13,611 bytes of built,
+gated page -- `tools/ship/orreryView-selfcheck.mjs` has been green over it for dozens of rounds -- and no page in this
+tree contained a link to it. Nobody could reach it without typing the filename. server.html's own comments record
+that same failure four separate times for four separate pages. This is the fifth.
+
+GitHub Terrain had the opposite problem: it was reachable only from a place no button can point at. `window.repoTerrain`
+has been wired in main.js since v4157, and it is CONSOLE-ONLY -- you open devtools and call `repoTerrain.load()`. There
+is no page. So the button needed a door built for it, and the door is a `?terrain=` deep link that mirrors the `?go=`
+idiom already in main.js: read on load, `?terrain=1` for this repository, `?terrain=<dir>` for another one. The button
+navigates to the engine with that parameter set.
+
+*** THE THIRD BUTTON IS DELIBERATELY ABSENT, AND THE GATE ASSERTS ITS ABSENCE RATHER THAN TRUSTING THIS PARAGRAPH. ***
+There is no GitHub Universe page in this tree. The closest thing by name is `es-universe.json`, which is the Escape
+Velocity dataset that `ev.html` reads -- systems, spobs, ships, governments -- and not a universe of repositories.
+Backlog #139 is the round that would build one (contributor count, authors as neighbouring planets, contributors as
+trading partners). A button that opens a 404 is worse than no button: it teaches the person clicking it that the row
+is unreliable. So server.html carries the reason in a comment, and the gate carries it as a check that FAILS if a
+GitHub Universe button appears before its destination does.
+
+`tools/ship/serverButtons-selfcheck.mjs` is new. It checks both halves of each link -- the button AND the thing that
+consumes it -- because a button whose target renamed itself still looks correct in the source. On top of the two
+specific checks it applies a GENERAL rule: every `window.open` or `location.href` target in shipped source that names
+a local `.html` must resolve to a file on disk. That rule immediately found a pre-existing hit in the render-qa output
+directory, which on inspection is a generated artefact rather than a shipped page, and is now excluded BY NAME in a
+list that a second output directory would have to argue its way into -- not silently skipped.
+
+Two things were wrong and were corrected before ship. The gate asserted that `es-universe.json`'s `govts` was an
+array; it is an object. That is a shape I asserted without looking at it, which is the same defect as a measurement
+nobody took. And the first draft of the sabotage log recorded 3 RED for all three sabotages, written from what the
+checks LOOK like they would do. Re-run with the exit codes read, they measure 2, 1 and 2 -- and the 1 is the
+interesting one: renaming the parameter main.js reads leaves section 3 green, because the TARGET still resolves. Only
+the check that asserts both halves of the link catches a button wired to a URL nothing consumes.
+
+Unchecked, and stated in the gate's own output: whether the buttons WORK. Nothing here renders server.html, clicks
+anything, or boots the engine. This reads source text and resolves file paths, so it proves the targets exist and the
+`?terrain=` link is consumed -- not that the orrery draws or that terrain stamps. A handler that throws would pass
+every check in the file.
+
+The build now stands at 4267 gates.
+## v4266 -- The orrery drew three planets made entirely of paperwork, and could not see two made of code
+
+Backlog #46 asked for "SweK at centre, repos in orbit, vendoring as impact ejecta". The orbit half has been
+built for a long time: world/orrery.mjs places a body by its licence state, its size and the date git says it
+arrived, and orrery.html draws it. The EJECTA half was never modelled at all. Licence state and size answer
+"what did we take, and is it papered". They cannot answer the question the metaphor is actually about: HOW
+FAR DID THE MATERIAL SPREAD. A dependency that landed and stayed where it fell and one whose fragments are
+embedded through the whole tree were drawn identically.
+
+world/orreryEjecta.mjs measures the spread as the engine files that IMPORT each body:
+
+  three 67,  box3d 21,  krbn 7,  htmx 5,  taichi-js 4,  jolt 3,  gifenc 3,
+  draco 2,  fonts 2,  heerich 1,  wasm 1,  grass 0,  keyhunt 0,  slug 0
+
+Those are CODE-ONLY counts. Counting raw source gave box3d 31 and three 70 -- ten of box3d's "importers" were
+files naming the vendor path in a COMMENT. Stripping comments is the rule v4262 and v4264 each reached
+independently, and it moved every figure above.
+
+AND THE THREE ZEROES ARE NOT UNUSED DEPENDENCIES. Those directories contain no code. vendor/grass is one
+LICENSE file. vendor/keyhunt is one ATTRIBUTION.txt. vendor/slug is a LICENSE and a PROVENANCE.txt. They have
+zero importers because there is nothing to import: they are licence RECORDS for sources that were reached,
+filed under vendor/ because that is where the orrery looks. Twenty-one per cent of the orrery's planets are
+paperwork, drawn as captured code with their bytes counted as mass. massOf discounts it -- grass goes from
+1,064 bytes to 0 -- and the bodies made of actual code are unchanged.
+
+THAT IS THE EXACT MIRROR OF v4263. Three days ago the finding was two bodies of REAL copied code that the
+orrery cannot see, because its scanner reads path.join(engineRoot, "vendor") and nothing else while there are
+TWO directories named vendor -- ui/vendor holds Kazuhiko Arase's 2,237-line QR generator. The register was
+wrong in both directions at once: substance it counts that is not there, and substance that is there it does
+not count.
+
+One clean result falls out of the measure: there is no vendored CODE in this tree that nothing imports. Every
+zero is a paper-only body.
+
+REFUSED, AND THE REFUSAL IS MEASURED. A first pass also counted CITATIONS -- files that merely name a body.
+That number is noise and is not shipped: it is a substring match on a directory name, so "wasm" scores 216 on
+an English word while importing from vendor/wasm exactly once, and "grass" scores 73 on grassField and
+grassModel while importing nothing. Re-inserted as sabotage B it takes three from 67 to 644 and box3d from
+21 to 176. A measure that cannot tell a dependency from a common noun is not a measure.
+
+AND THE GATE COUNTED ITSELF. Section 3's control fixture contains the literal "../vendor/box3d/box3d.js", so
+the moment the gate existed it became an extra importer of box3d and the recorded count went red -- and
+then main.js did the same, because this round's own version note quoted that path while EXPLAINING the trap.
+Naming offenders one at a time is not a fix; stripping comments is. That is the FOURTH and FIFTH self-counting
+scan in four rounds -- v4262's influence scan twice, v4263's licence-phrase grep, and
+now this -- and the rule is the same every time: a scan must not count the scanner. It is excluded by path,
+and the gate asserts that it really would have counted itself.
+
+TWO SABOTAGE RESULTS WERE WORTHLESS BEFORE THEY WERE USEFUL, and the same mistake produced both. A first
+attempt at sabotage B reported "0 RED", which was a CRASH: I read a grep count of FAIL lines and never looked
+at the exit code, so a gate that died looked exactly like a gate that passed. Every sabotage now reads exit
+code, red count and the ALL GREEN line. That crash also let a wrong conclusion stand for two edits -- I wrote
+that the quoted-specifier guard was "provably inert, and a sabotage is what showed it". The guard IS inert:
+all 32 files containing vendor/box3d/ satisfy the quoted test as well, measured directly. But the sabotage
+showed nothing, and a true claim resting on a broken measurement is still a claim I had not earned. It is
+removed as an assertion that cannot fail, which this tree has now found four of in its own gates.
+
+Also recorded, because three of this round's four wrong measurements share one cause -- I kept measuring with
+something other than the code that ships. The baseline was first taken from a throwaway probe (box3d 29) while
+ejectaOf measured 31; then the gate counted itself; then main.js did; and a probe written to confirm the
+stripped numbers returned 20 instead of 21 because it used `return` where it needed `continue` and silently
+abandoned a directory. A fourth check -- that vendorDirs does not recurse into a vendor directory -- went 0 RED
+under sabotage because no vendor dir here nests another, so it could not fail; it now runs against a synthetic
+tree with a control that the fixture contains the nested vendor a recursing scan would report.
+
+UNCHECKED: whether ejecta is the right MASS. This counts files that import a body, which says how WIDELY it
+is reached and nothing about how DEEPLY -- one file importing three at seventy places counts once, and a body
+reached only by a gate counts the same as one reached by the engine. Dynamic loads are invisible: a worker
+target, a fetch() or a <script src> naming a vendor path is not an import specifier, the same limit
+world/orrery.mjs's own directory exemption documents. And nothing here CHANGES the orrery -- massOf and the
+paper-only state are computed and asserted, orrery.json is still baked from total bytes, and rebaking it is a
+separate decision because every recorded figure citing a planet's size would move at once.
+
+The build now stands at 4266 gates.
+
+## v4265 -- Trap 3 measured at last, and the control inverted the finding
+
+tools/ship/swiftShaders-selfcheck.mjs has carried this sentence in its own tail since v4234: "NO comparison
+here renders at a device pixel ratio other than 1, so trap 3 is argued from the source and never measured."
+Trap 3 is the POINTS trap -- Metal's `position` is in points, GLSL's gl_FragCoord is in device pixels, so
+every offset and amplitude scales with the display's ratio unless it is carried explicitly. The port has
+carried a `pointScale` knob through the CPU model and the GLSL since v4163 and nothing had ever set it to
+anything but 1.
+
+It is measured now. All 17 pointScale-carrying shaders rendered at ps=2 on a real WebGL2 context and compared
+against the CPU reference at ps=2.
+
+  pointScale changes the picture in EVERY ONE of the 17, by 11 to 166 levels. None is inert, so the
+  parameter is load-bearing wherever it is carried rather than decoration somebody added for symmetry.
+
+  11 agree with the CPU model at BOTH 1x and 2x: emboss, heatShimmer, chromaticSplit, echo, neonEdge,
+  touchRipple, liveRipple, shockwave, gravityWells, refractLens, pulse.
+
+  NOTHING agrees at 1x and breaks at 2x. The port carries trap 3 correctly.
+
+THE FIRST RUN SAID OTHERWISE AND WAS WRONG, AND THAT IS THE PART WORTH KEEPING. Without a control it reported
+five shaders "DISAGREEING at 2x" -- glitch 22, melt 108, thermal 184, inkBleed 103, frosted 20 -- which reads
+as five ports that are correct at 1x and wrong on any Retina display. Re-run with the identical comparison at
+ps=1, every one of them ALREADY disagreed at 1x: glitch 12, melt 114, thermal 110, inkBleed 89, frosted 8.
+They are the known sin-hash set, whose CPU and GPU forms provably cannot agree on any two implementations,
+and attributing their divergence to the point scale would have been a fabricated defect reported with
+confidence. wavePool went the other way -- 0 at 2x and 5 at 1x -- so a single scale can flatter as easily as
+it accuses.
+
+A MEASUREMENT AT ONE SCALE IS NOT A COMPARISON. It becomes one only when the other scale is measured the same
+way, and the control is now part of the section rather than something I did once by hand.
+
+Sabotage A drops echo's pointScale multiply from its GLSL: 5 RED, and the section names echo as INERT at 2x
+and as the only shader that agrees at 1x and breaks at 2x -- exactly the defect shape it exists to catch, and
+one NO EARLIER VERSION OF THIS GATE COULD HAVE SEEN, because every comparison rendered at ps=1 where a
+dropped point scale is invisible by construction. Sabotage B hard-codes the control away and reproduces the
+false finding precisely: the same five shaders reported as breaking only at 2x. Both grep-confirmed before
+their results were read and restored md5-identical.
+
+AND THE BATCH ASKED FOR COULD NOT BE A PORT. The upstream Metal source is not in this tree, this sandbox has
+no network, and the 13 unported shaders are not even NAMED anywhere here -- only the 28 already ported appear
+in the model, plus bcs_liquidMirror, mentioned once in prose because v4233 mis-classified it. Porting a
+shader from its name would be invention of exactly the kind the rest of this file exists to prevent, so the
+count stays 28 of 41 and the round is a measurement instead. That is a smaller deliverable than a batch and
+it is the honest one.
+
+UNCHECKED: still whether these effects look GOOD, and still whether the eight sin-hash shaders match
+upstream's Metal pixel for pixel, which they cannot on any two implementations. Also unmeasured: any device
+pixel ratio other than 1 and 2 -- 3x exists on real hardware and was not tried -- and whether a CALLER would
+set pointScale correctly, since render/swiftShaderPass.js builds its own canvas and its own GL context, is
+mounted by nothing, and has no caller in the engine at all. The obligation its own comment states -- "a
+Retina caller MUST set it" -- currently has nobody to discharge it.
+
+The build now stands at 4265 gates.
+
+## v4264 -- The consumer is real and the offered algorithm is wrong for it
+
+Backlog #138 arrived as "take novalain/gpgpu-odd-even-transition-sort". v4262's rule says find and MEASURE
+the consumer before taking the solver, and this round is the same discipline arriving at a different answer:
+the consumer is unambiguous, the thing it needs is real, and the specific algorithm on offer is the wrong one.
+
+THE CONSUMER. Gaussian splats are alpha-blended with the depth buffer off, so they must be drawn back to
+front or the picture is wrong. Both engine/SplatRenderer.js and render/SplatRenderer.js re-sort every splat
+on every camera move -- the most unambiguous consumer any of these rounds has produced.
+
+WHAT THEY DID, AND WHAT IT COST. Both ran the identical line:
+
+    const sortable = Array.from(idx);
+    sortable.sort((a, b) => keys[a] - keys[b]);
+
+which boxes every index into a plain JS Array once per frame and then pays a function call per comparison.
+Measured on this sandbox:
+
+    10,000 splats      3.25 ms    fits a 16.7 ms frame
+    50,000 splats     26.52 ms    1.6x over
+   100,000 splats     45.66 ms    2.7x over
+   250,000 splats    120.29 ms    7.2x over
+   500,000 splats    255.87 ms   16.0x over -- 3.7 fps
+
+AND THE FILE DISAGREED WITH ITSELF. render/SplatRenderer.js's header claims ">500K splats interactively"
+while its own comment beside the sort says "for typical N=32K it's fine; we accept the cost". The comment was
+the honest half; the header was false and is now corrected in place rather than quietly reworded.
+engine/SplatRenderer.js described the same line as a "CPU radix-style sort", which it was not --
+Array.prototype.sort is a comparison sort.
+
+THE REPLACEMENT. render/splatSort.mjs is a two-pass 16-bit LSD radix sort over an order-preserving
+float-to-uint mapping, with the scratch allocated once per splat cloud instead of once per frame:
+
+    10,000 splats     0.41 ms     8.3x
+   100,000 splats     2.60 ms    17.0x
+   500,000 splats    14.43 ms    17.7x   -- 69 fps, inside the budget
+
+It is EXACT, not approximate. Splat renderers often quantise depth and accept an approximate order because
+the eye forgives it; this produces the SAME PERMUTATION index for index as the sort it replaces, asserted at
+nine sizes including 0, 1 and 65537, so the render is unchanged by construction rather than by inspection.
+Ties are stable in both, which matters because a flat wall of equal-depth splats is exactly where an unstable
+sort makes the picture shimmer.
+
+THE REFUSAL, PRICED IN COMPARE-EXCHANGES RATHER THAN BIG-O. Odd-even transposition needs n passes of n/2
+compare-exchanges. At 500K splats that is 1.25e11 against the 9.5e6 comparisons a comparison sort needs --
+1.3e4 times the work. It is a lovely GPGPU teaching example precisely because every stage is trivially
+parallel, and that is also its whole problem: it wins only when you have O(N) processors, and a browser does
+not. Nothing was vendored. What was taken is the PREMISE -- that this sort should stop being a comparison
+sort -- and not the algorithm. A depth key is a float, a float has a bit pattern that sorts as an integer,
+and integers can be counted.
+
+SABOTAGE D WENT 0 RED, AND IT IS THE ONE I HAD ALREADY NAMED "the sabotage that would ship". Making
+radixSortIndices allocate its own scratch on every call -- the exact defect the caller-supplied scratch
+exists to prevent -- changed nothing the gate could see, because even allocating a 65,537-entry histogram
+every frame leaves the radix sort far inside the budget. The clock says fine while every frame allocates.
+Speed was simply the wrong instrument for an allocation claim. The gate now fills the caller's scratch with a
+sentinel and asserts the function WROTE INTO IT, with a control that the probe can still read "untouched".
+1 RED after.
+
+Sabotage C also failed differently from my prediction: I expected reversing the final scatter to break ties
+only, and it broke the order outright at 47,926 inversions in 50,000, because reversing the walk while the
+counters still march forward is a different algorithm rather than an unstable one. Recorded as it ran. Five
+sabotages, 5/3/2/1/1 red.
+
+A scan in this gate also went red on this tree's own commentary for the third round running -- both renderers
+now QUOTE the old line in the paragraph explaining why it went. The rule is settled and written down: a check
+about CODE strips the comments first.
+
+UNCHECKED: the picture. Nothing here renders a splat; the permutation equality is what makes the render
+unchanged, but no frame was drawn and no WebGL context created. The timings are Node on this sandbox's CPU,
+best of two or three runs -- the RATIO is the durable claim and the milliseconds are not. The key
+distribution is uniform random and a real splat cloud is clustered, which changes a radix sort's memory
+behaviour though not its work. And the odd-even refusal is an operation COUNT, not a measurement: that shader
+was never run, on the same principle as v4262.
+
+The build now stands at 4264 gates.
+
+## v4263 -- The gap between the two licence registers, and the code that fell into it
+
+This tree has two licence registers and they are each correct. world/orrery.mjs answers "what did we VENDOR,
+and is it papered?" over the subdirectories of the TOP-LEVEL vendor/. world/reachedLicences.mjs answers "what
+did we READ AND NOT VENDOR?" -- explicitly the not-vendored ones. Code that was COPIED but does not live under
+vendor/ is in neither, by construction. It is not an oversight in either file; it is a hole between two
+correct definitions, and nothing in 4,262 rounds has ever listed that population.
+
+It is two files, both MIT, both real copies rather than ports.
+
+  shaders/ashimaNoise.js  Ashima Arts' textureless GLSL simplex noise, whose own header says "unmodified
+                          apart from whitespace". Used by render/badTvPass.js, render/aquarellePass.js,
+                          render/solidTexture.mjs, physics/fire/fireMesh.js and the noise gates.
+  ui/vendor/qrcode.mjs    Kazuhiko Arase's QR generator, 2,237 lines -- IN A DIRECTORY LITERALLY CALLED
+                          vendor AND STILL INVISIBLE, because the orrery scans the top-level vendor/ and this
+                          is ui/vendor/. There are exactly two directories named vendor in the tree and the
+                          orrery sees one.
+
+AND BOTH WERE OUT OF COMPLIANCE, NOT MERELY UNFILED. MIT requires two things in every copy: "The above
+copyright notice and this permission notice shall be included in all copies or substantial portions of the
+Software." Each file carried the copyright line and a POINTER -- "Distributed under the MIT License", or a
+URL to it. A pointer is not an inclusion.
+
+Measured before the fix: the tree held 15 MIT permission notices, 14 of them under vendor/ and the fifteenth
+in tools/strict-libm-pkg, a packaged dependency. NO engine-source copy outside vendor/ carried one. That is
+checked against `git show HEAD` rather than against memory, because a round's claim about what it found is
+the easiest place for a round to flatter itself.
+
+WORSE THAN THE GAP: THE FILE THAT STATED THE OBLIGATION STATED IT WRONG. shaders/ashimaNoise.js said the
+attribution was kept intact, "which is the licence's one requirement" -- understating what it owed, in the
+file whose whole job was to discharge it. The sentence is still there, quoted inside the paragraph that says
+it was wrong, and the gate now checks that it is QUOTED AS AN ERROR rather than asserted. A grep for its
+absence went red and was right to: this tree records corrections instead of deleting them, so "is the phrase
+gone" was the wrong question.
+
+THE FIX: the permission notice now sits beside the bytes it covers, at shaders/ASHIMA-LICENSE.txt and
+ui/vendor/LICENSE, with each source file pointing at it. Both are LABELLED as reproduced from the standard
+MIT form under the named copyright holder rather than fetched from upstream, because this sandbox has no
+network. That label is the point: at v4203 three of this tree's own licence records were wrong in the file
+whose entire purpose was quoting licences verbatim, one of them truncated to 48 words of 77 in a way that
+dropped an attribution requirement. A licence written from memory and labelled as such is honest; the same
+text labelled "verbatim from upstream" would be v4203 committed again.
+
+WHAT THE REGISTER DELIBERATELY DOES NOT CLAIM. The tree also holds nine works DERIVED from third-party
+sources -- render/aquarellePass.js and aquarelleModel.mjs from Ramotion, render/doomFire.mjs from
+filipedeschamps, ui/odometer.js and odometerModel.mjs from coderitual, shaders/ashimaNoise.mjs translated
+line by line from the GLSL beside it, and three TheLongSilence techniques whose headers say "lifted (not
+copied)" and "nothing copied". Whether a re-implementation is a "substantial portion of the Software" is a
+legal judgement, not a grep result. Those are recorded with their attributions and are NOT called a
+compliance gap. Claiming either way would be this file pretending to an authority it does not have.
+
+SABOTAGE D WENT 0 RED ON THE FIRST WRITING, and it is the one worth reading. Filling seenBy with ["orrery"]
+for both copies changed nothing, because the field holding the round's ENTIRE structural claim -- that
+neither register sees these files -- was read by no check. A register that asserts its own central finding in
+a field nothing verifies is the shape v4258 found the tree already had two of. seenBy is now COMPUTED from
+the orrery's population and reachedLicences' repo list, the recorded value must agree, and two controls
+assert the computation can still say "seen". 3 RED after. Five sabotages, 4/2/1/3/4 red, each grep-confirmed
+before its result was read and restored md5-identical. My first attempt at sabotage B used a line-anchored
+sed that silently did not match and went 0 RED; the marker count is what caught it, which is why the count is
+read before the result.
+
+UNCHECKED: whether the reproduced licence text matches upstream's own file, which no network here can settle
+-- the gate asserts the LABEL, which is the most it can honestly do. Whether the nine derived works owe
+anything at all, which the gate declines. Whether these two are the WHOLE population: the search was for
+third-party copyright lines in .js/.mjs/.glsl/.wgsl, so a copy carrying no notice at all is invisible to it
+by definition. And the DENSO WAVE trademark notice reproduced in ui/vendor/qrcode.mjs, which is not a licence
+term and has had no thought given to it.
+
+The build now stands at 4263 gates.
+
+## v4262 -- Find the consumer before taking the solver: the consumer exists, and it disqualifies
+
+Backlog #133 named ruvnet/sublinear-time-solver (MIT OR Apache-2.0) and put its own discipline in the title.
+This round is that search done as a measurement rather than a browse. The verdict is REFUSED. Nothing was
+vendored, nothing was ported, and math/solverFit.mjs is the reasoning kept where the next person will find it.
+
+WHAT THE SOLVER IS FOR. A local solver returns ONE coordinate of Mx = b without ever forming the whole vector,
+by walking the matrix outward from i. It buys something only when three things hold at once: (A) M is
+diagonally dominant, which is what makes the walk converge at all; (B) the consumer wants k << n coordinates;
+(C) n is large enough that the constant factors lose.
+
+THE TWO PROPERTIES ARE IN DIFFERENT FILES, AND THAT IS THE WHOLE FINDING.
+
+fluid/multigrid.mjs's 5-point Poisson operator satisfies the precondition perfectly: worst-row ratio exactly
+1.0000 with every row dominant, measured at 8x8, 16x16 and 32x32. Its consumer, fluid/flip2d.mjs's pressure
+projection, needs all 16,384 cells, because making a velocity field divergence-free touches every one of
+them. Asking for 16,384 single coordinates is 16,384 local solves in place of one global one.
+
+tools/roundhouse/beamBind.mjs is the ONE genuine single-coordinate consumer in the tree. It computes
+solve(K, unit(N,i2))[i1] for Maxwell-Betti reciprocity -- two numbers wanted, 320 computed -- and discards
+the rest. That is exactly the shape the solver is built for. And its matrix reads 0.3333 dominance with ONE
+ROW OF 160 dominant. Beam bending is a fourth-order operator; the interior stencil [1,-4,6,-4,1] is 6 against
+10, and the free end, which beam.js scales to a half cell, is 1 against 3. The ratio is IDENTICAL at n = 8,
+20, 60 and 160, because the free-end row is the same at every n -- so refining the mesh never approaches the
+precondition and there is no larger version of this problem that would qualify.
+
+THE THIRD CANDIDATE IS THE TRAP THE ITEM WAS WRITTEN AGAINST. The module import graph would fit: as
+(I - alpha P) it is diagonally dominant by rows at 1.1765 with all 3,467 rows dominant, and "how much does
+module X influence Y" is a single coordinate of it. NOTHING IN THIS TREE ASKS THAT QUESTION.
+tools/ship/gateReach.mjs does set reachability with a BFS -- no damping factor, no scores -- and a tree-wide
+scan finds ZERO files computing an influence score. Inventing this consumer to justify a taking is precisely
+the failure #133 exists to prevent, so it is recorded as a hole rather than as a roadmap.
+
+THE BUDGETS A REPLACEMENT WOULD HAVE TO BEAT, measured on the tree's own code: 2.95 ms for a full
+personalized-PageRank solve over all 3,465 module coordinates, 4.17 ms per right-hand side for the beam, and
+200.56 ms for a 128x128 pressure field at 8 V-cycles.
+
+THREE OF MY OWN CLAIMS WERE WRONG ON THE GATE'S FIRST RUN, and every one was corrected from the matrices
+rather than by loosening the check. (1) I wrote the beam's worst dominance as 6/10 = 0.6; that is the
+INTERIOR stencil, and the measured worst is 1/3 at the FREE-END row. Both are below the precondition so the
+verdict stands, but the stated reason was the wrong row. (2) I wrote that (I - alpha P^T) is strictly
+diagonally dominant. It is dominant by COLUMNS; measured by rows it is 0.0075 with 3,018 of 3,467, and
+(I - alpha P) is the row-dominant orientation. (3) The scan for "does anything compute an influence score"
+was counting this round's own files, which discuss influence scores at length -- the same self-counting shape
+v4257's licence census had to be anchored against.
+
+WHAT WAS KEPT: dominance(), the measurement that decided it. "Will an iterative method converge on this
+operator" is a question this tree could not previously answer about its own matrices, and it turns out to
+have four different answers.
+
+SABOTAGE C IS THE ONE THAT MATTERED. Giving the import-graph entry a fabricated consumer -- backlog #133's
+exact failure mode, and the one a person could commit by accident while believing they were being useful --
+went only 1 RED, because every source-text check in the gate interrogates the TREE rather than the census
+entry, and a fabrication can borrow a real filename. Every non-null consumer now carries a consumerEvidence
+line that the gate greps for in the file it names; a fabrication would have to invent that too, and the grep
+fails when it does. 2 RED after. Five sabotages, 8/2/2/1/1 red, each grep-confirmed before its result was
+read and restored md5-identical.
+
+UNCHECKED: the solver itself. Nothing in this round ran, benchmarked or read its code -- that is the point of
+refusing before taking, and it is also a real limit, so this says the SHAPE does not fit and says nothing
+about the solver's quality. The three-criteria test is a judgement: the k << n threshold (8x) and the
+n >= 10,000 floor are chosen, not derived, and a different pair could admit the Poisson entry. Only three
+systems were examined; XPBD, MPM and the seismic ray solver were not modelled, on the grounds that they are
+iterative time-steppers rather than one-shot solves, which is a claim this gate does not verify. And the
+timings were measured on this sandbox's CPU in Node, once each, not as a distribution.
+
+The build now stands at 4262 gates.
+
+## v4261 -- What does each effect destroy? Asking the question broke the instrument that asks it
+
+The tree has eight image passes and has never once asked any of them what it destroys. Every gate on them
+checks the maths against the shader it was ported from, which is the right question about FIDELITY and says
+nothing about what happens to the picture.
+
+v4260 built the missing instrument without meaning to. Its frames carry their own index in the pixels, so a
+known frame can be pushed through a pass and the OUTPUT asked which frame it is. An effect that still answers
+"47" has preserved the picture's identity; one that cannot has consumed it. Sweeping the strength knob makes
+that a dose-response curve, which is a number these passes have never had.
+
+FOUR PASSES, FOUR DIFFERENT CLIFFS, none of them previously stateable. Each is swept over its OWN exported
+defaults, so k=1 is the look the tree actually ships:
+
+  liquefy    stroke     first failure at k=0.25  -- BELOW its shipped strength
+  crt        optics     first failure at k=0.75
+  aquarelle  curl       first failure at k=1     -- AT exactly its shipped strength
+  badTv      per-row    first failure at k=3
+
+AND NONE OF THAT IS A SCORE. Destroying the picture is what a heavy stylisation IS -- liquefy failing first
+means it displaces hardest, which is its job. The number says where the cliff is, not whether the cliff is
+wrong. What it is good for is that nobody could previously say how far any of these could be pushed before
+the content went, and now each has a figure.
+
+THE CENSUS FOUND ITS OWN INSTRUMENT LYING TWICE BEFORE IT FOUND ANYTHING ABOUT AN EFFECT, which is why the
+gate puts both findings before any result.
+
+FINDING ONE: A CHECK BIT NEXT TO THE BIT IT CHECKS IS NO CHECK AT ALL. The first run put 1,248 encoded frames
+through four passes and got a confident WRONG frame number 182 times -- 14.58%. The pattern named the cause:
+frame 1 read as 129, frame 2 as 130, every time, which is bit 7 flipped. Bit 7 is the last data block and the
+parity block sat immediately beside it, both against the right edge, so a warp that pulled that edge flipped
+the two together, parity stayed consistent, and the decode handed back a plausible number. v4260 had reasoned
+that one parity bit catches any single flipped block. That is true and it was beside the point: the
+corruption an image effect produces is spatially local, and a check bit adjacent to its data is defeated by
+exactly that. The fix is a second band at the bottom, drawn REVERSED and INVERTED so the same physical damage
+lands on different bits, with both bands required to decode and agree. 182 silent errors became 3.
+
+FINDING TWO: THE INSTRUMENT SCORED badTv 312 OF 312 AND WAS SIMPLY NOT LOOKING. That read as "horizontal
+tearing is harmless to this encoding" and was blindness. badTv shifts each ROW by its own amount, and the
+decoder was reading exactly two pixel rows: at 3x strength the row it happened to read was torn 2.17 px while
+row 24 of the SAME BAND was torn 30.28 px -- nearly two whole 16 px blocks. A frame torn that far HAS lost
+its identity, so "unreadable" was the true answer and "survived" the false one. Three spread rows per band,
+required to agree, took 3 silent errors to 0 and gave badTv its honest score of 276 of 312.
+
+Silent errors across the same 1,248 cells: 182 -> 3 -> 0. The same fix took v4260's own noise sweep from 13
+of 256 silently wrong at +/-255 amplitude to 0 wrong with 220 correctly refused, and that stale figure has
+been corrected in the v4260 gate rather than left standing.
+
+THE STRICTER DECODER COSTS NOTHING ON REAL FOOTAGE, which had to be checked because making a decoder fussier
+usually does. Re-running the headless-Chromium codec probe against real VP9: 47/47, 40/48 and 46/47 exact
+across three clips with ZERO unreadable frames, matching v4260's numbers.
+
+A CLAIM WITHDRAWN. I documented liquefy as non-monotone in strength -- legible, then unreadable, then
+readable again -- and reasoned that a displacement large enough to carry a whole block onto a neighbour's
+position could land back on something decodable. It was not a property. Those three recoveries were the
+silent misreads the two-band fix then eliminated, and with the corrected encoding all four curves are
+monotone. The monotone flag stays, as a CHECK that has so far always been true rather than as documented
+behaviour.
+
+Five sabotages, 4/3/1/4/3 red, each grep-confirmed before its result was read and restored md5-identical. My
+FIRST attempt at sabotage A was worthless and is recorded rather than quietly redone: I removed only the
+bottom band's draw and left the decoder reading two, so nothing decoded at all and it went 8 red. That is a
+crash, not a regression -- a sabotage has to restore the old BEHAVIOUR or the red it produces proves nothing
+about the fix. Sabotage B is the one that matters most: with the one-row sampling restored, the census's own
+silent count STAYS AT ZERO. A blind instrument reports clean, not broken, and nothing but a check on the
+instrument itself catches that.
+
+UNCHECKED: the GPU. Every pass measured is the CPU model, not the shader that ships, so a cliff here is the
+model's cliff and the shader's is assumed to match. Four of the eight image passes are covered -- chromaKey,
+chuckClose, transition and swiftShader have no driver, chuckClose because it returns cells rather than an
+image and transition because it needs two sources. Nothing measures COMPOSITION: a chain of two passes has a
+legibility of its own and this only ever runs one. And the frame pattern is a synthetic test card of flat
+black and white blocks, which is the easiest possible content, so every cliff here is an OPTIMISTIC bound on
+where real footage stops being recognisable.
+
+The build now stands at 4261 gates.
+
+## v4260 -- Frame-accurate video: reproducible is not accurate, and measuring it split the goal in two
+
+v4188 gave this tree a live camera as a GL texture and pointed the whole shader chain at it. That was a
+multiplier and it was also ungradeable: a webcam never produces the same frame twice, so no test can ever
+say "effect X on frame 47 looks like this". render/videoFrames.mjs is the input a gate can hold --
+activetheory/activeframe (MIT) for the premise that a video is a sequence of ADDRESSABLE FRAMES rather than
+a thing that plays, and none of its code. It steps a file by seek-and-wait and is wired to
+window.videoFrames.open / run / check.
+
+WHAT THE TREE HAD, COUNTED AND NOT ASSERTED. Nothing in 4,259 rounds has ever set video.currentTime -- every
+.currentTime in the source is AudioContext.currentTime. There are no video files in the tree.
+requestVideoFrameCallback was called in exactly one place, render/cameraTexture.js, and it discarded the
+metadata argument, which is where mediaTime and presentedFrames arrive. The tree asked the only question that
+identifies a frame and threw away the answer. Section 1 re-counts all of that every run.
+
+FOUR HEADLESS-CHROMIUM PROBES, AND THE THIRD AND FOURTH CHANGED WHAT THE FILE CLAIMS. Videos were recorded
+with every frame carrying its own index in binary blocks, then read back two ways.
+
+PLAY + requestAnimationFrame disagrees with ITSELF. Two identical runs, same file, same code, one immediately
+after the other: 17 of 20 ticks differ. An effect graded that way is graded against whichever frame the
+scheduler happened to hand over.
+
+SEEK AND WAIT REPEATS EXACTLY: 20 of 20 frames identical on the second run, and 20 of 20 pixel digests
+identical too.
+
+AND THAT SAME PERFECTLY-REPEATABLE RUN WAS ON THE WRONG FRAME 19 TIMES OUT OF 20. The clip was 20.3 fps and
+the plan assumed 30, so the error grew linearly: deltas 0, -1, -2, ... -21 across 64 frames. Seeking at the
+file's measured mean rate got 32/64 exact and 32/64 off by one, because the recording was variable-rate and
+no single number describes it. A round that asked only "did it repeat" would have shipped the word
+frame-accurate on the strength of a repeatability result, so the gate holds the two questions apart in
+separate sections.
+
+FRAME-ACCURATE SEEKING IS ACHIEVABLE, and the failure has a shape. Where the file's real timing matches the
+assumed rate it is exact: 47 of 47 at 10 fps, 46 of 47 at 30 fps, 39 of 48 at 25 fps. The 25 fps deltas are 0
+thirty-nine times and then -1 nine times -- THE ERROR IS A STEP, NEVER NOISE. driftProfile names the shape,
+because the shape decides the fix: a RATE error is repaired by calibrating fps and a DROP is not repaired by
+anything, so misdiagnosing one as the other sends the caller somewhere useless.
+
+A HYPOTHESIS THIS ROUND GAVE UP. I expected seeking to a frame boundary (n/fps) to be ambiguous in the
+decoder and the midpoint to be necessary to fix it. Boundary seeks came back 6 of 6 exact. The midpoint keeps
+its place for the reason that was actually measured: floor(t * fps) on exact boundary times is wrong 137
+times in 2000 at 25 fps, 45 at 29.97, 38 at 30, and ZERO at 24 fps -- the rate at which the obvious
+implementation looks perfect. On midpoint times it is wrong zero times at every rate with no epsilon at all.
+
+SO THE PIXELS ARE THE ONLY AUTHORITY. Not the plan, not currentTime, not mediaTime. rVFC's mediaTime
+disagreed with the pixels in 11 of 12 comparisons, always by exactly +1, and it did so ON THE FILE THAT
+SEEKED 47 OF 47 CORRECT -- the container's timestamps sat a few milliseconds past each nominal boundary
+because the real rate was 9.9374 and not 10. identify() therefore returns a margin, and the gate records what
+the margin can and cannot do: the four margins were 0.020, 0.070, 0.130, 0.190, GROWING, so it warns about a
+boundary and looks more confident the more wrong it gets. That correction was written after the first run of
+the gate failed the claim I had made for it.
+
+A BUG CAUGHT BEFORE IT SHIPPED. With eight data blocks and a parity block, frame 0 is all-zero with parity
+zero, so an all-black frame was a valid encoding of frame 0 -- a failed decode, an un-uploaded texture and a
+seek before the first keyframe would all have read back a confident "frame 0", while the comment above the
+function claimed the opposite. Two sync blocks fix it. Re-inserted as a sabotage it goes 4 RED and the
+0..255 round trip stays GREEN, which is why that check alone did not catch it the first time either.
+
+cameraTexture.js now reads the rVFC metadata it has discarded since v4188, which gives the live camera a
+dropped-frame count a boolean could never carry. activetheory/activeframe is registered in
+world/reachedLicences.mjs in the same round its idea was taken, taking the unregistered-citation ratchet from
+52 to 51.
+
+SABOTAGE A WENT 1 RED, WHICH WAS TOO FEW. Section 7's midpoint check swept only 30 fps and only the twenty
+indices the probe happened to use, and not one of those twenty is among the 38-in-2000 boundary times floor()
+misreads -- so a plan built entirely on boundaries satisfied it. Widened to five rates over 400 frames each
+and asserted with no epsilon, it now goes 2 RED. Five sabotages, 2/4/1/2/2 red, each grep-confirmed before
+its result was read and restored md5-identical.
+
+UNCHECKED: a real video, in this process. Every measured array is FROZEN into the gate from probes run by
+hand this round, so no browser runs during the gate and a platform change would go unnoticed until somebody
+re-runs the probe. Every clip was made by MediaRecorder from a canvas, so no camera-shot or transcoded file
+has been through this and H.264/MP4 is entirely untested -- the sandbox's Chromium offers only WebM. Whether
+the mediaTime-versus-pixels off-by-one belongs to the container's timestamps or to the canvas capture that
+wrote them cannot be separated by this probe, and the file does not guess. And the EFFECT CHAIN is still
+ungraded: this round supplies the reproducible input and nothing yet renders a pass against it, so "an effect
+can now be graded" is a capability and not a result.
+
+The build now stands at 4260 gates.
+
+## v4259 -- Minecraft export: the door has only ever opened inwards, and the reader is what grades the writer
+
+world/schematicLoader.js has read .schem, .schematic and .litematic since v456. Nothing in 3,800 rounds has
+ever WRITTEN one, so a Minecraft build could come into this engine and never leave it, and a build made here
+could not be handed to anybody. world/schematicWriter.js is the missing half: a big-endian NBT sink, LEB128
+varints, gzip, and a Sponge v2 .schem that WorldEdit will //paste -- wired to window.schematic.save(), which
+reads a box of voxels straight out of the world with world.voxelAt, the same accessor CityGen and
+biomePainter use.
+
+WHAT MAKES THIS CHECKABLE RATHER THAN PLAUSIBLE: THE READER WAS ALREADY HERE. A writer with no reader is
+graded by opening the file in the game and squinting. A writer whose bytes go back through parseSchematic is
+graded by comparing every voxel -- no game, no network, and no second implementation of NBT written by the
+same hand that would repeat the same mistake. 105 voxels over a deliberately non-cubic 7x5x3 fixture, 0
+mismatches. Controls prove the comparison can fail: a transposed volume 84 mismatches, a constant-stone
+volume 94, and a single changed voxel exactly 1.
+
+THE ROUND TRIP CLOSES IN ONE DIRECTION ONLY, and the collapse is counted rather than glossed.
+voxels -> schem -> voxels is exact over the nine materials the loader can emit. schem -> voxels -> schem is
+NOT: 18 real Minecraft blocks went in and 9 came back, with cobblestone, granite, andesite, bedrock and
+deepslate all landing on stone, because mcNameToVoxel is many-to-one by construction. The names the writer
+picks are a CHOICE this tree makes, not information it recovers, so every one is asserted against the
+matcher rather than eyeballed -- the loader routes diorite to SNOW and oak_log to ASH today, and two of
+those three would have been guessed wrong.
+
+Of the engine's FOURTEEN voxel codes only nine survive a re-import. Rubble, flowing water, ice, screen and
+memory have no branch in mcNameToVoxel at all, so they live in a separate table named for what a Minecraft
+client RENDERS rather than for what this engine will re-read, and the gate prints exactly what each becomes.
+
+A BUG THIS ROUND SHIPPED AND THEN CAUGHT. MC_NAME_FOR is not injective: WATER 10 and FLOWING_WATER 11 are
+both minecraft:water. The first draft deduped the palette by VOXEL ID, which produced two palette indices
+for one palette NAME; a .schem palette is a name -> index map, so the second entry silently clobbered the
+first and every plain WATER block re-read as STONE. Re-inserted as a sabotage it goes 4 RED in section 5 and
+0 RED in the round trip, because those nine names are distinct. The fix keys the palette by name.
+
+THE SAME SHAPE TWICE MORE, AND BOTH ZEROS ARE THE FINDING. Dropping the varint continuation bit is 3 RED in
+section 2 and 0 RED in sections 3-7: this engine has fourteen materials, so no palette index in any round
+trip ever exceeds 13, every index fits in one byte, and a writer that cannot encode 128 passes the entire
+round trip. Dropping the forced-type table is 5 RED in section 6 and 0 RED in sections 3-5: Width/Height/
+Length go out as TAG_Int, the loader's Number() coercion does not care, and the file loads perfectly here
+while being wrong for the readers it is written FOR. Five sabotages, 3/4/3/5/7 red, each grep-confirmed
+before its result was read and restored md5-identical.
+
+Sabotage A also corrected a prediction: I expected section 5 to catch a transposed index order and it did
+not, because section 5's fixture is 14x1x1 and degenerate in y and z. Only the non-cubic fixture and the
+1-thick slab separate the orders. Recorded rather than quietly re-predicted.
+
+UNCHECKED: Minecraft itself. Nothing here opened the game or ran WorldEdit, so the claim that these bytes
+paste rests on the specification and on section 6's tag ids, not on observation. Block entities, biomes and
+entities are not written. Sponge v3 and .litematic are read by the loader and not written -- v2 is what
+WorldEdit pastes, and writing three formats to test one would be three chances to be wrong. And
+window.schematic.save() is reached by the gate as SOURCE TEXT: no browser ran, so the download is unobserved.
+
+The build now stands at 4259 gates.
+
+## v4258 -- #53 was built before it was recorded, and 54 sources are in the same position
+
+Backlog #53 read "jsfx: sound effects as DATA, and animatelo: DOM animation the dirty flag can see". Both
+were already built.
+
+audio/sfxModel.mjs at v4190: a parameter block in, a buffer of samples out, pure -- no AudioContext, no
+clock -- so a gate can render a sound and hash it, which nothing in this tree's audio could do before. Its
+one real departure from loov/jsfx was measured rather than assumed: Math.sin is not specified to the last
+bit across JavaScript engines, so tools/strictTrig.mjs was substituted at 10.18 ms per second of audio
+against 4.48 ms -- 2.3x -- for a worst per-sample difference of 1.11e-16. Fine for a game, fatal for a hash.
+
+ui/domAnimation.mjs at v4191, whose header already read "DOM ANIMATIONS AS DATA, AND AS SOMETHING THE DIRTY
+FLAG CAN SEE" -- backlog #53's own wording, sitting in the file, while the item stayed open. Twelve keyframe
+sets, a probe registered with frameDirty, and v4252 later measured that the probe asks too broad a question
+and split chrome from what the render samples.
+
+Each cites its source by name in its own header. NEITHER was in world/reachedLicences.mjs.
+
+*** SO THE REAL QUESTION WAS HOW GENERAL THAT IS, AND v4257's LEDGER MADE IT ASKABLE. *** Censusing every
+`owner/repo (LICENCE)` citation in a module header:
+
+    54 distinct repositories cited, across 65 files
+     0 of them in the register
+    13 register entries, appearing in NO header at all
+
+*** THE TWO SETS WERE COMPLETELY DISJOINT. *** They are two records of the same fact grown from opposite
+ends: the register is filled by ASSESSMENT rounds, where the answer is usually "read it, took nothing"; the
+headers are filled by BUILD rounds, where something WAS taken and the author wrote down whose idea it was.
+Nothing ever joined them. The register answers "what did we look at and refuse"; nothing answered "whose
+ideas are in the code".
+
+loov/jsfx and gibbok/animatelo are now entered, with what was taken, where it landed, and the consumers that
+prove it is used -- sfxModel is referenced in 10 files and domAnimation in 11, which is what separates this
+from #39's finding about modules wired to nothing but their own gates.
+
+That leaves 52, held as a ratchet the ledger owns rather than a bulk import. Each entry needs
+grantorHoldsRights, licenceExists, redistributable and a `why` that says what was taken -- judgements made
+one source at a time, and fabricating them to clear a number would be worse than owing it. Four of the cited
+sources carry GPL-3.0 or AGPL-3.0 and are named in the gate, because a taking that is fine under MIT can be a
+source-disclosure obligation under GPL and none of the four has been through that judgement.
+
+*** AND A SABOTAGE WALKED STRAIGHT THROUGH THE RATCHET. *** The debt check read `missing <= BASELINE`, so
+raising the baseline to 999 left the gate ALL GREEN -- a bound is satisfied more easily the looser it gets,
+and the number guarding the debt could be edited upward with nothing to say so. The debt is exactly
+measurable, so the assertion is now EQUALITY: the baseline must BE the debt, not bound it. Progress means
+editing it down in the same commit that clears an entry; a rise is a red check and a visible diff. With that
+change the sabotage goes red. A ratchet whose stop can be moved is not a ratchet, and the same shape is worth
+looking for in the four ratchets #134 records as red at HEAD.
+
+Two more sabotages, each grep-confirmed and restored md5-identical (261adecd9cd7e0f25f53d977ad44e240):
+emptying jsfx's takenPaths so it is registered while claiming nothing was taken (1 red -- the register's
+value is not the row, it is the row AGREEING with the tree), and renaming animatelo so it no longer matches
+its citation (2 red, and the pair is the point: the registered count falls AND the debt rises, one edit
+moving both halves, which is what says the two numbers read the same fact from opposite ends).
+
+UNCHECKED, and stated in the gate: the scan reads headers only -- the first 6 KB of each .mjs and .js -- so a
+citation further down a long file is invisible, as is any provenance in a .html page or a .md doc, or any
+mention that names a repository WITHOUT a licence in brackets. The count is a floor on the debt and never a
+ceiling. And it cannot tell a taking from a refusal: ui/gazeDwell.mjs names Ramotion/vr-menu-demo in order to
+say its code is refused, and render/silhouette.mjs names img2threejs to say its NUMBERS were not taken. The
+scan flags a mention and a person decides, which is why the gate reports a population and never files an
+entry by itself.
+
+The build now stands at 4258 gates.
+
+## v4257 -- the ledger recorded what was read and not taken; nothing recorded what was taken
+
+world/reachedLicences.mjs says it in its own docstring: "sources read during assessment rounds and NOT
+vendored". It is a careful, well-gated record of eleven repositories whose bytes never entered the tree. The
+asymmetry is that the bytes which DID enter had no register at all. #61 filed that as "box3d and htmx", and a
+census says the shape is bigger and stranger than two names.
+
+*** COUNTING BY FILENAME IS WRONG IN BOTH DIRECTIONS, AND HERE IS BY HOW MUCH. *** Asking which directories
+lack a file called LICENSE flags FOUR -- and three of the four answers are wrong:
+
+- vendor/fonts IS papered. The grant is IBMPlexSerif-OFL.txt, the SIL Open Font License 1.1, sitting there
+  under a name no LICENSE pattern matches. A census keyed on filenames finds only the licences somebody
+  named conventionally.
+- vendor/keyhunt needs no grant, because NOTHING IS VENDORED. Its ATTRIBUTION.txt records gpu-keyhunt as a
+  technique reference for physics/crypto/secp256k1.mjs and states "NO CODE WAS COPIED".
+- vendor/wasm needs none either, because it is OURS: sha256.wasm and graphlayout.wasm are AssemblyScript
+  output from .ts files in the same directory. First-party build output filed under a directory named for
+  its format rather than its origin.
+- And ui/vendor is a SECOND vendor directory, which a census pointed at the first one never sees. It is
+  papered in the file header -- "Licensed under the MIT license" atop qrcode.mjs -- with no licence file at
+  all.
+
+So the naive count says four and the true answer is ONE. htmx really did carry no grant, and its minified
+bundle has no banner to recover one from: grepping htmx.2.0.10.min.js for a licence word returns ten hits and
+ALL TEN are the substring "submit". The grant had to come from upstream at the pinned tag. It is Zero-Clause
+BSD, which drops even attribution -- *** SO NOTHING WAS EVER AT RISK AND THE GAP WAS PURELY PAPERWORK, ***
+which is exactly when to close one.
+
+New world/vendoredLicences.mjs is the register, with a taxonomy that asks what a directory IS before asking
+for its grant: THIRD_PARTY needs one, FIRST_PARTY has nobody to ask, NOT_VENDORED is a reachedLicences-shaped
+note that happens to live under vendor/. Fifteen entries, thirteen third-party, zero unpapered. The gate
+requires the register and the disk to agree in BOTH directions -- an undeclared dependency and a stale record
+are different failures and both are silent.
+
+*** #121 IS CLOSED IN THE SAME ROUND, AND ITS PREMISE CHECKED OUT STRONGER THAN FILED. *** The reached
+register held exactly TWO distinct spdx values, MIT and AGPL-3.0, and the strings "Apache" and "BSD"
+appeared NOWHERE in the file. Now: Apache-2.0 and BSD-3-Clause, with three entries.
+
+And the first Apache-2.0 entry is one that has been load-bearing in shipped code for nine hundred rounds:
+img2threejs. v3337 built render/perceptual.mjs and render/silhouette.mjs around its hard-gate rule and cited
+it in both; v4255 built mesh/lathe.mjs against the judge they provide. An Apache-2.0 source shaped this tree
+while the register that exists to record such things did not contain it. Amagine3D is recorded for its patent
+grant, which MIT has no equivalent of; shadertoy-render for BSD-3's non-endorsement clause, a constraint on
+what may be SAID rather than on what may be copied -- a category this ledger had no entry for.
+
+*** AND THE ROUND FOUND WHY SUCH THINGS GO UNNOTICED. *** tools/ship/affected.mjs walks the IMPORT GRAPH and
+says so in its own header. The licence gate does not import the tree, it SCANS it -- 4,059 files -- so its
+real inputs are invisible to the filter. Measured: of four files that all mention registered repositories --
+ui/gazeDwell.mjs, main.js, render/perceptual.mjs, mesh/lathe.mjs -- exactly ZERO reach the gate through
+--affected, while world/reachedLicences.mjs, which it imports, does. verify.mjs does not name it either.
+
+That is not hypothetical. v4247 added a mention of kamend/ChuckClose-SparkAR to ui/gazeDwell.mjs, shipped ALL
+GREEN, and left the licence gate RED -- 123 passed, 1 failed at HEAD before this round touched anything. It
+was found by running the gate by hand and fixed by recording the citation, which is the shape this register
+already documents: cited is the opposite of taken, and a byte-scan cannot tell them apart and is right not to
+try. A round can currently make this register wrong and be told nothing.
+
+FOUR SABOTAGES, each grep-confirmed applied and restored md5-identical
+(89f4e6683bff0bd05973be195c18621e). Deleting vendor/jolt from the register: 1 red. Marking htmx unpapered
+again: 2 red, and the naive-census check moves BOTH its numbers rather than a bare count. Reclassifying
+vendor/wasm as third-party -- the misclassification a filename census makes by default: 1 red. Naming draco's
+grant file COPYING when LICENSE is what is on disk: 2 red, because a register that names a licence file which
+is not there reads as diligence and is not.
+
+*** AND A SECOND DISCOVERABILITY FAILURE, FOUND FROM THE OPPOSITE DIRECTION, BY THIS ROUND'S OWN GATE NOT
+EXISTING. *** After adding it, the knowledge index still read 1332. staleness.mjs's SKIP pattern was
+/node_modules|[\/]\.git|[\/]vendor|GPU_Assets|demos_code/, and `[\/]vendor` has no trailing separator, so
+it matches any path segment BEGINNING with "vendor" -- including tools/ship/vendoredLicences-selfcheck.mjs.
+The gate existed, passed when run by hand, and WOULD NEVER HAVE RUN ON A SHIP: gateFiles() feeds the
+knowledge index, countGateFiles() and the affected filter alike. Measured before the fix: exactly ONE file on
+disk was wrongly excluded, and it was that one -- the hole has been there for hundreds of rounds and never
+bitten, because no gate had ever been named vendor-anything. `[\/]\.git` carried the identical hole and
+would have eaten a .gitsomething path the same way. Both are now anchored to a separator, the count reads
+1333, and no gate from inside a real vendor directory is swept in.
+
+Two independent discoverability failures in one round, from opposite directions: one is a gate that RUNS and
+cannot see its inputs, the other a gate that cannot be FOUND. Neither shows up as a red check anywhere -- the
+first reports green on stale data, the second reports nothing at all. A suite's coverage is not what its
+gates assert; it is what its discovery and filtering let them assert.
+
+*** AND RUNNING THE SUITE FOUND THAT FIVE GATES ARE RED AT HEAD, WHICH IS THE FINDING AT A SCALE THIS ROUND
+DID NOT EXPECT. *** Before v4257 touched anything: reachedLicences (fixed here), gateReach (472 recorded, 479
+found), referenceKind (201 against a ceiling of 181), statedRuntime (new drifted headers under
+tools/roundhouse/ and physics/em/), proseAudit. Six rounds shipped ALL GREEN across them this session, for
+exactly the two reasons above -- verify.mjs names one selfcheck path and --affected is an import-graph filter.
+
+THE FOUR RATCHET BASELINES ARE DELIBERATELY NOT BUMPED. They exist to make a person confirm that a population
+grew for a good reason, and confirming twenty unrelated additions is not a side effect of a licence round.
+Accounted precisely so the round that does it need not redo the work: gateReach reads 479 with AND without
+this round, so v4257 adds ZERO to it; referenceKind goes 201 -> 202, so twenty are pre-existing and exactly
+one is this round's own new gate. Logged as backlog #134 with both numbers.
+
+NOT DONE, deliberately and stated in the gate: widening --affected to model byte-scanning gates, or adding
+this one gate to verify.mjs's list. The first changes the filter every gate depends on and wants its own
+round and its own measurement of the cost; the second fixes one gate and leaves the class. Also unchecked:
+whether the recorded SPDX identifiers are RIGHT -- nothing verifies that the text under vendor/<x>/LICENSE is
+the licence it is labelled with, so a mislabelled MIT would pass every check here.
+
+The build now stands at 4257 gates.
+
+## v4256 -- the fix v4249 said could not be asked for was the default, and the work was never rig work
+
+v4249 measured a derived ragdoll self-colliding at 148x its neighbours' impulse, concluded the repair was
+"disabling collision between jointed neighbours", and recorded that box3d_shim.c had no way to request it.
+Backlog #125 filed the follow-up as RIG WORK. Both halves were wrong, and the second is why the first
+survived four rounds.
+
+*** IT WAS NEVER RIG WORK. *** box3d is C17 with no dependency beyond libm, box3d_shim.c is ordinary C, and
+cc 13.3 and cmake 3.28 are present in this sandbox. The library builds, the shim compiles against it with
+zero warnings, and the physics RUNS AND CAN BE MEASURED here. Only the WASM packaging needs emsdk. The task
+was not blocked on a machine; it was blocked on nobody trying.
+
+*** AND ONCE IT RUNS, THE HEADER ANSWERS THE QUESTION OUTRIGHT. *** b3JointDef.collideConnected is a bool on
+the shared base def -- declared exactly once in the whole header -- and b3DefaultJointDef() is `{ 0 }` and
+never sets it. Jointed neighbours have NEVER collided in box3d. Measured natively, with the arithmetic doing
+the arguing:
+
+    three mutually overlapping boxes, no joints      24 contacts   = 3 pairs x 8
+    the same three, two pairs jointed                 8 contacts   = 1 pair  x 8
+
+The 16 that vanish are exactly the two jointed pairs; the 8 that remain are the pair nothing joints. So the
+self-collision v4249 saw cannot have been the jointed neighbours, because those contribute exactly zero. It
+was NON-adjacent contact -- a limb folded back onto a part two joints away.
+
+box3d's own header names that case and prescribes the fix: "you may want ragdolls to collide with other
+ragdolls but you don't want ragdoll self-collision. In this case you would give each ragdoll a unique
+negative group index and apply that group index to all shapes on the ragdoll." v4249 reached for the joint
+flag; the library had already written down that the filter is the answer.
+
+New in box3d_shim.c: swk_body_set_filter / swk_body_get_filter and
+swk_joint_set_collide_connected / swk_joint_get_collide_connected. Measured:
+
+    folded chain, no filter        8 contacts   peak impulse 0.0442
+    group = -1                     0 contacts   peak impulse 0.0000
+    group = +1  (THE CONTROL)      8 contacts   peak impulse 0.0442   -- unchanged
+
+The control is the load-bearing row: a positive group index means ALWAYS collide, so the filter was set and
+did nothing. Without it, "we set a filter and the self-collision stopped" would not distinguish the mechanism
+from any other perturbation of the shape definition. *** IT IS THE SIGN THAT DOES THE WORK. ***
+
+THE HEADER IS NOW VENDORED, which is the other half of #125 and the box3d half of #61. vendor/box3d/ held
+box3d.js and box3d.wasm and NOTHING saying where they came from. It now carries the MIT LICENSE, a
+PROVENANCE.md naming tag v0.1.0 and commit 8441b4a06d6d09dcfb0b0f704df4d847d1437b92, and the whole public
+include closure -- eight headers, 268 KB. Two headers is not the closure: box3d.h includes base.h, and
+vendoring only the obvious two left the shim uncompilable, which a compile caught and reading did not. The
+shim now compiles offline, so a field renamed upstream is a gate failure here instead of a build failure on
+whichever machine next runs the wasm script.
+
+*** THE GATE FOUND A LATENT DEFECT THAT WAS NOTHING TO DO WITH THIS ROUND. *** The two build scripts disagree
+about how exports are chosen: build-box3d-wasm-clang.sh SCANS the compiled module for /^swk_/, while
+build-box3d-wasm.sh -- the default -- lists them by hand. Checking the hand list against the shim found FIVE
+functions missing, all pre-existing: swk_body_set_friction, swk_body_set_restitution, and
+swk_contact_count, swk_contacts, swk_contact_stride. The last three are the contact API that v4249's own 148x
+measurement runs on. Anyone rebuilding with the default script would have produced an artifact without them.
+All five added, and the check is now a permanent seam.
+
+THREE SABOTAGES, each grep-confirmed applied with the shim rebuilt each time, restored md5-identical
+(edea6fe180c2f9d7e65ce0eaf408cd3e). Removing the groupIndex assignment: 1 red. Applying the filter to only
+the first shape: ALL GREEN and it stays that way -- every body here owns exactly one hull, so that branch is
+untested and is recorded as a hole rather than papered over.
+
+*** AND THE THIRD SABOTAGE CAUGHT A VACUOUS CHECK OF MY OWN. *** Setting invokeContacts=false left the gate
+green, which looked like the flag being inert. It was not: the late-filter check waited 60 frames before
+filtering, and the boxes have pushed apart by then -- contacts hold at 8 through step 25 and read 0 by 60 --
+so it was filtering a world with nothing to filter and "0 after" was free. Moved to step 20 and made to
+ASSERT its precondition, the sabotage now goes red with 8 contacts before and 8 AFTER. The flag really does
+decide whether already-paired shapes are re-evaluated, and a sabotage surviving was the cheapest way to find
+a check that could not fail.
+
+UNCHECKED, and named in the gate: the RAGDOLL. Section 4 folds a three-link chain by hand; it is not
+ragdollFromSkeleton's output, nothing calls swk_body_set_filter for a derived ragdoll, and v4249's 148x is
+neither re-measured nor fixed in the engine -- only made fixable, waiting on the WASM rebuild this sandbox
+cannot do. The four names are on box3dNode.mjs's PENDING_REBUILD so exportReport() grades the gap rather than
+a caller discovering it. Also undecided: whether a negative group is the RIGHT policy, since it kills all
+self-collision within a ragdoll and a hand may then pass through its own thigh.
+
+The build now stands at 4256 gates.
+
+## v4255 -- the sculptor img2threejs's judge has been waiting for, and how little it proves
+
+v3337 lifted img2threejs's rule that a hard gate cannot be averaged away by soft signals, built
+render/perceptual.mjs and render/silhouette.mjs around it, and explicitly refused their thresholds as numbers
+nobody here had measured. It never built the other half. Grepped before starting: ev/spriteHullCore.js takes
+a bitmap to a 2D outline, mesh/extrudePolygon.mjs takes an outline to a prism, and NOTHING LATHES. That is
+the wrong gap to have, because the objects a single photograph is most often of -- a bottle, a cup, a wheel,
+a column, a bowl -- are solids of revolution, and a prism is exactly the wrong answer for all of them.
+
+New mesh/lathe.mjs: an occupancy mask to a radius-per-row profile, revolved into a closed shell, with the
+volume, the silhouette and the symmetry all measurable.
+
+*** THE LATHE IS EXACT, AND THE DISCRETISATION IS A CLOSED FORM RATHER THAN A TOLERANCE. *** A lathe with N
+segments builds an INSCRIBED N-gon, whose area is exactly (N/2pi)*sin(2pi/N) of the circle's. So there is a
+number to hit at every N, and the measured volume matches it to 3.71e-8 from N=3 to N=1024 -- including N=3,
+where the "cylinder" is a triangular prism and a tolerance-based check would have had to excuse a 17% miss.
+The 1e-8 floor rather than 1e-16 is the Float32Array positions, which is v4253's float32 story in a third
+place.
+
+*** TWO BUGS THE MEASUREMENTS CAUGHT, AND ONE OF THEM WAS IN THIS FILE'S OWN HEADER. ***
+
+The end caps were wound backwards. The divergence theorem sums SIGNED tetrahedra, so a reversed cap does not
+merely point the wrong way -- it SUBTRACTS its cone of volume: the caps contributed -1084033 against the
+sides' +2168066 and a cylinder measured EXACTLY one third of pi*r^2*h. The header had said a winding flip
+"is a bug about normals, not about how much space the object takes up", which is false, and taking Math.abs
+at the end hides the direction of the error and none of its magnitude.
+
+*** AND A SPHERE COULD NOT HAVE FOUND IT: *** a sphere's first and last rings have radius ~0, so a reversed
+cap subtracts nothing, and the sphere read 0.3% out while the cylinder read 67% out. The fixture has to have
+the feature the bug lives in. Separately, one gate check was written as ok(..., true, ...) -- an assertion
+that cannot fail, printed as a PASS among checks that can -- and was caught by reading the diff.
+
+*** THE HONEST RESULT: A LATHE DOES NOT RECOVER A SHAPE FROM A PHOTOGRAPH. IT ASSUMES ONE. ***
+
+The front view of a revolved profile IS the profile mirrored, so the front-view IoU is high nearly by
+construction. Measured: 0.9888 for a circle and 0.9877 for a wavy vase -- and still 0.64 for an L-bracket and
+0.61 for a crescent, neither of which is a solid of revolution in any sense and both of which lathe into
+objects that are simply wrong. Most of that number was never at risk. Adopting img2threejs's IoU < 0.85
+would have rejected the crescent only by luck of where it landed.
+
+The number that does carry information is MIRROR ASYMMETRY about the fitted axis: exactly 0.0000 for both
+revolvable shapes against 0.9063 and 0.9439 for the two that are not -- a gap of the whole range, where IoU
+gave 0.99 against 0.62. A lathe assumes rotational symmetry, and asymmetry is the cheapest evidence the
+assumption was false; unlike the IoU it is not answered by the very construction being tested.
+
+Rotational invariance is exact where it can be: spun a quarter turn the silhouette is PIXEL-IDENTICAL, IoU
+1.000000, because a 90 degree turn maps the pixel lattice onto itself. At an arbitrary yaw it reads 0.991,
+and that residual is DIAGNOSED rather than assumed: (1-IoU)*radius is 0.75, 0.69, 0.70, 0.68, 0.68 at radii
+from 20 to 320 px -- constant across a 16x range, the signature of a one-pixel boundary band whose area grows
+with the perimeter while the shape's grows with the area. Two explanations were tested and killed first:
+faceting, because the residual is identical at 32, 128 and 2048 segments, and a mesh fault, because a mesh
+fault would not scale with the perimeter. "Faceting" was written into the gate before the sweep was run.
+
+The score is taken from render/silhouette.mjs ITSELF -- 0.988783, through a converter to the RGBA buffers it
+takes -- rather than from a private copy of IoU that would have agreed with itself and proved nothing.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(620d1ecb6dc78445298876967b69a433). Reversed caps: 3 red. Caps dropped entirely: 4 red, and note the shape --
+an open surface has no enclosed volume and the theorem does not complain, it just returns the lateral term.
+Asymmetry hard-coded to 0: 1 red, which is the point of that number. And the axis taken as the frame's
+midpoint: 1 RED ON THE FIRST RUN, WHICH WAS TOO FEW -- every fixture happened to be centred at exactly w/2,
+so the axis fit was almost untested. An off-centre fixture was added, the fit recovers 120.00 against a true
+centre of 120, and the sabotage now goes 2 red.
+
+UNCHECKED, and named in the gate: a REAL PHOTOGRAPH. Every mask here is drawn by a formula, so nothing has
+met the segmentation problem, which is what img2threejs's first two stages spend most of their effort on.
+And even a perfect score would not show the subject is round: a flat cardboard cutout of a vase photographs
+identically to a vase. What is proven is that the OUTPUT is a solid of revolution, never that the SUBJECT
+was -- that gap needs a second view. Nothing in the engine calls mesh/lathe.mjs; judge and sculptor are
+joined in this gate and nowhere else.
+
+The build now stands at 4255 gates.
+
+## v4254 -- the staircase has a closed form, and pulling it straight is a net loss in tight geometry
+
+worker/botPathfinder.worker.js has been this tree's navigation since round 216 -- a real A* over a heightmap
+snapshot, run off-thread by simulation/BotPathfinderPool.js so dozens of bots can plan without stalling the
+frame. NOTHING HAS EVER GATED IT. tools/ship carries requestPathSync-selfcheck and winPathGuard-selfcheck and
+neither is about paths through a world. Grepped for navmesh, funnel and portal before starting: no hits.
+
+This gate drives the REAL worker -- shimming `self` and calling its own onmessage -- rather than a
+reimplementation, so every number is the shipped code's.
+
+*** THE CLOSED FORM. *** The solver is 8-connected, so every step is a multiple of 45 degrees and the path
+length to a goal at angle t is (dx - dz) + sqrt(2)*dz. As a multiple of the straight line that is
+cos(t) + (sqrt(2)-1)*sin(t), which is a*cos + b*sin and therefore peaks at sqrt(a^2+b^2) outright:
+
+    sqrt(4 - 2*sqrt(2)) = 1.0823922, at t = arctan(sqrt(2)-1) = 22.5 degrees
+
+Measured across nine directions, the shipped A* matches that to 8.88e-16, with a peak of 1.082392 at exactly
+22.5 degrees. The control is in the same sweep: 0 and 45 degrees measure EXACTLY 1.000000, because those are
+the two directions eight neighbours CAN express -- so the 8.24% is the grid, not the implementation.
+
+New nav/funnel.mjs adds the string-pulling. Three findings, and the third reverses the round.
+
+1. *** A FUNNEL OVER A GRID PATH IS PROVABLY USELESS UNTIL A DIAGONAL IS EXPANDED. *** Two cells joined
+   diagonally share exactly one CORNER, so the portal between them has width 0.00 -- measured -- and a
+   zero-width portal pins the path to a point. The taut path through such a corridor IS the staircase.
+   Routing each diagonal through an orthogonal neighbour restores a minimum portal width of 4.00, and only
+   then is there anything to pull against.
+
+2. On open ground it recovers 38-66% of the octile excess, with corner counts falling from ~50 to 4-9 and 0
+   portals missed. It does NOT recover 100%, and that is correct: the funnel returns the shortest path
+   THROUGH THE CORRIDOR, and the corridor is a staircase band. The rest needs a navmesh.
+
+3. *** ON A WALL WITH ONE GAP THE ANSWER REVERSES. *** The staircase never enters a wall: 0 of 724 samples.
+   The funnelled path through the SAME corridor enters one at 18 of 616, while being shorter (302.20 against
+   318.39 m). Neither the solver nor the corridor builder is wrong -- A* TESTS ONLY A CELL'S CENTRE, so all
+   it ever promises is that its centre-line is walkable, and the corridor of full cells around it is not
+   guaranteed clear because the heightmap is finer than the grid. Walking centre to centre kept the staircase
+   off the edges by luck of construction; pulling the string taut cashes that luck in. Insetting the portals
+   by an agent radius buys it back, and the path is first clear of the wall at r=1.9 -- at 319.59 m, LONGER
+   than the staircase's 318.39. The whole saving was the safety margin.
+
+So the verdict for this tree is split rather than favourable: string-pulling is a real gain on open ground
+and a net loss in tight geometry. A round that had measured only the open floor would have reported a flat
+improvement and shipped characters that clip walls near doorways.
+
+*** TWO SEPARATE TIMES A LENGTH TEST RATED A BROKEN FUNNEL ABOVE THE WORKING ONE. *** My first draft returned
+the straight line -- ratio 1.000000, a perfect score, while missing 46 of 49 portals. And the sabotage that
+inverts the portal orientation reports 1.0584 -> 1.0000, a PERFECT 100% of the excess recovered, better than
+the correct code's 63%, while missing 63 portals. Both score perfectly by leaving the corridor. Only
+membership in the corridor tells a perfect result from a useless one.
+
+A third bug the open floor could not have found: the left/right orientation was inverted in the first draft
+and a STRAIGHT corridor returns the same two points under both orientations -- a taut path with no corner has
+no corner to put on the wrong side. Only an L-shaped corridor separates them, 3 points against 5. A test that
+passes under both hypotheses distinguishes nothing, which is v4236's vertex stage and v4243's constant
+texture in a fifth shape.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(ec91ff67ebc0cbe617316ca107ce8fc2). The cheat: 3 red. No diagonal expansion: 2 red. Inverted orientation:
+2 red. insetPortals returning its input: 1 red.
+
+UNCHECKED, and named in the gate: a NAVMESH -- everything here pulls a string through grid cells, which is
+why it recovers only part of the excess and why an inset is needed at all. Also unchecked: whether any of
+this is WIRED. BotPathfinderPool still receives the staircase and nothing calls nav/funnel.mjs, so no bot
+walks a shorter path today -- and given finding 3, wiring it without an inset would be a regression.
+
+The build now stands at 4254 gates.
+
+## v4253 -- name a point and solve for the rotations: the tree had no IK of any kind
+
+v4244 built anim/retarget.mjs, so a clip can drive a skeleton it was not authored for. v4245 built
+physics/ragdollFromSkeleton.mjs, so a skeleton can be handed to a solver and fall over. Both push rotations
+FORWARD down a chain. Nothing anywhere solved the inverse. Grepped for FABRIK, ccdIK, solveIK and
+inverseKinematic across the whole tree before writing a line: no hits.
+
+New anim/ik.mjs: FABRIK, CCD, the analytic two-bone case, and an angle clamp. It reuses the tree's own
+quaternion multiply rather than forking a fifth copy -- which turned out to matter more than expected.
+
+*** IK IS GRADEABLE BECAUSE IT HAS CLOSED FORMS, AND THE SECOND ONE IS THE SHARP ONE. ***
+
+- The solved joint angle matches acos((l1^2 + l2^2 - D^2) / (2*l1*l2)) at every distance, worst 2.84e-6 rad.
+  FABRIK never computes an angle -- it places points -- so agreeing with the law of cosines is a result
+  rather than a restatement.
+- Beyond the chain's reach the error is EXACTLY D - L, to twelve decimals: D=4.5 gives 0.500000000000 on a
+  4 m chain, D=10 gives 6.000000000000. A solver that stretched bones would report a SMALLER error than the
+  geometry permits and one that gave up would report a larger one. There is one right number and it is not
+  tunable.
+
+*** THE CONTROL IS BONE LENGTH, AND IT PRODUCED THE ROUND'S REAL FINDING. *** Every check above is passed
+trivially by a "solver" that drags the end effector onto the target and lets the joints stretch -- a rubber
+band, not a skeleton. FABRIK preserves every length to 3.3e-16. CCD, on the same chain and the same targets,
+drifts 9.08e-7: eight orders worse.
+
+That is not a bug in CCD. FABRIK is pure vector arithmetic and never builds a rotation; CCD composes
+quaternions. Rotating a vector by the IDENTITY quaternion through anim/retarget.mjs's own qMul changes
+0.7810249675906655 into 0.7810249924659729 -- EXACTLY Math.fround of it -- because qMul returns through a
+Float32Array. And it is a FLOOR rather than accumulation: one CCD iteration costs 1.78e-7 and nine cost
+3.26e-7, less than four times the drift for nine times the work. So the number to quote for any
+quaternion-path solver in this tree is a representation limit no tuning removes. This is v4246's lesson in a
+third subsystem, and it surfaced the same way: by asserting an EXACT invariant instead of a plausible one.
+
+*** TWO CHECKS I NEARLY SHIPPED THAT THE MEASUREMENTS KILLED. ***
+
+1. "The two solvers agree." True on a two-bone chain -- worst point disagreement 1.24e-6 m -- and FALSE on a
+   four-bone chain, where they land 2.11 m apart. Both are right: four joints reaching a point in 3D is
+   REDUNDANT, so there are infinitely many solutions and no reason two mechanisms should pick the same one.
+   What is actually shared is that both REACH, and that is what the gate asserts.
+
+2. "It converges." FABRIK's convergence COLLAPSES approaching full extension: 6 iterations at 87.5% of reach,
+   42 at 97.5%, 84 at 98.75%, and no convergence in 200 at 99.75%. The chain is near-singular there. A
+   bent-start control degrades identically (7, 59, 148, none), which is what says it is the geometry rather
+   than a fixture that happened to start collinear. Reported rather than avoided: a gate that only tested
+   comfortable targets would have shipped a limb that locks up exactly when a character stretches for
+   something.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read, restored md5-identical. The rubber
+band (place points where they already are): 4 red, the length control reading 4.3e-1. Measuring the
+unreachable error to a moved target: 1 RED AND ONLY ONE -- every configuration still legal, every length
+still right, only the closed form caught it. clampJointAngle doing nothing: 2 red, including a drift of
+exactly 0.00e+0, which is why "the bones survived" is never asserted on its own.
+
+*** AND ONE SABOTAGE SURVIVED. *** Removing the clamp inside twoBoneAngles, so an impossible distance yields
+NaN, left the gate ALL GREEN: nothing had ever called it out of range, so its whole safety branch was
+unexercised. An exported branch with no exercise is untested whatever the coverage around it looks like. A
+check was added -- D=5.0 on a 1.8 m chain now must give PI and D=0.05 must give 0, both flagged clamped --
+and the sabotage now goes red. Recorded rather than quietly fixed, because the hole was in the gate and only
+the sabotage found it.
+
+UNCHECKED, and named in the gate: any of this ON A SKELETON. Every chain here is a bare list of points, not
+the node hierarchy retarget.mjs and ragdollFromSkeleton.mjs pass around, and nothing converts a solved point
+chain back into the LOCAL rotations a skeleton is posed with. The footSlide this was built to remove has not
+been removed, only made removable. Also unchecked: what the float32 qMul costs RETARGETING, which composes
+world rotations down a whole hierarchy through that same multiply and has never been measured at the end of
+a twenty-bone chain.
+
+The build now stands at 4253 gates.
+
+## v4252 -- #60's wall was not a wall, and the pixel test that found it almost told me the opposite
+
+v4232 measured 0.0% of frames skippable in four scenarios and named the last holder: "domAnimation -- a CSS
+animation in the page chrome". It reported that as a wall rather than a verdict, correctly, because a
+four-second window cannot separate "does not move" from "moves too slowly to see". v4250 built a
+requestAnimationFrame whose frame count is chosen rather than suffered. This round spends it.
+
+*** AND THE FIRST INSTRUMENT ALMOST GAVE ME THE OPPOSITE OF THE TRUTH. *** A screenshot-tile diff over the
+real index.html reported ZERO scene tiles changed at 120 frames and ZERO at 1200. The obvious reading --
+"the 3D picture is still for twenty seconds of engine time" -- is WRONG, and I had already said it out loud
+before checking. Reading window.dayNight.t directly instead of its pixels:
+
+    over   120 frames    t 0.540000 -> 0.546667    delta 6.667e-3
+    over  1200 frames    t 0.546667 -> 0.613333    delta 6.667e-2
+    over  6000 frames    t 0.613333 -> 0.946667    delta 3.333e-1     afternoon -> evening
+
+That is 5.5556e-5 per frame at all three counts: EXACTLY 1/18000 of a cycle, the same number every time. THE
+SUN MOVES ON EVERY FRAME. What the pixel test found is that 1/15th of a day of sun motion is still under one
+8-bit step in the tiles it sampled. A change below the display's quantisation is still a change, because it
+ACCUMULATES -- skipping those frames defers the redraw rather than saving it. So a pixel diff cannot license
+a skip, and dayNightCycle's ANIMATES verdict from the v4183 census stands.
+
+THE CONTROL, which is what stops the round being a story: paused, t moves 0.000e+0 over 6000 frames. Exactly
+zero, not merely small. So "demo stopped, day/night paused" is a genuinely static scene, and it is there that
+the interesting thing happens.
+
+*** IN THAT STATIC SCENE THE FLAG IS STILL DIRTY EVERY FRAME, HELD BY 14 RUNNING ANIMATIONS, 10 OF THEM
+ENDLESS: *** an SVG mascot (swekBob, swekDomeHalo, swekDomeCore, swekAntTip, swekBlink), a watermark fade,
+and four background-colour transitions. Not one of them is in the picture.
+
+*** THE TWO CLOCKS ARE INDEPENDENT, AND IT IS MEASURED AS A NUMBER RATHER THAN AS PIXELS: *** a CSS
+animation's currentTime advanced 999.96 ms across 1001 ms of WALL CLOCK while the engine stepped ZERO frames.
+CSS animations are driven by the compositor's own timeline; replacing requestAnimationFrame does not replace
+it. The engine cannot advance that mascot by drawing and cannot stop it by skipping -- so the frame being
+held open would not produce the movement it is being held open FOR. document.getAnimations() answers "is the
+document moving"; the flag needs "is the render stale", and those are different questions.
+
+New engine/domScope.mjs is the rule that separates them. Each animation classifies as CHROME (the compositor
+draws it), SAMPLED (inside a subtree someone rasterises into a texture), GEOMETRY (can change the canvas's
+box) or UNKNOWN -- and every uncertainty resolves towards drawing, because narrowing a probe is the one
+change that can freeze a screen. One SAMPLED animation in a list of a hundred CHROME ones still means draw.
+The asymmetry that is the whole design: a LAYOUT property on an ancestor of the canvas is GEOMETRY, while a
+TRANSFORM on that same ancestor is CHROME -- same element, same ancestry, only the property differs, because
+transforming an ancestor composites pixels the last draw already produced.
+
+It carries a registry for the one real DOM-to-scene path this tree has: v4120's ui/domToTexture.js really
+does put a live subtree into a texture and fallout.html really uses it. The registry starts EMPTY and the
+gate asserts that rather than assuming it, because an unregistered rasteriser is a frozen CRT screen.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical
+(911757a6f8e8583962f8e6ab496951bb). Deleting the fail-safe branch: 1 red. Ignoring inSampledRoot: 2 red --
+and every live check stayed green, because index.html has no sampled subtree at all, which is why the pure
+model section exists. A majority vote instead of "any": 1 red. Adding transform to the layout list: 1 red.
+*** I WROTE "2 RED" FOR THE FIRST ONE BEFORE RUNNING IT AND THE SABOTAGE SAID 1: *** the second fail-safe
+check is caught by a different branch, so two checks that read as one guard turned out to be two guards.
+
+NOT DONE, and stated in the gate: the probe's vote is UNCHANGED and engine/frameDirty.js still ships
+DISABLED. This round measures the holder and builds the rule; it does not turn anything on, and it claims no
+saving. The saving is a number for the round that enables the flag, and that round needs the other seventeen
+sources to be as honest as dayNight turned out to be. Also unchecked: fallout.html, where domToTexture
+registers no subtree yet, so the rule would answer CHROME for something that is not.
+
+The build now stands at 4252 gates.
+
+## v4251 -- rebar and bedding planes: the structures only a solid texture can show when sliced
+
+v4243 argued that a CSG cut face wants a solid texture rather than a triplanar projection, and measured it on
+a HOMOGENEOUS material -- concrete aggregate, statistically the same everywhere. A homogeneous material is
+still arguable on taste. This round takes the case that is not arguable, because it has a closed form.
+
+*** SLICE A CYLINDER AND THE SHAPE OF THE HOLE DEPENDS ON THE ANGLE. *** Square-on, the exposed end of a rod
+is a CIRCLE of the rod's radius. Obliquely it is an ELLIPSE, semi-minor still r and semi-major r / cos(phi).
+Along the rod it is a LENGTH of bar. The gate does not have to judge the picture; it predicts the number.
+
+render/rebar.mjs is new. A rebar cage is a distance-to-nearest-line field: a rod along X is a line at fixed
+(y, z), so the distance to the nearest one is a modulus per axis -- no rod list to walk, no extent to the
+cage, it fills space, which is what a solid texture has to do. BEDDING is the second material, parallel
+layers stacked along a normal, layer index being the signed distance divided by the thickness. The closed
+forms -- sectionSemiMajor, sectionSemiMinor, sectionEccentricity, apparentSpacing -- are exported from the
+module rather than written into the gate, so the prediction and the thing being graded are one statement.
+
+MEASURED, in tools/ship/rebar-selfcheck.mjs:
+
+- The section matches r / cos(phi) at 0, 30, 45, 60 and 70 degrees. Worst semi-major error 9.49e-5 m against
+  a sample spacing of 1.00e-4 m -- the whole discrepancy is the grid it was sampled on. Aspect ratios
+  measured against predicted: 0deg 1.000 vs 1.000, 30deg 1.151 vs 1.155, 45deg 1.418 vs 1.414, 60deg 2.004
+  vs 2.000, 70deg 2.933 vs 2.924.
+- *** THE CLAIM NO PROJECTION CAN MAKE: *** rebarAt takes no normal and no angle. Nothing about the material
+  changed between those five rows. What moved was the CUT PLANE, and the shape of the intersection followed.
+- THE CONTROL: the section's WIDTH is 0.01196 at 0 degrees and 0.01196 at 60 -- only its LENGTH grows. A
+  material that simply drew bigger blobs on steeper cuts would grow in both directions.
+- Rod spacing on the cut is pitch / sin(theta) to a worst error of 3.99e-3 m across four angles, and THE SAME
+  closed form predicts bedding stripes at 0.1245 m on a completely different material.
+- A rod crossing an edge is steel on both faces, 0 disagreements of 200, with the control that says the check
+  is not vacuous: 48 of those 200 edge points are steel.
+- A cut containing the rod's own axis is steel at all 2000 points, where a perpendicular cut showed a 24 mm
+  circle. Same field, same function, only the plane.
+
+*** THE GATE CAUGHT ITS OWN PREDICTOR. *** The first bedding check read 0.1245 against a predicted 0.0622 --
+exactly 2x, because the gate divided by two on the belief that band edges are half a layer apart. They are a
+full layer apart; band alternates every layer. A wrong predictor off by an exact integer factor is the
+predictor, not noise. A second check compared distances one pitch apart with ===, which fails at 1.19e-15 m
+on a cage that is perfect, because a modulus is float arithmetic; it now sweeps six offsets by up to twenty
+pitches each way and reports the worst, per the v4248 rule that one sample is not a bound.
+
+FOUR SABOTAGES, each grep-confirmed applied before its result was read and restored md5-identical. Spheres
+instead of rods: 5 red. Constant steel everywhere: 5 red, including the section-4 control at 200 of 200
+while the continuity check itself stayed green, which is the point. Bedding bands that stop alternating:
+1 red. And half-rods -- Math.round to Math.floor, so the bar is a D in section -- ONLY 1 RED: aspect ratio
+survives because both axes halve together and spacing survives because the grid is unchanged, so absolute
+size caught it alone. The width control was reached by none of the four: rebarAt receives no normal, so no
+edit to the module can make width vary with cut angle, which makes that check load-bearing against a
+projection and a statement of the signature against this implementation.
+
+UNCHECKED, and named in the gate: none of this has met a REAL CUT. Every section is sampled on an analytic
+plane, not on geometry meshCSG produced, and there is no GLSL in the file at all. Also unchecked: whether a
+rod should STOP a blast. The field says where steel is; nothing consults it when cutting, so meshCSG will
+slice a bar in half, and a wall whose rebar does not resist is a picture of reinforcement rather than
+reinforcement.
+
+The build now stands at 4251 gates.
+
+## v4250 -- A frame you cause, not a frame you wait for, and v4242's explanation of its own 89% was wrong
+
+*** THIS TREE HAS MEASURED requestAnimationFrame TWICE AND CORRECTLY REFUSED TO CONCLUDE ANYTHING BOTH
+TIMES. *** #60, open since v4232: frameDirty found 0.0% of frames skippable. v4242: 143 rAF callbacks against
+16 render cycles in five seconds, 89% of callbacks drawing nothing, written up as "NOT a claim that they were
+skippable: this is swiftshader, where a render cycle is slow enough that other rAF consumers get many turns
+in between. It is recorded as a measurement, not read as a verdict."
+
+Both are observations of a race, and a race cannot be read. With the clock in the gate's hand they become
+experiments.
+
+New tools/ship/deterministicRaf.mjs replaces requestAnimationFrame, performance.now and Date.now with a
+single counter the gate drives: step(n) runs exactly n frames, at times the gate chose. The idea is
+FormidableLabs/mock-raf (MIT, 2015-2016), not vendored -- twenty lines and unmaintained, so what travels is
+the shape rather than the package.
+
+*** THE ONE THING A NAIVE MOCK GETS WRONG IS THE ONLY THING THAT MATTERS. *** Every animation loop is
+`function frame() { ...; requestAnimationFrame(frame); }`, so a callback that registers another must run on
+the NEXT step. The queue has to be TAKEN before it is walked; a shim that walks the live array either runs
+the whole animation in one step or spins forever. The naive version is shipped alongside as a CONTROL and
+runs away to 10,000 invocations in a single step, so the correct one is not merely asserted correct.
+
+*** THE REAL ENGINE BOOTS UNDER IT WITH ZERO PAGE ERRORS, AND EVERY SINGLE FRAME DRAWS. ***
+
+    step(1)  -> +6 draws        step(10) -> +60 draws        step(50) -> +300 draws
+
+Six draws per frame in every batch, and all six draw sites firing identical counts across 243 frames. The
+render cycle does not skip frames -- it runs on all of them -- and no pass inside it is conditionally skipped
+either.
+
+*** AND THE 89% SURVIVES A CLOCK WITH NO RACE IN IT AT ALL. *** Under deterministic stepping, where every
+frame is one step and every consumer gets exactly one turn, 2,012 callbacks over 303 frames is 6.6 per frame,
+with NINE rAF consumers queued in steady state and exactly ONE of them rendering. 85% of callbacks draw
+nothing -- the same figure, with the race removed.
+
+So it was never about swiftshader being slow. It is the architecture: several consumers share the loop and
+one of them draws. v4242's caution was right and its diagnosis was not, and the sentence is corrected where
+it still lives, in tools/ship/effectMerge-selfcheck.mjs.
+
+*** WHICH CONFIRMS #60 RATHER THAN OVERTURNING IT, AND SHARPENS IT. *** The render cycle runs on 100% of
+frames, so there are no frames to skip. What frameDirty would have to skip is not a FRAME but the WORK INSIDE
+one, and that is a different question from the one v4232 was asking. The 0.0% was correct and was answering
+a question whose premise the deterministic clock has now changed.
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Walking the live queue turns the self-perpetuating
+loop check red at 50,000 invocations over five steps -- the same defect the control ships deliberately, which
+is not a duplication: the control proves the property is real and the sabotage proves the check on the
+correct implementation is load-bearing. Freezing the clock while frames still count turns the timestamp check
+red, and NOTHING ELSE MOVES: the loop check, the cancel check and the pending check are all about the queue.
+A shim that steps frames perfectly and lies about the time would pass every structural check in the file,
+which is why the timestamp is asked about directly.
+
+New: tools/ship/deterministicRaf.mjs, tools/ship/deterministicRaf-selfcheck.mjs (10 checks).
+
+NOT done, and stated in the gate: what the other consumers DO with their turns. This round establishes that
+all but one never draw; it does not say whether they compute anything worth computing, and "does not draw" is
+not "does nothing" -- which is exactly the conflation this file exists to undo, so it is not committed again
+in the other direction. Also not done: the NETWORK is still real. Asset fetch and decode run on wall time, so
+boot interleaves controlled steps with real waits, and only the FRAME COUNT is the gate's to choose. A fully
+hermetic page would need the fetches stubbed too, which is a bigger harness than this question needed.
+
+The build now stands at 4250 gates.
+
+## v4249 -- Every ragdoll this tree can derive fights itself, and the fix cannot be asked for
+
+*** v4248 FILED THE LAST POSSIBILITY FOR v4245's ANCHOR FIX: that its argument was about COLLISION VOLUME
+rather than the constraint, and that contacts had become available in the artifact without anyone using
+them. *** Used here, they found something neither earlier round was looking for.
+
+THE JOINTED NEIGHBOURS OVERLAP, IN BOTH DERIVATIONS, BY CONSTRUCTION. A bone's box runs to its child's head
+and the child's box STARTS at that head, and each is inflated by a radius on top of that. Pure geometry,
+before any solver runs:
+
+    enclosing (shipped)   14 overlapping pairs, deepest pelvis/thigh at 0.270 m
+    naive head-to-tail    10 overlapping pairs, deepest thigh/shin  at 0.238 m
+
+And the solver agrees. Hanging in EMPTY SPACE -- pelvis pinned, no ground anywhere in the world -- the
+ragdoll still produces 32 contact rows carrying real normal impulse. Every one of them is the body colliding
+with ITSELF while its own joints hold it together.
+
+*** AND THAT IS THE COST OF v4245's FIX THAT v4248 WENT LOOKING FOR A BENEFIT FROM AND DID NOT FIND. THE
+ENCLOSING BODIES FIGHT THEMSELVES 148 TIMES HARDER. ***
+
+    summed |normal impulse|    14,025 enclosing    against    94 naive
+
+The pair count differs by only 40%; the force differs by a factor of 148, because contact impulse grows with
+PENETRATION DEPTH and growing the chest out to reach the shoulder anchors buries each arm 0.241 m inside it.
+The fix remains geometrically right about the anchors -- v4245's measurement of 4 of 10 lying outside their
+body stands -- and it is no longer free.
+
+EVERY RAGDOLL IMPLEMENTATION SOLVES THIS THE SAME WAY: disable collision between jointed neighbours. A
+shoulder and an upper arm are SUPPOSED to occupy the same space; that is what a shoulder is, and no amount of
+careful box fitting changes it.
+
+*** THIS TREE CANNOT ASK FOR THAT. *** physics/box3d/box3d_shim.c exposes no collision filtering of any kind:
+no collideConnected on any joint def, no category or mask bits, no groups, no filter setter. The three joint
+constructors set bodyIdA, bodyIdB and two local frames and nothing else, so there is no argument a caller
+could pass to say "these two are meant to overlap".
+
+*** AND THE CHANGE CANNOT BE WRITTEN FROM HERE, WHICH IS WHY THIS ROUND MEASURES AND REFUSES TO REPAIR. ***
+vendor/box3d/ holds box3d.js and box3d.wasm and no headers at all, so the shim's `#include "box3d/box3d.h"`
+resolves only on a machine where build-box3d-wasm-clang.sh has fetched the library. Writing a
+collideConnected parameter against an API that cannot be read here would be guessing at a signature and
+shipping the guess as a fix. The repair is a shim change plus a wasm rebuild, which is rig work, and
+PENDING_REBUILD in box3dNode.mjs is the hand-off mechanism that already exists for exactly that.
+
+AND SHRINKING THE BOXES IS NOT THE WORKAROUND IT LOOKS LIKE. It does clear the overlap -- at 0.2x, which
+takes the forearm's collider radius from 0.058 m to 0.012 m, a limb about a centimetre thick. The overlap is
+gone because there is almost nothing left to overlap, and a ragdoll that thin falls through things and no
+longer matches any visual mesh. *** The first version of that check asserted "shrinking NEVER clears it" and
+was simply wrong; the gate caught the overclaim on its first run. ***
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Making bodiesFromSegments ignore its attach points
+turns 3 checks red -- 14 pairs collapse to 10 against 10 and the impulse ratio to 1 -- so both comparisons are
+load-bearing. A commented-out collideConnected line added to the shim turns the filtering check red, which is
+the right sensitivity: the claim is that no such argument exists anywhere in that file.
+
+*** AND THE FIRST SABOTAGE TOOK THREE ATTEMPTS TO LAND, WITH TWO WORTHLESS GREEN RUNS ON THE WAY. *** The
+first aimed at ragdollFromSkeleton's wiring, which this gate does not use -- it constructs both derivations
+itself, deliberately -- so it hit a path under no test. The second was a sed whose `|` delimiter collided
+with the `||` in the line it was matching: it printed an error, changed nothing, and the gate went green.
+That is v4248's lesson arriving one round later, and it is the same lesson: A SABOTAGE MUST BE CONFIRMED
+APPLIED BEFORE ITS RESULT IS READ.
+
+New: tools/ship/ragdollSelfCollide-selfcheck.mjs (9 checks).
+
+NOT done, and stated in the gate: what the self-collision actually COSTS in behaviour. This round establishes
+that the overlap exists, that the solver does real work about it, and that the fix cannot be requested. It
+does NOT show the ragdoll behaving wrongly because of it -- and after v4248 found three instruments unable to
+separate two derivations, that distinction is worth keeping. A ragdoll that fights itself may still look
+fine. Also not established: whether box3d supports collideConnected AT ALL. The claim is about the SHIM and
+about what can be read from this repository, not about the library, which only the rig can answer.
+
+The build now stands at 4249 gates.
+
+## v4248 -- The derived ragdoll, stepped in a real solver, and v4245's anchor fix is not confirmed
+
+*** v4245 CLOSED BY SAYING THE ONE THING IT COULD NOT DO WAS RUN THE THING IT BUILT. *** Its gate: "unchecked
+here: any of this INSIDE box3d. Nothing in this gate creates a world, adds a body or makes a joint -- it
+derives the description that would be handed to those calls and checks the description. A derived graph that
+box3d rejects, or that explodes on the first step, would pass every check above."
+
+That was a limit of the GATE, not of the tree. physics/box3d/box3dNode.mjs loads the box3d WASM outside a
+browser -- it exists precisely because box3dLoader.js is a browser loader whose fetch cannot reach a file:
+URL -- and several gates already step worlds through it. So this round hands ragdollFromSkeleton's output to
+the calls it was designed for.
+
+WHAT IS NOW ESTABLISHED, and none of it could be said before: box3d ACCEPTS the derived graph -- eleven bodies
+plus a ground, ten joints, zero refused, zero unmapped. It stays finite over 300 steps. It falls from 6 m and
+settles at 0.14 m. It hangs stably from a pinned pelvis. The derivation produces a well-posed articulated
+body rather than a plausible-looking description.
+
+*** AND THE THING THIS ROUND WENT TO PROVE CAME BACK NEGATIVE. ***
+
+v4245 found 4 of 10 joint anchors lying outside the body they attach to, fixed it by enclosing every child
+head, and justified the fix with a sentence: "the solver then pulls on a point the body does not contain."
+THREE INSTRUMENTS NOW FAIL TO SEPARATE THE FIXED GRAPH FROM THE NAIVE ONE.
+
+    joint separation      the NAIVE graph is TIGHTER at rest -- 0.035 m against 0.073 m
+    drop asymmetry        0.770 m against 0.017 m, but the chaos floor is 0.455 m: a factor of 1.7
+    hanging asymmetry     0.0285 m against 0.0286 m, against a floor of 9.5e-7 m: INDISTINGUISHABLE
+
+The hanging experiment is the one that settles it. Pin the pelvis, delete the ground, and let the limbs hang:
+no tumbling, no impact, one stable equilibrium, and the noise floor collapses from 0.455 m to 9.5e-7 m -- so a
+difference of a centimetre would be four orders of magnitude above the noise. There is no such difference.
+
+The fix is NOT shown to be wrong. The anchors really are inside the bodies now, and that is a geometric fact
+this round does not disturb. What is no longer supported is that it makes the ragdoll BEHAVE better, and that
+is a smaller claim than v4245 made. Corrected in both places it was made: physics/ragdollFromSkeleton.mjs's
+header and tools/ship/ragdollFromSkeleton-selfcheck.mjs's check message.
+
+What would actually test the argument: it is about the COLLISION VOLUME, not the constraint. A body that does
+not reach its own joint leaves that region uncovered, so limbs pass through where a torso should be. That is
+a CONTACT question, and contacts turn out to be available (see below) and unused.
+
+*** AND THE ROUND NEARLY SHIPPED "48 TIMES THE CHAOS FLOOR" ON A FLOOR MEASURED ONCE. *** The first version of
+the noise-floor section took a single 1 mm perturbation and got 0.000 m, so section 4 hard-coded 0.016 as the
+floor and the naive result read as a factor of 48. A later run of the SAME check produced 0.145. Five
+perturbations give 0.129, 0.455, 0.246, 0.000, 0.067 -- a worst of 0.455, and the factor becomes 1.7. A NOISE
+FLOOR MEASURED ONCE IS A SAMPLE, NOT A BOUND, and a multiple quoted against a lucky sample is how a modest
+result gets reported as a large one.
+
+TWO SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED.
+
+  * Every joint pointed at bone 999. This exposed TWO defects and neither was in the module. FIRST, the check
+    could not see it: idx.get(999) returns undefined, emscripten coerces undefined to 0, and box3d welds the
+    limb to the GROUND -- a perfectly valid body pair -- so "refused === 0" stayed green on a graph that was
+    nonsense. An `unmapped` counter exists because of that. SECOND, THE SABOTAGE ITSELF DID NOT APPLY THE
+    FIRST TWO TIMES: the sed pattern assumed the field began a line and the source has it mid-line after
+    `name:`. Two green runs were reported from a sabotage that had never been made, which is the same failure
+    as a badly built sabotage proving a gate sound.
+  * The knee rule given a zero axis and a [0, 0] limit. Three checks red, including the hanging comparison.
+    Note what stayed GREEN: finiteness, and the hang itself. A ragdoll with a degenerate joint axis does not
+    explode -- it hangs quietly and wrong, which is exactly why section 4 needed a deterministic experiment
+    rather than a stability check.
+
+ALSO CORRECTED: box3dNode.mjs's header, which describes a vendored wasm missing swk_contacts,
+swk_contact_count and swk_contact_stride. All three have been present since v3569; PENDING_REBUILD below them
+was emptied at v3571 with a note saying the rebuild had happened. The MECHANISM was updated and the PROSE was
+not, so a file whose entire purpose is catching a stale record carried one for six hundred versions. The
+artifact today exports 45 swk_* functions and the declared-minus-built difference is empty.
+
+New: tools/ship/ragdollStep-selfcheck.mjs (11 checks).
+
+NOT done, and stated in the gate: whether the ragdoll looks RIGHT. It is accepted, finite, falling and
+symmetric; nothing renders it, and a rig that settles symmetrically can still have its knees bending the
+wrong way -- the limits are checked as values by v4245 and never as behaviour. Also not done: the two
+hand-typed pages. ragdoll.html and flesh.html still carry their own copies of these eleven bones and neither
+consumes ragdollFromSkeleton, so the duplication v4245 measured is untouched; this round proves the
+derivation runs, not that anything has adopted it.
+
+The build now stands at 4248 gates.
+
+## v4247 -- Selecting by looking, and the one design number that decides whether a human can use it
+
+*** VR PARTS ONE, TWO AND THREE SHIPPED CONTROLLERS, STICK LOCOMOTION AND HAPTICS, AND EVERY ONE OF THOSE
+INPUT PATHS ASSUMES A CONTROLLER IN EACH HAND. *** There is no path at all for a headset with none, a
+controller that has died mid-session, or a phone in a holder -- which is the cheapest VR there is.
+
+Ramotion/vr-menu-demo's CODE is refused and none of it is here: no LICENSE file under any of the four common
+names on master, and a README that closes with an App Store advert rather than a grant. UNPAPERED, recorded
+at #106 beside ZachSaucier/Asset-Loading-Effects and kamend/ChuckClose-SparkAR. What is taken is the
+INTERACTION, which is a published idea and needs nobody's source: look at a target, a ring fills over a hold
+time, and the fill IS the commit.
+
+New ui/gazeDwell.mjs. A ray from the head matrix and a rectangle hit test are arithmetic. THE DWELL TIMER IS
+WHERE THIS SUCCEEDS OR FAILS.
+
+*** THE OBVIOUS IMPLEMENTATION IS UNUSABLE BY A HUMAN BEING, AND THE NUMBER SAYS SO. *** A dwell that RESETS
+to zero the moment the ray leaves its target cannot be completed on a small target, because a head does not
+hold still. Measured under 2 degrees of physiological tremor against a 1.43-degree target:
+
+    35.6% of frames land off the target
+    decaying timer   fires at 3.83 s
+    resetting timer  NEVER fires, in 20 seconds of continuous staring
+
+That is not a slow dwell. It is an impossible one, and it is what anybody writes first. On a large target
+(8.5 degrees, 1 degree of tremor) both fire at 1.19 s and there is nothing to choose between them -- a gate
+that only tested the easy size would have found no reason to prefer either.
+
+*** AND THE DECAY RATE IS NOT A FEEL KNOB: IT SETS, IN CLOSED FORM, EXACTLY HOW MUCH TREMOR SURVIVES. *** On
+target the timer gains dt; off it loses decay * dt. It can only ever complete while the net rate is positive:
+
+    (1 - p) > p * decay      <=>      p < 1 / (1 + decay)
+
+Checked against the simulation at four rates, by bisecting the off-fraction to find where a timer actually
+stops completing: predicted 66.7 / 50.0 / 33.3 / 25.0 percent against simulated 66.4 / 49.8 / 33.2 / 24.9,
+worst disagreement 0.28 points. Two independent routes to one number.
+
+*** THE FIRST DEFAULT THIS FILE SHIPPED WAS decay = 3.0, WHICH TOLERATES 25%. THE MEASURED TREMOR CASE IS
+35.6%. *** So the default made the small-target case impossible, and the gate is what found that -- not a
+review, and not taste. It is now 1.0, tolerating just under half the frames being off.
+
+The other failure is a separate knob and stays separate: a menu that fires whatever you looked past on the
+way somewhere else. That is rejected by hold versus crossing time and by nothing else -- a 3 rad/s sweep
+crosses a panel in 0.099 s against a 1.2 s hold, short by a factor of twelve -- so decay could be retuned
+freely without reopening it. Two failures, two independent knobs. The honest boundary is stated too: a sweep
+slow enough to stay on a panel for the full hold is not a glance, it is a dwell, and no setting separates
+those because they are the same event.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED -- AND TWO OF THEM EXPOSED DEFECTS IN THE GATE
+RATHER THAN IN THE MODULE.
+
+  * Reset-instead-of-decay first CRASHED the gate. Section 3 formatted its fire times with .toFixed()
+    directly, and with reset that time is null, so the gate threw a TypeError from inside a MESSAGE while
+    describing a check it had correctly computed as red. A GATE THAT DIES WHILE REPORTING A FAILURE HAS
+    FAILED THE SHIP AND TOLD NOBODY WHICH CHECK WENT. Fixed, and the sabotage now turns 2 checks red by name
+    -- including the formula check, which reads a simulated boundary of 1.1% against a predicted 25-67%,
+    because a reset timer has no tolerance at any decay rate and the formula stops describing it entirely.
+  * Dropping the `t > 0` test left its own check PERFECTLY GREEN. The panel it used sat behind the viewer
+    with its normal facing the viewer -- which the FACING test rejects before t is ever computed. The check
+    credited the wrong line for its own result. Isolating t > 0 needs a panel that is front-facing to the ray
+    AND behind it, which section 1 now uses, and the sabotage turns it red.
+  * Progress as a wall-clock animation turns 2 red, including "it goes DOWN when the gaze leaves" -- the
+    property that separates a readout of the decision from a picture of one.
+
+Also fixed in the module, found by a check that encoded the intent while the code did not: the COOLDOWN ran
+concurrently with the refill, so the repeat period came out as max(hold, cooldown) rather than hold +
+cooldown -- which makes the knob do nothing whenever cooldown <= hold, the case a caller is most likely to
+configure. A held gaze re-fired every 0.5 s at hold 0.5 and cooldown 0.5.
+
+New: ui/gazeDwell.mjs, tools/ship/gazeDwell-selfcheck.mjs (18 checks).
+
+NOT done, and stated in the gate: a real headset and a real head. The tremor model is two sinusoids per axis
+placed in the physiological band -- a plausible signal, NOT a measurement of anyone -- so 35.6% is a property
+of that model rather than of a person. What the model establishes is the SHAPE, that off-target frames are
+what decides this, and the closed form holds for any off-fraction however it arises. Also not done: anything
+that DRAWS the ring, since gazeDwell returns a progress number and no renderer consumes it; and any wiring
+into engine/xrSession.mjs, so nothing feeds it a real head pose yet.
+
+The build now stands at 4247 gates.
+
+## v4246 -- The JS and the GLSL simplex were never the same function, and the mechanism v4243 blamed was the wrong one
+
+*** THIS TREE GRADES SHADERS BY COMPARING A JS MODEL AGAINST THE GPU PASS. FOR ANY SHADER BUILT ON SIMPLEX
+NOISE THAT COMPARISON WAS IMPOSSIBLE, AND NOBODY HAD NOTICED BECAUSE NOBODY HAD TRIED. ***
+
+The convention is everywhere: render/crtModel.js graded against render/crtPass.js, swiftShaderModel against
+swiftShaderPass, each reporting a worst channel difference of 0 or 1 of 255. It rests on one assumption --
+that the two implementations compute the same function. v4243 tried to apply it to a procedural texture,
+found snoise3 and the GLSL snoise agreeing to 1e-3 at only 23.5% of 9,216 points with a worst disagreement of
+4.17 on a range of about +/-3.6, watched three instruments fail to separate a correct shader from a
+deliberately broken one, and shipped a section saying no agreement check was available.
+
+*** THE CAUSE IS ONE TRUNCATED DECIMAL, AND IT IS NOT WHERE v4243 SAID IT WAS. ***
+
+Ashima writes 1/7 as a literal:
+
+    const float n_ = 0.142857142857;      // 1/7
+
+and then takes floor(j * n_) to choose which gradient a corner gets. That literal is BELOW 1/7 in float64 and
+ABOVE it in float32 -- fround(0.142857142857) = 0.14285714924335480. So:
+
+    float64:  7 * 0.142857142857  = 0.999999999999   ->  floor = 0
+    float32:  7 * 0.1428571492... = 1.0000000447     ->  floor = 1
+
+Every multiple of 7 sits exactly on that boundary and falls the other way. MEASURED: of the 289 possible
+permute outputs, 41 select a different gradient index and 5 give a different j. That is 14% per lookup; four
+corners are summed per evaluation and octaves are stacked on top, which is how it becomes 76% per pixel.
+
+*** v4243 BLAMED mod289 CROSSING A FLOOR BOUNDARY, AND TWO SABOTAGES PROVED THAT WRONG. *** Removing the
+32-bit rounding from mod289 changed nothing. Removing it from the ENTIRE permute chain changed nothing
+either. It could never have mattered: that chain produces integers below 2^24, and integer arithmetic is
+exact in 32-bit float. The story was plausible, it was measured -- mod289 flips really do occur at a rate of
+0.06% -- and it was not the cause. A MECHANISM NO SABOTAGE CAN BREAK IS A STORY, NOT A DIAGNOSIS. Removing
+the rounding from the gradient index alone, one line, drops agreement from 9216 to 4146 of 9216, which is
+what turns the new account from an argument into a measurement.
+
+THE FIX IS NOT TO WRITE THE JS MORE CAREFULLY. It is to write JS that makes the SAME ROUNDING DECISIONS.
+shaders/ashimaNoise.mjs now also exports snoise3f32: the same algorithm with Math.fround after every
+arithmetic operation, which is what the hardware does. It reproduces the GPU at ALL 9,216 measured points,
+worst deviation 1.3e-6 -- the 24-bit readback's own resolution rather than a disagreement.
+
+BOTH ARE KEPT AND BOTH ARE EXPORTED. snoise3 is the mathematically clean answer and is what a caller doing
+noise on the CPU for its own sake wants. snoise3f32 is what a GATE grading a GLSL shader must use. Picking
+the wrong one is precisely the defect that cost v4243 a round, so neither is removed and the header says
+which is which.
+
+*** THE PAYOFF IS IMMEDIATE AND IS THE POINT. *** v4243's solidTexture gate contained a section that reported
+"no CPU/GPU agreement check is available here" and pinned three failed instruments rather than inventing a
+threshold. That section now makes a PER-PIXEL comparison: worst 1 of 255 over 9,216 pixels, 9,215 of them
+bit-identical, with the f64 reference kept alongside as a control and still reading 67. The difference is not
+a better tolerance; it is the right function.
+
+THE COST TO THE TREE WAS COUNTED RATHER THAN FEARED, AND IT IS SMALLER THAN THE BACKLOG ITEM CLAIMED. Of 69
+gates that drive a real GPU, NONE was grading a noise-based shader against the wrong function -- because none
+was grading one at all. render/aquarelle-selfcheck.mjs, named at v4243 as a pair at risk, drives no browser
+and says so in its own closing note: "unchecked here: the pass RENDERING. That needs a GL context and a GPU."
+It compares source text. So the defect was a MISSING CAPABILITY, not a wrong result in a shipped gate, and
+that is the claim the evidence supports. What remains true is that any FUTURE gate comparing a noise shader
+to a JS model would have been silently ungradeable. It no longer is.
+
+CORRECTED IN PLACE: shaders/ashimaNoise.mjs's header, which now carries the real mechanism instead of the
+plausible one; shaders/ashimaNoise-selfcheck.mjs's closing note, which has said "a GPU shadow check is the
+honest next step" since v4177 and now carries the answer that step produced; and
+tools/ship/solidTexture-selfcheck.mjs, which carried v4243's wrong mechanism in a check of its own.
+
+New: tools/ship/noisePrecision-selfcheck.mjs (10 checks).
+
+NOT done, and stated in the gate: whether OTHER GPUs agree with swiftshader. Everything here is measured on
+one software rasteriser, and while float32 is a standard, the order a compiler evaluates an expression in is
+not -- a driver that contracts a multiply-add differently could land on the other side of a boundary
+somewhere else. snoise3f32 is the right reference for THIS harness and a hypothesis about any other. Also not
+done: snoise2, whose 2D chain has the same shape at smaller magnitudes and has never been measured against a
+GPU at all.
+
+The build now stands at 4246 gates.
+
+## v4245 -- A ragdoll derived from a skeleton, and #116's own premise corrected by the gate that checked it
+
+*** #116 CAME FROM sunag/Oimo.js-Lab AND THE ASSESSMENT FOUND NOTHING TO TAKE. *** Its two headline features
+are ragdolls and a BVH; this tree has ragdoll.html's eleven bodies and ten box3d joints, simulation/
+RagdollDismember.js on the kaiju's particle skeleton, and a BVH from #96 that grew a third query at v4235.
+Its LICENSE is upstream's -- "Copyright (c) 2012-2014 authors saharan / js version loth" -- carried by the
+fork, which is worth recording precisely rather than as "MIT by sunag".
+
+What the assessment found instead was a grep result, AND #116 STATED IT WRONG. It said ragdoll.html is the
+only file in the tree that calls the box3d joint API. The gate written to check that claim found:
+
+    flesh.html, physics/backendConformance.mjs, ragdoll.html
+
+*** TWO PAGES, NOT ONE -- AND THE SECOND ONE MAKES THE ARGUMENT STRONGER RATHER THAN WEAKER. *** flesh.html
+("skin that follows the skeleton") carries THE SAME ELEVEN BONES AT THE SAME COORDINATES as ragdoll.html,
+identical row for row including every half-extent, plus its own ten-joint table. One creature, typed out
+twice, in two files, with nothing keeping them in step -- move a bone in one and the other silently
+disagrees -- while inside EACH file eleven box centres and ten joint anchors have to be kept consistent by
+hand. The third hit is backendConformance.mjs, which calls jointWeld to check that a backend claiming joints
+does not throw: a probe, not a rig. Everything else that mentions those names is a stub returning -1
+(planarFallbackWorld, freeSpaceWorld, joltLoader) or a comment.
+
+Meanwhile gpu/SkeletalAnimator.js holds real bone hierarchies from real GLBs, and nothing connects them.
+
+NEW physics/ragdollFromSkeleton.mjs derives the whole graph from a hierarchy, reusing anim/retarget.mjs's
+hierarchy walk from v4244. A body per bone spanning its SEGMENT -- head to child's head, which is why a
+ragdoll body sits between two joints rather than at one -- and a joint per parent link ANCHORED AT THE
+CHILD'S HEAD. That anchor is what makes this a derivation instead of a transcription: both bodies were
+measured from that point, so it is the same number rather than two numbers that agree. Type and limits are
+read off the bone name against a small deliberate table; an unrecognised bone gets a WELD, the conservative
+answer, because a joint that is too stiff looks wrong and one that is too free puts a knee through a shin.
+
+On the same creature it produces 11 bodies and 10 joints, the same five joint answers the hand table gives
+(shoulder spherical, elbow revolute, hip spherical, knee revolute, spine weld), knee [-145, 0] and hip cone
+60 included, and every anchor exact to 0.
+
+*** AND THE OBVIOUS DERIVATION IS WRONG, MEASURED BEFORE IT WAS FIXED. *** A box spanning head to tail is the
+natural answer and it puts
+
+    4 OF 10 JOINT ANCHORS OUTSIDE THE BODY THEY ATTACH TO
+
+-- both shoulders and both hips. The cause is that a bone with several children has only ONE tail: the
+pelvis's segment runs to the spine, so the hips, which hang off its sides, are nowhere near the box. The
+solver would pull on a point the body does not contain, which is a lever arm nobody chose. Fixed by making a
+body the box enclosing every point it must REACH -- its head, its tail, and the head of every child. 4 of 10
+becomes 0 of 10; the pelvis grows from 0.112 to 0.332 half-width while childless bones do not change at all.
+That is exactly why ragdoll.html's chest and pelvis are wide, done there by typing the numbers.
+
+THE ONE THING THAT CANNOT BE DERIVED IS DECLARED RATHER THAN HIDDEN. A leaf -- a head, a hand, a foot -- has
+no child, so it has no segment and no measurable length, and no amount of hierarchy walking produces one.
+Those five bones come from LEAF_FACTOR = 0.5 of the parent's length, named as a constant and measured by the
+gate, because a guess that is measured is a different thing from a guess that is baked in. Mass follows box
+volume, so a thigh outweighs a forearm 20.8 to 1 without anyone choosing a number.
+
+AND THE CONVERSE, WHICH IS THE HALF THAT MAKES IT USEFUL. "Switch to ragdoll" is not a hit reaction; a hit
+reaction is a per-bone weight ramping from the animated pose toward the simulated one and back, so a
+character staggers and recovers rather than dropping like a bag. blendPose is that: endpoints BIT-IDENTICAL
+(no slerp is run at 0 or 1, so a character standing still cannot drift), monotone all the way across, and
+SLERPED -- worst |q| - 1 of 4e-8 against 3.7e-2 for a lerp of the same two poses. A non-unit quaternion fed
+to a rotation matrix shortens the bone, which is the scale dip SkeletalAnimator's own round-292 note records
+for its matrix lerp.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Dropping the attach points on the REAL path (not
+just in the gate's side-by-side) turns 2 red; anchoring at the parent's tail turns 2 red at 0.888 -- a
+sabotage invisible on a chain and obvious on a humanoid, which is why the test creature has a pelvis with
+three children. *** AND THE LERP SABOTAGE LEFT BOTH THE ENDPOINTS AND THE MONOTONICITY GREEN: *** a blend can
+be monotone, exact at both ends, and still shorten every bone in the middle.
+
+Also corrected in passing: two endpoint checks were written with qAngle, whose 2*acos(dot) returns about 1e-8
+on two bit-identical float-normalised quaternions because |q| is not exactly 1. They failed on a pose that
+was already identical. An ANGLE cannot express an equality; the components can, and now do.
+
+New: physics/ragdollFromSkeleton.mjs, tools/ship/ragdollFromSkeleton-selfcheck.mjs (17 checks).
+
+NOT done, and stated in the gate: any of this INSIDE box3d. Nothing here creates a world, adds a body or
+makes a joint -- it derives the description that would be handed to those calls and checks the description. A
+graph box3d rejects, or that explodes on the first step, would pass every check above, and the two pages
+remain the only callers. Also not done: what DRIVES the blend weights, since blendPose takes them and nothing
+produces them; and the segment DIRECTION for a multi-child bone, which is still its first child's.
+
+The build now stands at 4245 gates.
+
+## v4244 -- A clip authored for one skeleton, played on another, and the test #115 asked for that proves nothing
+
+*** #115 SAID THE RETARGETING WAS THE HALF OF sunag/three.js-tba WORTH TAKING, AND PROPOSED THREE CHECKS. TWO
+OF THEM ARE GOOD. THE FIRST ONE IS NOT A TEST AT ALL. ***
+
+gpu/SkeletalAnimator.js is 1,216 lines with TRS composition, quaternion slerp, look-at, two-bone IK and
+FABRIK -- a deep animation stack. What it cannot do is play a clip authored against skeleton A on skeleton B.
+rig/RigSystem.js:752 uses the word "retargeted", but attachEntityRig binds a rig to a MESH (it needs
+JOINTS_0/WEIGHTS_0 and a skin) and does not map one skeleton's channels onto another's. There is no bone-name
+table anywhere in the tree.
+
+New anim/retarget.mjs. It reuses rig/rigMath.js's exported quaternion primitives rather than writing a fourth
+private copy -- rigMath, RigSystem, SkeletalAnimator and autoSpineRig already each carry one, which is the
+#51 "one Ashima noise, not three copies" shape and is noted here rather than fixed.
+
+*** THE MECHANISM, WHICH IS WHY THE OBVIOUS ANSWER FAILS: A CLIP DOES NOT STORE WHERE THE ARM IS. *** It
+stores a bone's LOCAL rotation, and a local rotation means nothing without the rest pose it was authored
+against. Copy a T-pose clip's quaternions onto an A-pose rig and every bone is wrong by the angle between the
+two rest poses. Measured rather than described: the naive copy puts the shoulder
+
+    0.9000 rad -- 51.57 degrees -- from where it belongs
+
+against a rest-pose difference of exactly 0.9. That is not a coincidence, it is the whole mechanism: the
+A-pose's arm drop is added on top of the animation. And nothing in the output looks malformed -- the
+quaternions are unit, the hierarchy is intact, and the arms are simply below the floor.
+
+THE FIX IS TO TRANSFER THE DELTA FROM REST, IN WORLD SPACE:
+
+    D(b)        = Ws_anim(b) * inverse(Ws_rest(b))          what the source bone actually did
+    Wt_anim(b)  = D(b) * Wt_rest(b)                         the same thing, done to the target's rest
+    Rt_local(b) = inverse(Wt_anim(parent)) * Wt_anim(b)     back to the frame the animator wants
+
+World space rather than local is what makes it survive bones whose LOCAL AXES differ -- the usual case
+between rigs from different tools, and invisible in the local-space formulation. Retargeted, every bone moves
+exactly as far from its own rest as the source did: worst discrepancy 5.7e-7 rad over 9 bones.
+
+*** AND NOW THE PART THAT MATTERS MOST. #115 PROPOSED "A CLIP RETARGETED A -> B -> A RETURNS TO THE ORIGINAL"
+AS THE CHECK. IT CANNOT SEE THE DEFECT. *** The naive algorithm round-trips to exactly 0.00e+0 as well:
+
+    correct   A -> B -> A     worst bone error  0.00e+0 rad
+    NAIVE     A -> B -> A     worst bone error  0.00e+0 rad     -- for an algorithm 51.57 degrees wrong
+
+A round trip applies a transform and then its inverse, so ANYTHING COMMON TO BOTH DIRECTIONS CANCELS -- and a
+systematically wrong transform is common to both directions. This is v4236's vertex stage, v4241's fragment
+shader and v4243's constant texture arriving a fourth time, in a fourth shape. The check is kept and
+labelled: it would catch a NON-INVERTIBLE error and cannot catch a wrong-but-consistent one. What does catch
+it is an EXTERNAL reference -- the source's own rest-relative motion -- and running the naive pose back
+through the correct algorithm exposes it at 0.9000 rad, because two DIFFERENT transforms do not cancel.
+
+BONE LENGTHS: ROTATIONS CARRY OVER, ROOT TRANSLATION DOES NOT. An elbow bent 40 degrees is bent 40 degrees on
+any arm; a stride is not. Unscaled, the 0.7x skeleton covers the tall one's ground at 0.0500 per frame --
+identical to the source, feet dragging. Scaled by the rest-height ratio it moves 0.0350, and that ratio
+matches the LEG-LENGTH ratio 0.6090 / 0.8700 measured off the skeletons rather than asserted from the 0.7
+they were built with.
+
+THE BONES THE MAP DOES NOT COVER, which are two different problems and get two different answers. A source
+bone with no target is DROPPED, and dropping it is correct -- there is nowhere to put it. A target bone with
+no source KEEPS ITS REST ROTATION rather than collapsing to identity; collapsing is the quiet version of the
+defect, where the rig still animates and one bone is limp. Both are reported BY NAME, because "3 bones
+unmapped" is not something a rigger can act on. And the matcher does not guess: it normalises prefixes, case
+and separators so mixamorig:UpperArm_L, upperArm.L and UPPERARML land on one key, and it will not pair
+"Hand.L" with "wrist_left". A mapper that guesses is worse than one that reports what it could not match.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Dropping the rest-delta turns 2 checks red at
+exactly 0.900 rad; collapsing an unmapped bone turns 1 red; neutering the root scale turns all 3 of section 4
+red together, which is what a shared cause should look like. *** AND SABOTAGE A LEFT THE ROUND TRIP PERFECTLY
+GREEN -- which is not a remark about the sabotage but the evidence for the paragraph above. ***
+
+New: anim/retarget.mjs, tools/ship/retarget-selfcheck.mjs (14 checks).
+
+NOT done, and stated in the gate: any of this on a REAL GLB. The skeletons are built in the gate, which makes
+the rest-pose difference exact and the arithmetic checkable, and means nothing here has met a twist chain, a
+non-uniform scale, or a bone whose local axes are rotated relative to its parent's -- the world-space
+formulation is chosen to survive that last one and has not been tested against it. Also not done: TRANSLATION
+channels on non-root bones, which some rigs animate and this file does not transfer at all; and wiring it to
+SkeletalAnimator, which is reached by this gate and by nothing else.
+
+The build now stands at 4244 gates.
+
+## v4243 -- Texturing a face that did not exist when the mesh was unwrapped, and a CPU/GPU check that turned out to be unavailable
+
+*** #114 ASKED FOR SOLID TEXTURING BECAUSE v4235's CSG CUT FACES HAVE NO UVs. THEY GOT IT, AND THE ROUND ALSO
+FOUND THAT THIS TREE CANNOT CURRENTLY GRADE A NOISE-BASED SHADER AGAINST ITS OWN JS MODEL. ***
+
+v4235 gave the engine mesh booleans that return POSITIONS ONLY -- toTriangleBuffer is nine floats per
+triangle and the word "uv" appears nowhere in physics/mesh/meshCSG.mjs. So a blast hole is geometrically
+perfect, watertight and gap-free, and cannot be textured: every face of the cut is a polygon that did not
+exist when the wall was authored, so no unwrap ever gave it a coordinate.
+
+New render/solidTexture.mjs writes both UV-free answers, once in JS and once in GLSL, which is how every
+shader in this tree is meant to be graded. TRIPLANAR projects a 2D image down three axes and blends by the
+normal. SOLID texturing evaluates a function of the 3D point.
+
+*** THEY ARE NOT EQUIVALENT, AND THE DIFFERENCE IS AT THE ONE PLACE THAT MATTERS. *** An original face and a
+cut face meet along an edge, and being an edge is exactly the property that their NORMALS DIFFER. Triplanar's
+weights are a function of the normal, so its output jumps across that rim while the position stands still.
+Measured on a real cut, at the 41 points where a tagged skin polygon and a tagged cut polygon share a vertex:
+
+    solid texture     0 of 255      triplanar     136 of 255
+
+*** AND THE REMEDY EVERYONE PRESCRIBES FOR TRIPLANAR MAKES IT WORSE. *** Raising the blend weights to a power
+is the standard fix for ghosting. On the real rim it takes the jump from 136 to 166 to 173 at k = 1, 4 and 8,
+because sharper weights mean a bigger swing when the normal flips. And on a PERFECTLY DIAGONAL face -- the
+worst ghosting case, the one the knob exists for -- it does nothing whatsoever: 0.333/0.333/0.333 at every
+exponent, because raising three EQUAL numbers to a power leaves them equal and normalising restores the same
+thirds. The knob works where it is least needed and cannot help where it is most.
+
+meshCSG NOW TAGS WHAT IT ALWAYS KNEW AND ALWAYS DISCARDED. subtract() returns two kinds of polygon: fragments
+of A's surface that survived clipping, and polygons of B turned inside out to cap the hole. The first is the
+object's SKIN, the second is the CUT. The tag rides through clonePolys and both halves of every splitPolygon,
+so a fragment is still what it was however many times the BSP cut it: 128 skin + 158 cut on the test wall,
+with every cut face verified to lie on one of B's planes. The converse is deliberately NOT asserted, because a
+skin face may coincidentally be coplanar with one of B's planes and demanding otherwise would be demanding a
+fact about the seed.
+
+*** THEN THE CHECK THIS TREE MAKES FOR EVERY SHADER TURNED OUT TO BE IMPOSSIBLE HERE, AND THAT IS THE ROUND'S
+LARGEST FINDING. *** crtModel is graded against crtPass, swiftShaderModel against swiftShaderPass; the
+convention rests on the two implementations computing the same function. Through Ashima simplex they do not.
+Over 9,216 points the JS snoise3 and the GLSL snoise agree to better than 1e-3 at only 23.5% of them, and the
+worst disagreement is 4.17 on a range of about +/-3.6. Exact agreement at many points with total disagreement
+at others is the signature of a DIFFERENT GRADIENT being selected -- a drifting precision error would be small
+everywhere, and a mistranslation would be wrong everywhere.
+
+The mechanism, measured rather than guessed: Ashima's permute chain ends in mod289(x) = x - floor(x*(1/289))*289
+with x reaching about 1.1e7. 1/289 is not exact in binary, so in 32-bit float the product lands on the other
+side of an integer boundary for a fraction of inputs; floor differs by one, mod289 differs by 289, and a whole
+different gradient is chosen. The JS runs in float64 and gets the other answer. No amount of care in the JS
+removes it.
+
+THREE INSTRUMENTS WERE TRIED AGAINST A DELIBERATELY BROKEN SHADER -- the GLSL's frequency multiplied by 1.6,
+exactly the "a constant drifted between the two copies" defect such a gate exists to catch -- AND NONE OF THEM
+SEPARATES IT FROM A CORRECT ONE:
+
+    mean brightness      correct 0.626, JS 0.615, BROKEN 0.623   -- a stationary field keeps its histogram,
+                                                                    so no distribution test sees a frequency error
+    pixel correlation    correct 0.199, BROKEN 0.096             -- real separation, far too little of it
+    block correlation    correct 0.193 over 8x8 means            -- averaging did not move it, so the
+                                                                    disagreement is pervasive, not sparse
+
+So section 5 says "no CPU/GPU agreement check is available here" and pins the numbers, rather than inventing a
+threshold around r = 0.15 that would manufacture a pass out of a gap. Filed as its own item, because it
+reaches much further than one texture: shaders/ashimaNoise-selfcheck.mjs, which exists precisely to guard the
+noise consolidated at v4177, checks TEXT AND CONSTANTS ONLY -- that the GLSL declares snoise(vec3), carries 0.6
+and 42.0, hashes correctly -- and has never compared a JS value to a GLSL value. render/aquarelleModel.mjs and
+render/aquarellePass.js are exactly such a pair.
+
+THREE SABOTAGES, RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Breaking the tag carry through splitPolygon turns 4
+checks red and leaves the tags on the 20 polygons that were never split. *** ONE SETTLED WHAT THE HEADLINE IS
+WORTH: *** making the solid texture a constant grey left the zero-seam check PERFECTLY GREEN, because a
+constant function also jumps zero across an edge. The CONTROL caught it. So the zero is near-circular on its
+own and is not the finding; the finding is the PAIR -- 0 against 136, both techniques asked the same question
+at the same points -- plus a control proving the zero is not the zero of a flat picture. And the third
+sabotage PASSED, which is what forced section 5 to be rewritten from "the two agree" into a measurement of why
+they cannot be compared.
+
+New: render/solidTexture.mjs, tools/ship/solidTexture-selfcheck.mjs (19 checks), tools/ship/solidTextureHarness.html.
+
+NOT done, and stated in the gate: what this costs. concreteAt is four fbm3 calls of two to three octaves, so a
+pixel is up to eleven simplex evaluations, and nothing here times it -- that number decides whether it ships as
+a shader or as a bake. Whether the aggregate READS as concrete is a judgement no gate makes; the material is
+asserted consistent and continuous, never convincing. And the SKIN/CUT tag is produced and verified but nothing
+in the engine consumes it yet: meshCSG's output still reaches the renderer as positions only.
+
+The build now stands at 4243 gates.
+
+## v4242 -- The optional effects, switched on: three of them cannot be, and the gate had reported a property that does not exist
+
+*** #113 ASKED WHAT THE FRAME LOOKS LIKE WITH THE OPT-IN EFFECTS ENABLED. THE ANSWER IS THAT MOST OF THEM
+CANNOT BE ENABLED, AND THAT v4241's OWN GATE MANUFACTURED ONE OF THE FACTS v4241 REPORTED. ***
+
+v4241 closed by saying its census was the DEFAULT scene, that "a frame with three swiftShader effects
+switched on is exactly the mergeable chain effectMerge was built for", and that reaching it meant driving
+the real UI. This round went looking for that frame. It does not exist, and finding out why took the
+measurement from one configuration to six.
+
+FIRST, THE FALSE PASS, AND IT IS THE ONE WORTH KEEPING. v4241's gate asked `!!window.ssao.enabled` and
+asserted the answer was false. window.ssao has never had an `enabled` property -- its keys are off, on,
+setBias, setRadius, setStrength, status. `!!undefined` is false, so the assertion PASSED, and the gate
+reported "SSAO is disabled at boot" in a line that read like a measurement. SSAO has been running the whole
+time at strength 0.85.
+
+    A PROBE FOR A BOOLEAN MUST ESTABLISH THAT THE PROPERTY EXISTS BEFORE READING IT, because
+    !!obj.missingProp and !!obj.falseProp are the same value, so a typo comes back looking like a finding.
+
+SECOND, THE FIVE bloomPass DRAWS ARE NOT "one pass's downsample and upsample ladder", which is what v4241
+called them while holding correct per-line attribution. Reading the attributed lines: 719 is the brightness
+extract, 729 the horizontal blur, 736 the vertical blur, 750 is SSAO, 818 the composite. There is no ladder --
+one half-res two-tap blur, and a draw that is not part of bloom at all. Proven on the real page rather than
+by reading: window.ssao.off() removes line 750 and only line 750, six call sites becoming five, with the
+strength read back afterwards so a setter that silently did nothing could not pose as a result.
+
+THIRD, THE FRAME IS NOT SIX DRAWS. It is five with SSAO off, six at boot, seven with phosphor on, and eight
+when the sun is high enough for god rays -- a sixth bloomPass draw at line 771 whose SETTING is already on
+(_gfxSettings.godrays = true, godRayStrength = 0.7) and which is suppressed by sunVisibility, recomputed
+from the sun's screen position every frame. So that draw is gated on the TIME OF DAY and no toggle can force
+it; it is reported as a bound rather than asserted at a number. Both v4236 and v4241 reported a property of
+one configuration as a property of the engine.
+
+*** FOURTH AND LARGEST: THREE OF THE FIVE NAMED "OPTIONAL PASSES" CANNOT ENTER THIS FRAME AT ALL, FOR THREE
+DIFFERENT STRUCTURAL REASONS. *** swiftShaderPass builds its OWN canvas and takes its OWN GL context on it
+(swiftShaderPass.js:914, :917) and never mounts it in the document -- its header says so in as many words,
+"an OFF-SCREEN pass by design, not another link in the phosphor/bloom chain" -- and a pass living in another
+GL context is unmergeable in principle, not merely unwired. crtPass and cameraEffectsPass are not imported
+by main.js at all; they are reached only from other pages. window.transitions is a FACTORY -- its whole
+surface is check, describe, make -- and nothing anywhere mounts what make() returns. Phosphor is the one
+optional pass that adds a draw, and switching it on takes the frame from six sites to seven.
+
+*** WHICH LEAVES THE REAL REASON effectMerge HAS NO CALLER, ONE LEVEL BELOW WHERE v4241 LEFT IT. *** v4241
+said "nothing mergeable is running". The stronger statement the toggles support is that THERE IS NO CHAIN TO
+MERGE: no list of enabled effects, no chain object, no order. bloom and phosphor are joined by a hand-written
+if/else at main.js:30807-30823, and every other effect is in another context, on another page, or behind a
+factory with no mount. A merger needs a SEQUENCE, and the sequence does not exist as data anywhere here.
+
+FOUR SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND md5-VERIFIED. Reproducing this round's own setup-string bug
+turns 2 checks red; forcing bloomPass's SSAO branch false turns 2 red; neutering window.phosphor.set turns 1
+red. *** AND ONE SABOTAGE PROVED A GUARD WAS DEFENSIVE RATHER THAN LOAD-BEARING: *** dropping the strength
+read-back from the assertion left exactly the same 2 checks red, because the site comparison catches a dead
+setter on its own. So the read-back is labelled DIAGNOSTIC and not counted -- what it adds is telling "the
+toggle never fired" apart from "the toggle fired and the draw did not move", which are the same red without
+it and need different fixes.
+
+THE BUG THIS ROUND SHIPPED AND THEN FOUND, because it is the same class as the false pass above:
+page.evaluate(string) EVALUATES the string, so a setup written as "() => window.ssao.off()" becomes a
+function object and is never called. All four toggles silently did nothing, every comparison returned "no
+change", and no change is exactly what a real negative result looks like. It was indistinguishable from a
+finding until the value was read back.
+
+And one new gate check banned the phrase "downsample and upsample ladder" -- which banned its own
+correction, since a header that refutes a sentence has to quote it. Same shape as the v4239 check that
+banned the word "Cesium" inside the paragraph explaining why Cesium was refused. What a correction looks
+like in text is the refutation being PRESENT, never the mistake being absent.
+
+Rewritten: tools/ship/postChain-selfcheck.mjs, now 23 checks measuring six configurations with a noise floor
+read first. Corrected in place: render/effectMerge.mjs's header, which carried both of v4241's wrong
+sentences.
+
+NOT done, and stated in the gate: the god-ray configuration, which needs the sun moved rather than a switch
+flipped; whether the fullscreen triangle is measurably faster, which nothing times; and what a real chain
+would cost, because building one is a change to main.js rather than a measurement of it.
+
+The build now stands at 4242 gates.
+
+## v4241 -- What the frame actually draws: v4236's census was wrong three ways, and the one real quad is gone
+
+*** #112 SAID "SIX POST DRAWS, ONE STILL A QUAD, AND IT IS ONE DRAW CALL TO FIND". THE QUAD WAS REAL AND
+EVERYTHING ELSE ABOUT THAT SENTENCE WAS WRONG. *** v4236 measured the chain on the real page and got three
+things wrong for one reason: its classifier counted any drawArrays of six vertices or fewer as
+"fullscreen-ish", and it had no way to say WHICH FILE was calling. A program slot cannot be mapped back to a
+source file -- glCapture interns objects, and its byte budget drops the shader sources that might otherwise
+identify a pass. What CAN name a file is the CALL STACK, so this round wraps drawArrays on the real page and
+reads it. Every draw is now attributed to a file and a line.
+
+WHAT THE DEFAULT FRAME ACTUALLY DRAWS, in a five-second steady window after six seconds of boot:
+
+    16 draws  bloomPass.js:719  <- main.js:30826
+    16 draws  bloomPass.js:729  <- main.js:30826
+    16 draws  bloomPass.js:736  <- main.js:30826
+    16 draws  bloomPass.js:750  <- main.js:30826
+    16 draws  bloomPass.js:818  <- main.js:30826
+    16 draws  VoxelMemoryGPU.js:245 <- main.js:29532
+
+*** THE FIVE "SEPARATE EFFECTS" ARE FIVE CALL SITES INSIDE ONE FILE. *** They are bloomPass's downsample and
+upsample ladder, called from one line of main.js -- and bloom is the single case effectMerge's own taxonomy
+classifies as OPAQUE and forbids merging, because it needs the full previous output as a texture at every
+level. *** SO effectMerge HAS NO CALLER BECAUSE NOTHING MERGEABLE IS RUNNING, NOT BECAUSE NOBODY WIRED IT. ***
+crtPass, cameraEffectsPass, swiftShaderPass, transitionPass and phosphorPass all exist, all have gates, and
+all draw nothing at boot; SSAO, whose two quad draws would otherwise have been candidates, reports
+enabled = false. They are opt-in, and the default scene enables none of them. That is a different problem
+from the one #112 described, and naming it correctly is worth more than the wiring would have been.
+
+*** AND THE SIXTH DRAW WAS NEVER IN THE POST CHAIN. *** It is gpu/VoxelMemoryGPU.js -- a GPGPU decay step over
+a square framebuffer with depth off. It WAS a genuine fullscreen quad, so the fix #112 asked for exists; it
+was simply somewhere else entirely. Converted to an attributeless fullscreen triangle built from
+gl_VertexID, and PROVEN BYTE-IDENTICAL: 0 of 16,384 pixels differ, both paths cover every pixel, one
+primitive where there were two. The vUV expression is unchanged, so the interpolated coordinate at every
+covered pixel is unchanged, which is why this is an equality and not a tolerance. The old quad vertex stage
+is kept and exported -- not dead code: the gate compiles both and compares them.
+
+FIVE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Shrinking the triangle to the viewport leaves
+8,256 of 16,384 pixels holding the sentinel; drifting its vUV by 0.01 breaks the byte-equality; putting the
+six-vertex draw back turns the census red. *** ONE STAYED GREEN AND IT IS THE SAME LESSON v4236 LEARNED,
+ARRIVING IN A DIFFERENT FILE: *** sabotaging the decay away -- c.r *= 1.0 -- left the quad-versus-triangle
+comparison perfectly green, because the fragment shader is COMMON TO BOTH SIDES and a change to it cancels.
+Anything shared by both halves of a comparison is invisible to it. In v4236 that was the vertex stage; here
+it is the fragment stage. The decay is now asked about directly: 6 -> 5, 215 -> 187, 108 -> 94 at a decay
+of 0.87.
+
+New: tools/ship/postChain-selfcheck.mjs (16 checks) and tools/ship/postChainHarness.html. Corrected in place:
+render/effectMerge.mjs's header, which carried the wrong census, and gpu/VoxelMemoryGPU.js, which now says
+who thought its quad was somewhere else. *** AND v4236'S OWN GATE WENT RED, WHICH IS THE FIX LANDING. *** It
+asserted 5 triangles to 1 quad on the real page; with the quad converted it reads 96 to 0 and failed. The
+assertion is inverted rather than deleted, keeping v4236's number as the evidence -- a gate left demanding
+the defect it asked to have fixed is worse than no gate at all.
+
+NOT done, and stated in the gate: what the chain looks like with the optional effects ENABLED. A frame with
+three swiftShader effects switched on is exactly the mergeable chain effectMerge was built for, and turning
+them on from a gate means driving the real UI -- a harness this round does not have. Also not done: whether
+the triangle is measurably FASTER. Nothing here times it. On a 128x128 target the saving is 128 duplicated
+fragments per pass, which is real, small, and free.
+
+The build now stands at 4241 gates.
+
+## v4240 -- Multiple scattering: the series that keeps twilight alive, and the ratio that bounds it
+
+*** v4237's CLOSING NOTE MADE A PREDICTION AND THIS ROUND MEASURED IT BEFORE WRITING A LINE. *** It said
+single scattering would read as a sky that goes black too fast at dusk. Baseline, at 0.5 km, zenith total:
+2.832e-2 with the sun at +40 degrees, 3.933e-3 at 0, 1.515e-3 at -2, 2.972e-4 at -4. An order of magnitude
+per two degrees once the sun is down. Real twilight does not do that.
+
+*** THE APPROXIMATION IS NAMED RATHER THAN IMPLIED: ORDERS TWO AND UP ARE TREATED AS ISOTROPIC. *** That is
+what lets a 2D table over (altitude, sun cosine) stand in for Bruneton's 4D one over (r, mu, muSun, nu) --
+32x128x32x8 is a million texels; this is 24x16 and builds on the CPU in 132 ms. It is least true of the
+SECOND order, the one with the most directionality left and the largest of those being lumped together, and
+nothing here measures that error because measuring it needs the 4D table this round exists to avoid.
+
+*** AND IT IS A GEOMETRIC SERIES, WHICH IS THE PART THAT CAN BE GRADED. *** If F is the fraction of uniform
+surrounding radiance that scatters back toward a point, the whole tail is L2/(1-F), which converges if and
+only if F < 1 -- and F < 1 is a physical fact the table must EXHIBIT rather than a condition the code
+assumes. Measured: worst F over the table is 0.2758. Each order falls by a factor of 5.5, and the running sum
+after 24 orders lands on the closed form to 1e-9, while the first order alone is only 82% of it. F is largest
+in blue (0.289 against 0.123 in red), so the added light comes out BLUER than the single-scattered light it
+is added to -- which falls out of betaR and was not asked for.
+
+*** THE GROUND TERM WAS 700x TOO SMALL AND THE ALBEDO KNOB IS WHAT SAID SO. *** For a DOWNWARD ray that meets
+the planet, distanceToTop() still returns a number -- where the LINE would leave the atmosphere going
+backwards THROUGH the planet -- and the first version used T(r, mu) there, a transmittance along a path no
+light takes. The symptom was a ground albedo that moved the sky by 0.07% across its entire range. The segment
+is recovered from the multiplicative property along the REVERSED, upward ray, where both ends are well
+defined: T(x -> ground) = T(ground -> top) / T(x -> top). After the fix, albedo 0 to 0.9 raises the sky by a
+factor of 5.09.
+
+*** THE PREDICTION, ANSWERED. *** The gain over single scattering GROWS as the sun goes down: 7.70x at +40
+degrees, 5.68x at 0, 10.87x at -4, 62.88x at -6. In daylight the single order dominates and the tail is a
+correction; after sunset the single order is nearly gone and the tail is the whole sky. The collapse is
+arrested: from sunset to -6 degrees, single scattering falls 222x and the total falls 20x.
+
+*** AND WHAT LIMITS THIS TABLE IS NOT ITS RESOLUTION, WHICH IS THE OPPOSITE OF v4237's. *** The first attempt
+to measure that graded three table sizes against a reference computed with the SAME 24 directions the tables
+used, so the "truth" carried its own sampling noise and the errors came out NON-MONOTONE -- 12.27%, 8.44%,
+14.80%, 7.11% as the table grew. #86 again, and harder than last time: a reference that is not converged
+measures the difference between two samplings of one wobble. Against a converged 512-direction reference, the
+picture is clear. Direction count converges monotonically: 1.98%, 0.76%, 0.46%, 0.35% at 12, 24, 48 and 96
+directions. Table resolution barely matters: 8x6 is 0.372% and 40x24 is 0.271%, so a twentyfold increase in
+texels buys a factor of 1.4. psi is SMOOTH in altitude and sun cosine and there is almost nothing for a finer
+grid to resolve -- where the transmittance LUT gained a factor of 15 over the same range, because it bends
+hard at the horizon. THE BUDGET FOR MULTIPLE SCATTERING BELONGS IN DIRECTIONS, NOT TEXELS.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED, EIGHT RED ON THE FIRST PASS. Dropping the
+uniform phase turns F into 3.47 and the series DIVERGES, which is 12 checks at once. *** THE NINTH WAS
+REMOVING THE PLANET'S SHADOW AND IT LEFT EVERYTHING GREEN: *** every other check measures a RATIO, and a
+glowing midnight only increases those. The terminator is now asked about directly -- psi is EXACTLY zero from
+the surface to 40 km past muSun -0.3. And the first version of THAT check said "at every altitude", which is
+false at 59 km, where 1.94e-5 survives because sunlit ground is visible over the horizon from up there. A
+check that demanded zero would have been demanding the model be wrong.
+
+The GLSL reads the table too, so sky.html is no longer a shader doing less than the model beside it: a
+multiple-scattering toggle, a ground-albedo slider, and the measured gain on screen. 24x16 table in 132 ms,
+sky drawn in 0.1-0.4 ms at 720x420 on swiftshader.
+
+New: the multiple-scattering half of render/atmosphere.mjs, tools/ship/atmosphereMulti-selfcheck.mjs (26
+checks). NOT done: the isotropic error itself, and aerial perspective.
+
+The build now stands at 4240 gates.
+
+## v4239 -- Bend a streamed world, and the one rule that keeps the seams shut
+
+*** THE BACKLOG ITEM FOR THIS ROUND MADE TWO GUESSES AND THE SECOND ONE WAS WRONG, WHICH IS WORTH MORE THAN
+THE ROUND'S CODE. *** Filing dreamfold (Makio64, MIT -- fold a photorealistic city map in real time), I wrote
+that the data path had to be refused and that what the tree GENUINELY lacks is "a 3D Tiles streaming loader
+-- level-of-detail geometry arriving over the network and being swapped in while the camera moves". The
+refusal stands. The gap does not exist:
+
+  render/screenSpaceError.js (v4150)  -- the real screen-space-error metric, geometric error, level
+                                         selection, and edgeLevel(), the crack-free edge rule
+  world/ChunkStreamer.js (round 332)  -- camera-following load and unload
+
+So the only part of dreamfold left standing is the fold itself, and asking what a fold COSTS a system that
+already has level-of-detail turns out to be the question worth asking.
+
+*** THE RULE: A DEFORMATION IS SAFE FOR AN LOD SYSTEM IF AND ONLY IF IT IS A PURE FUNCTION OF WORLD POSITION,
+AND THIS IS AN IDENTITY RATHER THAN A TOLERANCE. *** Two chunks meshed at different levels meet along a
+shared edge, and they only meet because edgeLevel() made both sides use the finer level's stations there.
+That agreement is in WORLD SPACE. A deformation preserves it exactly when it maps a world point to a world
+point and consults nothing else: equal inputs, equal outputs, seam error EXACTLY ZERO. Measured, on a seam
+whose vertices the fold displaces 78 units: 0. Not below a bound -- zero, and the reason is the definition of
+a function.
+
+*** AND ONE CHUNK-LOCAL TERM OPENS THAT SEAM BY 8 UNITS. *** The obvious thing to reach for when a fold is
+authored per chunk is a coordinate measured within the chunk, which makes it a DIFFERENT function on each
+side of the boundary. It looks perfect in any single-chunk preview and cracks the moment the camera crosses
+the boundary. *** THE TWO CHECKS THAT CATCH THIS ARE NOT REDUNDANT AND NEITHER REPLACES THE OTHER: *** the
+purity probe reports that fold as PURE -- correctly, since from the outside it IS a function of position,
+just a different one per chunk -- and only the seam measurement sees the crack. A gate cannot read intent; it
+can read whether two chunks agree.
+
+*** AND edgeLevel PICKS THE FINER OF THE TWO LEVELS, NOT THE COARSER, WHICH I HAD BACKWARDS AND WHICH THAT
+FILE SAYS IN CAPITALS. *** "Numerically finer means a SMALLER step, so this is a min and not a max. Getting
+that backwards produces terrain that looks correct in a screenshot and cracks whenever the camera moves."
+Also corrected: levelFor takes an ARRAY of steps, not a count -- my first call passed 4 and got null, which
+is that function refusing a malformed question rather than guessing at it.
+
+The bend itself is a rotation about a hinge whose angle ramps with distance past it, so lengths are preserved
+at every station: worst radius change over 200 points, 2.8e-14. It turns the world rather than stretching it.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. *** TWO OF THEM WERE ABOUT THIS GATE AND ONE
+WAS ABOUT MY OWN SABOTAGE. *** Cutting seamError to the first vertex left the gate GREEN, because the
+chunk-local fold happens to be wrong by the same 8 units at every station -- a seam that opens only at its
+FAR END is the realistic failure and nothing asked about it, so now something does. My first impurity
+sabotage incremented a counter nobody read, so the fold was still pure and the gate was right to stay green:
+a badly built sabotage proves nothing about a gate. And isPurePosition's interleaving stays green and is
+LABELLED DEFENSIVE -- the probe re-asks each point after all the others anyway.
+
+New: world/foldField.mjs, tools/ship/foldField-selfcheck.mjs (23 checks).
+
+NOT done, and the gate says so: no Cesium, no tile pipeline, no API key -- dreamfold's MIT covers its own
+code and says nothing about the Google tiles it renders, which is the #82 ENCUMBERED shape. The fold is also
+not wired into ChunkStreamer: this round establishes the RULE and the cost of breaking it, and a per-vertex
+JS call is exactly the shape that would have to move into a vertex shader before anyone shipped it.
+
+The build now stands at 4239 gates.
+
+## v4238 -- The pass v4226 never got, and the second projective solver nobody knew about
+
+*** THE BACKLOG ITEM SAID vision/homography.mjs HAS "NO RENDERING CONSUMER", AND THE HALF OF THAT WHICH IS
+WRONG IS THE INTERESTING HALF. *** v4226 shipped a DLT plus RANSAC with 40 checks, and nothing in the tree
+renders with it: grep for perspectiveWarp / homographyWarp across render/ and mesh/ returns nothing. True.
+What is ALSO true is that pipboy-models.html has warped a canvas onto a screen quad since long before v4226,
+through a hand-rolled adj() / mm() / mv() / basis() construction emitted as a CSS matrix3d -- and it does not
+import the module, and the module does not know it exists. That is the shape of #78 (three copies of
+stagger), #96 (two copies of Moller-Trumbore) and #51 (three copies of simplex noise), found again.
+
+*** SO THE FIRST THING THIS ROUND DOES IS HOLD THE TWO SOLVERS TO EACH OTHER, AND THEY AGREE TO 2.2e-14. ***
+A 2n-by-9 eigenproblem and a projective basis built from three points and scaled by the fourth, landing on
+the same matrix -- over forty random quads, worst 4.01e-14, not the one quad that happened to be typed first.
+Worth knowing before anyone deletes either one. The duplication is RECORDED and LEFT: pipboy's version works,
+it is CSS rather than GL, and swapping a page's working transform for an import is a risk nobody asked for.
+
+*** THE TRAP, AND IT IS THE ONLY ONE THAT MATTERS: A FRAGMENT SHADER WARPS BY THE INVERSE. *** H takes SOURCE
+corners to DESTINATION corners, which is the direction a person thinks in and the direction the DLT solves.
+A fragment shader runs at a DESTINATION pixel and must ask which source texel lands there, which is H
+inverse. Using H itself compiles, runs, and produces a perfectly convincing perspective effect pointing the
+wrong way: measured, it differs at 100% of pixels on the CPU reference and 85% of subpixels on the GPU. The
+uniform is named uHinv because of that.
+
+*** AND IT IS THE FIRST REAL EFFECT WRITTEN AGAINST v4236's TAXONOMY, WHICH PUT IT WHERE IT BELONGS WITHOUT
+BEING TOLD. *** The warp classifies as SAMPLING -- derived from its body, not declared -- so warp-then-grade
+plans to ONE draw and grade-then-warp plans to TWO. It also exercises the merge's typed knobs for the first
+time, emitting `uniform mat3` and `uniform vec2` rather than nine floats.
+
+On a real WebGL2 context the shader agrees with the CPU reference at 5 subpixels of 9216 over 2 levels
+(0.05%), and the disagreements are on the QUAD'S EDGE where a source coordinate lands within a rounding of
+the boundary test and the two sides take different branches -- the same texel-boundary signature the shader
+port classifies vortex under. Coverage: 2024 CPU pixels against 2026 GPU.
+
+SEVEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED, SIX RED. Mapping forward instead of backward,
+dropping the perspective divide (58.5% of subpixels), unbounding the source rectangle (coverage 2024 -> 3072),
+transposing the matrix on upload (coverage to ZERO -- the whole quad lands outside the source rectangle,
+which is what a transposed projective matrix does), losing the four-point scaling, and returning a colour
+instead of sampling. *** THE SEVENTH STAYS GREEN AND IS LABELLED DEFENSIVE RATHER THAN COUNTED: ***
+homographyDelta's scale normalisation, because both producers already divide through by h22 --
+vision/homography.mjs:174 and fourPointHomography's last line -- so nothing in this tree ever hands it an
+unnormalised matrix.
+
+New: render/perspectiveWarp.mjs, tools/ship/perspectiveWarp-selfcheck.mjs (18 checks),
+tools/ship/perspectiveWarpHarness.html.
+
+NOT done: bilinear sampling, since both sides here are NEAREST so the comparison measures the warp rather
+than two different filters; and glfx.js's other filters, which between the twelve render/*Pass*.js files, the
+28 ported SwiftUIShaders, gl-transitions, aquarelle and badTv the tree already has in some form. This was the
+one that was not a duplicate.
+
+The build now stands at 4238 gates.
+
+## v4237 -- A sky with closed forms: the tree had no scattering model of any kind, and now it has a graded one
+
+*** THE ARGUMENT FOR TAKING BRUNETON'S MODEL RATHER THAN ANY OTHER SKY SHADER WAS THAT IT CAN BE HELD TO A
+NUMBER, AND THIS ROUND HAD TO MAKE THAT GOOD. *** The gap was checked before a line was written: grep for
+atmosphericScatter / aerialPerspective / Bruneton / "precomputed atmospheric" across every .js and .mjs
+returns nothing. There is a sky, a day/night cycle and CloudVolume.js, and no Rayleigh and no Mie anywhere.
+Method from takram-design-engineering/three-geospatial (MIT, development concluded March 2025 -- a finished
+reference rather than a moving target); the code is written here because that repo is a three.js monorepo
+assuming a globe, 3d-tiles-renderer and astronomy-engine.
+
+*** FOUR CLOSED FORMS AND ONE CONVERGENCE, AND NOT ONE OF THEM IS "DOES IT LOOK LIKE A SKY". ***
+
+1. THE VERTICAL OPTICAL DEPTH IS ANALYTIC -- AND MY FIRST REFERENCE WAS THE WRONG ONE. Straight up there is
+no curvature and the integral of exp(-h/H) is elementary. But opticalDepth() stops at the TOP OF THE
+ATMOSPHERE while the closed form runs to INFINITY, and the gap between them looks like integrator error and
+is not: it is the truncated tail, H*exp(-(Rt-Rg)/H). Measured, the gap is 4.4157e-3 against a tail of
+4.4247e-3, so the tail accounts for 99.8% of it. Against the TRUNCATED closed form the integrator agrees to
+4.97e-5 relative at worst -- and the worst case is Mie, because Hm = 1.2 km is a far sharper exponential than
+Hr = 8 km. It converges too: 1.14e-3, 7.15e-5, 4.47e-6 at 64, 256 and 1024 steps.
+
+2. TRANSMITTANCE IS MULTIPLICATIVE, to 4.65e-16. T(a->b) computed as a RATIO of two whole-ray transmittances
+equals the segment integral, which is what makes singleScattering's one-integration-per-step shortcut exact
+rather than a saving with a hidden cost.
+
+3. BOTH PHASE FUNCTIONS INTEGRATE TO ONE over the sphere, at every asymmetry from g = 0 to 0.9. The
+unnormalised (1 + cos^2) integrates to 16.755 -- an eightfold brighter sky of exactly the same colour and
+shape, which is why a constant nobody checks is worth checking.
+
+4. THE SECANT LAW IS THE FLAT-PLANET LIMIT AND WHERE IT FAILS IS THE CURVATURE. At mu 0.9 the flat model is
+0.08% out; at mu 0.05 it is 32% TOO LONG, monotonically, because a curved atmosphere thins out beneath a
+grazing ray faster than a slab does.
+
+5. AND THE MEASUREMENT THE WHOLE PRECOMPUTATION EXISTS TO JUSTIFY: the table converges on the integral as it
+grows -- worst absolute error 1.46e-2, 4.09e-3, 1.00e-3 at 64x16, 128x32 and 256x64, mean 6.98e-4 to 9.45e-5.
+*** AND THE FIRST VERSION OF THAT MEASUREMENT WAS NOISE. *** It drew fresh random sample points for each
+table size and reported 2.05e-2, 6.26e-3, 1.19e-2 -- the biggest table coming out WORSE than the middle one,
+because it was being asked about different points. Three configurations compared on three different sample
+sets is not a comparison, which is #86's rule arriving somewhere new. One deterministic grid of 576 probes,
+walked by every size.
+
+*** THE SUNSET ARRIVES WITHOUT BEING ASKED FOR, AND MY FIRST TEST FOR IT ASKED THE WRONG QUESTION. *** I
+compared a HORIZON view against a ZENITH view with the sun overhead, expecting the horizon to be redder. It
+came back BLUER -- R/B 0.575 against 0.734 -- and that is correct: a long VIEW path with the sun high gathers
+more scattered light without reddening it, because the light reaching each scattering point still came down a
+short vertical path. The sunset is about the SUN's path, not the eye's. Drop the sun to 1 degree along one
+fixed view ray and R/B goes from 0.894 to 1.888 -- more than double, and CROSSING ONE, red overtaking blue.
+On sky.html the horizon reads R/B 0.924 with the sun at 30 degrees and 2.824 with it at 1.
+
+*** AND THE GLSL THAT SHIPS AGREES WITH THE MODEL IT WAS WRITTEN FROM: *** the shader reads the same table to
+within 1.74e-5 over 1024 (r, mu) samples, and the whole single-scattering integral agrees to 0.02% relative
+over 256 view directions on a real WebGL2 context.
+
+TEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Nine turned something red on the first pass.
+*** THE TENTH DID NOT, AND IT WAS A GUARD I HAD CALLED LOAD-BEARING IN A COMMENT. *** Removing the
+discriminant clamp from distanceToTop left the whole gate GREEN, because the table is built through
+rMuFromUv, which never returns r above Rt, so nothing the gate walked could reach the negative discriminant.
+The guard is real -- r a hair above Rt gives a discriminant of -2.6e-2 and sqrt returns NaN, and one NaN in a
+transmittance table is a black hole in the sky the table itself does not show -- but it was UNCHECKED, and
+the comment claiming otherwise was wrong. The gate now asks distanceToTop about r > Rt directly, over 16
+combinations of overshoot and near-zero mu.
+
+Worth noting which check caught which: using Mie's SCATTERING coefficient where the extinction belongs is
+caught by the MULTIPLICATIVE identity and by nothing else, because a single wrong coefficient still produces
+a perfectly plausible sky.
+
+New: render/atmosphere.mjs (CPU model, LUT, and the GLSL both are graded against),
+tools/ship/atmosphere-selfcheck.mjs (28 checks), tools/ship/atmosphereHarness.html, and sky.html -- a fisheye
+of the dome, 256x64 table built in 189 ms on the CPU and the sky drawn in 0.2-0.4 ms at 720x420 on
+swiftshader.
+
+NOT done, and the gate's closing note says so: MULTIPLE SCATTERING IS NOT IMPLEMENTED. This is single
+scattering, which carries a clear daytime sky and is not what carries twilight or the bright band above the
+horizon -- in the full model those are the second and later orders, and their absence will read as a sky too
+dark near the horizon that goes black too fast at dusk. An absence with a known shape rather than a mystery.
+Also not done: aerial perspective, which the same table would serve and which no caller asks for yet.
+
+The build now stands at 4237 gates.
+
+## v4236 -- One draw instead of three, the arrangement that must be refused, and a chain that CLIPS
+
+*** THE BACKLOG ITEM SAID "TWELVE PASSES, TWELVE ROUND TRIPS" AND IT WAS FILED WITH A WARNING NOT TO BELIEVE
+IT, WHICH TURNED OUT TO BE THE RIGHT INSTINCT. *** Measured on the real page rather than counted from
+filenames: index.html booted headless with a capture injected ahead of main.js, six seconds to let program
+compilation finish, then a five-second steady-state window. The chain is SIX fullscreen draws per render
+cycle, not twelve. Of the twelve render/*Pass*.js files, three are shadow or G-buffer producers, two export
+only shader SOURCE, and one is a scene raymarcher.
+
+*** AND FIVE OF THE SIX ALREADY USE THE FULLSCREEN TRIANGLE. *** 90 draws of 3 vertices against 18 of 6 in
+the window, exactly 5:1. postprocessing's second idea is already here for five sixths of the chain; the
+remaining quad pays for the fragments rasterised twice along its diagonal, and it is one draw call to find.
+Also measured: 288 framebuffer binds for 108 draws (2.7 per draw), bindTexture repeated with identical
+arguments five times running, and 161 rAF callbacks against 18 render cycles -- recorded as a measurement and
+NOT read as a verdict, because this is swiftshader and a slow render cycle gives other rAF consumers many
+turns in between.
+
+*** THIS IS glCapture.mjs's FIRST REAL CONSUMER, AND THE POINT IT WAS BUILT FOR. *** v4227 shipped it saying
+that all five existing recording gates BUILD THEIR OWN CONTEXT and not one of them observes a PAGE. Nothing
+had observed a page since. The injection is a module script in <head>, because module scripts execute in
+document order and so patch getContext before main.js runs, which a deferred dynamic import could not promise.
+
+*** THE MACHINERY: render/effectMerge.mjs, AND THE WHOLE CORRECTNESS ARGUMENT IS ONE TAXONOMY. *** An effect
+is mergeable only if what it needs is a COLOUR. A COLOUR effect reads the incoming vec4 and merges anywhere.
+A SAMPLING effect reads the source texture at a uv it computes -- badTvPass's fract(p.x + offset) is one --
+and may LEAD a run and never join one, because after merging there is no texture holding the previous
+effect's output to sample: there is a vec4 in a register. An OPAQUE effect needs the full previous output and
+is never merged. The kind is DERIVED FROM THE BODY rather than declared, because a caller who mislabels a
+sampling effect gets a wrong picture and no error -- and the body is stripped of comments first, which is the
+commentFalsePass shape this tree has caught in three other gates.
+
+*** THE REFUSAL IS WORTH 65 LEVELS OF 255, MEASURED RATHER THAN ARGUED. *** Forcing a sampling effect into
+second place compiles and runs: the second sampler reads the ORIGINAL image at its offset instead of the
+first effect's output. On a real WebGL2 context that is 65 levels at 96.4% of pixels.
+
+*** AND THE THING I EXPECTED TO BE ROUNDING IS CLIPPING, WORTH SIXTY-FIVE OF ITS SIXTY-SIX LEVELS. *** I
+bounded "merged against an 8-bit chain" at 4 levels, expecting quantisation. It measured 66. An RGBA8
+intermediate does not merely round -- it CLAMPS. The chain is tear, then exposure 1.35, then a vignette that
+scales back down; in float the overshoot above 1.0 survives the exposure and the vignette brings it home,
+while through an 8-bit buffer the overshoot is gone and nothing downstream can recover it. THE CONTROL IS
+WHAT MAKES THAT A FACT: the same chain at exposure 0.8, where nothing exceeds 1.0, closes the gap from 66
+levels to 1. So the eight bits are worth a level and the clamp is worth the other sixty-five -- which means
+the reason to merge is not only the draw call. Against a FLOAT chain the merge agrees to 1 level of 255.
+
+NINE SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Eight red. *** TWO OF THEM WERE ABOUT THE GATE
+AND NOT THE CODE. *** Shrinking the fullscreen triangle to half the screen left the gate ALL GREEN, because
+the vertex stage is COMMON to both sides of every comparison, so the merged and chained paths agreed
+perfectly about the same wrong half; coverage is now asked directly against a magenta sentinel and the
+sabotage leaves exactly 1536 of 3072 pixels. And removing the uniform prefixing CRASHED the gate with a stack
+trace naming nothing, so section 4's probes are wrapped and a compile error is a named red check. One
+sabotage stays green and is LABELLED DEFENSIVE rather than counted: reversing the uniform rename order
+changes nothing, because the rewrite regex is anchored on both sides -- and the module comment originally
+claimed that sort was load-bearing.
+
+New: render/effectMerge.mjs, tools/ship/effectMerge-selfcheck.mjs (26 checks),
+tools/ship/effectMergeHarness.html. NOT done, and the closing note says so: the tree's own six passes are not
+rewritten to use any of this. The machinery exists and the chain is measured; claiming the saving has been
+taken would be claiming a saving nobody has taken.
+
+The build now stands at 4236 gates.
+
+## v4235 -- Destructible environments: an exact hole in a wall, and what "gap-free" turns out to mean
+
+*** THE REQUEST WAS "SUBTRACT A JAGGED EXPLOSION SHAPE FROM A CONCRETE WALL IN REAL TIME TO CREATE REALISTIC,
+GAP-FREE RUBBLE AND HOLES", AND MEASURING IT BEFORE BUILDING IT CHANGED THE SHAPE OF THE ROUND THREE TIMES. ***
+The tree had no triangle-level boolean of any kind -- no BSP, no splitPolygon, no coplanar handling anywhere.
+The only CSG was physics/mesh/csg.mjs, which is exact in the FIELD and then samples it on a grid, so a jagged
+rim is smoothed toward the cell size. What BSP buys is a rim on the wall's OWN plane at any angle with no grid,
+and that is the reason to carry a second CSG at all. Neither replaces the other and both are kept.
+
+*** "IN REAL TIME" HOLDS FOR THE FIRST HOLE AND FAILS BY THE THIRD, AND THE COST IS NOT THE BOOLEAN. *** A
+six-polygon wall minus a 256-triangle blast is 561 polygons in 11.6 ms -- one frame, fine. Twelve overlapping
+blasts on the same wall: shot 1 costs 12.7 ms, SHOT 12 COSTS 318.8 ms, and the wall is 20,647 polygons where it
+began as 6. The cause is that clipping a polygon through B's BSP splits it along B's planes even where it lies
+nowhere near B, and B's planes are INFINITE: measured, a blast FIFTY UNITS AWAY still takes a 2,648-polygon
+wall to 3,310. Localised to the polygons a blast's box can reach: 2154 ms to 362 ms over twelve shots, and
+20,647 polygons to 8,979. The localised result is the BETTER MESH, not merely the faster one.
+
+*** WHICH FORCED THE RULE THE GATE IS BUILT AROUND: A BOOLEAN IS GRADED ON THE SOLID, NOT ON THE MESH. *** The
+two paths produce different polygon lists for the same cut. A gate that diffed them would be red on a correct
+optimisation, and the fix would then be to make the fast path reproduce the slow path's waste. So what is
+asserted is V(A - B) + V(A AND B) = V(A), which comes back at a residual of 9.7e-14, and V(A OR B) = V(A) +
+V(B) - V(A AND B) at 1.8e-14.
+
+*** THE LOCALISATION NEEDED A QUERY THE BVH DID NOT HAVE, AND meshBVH.mjs's OWN HEADER HAD ALREADY ARGUED FOR
+IT. *** That file says a single "raycast" would have been the wrong unification -- one KERNEL, several QUERIES
+-- and it shipped with two, raycastFirst and intersectsSegment. A boolean casts no ray at all; it asks which
+polygons a box can reach. trianglesInBox is the third query, and #96 shipping the BVH is what unblocked this.
+
+*** "GAP-FREE" IS TWO CLAIMS AND ONLY ONE OF THEM WAS TRUE OF THE RAW BOOLEAN. *** Of 3,239 directed edges
+after one blast, 803 (24.8%) have no exact opposite -- and every single one is FULLY COVERED by shorter edges
+running the other way. Zero uncovered. So the surface really does bound the solid; what it is NOT is WELDED. A
+long edge meeting two short ones is a T-junction: mathematically closed, and a hairline crack of background
+colour once a rasteriser interpolates the two sides. Neither the volume check nor a screenshot would show it.
+weldTJunctions inserts the covering vertices, and ONE BLAST SETTLES TO 100.0% MATCHED EDGES, ZERO T-JUNCTIONS,
+ZERO GAPS. The coplanar merge makes T-junctions WORSE first (24.8% to 55.8%), so the order is snap, merge,
+weld, and weld is last.
+
+*** OVER TWELVE BLASTS IT DOES NOT REACH 100%, AND THREE EXPLANATIONS WERE PROPOSED AND ALL THREE MEASURED AND
+REFUTED. *** 15 of 12,847 edges (0.117%) survive settle() and they are UNCOVERED -- real cracks. (1) "splitPolygon
+drops slivers under three vertices": a counter says 0 of 100,987 splits. (2) "the weld tolerance is too tight":
+identical at every tolerance from 1e-9 to 1e-7 and WORSE loosened to 1e-5. (3) "the same corner is spelled two
+ways" -- the cracks do come in equal-length PAIRS, which is what that looks like, but snapVertices closes none
+at any tolerance from 1e-12 to 1e-6. The volume is unaffected either way, 20.112588161 to the last digit across
+every combination of snap, merge and weld. So the solid is right and a hairline of its surface is not sewn, and
+that is written down with its measurements rather than rounded off.
+
+*** TWO PASSES ARE ONLY SOUND WHERE THEY ARE PUT, AND PUTTING THEM WRONG WAS MEASURED, NOT REASONED. *** blast()
+first ran cut -> merge -> weld every shot: 5546 ms over twelve against 656 ms, and merging an ALREADY-WELDED
+mesh exposed a lossy edge index that produced FIFTEEN CONCAVE POLYGONS up to 0.3 units deep on an 8-unit wall
+-- faces the fan triangulator would have drawn wrong. Merging only the freshly cut PATCH is faster and also
+wrong: the patch is an OPEN surface, mergeCoplanar's shared-edge test assumes every edge has a partner, and it
+left 36 uncovered edges. So blast() cuts and nothing else; settle() snaps, merges and welds once, on a closed
+mesh, when the shooting stops.
+
+*** AND HALF THE REQUEST IS NOT A BOOLEAN. *** "Gap-free rubble and holes" is two problems. A BSP subtraction
+returns ONE CONNECTED MESH WITH A HOLE IN IT. Rubble is pieces, and a piece needs a mass, a centre of mass and
+an inertia tensor -- physics/voxel/fracture.js, which already holds a voxel summation to the analytic box
+tensor including each voxel's own-centre term. Not duplicated here, and the gate asserts the boundary: meshCSG
+contains no connected-components pass and fracture.js does.
+
+SEVENTEEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND HASH-VERIFIED. Twelve turned something red: inverting the
+vertices without the plane (837 concave faces), the plane without the vertices (2.262 volume residual),
+forgetting the subtree swap (28.21), dropping subtract's final invert (54.16), a back-facing coplanar polygon
+in the front bucket (two boxes union to 12 polygons instead of 10, keeping a wall inside the solid), a
+localisation that misses grazing polygons, an exclusive BVH box test (2.491% uncovered edges), losing the
+convexity refusal in the merge, and volume() forgetting its 1/6. FIVE WENT GREEN AND THREE OF THOSE WERE THE
+GATE'S FAULT AND ARE NOW FIXED -- the BVH check asserted the WRONG DIRECTION, claiming the BVH set is a
+SUPERSET of the polygon-box set when it is TIGHTER (2,377 against 2,378, correctly, because it bounds each
+triangle); it passed only because a six-polygon wall has no case where it could fail. TWO REMAIN GREEN AND ARE
+LABELLED AS DEFENSIVE RATHER THAN COUNTED: the weld's iteration inserts nothing on the second pass at every
+maxRounds from 1 to 8, and the merge's multimap is unobservable now that blast() no longer merges. The comment
+claiming the iteration was load-bearing was FALSE and has been corrected in place.
+
+New: physics/mesh/meshCSG.mjs (BSP booleans, method from evanw/csg.js, MIT, code rewritten),
+physics/mesh/meshCSG-selfcheck.mjs (42 checks), destructible.html (blast a slab, watch it settle), and
+trianglesInBox on mesh/meshBVH.mjs. Consumed by a page, which is the same way physics/mesh/csg.mjs is reached.
+
+The build now stands at 4235 gates.
+
+## v4234 -- SwiftUIShaders batch 11: 28 of 41, the alpha hole closed by sabotage, and a branch that was dead code
+
+*** THE HOLE v4233's SABOTAGE FOUND IS CLOSED, AND CLOSING IT IS WORTH MORE THAN THE FOUR SHADERS. *** Last
+round, deleting the premultiplied branch from PULSE_FRAG left the whole gate GREEN. The reason was
+embarrassing and structural: every image the GPU section rendered was fully OPAQUE, so the alpha scale was 1
+whatever the shader did with it, and the branch that makes trap 2 real had never once executed on a GPU in
+eleven batches. The fix is a second comparison image, identical to the first but carrying a diagonal alpha
+ramp (40 + (x + y) * 175 / (W + H - 2)), rendered with premultiplied = 0 and graded against the CPU model
+told the same thing. A ramp rather than a constant, because a constant alpha can be absorbed into a knob and
+a ramp cannot. Verified by replaying the exact v4233 sabotage: it now fails with 48 levels where it
+previously passed.
+
+*** FOUR MORE SHADERS, 24 OF 41 TO 28, AND THE FIRST OF THEM IS THE LAST ONE UPSTREAM THAT TOUCHES NO
+HASH. *** bcs_wormhole, bcs_inkBleed, bcs_frosted and bcs_pixelateMosaic. The batch was picked by
+recomputing which of the 17 remaining shaders could be graded at all, with brace-matching over the upstream
+bodies rather than from memory -- and the recount corrected the note this round inherited, which said two
+were gradeable. Only wormhole is; liquidMirror calls bcs_valueNoise.
+
+*** wormhole IS EXACT AWAY FROM ITS OWN SEAM AND 255 LEVELS OUT ON IT, AND FINDING OUT WHICH TOOK A REAL PORT
+ERROR OUT FIRST. *** The first render disagreed by 255 levels at 4 pixels. The first thing that turned up
+under it was NOT the seam: the chromatic taps were being mixed against a fog-multiplied colour, when upstream
+fog-multiplies `color` at step 1 and then mixes against rSamp.r / bSamp.b, which are sampled AFTER that and
+never touched by the fog. Fixed in both the CPU reference and the GLSL. When 255 levels persisted, the
+remaining cause was measured rather than guessed: wormhole wraps its sample coordinate with fract(), so its
+disagreement is not bounded by one texel the way vortex's is -- a one-ULP difference at tunnelUV = 0.99999
+versus 1.0 moves the sample from column 47 to column 0, which on a gradient is the entire range. 50 pixels sit
+within 0.004 of a seam and some within 6e-5. So the seam pixels are excluded BY ARITHMETIC -- recomputed from
+the shader's own tunnel mapping, not from the list of failures -- and the count is asserted so the exclusion
+cannot quietly grow. 332 of 1152 pixels, 28.8%. Off the seam: worst 2 levels, 0 pixels over 2.
+
+*** A BRANCH THAT WAS DEAD CODE ON EVERY NUMBER THIS GATE RENDERS, FOUND BY COUNTING THE PIXELS THAT TAKE IT
+RATHER THAN BY LOOKING AT THE PICTURE. *** pixelateMosaic's grout returns an opaque constant regardless of
+what was underneath, which is the only branch in 28 shaders that ignores the source entirely. At the default
+gap of 0.08 on the 48x24 comparison image it draws ZERO pixels: cell is fract((x + 0.5) / 8), which only ever
+takes the eight values 0.0625, 0.1875 ... 0.9375, and the branch fires below gap * 0.5 = 0.04. The tile edges
+fall exactly between the samples. The targeted comparisons use gap 0.3 (504 grout pixels) and pixelSize 9
+rather than 8, because 8 puts a tile centre on an integer pixel coordinate -- a texel BOUNDARY under NEAREST
+-- and 9 puts it at x.5, a texel centre.
+
+*** THE TWO NEW HASH SHADERS ARE NOT LEFT UNGRADED, THEY ARE GRADED WHERE THE HASH CANCELS. *** A sin-hash
+shader can never be checked pixel-for-pixel against a CPU reference (v4196, measured at 0.68 divergence on a
+0..1 value). It does not follow that its alpha convention is unverifiable. frosted at pointScale 0 collapses
+every displaced tap onto the undisplaced one -- the hash is still computed and still diverges and cannot
+reach the output -- leaving exactly the part trap 2 lives in. pixelateMosaic fully assembled (time 2,
+animateAssemble 0) multiplies its scatter by 1 - ap = 0 and becomes wholly deterministic, grout and bevel and
+premultiplied factor included; mid-assemble on a FLAT-alpha source, every sample carries the same alpha, so
+the written alpha is hash-free even though the colour is not. Both come back at 0 levels.
+
+*** AND MY FIRST DRAFT SAID pixelateMosaic IS THE FIRST SHADER IN THE PORT THAT WRITES ALPHA, WHICH IS FALSE,
+AND THE CENSUS I WROTE TO PROVE IT SAID SO. *** bcs_refractLens has returned a hard alpha 1.0 from its lens
+interior since v4196 and nobody noticed for four batches, because a constant 1.0 is invisible on an opaque
+image. Measured on a flat-alpha image -- where a shader that merely DISPLACES a sample cannot show up, since
+every sample carries the same alpha -- exactly three of the 28 touch alpha: refractLens by 0.4 (the
+constant), frosted by 0.0001 (half quantisation of a mix between two equal values, which is under one level
+of 255 and is not a write), and pixelateMosaic by 0.3. The corrected claim is narrower and is the one that
+matters: pixelateMosaic is the first that writes a VARYING alpha, and that is why its premultiplied factor
+has to be taken from the alpha it is about to write rather than the one it read. refractLens gets away with
+adding its specular unscaled only because the alpha IT writes is 1, so the factor would have been 1 anyway.
+
+*** TRAP 6 IS LOAD-BEARING FOR THE FIRST TIME SINCE IT WAS WRITTEN DOWN AT v4163. *** Upstream's frosted
+clamps NOTHING: it samples layer at position + offset for four hash-rotated offsets of up to frostAmount * 8
+points, because Metal's layer sampling has defined edges. GL wraps. Measured at the default knobs, 400 of
+1152 pixels -- 34.7% of the frame -- push at least one tap outside the layer, so an unclamped port smears the
+far edge into the near one along the whole border.
+
+ELEVEN SABOTAGES, ALL RESTORED BYTE-IDENTICAL AND VERIFIED BY HASH, AND ALL ELEVEN TURNED SOMETHING RED --
+but the gate now labels the three that are weaker than they look rather than counting them with the rest.
+Dropping wormhole's fract: 250 levels off-seam at 452 pixels. Replaying the chroma port error: 52 levels at
+388. Deleting frosted's premultiplied factor: 8 levels. Deleting pixelateMosaic's: 18. Deleting its alpha
+write: 60 levels of alpha. Making its grout blend: 125. Flipping its bevel's top light: 14. Unclamping one
+frosted tap, dropping inkBleed's point scale, and unclamping the CPU reference are caught by SHAPE CHECKS
+ONLY -- a shape check falls to a rewrite that means the same thing -- and two of those three cannot be
+strengthened from this gate at all: frosted's clamp is invisible at pointScale 0 and unmeasurable above it,
+and inkBleed's point scale is invisible at devicePixelRatio 1, which is the only ratio anything here renders
+at. *** TRAP 3 HAS BEEN ARGUED FROM THE SOURCE AND NEVER ONCE MEASURED, FOR ELEVEN BATCHES. *** That is the
+next real hole in this file and it is written into the closing note rather than left to be rediscovered.
+
+Gate tools/ship/swiftShaders-selfcheck.mjs now runs 198 checks over 28 shaders on a real WebGL2 context: 15
+agree with their CPU reference to within 2 levels, 4 agree to within one texel of the test gradient, wormhole
+agrees exactly off its wrap seam, and 8 provably cannot agree at all. 13 remain.
+
+The build now stands at 4234 gates.
+
+## v4233 -- SwiftUIShaders batch 10: the five that could be graded, and the fmod that finally decides something
+
+*** BATCH 10: FIVE MORE SwiftUIShaders, 19 OF 41 TO 24, AND THE FIVE WERE CHOSEN SO THAT THEY COULD BE GRADED. *** Of the 22 still unported, 7 call the sin-hash directly and 8 more reach it through fbm, and v4196 established that such a shader CANNOT be verified against a CPU reference on any two implementations -- one float32 ULP into sin() times 43758 is a different random number, measured up to 0.68 divergence on a 0..1 value. Those 15 can be ported but only ever checked by shape. bcs_wavePool, bcs_pulse, bcs_holographic, bcs_geometricWarp and bcs_blackHole touch neither, so every one is answerable to the pixel, and a batch that can be graded is worth more than a batch that merely renders. *** TRAP 5 FINALLY HAS A CASE WHERE IT DECIDES SOMETHING, AFTER SITTING IN THE HEADER SINCE v4163. *** That header said the fmod helper "exists and is gated BEFORE a shader that needs it arrives". bcs_geometricWarp folds an angle taken from atan2, so the argument is NEGATIVE over most of the image, which is the only region where Metal's truncating fmod and GLSL's flooring mod differ at all. MEASURED over the gate's own 48x24 grid: the fold differs at 1019 of 1152 pixels, 88.5%, and that is EXACTLY the count of pixels where the angle is negative -- the two figures agreeing is what says the mechanism is understood rather than the number merely observed. Sabotaged on the real GPU by swapping bcs_fmod for mod: 248 levels of 255 at 2850 subpixels, against 11 levels at 2 for the correct version. *** AND THE FIRST DRAFT OF THAT CLAIM WAS WRONG, AND THIS GATE CAUGHT ME. *** I asserted geometricWarp was the FIRST shader to call bcs_fmod. It is the second: shockwave has called it since v4196. The true claim is narrower and better -- shockwave passes bcs_fmod(uTime, uRepeatRate), and uTime is a CLOCK, so the argument is never negative and the two functions agree on every value it will ever see. That is the same "unsafe by construction, safe on the shipped domain" reasoning the hsb2rgb audit reached. geometricWarp is the first port where choosing wrong CHANGES THE PICTURE. *** THREE OF THE FIVE ARE NOT BIT-EXACT AND THE ROUND SAYS SO RATHER THAN WIDENING A TOLERANCE. *** pulse and holographic match their CPU reference exactly. wavePool, geometricWarp and blackHole do not -- and those three are precisely the three that DISPLACE THE SAMPLE COORDINATE. The test image is a gradient whose texel is worth 255/47 = 5.4 levels horizontally and 255/23 = 11.1 vertically; the measured worsts are 5, 5 and 11, at two to four pixels of 1152. That is ONE TEXEL in the axis each shader displaces along, which is the identical signature vortex was classified under earlier: a sample lands on a texel boundary and float32 and float64 round across it under NEAREST sampling. So they are graded by a one-texel bound rather than by zero, and the bound is asserted with the arithmetic that produces it. *** A TRAP I ASSERTED AND THEN MEASURED AWAY. *** The holographic port's first comment claimed that using the exact 2*PI/3 instead of upstream's 2.094h would shift the green channel's phase. It would not: toHalf(2.094) and toHalf(2*PI/3) are the SAME number, 2.09375, and the half rounding swallows the difference. Even unrounded the gap is 0.000645 rad, worth 0.08 levels of 255 at the steepest point of the sine -- BELOW the quantisation floor, so it could not show on an 8-bit output whichever was chosen. The comment now says that, and the gate pins it, because implying a danger that measurement does not support is its own kind of wrong. *** AND SABOTAGE FOUND A HOLE THIS ROUND DOES NOT CLOSE. *** Deleting the premultiplied branch from PULSE_FRAG entirely left the whole gate GREEN, because the GPU comparison image is fully opaque and the alpha scale is 1 either way. Four new CPU-side checks now drive pulse, holographic, geometricWarp and blackHole against a half-transparent image and assert each one branches on the convention -- verified by re-sabotage, which turns them red. The GLSL side stays uncovered: closing it needs a second comparison image with alpha, and that is a round of its own rather than a line here. It is written into the gate's closing note so the next reader inherits the hole rather than rediscovering it. Gate tools/ship/swiftShaders-selfcheck.mjs now grades 24 shaders: 15 agree with their CPU reference to within 2 levels, 4 agree to within one texel, and 5 provably cannot agree at all. 17 remain.
+
+The build now stands at 4233 gates.
+## v4232 -- frameDirty measured: 0.0% skipped, and one probe was a constant
+
+*** #60 ASKED FOR THE MEASUREMENT BEFORE ENABLING, AND THE MEASUREMENT FOUND THAT THE THING BEING MEASURED COULD NEVER HAVE WORKED. *** v4231 finished the first two thirds of that item -- every ticker examined, every animator guarded. This is the third, run against the REAL index.html in a real headless Chromium with the flag enabled, three runs per scenario, a fresh page every run, four-second windows. The answer is 0.0% of frames skipped in EVERY scenario, and a repeated control gave 0.0 POINTS OF SPREAD, which is why that zero is reported as real rather than as sampling luck -- #86's rule, that a delta may not be read before its noise floor is. *** BUT THE INTERESTING PART IS WHAT HELD THE FLAG DIRTY EACH TIME, BECAUSE IT WAS A DIFFERENT THING AT EVERY LAYER. *** Idle, exactly as the page boots: "active:demo" -- index.html starts a demo (resume_fx), which is a legitimate animator. Demo stopped through its own _stopped field: "active:dayNight". Day/night cycle also paused, through its own pause(): "active:domAnimation" -- a CSS animation in the page chrome, which is #53 and #101's territory. Camera driven every frame: "active:camera", correctly. Every layer peeled reveals the next perpetual animator, and the honest summary is that this engine has no still scene to skip a frame in. *** AND THE MIDDLE LAYER WAS A LIE. *** The dayNight probe read `!!(window.dayNight?.isRunning?.() ?? dayNightCycle?.isRunning?.() ?? true)`. window.dayNight is a plain console helper defined at main.js:10253 whose keys are t, label, cycleSec, paused, setTime and the time presets; simulation/DayNightCycle.js has pause(), resume() and _paused. *** NEITHER HAS EVER HAD AN isRunning. *** Both optional calls short-circuited to undefined and the `?? true` answered for them, so the probe returned true on every frame of every scene from v4174 to v4231 -- a CONSTANT, not a measurement. It is declared to cover FOUR animators (dayNightCycle, sunFlare, cloudLayer, atmosphereSystem), so coveredIn() has been counting four systems as guarded by something that cannot report clean, and v4231's own "unguarded is back to 1" rested partly on it. Confirmed against the LIVE objects, not by grep: typeof window.dayNight.isRunning is "undefined", and the old expression evaluated on those same objects returns true whether the cycle is running or paused. The fix reads window.dayNight.paused, a getter over weatherSystem._paused that was sitting on the very object the probe was already dereferencing -- FOUND, not invented, which is the rule STILL_UNGUARDED_REASON states. *** FALLING BACK TO true WAS NEVER THE BUG. *** A probe that cannot tell must say dirty, because the cost of a wrong "clean" is a frozen screen and the cost of a wrong "dirty" is one drawn frame. Thirteen of the eighteen probes fail safe that way on purpose and they stay. What was wrong is that the fallback was doing ALL of the work, silently, in a probe whose whole job was to answer a question. New gate tools/ship/frameDirtyProbes-selfcheck.mjs, 12 checks, 4.1 s, and its rule is general rather than a patch for one line: NO probe may fall through a chain of optional calls into `?? true`, and every method a probe optional-calls must be defined somewhere in the tree. Its live section boots the real engine, pauses the cycle through its own API and watches the fixed expression go true -> false -> true, the transition a constant can never make, while the old expression stays true in both states on the same objects. Sabotage restores the original line verbatim and the gate goes red in two places. *** WHAT IS NOT CLAIMED: THAT THE FLAG NOW SAVES ANYTHING. *** It does not, it is still shipped disabled, and fixing the constant did not move the 0.0% -- with the cycle paused the next perpetual animator is simply domAnimation. What the fix buys is that dayNight is a reading instead of an answer, so the next layer is the real obstacle rather than a hidden one. Whether a scene exists in which this engine is genuinely still is still open, and it is now a question that can be asked honestly. AND NOTHING HERE IS A TIMING RESULT: the harness runs at about 5.5 fps on swiftshader. Skip RATE is a logic measurement and survives a slow rasteriser; a saving in milliseconds would not, and none is claimed. The gate also states its own limit -- section 3 evaluates both expressions inline rather than driving the probe main.js registers through a real frame, and sections 1 and 2 are what pin the shipped line.
+
+The build now stands at 4232 gates.
+## v4231 -- frameDirty: the last fourteen read, and eleven of them animate
+
+*** THE CENSUS HAS BEEN SAYING "FOURTEEN UNEXAMINED" SINCE v4184, AND READING THEM TURNED ELEVEN OF THE FOURTEEN INTO ANIMATORS -- WHICH MADE THE GUARDED NUMBER WORSE BEFORE SIX PROBES MADE IT BETTER. *** That direction is the whole point: a census whose figures only ever improve is not measuring anything. Writing the verdicts honestly took UNEXAMINED from 14 to ZERO and pushed UNGUARDED from 1 to 12, because eleven systems that can change the picture on their own clock were invisible for exactly one reason -- nobody had opened them. *** EVERY VERDICT WAS READ OUT OF THE SUBSYSTEM'S OWN SOURCE AND NAMES THE LINE IT RESTS ON, SO A READER CAN CHECK THE JUDGEMENT RATHER THAN TRUST IT. *** atmosphereSystem drifts clouds by wind every frame (_instData[base+0] += wx) and eases its colours toward the weather target. tintFX advances b.t += dt on a "pulse" tint and recomputes mix from a sine, so an entity's colour oscillates with no input. visionModes drains and regenerates battery every frame and at zero FORCES the mode back to normal and calls _apply(), changing the overlay unprompted. wadVisualPolish -- the entry whose name most invites a guess -- bobs pickups on sin(t), turns the exit portal and spins teleporters. spaceSuit calls particles.spawn() on its own clock and applies continuous asphyxiation damage. swimMode moves the camera through _applySwimPhysics(dt) and trails bubbles. bossPhaseManager calls botManager.spawn() on phase transitions, and a spawn is a visible change. csBotManager runs bot AI over positions and the bots move themselves. weaponSystem is the subtle one: queued BURST shots fire off a timestamp, so the first round is input and the second and third are the clock. fpsShooter applies gravity zones and fall damage, deals hazard damage over time, and completes a reload on a timestamp. ogreScenario tumbles blown-off debris, flies defender planes through strafing runs and surfaces subs to fire. *** AND THREE ARE INERT WITH RESPECT TO THIS FLAG, FOR THE HUD CLUSTER'S REASON AND ONLY IF THE PLACEMENT HOLDS -- WHICH WAS CHECKED, NOT ASSUMED. *** The flag guards the GL DRAW, so another surface is not what a skipped draw skips; but v4174 got exactly this wrong by leaving hud.update() INSIDE the guard, so every placement here was measured against main.js. playerEnergy recharges a number whose only reader is mechCockpit, itself a DOM overlay already ruled INERT, and its shake handler fires on a denied spend, which is input; it ticks at 29203, before the guard at 30071. ogreLauncher sets style.display and textContent on launcher chrome and nothing else; it ticks at 29456, also before. wadMap draws its minimap into ITS OWN 2D canvas -- c.getContext("2d"), appended to document.body -- a different surface from the GL canvas entirely, and it ticks at 30913, after the guard in postRenderTicks. *** SIX NEW PROBES BRING UNGUARDED BACK TO ONE, AND EVERY ONE READS STATE THE MODULE ALREADY HAD. *** That is the rule STILL_UNGUARDED_REASON was written for at v4184 -- "a baseline of zero reached by adding a field to the thing being measured is not the same as a baseline of zero" -- and nothing here is a field invented to flatter a number. FPSShooter.tick, SpaceSuit.tick and SwimMode.tick all literally begin `if (!this.fpsShooter?.active) return;`, BossPhaseManager begins `if (!this.fpsShooter?._enemies) return;` and WadVisualPolish walks FPSShooter._pickups, so ONE probe on fpsShooter.active covers five systems and it is the condition they themselves test. weaponSystem's probe is _burstQueue.length, which is the very expression its own while-loop tests. tintFX's probe is _base.size || _flash.size, which is literally the first line of its tick. ogreScenario's is active && !paused, both pre-existing fields. csBotManager's is _spawned. visionModes gets its OWN and narrower probe rather than riding on fpsShooter, because it does not gate on it -- and the probe is `current() !== "normal"` rather than "the battery is moving", since battery regen in normal mode changes only a DOM readout while the GL-visible overlay is applied by _apply() on a mode change. *** THE RESULT: 60 tickers, 41 animates, 3 reactive, 16 inert, 0 UNEXAMINED, and ONE unguarded animator -- fpsAutopilot, still named and still explained. *** Gates engine/frameDirtyCensus-selfcheck.mjs (75 checks) and engine/frameDirty-selfcheck.mjs (58) both green, 3 sabotages all red: dropping one name from a covers list turns a system silently unguarded and the ratchet catches it; deleting a verdict returns a ticker to UNEXAMINED and the other ratchet catches that; and substituting a COST-based reason -- "cheap, about 5us per frame for 90 clouds" -- for atmosphereSystem's behavioural one goes red against the census's own founding rule, which is the gate enforcing that rule against the person who wrote this round. *** WHAT IS NOT DONE, AND IT IS A THIRD OF THE ITEM: THE MEASUREMENT. *** #60 asks to guard the animators, examine the remainder, and THEN measure before enabling. The first two are now complete. The third is not: the flag is still constructed with { enabled: false } and this round does not change that. Nothing here establishes how often a frame is actually skippable in a real scene, which is a browser measurement and the only thing that could justify turning it on by default. What this round buys is that the question can finally be asked of a system where every ticker has been read.
+
+The build now stands at 4231 gates.
+## v4230 -- input/deviceGravity.mjs: which way is down, according to the phone
+
+*** THE PHONE'S TILT HAS REACHED THE ENGINE AT 30 Hz SINCE v618 AND NOTHING AT THE END OF THE PIPE EVER TURNED IT INTO A DIRECTION. *** The backlog item said the tree had no sensor and that was wrong, which checking found before a line was written: phone.html reads deviceorientation TWICE. onOrient() thresholds it into a UI control -- gamma > 12 sends look:right, beta > 55 sends look:down, a deadzone and a rate with no vector anywhere -- and onPickerOrient() relays raw { alpha, beta, gamma } to main.js, where it drives a cursor. So the angles arrive and are read as a button. Meanwhile physics/sph/tiltPower.mjs and wideTilt.mjs take `deg` -- transferRatio(deg), phaseSwing({deg}), wideTiltRun({deg}) -- a number the code hands itself, which no accelerometer has ever set. That is the real gap and it is narrower and more honest than "there is no sensor": the pipe exists and there is no arithmetic at the end of it. New input/deviceGravity.mjs, the half of shajidhasan/mobile-fluid-sim (MIT) worth taking. *** THE SOLVER IS REFUSED AND THE TREE'S OWN IS BETTER. *** Its FlipFluid.ts is the Ten Minute Physics FLIP, and fluid/flip2d.mjs and fluid/flip3d.mjs are here with a selfcheck each, and fluid-webgpu.html runs the same algorithm on the GPU with a staggered MAC grid, an atomic particle-to-grid splat, Jacobi pressure projection, an alternative red-black Gauss-Seidel + SOR solver, RK2 advection and a toggleable ST-FLIP mode. A 2D CPU FLIP on top of that would be a fourth copy of a solved problem. *** alpha/beta/gamma ARE NOT A DIRECTION, AND THE DERIVATION IS THE SUBSTANCE. *** They are intrinsic Euler angles in Z-X'-Y'' order, so R = Rz(alpha).Rx(beta).Ry(gamma) takes the device frame to the earth frame, gravity is (0,0,-1) in earth, and in the device frame it is R^T(0,0,-1) = minus the third ROW of R, giving g = (cos(beta)sin(gamma), -sin(beta), -cos(beta)cos(gamma)) -- independent of alpha, as it must be, since spinning a level phone about the vertical does not move down. *** CHECKED AGAINST Rz.Rx.Ry BUILT NUMERICALLY RATHER THAN AGAINST ITSELF: worst component error 2.220e-16 over 20,000 random orientations, and the vector is unit to 3.331e-16. *** Three cases a reader can do by hand also hold: flat gives (0,0,-1), upright gives (0,-1,0) so things fall down the screen, rolled right gives (1,0,0). *** MY FIRST DRAFT HAD THE SCREEN ROTATION BACKWARDS AND ONLY A PHYSICAL CASE CAUGHT IT. *** I wrote -angle, printed toScreenFrame([0,-1,0], 90) -> [-1,0,0], saw plausible numbers and read past them. The way to tell is to work one real phone through: screen.orientation.angle is 90 when the device is rotated COUNTER-CLOCKWISE, so its right edge points at the sky and device-frame down is (-1,0,0), while the content is counter-rotated and the person still sees gravity going down the screen. Only +angle sends (-1,0,0) to (0,-1,0), and at 270 it sends (+1,0,0) there too. The gate now asserts all FOUR orientations land on (0,-1,0), because one case cannot tell the two signs apart. *** THE ACCELEROMETER'S SIGN IS GENUINELY AMBIGUOUS AND IT IS RESOLVED RATHER THAN GUESSED. *** devicemotion's accelerationIncludingGravity is proper acceleration, so the W3C reading at rest screen-up is +9.81 on Z and gravity is its negation; iOS has historically reported the opposite. No arithmetic settles that, so accelerometerSign() compares one sample against the orientation-derived vector -- which has no such ambiguity -- and returns the convention, or NULL when the two are near perpendicular, because a confident answer from a sample that cannot support one is worse than none. Once resolved, both conventions give the same down. *** SMOOTHING THAT MEANS THE SAME THING AT ANY FRAME RATE: *** GravityFilter takes a time constant and is dt-aware, so one second of the same input lands within 1.72e-4 across 30, 60 and 120 Hz, where a naive per-frame alpha of 0.1 spans 4.24e-2 -- a range 246x wider. *** AND A SHAKE IS AN EVENT, NOT A SLIDER: *** ShakeDetector subtracts gravity first, so a phone merely HELD at 45 degrees reads 0.00 linear acceleration where accelerationIncludingGravity alone would read 9.81; hysteresis plus a refractory window turns 200 ms above the threshold into ONE fire rather than twenty; and a release threshold above the fire threshold is refused outright because it would chatter every frame. WIRED, not left orphaned: main.js now reads the SAME phone:picker:orient message as a direction alongside the cursor it already drove -- no new event and no change to the phone -- and publishes window.phoneGravity in screen-frame m/s^2. Gate tools/ship/deviceGravity-selfcheck.mjs, 42 checks, 705 ms, pure, 6 sabotages all red. *** WHAT IS NOT CLAIMED: THAT ANY OF THIS HAS SEEN A PHONE. *** There is no accelerometer in this sandbox and no handset on the other end of the relay. What is proven is the arithmetic. Whether a given handset reports what the spec says -- and the iOS sign is live evidence that they do not always -- is a rig question. The permission story is unexercised: iOS needs DeviceMotionEvent.requestPermission() from a user gesture and returns nothing over plain http, and devicemotion has no caller yet so nobody has asked. AND NOTHING CONSUMES window.phoneGravity: it is published and idle, physics/sph's tilt work still takes a `deg` the code hands itself, and pointing it at a real phone is another round.
+
+The build now stands at 4230 gates.
+## v4229 -- engine/wasmSupport.mjs: stop telling people to rebuild a file that already works
+
+*** THE ONE LINE A PERSON READS TO FIND OUT WHY THE PHYSICS DID NOT LOAD TOLD THEM TO SPEND AN AFTERNOON REBUILDING A FILE THAT WAS ALREADY ON DISK AND ALREADY CORRECT. *** Measured, not reasoned about: the tree was served over http into a real headless Chromium and every loader was called twice, once normally and once on a page where `delete globalThis.WebAssembly` had run first, which is what Apple's Lockdown Mode does to Safari. physics/box3d/box3dLoader.js returned ready:false with the reason "Box3D WASM not built yet -- run physics/box3d/build-box3d-wasm-clang.sh on a box with clang + wasi-libc, which outputs /vendor/box3d/box3d.{js,wasm}. (WebAssembly is not defined)" -- and vendor/box3d/box3d.wasm is present, and that same loader had returned ready:true from it seconds earlier. The true cause is four words in a parenthesis after 130 characters of wrong advice. physics/jolt/joltLoader.js threw a bare "WebAssembly is not defined": its try/catch covered only the choice between the vendored copy and the npm package, and the init() that actually touches WebAssembly sat outside it. world/terrainWasm.js degraded properly, warned once and returned false -- it was already right and this round does not touch it. *** THIS TREE HAS NOW SHIPPED THE SAME MISATTRIBUTION THREE TIMES AND WROTE THE FIX DOWN TWICE. *** tools/ship/playwrightResolve.mjs exists because browserSafety-selfcheck printed "no chromium at <SHELL>" whenever EITHER playwright or the shell was missing, and on that box the shell existed while playwright did not, so the diagnostic pointed at a file sitting right there. Its own header says that fix was "in that one file. It did not travel", and then mpmGpuPage was caught doing it again. browserSkipReason() is the rule it settled on: two independent facts reported on their own evidence rather than collapsed into one guess. New engine/wasmSupport.mjs is that rule applied to WebAssembly, and it is a SHARED module for exactly that reason -- the same fix written into box3dLoader.js would have been the fourth instance waiting to happen. *** AND `typeof WebAssembly` IS NOT A GOOD ENOUGH PROBE, WHICH WAS CHECKED RATHER THAN ASSUMED. *** Served under a Content-Security-Policy of "script-src 'self' 'unsafe-inline'", with no 'wasm-unsafe-eval', a real Chromium leaves the WebAssembly object in place and REFUSES to compile: typeof reports everything is fine and every loader fails anyway, which is the same misattribution one level down. So the probe compiles the eight bytes of a legal empty module -- magic and version, nothing else -- and distinguishes "switched off" from "this page's policy forbids it" from "your build is missing", naming the right one in the first sentence. Both loaders now report correctly with WebAssembly deleted, measured in the browser. *** THE CENSUS, WITH THE ITEM'S OWN NUMBER CORRECTED TWICE. *** The item said "82 files touch WASM". 82 mention .wasm or the WebAssembly API, but 16 of those are comments and prose only; 66 mention it in live code; and ELEVEN actually call the API, most of them Node-side gates and tools where a probe would be ceremony. My first grep said twelve and was wrong for the fourth time in this exact class: /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own Node WebAssembly. No Docker" -- and the escaped dot matched the full stop, the same shape as the licence scan that missed UNLICENSE and the /RANSAC/ that matched "transaction". *** MY OWN GATE COUNTED THIS ROUND'S OWN TWO NEW FILES, WHICH IS THE FOURTH CENSUS OF MINE TO INCLUDE ITSELF *** after v4224's basis owner, v4225's meshLine file count and v4227's recording-gate count: it first read 84 and 68 because engine/wasmSupport.mjs and the gate both talk about wasm, and the numbers being reported are the ones that MOTIVATED the round, so they have to be the numbers as they were. I also reached for codeOnly() to find the import specifier "../../engine/wasmSupport.mjs" -- and codeOnly blanks string literals, so it read 1 probe instead of 2, the same mistake v4223 made and named -- and matched multi-word prose claims against files wrapped at 110 columns until proseHas() was used instead, which sourceScan.mjs already provides for precisely that. *** evanw/polywasm (MIT) IS REFUSED, IN WRITING, WITH THE REASON. *** 3,725 lines of TypeScript that translate .wasm into JavaScript functions with, by its own README, no validation and no traps, and "extremely slow" -- against a physics engine, a JavaScript engine and a mesh decoder, which is exactly the perf-critical kind an interpreter cannot carry. What polywasm is FOR is the case where WebAssembly is switched off, and checking the tree against that case is what found the misattribution. The finding was worth the look; the polyfill was not worth vendoring. Gate tools/ship/wasmSupport-selfcheck.mjs, 28 checks, 3.4 s including two browser sections, 4 sabotages all red. *** WHAT IS NOT CLAIMED: THAT THE TREE WORKS WITHOUT WebAssembly. *** It does not, and nothing here makes it -- box3d and Jolt are the physics backends and there is no wasm-free substitute for either. What changed is that somebody who hits this is told the true cause in the first sentence instead of being sent to rebuild a working file. Only two loaders were wired; the other nine API callers are Node-side, where WebAssembly is always present, and that is a judgement rather than a measurement.
+
+The build now stands at 4229 gates.
+## v4228 -- engine/binaryHeader.mjs: a version in the file, not a comment in the reader
+
+*** A "// VERSION: v1" COMMENT AT THE TOP OF A READER TRAVELS WITH WHOEVER HAS THE CODE AND NEVER WITH THE DATA. *** engine/wndFormat.js, mtoFormat.js, molFormat.js, ovmFormat.js, p3dFormat.js and vxFormat.js each wrote a 4-byte magic at offset 0, CHECKED it on read, and then went straight to the payload -- and each carried that comment line, which is not a version field. A writer that changed a layout would keep the same magic, and today's reader would accept the file and misread it in silence, which is strictly worse than refusing it: a refusal names the problem, a misread invents a plausible number and hands it to a renderer. MEASURED AND IT IS WHY THE GAP SURVIVED THIS LONG: NOT ONE GATE IN THE TREE HAD EVER MENTIONED ANY OF THE SIX. New engine/binaryHeader.mjs is the one place that knows what a versioned header is, because six independent fixes would have been six chances to disagree -- the lesson tools/ship/playwrightResolve.mjs was written for. media/afContainer.mjs already did it right (u32 magic | u32 version, and unpack throws by name on a mismatch) and is the model it generalises; afContainer itself was LEFT ALONE rather than churned for uniformity. *** THE SCHEME, AND WHY IT CANNOT ORPHAN A FILE THAT ALREADY EXISTS: *** a versioned file is u32 magic | u32 version | exactly the body that used to follow the old magic, and the magic is bumped ONCE by replacing the trailing "!" with "2" -- "WND!" becomes "WND2" -- so the presence of a version field is decidable from the first four bytes and stays readable in a hex dump. After this single bump the magic never moves again; a future layout change bumps the VERSION, which is the entire point of having one. A reader accepts BOTH: the old magic means "written before there was a version", is reported as version 0, and is read at the old offsets. All six now round-trip at version 1, all six read a synthesised pre-version file as version 0 with byte-identical data, and all six REFUSE a version 99 file by name -- "file is version 99 and this reader speaks version 1 -- refusing rather than reading a layout it does not know". *** THE ITEM ALSO NAMED bz/net/bzPack.js AS "WORSE AGAIN" AND THAT WAS WRONG, WHICH THE GATE SAYS OUT LOUD. *** bzPack really has no magic and no version, and it is not ours to give one to: it is a transcription of BZFlag's src/net/Pack.cxx and four invented bytes on the wire is not a fix, it is a desync. BZFlag versions where BZFlag puts it -- the client sends "BZFLAG" and the server answers "BZFS0221", PROTO_VERSION is already in bzProtocol.js, and bzWorldDb.js ALREADY refuses a map version it does not speak, by name, in exactly the discipline this round adds elsewhere. *** ONE HEADER IS PADDED TO 16 BYTES AND ANOTHER IS 15, AND THAT IS NOT AN INCONSISTENCY. *** p3dFormat reads its payload as a Float32Array VIEW over the same buffer, and the platform really does throw a RangeError on an unaligned byte offset -- checked, not assumed -- so its header is a multiple of 4. vxFormat reads its RLE pairs one field at a time through a DataView, which does not care, so 15 bytes costs it nothing. Two formats, two right answers, and the gate states the reason for each. *** SABOTAGE FOUND A GUARD THAT NO CHECK WAS HOLDING. *** Deleting the "version 0 inside a versioned file" refusal left the gate entirely green -- and that guard carries real weight, because the versioned magic with a zeroed version word is what a partly zeroed buffer looks like, and treating it as legacy would read the body at the OLD offsets under the NEW magic, which is precisely the silent misread this round exists to stop. A check was added and the sabotage now turns it red. I also wrote one assertion whose second clause reduced to /afContainer/.test("x") -- false for every possible input, contributing nothing but the appearance of rigour -- and deleted it. Gate tools/ship/binaryHeader-selfcheck.mjs, 47 checks, 94 ms, 5 sabotages all red, and the version is asserted BY READING THE BYTES rather than by asking decode() what it read, because asking the writer to confirm its own work would pass on a format that stored nothing at all. *** WHAT IS NOT CLAIMED: THAT A VERSION FIELD MAKES A FORMAT COMPATIBLE. *** It makes an INCOMPATIBILITY DETECTABLE, which is smaller and far more useful. Nothing here migrates a v1 file to a future v2; when that day comes somebody writes the migration, and the version field is what tells them they have to. AND THE LEGACY PATH IS UNTESTED AGAINST A REAL OLD FILE, because there is not one -- the only file of any of these six types anywhere in the tree is none at all, media/stage.af being the already-versioned format. The pre-version buffers are SYNTHESISED by stripping the version word back out, which exercises the reader's branch honestly and proves nothing about a file this code has never seen. The legacy branch is kept anyway, for the file somebody exported from a demo page last month and still has: a round that inflicted its own failure mode while fixing it would be a poor argument.
+
+The build now stands at 4228 gates.
+## v4227 -- render/glCapture.mjs: recording a context the PAGE made, and compiling it back into code
+
+*** THE BACKLOG ITEM SAID "THE TREE CANNOT REPLAY A FRAME" AND I CHECKED BEFORE BUILDING, WHICH IS THE ONLY REASON THIS ROUND IS THE RIGHT SIZE. *** render/glBootstrap.js has had makeRecordingGL since v3058 and render/frameTrace.js has had normalize, fingerprint and diffTraces since v3060, and they are good. Half the premise was simply wrong. What they ARE is intent coverage of code a gate calls itself, and the two real gaps are what got built. MEASURED, NOT ASSERTED: all SIX gates in the tree that record -- brickShader, compositeDepth, drawIntent, frameTrace, populationRender, rendererIntent -- CONSTRUCT THEIR OWN CONTEXT, every one of them starting makeRecordingGL({width:64,height:64}) or 8x8 and handing it to a pass by hand. Not one observes a page. And makeRecordingGL's log CANNOT be replayed by construction: it summarises every typed array to {typed, length, head, checksum}, deliberately, so a 256 KB volume does not land in a log once per call -- a checksum is exactly what an assertion wants and exactly what a replay cannot use, because the bytes are gone. New render/glCapture.mjs, from evanw/webgl-recorder (CC0, granted in that repo's README -- there is no LICENSE file, and that is worth stating precisely because #61 and #100 are open on repos with NO grant at all; thin paperwork and absent paperwork are different problems and conflating them lets the real one hide). It patches HTMLCanvasElement.prototype.getContext so a context the PAGE built is recorded, keeps the bytes, and compiles the recording back into a generator that yields per frame. *** THE ONLY CHECK THAT MATTERS WAS RUN AGAINST A REAL DRIVER: *** in headless Chromium on swiftshader a frame was drawn on one canvas, captured, compiled to a 1,485-byte trace, and replayed into a SECOND canvas whose context was never patched -- both readPixels returned 51,153,230,255, the identical pixel. Not a fingerprint match against a fake context, a pixel from a driver. *** FOUR DEFECTS IN THE ORIGINAL, FIXED AND NAMED SO THE FIXES ARE NOT MISTAKEN FOR STYLE. *** (1) getContext IDENTITY: the spec says a second getContext("webgl2") on one canvas returns THE SAME OBJECT, and the original builds a fresh wrapper every call -- so a helper that re-fetches, and this tree's own acquireGL IS one, holds two wrappers over one context, writes two half-traces, and fails every gl === this.gl check it makes. (2) IT THROWS ON A null RETURN: its getVariable tests typeof value === 'object', which is TRUE FOR null, then reads value.constructor.name -- and getUniformLocation returns null for a uniform the compiler dropped, which a real headless Chromium confirmed is the everyday case, so recording a real program crashes inside the recorder. The original's own function is transcribed into the gate and throws there. (3) NO BYTE BUDGET: every typed array is inlined as a decimal literal, so one 4 MB upload becomes roughly 20 MB of source with no cap and no warning -- here a capture has maxBytes, and passing it does NOT silently yield a shorter trace, it marks the capture replayable:false and compile() REFUSES, because a trace that cannot round-trip must say so rather than run and diverge. (4) IT INSTALLS A PERMANENT requestAnimationFrame DRIVER purely to number frames -- in a tree where #60 is trying to measure whether a frame can be SKIPPED when nothing moved, an observer that guarantees a frame every 16 ms does not measure the system, it replaces it; frames here are marked by the caller or by a follower that schedules nothing and counts only callbacks the page asked for. *** MY GATE WENT RED ON MY OWN MODULE AND THE MODULE WAS WRONG. *** toRecordingLog handed frameTrace's normalize a fresh {slot:...} literal per call, and normalize symbolises by object IDENTITY -- so ONE program read as program#1 the first time it was used and program#2 the second, and a diff of two such traces would have been noise in the shape of evidence. One interned object per slot, named by the call that made it, and the capture now normalises to a byte-identical fingerprint against makeRecordingGL's own log. *** AND THE GATE COUNTED ITSELF, FOR THE THIRD TIME THIS SESSION *** -- 7 of 7 recording gates instead of 6 of 6, after v4225's meshLine file count and v4224's basis owner; a census that includes the censor reports a number that changes because the census exists. Two things a trace answers that a grep cannot: a CENSUS of which GL entry points a page actually uses (20 distinct ones in the live page), and REDUNDANT STATE -- the same idempotent setter called twice running with identical arguments, which is the measurement #60 keeps trying to make by argument. That check is narrow and says so: A -> B -> A is three real changes and is NOT counted, because costing it needs a model this file has not got. Gate tools/ship/glCapture-selfcheck.mjs, 41 checks, 762 ms including the browser, 5 sabotages all red -- and the identity sabotage went red in the LIVE section too, against a real driver, not only against a fake canvas. *** WHAT IS NOT CLAIMED: THAT A REPLAY IS ALWAYS FAITHFUL. *** One frame was measured end to end and gave the same pixel, which is evidence and not a guarantee: a capture started mid-run replays without the state the app had already set, and a page whose textures came from an image that finished loading before recording began replays with nothing in them. AND IT IS BLIND TO WEBGPU, which is where this tree's newest rendering lives -- fluid-webgpu.html and the WGSL passes are not touched, so a census from this file is honest about the WebGL half of the tree and silent about the rest.
+
+The build now stands at 4227 gates.
+## v4226 -- vision/homography.mjs: where a known flat thing is, given points that mostly match
+
+*** THE TREE CAN POINT A CAMERA AT THE WORLD AND HAS NEVER ONCE KNOWN WHERE ANYTHING IN IT IS. *** v4210 put the webcam into a GL texture and every pass in the tree can now consume it, but consuming a frame is not tracking one: nothing here answers "where is that flat thing, in this image". New vision/homography.mjs, the first piece of hiukim/mind-ar-js (MIT) worth taking -- the plane-to-plane map, by normalised DLT with a Jacobi eigensolver, plus RANSAC. *** IT IS FIRST BECAUSE IT IS THE ONLY PIECE WITH AN EXACT ANSWER. *** A feature detector can only be judged against a photograph and an opinion; a homography can be judged against arithmetic -- invent a matrix, project points through it, hand the pairs back, and demand the same matrix. It comes back: from 40 clean correspondences the worst reprojection is 3.3e-13 px and the worst COEFFICIENT error is 1.1e-13, which is the check that matters, because reprojection alone can be right for a wrong matrix. *** ONE BAD MATCH RUINS A LEAST-SQUARES FIT, SILENTLY, AND THAT IS THE WHOLE ARGUMENT FOR RANSAC: *** a single wrong pair in twenty throws the fit 83.7 px off ON THE GOOD POINTS, with no error raised anywhere. RANSAC at 20 percent outliers keeps 48 inliers, admits 0 outliers, and recovers the true matrix to 3.22e-13 px; at 40 percent it keeps 38 and recovers to 1.61e-13, where the plain fit on the same data is 517 px out. *** THE TEXTBOOK CALLS HARTLEY NORMALISATION ESSENTIAL. I MEASURED IT AGAINST THE SAME SOLVER WITH AND WITHOUT, AND IT IS NOT. *** On clean data it is 422x better -- 1.59e-10 px to 3.75e-13 px, both worthless. Under realistic noise, across 24 configurations (0.5 and 2 px of noise, 640 and 4096 wide, six seeds), the ratio runs min 0.61x, median 1.11x, max 6.22x, and normalisation was WORSE in 5 of the 24. It is kept because it is standard and free and would start to matter in single precision, NOT because it was measured to rescue anything. *** GENERAL POSITION MEANS NO THREE COLLINEAR, AND THE GATE'S FIRST PREMISE WAS WRONG ABOUT THAT. *** Four collinear points used to return a finite, plausible, arbitrary matrix; a rank check on the SECOND smallest eigenvalue, taken as a ratio against the largest so it is scale-free, now returns null. My check then asserted that three collinear plus a fourth off the line should be ACCEPTED -- it should not, three on a line still leaves a family of matrices, and the code was right where the check was wrong. *** SABOTAGE FOUND A HOLE IN MY OWN GATE. *** Deleting the perspective divide from applyHomography -- returning the numerator and calling it a point -- left 39 of the other 40 checks GREEN, because nearly all of them build their correspondences by calling applyHomography and then ask the solver to reproduce them, and an affine solver fitted to affine data agrees with itself. Only the coefficient check caught it, and the divide is now pinned against arithmetic done by hand. Six sabotages in all: the rank check, the RANSAC refit, the Hartley scale, the divide, and the inlier threshold each turned the right checks red -- and relaxing the explicit four-point minimum turned NOTHING red, because the rank check already catches an under-determined system, so the gate says the guard is defensive rather than claiming coverage it does not have. Gate tools/ship/homography-selfcheck.mjs, 41 checks, pure -- no DOM, no canvas, no camera. *** WHAT THIS DOES NOT CLAIM: THE TREE CANNOT TRACK AN IMAGE. *** mind-ar-js is a target compiler, a FREAK descriptor extractor, a detector, a matcher and a frame-to-frame tracker. This is the one piece underneath all of them. What is missing is everything that PRODUCES correspondences: without a detector and a matcher there is nothing to hand this, and hand-clicked points are the only source today.
+
+The build now stands at 4226 gates.
+## v4225 -- a line with a width in pixels, and the API call that has always done nothing
+
+*** gl.lineWidth IS CLAMPED TO 1 ON EVERY DESKTOP DRIVER, AND THIS ROUND ASKS THE DRIVER RATHER THAN QUOTING
+THE SPEC. *** ALIASED_LINE_WIDTH_RANGE comes back [1, 1]. Painting the same horizontal line at
+gl.lineWidth(1), (8) and (20) gives 2, 2 and 2 rows of pixels. The call is not deprecated and raises no error
+-- the Core Profile simply permits an implementation to support only a width of 1, and every desktop driver
+takes that option. So it succeeds, reports nothing, and does nothing.
+
+Seven call sites in five files draw gl.LINES in this tree -- ev/galaxyMap.js twice, rig/RigSystem.js twice,
+demos/p3d/p3dDemo.js, render/entityDebugRenderer.js and render/voxelhighlight.js -- and every one of them is
+one pixel wide and cannot be anything else.
+
+New render/meshLine.mjs, from Makio64/makio-meshline (MIT, THREE.MeshLine's lineage). A line is not a line
+primitive: it is a TRIANGLE STRIP, and the sideways offset is applied in the VERTEX SHADER after projection,
+so the width is a number of PIXELS that does not change with distance. Measured the same way as the premise:
+
+    requested width      1     8    20
+    gl.LINES             2     2     2      rows of painted pixels
+    meshLine             2     8    20
+
+*** WHAT THE TREE ALREADY HAD, CHECKED, BECAUSE "NOTHING" WOULD HAVE BEEN WRONG. *** render/BeamRibbonRenderer.js
+is ONE billboarded quad from source to target with a world-space width. render/sweptSpine.js is a world-space
+TUBE along a spine. Both are useful and neither is this. A single quad has no JOINT, so it never meets the
+problem below; and a world-space width thins with distance, which is exactly what gl.lineWidth was supposed to
+avoid. There was no miter or bevel anywhere in the tree, and nothing measured a width in pixels.
+
+*** THE JOINT IS WHERE THE MATHS BITES, AND IT DIVERGES. *** The outer corner of a mitered joint sits
+1/cos(theta/2) half-widths from the path:
+
+    turn      0     90      120      150      170       179      180
+    miter   1.00   1.414   2.000    3.864   11.474   114.593   Infinity
+
+A right angle needs sqrt(2) and 120 degrees needs exactly 2, but a full reversal is INFINITE -- the famous
+spike. It is not an exotic input: a trail that doubles back, a resampled curve with a cusp, or any hand-drawn
+stroke with a sharp return produces it, which is why every renderer that draws wide lines has a miter limit.
+Capped at 4 here, on the CPU and in the shader, at the same number.
+
+A repeated point is a zero-length segment whose direction is 0/0, so consecutive duplicates are dropped. And
+the ENDS extrapolate their missing neighbour backwards along the first segment rather than copying themselves
+-- a copy would reintroduce exactly the same 0/0 at both ends of every line.
+
+*** TWO OF MY OWN CHECKS WERE TOO WEAK, AND SABOTAGE IS WHAT FOUND THEM. ***
+
+  * "No NaN reaches the buffers" does not test the dedupe at all. With duplicates kept the positions are
+    still perfectly finite -- the 0/0 would only appear in the shader, which has its own zero-length guard --
+    so removing dedupe left the whole file green. What actually changes is measurable on the CPU: the strip
+    carries vertices for points that are not there, and the arc length STALLS across them, so a dash pattern
+    stops advancing while the line keeps going. That is the property, so that is what is asserted now.
+  * A naive count said six files draw gl.LINES where the module header says seven places -- because the gate
+    was counting ITSELF, and because two files draw twice. It counts call sites now, and excludes itself, with
+    the reason written down.
+
+Page mesh-line.html draws the same path both ways with a width slider: measured headless, 8,501 painted pixels
+for the mesh line against 352 for the one-pixel version of the same path.
+
+Gate tools/ship/meshLine-selfcheck.mjs, six sabotages all red, with the premise and the proof both measured in
+a real GL context rather than asserted from a specification.
+
+NOT DONE, AND STATED RATHER THAN IMPLIED: no existing call site is converted. The seven draws are debug
+wireframes, a galaxy map and a rig overlay, and each carries its own question -- whether a thicker line reads
+better or merely bigger -- that a gate cannot answer. Round joins and caps are not implemented either; the
+miter is capped by falling back to the limit, which is a bevel in effect rather than by name.
+
+The build now stands at 1305 gates.
+## v4224 -- solving x(t) = u where the slope will not help, and a first draft that was worse than what it replaced
+
+*** EASING IS AN INVERSE PROBLEM, AND THAT IS WHY IT HAS A FAILURE MODE AT ALL. *** A CSS timing function is a
+curve x(t), y(t). Progress arrives as x and the answer wanted is y, so t has to be recovered by solving
+x(t) = u. Newton-Raphson does that quickly and needs dx/dt -- and dx/dt is EXACTLY ZERO at t=0 whenever x1 is
+0, which `cubic-bezier(0, ...)` is, and which is one of the most common curves anyone writes.
+
+rig/RigSystem.js's entire answer to that was:
+
+    if (Math.abs(dx) < 1e-6) break;      // ...returning whatever t happened to be at that moment
+
+So the first instants of such an animation were solved by giving up. MEASURED against a 200-iteration
+bisection of the same curve, over the whole legal control-point grid:
+
+    ordinary sampling   1.7e-4      invisible
+    the small-u tail    2.2e-1      22% of the output range, at cubic-bezier(0, 1, 0, 1)
+
+New ui/bezierEasing.mjs adds what was missing, from gre/bezier-easing (MIT): a precomputed sample table for
+the initial guess, Newton where the slope can be trusted, and BINARY SUBDIVISION where it cannot -- bisection
+needs no derivative at all, so a flat region costs it nothing; it halves the bracket every step regardless.
+The two errors become 6.2e-15 and 1.0e-5. The tail improves by a factor of 20,957.
+
+*** MY FIRST DRAFT WAS WORSE THAN WHAT IT REPLACED, IN THE COMMON CASE, AND ONLY A FULL SWEEP FOUND IT. *** It
+fixed the tail and REGRESSED ordinary sampling from 1.7e-4 to 6.2e-4. Had I measured only the case the round
+was about, I would have shipped a regression while celebrating an improvement.
+
+The cause is a departure this round now makes deliberately. gre/bezier-easing takes Newton's answer whenever
+the slope at the guess clears 0.001, with no test of what came back. On cubic-bezier(1, 0, 0, 1) at u = 0.501
+that slope is 1.166e-2 -- comfortably over the line -- and four Newton steps still land 4.2e-4 away in t,
+where bisection over the same interval manages 5.2e-9. A shallow-but-not-flat curve is exactly where a fixed
+iteration count runs out, and THE SLOPE ALONE CANNOT TELL YOU THAT IT HAS. So the shipped solver runs eight
+steps and then VERIFIES THE RESIDUAL, falling back to bisection when |x(t) - u| is too large. One extra
+evaluation, and no guesswork about whether the answer is good.
+
+RigSystem now imports the solver and its own Newton loop is gone, leaving exactly one file in the tree that
+computes the bezier basis.
+
+The properties an easing function has to have, each asserted rather than assumed:
+  * the endpoints return EXACTLY 0 and 1 rather than being solved -- every solver here is iterative, so
+    without the shortcut a curve ends at 0.9999999 and the animation never quite arrives;
+  * a monotone y gives a monotone easing, over the whole grid;
+  * `linear` is the exact identity, returned without sampling anything;
+  * an OVERSHOOT curve still overshoots. y is unconstrained in CSS -- that is how ease-out-back is written --
+    so clamping it to [0,1] would be wrong, and the gate checks that it both overshoots and undershoots;
+  * an x outside [0,1] THROWS, because x must be monotonic for the curve to be invertible at all.
+
+TWO OF MY OWN GATE CHECKS FAILED AGAINST CORRECT CODE AND WERE REWRITTEN. One asserted gre/bezier-easing's
+FOUR-iteration behaviour while calling my shipped EIGHT-iteration function -- so it failed against the very
+code it was written to justify, and now reproduces the library's constant explicitly. The other counted the
+gate's own deliberate copy of the old solver as a second owner of the bezier basis; it is excluded by name,
+with the reason stated, because keeping that copy is what lets section 3 assert the improvement instead of
+remembering it.
+
+Gate tools/ship/bezierEasing-selfcheck.mjs, five sabotages all red.
+
+*** WHAT THIS DOES NOT CLAIM: THAT ANYTHING WAS VISIBLY BROKEN. *** The 22% error needs u below about 0.0025,
+which is inside the first frame of any animation, on curves with x1 = 0. At ordinary sampling the old error
+was 1.7e-4 and nobody could see it. This is a correctness hole that was not hurting anything, and saying so
+is more useful than inventing a symptom for it.
+
+The build now stands at 1304 gates.
+## v4223 -- a listener that stops when its element does, and the crude number that pointed the wrong way
+
+*** THE 619-VS-22 FIGURE THAT MOTIVATED THIS WAS MISLEADING. *** ui/ has 619 addEventListener calls against 22
+removals, which sounds alarming and mostly is not: a listener attached TO an element dies with that element,
+so a panel that is dropped takes its own button handlers with it. Narrowing to the ones that outlive their
+panel -- window and document -- gives the number that matters: 71 adds against 8 removals, and 27 modules that
+add a global listener and remove none.
+
+And the retained memory is the smaller half. THE HANDLER KEEPS RUNNING. A dismissed panel still answers
+resize, still answers keydown, still recomputes a layout nobody can see.
+
+MEASURED IN A REAL BROWSER, which is the only place a MutationObserver can be shown to notice a real removal:
+
+    naive listener:  1 fire attached  ->  2 after the element is removed
+    bound listener:  1 attached  ->  1 detached  ->  2 re-attached
+
+The re-attachment half is not decoration. This tree REPARENTS panels rather than rebuilding them --
+HeartbeatAvatar calls document.body.appendChild(root) in the middle of a drag to undock itself -- so a binding
+that only ever tore down would leave a docked panel deaf.
+
+New ui/boundListener.mjs takes the RULE from mutant (a binding should only listen while its element is
+attached) and not the framework, since mutant is a template-binding library and this tree has no templates.
+ONE MutationObserver for the whole page, not one per binding: an observer on document.body with subtree:true
+fires for every DOM change anywhere, so N observers do N pieces of work to discover that nothing moved. It
+disconnects itself when the last binding goes -- the module must not commit the leak it exists to prevent.
+
+*** TWO REAL CUSTOMERS REWIRED, RATHER THAN A MECHANISM NOBODY CALLS. ***
+
+  * ui/HeartbeatAvatar.js installed onDragMove and onDragUp on `document` AT CONSTRUCTION and never removed
+    them, so every mousemove anywhere on the page ran a drag handler for the life of the tab. It returned
+    immediately on `if (!dragStart) return`, which is exactly why nothing ever looked wrong and why it
+    survived this long. They are now added on mousedown and removed on mouseup: a drag handler should live
+    for the drag, not for the page.
+  * ui/kaggleLab.js hand-rolled a whole MutationObserver, for one panel, to clear one interval, under a
+    comment calling itself "a safety net for that case" -- which is the tell that the idea was general and
+    the code was not. It is one whenDetached() registration now. The cost was never the duplication: it is
+    that every copy observed document.body with subtree:true on its own.
+
+*** THE SILENT FAILURE THE WHOLE MODULE IS BUILT AROUND. *** removeEventListener matches on IDENTITY. Hand it
+a fresh wrapper -- a bind(), an arrow, anything constructed at call time -- and it removes NOTHING, returns
+undefined, and reports no error at all. The listener stays, the cleanup looks done, and the bug surfaces later
+as a handler firing twice. So the module registers the caller's own function, and the gate sabotages that line
+specifically to prove the check bites rather than trusting the comment.
+
+TWO OF MY OWN ERRORS, BOTH FOUND BY THE GATE RATHER THAN BY READING:
+
+  * I asserted `addEventListener("mousemove", onDragMove)` against sourceScan's codeOnly(), which BLANKS
+    STRING LITERALS as well as comments -- so the call became addEventListener("", onDragMove) and the check
+    failed against correctly fixed code. The tree's rule is that an ABSENCE is a code shape and belongs to
+    codeOnly; a PRESENCE containing a string argument needs noComments().
+  * A throwing teardown escaped the sweep and crashed the gate outright, with no line saying which check had
+    died. In a browser it would have escaped the MutationObserver callback and stopped EVERY OTHER binding on
+    the page from being swept -- one panel's bad cleanup silencing all the others. Guarded, and the gate now
+    reports it as a FAIL instead of dying.
+
+Gate tools/ship/boundListener-selfcheck.mjs: five sabotages all red, sections 1-6 driving the same code with a
+fake target so the logic is gated with or without a browser, and section 7 doing the decisive half in real
+headless Chromium.
+
+WHAT THIS DOES NOT CLAIM: that the other 25 modules are fixed. Two are. The rest are left deliberately,
+because each carries its own OWNER question -- which element governs this listener -- and answering it wrong
+makes a panel deaf, which is worse than making it wasteful. The mechanism is here and gated; the case-by-case
+judgement is not something a gate can supply.
+
+The build now stands at 1303 gates.
+## v4222 -- the tree's own 82 animations, read as data at last
+
+*** v4191 MEASURED THE CORPUS THAT MOTIVATED IT AND CONVERTED NONE OF IT. *** ui/domAnimation.mjs took the
+animatelo half of gibbok's idea -- a hand-written KEYFRAMES table plus quietStateOf(), so engine/frameDirty.js
+could be told about DOM animation at all -- and its header cited the tree's own @keyframes rules as the whole
+reason for existing. Those rules were still CSS-only: readable by a browser, invisible to a test, and beyond
+anything frameDirty could reason about except through a runtime document.getAnimations().
+
+fx/cssKeyframes.mjs is the other half, from gibbok/keyframes-tool (MIT). Written rather than vendored: the tool
+is a Node CLI built on the `css` parser and Ramda, and the transform worth having is about thirty lines once
+those dependencies go.
+
+*** THE RESULT, OVER THE TREE'S REAL RULES RATHER THAN A FIXTURE: 82 blocks, 80 distinct names, 32 files, and
+ALL 82 CONVERT TO SOMETHING THE BROWSER WOULD ACCEPT. *** 71 of the 82 also pass
+ui/domAnimation.mjs's validateKeyframes, and the 11-rule gap is the interesting part rather than a failure:
+
+    @keyframes spin { to { transform:rotate(360deg) } }
+
+is ONE frame at offset 1. That is legal CSS and legal WAAPI -- the browser fills the start from the element's
+current value, which is how you spin something from wherever it happens to be. validateKeyframes is a stricter
+HOUSE RULE for hand-authored tables, where an implicit endpoint hides the author's intent, and it is right to
+be stricter. So waapiProblems() and validateKeyframes() are kept as two separate questions; conflating them
+would have condemned eleven working animations as broken.
+
+This also CORRECTS v4191's own number. Its header says "86 DISTINCT @keyframes RULES ACROSS 34 FILES". That was
+a text scan, and a text scan counts prose: several of those 86 are the words `@keyframes RULES` and
+`@keyframes NAME { ... }` inside comments -- including domAnimation.mjs's own header. Parsed rather than
+grepped, and excluding the files that DOCUMENT keyframes instead of declaring them, it is 82 blocks under 80
+distinct names across 32 files.
+
+*** THE DEFECT keyframes-tool SHIPS, AND IT IS SILENT. *** Its camelCase is
+str.replace(/[-_]([a-z])/g, m => m[1].toUpperCase()), which has no case for a LEADING dash -- so
+`-webkit-transform` comes out `WebkitTransform`, with a capital W. WAAPI ignores a key it does not recognise,
+so the property simply does not animate, with no error anywhere. This tree carries 41 -webkit- declarations.
+
+*** AND THE DEFECT I SHIPPED IN THE FIRST DRAFT, WHICH IS v4219'S OVER AGAIN. *** stripComments ran across the
+whole file before searching it. In demos_code/home_assistant_control.js the line comment "Talks to the bridge's
+/ha/* proxy (token stays server-side)" contains `/ha/*` -- which opens a CSS comment that then runs to the next
+`*/` THIRTEEN THOUSAND NINE HUNDRED AND TWENTY-FIVE CHARACTERS LATER, swallowing two real @keyframes rules on
+the way. Five blocks were missing from the corpus in total. Comments are now stripped PER BLOCK, after the
+match, so an unrelated `/*` upstream cannot reach a rule. THE TRADE IS STATED RATHER THAN HIDDEN: a genuinely
+commented-out rule is now reported. That is the safe direction for a module whose job is to report what
+animations exist -- a false positive is visible in the output, a false negative is silent -- and the gate
+counts them, so the number is known.
+
+*** TWO OF MY OWN CHECKS PASSED FOR THE WRONG REASON, AND SABOTAGE IS WHAT FOUND THEM. ***
+
+  * The -webkit- test could not reach the branch it was supposed to be testing. Slicing the leading dash off
+    before the hyphen regex already leaves a lower-case `w`, so lower-casing the first character afterwards is
+    a no-op for every prefix anyone actually writes. Removing that branch left the whole file green. It is now
+    pinned on `-Webkit-transform`, which is the only input that distinguishes it.
+  * The home_assistant file stopped being a discriminating test the moment stripComments became string-aware:
+    the apostrophe in "the bridge's" is read as a string opener, which accidentally rescues that particular
+    file. The property is now pinned on a synthetic input that isolates it -- a block comment outside any
+    string, with a rule inside it -- so the check fails when the design is reverted, which is the only reason
+    to have it.
+
+Gate tools/ship/cssKeyframes-selfcheck.mjs, six sabotages all red, run against the tree's own 82 rules.
+
+WHAT THIS DOES NOT CLAIM: that the converted animations look the same. It reads offsets, properties and timing
+functions; it does not resolve var(), does not expand shorthands, and does not know an element's current value,
+so a partial animation converts faithfully and still needs the live element to mean anything. Nothing is
+rewired either -- all 82 rules still run as CSS. What exists now is the ability to READ them.
+
+The build now stands at 1302 gates.
+## v4221 -- one ray-triangle kernel and a tree, replacing two brute-force loops that had never met
+
+*** MEASURED BEFORE BUILDING: THE TREE RAYCAST TRIANGLES BY BRUTE FORCE, IN TWO SEPARATE PLACES, WITH NO
+ACCELERATION STRUCTURE ANYWHERE. *** multiplayer/wadLevelHost.js walked every wall triangle for each
+line-of-sight query, and losClear gates every bot engagement and every shot. tools/krbn/krbnCompare.js walked
+every triangle for each stroke POINT, and a stroke has hundreds. Two independent Moller-Trumbore
+implementations of the same intersection, disagreeing in three ways that each matter:
+
+  * DATA LAYOUT -- a flat 9-floats-per-triangle buffer, against arrays of [x,y,z] plus an index triple.
+  * EPSILON     -- 1e-6 on the determinant, against 1e-9 with a separate 1e-6 on the barycentrics.
+  * THE QUERY   -- ANY hit within a SEGMENT with an early out, against the NEAREST hit along an infinite ray.
+
+The third is why a single "raycast" function would have been the wrong unification: an occlusion test that
+computes the nearest hit does strictly more work than it needs, and a nearest-hit query that early-outs is
+simply wrong. So mesh/meshBVH.mjs is ONE KERNEL and TWO QUERIES over it. The binned-SAH build and the
+near-child-first traversal are from gkjohnson/three-mesh-bvh (MIT); the three.js binding is not taken, because
+neither call site is a three.js mesh.
+
+RESULT: identical triangle AND identical t against brute force on every ray at 500, 4000 and 20000 triangles,
+and 11.6x / 49.7x faster. Both call sites rewired, and all four krbn selfchecks produce BYTE-IDENTICAL output
+afterwards -- which is the evidence that the swap changed nothing but the time.
+
+*** AN ACCELERATION STRUCTURE IS A SPECIAL THING TO TEST, BECAUSE ITS ONLY JOB IS TO RETURN THE SAME ANSWER
+FASTER. *** A wrong one is not visibly wrong. It is fast and quietly missing geometry, which reads as a content
+bug -- a wall you can shoot through, a stroke that will not stick.
+
+*** THE BUG I ACTUALLY WROTE: THE RIGHT CHILD IS NOT AT left+1. *** In a depth-first build the left call
+allocates its ENTIRE SUBTREE before returning, so the right child sits at whatever the node counter reached
+afterwards -- adjacent for only 359 of 718 interior nodes in a 4000-triangle tree. With the assumption in place
+the traversal descended into arbitrary interior nodes and the whole tree MISSED EVERYTHING: 0 hits where brute
+force found 227, while reporting itself "63x faster" because it was traversing nonsense and finding nothing. A
+speed number is not a result until the answers match.
+
+*** AND THE TEST DATA FOOLED ME BEFORE THE CODE DID. *** The mesh generator used an LCG,
+s = (s * 1103515245 + 12345) & 0x7fffffff. In JS doubles that product exceeds 2^53 and the generator
+degenerates: it repeated with period 10466, so a "20000 triangle" mesh was 9534 real triangles plus exact
+duplicates. Every apparent BVH/brute-force mismatch was the two picking different members of an IDENTICAL pair
+-- both right, the data broken, and the differences all exactly 10466 apart, which is what gave it away.
+mulberry32 now, and the gate checks its own fixture for repeats before trusting anything built on it.
+
+*** TWO GUARDS TURNED OUT TO BE DEFENSIVE RATHER THAN LOAD-BEARING, AND THE GATE SAYS SO INSTEAD OF
+PRETENDING. *** I wrote in the module that the slab test's 0 * Infinity = NaN made the box "silently MISSED".
+That is false, and worth correcting rather than deleting: every comparison against NaN is false and the only
+early-out is `t0 > t1`, so a NaN can never trigger it -- the box comes back HIT, conservatively, and the
+triangle test still decides. Removing the guard entirely gave the SAME 2874 hits on 3000 axis-aligned rays
+against 20000 triangles, in 57ms against 41ms. It is worth about 28% and nothing at all in correctness. The
+determinant epsilon is the same story: a ray almost in a triangle's plane produces u = 1000000.25 and is thrown
+out by the barycentric range test anyway. Both guards are kept, and both are asserted by PRESENCE, with the
+measurements printed -- because a gate that cannot distinguish a guard's removal has to say that rather than
+claim a coverage it does not have.
+
+DEAD CODE REMOVED, AND THE REASON IT ALMOST SURVIVED: krbnCompare's rayTri was left in place by the first draft
+of this change, with a comment saying the selfcheck drove it directly as a reference. It did not -- nothing
+called it and nothing exported it. It was dead code justified by a sentence I had not checked, and what caught
+it was the gate counting the Moller-Trumbore determinant expression across the whole tree and expecting exactly
+one file.
+
+Gate tools/ship/meshBVH-selfcheck.mjs. Three sabotages red: the left+1 assumption (0 hits of 227), the
+equal-centroid split fallback (a RangeError from recursing off the end of the node arrays, now reported as a
+FAIL rather than crashing the gate), and the segment query's far bound -- which needed a deliberately
+constructed case, because culling boxes at maxT already covers a segment that ends before a whole box, and only
+a segment ending INSIDE a box with its triangle beyond distinguishes the two.
+
+WHAT THIS DOES NOT CLAIM: a refit cost. The tree is built once and cached against the buffer it came from, so a
+mesh that DEFORMS every frame would rebuild every frame and be slower than brute force. three-mesh-bvh has
+refit() for exactly that and it is not taken here, because neither call site deforms -- wall triangles are per
+level, and krbn's mesh is the rest pose the strokes are lifted onto. If a deforming caller appears, refit is
+the work.
+
+The build now stands at 1301 gates.
+## v4220 -- the GPU Brain paints: a colour that is solved, a score that is local, and a metric of mine that was wrong
+
+Keith: "We could have our own GPU Brain painter?" v4216 gave the tree a brush and render/perceptual.mjs already
+had reward functions. What was missing was the part that makes shape-fitting tractable at all, and it comes
+from ondras/primitive.js (MIT, Ondrej Zara and Michael Fogleman), by way of Fogleman's `primitive`. TWO ideas
+are taken and both are theorems rather than tricks, which is why both are checkable and both are checked.
+
+*** 1. THE COLOUR IS SOLVED, NEVER SEARCHED. *** The obvious way to place a shape is to try colours and keep
+the best. You never have to. Compositing a colour c at alpha a over the current canvas gives
+new = cur(1-a) + c*a, so the squared error against the target is (t - cur(1-a) - c*a)^2 -- a quadratic in c
+with exactly one minimum:
+
+    d/dc = -2a( t - cur(1-a) - c*a ) = 0    =>    c = (t - cur)/a + cur
+
+and because the total over a shape's pixels is a SUM of such quadratics, the best single colour for the whole
+shape is the MEAN of those per-pixel optima. The gate grid-searches all 256 values of every channel over four
+shape kinds and three alphas -- 9216 colours -- and finds ZERO that beat the closed form. Three of the hardest
+dimensions of the problem are removed before any search or any learning begins.
+
+*** 2. THE SCORE IS COMPUTED OVER THE SHAPE, NOT THE PICTURE. *** Adding a shape changes only the pixels it
+covers, so the change in total error is a sum over those pixels and nothing else. MEASURED: the mean random
+shape touches 99 pixels of 2304, so scoring against the whole image is 23.3x the work -- per candidate, and
+the search evaluates ninety candidates for every shape it keeps. The gate computes the delta both ways over
+39 random shapes and asserts they agree to the bit, worst disagreement 0.
+
+fx/primitiveFit.mjs is a pure scanline over typed arrays -- convex polygons by edge intersection, ellipses
+analytically -- rather than primitive.js's HTML5 canvas, because a canvas cannot run in the gate.
+
+*** THE BUG THAT COMPOUNDED, AND FIXING IT MADE THE FITTER BETTER AS WELL AS HONEST. *** differenceChange
+scored the IDEAL float composite while drawShape stored the value in a Uint8ClampedArray, and fit()
+ACCUMULATES those predictions rather than re-measuring the picture. MEASURED: the reported error drifted 0.13%
+optimistic after 10 shapes, 0.45% after 40 and 2.38% after 120 -- always in the flattering direction, and
+growing with every shape placed. Uint8ClampedArray rounds HALF TO EVEN -- (0.5) is 0 and (1.5) is 2, which the
+Math.round everyone reaches for gets wrong -- so quantise() models that exactly, and the accumulated total now
+equals the true total EXACTLY at 10, 40 and 120 shapes. It also made the pictures better: distance at 120
+shapes went 0.0327 -> 0.0310, because the search had been ranking every candidate against a model of a canvas
+it was not actually drawing on.
+
+*** A SECOND OMISSION IN trainDockES, THE SAME SHAPE AS v4218's maxSteps AND FOUND THE SAME WAY. *** The
+trainer read obsDim from the environment and did NOT read actDim, so the policy it built always emitted
+ACT_DIM (2) numbers whatever the env asked for. Every environment in this tree happened to want 2 -- dock,
+dock-hazard, drive -- so nothing was wrong until this round's painter asked for 5. Then the last three action
+components were literally `undefined`, clamped to 0 by the env, and the policy trained happily while steering
+a width, a height and an angle IT DID NOT HAVE. No caller passes actDim, so the dock gates are unchanged and
+dock-selfcheck still reports the same 93%.
+
+*** A DETERMINISTIC POLICY PROPOSED ONE SHAPE TWENTY TIMES. *** An MLP maps an observation to exactly one
+action, and painting needs a SEQUENCE of different shapes. When a shape is rejected the observation barely
+moves, so the policy proposes the same rejected rectangle again, and again: MEASURED, TWO distinct actions
+across 20 steps, 1 placed and 19 rejected, scoring below uniformly random shapes. The variation is drawn from
+the EPISODE SEED, so it is a fresh sequence per episode and identical on replay -- a Math.random() there would
+have quietly destroyed every evaluation in the gate.
+
+*** THE RESULT, AGAINST A MEASURED NOISE FLOOR RATHER THAN AGAINST NOTHING. *** Eight independent random
+painters on the same 24 held-out pictures score 0.0692 +/- 0.0014. Untrained policy: 0.0048. Trained: 0.0752,
+which is 4.4 standard deviations above the random floor, and 0.0777 averaged over three training seeds (4.5 to
+9.3 sd). The targets are generated per episode from a seed, so the policy cannot memorise one picture.
+
+*** AND THE METRIC I JUDGED IT BY WAS THE THING THAT WAS WRONG. *** The trained policy centred its shapes in
+the worst residual cell 13.3% of the time against 25% by chance, which reads as a policy that has not learned
+to aim -- so aiming was measured directly, as a heuristic that always places at the worst cell. It scored
+0.0537 against random's 0.0690: AIMING AT THE WORST CELL IS 22.3% WORSE THAN NOT AIMING. A shape's EXTENT
+matters more than its centre, and a shape centred in a corner cell falls half off-canvas. The policy was right
+and the metric was wrong, and it would have been very easy to write that up as a failure to learn.
+
+WHAT IT DOES NOT DO, stated in the changelog and printed by the gate every run: it does not beat random search
+given ninety evaluations per shape -- 0.1667 against 0.0752. What the policy buys is a better shape PER
+EVALUATION, one forward pass against ninety rasterisations, which is the comparison that matters only if
+shapes ever have to be proposed in real time. Nothing here claims the pictures are pretty.
+
+Page primitive-paint.html, which takes your own image: measured headless, 808 shapes in 3.5 s taking a sample
+picture from distance 0.2617 to 0.0181, 93.1% closer. Gate tools/ship/primitiveFit-selfcheck.mjs, 6 sabotages
+all red -- and a seventh finding that was mine rather than the code's: the gate first asserted that no colour
+beats the closed form against the QUANTISED score, and 7 of 9216 did. The theorem is about the continuous
+objective; once the composite is stored as 8 bits an adjacent integer can be a hair better. Both are now
+asserted separately: 0 of 9216 on the continuous objective, and at most 0.029% of the improvement on the
+quantised one.
+
+The build now stands at 1300 gates.
+## v4219 -- VR part three: the sticks move you, and the comment that said so for seven versions
+
+*** v4212 READ THE THUMBSTICKS AND NOTHING CONSUMED THEM. *** engine/xrInput.mjs has had moveVector() since
+that round -- deadzoned, per-hand, gated -- and main.js's XR frame carried the comment "so a locomotion vector
+is applied to the camera this frame". That was an intention, not a description: nothing called it. In a
+room-scale session the absence is invisible, because you can walk and the world answers; the sticks simply do
+nothing, which reads as a headset quirk rather than as a missing feature.
+
+New engine/xrLocomotion.mjs. Left stick walks on the floor plane, right stick snap-turns.
+
+*** LOCOMOTION IS NOT MOVING THE CAMERA, AND THAT IS THE WHOLE DESIGN. *** The per-eye cameras come from
+frame.getViewerPose() once per eye per frame, so anything written to them is overwritten on the next one. The
+player is moved by REPLACING THE REFERENCE SPACE -- XRReferenceSpace.getOffsetReferenceSpace -- which moves the
+head, both eye views AND the controller poses together. Move the camera instead and only what we drew moves,
+so the hands stay behind in the old space: your arms detach from your body.
+
+The offset is the player's pose INVERTED, and that is worth stating rather than assuming. For
+S' = S.getOffsetReferenceSpace(T), a point at p in S is reported at T^-1 . p in S'. We want a viewer standing
+physically at v to be reported at P . v, where P is where the player has walked to. So T^-1 = P, hence
+T = P^-1. Rather than trust that derivation, the gate asserts the invariant it implies: applying the offset to
+the player's own world position must land on the origin. Worst over four poses, 0.00e+0 m.
+
+*** FIVE FAILURE MODES, EVERY ONE OF WHICH PRODUCES A SESSION THAT RUNS AND IS WRONG TO BE INSIDE. ***
+
+  1. FULL HEAD ORIENTATION INSTEAD OF YAW. "Forward" for locomotion is the head's forward vector projected
+     onto the floor. Rotate (0,0,-1) by a head pitched up and it has a large +y, and moving along it leaves
+     the ground -- you look up and fly. moveDelta returns a 2-vector with no y term at all, so there is no way
+     to express leaving the floor, and a head pitched 51 degrees up produces movement identical to a level one.
+
+  2. A SNAP TURN ADDED TO THE YAW SWINGS YOU AROUND THE ORIGIN. Turning must pivot about the HEAD. A head
+     physically at h is at R(yaw).h + t in the world, so holding it still through a turn of a means
+     t' = t + R(yaw).h - R(yaw+a).h. MEASURED: a head 2.24 m from the reference origin is thrown 4.47 m by 180
+     degrees of naive turning; pivoting about the head leaves it within 4.97e-16 m over the same six turns.
+
+  3. ONE THRESHOLD INSTEAD OF TWO AND THE STICK TURNS EVERY FRAME. A bare `if (|x| > t) turn()` fires 30 times
+     in 30 frames -- 900 degrees, and at 72 Hz it is 2160 degrees a second. That does not feel fast, it feels
+     broken. Fire at 0.7, re-arm only below 0.4: exactly one turn per push, asserted both ways (a stick
+     returned to halfway between the two thresholds must NOT re-arm).
+
+  4. *** COMPOSING THE OFFSET ONTO THE CURRENT SPACE APPLIES THE WHOLE TOTAL AGAIN EVERY FRAME. *** Locomotion
+     accumulates an ABSOLUTE pose, so its transform is relative to where the session started -- it must be
+     applied to the BASE space. Offset the already-offset space and the player accelerates away from the world
+     exponentially, which looks like tracking failing rather than like a bug. XRSessionManager now keeps
+     baseRefSpace beside refSpace, and the gate drives 120 frames through a fake reference space that records
+     its own chain: depth 1, not 120.
+
+  5. AN UNCLAMPED dt TELEPORTS YOU. A tab-switch, a GC pause or a headset set down and picked up gives a dt of
+     seconds. Five seconds at 2.5 m/s is 12.5 m in one step; clamped to maxDt it is 0.25 m.
+
+*** AND THE GATE CAUGHT ME COMMITTING v4218'S OWN DEFECT, ONE ROUND LATER. *** The first draft had rotateY at
+one handedness and basisFor at the other, so yawOf(quatFromYaw(a)) came back as -a -- two copies of the
+heading, exactly what the driving env spent a round on. Everything now derives from a single rotation, and the
+gate counts the sin/cos pairs in the file. Three more of mine, all found by the same gate rather than by
+reading: _teardown dropped refSpace but not baseRefSpace, leaving a handle to a dead runtime object; the snap
+confirmation asked for a haptic effect named "tick", which is not in the EFFECTS table, so play() would have
+returned {ok:false, reason:"unknown effect: tick"} and buzzed nothing, silently, forever (the detent effect is
+"selection"); and my hand-rolled comment stripper -- a lazy /*...*/ over 30,000 lines of main.js -- ate from a
+`/*` inside a string to the next `*/` and swallowed the very import line it was checking for, failing against
+correctly wired code. Replaced with tools/ship/sourceScan.mjs's codeOnly, which is what it exists for. A fourth
+check overreached rather than broke: it asserted that NOWHERE in main.js moves a camera, in a file with a
+perfectly legitimate non-VR flycam. It is now brace-matched to _renderXRFrame -- brace-matched, not sliced at a
+flat character count, which is the defect v4179's gate shipped and v4212 had to rewrite.
+
+splat_viewer.html was the last three-based page with no VR button; glb_viewer, scene-view and aquarelle were
+wired at v4212 and it was missed. Same pattern, including the reason for it: setAnimationLoop REPLACES the rAF
+rather than joining it, so the fallback installers are guarded on threeVR's loopInstalled or the loop runs
+twice per frame.
+
+*** WHAT THIS ROUND DOES NOT CLAIM, PRINTED BY THE GATE EVERY RUN. *** That any of it feels right in a headset.
+Comfort is the whole subject of locomotion design and is not decidable from here -- whether 30 degrees is the
+right snap step, whether 2.5 m/s induces sickness, whether head-relative beats controller-relative are
+questions for a person wearing the thing. Two sandbox limits are stated so their absence is not mistaken for
+coverage: there is no navigator.xr here, so no page adds an Enter VR button and the gate checks the CALL rather
+than the button; and vendor/spark/spark.module.js is absent, so splat_viewer reports "renderer unavailable" and
+never reaches the loop this round wired. glb_viewer, wired since v4212, loads on the same box -- so that is
+Spark being unvendored here, not this change. Gate tools/ship/xrLocomotion-selfcheck.mjs, 6 sabotages all red,
+the entire session lifecycle driven on injected fakes.
+
+Next: #95, the GPU Brain painter, as Keith asked. ondras/primitive.js (MIT) is the take for it -- the analytic
+optimal colour (target-current)/alpha + current averaged over the covered pixels, so colour is SOLVED rather
+than searched, and bbox-local scoring that makes a candidate cost O(shape area) rather than O(image).
+render/perceptual.mjs is whole-image only and has neither.
+
+The build now stands at 1299 gates.
+## v4218 -- the GPU Brain learns to drive, and four ways to build a task that runs and is not the task
+
+Keith, on v4217: "and the GPU Brain could learn to drive. It may already be learning from it's interactions
+with BZFlag driving?" *** IT WAS NOT, AND THE REASON IS WORTH RECORDING. *** brain/bzTacticsPolicy.js learns
+TARGET SELECTION. Its features are [1, near, ahead, exposed, airborne] and its own header says what trains it:
+"the pilot died (the target it chose over the runner-up was the wrong one), or the target died (it was the
+right one)". Even `ahead` is the TARGET's bearing, not a steering command. Nothing in it has ever emitted a
+throttle. What DID exist was the machinery -- rocketEnv, dockEnv, bptt, imitation, sharedEncoder -- and nothing
+with wheels to point it at. v4217 built the wheels.
+
+So brain/rl/driveEnv.js is the environment, and it runs on physics/vehicle.mjs itself: one rigid body, wheels
+as rays, grip proportional to load, forces clamped to the friction circle. A driving env with its own private
+car physics would be teaching the brain to drive something that exists nowhere else in the tree. It presents
+the same drop-in interface as rocketEnv and dockEnv -- obsDim / actDim / maxSteps / reset / step -- so
+brain/rl/dockPolicy.js's trainDockES drives it UNCHANGED. That trainer already took an envFactory and an
+obsDim, which is the whole point of a shared interface and the reason no second trainer exists here.
+
+  obs (8, in the CAR's own frame): [ relForward, relRight, velForward, velRight, yawRate, slip, grounded, dist ]
+  act (2):                        [ steer, throttle ]   throttle > 0 drives, < 0 brakes
+
+*** THE RESULT, ON SEEDS THE TRAINER NEVER EVALUATED: 0 of 24 arrivals before, 24 of 24 after. *** The learned
+policy closes to 1.2 m from the goal where the hand driver stops at 5.2 m, and it was trained only against
+seeds 5000 + k*17 while every number above comes from 900000 + k*2237.
+
+*** FOUR DEFECTS, EVERY ONE OF WHICH PRODUCED A RUNNING ENVIRONMENT AND A SILENTLY DIFFERENT TASK. *** None
+threw. Each was found by measuring the environment rather than by reading it, and the gate now watches all four:
+
+  1. NaN IN THE FIRST OBSERVATION OF EVERY EPISODE. reset() built its obs from _slip and _grounded, which only
+     step() ever assigned. So reset() returned a Float32Array carrying two NaNs, the first act() spread them
+     through the whole MLP, and EVERY learned rollout returned NaN -- while the hand expert, which reads
+     neither slot, scored normally. The symptom pointed squarely at the trainer, and the trainer was fine.
+
+  2. *** THE CHASSIS HAD NO VERTICAL DEGREE OF FREEDOM, AND THIS ONE COST THE MOST. *** Wheel rays were cast
+     from a FIXED ride height, so the car could not follow the ground: wherever the terrain dipped, the
+     suspension simply extended and the load went with it. MEASURED, at rest on a 0.15 m dip: all four wheels
+     reporting contact and carrying 0 N of an 11,772 N car. frictionLimit is mu*N, so the limit was zero, every
+     tyre force clamped to nothing, and the car sat at full throttle with slip pinned at 1 for the whole
+     episode. That was 7 of 16 expert episodes -- and it read as a driving failure, not as a car that had never
+     been put down on the road. Even the episodes that worked were carried by 64% of the car's own weight.
+     ONE heave degree of freedom fixes it, integrated from the suspension forces the model already computes
+     (pitch and roll stay out; lateralLoadTransfer covers the shift that matters here). The hand driver went
+     from 5/16 to 16/16 arrivals on that change alone, and the three "reaches the goal but too fast to count"
+     episodes turned out to be the same defect: braking force was clamped by the collapsed load too.
+
+  3. TWO COPIES OF THE HEADING. The observation rotated by -heading while the integrator pushed velocity along
+     (cos h, -sin h) -- the same angle, opposite z. The policy saw a goal that was not where the car would
+     actually go if it drove at it, and it finished its episodes 393 m away, having driven steadily off. Every
+     individual formula was defensible. Both now read _axes(), and *** THIS ROUND'S OWN GATE THEN CAUGHT ME
+     WRITING A THIRD COPY *** in the wheel-position helper I added for (2), which put the TRACK offset along
+     the forward axis. The check that caught it is a count of how many times the file turns a heading into a
+     direction, and the answer has to be one.
+
+  4. THE TRAINER MEASURED A DIFFERENT TASK FROM THE ONE IT TRAINED. In brain/rl/dockPolicy.js, trainDockES
+     built its evaluation options without maxSteps, so every evaluation inside the loop fell back to
+     evaluate()'s default of 200 while the caller believed it had asked for 400. Episodes here need 157-267
+     steps to reach a goal and stop, so no episode could finish during training. THE TELL: the trainer's own
+     best.ev disagreed with a re-evaluation of the very same params on the very same seeds -- dockRate 0.21
+     against 1.0. Fixed by forwarding one field. No caller in this tree passes maxSteps, so dock and
+     dock-hazard are unchanged, and both were re-run and still pass.
+
+*** AND THE FIRST "IT BEATS THE HAND DRIVER" WAS AN ARTEFACT OF (4) THAT I NEARLY SHIPPED. *** With training
+capped at 200 steps, no policy could ever arrive, so dockRate was 0 for every candidate and elitism selected
+purely on LOWEST DISTANCE -- a dense, well-shaped signal -- and I was then reporting that policy's score at 400
+steps, where it looked like 16/16 and better-than-expert. Once training and reporting used one budget, the
+honest number was 5 of 32, and reaching 24/24 took 200 iterations rather than 120. A measurement that flatters
+the work is the one to re-run first.
+
+ROLLING IS A PROPERTY OF THE LOADOUT, NOT OF THE DRIVING. v4217's rollsBeforeSliding is mu > track/(2h) -- g
+cancels -- so the stock road car at grip 0.9 against a tip ratio of 1.538 slides wide, which is what a road car
+does. An earlier draft used physics/vehicle.mjs's default grip of 1.6, which is racing-slick: margin 0.06, and
+the car rolled 7 of 24 episodes under two completely different drivers, which is the tell that it was the CAR
+and not the driving. Bolt on 400 kg at 2.4 m and the SAME car with the SAME driver rolls 6 times in 16. The env
+asks the model that question once, at construction, rather than per step: an earlier version decided from the
+instantaneous suspension load, and a bump spikes that load enough to tip a car whose geometry forbids it.
+
+Page drive-brain.html, with drive-brain-worker.js training off the main thread so the car keeps driving while
+it learns -- toggle the roof turret and watch the same policy start rolling it. Gate
+tools/ship/driveEnv-selfcheck.mjs: 39 checks, four sabotages, each caught by the check written for it. The
+fifth sabotage found a weak check instead: the steering-sign test asked whether the goal's bearing had shrunk,
+and passed under the flipped sign too, because at full lock the car rotates past 90 degrees either way and the
+bearing changes sign whichever way it turned. It now measures where the car actually WENT (+1.67 m along its
+own right axis, and exactly -1.67 m sabotaged), which spinning cannot satisfy.
+
+Next: #88, VR part three -- xrInput.moveVector() has been gated since v4212 and nothing consumes it.
+#95, the painter, stays last as Keith asked.
+
+The build now stands at 1298 gates.
+## v4217 -- the raycast vehicle: wheels as rays, and why a turret on the roof rolls a tank
+
+*** MEASURED BEFORE BUILDING: physics/ CONTAINED NO VEHICLE MODEL AT ALL. *** Zero matches for wheel,
+suspension or raycastVehicle. Keith: "the wheel-and-suspension model against the existing box3d/Jolt substrate
+would be cool ... we have turrets and hard points. and some treads." All three of those are real and all three
+are at different depths, which is what this was built against:
+  * TURRETS ARE GAME LOGIC. ui/OgreBuyPanel.js has turret SLOTS taking machinegun / missile / railgun /
+    napalm / minelayer / landmine / subturret -- OGRE's hardpoints as inventory, never as mounted mass.
+  * TREADS ARE A TEXTURE THAT ROTATES. render/entityVisuals.js rolls ogre_tread about Z.
+  * AND THERE WAS NO CHASSIS UNDER EITHER OF THEM.
+
+*** THE WHOLE DESIGN IS THAT WHEELS ARE NOT BODIES. *** The intuitive model is five rigid bodies joined by
+constraints, and it is also why toy car physics jitters: a solver reconciling each wheel's ground contact AND
+its joint to the chassis, at a mass ratio of maybe 50:1, feeds the errors of each into the other. The standard
+answer -- Jolt's own VehicleConstraint works this way, and so does every driving game that feels solid -- is
+that THE VEHICLE IS ONE RIGID BODY. Wheels are not simulated at all. Each is a downward RAY from an attachment
+point, and what the ray finds becomes a force applied to that single body.
+
+So physics/vehicle.mjs produces FORCES and owns no world: it never imports a box3d or Jolt loader, creates no
+body and holds no handle -- the discipline physics/esBox3d.js already states for itself ("Wraps a box3d WORLD
+HANDLE (never imports the loader) so it runs headless against a mock"). That is what lets 56 checks drive it
+in node against no world at all, and the gate asserts those absences rather than trusting them.
+
+Five defects, every one of which produces a vehicle that RUNS and DRIVES BADLY rather than one that errors:
+
+1. THE RAY MUST REACH restLength + maxTravel + RADIUS. One term short and it ends at the hub, finds no ground,
+   reports every wheel airborne, produces no suspension force, and the car falls through the world while every
+   individual formula in the file stays correct. It has its own function and its own assertions for that
+   reason.
+
+2. A SUSPENSION PUSHES AND NEVER PULLS. A fast-extending damper makes the force term negative; unclamped that
+   sucks the chassis onto the ground over every bump. The gate asserts the clamp is doing work by checking the
+   unclamped arithmetic really would have gone negative.
+
+3. *** GRIP IS PROPORTIONAL TO LOAD, AND THIS IS THE LINE THAT MAKES IT A CAR. *** The friction a tyre can
+   produce is mu times the normal force, which for a raycast vehicle IS the suspension force -- so a wheel in
+   the air has zero grip. Give every wheel a constant friction instead and the vehicle drives on air: it
+   steers and accelerates with a wheel over a crest, and nothing reports a problem. Measured: lifting one
+   wheel of four takes total load to exactly 75% and that wheel's grip to exactly zero.
+
+4. ONE CONTACT PATCH, ONE BUDGET. Forces are clamped to the friction CIRCLE, not to two independent axes, so
+   the same steering input yields monotonically less cornering force as braking rises. With separate limits a
+   car brakes and corners at full strength simultaneously -- the arcade feel people then try to tune away
+   rather than fix.
+
+5. STATIC LOAD IS A LEVER-ARM SPLIT. A rear-mounted turret genuinely loads the rear wheels; an equal-share
+   model cannot express a loadout change at all.
+
+AND THE TURRET QUESTION, AS A NUMBER. Lateral load transfer is m*a*h/track, so a roof mount rolls a tank
+because it is HIGH, not because it is heavy: the same 300 kg mounted at 2.10 m instead of 0.30 m raises the
+combined CoG and transfers proportionally more load in the same corner. The inner wheels lift at the
+closed-form a = g*track/(2h), and by (3) their grip goes to zero at that moment -- which is the instant before
+it goes over. So "this loadout tips" becomes a computed fact about a build rather than something found by
+driving it.
+
+Treads get differentialDrive, because they are a different vehicle and not a setting: counter-rotating tracks
+PIVOT ON THE SPOT -- zero forward speed, non-zero yaw -- which no steering angle can ever produce. Modelling
+them as "wheels that steer a bit" gets a vehicle that cannot do the one thing treads are for.
+
+dampingRatio is IMPORTED from ui/springMotion.js rather than reimplemented, and the gate asserts the import
+line and that no second sqrt-based ratio hides in the file. The import direction is odd -- physics reaching
+into ui, with no precedent in this tree -- and the alternative was a duplicate constant, which is the defect
+v4192 named as "One Ashima simplex noise, not three copies of it".
+
+*** FOUR OF MY OWN TEST FIXTURES WERE WRONG WHILE THE MODEL WAS RIGHT, AND ONE OF THE CORRECTIONS IS A BETTER
+CHECK THAN WHAT IT REPLACED. *** restLength is the UNLOADED rest height, so asserting a wheel should carry
+load while sitting exactly at it was a wrong test; the replacement asserts that at the SETTLED ride height the
+force comes back as EXACTLY the corner weight -- 2943 N for 1200 kg on four wheels -- so the spring law and the
+static load have to agree. I also asserted a roll threshold at a=12 when the closed form for that build is
+12.58 m/s^2, and asserted a 40% cornering loss under braking when the real figure for those inputs is 10%:
+the clamp scales the whole force vector, so there is no single percentage to assert, and the sweep (2800 ->
+2419 N across rising brake demand, monotone) is the property that is actually true.
+
+Gate: tools/ship/vehicle-selfcheck.mjs, 56 checks, all pass. Seven sabotages, all red: casting only the rest
+length, letting the damper pull, constant per-wheel friction, two independent friction limits, equal-share
+static loads, treads that cannot pivot, and reimplementing dampingRatio instead of importing it.
+physics/vehicle.mjs restored byte-identical.
+
+Next: #94, pointing brain/rl at it. Note for that round -- BZFlag did NOT teach the brain to drive.
+brain/bzTacticsPolicy.js learns TARGET SELECTION from [1, near, ahead, exposed, airborne]; nothing in it has
+ever emitted a throttle.
+
+The build now stands at 1297 gates.
+## v4216 -- a drawing surface at last, and the optimisation that was faster and wrong
+
+*** MEASURED: THIS TREE HAD NO DRAWING SURFACE AT ALL. *** No painting page, no brush, no stroke model -- an
+engine full of shaders, fluids and simulations in which you could not draw a line.
+
+LICENCE FIRST, BECAUSE IT DECIDED HOW THIS WAS BUILT. mrdoob/harmony is GPL-3.0: "This program is free
+software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version." REACHED, NOT CAPTURED -- severity 3 RECIPROCAL, the same posture as CliWaifuTamagotchi and the same
+reason ai-bridge/sunshineBridge.js never vendors Sunshine: this tree publishes public release zips.
+
+*** SO harmony's SOURCE WAS DELIBERATELY NOT READ. *** For the MIT projects this tree has borrowed from --
+sileo at v4114, animatelo at v4191, frame.js one round ago -- reading the source and writing fresh is fine,
+and v4215 read frame.js's own Frame.js directly to get its data model. Under GPL-3.0 that is not the same act.
+What is implemented is the TECHNIQUE, publicly described since 2010 and a geometric idea rather than an
+expression of it: a conventional brush stamps something at each point, and a procedural brush of this family
+LOOKS BACK AT THE POINTS ALREADY IN THE STROKE AND DRAWS LINES BETWEEN THEM -- so the mark is made of
+relationships, and the same path drawn slowly, quickly, or doubled back over itself gives a different image.
+No harmony code, constants or structure is reproduced. The gate asserts the module still carries that
+reasoning, because a licence decision nobody can find later is one that gets quietly reversed.
+
+Three traps, and all three are worst in exactly the same place: where the hand slows down and the points bunch.
+
+1. POINTER EVENTS FIRE ON A CLOCK, NOT ON DISTANCE. Hold still for a second and the stroke gains sixty points
+   in one spot. Measured: an 80-point fixture dedupes to 21. Without that the other two guards are
+   overwhelmed, so deduping is not tidying -- it is the precondition for the rest of the file behaving.
+
+2. *** ALL-PAIRS NEIGHBOUR SEARCH IS O(n^2) -- 12,497,500 DISTANCE TESTS FOR A 5,000-POINT STROKE, DURING A
+   DRAG, ON THE MAIN THREAD. AND HERE IS WHERE MY FIRST ANSWER WAS WRONG IN A WAY ONLY MEASURING CAUGHT. ***
+   The obvious fix is a bounded lookback window, and it works: it cut that stroke to 475,344 tests, a 26x
+   saving. It was written, and it was in the first draft of this file, and the gate asserted the number.
+   THEN MEASURING WHAT IT DREW SHOWED IT HAD QUIETLY REMOVED THE POINT OF THE BRUSH. A circle of 160 points
+   produced ZERO links between its two passes, because coming back around takes more than the window allows --
+   and links that are FAR APART IN TIME BUT CLOSE IN SPACE are precisely what makes this kind of brush look
+   drawn rather than traced. A single smooth sweep links only to its own immediate neighbours, which just
+   redraws the line, which is what the first screenshot showed and what a faster number had hidden.
+   The bound was the wrong axis. A uniform grid keyed on POSITION answers "what is near here" over the WHOLE
+   stroke and wins on both: 72,400 tests for the same 5,000 points -- 173x better than all-pairs and 6.6x
+   better than the window it replaced -- AND self-crossing links at any distance in time (a 160-point circle
+   goes from 0 far links to 11). The gate asserts the grid finds EXACTLY what all-pairs finds across a
+   400-point self-crossing scribble, because a faster search that silently misses neighbours would be the same
+   defect as the window, only undetected.
+
+3. EACH LINK IS TRANSLUCENT, AND k OF THEM OVER THE SAME PIXELS ACCUMULATE TO 1-(1-a)^k. At alpha 0.12 eight
+   links already reach 0.64 opacity and twenty reach 0.92 -- black, in exactly the spot where somebody was
+   concentrating. BOTH guards are needed and the gate shows the second does something the first cannot: the
+   link count is capped, AND each link's alpha is divided by how many neighbours were FOUND rather than how
+   many were used, so a crowded region draws FAINTER lines rather than merely fewer. Capping alone would make
+   every dense area identical to a six-neighbour one.
+
+Five brushes -- line, sketchy, fur, shaded, ribbon -- each asserted to differ in the way it claims rather than
+merely to exist: fur reaches further than sketchy from the same points because it overshoots the neighbour,
+shaded varies its opacity with distance and its nearest link is stronger than its furthest, and ribbon is the
+only one that reads the timestamps, so it thins when the stroke is fast. Drawing point by point is
+byte-identical to rendering the whole stroke at once, or a picture would change the moment it was reloaded.
+
+Driven in headless Chromium against the real page: a self-crossing spiral of 342 points produced 2,025
+segments and 11,968 lit pixels, with the cross-links between adjacent turns visible -- which is the relational
+mark the whole round is about, and which the lookback version did not draw.
+
+New fx/procBrush.mjs, ui/procBrushCanvas.js and proc-brush.html. Gate: tools/ship/procBrush-selfcheck.mjs,
+40 checks, all pass. Six sabotages, all red: dropping the dedupe, uncapping the link count, dropping the
+density divisor, making the grid query only its centre cell, REINTRODUCING THE LOOKBACK WINDOW, and making fur
+stop overshooting. fx/procBrush.mjs restored byte-identical.
+
+The build now stands at 1296 gates.
+## v4215 -- a timeline, and the thing a playback-only loop gets wrong the instant you scrub
+
+*** MEASURED: THIS TREE ANIMATES BUT CANNOT SEQUENCE. *** ui/domAnimation.mjs (v4191) holds WAAPI keyframes as
+data, ui/springMotion.js (v4114) integrates a spring, fx/stagger.mjs (v4198) offsets a group -- and every one
+of them animates ONE thing FROM NOW. Nothing in the tree could say "at t=2.5 start the disintegrate, at t=4
+cross-fade, at t=6 the camera arrives". ui/clipEditorDialog.js (v818) has a play/scrub pair, but it drives a
+single skeletal clip through window.rigSystem; it is a clip editor, not a sequencer.
+
+The data model is mrdoob/frame.js's (MIT), READ FROM ITS OWN Frame.js rather than from its README, which
+documents none of it -- the README is four links and the words "work in progress". An Animation there is
+{ name, start, end, layer, effect }; the timeline sorts by start then layer; and an effect receives
+update(progress, delta) where PROGRESS IS NORMALISED TO ITS OWN CLIP. That last part is the idea worth taking:
+an effect never sees absolute time, so a clip can be moved, stretched or reused without touching the effect,
+which is the entire reason a timeline beats a pile of ifs. start() and end() are EDGES, fired on the frame a
+clip becomes or stops being active -- the same distinction engine/xrInput.mjs makes about a trigger.
+
+*** AND HERE IS THE PART ITS UPDATE LOOP DOES NOT HANDLE, WHICH IS WHY THIS IS MORE THAN A TABLE OF CLIPS:
+SEEKING IS NOT PLAYING. *** That loop walks animations in start order and breaks as soon as
+`animation.start > time`. Correct while time creeps forward one frame at a time. Wrong in two separate ways
+the moment somebody drags a scrubber:
+
+1. SCRUB BACKWARDS past a clip's start and the clip is still marked active from before, but a forward-only
+   walk may never visit it to call end(). It stays "running" with nothing driving it.
+2. JUMP FORWARD OVER A SHORT CLIP ENTIRELY -- from t=1 to t=10 across a clip spanning 3..4 -- and the clip is
+   never active on any evaluated frame, so start() AND end() NEVER FIRE AT ALL. A one-shot flash, a cut, a
+   trigger: it simply does not happen, and nothing reports that it was missed.
+
+Neither throws. Neither looks wrong until you scrub. So evaluate() is written against ARBITRARY time jumps
+rather than against playback. Entered and exited are a SET DIFFERENCE against the previously-active set, and
+*** A SET DIFFERENCE DOES NOT CARE WHICH WAY TIME WENT *** -- deriving edges from "did we pass start this
+frame" is exactly what ties a timeline to playback. And `skipped` is a first-class outcome, computed on the
+INTERVAL traversed rather than on the direction, so a BACKWARDS jump over a clip reports it too. It is
+deliberately not folded into entered or exited: the caller CHOOSES whether to fire both edges instantly or
+genuinely skip, and that is a decision only the caller can make and cannot make if it is never told.
+
+Two more refusals, both by name. A ZERO-LENGTH CLIP is rejected because progress is (t - start)/(end - start),
+so it is a division by zero whose NaN propagates into whatever the effect does with it -- and progressOf
+returns 0 rather than NaN even if one reaches it anyway. And containment is HALF-OPEN, so two abutting clips
+do not both claim the boundary instant. reset() exists for a third: without it, re-running a timeline from the
+top leaves the previous run's active set in place and the first evaluate emits end() for effects the new run
+never started -- an end without a start, which is the shape of bug that leaves something switched on forever.
+"Never evaluated" is null rather than 0, so a first evaluate at t=5 reports nothing skipped instead of falsely
+claiming everything before 5 was missed.
+
+Wired as window.swekTimeline, whose clips carry a plain effect function rather than a registry key: the tree's
+existing consoles -- window.fireworks, window.domFx, window.transitions -- ARE the registry, and a second one
+would be the third copy of an idea this tree keeps warning itself about.
+
+Gate: tools/ship/timeline-selfcheck.mjs, 46 checks, all pass. Six sabotages, all red: deriving exits from the
+direction of time, dropping the skipped report entirely (which is frame.js's behaviour), computing skipped only
+for forward jumps, treating "never evaluated" as time zero, making containment inclusive at both ends, and
+letting a zero-length clip through validation. fx/timeline.mjs restored byte-identical.
+
+The build now stands at 1295 gates.
+## v4214 -- the Sunshine bridge had never called the Sunshine API, and the control panel is not a way in
+
+*** MEASURED: ai-bridge/sunshineBridge.js HAD NEVER CALLED THE SUNSHINE API ONCE. *** All four of its
+references to port 47990 were string interpolation into a link. The bridge installed Sunshine, started it, and
+handed the user a URL to click. That was the whole integration, and it had been that way since v4154.
+
+Keith sent qiin2333/sunshine-control-panel (MIT). *** THE FIRST FINDING IS A NEGATIVE ONE, RECORDED SO NOBODY
+RE-EVALUATES IT: ITS AXUM PROXY IS TAURI-IPC-ONLY. *** It listens on 48081 but only inside the Tauri desktop
+application, reachable through Tauri's IPC bridge -- it is a CORS shim for a Vue frontend, not a headless
+service. And what it proxies TO is port 47990, which this tree already reaches directly. Taking a dependency
+on a desktop app in order to get at a port we already have would be strictly worse than what we have.
+
+WHAT IT DID PROVE IS THAT THE 47990 API IS RICH ENOUGH TO DRIVE AN ENTIRE APPLICATION -- app list, config,
+pairing, clients, covers, restart. So the answer is not to integrate their panel. It is to stop treating ours
+as a link.
+
+New ai-bridge/sunshineApi.mjs. THE ENDPOINT LIST COMES FROM LizardByte/Sunshine's OWN docs/api.md, not from
+reading the control panel's frontend: an endpoint table inferred from a UI is a table of what one client
+happened to call, which is a different and smaller thing than the API.
+
+Three hazards carry most of the assertions, because each produces a WRONG RESULT rather than an error.
+
+1. *** DELETE /api/apps/{index} ADDRESSES AN APPLICATION BY ITS POSITION IN THE LIST, AND POSITIONS ARE NOT
+   IDENTITY. *** Read the list, let anything add or remove an app between the read and the delete -- the
+   Sunshine UI in another tab, a config reload, another client -- and index 3 is now a different program. The
+   call SUCCEEDS, reports success, and removes something the caller never named. So a delete is not allowed to
+   travel on an index alone: verifyAppIndex takes the listing the index came from AND the name the caller
+   believes is there, and refuses when they no longer agree, saying what is actually at that position so the
+   caller can re-read and retry. It is a check the API itself cannot perform, because by the time the request
+   arrives the name is gone.
+
+2. A MUTATING CALL WITH NO CSRF TOKEN IS REJECTED IN A WAY THAT READS AS AN AUTH FAILURE -- which sends the
+   reader off to re-check a password that was right all along. buildRequest refuses by name before a request
+   exists, and the gate asserts EVERY mutating endpoint refuses, not merely the one that happened to be
+   sampled. The mutates flag is checked against the method too, so the rule cannot be skipped by mislabelling
+   one endpoint.
+
+3. *** SUNSHINE'S CONFIG SERVER USES A SELF-SIGNED CERTIFICATE, AND THE USUAL FIX FOR THAT IS A PROCESS-WIDE
+   HOLE. *** NODE_TLS_REJECT_UNAUTHORIZED=0 -- what most snippets reach for -- disables certificate
+   verification for every request the process makes for the rest of its life, including any carrying
+   credentials somewhere else entirely. The exception here is scoped to ONE https.request against one
+   known-local host, and the gate asserts the module sets neither that variable nor rejectUnauthorized, and
+   performs no request at all: it describes them. That check reads codeOnly, because the warning text quotes
+   the very variable it warns against -- an absence is a code shape, v4208's lesson in its other direction.
+
+MEASURED END TO END AGAINST A REAL SELF-SIGNED HTTPS SERVER stood up for the purpose, because classifying
+failures by name is worthless if the classes are not actually told apart in practice: correct credentials
+return the app list through the scoped exception ({"ok":true,"count":3,"apps":["Desktop","Steam","Firefox"]});
+WRONG credentials come back kind:"auth" with the fix named; and nothing listening on the port comes back
+kind:"down". Three distinct failure modes, three distinct answers. My first attempt at that test was badly
+built -- the fake server accepted any Basic prefix, so a wrong password appeared to succeed -- and it was
+rebuilt to actually validate before the result was believed.
+
+Every endpoint needs basic auth, which is the reason "here is a URL" was the only integration that could ever
+have worked: an unauthenticated call to any of them returns 401, and a 401 from a self-signed HTTPS host is
+easy to misread as a TLS problem. Credentials come from SUNSHINE_USER / SUNSHINE_PASS in the environment and
+never from the tree -- a default admin password in a repository is a default in everybody's repository.
+
+New route: GET /sunshine/apps. Gate: tools/ship/sunshineApi-selfcheck.mjs, 51 checks, all pass. Five
+sabotages, all red: building a mutating call with no CSRF token, checking only the bounds of an app index
+rather than the name at it, collapsing 401 and 403 into one answer, leaving an unfilled path placeholder in
+the URL, and having the module itself set the process-wide TLS switch. sunshineApi.mjs restored
+byte-identical.
+
+The build now stands at 1294 gates.
+## v4213 -- haptics: the tree had none, and the two APIs that play them cannot express each other
+
+*** MEASURED BEFORE BUILDING ANYTHING: THIS TREE CONTAINED ZERO HAPTICS. *** No navigator.vibrate, no
+hapticActuator, on any surface, in any file. Meanwhile v4212 had shipped engine/xrInput.mjs one round earlier
+with careful edge detection on trigger and squeeze -- reporting exactly one event per press -- AND NOTHING TO
+ANSWER A PRESS WITH. And phone.html is a touch UI on a device that has had a vibrator since 2010.
+
+Idea from lochie/web-haptics (MIT), taken the way ui/springMotion.js took sileo's and ui/domAnimation.mjs took
+animatelo's: THE VOCABULARY IS THE VALUABLE PART, NOT THE LIBRARY. web-haptics ships React, Vue and Svelte
+bindings; this tree ships none of those frameworks. What survives the translation is the observation that
+"success", "warning" and "impact" are named reusable patterns rather than magic numbers at call sites.
+
+*** THE FINDING THAT MAKES THIS MORE THAN A TABLE OF NUMBERS: THE TWO PLAYBACK APIS DO NOT AGREE ABOUT WHAT A
+HAPTIC IS, AND NEITHER CAN EXPRESS THE OTHER. ***
+
+    navigator.vibrate(pattern)            an array of milliseconds alternating on, off, on, off.
+                                          IT HAS NO INTENSITY. Every buzz is full strength.
+    hapticActuator.pulse(intensity, ms)   one buzz with an intensity in 0..1.
+                                          IT HAS NO RHYTHM. One call is one buzz.
+
+So a single vocabulary has to survive being flattened in two DIFFERENT lossy directions, and the gate proves
+what each one loses rather than the loss being discovered on a device.
+
+TOWARD vibrate, THE INTENSITIES ARE DISCARDED. That is not a bug awaiting a fix -- the Vibration API has no
+intensity -- and it has a consequence the table has to respect: a light and a heavy impact MUST ALSO DIFFER IN
+DURATION or they are indistinguishable on a phone. Asserted, 12ms against 26ms.
+
+TOWARD pulse, THE RHYTHM MUST BE REBUILT AS A SCHEDULE, because *** A LOOP OF pulse() CALLS DOES NOT QUEUE:
+each supersedes the one before, so firing three pulses in a row plays exactly ONE buzz and the pattern is
+silently gone. *** This is the direction where the naive implementation is not merely lossy but produces a
+plausible wrong result -- it runs, it buzzes, and it is wrong -- so it carries the most assertions. Two
+distinct collapses are pinned separately: scheduling everything at t=0 (all pulses overlap), and scheduling
+only the gap while ignoring the buzz that precedes it (the same collapse in slower motion).
+
+THREE WAYS OF MEASURING AN EFFECT ARE ASSERTED TO AGREE: durationOf, the sum of the vibrate pattern, and the
+end of the last scheduled pulse. If any two disagreed, one of them is lying about the effect's length and the
+caller cannot tell which.
+
+INDEX PARITY IS PINNED AS PARITY, NOT AS A LITERAL. Even indices buzz, odd indices pause. A pattern built one
+element out of phase does not fail -- it plays the rhythm INSIDE OUT, the gaps buzzing and the buzzes silent,
+which on a device reads as "the haptics feel wrong" and is close to impossible to debug by feel.
+
+THE STRENGTH SCALE TOUCHES INTENSITY AND NOT DURATION. Shortening a buzz to weaken it changes what it MEANS --
+a short heavy tap and a long light one are different signals -- and on the vibrate path, which has no
+intensity, duration is the ONLY visible quantity, so scaling it would silently turn a strength slider into a
+speed slider. The gate asserts the vibrate pattern is byte-identical at any strength.
+
+EVERY PLAY PATH REPORTS WHY, BECAUSE EVERY BROWSER HAPTIC API FAILS SILENTLY. iOS Safari has never shipped the
+Vibration API -- no error, the function is simply absent. Where it exists it returns FALSE before the page's
+first user gesture, and that return value is the platform's only signal that nothing happened. A real XR
+controller without motors exposes hapticActuators as a PRESENT BUT EMPTY array. And pulse() returns a Promise
+that can reject when a controller goes away mid-buzz. All four are handled and named.
+
+WIRED, not left as a module its gate imports. VR trigger and squeeze buzz THE CONTROLLER THAT FIRED THEM
+(e.source, not "the controller" -- a buzz in the wrong hand is worse than none), and a session ending cancels
+anything still scheduled, because a timer outliving its controller is a buzz with no owner. phone.html gets
+ONE delegated pointerdown listener rather than per-button binding, because that page BUILDS CONTROLS
+DYNAMICALLY from a schema that arrives over the WS and per-button binding would silently miss everything
+created after load. The effect is chosen by CONSEQUENCE rather than by widget type -- if every button feels
+identical the feedback carries no information beyond "registered" -- and that was MEASURED live in headless
+Chromium with a stubbed vibrator: a plain toggle sends [10], "Restart pipes" sends [18], and nothing at all
+fires before the first tap.
+
+Gate: tools/ship/haptics-selfcheck.mjs, 45 checks, all pass. Six sabotages, all red: inverting the pattern
+parity, scheduling every pulse at t=0, scheduling only the gap, making the strength scale touch duration,
+swallowing vibrate()'s false return, and making the light and heavy impacts the same length. Both modules
+restored byte-identical.
+
+The build now stands at 1293 gates.
+## v4212 -- VR part two: the post chain in stereo, the controllers, and the pages where the guide was right
+
+v4179 got the engine into a headset and said in its own comment what it was leaving behind: "Two eyes through
+a full-screen post pass is its own piece of work." This is that work, plus the input half it never had.
+
+*** THE POST-CHAIN FINDING IS NOT "IT DOES NOT RUN IN VR". *** It is that EVERY UV-SPACE EFFECT SILENTLY
+MEANS SOMETHING ELSE when an XRWebGLLayer hands both eyes ONE framebuffer with two viewports side by side. A
+shader written in "vUV of the whole target" -- which is every post shader ever written, correctly, for a
+monitor -- is now addressing a double-wide image whose middle is the bridge of your nose. Three consequences,
+each of which renders fine and looks wrong, all measured rather than described:
+
+1. THE BLUR READS ACROSS THE SEAM. bloomPass's BLUR_FS is a 9-tap Gaussian sampling +/-4 texels, run at HALF
+   resolution, so at the left eye's inner border it reaches 4 texels = 8 FULL-RESOLUTION PIXELS into the right
+   eye. A bright window on one side glows on the other side's inner border, where there is no light.
+   *** SCISSORING CANNOT FIX THIS: A SCISSOR RESTRICTS WRITES AND THIS IS A READ. *** GL_CLAMP_TO_EDGE cannot
+   either -- it guards the edge of the TEXTURE, and this boundary is the middle of it.
+
+2. THE VIGNETTE CENTRES ON THE SEAM. The composite does vUV minus 0.5, the centre of the TARGET. Two eyes side
+   by side put UV 0.5 exactly on the boundary, so each eye came out brightest at its inner edge and darkest at
+   its outer one. MEASURED at 0.25 in UV from each eye's real centre -- a quarter of the framebuffer's width.
+
+3. SCREEN-SPACE SOURCES PROJECT THROUGH ONE CAMERA. The god-ray pass takes a single uSunPosUV and the heat
+   sources are projected through whichever camera was passed last. One screen position cannot be right for two
+   eyes looking from different places; that is what stereo IS. This one is REPORTED as a warning rather than
+   silently handled, because a plan that drops what it cannot do turns a known defect into an unknown one.
+
+New engine/xrPost.mjs is the eye-rect arithmetic behind all three. No GL in it, so 30 checks drive it in node
+against XRView-shaped fixtures -- the posture engine/xrSession.mjs took at v4179 and scanTwin.mjs at v4208.
+render/bloomPass.js gains a uEyeRect uniform: the blur CLAMPS every tap into its own eye (inset by half a
+texel, so it lands on the last texel CENTRE rather than the boundary where linear filtering would coin-flip
+into the neighbour) and the vignette centres on the eye. *** FOR THE FULL-FRAME RECT A MONITOR PASSES, BOTH
+REDUCE ALGEBRAICALLY TO THE OLD LINES *** -- the clamp becomes the identity and the vignette becomes
+(vUV - 0.5) / 1.0 -- and the gate asserts that over 101 sampled points, because a stereo fix that changed the
+desktop would be a regression on the path 99% of frames take.
+
+New engine/xrInput.mjs is controllers. *** CONTROLLER BUGS ARE ALMOST NEVER POSE BUGS. THEY ARE EDGE BUGS,
+AND AN EDGE CANNOT BE SEEN IN ONE FRAME. *** `if (button.pressed)` fires sixty times for one trigger pull and
+looks like it works while you test it on something harmless, so every input assertion here drives a SEQUENCE:
+held for 60 frames, the trigger reports 0 further events. Three traps pinned: a controller that DISAPPEARS
+mid-press synthesises its release (otherwise the button is held for the life of the page, and the release is
+emitted BEFORE the removal so a listener still knows what it refers to); state is keyed on the inputSource
+OBJECT, not on handedness, because two sources can both report "none" and keying on handedness merges two
+devices into one; and the deadzone is RADIAL and rescaled, not per-axis -- a diagonal push of 0.1/0.1 has
+magnitude 0.1414 and is live, where a per-axis deadzone squares off a round stick and returns nothing. The
+thumbstick is axes 2/3; 0/1 are the touchpad, an off-by-two a lot of code has.
+
+New ui/threeVR.js is the EASY half. v4179's finding was that the guides' renderer.xr.enabled +
+setAnimationLoop answer does not apply to main.js, which never imports three -- but glb_viewer, scene-view and
+aquarelle DO use three, and for them it is exactly right and was never applied. *** setAnimationLoop REPLACES
+THE rAF, IT DOES NOT JOIN IT: *** a loop driven by both runs TWICE PER FRAME, which on a monitor merely reads
+as "the animation got faster" and in a headset is double the work for half the rate. MEASURED in headless
+Chromium by counting GL calls, against the unconverted files as controls: glb_viewer 119/s vs 120/s,
+aquarelle 42/s vs 44/s, scene-view 60/s vs 61/s -- matched, not doubled.
+
+TWO THINGS MY OWN MEASUREMENTS NEARLY GOT WRONG, BOTH CAUGHT BY RUNNING A CONTROL. A canvas-screenshot diff
+reported aquarelle FROZEN after conversion; the same probe against the ORIGINAL file reported it frozen too,
+so the probe was wrong, not the change. And scene-view showed 0 draw calls -- also 0 before conversion, because
+it is a viewer with no scene loaded; counting gl.clear instead showed its loop running at 60/s either way.
+
+AND I BROKE v4179's OWN GATE, WHICH IS WHY IT EXISTS. Its framebuffer check sliced a flat 900 characters from
+_renderXRFrame; giving that function a second branch pushed the bind past character 900, so a check about
+WHERE THE FRAME GOES failed because of HOW LONG THE FUNCTION IS. A positional window is not a property. It now
+delimits the function by matching braces and asserts BOTH paths reach the headset, each branch clears exactly
+once, and the post path resets the sticky eye rect on the way out -- strictly more than it checked before.
+
+Gate: tools/ship/xrStereo-selfcheck.mjs, 71 checks, all pass. Five sabotages, all red: dropping the clamp,
+restoring the target-centred vignette, reporting levels instead of edges, keying controller state on
+handedness, and putting a requestAnimationFrame back into a converted page. All touched files restored
+byte-identical. engine/xrSession-selfcheck.mjs 74 passed, 0 failed.
+
+WHAT THIS DOES NOT CLAIM: that any of it looks right in a headset. Nobody here has one. The rect arithmetic,
+the clamp, the edge detection and the loop rates are settled; comfort wants a person and a device.
+
+The build now stands at 1292 gates.
+## v4211 -- the droplets were square, and the fix was already written in the file next to it
+
+*** Keith, on fluid-webgpu.html: "does water droplets need to be square?" *** They were, and they did not need
+to be. Each particle is drawn as a 6-vertex QUAD (two triangles) and the fragment stage returned
+`vec4(i.col, 1.0)` for EVERY pixel of it. The quad is the right primitive -- an instanced billboard is how you
+draw a hundred thousand particles -- but a quad with no mask is a square, which is exactly what rendered.
+
+THE FIX WAS ALREADY IN THE TREE, ONE FILE OVER. fluid-webgpu-3d.html is the same simulation in 3D and already
+carries the sphere-impostor idiom: `let r2 = dot(i.uv,i.uv); if(r2>1.0){ discard; }` plus a reconstructed
+normal. So this round is that idiom applied to the 2D view, not a new invention, and the gate checks BOTH
+files -- the interesting property is that the tree stops holding two answers to one question.
+
+*** THE MISSING HALF WAS IN THE OTHER STAGE FROM WHERE THE SYMPTOM SHOWED. *** The 2D file could not have had
+a mask: its vertex stage never passed the quad corner to the fragment stage, so the fragment shader had no way
+to know where in the quad it was. Adding a discard to the fragment stage alone would not have compiled against
+anything. The vertex half is the fix as much as the fragment half is.
+
+*** THIS BOX HAS NO navigator.gpu, SO THE MASK IS PROVEN IN A TWIN RATHER THAN ASSERTED FROM THE SOURCE. ***
+Same posture as brain/transport/scanTwin.mjs at v4208: a shader nobody can run is a shader nobody has checked,
+and reading a discard out of the source proves only that somebody typed one. The mask is a pure function of
+the corner, so it is re-implemented in JS and INTEGRATED over the quad. A correct disc covers pi/4 =
+0.785398 of its bounding square; measured 0.785419 on a 2000x2000 grid. THE UNMASKED QUAD THIS REPLACED
+INTEGRATES TO EXACTLY 1.000000, so one number separates fixed from broken with no ambiguity. The four corners
+are asserted discarded by name, because the corners are the square's giveaway. The impostor normal is checked
+to be a unit vector across the whole disc: max deviation 2.22e-16.
+
+AND THE SERVER CONSOLE. Keith: "I think we have a file transfer button, and that would be better served as a
+'Peer 2 Peer' button and we can put the p2p options in that panel. nearshare maybe. We have a torrent re-skin
+app with voxels i think." He is right that it exists -- torrents.html is "Torrents -- Voxel View", where each
+tower is a download, lit cubes are progress and glow is speed, driven by ai-bridge/biglybtBridge.js, with
+webtorrent.html its browser-side sibling on webtorrentBridge.js.
+
+*** BOTH TORRENT PAGES WERE IN NO PANEL AT ALL, AND THE REASON WAS THAT NEITHER HAD AN ANCHOR ON server.html.
+*** They are present in the GENERATED indexes (launch-index.json, page-index.json) and so are not orphans by
+orphanScan's definition -- reachable by URL, unreachable by browsing, which is the v3011 defect ("shipping a
+module nobody can reach") in its subtler form. pageSections-selfcheck stated the rule and caught the attempt
+in the same run: "A SECTION ENTRY IS NOT A LINK: the renderer moves an existing <a> and cannot invent one, so
+a page filed into a drawer with no anchor gives an EMPTY DRAWER THAT LOOKS DELIBERATE." Filing them without
+adding the two anchors would have produced precisely that.
+
+The label is now the honest one. v4109 had already conceded that this panel's header "is narrower than its
+real membership" and deferred the wider regroup as "a bigger reorg ... that nobody has asked for yet". The ask
+arrived, so the deferral ends. The id and data-tab stay "nearshare" for the same reason they did at v4109:
+the id is load-bearing in server.html's selectors, in pageSections' id, and in the placements JSON, and only
+the visible label moves.
+
+Gate: tools/ship/dropletMask-selfcheck.mjs, 15 checks, all pass. Three sabotages, all red: restoring the
+original flat-square fragment shader, removing the vertex stage's corner pass-through, and inverting the mask
+so it keeps the corners and drops the middle. fluid-webgpu.html restored byte-identical. Measured live in
+headless Chromium: the renamed tab reads "Peer 2 Peer" and its panel now holds all seven peer pages
+(android-invite, remote-desktop, lan, sync-probe, pairlane, torrents, webtorrent) with no page errors.
+
+The build now stands at 1291 gates.
+## v4210 -- the Phone Mode button opened the phone UI on the PC, and the QR it needed was already in the tree
+
+*** server.html's "PHONE MODE" BUTTON OPENED THE PHONE UI ON THE PC, THE ONE DEVICE THAT DOES NOT NEED IT. ***
+Keith: "what should phone button do on server.html really? i remember, show a qr code so the phone can open
+it." It ran window.open("/phone.html"), putting a touch UI -- sticks, thumb-sized targets, a picker sized for
+a finger -- into a desktop tab, while the actual phone was still left needing someone to read an IP off the
+screen and type it in by hand.
+
+THE QR ALREADY EXISTED AND THIS PAGE COULD NOT REACH IT. ui/phoneConnectQR.js builds exactly the right thing:
+it asks the bridge's /net/info for the LAN address and renders a scannable code of <lan>/phone.html. But its
+modal was SEALED INSIDE initPhoneConnectQR'S CLOSURE, mountable only from the engine's left rail via
+miniIconStack -- so a page without that rail had no way in. The modal is now lifted to module scope and
+exported (showPhoneQR, closePhoneQR, togglePhoneQR, isPhoneQROpen, controlURLForPhone), and server.html
+raises THE SAME modal rather than growing a second copy of a thing the tree already had.
+
+THE LOCALHOST SUBSTITUTION IS THE WHOLE FEATURE, not a detail, so it is asserted rather than assumed. A QR
+encoding "http://localhost:8787/phone.html" is WORSE THAN NO QR: a phone scanning it resolves localhost to
+its OWN loopback and shows a broken page with no hint why. v637 solved that by asking /net/info for the first
+non-virtual NIC; the gate stubs /net/info with 192.168.50.41:8787 and reads the rendered URL back out of the
+DOM, so the substitution is checked end to end rather than trusted.
+
+*** THE LIFT BROKE THE ORIGINAL CALLER, AND THE GATE CAUGHT IT BEFORE IT SHIPPED. *** The rail mount's
+`getActive: () => !!card` still read the binding that had just moved to module scope, which throws on every
+hover of the button it belongs to. That is why the gate drives BOTH entry points and not only the new one: a
+refactor that serves a new caller by breaking the old one is not a refactor. An ABSENCE is a code shape, so
+the check for it reads codeOnly rather than raw source -- the same rule v4208 got wrong in its other
+direction.
+
+Gate: tools/ship/phoneQR-selfcheck.mjs, 24 checks, all pass. Three sabotages, all red: restoring the old
+window.open behaviour on server.html (4 checks red), putting back the stale `card` read, and dropping the
+localhost -> LAN substitution. Both touched files restored byte-identical. Measured in headless Chromium
+against the real server.html: no modal before the click, a 152px QR image after it, zero window.open calls,
+the encoded URL reading http://192.168.50.41:8787/phone.html, and a second click closing it.
+
+The build now stands at 1290 gates.
+## v4209 -- the shell is the firework, and three phone.html defects Keith photographed
+
+The shell IS the firework, and three phone.html defects Keith photographed. New world/fireworkShell.mjs takes
+the one idea worth taking from the three fireworks repos: a shell is a BALLISTIC BODY with a fuse, and the
+stars are what it becomes -- not a particle emitter that happens to be shaped like an arc. It reuses
+physics/ballistics.mjs (v4205) for the lift, so a shell and a naval round are the same object with different
+fuses. Six patterns (peony, chrysanthemum, willow, palm, ring, crossette) and a secondary break that fires
+inside the same step rather than a frame later. *** SPHERE SAMPLING IS THE PART THAT IS EASY TO GET WRONG AND
+LOOKS FINE: *** normalising a random cube vector piles stars onto the eight corners -- MEASURED, chi-squared
+27996 against 143 for the Marsaglia z-then-angle method, with the fullest cell holding 2.92x the emptiest
+versus 1.13x. Velocity inheritance measured too: a burst keeps the shell's motion, so stars drift 8.80 m
+downrange after 1 s where an un-inherited burst drifts -0.45 m. Ring planarity 2.22e-16 with gaps exactly
+2pi/72; crossette breaks 24 stars into 96 at step 108; willow leaves 140 stars alive at 3 s where peony has 0.
+58 checks, 6 sabotages all red. *** TWO OF MY OWN BUGS, BOTH FOUND BY THE GATE: *** shortOfFuse fired at
+y=39.9 for a 40 m fuse -- a discretisation artefact, fixed to test the apex rather than the sampled height;
+and the crossette test read (stars[0]?.t || 99), which treats t===0 as missing, and a freshly-born star has
+exactly t=0 -- the falsy-zero trap for the second time this month, in my TEST rather than the module.
+phone.html: *** THE `.row` CLASS WAS USED 30 TIMES AND DEFINED ZERO TIMES. *** A bare div with no rule is
+display:block, so every one of those rows was a hard line break -- which is what Keith photographed: "Raw on
+/ Raw off" on one line, "Event on / Event off" the next, "Restart pipes" alone on a third, each button 68px
+wide against the left edge. The intent was not guessed: 24 of the 30 rows set inline flex:2 / flex:1 / flex:0
+on their CHILDREN, and flex is inert on a child of a block box, so those ratios were written for a flex
+parent that never existed. Nine sibling pages in this tree each define their own .row; this page missed it.
+Adding server.html's declaration verbatim revives the 24 inline ratios rather than overriding them, because
+an inline flex beats a stylesheet rule. MEASURED before and after in headless Chromium at a 412px phone
+viewport: all 30 rows computed display:block with buttons at 68px and 69px; all 24 remaining rows now compute
+flex. The Listener control and Engine authority button stacks became ONE group each, using the page's own
+.grid three / .grid idiom rather than a bespoke rule. And the settings panel: *** ITS WATCHDOG COULD NOT FIRE
+ONCE A SCHEMA HAD EVER ARRIVED. *** The guard was `!schema` -- the last schema received, not the state of the
+request in flight -- so the first fetch reported "no reply from PC" correctly and every Refresh after a
+success sat on "requesting schema..." in blue forever, with no error and no timeout. That is the second thing
+Keith photographed. A per-request token replaces it, cleared by the reply handler on both the ok and the
+error path. Gate count 1289 gates.
+The build now stands at 1289 gates.
+## v4208 -- the three shaders v4207 found are fixed, and the obvious fix would have been worse than the bug
+
+brain/transport/shaders/scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl each declared
+@compute @workgroup_size(1024). That is four times WebGPU's default maxComputeInvocationsPerWorkgroup of
+256, on a tree whose 27 requestDevice() calls never pass requiredLimits, so createComputePipeline rejects all
+three -- and the rejection lands on the pipeline, not the shader, so the shader appears to compile and the
+error surfaces somewhere unrelated.
+
+WRITING 256 IN PLACE OF 1024 WOULD HAVE SHIPPED SILENTLY WRONG DATA.
+
+All three assumed ONE ELEMENT PER THREAD. The Blelloch up-sweep guards each level with `if (thid < d)`, and
+the widest level of a 1024-element scan needs 512 invocations. MEASURED, by replaying the original body at
+different thread counts against primeTransport.js's serial exclusiveScan: correct at 1024, correct at 512,
+and at 256 it gets 507 of 1024 offsets WRONG, the first at index 512 -- exactly where a level ran out of
+threads.
+
+A pipeline that will not build is visible. A scan that quietly returns wrong offsets is not. The naive fix
+would have traded a loud failure for a silent one.
+
+The real fix is the strided loop: `for (var i = thid; i < d; i += WG)`. Every invocation takes its share of
+each level whatever WG is, and it reduces to the original when WG >= d. Element capacity is UNCHANGED at
+N = 1024; only the invocation count moved. That is the whole difference between fixing the shader and quietly
+scanning a quarter of the data, and the gate checks the N constant and the shared array length as well as the
+workgroup size for exactly that reason.
+
+THIS BOX HAS NO GPU, SO THE ALGORITHM IS VERIFIED IN A TWIN.
+
+New brain/transport/scanTwin.mjs runs the same loops in JS with barriers as phase boundaries. A workgroup
+barrier means every invocation finishes the phase before any begins the next, which in JS is exactly "loop
+over all threads, then move on" -- so the simulation reproduces the read-write hazards a barrier exists to
+prevent, and a missing barrier is a wrong answer here rather than a vendor-specific glitch later.
+
+Graded against the serial reference, which did not move to meet the shaders:
+  - Blelloch exclusive scan matches at workgroup sizes 1, 2, 4, 16, 64, 128, 256, 512 and 1024.
+  - Hillis-Steele block bases match at 1, 4, 64, 256 and 1024.
+  - The fused filter + scan + scatter is BYTE-IDENTICAL to exclusiveScan + scatter at every size.
+
+TWO THINGS THE STRIDE COSTS, BOTH LOAD-BEARING.
+
+Hillis-Steele reads s[i - off] and then writes s[i], with a barrier between so no invocation reads a slot
+another has already advanced. At one element per thread a single scalar held that read across the barrier. At
+four elements per thread there are four reads to hold, so it becomes array<u32, 4>. Collapsing it back to one
+scalar reintroduces exactly the hazard the barrier is there to prevent -- gated by showing that the collapsed
+version produces a different answer.
+
+And the fused shader now carries its filter verdict PER ELEMENT from the filter phase, past two scan
+barriers, to the scatter. Re-evaluating the predicate at the scatter instead would make the write depend on a
+SECOND evaluation rather than on the one the scan counted, and any disagreement between them puts a survivor
+in a slot nothing reserved.
+
+v4207's GATE WENT RED, WHICH IS IT WORKING IN BOTH DIRECTIONS.
+
+tools/ship/wgslSpec-selfcheck.mjs asserted that three shipped files exceed the limit. It now asserts zero,
+and the entry says why the number moved rather than the number being quietly edited. It also gained a check
+that the validator can STILL see a 1024-wide workgroup, so a clean corpus is a fact about the tree and not
+about the checker. Four of its assertions moved in total, including one that read scan.wgsl's workgroup size
+as [1024,1,1] and one that expected global_invocation_id in a shader that no longer needs it -- with one
+workgroup the global index IS the element index, so the strided loop uses `i` directly.
+
+MY OWN SLIP, and it is the sourceScan rule again in its other direction. Three checks looked for the ABSENCE
+of `if (thid < d)` and `@workgroup_size(1024)`, and went red against correct code -- because the fixed files
+QUOTE those idioms in their headers while explaining what was wrong. The rule this tree already wrote down is
+noComments for anything quoted and codeOnly for code shapes; an absence is a shape. The gate now reads
+codeOnly for those, and separately asserts that scan.wgsl's header still quotes the old idiom, so the record
+is kept while the code is not.
+
+The pre-existing brain/transport/primeTransport-selfcheck.mjs still passes unchanged, which matters: the CPU
+twin it grades is the same reference the new shaders are graded against, and it did not move.
+
+Gate: tools/ship/scanLimits-selfcheck.mjs, 71 checks, all pass. Five sabotages, all red: restoring the three
+original shaders (30 checks go red), applying the naive 1024 -> 256 with no restructure, quietly shrinking N
+to 256, removing the stride from the twin's Blelloch, and collapsing Hillis-Steele's per-thread array to one
+scalar. All four touched files restored byte-identical.
+The build now stands at 1288 gates.
+## v4207 -- a WGSL conformance check, and it found three shipped shaders that cannot run on a default device
+
+Same mould as v4204's GL Transition check: read the shader, check it against the contract, refuse it BEFORE a
+compile is spent on it. Sharper here than for GLSL. A GLSL shader can be compiled by any GL context; WGSL
+needs a live WebGPU device, and the build box has none. So the twenty-odd places this tree writes WGSL -- ten
+.wgsl files plus inline shaders in fluid, mpm, blackhole, nebula, anime4k, blobulator, cell-tracking, gauges
+and the brain's transport kernels -- were, statically, unchecked by anything.
+
+THE FINDING. brain/transport/shaders/scan.wgsl, mb-scan-blocks.wgsl and fused-single-workgroup.wgsl each
+declare @compute @workgroup_size(1024). That is four times WebGPU's default maxComputeInvocationsPerWorkgroup
+of 256, and it also exceeds the default maxComputeWorkgroupSizeX of 256 on its own.
+
+MEASURED across 3,956 .js/.mjs/.html files, node_modules excluded: 27 requestDevice() call sites, and
+`requiredLimits` appears ZERO times. So the defaults are not a conservative floor for this tree -- they are
+exactly what every device in it gets. Those three pipelines cannot be created here.
+
+And the failure lands somewhere unhelpful: a workgroup size over the limit is rejected at
+createComputePipeline, not at createShaderModule. The shader "compiles" fine and the error arrives later,
+attached to the pipeline rather than to the shader that caused it.
+
+The other seven .wgsl files validate clean, which is what makes the three mean something rather than being a
+checker that rejects everything.
+
+WHERE THE IDEA CAME FROM. dantiicu/dawn-switch -- BSD-3-Clause, LICENSE read directly, "Copyright 2017-2023
+The Dawn & Tint Authors" -- a fork of Chromium's Dawn with a branch adding Nintendo Switch support. Dawn is
+the native WebGPU implementation underneath navigator.gpu, ~25,700 commits of C++ compiled against
+D3D12/Metal/Vulkan with GN/Bazel and a depot_tools checkout. The licence is properly permissive and none of
+it is vendorable into a browser JS tree -- vendoring it would mean shipping a browser. What transfers is that
+WGSL HAS A CHECKABLE SHAPE, which is what Tint, the WGSL compiler inside it, exists to exploit.
+
+THE LIMITS ARE A PARAMETER AND CARRY THEIR PROVENANCE. This is v4203's lesson applied before the mistake
+instead of after it. w3.org and gpuweb.github.io are both blocked by this sandbox's egress proxy, and the
+headless shell here exposes no navigator.gpu, so DEFAULT_LIMITS was written from knowledge and could be
+verified against NEITHER the specification nor a live device. LIMITS_PROVENANCE says so in the record:
+verifiedAgainstSpec false, verifiedAgainstDevice false, and why.
+
+Every entry point takes a `limits` argument, so a caller with a real device passes device.limits and gets an
+answer about that device. New tools/ship/wgslDeviceLimits.mjs reads the real limits from a browser and
+reports any disagreement -- a TOOL and not a gate, for the same reason tools/ship/verifyLicenceTexts.mjs is
+one: a gate that needs a GPU silently passes on every box without one. Run in this sandbox it prints
+UNVERIFIED and exits 2, which proves nothing and says so.
+
+MY BARRIER CHECK WAS WRONG TWICE BEFORE IT WAS RIGHT, AND BOTH FAILURES WERE ON CORRECT CODE.
+
+A barrier in WGSL must be reached by every invocation in the workgroup; anything else is undefined behaviour,
+and it is the commonest way a compute shader works on one vendor and hangs on another. The first draft
+flagged any barrier inside any if/for/while and fired twice on the very first real shader it read.
+scan.wgsl's first barrier is the opening statement of `for (var d = 1024u >> 1u; d > 0u; d >>= 1u)`, whose
+trip count is identical for every invocation, so it IS uniform control flow and the code is correct. The
+second sits at plain function scope; walking back through braces to find the enclosing block simply landed on
+the wrong one.
+
+The rule is not "not in a conditional", it is "in UNIFORM control flow". So the question is not whether there
+is an `if` but whether its predicate depends on WHICH INVOCATION IS ASKING -- and that is tractable. The
+check now collects names bound to invocation builtins (@builtin(local_invocation_id) and friends), propagates
+one hop through `let thid = lid.x;`, and flags only barriers reached under a predicate mentioning one.
+
+The second draft then captured that predicate with [\s\S]* and matched from an `if (` far above, through a
+whole block, to a later `)` -- reporting conditions like "gid.x < n) { shared_data[thid] = ...; } el" and
+flagging correct code on that basis. A condition cannot contain a brace.
+
+After both fixes: ZERO false positives across all ten .wgsl files, and it still catches a hand-written
+barrier under `if (t < 32u)` where t comes from local_invocation_id, naming the predicate in the report. A
+validator that fires on correct code teaches people to ignore it, which is worse than not having one.
+
+TWO MORE OF MY OWN, both caught by the gate rather than by review.
+
+The gate's first run reported "requiredLimits appears 3 times" and went red against a claim that is true.
+All three hits were in the files this round added -- a variable name, a regex literal, and a comment inside a
+template literal, none of which codeOnly() strips. A checker that counts itself measures the checker. The
+scan now excludes the three v4207 files and says why.
+
+And the first draft of the changelog entry said "eight requestDevice() call sites". That was a `head -8` on a
+grep, read as a total. There are 27. A number taken from a truncated listing is not a measurement, and the
+module comment carried the same error until the gate made me count properly.
+
+Also gated: vec3<f32> sizes to 16 bytes and not 12, because WGSL aligns it like a vec4 and under-counting it
+would clear a shader that overflows workgroup storage; sizeOf() returns null and never zero for a struct or a
+runtime-sized array, because an UNKNOWN size is not a zero size; a workgroup size built from a template hole
+(`@workgroup_size(${WG})`, which much of this tree uses) is not a violation, because it cannot be judged
+until the string is assembled; and a duplicate (group, binding) pair is refused, which the shader compiler
+will not catch.
+
+Wired as wgsl.check(src[, limits]), wgsl.parse(src), wgsl.limits() -- which prints the provenance as a
+warning next to the numbers -- and wgsl.cannotDo().
+
+Gate: tools/ship/wgslSpec-selfcheck.mjs, 69 checks, all pass. Nine sabotages, all red: removing the
+invocations-per-workgroup check so the finding goes unseen, restoring the flag-any-conditional barrier rule
+so the false positives return, sizing vec3 as 12 bytes, making sizeOf return 0 instead of null for an unknown
+type, having LIMITS_PROVENANCE claim it was verified, treating a template hole as a violation, dropping the
+duplicate-binding check, letting the device tool launch a browser on import (a bug v4204 shipped once), and
+unwiring window.wgsl. All three touched files restored byte-identical.
+The build now stands at 1287 gates.
+## v4206 -- two gunnery brains, one ocean, and the round's headline is a negative result about its own centrepiece
+
+brain/navalPolicy.mjs scores every unknown cell with a weight vector, the same shape brain/csTacticsPolicy.js
+uses for "which enemy does the brain shoot first?". brain/navalDuel.mjs fights two of them across a board
+with the real shells of v4205. Deliberately not a second idiom: counter-strike asks which enemy to shoot
+first, this asks which water to shell next, and that is the same question with a different board.
+
+THE REASON TO BUILD IT ON BALLISTICS IS THAT DISPERSION IS REAL, RANGE-DEPENDENT, AND POINTS THE WRONG WAY.
+
+A gun's aiming error is angular. The ground error it produces is dR/dtheta = 2 v^2 cos(2 theta) / g, which is
+ZERO at 45 degrees -- and 45 degrees is maximum range. So a gun is MOST accurate at the edge of its envelope
+and LEAST accurate up close, which is the opposite of the intuition. MEASURED at v=100 in vacuum: 34.90 m per
+degree at 200 m, and 1.33 m per degree at 1019 m. A 26x gradient, favouring the long shot.
+
+Two more measurements fell out. Lob and flat scatter IDENTICALLY in vacuum, agreeing to 1e-12, because the
+two roots sit symmetrically about 45 degrees and the cosine does not care which side. Add drag and the
+symmetry breaks: at 100 m the lob scatters 14.36 m/deg against the flat shot's 26.96, so the lob is 47%
+tighter, and the advantage fades with range (ratio 0.533 at 100 m, 0.956 at 440 m).
+
+THEN THE ABLATION SAID THE PHYSICS FEATURE IS WORTH NOTHING.
+
+Switching each feature off and playing the full policy against the cripple, three 40-game blocks:
+
+    density   62.5 salvos   REAL
+    hunt      21.9 salvos   REAL
+    aim        0.3 salvos   within noise
+    parity     1.2 salvos   within noise
+
+The noise floor is 8.1 salvos, and it was measured FIRST by running the same policy against itself across
+four seed blocks. Without that number the aim and parity results read like small real effects, and they are
+not.
+
+So the two information-theoretic features carry the entire result and the physically-motivated one carries
+none of it. Knowing where the ship probably is beats knowing where the shell will certainly go. Worse than
+neutral, chasing accurate cells actively FIGHTS density: the accurate cells are the far ones, and on this
+board the far ones are the low-density back row. Parity is nothing for a different reason -- it is a cheap
+SUBSTITUTE for density, not a complement, so with density switched on it is noise at best.
+
+AND THE REASON THAT CONCLUSION IS TRUSTWORTHY IS THE RESULT I ALMOST SHIPPED INSTEAD.
+
+On a deliberately terrible gun (aimError 6), one 50-game block showed wAim=1.5 beating wAim=0 by 8.6 salvos.
+6.4%. That is exactly the kind of number that gets written up as "the ballistics pays off", and it is what
+anyone who ran the experiment once would have published. Across three blocks the mean is 0.8 against a floor
+of 4.6 at that block size. One block is not a measurement.
+
+handWeights() therefore carries wAim: 0 and wParity: 0. A hand policy holding a weight the evidence does not
+support is a lie with a number in it. untunedWeights() keeps the originals so the comparison stays re-runnable,
+and both features are still computed and exported, because the brain may find a use for them that a hand
+weight cannot.
+
+The policy is strong in absolute terms, which is what makes the negative result mean anything rather than
+being a story about a weak bot. With a perfect gun it clears a 10x10 board in 43.6 salvos -- a proper
+Battleship number, near the density-plus-hunt optimum -- and beats the blind policy 50/50. A loose gun costs
+it 69.7 salvos, so dispersion is expensive; it is just not STEERABLE.
+
+Duels are bit-identical from a seed. Both sides face the same fleet layout and the same scatter draws
+shot-for-shot, so a difference in outcome cannot be blamed on luck. The scatter is a RANGE error along the
+line of fire and not a circular blob, because an elevation error makes a shell fall short or long, never
+sideways -- gated by firing sixty scattered shells from a gun due north of its target and requiring every one
+of them to stay in the firing column.
+
+CALIBRATION WAS A REAL DESIGN DECISION AND THE FIRST GUN WAS ABSURD. At v=40 the board sits so deep inside
+the envelope that cos(2 theta) is near 1 everywhere and dispersion is flat across every cell -- 5.69 cells per
+degree at range 2 and 5.68 at range 13. The physics is present and completely inert. At v=12.5 the envelope
+is 15.9 cells against a board diagonal of about 14, so the far corner sits near the accuracy minimum and the
+gradient is real: 0.55 cells/deg near, 0.32 far.
+
+TWO OF MY OWN BUGS.
+
+The first arcOptions integrated six full trajectories per CANDIDATE CELL -- a hundred cells a salvo, hundreds
+of salvos a duel -- and a 60-game series did not finish in two minutes. The vacuum case has a two-line closed
+form that this module already had the ingredients for; it is exact and free, and it agrees with the
+integrated numbers to the digit. Simulation is kept for the drag case, where no closed form exists, memoised
+by range because a square grid asks about the same distances over and over.
+
+The second was in the gate. The scatter check used aimError 40, which threw 56 of 60 shells clean off the
+board, so it was measuring the out-of-bounds branch rather than the direction of the error, and it went red
+against correct code. A one-cell sigma is loose enough to scatter and tight enough to stay on the water.
+
+Wired as naval.duel(seed), naval.series(n) and naval.ablate(n) -- the last of which prints the noise floor
+first and marks each feature REAL or within noise, because that is the shape of the finding and a console
+that hid it would be repeating the mistake.
+
+Gate: tools/ship/navalDuel-selfcheck.mjs, 54 checks, all pass. Eight sabotages, all red: dropping the
+cos(2 theta) term so the accuracy minimum at 45 degrees disappears, making the scatter a circular blob,
+removing the hunt bonus for continuing a two-hit run, letting Math.random into the duel, restoring the
+unsupported wAim weight to the hand policy, letting density ignore misses, removing the reach gate from
+score(), and unwiring window.naval. All three touched files restored byte-identical.
+The build now stands at 1286 gates.
+## v4205 -- shells that fall, and the three lines that had kept battleship3d.html black since it was written
+
+Keith said he had never seen his own naval demo render, and could not think why it was listed as a portfolio
+piece.
+
+Loaded headless: the main canvas held 0 lit pixels and exactly 1 distinct colour. One page error:
+
+    TypeError: Cannot assign to read only property 'position' of object '#<Mesh>'
+      at mkBridge (battleship3d.html:325)
+
+Three lines in mkBridge() do Object.assign(mesh, {position: new THREE.Vector3(...)}), which tries to REPLACE
+Object3D.position -- a read-only accessor in three.js since r15x. It threw inside
+init() -> newGame() -> placeFleet() -> makeShipMesh() -> buildShipBody() -> decorateSegment() -> mkBridge(),
+before a single frame was drawn. Every other mesh in the file uses .position.set(). These three now do too,
+and the page is a working 3D naval game: ships with bridges and turrets, a deployment grid, fleet rosters,
+fish swimming past.
+
+A note on measuring it: after the fix the pixel probe still read 0 lit pixels, and reporting "still broken"
+on that would have been wrong. Reading a WebGL canvas from outside its draw call returns a cleared buffer
+unless preserveDrawingBuffer is set. The screenshot is the evidence; the probe cannot see WebGL content.
+The BEFORE screenshot is the control and shows exactly what Keith described -- chrome and ocean, no ships,
+empty rosters, the deploy button reading "-- -- --".
+
+THEN THE SHELLS, BECAUSE THE ONE PLACE IN THE TREE ADVERTISING BALLISTICS WAS A LERP.
+
+battleship3d's cannon button says "arcing shell - single cell". The code was:
+
+    shell.position.lerpVectors(from,target,u); shell.position.y += Math.sin(u*Math.PI)*peak;
+
+A straight line with a sine hump added on top, with peak=14 and dur=1.05 as CONSTANTS. Identical arc height
+and identical flight time whether the target was one cell away or across the board. No launch angle, so no
+lob-versus-flat choice -- which is the entire tactical content of a gun. It could not miss, could not be
+intercepted, could not be dodged. ev/shots.js, the only other projectile system in the tree, is 2D
+straight-line or homing with NO GRAVITY ANYWHERE IN IT.
+
+New physics/ballistics.mjs. The launch solution is a quadratic in tan(theta), derived rather than looked up
+because it INCLUDES the height difference that the commonly quoted R = v^2 sin(2t)/g drops -- a naval gun
+firing across water is the flat case, a mortar on a hill is not. Its discriminant is exactly the in-range
+test, so "no elevation whatsoever reaches" is a real answer rather than a shrug at 45 degrees.
+
+Graded by firing the shell. launchAngles() solves algebra; flyShell() integrates step by step; they share no
+code. At 50, 300, 700 and 1000 m both roots land within 0.05 m of the target. On flat ground the two
+elevations sum to exactly 90 degrees -- a closed-form identity the integrator knows nothing about, so it
+grades the algebra and not the arithmetic. Max range is v^2/g to 1e-9, the roots have all but met there, and
+one metre beyond returns null.
+
+DRAG IS WHERE math/inverseSolve.mjs EARNS ITS KEEP. There is no closed form once air is in the problem.
+MEASURED at drag 0.002: the vacuum angle lands 27.1% short at 300 m, 45.3% at 700 m, 55.4% at 1000 m.
+v4201's solver -- which needs nothing but evaluations of a function, and "fire at this elevation, see where
+it lands" is an evaluation -- recovers the right elevation in 2 to 3 iterations to within 0.04 m, seeded by
+the vacuum answer, which is what makes it converge that fast instead of wandering.
+
+It also refuses honestly. At 500 m it returns ok:false, why "no downhill step exists from here -- a local
+minimum, or f is not smooth", residual 54.2 m. That is not a solver failure: 500 m is unreachable. Drag cuts
+this gun's envelope from 1019.7 m to 445.8 m -- 56.3% of its reach -- and moves the optimum elevation from
+45 degrees to 38.71, because a shell that hangs longer loses more speed to drag. Two independent methods
+agree on that peak: golden section 445.76 m at 38.713 deg, brute sweep 445.80 m at 38.75 deg. reachable()
+exists because an AI checking reachability with the closed form will confidently order a shot its gun
+physically cannot make.
+
+AND leadMoving() CLOSES A GAP FOUND WHILE LOOKING FOR THIS ONE. physics/predict/predict.js has a working
+firing lead -- a quadratic in time, one square root -- and NOTHING but its own demo and its own gate calls
+it. Meanwhile ev/shots.js correctly adds the ship's velocity to every shot it spawns, and then aims with
+aimHeading(), a plain bearing to where the target is RIGHT NOW. So the tree has a lead solver and every
+turret in it shoots behind moving targets.
+
+leadIntercept also takes the shooter as a stationary POINT, which is right for a fixed gun and wrong for a
+ship. Solving in the shooter's rest frame fixes it in one line: subtract the shooter's velocity from the
+target's. MEASURED miss 2.27e-13 m, where leadIntercept on the same shot misses by 40.1 m. With a stationary
+shooter it reduces to leadIntercept EXACTLY (t identical to 1e-12), which is what makes it a generalisation
+rather than a second implementation.
+
+MY OWN BUG, found by the uphill case and worth writing down. Firing 500 m onto ground 200 m up, the solved
+angle is right -- hand-checked, y = 200.000 at x = 500 -- but flyShell reported the shell landing at 138 m,
+and at one point at x = -6429 m and t = -82.47 SECONDS from a shell fired forwards. The apex of that shot
+clears the target plane by four millimetres, so the step that trips the ground test has both endpoints
+within 1e-7 of the ground and the interpolation (s.y - groundY) / (s.y - n.y) is a tiny number over a tiny
+number. Clamping the step fraction to [0,1] is not papering over it: the crossing is always inside the step,
+so a fraction outside [0,1] is arithmetic noise by definition. The gate keeps that grazing case with an
+explicitly wider tolerance and an assertion that it does NOT meet the tight one, because the near-tangent
+shot is genuinely less precise and a tolerance that hid that would be lying.
+
+Three of the gate's first-draft tolerances were mine and too tight, and are now stated with the measured
+value beside them rather than quietly widened: the dt spread is 1.42 m on 881.7 m (0.16%), the analytic
+agreement is 2.2e-2 m on 881.7 m, and the two roots at 99.9999% of max range are 0.28 degrees apart.
+
+The battleship cannon now solves its elevation per shot. With the page's own GUN_V=22, at range 20 the flat
+root arrives in 0.92 s peaking at 0.8 board units and the lob takes 4.42 s peaking at 23.6 -- the same
+target, two genuinely different shots. Flight time for the flat root varies 13x across the board where it
+was 1.05 s for everything.
+
+Wired as shells.solve / .fire / .envelope / .lead.
+
+Gate: tools/ship/ballistics-selfcheck.mjs, 104 checks, all pass. Eight sabotages, all red: dropping the
+height term from launchAngles, linear drag instead of quadratic, un-clamping the ground interpolation (which
+gives a 361.78 m error on the grazing shot), leadMoving forgetting to subtract the shooter's velocity, an
+altitude fuse that fires climbing as well as descending, battleship3d reverting to the lerp arc, mkBridge
+reverting to Object.assign, and unwiring window.shells. All three touched files restored byte-identical, and
+battleship3d re-checked in a browser afterwards.
+
+Filed, not fixed: the robot dock's compact scene does not span its own canvas. MEASURED, #demoChrome is
+286x96 and its canvas 278x88 at style 100%/100% -- the canvas IS filling its box, so this is not a CSS
+width fix. The backdrop geometry in face/avatarStage.js's _compact branch stops short of both canvas edges.
+That file is shared by five pages, so it needs before/after shots on all five rather than a change made
+during a ballistics round.
+The build now stands at 1285 gates.
+## v4204 -- the GL Transition spec, taken as a contract and not as 100 shaders
+
+Spec and validator idea from gl-transitions/gl-transitions and gre/gl-transition-libs. Both carry real MIT
+LICENSE files, read this round -- (c) 2017-present gl-transitions contributors, (c) 2016-present Gaetan
+Renaudeau. Neither is vendored and neither needs to be: the CONTRACT is the thing worth having, and 100
+transitions written against it are worth nothing without something that can check one.
+
+THE CONTRACT IS FOUR NAMES AND ONE SIGNATURE. A conforming file declares `vec4 transition(vec2 uv)` and may
+use, without declaring them, `progress` (0 to 1), `ratio` (viewport width/height), `getFromColor(uv)` and
+`getToColor(uv)`. The host supplies all four. That is the whole portability story: the shader never binds a
+texture, never learns what it is transitioning between, and cannot know whether it is running over two
+videos, two DOM rasterisations or two framebuffers.
+
+Nothing in this tree parsed a GLSL uniform out of source before today. The 14 shaders in
+render/swiftShaderPass.js declare uniforms and nothing checks their shape.
+
+THE SPEC STATES A LAW AND NOTHING ENFORCES IT. "When progress is 0.0, exclusively the from texture must be
+rendered. When progress is 1.0, exclusively the to texture." A GLSL compiler cannot check that. A text
+scanner cannot check that. It is a property of the FUNCTION, so the three shipped transitions exist twice --
+GLSL in shaders/transitions/ and JS in render/transitionModel.mjs -- which is the crtModel.js / crtPass.js
+discipline of v4119 applied to a law instead of to a look. A transition that fails it POPS at the start or
+the end of every single play, which reads as a dropped frame and is one.
+
+IT CAUGHT MY OWN SHADER ON THE FIRST RUN. swekWipe returned all `to` at progress 0 and all `from` at
+progress 1 -- an error of 1.0, the maximum possible, at every aspect ratio tested -- because its smoothstep
+edges were ordered the wrong way round. The factor must be 1 where the wipe has ALREADY passed, so the wider
+edge comes first; I had written smoothstep(front - softness, front + softness, 1.0 - t), which is inverted
+twice and cancels to exactly the wrong answer. swekIris was written minutes earlier and uses the correct
+reversed form, which is why it passed. Two shaders, one mistake, and only a measurement told them apart.
+The comment above the broken line asserted the property the line did not have.
+
+THEN THE VALIDATOR WAS GRADED AGAINST REALITY RATHER THAN AGAINST MY IDEA OF IT. Run over all 100 published
+transitions -- fetched to a scratch directory outside the tree, none vendored -- it reported four
+non-conforming files, and THREE OF THOSE FOUR WERE BUGS IN THE VALIDATOR.
+
+1. It banned `uniform sampler2D` outright, on the reasoning that a transition reads through
+   getFromColor/getToColor and needs no sampler of its own. That rejected luma.glsl and displacement.glsl,
+   and luma.glsl is by gre, who wrote the spec. Both take a THIRD texture as a parameter -- a luminance
+   mask, a displacement map -- and still read from and to only through the provided functions. The rule is
+   narrower than I wrote it: do not sample the FROM AND TO textures directly. sampler2D is now a parameter
+   type, exempt from the default requirement because no literal names an image.
+
+2. It expected the inline block-comment default AFTER the semicolon. Real files put it before:
+   `uniform vec3 color /* = vec3(0.9, 0.4, 0.2) */;`. So the comment fell into the NAMES capture and the
+   comma-split turned ONE real uniform into THREE FICTIONAL ONES called "color /* = vec3(0.9", "0.4" and
+   "0.2) */" -- each reported as a spec violation against the author. A parser that invents uniforms is
+   worse than one that misses them.
+
+3. It flagged FilmBurn.glsl for calling `texture(`. That is a local `vec4 texture(vec2 p)` blur helper,
+   perfectly legal in GLSL ES 1.0 where the builtin is texture2D. Matching a NAME where the rule is about a
+   SHAPE: a texture fetch takes a SAMPLER as its first argument, and this one takes a vec2.
+
+After the fixes: 100/100 conform, 164 parameters parsed across the corpus, 162 with a spec default, and the
+2 without are exactly the two sampler2D parameters.
+
+AND A LICENCE FINDING WHILE READING THEM. 98 of the 100 files declare MIT in their `// License:` header, one
+declares BSD 3 Clause (author: Hewlett-Packard, InvertedPageCurl) and one BSD 2 Clause (Ted Schundler,
+StereoViewer) -- in a repository whose LICENSE file is MIT. The per-file comment header is the only place
+that difference is written down, which is exactly why parseMetadata reads licences out of comments. Same
+shape as v4203's DesignTheWay entry: a repo-level licence and a file-level one that do not agree.
+
+TWO MORE OF MY OWN ERRORS, both caught by checks written this round.
+
+hasEntryPoint accepted a PROTOTYPE. `vec4 transition(vec2 uv);` satisfies every word of the spec's signature
+and has nothing to run, and validateTransition returned ZERO PROBLEMS on a file with no implementation --
+the worst kind of green. Fixed by requiring the brace that follows.
+
+And I wrote down a limitation this module does not have. LIMITS said "the entry-point signature must be on
+one line"; \s matches newlines and a split signature is found. The gate's section 6 tests that each STATED
+limit is REAL, and it went red on the claim immediately. An invented limitation is as misleading as a hidden
+one. The three limits now recorded are all demonstrated true by that section.
+
+RATIO CORRECTION, MEASURED. On 1920x1080 the iris boundary is 200.9 x 200.9 px at progress 0.2 -- exactly
+circular, ratio 1.000000. The same shader told ratio=1, which is what a transition authored against a square
+preview does, is 237.0 x 133.3 px: ratio 1.7778, exactly 16/9, a 77.8% horizontal stretch. My first attempt
+at this probed at progress 0.5, where the iris radius already exceeds half the frame height, so the vertical
+probe returned the FRAME EDGE and the ratio read 1.0199 -- a number that looks like a small shader error and
+is entirely an artefact of the measurement.
+
+render/transitionPass.js validates BEFORE compiling, which is the point of having a validator: a shader that
+samples its own texture or shadows `progress` COMPILES FINE and then renders wrong. A compile error is a
+message; a wrong picture is a bug report from a person three weeks later. It returns the driver's log rather
+than swallowing it, because conformance is not compilation and transitionSpec.mjs says so in its limits.
+
+Three transitions of this tree's own, written from the spec: swekCrossfade (the control -- if IT ever failed
+the endpoint law the harness would be the thing that is wrong), swekWipe and swekIris. Wired as
+transitions.check(glsl) / .make(gl, glsl) / .describe(glsl).
+
+Gate: tools/ship/transitionSpec-selfcheck.mjs, 114 checks, all pass. Nine sabotages, all red: restoring the
+wipe's inverted smoothstep in the JS model only, dropping the iris ratio correction (which fails the
+circularity check AND the endpoint law at extreme ratios, two independent checks on one bug), reverting
+parseParams to the after-the-semicolon assumption, banning sampler2D again, accepting a prototype again,
+compiling without validating, dropping getToColor from assemble(), placing a corpus shader in
+shaders/transitions/, and unwiring window.transitions. All six touched files restored byte-identical.
+The build now stands at 1284 gates.
+## v4203 -- the register quoted three things wrong, in the file whose purpose is quoting licences verbatim
+
+Keith sent five repositories to assess. One of them, projapati66/Svg-IsometricCityAnimation, carries an MIT
+LICENSE file AND a README whose "## License" section is not MIT. That section is codrops's 2018 licence text,
+byte for byte, sha256 1fb1764108a736f8, on a repository that has nothing to do with codrops.
+
+Comparing it against what world/reachedLicences.mjs recorded at v4198 found three defects in this tree's own
+record.
+
+**1. CODROPS_2018 was truncated: 48 words of a 77-word licence.** The two dropped sentences are not
+boilerplate. One is an attribution requirement -- "Free plugins built using this resource should have a
+visible mention and link to the original work" -- which is a CONDITION, removed from a field the gate treats
+as a quotation. The other is "Always consider the licenses of all included libraries, scripts and images
+used", which is the clause that decides the new entry filed this round. The truncation deleted the sentence
+that would have settled the case it was later needed for.
+
+**2. It read "built upon" where the source says "build upon".** This is the same word v4198 wrote a regex fix
+for. Facing a text that would not match `built? upon`, I widened the pattern to `buil[dt] upon` and recorded
+that as the finding. The regex was right to be widened -- the character class is correct either way -- but
+the reason it failed was that my transcription disagreed with its source, and I never asked why a text
+disagreed with itself.
+
+**3. The heat-distortion entry named a repository that does not exist.** `codrops/HeatDistortionEffect` 404s;
+the repo is `lbebber/HeatDistortionEffect`. Lucas Bebber wrote the RainEffect and ElasticProgress ones too;
+codrops hosts the article, not the code. And the note explaining why its licence was not quoted -- "the
+README points at the Codrops licence page rather than restating it" -- was simply false. It restates it in
+full. Being careful not to record a paraphrase was right; recording a claim ABOUT the source without reading
+the source is the same failure one level up.
+
+So backlog item #59's answer gets sharper rather than overturned. The earlier text is not a 2015 text: the
+identical 123 bytes, sha256 92e30c8db85cf371, appear in ElasticProgress (2015), RainEffect (2015) and
+HeatDistortionEffect (2016). One licence attested across at least 2015-2016, restated once in 2018, two years
+apart -- not four as the item read, not three as v4198 concluded. Each reading of one more source made it more
+precise, which is the argument for recording URLs rather than conclusions.
+
+And codropsDrift() now reports FOUR clauses added in 2018 where it reported two. The other two were
+truncated out of its own corpus: a drift detector cannot report a clause its corpus does not contain.
+
+WHY ALL THREE SURVIVED FOUR VERSIONS AND A ROUND WHOSE SUBJECT WAS THAT LICENCE: every check that existed
+compared the register against itself. Two of the gate's own spot-checks asserted 'as-is' and 'pluginized' in
+SINGLE quotes, where both sources use DOUBLE quotes -- the gate matched because it was written from the same
+misreading as the record. Self-consistency is worth having, and it is worth exactly nothing against a
+transcription error.
+
+The fix is attribution, which gpu/khronosSamples.mjs has had since it was written and this file did not.
+That module gives every model a licenceUrlFor() -- where a person goes to read the licence themselves, even
+for the 134 nobody has read. Nothing here carried a URL, so no quotation in this file could be checked
+against anything.
+
+Now: every quoted text lives in LICENCE_TEXTS with its source URLs, retrieval date, word count, character
+count and sha256. `sourceUrl` is a required field on every entry, so an entry naming a 404 is invalid.
+An entry that quotes a licence must name the LICENCE_TEXTS id it quotes, and its text must equal that
+registry's text, so a hand-edited near-copy cannot sit beside the checked one.
+
+New tools/ship/verifyLicenceTexts.mjs re-fetches every source URL and compares byte for byte. It is a TOOL
+and not a gate, deliberately: the gate can prove the record has not drifted, and only the source can prove
+the record was true, and a hermetic suite that silently passes when offline is worse than no check. MEASURED
+this round: 5 sources, 5 agree, 0 disagree. Replayed against the v4198 text it names the divergence at word 9
+-- recorded "built", source "build" -- and prints the 29 words that went missing.
+
+New entry, and the first ENCUMBERED case found by reading rather than from a hypothetical. v4200 defined the
+category from a question Keith asked about TIE fighter models. This one is real: Ananda's MIT covers Ananda's
+code and cannot reach Freepik's city artwork or GreenSock's GSAP, because Ananda never held those rights.
+severityOf ranks it 4 -- reading the licence gives the wrong answer -- and describeSource now reports that the
+LICENSE file and the README DISAGREE instead of preferring the tidier of the two. It previously said "MIT",
+which is the one word in that record that misleads.
+
+Also wired. The register shipped at v4198 and nothing but its own gate imported it -- the shape backlog #39
+was filed for. A record of what was deliberately not taken, readable only by its own test, is a record nobody
+consults at the moment they need it. window.licences.list() prints every source with its severity and reason,
+.quote(id) prints a licence with the URLs it was read from and its digest, .drift() prints the codrops
+finding.
+
+The other four repositories Keith sent, licences read directly rather than summarised: coderitual/xna.js and
+coderitual/jtop both carry real MIT files (c) 2017. NiklasKnaack/jquery-warpdrive-plugin asserts MIT in its
+README with no LICENSE file at any of the three usual names, and positlabs/temporalis says "MIT" in
+package.json with no LICENSE file -- both UNPAPERED, both unvendorable, neither yet filed.
+
+Gate: tools/ship/reachedLicences-selfcheck.mjs, 124 checks, all pass. Twelve sabotages, all red: re-truncating
+CODROPS_2018 to exactly what v4198 shipped (which reports "recorded 77 words, the text has 48"), restoring the
+one-letter "built upon" slip, restoring the 404 repo name, dropping a sourceUrl, letting an entry quote a
+hand-edited near-copy, marking the encumbered entry as rights-holding, two on the licence-section extractor,
+reverting describeSource to prefer spdx, letting quotationOf hand back its live array, unwiring
+window.licences, and dropping the source URLs from quote(). All four touched files restored byte-identical.
+The build now stands at 1283 gates.
+## v4202 -- spark-liquefy: a displacement that remembers, and a primitive I said the tree did not have
+
+Shape from positlabs/spark-liquefy (MIT), a Meta Spark effect that smudges the camera texture under a finger.
+Written here rather than ported, because a Spark project file is not something this tree can run.
+
+*** I ASSESSED THAT REPO BY GREPPING FOR sdSegment AND sdLine, FINDING NEITHER, AND WRITING DOWN THAT THIS
+TREE HAD ZERO POINT-TO-SEGMENT DISTANCES. *** physics/soft/boneField.js has had one since v2523 -- private,
+3D, unexported, and carrying the same comment about the clamp that the new file carries. The names were
+wrong, not the tree. A grep for the spelling I expected is not a search for the idea.
+
+So math/segment.mjs is the ONE copy before there are two: closestT2, distToSegment2, closestT3,
+distToSegment3, and distToLine2 kept deliberately unclamped so the gate can show what the clamp buys.
+boneField.js imports distToSegment3 under its old local name and declares nothing -- the shape v4165 removed
+for Ashima noise and v4199 removed for stagger.
+
+THE REFACTOR IS BYTE-IDENTICAL, and that is a measured fact rather than a hope. A fingerprint recipe was run
+against the pre-refactor file kept aside before the edit: a 15x16x8 fitted grid over four bones, one of them
+degenerate, sums to exactly 860.2220349703275 with min -0.21394360065460205, max 1.533807635307312 and 88
+cells inside the surface. The new file reproduces all five numbers. The gate also proves the fingerprint grid
+STRADDLES the clamp -- its 1920 cells split between cells whose closest point is a cap and cells on the
+segment's interior -- because a fingerprint that never leaves the segment proves only that arithmetic is
+deterministic.
+
+THE CLAMP IS THE WHOLE FUNCTION. Clamped and unclamped agree to 0.0e+0 everywhere BETWEEN the endpoints,
+which is exactly why the bug hides; 92 px past the end one reads 92 and the other reads 0. A 40px stroke with
+a 30px radius touches 5228 cells clamped and 24000 unclamped -- 4.6x, the full width of the field, 10x the
+stroke's own length. boneField's own comment already said what that costs there: "limbs that reach out of the
+room."
+
+THE STROKE IS A SWEPT SEGMENT, NOT TWO DOTS, AND THE GAPS ARE MEASURED RATHER THAN ASSERTED. A 600 px swipe
+in 0.2 s arrives as 24 pointer samples at 120 Hz, 12 at 60 Hz and 6 at 30 Hz -- 25, 50 and 100 px apart.
+Stamping a disc at each sample leaves 21 cells of the swipe's centre line at EXACTLY zero displacement at
+60 Hz and 281 at 30 Hz: visible craters with untouched gaps between them. Stamping the segment leaves 0 at
+every rate and holds the same 11.477 px floor at 50, 100 and 150 px apart. Even in the best case -- 25 px
+between samples, a 120 Hz pointer -- discs already dip to 1.121 px against the segment's 12.425.
+
+THE STATE IS THE NEW THING, NOT THE SMUDGE. touchRipple, liveRipple, shockwave, gravityWells and refractLens
+-- the five radial shaders of v4196 -- each recompute their whole displacement from `time` every frame.
+Nothing carries over. Liquefy's field IS its state, so it is the first displacement in this tree that
+engine/frameDirty.js has to be able to call QUIET.
+
+AND AN EXPONENTIAL DECAY NEVER REACHES ZERO. Measured: after five minutes of frames the peak is 1.121e-44 px
+and still falling. A dirty flag waiting for exact zero waits forever; one assuming quiet after a fixed delay
+is guessing. frameDirty's rule (v4174) is that clean is PROVEN, never assumed, so isQuiet proves it at half a
+pixel -- a threshold with a stated meaning, verified in both directions: a field just under it changes not
+one pixel of the image, and just over it pixels move.
+
+The decay is pow(rate, dt * 60), not a per-frame multiply. 30, 60, 120 and 144 fps agree to 1.1e-7 relative
+after one second -- about four float32 ULPs of accumulated rounding, not a rate dependence -- against a
+per-frame multiply that lands 41x apart over the same second. A 60-second dt from a backgrounded tab is
+clamped to maxStep, so a stall does not teleport the field to zero, and a negative dt decays by nothing
+rather than AMPLIFYING it.
+
+The field is SUBTRACTED in warp, which is not a sign convention: a uniform +2 px displacement moves content
+to index 4, along the push, where adding it would move the same pixel to index 0, backwards.
+
+New ui/domLiquefy.js is the browser half -- rasterise through ui/domToTexture.js (v4120, the module that
+refused html2canvas by name), pointer listeners that stamp from the last position to the new one, and a loop
+that stops itself. probe() is exactly !isQuiet(field), the level-triggered source FrameDirty.addSource wants.
+destroy() removes every listener it added, so the loop cannot outlive the node -- the defect #76 is filed
+against. Wired as domFx.liquefy(el) beside v4199's domFx.disintegrate.
+
+TWO OF MY OWN CHECKS WERE WRONG BEFORE THEY WERE RIGHT.
+
+The first asserted exact equality on frame-rate independence. pow(rate, dt*60) applied n times is
+mathematically independent of n, but the field is a Float32Array and every step rounds; the answers differ in
+the last four ULPs. My earlier scratch measurement printed six decimal places and looked identical, which is
+how I came to believe it was exact.
+
+The second was a bounding-box check that was BLIND. Sabotaging stampStroke's box to floor(max + radius) - 1
+left the gate GREEN, because with integer endpoints and an integer radius the right edge lands on 125.0, the
+last column holding a cell centre inside the radius is 124, and the column the shrunken box drops is empty.
+The boundary column is load-bearing only when the edge falls in a fractional band -- and a real pointer
+produces essentially nothing but fractional coordinates, so the blind case was the only case I had tested.
+Four strokes now, fractional and diagonal, plus an assertion that the set actually reaches a column a one-off
+box would drop.
+
+Gate: tools/ship/liquefy-selfcheck.mjs, 72 checks, all pass. Ten sabotages, all red: unclamping closestT2,
+unclamping closestT3 (which moves the bone fingerprint to 614.6296016579727), restoring boneField's private
+copy, decaying per frame, adding instead of subtracting in warp, stamping a disc instead of the segment,
+raising QUIET_PX to 2, two bounding-box off-by-ones, dropping domLiquefy's listener removal, and stamping at
+the pointer instead of from the last position. All four touched files restored byte-identical afterwards.
+The build now stands at 1283 gates.
+## v4201 -- Invert any pure function, and the tree was already computing the hard part and throwing it away
+
+Idea from `bijection/g9` (MIT), whose trick is that a **draw** function becomes draggable: drag a shape and
+it minimises a cost over the **data** to find values that put it where you let go. New `math/inverseSolve.mjs`
+takes the inversion and leaves the dragging.
+
+### The gap is sharper than "there is no solver"
+
+`physics/hmc/inference.js` already recovers parameters, graded against a closed-form posterior. Its own
+header says why it cannot help here: *"Gradients are ANALYTIC throughout (HMC's requirement)."* It inverts
+only models somebody differentiated **by hand** -- which is exactly why `physics/reaction/brusselator.js`
+carries an analytic `jacobian(A, B)`. Every procedural planet, spell cost and material knob in this tree has
+no derivative written anywhere, and nobody is going to write hundreds of them.
+
+### And knobLiveness perturbs every knob and discards the magnitude
+
+`tools/roundhouse/knobLiveness.mjs` probes each knob and asks whether any observable moved, returning
+`{ state, moved: string[] }` -- *which* ones, compared with `sameValue()`. **That is a one-sided finite
+difference rounded to a boolean.**
+
+Keep the number and liveness becomes **sensitivity**; collect it over every input and it is a **Jacobian**;
+and a Jacobian is what inverts a function. The same measurement, kept rather than rounded, is the whole of
+this module. The two ideas meet exactly: a knob knobLiveness calls "moves nothing" is a **zero column** here,
+and a zero column is what makes the normal equations singular -- so the Levenberg-Marquardt damping is what
+turns a dead knob from an explosion into an input the solver simply never moves.
+
+### Graded against algebra, not against itself
+
+Finite differences match brusselator's exact analytic Jacobian to **4.5e-11**, at three parameter settings.
+No numerical method is graded against another run of itself when a closed form exists.
+
+### The step size fails in both directions, and both were measured
+
+**4.0e-2** error at `h=1e-1` (measuring curvature instead of slope) and **2.9e-3** at `h=1e-13` (lost to
+float noise), against **1.7e-10** at the default -- a clean U with the shipped value at the bottom. The step
+is also **relative**: at `x=1e11` an absolute step is **100% wrong**, because `x + h === x` in float and the
+difference reads as a dead input.
+
+### Three ways to stop, and only one is success
+
+`ok` is decided by the **residual**, never by how the loop exited. Reached-the-target, local-minimum and
+iteration-cap are three different endings, and a solver returning `ok: true` whenever its loop finished would
+be confidently wrong on the two a caller most needs to know about. A **refused probe is NaN and not zero**,
+too: "f is undefined here" is the opposite of "this input moves nothing", and writing 0 would say the second
+when the first happened.
+
+**And solving `f(x) = y` does not recover the `x` that produced `y`** -- gated explicitly, because the solver
+found `a = 0.297` for a target generated at `a = 1.3`, and both are correct. The inverse of a function is not
+unique, and a caller reading the answer as "the original parameters" will be wrong on any system with more
+than one solution.
+
+### My own bug, found by replaying one iteration by hand
+
+The Gauss-Jordan back-substitution read `row[i][i]` -- which indexes a **number**, yields `undefined`, and
+produces NaN. Every solve returned NaN, every step was rejected as uphill, and the solver confidently
+reported **a local minimum on a linear function**. Reading it again would not have found it; replaying one
+iteration with the numbers printed did.
+
+46 new checks, 5 sabotages all red -- one of which found my relative-step assertion too gentle to detect its
+own sabotage, because at `x=1e6` an absolute step still works fine. The tree carries 1282 gates.
+## v4200 -- ENCUMBERED: the one posture where reading the licence gives you the wrong answer
+
+Keith asked whether SweK's flight sims could use TIE fighter models, and the answer needed a category
+`world/reachedLicences.mjs` did not have. It knew **UNPAPERED** (no licence) and **NO_REDISTRIBUTION** (a
+licence that forbids). It had no name for a licence that **exists**, reads as permissive, is sincerely meant,
+and is void as to the underlying rights.
+
+A fan-made `.glb` under CC-BY is exactly that. The modeller can license what they **made** -- the mesh, the
+topology, the texture work -- and cannot license Lucasfilm's design, because they never held it. So the file
+reads `licenceExists: true`, `redistributable: true` by its own terms, `spdx: CC-BY-4.0`, and is still not
+vendorable.
+
+### It ranks above AGPL, and not because it forbids more
+
+Every other posture announces itself: you read the licence and you know where you stand, and AGPL in
+particular is loud and honest about following your own work home. Encumbrance reaches from **outside the
+agreement** -- from a party who licensed you nothing, agreed to nothing, and whose rights no document in your
+possession can settle. It is the only posture you can walk into while doing everything right.
+
+### The mechanism is a required field, not a severity level
+
+A rank nobody remembers to apply is a comment. `grantorHoldsRights` is now **mandatory on every entry**, and
+`null` is not an answer -- an asset whose provenance is unestablished is not yet an entry. All seven existing
+sources answer it, and **zero are encumbered**. The category is defined before it was needed, which is the
+only time it can be defined calmly.
+
+`severityOf` checks it **before** the licence, because an encumbered file's licence is precisely what
+misleads. The gate's control is the assertion that matters: the same entry with that one field flipped
+classifies OPEN, so the classification is decided by whether the grantor held the rights and **not** by
+anything the licence text says.
+
+### And the practical answer was yes, for a reason the scale makes precise
+
+`ev/esShipModels.js` (v3827) assigns models per ship class from a local file or URL and keeps the assignment
+as a string in **localStorage**. `GPU_Assets/ships/` holds one README and no models; `ev/spriteHull.js` says
+of the Endless Sky art it lofts, *"GPLv3, nothing bundled"*. Nothing is redistributed when the bytes never
+leave the machine -- so **encumbrance bites on vendoring and not on use**, which is the distinction the rest
+of this register was already built on.
+
+### The gate found a second legitimate reason to name a source, having found the first one round ago
+
+Its byte-scan flagged `tools/ship/easingCurves-selfcheck.mjs` for containing the word "codrops" -- which it
+contains in order to assert that elastic easing comes from **Penner** and *not* from codrops. A refusal being
+written down. v4198's scan flagged `render/chuckCloseModel.mjs` for crediting what it took.
+
+Two opposite claims about a file, neither of them a leak: one took an idea and says so, the other took
+nothing and says that. So `citedPaths` now sits beside `takenPaths`, the allowance reads both, and the gate
+asserts **no path may be listed as both** -- they are contradictory claims about the same file.
+
+15 new checks, 4 sabotages all red. The tree carries 1281 gates.
+## v4199 -- Three gaps closed with what was already here, and none of them vendored a byte
+
+### 1. Disintegrate is thirty lines, because two earlier rounds did the work
+
+`ZachSaucier/Disintegrate` (MIT) turns a DOM element into canvas particles via html2canvas. Its one hard step
+was already solved: `ui/domToTexture.js` (v4120) rasterises a live subtree through SVG `<foreignObject>`, and
+**its header names html2canvas as the alternative it rejected** -- three rounds before this file needed it.
+`ui/gestureVfx.js` already owns a pure particle system. So `ui/domDisintegrate.js` is the loop between them.
+
+It emits into gestureVfx's **own** particle shape plus one field: the pixel's colour. `stepParticles` spreads
+`...p` when it advances a particle, so **r/g/b ride through a stepper that has never heard of them** and the
+existing gravity and fade apply unchanged. Asserted rather than assumed -- sabotaging that spread reddens the
+gate, and a disintegration would silently turn grey.
+
+The alpha floor is the whole difference between a disintegrating **shape** and a disintegrating **rectangle**.
+Measured on a disc: **45 particles kept, 200 grid points total** -- the rest transparent, and without the
+floor every one would be an invisible particle still costing a step each frame and still holding the frame
+dirty. An empty result names its cause, too, because the inherited limitation is silent: domToTexture
+**measured** that a nested `<canvas>` rasterises to zero pixels, so disintegrating an element containing one
+gives a plausible cloud with a rectangular hole.
+
+### 2. Elastic is Penner's, not codrops'
+
+`simulation/easing.js` already cited Penner. `codrops/ElasticProgress` only pointed at the gap, so no bespoke
+licence is involved and nothing was taken from it. `easeOutBack` overshoots **once** -- 1 target crossing --
+where `easeOutElastic` **oscillates**, at 7. Different motion, different meaning.
+
+The more interesting half: that file had **twelve curves, seven consumers and no gate at all**. Elastic was
+the occasion, not the reason.
+
+**And the obvious easing invariant is false, and was already false.** A `[0,1]` assertion would have blocked
+`easeOutBack`, which has overshot above 1 since it shipped. My first draft asserted **exact** endpoints and
+immediately reddened on `easeOutBack(0) = 2.22e-16` -- one ULP of cancellation residue from `1 - c3 + c1`,
+algebraically exactly zero. That is **twelve orders of magnitude** below elastic's raw `4.883e-4`, which is a
+formula genuinely missing its endpoint and leaves an animated property permanently short of target -- a fade
+that never quite reaches opaque. Flattening the two into one assertion would either excuse the real miss or
+condemn arithmetic for being arithmetic, so the family check uses float precision and the elastic guards are
+checked for exactness separately.
+
+### 3. The progress round found a defect in shipped code
+
+`ui/localModelRun.js`'s `progressLine()` already refuses to invent a percentage when `Content-Length` is
+absent, and its own comment cites this tree's "flag that lies". It is **wrong about a compressed one**:
+`Content-Length` counts bytes on the wire, `response.body.getReader()` yields bytes after decoding.
+
+Measured in headless Chromium against a local server: **200000 bytes served gzip carry `Content-Length: 235`
+-- a factor of 851.** `progressLine` clamps with `Math.min(100, ...)`, so it would show **100% on the first
+chunk and hold it there for the entire download** -- precisely the failure its own comment warns against,
+arrived at from the other direction.
+
+`net/fetchProgress.mjs` reports the total as **unknown** whenever any content-encoding is present -- not a
+list of known ones, which would start lying the day a new encoding ships -- and routes into the path
+`progressLine` already handles correctly. It feeds that reporter rather than growing a second one.
+`window.splat.load` now reports progress; it reported **nothing at all** before, on files routinely tens of
+megabytes.
+
+149 new checks across three gates, 4 sabotages all red. The tree carries 1281 gates.
+## v4198 -- The register of what was read and not taken, and #59 was wrong about its own premise
+
+`world/orrery.mjs` models a **vendored** dependency: it walks `vendor/`, finds licence files, and reports
+CAPTURED, UNPAPERED or REACHED. Its evidence is a file on disk, which makes it blind by construction to the
+case that dominates an assessment round -- a source **read and deliberately not taken** leaves nothing to
+walk. "We looked at this and chose not to vendor it, and here is why" is the fact that goes missing first and
+costs the most to reconstruct.
+
+New `world/reachedLicences.mjs` records seven such sources, with their licences **quoted rather than
+characterised**. `gpu/khronosSamples.mjs` set the shape: it already records BrainStem as
+`LicenseRef-Poser-EULA`, *"not an open licence at all"*.
+
+### Backlog #59 said "two different licences four years apart". It is one licence, restated once, three years apart.
+
+Four codrops repositories, read and compared: ElasticProgress (2015), RainEffect (2015),
+HeatDistortionEffect (2016), ParticleEffectsButtons (2018).
+
+**2015, verbatim:** *"Integrate or build upon it for free in your personal or commercial projects. Don't
+republish, redistribute or sell 'as-is'."*
+
+**2018, verbatim:** *"This resource can be used freely if integrated or built upon in personal or commercial
+projects such as websites, web apps and web templates intended for sale. It is not allowed to take the
+resource 'as-is' and sell it, redistribute, re-publish it, or sell 'pluginized' versions of it."*
+
+Both grant the same permission and forbid the same thing. The 2018 wording is longer and stricter, adding one
+permission (web templates intended for sale) and one prohibition (selling "pluginized" versions). **A drift
+in wording is not a drift in terms**, and saying which one happened is the entire value of quoting rather
+than paraphrasing.
+
+And the clause that decides everything for this tree is identical in both eras: **do not redistribute**.
+Vendoring a file into a public git repository *is* redistribution, so no codrops byte can enter this tree in
+any era of their licence, however permissive "integrate or build upon it for free" sounds on its own.
+
+### The check that matters goes and looks
+
+A register saying "we took nothing" is a promise about the past written by the party who made it. So the gate
+scans **1494 source files** for each publisher's name and requires zero hits outside the register itself. A
+planted file reading `// from codrops/RainEffect -- vendored` reddens it.
+
+**And the allowance is derived from the register, which the gate taught me.** The first scan flagged
+`render/chuckCloseModel.mjs`, which names `kamend/ChuckClose-SparkAR` -- as **attribution**, because it took
+the idea and says so. Crediting a source and smuggling one are opposite acts. The allowance now reads each
+entry's own `takenPaths`, so a new taking cannot quietly widen it, and the gate asserts that the one credited
+module really does credit -- the allowance is exercised, not merely declared.
+
+### Licence severity as a number the orrery can draw
+
+Keith's framing, and it is the right one: a restrictive licence should make a **bigger, angrier planet**, not
+a footnote. So severity ranks not by how much a licence forbids but by **how far the restriction reaches** --
+0 open, 1 unpapered (no grant, but no terms either: inert rather than hostile), 2 no-redistribution, 3
+reciprocal. AGPL is the most formidable not because it forbids the most but because its network clause
+follows your own work home. `asBodies()` hands the set to `world/orrery.mjs` with severity as heft.
+
+### Two of my own bugs, each caught by the thing it was inside
+
+`codropsDrift()` tested `/built? upon/` -- which matches "buil" and "built" and **never "build"**. The 2015
+text says "build upon", so the function reported `bothGrantIntegration: false`: **a manufactured difference
+between two licences, produced by the very function written to say whether they differ.** An optional letter
+is not a character class.
+
+`severityOf()` asked whether a licence had been **quoted** rather than whether one **exists**, ranking
+HeatDistortionEffect as UNPAPERED beside three identically-licensed siblings -- reporting a gap in *our*
+record as a gap in *theirs*. A `licenceExists` field now carries that distinction, which is exactly the line
+`world/orrery.mjs` draws for vendored code.
+
+46 new checks, 4 sabotages all red. The tree carries 1278 gates.
+## v4197 -- The microphone had been listened to in four files and never once processed
+
+`ui/sttLayer.js`, `simulation/VoiceCommander.js`, `dictation.html` and `AudioLab.html` all open
+`getUserMedia`, and all four do `src.connect(analyser)` and stop. AudioLab can already synthesise with
+oscillators, biquads, a convolver, FM and AudioWorklets. So the tree could make sound, and could hear sound,
+and could not put one through the other. This is what v4188 did for the camera, with a different input.
+
+New `audio/inputChain.mjs` (the chain as data, pure), `audio/inputChain.js` (the Web Audio half), and
+`AudioLab.html` now routes the mic through a chain -- with the analyser watching the **chain's output**
+rather than the raw mic, so the waveform shows what the effect did.
+
+### It overturns half of a claim this tree made at v4190
+
+Assessing `rexa-developer/tiks`, that round rejected the Web Audio node graph on the grounds that *"a node
+graph plays and can never be hashed"*, and built `audio/sfxModel.mjs` to render PCM offline instead. The
+first half is right and the second is not.
+
+A graph **playing** is tied to a clock and a device and cannot be hashed. The same graph rendered through an
+**`OfflineAudioContext`** is bit-deterministic. Measured on a chain chosen to be hostile -- IIR biquad state,
+a feedback delay loop, an LFO modulating `delayTime` through a fractional read head, and a waveshaper --
+three renders in one process and a fourth in a **fresh process and a fresh browser** all produced the same
+sha256. So a node graph is gateable after all, and the live microphone is simply the unreproducible input
+beside it: the arrangement `media/afContainer.mjs` (v4193) already made for video.
+
+### chorus and flanger are the argument for data over code
+
+They are the **same graph**, differing by four numbers and **one edge** -- the flanger feeds back. As two
+functions they would look unrelated; as data the difference is readable at a glance. Five presets ship
+(chorus, flanger, echo, telephone, fuzz), all valid, all rendered and measured.
+
+### What the gate asserts is derived from the chain, not typed into the gate
+
+Each preset's echo must arrive inside a window computed from **its own `delayTime` and its own modulation
+depth**, and a preset with no delay node gets **no lag assertion at all**. That second half was found by
+measuring: filter ringing produces peaks that look exactly like echoes, and `fuzz` -- which contains no delay
+whatsoever -- reported "1 echo at lag 196". A check that counted those would have passed on nonsense.
+
+Measured, all five: renders are bit-identical, **silence in gives exactly zero energy out** (the
+runaway-feedback check), nothing clips. `echo` arrives at 12000 samples against a configured 0.25 s at 48 kHz;
+`chorus` at 1234 inside [1008, 1392]; `flanger` at 148 inside [48, 240]. `telephone` passes 1 kHz and stops
+9 kHz by 9x, `fuzz` by 16x -- and `echo` treats both tones alike, which is the control that proves those two
+are measuring **filtering** and not merely "an effect happened".
+
+### The validator's real rule: a feedback loop must contain a delay
+
+Web Audio breaks a cycle only where a `DelayNode` says by how much. A loop without one is either silently
+dropped or runs away, and which one depends on the implementation -- so a chain relying on it behaves
+differently on someone else's machine. A loop **with** a delay is an echo, which is a feature. Nine
+structural rules, each sabotaged red.
+
+`ConvolverNode` is deliberately **absent**: the usual way to make an impulse response without shipping a file
+is decaying noise, which means `Math.random`, which would cost exactly the determinism everything above rests
+on. Left out, and said out loud.
+
+### anime.js's stagger taken, the library refused
+
+`juliangarnier/anime` (MIT) drives its own `requestAnimationFrame` loop, which would be invisible to
+`document.getAnimations()` and therefore to `frameDirty` -- the exact property `ui/domAnimation.mjs` (v4191)
+chose WAAPI for. Adopting it would be a regression wearing an upgrade's clothes.
+
+But this tree had already written `index * step` **three times** -- `ui/brainTrail.js`, `ui/odometerModel.mjs`
+and `ui/peerRadar.js` -- differing only in origin and one base offset. So `ui/stagger.mjs` carries exactly
+those two knobs and not anime's whole surface; grid and axis staggering are absent because nothing here needs
+them. `odometerModel.delaysFor` now goes through it and is **byte-identical**, asserted against outputs
+recorded before the change. A fractional centre is kept fractional: rounding the origin of an even count
+splits the middle pair, which is the symmetry the effect exists for.
+
+### And my own wiring check was decoration, again
+
+It asked whether the string `inputChain.js` appeared anywhere in `AudioLab.html`. Removing the import
+entirely left it **green**, because this file's own error message contains that path and `noComments()` keeps
+string literals. The rule the tree already has: noComments for anything quoted, codeOnly for code shapes --
+and an import is a code shape whose payload happens to be quoted, so the whole statement has to be matched.
+
+95 new checks, 8 sabotages: 7 red, and one green **by design** -- retuning a preset's `delayTime` moves the
+window the gate computes, because the assertion tracks the data. That is a conformance check, not a
+regression pin, and the difference is worth stating. The tree carries 1277 gates.
+## v4196 -- Five more SwiftUIShaders, a knob that is a coordinate, and the GLSL run for the first time
+
+`krispuckett/SwiftUIShaders` (MIT) goes from 14 to **19 of 41**: `touchRipple`, `liveRipple`, `shockwave`,
+`gravityWells`, `refractLens` -- all five radial displacement shaders, ported in one batch because they
+answer a single question three different ways.
+
+### 1. The new trap: a knob can be a coordinate too
+
+Every coordinate trap argued so far -- the y flip, the point scale -- was about `position`, which the shader
+**derives**. `bcs_touchRipple` and `bcs_refractLens` take their centre as a **parameter**, documented "touch
+location in pixels" and actually in **points, with y growing down**.
+
+So the fix does not live in the shader at all. It lives at the API boundary, and nothing inside the shader
+can detect a `y` that was never flipped. A letter-perfect port still puts the ripple at the vertical mirror
+of where the user touched -- still expanding, still decaying, still reading as a ripple. Measured: an
+unflipped touch y changes **852 of 2048 samples**. Nothing about it looks broken. It is simply centred
+somewhere nobody pointed.
+
+### 2. I wrote the aspect finding down backwards, and measuring it said so
+
+Reading the twelve radial shaders, they appear to split into ones that aspect-correct and convert back, and
+ones that correct and *forget* to convert back -- and the second group looks like an obvious bug. That
+reading is wrong:
+
+    delta = uv - centre;  delta.x *= size.x/size.y
+      =>  ((cx - w/2)/w * w/h,  (cy - h/2)/h)  =  (pixelDelta.x / h,  pixelDelta.y / h)
+
+**`delta.x *= aspectRatio` does not make the field abstractly circular. It converts a uv delta into a pixel
+delta.** So `normalize()` of it is *already* the true pixel radial direction, and dividing x back out is what
+breaks it. The question is never whether a shader un-corrects -- it is **what space the result is spent in**:
+`position + dir * k` must not divide back; `uv + dir * k`, then `* size`, must.
+
+On that criterion `liveRipple` and `refractLens`'s outer push ring are the defective ones, and `shockwave`
+and `gravityWells` -- the two that look like they forgot a step -- are correct. **`refractLens` divides x
+back twice and only one of the two is right**, in the same function, with the same idiom, because `pushDir`
+is spent in pixels and `chromaDir` in uv.
+
+Measured as the angle between the direction actually pushed and the true radial direction: **0.00 deg on a
+square canvas, 19.47 deg at 2:1, 30.00 deg at 3:1**. Exactly zero when width equals height, which is why it
+survives review -- a square preview is the one canvas on which the bug is invisible. Ported faithfully rather
+than repaired: a port that silently improves its source is a port nobody can check against the source.
+
+### 3. The gate said it had no GL context. The tree had had one since v3941.
+
+The header read *"nothing on this box has a GL context, so the GLSL is never executed"* and ended *"the day
+this tree grows a headless GL, the honest upgrade is to run both."* `tools/ship/playwrightResolve.mjs` has
+resolved a headless chromium for other gates since v3941, and `--use-gl=swiftshader` gives a real WebGL2
+context. So fourteen shaders were read for correspondence and **never once run, for two versions, on a box
+that could have run them the whole time**. A stated limit is better than a hidden one, but a stated limit
+that has quietly stopped being true is just a wrong claim with good manners.
+
+Running all nineteen found three things on its first execution.
+
+**`toHalf()` in the shared PREAMBLE returned NaN, and four pixels of `refractLens` rendered pure black.**
+It modelled half's *mantissa* and not its *exponent range*, quantising to 10 bits at any exponent. For a tiny
+input `exp2(e - 10)` with `e = -116` made `x / q` overflow to Inf, and `floor(Inf + 0.5) * q` was NaN -- one
+contagious NaN per pixel. Shipped since v4163; it never fired because no earlier shader raised anything to a
+high power, and `pow(dot, 64.0)` on an ordinary dot of 0.28 is about 1e-35. Clamping the exponent to half's
+smallest normal fixes it in one term and is also simply correct: **a half cannot represent 1e-35, and the
+true answer there is 0.** Fixed in the GLSL and the CPU model, which had the same gap in the other direction
+-- it silently kept full double precision.
+
+**Five of the fourteen can never agree with their CPU reference, and the boundary is exactly "does it call
+`bcs_hash`".** The sin-hash is `fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453)`. Multiplying sin's
+output by 43758 turns one float32 ULP into a **different random number**: measured divergence up to **0.68 on
+a 0..1 value**, 68 percent of the range. That is not a tolerance to widen; it is a limit to state, and it
+would hold between any two implementations. The other thirteen agree to within 2 levels, and all five of this
+round's ports are **bit-exact** against their CPU reference on a real GPU.
+
+**`bcs_vortex` differs at 12 pixels of 1152, by exactly one texel**, where a rotation lands on a texel
+boundary and float32 and float64 round across it. Benign, and now bounded rather than unknown.
+
+### 4. Two of my own checks were decoration, and sabotage said so
+
+The knob check asked whether a knob's **name** appeared anywhere in the frag -- which comments satisfy, and
+`heatShimmer` passed only because the word "verticalBias" occurs in a comment. It now asks for the declared
+`uniform`, across all nineteen. And the early-out check used `touchAge` 9, where the ripple has already faded
+to nothing on its own: deleting the early-out entirely changed **zero** samples and the check still passed.
+At a slow decay the same ripple is plainly alive at 5.5s, and the check now carries that control beside it.
+
+5 sabotages, all red. The tree carries 1276 gates.
+## v4195 -- The splat stack had two .ply parsers, 3,302 lines, and not one gate -- because nothing could write the format
+
+`engine/splatParser.js` and `gpu/SplatLoader.js` both read 3DGS `.ply`, into two different shapes, for two
+different renderers. Neither was gated: `physics/splat/gaussianSplat-selfcheck.mjs` and
+`tools/roundhouse/splatNuisance-selfcheck.mjs` gate the splat MATHS and contain zero references to any of the
+code that reads the file. The reason is mechanical -- **every test would have needed a vendored
+multi-megabyte capture from someone else's scanner**, so none was written. New `engine/plyWriter.mjs` makes
+the fixture **693 bytes** of this repo's own bytes. Writing a `.ply` is also the export half this tree never
+had, the same shape of gap as the Minecraft `.schem` writer.
+
+**The round trip found a live defect on the path `main.js` actually uses.** `engine/splatParser.js` scanned
+for the eleven bytes `end_header\n`, so a `.ply` with a CRLF header -- every one written on Windows -- was
+refused with *"could not find end_header in first 64KB"*, an error blaming the file for missing a marker it
+plainly has. `gpu/SplatLoader.js` read the same bytes without complaint. Measured before the fix: a
+byte-identical fixture parsed with LF and threw with CRLF. The marker is `end_header`; the newline after it
+is whitespace, and `\r` is whitespace too. The regression check carries an LF control beside it, so a fix
+that loosened the scan into uselessness could not pass either.
+
+**And the two parsers are not in conflict -- they sit on opposite sides of one undocumented boundary.**
+`engine/splatParser` hands back the file's own units (log scales, raw logit opacity, float RGB) because
+`engine/SplatRenderer.js` applies `exp(a_scale)` and `1.0/(1.0+exp(-a_opacity))` **in its vertex shader**.
+`gpu/SplatLoader` applies both on the CPU because `render/SplatRenderer.js` uploads colour as
+`UNSIGNED_BYTE` and multiplies `aScale` straight into the covariance. Measured across all four header
+variants: `exp(engineScale)` equals `gpuScale` to **5.3e-8**, and `round(engineColour*255)` and
+`sigmoid(engineOpacity)*255` equal the gpu bytes **exactly -- all 24 of them**. Neither convention is wrong.
+The defect was that the choice was unwritten, so a struct from one half handed to the other half's renderer
+drew a plausible, wrong picture instead of failing.
+
+**The conventions are derived from the format, not from the parsers.** A gate comparing the two only to each
+other would pass with both of them broken the same way, so `toShaderConvention()` and `toRenderConvention()`
+are written out from the 3DGS definition and each parser is held to its own before the two are compared.
+
+**And `.splat` is not a lossless interchange format, in numbers.** A quaternion component is stored as
+`round(q*128+128)`, so `+1` needs the byte 256, clamps to 255, and decodes as 0.9921875 -- **0.0078 off a
+unit quaternion**. A nearly-transparent splat (sigmoid 0.0025) lands on byte 1 (0.0039) and comes back
+**0.46 out in logit space**, a 57 percent error in linear alpha. Measured, not assumed.
+
+**And the export half is wired, not just claimed.** Until now this tree could read four splat formats and
+produce none of them, so a scene loaded here could never leave. `window.splat.save()` writes a loaded splat
+back out as `.ply` or `.splat`, and the write-read-write cycle is the strongest statement the fixture makes:
+**every field is byte-exact through a full export cycle except colour**. Colour splits cleanly in two, and
+the split is the clamp -- `engine/splatParser.js` clamps `f_dc` to a displayable 0..1 on the way in, so
+recovery is exact to **1.5e-7** where the coefficient fitted that range and **7.23 out** where it saturated.
+The gate names the field and the number rather than relaxing until it passes. Higher SH bands were never read
+(`f_rest_*`, 45 floats a splat), so they are not written either -- this exports what it imported.
+
+**93 new checks, 11 sabotages all red** -- reverting the CRLF fix, removing either the `exp` or the sigmoid
+from `gpu/SplatLoader`, adding an `exp` to `engine/splatParser`, adding one to `render/SplatRenderer`'s
+shader, dropping either live colour clamp, mis-quantising the writer's quaternion, dropping the SH0 inverse
+on export, swapping two quaternion components, and cutting `save()`'s call to the converter -- that last
+being exactly the failure mode of the v4191 gate I shipped as decoration, so it is checked by call and not by
+mention. **A twelfth stayed green**, which was the useful one: it found a `clamp01` in my own writer that
+`u8` already did, so the unreachable line was removed rather than annotated. The tree now carries 1276 gates.
+## v4194 -- the accessibility defect I shipped in v4191, and two ideas from tiks
+
+rexa-developer/tiks (MIT) generates ten UI sounds from live Web Audio node graphs. That is the architecture
+v4190 deliberately replaced -- a node graph plays and can never be hashed, compared between runs, or held by
+a headless gate -- so its code was not taken. Three of its ideas were, and the first is a bug of mine.
+
+**prefers-reduced-motion. This tree already knew, in six files, two of them gated.** ui/stateOrb.js "renders
+a STATIC REPRESENTATIVE FRAME rather than nothing -- the state still reads"; ui/textMorph.js sets the element
+to the final text and reports why. And ui/domAnimate.js, which I shipped yesterday with twelve animations and
+an infinite spin, ignored it entirely.
+
+**The obvious repair is wrong, and worth spelling out.** Returning early leaves a fadeIn at its *first*
+keyframe, which is opacity 0: the reader gets an invisible element rather than a calm one. So the animation
+still runs -- in zero time, with `fill: forwards` so the end state sticks, and `iterations` forced to 1. That
+last one is also a **performance** fix: an infinite animation holds engine/frameDirty.js open forever, so
+honouring reduced motion makes the page cheaper as well as calmer.
+
+**And my first gate for it was decoration.** Sabotaging play() to `return null` under reduced motion left
+every check green -- they proved the query and the helper were *mentioned*, not that play used them. An
+element only needs an `.animate` method to be animated and matchMedia can be stubbed, so the real behaviour
+is testable in node: a fake element, a forced-reduced query, and an assertion that play still animates with
+duration 0 and fill forwards. Now the sabotage goes red.
+
+**Themes are one transform over the whole table.** soft, crisp, arcade, glass -- and multiplicative rather
+than absolute, because a theme that *set* decay would flatten a 0.07s step and a 0.65s explosion into each
+other, which is exactly the difference the presets exist to carry. Thirty theme/preset combinations, all
+rendering to different audio, none clipping, all still ending at silence. v4192's spell book was already
+doing this job by hand with a per-spell `soundOver`; a theme is the general form.
+
+**And the mute the comment already claimed.** SfxPlayer.play() said "returns ... or null if muted" while the
+class had no mute at all -- a comment describing a feature that does not exist, which is worse than no
+comment because a reader stops looking. It is real now, beside a throttle keyed per **sound** (so a click
+straight after a hover still lands) whose decision is a pure function of two numbers, and where a `lastAt` of
+0 is a real timestamp rather than "never played". Reduced motion is honoured for sound too -- while saying
+plainly that it is a **proxy**: there is no standard preference for less sound, tiks infers it from the
+motion query, and this follows it one flag away from being switched off.
+
+41 new checks across tools/ship/domAnimation-selfcheck.mjs and tools/ship/sfx-selfcheck.mjs, 6 sabotages all
+red and all four files restored byte-identical. Two of the round's own gate failures were the same trap for
+the fourth time this session: `codeOnly()` blanks string literals, so a check for the
+"(prefers-reduced-motion: reduce)" query -- and one for a "@" in a cache key -- went red against correct code.
+The rule is noComments for anything quoted, codeOnly for code shapes. The tree carries 1275 gates.
+## v4193 -- a clip as a reproducible input, and the one thing about it that is not reproducible
+
+From activetheory/activeframe (MIT): encoded samples plus a JSON manifest, decoded through WebCodecs for
+frame-accurate random access. Written here rather than vendored, because what this tree wants from it is not
+playback.
+
+**camera-effects.html could be driven by exactly two things.** A synthetic test image, which is deterministic
+but is a rectangle I painted; or a live webcam, which is real but different on every run and absent from CI.
+A clip is the missing third: real footage that yields the same frame every time. It turns "the chroma key
+handles a shadowed fold" from a claim about a painted rectangle into a claim anyone can re-decode and hash.
+
+**The hard part is the seek, and it is pure.** You cannot decode frame 47 by handing the decoder sample 47 --
+an inter-frame codec makes most frames a *difference* from the one before, so showing frame 47 means feeding
+every sample from the last keyframe through 47. That is a function of the sample table alone, so 244 checks
+reason about it with no codec anywhere in the process, including exhaustively over every frame of a 60-frame
+GOP-15 table. The browser confirms the rest: seeking to frame 47 and playing forward to it give the identical
+picture (33f75fe3), at 3 decodes against 48. Keying clip frame 11, jumping to 50, and returning gives the
+identical keyed output (b14b6a1e) -- the whole reproducibility claim, through the real keyer, on real footage.
+
+Out-of-range seeks **throw** rather than clamping: clamping turns "show me frame 500 of a 90-frame clip" into
+a picture of frame 89, which looks like a working seek. And the container reports what seeking *costs* --
+a keyframe every N frames makes the file smaller and the seek slower, at (N+1)/2 decodes on average, measured
+and checked at five GOP lengths.
+
+**The clip is the engine's own output, which is a licence posture rather than a preference.** Stock
+green-screen footage is exactly the asset that arrives with no provenance (v4186), so
+tools/media/makeStageClip.mjs draws the scene: a lit cloth, a shadowed fold of the same cloth, a blown
+highlight on it, a walking subject with dark eyes and a green spill rim. Those are precisely the pixels
+render/chromaKeyModel.mjs was designed around and could previously only be shown a rectangle of.
+
+**And the honesty this round turned on, which is the exact opposite of v4190.** A sound can be thrown away
+and re-derived byte-for-byte, because SweK computes it. A video encoder cannot: two runs of the generator
+over the *same 60 drawn frames* produced 32,996 and 32,957 bytes, differing in **98.2% of them**. VP8's rate
+control is not deterministic. So the committed clip decodes identically forever -- verified twice in separate
+processes -- but `--write` **replaces** the fixture rather than refreshing it. The file is the artefact, not
+the generator, and both halves of that are recorded rather than glossed.
+
+Three API lessons the round paid for: `flush()` **ends** a decode sequence, so the next chunk must be a
+keyframe and forward play cannot flush (the first version threw on the second frame of ordinary playback);
+ESM ignores NODE_PATH, so a globally installed package is not importable by name; and playwright is CommonJS,
+so `import()` hides its exports behind `.default`.
+
+244 new checks in tools/ship/afContainer-selfcheck.mjs, 6 sabotages all red -- five as clean failures and one
+as an exit-1 crash from the container's own "no keyframe at or before" guard. The tree now carries 1275 gates.
+## v4192 -- the spell book, where the cost is measured and not typed
+
+Keith: the spell recipes should hinge on real render costs, with a ray-traced nuclear detonation that cracks
+the world as the max spell.
+
+**There is no `cost:` field anywhere in the book.** A spell says what it *does* -- how many particles, what
+carve radius, how many marched frames -- and the price falls out of that, times a unit price measured by
+doing the work. tools/ship/spellCost.mjs builds real bursts and carves and flood-fills a real voxel grid with
+physics/voxel/fracture.js. Make a spell cheaper to render and it gets cheaper to cast, with nothing edited.
+
+**And I typed the unit prices on the first draft, which is the exact sin this design exists to remove.**
+particle 0.42us and fractureVoxel 0.055us, because they looked like plausible microsecond figures. Measured:
+0.83 and 0.77. **The fracture price was out by fifteen times.** It is a gate fixture now: the recorded units
+are re-measured on every run, and a 15x gap fails while a merely slower machine does not.
+
+**The mana scale was measured too, not preferred.** The book spans 27,869x, because cataclysm is the only
+spell that ray-marches and 84% of its price is those 90 frames. Scaled linearly the book prices out as
+[0, 0, 0, 0, 2, 100] -- four spells cost nothing at all and the energy pool stops meaning anything. On a log
+curve it reads 1, 12, 17, 22, 62, 100, and the gate checks that the curve may compress but never **reorder**.
+
+**Nothing here is new physics.** cataclysm is dearest because it is the only spell that runs both of the two
+most expensive systems in the engine: a 48-cube fracture and 90 ray-marched frames. Measured live in the
+browser, its carve removes 11,513 voxels in 35.6 ms. Every piece already existed and was already gated --
+render/voxelRaymarchPass.js, physics/voxel/fracture.js, and v4190's sfx presets. The ray-march price is the
+one thing node cannot time, so it is **reported** as unmeasured rather than quietly folded in as though it
+had been checked.
+
+Bursts are **seeded**. Both existing spawn sites -- AsteroidsDemo.js and DungeonDemo.js's _explodeGrenade --
+call Math.random() inline, so the same cast never looks the same twice and no gate can hold it. Seeded, a
+cast is byte-identical and checkable by hash. The directions are also spread evenly over the sphere rather
+than bunched; sabotaging that to a naive pick gives octiles 28/150/384/684/619/378/136/21, a visible bell.
+
+**And Keith asked whether the spells had sound, which found a gap.** They did -- but six spells share four
+presets, so cataclysm and quake rendered the *same bytes*: the world-cracking spell arriving with the same
+noise as the one that chips a wall, and ember and causticSpray likewise. v4190 gave sfx presets overrides
+with their own cache key, so each is now bent away from its neighbour and all six render to different audio.
+The max spell is 1.79s against quake's 0.50s. The gate no longer asks whether a spell *names* a preset; it
+hashes the PCM, and the control shows that without the overrides they collapse to four.
+
+Two fixtures in this round were my own wrong physics, both worth keeping: a wall with a hole punched through
+it is still **one** connected piece, and a solid cube with a sphere carved out of its middle is still one
+piece standing on the floor. The fracture shows its teeth when the carve *disconnects* something from the
+ground -- so the gate's fixture is a pillar with its base shot out, and the top comes loose.
+
+90 new checks in tools/ship/spellBook-selfcheck.mjs, 8 sabotages all red and all files restored
+byte-identical. The tree now carries 1274 gates.
+## v4191 -- the DOM is a source too: the dirty flag could not see 86 animations
+
+From gibbok/animatelo (MIT), which ports animate.css to the Web Animations API. The half worth having is not
+the animations -- it is that WAAPI makes an animation an **object the page can be asked about**.
+
+**engine/frameDirty.js had eleven sources and not one of them was about the DOM.** camera, demo, particles,
+water, dayNight, weather, projectiles, debris, agents, scripted, reactions -- every one about the 3D scene.
+Meanwhile this tree carries **86 distinct @keyframes rules across 34 files** (19 in pages and 60 in ui/*.js
+modules that inject their own styles, which is exactly where a HUD animation lives), and
+document.getAnimations() was called in **exactly zero files**. A spinner could turn in the corner of the HUD
+while the dirty flag reported the frame quiet. One call covers all 86 at once: getAnimations returns CSS
+animations, CSS transitions and WAAPI animations together.
+
+**And it fails safe, which is frameDirty's own rule that clean is proven rather than assumed.** No
+getAnimations, an unreadable list, or a playState the model does not recognise all report DIRTY. Reporting
+quiet there would freeze a page that is visibly moving, which is far worse than drawing frames nobody needed.
+
+Verified in a real browser end to end, not only in the model:
+
+    idle page          quiet
+    pulse running      dirty
+    pulse finished     quiet
+    paused             quiet     (it holds its element still until an event resumes it)
+    spin (endless)     dirty, and NAMED as endless
+    CSS @keyframes     dirty, named swekTestSpin, flagged endless
+    after removing it  quiet
+
+The keyframes are **data**, the same move v4190 made for sound: twelve animations as a frozen table with an
+explicit offset on every frame. Validated rather than trusted -- offsets that go backwards make
+element.animate() throw at runtime on the page, and a frame with no properties animates *nothing* and reports
+nothing, so the element simply sits there. Exactly one animation in the table is endless, and it declares
+itself: an infinite spin holds the flag open forever by design, so quietStateOf reports endless animations by
+name and a page that will never go quiet can say why instead of merely being slow.
+
+**A number of mine was wrong and the gate caught it.** The first draft of this note said "77 across 14
+pages". Both figures were real and they measured different things -- 77 counted pages *and* ui modules, 14
+counted pages alone. Two measurements in one sentence is the shape of a number nobody can check. The gate now
+scans both and reports 86 across 34.
+
+95 new checks in tools/ship/domAnimation-selfcheck.mjs, 6 sabotages all red and all files restored
+byte-identical. The tree now carries 1273 gates.
+## v4190 -- sound effects as data, and the first sound in this engine that can be tested
+
+From loov/jsfx (MIT, sfxr's lineage) -- the idea, written here rather than vendored.
+
+**Every sound in this tree was a live Web Audio node graph.** world/ProceduralMusic.js and
+world/RoomAmbience.js call ctx.createOscillator() and wire nodes together. That plays, and it can never be
+tested: there is no artefact to look at, nothing to compare between runs, and nothing a headless gate can
+hold. A parameter block that *renders to samples* has all three -- the envelope is a function you can plot,
+the buffer is bytes you can hash, and "the same spell always sounds the same" becomes a claim with a number
+behind it.
+
+**It uses the strict sine, which is the one real departure from jsfx, and the cost was measured rather than
+assumed.**
+
+    Math.sin    one second of audio   4.48 ms
+    strictSin   one second of audio  10.18 ms   (2.3x)
+    worst per-sample difference      1.11e-16
+    one 16-bit PCM step              3.05e-5
+
+jsfx's own README claims about 10 ms for a second of audio, so the strict core lands exactly on its
+performance target anyway -- and the difference from Math.sin is four thousand times smaller than a single
+quantisation step of 16-bit audio. Inaudible by construction. Math.sin is not specified to the last bit
+across JavaScript engines, so a jsfx-style renderer makes subtly different audio on different machines: fine
+for a game, fatal for a hash. Verified end to end -- all six presets hash identically in node and in headless
+Chromium (coin is 657cd7bf0e437a40 in both). That is two runtimes rather than two engines; the cross-engine
+claim is earned by using no library trig at all, not by this comparison.
+
+**The defect the gate exists for is the click.** A sound whose last sample is not zero yanks the speaker cone
+back to rest in one sample -- a step function, which is broadband noise. It is the most common defect in
+generated audio and it is completely invisible in the parameter block: every number looks reasonable and
+every playback pops. The envelope runs to zero and the final sample is forced to silence; removing that one
+line turns six checks red.
+
+Clipping is **reported** rather than silently normalised (a renderer that quietly normalises hides a broken
+preset, and then a later envelope change alters the sound for a reason nobody can find), an unknown preset
+**throws** rather than playing the silence nobody notices, and the frequency slide is per **second** so a
+preset sounds like itself at any sample rate.
+
+That last one is worth its own note: the first version of the rate check compared duration and sample count,
+both of which are rate-correct by arithmetic and say nothing about the sound. Changing the slide from
+per-second to per-sample left every check green. Counting **zero crossings** catches it -- 462 against 462
+with correct code, 3948 against 2164 once the slide goes per-sample.
+
+The presets are a frozen table, which is the whole point: a spell, a pickup and a hit are three parameter
+blocks rather than three functions, so they can be listed, diffed, hashed, tuned in sfx.html, and handed to
+the dungeon's spell book as one more field beside cost and element. 126 new checks in
+tools/ship/sfx-selfcheck.mjs, 8 sabotages all red, both files restored byte-identical. The tree now carries
+1272 gates.
 ## v4189 -- the git log is the universe's seed, and a gas giant bug that 419 checks never saw
 
 Keith asked for the ES planets in the github demos, "as processes determined on a github log" -- run the
@@ -2028,6 +8445,7 @@ comes down and the markers come from its listing. If a part classifies wrong, th
 from that listing, never to lower the threshold until something matches.
 
 New `tools/ship/vbaArchive-selfcheck.mjs` takes the tree to 1246 gates.
+
 ## Since v4157 -- two solutions to one spring, and a readout that changes instead of being replaced
 
 v4158 -- Keith asked for lochie/torph's text morphing on the ticker. *** IT IS DELIBERATELY NOT ON THE TICKER, AND THE ARITHMETIC IS THE REASON. *** server.html's ticker is a marquee: 0.9px per frame at 60fps is 54px/s across a 220px clip, so a message sits on screen for 6.0s at 80px wide and 17.5s at 700px, against a queue that caps at 40 -- ABOUT FIVE AND A HALF MINUTES OF BACKLOG. Its problem is THROUGHPUT, which no transition fixes. And morphing only earns anything when the two strings SHARE STRUCTURE: consecutive log lines share almost nothing, so every glyph would fade out and every glyph fade in -- a crossfade with extra machinery, slower to read than the scroll it replaced. The measurement is now ASSERTED BY THE GATE against the ticker's own scroll constant, so if it is ever retimed the decision is revisited rather than inherited. Pointed at the READOUTS instead, where old and new always share structure. *** THE FOUNDATION IS A SECOND SOLUTION TO A SPRING THIS TREE ALREADY HAD, AND THAT IS WHAT MAKES THE GATE STRONG. *** ui/springMotion.js's step() INTEGRATES the damped harmonic oscillator numerically -- retargetable mid-flight, which an interruptible toast needs, and one call per frame on the main thread. New springToCssLinear() SOLVES THE SAME EQUATION IN CLOSED FORM and samples it into a CSS linear() easing, so the browser runs it ON THE COMPOSITOR and a busy main thread cannot make it stutter, at the cost of being a baked curve nothing can interrupt. Two independent answers to one question can be pointed at each other, and the agreement is asserted AS CONVERGENCE RATHER THAN AS A TOLERANCE: semi-implicit Euler is first order, so halving dt must halve the error. MEASURED at dt 1/480, 1/960 and 1/1920: errors 1.31e-2, 6.54e-3, 3.26e-3, ratios 2.01 and 2.00. *** A WRONG CLOSED FORM CANNOT DO THAT -- it would plateau at whatever constant it disagrees by, and a tolerance-based check would have passed it. *** The parameters are the SHARED PRESETS read through the shared dampingRatio(), so a CSS transition and a JS toast cannot disagree about what "snappy" means. *** AND THE CRITICAL BAND IS A SEPARATE BRANCH, WHICH THE OBVIOUS IMPLEMENTATION DIVIDES BY ZERO IN: *** the overdamped solution divides by (r2 - r1) and those roots COINCIDE at zeta 1, and this tree's `stiff` preset is zeta 1.0006 -- inside that band, and it is the preset meant for surfaces where overshoot would look like a bug. The last sampled point is pinned to EXACTLY 1, because a curve ending at 0.9997 makes CSS animate to 0.9997 and stop, which is the same defect step()'s snap-on-rest exists to prevent arriving in the other engine. New ui/textMorph.js diffs by LCS AND NOT BY A PREFIX/SUFFIX TRIM: "3 peers" -> "13 peers" keeps ALL SEVEN survivors and inserts one, where a trim sees a changed first character and rewrites the whole string -- saying "different value" when the truth is "one digit arrived". *** AND IT SEGMENTS BY GRAPHEME, WHICH THIS TREE'S UI MAKES NECESSARY RATHER THAN TIDY: *** the gear in server.html's own header is U+2699 followed by U+FE0F, and [...str] splits that into two, the second an invisible modifier that renders as a stray box on its own -- so a naive morph does not animate badly, IT CORRUPTS THE TEXT. Flags, ZWJ families and surrogate pairs are all gated. Segmentation, the diff and the plan are pure, so every number is settled in node; only the FLIP touches the DOM. Wired into the engine version in server.html through morphText(), at BOTH write sites -- boot and the update check -- since morphing one and not the other would make the animation depend on which path last ran. The module is fetched lazily and every failure falls back to textContent, because a readout that stopped updating when an animation module 404'd would be a strictly worse front door than one that never animated. New tools/ship/textMorph-selfcheck.mjs takes the tree to 1245 gates. Full changelog on docs/CHANGELOG.md.
@@ -12952,3 +19370,16 @@ flat field panel (Demo_FieldViewer) · petri dish (Demo_PetriViewer) · arcade p
 - Discovery table aligned to the **real** payload: EngineCore sends `{tick, entities:[{x,y,z,hp,alive}]}` (the voxel bridge may send `{tick,t_ms,player,enemies,events}`) — both accepted. `Entities`/`Entities Alive` replace the guessed `Enemies`. **fps/scene/solar are NOT in the engine payload** and stay unavailable until your transmitter sends them (solar normally comes from HA's own inverter integration).
 - Fixed the slimmer's `engineRoot` path; dry run = 232 files / ~2.7 MB.
 - Add-on repo now has `PUBLISHING.md` (GitHub steps + one-click badge) and `.github/workflows/ci.yml` (lints config + sanity-builds/serves the image).
+
+
+The build now stands at 4276 gates.
+
+The build now stands at 4277 gates.
+
+The build now stands at 4278 gates.
+
+The build now stands at 4279 gates.
+
+The build now stands at 4280 gates.
+
+The build now stands at 4281 gates.

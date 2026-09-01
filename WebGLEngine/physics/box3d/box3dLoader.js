@@ -26,6 +26,8 @@
 //   }
 // =============================================================================
 
+import { explainWasmFailure } from "../../engine/wasmSupport.mjs";
+
 class Box3DWorldHandle {
     constructor(mod) {
         this._m = mod;
@@ -264,11 +266,17 @@ export class Box3DLoader {
             this._status = { ready: true };
             console.log("[box3d] WASM module loaded — rigid-body physics available");
         } catch (e) {
+            // v4229 -- WAS: this said "Box3D WASM not built yet -- run build-box3d-wasm-clang.sh..." for EVERY
+            // failure. Measured in a headless Chromium with WebAssembly deleted, the build was present and this
+            // same loader had returned ready:true from it seconds earlier, and it still sent the reader off to
+            // install clang and wasi-libc. Two independent facts -- "wasm works here" and "this build loaded" --
+            // now get reported on their own evidence, which is browserSkipReason()'s rule from
+            // tools/ship/playwrightResolve.mjs applied to the third instance of the same defect.
             this._status = {
                 ready: false,
-                reason: "Box3D WASM not built yet — run physics/box3d/build-box3d-wasm-clang.sh on a " +
-                        "box with clang + wasi-libc, which outputs /vendor/box3d/box3d.{js,wasm}. " +
-                        "(" + (e && e.message) + ")",
+                reason: explainWasmFailure(e,
+                    "Box3D WASM not built yet — run physics/box3d/build-box3d-wasm-clang.sh on a " +
+                    "box with clang + wasi-libc, which outputs /vendor/box3d/box3d.{js,wasm}."),
             };
         }
         return this._status;

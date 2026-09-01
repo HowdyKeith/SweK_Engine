@@ -22,7 +22,9 @@
 //     beyond DC, no tile-based scheduling, no anti-aliasing pass). Those
 //     additions would each be substantial — this implementation matches
 //     antimatter15/splat and other "minimal viable" WebGL2 ports in scope.
-//   - Capable of handling >500K splats interactively (CPU sort is O(N log N)
+//   - Capable of handling >500K splats interactively -- TRUE ONLY SINCE v4264. With the comparison
+//     sort this file shipped until then it was 255.87 ms per sort at 500K, i.e. 3.7 fps, and the
+//     claim was simply false. The radix sort in render/splatSort.mjs makes it 14.43 ms. (O(N) now,
 //     each frame; at 1M splats this becomes a >50ms cost).
 //
 // Reference: Kerbl et al. 2023, "3D Gaussian Splatting for Real-Time
@@ -32,6 +34,8 @@
 // ============================================================================
 // MODE 1: BILLBOARD (v784 — fallback, cheap)
 // ============================================================================
+
+import { radixSortIndices, makeSortScratch } from "./splatSort.mjs";   // v4264
 
 const VS_BILLBOARD = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -360,6 +364,7 @@ export class SplatRenderer {
         }
         this._sortIdx = new Uint32Array(this.count);
         this._sortKey = new Float32Array(this.count);
+        this._sortScratch = makeSortScratch(this.count);   // v4264 -- allocated once, not per frame
         for (let i = 0; i < this.count; i++) this._sortIdx[i] = i;
 
         // Allocate sorted instance buffers — written each frame in gaussian mode
@@ -472,13 +477,15 @@ export class SplatRenderer {
             keys[i] = M[2]*x + M[6]*y + M[10]*z + M[14];
             idx[i] = i;
         }
-        // Sort indices by keys (back-to-front: more negative Z = further away)
-        // Array.prototype.sort with custom comparator on a Uint32Array works
-        // but is slower than building a plain array. For typical N=32K it's
-        // fine; we accept the cost.
-        const sortable = Array.from(idx);
-        sortable.sort((a, b) => keys[a] - keys[b]);
-        for (let i = 0; i < this.count; i++) idx[i] = sortable[i];
+        // Sort indices by keys (back-to-front: more negative Z = further away).
+        //
+        // v4264 -- *** THE COMMENT THAT USED TO SIT HERE WAS THE HONEST HALF OF A FILE THAT CONTRADICTED
+        // *** ITSELF. *** It said "for typical N=32K it's fine; we accept the cost", while this file's own
+        // header claims ">500K splats interactively". Measured: Array.from(idx).sort(comparator) is 255.87 ms
+        // at 500K splats -- 3.7 fps, and 16x over a 60 fps frame budget. The radix sort below produces the
+        // SAME permutation in 14.43 ms, which is 69 fps and inside the budget. The header's claim was the
+        // false half and is now corrected; this is the code that makes it true.
+        radixSortIndices(keys, idx, this._sortScratch);
 
         // Gather sorted instance data
         for (let j = 0; j < this.count; j++) {

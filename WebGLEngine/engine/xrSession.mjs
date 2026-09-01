@@ -130,6 +130,11 @@ export class XRSessionManager {
         this.state = XR_IDLE;
         this.session = null;
         this.refSpace = null;
+        // *** THE OFFSET IS ALWAYS TAKEN FROM THE BASE SPACE, NEVER FROM THE CURRENT ONE. *** Locomotion
+        // accumulates an ABSOLUTE player pose, so its transform is expressed relative to where the session
+        // started. Calling getOffsetReferenceSpace on the already-offset space would apply that total a
+        // second time every frame, and the player would accelerate away from the world exponentially.
+        this.baseRefSpace = null;
         this.lastError = null;
         this.entries = 0;
     }
@@ -160,12 +165,13 @@ export class XRSessionManager {
             if (typeof session.requestReferenceSpace === "function") {
                 try { this.refSpace = await session.requestReferenceSpace("local-floor"); }
                 catch { this.refSpace = await session.requestReferenceSpace("local"); }   // every device has local
+                this.baseRefSpace = this.refSpace;
             }
             this._set(XR_ACTIVE, { session });
             return { ok: true, reason: "in VR" };
         } catch (e) {
             this.lastError = e;
-            this.session = null; this.refSpace = null;
+            this.session = null; this.refSpace = null; this.baseRefSpace = null;
             this._set(XR_IDLE, { error: e });
             return { ok: false, reason: (e && e.message) ? e.message : String(e) };
         }
@@ -184,7 +190,10 @@ export class XRSessionManager {
     }
 
     _teardown(why) {
-        this.session = null; this.refSpace = null;
+        // *** BOTH SPACES, NOT JUST THE CURRENT ONE. *** A base space that outlives its session is a handle
+        // to a dead runtime object, and the next enter() would offset from it before requestReferenceSpace
+        // replaced it. Caught by v4219's gate, which asserts the pair rather than the one I remembered.
+        this.session = null; this.refSpace = null; this.baseRefSpace = null;
         if (this.state !== XR_IDLE) this._set(XR_IDLE, { why });
     }
 
@@ -220,9 +229,34 @@ export class XRSessionManager {
         return out;
     }
 
+    /**
+     * Move the player, by replacing the reference space with one offset from the BASE space.
+     *
+     * *** THIS IS HOW LOCOMOTION IS DONE, AND MOVING THE CAMERA IS NOT. *** The per-eye cameras come from
+     * frame.getViewerPose() every frame and anything written to them is discarded on the next one. Replacing
+     * the space moves the head, both eye views AND the controller poses together; moving the camera moves
+     * only what we drew, so the hands stay behind in the old space.
+     *
+     * @param transform  { position, orientation } from engine/xrLocomotion.mjs's offsetTransformFor
+     * @param Ctor       XRRigidTransform, injectable so the gate can drive this with no headset
+     * @returns true when the space was replaced
+     */
+    applyOffset(transform, Ctor = (typeof XRRigidTransform !== "undefined" ? XRRigidTransform : null)) {
+        const base = this.baseRefSpace;
+        if (!base || !transform || !Ctor) return false;
+        if (typeof base.getOffsetReferenceSpace !== "function") return false;
+        try {
+            const next = base.getOffsetReferenceSpace(new Ctor(transform.position, transform.orientation));
+            if (!next) return false;
+            this.refSpace = next;
+            return true;
+        } catch (e) { this.lastError = e; return false; }
+    }
+
     stats() {
         return { state: this.state, active: this.isActive(), entries: this.entries,
                  hasSession: !!this.session, hasRefSpace: !!this.refSpace,
+                 offsetFromBase: !!(this.baseRefSpace && this.refSpace !== this.baseRefSpace),
                  lastError: this.lastError ? String(this.lastError.message || this.lastError) : null };
     }
 }

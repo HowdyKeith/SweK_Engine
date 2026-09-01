@@ -352,7 +352,18 @@ async function init() {
   wgsl.render = COMMON + `
     @group(0) @binding(1) var<storage,read> pos:array<vec2<f32>>;
     @group(0) @binding(2) var<storage,read> vel:array<vec2<f32>>;
-    struct VOut { @builtin(position) clip:vec4<f32>, @location(0) col:vec3<f32> };
+    // *** v4211 -- THE DROPLETS WERE SQUARE, AND THE FIX WAS ALREADY WRITTEN IN THE SIBLING FILE. ***
+    // (NOTE FOR THE NEXT EDITOR: this comment lives INSIDE a JS template literal, so it must not contain a
+    // backtick. Writing one here ends the shader string mid-word; the page's inline-JS parse gate caught
+    // exactly that on my first attempt at this comment.)
+    // Keith: "does water droplets need to be square?" No. Each particle is a 6-vertex QUAD, and the fragment
+    // stage returned vec4(i.col, 1.0) for every pixel of it -- a flat, fully-opaque square. The quad is the
+    // right primitive; what was missing is the mask that turns it into a disc. fluid-webgpu-3d.html, the same
+    // author's 3D version of this same simulation, already carries the sphere-impostor idiom (let r2 =
+    // dot(i.uv,i.uv); if(r2>1.0){ discard; } plus a reconstructed normal), so this is that idiom applied to
+    // the 2D view rather than a new invention -- the corner offset simply was never passed to the fragment
+    // stage here, and without it the shader has no way to know where in the quad it is.
+    struct VOut { @builtin(position) clip:vec4<f32>, @location(0) col:vec3<f32>, @location(1) uv:vec2<f32> };
     @vertex fn vs(@builtin(vertex_index) vtx:u32, @builtin(instance_index) inst:u32) -> VOut {
       // small quad per particle (2 triangles)
       var corners = array<vec2<f32>,6>(vec2(-1.,-1.),vec2(1.,-1.),vec2(-1.,1.),vec2(-1.,1.),vec2(1.,-1.),vec2(1.,1.));
@@ -362,13 +373,27 @@ async function init() {
       let c = corners[vtx];
       var o:VOut;
       o.clip = vec4<f32>(ndc + c*pr, 0.0, 1.0);
+      o.uv = c;   // v4211 -- the corner, in [-1,1]: what the fragment stage needs to know it is outside the disc
       let sp = clamp(length(vel[inst])/14.0, 0.0, 1.0);
       // LCARS-ish: deep teal (slow) -> gold -> white (fast)
       let teal = vec3<f32>(0.15,0.55,0.75); let gold = vec3<f32>(0.95,0.75,0.25); let white=vec3<f32>(1.0,1.0,1.0);
       o.col = select(mix(teal,gold,sp*2.0), mix(gold,white,(sp-0.5)*2.0), sp>0.5);
       return o;
     }
-    @fragment fn fs(i:VOut) -> @location(0) vec4<f32> { return vec4<f32>(i.col, 1.0); }`;
+    @fragment fn fs(i:VOut) -> @location(0) vec4<f32> {
+      let r2 = dot(i.uv, i.uv);
+      if (r2 > 1.0) { discard; }        // the corners of the quad are not part of the droplet
+      // A flat disc still reads as a sticker. Reconstructing the impostor normal (the same z = sqrt(1-r2)
+      // the 3D file uses) costs one sqrt and gives each droplet a lit shoulder and a darker rim, so a pile
+      // of them reads as beads of water rather than as a field of dots.
+      let nz = sqrt(max(0.0, 1.0 - r2));
+      let L = normalize(vec3<f32>(-0.4, 0.5, 0.75));
+      let N = vec3<f32>(i.uv, nz);
+      let diff = clamp(dot(N, L), 0.0, 1.0);
+      let spec = pow(diff, 24.0);
+      let shade = 0.55 + 0.45 * diff;
+      return vec4<f32>(i.col * shade + vec3<f32>(spec * 0.55), 1.0);
+    }`;
 
   // ---- pipelines ----
   // v3822 -- VALIDATE EVERY SHADER BY NAME BEFORE BUILDING PIPELINES. getCompilationInfo() is the only way to

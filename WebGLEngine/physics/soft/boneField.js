@@ -26,18 +26,14 @@
 
 // Distance from point p to the segment a->b. The clamp is what makes it a segment and not an infinite line, and
 // getting it wrong gives you limbs that reach out of the room.
-function distToSegment(px, py, pz, ax, ay, az, bx, by, bz) {
-    const dx = bx - ax, dy = by - ay, dz = bz - az;
-    const len2 = dx * dx + dy * dy + dz * dz;
-    let t = 0;
-    if (len2 > 1e-12) {
-        t = ((px - ax) * dx + (py - ay) * dy + (pz - az) * dz) / len2;
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-    }
-    const cx = ax + t * dx, cy = ay + t * dy, cz = az + t * dz;
-    const ex = px - cx, ey = py - cy, ez = pz - cz;
-    return Math.sqrt(ex * ex + ey * ey + ez * ez);
-}
+//
+// v4202 -- moved to math/segment.mjs, unchanged. It lived here privately, which is why an assessment of
+// spark-liquefy searched for `sdSegment`, found nothing, and reported that this tree had no segment distance
+// at all. It had this one. Liquefy needed the 2D case, and one shared copy is the alternative to a second
+// implementation -- the shape v4165 removed for Ashima noise and v4199 for stagger. The bone field's output
+// is byte-identical across the move, asserted in tools/ship/segment-selfcheck.mjs against a recorded
+// fingerprint, because "a refactor that changed nothing" is a claim until something checks it.
+import { distToSegment3 as distToSegment } from "../../math/segment.mjs";
 
 // Polynomial smooth minimum (Quilez). k = 0 degenerates to plain min, which is the honest default for anyone who
 // wants to see the creases.

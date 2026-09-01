@@ -122,6 +122,83 @@ void swk_body_set_restitution(int idx, float e) {
     for (int i = 0; i < n; i++) b3Shape_SetRestitution(shapes[i], e);
 }
 
+// =============================================================================
+// v4256 -- COLLISION FILTERING, AND THE CLAIM IT CORRECTS.
+//
+// v4249 measured a derived ragdoll self-colliding at 148x the impulse of its neighbours, said the correct fix
+// was "disabling collision between jointed neighbours", and recorded that this could not be requested through
+// this shim. *** BOTH HALVES WERE WRONG, AND THE HEADER SAYS SO. ***
+//
+// b3JointDef.collideConnected is a plain bool on the shared base def, and b3DefaultJointDef() is `{ 0 }` and
+// never sets it -- so it is ALREADY false, and box3d has never collided jointed neighbours. Measured natively
+// against box3d v0.1.0: two overlapping dynamic boxes report 8 contacts unjointed and 0 once a spherical joint
+// is added. Nothing had to be requested; the behaviour v4249 asked for was the default all along.
+//
+// Which relocates the defect rather than removing it: the self-collision v4249 saw was between parts that are
+// NOT jointed to each other -- a forearm against a thigh, a hand against a torso two joints away. box3d's own
+// header names that case and prescribes the fix:
+//
+//     "you may want ragdolls to collide with other ragdolls but you don't want ragdoll self-collision. In
+//      this case you would give each ragdoll a unique negative group index and apply that group index to all
+//      shapes on the ragdoll."
+//
+// So the missing capability is the FILTER, not the joint flag. b3Filter carries categoryBits, maskBits and a
+// groupIndex whose sign wins over the mask entirely: negative means never collide within the group, positive
+// means always. One call per body, and a ragdoll stops fighting itself while still colliding with the world.
+
+// Set a body's collision filter on every shape it owns. A negative `group` shared across a ragdoll's bodies
+// disables self-collision among them without touching how they collide with anything else.
+//
+// The mask is applied to all shapes because a body with two shapes filtered differently is a body that is
+// half-solid, which is never what a caller asking for "this ragdoll" means.
+void swk_body_set_filter(int idx, double category, double mask, int group) {
+    if (idx < 0 || idx >= g_bodyCount) return;
+    b3ShapeId shapes[SWK_MAX_SHAPES_PER_BODY];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, SWK_MAX_SHAPES_PER_BODY);
+    for (int i = 0; i < n; i++) {
+        b3Filter f = b3Shape_GetFilter(shapes[i]);
+        // categoryBits/maskBits are uint64_t. They arrive as double because that is the only numeric type a
+        // WASM boundary carries losslessly up to 2^53 -- a JS number IS a double, and taking these as int32
+        // would silently truncate any category above bit 31. Above 2^53 a caller must use `group` instead,
+        // which is stated here rather than discovered.
+        if (category >= 0.0) f.categoryBits = (uint64_t)category;
+        if (mask >= 0.0) f.maskBits = (uint64_t)mask;
+        f.groupIndex = group;
+        b3Shape_SetFilter(shapes[i], f, true);   // invokeContacts: re-evaluate pairs already touching
+    }
+}
+
+// Read a body's filter back, so a caller can assert what it set rather than trust it. Returns 0 on success.
+//
+// *** THE READBACK SATURATES AT THE TOP OF THE RANGE, AND THIS IS MEASURED, NOT FEARED. *** box3d's default
+// is B3_DEFAULT_CATEGORY_BITS / B3_DEFAULT_MASK_BITS = UINT64_MAX, and (double)UINT64_MAX rounds to 2^64
+// exactly: this getter reports 18446744073709551616 for a value that is 18446744073709551615. So a category
+// or mask is faithful below 2^53 and APPROXIMATE above it, and the default is above it. A caller comparing a
+// read-back default for equality against UINT64_MAX will find they differ by one and be right to.
+int swk_body_get_filter(int idx, double* outCategory, double* outMask, int* outGroup) {
+    if (idx < 0 || idx >= g_bodyCount) return -1;
+    b3ShapeId shapes[SWK_MAX_SHAPES_PER_BODY];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, SWK_MAX_SHAPES_PER_BODY);
+    if (n <= 0) return -1;
+    b3Filter f = b3Shape_GetFilter(shapes[0]);
+    if (outCategory) *outCategory = (double)f.categoryBits;
+    if (outMask) *outMask = (double)f.maskBits;
+    if (outGroup) *outGroup = f.groupIndex;
+    return 0;
+}
+
+// Whether a joint lets the two bodies it connects collide. Exposed for completeness and for the gate, NOT
+// because a ragdoll needs it: box3d already defaults this to false, which is the correction above.
+void swk_joint_set_collide_connected(int idx, int shouldCollide) {
+    if (idx < 0 || idx >= g_jointCount) return;
+    b3Joint_SetCollideConnected(g_joints[idx], shouldCollide ? true : false);
+}
+
+int swk_joint_get_collide_connected(int idx) {
+    if (idx < 0 || idx >= g_jointCount) return -1;
+    return b3Joint_GetCollideConnected(g_joints[idx]) ? 1 : 0;
+}
+
 // v2263: an ES ship body -- planar (free to translate in X/Z, locked in Y), NON-rotating in box3d (heading is
 // owned by the flight model), zero damping so velocity persists like ES's drag-free space flight. box3d gives
 // it exactly two things ES lacks: collision response and staying in the plane. Returns index or -1.

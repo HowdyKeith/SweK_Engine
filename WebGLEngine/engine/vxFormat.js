@@ -22,8 +22,16 @@
 // dependencies. Writing is a single pass plus a sizing pre-pass for
 // allocation. Both run in pure JS in Node and the browser.
 
-export const VX_MAGIC = 0x56584C21;   // "VXL!" little-endian
-export const VX_HEADER_BYTES = 11;
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
+export const VX_MAGIC = 0x56584C21;   // "VXL!" little-endian -- the ORIGINAL, still read
+export const VX_MAGIC_V = versionedMagic(VX_MAGIC);   // "VXL2" -- carries a version field
+export const VX_VERSION = 1;          // IN THE FILE now, not only in the comment at the top of this one
+export const VX_LEGACY_HEADER_BYTES = 11;   // magic + W + H + D + channels, before there was a version
+export const VX_HEADER_BYTES = VERSIONED_HEADER_BYTES + 7;   // 15 -- and unaligned, which is fine HERE
+// The RLE payload is read one field at a time through a DataView (getUint16 / getUint8), never as a typed
+// array VIEW over the buffer, so an odd header length costs nothing. p3dFormat is the opposite case and its
+// header is padded to a multiple of 4 for exactly that reason. Two formats, two right answers.
 export const VX_MAX_RUN = 0xFFFF;      // uint16 cap per RLE pair
 
 /**
@@ -68,11 +76,11 @@ export function encodeVX(grid) {
     const dv  = new DataView(buf);
 
     // Write header
-    dv.setUint32(0,  VX_MAGIC, true);
-    dv.setUint16(4,  width,    true);
-    dv.setUint16(6,  height,   true);
-    dv.setUint16(8,  depth,    true);
-    dv.setUint8(10,  channels);
+    const hdr = writeVersionedHeader(dv, VX_MAGIC, VX_VERSION);
+    dv.setUint16(hdr,     width,  true);
+    dv.setUint16(hdr + 2, height, true);
+    dv.setUint16(hdr + 4, depth,  true);
+    dv.setUint8(hdr + 6,  channels);
 
     // Second pass: emit RLE pairs
     let off = VX_HEADER_BYTES;
@@ -104,23 +112,25 @@ export function encodeVX(grid) {
  * @returns {{ width, height, depth, channels, data: Uint8Array }}
  */
 export function decodeVX(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < VX_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeVX: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== VX_MAGIC) {
-        throw new Error(`decodeVX: magic mismatch (got 0x${magic.toString(16)}, expected 0x${VX_MAGIC.toString(16)})`);
-    }
-    const width    = dv.getUint16(4, true);
-    const height   = dv.getUint16(6, true);
-    const depth    = dv.getUint16(8, true);
-    const channels = dv.getUint8(10);
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeVX", legacyMagic: VX_MAGIC, current: VX_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 7;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeVX: truncated header (${buf.byteLength}B)`);
+    const width    = dv.getUint16(bodyOffset, true);
+    const height   = dv.getUint16(bodyOffset + 2, true);
+    const depth    = dv.getUint16(bodyOffset + 4, true);
+    const channels = dv.getUint8(bodyOffset + 6);
 
     const total = width * height * depth * channels;
     const data = new Uint8Array(total);
     let writePtr = 0;
-    let off = VX_HEADER_BYTES;
+    let off = headerBytes;
     while (off < buf.byteLength && writePtr < total) {
         const count = dv.getUint16(off, true); off += 2;
         const value = dv.getUint8(off);         off += 1;
@@ -131,7 +141,7 @@ export function decodeVX(buf) {
     if (writePtr !== total) {
         console.warn(`[vxFormat] decodeVX: payload ended at ${writePtr}/${total}; data is partial`);
     }
-    return { width, height, depth, channels, data };
+    return { width, height, depth, channels, data, version };
 }
 
 /**

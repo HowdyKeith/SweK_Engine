@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 424,
+ "count": 439,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -91,6 +91,13 @@
    "f": "anime4k.html",
    "t": "Anime4K Upscaler",
    "d": "Anime4K's classic real-time upscaler, reimplemented natively in SweK: bilinear 2x then a DoG deblur (overshoot-clamped) and line-darkening. WebGPU compute on a rig, CPU reference here. Compare nearest / bilinear / Anime4K side by side; upload your own image.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "aquarelle.html",
+   "t": "Aquarelle Dissolve",
+   "d": "Mask-driven watercolour dissolve: one image bleeds into another along a noise-warped mask edge, like ink through paper. Port of Ramotion/aquarelle (MIT).",
    "g": "",
    "p": 0
   },
@@ -522,6 +529,13 @@
    "p": 0
   },
   {
+   "f": "camera-effects.html",
+   "t": "SweK &middot; Camera Effects",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "camoufox.html",
    "t": "Camoufox — install & detect",
    "d": "Install and detect Camoufox (anti-detect scraping browser) in a dedicated venv. Runs on the PC bridge.",
@@ -809,6 +823,13 @@
    "p": 0
   },
   {
+   "f": "destructible.html",
+   "t": "Destructible — an exact hole in a wall",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "device.html",
    "t": "Roundhouse Devices",
    "d": "",
@@ -893,10 +914,24 @@
    "p": 0
   },
   {
+   "f": "doom-fire.html",
+   "t": "DOOM Fire",
+   "d": "The PSX DOOM fire: a cellular automaton on a grid of bytes against a fixed 37-colour palette. Seeded, so the same seed gives the same fire frame for frame. Port of filipedeschamps/doom-fire-algorithm (MIT).",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "doorbell.html",
    "t": "Doorbell",
    "d": "",
    "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "drive-brain.html",
+   "t": "GPU Brain: Learn to Drive",
+   "d": "A car learns to drive to a goal and stop there, on the real vehicle model: wheels as rays, grip proportional to the load each wheel actually carries, and tyre forces clamped to one friction circle. Trained by evolution strategy against a hand-written driver. Bolt a 400kg turret on the roof and the same policy starts rolling it over -- the loadout, not the driving.",
+   "g": "",
    "p": 0
   },
   {
@@ -1023,6 +1058,13 @@
    "t": "🛰️ EVE — SweK Engine",
    "d": "Live EVE Online pilot telemetry via ESI + SSO (pilot, ship, system, online, ISK) with a 3D ship view. Cloud API — register an app at developers.eveonline.com and log in once. Runs on the PC bridge.",
    "g": "gametheory",
+   "p": 0
+  },
+  {
+   "f": "excel.html",
+   "t": "SweK Excel &mdash; the VBA half",
+   "d": "The Excel half: link the VBA archive (transmitter, OpenGL render engine, connector workbook) into this install, assemble a workbook from its modules, and run one allowlisted macro.",
+   "g": "",
    "p": 0
   },
   {
@@ -1754,6 +1796,13 @@
    "p": 0
   },
   {
+   "f": "mesh-line.html",
+   "t": "Wide lines: what gl.lineWidth cannot do",
+   "d": "gl.lineWidth is clamped to 1 on every desktop driver -- it is in the spec and it silently does nothing. A wide line has to be a triangle strip, with the sideways offset applied in the vertex shader so the width is a number of PIXELS that does not change with distance. Drag the width; watch the same path drawn both ways.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "method-lab.html",
    "t": "the method instruments",
    "d": "Three instruments that measure the lab rather than the physics: the proposer registry (which knobs a machine may turn, and on whose evidence), the knob registry (which instruments are governed and which are deliberately not), and periodic boundaries for molecular dynamics. None of them has a picture to show, so this page shows their keys and their gates instead of pretending otherwise.",
@@ -1887,6 +1936,13 @@
    "p": 0
   },
   {
+   "f": "odometer.html",
+   "t": "Odometer",
+   "d": "Numbers that roll to their new value with motion blur, like a mechanical counter. Port of coderitual/bounty (MIT). For values that change occasionally -- not for live gauges.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "office-floor.html",
    "t": "Office floor - who is working on what",
    "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
@@ -1903,6 +1959,13 @@
   {
    "f": "orbs.html",
    "t": "State orbs (v3357)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "orrery.html",
+   "t": "SweK Orrery &mdash; the tree as a system",
    "d": "",
    "g": "",
    "p": 0
@@ -2097,10 +2160,24 @@
    "p": 0
   },
   {
+   "f": "primitive-paint.html",
+   "t": "Primitive: a picture in a few dozen shapes",
+   "d": "Approximates any image with coloured triangles, rectangles and ellipses, one at a time. The colour of each shape is never searched for -- it is solved in closed form, the exact least-squares answer -- and each candidate is scored only over the pixels it covers, which is what makes it fast enough to watch. Drop in your own picture.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "probe-lab.html",
    "t": "Probe Lab - a released instrument on a timelike geodesic",
    "d": "",
    "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "proc-brush.html",
+   "t": "SweK Procedural Brush",
+   "d": "Brushes that draw relationships between the points already in a stroke, rather than stamping a dab at each one. Sketchy, fur, shaded and ribbon, over a bounded neighbour search.",
+   "g": "",
    "p": 0
   },
   {
@@ -2314,6 +2391,13 @@
    "p": 0
   },
   {
+   "f": "scene-view.html",
+   "t": "Scene Viewer",
+   "d": "Open a .glb exported by swekExport.scene() on a phone, tablet or TV. Uses the file's own camera and applies the sun/fog recipe from scene.extras. Gamepad and D-pad aware.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "schrodinger.html",
    "t": "Schrodinger 1D - levels and tunnelling",
    "d": "",
@@ -2353,6 +2437,13 @@
    "t": "Settings",
    "d": "One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, plus tool readiness.",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "sfx.html",
+   "t": "SweK &middot; Sound Effects as Data",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {
@@ -2409,6 +2500,13 @@
    "t": "Skin depth, and a bisected threshold against a predicted one (v3628)",
    "d": "Skin depth exact vs the famous good-conductor limit (55% wrong at loss tangent 1), measured on a lossy 1D FDTD - and the stability meter's bisected threshold graded against FDTD's exactly predictable Courant limit for the first time.",
    "g": "em",
+   "p": 0
+  },
+  {
+   "f": "sky.html",
+   "t": "Sky — precomputed atmospheric scattering",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {
@@ -2470,6 +2568,13 @@
   {
    "f": "spectator.html",
    "t": "Engine Spectator",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "spellbook.html",
+   "t": "SweK &middot; The Spell Book",
    "d": "",
    "g": "",
    "p": 0
@@ -2646,7 +2751,7 @@
    "f": "torrents.html",
    "t": "SweK Torrents — Voxel View",
    "d": "A 3D voxel render of BiglyBT torrents: each tower is a download, lit cubes are progress, color is state, glow is speed.",
-   "g": "",
+   "g": "nearshare",
    "p": 0
   },
   {
@@ -2898,7 +3003,7 @@
    "f": "webtorrent.html",
    "t": "SweK P2P Share",
    "d": "Seed SweK output folders (cell-tracking runs, exports) as torrents and fetch them from peers. Native WebRTC/TCP P2P — no central server; magnets broadcast on the peer bus.",
-   "g": "",
+   "g": "nearshare",
    "p": 0
   },
   {

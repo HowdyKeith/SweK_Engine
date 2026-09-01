@@ -22,8 +22,13 @@
 //
 // Storage is row-major X-fastest (matches OpenGL's TEXTURE_3D upload).
 
-export const WND_MAGIC = 0x21444E57;   // "WND!" LE
-export const WND_HEADER_BYTES = 20;
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
+export const WND_MAGIC = 0x21444E57;   // "WND!" LE -- the ORIGINAL, still read
+export const WND_MAGIC_V = versionedMagic(WND_MAGIC);   // "WND2" -- carries a version field
+export const WND_VERSION = 1;          // IN THE FILE now, not only in this comment block
+export const WND_LEGACY_HEADER_BYTES = 20;
+export const WND_HEADER_BYTES = VERSIONED_HEADER_BYTES + 16;   // magic, version, W, H, D, reserved
 export const WND_VOXEL_BYTES = 16;     // RGBA32F
 
 export function encodeWND(wnd) {
@@ -39,36 +44,40 @@ export function encodeWND(wnd) {
     const total = WND_HEADER_BYTES + voxels * WND_VOXEL_BYTES;
     const buf = new ArrayBuffer(total);
     const dv = new DataView(buf);
-    dv.setUint32(0,  WND_MAGIC, true);
-    dv.setUint32(4,  width,     true);
-    dv.setUint32(8,  height,    true);
-    dv.setUint32(12, depth,     true);
-    dv.setUint32(16, 0,         true);
+    const b = writeVersionedHeader(dv, WND_MAGIC, WND_VERSION);
+    dv.setUint32(b,      width,  true);
+    dv.setUint32(b + 4,  height, true);
+    dv.setUint32(b + 8,  depth,  true);
+    // Still reserved, and still for what it says: a time slice count. The VERSION did not take this field --
+    // it went in its own, so that "how many time slices" and "which layout" can never be the same number.
+    dv.setUint32(b + 12, 0,      true);
     new Float32Array(buf, WND_HEADER_BYTES).set(data);
     return buf;
 }
 
 export function decodeWND(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < WND_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeWND: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== WND_MAGIC) {
-        throw new Error(`decodeWND: magic mismatch (got 0x${magic.toString(16)}, expected 0x${WND_MAGIC.toString(16)} = "WND!")`);
-    }
-    const width  = dv.getUint32(4,  true);
-    const height = dv.getUint32(8,  true);
-    const depth  = dv.getUint32(12, true);
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeWND", legacyMagic: WND_MAGIC, current: WND_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 16;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeWND: truncated header (${buf.byteLength}B)`);
+    const width  = dv.getUint32(bodyOffset,     true);
+    const height = dv.getUint32(bodyOffset + 4, true);
+    const depth  = dv.getUint32(bodyOffset + 8, true);
     const voxels = width * height * depth;
-    const expected = WND_HEADER_BYTES + voxels * WND_VOXEL_BYTES;
+    const expected = headerBytes + voxels * WND_VOXEL_BYTES;
     if (buf.byteLength < expected) {
         throw new Error(`decodeWND: truncated (have ${buf.byteLength}B, expected ${expected}B for ${width}×${height}×${depth})`);
     }
     // Copy the float data out — slicing the buffer keeps the original alive
     const data = new Float32Array(voxels * 4);
-    data.set(new Float32Array(buf, WND_HEADER_BYTES, voxels * 4));
-    return { width, height, depth, data };
+    data.set(new Float32Array(buf, headerBytes, voxels * 4));
+    return { width, height, depth, data, version };
 }
 
 /** Compute summary stats for status displays. */

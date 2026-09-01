@@ -88,6 +88,34 @@ export const VERDICTS = Object.freeze({
     ogreBuyPanel:     { verdict: INERT, why: "a DOM panel" },
     mechCockpit:      { verdict: INERT, why: "a DOM cockpit overlay" },
 
+    // --- THE LAST FOURTEEN, EXAMINED AT v4231 -- EACH FROM ITS OWN SOURCE, NOT FROM ITS NAME ---
+    //
+    // *** ELEVEN OF THE FOURTEEN TURNED OUT TO BE ANIMATORS, WHICH MADE THE UNGUARDED NUMBER WORSE BEFORE IT
+    // MADE IT BETTER, AND THAT IS WHAT AN HONEST CENSUS DOES. *** A census that only ever improves its own
+    // figures is not measuring anything. Each verdict below names the LINE of behaviour it rests on, so a
+    // reader can check the judgement instead of trusting it.
+    atmosphereSystem:{ verdict: ANIMATES, why: "clouds drift by wind every frame -- _instData[base+0] += wx -- and the layer eases its colours toward the weather target; it is never still" },
+    tintFX:          { verdict: ANIMATES, why: "a 'pulse' tint advances b.t += dt and recomputes mix from a sine, so an entity's colour oscillates with no input at all" },
+    visionModes:     { verdict: ANIMATES, why: "battery drains and regenerates every frame, and at zero it forces the mode back to normal and calls _apply(), changing the overlay unprompted" },
+    wadVisualPolish: { verdict: ANIMATES, why: "pickups bob on sin(t) and yaw, the exit portal turns, teleporters spin -- pure time-driven motion, and the entry whose name most invites a guess" },
+    spaceSuit:       { verdict: ANIMATES, why: "calls particles.spawn() on its own clock and applies continuous asphyxiation damage once O2 reaches zero" },
+    swimMode:        { verdict: ANIMATES, why: "_applySwimPhysics(dt) moves the camera while submerged and _emitBubbles(dt) trails bubbles; both run with no input" },
+    bossPhaseManager:{ verdict: ANIMATES, why: "phase transitions call botManager.spawn() for minions, and a spawn is a visible change -- the same reasoning as birthSpawner" },
+    csBotManager:    { verdict: ANIMATES, why: "runs bot AI over positions each tick; the bots move themselves, as botManager's already-settled verdict says" },
+    weaponSystem:    { verdict: ANIMATES, why: "queued BURST shots fire on a timer -- while (_burstQueue[0].fireT <= now) -- so the first round is input and the second and third are the clock" },
+    fpsShooter:      { verdict: ANIMATES, why: "gravity zones and fall damage move the player, hazards deal damage over time, and a reload completes on a timestamp" },
+    ogreScenario:    { verdict: ANIMATES, why: "_updateDebris(dt) tumbles blown-off parts, defender planes fly and strafe, and subs surface to fire -- all on their own clocks" },
+
+    // --- ...and three that are INERT with respect to THIS flag, for the HUD cluster's reason ---
+    //
+    // The flag guards the GL DRAW. A surface that is not the GL canvas is not what a skipped draw skips --
+    // BUT ONLY IF THE TICKER RUNS OUTSIDE THE GUARD, which is the half v4174 got wrong with hud.update(). All
+    // three placements were checked against main.js rather than assumed: playerEnergy at 29203 and
+    // ogreLauncher at 29456 run BEFORE the guard at 30071; wadMap at 30913 runs after it, in postRenderTicks.
+    playerEnergy:    { verdict: INERT, why: "recharges a number whose only reader is mechCockpit, itself a DOM overlay and already INERT; its shake handler fires on a denied spend, which is input. Ticks before the guard" },
+    ogreLauncher:    { verdict: INERT, why: "sets style.display and textContent on launcher chrome and nothing else; a DOM panel like ogreHUD beside it. Ticks before the guard" },
+    wadMap:          { verdict: INERT, why: "draws the minimap into ITS OWN 2D canvas -- c.getContext('2d'), appended to document.body -- which is a different surface from the GL canvas the flag guards. Ticks after the guard" },
+
     // --- INERT: cannot change the picture by itself ---
     systemPerf:      { verdict: INERT, why: "measures frame time and heap; it reads, it does not draw" },
     audio:           { verdict: INERT, why: "sound has no pixels" },
@@ -163,7 +191,7 @@ export function report(source, registered = []) {
  * unexamined, pushes the count above the baseline, and the gate goes red until somebody writes a verdict --
  * which is the whole mechanism by which this census stays a census instead of becoming a stale list.
  */
-export const UNEXAMINED_BASELINE = 14;   // v4184: 25 -> 14, the HUD and panel cluster settled as one decision
+export const UNEXAMINED_BASELINE = 0;    // v4231: 14 -> 0. Every ticker in the loop now carries a verdict.
 
 /**
  * Every ticker declared as covered by some probe, read out of main.js's own `covers:` lists.

@@ -1,0 +1,169 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Destructible — an exact hole in a wall</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0d0f12; color:#d6dae0; font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { padding:22px 26px 12px; border-bottom:1px solid #1e2430; }
+  h1 { margin:0 0 8px; font-size:20px; font-weight:650; letter-spacing:-0.01em; }
+  header p { margin:0; max-width:74ch; color:#9aa3af; }
+  code { background:#161b22; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+  .wrap { display:flex; gap:20px; padding:20px 26px; flex-wrap:wrap; align-items:flex-start; }
+  canvas { background:#111418; border:1px solid #1e2430; border-radius:6px; touch-action:none; cursor:grab; }
+  .side { flex:1; min-width:290px; max-width:420px; }
+  .panel { background:#12161c; border:1px solid #1e2430; border-radius:6px; padding:14px 16px; }
+  .panel + .panel { margin-top:12px; }
+  h2 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:0.09em; color:#7d8794; }
+  button { background:#1b222c; color:#d6dae0; border:1px solid #2b3442; border-radius:5px;
+           padding:6px 12px; font:inherit; cursor:pointer; }
+  button:hover { background:#232c38; } button:disabled { opacity:.45; cursor:default; }
+  label { display:block; margin:8px 0; color:#9aa3af; font-size:13px; }
+  input[type=range] { width:100%; }
+  pre { margin:0; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#c3cad3; white-space:pre-wrap; }
+  .note { color:#7d8794; font-size:12.5px; margin:10px 0 0; }
+  .warn { color:#e0b872; }
+</style>
+
+<header>
+  <h1>Destructible — an exact hole in a wall</h1>
+  <p>A jagged blast shape subtracted from a solid slab by BSP mesh booleans
+     (<code>physics/mesh/meshCSG.mjs</code>, method from evanw/csg.js, MIT). The rim lies on the wall's
+     <em>own plane</em> at any angle, with no grid — which is the one thing neither the voxel path nor the
+     SDF path next door can do. Only the polygons a blast can reach are cut, through the
+     <code>trianglesInBox</code> query added to <code>mesh/meshBVH.mjs</code>.</p>
+</header>
+
+<div class="wrap">
+  <div>
+    <canvas id="view" width="640" height="560"></canvas>
+    <p class="note">Drag to rotate. Every line is a polygon edge, so the mesh you see is the mesh that exists —
+       watch the wall shatter into coplanar fragments that <b>settle</b> takes back.</p>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>Blast</h2>
+      <label>radius <input id="r" type="range" min="20" max="140" step="5" value="80"><span id="rv">0.80</span></label>
+      <label>jaggedness <input id="j" type="range" min="0" max="90" step="5" value="60"><span id="jv">0.60</span></label>
+      <label>facets <input id="s" type="range" min="4" max="14" step="1" value="8"><span id="sv">8</span></label>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button id="hit">blast</button><button id="settle">settle</button><button id="reset">reset</button>
+      </div>
+      <p class="note">Blast cuts. <b>Settle</b> snaps, merges the coplanar waste and welds every T-junction —
+         a whole-mesh pass that belongs where the shooting stops, not in the frame loop.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Measured</h2>
+      <pre id="stats">…</pre>
+    </div>
+
+    <div class="panel">
+      <h2>What this does not do</h2>
+      <p class="note">It makes the <b>hole</b>, not the <b>rubble</b>. A BSP subtraction returns one connected
+         mesh with a hole in it; pieces need connected components and an inertia tensor, which is
+         <code>physics/voxel/fracture.js</code> and is already exact. Nothing here is duplicated from it.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as CSG from "./physics/mesh/meshCSG.mjs";
+
+const cv = document.getElementById("view"), g = cv.getContext("2d");
+const $ = (id) => document.getElementById(id);
+const HALF = [4, 3, 0.35];
+let wall = CSG.boxPolys([0, 0, 0], HALF);
+let seed = 1, shots = 0, lastMs = 0, settled = false;
+const V0 = CSG.volume(wall);
+let yaw = 0.7, pitch = -0.35, drag = null;
+
+function project(p) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const x = p[0] * cy - p[2] * sy, z0 = p[0] * sy + p[2] * cy;
+    const y = p[1] * cp - z0 * sp, z = p[1] * sp + z0 * cp;
+    const d = 16, k = 520 / (d - z);
+    return [cv.width / 2 + x * k, cv.height / 2 - y * k, z];
+}
+
+function draw() {
+    g.fillStyle = "#111418"; g.fillRect(0, 0, cv.width, cv.height);
+    g.lineWidth = 1;
+    // painter's order so the near face reads on top
+    const drawn = wall.map((p) => {
+        const pts = p.vs.map(project);
+        let zc = 0; for (const q of pts) zc += q[2];
+        return { pts, z: zc / pts.length, n: p.pl.n };
+    }).sort((a, b) => a.z - b.z);
+    for (const f of drawn) {
+        const lit = Math.abs(f.n[2]) * 0.5 + Math.abs(f.n[0]) * 0.3 + Math.abs(f.n[1]) * 0.2;
+        g.beginPath();
+        f.pts.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]));
+        g.closePath();
+        g.fillStyle = "rgba(" + Math.round(70 + lit * 90) + "," + Math.round(78 + lit * 95) + "," +
+                      Math.round(92 + lit * 100) + ",0.92)";
+        g.fill();
+        g.strokeStyle = "rgba(150,205,255,0.30)"; g.stroke();
+    }
+}
+
+function census() {
+    const E = new Map();
+    const Q = 1e-9, key = (v) => [Math.round(v[0] / Q), Math.round(v[1] / Q), Math.round(v[2] / Q)].join(",");
+    let n = 0;
+    for (const p of wall) for (let i = 0; i < p.vs.length; i++) {
+        const a = p.vs[i], b = p.vs[(i + 1) % p.vs.length];
+        if (Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) < 1e-12) continue;
+        n++; const k = key(a) + "|" + key(b); E.set(k, (E.get(k) || 0) + 1);
+    }
+    let un = 0;
+    for (const [k] of E) { const [a, b] = k.split("|"); if ((E.get(b + "|" + a) || 0) !== 1 || E.get(k) !== 1) un++; }
+    return { edges: n, unmatched: un };
+}
+
+function show() {
+    const c = census(), v = CSG.volume(wall);
+    $("stats").textContent =
+        "blasts        " + shots + (settled ? "  (settled)" : "") + "\n" +
+        "polygons      " + wall.length + "\n" +
+        "directed edge " + c.edges + "\n" +
+        "unmatched     " + c.unmatched + "  (" + (100 * c.unmatched / Math.max(1, c.edges)).toFixed(2) + "%)\n" +
+        "volume        " + v.toFixed(6) + "  of " + V0.toFixed(6) + "\n" +
+        "removed       " + (100 * (1 - v / V0)).toFixed(2) + "%\n" +
+        "last op       " + lastMs.toFixed(1) + " ms";
+}
+
+$("hit").onclick = () => {
+    const r = +$("r").value / 100, rough = +$("j").value / 100, sub = +$("s").value;
+    // put the blast on the face, somewhere it will actually bite
+    const c = [(Math.random() * 2 - 1) * (HALF[0] - r), (Math.random() * 2 - 1) * (HALF[1] - r), 0];
+    const blob = CSG.jaggedBlob(c, r, sub, seed++, { rough, floor: 1 - rough });
+    const { select } = CSG.bvhSelect(wall);
+    const t0 = performance.now();
+    wall = CSG.blast(wall, blob, { select }).polys;
+    lastMs = performance.now() - t0;
+    shots++; settled = false; draw(); show();
+};
+$("settle").onclick = () => {
+    const t0 = performance.now();
+    wall = CSG.settle(wall).polys;
+    lastMs = performance.now() - t0;
+    settled = true; draw(); show();
+};
+$("reset").onclick = () => {
+    wall = CSG.boxPolys([0, 0, 0], HALF); shots = 0; lastMs = 0; settled = false; draw(); show();
+};
+for (const [id, el, fmt] of [["r", "rv", (v) => (v / 100).toFixed(2)], ["j", "jv", (v) => (v / 100).toFixed(2)],
+                             ["s", "sv", (v) => String(v)]]) {
+    $(id).oninput = () => { $(el).textContent = fmt(+$(id).value); };
+    $(id).oninput();
+}
+cv.onpointerdown = (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; };
+cv.onpointerup = () => { drag = null; cv.style.cursor = "grab"; };
+cv.onpointermove = (e) => {
+    if (!drag) return;
+    yaw += (e.clientX - drag[0]) * 0.008; pitch += (e.clientY - drag[1]) * 0.008;
+    pitch = Math.max(-1.4, Math.min(1.4, pitch)); drag = [e.clientX, e.clientY]; draw();
+};
+draw(); show();
+</script>

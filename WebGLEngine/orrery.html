@@ -9,6 +9,9 @@
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; overflow:hidden; }
   #stage { position:absolute; inset:0; display:block; cursor:grab; }
+  /* The post stage draws HERE, over the 2D canvas, and is hidden until it attaches. It ignores the pointer so
+     every click, drag and scroll still reaches #stage -- the effect must not cost the orrery its interaction. */
+  #fx { position:absolute; inset:0; display:none; pointer-events:none; }
   #stage.zoomed { cursor:zoom-out; }
   .card { position:absolute; background:rgba(11,29,21,0.92); border:1px solid var(--line); border-radius:12px; padding:12px 14px; backdrop-filter:blur(6px); }
   #hud { top:14px; left:14px; max-width:340px; }
@@ -38,6 +41,7 @@
 </head>
 <body>
 <canvas id="stage"></canvas>
+<canvas id="fx"></canvas>
 
 <div class="card" id="hud">
   <h1>SweK ORRERY</h1>
@@ -52,6 +56,7 @@
   <div><i style="background:#33ccff"></i>reached &mdash; never copied in</div>
   <div><i style="border:1.5px dashed #ffcc66;background:none"></i>undated &mdash; inner orbit is a default</div>
   <div style="margin-top:8px"><button id="surf" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:11px">surface: file tree (measured)</button></div>
+  <div style="margin-top:8px"><button id="fxbtn" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:12px">&#9680; signal: off</button> <span id="fxwhy" style="font-size:11px;opacity:.7"></span></div>
 </div>
 
 <div class="card" id="ratchet"><h2>ratchet</h2><p id="rtext">reading&hellip;</p></div>
@@ -86,6 +91,11 @@ function resize() {
     cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d);
     cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
     ctx.setTransform(d, 0, 0, d, 0, 0);
+    // The post target matches the SOURCE exactly. A mismatch would not error -- it would rescale the picture
+    // through the sampler, which is the kind of wrong that looks like a slightly soft frame.
+    const fxc = document.getElementById("fx");
+    fxc.width = cv.width; fxc.height = cv.height;
+    fxc.style.width = innerWidth + "px"; fxc.style.height = innerHeight + "px";
 }
 addEventListener("resize", resize); resize();
 
@@ -106,11 +116,55 @@ if (!raw) {
         : `every body carries licence provenance. Baseline ${UNPAPERED_BASELINE}.`;
 }
 
+// ---- THE POST STAGE -----------------------------------------------------------------------------------------
+//
+// *** THE ORRERY HAD NO SHADER STAGE AT ALL UNTIL v4273, AND THIS IS WHERE IT GETS SWITCHED ON. *** A 2D
+// context cannot run one, so none of the tree's 134 GLSL or 39 WGSL modules could touch this page. The 2D
+// drawing is unchanged and still the product; ui/orreryPost.mjs reads the finished canvas as a texture.
+//
+// It is OFF by default and every failure leaves the page exactly as it was. That is not politeness: the orrery
+// is the thing, and an effect that can break it is worse than no effect. The button says WHY when it cannot
+// attach rather than sitting dead -- v4267 shipped a round whose whole subject was a built page nobody could
+// reach, and a control that fails silently is the same defect wearing a different hat.
+let fx = null, fxOn = false;
+
+async function toggleFx() {
+    const btn = document.getElementById("fxbtn"), why = document.getElementById("fxwhy");
+    const fxc = document.getElementById("fx");
+    if (!fx) {
+        btn.textContent = "\u25C9 attaching\u2026";
+        try {
+            const { makeOrreryPost } = await import("./ui/orreryPost.mjs");
+            fx = await makeOrreryPost(cv, fxc);
+        } catch (e) {
+            fx = { ok: false, reason: "import failed: " + (e && e.message ? e.message : String(e)) };
+        }
+        if (!fx.ok) {
+            // *** THE REASON IS SHOWN, NOT SWALLOWED. *** ui/orreryPost.mjs returns a sentence naming which
+            // backend it got and why that backend cannot carry a post stage; printing it to a console nobody
+            // has open would be the same as saying nothing.
+            btn.textContent = "\u25CB signal: unavailable";
+            btn.disabled = true;
+            why.textContent = fx.reason;
+            return;
+        }
+        fx.setEffect("badTv");
+    }
+    fxOn = !fxOn;
+    fxc.style.display = fxOn ? "block" : "none";
+    btn.textContent = fxOn ? "\u25C9 signal: on" : "\u25CB signal: off";
+    why.textContent = fxOn ? ("via " + fx.backend) : "";
+}
+document.getElementById("fxbtn").addEventListener("click", toggleFx);
+
 function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (playing && system) { t += dt * SPAN; document.getElementById("scrub").value = String(Math.round((t % slowestPeriod(system)) * 10)); }
     ctx.fillStyle = "#06120b"; ctx.fillRect(0, 0, innerWidth, innerHeight);
     if (system) draw();
+    // *** THE 2D FRAME IS FINISHED BEFORE THE EFFECT READS IT. *** The post stage samples #stage as a texture,
+    // so it must run after drawSystem and not beside it; uploading mid-draw would show a half-built system.
+    if (fx && fx.ok && fxOn) fx.draw(t);
     requestAnimationFrame(frame);
 }
 

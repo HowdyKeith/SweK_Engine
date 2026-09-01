@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK &middot; Sound Effects as Data</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#ff6b5e; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .wrap { max-width:940px; margin:0 auto; padding:34px 22px 70px; }
+  h1 { font-size:20px; color:var(--amber); margin:0 0 6px; letter-spacing:1px; }
+  .lede { color:var(--dim); margin:0 0 22px; font-size:12.5px; max-width:70ch; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin:0 0 16px; }
+  h2 { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); margin:0 0 12px; }
+  button { background:transparent; border:1px solid var(--line); color:var(--amber); border-radius:9px; padding:7px 14px; cursor:pointer; font:inherit; font-size:12px; margin:0 6px 6px 0; }
+  button:hover { border-color:var(--amber); }
+  button.on { background:var(--amber); color:#06120b; font-weight:700; }
+  canvas { width:100%; height:130px; display:block; background:#040d08; border:1px solid var(--line); border-radius:9px; }
+  label { display:block; margin:9px 0 1px; color:var(--dim); font-size:11px; }
+  input[type=range] { width:100%; accent-color:var(--amber); }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 18px; }
+  table { width:100%; border-collapse:collapse; font-size:11.5px; }
+  th { text-align:left; color:var(--dim); font-weight:400; padding:3px 8px 6px 0; border-bottom:1px solid var(--line); }
+  td { padding:3px 8px 3px 0; }
+  td.sha { color:var(--cyan); }
+  .num { color:var(--amber); }
+  .note { color:var(--dim); font-size:11.5px; margin:10px 0 0; }
+  @media (max-width:660px){ .grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SOUND EFFECTS AS DATA</h1>
+  <p class="lede">Every sound in this engine was a live Web Audio node graph &mdash; it played, and it could never be
+  tested. These are parameter blocks that render to samples, so a sound has an artefact you can look at, compare
+  between runs, and hash. The waveform below is the real buffer; the hash is of its 16-bit PCM.</p>
+
+  <div class="card">
+    <h2>presets</h2>
+    <div id="presets"></div>
+    <canvas id="wave" width="1800" height="260"></canvas>
+    <p class="note" id="stat">&nbsp;</p>
+  </div>
+
+  <div class="card">
+    <h2>the block</h2>
+    <div class="grid">
+      <div>
+        <label>frequency start <span class="num" id="vF">440</span> Hz</label>
+        <input type="range" id="f0" min="30" max="2400" step="1" value="440" />
+        <label>slide <span class="num" id="vS">0</span> Hz/s</label>
+        <input type="range" id="sl" min="-3000" max="3000" step="10" value="0" />
+      </div>
+      <div>
+        <label>sustain <span class="num" id="vSu">0.10</span> s</label>
+        <input type="range" id="su" min="0" max="0.5" step="0.005" value="0.10" />
+        <label>decay <span class="num" id="vD">0.20</span> s</label>
+        <input type="range" id="dc" min="0" max="1" step="0.005" value="0.20" />
+      </div>
+      <div>
+        <label>punch <span class="num" id="vP">0.30</span></label>
+        <input type="range" id="pu" min="0" max="1" step="0.01" value="0.30" />
+        <label>low pass <span class="num" id="vL">1.00</span></label>
+        <input type="range" id="lp" min="0.02" max="1" step="0.01" value="1" />
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span id="waves"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>determinism</h2>
+    <p class="note">Each preset rendered twice. The same block must give the same bytes &mdash; that is the claim
+    the gate holds, and this is it in your browser.</p>
+    <table id="det"><thead><tr><th>preset</th><th>samples</th><th>seconds</th><th>peak</th><th>sha256 (twice)</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script type="module">
+import { renderSfx, renderPreset, toPCM16, PRESETS, WAVES } from "./audio/sfxModel.mjs";
+import { SfxPlayer } from "./audio/sfxPlay.js";
+
+const S = (id) => document.getElementById(id);
+const player = new SfxPlayer();
+let wave = "square", current = null;
+
+async function sha(samples) {
+    const pcm = toPCM16(samples);
+    // window.crypto, spelled out: `crypto` bare is also a NODE builtin, and tools/ship/unboundBuiltin.mjs
+    // exists because a page reaching for a node module crashes the moment it opens. Naming the window makes
+    // it unambiguous to that scanner and to a reader that this is Web Crypto.
+    const d = await window.crypto.subtle.digest("SHA-256", pcm.buffer);
+    return [...new Uint8Array(d)].slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function draw(r) {
+    const cv = S("wave"), x = cv.getContext("2d");
+    x.clearRect(0, 0, cv.width, cv.height);
+    x.strokeStyle = "rgba(120,160,140,0.35)"; x.beginPath();
+    x.moveTo(0, cv.height / 2); x.lineTo(cv.width, cv.height / 2); x.stroke();
+    const n = r.samples.length;
+    if (!n) return;
+    // min/max per column, so a 28000-sample buffer in 1800 columns shows its ENVELOPE rather than
+    // whichever sample happened to land on each pixel -- the same point the Chuck Close cell mean makes
+    x.strokeStyle = "#9fe6c0"; x.lineWidth = 1; x.beginPath();
+    for (let c = 0; c < cv.width; c++) {
+        const a = Math.floor(c * n / cv.width), b = Math.max(a + 1, Math.floor((c + 1) * n / cv.width));
+        let lo = 1, hi = -1;
+        for (let i = a; i < b && i < n; i++) { const v = r.samples[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        x.moveTo(c + 0.5, cv.height / 2 - hi * cv.height / 2);
+        x.lineTo(c + 0.5, cv.height / 2 - lo * cv.height / 2);
+    }
+    x.stroke();
+}
+
+async function show(r, label) {
+    current = r;
+    draw(r);
+    const h = await sha(r.samples);
+    S("stat").innerHTML = `${label} &mdash; <span class="num">${r.samples.length}</span> samples, ` +
+        `<span class="num">${r.seconds.toFixed(3)}</span> s, peak <span class="num">${r.peak.toFixed(3)}</span>, ` +
+        `clipped <span class="num">${r.clipped}</span>, last sample <span class="num">${r.samples[r.samples.length - 1]}</span> ` +
+        `&mdash; sha256 <span style="color:var(--cyan)">${h}</span>`;
+}
+
+for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.onclick = () => { const r = renderPreset(name); show(r, name); player.play(name); };
+    S("presets").appendChild(b);
+}
+for (const w of WAVES) {
+    const b = document.createElement("button");
+    b.textContent = w; b.className = w === wave ? "on" : "";
+    b.onclick = () => { wave = w; for (const o of S("waves").children) o.className = o.textContent === w ? "on" : ""; live(); };
+    S("waves").appendChild(b);
+}
+
+function params() {
+    return {
+        wave, seed: 7, lowPass: Number(S("lp").value),
+        volume: { attack: 0.005, sustain: Number(S("su").value), punch: Number(S("pu").value), decay: Number(S("dc").value), gain: 0.32 },
+        frequency: { start: Number(S("f0").value), slide: Number(S("sl").value), min: 20 },
+    };
+}
+function live(play = true) {
+    const r = renderSfx(params());
+    show(r, "custom block");
+    if (play) player.playParams(params());
+}
+for (const [id, out, dp] of [["f0", "vF", 0], ["sl", "vS", 0], ["su", "vSu", 2], ["dc", "vD", 2], ["pu", "vP", 2], ["lp", "vL", 2]]) {
+    S(id).addEventListener("input", () => { S(out).textContent = Number(S(id).value).toFixed(dp); live(false); });
+    S(id).addEventListener("change", () => live(true));
+}
+
+// the determinism table: render each preset twice and show both hashes
+(async () => {
+    const tb = S("det").querySelector("tbody");
+    for (const name of Object.keys(PRESETS)) {
+        const a = renderPreset(name), b = renderPreset(name);
+        const [ha, hb] = [await sha(a.samples), await sha(b.samples)];
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${name}</td><td class="num">${a.samples.length}</td><td class="num">${a.seconds.toFixed(3)}</td>` +
+            `<td class="num">${a.peak.toFixed(3)}</td><td class="sha">${ha} ${ha === hb ? "= " + hb : "&ne; " + hb}</td>`;
+        tb.appendChild(tr);
+    }
+    window.__sfxReady = true;
+})();
+
+window.sfx = { player, renderSfx, renderPreset, params, sha };
+show(renderPreset("coin"), "coin");
+</script>
+</body>
+</html>

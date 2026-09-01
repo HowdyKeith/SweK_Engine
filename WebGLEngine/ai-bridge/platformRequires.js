@@ -35,7 +35,22 @@
 // constraint hide inside the word "unconstrained". `unknown: true` is UNMET on every machine -- fail closed, the
 // same direction as an unreadable macOS version -- and it clears the moment somebody measures it and replaces it
 // with a real block.
-const KNOWN = ["os", "arch", "macosMin", "unknown", "why"];
+// v4291 -- *** THE FIRST ROW WHOSE SUPPORT SET IS NOT A PRODUCT. *** os and arch are independent membership
+// tests, and every constrained row until now happened to be expressible that way: win32-only, darwin-only,
+// darwin+arm64. @node-3d ships PREBUILT binaries for exactly four platform/arch PAIRS -- win32-x64, linux-x64,
+// darwin-x64 and linux-arm64 -- and there is no build for darwin-arm64 or win32-arm64. That set is not a
+// product of independent constraints, and BOTH spellings of it in the old schema are wrong:
+//
+//   os:[win32,linux,darwin] arch:[x64]          refuses linux-arm64, which actually works
+//   os:[win32,linux,darwin] arch:[x64,arm64]    ADMITS darwin-arm64, which has no binary at all
+//
+// The second is the dangerous one, and it is precisely the failure this file was written to end: recommending
+// software to an Apple Silicon Mac that cannot run there, the app-apple-container hole with the architectures
+// swapped. So `platforms` takes an explicit allow-list of "<platform>-<arch>" pairs, checked as a SET.
+//
+// It COMBINES with os/arch rather than replacing them -- every declared requirement must hold. Narrowing is
+// always safe; a row that wants both gets both.
+const KNOWN = ["os", "arch", "platforms", "macosMin", "unknown", "why"];
 
 /**
  * env: { platform, arch, macosVersion }  -- platform/arch as Node reports them ("darwin"/"win32"/"linux",
@@ -54,6 +69,12 @@ function checkRequires(requires, env) {
     }
     if (Array.isArray(requires.arch) && requires.arch.length) {
         if (!requires.arch.includes(env.arch)) unmet.push({ field: "arch", need: requires.arch.join(" or "), got: env.arch });
+    }
+    // A PAIR TEST, because "which OSes" and "which chips" cannot express "this chip on that OS".
+    if (Array.isArray(requires.platforms) && requires.platforms.length) {
+        const pair = env.platform + "-" + env.arch;
+        if (!requires.platforms.includes(pair))
+            unmet.push({ field: "platforms", need: requires.platforms.join(", "), got: pair });
     }
     if (typeof requires.macosMin === "number") {
         if (env.platform !== "darwin") {
@@ -86,6 +107,9 @@ function explain(id, result, requires) {
     if (requires && requires.why) s += " " + requires.why;
     // A refusal that reads as a bug gets worked around. Say which kind it is.
     if (result.unmet.some((u) => u.field === "arch")) s += " An architecture refusal is not fixed by an OS upgrade.";
+    // A pair refusal reads as an arch refusal and is not one: the same chip is supported on a different OS.
+    if (result.unmet.some((u) => u.field === "platforms"))
+        s += " This is a MISSING PREBUILT for this exact OS-and-chip combination, not a limit of either on its own.";
     if (result.unmet.some((u) => u.unknown)) s += " Nothing was installed: a requirement that could not be checked is not a requirement met.";
     return s;
 }

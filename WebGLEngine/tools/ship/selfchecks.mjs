@@ -120,16 +120,63 @@ if (process.argv.includes("--affected")) {
         console.log("[selfchecks] --affected needs at least one changed file. Refusing to run a filtered set on an empty filter -- 0 of 0 passing is a pass that means nothing.");
         process.exit(2);
     }
+    // v4283 -- *** THE FORM OF THESE STRINGS WAS NEVER CHECKED, AND THE DOCUMENTED WORKFLOW PRODUCES THE
+    // WRONG ONE. *** affected.mjs matches ENGINE-RELATIVE paths. `git diff --name-only` prints REPO-relative
+    // ones -- "WebGLEngine/main.js" -- from every directory, and HANDOFF.md tells you to feed changed files
+    // to this flag. The two do not compose: every path misses, no gate is selected, and a run of no gates
+    // EXITS ZERO looking exactly like the good news that your change was well contained.
+    const { normaliseChanged, refusalLines } = await import("./changedPaths.mjs");
+    const cp = normaliseChanged(changed);
+    for (const n of cp.notes) console.log("[selfchecks] --affected normalised: " + n);
+    if (cp.refusals.length) {
+        for (const line of refusalLines(cp)) console.log("[selfchecks] " + line);
+        process.exit(2);
+    }
+    if (cp.outside.length)
+        console.log("[selfchecks] --affected: " + cp.outside.length + " path(s) are outside the engine and reach no gate by construction: " +
+                    cp.outside.map((c) => c.detail).join(" "));
+    if (!cp.resolved.length) {
+        console.log("[selfchecks] every path given is outside the engine, so no gate can reach any of them.");
+        console.log("[selfchecks] Refusing: 0 of 0 passing is a pass that means nothing.");
+        process.exit(2);
+    }
     const { affectedGates } = await import("./affected.mjs");
-    const a = affectedGates(changed);
+    const a = affectedGates(cp.resolved);
     const keep = new Set(a.gates);
-    all = all.filter((p) => keep.has(path.relative(ROOT, p).replace(/\\/g, "/")));
-    console.log("[selfchecks] --affected: " + all.length + " of " + a.total + " gates reach " + changed.length +
+    // *** v4283 -- RELATIVISED TWICE, AND THE SECOND ONE RESOLVED AGAINST THE WORKING DIRECTORY. ***
+    // walk() already returns ROOT-relative paths. Calling path.relative(ROOT, p) on one of those resolves p
+    // against process.cwd(), so it only came out right when the runner happened to be invoked FROM the engine
+    // root. From the repository root -- which is where `git diff` is run and where the ship ritual stands --
+    // every path became "../tools/ship/..." , matched nothing, and --affected selected ZERO gates and exited
+    // green. The tell was printed on the very next line and read past for versions: "0 of 1355 gates reach 3
+    // changed file(s) (0.1%)" -- a count of zero beside a fraction that is not zero, because the ANALYSIS
+    // found the gate and the RUNNER dropped it. The two now have to agree, and the check below says so.
+    all = all.filter((p) => keep.has(p.replace(/\\/g, "/")));
+    if (all.length !== a.gates.length) {
+        console.log("[selfchecks] *** the selector found " + a.gates.length + " gate(s) and the runner kept " +
+                    all.length + ". Those must agree; a runner that silently drops selected gates is a green ***");
+        console.log("[selfchecks] *** light on unrun checks, which is the exact failure --affected exists to prevent. ***");
+        process.exit(2);
+    }
+    console.log("[selfchecks] --affected: " + all.length + " of " + a.total + " gates reach " + cp.resolved.length +
                 " changed file(s) (" + (100 * a.fraction).toFixed(1) + "%)");
     console.log("[selfchecks] PRE-FILTER, NOT A SHIP. verify.mjs is not decomposable and still catches what these cannot.");
     if (!all.length) {
         console.log("[selfchecks] no gate reaches those files. That is a real answer AND worth a second look:");
         console.log("[selfchecks] a module no check can reach is the graveyard census's whole subject.");
+    }
+    // v4283 -- *** --select-only: PRINT THE PLAN AND RUN NOTHING, AND SAY SO IN THE EXIT CODE. ***
+    //
+    // Added because this round's gate needed to ask "what would you select" without paying for 96 gates, and
+    // because a sabotage that makes a check HANG instead of go RED is an unusable signal -- which is exactly
+    // what happened: breaking the comma refusal let the runner fall through to a real twenty-minute run.
+    //
+    // IT EXITS 3, NOT 0. A flag that runs no checks and returns success is the identical shape to the two
+    // silent green lights this round exists to close, and it would be a worse one for being deliberate.
+    // Three means "a selection, not a verdict", and nothing can mistake it for a ship.
+    if (process.argv.includes("--select-only")) {
+        console.log("[selfchecks] --select-only: NOTHING WAS RUN. The list above is a plan, not a result.");
+        process.exit(3);
     }
 }
 let toRun = all.filter((f) => f !== SELF && !ALREADY_GATED.has(f) && !SKIP.has(f));
@@ -151,8 +198,12 @@ if (process.argv.includes("--budget")) {
         process.exit(2);
     }
     const { selectGates, selectionLines } = await import("./gateSelection.mjs");
+    // v4283 -- THE PLANNER GOT THE RAW ARGV, WHICH IS THE SAME UNCHECKED FORM. A budget plan built on paths
+    // that match nothing orders every gate as unreachable, so the "gates the change can reach were dropped
+    // for time" warning -- the one thing keeping --budget honest -- could never fire.
+    const { normaliseChanged: normPlan } = await import("./changedPaths.mjs");
     const changedForPlan = process.argv.includes("--affected")
-        ? process.argv.slice(process.argv.indexOf("--affected") + 1).filter((a) => !a.startsWith("--"))
+        ? normPlan(process.argv.slice(process.argv.indexOf("--affected") + 1).filter((a) => !a.startsWith("--"))).resolved
         : [];
     let ledger = null;
     try { ledger = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "roundhouse", "perf-ledger.json"), "utf8")); } catch {}

@@ -1,0 +1,186 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>effectMerge harness</title>
+<canvas id="c" width="64" height="48"></canvas>
+<script type="module">
+import * as EM from "/render/effectMerge.mjs";
+
+const W = 64, H = 48;
+const gl = document.getElementById("c").getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
+window.__gl = gl;
+const floatOK = !!gl.getExtension("EXT_color_buffer_float");
+window.__floatOK = floatOK;
+
+function compile(vs, fs) {
+    const p = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + "\n" + src);
+        gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+// the source image: a gradient in R and G, a stripe in B, opaque. A gradient is what makes a displaced
+// sample visible as a different value rather than as the same flat colour moved sideways.
+const srcBytes = new Uint8Array(W * H * 4);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    srcBytes[i] = Math.round(255 * x / (W - 1));
+    srcBytes[i + 1] = Math.round(255 * y / (H - 1));
+    srcBytes[i + 2] = ((x + y) % 8) < 4 ? 220 : 40;
+    srcBytes[i + 3] = 255;
+}
+function makeTex(bytes, float) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    if (float) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes || null);
+    for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST);
+    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+    return t;
+}
+function makeFBO(tex) {
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    return f;
+}
+const vao = gl.createVertexArray();          // no attributes: the vertex stage builds the triangle from gl_VertexID
+
+let drawCount = 0;
+function drawWith(prog, inputTex, targetFBO, setUniforms) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targetFBO);
+    gl.viewport(0, 0, W, H);
+    gl.useProgram(prog);
+    gl.bindVertexArray(vao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, inputTex);
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+    const sz = gl.getUniformLocation(prog, "uSize");
+    if (sz) gl.uniform2f(sz, W, H);
+    setUniforms(prog);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    drawCount++;
+}
+function readOut(fbo) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    const px = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return px;
+}
+const setter = (map, vals) => (prog) => {
+    for (const [knob, mangled] of Object.entries(map)) {
+        const loc = gl.getUniformLocation(prog, mangled);
+        if (loc) gl.uniform1f(loc, vals[knob]);
+    }
+};
+
+/** Render the chain merged and unmerged and compare. mode: "float" | "rgba8" for the INTERMEDIATE format. */
+window.__compare = (chain, knobs, mode) => {
+    const srcTex = makeTex(srcBytes, false);
+    const float = mode === "float" && floatOK;
+
+    // ---- merged: one draw per run (this chain plans to one) ----
+    drawCount = 0;
+    const plan = EM.mergeChain(chain);
+    const outM = makeTex(null, false), fboM = makeFBO(outM);
+    let input = srcTex;
+    for (const run of plan) {
+        const prog = compile(EM.VERT, run.frag);
+        drawWith(prog, input, fboM, (p) => {
+            for (const name of run.names) setter(run.uniforms[name], knobs[name])(p);
+        });
+    }
+    const mergedPx = readOut(fboM);
+    const mergedDraws = drawCount;
+
+    // ---- chained: one draw per effect, through an intermediate of the requested format ----
+    drawCount = 0;
+    const ping = [makeTex(null, float), makeTex(null, float)];
+    const pfbo = [makeFBO(ping[0]), makeFBO(ping[1])];
+    const outC = makeTex(null, false), fboC = makeFBO(outC);
+    input = srcTex;
+    chain.forEach((e, i) => {
+        const last = i === chain.length - 1;
+        const run = { effects: [e], kind: EM.classify(e) };
+        const m = EM.mergeRun(run);
+        const prog = compile(EM.VERT, m.frag);
+        drawWith(prog, input, last ? fboC : pfbo[i % 2], setter(m.uniforms[e.name], knobs[e.name]));
+        input = ping[i % 2];
+    });
+    const chainPx = readOut(fboC);
+    const chainDraws = drawCount;
+
+    let worst = 0, over1 = 0, over2 = 0;
+    for (let i = 0; i < W * H * 4; i++) {
+        if (i % 4 === 3) continue;
+        const d = Math.abs(mergedPx[i] - chainPx[i]);
+        if (d > worst) worst = d;
+        if (d > 1) over1++;
+        if (d > 2) over2++;
+    }
+    return { worst, over1, over2, pixels: W * H, mergedDraws, chainDraws, float, floatOK };
+};
+
+/**
+ * Does the one triangle actually reach every pixel? Clear to a sentinel nothing renders, draw a pass-through
+ * effect, and count what still carries it. The comparisons above use the same vertex stage on both sides, so
+ * a triangle that covered half the screen would agree with itself and tell nobody.
+ */
+window.__coverage = () => {
+    const srcTex = makeTex(srcBytes, false);
+    const out = makeTex(null, false), fbo = makeFBO(out);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(1.0, 0.0, 1.0, 1.0);          // magenta: the source image never produces it
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const m = EM.mergeRun({ effects: [{ name: "id", uniforms: {}, glsl: "return c;" }], kind: EM.COLOUR });
+    drawWith(compile(EM.VERT, m.frag), srcTex, fbo, () => {});
+    const px = readOut(fbo);
+    let untouched = 0;
+    for (let i = 0; i < W * H; i++) {
+        if (px[i * 4] === 255 && px[i * 4 + 1] === 0 && px[i * 4 + 2] === 255) untouched++;
+    }
+    return { untouched, pixels: W * H };
+};
+
+/**
+ * FORCE the arrangement planRuns refuses: a colour effect followed by a SAMPLING effect, jammed into one
+ * merged run by hand. It compiles and runs. The point is how far the picture moves.
+ */
+window.__illegalMerge = (knobs) => {
+    const GRADE = { name: "grade", uniforms: { exposure: "uExp" }, glsl: "c.rgb *= uExp; return c;" };
+    const TEAR  = { name: "tear",  uniforms: { amount: "uAmt" },
+                    glsl: "return texture(tex, vec2(fract(uv.x + uAmt), uv.y));" };
+    const srcTex = makeTex(srcBytes, false);
+
+    // the illegal single draw
+    const bad = EM.mergeRun({ effects: [GRADE, TEAR], kind: EM.COLOUR });
+    const outB = makeTex(null, false), fboB = makeFBO(outB);
+    const progB = compile(EM.VERT, bad.frag);
+    drawWith(progB, srcTex, fboB, (p) => { setter(bad.uniforms.grade, knobs.grade)(p); setter(bad.uniforms.tear, knobs.tear)(p); });
+    const badPx = readOut(fboB);
+
+    // the legal two draws, float intermediate so the chain is not the thing being blamed
+    const mid = makeTex(null, floatOK), fmid = makeFBO(mid);
+    const outG = makeTex(null, false), fboG = makeFBO(outG);
+    const m1 = EM.mergeRun({ effects: [GRADE], kind: EM.COLOUR });
+    const m2 = EM.mergeRun({ effects: [TEAR], kind: EM.SAMPLING });
+    drawWith(compile(EM.VERT, m1.frag), srcTex, fmid, setter(m1.uniforms.grade, knobs.grade));
+    drawWith(compile(EM.VERT, m2.frag), mid, fboG, setter(m2.uniforms.tear, knobs.tear));
+    const goodPx = readOut(fboG);
+
+    let worst = 0, over2 = 0;
+    for (let i = 0; i < W * H * 4; i++) {
+        if (i % 4 === 3) continue;
+        const d = Math.abs(badPx[i] - goodPx[i]);
+        if (d > worst) worst = d;
+        if (d > 2) over2++;
+    }
+    return { worst, over2, pixels: W * H * 3 };
+};
+</script>

@@ -6,9 +6,16 @@
 // draws -- is unified.
 "use strict";
 
+import { checkHostUniforms } from "../render/wgslLayout.mjs";
+
 
 // std140-ish uniform layout: compute each uniform's byte offset + the total (padded to 16) so the WebGPU backend can
 // pack a single uniform buffer. sizes/alignments: f32 4/4, vec2 8/8, vec3 12/16, vec4 16/16, mat4 64/16.
+// *** THE SIZE HERE IS THE UNIFORM-ADDRESS-SPACE SIZE, AND NOTHING SAID SO UNTIL v4278. ***
+// `Math.max(16, ...)` is not a defensive minimum -- it is WGSL's rule that a struct in the uniform space is
+// aligned to RoundUp(16, its natural alignment). render/wgslLayout.mjs computes the same number from the
+// shader text and agrees with this function exactly; it returns 24 for badTvWgsl's six-f32 struct under the
+// STORAGE rule and 32 under this one. Two files, two right answers, to a question neither had named.
 function _uniformLayout(uniforms) {
     const SZ = { f32: 4, vec2: 8, vec3: 12, vec4: 16, mat4: 64 }, AL = { f32: 4, vec2: 8, vec3: 16, vec4: 16, mat4: 16 };
     let off = 0; const offsets = {};
@@ -50,7 +57,14 @@ function webgl2Backend(canvas, opts = {}) {
         backend: "webgl2", gl,
         buffer: (d) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, d.data, gl.STATIC_DRAW); return { gl: b, count: (d.count || (d.data.length / (d.components || 1))) }; },
         pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, _u: {} }),
-        texture: (d) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, d.width, d.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, d.data || null); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); return { gl: t }; },
+        // *** `source` ACCEPTS A CANVAS OR IMAGE, WHICH v4273's FIRST REAL CONSUMER NEEDED AND THIS DID NOT HAVE.
+        // *** ui/orreryPost.mjs feeds the orrery's 2D canvas through a post effect, and a post stage's source is
+        // ALWAYS an already-drawn surface. This only took {width, height, data} -- raw bytes -- so the only way
+        // to use a canvas was getImageData() every frame, a full readback to hand back something the GL call can
+        // take directly. The two-argument form of texImage2D does it with no copy. `data` still works unchanged.
+        texture: (d) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+            if (d.source) { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !!d.flipY); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, d.source); }
+            else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, d.width, d.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, d.data || null); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); return { gl: t }; },
         frame: (fn) => {
             let cur = null;
             const pass = {
@@ -78,6 +92,36 @@ async function webgpuBackend(canvas, opts = {}) {
         backend: "webgpu", gpu, ctx, fmt,
         buffer: (d) => { const b = gpu.createBuffer({ size: d.data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }); gpu.queue.writeBuffer(b, 0, d.data); return { gpu: b, count: (d.count || (d.data.length / (d.components || 1))) }; },
         pipeline: (d) => {
+            // *** REFUSE BY NAME RATHER THAN HAND THE GPU `undefined`. *** v4269 counted what can actually take
+            // this backend: 118 modules in this tree ship GLSL, 38 ship WGSL, and 5 ship both. So a pipeline
+            // arriving here with no wgsl is the COMMON case, not a freak one, and until now it reached
+            // createShaderModule as `code: undefined` -- a driver-shaped error naming neither the pipeline nor
+            // the missing language. The abstraction's whole promise is that a render travels; when one cannot,
+            // the caller is owed the reason in the terms the contract is written in.
+            if (!d.shaders || typeof d.shaders.wgsl !== "string") {
+                throw new Error("gfx/device: this pipeline has no WGSL, so it cannot run on the WebGPU backend. " +
+                    "A pipeline must carry both { wgsl } and { glsl }; this one carries " +
+                    (d.shaders && typeof d.shaders.glsl === "string" ? "only glsl" : "neither") +
+                    ". Request the webgl2 backend, or add a WGSL path -- see render/backendParity.mjs.");
+            }
+            // *** AND THE SECOND THING THIS PIPELINE NEVER CHECKED: THAT THE HOST AND THE SHADER AGREE ABOUT
+            // WHAT THE UNIFORM BUFFER CONTAINS. *** `layout: "auto"` below means WebGPU derives the real
+            // buffer layout FROM THE SHADER, while _uniformLayout() computes write offsets from `d.uniforms`
+            // -- a list the CALLER supplies, in the caller's order. Reorder either and every value lands in
+            // the wrong field. The module compiles. The pipeline builds. The pass runs. The draw completes.
+            // Nothing in that chain has an error to raise, which is exactly why this one has to be asked for.
+            //
+            // It refuses only on a POSITIVE disagreement: render/wgslLayout.mjs returns ok with a reason
+            // whenever it cannot resolve the struct, so a shader this scanner does not understand is passed
+            // through untouched rather than blocked by a scanner's shortcoming.
+            const agree = checkHostUniforms(d.shaders.wgsl, d.uniforms);
+            if (!agree.ok) {
+                throw new Error("gfx/device: this pipeline's uniform list does not match the struct its WGSL " +
+                    "declares, so every uniform would be written at the wrong offset and the draw would " +
+                    "succeed anyway. " + agree.complaints.join("; ") +
+                    ". The shader is the authority on its own layout -- derive the list from it (see " +
+                    "render/wgslLayout.mjs fieldOrder) rather than restating it here.");
+            }
             const mod = gpu.createShaderModule({ code: d.shaders.wgsl });
             const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers: [{ arrayStride: d.stride, attributes: d.attributes.map((a, i) => ({ shaderLocation: i, offset: a.offset, format: a.wgpuFormat || ("float32x" + a.size) })) }] }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
             let ubuf = null, bind = null, uni = null;
@@ -92,7 +136,26 @@ async function webgpuBackend(canvas, opts = {}) {
                 use: (p) => { rp.setPipeline(p.pipe); if (p.bind) rp.setBindGroup(0, p.bind); cur = p; },
                 vertices: (b) => rp.setVertexBuffer(0, b.gpu),
                 uniform: (n, v) => { if (!cur || !cur.ubuf || !cur.uni || cur.uni.offsets[n] == null) return; const data = (v instanceof Float32Array) ? v : Float32Array.from(Array.isArray(v) ? v : [v]); gpu.queue.writeBuffer(cur.ubuf, cur.uni.offsets[n], data); },
-                texture: () => {}, draw: (n) => rp.draw(n)
+                // *** THIS WAS `() => {}` AND IT SILENTLY DROPPED EVERY TEXTURE BIND. *** v4273 attached the
+                // first non-demo consumer -- ui/orreryPost.mjs, a post stage reading the orrery's 2D canvas --
+                // and that is what surfaced it: the pipeline builds without throwing, this runs, nothing is
+                // bound, and the frame draws without its source. A post-processing effect is a texture
+                // consumer BY DEFINITION, so the practical reading is that this backend can carry a
+                // texture-free render and no post effect at all, while WebGL2 carries both. Neither the
+                // pipeline nor the pass said so.
+                //
+                // Implementing it properly means declaring texture and sampler bindings at pipeline creation
+                // and building the bind group from them, which is surgery on a module with existing
+                // consumers. Until that round, it REFUSES BY NAME -- the same choice v4269 made for a
+                // pipeline arriving with no WGSL. A caller that cannot have the feature is owed the reason,
+                // not a picture with the source missing.
+                texture: (n) => {
+                    throw new Error("gfx/device: the WebGPU backend cannot bind textures yet, so pass.texture(" +
+                        JSON.stringify(n) + ") cannot be honoured. It was a silent no-op until v4273. Request " +
+                        "the webgl2 backend for anything that samples a texture -- see ui/orreryPost.mjs, " +
+                        "which does exactly that and says why.");
+                },
+                draw: (n) => rp.draw(n)
             };
             fn({ pass, device: dev }); if (rp) rp.end(); gpu.queue.submit([enc.finish()]);
         },

@@ -363,7 +363,21 @@ export const SECTIONS = [
     // v4109 -- label renamed to "File Transfer Utils" (id/tab stay "nearshare" -- see server.html's tab button
     // for why). Keith: "NearShare is an app, that button could rename to File Transfer Utils, and both could
     // be in there" -- referring to pairlane.html, added to pages[] below in the same round.
-    { id: "nearshare", tab: "nearshare", label: "File Transfer Utils", note: "appended",
+    // v4211 -- RENAMED "Peer 2 Peer", and the two torrent pages JOIN. Keith: "I think we have a file transfer
+    // button, and that would be better served as a 'Peer 2 Peer' button and we can put the p2p options in that
+    // panel. nearshare maybe. We have a torrent re-skin app with voxels i think." He is right that it exists:
+    // torrents.html is "Torrents -- Voxel View" ("each tower is a download, lit cubes are progress, color is
+    // state, glow is speed"), driven by ai-bridge/biglybtBridge.js, and webtorrent.html is its browser-side
+    // sibling on ai-bridge/webtorrentBridge.js.
+    // *** BOTH WERE IN NO PANEL AT ALL. *** Measured: every other page named here resolves to this section,
+    // and those two resolved to none -- present in the GENERATED indexes (launch-index.json, page-index.json)
+    // and so not "orphans" by orphanScan's definition, but absent from the console's own grouping, which is
+    // how a person actually finds a page. That is the v3011 defect one level up ("shipping a module nobody can
+    // reach") in its subtler form: reachable by URL, unreachable by browsing.
+    // The label is the honest one now. v4109 already conceded "this one's own header text is narrower than its
+    // real membership" and deferred the regroup as "a bigger reorg ... that nobody has asked for yet"; the ask
+    // has arrived, so the deferral ends. THE id AND tab STAY "nearshare" -- see server.html's tab button.
+    { id: "nearshare", tab: "nearshare", label: "Peer 2 Peer", note: "appended",
       // v4109 -- pairlane.html JOINS. Keith: "pairlane should also show up under a File Transfer panel. or a
       // more general panel too, but i dont know which." There is no dedicated File Transfer panel -- this one's
       // own header text is narrower than its real membership (Quick Share / Nearby Sharing specifically), but
@@ -371,7 +385,9 @@ export const SECTIONS = [
       // which is the closer match than any topic drawer. A dedicated panel is a bigger reorg (regrouping
       // webtorrent/copyparty/the trusted-peer transfer too) that nobody has asked for yet; this is the minimal,
       // honest placement today.
-      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html"] },
+      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html",
+              // v4211 -- the two BitTorrent front doors, which belonged to no panel before this round.
+              "torrents.html", "webtorrent.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 

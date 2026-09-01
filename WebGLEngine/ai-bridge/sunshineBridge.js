@@ -277,6 +277,68 @@ async function adbDevices() {
 const PREFIX = "/sunshine";
 function owns(url) { return typeof url === "string" && (url === PREFIX || url.startsWith(PREFIX + "/") || url.startsWith(PREFIX + "?")); }
 
+// ---- v4214 -- THE API HALF, WHICH THIS BRIDGE NEVER HAD ---------------------------------------------------
+// Until now every reference to WEB_PORT above was string interpolation into a LINK. The bridge installed
+// Sunshine, started it, and handed the user a URL to click. ai-bridge/sunshineApi.mjs models the real API
+// (endpoints from LizardByte/Sunshine's own docs/api.md) and this is the part that performs a call.
+//
+// Credentials come from the ENVIRONMENT, never from the tree: they are the admin password for a service on
+// the user's own machine, and a default in a repo is a default in everybody's repo.
+const SUN_USER = process.env.SUNSHINE_USER || "";
+const SUN_PASS = process.env.SUNSHINE_PASS || "";
+let _api = null;
+async function api() { if (!_api) _api = await import("./sunshineApi.mjs"); return _api; }   // CJS file, ESM helper
+
+/**
+ * Perform one described request.
+ *
+ * *** rejectUnauthorized IS SET ON THIS REQUEST AND NOWHERE ELSE. *** Sunshine's config server uses a
+ * self-signed certificate, so verification has to be relaxed to reach it -- but the usual snippet for that,
+ * NODE_TLS_REJECT_UNAUTHORIZED=0, turns verification off for EVERY request this process ever makes, for its
+ * whole life, including any that carry credentials to somewhere else. Scoping it to one https.request against
+ * one known-local host is the difference between a targeted exception and a process-wide hole.
+ */
+function callSunshine(req) {
+    return new Promise((resolve) => {
+        let https, u;
+        try { https = require("node:https"); u = new URL(req.url); }
+        catch (e) { resolve({ error: e }); return; }
+        const r = https.request({
+            hostname: u.hostname, port: u.port, path: u.pathname + u.search, method: req.method,
+            headers: req.headers, rejectUnauthorized: false, timeout: 6000,
+        }, (res) => {
+            let b = "";
+            res.setEncoding("utf8");
+            res.on("data", (c) => { b += c; });
+            res.on("end", () => resolve({ status: res.statusCode, body: b }));
+        });
+        r.on("timeout", () => { try { r.destroy(new Error("ETIMEDOUT")); } catch {} });
+        r.on("error", (e) => resolve({ error: e }));
+        if (req.body) r.write(req.body);
+        r.end();
+    });
+}
+
+/** GET /api/apps, for real. Returns the same {ok,...} shape every other route here uses. */
+async function listApps() {
+    const A = await api();
+    if (!SUN_USER && !SUN_PASS) {
+        return { ok: false, kind: "auth",
+                 error: "no credentials -- set SUNSHINE_USER and SUNSHINE_PASS to the admin login you chose in "
+                      + "Sunshine's own web UI at https://" + DEFAULT_HOST + ":" + WEB_PORT };
+    }
+    let req;
+    try { req = A.buildRequest("apps", { host: DEFAULT_HOST, port: WEB_PORT, user: SUN_USER, pass: SUN_PASS }); }
+    catch (e) { return { ok: false, error: e.message }; }
+    const res = await callSunshine(req);
+    if (res.error) { const c = A.classifyNetworkError(res.error); return { ok: false, kind: c.kind, error: c.reason }; }
+    const c = A.classifyStatus(res.status);
+    if (!c.ok) return { ok: false, kind: c.kind, error: c.reason, status: res.status };
+    let payload = null;
+    try { payload = JSON.parse(res.body); } catch (e) { return { ok: false, error: "Sunshine returned non-JSON" }; }
+    return { ok: true, count: A.appsOf(payload).length, apps: A.appNames(payload) };
+}
+
 const ROUTES = Object.freeze([
     "GET  " + PREFIX + "/status",
     "POST " + PREFIX + "/install",
@@ -284,6 +346,7 @@ const ROUTES = Object.freeze([
     "POST " + PREFIX + "/start",
     "POST " + PREFIX + "/stop",
     "GET  " + PREFIX + "/adb/devices",
+    "GET  " + PREFIX + "/apps",          // v4214 -- the real API, not a link
     "POST " + PREFIX + "/moonlight/launch",
 ]);
 
@@ -295,6 +358,7 @@ async function handle(req, res, ctx) {
     if (m === "GET" && (route === PREFIX + "/status" || route === PREFIX)) { sendJson(await status()); return; }
     if (m === "GET" && route === PREFIX + "/install/status") { sendJson(installStatus() || { ok: true, running: false, note: "no install has been started" }); return; }
     if (m === "GET" && route === PREFIX + "/adb/devices") { sendJson(await adbDevices()); return; }
+    if (m === "GET" && route === PREFIX + "/apps") { const r = await listApps(); sendJson(r, r.ok ? 200 : 400); return; }   // v4214
     if (m === "POST" && route === PREFIX + "/install") { const r = install(); sendJson(r, r.ok ? 200 : 400); return; }
     if (m === "POST" && route === PREFIX + "/start") { const r = start(); sendJson(r, r.ok ? 200 : 400); return; }
     if (m === "POST" && route === PREFIX + "/stop") { sendJson(stop()); return; }
@@ -307,4 +371,4 @@ async function handle(req, res, ctx) {
 }
 
 module.exports = { owns, handle, PREFIX, ROUTES, detect, install, installStatus, start, stop, status,
-                   launchMoonlight, adbDevices, UPSTREAM, INSTALL, PROBES, REFUSED, MOONLIGHT, WEB_PORT };
+                   launchMoonlight, adbDevices, listApps, UPSTREAM, INSTALL, PROBES, REFUSED, MOONLIGHT, WEB_PORT };

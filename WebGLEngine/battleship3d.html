@@ -138,6 +138,10 @@ let THREE;
 try { THREE = await import("/vendor/three/three.module.js"); }
 catch { THREE = await import("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js"); }
 try { if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; } catch {}
+
+// v4205 -- real shell ballistics. This page is already a module, so the physics is a plain import rather
+// than a window shim. See fireCannon() for what it replaced.
+import * as BALLISTICS from "/physics/ballistics.mjs";
 /* ============================================================
    ABYSS — a 3D remake of Battleship.
    Pure Three.js (r128). No external controls (custom orbit cam).
@@ -321,10 +325,16 @@ function mkTurret(scale,barrels,face){
   return g;
 }
 function mkBridge(){
+  // v4205 -- THESE THREE LINES CRASHED THE PAGE ON LOAD, AND HAD SINCE THEY WERE WRITTEN.
+  // Object.assign(mesh,{position:...}) tries to REPLACE Object3D.position, which three.js has defined as a
+  // read-only accessor since r15x -- so it threw "Cannot assign to read only property 'position'" inside
+  // init() -> newGame() -> placeFleet() -> makeShipMesh() -> buildShipBody() -> decorateSegment() ->
+  // mkBridge(), before a single frame was drawn. Measured: the main canvas held 0 lit pixels and exactly 1
+  // distinct colour. Every other mesh in this file uses .position.set(), which is what these now do.
   const g=new THREE.Group();
-  g.add(Object.assign(sbox(0.78,0.5,0.95,SP.island),{position:new THREE.Vector3(0,0.25,0)}));
-  g.add(Object.assign(sbox(0.55,0.42,0.66,SP.island),{position:new THREE.Vector3(0,0.7,0)}));
-  g.add(Object.assign(sbox(0.34,0.32,0.42,SP.detail),{position:new THREE.Vector3(0,1.07,0)}));
+  const isle1=sbox(0.78,0.5,0.95,SP.island); isle1.position.set(0,0.25,0); g.add(isle1);
+  const isle2=sbox(0.55,0.42,0.66,SP.island); isle2.position.set(0,0.7,0); g.add(isle2);
+  const isle3=sbox(0.34,0.32,0.42,SP.detail); isle3.position.set(0,1.07,0); g.add(isle3);
   const mast=scyl(0.035,0.035,0.9,6,SP.detail); mast.position.y=1.6; g.add(mast);
   return g;
 }
@@ -450,17 +460,50 @@ function explode(pos){ burst(pos, 0xffb43f, 22, {spread:3.4,up:6,ttl:1.0,size:0.
   burst(pos, 0xff4d4d, 14, {spread:2,up:4,ttl:0.8,size:0.4}); }
 
 // ============================================================ weapons
-function fireCannon(board, r, c, onArrive){
+// v4205 -- A REAL SHELL. This used to be `lerpVectors(from,target,u)` with `Math.sin(u*Math.PI)*peak`
+// added on top: a straight line with a sine hump, `peak=14` and `dur=1.05` CONSTANT. The arc height and the
+// time of flight were identical whether the target was one cell away or across the board, there was no
+// launch angle, and therefore no lob-versus-flat choice -- which is the entire tactical content of a gun.
+//
+// Now physics/ballistics.mjs solves the elevation that puts the shell on the cell, and the shell FALLS.
+// Consequences you can see: a far shot takes visibly longer than a near one, the apex scales with range,
+// and LOB vs FLAT is a real choice -- the lob hangs and drops steeply onto the deck, the flat one gets
+// there fast. GUN_V is the muzzle velocity, so raising it flattens every trajectory at once, the way it
+// does on a real gun.
+function fireCannon(board, r, c, onArrive, arc){
   const target=cellWorld(board,r,c); target.y=0.4;
   const from=new THREE.Vector3(target.x*0.2, 1.0, BOARD.you.oz - 6); // from your side
   const shell=new THREE.Mesh(new THREE.SphereGeometry(0.28,10,10),
     new THREE.MeshStandardMaterial({color:0x222,emissive:0x554422,emissiveIntensity:0.4}));
   scene.add(shell);
-  let t=0; const dur=1.05, peak=14;
-  animators.push({update(dt){ t+=dt; const u=Math.min(1,t/dur);
-    shell.position.lerpVectors(from,target,u); shell.position.y+=Math.sin(u*Math.PI)*peak;
-    if(u>=1){ scene.remove(shell); onArrive(); return true;} return false; }});
+
+  // Solve in the vertical plane containing gun and target: horizontal range and the rise to the target.
+  const dx=target.x-from.x, dz=target.z-from.z;
+  const range=Math.hypot(dx,dz), rise=target.y-from.y;
+  const dirx=range>1e-6?dx/range:0, dirz=range>1e-6?dz/range:1;
+  const prefer=(arc||state.arc||"lob");
+  const sol=BALLISTICS.launchAngles(range, rise, GUN_V, GUN_G);
+  // Out of range at this muzzle velocity is a real answer, not a crash: fall back to the max-range
+  // elevation so the shell still flies and visibly falls SHORT, which is the honest picture.
+  const elev = sol ? (prefer==="flat"?sol.flat:sol.lob) : Math.PI/4;
+  const vh=GUN_V*Math.cos(elev), vv=GUN_V*Math.sin(elev);
+
+  let sh={x:from.x, y:from.y, z:from.z, vx:dirx*vh, vy:vv, vz:dirz*vh, t:0};
+  animators.push({update(dt){
+    // Fixed sub-steps so the flight does not depend on the frame rate -- the same discipline
+    // render/liquefyModel.mjs uses for its decay.
+    const H=1/240; let left=Math.min(dt,0.05);
+    while(left>0){ const h=Math.min(H,left); sh=BALLISTICS.stepShell(sh,h,{gravity:GUN_G}); left-=h; }
+    shell.position.set(sh.x,sh.y,sh.z);
+    if(sh.y<=target.y && sh.vy<0){ scene.remove(shell); onArrive(); return true; }
+    if(sh.t>12){ scene.remove(shell); onArrive(); return true; }   // safety net, never reached in practice
+    return false;
+  }});
 }
+// Muzzle velocity and gravity for the cannon, in board units. GUN_V is the one knob that changes the feel
+// of every shot: raise it and every trajectory flattens, exactly as it would on a real gun.
+const GUN_V=22, GUN_G=9.80665;
+
 function fireTorpedo(board, r, c, onArrive){
   // runs the lane (constant heading toward the cell) just under the surface,
   // detonates on the FIRST occupied hull along the way, else the target cell.

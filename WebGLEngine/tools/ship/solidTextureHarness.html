@@ -1,0 +1,105 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>solidTexture harness</title>
+<canvas id="c" width="96" height="96"></canvas>
+<script type="module">
+import { NOISE_COMMON, SNOISE3 } from "/shaders/ashimaNoise.js";
+import { FBM3_FN, CONCRETE_FN, TRIPLANAR_FN, CONCRETE } from "/render/solidTexture.mjs";
+
+const N = 96;
+const gl = document.getElementById("c").getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
+
+const VS = `#version 300 es
+out vec2 vUV;
+void main() {
+    vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
+    vUV = p * 0.5 + 0.5;
+    gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+// The fragment shader maps the pixel to a 3D point on a plane in world space and asks concreteAt for the
+// colour there. NOTHING is sampled from a texture and no UV reaches the function -- which is the property
+// under test, so the shader is written so that violating it would need new code rather than a changed value.
+const FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 fragColor;
+uniform vec3 uOrigin;
+uniform vec3 uDU;
+uniform vec3 uDV;
+uniform float uWeathered;
+${NOISE_COMMON.join("\n")}
+${SNOISE3.join("\n")}
+${FBM3_FN}
+${CONCRETE_FN}
+uniform float uRaw;
+void main() {
+    vec3 p = uOrigin + uDU * vUV.x + uDV * vUV.y;
+    if (uRaw > 0.5) {
+        // RAW snoise, encoded across rgb at 24 bits so the readback is not the limiting precision. This mode
+        // exists because the per-pixel CPU/GPU comparison this tree's convention asks for turned out not to
+        // be available through this noise, and the gate has to be able to SHOW that rather than assert it.
+        float n = snoise(p);
+        float t = clamp(n / 8.0 + 0.5, 0.0, 1.0);
+        float sc = t * 255.0;
+        float r = floor(sc);
+        float f1 = (sc - r) * 255.0;
+        float g = floor(f1);
+        float bl = (f1 - g) * 255.0;
+        fragColor = vec4(r / 255.0, g / 255.0, floor(bl) / 255.0, 1.0);
+        return;
+    }
+    fragColor = vec4(concreteAt(p, uWeathered), 1.0);
+}`;
+
+function compile(vs, fs) {
+    const p = gl.createProgram();
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(t);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+}
+
+let prog = null, vao = null;
+try { prog = compile(VS, FS); vao = gl.createVertexArray(); }
+catch (e) { window.__err = String(e && e.message || e); }
+
+/**
+ * Render the plane spanned by (origin, du, dv) and hand back the pixels PLUS the exact 3D point each pixel
+ * stands for, so the CPU reference can be evaluated at the same coordinates rather than at coordinates the
+ * gate reconstructed and hoped were the same.
+ */
+window.__render = (origin, du, dv, weathered, raw) => {
+    if (!prog) return { ok: false, error: window.__err };
+    gl.viewport(0, 0, N, N);
+    gl.useProgram(prog);
+    gl.uniform3f(gl.getUniformLocation(prog, "uOrigin"), origin[0], origin[1], origin[2]);
+    gl.uniform3f(gl.getUniformLocation(prog, "uDU"), du[0], du[1], du[2]);
+    gl.uniform3f(gl.getUniformLocation(prog, "uDV"), dv[0], dv[1], dv[2]);
+    gl.uniform1f(gl.getUniformLocation(prog, "uWeathered"), weathered ? 1 : 0);
+    gl.uniform1f(gl.getUniformLocation(prog, "uRaw"), raw ? 1 : 0);
+    for (const [k, v] of [["uScale", CONCRETE.scale], ["uAggregate", CONCRETE.aggregate],
+                          ["uStoneLight", CONCRETE.stoneLight], ["uGrain", CONCRETE.grain]]) {
+        gl.uniform1f(gl.getUniformLocation(prog, k), v);
+    }
+    for (const [k, v] of [["uCement", CONCRETE.cement], ["uStone", CONCRETE.stone], ["uWeather", CONCRETE.weather]]) {
+        gl.uniform3f(gl.getUniformLocation(prog, k), v[0], v[1], v[2]);
+    }
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    const px = new Uint8Array(N * N * 4);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return { ok: true, px: [...px], n: N };
+};
+
+// The GLSL text itself, so the gate can assert what it does NOT contain -- a sampler, a varying uv -- rather
+// than only what it produces.
+window.__fs = FS;
+window.__ready = true;
+</script>

@@ -14,11 +14,19 @@
 //     box3d.wasm exports     40
 //     missing                swk_contacts, swk_contact_count, swk_contact_stride
 //
-// Those three arrived at v3037 ("CONTACTS -- round 1 of 3 (exports -> gate -> overlay)"). The vendored artifact
-// header says v2560. SO THE WASM IS FIVE HUNDRED VERSIONS BEHIND ITS OWN SOURCE AND NOTHING IN THE TREE NOTICED,
-// because every consumer calls through box3dLoader, and the loader only reports ready/not-ready -- never
-// ready-but-stale. A capability that is declared, compiled in source, documented in a header, and simply ABSENT
-// from the binary is the failure mode a boolean cannot express.
+// Those three arrived at v3037 ("CONTACTS -- round 1 of 3 (exports -> gate -> overlay)") while the vendored
+// artifact header said v2560. THE WASM WAS FIVE HUNDRED VERSIONS BEHIND ITS OWN SOURCE AND NOTHING IN THE TREE
+// NOTICED, because every consumer calls through box3dLoader and the loader only reports ready/not-ready --
+// never ready-but-stale. A capability that is declared, compiled in source, documented in a header, and simply
+// ABSENT from the binary is the failure mode a boolean cannot express.
+//
+// *** THAT WAS FIXED AT v3569 AND THIS PARAGRAPH WENT ON DESCRIBING IT IN THE PRESENT TENSE UNTIL v4248. ***
+// PENDING_REBUILD below was emptied at v3571 with a note saying the rebuild had happened; the MECHANISM was
+// updated and the PROSE was not, so a file whose entire purpose is catching a stale record carried one. Today
+// the artifact exports 45 swk_* functions, all three contact calls among them, and `stale` is empty. The
+// numbers above are kept as history because the shape they describe is the reason this file exists -- but they
+// are history, and the only name still outstanding is swk_joint_motor_set, which is documented in the shim and
+// defined nowhere.
 //
 // The check is an integer set difference. No tolerance, no fixture, and it grades a build artifact rather than a
 // simulation -- which is the same move backendConformance makes one level down.
@@ -130,6 +138,16 @@ export const PENDING_REBUILD = [
     //
     // The list stays as a mechanism rather than being deleted: the next shim function added without a rebuild
     // belongs here, and `unexplained` goes red until somebody says so.
+    //
+    // v4256 -- AND HERE IS THAT NEXT ONE. Four collision-filtering functions were added to box3d_shim.c and
+    // the vendored artifact predates them, because this sandbox has no emcc. They are written down rather
+    // than discovered: a caller asking for self-collision filtering on the current artifact gets `false` from
+    // has() and must degrade, and the day someone runs build-box3d-wasm.sh this list empties and
+    // `manifestStale` says so.
+    "swk_body_set_filter",
+    "swk_body_get_filter",
+    "swk_joint_set_collide_connected",
+    "swk_joint_get_collide_connected",
 ];
 
 

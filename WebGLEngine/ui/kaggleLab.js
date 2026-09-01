@@ -1,5 +1,6 @@
 // ui/kaggleLab.js — v645
 
+import { whenDetached } from "./boundListener.mjs";   // v4223 -- one observer for the page, not one per panel
 import { mountKaggleSetupWizard }   from "./kaggleSetupWizard.js";   // v695 — first-time setup wizard
 import { createMiniTab }            from "./LCARSMiniTab.js";        // v1572 — right-edge minitab
 import { mountKaggleDatasetCache }  from "./kaggleDatasetCache.js";  // v696 — per-template dataset cache
@@ -627,15 +628,14 @@ async function _buildPanel() {
     // Refresh periodically + after wizard/cache panels close (in case
     // creds got saved or kaggle pkg installed via the wizard).
     const _statusInterval = setInterval(refreshStatusStrip, 60_000);
-    // When panel removes itself (e.g. user reopens), clear the interval.
-    // The dock system may remove the wrap; use a MutationObserver as a
-    // safety net for that case.
-    try {
-        const obs = new MutationObserver(() => {
-            if (!document.body.contains(wrap)) { clearInterval(_statusInterval); obs.disconnect(); }
-        });
-        obs.observe(document.body, { childList: true, subtree: true });
-    } catch {}
+    // When panel removes itself (e.g. user reopens), clear the interval. The dock system may remove the wrap.
+    //
+    // v4223 -- *** THIS WAS A WHOLE MutationObserver, FOR ONE PANEL, TO CLEAR ONE INTERVAL. *** It worked, and
+    // its own comment called itself a safety net, which is the tell that the idea was general and the code was
+    // not. ui/boundListener.mjs now owns the one observer the page needs, so this is a registration rather
+    // than an implementation -- and the cost stops being per-panel: every copy of this pattern observed
+    // document.body with subtree:true on its own, so a single DOM change ran all of them.
+    try { whenDetached(wrap, () => clearInterval(_statusInterval)); } catch {}
 
     function refreshSubmitState() {
         // v693 — submit is ready when EVERY selected template has its required

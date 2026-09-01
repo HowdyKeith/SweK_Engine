@@ -28,8 +28,15 @@
 // preference for u16 index buffers. Mesh capacity = 65,535 unique
 // verts per submesh — enough for most Pixal3D outputs.
 
-export const P3D_MAGIC = 0x21443350;   // "P3D!" little-endian
-export const P3D_HEADER_BYTES = 12;
+import { writeVersionedHeader, readVersionedHeader, versionedMagic, VERSIONED_HEADER_BYTES } from "./binaryHeader.mjs";
+
+export const P3D_MAGIC = 0x21443350;   // "P3D!" little-endian -- the ORIGINAL, still read
+export const P3D_MAGIC_V = versionedMagic(P3D_MAGIC);   // "P3D2" -- carries a version field
+export const P3D_VERSION = 1;          // IN THE FILE now, not only in the comment at the top of this one
+export const P3D_LEGACY_HEADER_BYTES = 12;   // magic + vertex count + face count, before there was a version
+// 16 stays a multiple of 4, which matters here and nowhere else in this round: the payload is read as a
+// Float32Array VIEW over the same buffer, and a typed-array view throws on an unaligned byte offset.
+export const P3D_HEADER_BYTES = VERSIONED_HEADER_BYTES + 8;
 
 /**
  * Encode a mesh into the .p3d binary format.
@@ -56,9 +63,9 @@ export function encodeP3D(mesh) {
     const buf = new ArrayBuffer(total);
     const dv  = new DataView(buf);
 
-    dv.setUint32(0, P3D_MAGIC, true);
-    dv.setUint32(4, numVerts,   true);
-    dv.setUint32(8, numFaces,   true);
+    const hdr = writeVersionedHeader(dv, P3D_MAGIC, P3D_VERSION);
+    dv.setUint32(hdr,     numVerts, true);
+    dv.setUint32(hdr + 4, numFaces, true);
 
     // Copy raw float32/uint16 buffers in one shot — typed-array byte order
     // is platform-native, but on every system we care about (x86, ARM, M1)
@@ -75,17 +82,19 @@ export function encodeP3D(mesh) {
  * COPY (safe to mutate) and indices is a fresh Uint16Array.
  */
 export function decodeP3D(buf) {
-    if (!(buf instanceof ArrayBuffer) || buf.byteLength < P3D_HEADER_BYTES) {
+    if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) {
         throw new Error("decodeP3D: buffer too small for header");
     }
     const dv = new DataView(buf);
-    const magic = dv.getUint32(0, true);
-    if (magic !== P3D_MAGIC) {
-        throw new Error(`decodeP3D: magic mismatch (got 0x${magic.toString(16)}, expected 0x${P3D_MAGIC.toString(16)} = "P3D!")`);
-    }
-    const numVerts = dv.getUint32(4, true);
-    const numFaces = dv.getUint32(8, true);
-    const expectedLen = P3D_HEADER_BYTES + numVerts * 12 + numFaces * 6;
+    // Refuses a FUTURE version by name; accepts a pre-version file as version 0 and reads the old offsets.
+    const { version, bodyOffset } = readVersionedHeader(dv, {
+        name: "decodeP3D", legacyMagic: P3D_MAGIC, current: P3D_VERSION, legacyBodyOffset: 4,
+    });
+    const headerBytes = bodyOffset + 8;
+    if (buf.byteLength < headerBytes) throw new Error(`decodeP3D: truncated header (${buf.byteLength}B)`);
+    const numVerts = dv.getUint32(bodyOffset,     true);
+    const numFaces = dv.getUint32(bodyOffset + 4, true);
+    const expectedLen = headerBytes + numVerts * 12 + numFaces * 6;
     if (buf.byteLength < expectedLen) {
         throw new Error(`decodeP3D: payload truncated (have ${buf.byteLength}B, expected ${expectedLen}B for ${numVerts}v/${numFaces}f)`);
     }
@@ -93,11 +102,11 @@ export function decodeP3D(buf) {
     // Copy out (don't keep a typed-array view that holds the original
     // buffer reference — the caller may free it)
     const vertices = new Float32Array(numVerts * 3);
-    vertices.set(new Float32Array(buf, P3D_HEADER_BYTES, numVerts * 3));
+    vertices.set(new Float32Array(buf, headerBytes, numVerts * 3));
     const indices = new Uint16Array(numFaces * 3);
-    indices.set(new Uint16Array(buf, P3D_HEADER_BYTES + numVerts * 12, numFaces * 3));
+    indices.set(new Uint16Array(buf, headerBytes + numVerts * 12, numFaces * 3));
 
-    return { vertices, indices, numVerts, numFaces };
+    return { vertices, indices, numVerts, numFaces, version };
 }
 
 /** Bounding box of a mesh. Returns { min, max, center, size } as 3-tuples. */

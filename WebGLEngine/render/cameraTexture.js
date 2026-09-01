@@ -60,6 +60,9 @@ export class CameraTexture {
         this.error = null;
         this._pending = false;
         this._vfc = null;
+        this.presentedFrames = -1;   // v4260 -- the compositor's count, straight off rVFC metadata
+        this.mediaTime = NaN;        // v4260 -- the presented frame's own timestamp
+        this.dropped = 0;            // v4260 -- frames the compositor presented that we never uploaded
     }
 
     async start(constraints) {
@@ -86,8 +89,22 @@ export class CameraTexture {
         // requestVideoFrameCallback fires once per DECODED frame, which is the only honest way to know a new
         // one exists. Without it we fall back to uploading every tick and the frameProbe simply always reads
         // dirty -- worse, but never WRONG, which is the direction that rule has to fail in.
+        // v4260 -- *** THE SECOND ARGUMENT IS THE ANSWER TO "WHICH FRAME", AND THIS CALL USED TO THROW IT
+        // *** AWAY. *** rVFC hands the callback (now, metadata), and metadata.presentedFrames is the
+        // compositor's own count. Keeping it costs one field and buys the one thing a boolean cannot say:
+        // whether frames went past UNSEEN. render/videoFrames.mjs (v4260) turns the same metadata into a
+        // frame INDEX for a file, where mediaTime is meaningful; for a live camera there is no index to
+        // have, so only the count and the drops are recorded here.
         if (typeof v.requestVideoFrameCallback === "function") {
-            const tick = () => { this._pending = true; this._vfc = v.requestVideoFrameCallback(tick); };
+            const tick = (now, md) => {
+                this._pending = true;
+                if (md && Number.isFinite(md.presentedFrames)) {
+                    if (this.presentedFrames >= 0) this.dropped += Math.max(0, md.presentedFrames - this.presentedFrames - 1);
+                    this.presentedFrames = md.presentedFrames;
+                    this.mediaTime = Number(md.mediaTime);
+                }
+                this._vfc = v.requestVideoFrameCallback(tick);
+            };
             this._vfc = v.requestVideoFrameCallback(tick);
         } else { this._pending = true; this._always = true; }
         return true;
@@ -120,5 +137,6 @@ export class CameraTexture {
         try { if (this.video) { this.video.pause(); this.video.srcObject = null; } } catch {}
         try { if (this.texture && this.gl) this.gl.deleteTexture(this.texture); } catch {}
         this.stream = null; this.video = null; this.texture = null; this._vfc = null; this._pending = false;
+        this.presentedFrames = -1; this.mediaTime = NaN; this.dropped = 0;   // v4260 -- a restart must not report the old run's drops
     }
 }
