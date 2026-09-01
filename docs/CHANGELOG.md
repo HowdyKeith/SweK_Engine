@@ -8,6 +8,61 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4287 -- Scene texture in, bloom texture out, one dispatch
+
+v4284 proved the fused bloom shader reproduces the shipping three-pass chain, and stopped short of a render
+pass in two ways that both mattered. It wrote f32 into a storage BUFFER, because that is what the compute
+harness bound. And it COMPUTED its own input from srcAt, because there was no way to hand it a texture.
+Neither is a thing a renderer can use: a post pass reads the scene somebody else drew and writes a texture
+the next pass samples, and each of those is a different binding with its own ways of being wrong.
+
+Both are closed now, and each link is measured on a real device:
+
+    v4284   the shipping GLSL three-pass chain == a CPU oracle             0.500/255 (WebGL2)
+    v4284   that oracle == the fused dispatch, f32 into a buffer           2.5 float32 epsilons
+    here    that buffer result == the same shader into a storage TEXTURE   4.72e-4 relative
+    here    procedural input == a real SAMPLED input texture               6.24e-4 relative
+
+Half-float carries a ten-bit mantissa, so ~1e-3 relative is the FORMAT's resolution rather than slack.
+
+*** THE STORAGE FORMAT IS A CORRECTNESS DECISION AND THE CLIPPING IS MEASURED. *** rgba8unorm is the obvious
+default: it validates, it dispatches, it produces a picture. It also clamps to [0,1], and bloom's entire job
+is to carry values above 1. The reference scene peaks at 1.7480 and 181 samples exceed 1.0; through an 8-bit
+target the peak reads exactly 1.0000 and every one of those samples is destroyed -- a 43% loss on the
+brightest, which no tolerance would call agreement. Nothing but a measurement separates that from the right
+answer, because the failure is invisible anywhere the scene happens to be dim. rgba16float is the default and
+both formats are named in the module rather than one hiding in a default.
+
+The harness gained runWgslComputeToTexture: a compute dispatch into a storage texture, read back and decoded,
+with an optional rgba16float SAMPLED input at binding 2. The input is half-float for the same reason the
+output is -- an 8-bit scene texture would clip before the shader ever saw it, the same trap one stage earlier.
+Nothing in this tree had ever used a storage texture; the only textureStore in the repository was inside
+vendored taichi.
+
+*** WHAT IS STILL NOT WIRED, AND IT IS SAID IN THE GATE'S OWN HEADER RATHER THAN ONLY HERE: *** render/
+bloomPass.js still runs its three draws and does not import the fused module. Both are asserted, so the claim
+cannot rot. What exists is a pass a WebGPU renderer COULD call, proven equivalent; swapping the live path
+needs a device obtained at runtime, a WebGL fallback for machines without one, and a reason to believe the
+swap is worth it -- and that last part is a memory-traffic measurement this sandbox cannot make, because its
+only device is a software rasteriser. Building the wiring before the measurement is defensible: it puts the
+measurement one RUN away from anyone with hardware instead of one ROUND away. Claiming the measurement
+happened would not be.
+
+Three sabotages. The HDR default changed to rgba8unorm goes 6 red, and the CONTROL that the image is not
+empty fails along with the rest -- a clamped bloom looks exactly like a bloom that never happened.
+textureStore's coordinates transposed goes 4 red at 8.43e+1 relative, and *** THE SHADER STILL COMPILES,
+DISPATCHES AND FILLS EVERY TEXEL: *** a transposed image is a perfectly plausible picture, and only a
+reference that knows where each pixel belongs catches it.
+
+*** AND ONE WENT 0 RED BECAUSE A BRANCH OF THE READER WAS UNREACHABLE AT THE SIZE THE GATE USED. ***
+copyTextureToBuffer pads every row to a 256-byte multiple, and at N=64 an rgba16float row is 512 bytes --
+already aligned, so the padding path never ran and deleting it changed nothing. A whole branch, written
+carefully, tested by nothing. N=40 pads 320 up to 512 and is now checked, with a control asserting N=64 does
+NOT pad so the pair cannot collapse into one case; redone, the sabotage reddens the padded size by name.
+That is the third round running in which a sabotage found machinery that was present, correct and untested
+rather than a defect -- v4285's overstated label, v4286's unreached guard, and now this.
+
+This round adds no module and one gate, and the tree stands at 1359 gates.
 ## v4286 -- The two passes that were never unmeasurable
 
 v4285 filed SSAO and the composite as READ OFF SOURCE and gave two reasons for it. *** ONE OF THEM WAS

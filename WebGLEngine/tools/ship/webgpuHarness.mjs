@@ -488,3 +488,144 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
     } finally { try { await browser?.close(); } catch {} srv.close(); }
 }
+
+/**
+ * Run a compute shader that writes to a STORAGE TEXTURE, and read the texture back.
+ *
+ * *** THIS IS THE GAP BETWEEN "THE ARITHMETIC SURVIVES" AND "A RENDERER CAN USE IT". *** v4284 proved the
+ * fused bloom shader reproduces the three-pass chain, but it wrote to a storage BUFFER, because that is what
+ * runWgslCompute binds. A render path does not want a buffer -- it wants a texture the next pass can sample.
+ * Those are different bindings, a different WGSL declaration, and a different set of ways to be wrong.
+ *
+ * `format` is the storage format and IT IS NOT A DETAIL: rgba8unorm clamps to [0,1], and bloom's whole job is
+ * to carry values above 1. The gate measures that clipping rather than taking the format on trust.
+ *
+ * Returns { ok, pixels } with pixels as a Float32Array of n*n*4, decoded from whichever format was asked for.
+ */
+export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 64, format = "rgba16float",
+                                                uniforms = null, workgroups = 1, timeoutMs = 60000,
+                                                inputTexel = null }) {
+    // `inputTexel(x,y,n) -> [r,g,b,a]` uploads an rgba16float SAMPLED texture at binding 2. Half-float
+    // because a bloom input carries values above 1, and an 8-bit input would clip the scene before the
+    // shader ever saw it -- the same trap the output format has, one stage earlier.
+    const enc16 = (v) => {                                    // double -> half float bits
+        if (!isFinite(v)) return v > 0 ? 0x7c00 : 0xfc00;
+        const s = v < 0 ? 0x8000 : 0; v = Math.abs(v);
+        if (v === 0) return s;
+        let e = Math.floor(Math.log2(v));
+        if (e < -14) return s | Math.round(v / Math.pow(2, -24));
+        if (e > 15) return s | 0x7c00;
+        const m = Math.round((v / Math.pow(2, e) - 1) * 1024);
+        return s | ((e + 15) << 10) | (m & 0x3ff);
+    };
+    let inputBits = null;
+    if (inputTexel) {
+        const u = new Uint16Array(n * n * 4);
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const p = inputTexel(x, y, n);
+            for (let c = 0; c < 4; c++) u[(y * n + x) * 4 + c] = enc16(p[c]);
+        }
+        inputBits = Array.from(u);
+    }
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { ok: false, skipped: true, reason: skip, pixels: null };
+    const pw = resolvePlaywright(requireFn);
+
+    const srv = http.createServer((_q, s) => {
+        s.writeHead(200, { "Content-Type": "text/html" });
+        s.end("<!doctype html><title>wgsl-storage-texture</title>");
+    });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    const url = `http://${SECURE_HOST}:${srv.address().port}/`;
+
+    let browser = null;
+    try {
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        const page = await browser.newPage();
+        page.setDefaultTimeout(timeoutMs);
+        await page.goto(url);
+        const out = await page.evaluate(async (a) => {
+            if (!navigator.gpu) return { ok: false, reason: "navigator.gpu undefined" };
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) return { ok: false, reason: "requestAdapter() returned null" };
+            const dev = await adapter.requestDevice();
+            const errs = [];
+            dev.pushErrorScope("validation");
+
+            const mod = dev.createShaderModule({ code: a.code });
+            const info = await mod.getCompilationInfo();
+            const cErr = info.messages.filter((m) => m.type === "error")
+                                      .map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
+            if (cErr.length) return { ok: false, reason: "WGSL did not compile", errors: cErr };
+
+            const tex = dev.createTexture({ size: [a.n, a.n], format: a.format,
+                usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC });
+            const bpp = a.format === "rgba16float" ? 8 : 4;
+            const bytesPerRow = Math.ceil(a.n * bpp / 256) * 256;
+            const readBuf = dev.createBuffer({ size: bytesPerRow * a.n,
+                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+
+            const entries = [{ binding: 0, resource: tex.createView() }];
+            if (a.inputBits) {
+                const src = dev.createTexture({ size: [a.n, a.n], format: "rgba16float",
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+                dev.queue.writeTexture({ texture: src }, new Uint16Array(a.inputBits),
+                    { bytesPerRow: a.n * 8 }, [a.n, a.n]);
+                entries.push({ binding: 2, resource: src.createView() });
+            }
+            if (a.uniforms) {
+                const ub = dev.createBuffer({ size: Math.max(16, a.uniforms.length * 4),
+                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+                dev.queue.writeBuffer(ub, 0, new Float32Array(a.uniforms));
+                entries.push({ binding: 1, resource: { buffer: ub } });
+            }
+            const pipe = dev.createComputePipeline({ layout: "auto",
+                compute: { module: mod, entryPoint: a.entryPoint } });
+            const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
+            const enc = dev.createCommandEncoder();
+            const cp = enc.beginComputePass();
+            cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(a.workgroups); cp.end();
+            enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [a.n, a.n]);
+            dev.queue.submit([enc.finish()]);
+            const scoped = await dev.popErrorScope();
+            if (scoped) errs.push(scoped.message);
+            await readBuf.mapAsync(GPUMapMode.READ);
+            const raw = new Uint8Array(readBuf.getMappedRange()).slice();
+            readBuf.unmap();
+            const ai = adapter.info || {};
+            return { ok: true, raw: Array.from(raw), bytesPerRow, errors: errs,
+                     adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null } };
+        }, { code, entryPoint, n, format, uniforms: uniforms ? Array.from(uniforms) : null, workgroups,
+             inputBits });
+        if (!out.ok) return { skipped: false, pixels: null, ...out };
+
+        // Decode ROW BY ROW, because copyTextureToBuffer pads every row up to a 256-byte multiple and the
+        // padding is not pixels. Reading it as a flat array would shear the image by a few texels per row --
+        // a corruption that looks like a shader bug and is arithmetic in the reader.
+        const raw = new Uint8Array(out.raw);
+        const px = new Float32Array(n * n * 4);
+        const f16 = (u) => {                                   // half float -> double
+            const s = (u & 0x8000) ? -1 : 1, e = (u >> 10) & 0x1f, m = u & 0x3ff;
+            if (e === 0) return s * Math.pow(2, -14) * (m / 1024);
+            if (e === 31) return m ? NaN : s * Infinity;
+            return s * Math.pow(2, e - 15) * (1 + m / 1024);
+        };
+        const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+        for (let y = 0; y < n; y++) {
+            const row = y * out.bytesPerRow;
+            for (let x = 0; x < n; x++) for (let c = 0; c < 4; c++) {
+                const o = (y * n + x) * 4 + c;
+                px[o] = format === "rgba16float" ? f16(dv.getUint16(row + (x * 4 + c) * 2, true))
+                                                 : raw[row + x * 4 + c] / 255;
+            }
+        }
+        return { skipped: false, ok: true, pixels: px, format, bytesPerRow: out.bytesPerRow,
+                 errors: out.errors || [], adapter: out.adapter };
+    } catch (e) {
+        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
+    } finally {
+        try { await browser?.close(); } catch {}
+        srv.close();
+    }
+}

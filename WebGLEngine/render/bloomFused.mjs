@@ -171,6 +171,46 @@ export function blurCpu({ n = N, src, dx, dy, weights = kernelWeights() } = {}) 
  * rows from shared memory to finish the vertical blur. The two textures the GLSL chain writes and re-reads
  * are that array.
  */
+/**
+ * The same fused shader, writing to a STORAGE TEXTURE instead of a storage buffer.
+ *
+ * *** THIS IS THE DIFFERENCE BETWEEN A PROOF AND A RENDER PASS. *** v4284 proved the arithmetic against the
+ * three-pass chain, but it wrote f32 into a buffer, because that is what the compute harness binds. A
+ * renderer wants a TEXTURE the composite can sample. Different binding, different WGSL declaration, and a
+ * different set of ways to be wrong -- so it is a separate emitter with its own gate rather than a flag.
+ *
+ * *** THE FORMAT IS A CORRECTNESS DECISION, NOT A PREFERENCE. *** rgba8unorm clamps to [0,1] and bloom's
+ * entire job is to carry values above 1: the reference scene peaks at 1.748, so an 8-bit target silently
+ * discards 43% of the brightest sample's magnitude. rgba16float is the default here and the gate MEASURES the
+ * clipping rather than asserting the choice.
+ */
+export const STORAGE_FORMATS = Object.freeze({ hdr: "rgba16float", clipping: "rgba8unorm" });
+
+export function fusedWgslToTexture(opts = {}) {
+    const body = fusedWgsl(opts);
+    const fmt = opts.format || STORAGE_FORMATS.hdr;
+    // *** `sampled: true` IS THE ONE THAT IS ACTUALLY A RENDER PASS. *** Without it the shader COMPUTES its
+    // own input from srcAt, which is fine for proving arithmetic and useless in a renderer: a post pass reads
+    // the scene somebody else drew. With it, srcAt becomes a textureLoad from an input texture and the shader
+    // is scene-texture in, bloom-texture out, one dispatch. Everything else about it is unchanged, which is
+    // what lets the gate compare the two and attribute any difference to the SAMPLING rather than the maths.
+    const sampled = !!opts.sampled;
+    const withInput = !sampled ? body : body
+        .replace("fn srcAt(xi : i32, yi : i32) -> vec3<f32> {",
+                 "@group(0) @binding(2) var srcTex : texture_2d<f32>;\n\n" +
+                 "fn srcAt(xi : i32, yi : i32) -> vec3<f32> {\n" +
+                 "    return textureLoad(srcTex, vec2<i32>(clampi(xi, 0, N - 1), clampi(yi, 0, N - 1)), 0).rgb;\n" +
+                 "}\n\nfn srcAtProcedural(xi : i32, yi : i32) -> vec3<f32> {");
+    return withInput
+        .replace("@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;",
+                 `@group(0) @binding(0) var outTex : texture_storage_2d<${fmt}, write>;`)
+        .replace(`    let o = (gy * N + gx) * 3;
+    outBuf[o] = s.r;
+    outBuf[o + 1] = s.g;
+    outBuf[o + 2] = s.b;`,
+                 `    textureStore(outTex, vec2<i32>(gx, gy), vec4<f32>(s, 1.0));`);
+}
+
 export function fusedWgsl({ n = N, weights = kernelWeights(), luma = lumaCoefficients(), knee = softKnee() } = {}) {
     const [W0, W1, W2, W3, W4] = weights;
     const F = (v) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
