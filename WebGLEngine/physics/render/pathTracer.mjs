@@ -404,6 +404,37 @@ function diffuseTable(sigma) {
 }
 
 /**
+ * *** THE CAMERA, ONCE. *** v3473 built this basis inside `render` and v3473 built it again inside `coverage`,
+ * and the two copies have agreed ever since only because nobody touched either. A renderer and its own
+ * coverage mask disagreeing about where the rays go is not a bug anyone would find by looking: the mask would
+ * simply be describing a slightly different picture than the one being graded.
+ *
+ * v4290 needed a THIRD copy -- a GPU port has to build the same rays or the comparison is about the camera
+ * rather than the arithmetic -- which is the point at which a duplicate stops being tolerable. The operations
+ * and their ORDER are unchanged from the two copies this replaces, so every buffer either function returned
+ * before is bit-identical to the one it returns now.
+ *
+ * An explicit basis rather than a matrix, for the reason the header gives: a matrix hides the handedness error
+ * the flat-furnace check exists to catch.
+ */
+export function cameraBasis({ eye = [0, 0, 5], look = [0, 0, 0], up = [0, 1, 0], fovDeg = 40 } = {}) {
+    const fwd = norm(sub(look, eye));
+    const right = norm([fwd[1] * up[2] - fwd[2] * up[1], fwd[2] * up[0] - fwd[0] * up[2], fwd[0] * up[1] - fwd[1] * up[0]]);
+    const camUp = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    return { eye, fwd, right, camUp, scale: Math.tan(fovDeg * Math.PI / 360) };
+}
+
+/**
+ * The unit direction through pixel (x, y) offset by (fx, fy) within it. `fx = fy = 0.5` is the pixel centre,
+ * which is what a coverage mask wants; `render` passes its two jitter draws instead.
+ */
+export function pixelRay(x, y, fx, fy, w, h, B) {
+    const u = ((x + fx) / w * 2 - 1) * B.scale * (w / h);
+    const v = (1 - (y + fy) / h * 2) * B.scale;
+    return norm(add(B.fwd, add(mul(B.right, u), mul(B.camUp, v))));
+}
+
+/**
  * Render a rectangle of pixels. Returns a Float64Array of length w*h.
  *
  * The camera is an explicit orthonormal basis rather than a matrix, because a matrix would hide exactly the
@@ -439,10 +470,7 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
     // BROKEN SEEDING SCHEME. On a gradient sky the crop stops matching the frame. ***
     const streamed = streamRng ? rng(seed >>> 0) : null;
     const pixelRand = (x, y) => streamed || rng(((seed * 73856093) ^ (x * 19349663) ^ (y * 83492791)) >>> 0);
-    const fwd = norm(sub(look, eye));
-    const right = norm([fwd[1] * up[2] - fwd[2] * up[1], fwd[2] * up[0] - fwd[0] * up[2], fwd[0] * up[1] - fwd[1] * up[0]]);
-    const camUp = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
-    const scale = Math.tan(fovDeg * Math.PI / 360);
+    const B = cameraBasis({ eye, look, up, fovDeg });
     // A REGION is a sub-rectangle of the SAME camera, never a re-aimed one: the frustum is unchanged and only
     // which pixels get walked changes. Re-aiming would give a different projection and the crop identity below
     // would quietly stop holding.
@@ -478,11 +506,7 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
                     fx = (cx + (plantNoJitter ? 0.5 : r1)) / nStrat;
                     fy = (cy + (plantNoJitter ? 0.5 : r2)) / nStrat;
                 } else { fx = r1; fy = r2; }
-                const u = ((x + fx) / w * 2 - 1) * scale * (w / h);
-                const v = (1 - (y + fy) / h * 2) * scale;
-                const dir = norm(add(fwd, add(mul(right, u), mul(camUp, v))));
-                // `v` is already the vertical image coordinate two lines up -- v3421 lost a round to a name
-                // collision in a temporal dead zone, and this one would merely have thrown, which is luckier.
+                const dir = pixelRay(x, y, fx, fy, w, h, B);
                 const L = trace(eye, dir, scene, rand,
                                 { maxDepth, rrQ, sky, nee, plantGlobalGuard, plantDoubleCount, rgb,
                                   strata: pathStrat ? { n: nStrat, i: s, shuffle: perm } : null, ...rest });
@@ -498,16 +522,10 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
 
 /** Which pixels actually landed on geometry -- so a flatness check can ask about those and not the background. */
 export function coverage(scene, opts = {}) {
-    const { w = 48, h = 48, eye = [0, 0, 5], look = [0, 0, 0], up = [0, 1, 0], fovDeg = 40 } = opts;
-    const fwd = norm(sub(look, eye));
-    const right = norm([fwd[1] * up[2] - fwd[2] * up[1], fwd[2] * up[0] - fwd[0] * up[2], fwd[0] * up[1] - fwd[1] * up[0]]);
-    const camUp = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
-    const scale = Math.tan(fovDeg * Math.PI / 360);
+    const { w = 48, h = 48 } = opts;
+    const B = cameraBasis(opts);
     const mask = new Uint8Array(w * h);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const u = ((x + 0.5) / w * 2 - 1) * scale * (w / h);
-        const v = (1 - (y + 0.5) / h * 2) * scale;
-        mask[y * w + x] = intersect(eye, norm(add(fwd, add(mul(right, u), mul(camUp, v)))), scene) ? 1 : 0;
-    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+        mask[y * w + x] = intersect(B.eye, pixelRay(x, y, 0.5, 0.5, w, h, B), scene) ? 1 : 0;
     return mask;
 }
