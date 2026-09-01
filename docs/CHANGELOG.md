@@ -8,6 +8,83 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4264 -- The consumer is real and the offered algorithm is wrong for it
+
+Backlog #138 arrived as "take novalain/gpgpu-odd-even-transition-sort". v4262's rule says find and MEASURE
+the consumer before taking the solver, and this round is the same discipline arriving at a different answer:
+the consumer is unambiguous, the thing it needs is real, and the specific algorithm on offer is the wrong one.
+
+THE CONSUMER. Gaussian splats are alpha-blended with the depth buffer off, so they must be drawn back to
+front or the picture is wrong. Both engine/SplatRenderer.js and render/SplatRenderer.js re-sort every splat
+on every camera move -- the most unambiguous consumer any of these rounds has produced.
+
+WHAT THEY DID, AND WHAT IT COST. Both ran the identical line:
+
+    const sortable = Array.from(idx);
+    sortable.sort((a, b) => keys[a] - keys[b]);
+
+which boxes every index into a plain JS Array once per frame and then pays a function call per comparison.
+Measured on this sandbox:
+
+    10,000 splats      3.25 ms    fits a 16.7 ms frame
+    50,000 splats     26.52 ms    1.6x over
+   100,000 splats     45.66 ms    2.7x over
+   250,000 splats    120.29 ms    7.2x over
+   500,000 splats    255.87 ms   16.0x over -- 3.7 fps
+
+AND THE FILE DISAGREED WITH ITSELF. render/SplatRenderer.js's header claims ">500K splats interactively"
+while its own comment beside the sort says "for typical N=32K it's fine; we accept the cost". The comment was
+the honest half; the header was false and is now corrected in place rather than quietly reworded.
+engine/SplatRenderer.js described the same line as a "CPU radix-style sort", which it was not --
+Array.prototype.sort is a comparison sort.
+
+THE REPLACEMENT. render/splatSort.mjs is a two-pass 16-bit LSD radix sort over an order-preserving
+float-to-uint mapping, with the scratch allocated once per splat cloud instead of once per frame:
+
+    10,000 splats     0.41 ms     8.3x
+   100,000 splats     2.60 ms    17.0x
+   500,000 splats    14.43 ms    17.7x   -- 69 fps, inside the budget
+
+It is EXACT, not approximate. Splat renderers often quantise depth and accept an approximate order because
+the eye forgives it; this produces the SAME PERMUTATION index for index as the sort it replaces, asserted at
+nine sizes including 0, 1 and 65537, so the render is unchanged by construction rather than by inspection.
+Ties are stable in both, which matters because a flat wall of equal-depth splats is exactly where an unstable
+sort makes the picture shimmer.
+
+THE REFUSAL, PRICED IN COMPARE-EXCHANGES RATHER THAN BIG-O. Odd-even transposition needs n passes of n/2
+compare-exchanges. At 500K splats that is 1.25e11 against the 9.5e6 comparisons a comparison sort needs --
+1.3e4 times the work. It is a lovely GPGPU teaching example precisely because every stage is trivially
+parallel, and that is also its whole problem: it wins only when you have O(N) processors, and a browser does
+not. Nothing was vendored. What was taken is the PREMISE -- that this sort should stop being a comparison
+sort -- and not the algorithm. A depth key is a float, a float has a bit pattern that sorts as an integer,
+and integers can be counted.
+
+SABOTAGE D WENT 0 RED, AND IT IS THE ONE I HAD ALREADY NAMED "the sabotage that would ship". Making
+radixSortIndices allocate its own scratch on every call -- the exact defect the caller-supplied scratch
+exists to prevent -- changed nothing the gate could see, because even allocating a 65,537-entry histogram
+every frame leaves the radix sort far inside the budget. The clock says fine while every frame allocates.
+Speed was simply the wrong instrument for an allocation claim. The gate now fills the caller's scratch with a
+sentinel and asserts the function WROTE INTO IT, with a control that the probe can still read "untouched".
+1 RED after.
+
+Sabotage C also failed differently from my prediction: I expected reversing the final scatter to break ties
+only, and it broke the order outright at 47,926 inversions in 50,000, because reversing the walk while the
+counters still march forward is a different algorithm rather than an unstable one. Recorded as it ran. Five
+sabotages, 5/3/2/1/1 red.
+
+A scan in this gate also went red on this tree's own commentary for the third round running -- both renderers
+now QUOTE the old line in the paragraph explaining why it went. The rule is settled and written down: a check
+about CODE strips the comments first.
+
+UNCHECKED: the picture. Nothing here renders a splat; the permutation equality is what makes the render
+unchanged, but no frame was drawn and no WebGL context created. The timings are Node on this sandbox's CPU,
+best of two or three runs -- the RATIO is the durable claim and the milliseconds are not. The key
+distribution is uniform random and a real splat cloud is clustered, which changes a radix sort's memory
+behaviour though not its work. And the odd-even refusal is an operation COUNT, not a measurement: that shader
+was never run, on the same principle as v4262.
+
+The build now stands at 4264 gates.
+
 ## v4263 -- The gap between the two licence registers, and the code that fell into it
 
 This tree has two licence registers and they are each correct. world/orrery.mjs answers "what did we VENDOR,
