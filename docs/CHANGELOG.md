@@ -8,6 +8,65 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4285 -- How far one texel's damage travels, and what that forbids
+
+v4284 fused three post passes into one compute dispatch and closed by saying the composite was "the one that
+would decide whether the whole post chain can become one dispatch or merely two."
+
+*** THAT WAS WRONG. THE COMPOSITE DECIDES NOTHING. GOD RAYS DECIDES, AND IT DECIDES NO. ***
+
+render/passFootprint.mjs settles it by MEASUREMENT rather than by reading shaders. A pass can join a
+tile-local dispatch only if its read footprint is bounded by a constant -- an apron of A texels, with A
+independent of image size. Counting taps in the source gives a claim about that. Rendering the pass twice,
+identical but for ONE texel, and collecting every output pixel that moved, gives the footprint itself, with no
+step where somebody's reading of the code is trusted. The tap count becomes a PREDICTION the measurement can
+contradict.
+
+Measured on a real WebGL2 driver, perturbing the centre texel:
+
+                     N = 32      N = 64
+    BRIGHT_FS          0           0        constant -- purely local
+    BLUR_FS (H)        4           4        CONSTANT -- a fixed apron works
+    GODRAYS_FS        15          31        DOUBLES WITH THE IMAGE
+
+*** THE LAST ROW IS THE FINDING. *** A footprint that grows with resolution cannot be covered by any fixed
+apron, so god rays cannot join a tile-local dispatch at 8x8, at 32x32, or at any size. And the numbers are not
+merely large: 15 = 31 - 16 and 31 = 63 - 32, exactly the distance to the far corner. The true footprint is
+THE REST OF THE IMAGE ALONG THE RAY FROM THE SUN. At 1920 wide the apron would be about 1700 texels, which is
+not an apron, it is the frame.
+
+The blur's 4 is the same 4 at both resolutions and equals the kernel's own reach parsed from the shipping
+shader -- the two are checked against each other, so the measurement and the source have to agree.
+
+SO THE ANSWER IS TWO DISPATCHES, AND THE REASON IS STRUCTURAL RATHER THAN BUDGETARY. bright + blur + SSAO +
+composite can share a tile; god rays cannot join them. The composite is fusable IN ITSELF -- its reads are
+capped by literals in its own source, a 3x3 depth Sobel and a heat displacement of at most 0.0035 UV -- and
+still cannot be fused, because it CONSUMES the pass that cannot. Fusable and reachable are different
+properties and only the second one ships. SSAO is a third category: bounded by a UNIFORM rather than a
+literal, so an apron exists only once somebody bounds uRadius.
+
+Four sabotages. The radius accumulator starting at 0 instead of -1 reddens the control that separates "no
+dependency at all" from "purely local" -- every number in the file is a radius, and a method that cannot
+report nothing would give 0 for a shader that ignores its input. The row flip dropped gives 16 and 32 instead
+of 15 and 31: *** STILL DOUBLING, SO THE TREND CHECK STILL PASSES, *** and only the check predicting the
+EXACT number catches it. A trend is cheap to satisfy and a number is not.
+
+*** AND ONE SABOTAGE WENT 0 RED BECAUSE THE GATE WAS OVERSTATING, NOT BECAUSE THE MODULE WAS RIGHT. ***
+Hardcoding DENSITY instead of parsing it changed no prediction, and the check was labelled "the geometry
+predicts both numbers from DENSITY alone" -- untrue: at the centre the radius is set by the distance to the
+corner and density never enters. Chasing that found a regime where it does. One texel from the sun, density
+0.9 predicts 3 and 1.0 predicts 30, a factor of ten. *** AND MEASURING THAT REGIME SHOWED THE MODEL IS WRONG
+THERE: *** the device says 12 against a modelled 3, because near the sun every pixel's ray converges and one
+texel lies on rays from all directions at once. The model is now scoped to the centre where it is exact, the
+near-sun disagreement is recorded as MODEL_LIMIT rather than tuned away, and the redone sabotage goes 2 red.
+A model right in one regime and quietly wrong in another is worth keeping only if the regimes are named.
+
+Not measured, and marked as such rather than presented beside what was: the composite and SSAO were not
+perturbed. The composite takes five samplers and SSAO needs a depth buffer that is not the colour buffer, and
+this harness binds one texture. Their entries are read off their SOURCE, which is exactly the weaker evidence
+this round exists to replace.
+
+This round adds one module and one gate, and the tree stands at 1358 gates.
 ## v4284 -- Three passes, one dispatch, and the picture had to survive it
 
 Keith asked whether more of the tree's shaders can move to WebGPU. The census answers first: 169 files are
