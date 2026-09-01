@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { orenNayarAB, orenNayarFactor, orenNayarBrdf, directionalAlbedo, buildDiffuseTable,
          compensationAt, roughDiffuseBrdf, energyLoss, SIGMA_MAX } from "../../physics/render/roughDiffuse.mjs";
 import { NAMED_SOURCES } from "../../world/namedNotChecked.mjs";
+import { SWEEP, settles } from "../../world/licenceSweep.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -116,18 +117,28 @@ console.log("\n4. WHAT IT DOES NOT CLAIM TO BE");
     ok("CONTROL: the normaliser is doing work -- the phrase is NOT contiguous in the raw file",
         !/THIS IS NOT THAT/.test(src),
         "so this pair proves the check reads meaning rather than line breaks");
-    ok("  and says why: no network, so it was never opened", /no network/.test(prose) && /never read|not read|not consulted/.test(prose));
-    ok("  and points at the register that holds the unchecked name",
-        /namedNotChecked/.test(prose));
-    const named = NAMED_SOURCES.filter((e) => e.namedIn === "v4275 suggestion");
-    ok("*** all six suggested repositories are registered as NAMED and unchecked ***", named.length === 6,
-        named.map((e) => e.repo.split("/").pop()).join(", "));
-    ok("  including the one this round took an idea from", named.some((e) => e.repo === "portsmouth/EON-diffuse"));
-    ok("  and none of them carries a licence verdict",
-        named.every((e) => !["spdx", "licence", "licenceExists", "redistributable"].some((f) => f in e)));
-    ok("  and the likely-duplicate one is flagged BEFORE anybody spends a round on it",
-        named.some((e) => /Trinity/.test(e.repo) && /LIKELY DUPLICATE/.test(e.wanted)),
-        "four fluid solvers already ship here; v4239 found the solver was the duplicate and the sensor was not");
+    ok("  and says the FIT was not consulted, which is the honest reason", /not consulted/.test(prose));
+    ok("*** and records that v4275's stated reason -- no network -- was wrong ***",
+        /THE REASON GIVEN FOR THAT AT v4275 WAS WRONG/.test(prose) && /clonable the whole time/.test(prose),
+        "the refusal stands on its merits; the excuse for it did not");
+    ok("  and points at the sweep that holds the checked verdict", /licenceSweep/.test(prose));
+    // *** v4275 ASSERTED THESE SIX WERE UNCHECKED. v4276 CHECKED THEM, SO THE ASSERTION INVERTS. ***
+    const swept = SWEEP.filter((e) => e.namedIn === "v4275 suggestion");
+    ok("*** all six suggested repositories are now CHECKED, not merely named ***", swept.length === 6,
+        swept.map((e) => `${e.repo.split("/").pop()}=${e.spdx}`).join(" "));
+    ok("  every one of them is permissively licensed", swept.every((e) => e.licenceExists && /^(MIT|Apache-2\.0)$/.test(e.spdx)),
+        "five MIT and one Apache-2.0 -- so v4275's caution cost nothing and was based on a false premise");
+    ok("  including the one this round took an idea from",
+        swept.some((e) => e.repo === "portsmouth/EON-diffuse" && e.spdx === "MIT"));
+    ok("  and each carries evidence rather than a recollection",
+        swept.every((e) => e.evidence && e.evidence.file && e.evidence.sha256 && e.evidence.lines > 0),
+        "licence file, hash prefix and line count, read off disk in the session that recorded them");
+    ok("  and none of them is still parked in namedNotChecked",
+        settles(NAMED_SOURCES).length === 0,
+        `${settles(NAMED_SOURCES).length} still there -- a register of the unchecked must shrink when things get checked`);
+    ok("*** the LIKELY-DUPLICATE judgement survives the licence coming back clean ***",
+        SWEEP.some((e) => /Trinity/.test(e.repo) && /LIKELY DUPLICATE/.test(e.note || "")),
+        "MIT says it MAY be taken; four fluid solvers already shipping says it should not be");
     report("taking an IDEA and refusing a CODEBASE is the same move v4247 made with Ramotion's gaze dwell. " +
         "The difference this time is that the idea's published form was available and its recent refinement " +
         "was not, so the file implements the former and names the latter as the thing it is not.");

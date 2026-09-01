@@ -43,12 +43,9 @@ const SELF = ["world/namedNotChecked.mjs", "tools/ship/namedNotChecked-selfcheck
 const ALLOWED = Object.freeze([
     { file: "world/reachedLicences.mjs", repo: "advanced-threejs-tsl-webgpu-rendering",
       why: "the v4268 entry for boytchev/tsl-textures quotes #100 to say what it answers" },
-    // v4275: the round built a rough-diffuse lobe and its header says, at length, that it is NOT this
-    // repository's model and that the repository was never opened. Naming it is the disclaimer working.
-    { file: "physics/render/roughDiffuse.mjs", repo: "portsmouth/EON-diffuse",
-      why: "its header names the source it is NOT, which is the point of the file" },
-    { file: "tools/ship/roughDiffuse-selfcheck.mjs", repo: "portsmouth/EON-diffuse",
-      why: "the gate asserts that disclaimer is present" },
+    // (v4275 added two allowances for portsmouth/EON-diffuse here. v4276 CHECKED that repository -- it is MIT --
+    // so it left this register for world/licenceSweep.mjs, and the allowances went with it. An allowance for a
+    // repo the register no longer holds cannot be exercised, which is how this pair announced itself.)
 ]);
 
 // *** AND THE VERSION NOTE, WHICH CAUGHT THIS GATE'S AUTHOR A SECOND TIME IN THE SAME ROUND. ***
@@ -265,8 +262,15 @@ console.log("\n4. #100 IS ANSWERED BY A SOURCE THE TREE ALREADY HAD");
     ok("*** and that source is now IN the register, which it was not before this round ***", !!reg);
     ok("  it validates", reg && validateEntry(reg).length === 0, reg ? validateEntry(reg).join(" | ") || "clean" : "absent");
     ok("  it is OPEN severity, not unpapered", reg && severityOf(reg) === SEVERITY.OPEN);
-    ok("  its licenceNote says the reading is SECOND-HAND", reg && /second-hand|SECOND-HAND/.test(reg.licenceNote),
-        "this round had no network and registered our own v4243 header, not a fresh look at the LICENSE");
+    // v4275 asserted here that the licenceNote said SECOND-HAND, which was the right check while the reading
+    // was second-hand. v4276 opened the repository, so the check is inverted rather than deleted: the note has
+    // to carry the EVIDENCE now, and a regression back to a header-only reading would go red.
+    ok("*** its licenceNote is now a FIRST-HAND reading, with the evidence in it ***",
+        reg && /FIRST-HAND/.test(reg.licenceNote) && /9b78f997e3b1/.test(reg.licenceNote),
+        "LICENSE, 21 lines, sha256 9b78f997e3b1, (c) 2024 Pavel Boytchev -- and package.json agrees");
+    ok("  and it still records that v4275 read it second-hand, rather than tidying that away",
+        reg && /SECOND-HAND/.test(reg.licenceNote),
+        "the header was right; 'the header was right' is only knowable after looking, and both states are kept");
     ok("  and it credits the file that actually took from it", reg && reg.takenPaths.includes("render/solidTexture.mjs"));
 
     // *** THE CHECK THE EXISTING GATE DOES NOT DO: A CITED FILE MUST ACTUALLY NAME THE SOURCE. ***
@@ -360,11 +364,12 @@ console.log("\n5. THE RATCHET: THIS FILE MUST NOT BECOME A PARKING SPACE");
 // agree with -- a name present or absent in 4,572 files, a path whose contents must contain a string, a
 // count derived from the entries actually filed -- rather than a fact this file asserts about itself.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: WHETHER ANY OF THE SIX REPOSITORIES ACTUALLY LACKS A LICENCE. This round had no " +
-    "network and opened none of them, which is the entire reason world/namedNotChecked.mjs exists -- it " +
-    "records that the question is OPEN, and a gate cannot close it from inside the tree. Also unchecked: " +
-    "whether boytchev/tsl-textures is really MIT. Section 4 proves the tree SAYS so, in a header it has " +
-    "relied on since v4243, and that the register now records it as second-hand. A round with a network " +
-    "should open the LICENSE file and either confirm it or correct it -- and if it is corrected, " +
-    "render/solidTexture.mjs's provenance is what changes, not just this entry.");
+console.log("unchecked here: WHETHER ANY OF THE SIX REPOSITORIES ACTUALLY LACKS A LICENCE. None was opened. " +
+    "*** v4275 SAID THAT WAS BECAUSE THE SESSION HAD NO NETWORK, AND THAT WAS FALSE -- see world/licenceSweep." +
+    "mjs, which opened thirteen. *** The real obstacle is that not one of the six records an OWNER: they are " +
+    "bare names, and a bare name is not an address. So the question stays OPEN, for a duller and far more " +
+    "fixable reason than the one this file used to give. What is no longer unchecked is boytchev/tsl-textures: " +
+    "section 4 used to prove only that the tree SAYS MIT in a header it has relied on since v4243, and v4276 " +
+    "opened the LICENSE and confirmed it. The second-hand reading was right, which is a thing you only know " +
+    "after looking.");
 process.exit(fails ? 1 : 0);

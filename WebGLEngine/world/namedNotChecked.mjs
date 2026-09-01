@@ -77,58 +77,24 @@ export const UNCHECKED = "unchecked";
  */
 export const NAMED_SOURCES = Object.freeze([
     // =========================================================================================================
-    // v4275 -- SIX SUGGESTED IN ONE MESSAGE, NONE OF THEM OPENED. Five from portsmouth and one from the Academy
-    // Software Foundation. This session has no network, so not one licence was read; every one of them is here
-    // for the reason this register exists, and NOT because anything is wrong with them.
+    // *** v4275 PUT SIX ENTRIES HERE AND v4276 TOOK ALL SIX BACK OUT, BECAUSE THE PREMISE WAS FALSE. ***
+    //
+    // They were filed as NAMED-and-unchecked on the stated ground that "this session has no network". That was
+    // never tested. A bare `curl https://github.com` returns HTTP 400 through this environment's proxy, which
+    // reads like a wall and is not one -- the proxy gates GitHub PER REPOSITORY and its own error text names the
+    // way through. Anonymous git reads of public repositories work, and all six were clonable the whole time.
+    //
+    // They are now in world/licenceSweep.mjs with the licence file, its hash and its line count: five MIT and
+    // one Apache-2.0. promotable() is what should have caught this, and it could not, because it compares this
+    // register against reachedLicences.mjs and the problem was never that they had been assessed elsewhere --
+    // it was that nobody had tried.
+    //
+    // *** THE REGISTER ITSELF IS NOT DISCREDITED BY THIS AND THE DISTINCTION MATTERS: *** "nobody has
+    // established a grant" was the honest state at v4275 given what I believed, and it is still the right home
+    // for a source that genuinely cannot be reached. What was wrong was the belief, not the shelf. The six
+    // entries below predate that session and remain unchecked -- v4276 did not attempt them, so nothing here
+    // claims they are unreachable, only that they are unread.
     // =========================================================================================================
-    {
-        repo: "portsmouth/EON-diffuse", namedIn: "v4275 suggestion",
-        claimedState: "not stated -- suggested as a source, with no claim about its licence",
-        established: UNCHECKED,
-        wanted: "An energy-preserving Oren-Nayar diffuse BRDF. *** THE ONE OF THE SIX WITH A MEASURED GAP " +
-                "BEHIND IT: *** this tree's specular lobe has GGX, Smith, furnace tests and multiple-scattering " +
-                "compensation, and its DIFFUSE lobe is albedo/PI with zero files mentioning Oren-Nayar. " +
-                "v4275 built physics/render/roughDiffuse.mjs from Oren-Nayar's published 1994 form plus a " +
-                "compensation measured by this tree's own furnace machinery -- NOT from this repository's " +
-                "analytic fit, which was never read.",
-    },
-    {
-        repo: "AcademySoftwareFoundation/OpenPBR", namedIn: "v4275 suggestion",
-        claimedState: "not stated",
-        established: UNCHECKED,
-        wanted: "A surface shading model SPECIFICATION rather than an implementation. The interesting question " +
-                "is whether this tree's material parameters could be named in its vocabulary; that is a " +
-                "reading exercise and needs the document, not the code.",
-    },
-    {
-        repo: "portsmouth/OpenPBR-viewer", namedIn: "v4275 suggestion",
-        claimedState: "not stated",
-        established: UNCHECKED,
-        wanted: "A viewer for the above. The tree already has render surfaces and a path tracer; a second " +
-                "viewer is the kind of thing #133 asks the consumer question about before taking.",
-    },
-    {
-        repo: "portsmouth/snelly", namedIn: "v4275 suggestion",
-        claimedState: "not stated",
-        established: UNCHECKED,
-        wanted: "GPU path tracing of signed distance fields. The tree has physics/render/sdfMarch.mjs and a " +
-                "CPU path tracer in physics/render/pathTracer.mjs, so the gap is the GPU half, not the idea.",
-    },
-    {
-        repo: "portsmouth/fibre", namedIn: "v4275 suggestion",
-        claimedState: "not stated",
-        established: UNCHECKED,
-        wanted: "GPU visualisation of vector fields as fibre bundles. Nothing in this tree draws a field line; " +
-                "the closest is the vorton work, which SIMULATES vorticity and does not render its streamlines.",
-    },
-    {
-        repo: "portsmouth/Trinity", namedIn: "v4275 suggestion",
-        claimedState: "not stated",
-        established: UNCHECKED,
-        wanted: "GPU fluid simulation. *** LIKELY DUPLICATE AND THAT IS WORTH RECORDING BEFORE ANYONE LOOKS: *** " +
-                "this tree already ships fluid-webgpu, fluid-webgpu-3d, mpm-gpu and an SPH solver. v4239's " +
-                "finding on mobile-fluid-sim applies -- the solver was the duplicate and the SENSOR was not.",
-    },
     {
         repo: "advanced-threejs-tsl-webgpu-rendering", namedIn: "#100",
         claimedState: "no licence at all",

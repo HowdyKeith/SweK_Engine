@@ -8,6 +8,113 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4276 -- The licence sweep: twenty-six repositories opened, and the premise that said they could not be
+
+*** v4275 SAID "THIS SESSION HAS NO NETWORK" IN FOUR PLACES -- ITS MODULE HEADER, ITS GATE, ITS CHANGELOG AND
+ITS COMMIT MESSAGE -- AND NOBODY EVER TESTED IT. *** A bare `curl https://github.com` returns HTTP 400 through
+this environment's proxy. That reads like a wall. It is not one: the proxy gates GitHub per repository, and
+anonymous git reads of public repositories work. Six repositories were filed in world/namedNotChecked.mjs as
+NAMED-and-unchecked on the stated ground that they could not be reached, and every one of them was clonable
+the whole time.
+
+This is the same shape as v4270's WebGPU error, one round after it: an environment's refusal read as a fact
+about the environment rather than as a message to be read. Both times the system said why, and both times I
+did not look.
+
+### What replaced the assumption
+
+world/licenceSweep.mjs holds TWENTY-SIX repositories that were actually cloned and whose licence files were
+actually opened. Every verdict carries its evidence -- which file, its sha256 prefix, its line count -- so a
+later round can tell a reading from a recollection. 20 papered (18 MIT, 1 Apache-2.0, 1 unresolved), 6 not.
+
+### Four findings a "repo: MIT" ledger would have missed
+
+*** WHO IS GRANTING THE LICENCE IS NOT THE ACCOUNT YOU CLONED FROM. *** Five of the repositories carry a
+licence file naming somebody else entirely: Brendan Duncan, Jamie Owen, Alin, Daniel Esteban Nombela, and
+Brandon Jones with Colin MacKenzie IV. The licences are real and permissive -- what would have been wrong is
+the credit. A ledger that recorded owner/name and an spdx and stopped would have credited a mirror account for
+gl-matrix itself. Backlog #82 is this question in its dangerous direction, ENCUMBERED, a licence granted by
+somebody who lacked the rights; this is its ordinary direction, and it is far commoner.
+
+*** AND IT IS NOT AUTOMATABLE. *** but0n/Ashes is licensed to "Jeff Ma" and its package.json author field
+says "but0n" -- the same person under a legal name and a handle. No rule matching the owner segment of the URL
+against the copyright line could ever have got that right, in either direction: it would call this one a
+mirror and would have no way to notice the five that are. Every grantor verdict in the file was decided by
+reading at least two things in the repository, and that limit is written into the module rather than left for
+whoever trusts the field too far. A collective grantor is a third answer again -- "recastCLI.js authors" is
+neither the account holder nor somebody else, and is recorded as null rather than false.
+
+*** AN SPDX WITH NO GRANT BEHIND IT IS A STATE OF ITS OWN, NOT A ROUNDING ERROR. *** Two repositories name a
+licence in package.json -- one MIT, one ISC -- and ship no licence text at any depth. Called papered, the tree
+would believe it holds a grant it has never seen; called unpapered, the tree would forget that the author's
+own metadata names one, which is where a real answer would start. They are the entries where spdx is set and
+licenceExists is false, deliberately, and the gate asserts how many there are, names them, and checks they do
+not share an spdx -- because two different licences declared the same way is a shape, where one would only be
+a quirk.
+
+*** AND A REPOSITORY CAN STATE TWO DIFFERENT LICENCES. *** but0n/recastCLI.js ships the MIT text in LICENSE
+and says "license": "ISC" in package.json. Both are permissive, so nothing here is alarming, and they are NOT
+THE SAME GRANT. A ledger that recorded whichever it happened to read first would be writing down a coin toss
+as a fact. That entry is the only one in the sweep where a licence certainly EXISTS and its spdx is null, and
+tally() counts it under `unresolved` -- the first version of tally() reduced over every papered entry and put
+a key literally named "null" into the spdx histogram the moment this repository arrived, which is how an open
+question quietly becomes a category nobody looks at twice.
+
+*** BOTH DIRECTIONS OF THE SCAN ERROR HAPPENED IN THE SAME HOUR. *** christopherbatty/SDFGen has NO licence
+file and the full MIT text with its copyright line sitting in the README -- a root-directory scan calls it
+unpapered and is wrong, which is the exact mistake world/orrery.mjs records three of this tree's own scans
+making. The opposite: grepping READMEs case-insensitively for "MIT" reported hits in two repositories that
+have no licence at all, from the words "emitter" and "transmitted". A third variant turned up as well --
+ashima/webgl-diagnostic and redcamel/gl-matrix are plainly MIT and neither contains the words "MIT License"
+anywhere, opening with a copyright line and going straight into the grant. Only reading the matched lines
+catches any of the three. (And reading them caught a fourth thing: a grep for "shall be included in all
+copies" answered zero against a file that says exactly that, because it wraps as "included in / all copies".
+Prose does not hold still for a grep, which is a defect v4275 shipped in a gate and this round reproduced.)
+
+### The one the tree was already relying on
+
+boytchev/tsl-textures has been cited in render/solidTexture.mjs's header since v4243 as MIT, and v4275
+registered that reading in world/reachedLicences.mjs while explicitly marking it SECOND-HAND -- our own note,
+not the LICENSE file, on the stated ground that there was no network. Opened now: MIT, (c) 2024 Pavel
+Boytchev, 21 lines, sha256 9b78f997e3b1, and package.json agrees. The header was right. A claim made on a
+reason that did not hold up is not thereby wrong, and is not thereby verified either, and both states are
+kept in the entry rather than the earlier one being tidied away.
+
+### And why the six that remain are still unchecked
+
+Not for the reason v4275 gave. The real obstacle is duller and fixable: NOT ONE OF THE SIX RECORDS AN OWNER.
+They are bare repository names, and a bare name is not an address. All twenty-six the sweep settled carry
+owner/name. That is the whole difference between the two shelves, and it was hidden for a round behind a
+claim about the environment that nobody tested. The next round on #100 or #132 does not need a network it
+already has -- it needs six URLs the backlog items were written from and the register did not keep.
+
+### Sabotage
+
+Ten, each grep-confirmed before the result was read, exit code and FAIL summary both read, every file
+restored md5-identical. A verdict with null evidence: 3 red across three sections. An spdx with no licence:
+1. A hash collapsed so a byte-identical group breaks up: 1. A settled repository re-shelved as unchecked in a
+different file: 2. The first-hand note reverted to a header citation: 1, and in a different gate. A mirror
+re-credited to the account holder: 1. The declared-only entry collapsed into papered: 1 -- not a typo but the
+tempting simplification, which is what makes it the one worth having. Every mirror re-credited at once: 2,
+including the control that proves the finding is per-repository rather than per-account. The contradiction
+resolved by taking the licence file's answer: 2, the second red being the named-exception list noticing that
+one of its exceptions had stopped being exercised. The legal name replaced by the account handle -- exactly
+what a naive rule would produce: 1.
+
+*** SABOTAGE C'S FIRST RUN CRASHED THE GATE INSTEAD OF REDDENING IT. *** The detail argument computed
+`find(...)[1]` inline, so when the group it was reporting on ceased to exist the TypeError threw before the
+check was ever called: exit 1, which looks like a successful sabotage to anyone reading only the exit code,
+and no FAIL line and no count printed. A detail string that assumes the condition it is grading goes silent
+at the exact moment it has something to say.
+
+Five counts in this round were wrong before they were run and all five are corrected. The line-count-versus-
+hash check was typed as a number twice, and is DERIVED now -- it asserts that grouping by length is strictly
+coarser than grouping by bytes. That form then survived two further batches of repositories arriving without
+a single edit, and reports eleven files of exactly 21 lines of which ten are genuinely different, where a
+literal would have gone red on correct data twice more. Not one of the five was caught by re-reading; every
+one was caught by running.
+
+This round adds one module and one gate, and the tree stands at 1350 gates.
 ## v4275 -- The diffuse lobe learns about roughness, and six repositories go unopened into the register
 
 The specular side of this renderer is serious. `physics/render/microfacet.mjs` has the GGX distribution, Smith
@@ -18317,3 +18424,5 @@ flat field panel (Demo_FieldViewer) · petri dish (Demo_PetriViewer) · arcade p
 - Fixed the slimmer's `engineRoot` path; dry run = 232 files / ~2.7 MB.
 - Add-on repo now has `PUBLISHING.md` (GitHub steps + one-click badge) and `.github/workflows/ci.yml` (lints config + sanity-builds/serves the image).
 
+
+The build now stands at 4276 gates.

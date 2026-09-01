@@ -173,12 +173,15 @@ export const REACHED_SOURCES = Object.freeze([
         repo: "boytchev/tsl-textures", sourceUrl: "https://github.com/boytchev/tsl-textures",
         grantorHoldsRights: true, licenceExists: true, publisher: "Pavel Boytchev", year: 2024,
         spdx: "MIT", licence: null,
-        licenceNote: "MIT with the author and year, as stated in render/solidTexture.mjs's header at v4243. " +
-             "*** THAT IS A SECOND-HAND READING AND IS RECORDED AS ONE: *** this round has no network and " +
-             "did not re-open the repository, so what is registered here is OUR OWN v4243 note, not a fresh " +
-             "look at the LICENSE file. It is entered in the direction that cannot become a false accusation " +
-             "-- affirming a grant the tree already relied on when it shipped solidTexture -- and a round " +
-             "with a network should confirm it.",
+        licenceNote: "MIT, (c) 2024 Pavel Boytchev. *** READ FIRST-HAND AT v4276: *** LICENSE, 21 lines, " +
+             "sha256 9b78f997e3b1, and package.json's \"license\" field agrees. " +
+             "v4275 entered this SECOND-HAND -- from render/solidTexture.mjs's own v4243 header -- and said " +
+             "so, on the stated ground that the session had no network. That ground was false and the entry " +
+             "was right anyway, which is the least comfortable pair of facts to hold: a claim made on a " +
+             "reason that did not hold up is not thereby wrong, and is not thereby verified either. What " +
+             "made it safe in the meantime was its direction -- affirming a grant the tree already relied on, " +
+             "which cannot become a false accusation. What makes it settled now is the file. " +
+             "See world/licenceSweep.mjs, which opened this and twelve others.",
         redistributable: true, posture: POSTURE.REACHED,
         taken: "The idea only: procedural texture as a function evaluated on the GPU rather than an image " +
              "fetched from a file. No bytes. The library is TSL against a WebGPURenderer and this tree has " +

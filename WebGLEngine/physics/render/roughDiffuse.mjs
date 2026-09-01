@@ -17,10 +17,15 @@
 // ---- *** WHAT THIS IS AND, MORE IMPORTANTLY, WHAT IT IS NOT *** --------------------------------------------------
 //
 // The round was suggested by portsmouth/EON-diffuse -- "EON" being an energy-preserving Oren-Nayar. *** THIS IS
-// NOT THAT, AND CALLING IT THAT WOULD BE A CLAIM I CANNOT CHECK. *** This session has no network: the repository
-// was not fetched, its licence was not read, and its analytic fit was not consulted. It is recorded in
-// world/namedNotChecked.mjs with the five others suggested alongside it, as NAMED and unchecked, which is what
-// that register exists for.
+// NOT THAT, AND CALLING IT THAT WOULD BE A CLAIM I HAVE NOT CHECKED. *** Its analytic fit was not consulted:
+// what is below was derived here, and nothing in it came from that repository.
+//
+// *** THE REASON GIVEN FOR THAT AT v4275 WAS WRONG, AND v4276 CORRECTED IT. *** That round said "this session
+// has no network" and filed the repository as unreachable. It was never tested. The proxy gates GitHub per
+// repository and anonymous git reads of public repositories work; EON-diffuse was clonable the whole time and
+// is MIT (world/licenceSweep.mjs holds the licence file's hash and line count). So the refusal to copy its
+// model stands on its own merits -- the fit was not read, so it is not claimed -- and NOT on a claim about
+// what this machine could reach.
 //
 // What is implemented here is:
 //
