@@ -132,12 +132,12 @@ export const DEVICE_CONTRACT = Object.freeze({
 export const PARITY_BASELINE = Object.freeze({
     // *** v4269 RECORDED 118 AND THAT WAS AN UNDERCOUNT OF 16. *** See GLSL_TELL: the directive-only marker
     // could not see a three.js ShaderMaterial pass, which is exactly the population this census is about.
-    glslBearing: 134,
-    glslDirective: 118,  // raw WebGL2 -- the file writes its own #version header
+    glslBearing: 135,    // v4271 +1: render/badTvDevicePass.mjs, the GLSL half of the first device pipeline
+    glslDirective: 119,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     wgslBearing: 39,     // v4270 +1: render/badTvWgsl.mjs, the first shader deliberately carried across
     both: 5,
-    glslOnly: 129,
+    glslOnly: 130,
     wgslOnly: 34,        // v4270 +1, same file
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
@@ -161,6 +161,15 @@ export const PORTED_PAIRS = Object.freeze([
     Object.freeze({ effect: "badTv", glsl: "render/badTvPass.js", wgsl: "render/badTvWgsl.mjs",
                     model: "render/badTvModel.mjs", gate: "tools/ship/badTvWgsl-selfcheck.mjs",
                     graded: "numerically, on a real GPU, against the CPU model -- agrees to 3.2e-8" }),
+    // *** THE DEVICE PIPELINE, WHICH IS THE PAIR THAT ACTUALLY SATISFIES gfx/device.js. *** The entry above is
+    // the three.js pass beside its WGSL twin; this one is a single descriptor carrying both languages, which
+    // is what the abstraction asks for. It renders on BOTH backends and v4271 diffs the frames: 0 of 4,096
+    // pixels differ, and both match the CPU model exactly.
+    Object.freeze({ effect: "badTv (device pipeline)", glsl: "render/badTvDevicePass.mjs",
+                    wgsl: "render/badTvWgsl.mjs", model: "render/badTvModel.mjs",
+                    gate: "tools/ship/badTvDevicePass-selfcheck.mjs",
+                    graded: "rendered on WebGPU and WebGL2 and diffed -- 0 of 4096 pixels differ, both exact " +
+                            "against the CPU model" }),
 ]);
 
 /** Walk a tree and classify every candidate file. Pure but for the two readers handed in. */

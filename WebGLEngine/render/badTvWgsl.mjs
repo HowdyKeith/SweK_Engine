@@ -131,6 +131,36 @@ fn probe(@builtin(global_invocation_id) gid: vec3u) {
 }`;
 
 /**
+ * *** WHICH WAY IS UP, WHICH THE ARITHMETIC TEST COULD NOT ASK AND THE PIXEL TEST ANSWERED IMMEDIATELY. ***
+ *
+ * v4270 proved this shader computes badTvModel's sample coordinates to 3.2e-8. It could not prove anything
+ * about ORIENTATION, because a coordinate is just a pair of numbers until something samples a real texture
+ * with it. v4271 rendered a 64x64 source whose texels encode their own position and read the frame back: the
+ * first attempt disagreed with the model by 126 of 255, and agreed EXACTLY -- 0 of 255 -- with the model
+ * evaluated at (1 - v).
+ *
+ * The shader was right and the expectation was flipped, but the disagreement is real and belongs to the port:
+ *
+ *   WebGL / three.js   textures are uploaded with flipY, and a PlaneGeometry's `uv` has v = 0 at the BOTTOM.
+ *   WebGPU            has no flipY and texture row 0 is the TOP. NDC y still points up.
+ *
+ * So a vertex stage that derives uv straight from NDC samples the source upside down relative to the GLSL
+ * pass. This one therefore flips v, putting uv in FRAMEBUFFER space: uv.y = 0 is the top row of the target
+ * and the top row of the texture, which is the one convention where the two agree without a caller thinking
+ * about it.
+ *
+ * *** AND THIS IS NOT ONLY COSMETIC, BECAUSE THE ROLL READS v. *** badTvSampleAt returns
+ * fract(v - time * rollSpeed): flipping v reverses which way the picture rolls. Getting the orientation
+ * "wrong but symmetric" would have shipped an effect that rolls the wrong way and looks perfectly plausible.
+ */
+export const UV_CONVENTION = Object.freeze({
+    space: "framebuffer",
+    origin: "top-left",
+    note: "uv.y = 0 is the top row of both the render target and the sampled texture -- v is flipped out of NDC",
+    affects: "the roll direction, because badTvSampleAt computes fract(v - time * rollSpeed)",
+});
+
+/**
  * The shipping fragment shader, in the shape gfx/device.js's WebGPU backend wants: a `vs` and an `fs` entry in
  * one module, uniforms in a single struct at binding 0 of group 0.
  *
@@ -153,7 +183,8 @@ fn vs(@builtin(vertex_index) vi: u32) -> VSOut {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   var o: VSOut;
   o.pos = vec4f(p[vi], 0.0, 1.0);
-  o.uv = vec2f((p[vi].x + 1.0) * 0.5, (p[vi].y + 1.0) * 0.5);
+  // *** uv.y IS FLIPPED OUT OF NDC AND THAT IS THE WHOLE ORIENTATION QUESTION. *** See UV_CONVENTION below.
+  o.uv = vec2f((p[vi].x + 1.0) * 0.5, 1.0 - (p[vi].y + 1.0) * 0.5);
   return o;
 }
 

@@ -8,6 +8,75 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4271 -- Both backends render it, and the frames are identical
+
+`gfx/device.js` has promised, since the day it was written, that "a demo writes its render ONCE and runs on
+either runtime". Nothing had ever rendered the same effect both ways and compared the pixels.
+
+v4269 counted how many modules could even take that offer: five of 135, three of them pages. v4270 ported one
+shader and proved it computes the right coordinates, to 3.2e-8 -- a claim about arithmetic, not about pictures.
+This round draws it.
+
+`render/badTvDevicePass.mjs` is one descriptor carrying both languages: the WGSL from `badTvWgsl.mjs` and a
+standalone GLSL pair -- not the three.js one, because a device pipeline has no `uv` attribute, no
+`projectionMatrix` and no version header supplied for it. `render/badTvPass.js`, which is what `main.js` actually
+draws with, is untouched.
+
+Both are rendered against the same 64x64 source texture whose texels encode their own position, with NEAREST
+sampling and repeat addressing, so a rendered pixel is a direct readout of *which texel* the shader sampled.
+Then the frames are compared to `badTvModel.mjs` and to each other:
+
+*** 0 of 4,096 pixels differ between WebGPU and WebGL2, and both match the CPU model exactly -- 0 of 255. ***
+
+That third comparison is the one worth having. Agreeing with a model twice is weaker: two backends can each
+match a reference at the points sampled and still differ from each other elsewhere.
+
+### Orientation, which I got wrong twice and measured right once
+
+v4270 proved the WGSL computes the model's coordinates to 3.2e-8 and could say **nothing** about which way is
+up, because a coordinate is a pair of numbers until something samples a real texture with it. The first
+rendered comparison disagreed by 126 of 255 and agreed *exactly* at (1 - v).
+
+Then this round's first draft argued, in a confident comment, that the two vertex stages must **differ** --
+WebGPU's texture row 0 is the top, while `readPixels` hands rows back bottom-first, so surely one side
+compensates. Rendered both ways and diffed: every one of 4,096 pixels differed, in whole-texel steps that grew
+with the row, which is the signature of two backends evaluating the tear at different `v` rather than of a
+sampling wobble. The readback flip already lives in the harness, so flipping again in the shader flipped twice.
+With both vertex stages doing the same thing, the two agree on every pixel exactly.
+
+*** And it is not cosmetic, because the roll reads v. *** `badTvSampleAt` computes `fract(v - time * rollSpeed)`,
+so an orientation that is "wrong but symmetric" ships an effect that rolls the wrong way and looks entirely
+plausible. Reasoning about it produced a confident wrong answer; rendering it produced the right one in one run.
+
+### The sabotages, and what each one could not see
+
+**A** un-flips the GLSL vertex stage -- the mistake the round actually made. 3 red: WebGL2 against the model
+goes to 255 of 255 and all 4,096 pixels diverge. *** The WebGPU side stays green throughout. *** A per-backend
+check would have reported half a success and called the port finished.
+
+**B** reverses the descriptor's uniform list so it names the knobs in a different order from `packKnobs`. 1 red,
+and **none of it in the render** -- the gate hands both backends the same `Float32Array`, so the pixels still
+agree perfectly. Only the descriptor check notices. A consumer binding by name would have shipped an effect with
+`speed` and `rollSpeed` swapped, rendering beautifully. A pixel diff cannot see a contract nothing in the test
+obeys.
+
+**C** drops the cube from the GLSL, `offset * distortion` instead of `offset^3 * distortion^2`. 3,456 of 4,096
+differ. The 640 that still agree are rows where the tear rounds to the same texel either way, which is why the
+check is "every pixel" and not "most".
+
+A control threshold was guessed again and had to be measured. The first version asserted that more than a tenth
+of sample points move by over a texel; the real figure is 320 of 4,096, 7.8%, and the check went red on correct
+code. What the effect actually does at this size: **12 of 64 rows torn past one texel, worst tear 1.86 texels**
+against the model's own exported `maxTear` of 1.93. The tear is intermittent -- which is what a failing
+television looks like, and why a whole-frame percentage was the wrong instrument.
+
+Unchecked, and stated in the gate: the three.js pass. `badTvPass.js` renders through a `ShaderMaterial` with
+three's `uv` and a `flipY` texture, and nothing here compares its output to these two. "The device path is
+self-consistent" is proven; "the device path matches what ships today" is not. Also unchecked: any adapter but
+swiftshader. Both backends here are CPU implementations, which is the right instrument for exactness and the
+wrong one for asking whether real hardware agrees.
+
+The build now stands at 4271 gates.
 ## v4270 -- WGSL runs here after all, and the first shader is carried across and graded on a GPU
 
 v4269 wrote, in a gate's output and a module header and a changelog, "NOTHING HERE CAN EXECUTE WGSL", and
