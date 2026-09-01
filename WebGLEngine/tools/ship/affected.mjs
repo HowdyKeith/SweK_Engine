@@ -32,21 +32,15 @@ import { gateFiles } from "./staleness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
-const SKIP = /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/;
 const rel = (p) => path.relative(ENG, p).replace(/\\/g, "/");
 
-function walk(dir, test, out = []) {
-    let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const f of entries) {
-        const p = path.join(dir, f);
-        if (SKIP.test(p)) continue;
-        let st; try { st = fs.statSync(p); } catch { continue; }
-        if (st.isDirectory()) walk(p, test, out);
-        else if (test(f)) out.push(p);
-    }
-    return out;
-}
+// v4283 -- *** THE THIRD WALKER THE v3041 NOTE BELOW IS ABOUT WAS NEVER ACTUALLY REMOVED, ONLY ORPHANED. ***
+// A private walk() sat here with its own SKIP regex, called by nothing but itself -- v3041 stopped USING it and
+// left it in the file. That is worse than either keeping or deleting it, because a dead walker reads as a live
+// one to whoever revives it next, and this one was subtly wrong: its skip pattern was /[\\/]vendor/, unanchored
+// to a path segment, so it matched "/vendoredLicences-selfcheck.mjs" as readily as "/vendor/". Reviving it
+// would have silently dropped a real gate whose name merely STARTS with the word being excluded. Deleted, so
+// that gateFiles() from staleness.mjs is the one walker in fact and not only in the comment.
 
 /** Relative import specifiers. Bare ones (node:fs, three) are not ours and cannot be edited here. */
 export function importsOf(file) {

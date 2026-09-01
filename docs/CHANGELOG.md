@@ -8,6 +8,70 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4283 -- The pre-filter that ran nothing and said it was fine
+
+tools/ship/affected.mjs answers "which gates can this change reach", and the point of it is stated in its own
+header: *** "a MISSED gate is a green light on a broken tree, and it would be SILENT." *** It had two ways of
+missing every gate at once.
+
+*** THE FIRST IS THE FORM. *** affected.mjs matches ENGINE-relative paths -- `physics/render/pathTracer.mjs`.
+`git diff --name-only` prints REPO-relative ones -- `WebGLEngine/physics/render/pathTracer.mjs` -- and it
+prints them that way from EVERY directory, including from inside the engine. HANDOFF.md documents feeding
+changed files to --affected. The two have never composed. Nothing checked that the strings named files at all,
+so a path that matched nothing selected no gates, and a run of no gates exits ZERO. Measured on this round's
+own previous commit: three real changed files, unnormalised, select 0 gates; normalised, they select 1. Same
+files, same commit, only the spelling differs. A typo bought the identical clean green in 0.0 seconds.
+
+*** THE SECOND IS THE WORKING DIRECTORY, AND IT IS WORSE BECAUSE THE PATHS WERE PERFECT. *** walk() returns
+ROOT-relative paths and the selection filter relativised them a SECOND time -- and the second call resolves
+against process.cwd(). Run from the engine root it was right. Run from the REPOSITORY root, which is where git
+is run and where the ship ritual stands, every path became "../tools/ship/..." and matched no key. Zero gates,
+exit zero, from the directory you are most likely to be standing in. Measured before the fix: the same
+arguments select 1 gate from the engine root and 0 from the repository root and 0 from the filesystem root.
+
+*** BOTH PRINTED THE EVIDENCE AND NEITHER WAS READ. *** "0 of 1355 gates reach 3 changed file(s) (0.1%)" is a
+count of zero beside a fraction that is not zero, because the ANALYSIS found the gate and the RUNNER dropped
+it. That line has been on screen every time and it contradicts itself in eleven characters.
+
+What is new: world -- tools/ship/changedPaths.mjs classifies each path as engine-relative, dot-slash,
+repo-relative, absolute, outside-engine, comma-joined or missing, normalises what it can and REFUSES what it
+cannot. The runner prints every normalisation rather than doing it quietly, and refuses a path naming nothing.
+*** IT DOES NOT MAKE "NOTHING REACHES THIS" AN ERROR: *** that verdict is real, it is the graveyard census's
+whole subject, and shaders/voxel.vert.glsl is checked to still report zero rather than being refused. The bug
+was never that zero can be reported -- it is that zero was reported for inputs nobody had established were
+files. Unmeasured wearing measured's clothes, which is the third state this session keeps finding.
+
+The comma-joined list is REFUSED rather than split, and not out of squeamishness: a comma is legal in a
+filename, so splitting would guess, and a selector that guesses wrong under-selects -- the one failure mode
+affected.mjs is written never to have. --budget was found taking the same raw argv, which meant its
+"reachable gates were dropped for time" warning, the single thing keeping that flag honest, could never fire.
+
+TWO THINGS FOUND ALONG THE WAY. selfchecks.mjs now refuses when the selector and the runner disagree on how
+many gates were kept, and the soundness of that refusal was CHECKED rather than assumed: the runner's walk and
+gateFiles() hold the same 1356, differing only by the runner finding itself. And affected.mjs still contained
+the third walker its own v3041 note is about -- v3041 stopped USING it and left it in the file, called by
+nothing but itself, with a skip pattern unanchored to a path segment that matched
+tools/ship/vendoredLicences-selfcheck.mjs as readily as vendor/. Reviving it would have silently dropped a real
+gate whose name merely starts with the excluded word. Deleted.
+
+*** AND ONE CLAIM FROM v4282 IS WITHDRAWN. *** That round closed by observing the pre-filter had cost more
+than the ship gate it precedes and calling that a finding. It is not: the SELECTION takes four seconds, and
+the twenty minutes was 97 gates that genuinely reach the path tracer, run without --budget. The selection was
+never the expensive part.
+
+Six sabotages, none 0 RED. The cwd bug restored no longer produces a green run -- it produces a REFUSAL.
+Dropping "missing" from the refusal set reddens, but not the check aimed at: a separate guard still exits 2,
+and what fails is that the refusal NAMES the path -- a refusal for the wrong reason sends someone looking in
+the wrong place. --select-only exiting 0 instead of 3 goes 3 red, the most of any, because a flag that runs no
+checks and returns success is a fourth silent green and a deliberate one.
+
+*** AND ONE SABOTAGE DID NOT GO RED, IT HUNG. *** Splitting the comma list on a guess let the runner fall
+through to a real run of 96 gates, and the check sat past two minutes reporting nothing. A gate whose failure
+mode is "takes twenty minutes" is a gate nobody reads the result of. tools/ship/selfchecks.mjs gained
+--select-only for it, every spawn in the new gate carries it, and the redone sabotage reddens in seconds.
+It exits 3 rather than 0 for the reason this whole round is about.
+
+This round adds one module and one gate, and the tree stands at 1356 gates.
 ## v4282 -- The lobe that had no caller
 
 physics/render/roughDiffuse.mjs shipped at v4275 with a measured energy compensation and, for seven rounds,
