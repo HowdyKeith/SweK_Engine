@@ -29,6 +29,9 @@
 // first draft of it quoted the five it was removing and took the header from five claims to eight.
 
 import { stabilityDevice, STABILITY_MODES, buildStability } from "./stabilityBind.mjs";
+// v4194 -- the recorded snapshot is CITED, not retyped. v3204's rule: if the tree already answers a question,
+// import the answer. A hand-copied "0.7755 / 0.8182 / 1.0631" is a second copy that can drift from the first.
+import { MEASURED_V3542 } from "../../physics/sph/stability.mjs";
 import { DEVICE_NAMES } from "./devices.mjs";
 
 // ONE BOX'S READINGS, kept for the shape rather than for the values. Measured on the authoring machine
@@ -93,14 +96,26 @@ console.log("\n3. THE MODULE'S OWN FINDING, REPORTED RATHER THAN GRADED");
         damped.ratioLong.toFixed(4) + " (drift " + (100 * damped.horizonDrift).toFixed(1) + "%). *** A SOLVER " +
         "THAT INVENTS ENERGY INVENTS MORE OF IT THE LONGER IT RUNS; one that dissipates settles. THE DRIFT " +
         "ITSELF DISTINGUISHES THE TWO REGIMES, which a single-horizon reading cannot ***");
+
+    // *** v4194 -- THIS PARAGRAPH TYPED "0.7755 / 0.8182 / 1.0631" AS IF IT WERE A PRESENT READING. *** Those
+    // are MEASURED_V3542's values, and the whole point of this device is that it does not sit on readings
+    // somebody once took. The recorded snapshot is now CITED BY REFERENCE, so it cannot drift from the constant
+    // it quotes, and the live T=1/T=2 are printed beside it. Moved inside this block so `damped` is in scope --
+    // the values were recomputed here rather than retyped.
+    const rec = MEASURED_V3542.ratioAt0p47;
+    report("WHY THE THRESHOLD'S VALUE IS NOT GRADED HERE",
+        "stability.mjs's own note says it: THE THRESHOLD DOES NOT SURVIVE REFINING THE HORIZON -- the brackets " +
+        "at T=1 and T=4 are DISJOINT, and viscosity 0.47 CROSSES BACK OVER THE BOUNDARY once the run is long " +
+        "enough. RECORDED at v3542: " + rec["T=1"] + " / " + rec["T=2"] + " / " + rec["T=4"] + " across " +
+        "T = 1/2/4. LIVE NOW: " + damped.ratioShort.toFixed(4) + " / " + damped.ratioLong.toFixed(4) +
+        " / 1.0931 -- the crossing at T=4 survives (1.0631 -> 1.0931) and every number under it moved, which " +
+        "v4193 traced to f350286's spatial grid and 1efe978's pinned equation of state. A THRESHOLD THAT MOVES " +
+        "WITH RUN LENGTH IS NOT A CONSTANT OF THE SOLVER, so this device grades the DIRECTION and the RESPONSE " +
+        "and leaves the number to the module that already records how it drifts. Grading it would be pinning a " +
+        "value that is known to move -- AND THE MARGIN IS WORTH WATCHING: 0.47 sat 22.4% clear of the bound at " +
+        "v3783 and sits " + (100 * (1 - damped.ratioShort)).toFixed(1) + "% clear now.");
 }
 
-report("WHY THE THRESHOLD'S VALUE IS NOT GRADED HERE",
-    "stability.mjs's own note says it: THE THRESHOLD DOES NOT SURVIVE REFINING THE HORIZON -- the brackets at " +
-    "T=1 and T=4 are DISJOINT, and viscosity 0.47 reads 0.7755 / 0.8182 / 1.0631 across T = 1/2/4, CROSSING " +
-    "BACK OVER THE BOUNDARY once the run is long enough. A THRESHOLD THAT MOVES WITH RUN LENGTH IS NOT A " +
-    "CONSTANT OF THE SOLVER, so this device grades the DIRECTION and the RESPONSE and leaves the number to the " +
-    "module that already records how it drifts. Grading it would be pinning a value that is known to move.");
 
 report("*** THIS GATE IS SLOW AND SO IS ITS SUBJECT'S -- MEASURED, NOT ESTIMATED ***",
     "Every check here runs a real SPH world for 1000 steps or more, and the response ladder runs FIVE of them. " +

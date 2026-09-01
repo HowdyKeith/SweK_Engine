@@ -12,11 +12,20 @@
 // SO THIS DEVICE DOES NOT PROMOTE A FINDING. It re-measures numbers the file already recorded, which is the
 // only useful thing left to do with a question that has been answered twice and mis-answered twice.
 //
-// WHAT REPRODUCES EXACTLY (recorded v2881, re-measured v3294, drift <= 0.1%):
-//     ideal EOS, restDensity = the actual packing (144)   retained 0.632
-//     tait gamma=7, c=8 / 15 / 25                          retained 1.845 / 1.842 / 1.844
+// WHAT REPRODUCES (recorded v2881, re-measured v3294 at drift <= 0.1%, RE-MEASURED v4194):
+//     ideal EOS, restDensity = the actual packing (144)   retained 0.6324    (recorded 0.632 -- holds)
+//     tait gamma=7, c=8 / 15 / 25                          retained 1.8237 / 1.8199 / 1.8265
+//                                                          (recorded 1.845 / 1.842 / 1.844)
 //
-// AND THE FINDING THAT MATTERS -- TAIT DOES NOT FIX IT, TAIT EXPANDS THE COLUMN TO 184%. The v2494 diagnosis
+// *** AND "drift <= 0.1%" IS THE CLAIM THAT DIED, BY AN ORDER OF MAGNITUDE. *** The Tait rows have moved 1.2%,
+// 1.2% and 1.0% against the values this header has carried since v3294, so a bound stated as a tenth of a
+// percent is now wrong by a factor of twelve. The ideal-EOS row is untouched at 0.6324, which is the useful
+// half of the result: THE COLLAPSE REPRODUCES AND THE EXPANSION DOES NOT, because only the Tait path runs
+// through the equation of state that 1efe978 pinned and the neighbour ordering that f350286 changed -- the two
+// commits v4193 traced every moved SPH value in the lab to. The spread ACROSS c is 0.36% today, so the rows are
+// still tight with respect to each other; what moved is where they all sit.
+//
+// AND THE FINDING THAT MATTERS -- TAIT DOES NOT FIX IT, TAIT EXPANDS THE COLUMN TO 182%. The v2494 diagnosis
 // named a proper equation of state as the fix; measured, it makes the column blow apart instead of collapse.
 // Both are failures to sit still, and swapping one for the other is not progress. That is what the file means by
 // "it did not go the way the note predicted".
@@ -34,6 +43,13 @@
 //                                              retained 0.6324 -> 0.6220   (1.6%, and still `collapsed`)
 //     Tait B missing its /gamma (B = rho0 c^2, the classic, injected as c -> c*sqrt(gamma))
 //                                              retained 1.8418 -> 1.8352   (0.4%, and still `expanded`)
+//
+// THOSE FOUR NUMBERS ARE A DATED RECORD OF v3845'S EXPERIMENT AND ARE LEFT AS THEY WERE MEASURED. Neither
+// candidate was shipped, so neither can be re-run from this file, and the honest Tait baseline they were taken
+// against (1.8418) has since moved to 1.8199 -- re-deriving a percentage from a baseline the experiment never
+// saw would invent a measurement. The ARGUMENT does not depend on the digits: both defects are real, both are
+// invisible to `retained`, and that is why the plant is declared against densityMismatch. The live half of it
+// IS re-derived every run -- hydrostatic-selfcheck rebuilds the rho0=160 candidate and prints 1.7% today.
 //
 // Both are REAL defects and both are INVISIBLE to the device's headline observable. A plant declared against
 // `retained` would have been technically live -- the census only asks that the number MOVE -- and would have

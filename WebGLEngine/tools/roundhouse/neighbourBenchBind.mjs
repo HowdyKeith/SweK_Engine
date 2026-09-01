@@ -2,10 +2,25 @@
 //
 // *** KEITH ASKED FOR THIS AT v3792 IN HIS OWN WORDS: a Morton BVH is "the alternative worth MEASURING rather
 // than assuming better" for SPH neighbour search. THE ANSWER IS THAT IT IS NOT BETTER HERE, AND THE MARGIN IS
-// NOT CLOSE: the hashed grid examines 33.4 / 71.8 / 92.2 candidates per query at N = 500 / 2000 / 8000, and
-// the BVH visits 278.3 / 580.9 / 819.9 nodes -- 8.3x, 8.1x, 8.9x MORE WORK, STABLE ACROSS A SIXTEENFOLD RANGE
-// so it is not a size artefact. And that is BEFORE the rebuild, which SPH pays EVERY STEP because the
+// NOT CLOSE: the hashed grid examines 33.4 / 71.7 / 129.5 candidates per query at N = 500 / 2000 / 8000, and
+// the BVH visits 278.3 / 580.9 / 1030.0 nodes -- 8.32x, 8.10x, 7.95x MORE WORK, STABLE ACROSS A SIXTEENFOLD
+// RANGE so it is not a size artefact. And that is BEFORE the rebuild, which SPH pays EVERY STEP because the
 // particles move: 15999 nodes at N = 8000. ***
+//
+// *** v4194 -- THE N = 8000 COLUMN WAS OUT BY 40% AND NO GATE COULD HAVE SEEN IT. *** It read 92.2 / 819.9 /
+// 8.9x against a measured 129.5 / 1030.0 / 7.95x. The reason it went unchecked for 389 versions is structural
+// rather than careless: DEF.sizes is [[500, 0.15], [2000, 0.12]], so THE THIRD COLUMN IS NOT IN ANY MODE THIS
+// DEVICE RUNS. The value freeze covers declared modes at their defaults, so a header number taken from a wider
+// sweep than the device performs is watched by nothing at all. Re-measured here by driving `sizes` explicitly;
+// the whole three-size sweep costs 0.6s, so the gap was never affordability.
+//
+// AND THE SHAPE CHANGED, WHICH THE OLD DIGITS HID. The ratios were 8.3 / 8.1 / 8.9 -- a dip and a rise, so
+// "stable" was the honest reading of a wobble. They are now MONOTONICALLY DECREASING: 8.32 / 8.10 / 7.95, a
+// 4.6% spread across a sixteenfold range, TIGHTER than what the claim was originally made on. The grid's
+// advantage does shrink slowly with N, and at an order of magnitude the conclusion is untouched.
+//
+// The per-query counts also moved slightly with v4193's SPH commits (f350286's spatial grid, 1efe978's pinned
+// EOS): 71.771 -> 71.745, which is what turned the second column from 71.8 to 71.7.
 //
 // *** WHY, AND THE REASON IS ABOUT THE WORKLOAD RATHER THAN THE STRUCTURES: SPH PARTICLES ARE NEAR-UNIFORMLY
 // DISTRIBUTED AND SHARE ONE INTERACTION RADIUS, which is precisely the case a uniform hash grid is optimal
@@ -14,7 +29,8 @@
 // SIZES flying through mostly-empty space. THE DEMO IS RIGHT AND SO IS THE GRID; THEY ARE ANSWERING DIFFERENT
 // QUESTIONS. ***
 //
-// *** AND THE COUNTS ARE ONLY READ BECAUSE CORRECTNESS PASSED FIRST: 2000 of 2000 neighbour lists IDENTICAL.
+// *** AND THE COUNTS ARE ONLY READ BECAUSE CORRECTNESS PASSED FIRST: 2500 of 2500 neighbour lists IDENTICAL
+// at the declared default (10500 of 10500 across the three-size sweep above; it read "2000 of 2000" here).
 // A FASTER STRUCTURE THAT RETURNS A DIFFERENT SET IS NOT FASTER, IT IS WRONG. The count is node visits and
 // candidate examinations, NOT milliseconds -- this sandbox is one core, so a runtime here is not a runtime for
 // the rig. CHECKS ARE MACHINE-INDEPENDENT. ***

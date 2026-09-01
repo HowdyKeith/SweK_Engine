@@ -79,7 +79,10 @@ console.log("\n2. A RUNAWAY IS ALL FINITE, WHICH IS THE BLINDNESS WORTH REPORTIN
 console.log("\n3. THE KEY: THE BREAK POINT SCALES WITH THE SOUND SPEED");
 {
     const honest = await buildCfl({ mode: "sweep" });
-    ok("!! *** break/(h/c) HOLDS ACROSS A 4x RANGE IN c -- 0.450, 0.600, 0.600 ***",
+    // NOT "-- 0.450, 0.600, 0.600" in the name: those were the ratios when this line was written and they are
+    // 0.600 / 0.600 / 0.600 today (v4193's SPH trace). The evidence string one line down PRINTS them, so a
+    // literal here is a second copy that only ever goes stale -- the defect v4193 fixed one label along.
+    ok("!! *** break/(h/c) HOLDS ACROSS A 4x RANGE IN c ***",
         honest.scalesWithC === true && honest.ratioSpread < 0.6,
         "spread " + honest.ratioSpread.toFixed(3) + " over c = " + honest.ladder.map((r) => r.c).join(", ") +
         ", break dt " + honest.ladder.map((r) => r.breakDt).join(" / ") + ". *** THE BREAK dt HALVES WHEN c " +
@@ -92,15 +95,23 @@ console.log("\n3. THE KEY: THE BREAK POINT SCALES WITH THE SOUND SPEED");
         "does not round it to a textbook 0.5");
 
     const planted = await buildCfl({ mode: "advectiveonly" });
-    ok("!! *** PREDICTING THE LIMIT FROM THE PARTICLE SPEED FAILS BY 45x, AND THE VERDICT FLIPS ***",
-        planted.scalesWithC === false && planted.ratioSpread > honest.ratioSpread * 20,
+    // *** v4194 -- `> honest.ratioSpread * 20` HAD BECOME `> 0`, AND ANY NUMBER AT ALL WOULD HAVE PASSED IT. ***
+    // The honest spread was 0.333 when this was written and the SPH changes traced at v4193 took it to EXACTLY
+    // ZERO -- all three rungs now give ratio 0.600. A relative bar against zero is not a bar. The absolute floor
+    // is what carries the claim now: the plant has to fan the ratios out across the ladder, not merely differ
+    // from a honest run that no longer varies. MEASURED: honest 0, planted 19.415.
+    ok("!! *** PREDICTING THE LIMIT FROM THE PARTICLE SPEED FANS THE RATIOS OUT, AND THE VERDICT FLIPS ***",
+        planted.scalesWithC === false && planted.ratioSpread > 5 &&
+        planted.ratioSpread > honest.ratioSpread * 20,
         "spread " + honest.ratioSpread.toFixed(3) + " -> " + planted.ratioSpread.toFixed(3) + ", scalesWithC " +
         "true -> false. Ratios " + planted.ladder.map((r) => r.ratio.toFixed(3)).join(", ") + " -- they FAN OUT " +
         "because the max particle speed hardly changes with c while the true limit halves. *** THE PLANT IS " +
         "EXACTLY THE SHIPPED FORMULA'S CHOICE OF SPEED, WHICH IS WHY THE GAP IS WORTH REPORTING ***");
     ok("!! the break points themselves are IDENTICAL in both arms -- only the prediction moves",
         planted.ladder.every((r, i) => r.breakDt === honest.ladder[i].breakDt),
-        "0.003 / 0.002 / 0.001 in both. THE SIMULATION IS UNTOUCHED: the plant changes what the limit is " +
+        honest.ladder.map((r) => r.breakDt).join(" / ") + " in both, READ FROM THE RUN rather than typed here " +
+        "(it was \"0.003 / 0.002 / 0.001\" and the first rung moved). THE SIMULATION IS UNTOUCHED: the plant " +
+        "changes what the limit is " +
         "COMPARED AGAINST, not the physics, so it cannot cancel (v3733)");
     ok("!! and the device DECLARES the plant, with `sweep` first so the contract compares like with like",
         DEVICE_NAMES.includes("cfl") && cflDevice.plantMode === "advectiveonly" &&
@@ -112,7 +123,7 @@ console.log("\n3. THE KEY: THE BREAK POINT SCALES WITH THE SOUND SPEED");
 report("WHAT THIS DOES NOT CLAIM",
     "That cflNumber is wrong. Its documented job is the ADVECTIVE courant and it does that correctly; the " +
     "acoustic constraint is a SECOND condition that a weakly-compressible scheme also has to satisfy, and " +
-    "this device reports both. Nor is the safety factor derived: 0.45-0.60 is MEASURED on THIS fixture at " +
+    "this device reports both. Nor is the safety factor derived: 0.600 is MEASURED on THIS fixture at " +
     "these viscosities, and a different kernel or a different artificial-viscosity setting would move it. " +
     "The SCALING is the claim; the CONSTANT is a measurement of this rig.");
 
