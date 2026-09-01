@@ -6,10 +6,22 @@
 // ---- WHY THIS FILE AND NOT AN EDIT TO badTvPass.js -------------------------------------------------------------
 //
 // render/badTvPass.js is a THREE.ShaderMaterial factory: it takes the three namespace, builds a material, an
-// OrthographicCamera and a quad, and is what main.js actually draws with today. gfx/device.js is a different
+// OrthographicCamera and a quad. gfx/device.js is a different
 // API -- a pipeline descriptor and a pass with clear/use/vertices/draw -- and its whole premise is that a
 // render written once runs on either runtime. Those are two shapes for the same effect, and merging them would
 // make the three.js path depend on the device path for no benefit. badTvPass.js is untouched.
+//
+// *** AND A CORRECTION THIS FILE OWES: v4271 AND v4272 BOTH CALLED badTvPass.js "what main.js actually draws
+// with". IT HAS NO CALLERS AT ALL. *** makeBadTvPass is referenced by its own gate and by
+// tools/ship/badTvThreeParity-selfcheck.mjs and nowhere else; main.js does not contain the string "badTv"
+// outside its version note. The claim was inferred from the file's SHAPE -- a THREE factory in render/, beside
+// passes that do have callers -- and asserted three times without being checked. For comparison, measured at
+// v4273: makeCrtPass has ten call sites across fallout.html, ui/crtToggle.js and pipboy-models.html;
+// makeSwiftShaderPass six, makeAquarellePass four, makeTransitionPass two; makeBadTvPass, makeGrassField and
+// makeHoloFoil have none.
+//
+// That changes what the v4272 mirror finding MEANS rather than whether it is true. There is no incumbent to
+// migrate and no existing picture to preserve: the first real consumer chooses the convention.
 //
 // ---- *** WHAT v4269 MEASURED AND THIS FILE IS THE FIRST ANSWER TO *** -------------------------------------------
 //

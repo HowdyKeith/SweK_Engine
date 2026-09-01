@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4273 -- The orrery gets a shader stage, and the consumer finds three holes the counting missed
+
+`ui/orreryDraw.js` is canvas 2D -- 28 drawing calls, four of them `fillText`. Not a speed problem, a **capability
+ceiling**: a 2D context has no shader stage, so not one of this tree's 134 GLSL or 39 WGSL modules could touch
+the orrery.
+
+`ui/orreryPost.mjs` keeps every line of the 2D drawing and makes the canvas the **source texture** of a
+`gfx/device.js` pipeline. Porting 368 lines of arcs, gradients and labels would also have needed a WGSL glyph
+renderer -- `text/slugShader.js` is 337 lines of GLSL with none -- and would have risked the one thing the orrery
+does well.
+
+It is that abstraction's **first non-demo consumer**. v4269 measured its reach and found two consumers, both its
+own demos; v4271 rendered badTv through both backends and diffed the frames. What was missing was anything real
+that wanted it.
+
+The gate attaches the stage in a real browser, feeds it the actual `drawSystem` output -- 1,851 lit texels, not a
+fixture -- and reads **2,031 lit texels** back off the target with the effect on, and nothing with it off.
+
+### It settles v4272's orientation question by being a consumer rather than an argument
+
+v4272 measured that the three.js pass and the device pass are exact vertical mirrors, refused to call either
+wrong, and said the choice needed a consumer to decide *for*. *** A 2D canvas's row 0 is its top. *** Framebuffer
+space is not a preference here, it is the source's own layout: `uv.y = 0` is the first row of the ImageData the
+orrery just drew. No flip anywhere. The three.js convention would need one.
+
+### Three holes, all found by attaching rather than counting
+
+**One.** `gfx/device.js`'s WebGPU `pass.texture` was `() => {}`. Measured before changing it: the pipeline builds
+without throwing, the call runs, nothing binds. A post-processing effect samples a source **by definition**, so
+that backend could carry a texture-free render and no post effect at all, silently, while WebGL2 carried both.
+It refuses by name now, the same choice v4269 made for a pipeline with no WGSL.
+
+**Two.** `device.texture()` took only `{width, height, data}`. The only route from a canvas was `getImageData()`
+every frame -- a full readback to produce bytes the GL call can take from the canvas directly. `source` now
+accepts a canvas or image.
+
+**Three.** `requestDevice` reads `opts.backend` or `opts.prefer`. I passed `backends`, an option name I invented,
+so the request was ignored and the stage was handed WebGPU. *** My own probe had masked it: *** it passed
+`{backends: ["webgpu"]}` and got WebGPU, which is what it would have got with no options at all. A test whose
+expected answer is also its failure mode confirms nothing.
+
+### A correction
+
+v4271 and v4272 both called `render/badTvPass.js` "what `main.js` actually draws with". *** It has no callers. ***
+`makeBadTvPass` appears in its own gate and in the parity gate and nowhere else; `main.js` does not contain the
+string outside its version note. Measured for comparison: `makeCrtPass` has ten call sites across `fallout.html`,
+`ui/crtToggle.js` and `pipboy-models.html`; `makeSwiftShaderPass` six, `makeAquarellePass` four,
+`makeTransitionPass` two; `makeBadTvPass`, `makeGrassField` and `makeHoloFoil` none. The mirror finding is
+unaffected -- two real renderers, measured -- but "what ships today" was the wrong name for it, asserted from the
+file's shape three times without being checked.
+
+The ninth self-counting scan in nine rounds arrived too: a check asserting the plural option name appears nowhere
+in the file, in a file whose comment explains that exact mistake. Comments stripped, with a control proving the
+stripping does work.
+
+Sabotage A (null backend accepted) 1 red, B (`source` reverted) 1 red, C (the no-op restored) 2 red. B is the one
+worth keeping: 2,031 lit texels becomes 0 while the stage still attaches, the pipeline still builds and `draw()`
+still reports success. A post stage with no source reports success and produces an empty frame, which is why the
+gate counts pixels instead of trusting a return value.
+
+Unchecked and stated: `orrery.html` is not yet wired to the stage. The module exists, attaches, draws and refuses
+correctly; putting a control on the page is the next round. Saying so is better than implying the orrery has an
+effect stage on screen today.
+
+The build now stands at 4273 gates.
 ## v4272 -- The shipping pass renders it upside down, exactly, and neither version is wrong
 
 v4271 proved the device path is self-consistent: WGSL on WebGPU and GLSL on WebGL2 render badTv to the same

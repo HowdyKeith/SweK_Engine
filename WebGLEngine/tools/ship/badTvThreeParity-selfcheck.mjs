@@ -8,6 +8,11 @@
 //     "render/badTvPass.js is what main.js actually draws with and is untouched by this round ... So 'the
 //      device path is consistent' is proven and 'the device path matches what ships today' is not."
 //
+// *** THE QUOTE ABOVE CONTAINS AN ERROR THIS FILE INHERITED AND v4273 CORRECTED: badTvPass.js IS NOT WHAT
+// main.js DRAWS WITH. IT HAS NO CALLERS. *** makeBadTvPass appears in its own gate and in this one and nowhere
+// else. The comparison below is unaffected -- two real renderers, measured -- but "what ships today" was the
+// wrong name for it, asserted from the file's shape rather than checked.
+//
 // *** IT DOES NOT MATCH. THE SHIPPING three.js PASS RENDERS THE PICTURE VERTICALLY MIRRORED RELATIVE TO THE
 // DEVICE PATH, EXACTLY. *** Row-mirror three's frame and it equals the device frame pixel for pixel, 0 of 255.
 // Leave it as it is and every pixel is wrong, 255 of 255.

@@ -180,8 +180,7 @@ console.log("\n3. THE ORIENTATION RULE, WHICH REASONING GOT WRONG AND RENDERING 
 // None went 0 RED. A, the orientation error, is the one that matters: it is invisible to v4270's arithmetic
 // test, which passed at 3.2e-8 with the same shader in either orientation.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: THE THREE.JS PASS. render/badTvPass.js is what main.js actually draws with and is " +
-    "untouched by this round; it renders through a THREE.ShaderMaterial with three's own uv attribute and a " +
+console.log("unchecked here: THE THREE.JS PASS. render/badTvPass.js is untouched by this round (and, corrected at v4273, has NO CALLERS -- it is not what main.js draws with, which this file claimed); it renders through a THREE.ShaderMaterial with three's own uv attribute and a " +
     "flipY texture, and nothing here compares its output to these two. So 'the device path is consistent' is " +
     "proven and 'the device path matches what ships today' is not. Also unchecked: any adapter but " +
     "swiftshader. Both backends here are CPU implementations, which is the right instrument for exactness -- " +
