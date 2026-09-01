@@ -2164,6 +2164,13 @@ A password fetches a token from the list server; an unregistered callsign needs 
                            pointing at a page that does not exist is worse than no button. -->
         <button id="bOrrery" title="SweK at the centre, every vendored dependency in orbit -- licence state, size, arrival date, and (v4266) how far each one's material spread through the tree">&#128302; SweK Orrery</button>
         <button id="bRepoTerrain" class="go-link" title="This repository as walkable terrain: files as land, directories as ranges, data files as lakes, language as biome. An engine DEPTH-LINK (?terrain=1), not a page -- it exists only while the engine is running.">&#127956; GitHub Terrain</button>
+        <!-- v4298 -- Keith: "audio file to terrain, with a big button on the right side of server.html." The
+             terrain half shipped at v4280 (world/songHeightfield.mjs, window.songTerrain) and was console-only,
+             the exact state GitHub Terrain was in before v4267. Same fix, same shape: an engine deep-link,
+             ?song=1, so it wears .go-link like its neighbour. One thing this button cannot do is open a file
+             dialog by itself -- that needs a gesture the boot does not have -- so the engine flies a rising
+             sweep immediately and puts a chooser on screen; the SECOND click is the one that picks the song. -->
+        <button id="bSongTerrain" class="go-link" title="An audio file as walkable terrain: rows are time, columns are frequency, height is loudness, silence is water. An engine DEEP-LINK (?song=1) -- it flies a rising sweep at once and shows a chooser for a song on this machine.">&#127925; Song Terrain</button>
         <!-- v3552 -- ONE INDEX, THREE KINDS. These were three pills listing three DIFFERENT KINDS of thing and
              calling them all demos: 56 demos_code scripts (?go= deep-links), 58 inline DEMO_MODES (engine
              states), and 15 real .html apps. THIRTEEN OF THOSE FIFTEEN APPS WERE IN NO PANEL AT ALL -- reachable
@@ -3252,6 +3259,8 @@ A password fetches a token from the list server; an unregistered callsign needs 
       if (_orr) _orr.onclick = function () { window.open("/orrery.html", "_blank", "noopener"); };
       var _rt = document.getElementById("bRepoTerrain");
       if (_rt) _rt.onclick = function () { location.href = "/index.html?terrain=1"; };
+      var _st = document.getElementById("bSongTerrain");
+      if (_st) _st.onclick = function () { location.href = "/index.html?song=1"; };
     } catch (e) {}
     var pfDemo = { pfResumeFx:"resume_fx" };
     Object.keys(pfDemo).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open("/index.html?forceEngine=1&go=" + pfDemo[id], "_blank"); }; });
