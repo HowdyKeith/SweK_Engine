@@ -416,7 +416,7 @@ export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e
 // one and the unmeasured one cannot be read as the same kind of thing. The full sweep that IS entitled to the
 // answer ran at v4297; see gateSweep.SWEEP_V4297.
 export const RECHECK = Object.freeze({
-    at: "v4295", roundsSince: 16, method: "serial, one gate at a time, via runGate",
+    at: "v4296", roundsSince: 16, method: "serial, one gate at a time, via runGate", // ran in the round that shipped as v4296; the header said v4295 then
     checked: 37, stillRed: 37, nowGreen: 0,
     // MEASURED: of the 37 re-run, none had gone from red to red-for-a-new-reason or otherwise moved.
     regressedAmongChecked: 0,

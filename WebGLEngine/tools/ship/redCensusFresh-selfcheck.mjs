@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/redCensusFresh-selfcheck.mjs -- v4295
+// WebGLEngine/tools/ship/redCensusFresh-selfcheck.mjs -- v4297
 //
 // *** THE CENSUS WAS TAKEN AT v4279 AND NOBODY LOOKED AGAIN FOR SIXTEEN ROUNDS. *** This is the thing that
 // looks. It cannot be a full re-run -- the list costs 142 s serially and a gate that expensive gets skipped,
@@ -132,7 +132,8 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: THE OTHER 17 ENTRIES. This re-runs twenty of thirty-seven, chosen by cost, so a " +
     "gate fixed among the seventeen slow ones will not be noticed until somebody re-runs the full list -- " +
-    "which costs 142 s and is a deliberate trade, not an oversight. Also unchecked: whether any gate that was " +
-    "GREEN at v4279 has since gone red. That needs the full 1,348-gate sweep this file explicitly does not " +
-    "attempt, and the honest state of that question is UNKNOWN rather than fine.");
+    "which costs 142 s and is a deliberate trade, not an oversight. Also unchecked HERE: whether any gate that " +
+    "was GREEN at v4279 has since gone red. That question was UNKNOWN until v4297; the full 1,366-gate two-phase " +
+    "sweep answered it -- SIX regressions, named in gateSweep.SWEEP_V4297 and reconciled by " +
+    "gateSweep-selfcheck.mjs section 7. This file still cannot see the next one; that needs the sweep re-run.");
 process.exit(fails ? 1 : 0);

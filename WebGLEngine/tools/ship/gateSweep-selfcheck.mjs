@@ -14,6 +14,18 @@
 // beside `checked: 37`. All 37 were already red, so not one was eligible to regress; the zero covers the
 // 1,329 gates the method never ran. The prose in the same commit admitted the question was UNKNOWN. The
 // caveat and the field disagreed inside one round, and the field is the half a reader greps.
+//
+// *** AND SECTION 7 IS THE RECORD ITSELF. *** SWEEP_V4297 answers the UNKNOWN: six gates green at v4279 are
+// red at v4297, and 38 of 107 phase-1 reds were starvation. Sabotaged before it was trusted:
+//   A  confirmedRed 48 -> 47, parts untouched      -> 3 reds: sum-to-swept, sum-to-candidates, and the split
+//   B  a standing red (unattendedHold) listed as a regression -> "already red at v4279" and regressionsAgainst()
+//   C  regressions emptied, stillRed bumped to 43 to keep the sum -> "register minus repaired" and NON-EMPTY
+//   D  one named path renamed                      -> the existence check, naming it
+//   E  cover.covers flipped to false                -> the cover line
+//   F  a false red moved into unmeasuredCount, lists untouched -> sum-to-swept and counts-vs-lists
+//   Baseline 0 red. Also caught while writing: UNCONFIRMED_SLOW is a list of paths and RED_AT_V4279 a list of
+//   {gate} records, and `.map(e => e.gate)` over the wrong one produced a set of undefineds that matched
+//   nothing -- which read as two reds, not as a vacuous pass, because both checks were written to expect hits.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -250,5 +262,71 @@ sec("6. THE SWEEP LOG PARSES BACK, SO A RECORD CAN BE REBUILT FROM IT RATHER THA
     ok(rows[1].ms === 912, "and the wall time survives, which is what the cheap-subset selection runs on");
 }
 
+
+// ---------------------------------------------------------------------------------------------------------
+sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL POINTS AT A FILE");
+// ---------------------------------------------------------------------------------------------------------
+{
+    // The record is the deliverable. Sections 1-6 prove the METHOD can refuse; this proves the RESULT is the
+    // method's output and not a retyped summary of it. Every line below is arithmetic over the frozen record,
+    // so a hand-edit that changes one figure and not its parts fails here by name.
+    const S = GS.SWEEP_V4297;
+    ok(S.swept === GS.enumerateGates().length - 1,
+       "the swept population is the tree's own count, minus this gate, which did not exist when it ran",
+       `${S.swept} swept; ${GS.enumerateGates().length} in the tree now`);
+    ok(S.green + S.confirmedRed + S.unmeasuredCount === S.swept,
+       "*** green + red + unmeasured = swept, with NO fourth bucket ***",
+       `${S.green} + ${S.confirmedRed} + ${S.unmeasuredCount} = ${S.swept}`);
+    ok(S.confirmedRed + S.falseReds + S.unmeasuredCount === S.candidates,
+       "and every phase-1 candidate landed in exactly one of red / false red / unmeasured",
+       `${S.confirmedRed} + ${S.falseReds} + ${S.unmeasuredCount} = ${S.candidates}`);
+    ok(S.stillRed + S.fromSlowBucket.length + S.regressions.length === S.confirmedRed,
+       "*** the red count splits into still-red + slow-bucket + REGRESSIONS, and the split reconciles ***",
+       `${S.stillRed} + ${S.fromSlowBucket.length} + ${S.regressions.length} = ${S.confirmedRed}`);
+    ok(S.stillRed === RC.RED_AT_V4279.length - S.repaired.length,
+       "still-red is the v4279 register minus what was repaired, so the two files describe one population",
+       `${RC.RED_AT_V4279.length} - ${S.repaired.length} = ${S.stillRed}`);
+    ok(S.falseRedList.length === S.falseReds && S.unmeasured.length === S.unmeasuredCount,
+       "the counts equal the lists they summarise", "a count beside a list it does not match is the v4296 mistake again");
+
+    // *** THE REGRESSIONS ARE THE ANSWER TO v4296's UNKNOWN, AND THEY MUST BE NEW. *** A gate that was in
+    // RED_AT_V4279 is not a regression, it is a standing failure; one from UNCONFIRMED_SLOW was never green.
+    const wasRed = new Set(RC.RED_AT_V4279.map((e) => e.gate));
+    const wasSlow = new Set(RC.UNCONFIRMED_SLOW); // plain paths, unlike RED_AT_V4279
+    ok(S.regressions.length > 0,
+       "*** the regression list is NON-EMPTY: the question v4296 could not answer has an answer ***",
+       `${S.regressions.length} gates green at v4279 are red at v4297`);
+    ok(S.regressions.every((g) => !wasRed.has(g) && !wasSlow.has(g)),
+       "and none of them was already red or already unmeasured at v4279, so each one is a real regression",
+       "otherwise it belongs in stillRed or fromSlowBucket and the split above is lying");
+    ok(S.fromSlowBucket.every((g) => wasSlow.has(g)),
+       "every slow-bucket red WAS in UNCONFIRMED_SLOW", "that is the definition of the bucket");
+    ok(GS.regressionsAgainst(RC.RED_AT_V4279.map((e) => e.gate),
+                             [...RC.RED_AT_V4279.map((e) => e.gate), ...S.fromSlowBucket, ...S.regressions])
+         .filter((g) => !wasSlow.has(g)).length === S.regressions.length,
+       "and the module's own regressionsAgainst() recovers the same six from the same inputs",
+       "the record was built by this code, not beside it");
+    const unm = new Set(S.unmeasured);
+    ok(S.regressions.every((g) => !unm.has(g)) && S.fromSlowBucket.every((g) => !unm.has(g)),
+       "nothing red is also unmeasured", "a gate that did not finish has no verdict to be red with");
+
+    const named = [...S.fromSlowBucket, ...S.regressions, ...S.unmeasured, ...S.falseRedList.map((e) => e.gate)];
+    const missing = named.filter((g) => !fs.existsSync(path.join(GS.ENG, g)));
+    ok(missing.length === 0,
+       "*** every gate the record names still exists, so every entry stays falsifiable ***",
+       missing.length ? missing.join(", ") : `${named.length} paths checked`);
+
+    // The cover figure is the thing RECHECK could not claim. It is derived here from the record, not read.
+    const cover = GS.coversRegressions(Array(S.swept).fill(0).map((_, i) => "g" + i), []);
+    const c = GS.coversRegressions(named.concat(RC.RED_AT_V4279.map((e) => e.gate)), RC.RED_AT_V4279.map((e) => e.gate));
+    ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - RC.RED_AT_V4279.length,
+       "*** the sweep COVERS regressions: it ran gates that were not already red ***",
+       `eligible ${S.cover.eligible} = ${S.swept} - ${RC.RED_AT_V4279.length}; ` + cover.reason);
+    ok(S.falseRedList.every((e) => e.serialMs > 0 && e.parallelMs > 0),
+       "and each false red carries both timings, so the starvation claim can be re-read later",
+       `${S.falseReds} of ${S.candidates} candidates, ${Math.round(100 * S.falseReds / S.candidates)}% of phase 1's reds were starvation`);
+    ok(Object.isFrozen(S) && Object.isFrozen(S.regressions),
+       "the record is frozen", "a gate's own record is not a place a run gets to write");
+}
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

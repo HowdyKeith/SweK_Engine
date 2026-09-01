@@ -201,6 +201,115 @@ export function parseSweepTsv(text, { timeoutMs = 180000 } = {}) {
     return rows;
 }
 
+
+// ---------------------------------------------------------------------------------------------------------
+// THE v4297 SWEEP, FROZEN. This is the record redCensus.METHOD's prose could not be: every number below was
+// produced by finalize() over the two phase logs, and gateSweep-selfcheck.mjs section 7 re-derives the
+// arithmetic and refuses if the parts stop summing to the whole. The question v4296 recorded as UNKNOWN --
+// has any gate green at v4279 since gone red -- is answered here, and the answer is SIX.
+//
+// Read it as three moments, not one number. 37 were red at v4279 and are still red. 5 were in the v4279
+// slow bucket, never run serially then, and are red now that they have been given 300 s alone. 6 were GREEN
+// at v4279 and are red now: those are the regressions, and they are the only entries a fix should be aimed
+// at first, because each one is a thing that WORKED and was broken by a round that shipped ALL GREEN.
+// ---------------------------------------------------------------------------------------------------------
+export const SWEEP_V4297 = Object.freeze({
+    at: "v4297",
+    baseline: "v4279",
+    swept: 1366,
+    candidates: 107,
+    parallelTimeouts: 56,
+    confirmedRed: 48,
+    falseReds: 38,
+    unmeasuredCount: 21,
+    green: 1297,
+    // confirmedRed splits three ways, and the split must reconcile: stillRed + fromSlowBucket + regressions.
+    stillRed: 37,
+    repaired: Object.freeze([]),        // of the 37 in RED_AT_V4279, none has been fixed. Eighteen rounds.
+    fromSlowBucket: Object.freeze([
+        "tools/roundhouse/detectionMap-selfcheck.mjs",
+        "tools/roundhouse/sensitivity-selfcheck.mjs",
+        "tools/ship/doorKinds-selfcheck.mjs",
+        "tools/ship/graveyard-selfcheck.mjs",
+        "tools/ship/orphanDisposition-selfcheck.mjs",
+    ]),
+    regressions: Object.freeze([
+        "tools/ship/backendParity-selfcheck.mjs",
+        "tools/ship/copiedOutsideVendor-selfcheck.mjs",
+        "tools/ship/gateQuality-selfcheck.mjs",
+        "tools/ship/postChain-selfcheck.mjs",
+        "tools/ship/staleness-selfcheck.mjs",
+        "tools/ship/windowsImport-selfcheck.mjs",
+    ]),
+    // Ran alone for 300 s and still did not finish. NOT red, NOT green, and never to be folded into either:
+    // a gate that cannot be measured on this box is a cost problem, not a correctness verdict.
+    unmeasured: Object.freeze([
+        "physics/sph/levelClaim-selfcheck.mjs",
+        "physics/sph/packingTransfer-selfcheck.mjs",
+        "physics/sph/stability-selfcheck.mjs",
+        "tools/roundhouse/assumptionMap-selfcheck.mjs",
+        "tools/roundhouse/census-selfcheck.mjs",
+        "tools/roundhouse/claimTrace-selfcheck.mjs",
+        "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+        "tools/roundhouse/khConvergence-selfcheck.mjs",
+        "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+        "tools/roundhouse/khMichalke-selfcheck.mjs",
+        "tools/roundhouse/knobLiveness-selfcheck.mjs",
+        "tools/roundhouse/labResults-selfcheck.mjs",
+        "tools/roundhouse/libmSensitivity-selfcheck.mjs",
+        "tools/roundhouse/plantDirection-selfcheck.mjs",
+        "tools/roundhouse/plantedCoverage-selfcheck.mjs",
+        "tools/roundhouse/responseCensus-selfcheck.mjs",
+        "tools/roundhouse/twoFBind-selfcheck.mjs",
+        "tools/roundhouse/valueMatch-selfcheck.mjs",
+        "tools/ship/orphanTriage-selfcheck.mjs",
+        "tools/ship/shaderRefs-selfcheck.mjs",
+        "tools/ship/toolFrontDoor-selfcheck.mjs",
+    ]),
+    // Went red under -P 8 and green alone. 38 of 107 candidates -- more than a third of what phase 1 called
+    // red was starvation. This is the figure that makes phase 2 non-optional.
+    falseRedList: Object.freeze([
+        { gate: "ev/esFleetSize-selfcheck.mjs", parallelMs: 16391, serialMs: 11236 },
+        { gate: "physics/astroparticle/jeans-selfcheck.mjs", parallelMs: 180031, serialMs: 105348 },
+        { gate: "physics/mesh/weightScaling-selfcheck.mjs", parallelMs: 180116, serialMs: 84426 },
+        { gate: "physics/nuclear/reactorControl-selfcheck.mjs", parallelMs: 180036, serialMs: 107964 },
+        { gate: "physics/sph/materialKnobs-selfcheck.mjs", parallelMs: 180044, serialMs: 218702 },
+        { gate: "physics/sph/poolFixture-selfcheck.mjs", parallelMs: 180031, serialMs: 149013 },
+        { gate: "physics/sph/tiltPower-selfcheck.mjs", parallelMs: 180633, serialMs: 89205 },
+        { gate: "physics/sph/wideTilt-selfcheck.mjs", parallelMs: 180098, serialMs: 86278 },
+        { gate: "simulation/carrySpawn-selfcheck.mjs", parallelMs: 18300, serialMs: 17638 },
+        { gate: "physics/thermal/stefan-selfcheck.mjs", parallelMs: 180055, serialMs: 200460 },
+        { gate: "physics/tomography/matchedAdjoint-selfcheck.mjs", parallelMs: 180052, serialMs: 52023 },
+        { gate: "rig/cinematicShot-selfcheck.mjs", parallelMs: 163718, serialMs: 78456 },
+        { gate: "simulation/lbm/inflow-selfcheck.mjs", parallelMs: 180024, serialMs: 114343 },
+        { gate: "simulation/lbm/onsetTrend-selfcheck.mjs", parallelMs: 180046, serialMs: 59738 },
+        { gate: "simulation/lbm/settleCurve-selfcheck.mjs", parallelMs: 180032, serialMs: 133885 },
+        { gate: "tools/render-qa/terminatorOracle-selfcheck.mjs", parallelMs: 180043, serialMs: 102484 },
+        { gate: "tools/roundhouse/compose-selfcheck.mjs", parallelMs: 180072, serialMs: 143967 },
+        { gate: "tools/roundhouse/flip3dBind-selfcheck.mjs", parallelMs: 180046, serialMs: 84944 },
+        { gate: "tools/roundhouse/hydrostatic-selfcheck.mjs", parallelMs: 180038, serialMs: 161659 },
+        { gate: "tools/roundhouse/labExport-selfcheck.mjs", parallelMs: 180036, serialMs: 122891 },
+        { gate: "tools/roundhouse/menuScope-selfcheck.mjs", parallelMs: 180039, serialMs: 110685 },
+        { gate: "tools/roundhouse/observableUnits-selfcheck.mjs", parallelMs: 180060, serialMs: 221029 },
+        { gate: "tools/roundhouse/opticsBind-selfcheck.mjs", parallelMs: 180027, serialMs: 120053 },
+        { gate: "tools/roundhouse/pipeFlowKey-selfcheck.mjs", parallelMs: 180032, serialMs: 95323 },
+        { gate: "tools/roundhouse/rayleighOnset-selfcheck.mjs", parallelMs: 180041, serialMs: 127852 },
+        { gate: "tools/roundhouse/stabilityBind-selfcheck.mjs", parallelMs: 180031, serialMs: 86996 },
+        { gate: "tools/roundhouse/twoF-selfcheck.mjs", parallelMs: 180032, serialMs: 180429 },
+        { gate: "tools/ship/crtToggle-selfcheck.mjs", parallelMs: 5204, serialMs: 3174 },
+        { gate: "tools/ship/ddaPrecisionReport-selfcheck.mjs", parallelMs: 180559, serialMs: 121123 },
+        { gate: "tools/ship/deterministicRaf-selfcheck.mjs", parallelMs: 180288, serialMs: 71825 },
+        { gate: "tools/ship/domScope-selfcheck.mjs", parallelMs: 180246, serialMs: 143947 },
+        { gate: "tools/ship/driveEnv-selfcheck.mjs", parallelMs: 180030, serialMs: 78274 },
+        { gate: "tools/ship/loopTarget-selfcheck.mjs", parallelMs: 51680, serialMs: 26830 },
+        { gate: "tools/ship/labDevices-selfcheck.mjs", parallelMs: 180064, serialMs: 213217 },
+        { gate: "tools/ship/loopSearch-selfcheck.mjs", parallelMs: 180060, serialMs: 107415 },
+        { gate: "tools/ship/spellBook-selfcheck.mjs", parallelMs: 1012, serialMs: 332 },
+        { gate: "tools/ship/splatSort-selfcheck.mjs", parallelMs: 5310, serialMs: 1656 },
+        { gate: "tools/ship/redCensus-selfcheck.mjs", parallelMs: 180104, serialMs: 163172 },
+    ]),
+    cover: Object.freeze({ covers: true, eligible: 1329, swept: 1366 }),
+});
 // ---------------------------------------------------------------------------------------------------------
 // CLI -- so phase 2 is a command rather than a thing somebody remembers to do.
 //
