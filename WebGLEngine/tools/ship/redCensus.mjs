@@ -376,3 +376,75 @@ export function runGate(rel, { timeoutMs = 120000 } = {}) {
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */
 export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e.ms, 0);
+
+// ================================================================================================
+// v4295 -- THE RE-CHECK, SIXTEEN ROUNDS LATER
+// ================================================================================================
+//
+// *** ALL 37 ARE STILL RED. NOT ONE HAS BEEN FIXED. ***
+//
+// The census was taken at v4279 and then nobody looked again. Sixteen rounds shipped ALL GREEN over it --
+// which was true, because verify.mjs runs a different and much smaller set, and the selfcheck sweep is not
+// what a ship gate executes. So the tree's "ALL GREEN" was never lying; it was answering a narrower question
+// than anybody reading it assumed.
+//
+// Re-run serially at v4295, one gate at a time, with the same runGate the census itself provides:
+//
+//     recorded red at v4279 : 37
+//     STILL red now         : 37
+//     now green             :  0
+//
+// A 37-of-37 result is the shape of a broken measurement, so the runner was controlled first: it reports GREEN
+// for frameGraph-selfcheck (83 ms), crossBackend-selfcheck (7480 ms) and claimCheck-selfcheck (516 ms), and
+// the 37 reds take between 89 ms and 7.5 s with the spread you would expect from real work. They are running
+// and they are failing.
+//
+// WHAT DID NOT HAPPEN IS AS IMPORTANT: nothing REGRESSED either. No gate that was green went red. The register
+// is not rotting in the direction it rotted last time -- at v4279 THIRTEEN of the nineteen previously recorded
+// were found already fixed with nobody removing the entry. This time the list is exactly true and exactly
+// stalled, which is a different failure and needs a different fix: not a correction, a RATCHET.
+export const RECHECK = Object.freeze({
+    at: "v4295", roundsSince: 16, method: "serial, one gate at a time, via runGate",
+    checked: 37, stillRed: 37, nowGreen: 0, regressed: 0,
+    controlled: Object.freeze(["tools/ship/frameGraph-selfcheck.mjs", "tools/ship/crossBackend-selfcheck.mjs",
+                               "tools/ship/claimCheck-selfcheck.mjs"]),
+    controlVerdict: "all three report GREEN, so 37-of-37 is not a runner that reports red for everything",
+    whyShipsWereHonest: "verify.mjs runs a smaller, different set; the selfcheck sweep is not what a ship gate executes",
+});
+
+/**
+ * *** THE TWO NUMBERS DESCRIBE TWO MOMENTS, AND NOTHING SAID SO. ***
+ *
+ * METHOD.confirmedSerially is 39. RED_AT_V4279 holds 37. A reader comparing them finds a contradiction, and
+ * there is none: 39 is what the sweep FOUND, 37 is what remained after v4279 fixed the two it had itself
+ * introduced (gateQuality and orreryEjecta, both absent from the standing list, correctly).
+ *
+ *     37 standing + 2 introduced-and-fixed = 39 confirmed
+ *
+ * Same shape as v4293's ROUND_TRIPS, which described two different draw spans in one frozen object. A record
+ * whose fields are snapshots of different instants has to say which instant, or its own reader will treat the
+ * difference as an error.
+ */
+export const MOMENTS = Object.freeze({
+    confirmedBySweep: 39, standingAfterFixes: 37, introducedAndFixedInRound: 2,
+    reconciles: "37 + 2 = 39",
+    fixedInRound: Object.freeze(["tools/ship/gateQuality-selfcheck.mjs", "tools/ship/orreryEjecta-selfcheck.mjs"]),
+});
+
+/**
+ * The cheapest gates whose recorded times fit a budget -- so a gate can re-check a real subset every sweep
+ * without paying the 142 s the full list costs.
+ *
+ * Sorted by cost and taken greedily, which makes the selection DETERMINISTIC. A random sample would make the
+ * gate flap: a run that happened to pick a slow gate would time out, and one that happened to pick a fixed
+ * gate would go red on a different day than its neighbour.
+ */
+export function cheapSubset(budgetMs = 4000, list = RED_AT_V4279) {
+    const out = [];
+    let acc = 0;
+    for (const e of list.slice().sort((a, b) => a.ms - b.ms || a.gate.localeCompare(b.gate))) {
+        if (acc + e.ms > budgetMs) break;
+        acc += e.ms; out.push(e);
+    }
+    return { gates: out, costMs: acc };
+}
