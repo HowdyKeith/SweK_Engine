@@ -8,6 +8,61 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4265 -- Trap 3 measured at last, and the control inverted the finding
+
+tools/ship/swiftShaders-selfcheck.mjs has carried this sentence in its own tail since v4234: "NO comparison
+here renders at a device pixel ratio other than 1, so trap 3 is argued from the source and never measured."
+Trap 3 is the POINTS trap -- Metal's `position` is in points, GLSL's gl_FragCoord is in device pixels, so
+every offset and amplitude scales with the display's ratio unless it is carried explicitly. The port has
+carried a `pointScale` knob through the CPU model and the GLSL since v4163 and nothing had ever set it to
+anything but 1.
+
+It is measured now. All 17 pointScale-carrying shaders rendered at ps=2 on a real WebGL2 context and compared
+against the CPU reference at ps=2.
+
+  pointScale changes the picture in EVERY ONE of the 17, by 11 to 166 levels. None is inert, so the
+  parameter is load-bearing wherever it is carried rather than decoration somebody added for symmetry.
+
+  11 agree with the CPU model at BOTH 1x and 2x: emboss, heatShimmer, chromaticSplit, echo, neonEdge,
+  touchRipple, liveRipple, shockwave, gravityWells, refractLens, pulse.
+
+  NOTHING agrees at 1x and breaks at 2x. The port carries trap 3 correctly.
+
+THE FIRST RUN SAID OTHERWISE AND WAS WRONG, AND THAT IS THE PART WORTH KEEPING. Without a control it reported
+five shaders "DISAGREEING at 2x" -- glitch 22, melt 108, thermal 184, inkBleed 103, frosted 20 -- which reads
+as five ports that are correct at 1x and wrong on any Retina display. Re-run with the identical comparison at
+ps=1, every one of them ALREADY disagreed at 1x: glitch 12, melt 114, thermal 110, inkBleed 89, frosted 8.
+They are the known sin-hash set, whose CPU and GPU forms provably cannot agree on any two implementations,
+and attributing their divergence to the point scale would have been a fabricated defect reported with
+confidence. wavePool went the other way -- 0 at 2x and 5 at 1x -- so a single scale can flatter as easily as
+it accuses.
+
+A MEASUREMENT AT ONE SCALE IS NOT A COMPARISON. It becomes one only when the other scale is measured the same
+way, and the control is now part of the section rather than something I did once by hand.
+
+Sabotage A drops echo's pointScale multiply from its GLSL: 5 RED, and the section names echo as INERT at 2x
+and as the only shader that agrees at 1x and breaks at 2x -- exactly the defect shape it exists to catch, and
+one NO EARLIER VERSION OF THIS GATE COULD HAVE SEEN, because every comparison rendered at ps=1 where a
+dropped point scale is invisible by construction. Sabotage B hard-codes the control away and reproduces the
+false finding precisely: the same five shaders reported as breaking only at 2x. Both grep-confirmed before
+their results were read and restored md5-identical.
+
+AND THE BATCH ASKED FOR COULD NOT BE A PORT. The upstream Metal source is not in this tree, this sandbox has
+no network, and the 13 unported shaders are not even NAMED anywhere here -- only the 28 already ported appear
+in the model, plus bcs_liquidMirror, mentioned once in prose because v4233 mis-classified it. Porting a
+shader from its name would be invention of exactly the kind the rest of this file exists to prevent, so the
+count stays 28 of 41 and the round is a measurement instead. That is a smaller deliverable than a batch and
+it is the honest one.
+
+UNCHECKED: still whether these effects look GOOD, and still whether the eight sin-hash shaders match
+upstream's Metal pixel for pixel, which they cannot on any two implementations. Also unmeasured: any device
+pixel ratio other than 1 and 2 -- 3x exists on real hardware and was not tried -- and whether a CALLER would
+set pointScale correctly, since render/swiftShaderPass.js builds its own canvas and its own GL context, is
+mounted by nothing, and has no caller in the engine at all. The obligation its own comment states -- "a
+Retina caller MUST set it" -- currently has nobody to discharge it.
+
+The build now stands at 4265 gates.
+
 ## v4264 -- The consumer is real and the offered algorithm is wrong for it
 
 Backlog #138 arrived as "take novalain/gpgpu-odd-even-transition-sort". v4262's rule says find and MEASURE

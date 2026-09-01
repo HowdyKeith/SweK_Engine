@@ -1467,6 +1467,79 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. The source-shape " +
             "sections are what check these eight, and they check the SHAPE rather than the pixels -- plus, " +
             "since v4234, the two configurations above in which frosted's and pixelateMosaic's hash cancels.");
+
+        // ---- 20. TRAP 3, MEASURED AT LAST -----------------------------------------------------------------
+        //
+        // *** THIS GATE'S OWN TAIL HAS SAID SINCE v4234 THAT "NO comparison here renders at a device pixel
+        // *** ratio other than 1, so trap 3 is argued from the source and never measured". *** v4265 measures
+        // it: every pointScale-carrying shader is rendered at ps=2 and compared against the CPU model AT ps=2.
+        //
+        // *** AND THE CONTROL IS THE WHOLE REASON THE ANSWER IS TRUSTWORTHY. *** The first run without it
+        // reported FIVE shaders "DISAGREEING at 2x" -- glitch, melt, thermal, inkBleed, frosted -- which read
+        // as five ports that are right at 1x and wrong on a Retina display. Re-run with the same comparison at
+        // ps=1, every one of them ALREADY disagreed at 1x: they are the known sin-hash set, and attributing
+        // their divergence to the point scale would have been a fabricated defect. wavePool went the other
+        // way -- it looked clean at 2x (worst 0) while reading 5 at 1x, so a single scale can flatter as well
+        // as accuse.
+        console.log("\n20. trap 3 -- the first comparison at a device pixel ratio other than 1");
+        {
+            const carriers = pass.swiftShaderNames().filter((n) => "pointScale" in (pass.DEFAULT_KNOBS[n] || {}));
+            ok("!! 17 of the 28 ported shaders carry pointScale at all", carriers.length === 17,
+                carriers.length + " carriers: " + carriers.join(" "));
+            const rows = [];
+            for (const name of carriers) {
+                const shot = (ps) => pg.evaluate(({ name, knobs, W, H, src }) => {
+                    const p = window.__mk(name, W, H); p.render(new Uint8Array(src), knobs);
+                    return Array.from(p.readPixels());
+                }, { name, knobs: { ...CASES[name], pointScale: ps }, W, H, src: Array.from(src) });
+                const g1 = await shot(1), g2 = await shot(2);
+                let selfWorst = 0;
+                for (let i = 0; i < W * H * 4; i++) { if (i % 4 === 3) continue;
+                    const d = Math.abs(g1[i] - g2[i]); if (d > selfWorst) selfWorst = d; }
+                const cmp = (gpu, ps) => { const cpu = MODEL[name]({ ...fimg },
+                        { ...pass.DEFAULT_KNOBS[name], ...CASES[name], pointScale: ps });
+                    let w2 = 0; for (let i = 0; i < W * H * 4; i++) { if (i % 4 === 3) continue;
+                        const c = Math.max(0, Math.min(255, Math.round(cpu.data[i] * 255)));
+                        const d = Math.abs(c - gpu[i]); if (d > w2) w2 = d; } return w2; };
+                rows.push({ name, selfWorst, at1: cmp(g1, 1), at2: cmp(g2, 2) });
+            }
+            // 1. The parameter is LOAD-BEARING wherever it is carried -- not decoration.
+            const inert = rows.filter((r) => r.selfWorst <= 2);
+            ok("!! *** pointScale changes the picture in EVERY shader that carries it ***", inert.length === 0,
+                "worst change per shader ranges " + Math.min(...rows.map((r) => r.selfWorst)) + " to " +
+                Math.max(...rows.map((r) => r.selfWorst)) + " levels; inert: " + (inert.map((r) => r.name).join(" ") || "none"));
+            // 2. THE FINDING: nothing is correct at 1x and broken at 2x.
+            const brokeAt2 = rows.filter((r) => r.at1 <= 2 && r.at2 > 2);
+            ok("!! *** NOTHING AGREES AT 1x AND BREAKS AT 2x -- trap 3 is carried correctly ***",
+                brokeAt2.length === 0, brokeAt2.map((r) => r.name + "(" + r.at2 + ")").join(" ") || "0 of " + rows.length);
+            const both = rows.filter((r) => r.at1 <= 2 && r.at2 <= 2);
+            ok("!! and " + both.length + " agree with the CPU model at BOTH 1x and 2x", both.length === 11,
+                both.map((r) => r.name).join(" "));
+            // 3. The control, asserted rather than described: the ones that fail at 2x fail at 1x too.
+            const off2 = rows.filter((r) => r.at2 > 2);
+            ok("!! *** every shader that disagrees at 2x ALREADY disagrees at 1x -- the hash, not the scale ***",
+                off2.every((r) => r.at1 > 2), off2.map((r) => r.name + " 1x=" + r.at1 + " 2x=" + r.at2).join(", "));
+            ok("   and each of those is a known sin-hash user, derived from the source",
+                off2.every((r) => HASHED.includes(r.name)), off2.map((r) => r.name).join(" "));
+            report("*** WITHOUT THE 1x CONTROL THIS SECTION WOULD HAVE REPORTED FIVE DEFECTS THAT DO NOT " +
+                "EXIST. *** A measurement at one scale is not a comparison; it becomes one only when the " +
+                "other scale is measured the same way.");
+            // SABOTAGE LOG for this section -- applied to a working tree, grep-confirmed before the result was
+            // read, restored md5-identical (swiftShaderPass.js 5c65adc3e58a1e8cba909b2bb47a025f, this gate
+            // ac12687c26834ceccbff8988b30a2716).
+            //
+            //   A  echo's GLSL drops its pointScale multiply (`uSpread * uPointScale` -> `uSpread`).
+            //      -> 5 RED, and the diagnosis is exact: echo turns up as INERT at 2x and as the only shader
+            //      that "agrees at 1x and breaks at 2x". That is precisely the defect shape this section
+            //      exists to name, and before v4265 nothing in this gate could have seen it -- every
+            //      comparison rendered at ps=1, where a dropped point scale is invisible by construction.
+            //
+            //   B  the 1x control removed (at1 hard-coded to 0).
+            //      -> 3 RED, and it reproduces the false finding exactly: glitch, melt, thermal, inkBleed and
+            //      frosted are reported as agreeing at 1x and breaking at 2x. FIVE DEFECTS THAT DO NOT EXIST,
+            //      which is what the first run of this section actually printed before the control was added.
+        }
+
         await b.close(); srv.close();
     }
 }
@@ -1483,6 +1556,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "and is rendered with premultiplied = 0, so deleting a `* k` from a fragment shader now turns this red " +
     "for the six gradeable alpha-aware shaders, and the two hash ones are graded in the configurations where " +
     "the hash cancels (frosted at pointScale 0, pixelateMosaic fully assembled and on a flat alpha). *** " +
-    "STILL OPEN: the 13 unported shaders, and the fact that NO comparison here renders at a device pixel " +
-    "ratio other than 1, so trap 3 is argued from the source and never measured.");
+    "*** TRAP 3 IS NO LONGER ARGUED FROM THE SOURCE: v4265 MEASURED IT. *** Section 20 renders every one of " +
+    "the 17 pointScale-carrying shaders at ps=2 and compares against the CPU model at ps=2. The parameter " +
+    "changes the picture in ALL 17 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
+    "BOTH 1x and 2x, and NOTHING agrees at 1x and breaks at 2x. The six that disagree at 2x already disagree " +
+    "at 1x and are the sin-hash set, which the 1x control is what establishes: without it this gate would " +
+    "have reported five defects that do not exist. STILL OPEN: the 13 unported shaders, and v4265 could not " +
+    "reduce that number -- *** THE UPSTREAM METAL SOURCE IS NOT IN THIS TREE AND THIS SANDBOX HAS NO " +
+    "NETWORK, so the remaining thirteen are not even NAMED anywhere here. *** Porting a shader from its " +
+    "name would be invention, so the batch this round was asked for is a measurement instead.");
 process.exit(fails ? 1 : 0);
