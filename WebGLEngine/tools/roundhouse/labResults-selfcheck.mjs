@@ -27,6 +27,12 @@
 //
 // COMPARISON IS EXACT. A tolerance would hide the day a device stops being deterministic, which is the single
 // most important thing this file could ever tell anybody.
+//
+// *** v4192 -- AND THEN IT WENT RED AND WOULD NOT SAY HOW RED. *** Every failing line printed the first six
+// entries and never the count, so a run reporting "6 FAILURES" named 26 entries and gave no way to tell whether
+// that was the whole set or the visible corner of it. The gate that exists to be the lab's MEMORY could not
+// report the size of what it had remembered. Counts are now always stated, the sample is labelled as a sample,
+// the devices involved are rolled up by name, and SWEK_LAB_DRIFT_FULL=1 prints everything. See evidence().
 
 import path from "node:path";
 import fsMod from "node:fs";
@@ -35,6 +41,45 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+
+// *** v4192 -- THIS GATE WENT RED AND WOULD NOT SAY HOW RED. ***
+//
+// Every failing line here printed `list.slice(0, 6)` and NOT `list.length`, so a red run reported six names and
+// no count -- 6 drifted values and 600 look identical from the outside. MEASURED on the run that found this: the
+// gate reported "6 FAILURES" and named 26 entries across the six lines, and NOTHING IN THE OUTPUT SAID WHETHER
+// THAT WAS THE WHOLE SET. A ratchet whose red state cannot be read is a ratchet nobody can act on, and this one
+// guards 484 device-mode pairs and 4265 observables -- the lab's entire answer surface.
+//
+// THE SAMPLE STAYS. Printing 600 entries inline would be the same failure with the opposite sign: unreadable
+// rather than incomplete. So the count is ALWAYS stated, the sample is labelled as a sample, and the rollup
+// below names every device involved -- bounded by the roster (129) rather than by the drift. The complete list
+// is one env var away for when triage needs it, and the line says so rather than leaving it to be discovered.
+const FULL = process.env.SWEK_LAB_DRIFT_FULL === "1";
+
+/** "N entries; first K: a, b, c (+M more -- SWEK_LAB_DRIFT_FULL=1 for all)". Never just the head. */
+function evidence(list, cap = 6, sep = ", ") {
+    if (!list.length) return "";
+    if (FULL || list.length <= cap) return list.length + " entries: " + list.join(sep);
+    return list.length + " entries; first " + cap + ": " + list.slice(0, cap).join(sep) +
+           " (+" + (list.length - cap) + " more -- rerun with SWEK_LAB_DRIFT_FULL=1 for the complete list)";
+}
+
+/** Which DEVICES are involved, and how much each contributes. The list that triage actually starts from. */
+function rollup(label, groups) {
+    const per = new Map();
+    for (const [kind, list] of Object.entries(groups)) {
+        for (const entry of list) {
+            const dev = entry.split(/[/.:]/)[0];
+            if (!per.has(dev)) per.set(dev, {});
+            per.get(dev)[kind] = (per.get(dev)[kind] || 0) + 1;
+        }
+    }
+    if (!per.size) return;
+    const rows = [...per.entries()].sort((a, b) =>
+        Object.values(b[1]).reduce((x, y) => x + y, 0) - Object.values(a[1]).reduce((x, y) => x + y, 0));
+    console.log("  ----  " + label + " BY DEVICE (" + rows.length + " devices): " +
+        rows.map(([d, c]) => d + "[" + Object.entries(c).map(([k, n]) => k + " " + n).join(" ") + "]").join(", "));
+}
 const D = await import(pathToFileURL(path.join(HERE, "devices.mjs")).href);
 const L = await import(pathToFileURL(path.join(HERE, "labExport.mjs")).href);
 const BASE = path.join(HERE, "lab-results-baseline.json");
@@ -89,6 +134,27 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
                 base.pairCount + " device-mode pairs, " + base.pairObservables + " observables.");
 }
 
+// ---- 0a. THE REPORTER ITSELF, DRIVEN RATHER THAN READ OUT OF THE SOURCE --------------------------------------------
+//
+// The claim this round makes is "a red run states its true size". That claim is worth exactly as much as a gate
+// on it -- so the reporter is driven on a synthetic list longer than its own cap, and the count it prints is
+// checked against the length it was handed. Reading the source for a `.length` would be the keyword probe this
+// tree has been misled by three times.
+{
+    const many = Array.from({ length: 137 }, (_, i) => "dev" + (i % 9) + "/mode.obs" + i);
+    const line = evidence(many, 6);
+    ok("!! *** a red line states HOW red -- the count, not just the head of the list ***",
+        line.startsWith("137 entries") && (FULL || line.includes("(+131 more")) && line.includes("dev0/mode.obs0"),
+        "137 synthetic entries -> \"" + line.slice(0, 96) + "...\". EVERY FAILING LINE IN THIS FILE PRINTED " +
+        "slice(0, 6) AND NEVER length, so a red run named six entries and left 6 and 600 indistinguishable. " +
+        "This gate guards 484 device-mode pairs and 4265 observables; it went red and could not say how red");
+
+    ok("...and the empty case stays empty, so a GREEN line is not decorated with a zero",
+        evidence([]) === "" && evidence([], 4) === "",
+        "the passing branches of these assertions carry their own prose and must not be prefixed with " +
+        "'0 entries'. A reporter that changed the green output would have been a cosmetic edit to a value freeze");
+}
+
 // ---- 0. THE PAIRS, AND THE TWO HALVES GATED AGAINST EACH OTHER ---------------------------------------------------
 {
     const moved = [], vanished = [], appeared = [], newPair = [], gonePair = [];
@@ -107,17 +173,18 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
     for (const key of Object.keys(pairs)) if (!(key in bp)) newPair.push(key);
 
     ok("!! *** no frozen value has moved on ANY DECLARED MODE ***", moved.length === 0,
-        moved.length ? moved.slice(0, 6).join("; ") :
+        moved.length ? evidence(moved, 6, "; ") :
         Object.keys(bp).length + " device-mode pairs, " + (base.pairObservables || 0) + " observables. THIS IS " +
         "THE LAB'S ANSWER SURFACE; the per-device rows below are its DEFAULT SLICE, and until v3519 the slice " +
         "was all that was watched -- 26.4% of the pairs.");
-    ok("no observable VANISHED from a non-default mode", vanished.length === 0, vanished.slice(0, 6).join(", ") || "none");
-    ok("and none APPEARED unannounced", appeared.length === 0, appeared.slice(0, 6).join(", ") ||
+    ok("no observable VANISHED from a non-default mode", vanished.length === 0, evidence(vanished) || "none");
+    ok("and none APPEARED unannounced", appeared.length === 0, evidence(appeared) ||
         "none. THREE CONSECUTIVE ROUNDS ADDED OBSERVABLES TO MODES THIS FILE NEVER EVALUATED (splat/perspective " +
         "v3516, kepler/kepler3 v3517, lens/deflect v3518) AND IT REPORTED 'none APPEARED' EVERY TIME, CORRECTLY " +
         "AND USELESSLY. Re-freeze deliberately after an intended change.");
-    ok("the declared mode set has not shrunk", gonePair.length === 0, gonePair.slice(0, 6).join(", ") || "none");
-    if (newPair.length) console.log("  ----  NEW PAIRS since the freeze: " + newPair.slice(0, 8).join(", "));
+    ok("the declared mode set has not shrunk", gonePair.length === 0, evidence(gonePair) || "none");
+    if (newPair.length) console.log("  ----  NEW PAIRS since the freeze: " + evidence(newPair, 8));
+    rollup("PAIR DRIFT", { moved, vanished, appeared, gonePair });
 
     // *** THE TWO HALVES READ AGAINST EACH OTHER, WHICH IS THIS TREE'S PRESCRIBED FIX FOR A SECOND DECLARATION.
     // `devices` is retained because labGalaxy reads `baseline.devices` keyed by device name and would have
@@ -134,7 +201,7 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
         }
     }
     ok("!! the per-device rows AGREE with their own default-mode pairs", mismatched.length === 0,
-        mismatched.slice(0, 6).join(", ") || "every retained row matches its twin. THE SECOND COPY IS NEVER THE " +
+        evidence(mismatched) || "every retained row matches its twin. THE SECOND COPY IS NEVER THE " +
         "ONE THAT GETS UPDATED, so it is not trusted -- it is checked.");
 }
 
@@ -158,18 +225,18 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
 
     ok("!! *** no frozen value has MOVED ***",
         moved.length === 0,
-        moved.length ? "MOVED: " + moved.slice(0, 4).join("; ") : base.observables + " observables across " +
+        moved.length ? "MOVED: " + evidence(moved, 4, "; ") : base.observables + " observables across " +
         base.deviceCount + " devices, all identical. EVERY GATE IN THIS LAB CHECKS A RELATIONSHIP AND NONE " +
         "CHECKED THE VALUES -- a shift that moves both sides of an inequality passes all of them");
 
     ok("!! no observable VANISHED",
         vanished.length === 0,
-        vanished.length ? "VANISHED: " + vanished.slice(0, 5).join(", ") : "none. A device that stopped " +
+        vanished.length ? "VANISHED: " + evidence(vanished, 5) : "none. A device that stopped " +
         "emitting a number would pass every relationship check about the numbers it still emits");
 
     ok("!! and none APPEARED unannounced",
         appeared.length === 0,
-        appeared.length ? "APPEARED: " + appeared.slice(0, 5).join(", ") + " -- re-freeze with " +
+        appeared.length ? "APPEARED: " + evidence(appeared, 5) + " -- re-freeze with " +
         "SWEK_FREEZE_LAB_RESULTS=1 if intended" : "none. A new observable is not a fault, but it IS a change, " +
         "and a baseline that absorbed it silently would be a record of whatever happened to be there");
 
