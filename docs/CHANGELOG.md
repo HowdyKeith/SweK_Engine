@@ -8,6 +8,71 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4284 -- Three passes, one dispatch, and the picture had to survive it
+
+Keith asked whether more of the tree's shaders can move to WebGPU. The census answers first: 169 files are
+GLSL-only, 19 are WGSL-only, and FOUR author a shader in both. The WGSL side is not a partial port of the GLSL
+side -- it is almost all COMPUTE (LBM, Euler, MPM, Ising, HMC, magmap, flowfield, MLP, multigrid) that WebGL2
+could never have run. Of the 44 GLSL files in render/, 27 are geometry. So the honest opportunity is much
+smaller than 169, and the right target is the passes that WANT compute rather than the ones that are easy.
+
+*** THE BLOOM CHAIN IS THE CASE. *** render/bloomPass.js runs bright-extract, blur-H and blur-V as three
+separate framebuffer binds and three separate gl.drawArrays, each writing a half-resolution texture the next
+pass reads straight back. Those intermediates exist for exactly one reason: a fragment shader cannot hand a
+value to its neighbour, so the only channel between passes is memory. A compute shader can. render/
+bloomFused.mjs fuses all three into ONE dispatch, with the first intermediate living in WORKGROUP SHARED
+MEMORY -- the thing WebGL2 has no equivalent of. Three round trips become one.
+
+*** THE CHAIN OF TRUST, AND IT HAD TO CLOSE OR THE ROUND PROVED NOTHING. *** The fused shader was compared to
+a CPU oracle of the three-pass maths, and the oracle was compared to the SHIPPING SHADERS THEMSELVES running
+on a real WebGL2 driver, because a CPU model written by whoever is doing the port shares the porter's
+misreadings. Measured: the oracle reproduces BRIGHT_FS at 0.500/255, BLUR_FS horizontally at 0.494/255 and
+vertically at 0.487/255 -- half a byte is the FLOOR of an 8-bit readback comparison, not a loose tolerance.
+Then the fused dispatch reproduces the oracle at 3.03e-7 relative, which is 2.5 float32 epsilons, on
+google/swiftshader. Bit-identical was never available and claiming it would have been a lie: a GPU may
+contract a multiply and an add into one FMA where a JavaScript engine does not.
+
+*** NO TIMING IS REPORTED AND THAT IS THE POINT. *** The only WebGPU device here is a SOFTWARE rasteriser.
+Fusing passes is a memory-traffic optimisation, and timing memory traffic on a CPU measures the CPU. A number
+from that would look like evidence and be noise, which is worse than no number. The round-trip count is
+offered instead: exact, structural, countable in either source, independent of what silicon is present.
+
+AND THE PORT ADDS NO DUAL-AUTHORED PAIR. shaderCensus still reports FOUR, because every constant in the WGSL
+-- the nine kernel weights, the luma vector, the soft-knee width -- is PARSED OUT OF bloomPass.js at call
+time rather than retyped. Editing the GLSL moves the compute shader with it. That is the whole reason the
+census's own verdict ("do not build the compiler") is not challenged by this round.
+
+TWO THINGS THE GATE CAUGHT IN MY OWN CLAIMS. The round-trip table said the chain was THREE draws and the
+check counted FIVE: SSAO and god rays sit between the blur and the composite, both guarded, both easy to
+forget, and "three passes become one" while five live there is overstating by omission. The table now records
+5 in the span, 3 unconditional and fused, 2 guarded. And the kernel does not sum to one -- W0 + 2*(W1..W4) is
+0.999999, so the shipping blur loses a millionth of its light. REPORTED, NOT CORRECTED: rounding it would
+alter every bloomed image the engine has made for a difference no eye can see.
+
+TWO GAPS FOUND IN THE SHARED HARNESS, BOTH SILENT. renderGlslToPixels draws three vertices with an EMPTY vao,
+so a vertex shader that reads an attribute -- which bloomPass's own PASSTHROUGH_VS does, because it brings its
+own buffer -- gets (0,0) three times, collapses to a degenerate triangle, and returns a BLACK FRAME with
+ok:true. That cost an hour and every comparison against it failed far from the actual shader; the harness now
+returns a distinct-colour count so a caller can assert a picture happened. And it supported only scalar
+uniforms by name, while BLUR_FS takes two vec2s and a vec4; an unset uniform reads ZERO, and uEyeRect at zero
+clamps every tap onto texel 0 -- a harness gap that looks exactly like a shader bug. Vector uniforms are
+supported now, and unresolved names are RETURNED rather than skipped.
+
+Four sabotages. The apron one row short goes 2 red with tile-shaped seams. The workgroup barrier deleted goes
+3 red and the peak collapses from 1.7480 to 0.0495, caught by the control before the comparison. *** THE
+LUMA VECTOR ROUNDED IN BOTH THE ORACLE AND THE PORT AT ONCE GOES 2 RED AND SECTION 3 PASSES *** -- they are
+wrong together, and only the check against the shipping shader sees it, which is the chain of trust
+demonstrated rather than asserted.
+
+*** AND ONE SABOTAGE WENT 0 RED TWICE, BOTH TIMES BECAUSE THE GATE WAS WRONG. *** Removing the clamp changed
+nothing because there were TWO layers of clamping and either sufficed -- redundant defence reads as care and
+costs the ability to test either half. One layer removed, still 0 red: the edge comparison divides by the
+reference and skips values under 1e-4, and both bright spots were in the interior, so the whole border
+extracted to BLACK. An edge check on an edge with no light in it is an assertion that cannot fail, the sixth
+of that family this session. A third source now straddles the left border, 180 of 2880 border samples are lit
+with a control that says so, and the sabotage then reddens the edge check by name.
+
+This round adds one module and one gate, and the tree stands at 1357 gates.
 ## v4283 -- The pre-filter that ran nothing and said it was fine
 
 tools/ship/affected.mjs answers "which gates can this change reach", and the point of it is stated in its own

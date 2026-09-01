@@ -259,7 +259,14 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
  * the whole reason the flip lives here, once, instead of at every call site.
  */
 export async function renderGlslToPixels({ vertex, fragment, width = 64, height = 64, srcSize = 64,
-                                           uniforms = null, uniformNames = [], sourceTexel = null }) {
+                                           uniforms = null, uniformNames = [], sourceTexel = null,
+                                           uniformVecs = null }) {
+    // v4284 -- `uniformVecs` is {name: [..2|3|4 numbers]}, set with uniform2f/3f/4f by array length. ADDITIVE:
+    // it defaults to null and every existing caller is untouched. It exists because render/bloomPass.js's
+    // BLUR_FS takes uTexel and uDir as vec2 and uEyeRect as vec4, and a uniform that is never assigned reads
+    // as ZERO -- which for uEyeRect means clamping every tap to texel 0 and returning a flat image that looks
+    // like a shader bug rather than a harness gap. A missing uniform must be impossible to mistake for a
+    // wrong shader, so unresolved names are RETURNED rather than skipped.
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
@@ -308,8 +315,18 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
             gl.uniform1i(gl.getUniformLocation(prog, "tDiffuse"), 0);
+            const unresolved = [];
+            for (const [nm, v] of Object.entries(a.uniformVecs || {})) {
+                const loc = gl.getUniformLocation(prog, nm);
+                if (!loc) { unresolved.push(nm); continue; }
+                if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
+                else if (v.length === 3) gl.uniform3f(loc, v[0], v[1], v[2]);
+                else if (v.length === 4) gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
+                else unresolved.push(nm + " (length " + v.length + ")");
+            }
             for (let i = 0; i < a.uniformNames.length; i++) {
                 const loc = gl.getUniformLocation(prog, a.uniformNames[i]);
+                if (!loc) unresolved.push(a.uniformNames[i]);
                 if (loc) gl.uniform1f(loc, a.uniforms[i]);
             }
             const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -318,9 +335,21 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             const px = new Uint8Array(a.width * a.height * 4);
             gl.readPixels(0, 0, a.width, a.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
-            return { ok: true, pixels: Array.from(px), renderer: gl.getParameter(gl.RENDERER) };
+            // v4284 -- *** A FRAME THAT DREW NOTHING CAME BACK ok:true AND ALL ZEROES, AND COST AN HOUR. ***
+            // This harness binds an EMPTY vao and draws three vertices attributelessly, so a vertex shader
+            // that reads `in vec2 aPos` -- which render/bloomPass.js's PASSTHROUGH_VS does, because it brings
+            // its own buffer -- gets (0,0) for all three, collapses to a degenerate triangle, and rasterises
+            // no pixels. The result is a black frame that is indistinguishable from a shader legitimately
+            // outputting black, and every comparison against it fails for a reason nowhere near the shader.
+            // The count is returned so a caller can assert a picture happened; it is NOT an error here,
+            // because a uniformly black frame is a legitimate answer for some shaders.
+            const seen = new Set();
+            for (let i = 0; i < px.length; i += 4) seen.add((px[i] << 16) | (px[i + 1] << 8) | px[i + 2]);
+            return { ok: true, pixels: Array.from(px), renderer: gl.getParameter(gl.RENDERER), unresolved,
+                     distinctColours: seen.size };
         }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
-             uniforms: uniforms ? Array.from(uniforms) : [], uniformNames });
+             uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
+             uniformVecs: uniformVecs || {} });
         if (!out.ok) return { skipped: false, ...out };
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);
@@ -329,7 +358,8 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
             flipped.set(out.pixels.slice(srcRow, srcRow + width * 4), y * width * 4);
         }
         return { skipped: false, ok: true, pixels: Array.from(flipped), bytesPerRow: width * 4,
-                 renderer: out.renderer, source: src };
+                 renderer: out.renderer, source: src, unresolved: out.unresolved || [],
+                 distinctColours: out.distinctColours };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
     } finally { try { await browser?.close(); } catch {} }
