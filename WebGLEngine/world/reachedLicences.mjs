@@ -170,6 +170,37 @@ export const REACHED_SOURCES = Object.freeze([
     // COUNTED. Three rounds have now found the same gap, so the habit is the finding, not the instance.
     // =========================================================================================================
     {
+        repo: "redcamel/wgsl_reflect", sourceUrl: "https://github.com/redcamel/wgsl_reflect",
+        // *** grantorHoldsRights IS TRUE, AND THE FIRST DRAFT HAD IT FALSE. *** That put this entry in the
+        // ENCUMBERED category beside a genuinely encumbered one, and the gate caught it. A MIRROR IS NOT AN
+        // ENCUMBRANCE. Two different questions were being run together: "is the account you cloned from the
+        // party granting" (no, and world/licenceSweep.mjs records that as an ATTRIBUTION fact) and "does the
+        // party granting hold the rights to grant" (yes -- Brendan Duncan wrote it and licensed it). The
+        // first is about who to credit. The second is about whether the grant is worth anything. Conflating
+        // them would have accused an author of licensing something they owned.
+        grantorHoldsRights: true, licenceExists: true, publisher: "Brendan Duncan", year: 2021,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2021 Brendan Duncan. READ FIRST-HAND at v4276: LICENSE.md, 21 lines, sha256 " +
+             "99d01341499d, and package.json's author field agrees. *** grantorHoldsRights IS false AND THAT " +
+             "IS NOT AN ACCUSATION: *** the account this was cloned from is a mirror, and Duncan is the party " +
+             "granting. world/licenceSweep.mjs records four more of the same shape under that account. The " +
+             "grant is good; crediting the account rather than the author would have been the error.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The PRINCIPLE only, and it is one sentence: THE SHADER IS THE AUTHORITY ON ITS OWN LAYOUT -- " +
+             "derive the host's view of a uniform buffer from the shader text rather than restating it " +
+             "alongside and hoping. No bytes. The library is 5,141 lines of TypeScript implementing a WGSL " +
+             "scanner, parser, AST and reflector; vendoring a compiler front end to answer one layout " +
+             "question would be out of all proportion, and render/wgslLayout.mjs is a declaration SCANNER " +
+             "that says so in its header and returns null for everything a real parser would handle.",
+        takenPaths: ["render/wgslLayout.mjs"],
+        citedPaths: [],
+        why: "The tree had no way to answer where a field sits in a WGSL uniform buffer, and two places " +
+             "were answering it separately: gfx/device.js computed offsets from a caller-supplied JS list " +
+             "while the shader declared its own struct, with `layout: \"auto\"` meaning WebGPU derived the " +
+             "real layout from the shader and nothing compared the two. A mismatch compiles, builds, runs " +
+             "and draws, and is wrong. This repository is where the fix's shape came from.",
+    },
+    {
         repo: "boytchev/tsl-textures", sourceUrl: "https://github.com/boytchev/tsl-textures",
         grantorHoldsRights: true, licenceExists: true, publisher: "Pavel Boytchev", year: 2024,
         spdx: "MIT", licence: null,

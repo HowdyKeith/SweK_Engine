@@ -34,6 +34,8 @@
 // still has to pick an f32-appropriate tolerance instead of demanding equality.
 "use strict";
 
+import { fieldOrder, uniformStructOf } from "./wgslLayout.mjs";
+
 import { COARSE_FREQ, FINE_FREQ, COARSE_GAIN, FINE_GAIN, DEFAULTS } from "./badTvModel.mjs";
 
 /**
@@ -98,8 +100,8 @@ fn badTvSampleAt(uv: vec2f, k: Knobs) -> vec2f {
   return vec2f(fract(uv.x + badTvOffsetAt(uv.y, k)), fract(uv.y - k.time * k.rollSpeed));
 }`;
 
-/** The knob order the uniform struct expects, so a caller cannot pack them in the wrong sequence by guessing. */
-export const KNOB_ORDER = Object.freeze(["distortion", "distortion2", "speed", "rollSpeed", "time", "rows"]);
+// KNOB_ORDER is declared AFTER FRAGMENT_WGSL, because it is now derived from it -- see below.
+
 
 /** Pack knobs for the harness in KNOB_ORDER, filling from badTvModel's DEFAULTS. */
 export function packKnobs({ time = 0, rows = 16, ...knobs } = {}) {
@@ -193,3 +195,18 @@ fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
   let k = Knobs(u.distortion, u.distortion2, u.speed, u.rollSpeed, u.time, u.rows);
   return textureSample(tDiffuse, samp, badTvSampleAt(uv, k));
 }`;
+
+/**
+ * The knob order the uniform struct expects, so a caller cannot pack them in the wrong sequence by guessing.
+ *
+ * *** THIS WAS ITSELF A GUESS UNTIL v4278. *** It was a frozen literal hand-copied from `struct U` below,
+ * carrying a comment about stopping other people from guessing, with nothing anywhere comparing it to the
+ * struct it claimed to mirror. Reordering the struct would have left packKnobs silently writing every value
+ * into the wrong field: the shader compiles, the pipeline builds, the picture is just wrong.
+ *
+ * It is now DERIVED from the shader text, so the two cannot drift. render/wgslLayout.mjs resolves the struct
+ * through the @group(0) @binding(0) uniform declaration rather than by name, so renaming U does not quietly
+ * disable this either.
+ */
+export const KNOB_ORDER = Object.freeze(fieldOrder(uniformStructOf(FRAGMENT_WGSL).layout.name,
+                                                   FRAGMENT_WGSL, { space: "uniform" }));

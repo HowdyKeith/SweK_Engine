@@ -149,6 +149,14 @@ export function parseWorkgroupVars(src) {
  * *** null IS A REAL ANSWER AND IS NOT ZERO. *** A struct or an aliased type is unsized HERE, and a
  * validator that silently counted it as zero would clear a shader that overflows workgroup storage --
  * the exact "we did not copy the text" versus "there is no text" confusion v4203 was about.
+ *
+ * *** AND THIS IS NOT A LAYOUT PRIMITIVE. DO NOT COMPUTE A FIELD OFFSET WITH IT. *** It answers 16 for
+ * vec3<f32>, which is that type's ALIGNMENT, not its size -- WGSL says vec3<f32> aligns to 16 and occupies
+ * 12, and a real WebGPU device confirmed the 12 at v4278. The padded answer is the right one for this
+ * function's own caller, which totals workgroup storage where over-counting is the safe direction, and it is
+ * the WRONG one for placing a field: a struct { vec3f, f32 } is 16 bytes with the scalar at offset 12, and
+ * this function would have made it 32. render/wgslLayout.mjs keeps alignOf and sizeOfType separate for
+ * exactly that reason and is what a layout question should ask. Nothing here changes; it is only now said.
  */
 export function sizeOf(type) {
     const t = type.trim();

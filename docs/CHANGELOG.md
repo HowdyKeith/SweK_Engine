@@ -8,6 +8,98 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4278 -- The shader is the authority on its own layout
+
+gfx/device.js's WebGPU pipeline builds its uniform buffer at offsets computed from `d.uniforms` -- a list the
+CALLER supplies, in the caller's order, with the caller's names. The shader independently declares its own
+struct. And `layout: "auto"` means WebGPU derives the real buffer layout FROM THE SHADER.
+
+*** NOTHING COMPARED THE TWO. *** Reorder either and every uniform lands in the wrong field. The module
+compiles. The pipeline builds. The bind group binds. The pass runs. The draw completes. There is no error
+anywhere in that chain to catch, because nothing in WebGPU's contract is entitled to an opinion about which
+number the host meant to put in which slot -- the host said where to write, and the host was wrong.
+
+render/badTvWgsl.mjs had the same duplication in miniature and announced it without noticing: `KNOB_ORDER` was
+a frozen literal hand-copied from `struct U`, carrying a comment saying it existed "so a caller cannot pack
+them in the wrong sequence by guessing". It was itself a guess.
+
+### What was taken, and what was not
+
+The idea is redcamel/wgsl_reflect (MIT, (c) 2021 Brendan Duncan -- read first-hand at v4276; the account is a
+mirror and Duncan is the grantor, now registered REACHED). *** NONE OF ITS CODE IS HERE. *** It is 5,141 lines
+of TypeScript implementing a real WGSL scanner, parser, AST and reflector, and vendoring a compiler front end
+to answer one layout question would be out of all proportion to the question.
+
+What transfers is one sentence: derive the host's view from the shader text, never restate it alongside and
+hope. render/wgslLayout.mjs is about 200 lines and is a DECLARATION SCANNER, not a parser -- it says so in its
+header, and everything a parser would handle (type aliases, const-expression array lengths, `@align` and
+`@size` attributes, nested braces) returns null rather than a confident wrong number.
+
+### The tree already held two answers for vec3, which is how this was found
+
+render/wgslSpec.mjs's `sizeOf("vec3<f32>")` returns 16. gfx/device.js's table says size 12, align 16. Both
+files shipped; neither cites the other.
+
+WGSL's rule is that `vec3<f32>` ALIGNS to 16 and OCCUPIES 12. The gap is the whole reason a scalar can sit at
+offset 12 immediately after a vec3, and why `{ vec3f, f32 }` is sixteen bytes and not thirty-two. wgslSpec was
+never wrong for its own caller -- it totals workgroup storage, where over-counting is the safe direction -- and
+it is wrong as a layout primitive, and nothing said so. It is unchanged and now documented. This module keeps
+`alignOf` and `sizeOfType` as two functions that never fall back on each other.
+
+A second question was buried under the first: THE ADDRESS SPACE CHANGES THE ANSWER. This module first returned
+24 for `struct U` and device.js returns 32. Both right -- a uniform-space struct's alignment has a floor of 16,
+and device.js's `Math.max(16, ...)` was implementing that rule without naming it, while this module implemented
+the other one without naming it either. Once the space is named they agree exactly, on the size and on every
+field offset.
+
+### And a real device was asked, rather than a note written saying none was available
+
+WGSL has no `sizeof`, so the layout was measured behaviourally: declare the output storage buffer as
+`array<T>`, write distinct markers into two elements, read the buffer back as raw f32 words. The markers came
+back at float indices 3 and 4 -- putting `b` at byte 12 and the element stride at 16, exactly what the module
+computes and exactly what a size-16 vec3 would have got wrong.
+
+The first draft of the closing note said no device had been asked and that the strongest evidence was two
+implementations agreeing. That was written before trying. It is the same mistake v4275 made about the network
+and v4269 made about WebGPU itself, and it would have shipped a weaker claim than the evidence supports.
+
+### Wired, not shelved
+
+`KNOB_ORDER` is derived from the shader -- resolved through the `@group(0) @binding(0)` declaration rather than
+by looking for a struct named "U", so renaming it cannot silently disable the check. And gfx/device.js now
+refuses a positive host/shader disagreement, with a message that says the draw would otherwise SUCCEED,
+because a caller told only "mismatch" goes looking for a crash that never comes. It refuses only on a positive
+disagreement: a shader the scanner cannot read passes through, so a limitation here can never block a working
+pipeline.
+
+### Sabotage
+
+A collapses vec3's SIZE onto its ALIGNMENT -- one ternary, and precisely the confusion already shipped in this
+tree. Not a typo: the wrong answer somebody reaches honestly. 5 red, including the real device contradicting
+the code, which is the strongest red available and the reason section 6 exists rather than being a note about
+why it could not.
+
+B swaps two struct fields: 1 red, and NOT the failure it used to be. KNOB_ORDER followed the struct and the
+host/shader check reported zero complaints. The runtime defect is gone by construction; what is left is a
+frozen expectation asking a human to confirm the contract changed.
+
+C un-wires KNOB_ORDER back to the literal: 1 red on the guarantee rather than on its current output, since the
+literal and the struct agree today. D deletes the device.js refusal: 2 red, both about the wiring -- the check
+still works perfectly as a function and is called by nobody, which is the failure this tree ships repeatedly.
+
+Two more reds arrived unbidden. A claim that swapping two uniforms changes no offset device.js computes --
+false, because the map is keyed by NAME, and that change IS the bug; what stays identical is the BUFFER. And
+the device probe embedded a compute entry-point attribute literally, pushing backendParity's census of
+WGSL-bearing modules from 39 to 40: a gate's test fixture counted as a shipped shader. The tempting fix was to
+bump the baseline. The right one was to stop self-counting -- and then the comment explaining THAT spelled the
+attribute out and turned a marker check red on the very sentence describing the rule. Tenth instance.
+
+One more correction worth recording: the new licence-register entry first set `grantorHoldsRights: false`,
+which filed it as ENCUMBERED. A MIRROR IS NOT AN ENCUMBRANCE. Two questions were running together -- "is the
+account the party granting" (no, an attribution fact) and "does the party granting hold the rights" (yes,
+Duncan wrote it). Conflating them accuses an author of licensing something they own.
+
+This round adds two modules and one gate, and the tree stands at 1351 gates.
 ## v4277 -- Twenty-six permissive licences in a row, and then one that is not
 
 The sweep ran for two rounds and thirty-odd repositories without meeting a restricted licence. That is not a
@@ -18516,3 +18608,5 @@ flat field panel (Demo_FieldViewer) · petri dish (Demo_PetriViewer) · arcade p
 The build now stands at 4276 gates.
 
 The build now stands at 4277 gates.
+
+The build now stands at 4278 gates.

@@ -6,9 +6,16 @@
 // draws -- is unified.
 "use strict";
 
+import { checkHostUniforms } from "../render/wgslLayout.mjs";
+
 
 // std140-ish uniform layout: compute each uniform's byte offset + the total (padded to 16) so the WebGPU backend can
 // pack a single uniform buffer. sizes/alignments: f32 4/4, vec2 8/8, vec3 12/16, vec4 16/16, mat4 64/16.
+// *** THE SIZE HERE IS THE UNIFORM-ADDRESS-SPACE SIZE, AND NOTHING SAID SO UNTIL v4278. ***
+// `Math.max(16, ...)` is not a defensive minimum -- it is WGSL's rule that a struct in the uniform space is
+// aligned to RoundUp(16, its natural alignment). render/wgslLayout.mjs computes the same number from the
+// shader text and agrees with this function exactly; it returns 24 for badTvWgsl's six-f32 struct under the
+// STORAGE rule and 32 under this one. Two files, two right answers, to a question neither had named.
 function _uniformLayout(uniforms) {
     const SZ = { f32: 4, vec2: 8, vec3: 12, vec4: 16, mat4: 64 }, AL = { f32: 4, vec2: 8, vec3: 16, vec4: 16, mat4: 16 };
     let off = 0; const offsets = {};
@@ -96,6 +103,24 @@ async function webgpuBackend(canvas, opts = {}) {
                     "A pipeline must carry both { wgsl } and { glsl }; this one carries " +
                     (d.shaders && typeof d.shaders.glsl === "string" ? "only glsl" : "neither") +
                     ". Request the webgl2 backend, or add a WGSL path -- see render/backendParity.mjs.");
+            }
+            // *** AND THE SECOND THING THIS PIPELINE NEVER CHECKED: THAT THE HOST AND THE SHADER AGREE ABOUT
+            // WHAT THE UNIFORM BUFFER CONTAINS. *** `layout: "auto"` below means WebGPU derives the real
+            // buffer layout FROM THE SHADER, while _uniformLayout() computes write offsets from `d.uniforms`
+            // -- a list the CALLER supplies, in the caller's order. Reorder either and every value lands in
+            // the wrong field. The module compiles. The pipeline builds. The pass runs. The draw completes.
+            // Nothing in that chain has an error to raise, which is exactly why this one has to be asked for.
+            //
+            // It refuses only on a POSITIVE disagreement: render/wgslLayout.mjs returns ok with a reason
+            // whenever it cannot resolve the struct, so a shader this scanner does not understand is passed
+            // through untouched rather than blocked by a scanner's shortcoming.
+            const agree = checkHostUniforms(d.shaders.wgsl, d.uniforms);
+            if (!agree.ok) {
+                throw new Error("gfx/device: this pipeline's uniform list does not match the struct its WGSL " +
+                    "declares, so every uniform would be written at the wrong offset and the draw would " +
+                    "succeed anyway. " + agree.complaints.join("; ") +
+                    ". The shader is the authority on its own layout -- derive the list from it (see " +
+                    "render/wgslLayout.mjs fieldOrder) rather than restating it here.");
             }
             const mod = gpu.createShaderModule({ code: d.shaders.wgsl });
             const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers: [{ arrayStride: d.stride, attributes: d.attributes.map((a, i) => ({ shaderLocation: i, offset: a.offset, format: a.wgpuFormat || ("float32x" + a.size) })) }] }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });

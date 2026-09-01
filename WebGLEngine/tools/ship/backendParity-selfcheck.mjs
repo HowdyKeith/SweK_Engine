@@ -188,6 +188,19 @@ console.log("\n4. THE CONTRACT, AND THE READ THAT WAS UNGUARDED UNTIL THIS ROUND
                    /src\s*=\s*["'][^"']*gfx\/device\.js["']/.test(code);
         } catch { return false; }
     });
+    // *** AN EXEMPTION WAS ADDED HERE AND THEN REMOVED IN THE SAME ROUND, WHICH IS WORTH RECORDING. ***
+    // v4278's new selfcheck imports _uniformLayout to grade it, and briefly showed up here as a third
+    // consumer. The first fix was a named-grader exemption list. The REAL cause was elsewhere: that gate
+    // embedded a compute entry-point attribute in a device probe, so backendParity counted it as a module
+    // that ships WGSL, which is what put it in this scan at all. Assembling the attribute from two pieces --
+    // the technique nine earlier self-counting rounds settled on -- removed it from the census and from
+    // here, and left the exemption list with nothing in it. An exemption nobody exercises is the staleness
+    // this file warns about elsewhere, so it went out with the defect that motivated it.
+    //
+    // (And writing THIS note spelled the attribute out in full, which turned section 2's literal-marker
+    // check red on the very sentence explaining why the literal must not appear. Tenth instance. The rule is
+    // not "assemble the markers in code" -- it is that a file grading a marker may not contain it anywhere,
+    // prose included.)
     ok("*** and NOTHING outside those two consumes it ***",
         new Set(importers).size <= DEVICE_CONTRACT.consumers.length,
         [...new Set(importers)].join(" ") || "none beyond the demos");
