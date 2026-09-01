@@ -196,6 +196,36 @@ export const REACHED_SOURCES = Object.freeze([
              "actually samples. The idea was right and its first application was too broad.",
     },
     // =========================================================================================================
+    // v4262 -- *** A REFUSAL, WHICH IS WHAT THIS LEDGER IS FOR. *** Nothing was taken; the entry exists so the
+    // reasoning survives and nobody re-opens the question from scratch.
+    // =========================================================================================================
+    {
+        repo: "ruvnet/sublinear-time-solver", sourceUrl: "https://github.com/ruvnet/sublinear-time-solver",
+        grantorHoldsRights: true, licenceExists: true, publisher: "ruvnet", year: 2025,
+        spdx: "MIT OR Apache-2.0", licence: null,
+        licenceNote: "Dual MIT / Apache-2.0, stated in the repository. The licence was never the question here.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "NOTHING. No bytes, no port, no idea. math/solverFit.mjs is the REFUSAL and its reasoning, not " +
+             "a derivative of anything in the repository -- which was not read beyond its premise.",
+        takenPaths: [],
+        citedPaths: ["math/solverFit.mjs", "tools/ship/solverFit-selfcheck.mjs"],
+        why: "Backlog #133 put the discipline in its own title: FIND THE CONSUMER BEFORE TAKING THE SOLVER. " +
+             "A local solver returns ONE coordinate of Mx = b without forming the whole vector, and needs " +
+             "three things at once: M diagonally dominant, a consumer wanting k << n coordinates, and n large " +
+             "enough. *** THE TWO PROPERTIES ARE IN DIFFERENT FILES IN THIS TREE. *** fluid/multigrid.mjs's " +
+             "Poisson operator is dominant in every row (worst ratio exactly 1.0000) and flip2d's pressure " +
+             "projection needs all 16,384 cells. tools/roundhouse/beamBind.mjs is the ONE genuine " +
+             "single-coordinate consumer -- solve(K, unit(N,i2))[i1], two numbers wanted of 320 computed -- " +
+             "and its matrix reads 0.3333 with one row of 160 dominant, identically at n = 8, 20, 60 and 160, " +
+             "so refinement never approaches the precondition. The module import graph WOULD fit " +
+             "((I - alpha P) is row-dominant at 1.1765, all 3,467 rows) and NOTHING ASKS IT ANYTHING: " +
+             "gateReach does BFS reachability, and a tree-wide scan finds zero files computing an influence " +
+             "score. Inventing that consumer to justify the taking is the failure #133 was written to " +
+             "prevent, so it is recorded as a hole. What was kept is dominance(), the measurement that " +
+             "decided it. AND THE LIMIT IS STATED: the solver itself was never run or benchmarked, so this " +
+             "says the SHAPE does not fit and says nothing about its quality.",
+    },
+    // =========================================================================================================
     // v4260 -- REGISTERED IN THE SAME ROUND IT WAS READ, which is the habit #53 said this ledger should have.
     // =========================================================================================================
     {

@@ -8,6 +8,74 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4262 -- Find the consumer before taking the solver: the consumer exists, and it disqualifies
+
+Backlog #133 named ruvnet/sublinear-time-solver (MIT OR Apache-2.0) and put its own discipline in the title.
+This round is that search done as a measurement rather than a browse. The verdict is REFUSED. Nothing was
+vendored, nothing was ported, and math/solverFit.mjs is the reasoning kept where the next person will find it.
+
+WHAT THE SOLVER IS FOR. A local solver returns ONE coordinate of Mx = b without ever forming the whole vector,
+by walking the matrix outward from i. It buys something only when three things hold at once: (A) M is
+diagonally dominant, which is what makes the walk converge at all; (B) the consumer wants k << n coordinates;
+(C) n is large enough that the constant factors lose.
+
+THE TWO PROPERTIES ARE IN DIFFERENT FILES, AND THAT IS THE WHOLE FINDING.
+
+fluid/multigrid.mjs's 5-point Poisson operator satisfies the precondition perfectly: worst-row ratio exactly
+1.0000 with every row dominant, measured at 8x8, 16x16 and 32x32. Its consumer, fluid/flip2d.mjs's pressure
+projection, needs all 16,384 cells, because making a velocity field divergence-free touches every one of
+them. Asking for 16,384 single coordinates is 16,384 local solves in place of one global one.
+
+tools/roundhouse/beamBind.mjs is the ONE genuine single-coordinate consumer in the tree. It computes
+solve(K, unit(N,i2))[i1] for Maxwell-Betti reciprocity -- two numbers wanted, 320 computed -- and discards
+the rest. That is exactly the shape the solver is built for. And its matrix reads 0.3333 dominance with ONE
+ROW OF 160 dominant. Beam bending is a fourth-order operator; the interior stencil [1,-4,6,-4,1] is 6 against
+10, and the free end, which beam.js scales to a half cell, is 1 against 3. The ratio is IDENTICAL at n = 8,
+20, 60 and 160, because the free-end row is the same at every n -- so refining the mesh never approaches the
+precondition and there is no larger version of this problem that would qualify.
+
+THE THIRD CANDIDATE IS THE TRAP THE ITEM WAS WRITTEN AGAINST. The module import graph would fit: as
+(I - alpha P) it is diagonally dominant by rows at 1.1765 with all 3,467 rows dominant, and "how much does
+module X influence Y" is a single coordinate of it. NOTHING IN THIS TREE ASKS THAT QUESTION.
+tools/ship/gateReach.mjs does set reachability with a BFS -- no damping factor, no scores -- and a tree-wide
+scan finds ZERO files computing an influence score. Inventing this consumer to justify a taking is precisely
+the failure #133 exists to prevent, so it is recorded as a hole rather than as a roadmap.
+
+THE BUDGETS A REPLACEMENT WOULD HAVE TO BEAT, measured on the tree's own code: 2.95 ms for a full
+personalized-PageRank solve over all 3,465 module coordinates, 4.17 ms per right-hand side for the beam, and
+200.56 ms for a 128x128 pressure field at 8 V-cycles.
+
+THREE OF MY OWN CLAIMS WERE WRONG ON THE GATE'S FIRST RUN, and every one was corrected from the matrices
+rather than by loosening the check. (1) I wrote the beam's worst dominance as 6/10 = 0.6; that is the
+INTERIOR stencil, and the measured worst is 1/3 at the FREE-END row. Both are below the precondition so the
+verdict stands, but the stated reason was the wrong row. (2) I wrote that (I - alpha P^T) is strictly
+diagonally dominant. It is dominant by COLUMNS; measured by rows it is 0.0075 with 3,018 of 3,467, and
+(I - alpha P) is the row-dominant orientation. (3) The scan for "does anything compute an influence score"
+was counting this round's own files, which discuss influence scores at length -- the same self-counting shape
+v4257's licence census had to be anchored against.
+
+WHAT WAS KEPT: dominance(), the measurement that decided it. "Will an iterative method converge on this
+operator" is a question this tree could not previously answer about its own matrices, and it turns out to
+have four different answers.
+
+SABOTAGE C IS THE ONE THAT MATTERED. Giving the import-graph entry a fabricated consumer -- backlog #133's
+exact failure mode, and the one a person could commit by accident while believing they were being useful --
+went only 1 RED, because every source-text check in the gate interrogates the TREE rather than the census
+entry, and a fabrication can borrow a real filename. Every non-null consumer now carries a consumerEvidence
+line that the gate greps for in the file it names; a fabrication would have to invent that too, and the grep
+fails when it does. 2 RED after. Five sabotages, 8/2/2/1/1 red, each grep-confirmed before its result was
+read and restored md5-identical.
+
+UNCHECKED: the solver itself. Nothing in this round ran, benchmarked or read its code -- that is the point of
+refusing before taking, and it is also a real limit, so this says the SHAPE does not fit and says nothing
+about the solver's quality. The three-criteria test is a judgement: the k << n threshold (8x) and the
+n >= 10,000 floor are chosen, not derived, and a different pair could admit the Poisson entry. Only three
+systems were examined; XPBD, MPM and the seismic ray solver were not modelled, on the grounds that they are
+iterative time-steppers rather than one-shot solves, which is a claim this gate does not verify. And the
+timings were measured on this sandbox's CPU in Node, once each, not as a distribution.
+
+The build now stands at 4262 gates.
+
 ## v4261 -- What does each effect destroy? Asking the question broke the instrument that asks it
 
 The tree has eight image passes and has never once asked any of them what it destroys. Every gate on them
