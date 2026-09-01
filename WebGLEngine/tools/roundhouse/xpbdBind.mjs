@@ -14,6 +14,12 @@
 //
 // THE PLANTED FAULT drops the lambda term, which is the exact fault the header warns about. PBD's stretch then
 // HALVES with each doubling of iterations: 1.0000e-2, 4.9383e-3, 2.4082e-3, 1.1447e-3, 5.1599e-4.
+//
+// v4298 -- RE-MEASURED AND UNCHANGED, all five to every digit, XPBD spread still exactly 0. Recorded because
+// this ladder is NOT EMITTED BY ANY OBSERVABLE -- the device reports iterSpread, iterWorstErrFrac and
+// halvesWithIterations, so the value freeze watches none of these five numbers and only a deliberate re-run
+// can confirm them. nbench carried a column of the same kind that was 40% wrong for 389 versions. This one
+// holds because compliance.mjs never touches the SPH neighbour path that moved the lab's other values.
 
 // v4053 -- `hookeStretch` WAS IMPORTED HERE AND NEVER CALLED. It is one line -- compliance * force -- and
 // hangingLink ALREADY APPLIES IT to produce the `exact` this bind publishes as exactStretch, so importing it
