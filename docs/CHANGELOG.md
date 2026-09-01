@@ -8,6 +8,60 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4282 -- The lobe that had no caller
+
+physics/render/roughDiffuse.mjs shipped at v4275 with a measured energy compensation and, for seven rounds,
+exactly two importers: itself and its own gate. v4280 and v4281 both cited it BY NAME as the example of a
+module the engine does not have. Its own closing note said so out loud: *** "unchecked: ANY CONSUMER.
+physics/render/pathTracer.mjs still uses albedo/PI and this round did not change it." *** This round wires it.
+
+*** THE BEHAVIOUR CHANGE IS OPT-IN, AND THAT IS PROVED AGAINST GIT RATHER THAN ARGUED FROM THE DIFF. *** A
+sphere with no `sigma` runs the statements it ran yesterday, in the same order, consuming the same random
+numbers. tools/ship/roughDiffuseWired-selfcheck.mjs extracts the committed v4281 tracer with `git show`, runs
+it in a child process, and compares the hash of the float buffer: both d66e8de3147f2a91. An explicit
+`sigma: 0` gives the same bits again. Oren-Nayar at sigma 0 has A = 1 and B = 0, so its BRDF *is* albedo/pi to
+the last bit and one code path could have served both -- it does not, because "the arithmetic agrees" and "the
+same statements run in the same order consuming the same randoms" are different guarantees, and only the
+second makes every existing image identical BY CONSTRUCTION rather than by a re-derivation somebody trusts.
+
+WHAT ROUGHNESS DOES, MEASURED IN A PICTURE FOR THE FIRST TIME. The peak falls monotonically, 1.1387 to 1.1063
+to 1.0887 to 1.0774 across sigma 0 / 0.3 / 0.6 / 1.0. More to the point it falls FIFTEEN TIMES FASTER than
+the mean -- peak -5.38% against mean -0.37% at sigma 1.0. That ratio is the signature: light is moved out of
+the brightly-lit facing region toward grazing angles, so the ball reads flatter, the moon rather than a
+billiard ball. A model that merely darkened everything would move both numbers together.
+
+AND THE COMPENSATION, WHICH v4275 MEASURED IN THE BRDF INTEGRAL AND NOBODY HAD MEASURED IN A RENDER. The gate
+generates an uncompensated tracer by rewriting `diffuseTable(sig)` to `null` and rendering the same scene:
+the mean falls 2.48%, 7.68%, 11.99% at sigma 0.3 / 0.6 / 1.0. With the table, 0.37%. *** THE INTEGRAL LOSES
+25.6% AND THE PICTURE LOSES 12.0% AND NEITHER NUMBER CONTRADICTS THE OTHER *** -- a render dilutes the lobe's
+loss with multiple bounces, the light's geometry, and the pixels that see sky. Quoting the integral figure as
+the picture's would have been the easy error.
+
+NEE now evaluates the real BRDF at the light rather than assuming Lambert there; the table is cached by sigma
+because buildDiffuseTable integrates the lobe and no bounce can afford that; sigma is clamped to SIGMA_MAX.
+
+*** AND THE STALE SENTENCE IS REPLACED BY A DERIVED ONE, NOT A CORRECTED ONE. *** roughDiffuse-selfcheck's
+note had said "no consumer" for seven rounds after it stopped being interesting and would have said it
+forever, because prose does not go red. Section 5 now WALKS the tree, finds every importer, and reports what
+it finds: 3 files, 1 consumer, 2 gates. Rip the wiring out and that section says so.
+
+Five sabotages, all measured, none 0 RED. `!(sig > 0)` relaxed to `sig <= 0` -- the tidy-up a reviewer would
+wave through -- goes 6 red, because `undefined <= 0` is FALSE and every sphere in the tree that has never
+heard of roughness falls into the new branch with a NaN sigma. The compensation table nulled goes 2 red, and
+the second is the interesting one: peak and mean fall together, "a factor of 1", which turns section 2's
+prose into a check. `Math.PI *` dropped goes 3 red. azimuthCos pinned to 1 goes 3 red and makes the ball
+BRIGHTER with roughness -- a rough surface that glows still looks like a rough surface, which is why the
+direction of every measurement is asserted and not only its size.
+
+TWO UNBIDDEN REDS FIXED, BOTH FOUND BY SABOTAGE POINTING AT THE GATE RATHER THAN THE MODULE. The clamp was
+asserted as a REGEX and nothing ever rendered past it, so deleting it reddened one text check and no picture;
+sigma 10 and sigma SIGMA_MAX are now required to agree to the bit. And the signature check, when NEE's weight
+was forced to 1, FAILED WHILE PRINTING "a factor of 33" -- the ratio of two negative deltas reads exactly
+like the healthy answer, so the sign is now part of the claim. A check that fails while printing a reassuring
+number is half a check.
+
+All sixteen path-tracer consumer gates still pass. This round adds no module and one gate, and the tree
+stands at 1355 gates.
 ## v4281 -- Our own labels, read against our own licence text
 
 tools/ship/vendoredLicences-selfcheck.mjs is ALL GREEN, and its own closing note says precisely what it does

@@ -31,6 +31,9 @@ import { sampleCone, conePdf, capHalfAngle } from "./nee.mjs";
 import { sampleHalfVector, bounceWeight, bsdfEval, sampleDirPdf, misWeight, D, G2 } from "./microfacet.mjs";
 import { fresnel } from "./fresnel.mjs";
 import { albedoAt, msLobe } from "./energyCompensation.mjs";
+// v4282 -- THE DIFFUSE LOBE THAT SHIPPED AT v4275 AND HAD NO CALLER UNTIL NOW. See the block above the
+// Lambertian bounce for why `sigma` is opt-in and why absent means bit-identical rather than merely similar.
+import { roughDiffuseBrdf, buildDiffuseTable, SIGMA_MAX } from "./roughDiffuse.mjs";
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -183,7 +186,16 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
             const shadowOrig = add(hit.P, mul(hit.N, 1e-6));
             const blocker = intersect(shadowOrig, sd, scene);
             if (!blocker || blocker.sphere !== L) continue;        // something else is in the way
-            radiance = cadd(radiance, cscale(cmul(throughput, cmul(alb(hit.sphere), col(L.emit))), cos / (Math.PI * conePdf(cosA))));
+            // *** THE LAMBERTIAN INTEGRAND IS albedo/pi AND A SIGMA SURFACE'S IS NOT. *** Rather than skip
+            // NEE the way a microfacet surface does, the BRDF is evaluated at the light direction -- which
+            // Oren-Nayar makes cheap, being a closed form rather than a sampled lobe. At sigma 0 kL is
+            // exactly 1 and this line is arithmetically what it always was.
+            const wo0 = [-d[0], -d[1], -d[2]];
+            const kL = hit.sphere.sigma > 0
+                ? Math.PI * roughDiffuseBrdf(1, cos, dot(wo0, hit.N), azimuthCos(wo0, sd, hit.N),
+                                             Math.min(hit.sphere.sigma, SIGMA_MAX), diffuseTable(hit.sphere.sigma))
+                : 1;
+            radiance = cadd(radiance, cscale(cmul(throughput, cmul(alb(hit.sphere), col(L.emit))), kL * cos / (Math.PI * conePdf(cosA))));
         }
         neeSkipped = skipped;
         prevWasCamera = false;
@@ -310,10 +322,43 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
         }
 
         misFrom = null;      // a Lambertian bounce is not a microfacet one; a stale record would weight its hit
-        throughput = cmul(throughput, alb(hit.sphere));
-        {
+
+        // *** v4282 -- OREN-NAYAR, OPT-IN, AND ABSENT MEANS THE OLD CODE RUNS UNCHANGED. ***
+        //
+        // physics/render/roughDiffuse.mjs shipped at v4275 with an energy compensation measured against this
+        // tree's own integration, and for seven rounds the only files importing it were itself and its gate.
+        // v4280 and v4281 both cited it as THE example of a module the engine does not have. This is the
+        // round that stops citing it.
+        //
+        // *** THE REDUCTION IS EXACT AND THE BRANCH IS STILL SEPARATE. *** At sigma 0 Oren-Nayar's A is 1 and
+        // its B is 0, so its BRDF is albedo/pi to the last bit -- roughDiffuse-selfcheck asserts that with
+        // === and no epsilon. So one path COULD have served both. It does not, because "the arithmetic
+        // agrees" and "the same statements run in the same order consuming the same randoms" are different
+        // guarantees, and only the second makes every existing image and every existing gate bit-identical BY
+        // CONSTRUCTION rather than by a re-derivation somebody has to trust. A scene that sets no sigma runs
+        // the code it ran yesterday.
+        const sig = hit.sphere.sigma;
+        if (!(sig > 0)) {
+            throughput = cmul(throughput, alb(hit.sphere));
+            {
+                const [a1, a2] = stratPair(rand(), rand());
+                d = toWorld(cosineSampleHemisphere(a1, a2), hit.N, Nt, Nb);
+            }
+        } else {
+            // The outgoing direction is where the ray CAME FROM, and it must be read before d is replaced.
+            const wo = [-d[0], -d[1], -d[2]], cosO = dot(wo, hit.N);
+            // EXACTLY THE SAME TWO RANDOM NUMBERS AT EXACTLY THE SAME POINT, so a sigma surface does not
+            // shift the sequence for anything later in the path.
             const [a1, a2] = stratPair(rand(), rand());
-            d = toWorld(cosineSampleHemisphere(a1, a2), hit.N, Nt, Nb);
+            const wi = toWorld(cosineSampleHemisphere(a1, a2), hit.N, Nt, Nb);
+            const cosI = dot(wi, hit.N);
+            // Cosine-weighted sampling gives pdf = cosI/pi, so f * cosI / pdf = pi * f. For Lambert that is
+            // pi * (albedo/pi) = albedo, the multiply the branch above does. The gate measures the agreement
+            // rather than this comment asserting it.
+            const k = Math.PI * roughDiffuseBrdf(1, cosI, cosO, azimuthCos(wo, wi, hit.N),
+                                                 Math.min(sig, SIGMA_MAX), diffuseTable(sig));
+            throughput = cmul(throughput, cscale(alb(hit.sphere), k));
+            d = wi;
         }
         bounce++;
         // OFFSET ALONG THE NORMAL, NOT ALONG THE NEW DIRECTION: a ray leaving a curved surface at a grazing
@@ -325,6 +370,37 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
         }
     }
     return out(radiance);                               // depth exhausted: gathers nothing (v3470's guard)
+}
+
+/**
+ * Cosine of the azimuth between two directions, measured in the surface's tangent plane.
+ *
+ * Oren-Nayar's factor needs cos(phi_i - phi_o); the cheap way is to project both directions onto the plane
+ * and take their normalised dot. A direction along the normal has no azimuth at all, and that degenerate
+ * case returns 0 rather than dividing by a vanishing length.
+ */
+function azimuthCos(wo, wi, N) {
+    const dO = dot(wo, N), dI = dot(wi, N);
+    const po = [wo[0] - N[0] * dO, wo[1] - N[1] * dO, wo[2] - N[2] * dO];
+    const pi = [wi[0] - N[0] * dI, wi[1] - N[1] * dI, wi[2] - N[2] * dI];
+    const lo = Math.hypot(po[0], po[1], po[2]), li = Math.hypot(pi[0], pi[1], pi[2]);
+    if (lo < 1e-12 || li < 1e-12) return 0;
+    return (po[0] * pi[0] + po[1] * pi[1] + po[2] * pi[2]) / (lo * li);
+}
+
+/**
+ * The energy-compensation table for one sigma, built once and kept.
+ *
+ * buildDiffuseTable INTEGRATES the lobe, which is far too expensive per bounce, so it is cached by sigma.
+ * The key is the NUMBER: two spheres sharing a roughness share a table, and a scene animating roughness
+ * continuously would grow the map without bound -- stated here rather than discovered later.
+ */
+const _diffuseTables = new Map();
+function diffuseTable(sigma) {
+    const s = Math.min(sigma, SIGMA_MAX);
+    let t = _diffuseTables.get(s);
+    if (!t) { t = buildDiffuseTable(s); _diffuseTables.set(s, t); }
+    return t;
 }
 
 /**

@@ -144,6 +144,43 @@ console.log("\n4. WHAT IT DOES NOT CLAIM TO BE");
         "was not, so the file implements the former and names the latter as the thing it is not.");
 }
 
+// *** v4275 CLOSED BY SAYING THIS MODULE HAD NO CONSUMER, AND THAT SENTENCE WENT STALE AT v4282. ***
+// It was prose, so nothing caught it -- the same failure mode as every hardcoded count this session has had to
+// unpick. The replacement is not a corrected sentence: it is a DERIVED one. The tree is walked, the importers
+// are found, and the gate states what it finds. If the wiring is ever ripped out, this section says so.
+console.log("\n5. IT HAS A CONSUMER, AND THE GATE FINDS IT RATHER THAN BEING TOLD");
+{
+    const walk = (dir, out = []) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name === ".git" || e.name === ".claude") continue;
+            const p = path.join(dir, e.name);
+            if (e.isDirectory()) walk(p, out);
+            else if (e.name.endsWith(".mjs") || e.name.endsWith(".js")) out.push(p);
+        }
+        return out;
+    };
+    const importers = walk(ENG).filter((p) => {
+        if (p.endsWith("physics/render/roughDiffuse.mjs")) return false;      // itself
+        return /^\s*import\s[^;]*["'][^"']*roughDiffuse\.mjs["']/m.test(fs.readFileSync(p, "utf8"));
+    }).map((p) => path.relative(ENG, p));
+    const gates = importers.filter((p) => p.startsWith("tools/"));
+    const real  = importers.filter((p) => !p.startsWith("tools/"));
+    ok("CONTROL: the walk finds THIS gate, so it is looking at the right thing",
+        gates.some((p) => p.endsWith("roughDiffuse-selfcheck.mjs")), gates.join(" "));
+    ok("*** the lobe has at least one importer that is NOT a gate ***", real.length > 0,
+        real.length ? real.join(" ") : "NONE -- the module is still graded by nobody but its own checks");
+    ok("  and the path tracer is among them", real.includes("physics/render/pathTracer.mjs"));
+    // The wiring is OPT-IN: a sphere without a sigma takes the old branch, byte for byte. That property is
+    // measured in tools/ship/roughDiffuseWired-selfcheck.mjs against the pre-v4282 tracer read out of git,
+    // which is the only way to prove "unchanged" rather than assert it. Named here so the two are findable
+    // from each other; not re-measured here, because a gate that copies another gate's work proves nothing.
+    ok("  and the before-and-after of that wiring has its own gate",
+        fs.existsSync(path.join(ENG, "tools/ship/roughDiffuseWired-selfcheck.mjs")));
+    report(`${importers.length} file(s) import this module: ${real.length} consumer(s), ${gates.length} gate(s). ` +
+        "v4275 shipped it with zero consumers and said so; seven rounds later that was still true, which is " +
+        "how a module becomes furniture. The number above is read off the tree at every run.");
+}
+
 // =============================================================================================================
 // SABOTAGE LOG -- grep-confirmed before the result was read, exit codes read, restored md5-identical. MEASURED.
 //
@@ -172,7 +209,7 @@ console.log("unchecked here: WHETHER THIS IS THE RIGHT ROUGH-DIFFUSE MODEL. Oren
     "the field has moved on; the repository that prompted this exists precisely because the 1994 form loses " +
     "energy, which section 3 measures at 25%. What is proven is that the lobe reduces to Lambert exactly, is " +
     "reciprocal exactly, loses energy monotonically with roughness, and that the compensation built here " +
-    "restores it to better than half a percent. Also unchecked: ANY CONSUMER. physics/render/pathTracer.mjs " +
-    "still uses albedo/PI and this round did not change it -- wiring a new lobe into a renderer is a " +
-    "behaviour change to every existing image, which is its own round with its own before-and-after.");
+    "restores it to better than half a percent. v4275 also left it with NO CONSUMER and said so in this " +
+    "note; section 5 now derives the consumer list instead, because v4282 wired it into the path tracer and " +
+    "the sentence saying otherwise sat here unchallenged for seven rounds. Prose does not go red.");
 process.exit(fails ? 1 : 0);
