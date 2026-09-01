@@ -1,6 +1,21 @@
 // tools/roundhouse/responseCensus-selfcheck.mjs
 //
-// Run: node tools/roundhouse/responseCensus-selfcheck.mjs   (~5 min: it rebuilds the lab once per config knob)
+// Run: node tools/roundhouse/responseCensus-selfcheck.mjs
+//
+// *** COST: THIS LINE SAID "~5 min" AND THE GATE HAD NOT FINISHED AT NINETY-NINE MINUTES. ***
+// MEASURED at v4306 on one core at 100% CPU, uncontended: still running at 5944 s against a claim of 300 s,
+// so the stated figure is wrong by AT LEAST TWENTYFOLD and the true number is a lower bound, not a reading.
+//
+// THE REASON IS STRUCTURAL AND THE LINE COULD NOT HAVE STAYED RIGHT. responseCensus walks
+// DEVICE_NAMES x modes x config keys and REBUILDS FOR EVERY ONE -- so its cost tracks the size of the lab,
+// which is now 129 devices and 484 declared device-mode pairs. The ~5 min was true of a smaller lab and was
+// never re-measured. A STATED RUNTIME NOBODY RE-MEASURES IS A MEMORY (v3211-v3213, which found stated
+// runtimes wrong in 59 of 82 gate headers and did not reach this file).
+//
+// PRACTICAL CONSEQUENCE, stated because it changes how this gate should be used: at this cost it does not
+// belong in a run-everything pass. Run it deliberately and in the background, the way plantedCoverage
+// --verify is run. 163 of the lab's 815 gate files state a runtime at all; this one now states a measured
+// bound instead of a remembered guess.
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2910 -- OPEN ITEM 2, AND THE THING THE SWEEP FOUND WAS A HOLE IN THE SWEEPS.
