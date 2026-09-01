@@ -54,14 +54,38 @@ export const PLASTIC_OBSERVABLES = [
  * sits above the true yield by about eps/(2*creep) -- MEASURED at 98.8, 28.8 and 8.8 ULP for creep 0.05, 0.2 and
  * 0.5, which is that law to the accuracy the ULP floor allows.
  *
- * The extra 8 ULP is the handful of roundings that produce the strain itself (a sqrt, a subtract, a divide). It is
- * an allowance, not a fudge factor: worst observed usage of the whole budget is 0.96, so it is snug rather than
- * padded, and it is safe to be snug BECAUSE this module is +,-,*,/ and sqrt only -- every operation IEEE-exact,
- * the same bits on every machine, which plastic-selfcheck section 6 asserts directly.
+ * The second term is the handful of roundings that produce the strain itself (a sqrt, a subtract, a divide). It is
+ * an allowance, not a fudge factor, and it is safe to be snug BECAUSE this module is +,-,*,/ and sqrt only --
+ * every operation IEEE-exact, the same bits on every machine, which plastic-selfcheck section 6 asserts directly.
+ *
+ * *** v4191 -- THAT ALLOWANCE WAS RELATIVE TO yieldStrain AND THE RESIDUAL IT COVERS IS ABSOLUTE, SO IT SHRANK
+ * EXACTLY WHERE IT WAS NEEDED MOST, AND THE BUDGET WAS EXCEEDED BY 41%. *** It read `8 * |yieldStrain| * eps`.
+ * But permanentSet feeds the strain in as the POSITION `1 + s`, so the finest strain step the bisection can
+ * represent at all is one ULP of 1 -- eps, flat, whatever yieldStrain is. MEASURED on the shipped module across
+ * yieldStrain x creep = {0.02,0.05,0.1,0.2,0.35} x {0.05,0.2,0.5,0.9,2.0}: once eps/(2*creep) drops below that
+ * floor the residual stops falling and sits at 0.578, 0.688, 0.875, 1.250 and 1.000 eps for the five yieldStrains
+ * -- ABSOLUTE, and flat in creep across 0.5, 0.9 and 2.0, which is the signature of a representation floor rather
+ * than of the creep law. Against the old allowance of 8*|y|*eps that floor is 0.16 eps of budget at yieldStrain
+ * 0.02, and worst usage there reached 1.4101 -- OVER, not snug -- with 1.0577 at yieldStrain 0.05.
+ *
+ * *** AND WHAT KEPT IT INVISIBLE WAS A DEAD OBSERVABLE, NOT A HARD MEASUREMENT. *** `yieldWorstBudgetUsed` has
+ * been in PLASTIC_OBSERVABLES since the list was written and WAS ASSIGNED BY NO MODE: it read the NONE sentinel
+ * -1 in all five modes and both arms, and -1 is what lab-results-baseline.json froze. The only mode that did
+ * compute a usage, creepFree, varies creep at ONE yieldStrain -- its own default 0.1 -- where usage is 0.9144 and
+ * nothing is wrong. The `yield` mode's sweep ALREADY RUNS yieldStrain 0.02 and 0.05, the two configurations where
+ * the old budget fails, and never once formed the ratio. The claim was checked at the one point that passes.
+ *
+ * The allowance is now the absolute eps it was always covering. MEASURED over the same 25-point grid, worst usage
+ * falls to 0.9318 at yieldStrain 0.2 / creep 0.05 and is never exceeded -- still snug, now also true. (The 0.96
+ * this comment used to quote is not reproduced by any point of this grid; the nearest is the OLD budget's 0.9692
+ * at yieldStrain 0.02 / creep 0.2 -- one step in creep away from the 1.4101 nobody was looking at.)
  */
-function resolutionBudget(yieldStrain, creep) {
-    const ulp = Math.abs(yieldStrain) * Number.EPSILON;
-    return Number.EPSILON / (2 * creep) + 8 * ulp;
+function resolutionBudget(creep) {
+    // ABSOLUTE, not |yieldStrain|-scaled: the strain reaches applyPlasticity as the position `1 + s`, so one ULP
+    // of 1 is the finest step there is, no matter how small the yield being recovered. *** AND yieldStrain IS NOW
+    // GONE FROM THE SIGNATURE RATHER THAN LEFT UNUSED: *** a parameter the body ignores is a vestigial field
+    // (v4170), and here it is the exact one that carried the fault -- keeping it invites the scaling back in.
+    return Number.EPSILON / (2 * creep) + Number.EPSILON;
 }
 
 const DEF = { yieldStrain: 0.1, creep: 0.5, maxStrain: 0.5 };
@@ -194,7 +218,7 @@ export async function buildPlastic(args = {}) {
         const cs = [0.05, 0.2, 0.5, 0.9, 2.0];
         const found = cs.map((cr) => onsetStrain({ ...base, creep: cr }));
         const offs = found.map((f) => Math.abs(f - base.yieldStrain));
-        const used = offs.map((o, i) => o / resolutionBudget(base.yieldStrain, cs[i]));
+        const used = offs.map((o, i) => o / resolutionBudget(cs[i]));
         let falling = 1;
         for (let i = 1; i < offs.length; i++) if (offs[i] > offs[i - 1]) falling = 0;
         return { ...NONE, yieldKey: base.yieldStrain, yieldTension: found[2],
@@ -229,8 +253,16 @@ export async function buildPlastic(args = {}) {
     // EXACTLY ZERO, right up to the boundary -- including one ULP short of it, where a leaky yield would show.
     let allZero = 1;
     for (const s of [0, 0.01, 0.05, 0.099, base.yieldStrain * (1 - Number.EPSILON)]) if (permanentSet(s, base) !== 0) allZero = 0;
+    // *** v4191 -- `yieldWorstBudgetUsed` IS DECLARED IN PLASTIC_OBSERVABLES AND WAS ASSIGNED BY NO MODE, *** so
+    // it read the NONE sentinel -1 in all five modes and both arms, and -1 is what lab-results-baseline.json
+    // froze. It names the sweep's worst offset against the eps allowance, and it belongs to THIS mode because
+    // this is the mode that varies yieldStrain -- the fault v4191 found in the budget was a term relative to
+    // yieldStrain, which cannot be seen from creepFree's single yieldStrain. It is ONE DIVISION and not a second
+    // max over the sweep, because the repaired budget no longer depends on yieldStrain: writing it as a running
+    // max would imply a per-y budget that no longer exists.
     return { ...NONE, yieldKey: base.yieldStrain, yieldTension: tension, yieldCompression: compression,
-             yieldWorstErrAbs: worst, belowYieldExactlyZero: allZero };
+             yieldWorstErrAbs: worst, yieldWorstBudgetUsed: worst / resolutionBudget(base.creep),
+             belowYieldExactlyZero: allZero };
 }
 
 export const plasticDevice = {

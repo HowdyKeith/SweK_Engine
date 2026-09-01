@@ -29,7 +29,7 @@
     "yieldTension": 0.1000000000000002,
     "yieldCompression": -0.10000000000000014,
     "yieldWorstErrAbs": 2.7755575615628914e-16,
-    "yieldWorstBudgetUsed": -1,
+    "yieldWorstBudgetUsed": 0.625,
     "belowYieldExactlyZero": 1,
     "creepKey": -1,
     "creepRegressed": -1,
@@ -2357,7 +2357,7 @@
     "yieldTension": 0.1000000000000002,
     "yieldCompression": -0.10000000000000014,
     "yieldWorstErrAbs": 2.7755575615628914e-16,
-    "yieldWorstBudgetUsed": -1,
+    "yieldWorstBudgetUsed": 0.625,
     "belowYieldExactlyZero": 1,
     "creepKey": -1,
     "creepRegressed": -1,
@@ -2434,7 +2434,7 @@
     "capErrAbs": -1,
     "capRatchets": -1,
     "creepFreeSpread": 2.220446049250313e-15,
-    "creepFreeWorstBudgetUsed": 0.9143518518518517,
+    "creepFreeWorstBudgetUsed": 0.8977272727272727,
     "creepFreeFallsWithCreep": 1,
     "creepFreeSamples": 5
    }
@@ -2445,7 +2445,7 @@
     "yieldTension": 0.1000000000000002,
     "yieldCompression": 0.1000000000000002,
     "yieldWorstErrAbs": 0.7000000000000002,
-    "yieldWorstBudgetUsed": -1,
+    "yieldWorstBudgetUsed": 1576259869579674,
     "belowYieldExactlyZero": 1,
     "creepKey": -1,
     "creepRegressed": -1,
@@ -5644,7 +5644,8 @@
     "convecting": false,
     "convectingIsThreshold": true,
     "massDrift": 0,
-    "steps": 360
+    "steps": 360,
+    "rayleigh": 0
    }
   },
   "thermal/rayleigh": {
@@ -9402,5 +9403,5 @@
   }
  },
  "pairCount": 484,
- "pairObservables": 4264
+ "pairObservables": 4265
 }
