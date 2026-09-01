@@ -16,6 +16,9 @@
 //        and both plant states. The last two are not admissible Poisson ratios and the observables do not
 //        notice, which is the point: NO KEY THIS DEVICE CARRIES CAN GRADE THE CONSTITUTIVE MODEL. Registered
 //        in knobLiveness's STILL_OK with that sentence rather than fixed, because there is nothing to fix.
+//        v4301 -- RE-DRIVEN AND STILL EXACT: 64 builds (8 nu x 4 modes x 2 arms), every output bit-identical
+//        by labExport's canonical form. A load-bearing negative is worth re-running precisely because nothing
+//        about it changes when it breaks -- the numbers stay plausible and only the invariance goes.
 //        *** AND E IS THE SAME PHYSICS: it reads "live" in the census on a ONE-ULP difference at E = 250
 //        (8.882e-16 -> 1.776e-15) and on the run at E = 5e8 where the explicit step violates CFL and the
 //        particles leave the grid. The live/still line between E and nu here is ROUNDING, NOT GRADING. ***

@@ -52,7 +52,7 @@
 // lightspeed bit-identical.
 //
 // MEASURED HONEST: v/c reads 1.000000 / 0.706714 / 0.498753 / 0.331950 at epsR = 1 / 2 / 4 / 9 against an exact
-// 1 / 0.707107 / 0.500000 / 0.333333 -- relative error 0.0e+0 / 5.6e-4 / 2.5e-3 / 4.2e-3. *** THE RESIDUE
+// 1 / 0.707107 / 0.500000 / 0.333333 -- relative error 0.0e+0 / 5.6e-4 / 2.5e-3 / 4.1e-3. *** THE RESIDUE
 // GROWS WITH epsR AND THAT IS PREDICTED BY THIS FILE'S OWN HEADER, NOT SLACK: inside the slab the effective
 // Courant number is S/sqrt(epsR), so a run launched at the magic step S = 1 IS NO LONGER AT IT once the wave
 // crosses in, and the numerical dispersion the magic step suppresses comes back. The bar is 1e-2, above the

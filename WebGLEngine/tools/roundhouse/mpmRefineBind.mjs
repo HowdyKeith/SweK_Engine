@@ -9,9 +9,17 @@
 //
 // *** AND THE ROUND'S FINDING IS THAT THE RATIO TEST CANNOT TELL YOU THAT YOU REFINED THE RIGHT THING.
 // Holding the floor at a fixed CELL COUNT instead of a fixed WORLD HEIGHT moves the floor down every time the
-// grid refines -- a completely different problem at each level -- and the sequence 1.1517 / 0.5840 / 0.3027
-// CONVERGES JUST AS TIDILY, ratio 2.018. IT IS CONVERGING TO ZERO, because the floor is going to zero.
+// grid refines -- a completely different problem at each level -- and the sequence 1.151674 / 0.581824 /
+// 0.301923 CONVERGES JUST AS TIDILY, ratio 2.036. IT IS CONVERGING TO ZERO, because the floor is going to zero.
 // A CONVERGENCE TEST GRADES THE SOLVER AND ASSUMES THE FIXTURE; ONLY AN INVARIANCE CHECK GRADES THE FIXTURE. ***
+//
+// *** v4301 -- v3846 RE-MEASURED ONE OF THESE TWO LADDERS AND LEFT THE OTHER. *** This one read
+// "1.1517 / 0.5840 / 0.3027, ratio 2.018" and re-runs at 1.151674 / 0.581824 / 0.301923, ratio 2.036 -- rungs
+// 2 and 3 off by 0.38% and 0.26%, the ratio by 0.9%. The `refine` ladder above, which v3846 did update, is
+// EXACT to every digit including order 1.11. Consistent with the cellfloor numbers predating DEF.blockL and
+// never being retaken; not shown, since the old per-level spacing cannot be reproduced from one config, which
+// is exactly what blockL was introduced to fix. THE FINDING IS UNTOUCHED: still tidy, still ratio ~2, still
+// converging to zero. Neither ladder is watched -- both run k = 1, 2, 4 and DEF.levels is [1, 2].
 
 // ================================================================================================================
 // *** v3851 -- THE PLANT WORKED AND THE CENSUS COULD NOT ADJUDICATE IT, AND THE REASON IS A TYPE. ***
