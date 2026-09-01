@@ -8,6 +8,81 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4266 -- The orrery drew three planets made entirely of paperwork, and could not see two made of code
+
+Backlog #46 asked for "SweK at centre, repos in orbit, vendoring as impact ejecta". The orbit half has been
+built for a long time: world/orrery.mjs places a body by its licence state, its size and the date git says it
+arrived, and orrery.html draws it. The EJECTA half was never modelled at all. Licence state and size answer
+"what did we take, and is it papered". They cannot answer the question the metaphor is actually about: HOW
+FAR DID THE MATERIAL SPREAD. A dependency that landed and stayed where it fell and one whose fragments are
+embedded through the whole tree were drawn identically.
+
+world/orreryEjecta.mjs measures the spread as the engine files that IMPORT each body:
+
+  three 67,  box3d 21,  krbn 7,  htmx 5,  taichi-js 4,  jolt 3,  gifenc 3,
+  draco 2,  fonts 2,  heerich 1,  wasm 1,  grass 0,  keyhunt 0,  slug 0
+
+Those are CODE-ONLY counts. Counting raw source gave box3d 31 and three 70 -- ten of box3d's "importers" were
+files naming the vendor path in a COMMENT. Stripping comments is the rule v4262 and v4264 each reached
+independently, and it moved every figure above.
+
+AND THE THREE ZEROES ARE NOT UNUSED DEPENDENCIES. Those directories contain no code. vendor/grass is one
+LICENSE file. vendor/keyhunt is one ATTRIBUTION.txt. vendor/slug is a LICENSE and a PROVENANCE.txt. They have
+zero importers because there is nothing to import: they are licence RECORDS for sources that were reached,
+filed under vendor/ because that is where the orrery looks. Twenty-one per cent of the orrery's planets are
+paperwork, drawn as captured code with their bytes counted as mass. massOf discounts it -- grass goes from
+1,064 bytes to 0 -- and the bodies made of actual code are unchanged.
+
+THAT IS THE EXACT MIRROR OF v4263. Three days ago the finding was two bodies of REAL copied code that the
+orrery cannot see, because its scanner reads path.join(engineRoot, "vendor") and nothing else while there are
+TWO directories named vendor -- ui/vendor holds Kazuhiko Arase's 2,237-line QR generator. The register was
+wrong in both directions at once: substance it counts that is not there, and substance that is there it does
+not count.
+
+One clean result falls out of the measure: there is no vendored CODE in this tree that nothing imports. Every
+zero is a paper-only body.
+
+REFUSED, AND THE REFUSAL IS MEASURED. A first pass also counted CITATIONS -- files that merely name a body.
+That number is noise and is not shipped: it is a substring match on a directory name, so "wasm" scores 216 on
+an English word while importing from vendor/wasm exactly once, and "grass" scores 73 on grassField and
+grassModel while importing nothing. Re-inserted as sabotage B it takes three from 67 to 644 and box3d from
+21 to 176. A measure that cannot tell a dependency from a common noun is not a measure.
+
+AND THE GATE COUNTED ITSELF. Section 3's control fixture contains the literal "../vendor/box3d/box3d.js", so
+the moment the gate existed it became an extra importer of box3d and the recorded count went red -- and
+then main.js did the same, because this round's own version note quoted that path while EXPLAINING the trap.
+Naming offenders one at a time is not a fix; stripping comments is. That is the FOURTH and FIFTH self-counting
+scan in four rounds -- v4262's influence scan twice, v4263's licence-phrase grep, and
+now this -- and the rule is the same every time: a scan must not count the scanner. It is excluded by path,
+and the gate asserts that it really would have counted itself.
+
+TWO SABOTAGE RESULTS WERE WORTHLESS BEFORE THEY WERE USEFUL, and the same mistake produced both. A first
+attempt at sabotage B reported "0 RED", which was a CRASH: I read a grep count of FAIL lines and never looked
+at the exit code, so a gate that died looked exactly like a gate that passed. Every sabotage now reads exit
+code, red count and the ALL GREEN line. That crash also let a wrong conclusion stand for two edits -- I wrote
+that the quoted-specifier guard was "provably inert, and a sabotage is what showed it". The guard IS inert:
+all 32 files containing vendor/box3d/ satisfy the quoted test as well, measured directly. But the sabotage
+showed nothing, and a true claim resting on a broken measurement is still a claim I had not earned. It is
+removed as an assertion that cannot fail, which this tree has now found four of in its own gates.
+
+Also recorded, because three of this round's four wrong measurements share one cause -- I kept measuring with
+something other than the code that ships. The baseline was first taken from a throwaway probe (box3d 29) while
+ejectaOf measured 31; then the gate counted itself; then main.js did; and a probe written to confirm the
+stripped numbers returned 20 instead of 21 because it used `return` where it needed `continue` and silently
+abandoned a directory. A fourth check -- that vendorDirs does not recurse into a vendor directory -- went 0 RED
+under sabotage because no vendor dir here nests another, so it could not fail; it now runs against a synthetic
+tree with a control that the fixture contains the nested vendor a recursing scan would report.
+
+UNCHECKED: whether ejecta is the right MASS. This counts files that import a body, which says how WIDELY it
+is reached and nothing about how DEEPLY -- one file importing three at seventy places counts once, and a body
+reached only by a gate counts the same as one reached by the engine. Dynamic loads are invisible: a worker
+target, a fetch() or a <script src> naming a vendor path is not an import specifier, the same limit
+world/orrery.mjs's own directory exemption documents. And nothing here CHANGES the orrery -- massOf and the
+paper-only state are computed and asserted, orrery.json is still baked from total bytes, and rebaking it is a
+separate decision because every recorded figure citing a planet's size would move at once.
+
+The build now stands at 4266 gates.
+
 ## v4265 -- Trap 3 measured at last, and the control inverted the finding
 
 tools/ship/swiftShaders-selfcheck.mjs has carried this sentence in its own tail since v4234: "NO comparison
