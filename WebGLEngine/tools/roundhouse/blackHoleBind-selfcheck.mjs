@@ -163,7 +163,10 @@ const pwPrecession = (r) => 2 * Math.PI * (Math.sqrt((r - rs) / (r - 3 * rs)) - 
     const esc = buildBH({ mode: "escape", r0: 8 });
     ok("!! the bisected escape boundary lands within 1% of sqrt(2GM/(r-rs))", esc.escapeErrFrac < 0.01,
         "measured " + esc.escapeV.toFixed(5) + " vs theory " + esc.escapeTheory.toFixed(5) +
-        " (" + (esc.escapeErrFrac * 100).toFixed(2) + "%) -- a finite-horizon boundary that converges to theory as rFar grows (0.5717/0.5730/0.5766 at 200/400/800), same honest-bias family as the ISCO onset");
+        " (" + (esc.escapeErrFrac * 100).toFixed(2) + "%) -- a finite-horizon boundary that converges to theory " +
+        "as the horizon grows (0.573792/0.573792/0.575180 at escRFar 200/400/800, re-measured v4303: the first " +
+        "two are BIT-IDENTICAL even at escTol 1e-5, so the bias is quantised by the orbit rather than smooth), " +
+        "same honest-bias family as the ISCO onset");
 }
 
 // ---- 4. SLOPPY HYPOTHESES STILL BUILD (the local-model contract) ------------------------------------------------

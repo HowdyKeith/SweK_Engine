@@ -237,9 +237,22 @@ function onsetRun(cfg) {
 // v2806 -- "escape" mode: bisect the radial launch speed at r0 for the reaches-rFar-within-T boundary. PW escape
 // speed has a closed form, v_esc = sqrt(2GM/(r0-rs)), but "escaped" is measured as a FINITE-HORIZON event (reached
 // escRFar within escSteps), so the measured boundary sits BELOW theory by an amount that shrinks as the horizon
-// grows -- measured at r0=8: rFar 200 -> 0.5717, 400 -> 0.5730, 800 -> 0.5766, theory 0.57735 (0.13% at the
-// default). Same honest-convergent-bias family as the ISCO onset; escapeErrFrac carries the residual so claims
-// state what the horizon earned.
+// grows -- measured at r0=8: escRFar 200 -> 0.573792, 400 -> 0.573792, 800 -> 0.575180, theory 0.57735 (0.38%
+// at the default, which IS escRFar 800). Same honest-convergent-bias family as the ISCO onset; escapeErrFrac
+// carries the residual so claims state what the horizon earned.
+//
+// *** v4303 -- ALL THREE RUNGS WERE STALE AND THE 200/400 STEP HAS GONE FLAT. *** This line read
+// "200 -> 0.5717, 400 -> 0.5730, 800 -> 0.5766 ... (0.13% at the default)", a clean monotone convergence.
+// Re-run: 200 and 400 now return the SAME boundary, BIT-IDENTICAL, and that is not the bisection giving up --
+// it holds at escTol 1e-5, ten times finer than the 1e-4 default. The trajectory that marginally escapes
+// overshoots both thresholds, so the finite-horizon bias is QUANTISED BY THE ORBIT rather than smooth in
+// escRFar. The claim survives -- 0.573792 -> 0.575180 still climbs toward 0.57735 as the horizon grows -- but
+// it is now exhibited by ONE step of the three, not by all of them, and the residual at the default is 0.38%
+// rather than the 0.13% this line has been quoting.
+//
+// AND THE KNOB IS `escRFar`, NOT `rFar`. The prose said rFar and the config key is escRFar; a sweep written
+// from the comment passes a key defaults() ignores and gets three identical numbers that look like a dead
+// knob. Named correctly above so the next reader measures the thing the sentence is about.
 function escapeRun(hypR0, cfg) {
     const rs = horizon(cfg);
     const theory = Math.sqrt(2 * cfg.G * cfg.M / (hypR0 - rs));
