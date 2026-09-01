@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/orreryPost-selfcheck.mjs -- v4273
+// WebGLEngine/tools/ship/orreryPost-selfcheck.mjs -- v4273, WebGPU route since Level 11
 //
 // GRADES ui/orreryPost.mjs -- gfx/device.js's FIRST NON-DEMO CONSUMER -- BY ATTACHING IT IN A REAL BROWSER.
 //
@@ -47,23 +47,20 @@ console.log("\n1. THE STAGE DEGRADES INSTEAD OF THROWING, BECAUSE THE 2D ORRERY 
         "leave the page exactly as good as it was.");
 }
 
-console.log("\n2. THE CONSTRAINT THE CONSUMER DISCOVERED, STATED AS DATA");
+console.log("\n2. THE CONSTRAINT THE CONSUMER DISCOVERED, AND WHAT Level 11 DID ABOUT IT");
 {
     const dev = read("gfx/device.js");
-    ok("*** gfx/device.js's WebGPU texture bind now REFUSES BY NAME ***",
-        /cannot bind textures yet/.test(dev), "it was `() => {}` -- a silent drop");
-    ok("  and the refusal names the call and the alternative",
-        /pass\.texture\(/.test(dev) && /webgl2 backend/.test(dev));
-    ok("  the WebGL2 backend really does bind, so this is a gap and not a design",
-        /activeTexture/.test(dev) && /uniform1i/.test(dev),
-        "one backend implements it and the other did nothing: that is a hole, not a decision");
-    ok("the post stage records which backends can carry it",
-        TEXTURE_CAPABLE_BACKENDS.length === 1 && TEXTURE_CAPABLE_BACKENDS[0] === "webgl2");
+    // v4273..v4296: pass.texture on WebGPU refused by name. Level 11: it binds. The history stays checkable --
+    // the refusal must be GONE and the binding must be DERIVED from the shader, not typed.
+    ok("*** gfx/device.js's WebGPU texture bind no longer refuses ***", !/cannot bind textures yet/.test(dev),
+        "it was `() => {}` before v4273 and a refusal by name until Level 11");
+    ok("  bindings are read from the WGSL with parseBindings and the bind group is built from them",
+        /parseBindings\(/.test(dev) && /texBindings/.test(dev) && /createBindGroup/.test(dev));
+    ok("  the WebGL2 backend binds too, so both routes carry a post effect",
+        /activeTexture/.test(dev) && /uniform1i/.test(dev));
+    ok("the post stage's capable list DERIVES from the device's CAPABILITIES table and names both backends",
+        TEXTURE_CAPABLE_BACKENDS.includes("webgpu") && TEXTURE_CAPABLE_BACKENDS.includes("webgl2"), TEXTURE_CAPABLE_BACKENDS.join(", "));
     const src = read("ui/orreryPost.mjs");
-    // *** AND THIS CHECK'S FIRST DRAFT FORBADE A STRING ITS OWN EXPLANATION CONTAINS. *** It asserted the
-    // plural option name appears nowhere in the file -- but ui/orreryPost.mjs explains the mistake in a
-    // comment, so the check went red on correct code. The ninth self-counting scan in nine rounds, and the
-    // settled rule applies here as everywhere: a check about CODE strips comments first.
     const codeOf = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
     const srcCode = codeOf(src);
     ok("  and asks gfx/device.js for one BY THE OPTION NAME IT ACTUALLY READS",
@@ -72,13 +69,13 @@ console.log("\n2. THE CONSTRAINT THE CONSUMER DISCOVERED, STATED AS DATA");
     ok("CONTROL: the plural form IS present in the file, just not in its code",
         /backends/.test(src) && !/backends\s*:/.test(srcCode),
         "so the comment-stripping is doing work rather than passing vacuously");
-    const devSrc = read("gfx/device.js");
-    ok("  and that option name is the one in requestDevice", /opts\.backend \? \[opts\.backend\]/.test(devSrc),
+    ok("  and that option name is the one in requestDevice", /opts\.backend \? \[opts\.backend\]/.test(codeOf(dev)),
         "checked against the callee rather than remembered");
-    ok("  and refuses a non-capable backend with the reason attached",
-        /cannot bind textures in gfx\/device\.js/.test(src));
-    report("a preference with no reason attached is the kind of line a later round deletes as redundant. " +
-        "This one carries why, and section 3 proves the why is true by running it.");
+    ok("  a backend without the capability is still refused with the reason attached",
+        /cannot bind textures in gfx\/device\.js/.test(src) && /CAPABILITIES\[device\.backend\]/.test(srcCode));
+    ok("  and the stage no longer pins webgl2 by name", !/TEXTURE_CAPABLE_BACKENDS\[0\]/.test(srcCode));
+    report("v4273 wrote this section to hold a refusal in place. Level 11 turned it around: the same lines now hold " +
+        "the binding in place, and section 3 draws through BOTH routes and diffs them.");
 }
 
 console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
@@ -106,7 +103,7 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
         const errs = [];
         page.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));
         await page.goto(`http://127.0.0.1:${srv.address().port}/`);
-        const r = await page.evaluate(async () => {
+        const runOne = async (attach) => await page.evaluate(async (attach) => {
             const { makeOrreryPost, EFFECTS } = await import("/ui/orreryPost.mjs");
             const { drawSystem } = await import("/ui/orreryDraw.js");
             const { buildOrrery } = await import("/world/orrery.mjs");
@@ -124,27 +121,39 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
             let drawn = 0; for (let i = 0; i < before.length; i += 4) if (before[i] || before[i + 1] || before[i + 2]) drawn++;
 
             const dst = document.createElement("canvas"); dst.width = N; dst.height = N;
-            const post = await makeOrreryPost(src, dst);
+            const post = await makeOrreryPost(src, dst, attach);
             if (!post.ok) return { ok: false, reason: post.reason, sourceLit: drawn };
             const off = post.draw(0);
             const setRes = post.setEffect("badTv");
-            const on = post.draw(1.5);
-            const gl = dst.getContext("webgl2") || dst.getContext("2d");
+            // Level 11 -- the pixels come back THROUGH THE DEVICE (draw with read: true), the same way on both
+            // backends, instead of a readPixels on a context this page does not own.
+            const on = post.draw(1.5, { read: true });
+            const fr = await on.pixels;
             let lit = 0;
-            try {
-                const g = dst.getContext("webgl2");
-                if (g) { const px = new Uint8Array(N * N * 4); g.readPixels(0, 0, N, N, g.RGBA, g.UNSIGNED_BYTE, px);
-                         for (let i = 0; i < px.length; i += 4) if (px[i] || px[i + 1] || px[i + 2]) lit++; }
-            } catch (e) { /* reported via lit === 0 */ }
+            for (let i = 0; i < fr.pixels.length; i += 4) if (fr.pixels[i] || fr.pixels[i + 1] || fr.pixels[i + 2]) lit++;
             const bad = post.setEffect("nope");
             post.destroy();
             return { ok: true, backend: post.backend, effects: post.effects, sourceLit: drawn,
-                     offDrawn: off.drawn, offWhy: off.why, setRes, onDrawn: on.drawn, lit,
+                     offDrawn: off.drawn, offWhy: off.why, setRes, onDrawn: on.drawn, lit, pixels: Array.from(fr.pixels),
                      badEffect: bad, uv: post.uvConvention.space };
-        }).catch((e) => ({ ok: false, reason: "evaluate threw: " + String(e).slice(0, 200) }));
+        }, attach).catch((e) => ({ ok: false, reason: "evaluate threw: " + String(e).slice(0, 200) }));
+        // The page's fallback route, by name; then the page's PREFERRED route. WebGPU is offscreen here because
+        // this shell loses the device on any canvas-targeted pass (measured at Level 11, deviceTexture-selfcheck).
+        const r = await runOne({ backend: "webgl2" });
+        const r2 = await runOne({ deviceOpts: { offscreen: true } });
         await browser.close(); srv.close();
 
         ok("*** the stage attaches to a real device ***", r.ok, r.ok ? `backend ${r.backend}` : r.reason);
+        ok("*** and to the PREFERRED route, which is WebGPU ***", r2.ok && r2.backend === "webgpu", r2.ok ? `backend ${r2.backend}` : r2.reason);
+        if (r.ok && r2.ok) {
+            let differ = 0, worst = 0; for (let i = 0; i < r.pixels.length; i++) if (r.pixels[i] !== r2.pixels[i]) { differ++; worst = Math.max(worst, Math.abs(r.pixels[i] - r2.pixels[i])); }
+            // Measured at Level 11: 1 channel of 9,216 pixels differs, by 1 of 255. The page path samples LINEAR
+            // (badTvDevicePass-selfcheck's exact match is NEAREST), and two bilinear units round one texel
+            // differently by one level. The claim is therefore "within one level, on next to no pixels", with
+            // the number printed so the next round sees it move.
+            ok("*** the two routes draw the orrery's post effect the same, within one level ***", worst <= 1 && differ < r.pixels.length / 4 * 0.001 && r2.lit > 200,
+                `${differ} channel value(s) of ${r.pixels.length / 4} pixels differ, worst ${worst} of 255; ${r2.lit} lit on WebGPU`);
+        }
         if (r.ok) {
             ok("  on a texture-capable backend", TEXTURE_CAPABLE_BACKENDS.includes(r.backend), r.backend);
             ok("CONTROL: the real orrery drawing put pixels on the source canvas", r.sourceLit > 200,
@@ -309,6 +318,8 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
 //
 //   C  the WebGPU texture refusal reverted to `() => {}`, the silent no-op as shipped before v4273.
 //      -> exit=1, 2 red, both in section 2. Nothing in section 3 moves, because the stage asks for webgl2.
+//      (Level 11: that refusal is gone and the bind is real; section 3 now draws the WebGPU route too and
+//      diffs it against WebGL2 -- a silent no-op there would go red on the pixel comparison, 0 lit.)
 //
 //   D  fx.draw(t) removed from orrery.html's frame loop -- the effect is switched on and never rendered.
 //      -> exit=1, 1 red, in SECTION 4's source check, and *** SECTION 5's SCREENSHOTS STILL PASS. *** That is
@@ -331,6 +342,7 @@ console.log("unchecked here: WHETHER THE EFFECT LOOKS RIGHT ON THE ORRERY. This 
     "real device, that the real drawSystem output is its source, that it draws with the effect on and nothing " +
     "with it off, and that it refuses an unknown effect and a texture-incapable backend by name. It does NOT " +
     "compare the output pixel by pixel to a model the way badTvDevicePass-selfcheck does -- the source there " +
-    "is a texture whose texels encode their own position, and an orrery frame is not. Also unchecked: WebGPU, " +
-    "which cannot carry this at all until gfx/device.js can bind a texture.");
+    "is a texture whose texels encode their own position, and an orrery frame is not. Also unchecked: WebGPU " +
+    "PRESENTING to the page's canvas -- this shell loses the device on any canvas-targeted pass, so the WebGPU " +
+    "route above rendered offscreen; section 5 loads the page without WebGPU and gets the WebGL2 fallback.");
 process.exit(fails ? 1 : 0);

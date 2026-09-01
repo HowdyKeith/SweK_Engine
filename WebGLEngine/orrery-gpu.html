@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK Orrery -- on the GPU</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #06120b; color: #cfe6d6; font: 13px ui-monospace, monospace; overflow: hidden; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  #hud { position: absolute; left: 12px; top: 10px; background: rgba(4, 18, 11, .82); border: 1px solid #14351f; padding: 8px 10px; max-width: 520px; line-height: 1.5; }
+  #hud b { color: #9ef0b4; }
+  #hud .warn { color: #f0c66a; }
+  label { display: inline-block; margin-right: 12px; }
+  input[type=range] { width: 160px; vertical-align: middle; }
+  a { color: #9ef0b4; }
+</style>
+</head>
+<body>
+<!--
+  Level 12 -- THE WebGPU ORRERY. orrery.html draws the system in canvas 2D and (since v4273) can pass that picture
+  through a device post stage. THIS page draws the system THROUGH the device: a compute pass places every body
+  from its orbital elements (render/gpuOrbits.mjs, positionAt to the letter), a second culls and picks LOD
+  (render/gpuDriven.mjs), and each LOD is one drawIndexedIndirect. On a browser without WebGPU the same scene
+  draws on WebGL2 through the CPU twin, and the HUD says which route it took -- the route is a fact about the
+  browser, not a promise about the page.
+
+  The 2D orrery stays the product: this is the same data (orrery.json, buildOrrery) on the Level 11/12 path.
+
+  Level 13 -- LIFE. world/gitEconomy.mjs runs ev/esEconomy.js's trading among these bodies: each repository is a
+  market stocked from its own files, each of git's contributors a hauler chasing the best margin. The traders
+  are a second GPU-driven scene drawn over the first without clearing; the pointer names a body or a trader
+  from a one-pixel pick, and the log shows what was just bought and sold, and where it is bound.
+-->
+<canvas id="stage"></canvas>
+<div id="hud">
+  <div><b>SweK orrery, GPU-driven</b> &mdash; <span id="route">starting&hellip;</span></div>
+  <div id="bodies"></div>
+  <div>
+    <label>tilt <input id="tilt" type="range" min="0" max="80" value="35"></label>
+    <label>days/s <input id="speed" type="range" min="0" max="40" value="8"></label>
+    <label><input id="occ" type="checkbox" checked> occlusion (WebGPU)</label>
+  </div>
+  <div><label><input id="life" type="checkbox" checked> life: the economy's traders</label> <span id="pick" style="color:#f0e29e">point at something</span></div>
+  <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
+  <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
+</div>
+<script type="module">
+import { buildOrrery } from "./world/orrery.mjs";
+import { extentOf, slowestPeriod } from "./world/orreryView.mjs";
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import { makeOrbitSource } from "./render/gpuOrbits.mjs";
+import { makeGitEconomy } from "./world/gitEconomy.mjs";
+
+const cv = document.getElementById("stage"), route = document.getElementById("route");
+const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
+
+const raw = await fetch("./orrery.json").then((r) => r.json()).catch(() => null);
+if (!raw) { say("orrery.json not found -- run: node tools/ship/orreryBake.mjs --write", true); throw new Error("no orrery.json"); }
+const system = buildOrrery(raw.bodies);
+document.getElementById("bodies").textContent = `${system.bodies.length} bodies around ${system.centre}; ${system.captured} captured, ${system.reached} reached, ${system.unpapered.length} unpapered`;
+
+function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
+size();
+
+let device = null;
+try { device = await requestDevice(cv, {}); } catch (e) { say("requestDevice threw: " + e.message, true); throw e; }
+if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is available on this origin -- nothing can be drawn (WebGPU needs https or localhost)", true); throw new Error("no device"); }
+
+// LODs: a finer disc up close, a coarser one far away; the ORDER is derived from the meshes, not typed here.
+const lods = [{ name: "far", mesh: G.quadMesh(1, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: G.quadMesh(6, [0.62, 0.94, 0.71, 1]) }];
+const source = makeOrbitSource(device, system);
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.012], records: source, occlusion: true });
+say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
+
+// the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
+const economy = makeGitEconomy(system, { seed: 7 });
+const lifeSource = { count: economy.ships.length, cpu: () => economy.records(0.14) };
+const lifeScene = G.makeGpuDrivenScene(device, { lods: [{ name: "ship", mesh: G.quadMesh(1, [1, 0.85, 0.35, 1]) }], thresholds: [], records: lifeSource });
+const bodyNames = ["SweK", ...system.bodies.map((b) => b.name)];
+let pointer = null, lastSimT = 0;
+cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
+const ext = Math.max(1, extentOf(system)), span = slowestPeriod(system) / 24;
+let t = 0, last = performance.now();
+function camera() {
+    const tilt = Number(document.getElementById("tilt").value) * Math.PI / 180, dist = ext * 2.4;
+    const eye = [0, Math.sin(tilt) * dist, Math.cos(tilt) * dist];
+    const aspect = cv.width / Math.max(1, cv.height);
+    const proj = G.perspective(0.9, aspect, 0.1, dist * 4), view = G.lookAt(eye, [0, 0, 0], [0, 0, -1]);
+    return { eye, proj, view, viewProj: G.multiply(proj, view) };
+}
+let frames = 0;
+async function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    t += dt * Number(document.getElementById("speed").value) * span / 8;
+    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) size();
+    source.advance(t);
+    const cam = camera();
+    scene.frame({ viewProj: cam.viewProj, view: cam.view, proj: cam.proj, eye: cam.eye, clear: [0.024, 0.07, 0.043, 1] });
+    const life = document.getElementById("life").checked;
+    if (life) {
+        // the sim steps in orrery days, a quarter day at a time, however fast the wall clock runs
+        while (lastSimT + 0.25 <= t) { economy.step(0.25); lastSimT += 0.25; }
+        lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
+        if ((frames & 15) === 0) { const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
+    }
+    if (pointer && (frames & 3) === 0) {
+        try {
+            let hit = life ? await lifeScene.pick(pointer[0], pointer[1]) : null;
+            document.getElementById("pick").textContent = hit ? economy.describe(hit.id)
+                : ((hit = await scene.pick(pointer[0], pointer[1])) ? `${bodyNames[hit.id]}${hit.id ? " -- " + Object.entries(economy.markets[hit.id - 1].trade).map(([g, p]) => g + " " + p).join(", ") : ""}` : "nothing under the pointer");
+        } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }
+    }
+    document.getElementById("t").textContent = t.toFixed(1);
+    if ((frames++ & 31) === 0) { try { const c = await scene.readCounts(); if (c) document.getElementById("drawn").textContent = c.join(" + ") + " of " + source.count + (life ? " bodies, " + economy.ships.length + " traders" : ""); } catch (e) {} }
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

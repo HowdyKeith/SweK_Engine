@@ -1,5 +1,5 @@
 // @ts-check
-// WebGLEngine/render/crtPass.js -- v4119
+// WebGLEngine/render/crtPass.js -- v4119, strength field since Level 11
 //
 // THE CRT POST-PROCESS, ON THE GPU. Its GLSL is a LINE-FOR-LINE MIRROR of render/crtModel.js.
 //
@@ -29,6 +29,7 @@ const FRAG = `#version 300 es
 precision highp float;
 precision highp int;
 uniform sampler2D uTex;
+uniform sampler2D uField;   // Level 11 -- strength field, red = s in [0,1]; a 1x1 white texture by default
 uniform vec2  uSize;        // output size in pixels
 uniform float uCurvature, uScanlines, uScanDepth, uMaskPitch, uMaskDepth, uVignette, uBleed, uGain;
 uniform vec3  uTint;
@@ -53,7 +54,11 @@ void main() {
     float r2 = cx * cx + cy * cy;
     float f  = 1.0 + uCurvature * r2;
     float su = (cx * f) * 0.5 + 0.5, sv = (cy * f) * 0.5 + 0.5;
-    if (su < 0.0 || su > 1.0 || sv < 0.0 || sv > 1.0) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+    // Level 11 -- the strength at this pixel, read once. Outside the barrel the CRT is black, and that black is
+    // still blended toward the source by (1 - s), so a field of 0 shows the picture untouched everywhere.
+    float s = texture(uField, vec2(u, v)).r;
+    vec3 raw = fetch(px, py);
+    if (su < 0.0 || su > 1.0 || sv < 0.0 || sv > 1.0) { fragColor = vec4(mix(raw, vec3(0.0), s), 1.0); return; }
 
     int sx = clamp(int(floor(su * uSize.x)), 0, int(uSize.x) - 1);
     int sy = clamp(int(floor(sv * uSize.y)), 0, int(uSize.y) - 1);
@@ -84,7 +89,9 @@ void main() {
     float vg = clamp(1.0 - uVignette * r2 * 0.5, 0.0, 1.0);
 
     float k = uGain * sc * vg;
-    fragColor = vec4(clamp(c * mk * k * uTint, 0.0, 1.0), 1.0);
+    vec3 crt = clamp(c * mk * k * uTint, 0.0, 1.0);
+    // mix(raw, crt, 1.0) is crt EXACTLY (x * 0 + y * 1), so the scalar effect is unchanged at full strength.
+    fragColor = vec4(clamp(mix(raw, crt, s), 0.0, 1.0), 1.0);
 }`;
 
 /** @param {WebGL2RenderingContext} gl @param {number} type @param {string} src @returns {WebGLShader} */
@@ -134,9 +141,21 @@ export function makeCrtPass(width, height, opts = {}) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    // Level 11 -- the strength field on unit 1: NEAREST and CLAMP like the source, a 1x1 white texel by default so
+    // a caller that never passes a field gets the scalar effect exactly.
+    const fieldTex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, fieldTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    gl.activeTexture(gl.TEXTURE0);
+
     /** @type {Record<string, WebGLUniformLocation | null>} */
     const U = {};
-    for (const n of ["uTex", "uSize", "uCurvature", "uScanlines", "uScanDepth", "uMaskPitch",
+    for (const n of ["uTex", "uField", "uSize", "uCurvature", "uScanlines", "uScanDepth", "uMaskPitch",
                      "uMaskDepth", "uVignette", "uBleed", "uGain", "uTint"]) U[n] = gl.getUniformLocation(prog, n);
 
     // *** GL AND CANVAS ARE RE-CAPTURED HERE, NON-NULL, FOR THE CLOSURES BELOW. *** The two early returns
@@ -148,8 +167,18 @@ export function makeCrtPass(width, height, opts = {}) {
 
     /** @param {TexImageSource | Uint8Array | Uint8ClampedArray} source
      * @param {import("./crtModel.js").CrtParams} [params] @returns {HTMLCanvasElement} */
-    function render(source, params = DEFAULTS) {
+    function render(source, params = DEFAULTS, field = null) {
         const p = { ...DEFAULTS, ...params };
+        // Level 11 -- an optional strength field: { width, height, data } from render/strengthField.mjs, or any
+        // TexImageSource. Omitted, the last field uploaded stays bound (white until one is given).
+        if (field) {
+            GL.activeTexture(GL.TEXTURE1);
+            GL.bindTexture(GL.TEXTURE_2D, fieldTex);
+            GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
+            if (field.data) GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, field.width, field.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, field.data instanceof Uint8Array ? field.data : new Uint8Array(field.data));
+            else GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, /** @type {TexImageSource} */ (field));
+            GL.activeTexture(GL.TEXTURE0);
+        }
         GL.bindTexture(GL.TEXTURE_2D, tex);
         // FLIP_Y stays FALSE: texel row 0 must be the source's FIRST row, because crtModel.js indexes rows
         // from the top and the shader flips gl_FragCoord to match. Turning this on would move the scanlines
@@ -165,6 +194,7 @@ export function makeCrtPass(width, height, opts = {}) {
         GL.useProgram(prog);
         GL.bindVertexArray(vao);
         GL.uniform1i(U.uTex, 0);
+        GL.uniform1i(U.uField, 1);
         GL.uniform2f(U.uSize, CV.width, CV.height);
         GL.uniform1f(U.uCurvature, p.curvature);
         GL.uniform1f(U.uScanlines, p.scanlines);

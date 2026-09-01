@@ -53,7 +53,7 @@
 
 "use strict";
 
-import { FRAGMENT_WGSL, packKnobs, KNOB_ORDER, UV_CONVENTION } from "./badTvWgsl.mjs";
+import { FRAGMENT_WGSL, FIELD_FRAGMENT_WGSL, packKnobs, KNOB_ORDER, UV_CONVENTION } from "./badTvWgsl.mjs";
 import { COARSE_FREQ, FINE_FREQ, COARSE_GAIN, FINE_GAIN } from "./badTvModel.mjs";
 import { NOISE_COMMON, SNOISE2, ASHIMA_CREDIT } from "../shaders/ashimaNoise.js";
 
@@ -149,4 +149,27 @@ export const THREE_PASS_RELATION = Object.freeze({
 });
 
 /** Knobs for either backend, in one place so the two cannot be fed different numbers. */
+/**
+ * Level 11 -- THE FIELD VARIANT, GLSL SIDE, derived from FRAGMENT_GLSL by the same substitution rule the WGSL uses
+ * (see badTvWgsl.mjs FIELD_FRAGMENT_WGSL): one more sampler, `tField`, whose red channel scales both
+ * displacements before the wrap. A missing anchor throws at load rather than shipping a shader that drifted.
+ */
+function _deriveGlsl(src, from, to, what) {
+    if (!src.includes(from)) throw new Error("badTvDevicePass: FIELD_FRAGMENT_GLSL cannot be derived -- FRAGMENT_GLSL no longer contains " + what);
+    return src.replace(from, to);
+}
+export const FIELD_FRAGMENT_GLSL = _deriveGlsl(_deriveGlsl(FRAGMENT_GLSL,
+    "uniform sampler2D tDiffuse;", "uniform sampler2D tDiffuse;\nuniform sampler2D tField;", "the tDiffuse declaration"),
+    "  vec2 uv = vec2(fract(vUv.x + badTvOffsetAt(vUv.y)), fract(vUv.y - time * rollSpeed));",
+    "  float s = texture(tField, vUv).r;\n  vec2 uv = vec2(fract(vUv.x + badTvOffsetAt(vUv.y) * s), fract(vUv.y - time * rollSpeed * s));",
+    "the sample line");
+
+/** The name a consumer binds the strength field under, on either backend. Data, so a gate and a page agree. */
+export const FIELD_BINDING = "tField";
+
+/** badTvPipelineDesc() with the strength field: same knobs, same uv convention, one more texture to bind. */
+export function badTvFieldPipelineDesc() {
+    return { ...badTvPipelineDesc(), shaders: { wgsl: FIELD_FRAGMENT_WGSL, glsl: { vertex: VERTEX_GLSL, fragment: FIELD_FRAGMENT_GLSL } }, field: FIELD_BINDING };
+}
+
 export { packKnobs, KNOB_ORDER, UV_CONVENTION };

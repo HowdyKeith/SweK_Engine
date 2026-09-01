@@ -1,4 +1,4 @@
-// WebGLEngine/ui/orreryPost.mjs -- v4273
+// WebGLEngine/ui/orreryPost.mjs -- v4273, WebGPU-capable since Level 11
 //
 // A SHADER STAGE FOR THE ORRERY, WHICH HAS NEVER HAD ONE.
 //
@@ -34,12 +34,16 @@
 // data rather than by whoever argues last.
 "use strict";
 
-import { requestDevice, detectBackends } from "../gfx/device.js";
+import { requestDevice, detectBackends, CAPABILITIES } from "../gfx/device.js";
 import { badTvPipelineDesc, packKnobs, KNOB_ORDER, UV_CONVENTION } from "../render/badTvDevicePass.mjs";
 
 /** Effects this stage can run. Data, so a caller can offer a menu without knowing what is in it. */
-/** The backend constraint, as data, so a caller and a gate read the same fact. */
-export const TEXTURE_CAPABLE_BACKENDS = Object.freeze(["webgl2"]);
+/**
+ * The backends that can carry a texture, DERIVED from gfx/device.js's own capability table rather than typed
+ * here. v4273 typed ["webgl2"] because the WebGPU backend could not bind a texture; Level 11 taught it to, and a
+ * list restated here would have kept saying "webgl2" until somebody remembered this file. Now the device says.
+ */
+export const TEXTURE_CAPABLE_BACKENDS = Object.freeze(Object.keys(CAPABILITIES).filter((b) => b !== "null" && CAPABILITIES[b].textures));
 
 export const EFFECTS = Object.freeze({
     none: Object.freeze({ id: "none", label: "off", desc: null }),
@@ -66,25 +70,22 @@ export function postSkipReason(env = {}) {
 export async function makeOrreryPost(sourceCanvas, targetCanvas, opts = {}) {
     const skip = postSkipReason(opts.env || {});
     if (skip) return { ok: false, reason: skip, device: null };
-    // *** WebGL2 IS REQUESTED FIRST, AND THAT IS A MEASURED CONSTRAINT RATHER THAN A PREFERENCE. ***
-    // gfx/device.js's WebGPU backend cannot bind textures: pass.texture was `() => {}` until v4273 -- the
-    // pipeline built, the call ran, nothing bound, the frame drew without its source. Attaching this stage is
-    // what surfaced it, because a post effect is a texture consumer by definition. It refuses by name now,
-    // which is honest and still means this stage cannot use that backend. So the order is explicit here, with
-    // the reason attached, instead of taking whatever requestDevice prefers and failing at the first frame.
+    // *** Level 11 -- WebGPU IS NO LONGER REFUSED. *** From v4273 to v4296 this stage asked for webgl2 BY NAME,
+    // because gfx/device.js's WebGPU backend could not bind a texture (pass.texture was `() => {}` and then a
+    // refusal). That backend binds now -- bindings are derived from the shader and the bind group is built from
+    // what the pass bound by name -- so the request is a PREFERENCE again, resolved by the device's own order
+    // (WebGPU first, WebGL2 fallback), and the capability check below reads the device's table rather than
+    // this file's memory of it. `backend` is still honoured as a hard choice for a caller or a gate that wants
+    // one route in particular.
+    //
     // *** AND THE OPTION IS `backend`, NOT `backends`. *** The first draft passed an ARRAY under a key
     // requestDevice does not read -- gfx/device.js takes `opts.backend` (a hard choice) or `opts.prefer`
-    // (an order) -- so the request was ignored and the stage was handed WebGPU, the default. The probe that
-    // was supposed to have established this passed `{backends: ["webgpu"]}` and got WebGPU, which is what it
-    // would have got with no options at all: a test whose expected answer is also its failure mode confirms
-    // nothing. The gate caught it on the first real attach.
-    //
-    // `backend` and not `prefer`, because this is not a preference: the stage cannot use WebGPU at all until
-    // that backend can bind a texture, so falling back to it would only defer the failure by one frame.
-    const wanted = opts.backend || TEXTURE_CAPABLE_BACKENDS[0];
+    // (an order) -- so the request was ignored and the stage was handed WebGPU, the default. A test whose
+    // expected answer is also its failure mode confirms nothing. The gate caught it on the first real attach.
+    const wanted = opts.backend || null;
     let device = null;
     try {
-        device = await requestDevice(targetCanvas, { ...(opts.deviceOpts || {}), backend: wanted });
+        device = await requestDevice(targetCanvas, { ...(opts.deviceOpts || {}), ...(wanted ? { backend: wanted } : {}) });
     } catch (e) {
         return { ok: false, reason: "requestDevice threw: " + String(e && e.message).slice(0, 120), device: null };
     }
@@ -97,14 +98,14 @@ export async function makeOrreryPost(sourceCanvas, targetCanvas, opts = {}) {
                  device: null };
     }
 
-    // Named so a caller can report it, and so the gate can assert the constraint is stated rather than implied.
-    const textureCapable = device.backend === "webgl2";
+    // Read from the device's capability table, so a backend that loses the feature is refused here by name.
+    const textureCapable = !!(CAPABILITIES[device.backend] && CAPABILITIES[device.backend].textures);
     if (!textureCapable) {
         try { device.destroy?.(); } catch {}
         return { ok: false, device: null,
                  reason: `got the ${device.backend} backend, which cannot bind textures in gfx/device.js ` +
-                         `(see its pass.texture). A post stage needs the source as a texture, so this would ` +
-                         `draw the effect over nothing. Request webgl2.` };
+                         `(see its CAPABILITIES). A post stage needs the source as a texture, so this would ` +
+                         `draw the effect over nothing. Request one of ${TEXTURE_CAPABLE_BACKENDS.join(", ")}.` };
     }
 
     let current = EFFECTS.none, pipeline = null, knobs = packKnobs({ time: 0 }), srcTex = null;
@@ -117,27 +118,33 @@ export async function makeOrreryPost(sourceCanvas, targetCanvas, opts = {}) {
         return { ok: true, effect: eff.id };
     }
 
-    function draw(tSeconds = 0) {
+    function draw(tSeconds = 0, o = {}) {
         if (current.id === "none") return { drawn: false, why: "effect is off -- the 2D canvas is the picture" };
         if (!pipeline) {
             const desc = current.desc();
             pipeline = device.pipeline(desc);
         }
         knobs = packKnobs({ time: tSeconds });
-        // *** THE SOURCE IS RE-UPLOADED EVERY FRAME, ON PURPOSE. *** The orrery redraws its 2D canvas whenever
-        // the view or the clock moves, so a texture cached across frames would show a stale system. v4273 added
-        // `source` to gfx/device.js's texture() for exactly this -- before it, the only route from a canvas was
-        // getImageData(), a full readback per frame to produce bytes the GL call can take from the canvas
-        // directly. flipY stays FALSE: a 2D canvas's row 0 is its top, which is what UV_CONVENTION expects.
-        srcTex = device.texture({ source: sourceCanvas, flipY: false });
-        device.frame(({ pass }) => {
+        // *** THE SOURCE IS RE-UPLOADED EVERY FRAME, ON PURPOSE -- INTO ONE TEXTURE. *** The orrery redraws its
+        // 2D canvas whenever the view or the clock moves, so a texture cached across frames would show a stale
+        // system. v4273 added `source` to gfx/device.js's texture() for exactly this -- before it, the only route
+        // from a canvas was getImageData(), a full readback per frame. Until Level 11 this line CREATED a new
+        // texture every frame and never freed the last one: a leak of one canvas-sized texture per frame on both
+        // backends, invisible in a gate that draws twice. update() re-uploads into the texture it already has.
+        // flipY stays FALSE: a 2D canvas's row 0 is its top, which is what UV_CONVENTION expects.
+        if (!srcTex || srcTex.w !== sourceCanvas.width || srcTex.h !== sourceCanvas.height) {
+            try { srcTex?.destroy?.(); } catch {}
+            srcTex = device.texture({ source: sourceCanvas, flipY: false });
+            srcTex.w = sourceCanvas.width; srcTex.h = sourceCanvas.height;
+        } else srcTex.update({ source: sourceCanvas });
+        const read = device.frame(({ pass }) => {
             pass.clear([0, 0, 0, 1]);
             pass.use(pipeline);
             for (let i = 0; i < KNOB_ORDER.length; i++) pass.uniform(KNOB_ORDER[i], knobs[i]);
             pass.texture("tDiffuse", srcTex, 0);
             pass.draw(3);              // the full-screen triangle both shader stages synthesise
-        });
-        return { drawn: true, effect: current.id, backend: device.backend };
+        }, o.read ? { read: true } : undefined);
+        return { drawn: true, effect: current.id, backend: device.backend, ...(o.read ? { pixels: read } : {}) };
     }
 
     return {
@@ -145,6 +152,6 @@ export async function makeOrreryPost(sourceCanvas, targetCanvas, opts = {}) {
         effects: Object.keys(EFFECTS),
         get effect() { return current.id; },
         setEffect, draw,
-        destroy() { try { device.destroy(); } catch {} },
+        destroy() { try { srcTex?.destroy?.(); } catch {} try { device.destroy(); } catch {} },
     };
 }

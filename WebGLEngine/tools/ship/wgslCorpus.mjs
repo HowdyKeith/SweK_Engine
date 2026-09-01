@@ -34,6 +34,9 @@ import { fileURLToPath } from "node:url";
 import * as B from "../../render/bloomFused.mjs";
 import { PROBE_WGSL, FRAGMENT_WGSL, packKnobs } from "../../render/badTvWgsl.mjs";
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
+import * as GD from "../../render/gpuDriven.mjs";
+import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
+import { TERRAIN_WGSL } from "../../render/gpuTerrain.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -76,6 +79,35 @@ export function corpus() {
                "carried anyway, because a shader that compiles on one backend and not the other is exactly " +
                "the divergence a corpus exists to catch",
           opts: { code: FRAGMENT_WGSL, compileOnly: true, outCount: 0 } },
+        // Level 11 -- Level 11. The cull probe is the corpus-shaped twin of the real cull shader (same cullLod text,
+        // procedural scene, f32 out at binding 0, uniforms at binding 1); the render shader and the strength-field
+        // badTv are compile-only here because a vs/fs pair has no buffer to read.
+        { id: "gpuDriven.cullProbeWgsl", from: "render/gpuDriven.mjs",
+          why: "a frustum test against six planes, a distance, an angular-size ladder and an i32 verdict -- the cull's whole decision, over 768 instances",
+          opts: { code: GD.cullProbeWgsl(), entryPoint: "probe", outCount: 768 * 2,
+                  uniforms: GD.packCullUniforms({ planes: GD.frustumPlanes(GD.multiply(GD.perspective(Math.PI / 3, 1, 0.1, 100), GD.lookAt([0, 0, 6], [0, 0, 0]))),
+                                                  eye: [0, 0, 6], thresholds: [0.04, 0.025], count: 768, lodCount: 3, cap: 768 }),
+                  workgroups: Math.ceil(768 / GD.CULL_WORKGROUP) } },
+        { id: "gpuDriven.RENDER_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
+          why: "an instance-stepped vertex attribute read per instance and a mat4x4 uniform -- the GPU-driven draw's vertex stage",
+          opts: { code: GD.RENDER_WGSL, compileOnly: true, outCount: 0 } },
+        // Level 12 -- Level 12. The pyramid builders are compile-only: level0 reads a depth texture and reduce reads
+        // the level below it, neither of which the one-buffer harness can bind. hiZ-selfcheck runs them for real.
+        { id: "gpuDriven.hizLevel0Wgsl", from: "render/gpuDriven.mjs", compileOnly: true,
+          why: "textureLoad on a texture_depth_2d from a compute stage -- the one place the tree reads depth as numbers",
+          opts: { code: GD.hizLevel0Wgsl(), compileOnly: true, outCount: 0 } },
+        { id: "gpuDriven.hizReduceWgsl", from: "render/gpuDriven.mjs", compileOnly: true,
+          why: "a 2x2 max-reduce with clamped edges, the Hi-Z pyramid's whole arithmetic",
+          opts: { code: GD.hizReduceWgsl(), compileOnly: true, outCount: 0 } },
+        { id: "gpuDriven.PICK_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
+          why: "a flat-interpolated identity output and u32 bit slicing in the vertex stage -- the pick picture's encoding",
+          opts: { code: GD.PICK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "gpuTerrain.TERRAIN_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
+          why: "textureLoad and textureDimensions in the VERTEX stage -- the heightfield lift, which no other shader here does",
+          opts: { code: TERRAIN_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "badTv.FIELD_FRAGMENT_WGSL", from: "render/badTvWgsl.mjs", compileOnly: true,
+          why: "FRAGMENT_WGSL with a second texture binding, the strength field, derived by substitution -- proves the derivation still compiles",
+          opts: { code: FIELD_FRAGMENT_WGSL, compileOnly: true, outCount: 0 } },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
@@ -116,6 +148,17 @@ export const EXCLUDED = Object.freeze([
                     why: "it PARSES WGSL. The name matched; the direction is opposite" }),
     Object.freeze({ id: "wgslSpec.parseWgsl", kind: "consumer, not producer",
                     why: "same -- reads WGSL rather than emitting it" }),
+    // Level 11 -- Level 11's shaders. The real cull pass binds four buffers and appends through an atomic, which
+    // neither harness's one-buffer signature can drive; its decision function is what cullProbeWgsl runs here,
+    // and the pass itself is graded end to end by tools/ship/gpuDriven-selfcheck.mjs on the browser harness.
+    Object.freeze({ id: "gpuDriven.cullLodWgsl", kind: "lives on its own gate",
+                    why: "four bindings (uniform, instances, indirect commands, records) and an atomicAdd -- outside the one-buffer harness signature; graded by gpuDriven-selfcheck through gfx/device.js" }),
+    Object.freeze({ id: "gpuOrbits.orbitWgsl", kind: "lives on its own gate",
+                    why: "reads an elements buffer and writes a records buffer -- two storage bindings, outside the one-buffer harness signature; graded against positionAt by gpuOrbits-selfcheck" }),
+    Object.freeze({ id: "gpuDriven.OCC_FN_WGSL", kind: "source fragment",
+                    why: "the Occ struct, the level arithmetic and hizOccluded() with no entry point -- cullLodWgsl({ occlusion: true }) is its runnable composition, graded by hiZ-selfcheck" }),
+    Object.freeze({ id: "gpuDriven.CULL_FN_WGSL", kind: "source fragment",
+                    why: "the Cull struct and cullLod() with no entry point -- cullLodWgsl and cullProbeWgsl are its runnable compositions, and the probe IS in the corpus" }),
 ]);
 
 /**

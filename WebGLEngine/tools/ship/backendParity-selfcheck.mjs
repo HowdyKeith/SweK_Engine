@@ -109,11 +109,11 @@ console.log("\n3. THE MEASUREMENT");
     ok("of the BOTH files, the pages are the ones the baseline names",
         pages.length === PARITY_BASELINE.bothPages.length &&
         pages.every((p) => PARITY_BASELINE.bothPages.includes(p)), pages.join(" "));
-    ok("*** and only TWO are shader MODULES rather than pages ***",
+    ok(`*** and only ${PARITY_BASELINE.bothShaderModules.length} are shader MODULES rather than pages ***`,
         mods.length === PARITY_BASELINE.bothShaderModules.length &&
         mods.every((m) => PARITY_BASELINE.bothShaderModules.includes(m)), mods.join(" "));
     report("a page carrying both languages carries its own two shaders and lends nothing to anybody else, so " +
-        "the reach number is two, not five.");
+        `the reach number is ${mods.length}, not ${N.both}.`);
 }
 
 console.log("\n4. THE CONTRACT, AND THE READ THAT WAS UNGUARDED UNTIL THIS ROUND");
