@@ -138,7 +138,13 @@ ok("!! *** no row states a platform constraint in prose alone ***", proseOnly.le
 // added after it shipped was neither: ARDY's constraint is real and unmeasured. Counting it as unconstrained
 // would have had this gate assert that it ALLOWS every machine -- which is the claim the row exists to avoid.
 const unknownState = declared.filter((k) => cat[k].requires.unknown === true);
-const unconstrained = declared.filter((k) => !unknownState.includes(k) && !["os", "arch", "macosMin"].some((f) => f in cat[k].requires));
+// v4291 -- *** THIS LIST WAS HARDCODED AND A NEW FIELD WALKED STRAIGHT PAST IT. *** `platforms` arrived this
+// round; the classifier did not know it was a constraint, so node3d-gl was filed as READ-AND-UNCONSTRAINED and
+// the check below drove it across five machines expecting all five to pass. It refuses Apple Silicon, so the
+// gate went red -- correctly, and for the wrong stated reason. Derived from KNOWN now, so the next constraint
+// field is classified the moment it is added rather than the moment it is noticed.
+const CONSTRAINT_FIELDS = PR.KNOWN.filter((f) => f !== "why" && f !== "unknown");
+const unconstrained = declared.filter((k) => !unknownState.includes(k) && !CONSTRAINT_FIELDS.some((f) => f in cat[k].requires));
 say("declared: " + declared.length + " -- constrained: " + (declared.length - unconstrained.length - unknownState.length) +
     ", read-and-deliberately-unconstrained: " + unconstrained.length + ", real-but-unmeasured: " + unknownState.length);
 ok("!! every read-but-unconstrained row carries its REASON",
