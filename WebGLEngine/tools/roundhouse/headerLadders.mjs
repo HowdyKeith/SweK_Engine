@@ -92,7 +92,16 @@ function headerOf(file) {
 const sig = (x, n) => { if (x === 0) return 0;
     const f = Math.pow(10, n - Math.ceil(Math.log10(Math.abs(x)))); return Math.round(x * f) / f; };
 const NUM = String.raw`-?\d+\.\d+e[+-]?\d+|-?\d+e[+-]?\d+|-?\d+\.\d+|-?\d+`;
-const digitsOf = (t) => Math.min((t.replace(/^-|e[+-]?\d+$/i, "").match(/\d/g) || []).length, 6);
+// *** v4304 -- THIS COUNTED LEADING ZEROS AS SIGNIFICANT, AND IT MATTERED TWICE. *** It read the digits of
+// "0.005" as FOUR and of "0.0000091" as SIX, where they carry one and two. Two consequences, and the second
+// is the worse: the >=4-figure filter let INPUT LISTS through (inspiral's "safety 0.02/0.01/0.005" was flagged
+// as a measurement ladder), and sig() then compared such a token against the freeze at four figures instead of
+// one -- FAR STRICTER THAN INTENDED, so ladders that ARE held could be reported unwatched. A detector whose
+// precision estimate is wrong reports both kinds of error at once.
+const digitsOf = (t) => {
+    const m = t.replace(/^[+-]/, "").replace(/e[+-]?\d+$/i, "").replace(".", "").replace(/^0+/, "");
+    return Math.min(Math.max(m.length, 1), 6);
+};
 
 const rows = [];
 for (const [name, file] of nameToFile) {

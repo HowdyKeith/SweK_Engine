@@ -23,13 +23,25 @@ const row = (d, m) => c.rows.find((r) => r.device === d && r.mode === m);
 {
     const dev = await getDevice("thermal");
     const a = [];
-    for (const tauG of [0.8, 0.9, 1.1]) a.push(await dev.build({ mode: "diffusion", config: { tauG } }));
+    // *** v4304 -- THIS ASKED FOR MODE "diffusion" AND THERMAL DECLARES "diffuse". *** thermalDefaults does not
+    // refuse an unknown mode, it SUBSTITUTES THE DEFAULT -- and the default happens to be `diffuse`, so this
+    // control has been testing the right thing BY LUCK for its whole life. Verified: the two builds are
+    // byte-identical by labExport's canonical form. If the default ever moved, the control would silently start
+    // measuring another mode and still pass. Named correctly now; this is v3806's silent-substitution shape.
+    const MODE = "diffuse";
+    for (const tauG of [0.8, 0.9, 1.1]) a.push(await dev.build({ mode: MODE, config: { tauG } }));
     const tracks = a.every((o) => Math.abs(o.alphaMeasured - o.alphaTheory) / o.alphaTheory < 5e-3);
     ok("!! a knob that SHOULD move an observable does",
         a[0].alphaMeasured !== a[2].alphaMeasured && tracks,
-        "thermal tauG 0.8 -> 0.9 -> 1.1 moves alphaMeasured 0.0999983, 0.1333015, 0.1992345 and alphaTheory " +
-        "tracks it at 0.1, 0.13333, 0.2 -- the emergent diffusivity follows (tau_g - 1/2)/3 out of the collision. " +
-        "Without this control an inert verdict anywhere would be indistinguishable from a broken sweep");
+        // AND THE NUMBERS ARE PRINTED FROM THE RUN THIS LINE JUST DID, not typed beside it. They were
+        // "0.0999983, 0.1333015, 0.1992345" as literals -- correct when re-measured at v4304, and correct is
+        // the point: a gate that BUILDS the sweep and then quotes a remembered answer has a second copy that
+        // can rot while the assertion above it stays green.
+        "thermal tauG 0.8 -> 0.9 -> 1.1 moves alphaMeasured " +
+        a.map((o) => o.alphaMeasured.toPrecision(7)).join(", ") + " and alphaTheory tracks it at " +
+        a.map((o) => o.alphaTheory.toPrecision(5)).join(", ") + " -- the emergent diffusivity follows " +
+        "(tau_g - 1/2)/3 out of the collision. Without this control an inert verdict anywhere would be " +
+        "indistinguishable from a broken sweep");
 }
 
 // ---- 2. THE PRE-REGISTERED PREDICTIONS ---------------------------------------------------------------------------------
