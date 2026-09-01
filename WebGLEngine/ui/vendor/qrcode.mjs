@@ -9,6 +9,10 @@
 // Licensed under the MIT license:
 //  http://www.opensource.org/licenses/mit-license.php
 //
+// v4263 -- MIT requires the copyright notice AND the permission notice in every copy. The URL above is a
+// pointer, not an inclusion, so the notice now sits beside this file at ui/vendor/LICENSE. Note also that
+// world/orrery.mjs scans the TOP-LEVEL vendor/ only, so this directory was invisible to it.
+//
 // The word 'QR Code' is registered trademark of
 // DENSO WAVE INCORPORATED
 //  http://www.denso-wave.com/qrcode/faqpatent-e.html

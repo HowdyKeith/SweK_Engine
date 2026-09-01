@@ -8,6 +8,76 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4263 -- The gap between the two licence registers, and the code that fell into it
+
+This tree has two licence registers and they are each correct. world/orrery.mjs answers "what did we VENDOR,
+and is it papered?" over the subdirectories of the TOP-LEVEL vendor/. world/reachedLicences.mjs answers "what
+did we READ AND NOT VENDOR?" -- explicitly the not-vendored ones. Code that was COPIED but does not live under
+vendor/ is in neither, by construction. It is not an oversight in either file; it is a hole between two
+correct definitions, and nothing in 4,262 rounds has ever listed that population.
+
+It is two files, both MIT, both real copies rather than ports.
+
+  shaders/ashimaNoise.js  Ashima Arts' textureless GLSL simplex noise, whose own header says "unmodified
+                          apart from whitespace". Used by render/badTvPass.js, render/aquarellePass.js,
+                          render/solidTexture.mjs, physics/fire/fireMesh.js and the noise gates.
+  ui/vendor/qrcode.mjs    Kazuhiko Arase's QR generator, 2,237 lines -- IN A DIRECTORY LITERALLY CALLED
+                          vendor AND STILL INVISIBLE, because the orrery scans the top-level vendor/ and this
+                          is ui/vendor/. There are exactly two directories named vendor in the tree and the
+                          orrery sees one.
+
+AND BOTH WERE OUT OF COMPLIANCE, NOT MERELY UNFILED. MIT requires two things in every copy: "The above
+copyright notice and this permission notice shall be included in all copies or substantial portions of the
+Software." Each file carried the copyright line and a POINTER -- "Distributed under the MIT License", or a
+URL to it. A pointer is not an inclusion.
+
+Measured before the fix: the tree held 15 MIT permission notices, 14 of them under vendor/ and the fifteenth
+in tools/strict-libm-pkg, a packaged dependency. NO engine-source copy outside vendor/ carried one. That is
+checked against `git show HEAD` rather than against memory, because a round's claim about what it found is
+the easiest place for a round to flatter itself.
+
+WORSE THAN THE GAP: THE FILE THAT STATED THE OBLIGATION STATED IT WRONG. shaders/ashimaNoise.js said the
+attribution was kept intact, "which is the licence's one requirement" -- understating what it owed, in the
+file whose whole job was to discharge it. The sentence is still there, quoted inside the paragraph that says
+it was wrong, and the gate now checks that it is QUOTED AS AN ERROR rather than asserted. A grep for its
+absence went red and was right to: this tree records corrections instead of deleting them, so "is the phrase
+gone" was the wrong question.
+
+THE FIX: the permission notice now sits beside the bytes it covers, at shaders/ASHIMA-LICENSE.txt and
+ui/vendor/LICENSE, with each source file pointing at it. Both are LABELLED as reproduced from the standard
+MIT form under the named copyright holder rather than fetched from upstream, because this sandbox has no
+network. That label is the point: at v4203 three of this tree's own licence records were wrong in the file
+whose entire purpose was quoting licences verbatim, one of them truncated to 48 words of 77 in a way that
+dropped an attribution requirement. A licence written from memory and labelled as such is honest; the same
+text labelled "verbatim from upstream" would be v4203 committed again.
+
+WHAT THE REGISTER DELIBERATELY DOES NOT CLAIM. The tree also holds nine works DERIVED from third-party
+sources -- render/aquarellePass.js and aquarelleModel.mjs from Ramotion, render/doomFire.mjs from
+filipedeschamps, ui/odometer.js and odometerModel.mjs from coderitual, shaders/ashimaNoise.mjs translated
+line by line from the GLSL beside it, and three TheLongSilence techniques whose headers say "lifted (not
+copied)" and "nothing copied". Whether a re-implementation is a "substantial portion of the Software" is a
+legal judgement, not a grep result. Those are recorded with their attributions and are NOT called a
+compliance gap. Claiming either way would be this file pretending to an authority it does not have.
+
+SABOTAGE D WENT 0 RED ON THE FIRST WRITING, and it is the one worth reading. Filling seenBy with ["orrery"]
+for both copies changed nothing, because the field holding the round's ENTIRE structural claim -- that
+neither register sees these files -- was read by no check. A register that asserts its own central finding in
+a field nothing verifies is the shape v4258 found the tree already had two of. seenBy is now COMPUTED from
+the orrery's population and reachedLicences' repo list, the recorded value must agree, and two controls
+assert the computation can still say "seen". 3 RED after. Five sabotages, 4/2/1/3/4 red, each grep-confirmed
+before its result was read and restored md5-identical. My first attempt at sabotage B used a line-anchored
+sed that silently did not match and went 0 RED; the marker count is what caught it, which is why the count is
+read before the result.
+
+UNCHECKED: whether the reproduced licence text matches upstream's own file, which no network here can settle
+-- the gate asserts the LABEL, which is the most it can honestly do. Whether the nine derived works owe
+anything at all, which the gate declines. Whether these two are the WHOLE population: the search was for
+third-party copyright lines in .js/.mjs/.glsl/.wgsl, so a copy carrying no notice at all is invisible to it
+by definition. And the DENSO WAVE trademark notice reproduced in ui/vendor/qrcode.mjs, which is not a licence
+term and has had no thought given to it.
+
+The build now stands at 4263 gates.
+
 ## v4262 -- Find the consumer before taking the solver: the consumer exists, and it disqualifies
 
 Backlog #133 named ruvnet/sublinear-time-solver (MIT OR Apache-2.0) and put its own discipline in the title.
