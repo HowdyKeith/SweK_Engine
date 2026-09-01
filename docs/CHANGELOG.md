@@ -8,6 +8,82 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4270 -- WGSL runs here after all, and the first shader is carried across and graded on a GPU
+
+v4269 wrote, in a gate's output and a module header and a changelog, "NOTHING HERE CAN EXECUTE WGSL", and
+concluded that a WGSL port could only ever be checked structurally on this box. *** That was inferred and never
+tested, and it is false. ***
+
+The inference came from `render/wgslSpec.mjs`, which says truthfully that the build box has no GPU and that
+`createShaderModule()` on a live device was unavailable. That is true of a bare node process and irrelevant to a
+browser, and the tree already had a headless Chromium harness.
+
+*** And the first probe that went looking reproduced, exactly, the confusion `ui/webgpuProbe.mjs` was written to
+name. *** It launched Chromium, evaluated on the default `about:blank` page, got `navigator.gpu === undefined`
+under three separate flag combinations, and was one step from concluding this machine has no WebGPU. From that
+file's header, dated v3666:
+
+    "'THE BROWSER HAS NO WebGPU' AND 'THIS ORIGIN DOES NOT GET WebGPU' ARE TWO THINGS WEARING ONE LABEL, and the
+     message named the wrong one -- so the reader goes looking at their GPU, their driver and their browser
+     version, none of which is the problem."
+
+WebGPU is gated on a secure context and `about:blank` is not one. Served the same empty page over
+`http://127.0.0.1`, the adapter appears on the first flag set tried: **google / swiftshader**, with a device, a
+compiler and readable buffers. SwiftShader is what serves WebGPU here -- which makes the naming collision
+between "SwiftShader" and the SwiftUI shader ports load-bearing rather than pedantic.
+
+### The harness, and then the port
+
+`tools/ship/webgpuHarness.mjs` compiles and dispatches a WGSL compute shader and reads f32 back, or compiles
+only, and carries the origin requirement in its own header so the next person does not repeat the probe. It is
+honest about one thing that is easy to get wrong: the GPU computes in f32 and JavaScript in f64, so an
+ill-conditioned expression can disagree wildly while both sides are correct. Measured while building it, on the
+classic `sin(i * 12.9898) * 43758.5453` hash: CPU 0.921690, GPU 0.240234, GPU values landing on 1/1024 steps.
+Neither is wrong; the function is.
+
+`render/badTvWgsl.mjs` is the first shader in this tree deliberately carried to WGSL -- Ashima's 2D simplex plus
+felixturner/bad-tv, chosen because `badTvPass.js` is the smallest pass with a CPU model beside it. Three things
+WGSL requires and GLSL does not are called out where a later reader would otherwise "tidy" them: no user-function
+overloading (so `mod289_3` and `mod289_4`), no swizzle assignment (so `x12` is rebuilt), and no ternary -- so
+`select(FALSE, TRUE, cond)`, whose argument order is the reverse of what a C programmer reads.
+
+It is graded by running it. On the GPU, against `badTvModel.sampleAt`, over 32 rows at two different times:
+**agreement to 3.2e-8**, against a tolerance of two f32 ulps set from the format rather than from the result. The
+shipping `@vertex`/`@fragment` pair compiles on the real driver, texture and sampler bindings accepted.
+
+### The sabotage that justifies all of it
+
+Swapping `select()`'s two value arguments produces a shader that compiles, runs, produces noise and tears the
+picture. Agreement with the model goes from 3.2e-8 to **2.1e-2** -- six orders of magnitude. No structural check
+can see that, and neither can a person looking at the output, because inverted simplex corners look like simplex
+noise. 5 red.
+
+Altering one digit of Ashima's `C.x`, in the 15th significant figure, trips the constant-text check and leaves
+the GPU output **bit-identical**, because the change is far below f32. 2 red, none of them numeric. The two
+checks are not redundant: the text check catches drift the arithmetic cannot feel yet, and the arithmetic check
+catches structure the text looks fine in. Retyping `COARSE_GAIN` as a literal 0.25 instead of interpolating it
+from the model: 3 red, all numeric.
+
+### And v4269's count was wrong too, by sixteen
+
+Its GLSL marker was the `#version` directive. No three.js `ShaderMaterial` pass carries one, because three
+prepends it -- so `badTvPass.js`, `aquarellePass.js`, `grassField.js`, `solidTexture.mjs` and `atmosphere.mjs` all
+classified as shipping no shader at all. That is precisely the population a "can this move to WebGPU" census is
+about. The marker is now a pair and both halves are counted separately, because they mean different things: 134
+GLSL-bearing modules, 118 writing their own header and 16 riding the framework's.
+
+This was found by tripping over it -- a new check asserted `badTvPass.js` "really is GLSL" and went red.
+
+The eighth self-counting scan in eight rounds arrived in the same edit. The new marker was written as a regex
+LITERAL, so the module matched itself and the count jumped 134 to 135 on the next run; and once that was
+assembled from fragments, the comment explaining the fix quoted the version directive verbatim and matched
+again. Both are built from fragments now, and section 2 asserts the absence rather than trusting the habit.
+
+`PORTED_PAIRS` records what the per-file `both` count cannot see: badTv now exists in both languages, but as two
+files, so `both` still reads 5. A per-file count is what a scanner can see; an effect is what a person cares
+about. Both are reported.
+
+The build now stands at 4270 gates.
 ## v4269 -- The tree is WebGPU-capable and can move almost nothing to it, and nobody had counted the ratio
 
 The capability is not missing. Thirteen pages call `getContext("webgpu")`, sixty files touch `navigator.gpu`,

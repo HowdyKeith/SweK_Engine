@@ -15,14 +15,14 @@
 // thing the abstraction cannot unify. Its own header says so -- "a pipeline carries both { wgsl } and { glsl }
 // and each backend takes its own".
 //
-// ---- *** THE COUNT: 118 MODULES SHIP GLSL, 38 SHIP WGSL, AND FIVE SHIP BOTH. *** ------------------------------
+// ---- *** THE COUNT: 134 MODULES SHIP GLSL, 39 SHIP WGSL, AND FIVE SHIP BOTH. *** ------------------------------
 //
 // And of those five, three are pages rather than shader modules -- gfx-device.html and nebula-device.html, which
 // are gfx/device.js's ONLY two consumers, plus wormhole-jump.html. Two actual shader modules carry both
 // languages: fx/nebula/nebulaShaders.js and fx/wormhole/wormholeNebula.js.
 //
 // So the abstraction whose entire premise is "write it once, run on either" is satisfied by two shader modules
-// out of a hundred and eighteen. That is not a criticism of the abstraction, which works: it is the measurement
+// out of a hundred and thirty-four. That is not a criticism of the abstraction, which works: it is the measurement
 // nobody had taken, and it is the difference between "the tree is WebGPU-capable" and "the tree can move a
 // given render to WebGPU". The first is true. The second is true 5 times out of 118.
 //
@@ -32,12 +32,20 @@
 // calls, four of them fillText -- so it has NO shader stage at all and no effect in this tree can touch it. The
 // route off 2D is gfx/device.js, and its labels would need text/slug*.js, the tree's own GPU glyph renderer.
 //
-// *** text/slugShader.js IS GLSL-ONLY: 337 lines, zero WGSL. *** It is one of the 113. So a orrery ported to
+// *** text/slugShader.js IS GLSL-ONLY: 337 lines, zero WGSL. *** It is one of the 129. So a orrery ported to
 // gfx/device.js draws on the WebGL2 backend and, on the WebGPU backend, gets as far as createShaderModule({
 // code: undefined }) -- because gfx/device.js reads d.shaders.wgsl unconditionally and does not check. Labels
 // would not degrade; the pipeline would throw.
 //
 // That is the actual blocker, it is one file, and it is now a number instead of a hunch.
+//
+// *** AND A CORRECTION THIS FILE OWES ITS OWN ROUND. *** v4269 said the port could only be checked
+// structurally because nothing here can execute WGSL. That was inferred, never tested, and is false: Chromium
+// on this box serves a WebGPU adapter over a SECURE origin -- http://127.0.0.1, not about:blank, which is the
+// distinction ui/webgpuProbe.mjs has drawn since v3666 and which the first probe still got wrong.
+// tools/ship/webgpuHarness.mjs compiles and runs WGSL on that device, and v4270's render/badTvWgsl.mjs is
+// graded against render/badTvModel.mjs numerically, agreeing to 3.2e-8. The COUNT above stands; the claim
+// about what could be verified did not.
 //
 // ---- *** THE MARKERS ARE BUILT BY CONCATENATION, AND THAT IS DELIBERATE. *** -----------------------------------
 //
@@ -55,6 +63,28 @@
 export const GLSL_MARK = "#" + "version 300 es";
 export const WGSL_MARKS = Object.freeze(["@" + "vertex", "@" + "fragment", "@" + "compute"]);
 
+/**
+ * *** THE DIRECTIVE ALONE MISSES EVERY three.js PASS, AND v4270 FOUND THAT BY TRIPPING OVER IT. ***
+ *
+ * v4269 counted GLSL by the version directive alone and reported 118. Then v4270 asserted, in a new check,
+ * that render/badTvPass.js "really is GLSL" -- and the gate went red, because badTvPass.js does not contain the
+ * directive at all. It does not need to: it hands its source to THREE.ShaderMaterial, and three PREPENDS the
+ * version. The file is unambiguously GLSL -- `uniform sampler2D tDiffuse;`, `void main()` -- and the census
+ * called it none.
+ *
+ * Sixteen files are in that position, among them badTvPass, aquarellePass, grassField, solidTexture and
+ * atmosphere: the post-effect passes, which is to say exactly the population a "can this move to WebGPU"
+ * census is for. So the marker is now a pair, and both halves are counted separately rather than merged,
+ * because they mean different things: a file with the directive drives raw WebGL2 and one without it is
+ * riding a framework that supplies the header.
+ */
+export const GLSL_TELL = new RegExp(
+    // *** ASSEMBLED, LIKE THE OTHER MARKERS, AND THE FIRST DRAFT WAS NOT. *** Written as a regex LITERAL, this
+    // pattern contains the words it searches for, so this module matched itself and the gate matched itself:
+    // glslBearing jumped 134 -> 135 and framework 16 -> 17 on the very next run. The eighth self-count in
+    // eight rounds, caught immediately because section 2 asserts the absence rather than trusting the habit.
+    "uni" + "form\\s+(sam" + "pler2D|flo" + "at|ve" + "c[234]|ma" + "t[234])\\s+\\w+\\s*;");
+
 /** A check about CODE strips comments first -- the rule settled at v4266 and re-earned here. */
 export function codeOnly(t) {
     return String(t).replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
@@ -71,8 +101,17 @@ export const LANG = Object.freeze({ NONE: "none", GLSL: "glsl", WGSL: "wgsl", BO
  */
 export function classify(text) {
     const t = codeOnly(text);
-    const g = t.includes(GLSL_MARK), w = WGSL_MARKS.some((m) => t.includes(m));
+    const g = t.includes(GLSL_MARK) || GLSL_TELL.test(t);
+    const w = WGSL_MARKS.some((m) => t.includes(m));
     return g && w ? LANG.BOTH : g ? LANG.GLSL : w ? LANG.WGSL : LANG.NONE;
+}
+
+/** Which of the two GLSL forms a file uses, for the split the baseline records. */
+export function glslStyle(text) {
+    const t = codeOnly(text);
+    if (t.includes(GLSL_MARK)) return "directive";      // raw WebGL2: the file writes its own header
+    if (GLSL_TELL.test(t)) return "framework";          // three.js ShaderMaterial: three prepends the version
+    return null;
 }
 
 /** gfx/device.js's contract, restated where a check can read it rather than left in its header. */
@@ -91,17 +130,38 @@ export const DEVICE_CONTRACT = Object.freeze({
  * Measured at v4269 over .js/.mjs/.html outside node_modules and vendor, comments stripped.
  */
 export const PARITY_BASELINE = Object.freeze({
-    glslBearing: 118,
-    wgslBearing: 38,
+    // *** v4269 RECORDED 118 AND THAT WAS AN UNDERCOUNT OF 16. *** See GLSL_TELL: the directive-only marker
+    // could not see a three.js ShaderMaterial pass, which is exactly the population this census is about.
+    glslBearing: 134,
+    glslDirective: 118,  // raw WebGL2 -- the file writes its own #version header
+    glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
+    wgslBearing: 39,     // v4270 +1: render/badTvWgsl.mjs, the first shader deliberately carried across
     both: 5,
-    glslOnly: 113,
-    wgslOnly: 33,
+    glslOnly: 129,
+    wgslOnly: 34,        // v4270 +1, same file
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
-    wgslRawVsCode: Object.freeze({ raw: 39, code: 38 }),
+    wgslRawVsCode: Object.freeze({ raw: 40, code: 39 }),
 });
+
+/**
+ * *** THE `both` COUNT DID NOT MOVE WHEN v4270 PORTED A SHADER, AND THAT IS A LIMIT OF THE METRIC. ***
+ *
+ * badTv now exists in both languages -- render/badTvPass.js holds the GLSL, render/badTvWgsl.mjs the WGSL --
+ * but they are two FILES, so a per-file "carries both" count still reads 5. The census measures files because
+ * files are what a scanner can see; an EFFECT is what a person cares about. Both numbers are true and they
+ * answer different questions, so the pairs are listed rather than folded into the count.
+ *
+ * A pair here is a stronger claim than a file that happens to contain both markers: it means somebody carried
+ * one across deliberately and a gate compares them.
+ */
+export const PORTED_PAIRS = Object.freeze([
+    Object.freeze({ effect: "badTv", glsl: "render/badTvPass.js", wgsl: "render/badTvWgsl.mjs",
+                    model: "render/badTvModel.mjs", gate: "tools/ship/badTvWgsl-selfcheck.mjs",
+                    graded: "numerically, on a real GPU, against the CPU model -- agrees to 3.2e-8" }),
+]);
 
 /** Walk a tree and classify every candidate file. Pure but for the two readers handed in. */
 export function census(root, { readdir, readFile, join, relative }) {

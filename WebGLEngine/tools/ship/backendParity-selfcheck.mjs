@@ -17,8 +17,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { GLSL_MARK, WGSL_MARKS, LANG, codeOnly, classify, census, countsOf, shortfall,
-         PARITY_BASELINE, DEVICE_CONTRACT } from "../../render/backendParity.mjs";
+import { GLSL_MARK, GLSL_TELL, WGSL_MARKS, LANG, codeOnly, classify, census, countsOf, shortfall, glslStyle,
+         PARITY_BASELINE, DEVICE_CONTRACT, PORTED_PAIRS } from "../../render/backendParity.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -85,6 +85,22 @@ console.log("\n3. THE MEASUREMENT");
         ok(`  ${k} matches the recorded baseline`, N[k] === PARITY_BASELINE[k],
             `measured ${N[k]}, recorded ${PARITY_BASELINE[k]}`);
     }
+    // *** THE SPLIT v4270 ADDED, BECAUSE ONE NUMBER HID A WHOLE POPULATION. ***
+    const styles = { directive: 0, framework: 0 };
+    for (const f of C.glsl) { const st = glslStyle(read(f)); if (st) styles[st]++; }
+    ok("  GLSL splits into directive-style and framework-style as recorded",
+        styles.directive === PARITY_BASELINE.glslDirective && styles.framework === PARITY_BASELINE.glslFramework,
+        `directive ${styles.directive}, framework ${styles.framework}`);
+    ok("*** and the two sum to the total, so nothing is double-counted or dropped ***",
+        styles.directive + styles.framework === N.glslBearing, `${styles.directive}+${styles.framework}=${N.glslBearing}`);
+    // The control fixtures are ASSEMBLED too -- a literal here would make this gate a GLSL-bearing file, which
+    // is exactly what happened on the first run after GLSL_TELL was added.
+    const TELL_SAMPLE = "uni" + "form sam" + "pler2D tDiffuse;";
+    ok("CONTROL: a three.js-style pass with no directive IS counted as GLSL",
+        classify("const fs = `" + TELL_SAMPLE + "\nvoid main(){}`;") === LANG.GLSL,
+        "this is the case v4269's marker missed sixteen times");
+    ok("CONTROL: and the same declaration inside a comment is still not GLSL",
+        classify("// " + TELL_SAMPLE + " is what a pass declares\nlet x=1;") === LANG.NONE);
     ok("*** and BOTH is a tiny fraction of GLSL-bearing ***", N.both < N.glslBearing / 10,
         `${N.both} of ${N.glslBearing} -- ${(100 * N.both / N.glslBearing).toFixed(1)}%`);
     // The distinction that stops the 5 from sounding better than it is.
@@ -160,8 +176,17 @@ console.log("\n4. THE CONTRACT, AND THE READ THAT WAS UNGUARDED UNTIL THIS ROUND
         ok(`  consumer ${c} exists and imports the device`, fs.existsSync(path.join(ENG, c)) &&
             read(c).includes("gfx/device.js"));
     }
+    // *** THIS READ RAW TEXT AND v4270 CAUGHT IT. *** render/badTvWgsl.mjs discusses gfx/device.js in its
+    // header -- it is written to fit that contract -- and was counted as a third consumer. Mentioning a module
+    // is not importing it. The rule this tree settled at v4266 is that a check about CODE strips comments
+    // first, and this check had not been holding to it; it now strips, and requires an actual import or a
+    // module-specifier string rather than the bare name appearing anywhere.
     const importers = C.glsl.concat(C.wgsl).filter((f) => {
-        try { return read(f).includes("gfx/device.js"); } catch { return false; }
+        try {
+            const code = codeOnly(read(f));
+            return /(from|import)\s*\(?\s*["'][^"']*gfx\/device\.js["']/.test(code) ||
+                   /src\s*=\s*["'][^"']*gfx\/device\.js["']/.test(code);
+        } catch { return false; }
     });
     ok("*** and NOTHING outside those two consumes it ***",
         new Set(importers).size <= DEVICE_CONTRACT.consumers.length,
@@ -170,7 +195,30 @@ console.log("\n4. THE CONTRACT, AND THE READ THAT WAS UNGUARDED UNTIL THIS ROUND
         "one. The orrery becoming its first is the round this measurement was taken for.");
 }
 
-console.log("\n5. THE ORRERY AND THE GLYPH SHADER, WHICH IS THE ACTUAL BLOCKER");
+console.log("\n5. PAIRS DELIBERATELY CARRIED ACROSS, WHICH THE `both` COUNT CANNOT SEE");
+{
+    ok("at least one effect exists in both languages as a PAIR", PORTED_PAIRS.length >= 1,
+        PORTED_PAIRS.map((p) => p.effect).join(", "));
+    for (const p of PORTED_PAIRS) {
+        for (const k of ["glsl", "wgsl", "model", "gate"]) {
+            ok(`  ${p.effect}: ${k} file exists`, fs.existsSync(path.join(ENG, p[k])), p[k]);
+        }
+        ok(`  ${p.effect}: the GLSL half really is GLSL`, classify(read(p.glsl)) === LANG.GLSL);
+        ok(`  ${p.effect}: the WGSL half really is WGSL`, classify(read(p.wgsl)) === LANG.WGSL);
+        ok(`  ${p.effect}: the WGSL imports the model rather than retyping its constants`,
+            /from ["'][^"']*badTvModel/.test(codeOnly(read(p.wgsl))),
+            "a second hand-written 0.2 or 50.0 is how a port drifts");
+    }
+    // *** THE PAIR IS NOT A `both` FILE AND THE GATE SAYS SO RATHER THAN LETTING THE NUMBER MISLEAD. ***
+    ok("*** and none of those pairs shows up in the BOTH count ***",
+        PORTED_PAIRS.every((p) => !C.both.includes(p.wgsl) && !C.both.includes(p.glsl)),
+        `BOTH is still ${C.both.length} -- it counts FILES carrying two languages, not EFFECTS available in two`);
+    report("a per-file count is what a scanner can see and an effect is what a person cares about. Reporting " +
+        "only the first would have made v4270's port invisible to this gate; reporting only the second would " +
+        "hide that gfx/device.js still needs one file with both.");
+}
+
+console.log("\n6. THE ORRERY AND THE GLYPH SHADER, WHICH IS THE ACTUAL BLOCKER");
 {
     const orr = read("ui/orreryDraw.js");
     ok("ui/orreryDraw.js is canvas 2D", /getContext\("2d"\)/.test(orr));
@@ -188,11 +236,17 @@ console.log("\n5. THE ORRERY AND THE GLYPH SHADER, WHICH IS THE ACTUAL BLOCKER")
         "slugEval.js transliterates the fragment shader and is graded against a segment winding number");
     ok("CONTROL: shortfall() returns null for a module that is already ready",
         shortfall("x", GLSL_MARK + " " + WGSL_MARKS[0]) === null);
-    report("this is what the round refused to do rather than do badly: transliterating 337 lines of Slug to " +
-        "WGSL is delicate -- the negative-zero bit extraction, the 1/65536 double-root fallback, the abs() in " +
-        "calcCoverage are all load-bearing -- and NOTHING HERE CAN EXECUTE WGSL. render/wgslSpec.mjs would " +
-        "validate its structure; only a GPU can say it draws the same glyph. Measuring first is the honest " +
-        "half, and it turned a hunch into one file and one number.");
+    // *** v4270 WITHDREW HALF OF WHAT THIS PARAGRAPH USED TO SAY. *** It read "NOTHING HERE CAN EXECUTE
+    // WGSL", which was inferred from render/wgslSpec.mjs's true statement that the build box has no GPU, and
+    // was never tested. Chromium here serves a WebGPU adapter (google/swiftshader) over a SECURE origin and
+    // compiles and runs WGSL; see tools/ship/webgpuHarness.mjs, which does it, and badTvWgsl-selfcheck, which
+    // grades a port numerically against its CPU model. The refusal to transliterate Slug stands on its own
+    // merits -- 337 delicate lines -- but not on that reason.
+    report("transliterating 337 lines of Slug to WGSL is delicate: the negative-zero bit extraction, the " +
+        "1/65536 double-root fallback and the abs() in calcCoverage are all load-bearing, and slugEval.js " +
+        "names them as rules for anyone editing. That is why it was not attempted in the same round as the " +
+        "measurement. It IS now checkable end to end -- tools/ship/webgpuHarness.mjs runs WGSL on a real " +
+        "device, so a port can be graded against slugEval the way v4270 graded badTv against badTvModel.");
 }
 
 // =============================================================================================================
