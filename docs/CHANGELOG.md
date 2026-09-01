@@ -8,6 +8,95 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4279 -- Nobody knew what was red, and three answers were on record, all wrong
+
+Backlog #134 said FIVE gates were red at HEAD and that rounds kept shipping ALL GREEN over them.
+tools/ship/gate-timings.json's `failingAt` register said NINETEEN, snapshotted somewhere around v3211.
+A full sweep at v4278 -- every one of the 1,348 runnable gates, actually executed -- found THIRTY-NINE, and a
+fortieth was hiding in the bucket of gates that had not finished.
+
+*** THE OLD REGISTER WAS WRONG IN BOTH DIRECTIONS AT ONCE, AND THAT IS THE PART WORTH KEEPING. *** Twelve of
+its nineteen entries are GREEN now: somebody fixed them, nobody removed the line, and it went on accusing
+working code for a thousand versions. And thirty of the thirty-seven that really are red were absent from it
+entirely -- they went red after the snapshot and nothing has looked since. A register that is only ever
+appended to becomes a list of grievances; one that is never appended to becomes a list of fiction. That one
+had managed both, which is only possible if nothing ever re-ran it.
+
+### The reason nobody looked was also never tested
+
+The honest reason this item slid for round after round is that the suite runner buffers its output and the
+full run was believed to take about ninety minutes, so every attempt looked like an hour of silence with an
+unknown payoff. That belief was never checked either. Running the gate files DIRECTLY, eight at a time, with
+each verdict appended to a file as it lands, finished in about twenty-five minutes with progress visible
+throughout. The obstacle was the runner, not the work.
+
+### But a parallel sweep lies about anything timed, and it lied about seven
+
+The 8-way sweep reported FORTY-SIX red. Re-running those forty-six ONE AT A TIME on an idle box turned SEVEN
+of them green: a battle sim whose gate asserts its clock passed 0.5 s after 2.5 s of wall time, a frame-budget
+check, a sort benchmark, three browser-driven gates and a fast-path timing check. Every one measures something
+against the clock, and every one was starved by the other seven workers.
+
+So the method is TWO PHASES and the second is not optional: sweep wide in parallel to find candidates, then
+CONFIRM EVERY CANDIDATE SERIALLY. A parallel red is a hypothesis. Fifteen per cent of them were false.
+
+### And attributing a red by checking out an old commit has its own trap
+
+Re-running the thirty-nine in a worktree at v4266, before this session's rounds, said thirty-six were already
+red there and three were not. Two of those three really were mine. gateQuality: four prose-matching regexes in
+gates I wrote at v4270-71 -- and one is an ABSENCE check on a retracted claim, where a literal would have gone
+quietly GREEN if the sentence were ever re-wrapped, which is the failure direction that hides a false claim
+rather than surfacing one. orreryEjecta: tools/ship/webgpuHarness.mjs really does import three, so the count
+moved 67 -> 68, established by diffing the importer lists rather than assumed.
+
+*** THE THIRD WAS A FALSE ATTRIBUTION, AND THE MEASUREMENT MADE IT. *** duplicateFiles walks the filesystem,
+and the working tree carries two git-ignored agent worktrees under .claude/ that a clean checkout does not --
+hundreds of phantom duplicate groups, present on this box and in no commit. A CLEAN CHECKOUT IS A DIFFERENT
+WORLD from a working tree, and any gate that scans files rather than reading git's index is compared across
+that gap. Fixed at its cause: the walk skips .claude.
+
+### What is now permanent
+
+tools/ship/redCensus.mjs records the thirty-seven with what each one fails and its own measured runtime -- so
+re-verifying ALL of them costs 142 seconds and the census is never sampled, because a census that spot-checks
+can be wrong about exactly what it skipped. Its gate RE-RUNS every listed gate, and *** GOES RED WHEN ONE OF
+THEM IS FIXED. *** The list may only shrink, and only by someone deleting a line on purpose. That is the
+mechanism the old register lacked, and its absence is the whole reason twelve entries rotted into accusations.
+
+### The first draft shipped the exact bug the census exists to catch
+
+tools/ship/referenceKind-selfcheck.mjs runs in 73.7 seconds and exits 1. It was starved past the sweep's flat
+120-second cap -- a number I chose, not a budget the tree records -- filed as "timed out", and then read as
+exonerated because it was not in the confirmed-red list. It was red the entire time. It was caught only by the
+control in section 3, which re-runs a sample of the wrongly-accused instead of trusting a set difference, and
+that control exists because this tree keeps rediscovering that a check comparing two lists is a check on
+neither.
+
+Sixty-four gates remain UNMEASURED -- not red, not green -- and are named in the census rather than rounded
+into either. Twenty are confirmed so far: eighteen green, two still unfinished at 400 seconds. Finishing them
+is about three hours of serial running and is the next round. *** SO THE HONEST TOTAL IS "AT LEAST 37", NOT
+"37". *** Recording the hole is what stops this census becoming the fourth wrong answer on the subject.
+
+### Sabotage
+
+A gate that actually passes added to the red list: 3 red -- the re-run names it and says delete the line, the
+cross-register comparison notices the two disagree, and the arithmetic identity stops closing. Three
+independent reds for one bad line, so no single check has to be the reliable one.
+
+UNCONFIRMED_SLOW emptied so the census silently claims completeness: 1 red, narrow and exactly right --
+nothing about the red set changes, and the only thing that breaks is the claim. It is the sabotage closest to
+what a tidying pass would really do, because an empty list looks like good news.
+
+The mis-bucketing restored: 3 red, including the check written specifically to remember it.
+
+Two more reds arrived unbidden and are corrected rather than logged. The arithmetic was written as
+(confirmed - fixed) and stopped closing the moment a gate ENTERED the red set from outside the swept count; it
+needs a recovery term, and the gate went red on its own bookkeeping. And twoF-selfcheck sat in both the
+unmeasured bucket and the wrongly-accused list, because it had in fact been measured -- 120.5 s, exit 0. Both
+directions out of that bucket are now resolved and counted: one red, one green, from a set that had been
+called neither.
+
+This round adds one module and one gate, and the tree stands at 1352 gates.
 ## v4278 -- The shader is the authority on its own layout
 
 gfx/device.js's WebGPU pipeline builds its uniform buffer at offsets computed from `d.uniforms` -- a list the
@@ -18610,3 +18699,5 @@ The build now stands at 4276 gates.
 The build now stands at 4277 gates.
 
 The build now stands at 4278 gates.
+
+The build now stands at 4279 gates.

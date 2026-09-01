@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 434,
+ "count": 439,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -823,6 +823,13 @@
    "p": 0
   },
   {
+   "f": "destructible.html",
+   "t": "Destructible — an exact hole in a wall",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "device.html",
    "t": "Roundhouse Devices",
    "d": "",
@@ -918,6 +925,13 @@
    "t": "Doorbell",
    "d": "",
    "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "drive-brain.html",
+   "t": "GPU Brain: Learn to Drive",
+   "d": "A car learns to drive to a goal and stop there, on the real vehicle model: wheels as rays, grip proportional to the load each wheel actually carries, and tyre forces clamped to one friction circle. Trained by evolution strategy against a hand-written driver. Bolt a 400kg turret on the roof and the same policy starts rolling it over -- the loadout, not the driving.",
+   "g": "",
    "p": 0
   },
   {
@@ -1782,6 +1796,13 @@
    "p": 0
   },
   {
+   "f": "mesh-line.html",
+   "t": "Wide lines: what gl.lineWidth cannot do",
+   "d": "gl.lineWidth is clamped to 1 on every desktop driver -- it is in the spec and it silently does nothing. A wide line has to be a triangle strip, with the sideways offset applied in the vertex shader so the width is a number of PIXELS that does not change with distance. Drag the width; watch the same path drawn both ways.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "method-lab.html",
    "t": "the method instruments",
    "d": "Three instruments that measure the lab rather than the physics: the proposer registry (which knobs a machine may turn, and on whose evidence), the knob registry (which instruments are governed and which are deliberately not), and periodic boundaries for molecular dynamics. None of them has a picture to show, so this page shows their keys and their gates instead of pretending otherwise.",
@@ -2139,6 +2160,13 @@
    "p": 0
   },
   {
+   "f": "primitive-paint.html",
+   "t": "Primitive: a picture in a few dozen shapes",
+   "d": "Approximates any image with coloured triangles, rectangles and ellipses, one at a time. The colour of each shape is never searched for -- it is solved in closed form, the exact least-squares answer -- and each candidate is scored only over the pixels it covers, which is what makes it fast enough to watch. Drop in your own picture.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "probe-lab.html",
    "t": "Probe Lab - a released instrument on a timelike geodesic",
    "d": "",
@@ -2472,6 +2500,13 @@
    "t": "Skin depth, and a bisected threshold against a predicted one (v3628)",
    "d": "Skin depth exact vs the famous good-conductor limit (55% wrong at loss tangent 1), measured on a lossy 1D FDTD - and the stability meter's bisected threshold graded against FDTD's exactly predictable Courant limit for the first time.",
    "g": "em",
+   "p": 0
+  },
+  {
+   "f": "sky.html",
+   "t": "Sky — precomputed atmospheric scattering",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {

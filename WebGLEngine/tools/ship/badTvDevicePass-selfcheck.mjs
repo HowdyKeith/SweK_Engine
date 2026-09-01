@@ -65,7 +65,12 @@ console.log("\n1. THE DESCRIPTOR SATISFIES THE CONTRACT v4269 MEASURED");
         UV_CONVENTION.space === "framebuffer", "a consumer reads it rather than guessing");
     // The guard v4269 added, exercised from the consumer's side.
     const dev = fs.readFileSync(path.join(ENG, "gfx/device.js"), "utf8");
-    ok("  a GLSL-only pipeline would still be refused by name", /cannot run on the WebGPU backend/.test(dev),
+    // *** \s+ RATHER THAN A LITERAL SPACE, BECAUSE THIS MATCHES PROSE AND PROSE WRAPS. ***
+    // gateQuality flagged this at v4279 as prose-matching debt, and it was right twice over: the phrase lives
+    // inside a thrown message that is assembled across source lines, so a re-wrap of that message -- an edit
+    // that changes nothing a caller sees -- would have turned this check red on correct code. Whitespace-
+    // insensitive is the tree's settled idiom for the cases where prose really is the thing being checked.
+    ok("  a GLSL-only pipeline would still be refused by name", /cannot\s+run\s+on\s+the\s+WebGPU\s+backend/.test(dev),
         "this descriptor passes that guard because it supplies wgsl");
 }
 
@@ -152,7 +157,7 @@ console.log("\n3. THE ORIENTATION RULE, WHICH REASONING GOT WRONG AND RENDERING 
         /o\.uv = vec2f\(\(p\[vi\]\.x \+ 1\.0\) \* 0\.5, 1\.0 - \(p\[vi\]\.y \+ 1\.0\) \* 0\.5\)/.test(wgsl),
         "an earlier draft argued they must differ; rendering both ways made all 4,096 pixels disagree");
     ok("  the file records that it was wrong rather than quietly fixing it",
-        /GOT WRONG TWICE AND MEASURED RIGHT ONCE/.test(src));
+        /GOT\s+WRONG\s+TWICE\s+AND\s+MEASURED\s+RIGHT\s+ONCE/.test(src));
     ok("  and says why it is not cosmetic", /the roll reads v|ROLL READS v/i.test(src),
         "fract(v - time * rollSpeed): a symmetric error rolls the wrong way and looks plausible");
     ok("UV_CONVENTION is stated as data, not only in prose",

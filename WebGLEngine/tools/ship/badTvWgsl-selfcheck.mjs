@@ -173,8 +173,14 @@ console.log("\n5. THE v4269 CLAIM THIS ROUND WITHDREW");
 {
     const bp = fs.readFileSync(path.join(ENG, "render/backendParity.mjs"), "utf8");
     const gate = fs.readFileSync(path.join(ENG, "tools/ship/backendParity-selfcheck.mjs"), "utf8");
+    // *** A NEGATIVE PROSE CHECK IS STILL A PROSE CHECK, AND THIS ONE WAS THE MORE DANGEROUS DIRECTION. ***
+    // Written as a literal, a re-wrap of the retracted sentence across two comment lines would have made it
+    // stop matching -- and this assertion is an ABSENCE, so it would have gone quietly GREEN with the false
+    // claim still sitting in the file. gateQuality flagged it at v4279. Whitespace-insensitive now, so the
+    // sentence cannot hide behind a line break.
+    const RETRACTED = /NOTHING\s+HERE\s+CAN\s+EXECUTE\s+WGSL/;
     ok("*** neither v4269 file still asserts that WGSL cannot be executed here ***",
-        !/NOTHING HERE CAN EXECUTE WGSL/.test(bp) && !/NOTHING HERE CAN EXECUTE WGSL/.test(gate),
+        !RETRACTED.test(bp) && !RETRACTED.test(gate),
         "the claim was inferred from 'the build box has no GPU' and never tested");
     ok("  and both now point at the harness that disproved it",
         /webgpuHarness/.test(bp) && /webgpuHarness/.test(gate));

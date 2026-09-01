@@ -32,7 +32,19 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const SKIP = new Set([".git", "node_modules", "__pycache__", ".DS_Store"]);
+// *** WHAT IS SKIPPED, AND WHY .claude/worktrees JOINED THE LIST AT v4279. ***
+// This walk reads the FILESYSTEM, not git's index, and the two disagree about what is in the repository. An
+// agent worktree under .claude/worktrees/ is a whole second copy of the tree, git-ignored (.git/info/exclude
+// carries `**/.claude/worktrees/`) and present only on a machine where such an agent has run. With two of
+// them on disk this gate reported HUNDREDS of new duplicate groups -- every file in the tree "duplicated"
+// two or three times -- and went red on a repository that had not changed at all.
+//
+// It looked, from a clean checkout, exactly like a defect introduced during this session. It was not: the
+// v4279 sweep compared HEAD against a worktree at v4266 and read that as "these three gates were broken by
+// recent rounds", and this was one of them. A CLEAN CHECKOUT HAS NO SCRATCH DIRECTORIES, so any gate that
+// scans the filesystem is comparing two different worlds. That is a fact about the measuring method, and it
+// is recorded here because the next person to attribute a red by checking out an old commit will hit it too.
+const SKIP = new Set([".git", "node_modules", "__pycache__", ".DS_Store", ".claude"]);
 // Text-ish and code-ish only. A duplicated BINARY ASSET (an icon, a wasm blob, a font) is normal and carries no
 // obligation to stay in step, so counting it would bury the six that matter under noise nobody would read.
 const WATCHED = /\.(mjs|js|jsx|ts|py|sh|bat|json|md|html|css|glsl|vert|frag)$/i;

@@ -129,8 +129,14 @@ export function ejectaOf(name, files) {
  * So: the numbers here are the ones the SHIPPED sweep prints. Every time this baseline was taken from
  * something else -- a probe, a looser regex, an un-stripped read -- it disagreed with the code that ships.
  */
+// *** three MOVED 67 -> 68 AT v4279, AND THE REASON IS RECORDED BECAUSE A RATCHET THAT MOVES SILENTLY IS
+// NOT A RATCHET. *** The new importer is tools/ship/webgpuHarness.mjs, added at v4270, which loads three in
+// order to render the SHIPPING three.js pass to pixels and compare it against the WGSL port. It is a real
+// import of the real library, not a mention in prose and not the scanner counting itself -- both of which
+// this file's own header records happening before. Established by diffing the importer list at v4266 against
+// HEAD, which returned exactly one added path.
 export const EJECTA_BASELINE = Object.freeze({
-    three: 67, box3d: 21, krbn: 7, htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
+    three: 68, box3d: 21, krbn: 7, htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
     draco: 2, fonts: 2, heerich: 1, wasm: 1, grass: 0, keyhunt: 0, slug: 0,
 });
 
