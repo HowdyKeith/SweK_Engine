@@ -100,13 +100,34 @@ const row = (d, m) => c.rows.find((r) => r.device === d && r.mode === m);
 // ---- 4. TWO CANDIDATES INSPECTED, TWO FALSE POSITIVES, ONE SHARED CAUSE -------------------------------------------------
 {
     // Recorded because the alarming version of both was drafted first.
+    // *** v4307 -- THE REASONING WAS ABOUT THE STILL MODES AND THE ASSERTION WAS ABOUT ALL OF THEM. *** This
+    // read `th.every(...)` across EVERY thermal row and went red, because thermal declares a `rayleigh` mode
+    // that SWEEPS GRAVITY ON PURPOSE to find the critical point -- and Ra runs through the viscosity, which is
+    // what tau sets. MEASURED per mode: diffuse, convect and onedmoment move NOTHING under tau; rayleigh moves
+    // raCritMeasured and raCritErrFrac. The prose already said which case it meant -- "the diffusion test runs
+    // with gravity 0 and beta 0 and walls injecting nothing, so there is no flow for it to act on" -- and that
+    // sentence is exactly false of the rayleigh mode. A CLAIM STATED WIDER THAN WHAT WAS MEASURED, which is the
+    // defect this branch has been chasing, in the file that reports on other devices doing it.
+    //
+    // NOT MINE, AND THAT WAS CHECKED RATHER THAN ASSUMED: `rayleigh` has always been in deviceModes'
+    // CANDIDATE_MODES, so that row has always been swept, and the dependence is structural -- alpha =
+    // c_s^2 (tau_g - 1/2) by thermalBind's own header, with Ra inversely in the viscosity tau sets. The
+    // `rayleigh` observable v4184 added lives in `convect`, which reads gravity 0 and moves under nothing.
+    //
+    // The response is now asserted BOTH WAYS, because "tau is dead here" is only worth saying if tau is alive
+    // somewhere: a suite where tau moved nothing anywhere would be a broken sweep, not a physics result.
     const th = c.rows.filter((r) => r.device === "thermal");
-    ok("thermal's dead tau is correct physics, not a defect",
-        th.every((r) => !r.movedBy.tau || r.movedBy.tau.length === 0),
-        "tau is the MOMENTUM relaxation time; the diffusion test runs with gravity 0 and beta 0 and walls " +
-        "injecting nothing, so there is no flow for it to act on. thermalBind's own header says the diffusivity " +
-        "comes from tau_g. I had drafted this as 'the measured diffusivity ignores the relaxation time that " +
-        "defines it' before reading the file");
+    const still = th.filter((r) => r.mode !== "rayleigh");
+    const ray = th.filter((r) => r.mode === "rayleigh");
+    const movedIn = (rs) => rs.filter((r) => r.movedBy.tau && r.movedBy.tau.length);
+    ok("thermal's dead tau is correct physics in the STILL modes -- and rayleigh responds, as it must",
+        still.length > 0 && movedIn(still).length === 0 && ray.length > 0 && movedIn(ray).length > 0,
+        "tau is the MOMENTUM relaxation time; the still modes (" + still.map((r) => r.mode).join(", ") +
+        ") run with gravity 0 and beta 0 and walls injecting nothing, so there is no flow for it to act on, and " +
+        "tau moves nothing in them. `rayleigh` sweeps gravity to locate the critical point, so tau reaches it " +
+        "through the viscosity: " + (movedIn(ray)[0] ? movedIn(ray)[0].movedBy.tau.join(", ") : "") + ". " +
+        "thermalBind's own header says the diffusivity comes from tau_g. I had drafted this as 'the measured " +
+        "diffusivity ignores the relaxation time that defines it' before reading the file");
 
     ok("chaos's dead warmup is convergence, not a defect",
         (row("chaos", "lyapunov").movedBy.warmup || []).length === 0,
