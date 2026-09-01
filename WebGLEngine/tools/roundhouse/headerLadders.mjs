@@ -108,9 +108,35 @@ for (const [name, file] of nameToFile) {
         const vals = toks.map(Number).filter(Number.isFinite);
         if (vals.length < 3) continue;
         if (vals.every((v) => Number.isInteger(v) && v > 1900 && v < 2100)) continue;   // years
+
+        // *** v4302 -- A CONFIG LIST IS NOT A LADDER, AND THE FIRST CUT COULD NOT TELL THEM APART. *** mpmstep
+        // was flagged on "nu = 0, 0.15, 0.3, 0.45, 0.49, 1e-6, -0.3 and 3e5" -- the INPUTS a knob was swept
+        // over, not readings taken from it -- and the same mistake caught fdtd's "epsR = 1 / 2 / 4 / 9",
+        // freesurface's seed numbers, nbench's "N = 500 / 2000 / 8000" and xpbd's iteration counts. Asking
+        // whether the FREEZE HOLDS AN INPUT is a question with no meaning: the freeze records what a device
+        // REPORTS.
+        //
+        // The separator that works is PRECISION, and it works because of what the two things are for. A swept
+        // input is chosen by a human and written the short way -- small integers, one or two figures. A reading
+        // is whatever came out and gets quoted to the digits that were measured. So: at least one rung carrying
+        // FOUR OR MORE significant digits, and not every rung an integer.
+        //
+        // MEASURED at v4302: this drops 23 of 51 series and every one of the nine already adjudicated by hand
+        // survives it -- including nbench's 33.4 / 71.7 / 129.5, which is the loosest real ladder in the set and
+        // the one that was 40% wrong. A FILTER THAT REMOVED THE ONLY CONFIRMED DEFECT WOULD BE WORSE THAN THE
+        // NOISE IT CLEARED, so that case was checked before this line was kept.
+        const anyPrecise = toks.some((t) => digitsOf(t) >= 4);
+        if (!anyPrecise || vals.every((v) => Number.isInteger(v))) continue;
         const hits = toks.map((t) => watched.some((w) => sig(w, digitsOf(t)) === sig(Number(t), digitsOf(t))));
         const n = hits.filter(Boolean).length;
-        rows.push({ name, file, series: m[0].trim().replace(/\s+/g, " "), rungs: toks.length, watched: n,
+        const series = m[0].trim().replace(/\s+/g, " ");
+        // *** v4302 -- THE SAME LADDER TWICE IN ONE HEADER IS ONE LADDER. *** v4300 recorded that documenting a
+        // verified ladder ADDS a ladder, and the commonest case is the plainest: a correction leaves the old
+        // series in place beside the new one, or a dated note repeats the corrected series verbatim. Counting
+        // those twice inflates the very number this file exists to report -- mpmrefine showed five entries for
+        // four distinct ladders. Deduplicated per device, on the normalised text.
+        if (rows.some((r) => r.name === name && r.series === series)) continue;
+        rows.push({ name, file, series, rungs: toks.length, watched: n,
                     kind: n === 0 ? "NONE" : n < toks.length ? "PARTIAL" : "all" });
     }
 }

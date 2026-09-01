@@ -32,6 +32,12 @@
 // Measured: 0.000001 / 0.000000 / 0.000091, all "chaotic = true". THE SIGN OF A NUMBER THAT SHOULD BE ZERO IS
 // ARBITRARY, AND A BOOLEAN LATCHED ONTO IT INHERITS THAT ARBITRARINESS -- the plant is caught by the
 // MAGNITUDE against ln 2, never by the flag. ***
+//
+// v4302 -- RE-DRIVEN AND EXACT, all three, all still "chaotic = true". The honest arm is the other half of the
+// argument and is worth having beside them: r = 4 reads +0.6931468 (ln 2 to seven places), r = 3.2 reads
+// -0.9162907 and r = 3.83 reads -0.3697549, so the two the plant miscalls are NOT MARGINAL -- they are deeply
+// negative and the plant still reports them chaotic. Unwatched: `lyapunov` runs at DEF.r, so the r = 3.2 and
+// r = 3.83 rungs are produced by no declared mode, in either arm.
 import { FEIGENBAUM_DELTA, LN2, orbit, fixedPoint, secondDoubling, periodOf, lyapunov, bifurcationPoint, cascade, deltaEstimates, LOGISTIC_SLOPE } from "../../physics/chaos/logistic.js";
 
 /** The true slope; the plant swaps in the map-over-x form, which telescopes to zero. */

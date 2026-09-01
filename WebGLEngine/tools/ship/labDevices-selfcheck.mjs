@@ -361,8 +361,28 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         ok("!! chaos PLANTED: the modes that never call lyapunov are BIT-IDENTICAL",
             pf.deltaBest === fg.deltaBest, `deltaBest ${fg.deltaBest.toFixed(6)} -- a knob that moved a mode it does not touch would be a leak`);
 
-        ok("chaos names what its plant overturns, as data rather than prose",
-            chaosDevice.planted && chaosDevice.planted.observable === "lyapunovErr" && !!chaosDevice.planted.knob);
+        // *** v4302 -- THIS PINNED THE STRING "lyapunovErr" AND WENT RED WHEN THE DECLARATION WAS CORRECTED. ***
+        // chaos declared `lyapunovErr` and that observable IS UNDEFINED AT THE DEVICE'S OWN DEFAULT: it is
+        // |lambda - exact| and `exact` only exists at r = 4, while DEF.r is 2.5. So the device named an
+        // observable the census could not grade, the declaration was moved to `lyapunovValue`, and THIS LINE
+        // WENT RED FOR THE FIX -- the same shape as a selfcheck that pins plantKind as a literal.
+        //
+        // A LITERAL NAME WAS NEVER WHAT THIS ASSERTION MEANT. It means the device names, AS DATA, an observable
+        // its plant actually overturns -- so it is now DRIVEN at the device's own default rather than compared
+        // against a spelling. MEASURED there (r = 2.5): lyapunovValue -0.693147 honest, which is -ln 2 for the
+        // period-2 cycle, against -1.11e-16 planted; lyapunovErr undefined in BOTH arms, which is precisely why
+        // it could not carry the declaration. A rename cannot break this line, and a declaration that goes dead
+        // at the default cannot pass it.
+        const dObs = chaosDevice.planted && chaosDevice.planted.observable;
+        const dh = await buildChaos({ mode: "lyapunov" });
+        const dp = await buildChaos({ mode: "lyapunov", config: { planted: true } });
+        ok("chaos names what its plant overturns, as data -- AND NAMES ONE THAT IS LIVE AT ITS OWN DEFAULT",
+            !!dObs && !!(chaosDevice.planted && chaosDevice.planted.knob) &&
+            Number.isFinite(dh[dObs]) && Number.isFinite(dp[dObs]) && dh[dObs] !== dp[dObs],
+            `declared "${dObs}" via knob "${chaosDevice.planted && chaosDevice.planted.knob}": ` +
+            `${Number.isFinite(dh[dObs]) ? dh[dObs].toExponential(6) : String(dh[dObs])} -> ` +
+            `${Number.isFinite(dp[dObs]) ? dp[dObs].toExponential(6) : String(dp[dObs])} at the default r=${dh.r}. ` +
+            "lyapunovErr reads undefined in BOTH arms here, which is why it cannot carry the declaration");
     }
 
     const wild = await buildChaos({ mode: "lyapunov", config: { r: 99 } });
