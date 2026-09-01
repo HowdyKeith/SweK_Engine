@@ -94,9 +94,24 @@ export async function buildCfl(hyp, base = {}) {
 
     if (h.mode === "runaway") {
         // *** THE BLINDNESS WORTH REPORTING: A RUNAWAY IS ALL FINITE. Stepped far past the limit this fixture
-        // reaches speeds around 1e8 and EVERY COORDINATE IS STILL A FINITE FLOAT -- so a check asking only
+        // reaches speeds around 1e13 and EVERY COORDINATE IS STILL A FINITE FLOAT -- so a check asking only
         // "did it produce NaN", which is the check most people reach for, PASSES A COMPLETELY BROKEN RUN. ***
-        const r = run(c, 0.02, c.soundSpeed);
+        //
+        // *** v4193 -- THE STEP WAS 0.02 AND THE DEMONSTRATION HAD STOPPED DEMONSTRATING. *** Two upstream
+        // changes to the SPH core landed after this fixture was chosen -- f350286's direct-indexed spatial grid
+        // (crossover 1000 -> 128) and 1efe978's pinned equation of state -- and TOGETHER THEY MADE THE SOLVER
+        // STABLE AT ACOUSTIC COURANT 3.0, which is where dt = 0.02 sits. MEASURED on the shipped module: at
+        // courant 3.0 the run tops out at 1.75e2 and stays bounded even at 2000 steps (1.12e2), so
+        // `finiteButBroken` -- the whole point of this mode -- had quietly become FALSE. Proven to be the code
+        // and not this host by running the fixture at the freeze commit dc04ec4 in a worktree: 8.7966e8 there,
+        // bit-identical to the frozen row, on the same machine and the same Node.
+        //
+        // THE FIX IS THE STEP, NOT THE THRESHOLD. Lowering the 1e4 bar to meet 1.75e2 would be moving the goal
+        // posts to keep a green light; the mode's claim is about a run stepped FAR PAST its limit, so the step
+        // goes far past the NEW limit. MEASURED across the ladder: courant 4.5 (dt 0.03) -> 5.30e12, courant
+        // 7.5 (dt 0.05) -> 1.63e13, courant 15 (dt 0.1) -> 1.74e13, all allFinite. 0.05 is chosen over 0.03 for
+        // margin: 4.5 is one rung off the new stability edge and would be a fixture waiting to go quiet again.
+        const r = run(c, 0.05, c.soundSpeed);
         out.maxSpeed = r.maxSpeed;
         out.allFinite = r.allFinite;
         out.finiteButBroken = r.allFinite && r.maxSpeed > 1e4;

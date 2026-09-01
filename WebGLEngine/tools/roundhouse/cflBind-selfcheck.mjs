@@ -50,20 +50,30 @@ console.log("\n2. A RUNAWAY IS ALL FINITE, WHICH IS THE BLINDNESS WORTH REPORTIN
     // the ACOUSTIC COURANT, and that is c*dt/h -- three fixture constants, 15 * 0.002 / 0.01 = 3.0 exactly, the
     // same on every machine that will ever run it. maxSpeed is REPORTED, because it is a measurement of this
     // host and reporting a measurement is not the same as requiring one.
-    ok("!! *** STEPPED PAST THE LIMIT (acoustic courant 3x) AND EVERY COORDINATE IS STILL FINITE ***",
+    // NOT "courant 3x" in the name: the fixture's step moved at v4193 and a hardcoded multiple in a LABEL is
+    // the same stale-number defect as the one in the line below it, one indirection further out.
+    ok("!! *** STEPPED WELL PAST THE LIMIT AND EVERY COORDINATE IS STILL FINITE ***",
         runaway.allFinite === true && runaway.acousticCourant > 1,
         "acoustic courant " + runaway.acousticCourant.toFixed(2) + " (c*dt/h, fixture constants -- portable), " +
         "allFinite " + runaway.allFinite + ", maxSpeed " + runaway.maxSpeed.toExponential(2) + " on THIS host. " +
         "*** A CHECK ASKING ONLY 'DID IT PRODUCE NaN' -- WHICH IS THE CHECK MOST PEOPLE REACH FOR -- PASSES A " +
         "COMPLETELY BROKEN RUN. cflNumber.ok requires courant <= 1 AND finite, so it catches this; the " +
         "near-miss is recorded because the cheaper check is the tempting one ***");
-    report("HOST-DEPENDENT, REPORTED NOT ASSERTED",
-           "maxSpeed and advectiveCourant differ by machine: " +
-           runaway.maxSpeed.toExponential(2) + " here, 1.20e+2 on Keith's rig, from the same code. " +
-           "finiteButBroken carries the same 1e4 threshold inside the device and lab-results-baseline.json " +
-           "pins it true -- so that baseline row is host-dependent too. NOT changed here: the observable is a " +
-           "measurement and the baseline is a record of one, and rewriting either to make a gate portable " +
-           "would be editing the evidence instead of the check that misused it.");
+    report("REPORTED NOT ASSERTED -- AND v4193 FOUND THE CAUSE WAS NOT THE HOST",
+           "maxSpeed here is " + runaway.maxSpeed.toExponential(2) + ". *** v4137 READ THE 8.8e8-vs-1.20e+2 GAP " +
+           "AS HOST-DEPENDENT Math AND IT WAS A CODE CHANGE. *** v4193 ran this fixture at the freeze commit " +
+           "dc04ec4 in a worktree, SAME MACHINE AND SAME NODE, and got 8.7966e8 -- bit-identical to the frozen " +
+           "row -- against 1.75e2 from the tree as it now ships. Two upstream commits explain it: f350286's " +
+           "direct-indexed spatial grid (which changes neighbour ITERATION ORDER, so the sums differ in the " +
+           "last bits) and 1efe978's pinned equation of state. That Keith's rig read 1.20e+2, the same order " +
+           "as this tree's 1.75e2, is CONSISTENT WITH his having run newer SPH than the freeze -- consistent " +
+           "with, not shown: nobody has run both revisions on that machine. " +
+           "*** v4137'S FIX STANDS AND IS NOT BEING UNDONE. *** Asserting a chaotic magnitude across machines " +
+           "was wrong for the reason it gave, and the portable conjunct (acoustic courant, three fixture " +
+           "constants) is still what this gate rests on. What v4193 changes is the ATTRIBUTION -- and one " +
+           "thing that followed from it: a runaway that had stopped running away, because courant 3.0 is " +
+           "inside the new solver's stable region. The fixture now steps to courant 7.5. A REPORTED " +
+           "MEASUREMENT DRIFTING IS STILL EVIDENCE; it was read as noise for 56 versions.");
 }
 
 console.log("\n3. THE KEY: THE BREAK POINT SCALES WITH THE SOUND SPEED");
