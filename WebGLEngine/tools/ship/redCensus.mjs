@@ -399,13 +399,30 @@ export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e
 // the 37 reds take between 89 ms and 7.5 s with the spread you would expect from real work. They are running
 // and they are failing.
 //
-// WHAT DID NOT HAPPEN IS AS IMPORTANT: nothing REGRESSED either. No gate that was green went red. The register
-// is not rotting in the direction it rotted last time -- at v4279 THIRTEEN of the nineteen previously recorded
-// were found already fixed with nobody removing the entry. This time the list is exactly true and exactly
-// stalled, which is a different failure and needs a different fix: not a correction, a RATCHET.
+// WHAT DID NOT HAPPEN IS AS IMPORTANT: nothing among the 37 was fixed. The register is not rotting in the
+// direction it rotted last time -- at v4279 THIRTEEN of the nineteen previously recorded were found already
+// fixed with nobody removing the entry. This time the list is exactly true and exactly stalled, which is a
+// different failure and needs a different fix: not a correction, a RATCHET.
+//
+// *** CORRECTED AT v4297: THIS RECORD ORIGINALLY CARRIED `regressed: 0`, AND IT HAD NO RIGHT TO. ***
+//
+// A regression is a gate that was GREEN and is now red. All 37 gates this re-check ran were already red, so
+// not one of them was eligible; the zero was a claim about the 1,329 gates the method never executed. The
+// prose shipped in the same round said the honest state of that question was UNKNOWN -- so the caveat and the
+// field contradicted each other inside one commit, and the field is the half a reader greps.
+//
+// The rule that catches it is gateSweep.coversRegressions(): a method may report on regressions only if the
+// gates it ran include gates that were not already red. The two figures are split below so that the measured
+// one and the unmeasured one cannot be read as the same kind of thing. The full sweep that IS entitled to the
+// answer ran at v4297; see gateSweep.SWEEP_V4297.
 export const RECHECK = Object.freeze({
     at: "v4295", roundsSince: 16, method: "serial, one gate at a time, via runGate",
-    checked: 37, stillRed: 37, nowGreen: 0, regressed: 0,
+    checked: 37, stillRed: 37, nowGreen: 0,
+    // MEASURED: of the 37 re-run, none had gone from red to red-for-a-new-reason or otherwise moved.
+    regressedAmongChecked: 0,
+    // NOT MEASURED, and originally shipped as a bare `regressed: 0`. See the correction above.
+    regressedOverall: "unmeasurable by this method -- all 37 gates it ran were already red, so no gate " +
+                      "eligible to regress was executed; answered by the full sweep at v4297",
     controlled: Object.freeze(["tools/ship/frameGraph-selfcheck.mjs", "tools/ship/crossBackend-selfcheck.mjs",
                                "tools/ship/claimCheck-selfcheck.mjs"]),
     controlVerdict: "all three report GREEN, so 37-of-37 is not a runner that reports red for everything",

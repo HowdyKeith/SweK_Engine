@@ -102,9 +102,14 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
     const R = RC.RECHECK;
     ok(R.checked === RC.RED_AT_V4279.length && R.stillRed + R.nowGreen === R.checked,
        "the recorded re-check adds up", `${R.stillRed} red + ${R.nowGreen} green = ${R.checked}`);
-    ok(R.nowGreen === 0 && R.regressed === 0,
-       "*** sixteen rounds, nothing fixed and nothing regressed ***",
+    // v4297: this line used to read `R.regressed === 0` and asserted a field the re-check could not measure.
+    // A gate that checks a record is only as honest as the record, and this one repeated its error verbatim.
+    ok(R.nowGreen === 0 && R.regressedAmongChecked === 0,
+       "*** sixteen rounds, nothing fixed among the thirty-seven ***",
        "the previous register rotted by accusing fixed code; this one is exactly true and exactly stalled");
+    ok(!Object.prototype.hasOwnProperty.call(R, "regressed") && /unmeasur/i.test(R.regressedOverall),
+       "*** and the REGRESSION question is recorded as unmeasurable rather than as a zero ***",
+       "all 37 it ran were already red, so none was eligible; answered by the full sweep at v4297");
     ok(typeof R.whyShipsWereHonest === "string" && /verify\.mjs/.test(R.whyShipsWereHonest),
        "and it explains why every ALL GREEN was honest anyway",
        "verify.mjs runs a smaller, different set -- the sweep is not what a ship gate executes");
