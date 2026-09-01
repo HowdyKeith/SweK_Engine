@@ -34,6 +34,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { parsePasses, spanOf, intermediatesOf, SPANS } from "./frameGraph.mjs";
+
 export const BLOOM_SOURCE = "render/bloomPass.js";
 
 const readBloom = () => fs.readFileSync(path.join(ENG, BLOOM_SOURCE), "utf8");
@@ -75,17 +77,42 @@ export function kernelSum(w = kernelWeights()) {
 // *** THE FIRST VERSION OF THIS TABLE SAID THE CHAIN WAS THREE DRAWS AND ITS OWN GATE SAID FIVE. ***
 // Between "Pass 1" and "Pass 4" render/bloomPass.js issues FIVE gl.drawArrays: bright, blur-H, blur-V, then
 // SSAO and god rays. The last two are CONDITIONAL -- guarded on ssaoStrength and godRayStrength -- and they
-// are not part of the bloom the fusion replaces, which is why they were easy to forget and why forgetting
-// them would have understated the chain the reader was being told about. What this round fuses is the
-// UNCONDITIONAL three; the other two are counted here so the number is the file's and not the claim's.
-export const ROUND_TRIPS = Object.freeze({
-    glsl: Object.freeze({ passes: 3, intermediateTextures: 2, roundTrips: 3,
-                          names: Object.freeze(["bright", "blurH", "blurV"]),
-                          drawsInSpan: 5, conditional: 2,
-                          conditionalNames: Object.freeze(["ssao", "godRays"]) }),
-    wgsl: Object.freeze({ passes: 1, intermediateTextures: 0, roundTrips: 1,
-                          names: Object.freeze(["fused"]) }),
-});
+// are not part of the bloom the fusion replaces, which is why they were easy to forget.
+//
+// *** v4293 -- AND THEN EVERY NUMBER IN IT WAS TYPED BY HAND, WHICH IS HOW IT WENT WRONG THE FIRST TIME. ***
+// They are DERIVED now, by render/frameGraph.mjs, from the same bloomPass.js source this file already parses
+// for the kernel weights. Deriving them also settled a question the literal had been quietly begging:
+//
+//   `passes: 3, intermediateTextures: 2, roundTrips: 3`  describe bright..blurV   -- what fusion REPLACES
+//   `drawsInSpan: 5, conditional: 2`                     describe bright..godRay  -- what it must SPAN
+//
+// ONE FROZEN OBJECT WAS DESCRIBING TWO DIFFERENT RANGES and nothing said so, which is why "3 passes" and
+// "5 draws" sat side by side looking like a contradiction. frameGraph.SPANS names both.
+//
+// *** deriveRoundTrips TAKES ITS SOURCE AS AN ARGUMENT, AND THAT IS NOT A CONVENIENCE. *** v4293's third
+// sabotage put a hand-typed literal back, carrying today's correct numbers, and the gate went ALL GREEN: its
+// "proof of derivation" mutated a copy of bloomPass.js and watched parsePasses follow, which tests the PARSER
+// and not this constant. A gate can only tell derived from copied by re-deriving from changed input, so the
+// function has to accept input. With a literal there is no function to call and the gate fails on that too.
+export function deriveRoundTrips(src = readBloom()) {
+    const { draws } = parsePasses(src);
+    const fusable = spanOf(draws, SPANS.fusable.first, SPANS.fusable.last);
+    const enclosing = spanOf(draws, SPANS.enclosing.first, SPANS.enclosing.last);
+    return Object.freeze({
+        glsl: Object.freeze({
+            passes: fusable.count, intermediateTextures: intermediatesOf(fusable), roundTrips: fusable.count,
+            names: Object.freeze(["bright", "blurH", "blurV"]),
+            drawsInSpan: enclosing.count, conditional: enclosing.conditional,
+            conditionalNames: Object.freeze(enclosing.draws.filter((d) => d.conditional)
+                                                           .map((d) => d.program.replace(/Prog$/, ""))),
+            derivedFrom: BLOOM_SOURCE,
+            spans: Object.freeze({ passes: "fusable", drawsInSpan: "enclosing" }),
+        }),
+        wgsl: Object.freeze({ passes: 1, intermediateTextures: 0, roundTrips: 1,
+                              names: Object.freeze(["fused"]) }),
+    });
+}
+export const ROUND_TRIPS = deriveRoundTrips();
 
 // The tile the fused shader works in. TILE is the output square; APRON is the 4 texels each side that a
 // nine-tap kernel reaches. The shared array is (TILE + 2*APRON) rows of TILE columns, holding the
