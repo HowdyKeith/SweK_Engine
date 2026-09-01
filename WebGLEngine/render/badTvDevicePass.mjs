@@ -107,5 +107,34 @@ export function badTvPipelineDesc() {
     };
 }
 
+/**
+ * *** THE SHIPPING three.js PASS RENDERS THIS EFFECT MIRRORED RELATIVE TO THIS ONE, EXACTLY. ***
+ *
+ * v4272 rendered render/badTvPass.js -- the file main.js imports -- through a real WebGLRenderer against the
+ * same source texture, and compared it to this pipeline's WebGL2 output. As rendered they disagree on every
+ * one of 4,096 pixels, worst 255 of 255. Row-mirror three's frame and they agree EXACTLY, 0 of 255.
+ *
+ * NEITHER IS WRONG. badTvPass.js reads three's own `uv` attribute, where v = 0 is the bottom of the quad, which
+ * is the standard three post-processing convention and correct for an EffectComposer. This pipeline defines uv
+ * in framebuffer space because that is the one convention where WebGPU and WebGL2 agree without a caller
+ * thinking about it. They are opposite, and both are internally exact against badTvModel.
+ *
+ * *** SO A MIGRATION IS NOT A DROP-IN. *** Swapping badTvPass for this pipeline flips the picture AND, because
+ * badTvSampleAt computes fract(v - time * rollSpeed), reverses the roll -- and a mirrored ROLLING image looks
+ * like a working effect with the tape running the other way. The transformation is exact and known, which is
+ * the whole reason it is written here as data rather than left to be rediscovered.
+ */
+export const THREE_PASS_RELATION = Object.freeze({
+    other: "render/badTvPass.js",
+    relation: "vertical mirror -- row y here equals row (height - 1 - y) there",
+    measuredAt: "v4272",
+    asRendered: "255 of 255 -- every pixel differs",
+    rowMirrored: "0 of 255 across 4096 pixels",
+    whyNeitherIsWrong: "three's uv attribute has v = 0 at the quad's bottom; this pipeline uses framebuffer " +
+                       "space, v = 0 at the top row, because that is where WebGPU and WebGL2 agree",
+    migrationHazard: "the roll reverses as well as the image flipping, and both look plausible",
+    gate: "tools/ship/badTvThreeParity-selfcheck.mjs",
+});
+
 /** Knobs for either backend, in one place so the two cannot be fed different numbers. */
 export { packKnobs, KNOB_ORDER, UV_CONVENTION };

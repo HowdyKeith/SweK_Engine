@@ -8,6 +8,65 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4272 -- The shipping pass renders it upside down, exactly, and neither version is wrong
+
+v4271 proved the device path is self-consistent: WGSL on WebGPU and GLSL on WebGL2 render badTv to the same
+4,096 pixels, both exact against the CPU model. It closed by naming what that did not settle:
+
+    "render/badTvPass.js is what main.js actually draws with and is untouched by this round ... So 'the device
+     path is consistent' is proven and 'the device path matches what ships today' is not."
+
+*** It does not match. *** `render/badTvPass.js`, rendered through a real `WebGLRenderer` from the file `main.js`
+imports, disagrees with the device pipeline on **every one of 4,096 pixels** -- worst 255 of 255. Row-mirror
+three's frame and the two agree **exactly**, 0 of 255.
+
+An exact mirror is a far stronger result than "they look different". It says the arithmetic, the constants and
+the sampling are all identical and only the vertical convention differs -- so a migration is a known
+transformation rather than a debugging session.
+
+### Neither one is wrong
+
+`badTvPass.js` draws a quad through `THREE.OrthographicCamera` and reads three's own `uv` attribute, where v = 0
+is the **bottom** of the quad. That is the standard three post-processing convention and it is correct in its own
+terms: an `EffectComposer` feeding it a `WebGLRenderTarget` gets the right picture.
+
+`badTvDevicePass.mjs` defines uv in **framebuffer space**, v = 0 at the top row, because v4271 established by
+rendering -- after arguing the opposite in a comment -- that this is the one convention where WebGPU and WebGL2
+agree without a caller thinking about it.
+
+Both are internally exact against `badTvModel.mjs`, in opposite orientations. Sabotage A demonstrates there is no
+arrangement where all three agree at once: un-flip the device pass and it starts matching three as rendered while
+ceasing to match the model in the orientation the gate evaluates it in. The mirror moves; it does not vanish.
+
+### The hazard is the roll, not the mirror
+
+`badTvSampleAt` computes `fract(v - time * rollSpeed)`. Mirroring v does not only flip the image -- it reverses
+which way the picture rolls. *** A mirrored still is obvious; a mirrored ROLLING image looks like a working
+effect with the tape running the other way, and nothing flags it. *** That is why this is recorded rather than
+left to be rediscovered by whoever first swaps one pass for the other.
+
+### What the round refused to do
+
+Pick a winner. Deciding which convention the engine wants is a migration question and needs a consumer to decide
+*for*; `badTvPass.js` is untouched and still the only version anything draws with. Instead the relationship is
+frozen as exported data -- `THREE_PASS_RELATION` on `badTvDevicePass.mjs` -- naming the other file, the exact
+relation, both measured numbers, the hazard and the gate. Sabotage B edits that record to claim the two already
+agree: 1 red, and only in the line comparing the record to the live render. That check is the entire reason it is
+data rather than a paragraph.
+
+`tools/ship/webgpuHarness.mjs` gained a third renderer, `renderThreePassToPixels`, which serves the engine tree
+over HTTP so the page imports the *shipping* module rather than a copy adapted for testing. The file is named for
+WebGPU and this function uses none, which is said plainly in its header instead of hidden: it has become the
+place where a frame is produced by any of the three paths this tree has for one effect.
+
+Sabotage A 6 red, B 1, C (flipping the three.js pass instead) 6 red -- C mirroring A almost exactly, because the
+gate privileges neither file.
+
+Unchecked and stated: which convention the engine actually wants, and the WebGPU backend in this gate -- v4271
+already proved it equals the device GLSL on every pixel, so comparing three against one compares it against both,
+and a third render would add cost and no fact.
+
+The build now stands at 4272 gates.
 ## v4271 -- Both backends render it, and the frames are identical
 
 `gfx/device.js` has promised, since the day it was written, that "a demo writes its render ONCE and runs on

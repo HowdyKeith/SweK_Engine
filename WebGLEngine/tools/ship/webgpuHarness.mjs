@@ -40,6 +40,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
+import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 
 /** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
 export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
@@ -332,4 +333,92 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
     } finally { try { await browser?.close(); } catch {} }
+}
+
+/**
+ * The THIRD renderer: the shipping three.js pass, through a real WebGLRenderer.
+ *
+ * *** THE FILE IS CALLED webgpuHarness AND THIS FUNCTION USES NO WebGPU, WHICH IS WORTH SAYING RATHER THAN
+ * HIDING. *** It started as a way to run WGSL and became the place where a frame is produced by any of the
+ * three paths this tree has for one effect: WGSL on WebGPU, GLSL on WebGL2, and a THREE.ShaderMaterial on
+ * WebGL2. Renaming it would churn three importers for a tidier label; saying so costs nothing.
+ *
+ * The page imports three and the pass module over HTTP from the engine root, so what is rendered is the
+ * SHIPPING file -- render/badTvPass.js as main.js uses it -- and not a copy adapted for testing.
+ *
+ * `readRenderTargetPixels` returns rows bottom-first, like readPixels, so this flips them to top-first for the
+ * same reason renderGlslToPixels does: every path in this file hands back the same orientation, and a caller
+ * comparing two of them is comparing pictures rather than conventions.
+ */
+export async function renderThreePassToPixels({ engineRoot, passModule, passFactory, width = 64, srcSize = 64,
+                                                time = 0, uniforms = {}, flipY = false, sourceTexel = null }) {
+    const requireFn = createRequire(import.meta.url);
+    if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
+    const pw = resolvePlaywright(requireFn);
+    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    const three = path.join(engineRoot, "vendor/three/three.module.js");
+    if (!fs.existsSync(three)) return { ok: false, skipped: true, reason: "no vendored three at " + three, pixels: null };
+
+    const n = srcSize;
+    const src = new Uint8Array(n * n * 4);
+    const gen = sourceTexel || ((x, y, N) => [Math.round(x * 255 / (N - 1)), Math.round(y * 255 / (N - 1)), 0, 255]);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const px = gen(x, y, n), i = (y * n + x) * 4;
+        src[i] = px[0]; src[i + 1] = px[1]; src[i + 2] = px[2]; src[i + 3] = px[3];
+    }
+
+    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html" };
+    const srv = http.createServer((q, s) => {
+        let u = decodeURIComponent(String(q.url).split("?")[0]);
+        if (u === "/") { s.writeHead(200, { "Content-Type": "text/html" }); return s.end("<!doctype html><title>three</title>"); }
+        const f = path.join(engineRoot, u);
+        if (!f.startsWith(engineRoot) || !fs.existsSync(f)) { s.writeHead(404); return s.end("no"); }
+        s.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" });
+        s.end(fs.readFileSync(f));
+    });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+
+    let browser = null;
+    try {
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const page = await browser.newPage();
+        const pageErrors = [];
+        page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));
+        await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+        const out = await page.evaluate(async (a) => {
+            const THREE = await import("/vendor/three/three.module.js");
+            const mod = await import(a.passModule);
+            const make = mod[a.passFactory];
+            if (typeof make !== "function") return { ok: false, reason: `${a.passFactory} is not exported by ${a.passModule}` };
+            const canvas = document.createElement("canvas"); canvas.width = a.width; canvas.height = a.width;
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
+            renderer.setSize(a.width, a.width, false);
+            const tex = new THREE.DataTexture(new Uint8Array(a.src), a.srcSize, a.srcSize, THREE.RGBAFormat);
+            tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            tex.flipY = a.flipY;
+            tex.needsUpdate = true;
+            const pass = make(THREE, {});
+            pass.uniforms.tDiffuse.value = tex;
+            if (typeof pass.setTime === "function") pass.setTime(a.time);
+            for (const k of Object.keys(a.uniforms)) if (pass.uniforms[k]) pass.uniforms[k].value = a.uniforms[k];
+            const rt = new THREE.WebGLRenderTarget(a.width, a.width,
+                { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+            renderer.setRenderTarget(rt);
+            renderer.render(pass.scene, pass.camera);
+            const px = new Uint8Array(a.width * a.width * 4);
+            renderer.readRenderTargetPixels(rt, 0, 0, a.width, a.width, px);
+            return { ok: true, pixels: Array.from(px), revision: THREE.REVISION, flipY: tex.flipY };
+        }, { passModule, passFactory, width, srcSize: n, src: Array.from(src), time, uniforms, flipY });
+        if (!out.ok) return { skipped: false, ...out, pageErrors };
+        const flipped = new Uint8Array(width * width * 4);
+        for (let y = 0; y < width; y++) {
+            const srcRow = (width - 1 - y) * width * 4;
+            flipped.set(out.pixels.slice(srcRow, srcRow + width * 4), y * width * 4);
+        }
+        return { skipped: false, ok: true, pixels: Array.from(flipped), bytesPerRow: width * 4,
+                 revision: out.revision, flipY: out.flipY, pageErrors };
+    } catch (e) {
+        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), pixels: null };
+    } finally { try { await browser?.close(); } catch {} srv.close(); }
 }
