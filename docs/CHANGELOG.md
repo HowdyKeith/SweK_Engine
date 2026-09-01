@@ -8,6 +8,91 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4280 -- A song is already a heightfield, and nobody had written the line that says so
+
+physics/fft.js was built to be BIT-REPRODUCIBLE. Its twiddle factors come from the strict-trig core this tree
+proves bit-identical, and every butterfly after that is nothing but +, -, * and /; its header promises a
+spectrum you can publish and have somebody else recompute exactly.
+
+*** THAT PROMISE HAD NEVER BEEN EXERCISED AGAINST THE THING IT MAKES POSSIBLE, BECAUSE THE FFT HAD NO
+GEOMETRIC CONSUMER. *** Nine files reach it, and every one of them either drives a meter or checks the
+transform against itself.
+
+A short-time Fourier transform is a two-dimensional array indexed by TIME and by FREQUENCY. That is a height
+grid. Not a metaphor for one, not a seed for noise that then makes one -- the same object, read with a
+different name.
+
+### The consumer was already here, which is the only reason this was worth building
+
+world/repoHeightfield.js returns "the exact object world/realTerrainStamp.js's applyRealTerrain() consumes",
+and main.js already flies a camera over whatever that produces. world/songHeightfield.mjs returns that same
+shape: the same thirteen keys, the same types, water as { areas, ways } polygons. Nothing downstream needs a
+song-specific branch. #133's rule is find the consumer BEFORE taking the solver; here the solver and the
+consumer were both in the tree already with nothing between them.
+
+### What makes it checkable rather than pretty
+
+A terrain generator can only be argued about on taste. The Fourier transform of a pure tone cannot.
+
+A bin-centred sine lands in EXACTLY bin f * frameSize / sampleRate -- 250 Hz at N = 1024 and SR = 8 kHz is bin
+32, and bin 32 is what comes back. Its magnitude is EXACTLY A * frameSize / 2: measured 512, exact equality,
+no tolerance anywhere in the check. Its neighbours sit at 1.9e-12, fourteen orders below the peak. An octave up
+is exactly twice the bin -- an integer, so no tolerance is even sayable. Every ridge below is compared against
+a number the gate computes independently, which is physics/rebar.mjs's rule (predict the ellipse, do not
+admire the picture) applied to sound.
+
+### And the honest limits, measured on both sides
+
+*** ALL OF THAT HOLDS ONLY FOR A TONE WHOSE PERIOD FITS THE WINDOW A WHOLE NUMBER OF TIMES. *** Move it half a
+bin and a rectangular window smears it: 4.42% of the energy lands more than four bins from the peak, and the
+peak loses 3.856 dB of height -- scalloping, against the -3.92 dB a rectangular window approaches as N grows.
+Hann takes the spill to 0.00%. rect is the DEFAULT here precisely because it makes the closed forms exact,
+which is what a gate can grade, and that is a stated trade rather than an oversight.
+
+Bit-reproducibility is checked ACROSS SEPARATE PROCESSES, because reading a value twice inside one process is
+the same memory and proves nothing. The same measurement shows something better: THE RIDGE IS NOT PERFECTLY
+FLAT. It varies by 8.44e-15 relative across thirty frames -- 250 Hz at 8 kHz repeats every 32 samples and the
+hop is 512, so every frame holds the same cycle, yet the frames are not bit-identical, because
+Math.sin(2*pi*250*i/8000) is evaluated at a larger i each time. The transform reproduces exactly what it is
+given; the generator is what wobbles.
+
+### Three defects the round found in itself
+
+*** THE FIRST DRAFT POINT-SAMPLED THE SPECTRUM. *** A pure tone occupies one bin out of 512, so at grid 16 the
+sampler stepped 0, 34, 68 and never landed on bin 32: every cell came back at the floor, the whole map was
+classified as silence, and a 250 Hz tone produced a lake. The picture was wrong in the most complete way
+available and nothing threw. Max-pooling puts the ridge exactly at floor(32 * grid / 512) at every resolution
+-- a spectrogram cell is not the value at a point, it is what happened in that band over that stretch.
+
+*** THE FIRST DRAFT RETURNED `water` AS A FLAT MASK ARRAY. *** realTerrainStamp.js reads data.water.areas and
+data.water.ways, both undefined on an array, so the guard would have been falsy, no water would have been
+painted, and nothing would have reported a problem -- a field that looks right, is the wrong shape, and fails
+silently. And it was missing three of repoHeightfield's thirteen keys while calling the contract matched.
+Both were caught by comparing the two objects key by key and then type by type.
+
+### Wired, not shelved
+
+physics/render/roughDiffuse.mjs shipped at v4275 with a measured energy compensation and, five rounds later,
+still has exactly two files reaching it: itself and its gate. So window.songTerrain.load() flies over a rising
+sweep with no arguments at all, .load({url}) decodes anything the browser can play through decodeAudioData,
+.load({hz}) takes a single tone -- all through the same stamper and the same fly-in repoTerrain uses.
+
+### Sabotage
+
+Reverting max-pooling: 1 red. Water back to a flat mask: 2. binOfFrequency wrapped in Math.round: 1. The
+wiring deleted from main.js: 7, all in the section that reads main.js, because being unreachable is not a
+small defect in a feature.
+
+*** TWO OF THE FOUR FIRST CAME BACK ZERO RED, AND BOTH TIMES THE GATE WAS AT FAULT RATHER THAN THE MODULE. ***
+Section 4 had asserted that a point sampler WOULD miss the tone -- by writing a point sampler inside the gate
+and running it. That grades an expression the file had just authored, not the module, and the sampler the
+module actually used floors to c * 512 / grid, which lands on bin 32 exactly. It asks the module about bin 33
+now, which no floor-based sampler visits at any of these resolutions. And nothing tested that binOfFrequency
+is CONTINUOUS, so wrapping it in Math.round was invisible: every frequency the file asked about sat on a whole
+bin. Section 1 round-trips 32.5 and 7.25 now. A sabotage that finds a hole in the gate rather than a bug in
+the module is the outcome sabotage is for, and this round produced two.
+
+This round adds one module and one gate, and the tree stands at 1353 gates.
 ## v4279 -- Nobody knew what was red, and three answers were on record, all wrong
 
 Backlog #134 said FIVE gates were red at HEAD and that rounds kept shipping ALL GREEN over them.
@@ -18701,3 +18786,5 @@ The build now stands at 4277 gates.
 The build now stands at 4278 gates.
 
 The build now stands at 4279 gates.
+
+The build now stands at 4280 gates.
