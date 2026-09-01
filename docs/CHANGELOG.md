@@ -8,6 +8,67 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4289 -- Contributors as traders, built from git because the API is shut
+
+Keith's idea: contributors travel between repositories like traders, owning a repo makes you an armed ship,
+contributing without owning makes you a hauler. The obvious way to build that is the GitHub API.
+
+*** THE OBVIOUS WAY IS UNAVAILABLE, AND NOT FOR A REASON ANYONE WOULD GUESS FROM RATE LIMITS. *** Three
+distinct refusals were probed and recorded verbatim, each with its own remedy: an unattached repository says
+"use add_repo"; our OWN repository says "an org admin must connect"; and a contributor's profile says
+*** "This GitHub API path is not available: sessions are bound to their configured repositories" *** -- the
+whole /users path class is refused, not rate-limited. So the armed-ship axis, do they own anything else, is
+exactly the axis that cannot be reached. The gate RE-PROBES all three every run: if one opens, it goes red,
+and that red means "go and use what you said you could not use".
+
+What is available turned out to be better. `git clone --filter=blob:none` fetches full history without blobs
+in seconds, and every commit carries its author -- the same substrate GitHub derives its own contributor
+graphs from. All 35 repositories in world/licenceSweep.mjs were cloned, 11,172 commits read, ZERO clone
+failures, and no API call was made at any point.
+
+*** TWELVE OF THE THIRTY-FIVE REPOSITORIES CONTAIN NO COMMIT BY THEIR OWNER. *** They are forks: cargo
+parked in someone else's dock. Six of redcamel's nine and five of but0n's thirteen. And history answers a
+sharper question than the API's boolean `fork` flag would: ownerShare, how much of what they own they
+actually wrote. but0n/THREE.js-PathTracing-Renderer counts as owner-authored on a handful of commits out of
+1,992 -- the difference between an armed ship and somebody standing next to one.
+
+*** THERE IS NO CORRECT IDENTITY KEY AND THE MODULE USES TWO. *** Git author identity is self-declared. By
+display name: 473 identities, 13 crossings. By address hash: 466 identities, 10 crossings. Email-keying is
+right about but0n -- 'but0n', 'Jeff Ma', 'Jeffrey Ma' and 'Jeffrey' are ONE address, so the owner of thirteen
+repositories here is one trader under four names. It is still WRONG about Jamie Portsmouth, who holds two
+addresses and stays two traders, at 11 repos and 5. Picking one key would be choosing which error to have,
+so both are recorded and the disagreement is a function anyone can call.
+
+NO EMAIL ADDRESS IS STORED. Identity is a truncated SHA-256 of the lowercased address, which merges an author
+across repositories without keeping the address, because a joinable index of commit emails is what turns a
+project's own relationship graph into a database of people. *** AND THE FIRST VERSION OF THAT PROMISE WAS
+FALSE AT THE MOMENT IT WAS WRITTEN. *** It hashed the address FIELD and kept the name field verbatim, on the
+reasoning that names are not addresses -- and one contributor has set their git name TO their address, which
+shipped untouched in a topAuthor field. Address-shaped names are hashed now and the gate scans the WHOLE FILE,
+prose included, so the promise is a check. A rule that protects one field and trusts another is only as good
+as the assumption that the fields mean what they are called.
+
+TWO THINGS IN THE CROSSING LIST WERE NOT PEOPLE. ImgBotApp is a bot the first predicate missed -- it tested
+for "[bot]", a "bot@" address and names ending in "bot", and ImgBotApp is none of those. And better:
+*** e3b0c44298fc IS sha256(""). *** Two repositories carry commits with an EMPTY author address; hashing that
+missing field produced a stable, plausible identity, and the graph reported it travelling between them. A
+coincidence of ABSENCE read as a connection, and it looked exactly like a finding.
+
+The classification rule is EXPORTED now rather than living in the script that generated the data, because a
+list nobody can argue with is a second place for a wrong answer to live. Exercising it immediately found the
+false positive its own comment had warned about: *** "bot@" MATCHES talbot@example.com. *** Anchored.
+
+Three sabotages, none 0 RED. Restoring the one redacted address goes 2 red. Letting the empty hash back into
+traders() goes 2 red and the people count rises from 8 to 9 -- that ninth trader is the hash of nothing.
+Un-anchoring the address pattern reddens the surnames, on a check that exercises the rule; the earlier
+version, which read the module's TEXT for a forbidden pattern, had already gone red on the comment explaining
+that the pattern is not used -- a file grading a marker it also discusses, the twelfth time this session.
+
+*** WHAT THIS DELIBERATELY IS NOT: *** a survey of GitHub. The graph covers the 35 repositories this project
+already opened and says who moves between THEM. Extending it to contributors' other repositories is the axis
+the /users refusal blocks, and it is also the axis worth leaving alone.
+
+This round adds one module and one gate, and the tree stands at 1360 gates.
 ## v4288 -- Three ways a uniform can fail, and the third one has no symptom
 
 Two threads were left open at v4287. Both close here, and closing them found a third harness defect worse
