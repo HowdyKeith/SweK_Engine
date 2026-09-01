@@ -272,3 +272,136 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         return { ok: false, skipped: false, reason: "headlessGpu error: " + String(e).slice(0, 200), values: [], errors: [] };
     }
 }
+
+// ================================================================================================
+// THE TEXTURE PATH, WHICH v4292 LEFT OUT AND v4294 HAD TO RECORD AS A HOLE
+// ================================================================================================
+//
+// *** THE CROSS-BACKEND CORPUS COVERED SEVEN SHADERS AND NOT ONE OF THEM WROTE A TEXTURE. *** 41,656 floats of
+// agreement, all of it through storage BUFFERS, while the one shader in the tree that writes a storage TEXTURE
+// sat in wgslCorpus.EXCLUDED with "there is nothing to compare against" as its reason.
+//
+// That is the worst place to have no evidence. v4287 measured what storage-texture FORMAT handling does when
+// it goes wrong: rgba8unorm clamped a peak of 1.7480 to 1.0000 and destroyed all 181 samples above 1, and the
+// resulting image looked like a bloom that had simply never happened. Format and padding bugs do not announce
+// themselves; they produce a plausible picture.
+//
+// TWO THINGS HERE ARE ARITHMETIC IN THE READER RATHER THAN THE SHADER, and both are copied deliberately from
+// webgpuHarness.runWgslComputeToTexture rather than reinvented, because a second decoder that disagreed with
+// the first would make every comparison a fact about the two readers:
+//
+//   ROW PADDING. copyTextureToBuffer pads every row up to a 256-byte multiple and the padding is not pixels.
+//   Read flat, the image shears a few texels per row -- which looks exactly like a shader bug.
+//   HALF FLOAT. rgba16float is 16 bits per channel with a 5-bit exponent and a 10-bit mantissa, and Node has
+//   no native reader for it.
+"use strict";
+
+/** rgba16float bits -> double. The browser harness's decoder, character for character. */
+export function halfToDouble(u) {
+    const s = (u & 0x8000) ? -1 : 1, e = (u >> 10) & 0x1f, m = u & 0x3ff;
+    if (e === 0) return s * Math.pow(2, -14) * (m / 1024);
+    if (e === 31) return m ? NaN : s * Infinity;
+    return s * Math.pow(2, e - 15) * (1 + m / 1024);
+}
+
+/** double -> rgba16float bits, for uploading a sampled input. Also the browser harness's, unchanged. */
+export function doubleToHalf(v) {
+    if (!isFinite(v)) return v > 0 ? 0x7c00 : 0xfc00;
+    const s = v < 0 ? 0x8000 : 0; v = Math.abs(v);
+    if (v === 0) return s;
+    const e = Math.floor(Math.log2(v));
+    if (e < -14) return s | Math.round(v / Math.pow(2, -24));
+    if (e > 15) return s | 0x7c00;
+    return s | ((e + 15) << 10) | (Math.round((v / Math.pow(2, e) - 1) * 1024) & 0x3ff);
+}
+
+export const BYTES_PER_TEXEL = Object.freeze({ rgba16float: 8, rgba8unorm: 4 });
+export const paddedBytesPerRow = (n, format) =>
+    Math.ceil(n * (BYTES_PER_TEXEL[format] || 4) / 256) * 256;
+
+/**
+ * Run a compute shader that writes a storage texture at binding 0, and read it back as RGBA floats.
+ *
+ * Deliberately the same signature and the same returned fields as
+ * webgpuHarness.runWgslComputeToTexture, for the reason the buffer version gives: a corpus can only
+ * exist if the two harnesses take the same options.
+ */
+export async function runWgslComputeToTextureNative({ code, entryPoint = "main", n = 64,
+                                                      format = "rgba16float", uniforms = null,
+                                                      workgroups = 1, inputTexel = null,
+                                                      requireFn = null } = {}) {
+    const skip = headlessGpuSkipReason(requireFn);
+    if (skip) return { ok: false, skipped: true, reason: skip, pixels: null };
+    const icd = configureVulkanIcd();
+    const { mod, from } = resolveWebgpu(requireFn);
+
+    try {
+        const gpu = mod.create([]);
+        const adapter = await gpu.requestAdapter();
+        if (!adapter) return { ok: false, skipped: false, reason: "requestAdapter() returned null with ICD " + icd.path, pixels: null };
+        const info = adapter.info || {};
+        const meta = { from, icd: icd.path,
+                       adapter: { vendor: info.vendor || null, architecture: info.architecture || null,
+                                  description: info.description || null } };
+        const dev = await adapter.requestDevice();
+        const G = mod.globals || globalThis;
+        const TU = G.GPUTextureUsage || globalThis.GPUTextureUsage;
+        const BU = G.GPUBufferUsage || globalThis.GPUBufferUsage;
+        const MM = G.GPUMapMode || globalThis.GPUMapMode;
+
+        const shader = dev.createShaderModule({ code });
+        const ci = await shader.getCompilationInfo();
+        const errors = ci.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
+        if (errors.length) return { ok: false, skipped: false, reason: "WGSL did not compile", errors, pixels: null, ...meta };
+
+        const tex = dev.createTexture({ size: [n, n], format,
+            usage: TU.STORAGE_BINDING | TU.COPY_SRC });
+        const bytesPerRow = paddedBytesPerRow(n, format);
+        const readBuf = dev.createBuffer({ size: bytesPerRow * n, usage: BU.COPY_DST | BU.MAP_READ });
+
+        const entries = [{ binding: 0, resource: tex.createView() }];
+        if (inputTexel) {
+            const u = new Uint16Array(n * n * 4);
+            for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+                const p = inputTexel(x, y, n);
+                for (let c = 0; c < 4; c++) u[(y * n + x) * 4 + c] = doubleToHalf(p[c]);
+            }
+            const src = dev.createTexture({ size: [n, n], format: "rgba16float",
+                usage: TU.TEXTURE_BINDING | TU.COPY_DST });
+            dev.queue.writeTexture({ texture: src }, u, { bytesPerRow: n * 8 }, [n, n]);
+            entries.push({ binding: 2, resource: src.createView() });
+        }
+        if (uniforms) {
+            const ub = dev.createBuffer({ size: Math.max(16, uniforms.length * 4), usage: BU.UNIFORM | BU.COPY_DST });
+            dev.queue.writeBuffer(ub, 0, new Float32Array(uniforms));
+            entries.push({ binding: 1, resource: { buffer: ub } });
+        }
+
+        const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
+        const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
+        const enc = dev.createCommandEncoder();
+        const cp = enc.beginComputePass();
+        cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(workgroups); cp.end();
+        enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [n, n]);
+        dev.queue.submit([enc.finish()]);
+        await readBuf.mapAsync(MM.READ);
+        const raw = new Uint8Array(readBuf.getMappedRange()).slice();
+        readBuf.unmap();
+        tex.destroy(); readBuf.destroy();
+
+        // ROW BY ROW. Reading the padding as pixels shears the image, which reads as a shader defect.
+        const px = new Float32Array(n * n * 4);
+        const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+        for (let y = 0; y < n; y++) {
+            const row = y * bytesPerRow;
+            for (let x = 0; x < n; x++) for (let c = 0; c < 4; c++) {
+                const o = (y * n + x) * 4 + c;
+                px[o] = format === "rgba16float" ? halfToDouble(dv.getUint16(row + (x * 4 + c) * 2, true))
+                                                 : raw[row + x * 4 + c] / 255;
+            }
+        }
+        return { ok: true, skipped: false, pixels: px, format, bytesPerRow, errors: [], ...meta };
+    } catch (e) {
+        return { ok: false, skipped: false, reason: "headlessGpu texture error: " + String(e).slice(0, 200), pixels: null };
+    }
+}

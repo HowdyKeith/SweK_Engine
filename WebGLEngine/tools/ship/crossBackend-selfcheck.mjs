@@ -17,8 +17,9 @@
 // Section 4 is the control. Agreement across seven shaders is a zero, and a zero with nothing beside it is the
 // shape of a comparison that cannot fail.
 "use strict";
-import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "./headlessGpu.mjs";
+import { runWgslCompute, runWgslComputeToTexture, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { runWgslComputeNative, runWgslComputeToTextureNative, headlessGpuSkipReason,
+         exitCleanly } from "./headlessGpu.mjs";
 import { corpus, EXCLUDED, census, compare } from "./wgslCorpus.mjs";
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 
@@ -50,8 +51,8 @@ sec("1. THE CORPUS ACCOUNTS FOR EVERY WGSL PRODUCER IN THE TREE");
     ok(EXCLUDED.every((e) => typeof e.why === "string" && e.why.length > 30 && typeof e.kind === "string"),
        "each exclusion says what KIND of thing it is, not just that it is out",
        [...new Set(EXCLUDED.map((e) => e.kind))].join(" | "));
-    ok(EXCLUDED.filter((e) => e.keeps).length === 2,
-       "and the two that are real shaders name the gate that keeps the browser harness",
+    ok(EXCLUDED.filter((e) => e.keeps).length === 1,
+       "and the one real shader still out names the gate that keeps the browser harness",
        EXCLUDED.filter((e) => e.keeps).map((e) => e.id).join(", "));
     // The census is a candidate finder. If it ever matches nothing, it has stopped working rather than passed.
     ok(c.some((f) => f.where === "corpus") && c.some((f) => f.where === "excluded"),
@@ -63,9 +64,12 @@ sec("2. EVERY SHADER IN THE CORPUS RUNS ON BOTH BACKENDS");
 // ---------------------------------------------------------------------------------------------------------
 const results = [];
 {
-    for (const e of corpus()) results.push(await compare(e, runWgslCompute, runWgslComputeNative));
+    for (const e of corpus())
+        results.push(await compare(e, runWgslCompute, runWgslComputeNative,
+                                   runWgslComputeToTexture, runWgslComputeToTextureNative));
     for (const r of results)
-        ok(r.ok, `runs: ${r.id}`, r.ok ? (r.compileOnly ? "compileOnly" : `${r.n} floats`) : r.reason);
+        ok(r.ok, `runs: ${r.id}`, r.ok ? (r.compileOnly ? "compileOnly"
+              : r.texture ? `${r.n} texels x4, ${r.format}, bytesPerRow ${r.bytesPerRow}` : `${r.n} floats`) : r.reason);
     ok(results.length === corpus().length && results.every((r) => r.ok),
        "*** all of them, on both ***", `${results.length} shaders`);
 }
@@ -95,6 +99,19 @@ sec("3. AND EVERY ONE IS BYTE-IDENTICAL");
     ok(bogus.identical === false,
        "*** and 'both refused' does NOT score as identical ***",
        "the compileOnly branch reports agreement on ACCEPTANCE, not on having produced no values");
+
+    const tex = results.filter((r) => r.texture);
+    ok(tex.length >= 3 && tex.every((r) => r.identical),
+       "*** and the TEXTURE entries agree too -- a binding class the corpus had none of until v4295 ***",
+       `${tex.length} texture shaders, ${tex.reduce((a, r) => a + r.n, 0)} texels compared`);
+    const padded = results.find((r) => /padded/.test(r.id));
+    ok(padded && padded.identical && padded.bytesPerRow === padded.bytesPerRowNative,
+       "*** including the PADDED size, where a row is 320 bytes and pads to 512 ***",
+       padded ? `bytesPerRow ${padded.bytesPerRow} on both -- v4287 found this branch unreachable at N=64, where 512 is already aligned` : "absent");
+    const clip = results.find((r) => /clipping/.test(r.id));
+    ok(clip && clip.identical && clip.format === "rgba8unorm",
+       "and the CLIPPING format, where the two must agree on what an out-of-range value becomes",
+       clip ? `${clip.format}, ${clip.same}/${clip.n}` : "absent");
 
     const planted = results.find((r) => /shaderTan/.test(r.id));
     ok(planted && planted.identical,
@@ -140,6 +157,26 @@ sec("4. THE CONTROL: THE COMPARISON CAN FAIL, ON THE SAME PAIR OF HARNESSES");
 //
 // A and B behaved as written. C did not, and it is the fifth time this session that the sharpest sabotage
 // found a check that could not fail rather than code that was wrong.
+//
+//   D  (v4295) the native texture reader reads rows at their UNPADDED stride.
+//      -> exit=1, and ONLY the padded entry goes red: 4117/6400, max diff 1.748e+0. The two N=64 entries stay
+//      green because a 64-wide rgba16float row is 512 bytes and already 256-aligned, which is exactly what
+//      v4287 found made this branch unreachable at that size. The corpus carries N=40 for no other reason.
+//
+// ---- AND THE SPEED RATIONALE FOR THIS WHOLE BACKEND IS STRUCTURALLY VOID -------------------------------------
+//
+// Two rounds predicted a wall-clock win from moving gates onto the native harness. Both delivered a LOSS, and
+// the arithmetic says they had to:
+//
+//     moving a gate saves      browser - native
+//     validating it costs      browser + native      (a cross-check runs BOTH)
+//
+// The pair can never net positive while every moved shader is also corpus-validated -- and it must be, or the
+// move is unjustified. Measured: v4294 moved three gates for -944 ms, v4295 moved the last one for -856 ms,
+// and the session stands at -1800 ms against v4293.
+//
+// *** SO THE BACKEND IS JUSTIFIED BY EVIDENCE AND NEVER BY SPEED, *** and 80,824 floats across ten shaders is
+// what it bought. Anybody proposing to move more work here for performance should read this paragraph first.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: ANY GPU BUT THIS ONE. Both backends land on the same software rasteriser, so " +
     "this says the two HARNESSES agree, not that Dawn and a browser agree on real hardware where a driver " +

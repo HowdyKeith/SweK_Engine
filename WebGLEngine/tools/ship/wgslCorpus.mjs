@@ -76,14 +76,28 @@ export function corpus() {
                "carried anyway, because a shader that compiles on one backend and not the other is exactly " +
                "the divergence a corpus exists to catch",
           opts: { code: FRAGMENT_WGSL, compileOnly: true, outCount: 0 } },
+        // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
+        // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
+        // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
+        // rgba8unorm clamping a 1.7480 peak to 1.0000 and destroying all 181 samples above 1, and the result
+        // looked like a bloom that had never happened. Format and padding faults produce a plausible picture.
+        { id: "bloomFused.fusedWgslToTexture", from: "render/bloomFused.mjs", texture: true,
+          why: "writes a storage texture in rgba16float -- a whole binding class the buffer entries never touch",
+          opts: { code: B.fusedWgslToTexture(), n, uniforms: [T, 0, 0, 0], workgroups: (n / B.TILE) * (n / B.TILE) } },
+        { id: "bloomFused.fusedWgslToTexture+padded", from: "render/bloomFused.mjs", texture: true,
+          why: "N=40, where a row is 320 bytes and pads to 512. v4287 found this branch UNREACHABLE at N=64, " +
+               "because 512 is already 256-aligned -- so the reader's padding arithmetic is only exercised here",
+          opts: { code: B.fusedWgslToTexture({ n: 40 }), n: 40, uniforms: [T, 0, 0, 0], workgroups: (40 / B.TILE) * (40 / B.TILE) } },
+        { id: "bloomFused.fusedWgslToTexture+clipping", from: "render/bloomFused.mjs", texture: true,
+          why: "rgba8unorm, the format that CLIPS. Both backends must clip identically or the two disagree " +
+               "about what an out-of-range value becomes, which is a correctness decision and not a rounding one",
+          opts: { code: B.fusedWgslToTexture({ format: B.STORAGE_FORMATS.clipping }), n,
+                  format: B.STORAGE_FORMATS.clipping, uniforms: [T, 0, 0, 0], workgroups: (n / B.TILE) * (n / B.TILE) } },
     ];
 }
 
 /** Shaders the tree runs that this corpus cannot, each with the reason it cannot rather than a shrug. */
 export const EXCLUDED = Object.freeze([
-    Object.freeze({ id: "bloomFused.fusedWgslToTexture", kind: "no harness path",
-                    why: "writes a storage texture; headlessGpu.mjs has no texture path, so there is nothing to compare",
-                    keeps: "tools/ship/bloomFusedTexture-selfcheck.mjs stays on the browser harness" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
                     why: "assembled in its own gate by concatenation to dodge a self-counting trap; copying it here would defeat that",
                     keeps: "tools/ship/wgslLayout-selfcheck.mjs stays on the browser harness" }),
@@ -136,7 +150,24 @@ export function census({ roots = ["render", "physics/render", "shaders"] } = {})
 }
 
 /** Run one corpus entry through both harnesses and compare element for element. */
-export async function compare(entry, runBrowser, runNative) {
+export async function compare(entry, runBrowser, runNative, runBrowserTex = null, runNativeTex = null) {
+    // A texture entry returns `pixels`, a buffer entry returns `values`, and a compileOnly entry returns
+    // neither. Dispatching on the entry rather than sniffing the result keeps a missing runner LOUD: asking
+    // for a texture comparison without a texture runner refuses instead of silently comparing nothing.
+    if (entry.texture) {
+        if (!runBrowserTex || !runNativeTex)
+            return { id: entry.id, ok: false, reason: "texture entry needs texture runners on both sides" };
+        const bt = await runBrowserTex(entry.opts), at = await runNativeTex(entry.opts);
+        if (!bt.ok || !at.ok) return { id: entry.id, ok: false, reason: bt.reason || at.reason || "texture run failed" };
+        let same = 0, maxAbs = 0, firstDiff = -1;
+        for (let i = 0; i < bt.pixels.length; i++) {
+            if (bt.pixels[i] === at.pixels[i]) same++;
+            else { if (firstDiff < 0) firstDiff = i; maxAbs = Math.max(maxAbs, Math.abs(bt.pixels[i] - at.pixels[i])); }
+        }
+        return { id: entry.id, ok: true, texture: true, n: bt.pixels.length, same, maxAbs, firstDiff,
+                 identical: same === bt.pixels.length,
+                 bytesPerRow: bt.bytesPerRow, bytesPerRowNative: at.bytesPerRow, format: bt.format };
+    }
     const b = await runBrowser(entry.opts);
     const a = await runNative(entry.opts);
     // A compileOnly entry returns no values. The comparable fact is that BOTH accepted it, and a corpus that

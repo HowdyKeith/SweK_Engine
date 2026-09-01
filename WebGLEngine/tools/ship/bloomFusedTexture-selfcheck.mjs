@@ -29,7 +29,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runWgslComputeToTexture, runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// v4295 -- MOVED TO THE BROWSER-FREE BACKEND, INCLUDING THE TEXTURE PATH. This was the last and the most
+// expensive WGSL gate on the browser harness (4,009 ms). headlessGpu.mjs grew a storage-texture reader
+// this round, mirroring the browser one's row-padding and half-float arithmetic rather than reinventing
+// it -- a second decoder that disagreed would make every comparison a fact about the two readers.
+// crossBackend-selfcheck runs all three texture shapes through BOTH backends and asserts byte-identity,
+// so the browser path is still covered. The arithmetic below and its numbers are unchanged.
+import { runWgslComputeToTextureNative as runWgslComputeToTexture,
+         runWgslComputeNative as runWgslCompute,
+         headlessGpuSkipReason as webgpuSkipReason, exitCleanly } from "./headlessGpu.mjs";
 import * as B from "../../render/bloomFused.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -205,4 +213,4 @@ console.log("unchecked here: EVERY OTHER PASS IN THE CHAIN. SSAO, god rays and t
     "the half-float input. The scene texture is uploaded as rgba16float because an 8-bit input would clip " +
     "before the shader saw it -- the same trap as the output, one stage earlier -- but nothing here compares " +
     "a real renderer's scene target against that assumption, because there is no real renderer in the loop.");
-process.exit(fails ? 1 : 0);
+exitCleanly(fails ? 1 : 0);
