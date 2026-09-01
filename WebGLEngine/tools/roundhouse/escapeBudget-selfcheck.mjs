@@ -77,29 +77,39 @@ const run = async (cfg) => await dev.build({ mode: "escape", config: cfg });
         const o = await run({ escSteps });
         prof.push({ budget: escSteps * 0.02, v: o.escapeV, err: o.escapeErrFrac });
     }
-    const [def, x2, x4, x8] = prof;
+    // *** v4305 -- THIS BINDING WAS CALLED `def` AND IT HAS NOT BEEN THE DEFAULT SINCE v2932. *** The sweep's
+    // first rung is escSteps 600000; the DEVICE default is 1200000, raised by v2932 -- which SECTION 3 OF THIS
+    // FILE STATES IN SO MANY WORDS. So section 2 said "the DEFAULT budget is not converged" about a budget that
+    // is no longer the default, attributed the flattering 1.569e-3 to "the default" when the default reports
+    // 4.425e-3, and section 3 said the opposite. BOTH HALVES PASSED. Every number here re-measures exact
+    // (0.5882 / 0.5440 / 0.5337 / 0.5322, verified v4305); what was stale was the WORD.
+    const [old600k, x2, x4, x8] = prof;
+    const def = x2;                                   // escSteps 1200000 -- the default as v2932 left it
 
     ok("!! the escape velocity converges to a settled value",
         Object.is(x2.v, x4.v) && Object.is(x4.v, x8.v),
         "budgets 24000, 48000 and 96000 all return " + x2.v.toPrecision(12) + " bit-identically -- a four-fold " +
         "range with no movement, so this is converged rather than slowly drifting");
 
-    ok("!! the DEFAULT budget is not converged",
-        !Object.is(def.v, x2.v),
-        "the default 12000 returns " + def.v.toPrecision(12) + " against the converged " + x2.v.toPrecision(12) +
-        " -- it is still on the way down");
+    ok("!! the PRE-v2932 budget was not converged, which is why v2932 moved it",
+        !Object.is(old600k.v, x2.v),
+        "budget " + old600k.budget + " (escSteps 600000, the default until v2932) returns " +
+        old600k.v.toPrecision(12) + " against the converged " + x2.v.toPrecision(12) + " -- it was still on " +
+        "the way down. THE DEFAULT TODAY IS escSteps 1200000, budget " + def.budget + ", and it IS converged");
 
     ok("!! and the unconverged value scores BETTER against the quoted theory",
-        def.err < x2.err && x2.err / def.err > 2.5,
-        "reported error at the default is " + def.err.toExponential(3) + "; the converged error is " +
-        x2.err.toExponential(3) + ", a factor of " + (x2.err / def.err).toFixed(1) + " worse. The headline " +
-        "agreement is a product of stopping early, and the honest number is the larger one");
+        old600k.err < x2.err && x2.err / old600k.err > 2.5,
+        "error at the OLD budget is " + old600k.err.toExponential(3) + "; the converged error -- which is what " +
+        "the default reports now -- is " + x2.err.toExponential(3) + ", a factor of " +
+        (x2.err / old600k.err).toFixed(1) + " worse. The headline agreement was a product of stopping early, " +
+        "and the honest number is the larger one");
 
-    ok("the approach is monotone from above, so the default is a crossing rather than a minimum in the physics",
-        def.v > x2.v && prof[0].v < 0.54,
-        "escapeV falls 0.5882, 0.5440, 0.5337, then settles at 0.5322 as the budget grows. The theory value " +
-        "0.5345 sits between the default's 0.5337 and the previous 0.5440, so the curve passes THROUGH the " +
-        "answer on its way to its own limit");
+    ok("the approach is monotone from above, so the OLD default was a crossing rather than a minimum in the physics",
+        old600k.v > x2.v && prof[0].v < 0.54,
+        "escapeV falls 0.5882, 0.5440, " + old600k.v.toFixed(4) + ", then settles at " + x2.v.toFixed(4) +
+        " as the budget grows (all four re-measured exact at v4305). The theory value 0.5345 sits between the " +
+        "settled " + x2.v.toFixed(4) + " and the earlier 0.5440, so the curve passes THROUGH the answer on its " +
+        "way to its own limit -- and the OLD default sat on the crossing, which is what flattered it");
 }
 
 // ---- 3. v2932 ADOPTED THE FIX: THE DEFAULT NOW CONVERGES -------------------------------------------------------------
