@@ -76,6 +76,59 @@ export const UNCHECKED = "unchecked";
  * question does not -- an idea can be built from a description, as #117 built gaze dwell from Ramotion's.
  */
 export const NAMED_SOURCES = Object.freeze([
+    // =========================================================================================================
+    // v4275 -- SIX SUGGESTED IN ONE MESSAGE, NONE OF THEM OPENED. Five from portsmouth and one from the Academy
+    // Software Foundation. This session has no network, so not one licence was read; every one of them is here
+    // for the reason this register exists, and NOT because anything is wrong with them.
+    // =========================================================================================================
+    {
+        repo: "portsmouth/EON-diffuse", namedIn: "v4275 suggestion",
+        claimedState: "not stated -- suggested as a source, with no claim about its licence",
+        established: UNCHECKED,
+        wanted: "An energy-preserving Oren-Nayar diffuse BRDF. *** THE ONE OF THE SIX WITH A MEASURED GAP " +
+                "BEHIND IT: *** this tree's specular lobe has GGX, Smith, furnace tests and multiple-scattering " +
+                "compensation, and its DIFFUSE lobe is albedo/PI with zero files mentioning Oren-Nayar. " +
+                "v4275 built physics/render/roughDiffuse.mjs from Oren-Nayar's published 1994 form plus a " +
+                "compensation measured by this tree's own furnace machinery -- NOT from this repository's " +
+                "analytic fit, which was never read.",
+    },
+    {
+        repo: "AcademySoftwareFoundation/OpenPBR", namedIn: "v4275 suggestion",
+        claimedState: "not stated",
+        established: UNCHECKED,
+        wanted: "A surface shading model SPECIFICATION rather than an implementation. The interesting question " +
+                "is whether this tree's material parameters could be named in its vocabulary; that is a " +
+                "reading exercise and needs the document, not the code.",
+    },
+    {
+        repo: "portsmouth/OpenPBR-viewer", namedIn: "v4275 suggestion",
+        claimedState: "not stated",
+        established: UNCHECKED,
+        wanted: "A viewer for the above. The tree already has render surfaces and a path tracer; a second " +
+                "viewer is the kind of thing #133 asks the consumer question about before taking.",
+    },
+    {
+        repo: "portsmouth/snelly", namedIn: "v4275 suggestion",
+        claimedState: "not stated",
+        established: UNCHECKED,
+        wanted: "GPU path tracing of signed distance fields. The tree has physics/render/sdfMarch.mjs and a " +
+                "CPU path tracer in physics/render/pathTracer.mjs, so the gap is the GPU half, not the idea.",
+    },
+    {
+        repo: "portsmouth/fibre", namedIn: "v4275 suggestion",
+        claimedState: "not stated",
+        established: UNCHECKED,
+        wanted: "GPU visualisation of vector fields as fibre bundles. Nothing in this tree draws a field line; " +
+                "the closest is the vorton work, which SIMULATES vorticity and does not render its streamlines.",
+    },
+    {
+        repo: "portsmouth/Trinity", namedIn: "v4275 suggestion",
+        claimedState: "not stated",
+        established: UNCHECKED,
+        wanted: "GPU fluid simulation. *** LIKELY DUPLICATE AND THAT IS WORTH RECORDING BEFORE ANYONE LOOKS: *** " +
+                "this tree already ships fluid-webgpu, fluid-webgpu-3d, mpm-gpu and an SPH solver. v4239's " +
+                "finding on mobile-fluid-sim applies -- the solver was the duplicate and the SENSOR was not.",
+    },
     {
         repo: "advanced-threejs-tsl-webgpu-rendering", namedIn: "#100",
         claimedState: "no licence at all",

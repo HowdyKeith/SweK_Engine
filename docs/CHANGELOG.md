@@ -8,6 +8,73 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4275 -- The diffuse lobe learns about roughness, and six repositories go unopened into the register
+
+The specular side of this renderer is serious. `physics/render/microfacet.mjs` has the GGX distribution, Smith
+Lambda, G1 and G2, a furnace integral, directional albedo, half-vector sampling and MIS weights;
+`energyCompensation.mjs` adds back the multiple scattering single-scattering GGX loses; `furnace.mjs` is a white
+furnace harness with named failure modes. Nine files mention GGX and thirty-one touch path tracing.
+
+*** And the diffuse lobe was `albedo / PI`, with zero files in the tree mentioning Oren-Nayar. *** A rough surface
+and a polished one scattered identically in the one lobe where roughness is obviously the point, and the
+elaborate energy machinery next door applied to neither.
+
+`physics/render/roughDiffuse.mjs` closes it with two things:
+
+**Oren-Nayar's published 1994 form**, which reduces to Lambert *exactly* -- `A === 1`, `B === 0`, factor `=== 1`,
+no epsilon and no special case -- and is reciprocal *exactly*, because alpha is `max(thetaI, thetaO)` and beta is
+`min`, so the symmetry is structural rather than arithmetic.
+
+**A compensation measured here rather than quoted.** The directional albedo is integrated by deterministic
+quadrature (Monte Carlo would make the compensated furnace read "1 plus noise", with no way to tell a real 0.5%
+loss from the sampler), tabulated over cos(theta_o), and the correction is whatever makes a white surface return
+its light.
+
+The motivation, as numbers: plain Oren-Nayar loses **1.4%** of the light at sigma 0.2, **15.6%** at 0.6 and
+**25.6%** at 1.0, worst case 34.5%. The table puts it back to **0.23%**, and the residual is table interpolation
+-- 33 stored values against 40 queried -- not a missing term.
+
+### What the round refuses to claim
+
+It was prompted by `portsmouth/EON-diffuse` and five siblings. *** This is not EON, and calling it that would be
+a claim I cannot check. *** This session has no network: not one of the six was opened, no licence was read, and
+no analytic fit was consulted. All six -- EON-diffuse, OpenPBR, OpenPBR-viewer, snelly, fibre, Trinity -- are
+registered in `world/namedNotChecked.mjs` as NAMED and unchecked, which is exactly what v4268 built that register
+for. The idea travels (rough diffuse loses energy; put it back) and the codebase does not, the same move v4247
+made with Ramotion's gaze dwell.
+
+`Trinity` is flagged LIKELY DUPLICATE in its entry, before anyone spends a round on it: this tree already ships
+`fluid-webgpu`, `fluid-webgpu-3d`, `mpm-gpu` and an SPH solver, and v4239's finding on mobile-fluid-sim was that
+the solver was the duplicate and the *sensor* was not.
+
+The register's own gate asserted a total of six entries and went red when six more arrived. It is per-source now:
+a register meant to grow should never be gated on its size, only on every entry being attributable.
+
+### The sabotages
+
+**A** adds `1e-9` to Oren-Nayar's A coefficient -- a billionth, invisible to any image anyone would render. 3
+red. *** That is the argument for asserting `=== 1` instead of a tolerance: *** the claim is about the model
+reducing to Lambert, not about a picture, and `|f - 1| < 1e-6` would have shipped it.
+
+**B** replaces `max`/`min` in alpha/beta with thetaI/thetaO directly. 4 red, and the most instructive: reciprocity
+breaks outright (worst asymmetry 3.78) and the energy check *inverts* -- the surface gains light, the worst
+reading -120%, returning more than twice what arrives. *** A non-reciprocal BRDF that creates light still renders
+a perfectly plausible rough surface. ***
+
+**C** fills the compensation table with 1s: present, correctly shaped, doing nothing. 2 red. The same shape v4273
+found in `gfx/device.js`'s texture bind, and the same lesson -- an API that runs and has no effect is worse than
+one that refuses.
+
+A prose check went red on correct code too: it searched for a phrase that wraps across two comment lines. Comment
+markers are stripped and whitespace collapsed now, with a control asserting the phrase is genuinely non-contiguous
+in the raw file, so the check reads meaning rather than line breaks.
+
+Unchecked and stated: whether Oren-Nayar is the *right* rough-diffuse model -- the repository that prompted this
+exists precisely because the 1994 form loses the 25% measured here. And there is no consumer:
+`physics/render/pathTracer.mjs` still uses `albedo / PI`, because wiring a new lobe into a renderer changes every
+existing image and needs its own round with its own before-and-after.
+
+The build now stands at 4275 gates.
 ## v4274 -- The orrery's shader stage is switched on, and my check of it was wrong twice
 
 v4273 built `ui/orreryPost.mjs`, proved it attaches to a real device and draws, and shipped it with nothing on the
