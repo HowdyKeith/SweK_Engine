@@ -25,7 +25,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runWgslCompute, renderGlslToPixels, webgpuSkipReason } from "./webgpuHarness.mjs";
+// v4294 -- MOVED TO THE BROWSER-FREE BACKEND. tools/ship/crossBackend-selfcheck.mjs runs every shader
+// this gate uses through BOTH harnesses and asserts byte-identity across 41,656 floats, so the browser
+// path is still covered -- by one gate, once, instead of by every gate paying a browser launch per call.
+// The arithmetic below is unchanged and its numbers are unchanged; only who ran it moved.
+import { renderGlslToPixels } from "./webgpuHarness.mjs";
+import { runWgslComputeNative as runWgslCompute, headlessGpuSkipReason as webgpuSkipReason,
+         exitCleanly } from "./headlessGpu.mjs";
 import * as B from "../../render/bloomFused.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -282,4 +288,4 @@ console.log("unchecked here: WHETHER THE FUSED PASS IS WIRED INTO ANYTHING. rend
     "survives the move. Also unchecked: the other three passes of the chain -- SSAO, god rays and the " +
     "composite -- and the composite is the one that would decide whether the whole post chain can become one " +
     "dispatch or merely two.");
-process.exit(fails ? 1 : 0);
+exitCleanly(fails ? 1 : 0);

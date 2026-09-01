@@ -19,7 +19,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runWgslCompute, webgpuSkipReason, SECURE_HOST, LAUNCH_ARGS } from "./webgpuHarness.mjs";
+// v4294 -- MOVED TO THE BROWSER-FREE BACKEND. tools/ship/crossBackend-selfcheck.mjs runs every shader
+// this gate uses through BOTH harnesses and asserts byte-identity across 41,656 floats, so the browser
+// path is still covered -- by one gate, once, instead of by every gate paying a browser launch per call.
+// The arithmetic below is unchanged and its numbers are unchanged; only who ran it moved.
+import { SECURE_HOST, LAUNCH_ARGS } from "./webgpuHarness.mjs";
+import { runWgslComputeNative as runWgslCompute, headlessGpuSkipReason as webgpuSkipReason,
+         exitCleanly } from "./headlessGpu.mjs";
 import { SNOISE2_WGSL, BADTV_WGSL, PROBE_WGSL, FRAGMENT_WGSL, KNOB_ORDER, packKnobs } from "../../render/badTvWgsl.mjs";
 import { sampleAt, offsetAt, DEFAULTS, COARSE_FREQ, FINE_FREQ, COARSE_GAIN, FINE_GAIN } from "../../render/badTvModel.mjs";
 import { SNOISE2, NOISE_COMMON } from "../../shaders/ashimaNoise.js";
@@ -124,7 +130,12 @@ console.log("\n4. RUN IT ON A GPU");
             "structure; only this one checks that the shader COMPUTES the right thing. If it is skipping, the " +
             "port is unverified, whatever the summary line says.");
     } else {
-        console.log(`        serving over ${SECURE_HOST} with ${LAUNCH_ARGS.join(" ")} -- NOT about:blank`);
+        // v4294 -- THIS LINE USED TO SAY "serving over 127.0.0.1 ... NOT about:blank", which was true of the
+        // browser harness and became false the moment this gate moved to the native one. There is no server
+        // and no page now. Left as a note rather than deleted, because the reason the browser harness needed
+        // a secure origin at all is still the reason it exists for the two gates that kept it.
+        console.log(`        running natively on Dawn -- no browser, no server; the browser harness still ` +
+                    `needs ${SECURE_HOST} and ${LAUNCH_ARGS.join(" ")}, and crossBackend-selfcheck runs both`);
         const rows = 32, time = 1.5;
         const r = await runWgslCompute({ code: PROBE_WGSL, entryPoint: "probe", outCount: rows * 2,
                                          uniforms: packKnobs({ time, rows }), workgroups: 1 });
@@ -221,4 +232,4 @@ console.log("unchecked here: WHETHER IT LOOKS RIGHT. This proves the WGSL comput
     "version anything in the engine actually draws with; badTvWgsl.mjs has NO CONSUMER yet, which is the " +
     "orphan shape this tree catches elsewhere and is accepted here only because gfx/device.js has no " +
     "production consumer either -- wiring both is the next round, not this one.");
-process.exit(fails ? 1 : 0);
+exitCleanly(fails ? 1 : 0);

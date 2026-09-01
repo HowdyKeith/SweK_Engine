@@ -24,7 +24,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// v4294 -- MOVED TO THE BROWSER-FREE BACKEND. tools/ship/crossBackend-selfcheck.mjs runs every shader
+// this gate uses through BOTH harnesses and asserts byte-identity across 41,656 floats, so the browser
+// path is still covered -- by one gate, once, instead of by every gate paying a browser launch per call.
+// The arithmetic below is unchanged and its numbers are unchanged; only who ran it moved.
+import { runWgslComputeNative as runWgslCompute, headlessGpuSkipReason as webgpuSkipReason,
+         exitCleanly } from "./headlessGpu.mjs";
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import { render, coverage, cameraBasis, pixelRay } from "../../physics/render/pathTracer.mjs";
 
@@ -308,4 +313,4 @@ console.log("unchecked here: THE TRACER ITSELF. `trace` is ~300 lines of MIS, mi
     "the value it cannot, the camera it must be handed rather than compute, and how far a primary ray drifts " +
     "in f32. Also unchecked: any surface that is not a sphere, and any claim at all about speed -- the only " +
     "adapter here is a software rasteriser, so every number above is arithmetic and none of it is a timing.");
-process.exit(fails ? 1 : 0);
+exitCleanly(fails ? 1 : 0);
