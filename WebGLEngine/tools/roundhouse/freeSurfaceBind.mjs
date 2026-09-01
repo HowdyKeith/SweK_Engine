@@ -41,7 +41,10 @@
 // *** AND THE MARGIN THIS FILE FIRST CLAIMED (0.4737, 2.11x) WAS MEASURED ON TOO NARROW A SWEEP -- A SECOND
 // SWEEP MOVED IT AND THE HONEST NUMBER IS WORSE. *** At per=3 the envelope reads 0.1053 / 0.3684 / 0.8421 /
 // 0.8947 across seeds 3 / 4 / 2 / 5. *** SO THE WORST HONEST READING IS 0.8947 AGAINST A BOUND OF 1: A MARGIN
-// OF 1.12x, NOT 2.11x. *** IT IS NOT AN UNSETTLED RUN AND THAT WAS CHECKED RATHER THAN ASSUMED -- seed 2 reads
+// OF 1.12x, NOT 2.11x. *** (v4300: RE-RUN AND EXACT -- all four seeds to four decimals, and the census was
+// WIDENED to seeds 1 and 6, which read 0.3158 and 0.5263, so 0.8947 is still the worst over six. This ladder
+// is watched by nothing: the freeze records per=2, and the whole per=3 census is outside every declared mode.)
+// IT IS NOT AN UNSETTLED RUN AND THAT WAS CHECKED RATHER THAN ASSUMED -- seed 2 reads
 // 0.8421 at 3000 steps and 0.7895 at BOTH 4500 and 6000, a STATIONARY offset of 15 grid quanta, not a decaying
 // slosh. per=2 and per=4 stay under 0.3684 on every seed tried, so the tight readings are ODD-per only and
 // WHY IS NOT KNOWN HERE; NOT CLAIMED: that it is a fill artefact. THE BOUND ITSELF MUST NOT MOVE -- it is

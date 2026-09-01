@@ -43,6 +43,20 @@
 // asymmetric one moves the AXES, and each key is deaf to the other's case. C IS THE HALF THAT IS EASY TO SKIP,
 // and skipping it would have left "isotropy catches everything" standing unmeasured. ***
 //
+// *** v4300 -- AND NOT ONE NUMBER IN THAT CENSUS CAN BE RE-CHECKED WITHOUT EDITING THE MODULE. *** The three
+// plants are described as "measured on the shipped module, each restored afterwards" -- they are SOURCE EDITS
+// to divergence, to the stencil and to the pressure scale, not knobs, so no configuration of any declared mode
+// reproduces them. The value freeze records the honest arm at defaults; these nine readings (slopes, R^2 and
+// bottoms at 78.4800 / 78.4801 / 78.4801) are watched by nothing at all, and the only way to confirm them is to
+// re-install three faults by hand and take them out again.
+//
+// NOT FIXED HERE, AND THE REASON IS NOT COST. Turning A, B and C into declared plant modes would make the whole
+// census re-derivable every run -- which is what this tree does everywhere else -- but it ADDS OBSERVABLES, and
+// lab-results-baseline.json is mid-drift with a re-freeze pending (v4193 traced 31 moved values to two upstream
+// SPH commits). Adding rows to a baseline that is already stale would bury the change in the noise. THE CLAIM
+// IS SOUND AND THE ARGUMENT FOR IT IS THE STRONGEST IN THIS FILE; what is missing is that it is unfalsifiable
+// from outside, which headerLadders.mjs found by asking how many rungs of the ladder the freeze holds: none.
+//
 // *** AND THE HONEST HALF, MEASURED BECAUSE v3724 SAYS TO MEASURE IT: fluid/flip3d-selfcheck.mjs ALREADY
 // CATCHES ALL THREE. *** Every plant trips the same two pre-existing checks -- "more pressure iterations drive
 // the divergence down" and "and MONOTONICALLY" -- with reduction factors of 1.1e+0 (A), 6.0e-3 (B) and 1.8e+0

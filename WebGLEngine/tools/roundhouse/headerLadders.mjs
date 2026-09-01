@@ -29,6 +29,30 @@
 //   eccentric "0.999635 / ... / 0.003407" across e0 -- `time` pins e0 = 0.01 by design, so five of six rungs
 //            are reachable by no mode. Re-run directly: ALL SIX HOLD TO EVERY DIGIT.
 // Same structure, opposite verdicts, and only looking tells them apart. That is the case for the report.
+//
+// *** v4300 -- WHAT THE UNWATCHED LADDERS ACTUALLY ARE, after six adjudicated. *** They are not careless
+// numbers. They are overwhelmingly measurements from THE PLANTED ARM or from A NON-DEFAULT CONFIGURATION, and
+// the value freeze records the HONEST ARM AT DEFAULTS. So the gap is structural: headers argue with both arms
+// and across sweeps, and the freeze holds one corner of that.
+//   freesurface  per=3 seed census   RE-RUN EXACT, and widened to six seeds -- 0.8947 still the worst
+//   voxelize     segments=64 ladder  RE-RUN EXACT, both sequences, non-monotone and bounded in each
+//   fragmentRot  planted spectrum    RE-RUN EXACT -- unwatched TWICE, planted arm and not an emitted key
+//   eccentric    e0 ladder (v4299)   RE-RUN EXACT, five of six rungs reachable by no mode
+//   xpbd         PBD ladder (v4298)  RE-RUN EXACT
+//   nbench       N=8000 column       40% WRONG for 389 versions
+// Five of six were right. THAT IS THE POINT AND NOT A REASON TO STOP: the one that was wrong was wrong by 40%
+// and had stood since the header was written, and nothing in the lab could have told the six apart.
+//
+// AND ONE IS NOT RE-RUNNABLE AT ALL. flip3d's blindness census (three plants, nine readings) is source edits
+// "restored afterwards" -- not knobs, so no configuration reproduces them and no re-run can confirm them. That
+// is the worst case this sweep can find: not a stale number but an unfalsifiable one.
+//
+// *** AND A LIMITATION FOUND BY FIXING THINGS: RECORDING A VERIFIED LADDER ADDS A LADDER. *** The count went
+// 48 -> 51 across v4300's own edits, because "honest 3.0000/5.0000/7.0000, planted 4.0897/4.4049/6.5053" is
+// itself three-plus numbers in a series. THE TOOL FLAGS ITS OWN REMEDIATION. That is harmless in a report and
+// would be corrosive in a ratchet -- a gate that grows every time somebody documents a re-measurement teaches
+// people to stop documenting. Whoever turns this into a gate has to exclude re-measurement records (a dated
+// "RE-RUN EXACT" marker is the obvious hook) or the ratchet will fight its own fixes.
 
 import fs from "node:fs";
 import path from "node:path";

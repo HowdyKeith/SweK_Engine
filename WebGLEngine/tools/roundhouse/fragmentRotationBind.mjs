@@ -23,6 +23,11 @@
 //   THE TRIANGLE INEQUALITY   I1 <= I2 + I3 still holds: the planted spectrum 4.0897/4.4049/6.5053 is a
 //                             perfectly valid body. It is just NOT THIS ONE.
 //
+// v4300 -- BOTH RE-RUN AND EXACT: honest 3.0000/5.0000/7.0000, planted 4.0897/4.4049/6.5053, trace
+// 15.000000000000 in both arms. NEITHER IS IN THE FREEZE: the device emits rotatedBoxWorstErr (3.55e-15 ->
+// 1.0897) and never the spectrum, and the freeze records the honest arm only -- so a PLANTED reading quoted in
+// a header is unwatched twice over. That is the shape headerLadders.mjs looks for.
+//
 // A device carrying only the two structural checks would certify a fragment whose principal moments are wrong by
 // 36% as a physically admissible rigid body -- which it is. That is the difference between "is a body" and "is
 // THE body", and only a key with an independently known answer can tell them apart.
