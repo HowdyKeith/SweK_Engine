@@ -8,6 +8,60 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4259 -- Minecraft export: the door has only ever opened inwards, and the reader is what grades the writer
+
+world/schematicLoader.js has read .schem, .schematic and .litematic since v456. Nothing in 3,800 rounds has
+ever WRITTEN one, so a Minecraft build could come into this engine and never leave it, and a build made here
+could not be handed to anybody. world/schematicWriter.js is the missing half: a big-endian NBT sink, LEB128
+varints, gzip, and a Sponge v2 .schem that WorldEdit will //paste -- wired to window.schematic.save(), which
+reads a box of voxels straight out of the world with world.voxelAt, the same accessor CityGen and
+biomePainter use.
+
+WHAT MAKES THIS CHECKABLE RATHER THAN PLAUSIBLE: THE READER WAS ALREADY HERE. A writer with no reader is
+graded by opening the file in the game and squinting. A writer whose bytes go back through parseSchematic is
+graded by comparing every voxel -- no game, no network, and no second implementation of NBT written by the
+same hand that would repeat the same mistake. 105 voxels over a deliberately non-cubic 7x5x3 fixture, 0
+mismatches. Controls prove the comparison can fail: a transposed volume 84 mismatches, a constant-stone
+volume 94, and a single changed voxel exactly 1.
+
+THE ROUND TRIP CLOSES IN ONE DIRECTION ONLY, and the collapse is counted rather than glossed.
+voxels -> schem -> voxels is exact over the nine materials the loader can emit. schem -> voxels -> schem is
+NOT: 18 real Minecraft blocks went in and 9 came back, with cobblestone, granite, andesite, bedrock and
+deepslate all landing on stone, because mcNameToVoxel is many-to-one by construction. The names the writer
+picks are a CHOICE this tree makes, not information it recovers, so every one is asserted against the
+matcher rather than eyeballed -- the loader routes diorite to SNOW and oak_log to ASH today, and two of
+those three would have been guessed wrong.
+
+Of the engine's FOURTEEN voxel codes only nine survive a re-import. Rubble, flowing water, ice, screen and
+memory have no branch in mcNameToVoxel at all, so they live in a separate table named for what a Minecraft
+client RENDERS rather than for what this engine will re-read, and the gate prints exactly what each becomes.
+
+A BUG THIS ROUND SHIPPED AND THEN CAUGHT. MC_NAME_FOR is not injective: WATER 10 and FLOWING_WATER 11 are
+both minecraft:water. The first draft deduped the palette by VOXEL ID, which produced two palette indices
+for one palette NAME; a .schem palette is a name -> index map, so the second entry silently clobbered the
+first and every plain WATER block re-read as STONE. Re-inserted as a sabotage it goes 4 RED in section 5 and
+0 RED in the round trip, because those nine names are distinct. The fix keys the palette by name.
+
+THE SAME SHAPE TWICE MORE, AND BOTH ZEROS ARE THE FINDING. Dropping the varint continuation bit is 3 RED in
+section 2 and 0 RED in sections 3-7: this engine has fourteen materials, so no palette index in any round
+trip ever exceeds 13, every index fits in one byte, and a writer that cannot encode 128 passes the entire
+round trip. Dropping the forced-type table is 5 RED in section 6 and 0 RED in sections 3-5: Width/Height/
+Length go out as TAG_Int, the loader's Number() coercion does not care, and the file loads perfectly here
+while being wrong for the readers it is written FOR. Five sabotages, 3/4/3/5/7 red, each grep-confirmed
+before its result was read and restored md5-identical.
+
+Sabotage A also corrected a prediction: I expected section 5 to catch a transposed index order and it did
+not, because section 5's fixture is 14x1x1 and degenerate in y and z. Only the non-cubic fixture and the
+1-thick slab separate the orders. Recorded rather than quietly re-predicted.
+
+UNCHECKED: Minecraft itself. Nothing here opened the game or ran WorldEdit, so the claim that these bytes
+paste rests on the specification and on section 6's tag ids, not on observation. Block entities, biomes and
+entities are not written. Sponge v3 and .litematic are read by the loader and not written -- v2 is what
+WorldEdit pastes, and writing three formats to test one would be three chances to be wrong. And
+window.schematic.save() is reached by the gate as SOURCE TEXT: no browser ran, so the download is unobserved.
+
+The build now stands at 4259 gates.
+
 ## v4258 -- #53 was built before it was recorded, and 54 sources are in the same position
 
 Backlog #53 read "jsfx: sound effects as DATA, and animatelo: DOM animation the dirty flag can see". Both
