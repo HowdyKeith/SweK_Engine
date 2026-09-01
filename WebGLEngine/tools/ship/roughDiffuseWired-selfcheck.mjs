@@ -48,11 +48,27 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
 {
     // The comparison is against the COMMITTED file, extracted from git, rather than against a remembered
     // number: a hash written into this gate would only ever prove that somebody typed it.
+    // *** THE FIRST VERSION OF THIS SECTION READ `HEAD:` AND WAS CORRECT FOR EXACTLY AS LONG AS IT TOOK TO
+    // COMMIT. *** The moment v4282 landed, HEAD held the PATCHED tracer, and "the committed tracer and the
+    // patched one render the same bits" became a file compared with itself -- a check that can never fail
+    // again, passing forever while proving nothing. What is wanted is the tracer AS IT WAS BEFORE THE
+    // WIRING, and that revision is FOUND rather than typed: walk this file's history newest-first and take
+    // the first revision whose source does not import roughDiffuse. A pinned SHA would be a claim with an
+    // expiry date; this survives every future commit to the tracer, including ones that move the wiring.
     const before = path.join(ENG, "physics/render/_ptBefore.mjs");
-    let ran = false, beforeSha = null;
+    const REL = "WebGLEngine/physics/render/pathTracer.mjs";
+    const ROOT = path.join(ENG, "..");
+    let ran = false, beforeSha = null, rev = null, beforeSrc = null;
     try {
-        const src = execFileSync("git", ["show", "HEAD:WebGLEngine/physics/render/pathTracer.mjs"],
-                                 { cwd: path.join(ENG, ".."), encoding: "utf8", maxBuffer: 8e6 });
+        const revs = execFileSync("git", ["log", "--format=%H", "--", REL],
+                                  { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 }).trim().split("\n");
+        for (const r of revs) {
+            const t = execFileSync("git", ["show", `${r}:${REL}`],
+                                   { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 });
+            if (!/roughDiffuse\.mjs/.test(t)) { rev = r; beforeSrc = t; break; }
+        }
+        if (!rev) throw new Error("no revision of the tracer predates the roughDiffuse import");
+        const src = beforeSrc;
         fs.writeFileSync(before, src);
         const prog = "const M=await import(" + JSON.stringify(before) + ");" +
             "const b=M.render([{centre:[0,0,0],radius:1.6,albedo:0.8,emit:0},{centre:[3,4,3],radius:1,albedo:0,emit:8}]," +
@@ -65,7 +81,13 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
     finally { try { fs.unlinkSync(before); } catch {} }
 
     const now = shot(undefined);
-    ok("*** the committed tracer and the patched one render the same bits ***", ran && beforeSha === now.sha,
+    // *** THE GUARD AGAINST A VACUOUS PASS. *** If the two sources are the same bytes, the hash comparison
+    // below is a tautology no matter what it prints, so the difference is asserted BEFORE the agreement is.
+    const nowSrc = fs.readFileSync(path.join(ENG, "physics/render/pathTracer.mjs"), "utf8");
+    ok("CONTROL: the reference revision is genuinely a DIFFERENT file, not this one",
+        ran && beforeSrc !== null && beforeSrc !== nowSrc && !/roughDiffuse\.mjs/.test(beforeSrc),
+        ran ? `${rev.slice(0, 12)}, ${beforeSrc.length} chars against ${nowSrc.length}` : "not reached");
+    ok("*** the pre-wiring tracer and the patched one render the same bits ***", ran && beforeSha === now.sha,
         !ran ? "SKIPPED -- git show failed, so this proves nothing"
              : beforeSha === now.sha ? `both ${now.sha}`
              : `committed ${beforeSha} against patched ${now.sha}`);
@@ -201,8 +223,20 @@ console.log("\n4. THE WIRING, READ FROM THE TRACER'S OWN SOURCE");
 //      reads exactly like the healthy answer. The condition now requires both deltas to be POSITIVE before
 //      their ratio means anything. A check that fails while printing a reassuring number is half a check.
 //
-// None went 0 RED. B and E are the pair worth keeping: B proves section 2's prose is load-bearing, and E is
-// the only one small enough that a tolerance would have shrugged at it.
+//   F  the history walk stops at the first revision instead of the first one without the import -- which is
+//      to say, `git show HEAD:`, exactly what this section did when it was written.
+//      -> exit=1, 1 red, AND IT IS NOT THE BIT-IDENTITY CHECK. That check PASSED, reporting "both
+//      d66e8de3147f2a91", because it was comparing the file with itself: 37357 chars against 37357, at
+//      revision 4f50dcd -- the tree's HEAD when the sabotage was run, which is to say this round's own
+//      wiring commit. *** THE HEADLINE ASSERTION OF THIS SECTION BECAME
+//      INCAPABLE OF FAILING THE INSTANT v4282 WAS COMMITTED, AND IT WENT ON PRINTING A HASH AND THE WORD
+//      PASS. *** Nothing in the run looked wrong. Only the control that asserts the two sources DIFFER
+//      before asserting they AGREE says anything at all, which is why it exists and why it runs first.
+//
+// None went 0 RED. B, E and F are the trio worth keeping: B proves section 2's prose is load-bearing, E is
+// the only one small enough that a tolerance would have shrugged at it, and F is the one where the gate was
+// wrong rather than the module -- a before-and-after whose "before" drifts forward to meet the "after" is
+// not a comparison, and it decays into a tautology quietly, at commit time, with every light still green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER OREN-NAYAR IS THE RIGHT MODEL, which v4275's own note already said and " +
     "is no more settled now -- the 1994 form is one of several and the repository that prompted it exists " +

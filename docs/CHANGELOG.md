@@ -60,6 +60,18 @@ was forced to 1, FAILED WHILE PRINTING "a factor of 33" -- the ratio of two nega
 like the healthy answer, so the sign is now part of the claim. A check that fails while printing a reassuring
 number is half a check.
 
+*** AND THE GATE'S OWN HEADLINE CHECK DIED THE MOMENT THIS ROUND WAS COMMITTED. *** Section 1 read the
+reference tracer with `git show HEAD:`, which was correct for exactly as long as it took to run `git commit`
+-- after that, HEAD held the PATCHED file and "the committed tracer and the patched one render the same bits"
+was a file compared with itself. Sabotaging the history walk to accept HEAD reproduces it: the bit-identity
+check PASSES, reporting "both d66e8de3147f2a91", at 37357 chars against 37357, revision 4f50dcd -- the
+tree's HEAD when the sabotage was run, which is to say this round's own wiring commit. NOTHING IN THE RUN LOOKS WRONG. The reference revision is now FOUND rather than named:
+walk the tracer's history newest-first and take the first revision whose source does not import roughDiffuse
+(66db97c45b52, 32552 chars). A pinned SHA would have been a claim with an expiry date. And a control asserts
+the two sources DIFFER before anything asserts they agree, because that control is the only check in the
+section that sabotage F reddens. A before-and-after whose "before" drifts forward to meet the "after" is not
+a comparison, and it decays into a tautology quietly, at commit time, with every light still green.
+
 All sixteen path-tracer consumer gates still pass. This round adds no module and one gate, and the tree
 stands at 1355 gates.
 ## v4281 -- Our own labels, read against our own licence text
