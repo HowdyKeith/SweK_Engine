@@ -1,4 +1,4 @@
-// WebGLEngine/render/gpuTerrain.mjs -- v4299 (Level 12)
+// WebGLEngine/render/gpuTerrain.mjs -- v4299 (Level 12), lit at v4300 (Level 14)
 //
 // LEVEL 12: TERRAIN ON THE GPU-DRIVEN PATH. A heightfield is a texture; the ground is a grid of chunk instances
 // culled and LOD-picked by render/gpuDriven.mjs's compute pass; each chunk's vertices are lifted in the VERTEX
@@ -20,8 +20,12 @@ import { makeField } from "./strengthField.mjs";
 /** radius = halfSize * RADIUS_PER_HALF + heightScale / 2; the shader inverts the first term. */
 export const RADIUS_PER_HALF = Math.SQRT2;
 
+// v4300 -- LIGHT. The normal at a texel is the central difference of its four neighbours in world units, the
+// shade is ambient + (1 - ambient) * max(0, n . L). It is computed ONCE per chunk at the centre texel and painted
+// flat, like the height: red stays the centre height byte (exact, as Level 12 graded it) and GREEN is the shade, so
+// a pixel is still a readout the CPU model can be held to, now of two numbers.
 export const TERRAIN_WGSL = `
-struct Cam { viewProj: mat4x4<f32>, terrain: vec4<f32> };   // terrain = (originX, originZ, extent, heightScale)
+struct Cam { viewProj: mat4x4<f32>, terrain: vec4<f32>, light: vec4<f32> };   // terrain = (originX, originZ, extent, heightScale); light = (dir.xyz, ambient)
 @group(0) @binding(0) var<uniform> cam: Cam;
 @group(0) @binding(1) var heightTex: texture_2d<f32>;
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32> };
@@ -31,15 +35,29 @@ fn texelAt(x: f32, z: f32) -> vec2<i32> {
   let u = (x - cam.terrain.x) / cam.terrain.z; let v = (z - cam.terrain.y) / cam.terrain.z;
   return vec2<i32>(clamp(i32(floor(u * f32(dims.x))), 0, i32(dims.x) - 1), clamp(i32(floor(v * f32(dims.y))), 0, i32(dims.y) - 1));
 }
+fn heightTexel(t: vec2<i32>) -> f32 {
+  let dims = vec2<i32>(textureDimensions(heightTex));
+  return textureLoad(heightTex, clamp(t, vec2<i32>(0), dims - vec2<i32>(1)), 0).r;
+}
+// the shade at texel t: central differences, one texel = extent / dims world units, heights * heightScale
+fn shadeAt(t: vec2<i32>) -> f32 {
+  let dims = textureDimensions(heightTex);
+  let step = cam.terrain.z / f32(dims.x);
+  let dx = (heightTexel(t + vec2<i32>(1, 0)) - heightTexel(t - vec2<i32>(1, 0))) * cam.terrain.w;
+  let dz = (heightTexel(t + vec2<i32>(0, 1)) - heightTexel(t - vec2<i32>(0, 1))) * cam.terrain.w;
+  let n = normalize(vec3<f32>(-dx, 2.0 * step, -dz));
+  return cam.light.w + (1.0 - cam.light.w) * max(0.0, dot(n, normalize(cam.light.xyz)));
+}
 @vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>) -> VOut {
   let half = (rec.w - cam.terrain.w * 0.5) / ${RADIUS_PER_HALF};
   let wx = rec.x + p.x * half; let wz = rec.z + p.y * half;
   let h = textureLoad(heightTex, texelAt(wx, wz), 0).r;
-  let hc = textureLoad(heightTex, texelAt(rec.x, rec.z), 0).r;
+  let tc = texelAt(rec.x, rec.z);
+  let hc = textureLoad(heightTex, tc, 0).r;
   var o: VOut;
   // p.z is a height OFFSET in units of heightScale: 0 on the surface, -1 on a skirt vertex hanging below its edge
   o.pos = cam.viewProj * vec4<f32>(wx, (h + p.z) * cam.terrain.w, wz, 1.0);
-  o.color = vec4<f32>(hc, hc, hc, 1.0);
+  o.color = vec4<f32>(hc, shadeAt(tc), hc * shadeAt(tc), 1.0);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> { return v.color; }
@@ -48,6 +66,7 @@ export const TERRAIN_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
 uniform vec4 terrain;
+uniform vec4 light;
 uniform sampler2D heightTex;
 in vec3 p; in vec4 color; in vec4 rec;
 out vec4 vColor;
@@ -56,13 +75,27 @@ ivec2 texelAt(float x, float z) {
   float u = (x - terrain.x) / terrain.z; float v = (z - terrain.y) / terrain.z;
   return ivec2(clamp(int(floor(u * float(dims.x))), 0, dims.x - 1), clamp(int(floor(v * float(dims.y))), 0, dims.y - 1));
 }
+float heightTexel(ivec2 t) {
+  ivec2 dims = textureSize(heightTex, 0);
+  return texelFetch(heightTex, clamp(t, ivec2(0), dims - ivec2(1)), 0).r;
+}
+float shadeAt(ivec2 t) {
+  ivec2 dims = textureSize(heightTex, 0);
+  float step_ = terrain.z / float(dims.x);
+  float dx = (heightTexel(t + ivec2(1, 0)) - heightTexel(t - ivec2(1, 0))) * terrain.w;
+  float dz = (heightTexel(t + ivec2(0, 1)) - heightTexel(t - ivec2(0, 1))) * terrain.w;
+  vec3 n = normalize(vec3(-dx, 2.0 * step_, -dz));
+  return light.w + (1.0 - light.w) * max(0.0, dot(n, normalize(light.xyz)));
+}
 void main() {
   float half_ = (rec.w - terrain.w * 0.5) / ${RADIUS_PER_HALF};
   float wx = rec.x + p.x * half_; float wz = rec.z + p.y * half_;
   float h = texelFetch(heightTex, texelAt(wx, wz), 0).r;
-  float hc = texelFetch(heightTex, texelAt(rec.x, rec.z), 0).r;
+  ivec2 tc = texelAt(rec.x, rec.z);
+  float hc = texelFetch(heightTex, tc, 0).r;
   gl_Position = viewProj * vec4(wx, (h + p.z) * terrain.w, wz, 1.0);
-  vColor = vec4(hc, hc, hc, 1.0);
+  float sh = shadeAt(tc);
+  vColor = vec4(hc, sh, hc * sh, 1.0);
 }
 `;
 export const TERRAIN_FRAGMENT_GLSL = `#version 300 es
@@ -78,7 +111,7 @@ export function terrainPipelineDesc() {
             { stride: VERTEX_FLOATS * 4, stepMode: "vertex", attributes: [{ name: "p", size: 3, offset: 0 }, { name: "color", size: 4, offset: 12 }] },
             { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0 }] },
         ],
-        uniforms: [{ name: "viewProj", type: "mat4" }, { name: "terrain", type: "vec4" }],
+        uniforms: [{ name: "viewProj", type: "mat4" }, { name: "terrain", type: "vec4" }, { name: "light", type: "vec4" }],
         // Level 13 -- the sheet's underside is culled. The quad's winding gives a normal pointing DOWN in world
         // (its p.y becomes world z), so the TOP is the clockwise face; saying so here rather than re-winding the
         // mesh keeps one quad for every consumer. Skirts carry both windings and are never culled.
@@ -129,5 +162,20 @@ export function skirtedQuadMesh(subdiv = 1, color = [1, 1, 1, 1], drop = 1) {
     return { positions, indices, color, skirt: true };
 }
 
+/** The CPU model of shadeAt(): the same central differences over the same clamped texels, in f64. */
+export function shadeAtTexel(field, params, tx, tz, light) {
+    const H = (x, z) => field.data[(Math.max(0, Math.min(field.height - 1, z)) * field.width + Math.max(0, Math.min(field.width - 1, x))) * 4] / 255;
+    const step = params.extent / field.width;
+    const dx = (H(tx + 1, tz) - H(tx - 1, tz)) * params.heightScale, dz = (H(tx, tz + 1) - H(tx, tz - 1)) * params.heightScale;
+    const nl = Math.hypot(dx, 2 * step, dz), n = [-dx / nl, 2 * step / nl, -dz / nl];
+    const ll = Math.hypot(light[0], light[1], light[2]), L = [light[0] / ll, light[1] / ll, light[2] / ll];
+    return light[3] + (1 - light[3]) * Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
+}
+/** The texel the shaders take as a chunk centre's, for the model to look at the same one. */
+export function texelOf(field, params, x, z) {
+    return [Math.max(0, Math.min(field.width - 1, Math.floor((x - params.originX) / params.extent * field.width))), Math.max(0, Math.min(field.height - 1, Math.floor((z - params.originZ) / params.extent * field.height)))];
+}
+/** A light: direction toward the light, and ambient. Data, so page and gate agree. */
+export const LIGHT = Object.freeze([0.4, 1.0, 0.3, 0.25]);
 /** Pack the terrain uniform the way struct Cam.terrain reads it. */
 export function terrainParams({ originX, originZ, extent, heightScale }) { return new Float32Array([originX, originZ, extent, heightScale]); }

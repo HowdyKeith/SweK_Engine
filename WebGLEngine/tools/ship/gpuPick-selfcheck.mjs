@@ -30,7 +30,8 @@ console.log("\n1. IDENTITY SURVIVES COMPACTION");
     const twin = G.cullLodCpu(records, u);
     let idsOk = true; for (let l = 0; l < 3; l++) for (let s = 0; s < twin.counts[l]; s++) { const o = (l * COUNT + s) * 8; if (twin.compact[o + 4] !== twin.ids[l][s] || twin.compact[o + 5] !== l) idsOk = false; }
     ok("the twin writes the input index and the LOD into every compacted record", idsOk);
-    ok("decodePick reads back what the shader encodes, and null for background", JSON.stringify(G.decodePick(new Uint8Array([0x34, 0x12, 2, 255]), 0)) === JSON.stringify({ id: 0x1234, lod: 2 }) && G.decodePick(new Uint8Array([9, 9, 9, 0]), 0) === null);
+    ok("decodePick reads back what the shader encodes, and null for background", JSON.stringify(G.decodePick(new Uint8Array([0x34, 0x12, 2, 128]), 0)) === JSON.stringify({ id: 0x1234, lod: 2 }) && G.decodePick(new Uint8Array([9, 9, 9, 0]), 0) === null);
+    ok("  v4300: a third byte rides in alpha, so an id above 65,535 decodes", G.decodePick(new Uint8Array([0x70, 0x11, 1, 128 + 1]), 0).id === 0x11170 + 0 && G.decodePick(new Uint8Array([0, 0, 0, 128 + 127]), 0).id === 127 * 65536, "ids to 8,388,607; the universe's 6,211 needed one more than two bytes' worth of room to be honest about");
 }
 
 console.log("\n2. PICK EVERY VISIBLE BODY AT ITS CENTRE, ON BOTH BACKENDS");
@@ -84,6 +85,9 @@ else {
 //   A  the id's two bytes swapped in the pick shader -> exit=1, 2 red: 101 of 101 picks wrong (body 51 reads as
 //      13,056), and the covered centres name nothing recognisable. WebGL2 stays green, since only the WGSL moved,
 //      which is why each backend is graded on its own line.
+//   B  (v4300) the third byte dropped from decodePick -> exit=1, 1 red: 0x11170 decodes as 0x1170. The scene
+//      picks stay green, since nothing in it has an id above 65,535 -- which is why the encoding is graded
+//      on its own line with a synthetic pixel rather than only through the scene.
 //   0  (found, not planted) `meta` as an attribute name: a reserved word in WGSL, caught by Level 11's compile
 //      watcher as "'meta' is a reserved keyword" at the first use() -- the second time that word cost a frame.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

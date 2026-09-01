@@ -13,6 +13,9 @@ import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import { universeRecords, slimUniverse, kindOf } from "../../world/universeBodies.mjs";
+import { makeUniverseEconomy } from "../../world/universeEconomy.mjs";
+import { haulRecordsCpu, haulWgsl } from "../../render/gpuHaul.mjs";
+import { validateWgsl } from "../../render/wgslSpec.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -111,12 +114,13 @@ else {
     await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(4000);
     // sweep the pointer across the middle until something is named
     let named = null; for (let x = 40; x < 640 && !named; x += 24) { await pg.mouse.move(x, 250); await pg.waitForTimeout(150); const t = await pg.evaluate(() => document.getElementById("pick").textContent); if (/record \d+/.test(t)) named = t; }
-    const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, bodies: document.getElementById("bodies").textContent, drawn: document.getElementById("drawn").textContent }));
+    const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, bodies: document.getElementById("bodies").textContent, drawn: document.getElementById("drawn").textContent, haul: document.getElementById("haul").textContent, trade: document.getElementById("trade").textContent }));
     await br.close(); srv.close();
     ok("*** the page loads on the WebGL2 route here and says so ***", /webgl2/.test(st.route), st.route);
     ok("  it counts the file's records", /694 systems/.test(st.bodies) && /6211 records/.test(st.bodies), st.bodies);
     ok("  it reports what it drew", /of 6211/.test(st.drawn), st.drawn);
     ok("*** hovering names a system or body from a pick ***", !!named, named || "nothing named along the sweep");
+    ok("  v4300: the page reports the haulers' flight route and a trade", /flight by/.test(st.haul || "") && (st.trade || "").length > 10, `${st.haul} | ${(st.trade || "").slice(0, 80)}`);
     ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
 }
 
@@ -125,9 +129,55 @@ else {
 //   A  the lift removed (every record on one plane) -> exit=1, 3 red: the star is no longer above its system,
 //      and near Sol 0 of 20 picks are exact -- all 20 resolve to "a body in front", which with equal depths means
 //      draw order, the atomics' order, decided every one. The lift is what makes a pick an answer.
+//   B  (v4300) the haul lerp reversed on x -> exit=1, 1 red: the GPU's hauler positions are 108 map units from the
+//      sim's, which is the width of the map -- every ship drawn at the far end of its own flight.
 //   0  (found, not planted) the map first went on XZ while the quads lie in XY, so from above every marker was a
 //      sliver and the picks named neighbours; and objects at 0.02 map units per in-system pixel put Sol's planets
 //      over Caph's star. Both measured by this gate before the model was right.
+console.log("\n4. v4300 -- THREE HUNDRED HAULERS, THEIR FLIGHT ON THE GPU, THEIR TRADES ON THE CPU");
+{
+    ok("the haul pass validates and declares info, flights, records", validateWgsl(haulWgsl()).length === 0);
+    const e = makeUniverseEconomy(slim, { haulers: 300, seed: 11 });
+    for (let i = 0; i < 400; i++) e.step(0.25);
+    const a = e.accounting();
+    ok("*** a hundred days over 694 markets: every ton and every credit accounted for ***", a.tonsConserved && a.creditsConserved && a.creditsOk, `${a.total} tons, ${a.creditsTotal} credits, ${e.events.length} events`);
+    ok("  the haulers trade across the map", e.ships.reduce((s, x) => s + x.trips, 0) > 3000 && new Set(e.ships.map((x) => x.at)).size > 100, `${e.ships.reduce((s, x) => s + x.trips, 0)} trips, docked at ${new Set(e.ships.map((x) => x.at)).size} distinct systems`);
+    ok("  markets produced and some ran out of money, which is the shape of a market", a.ledger.recipesRun > 1000 && a.brokeMarkets > 0, `${a.ledger.recipesRun} recipe runs, ${a.brokeMarkets} broke of ${e.markets.length}`);
+    // the twin of the flight: the records the haul pass would write equal the sim's own ship positions
+    const F = e.flightElements(0.35), R = haulRecordsCpu(F, e.t, 1.2); let worst = 0;
+    for (let i = 0; i < e.ships.length; i++) worst = Math.max(worst, Math.abs(R[i * 4] - e.ships[i].x), Math.abs(R[i * 4 + 1] - e.ships[i].y));
+    ok("  the flight twin reproduces the sim's own positions at f32", worst < 1e-4, `worst ${worst.toExponential(2)}`);
+    if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+    else {
+        const r = await runInEngineOrigin({ engineRoot: ENG, args: { slim, N }, script: `async (a) => {
+            const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
+            const { makeUniverseEconomy } = await import("/world/universeEconomy.mjs"); const { makeHaulSource, haulRecordsCpu } = await import("/render/gpuHaul.mjs");
+            const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N;
+            const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const e = makeUniverseEconomy(a.slim, { haulers: 300, seed: 11 });
+            const haul = makeHaulSource(dev, e, { radius: 0.35, lift: 1.2 });
+            const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "ship", mesh: G.quadMesh(1, [1, 0.85, 0.35, 1]) }], thresholds: [], records: haul });
+            const U = e.universe, ext = U.extent, eye = [0, -ext * 0.9, ext * 1.3];
+            const proj = G.perspective(0.9, 1, 0.05, ext * 8), view = G.lookAt(eye, [0, 0, 0], [0, 1, 0]), viewProj = G.multiply(proj, view);
+            let worst = 0, uploads = 0, t = 0, dirtyTicks = 0;
+            for (let i = 0; i < 120; i++) { e.step(0.25); t += 0.25; if (e.flightDirty) dirtyTicks++; const h = haul.advance(t); uploads = h.uploads; sc.frame({ viewProj, eye });
+                if (i % 30 === 29) { const gpu = await haul.readRecords(); for (let k = 0; k < e.ships.length; k++) worst = Math.max(worst, Math.abs(gpu[k * 4] - e.ships[k].x), Math.abs(gpu[k * 4 + 1] - e.ships[k].y)); } }
+            const counts = await sc.readCounts(); const out = { worst, uploads, dirtyTicks, ticks: 120, counts, path: haul.advance(t).path };
+            // a small crew: ticks where nobody departs or docks must cost no upload
+            const e2 = makeUniverseEconomy(a.slim, { haulers: 6, seed: 3 }); const haul2 = makeHaulSource(dev, e2, { radius: 0.35, lift: 1.2 }); let t2 = 0, dirty2 = 0;
+            for (let i = 0; i < 120; i++) { e2.step(0.25); t2 += 0.25; if (e2.flightDirty) dirty2++; haul2.advance(t2); }
+            out.small = { uploads: haul2.uploads, dirtyTicks: dirty2 };
+            sc.destroy(); haul.destroy(); haul2.destroy(); dev.destroy(); return out;
+        }` });
+        ok("*** the GPU's hauler positions are the sim's, every thirty ticks for 120 ticks ***", r.ok && r.result.worst < 2e-3, r.ok ? `worst ${r.result.worst.toExponential(2)} map units, flight by ${r.result.path}` : r.reason);
+        // At 300 haulers somebody departs or docks every quarter-day, so an upload every tick is RIGHT; the claim is
+        // that uploads happen exactly on the ticks something changed, and a crew of six shows the ticks saved.
+        ok("  the elements went up exactly on the ticks a ship departed, docked or went broke", r.ok && r.result.uploads === r.result.dirtyTicks, r.ok ? `${r.result.uploads} uploads for ${r.result.dirtyTicks} changed ticks of 120 (300 haulers: every tick)` : "");
+        ok("  and a crew of six skips the ticks where nothing changed", r.ok && r.result.small.uploads === r.result.small.dirtyTicks && r.result.small.uploads < 120, r.ok ? `${r.result.small.uploads} uploads in 120 ticks` : "");
+        ok("  the haulers were drawn", r.ok && r.result.counts[0] > 200, r.ok ? `${r.result.counts.join("/")} of 300` : "");
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: SPEED at this scale on a real GPU -- the milliseconds printed are SwiftShader's, two frames " +
     "including pipeline creation, and say nothing about Keith's box. Also unchecked: links between systems (the file has " +

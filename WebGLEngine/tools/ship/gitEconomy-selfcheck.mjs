@@ -14,7 +14,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
-import { makeGitEconomy, marketsOf, goodOf, GOODS, reprice, PRICE_FLOOR, PRICE_CEIL, BASE } from "../../world/gitEconomy.mjs";
+import { makeGitEconomy, marketsOf, goodOf, GOODS, reprice, PRICE_FLOOR, PRICE_CEIL, BASE, RECIPES, DEFAULTS } from "../../world/gitEconomy.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { traders } from "../../world/traderGraph.mjs";
 
@@ -52,7 +52,10 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
     }
     const a = e.accounting();
     ok("*** every ton is where the ledger says: stock + holds + consumed - produced equals the start ***", a.tonsConserved && a.total === before.initialTons, `${a.total} of ${before.initialTons} tons`);
-    ok("*** every trader's credits are start + earned - spent ***", a.creditsOk);
+    ok("*** every trader's credits are start + earned - spent - upkeep, and traders + treasuries - minted is the starting total ***", a.creditsOk && a.creditsConserved, `${a.creditsTotal} of ${a.initialCredits} credits; ${a.treasuries} in treasuries, ${a.traderCredits} in holds, ${a.ledger.minted} minted`);
+    ok("  v4300: production ran recipes -- goods were MADE from other goods, not only moved", a.ledger.recipesRun > 100 && GOODS.some((g) => a.ledger.produced[g] > 0) && RECIPES.length === 3, `${a.ledger.recipesRun} runs`);
+    ok("  v4300: upkeep was paid, and it circulates -- it sits in a treasury, not in a sink", a.ledger.upkeep > 0 && a.creditsConserved, `${a.ledger.upkeep} paid`);
+    ok("  at the default upkeep nobody went bankrupt and no treasury ran dry over a hundred days", a.bankrupt === 0 && a.brokeMarkets === 0, `${a.bankrupt} bankrupt, ${a.brokeMarkets} broke of ${e.markets.length}`);
     ok("  traders traded", e.events.length > 100 && e.ships.every((s) => s.trips > 0), `${e.events.length} events, trips ${e.ships.map((s) => s.trips).join("/")}`);
     ok("*** every departure was the best margin per ton on offer at that moment (within the 5% preference noise) ***", routesOk && routeChecks > 50, `${routeChecks} choices checked`);
     ok("  no trader was ever between bodies that do not exist", offSegment === 0);
@@ -64,6 +67,11 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
     ok("*** the same seed gives the same hundred days, event for event ***", JSON.stringify(e2.events) === JSON.stringify(e.events) && e2.accounting().total === a.total);
     const e3 = makeGitEconomy(system, { seed: 8 }); for (let i = 0; i < 400; i++) e3.step(0.25);
     ok("CONTROL: a different seed gives a different life", JSON.stringify(e3.events) !== JSON.stringify(e.events));
+    // v4300 -- the loops can close on somebody: a punishing upkeep bankrupts haulers, and the books still balance
+    const hard = makeGitEconomy(system, { seed: 7, upkeep: 900 }); for (let i = 0; i < 800; i++) hard.step(0.25); const h = hard.accounting();
+    ok("*** v4300: at 900 credits a day of upkeep, haulers go BANKRUPT, and every ton and credit is still accounted for ***", h.bankrupt > 0 && h.active > 0 && h.tonsConserved && h.creditsConserved, `${h.bankrupt} bankrupt, ${h.active} still trading, after 200 days`);
+    ok("  a bankrupt ship leaves the sky: its record has radius 0 and it makes no more events", hard.ships.filter((x) => x.bankrupt).every((x) => hard.records()[x.id * 4 + 3] === 0) && hard.events.some((x) => /is bankrupt/.test(x)));
+    ok("  a market that cannot pay says so instead of buying on credit", (() => { const poor = makeGitEconomy(system, { seed: 7, treasury: 200 }); for (let i = 0; i < 200; i++) poor.step(0.25); return poor.events.some((x) => /cannot pay/.test(x)) && poor.accounting().creditsConserved; })());
     ok("records() places every ship in the orrery's plane, slightly above it", (() => { const r = e.records(); for (let i = 0; i < e.ships.length; i++) if (r[i * 4 + 2] !== Math.fround(0.05) || r[i * 4 + 3] !== Math.fround(0.12)) return false; return r.length === e.ships.length * 4; })());
     report("sample: " + e.events.slice(-2).join(" | "));
 }
@@ -100,11 +108,17 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
 //   B  the WORST margin chosen instead of the best -> exit=1, 2 red: "every departure was the best margin" has 0
 //      choices to check (a worst-first trader buys nothing profitable and never departs) and the first trader
 //      goes nowhere. Life stops, and the gate says where.
+//   C  (v4300) production mints nothing -> exit=1, 4 red: the credit ledger finds 597,780 of 530,000 -- more money
+//      than ever existed, because minting was removed from the ledger but not from the treasuries. Every check
+//      that leans on creditsConserved goes with it. A leak in either direction is visible only to the total.
+//   D  (v4300) bankruptcy never declared -> exit=1, 2 red: at 900 a day, 0 bankrupt and 22 still "trading" on
+//      nothing, and no ship ever leaves the sky.
 //   0  (found, not planted) the gate's own route check drew from the seeded stream and broke determinism; the
 //      preference noise is now a pure hash of (tick, ship, market, good), so an observer cannot move a choice.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: WHETHER THIS IS A GOOD ECONOMY. Markets have infinite credit and traders never spend on " +
-    "anything but cargo, so the richest hauler only gets richer; nothing produces from inputs, nothing is built, " +
-    "nobody goes bankrupt. Kalcode/spaceprojectsim, where the idea came from, has all of those. What is graded is " +
-    "that the toy is exact about what it does.");
+console.log("unchecked here: WHETHER THIS IS A GOOD ECONOMY. v4300 closed the loops Level 13 named -- treasuries, " +
+    "recipes, upkeep, bankruptcy -- and found on the way that with upkeep as a pure sink the universe deflates in " +
+    "200 days (14 empty treasuries), so production mints and upkeep circulates. Whether the parameters make a " +
+    "LIVELY economy rather than a merely balanced one is a matter of taste this gate does not have; the only " +
+    "money source is production and the only sink is nothing, so the total grows by what is made.");
 process.exit(fails ? 1 : 0);

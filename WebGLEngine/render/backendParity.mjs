@@ -146,15 +146,15 @@ export const PARITY_BASELINE = Object.freeze({
     glslBearing: 139,
     glslDirective: 123,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 47,
+    wgslBearing: 48,
     both: 7,
     glslOnly: 132,
-    wgslOnly: 40,
+    wgslOnly: 41,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/gpuDriven.mjs", "render/gpuTerrain.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
-    wgslRawVsCode: Object.freeze({ raw: 50, code: 47 }),
+    wgslRawVsCode: Object.freeze({ raw: 51, code: 48 }),
 });
 
 /**

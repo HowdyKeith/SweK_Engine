@@ -38,6 +38,7 @@ console.log("\n1. THE SHADERS, THE CONTRACT, THE MODEL");
     ok("  the host uniform list matches struct Cam", checkHostUniforms(T.TERRAIN_WGSL, T.terrainPipelineDesc().uniforms).ok);
     ok("  the lift is an integer fetch on both languages", /textureLoad\(heightTex/.test(T.TERRAIN_WGSL) && /texelFetch\(heightTex/.test(T.TERRAIN_VERTEX_GLSL) && !/textureSample|texture\(/.test(T.TERRAIN_WGSL + T.TERRAIN_VERTEX_GLSL));
     ok("  the chunk colour is the CENTRE texel, flat, so a pixel names a texel", /texelAt\(rec\.x, rec\.z\)/.test(T.TERRAIN_WGSL) && /texelAt\(rec\.x, rec\.z\)/.test(T.TERRAIN_VERTEX_GLSL));
+    ok("  v4300: both languages shade from the same central differences and the same light", /shadeAt/.test(T.TERRAIN_WGSL) && /shadeAt/.test(T.TERRAIN_VERTEX_GLSL) && T.terrainPipelineDesc().uniforms.some((u) => u.name === "light"));
     const r0 = records[3], half = PARAMS.extent / SIDE / 2;
     // the record lives in a Float32Array, so the inversion is checked to f32, not to ===
     ok("the record radius contains the chunk's corners at any height, and the shader can invert it", Math.abs(r0 - (half * Math.SQRT2 + PARAMS.heightScale / 2)) < 1e-6 && Math.abs((r0 - PARAMS.heightScale / 2) / T.RADIUS_PER_HALF - half) < 1e-6, `radius ${r0.toFixed(3)}, half ${half}`);
@@ -61,7 +62,7 @@ else {
             const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
             const tex = dev.texture({ width: a.H, height: a.H, data: new Uint8Array(a.field.data), nearest: true });
             const params = T.terrainParams(a.PARAMS);
-            const sc = G.makeGpuDrivenScene(dev, { lods: lods(), thresholds: a.THRESHOLDS, records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", params); pass.texture("heightTex", tex, 0); } });
+            const sc = G.makeGpuDrivenScene(dev, { lods: lods(), thresholds: a.THRESHOLDS, records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); } });
             const f = sc.frame({ viewProj, eye: a.CAM.eye, clear: [0, 0, 1, 1], read: true }); const p = await f.pixels;
             out[backend] = { backend: dev.backend, path: sc.path, counts: await sc.readCounts(), pixels: Array.from(p.pixels), order: sc.order.lods.map((l) => l.name) };
             sc.destroy(); dev.destroy();
@@ -84,6 +85,17 @@ else {
             if (W.pixels[j] === want && L.pixels[j] === want) right++; else { wrong++; if (bad.length < 3) bad.push(`chunk ${i} want ${want} got ${W.pixels[j]}/${L.pixels[j]}`); }
         }
         ok("*** at every chunk's projected centre the pixel IS the centre texel's height byte, on both backends ***", wrong === 0 && right > 0, `${right} right, ${wrong} wrong of ${sampled} sampled${bad.length ? " -- " + bad.join("; ") : ""}`);
+        // v4300 -- and the GREEN channel is the shade the model computes from the same four neighbouring texels
+        let shadeOk = 0, shadeBad = 0, worstShade = 0, shades = new Set();
+        for (let i = 0; i < SIDE * SIDE; i++) {
+            const cx = records[i * 4], cz = records[i * 4 + 2], h = T.heightAt(field, PARAMS, cx, cz);
+            const p = G.project(viewProj, [cx, h * PARAMS.heightScale, cz]); if (Math.abs(p[0]) >= 0.98 || Math.abs(p[1]) >= 0.98) continue;
+            const px = Math.floor((p[0] * 0.5 + 0.5) * N), py = Math.floor((1 - (p[1] * 0.5 + 0.5)) * N), j = (py * N + px) * 4;
+            const [tx, tz] = T.texelOf(field, PARAMS, cx, cz), want = Math.round(T.shadeAtTexel(field, PARAMS, tx, tz, T.LIGHT) * 255); shades.add(want);
+            const d = Math.max(Math.abs(W.pixels[j + 1] - want), Math.abs(L.pixels[j + 1] - want)); worstShade = Math.max(worstShade, d); if (d <= 1) shadeOk++; else shadeBad++;
+        }
+        ok("*** and the green channel is the model's lambert shade at that texel's normal, within one level, on both ***", shadeBad === 0 && shadeOk > 0, `${shadeOk} right, ${shadeBad} off by more than one, worst ${worstShade} of 255`);
+        ok("CONTROL: the shades vary across the ground (a flat field would shade evenly)", shades.size > 8, `${shades.size} distinct shades`);
         const hist = (P) => { const c = {}; for (let i = 0; i < P.length; i += 4) { const k = P[i] + "," + P[i + 1] + "," + P[i + 2]; c[k] = (c[k] || 0) + 1; } return c; };
         const hw = hist(W.pixels), hl = hist(L.pixels), keys = [...new Set([...Object.keys(hw), ...Object.keys(hl)])];
         let worst = 0; for (const k of keys) worst = Math.max(worst, Math.abs((hw[k] || 0) - (hl[k] || 0)));
@@ -130,7 +142,7 @@ else {
             const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
             const tex = dev.texture({ width: a.field.width, height: a.field.height, data: new Uint8Array(a.field.data), nearest: true });
             const mk = (n, c) => skirt ? T.skirtedQuadMesh(n, c) : G.quadMesh(n, c);
-            const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "coarse", mesh: mk(1) }, { name: "fine", mesh: mk(8) }], thresholds: [0.7], records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", T.terrainParams(a.P2)); pass.texture("heightTex", tex, 0); } });
+            const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "coarse", mesh: mk(1) }, { name: "fine", mesh: mk(8) }], thresholds: [0.7], records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", T.terrainParams(a.P2)); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); } });
             const f = sc.frame({ viewProj, eye: a.C2.eye, clear: [0, 0, 1, 1], read: true }); const p = await f.pixels;
             out[String(skirt)] = { pixels: Array.from(p.pixels), counts: await sc.readCounts() };
             sc.destroy(); dev.destroy();
@@ -161,6 +173,9 @@ else {
     if (r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
 }
 
+//   D  (v4300) the normal's x flipped in the WGSL only -> exit=1, 2 red: 62 of 64 shades off, worst 117 of 255,
+//      and the backends part by 252 pixels per colour because GLSL still lights the right way. One language
+//      wrong is exactly the drift the two-language gate exists to catch.
 //   C  (Level 13) skirt vertices left at z = 0 (a skirt that hangs nowhere) -> exit=1, 3 red: the mesh check, the
 //      seam still showing 10,266 sky pixels with "skirts" on, and the coarse surface's centre reading sky (0)
 //      because a flat skirt is drawn ON the surface and wins the depth tie.

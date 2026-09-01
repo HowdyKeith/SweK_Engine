@@ -259,7 +259,8 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat)
   var o: VOut;
   o.pos = cam.viewProj * vec4<f32>(rec.xyz + p * rec.w, 1.0);
   let id = u32(ident.x);
-  o.id = vec4<f32>(f32(id & 255u) / 255.0, f32((id >> 8u) & 255u) / 255.0, ident.y / 255.0, 1.0);
+  // r, g: the id's low two bytes; b: the LOD; a: 128 + the id's third byte -- never 0, so "something" survives
+  o.id = vec4<f32>(f32(id & 255u) / 255.0, f32((id >> 8u) & 255u) / 255.0, ident.y / 255.0, f32(128u + ((id >> 16u) & 127u)) / 255.0);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> { return v.id; }
@@ -272,7 +273,7 @@ flat out vec4 vId;
 void main() {
   gl_Position = viewProj * vec4(rec.xyz + p * rec.w, 1.0);
   int id = int(ident.x);
-  vId = vec4(float(id & 255) / 255.0, float((id >> 8) & 255) / 255.0, ident.y / 255.0, 1.0);
+  vId = vec4(float(id & 255) / 255.0, float((id >> 8) & 255) / 255.0, ident.y / 255.0, float(128 + ((id >> 16) & 127)) / 255.0);
 }
 `;
 export const PICK_FRAGMENT_GLSL = `#version 300 es
@@ -280,8 +281,8 @@ precision highp float;
 flat in vec4 vId; out vec4 fragColor;
 void main() { fragColor = vId; }
 `;
-/** Decode a pick pixel: null for background, else { id, lod }. Ids up to 65535. */
-export function decodePick(px, i) { if (!px[i + 3]) return null; return { id: px[i] + px[i + 1] * 256, lod: px[i + 2] }; }
+/** Decode a pick pixel: null for background, else { id, lod }. v4300: ids up to 8,388,607 (a third byte in alpha). */
+export function decodePick(px, i) { if (px[i + 3] < 128) return null; return { id: px[i] + px[i + 1] * 256 + (px[i + 3] - 128) * 65536, lod: px[i + 2] }; }
 export const RENDER_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
