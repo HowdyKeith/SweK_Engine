@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4267 -- Three buttons were asked for, two shipped, and the third is refused in writing
+
+*** orrery.html had existed since v3195 and nothing in the tree linked to it. *** The backlog asked for three big
+buttons on the right side of server.html: SweK Orrery, GitHub Terrain, and GitHub Universe. Two of them now exist.
+
+The orrery button was the easy one, and it is the one that says something. `orrery.html` is 13,611 bytes of built,
+gated page -- `tools/ship/orreryView-selfcheck.mjs` has been green over it for dozens of rounds -- and no page in this
+tree contained a link to it. Nobody could reach it without typing the filename. server.html's own comments record
+that same failure four separate times for four separate pages. This is the fifth.
+
+GitHub Terrain had the opposite problem: it was reachable only from a place no button can point at. `window.repoTerrain`
+has been wired in main.js since v4157, and it is CONSOLE-ONLY -- you open devtools and call `repoTerrain.load()`. There
+is no page. So the button needed a door built for it, and the door is a `?terrain=` deep link that mirrors the `?go=`
+idiom already in main.js: read on load, `?terrain=1` for this repository, `?terrain=<dir>` for another one. The button
+navigates to the engine with that parameter set.
+
+*** THE THIRD BUTTON IS DELIBERATELY ABSENT, AND THE GATE ASSERTS ITS ABSENCE RATHER THAN TRUSTING THIS PARAGRAPH. ***
+There is no GitHub Universe page in this tree. The closest thing by name is `es-universe.json`, which is the Escape
+Velocity dataset that `ev.html` reads -- systems, spobs, ships, governments -- and not a universe of repositories.
+Backlog #139 is the round that would build one (contributor count, authors as neighbouring planets, contributors as
+trading partners). A button that opens a 404 is worse than no button: it teaches the person clicking it that the row
+is unreliable. So server.html carries the reason in a comment, and the gate carries it as a check that FAILS if a
+GitHub Universe button appears before its destination does.
+
+`tools/ship/serverButtons-selfcheck.mjs` is new. It checks both halves of each link -- the button AND the thing that
+consumes it -- because a button whose target renamed itself still looks correct in the source. On top of the two
+specific checks it applies a GENERAL rule: every `window.open` or `location.href` target in shipped source that names
+a local `.html` must resolve to a file on disk. That rule immediately found a pre-existing hit in the render-qa output
+directory, which on inspection is a generated artefact rather than a shipped page, and is now excluded BY NAME in a
+list that a second output directory would have to argue its way into -- not silently skipped.
+
+Two things were wrong and were corrected before ship. The gate asserted that `es-universe.json`'s `govts` was an
+array; it is an object. That is a shape I asserted without looking at it, which is the same defect as a measurement
+nobody took. And the first draft of the sabotage log recorded 3 RED for all three sabotages, written from what the
+checks LOOK like they would do. Re-run with the exit codes read, they measure 2, 1 and 2 -- and the 1 is the
+interesting one: renaming the parameter main.js reads leaves section 3 green, because the TARGET still resolves. Only
+the check that asserts both halves of the link catches a button wired to a URL nothing consumes.
+
+Unchecked, and stated in the gate's own output: whether the buttons WORK. Nothing here renders server.html, clicks
+anything, or boots the engine. This reads source text and resolves file paths, so it proves the targets exist and the
+`?terrain=` link is consumed -- not that the orrery draws or that terrain stamps. A handler that throws would pass
+every check in the file.
+
+The build now stands at 4267 gates.
 ## v4266 -- The orrery drew three planets made entirely of paperwork, and could not see two made of code
 
 Backlog #46 asked for "SweK at centre, repos in orbit, vendoring as impact ejecta". The orbit half has been

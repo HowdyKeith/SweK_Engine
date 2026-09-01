@@ -2149,6 +2149,21 @@ A password fetches a token from the list server; an unregistered callsign needs 
         <button id="bUniversal" title="switch THIS window to the Universal Viewer">🗂 Universal Viewer</button>
         <button id="bShowcase" class="demospill" title="the curated front door — the distributed-OS framing, three primitives, five showcases, and a 60-second tour (this is the page to open first / link on GitHub)" style="color:#8effc4;border-color:#2a5a3a;background:#12230f;">✦ Showcase (front door)</button>
         <button id="bComics" title="switch THIS window to the PDF / comic reader">📖 PDF / Comics</button>
+        <!-- v4267 -- Keith: "SweK Orrery would get a big button on the right side of Server.html. And the
+             Github Universe and Github Terrain would also have a big button on Server.html."
+             TWO OF THE THREE ARE HERE AND THE THIRD IS NOT, and the reason is written down rather than
+             filled in with a button that goes nowhere:
+               ORRERY   -- orrery.html has existed since v3195 and NOTHING LINKED TO IT. A built page nobody
+                           can find is the failure this row's own comments record four separate times.
+               TERRAIN  -- window.repoTerrain has turned a repo into walkable land since v4114 and was
+                           reachable only by typing at a console. ?terrain=1 (main.js, v4267) is the deep
+                           link that makes a button possible, shaped like the ?go= demo-mode link beside it.
+               UNIVERSE -- HAS NO DESTINATION. There is no GitHub-universe page and no data for one;
+                           es-universe.json is the Escape Velocity dataset ev.html reads, a different
+                           universe entirely. Backlog #139 is the round that would build it, and a button
+                           pointing at a page that does not exist is worse than no button. -->
+        <button id="bOrrery" title="SweK at the centre, every vendored dependency in orbit -- licence state, size, arrival date, and (v4266) how far each one's material spread through the tree">&#128302; SweK Orrery</button>
+        <button id="bRepoTerrain" class="go-link" title="This repository as walkable terrain: files as land, directories as ranges, data files as lakes, language as biome. An engine DEPTH-LINK (?terrain=1), not a page -- it exists only while the engine is running.">&#127956; GitHub Terrain</button>
         <!-- v3552 -- ONE INDEX, THREE KINDS. These were three pills listing three DIFFERENT KINDS of thing and
              calling them all demos: 56 demos_code scripts (?go= deep-links), 58 inline DEMO_MODES (engine
              states), and 15 real .html apps. THIRTEEN OF THOSE FIFTEEN APPS WERE IN NO PANEL AT ALL -- reachable
@@ -3230,6 +3245,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
     };
     // Resume FX + ABYSS Battleship are engine DEMO MODES, launched via the ?go=<id> deep-link (index.html
     // boots straight into that demo). Open in a new tab so the server console stays put.
+    // v4267 -- the two new big buttons. Orrery is a real page; Terrain is an engine deep-link, which is why
+    // only the second one wears .go-link (see the palette note at the top of this file).
+    try {
+      var _orr = document.getElementById("bOrrery");
+      if (_orr) _orr.onclick = function () { window.open("/orrery.html", "_blank", "noopener"); };
+      var _rt = document.getElementById("bRepoTerrain");
+      if (_rt) _rt.onclick = function () { location.href = "/index.html?terrain=1"; };
+    } catch (e) {}
     var pfDemo = { pfResumeFx:"resume_fx" };
     Object.keys(pfDemo).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open("/index.html?forceEngine=1&go=" + pfDemo[id], "_blank"); }; });
   })();
