@@ -8,6 +8,95 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4281 -- Our own labels, read against our own licence text
+
+tools/ship/vendoredLicences-selfcheck.mjs is ALL GREEN, and its own closing note says precisely what it does
+not do: *** "nothing verifies that the text under vendor/<x>/LICENSE is the licence it is labelled with -- a
+mislabelled MIT would pass every check above." ***
+
+v4276 and v4277 built the instrument for exactly that question and pointed it at thirty-five OTHER people's
+repositories. world/licenceBodies.mjs turns it inward. Every label survived: twelve of fourteen confirmed
+from the licence body, two correctly unverifiable, zero mismatches. That is the outcome to want from an audit
+rather than the one that justifies having run it.
+
+### What is compared is the operative body, and getting that right is the whole difficulty
+
+Two files can be the same licence and share not one byte. The title line is optional ("MIT License", "The MIT
+License (MIT)", or absent). The copyright notice differs by definition. One upstream hard-wraps at 80 columns
+while another puts each paragraph on a single line.
+
+*** THE FIRST NORMALISER I WROTE DELETED THE RETENTION CLAUSE. *** It dropped every line CONTAINING the word
+"copyright" -- which in an unwrapped file removes the whole of "The above copyright notice and this permission
+notice shall be included in all copies", and in a wrapped one removes half. Jolt's upstream licence is
+unwrapped and ours is wrapped, so the two came out at 432 and 870 characters and looked like different
+licences. They are the same licence. The filter now drops a line that BEGINS with "Copyright" -- that is the
+notice -- and keeps every line that merely mentions it -- that is the condition.
+
+### The clause the label actually turns on
+
+*** MIT AND 0BSD DIFFER BY EXACTLY ONE CLAUSE. *** Both grant everything. MIT requires the notice be carried
+in all copies; 0BSD drops that requirement entirely. So "is this MIT" is not a question about the word MIT
+appearing anywhere -- htmx's minified bundle has ten licence-word hits and every one of them is the substring
+"submit", which is why #61 recorded it as unpapered until the licence was recovered from upstream at its
+pinned tag. It is a question about an obligation being present.
+
+*** AND THE MIT GRANT SENTENCE IS NOT UNIQUE TO MIT. *** SIL OFL 1.1 opens with the identical "Permission is
+hereby granted, free of charge, to any person obtaining a copy", so a matcher keyed on that sentence calls IBM
+Plex Serif's font licence MIT. The gate demonstrates it rather than asserting it: run the naive clause order
+on the same bytes and it answers MIT; run the correct one and it answers OFL-1.1. What identifies the OFL is
+that it constrains RENAMING -- a Reserved Font Name -- which no permissive software licence has an equivalent
+of.
+
+### Ten unrelated upstreams shipped the same 1,020 characters
+
+Every confirmed-MIT body in the tree is byte-identical to every other: ten licences, one body hash
+56959050891f, exactly 1,020 characters. 0BSD is 635 and the OFL 4,045. An eleventh copy that differed would
+have something to say; one that matches says only that its author used the standard text, and that is only
+unremarkable because somebody checked.
+
+### Corroborated from outside the tree
+
+Eight vendored licences were diffed against their live upstream, cloned this round. Six are byte-identical
+files. The two that differ differ by a pinned copyright year range (three.js reads 2010-2023 against HEAD's
+2010-2026, which is what pinning means) and by a title line plus wrapping (jolt). Neither is a difference of
+licence, and all eight operative bodies match exactly.
+
+*** THE 2026 COPYRIGHT DATES LOOKED ALARMING AND WERE UPSTREAM'S OWN. *** Four vendored licences carry a
+copyright year equal to the current one, which reads exactly like paperwork generated here on somebody else's
+behalf -- backlog #82's ENCUMBERED shape in its dangerous direction. Cloning three of those upstreams and
+diffing settled it in about a minute: byte-identical, 2026 included. A suspicion that survives being checked
+is a finding; one that does not is the reason you check rather than the reason not to.
+
+### Three entries whose spdx is a claim rather than a text
+
+vendor/keyhunt is a six-line ATTRIBUTION.txt recording a technique reference with no code copied; ui/vendor's
+grant is a comment at the top of a JavaScript file; vendor/wasm is first-party AssemblyScript output.
+world/vendoredLicences.mjs types all three correctly already. The narrow point here is that identify() cannot
+confirm them because there is no licence body to read -- and "unverifiable by this method" is a different
+answer from "wrong". Collapsing the two is how an audit manufactures a finding.
+
+### Sabotage
+
+htmx's 0BSD relabelled MIT -- the mislabel the older gate's note says it cannot catch, done to the entry where
+it matters most: 2 red, naming the file and both licences.
+
+The clause order reversed so MIT is tested first: 5 red, including the one nobody aimed at it -- the
+canonical-body count goes from "10 licences, 1 distinct body" to "11 licences, 2 distinct bodies", because a
+4,045-character font licence has joined the MIT set.
+
+The normaliser's original bug restored: 6 red, every MIT body losing its retention clause at once, so the
+count of identifiable MIT licences drops to zero.
+
+One unbidden red, corrected rather than logged: section 3 asserted the OFL/MIT collision with the literal
+`true`. That is an assertion that cannot fail -- the fifth this session has caught -- and the claim was
+testable the whole time.
+
+### And the v4279 census's open bucket
+
+22 of its 64 unmeasured gates are now confirmed: 19 green, 3 still unfinished at 400 seconds, 0 red. The run
+continues.
+
+This round adds one module and one gate, and the tree stands at 1354 gates.
 ## v4280 -- A song is already a heightfield, and nobody had written the line that says so
 
 physics/fft.js was built to be BIT-REPRODUCIBLE. Its twiddle factors come from the strict-trig core this tree
@@ -18788,3 +18877,5 @@ The build now stands at 4278 gates.
 The build now stands at 4279 gates.
 
 The build now stands at 4280 gates.
+
+The build now stands at 4281 gates.

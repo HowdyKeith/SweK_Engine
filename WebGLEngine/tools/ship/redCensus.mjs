@@ -353,6 +353,14 @@ export const SLOW_PARTIAL = Object.freeze({
     "tools/roundhouse/census-selfcheck.mjs": {
         "verdict": "SLOW400",
         "ms": 400025
+    },
+    "tools/roundhouse/claimTrace-selfcheck.mjs": {
+        "verdict": "SLOW400",
+        "ms": 400022
+    },
+    "tools/roundhouse/compose-selfcheck.mjs": {
+        "verdict": "GREEN",
+        "ms": 111202
     }
 });
 
