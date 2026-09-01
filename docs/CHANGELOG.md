@@ -8,6 +8,83 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4261 -- What does each effect destroy? Asking the question broke the instrument that asks it
+
+The tree has eight image passes and has never once asked any of them what it destroys. Every gate on them
+checks the maths against the shader it was ported from, which is the right question about FIDELITY and says
+nothing about what happens to the picture.
+
+v4260 built the missing instrument without meaning to. Its frames carry their own index in the pixels, so a
+known frame can be pushed through a pass and the OUTPUT asked which frame it is. An effect that still answers
+"47" has preserved the picture's identity; one that cannot has consumed it. Sweeping the strength knob makes
+that a dose-response curve, which is a number these passes have never had.
+
+FOUR PASSES, FOUR DIFFERENT CLIFFS, none of them previously stateable. Each is swept over its OWN exported
+defaults, so k=1 is the look the tree actually ships:
+
+  liquefy    stroke     first failure at k=0.25  -- BELOW its shipped strength
+  crt        optics     first failure at k=0.75
+  aquarelle  curl       first failure at k=1     -- AT exactly its shipped strength
+  badTv      per-row    first failure at k=3
+
+AND NONE OF THAT IS A SCORE. Destroying the picture is what a heavy stylisation IS -- liquefy failing first
+means it displaces hardest, which is its job. The number says where the cliff is, not whether the cliff is
+wrong. What it is good for is that nobody could previously say how far any of these could be pushed before
+the content went, and now each has a figure.
+
+THE CENSUS FOUND ITS OWN INSTRUMENT LYING TWICE BEFORE IT FOUND ANYTHING ABOUT AN EFFECT, which is why the
+gate puts both findings before any result.
+
+FINDING ONE: A CHECK BIT NEXT TO THE BIT IT CHECKS IS NO CHECK AT ALL. The first run put 1,248 encoded frames
+through four passes and got a confident WRONG frame number 182 times -- 14.58%. The pattern named the cause:
+frame 1 read as 129, frame 2 as 130, every time, which is bit 7 flipped. Bit 7 is the last data block and the
+parity block sat immediately beside it, both against the right edge, so a warp that pulled that edge flipped
+the two together, parity stayed consistent, and the decode handed back a plausible number. v4260 had reasoned
+that one parity bit catches any single flipped block. That is true and it was beside the point: the
+corruption an image effect produces is spatially local, and a check bit adjacent to its data is defeated by
+exactly that. The fix is a second band at the bottom, drawn REVERSED and INVERTED so the same physical damage
+lands on different bits, with both bands required to decode and agree. 182 silent errors became 3.
+
+FINDING TWO: THE INSTRUMENT SCORED badTv 312 OF 312 AND WAS SIMPLY NOT LOOKING. That read as "horizontal
+tearing is harmless to this encoding" and was blindness. badTv shifts each ROW by its own amount, and the
+decoder was reading exactly two pixel rows: at 3x strength the row it happened to read was torn 2.17 px while
+row 24 of the SAME BAND was torn 30.28 px -- nearly two whole 16 px blocks. A frame torn that far HAS lost
+its identity, so "unreadable" was the true answer and "survived" the false one. Three spread rows per band,
+required to agree, took 3 silent errors to 0 and gave badTv its honest score of 276 of 312.
+
+Silent errors across the same 1,248 cells: 182 -> 3 -> 0. The same fix took v4260's own noise sweep from 13
+of 256 silently wrong at +/-255 amplitude to 0 wrong with 220 correctly refused, and that stale figure has
+been corrected in the v4260 gate rather than left standing.
+
+THE STRICTER DECODER COSTS NOTHING ON REAL FOOTAGE, which had to be checked because making a decoder fussier
+usually does. Re-running the headless-Chromium codec probe against real VP9: 47/47, 40/48 and 46/47 exact
+across three clips with ZERO unreadable frames, matching v4260's numbers.
+
+A CLAIM WITHDRAWN. I documented liquefy as non-monotone in strength -- legible, then unreadable, then
+readable again -- and reasoned that a displacement large enough to carry a whole block onto a neighbour's
+position could land back on something decodable. It was not a property. Those three recoveries were the
+silent misreads the two-band fix then eliminated, and with the corrected encoding all four curves are
+monotone. The monotone flag stays, as a CHECK that has so far always been true rather than as documented
+behaviour.
+
+Five sabotages, 4/3/1/4/3 red, each grep-confirmed before its result was read and restored md5-identical. My
+FIRST attempt at sabotage A was worthless and is recorded rather than quietly redone: I removed only the
+bottom band's draw and left the decoder reading two, so nothing decoded at all and it went 8 red. That is a
+crash, not a regression -- a sabotage has to restore the old BEHAVIOUR or the red it produces proves nothing
+about the fix. Sabotage B is the one that matters most: with the one-row sampling restored, the census's own
+silent count STAYS AT ZERO. A blind instrument reports clean, not broken, and nothing but a check on the
+instrument itself catches that.
+
+UNCHECKED: the GPU. Every pass measured is the CPU model, not the shader that ships, so a cliff here is the
+model's cliff and the shader's is assumed to match. Four of the eight image passes are covered -- chromaKey,
+chuckClose, transition and swiftShader have no driver, chuckClose because it returns cells rather than an
+image and transition because it needs two sources. Nothing measures COMPOSITION: a chain of two passes has a
+legibility of its own and this only ever runs one. And the frame pattern is a synthetic test card of flat
+black and white blocks, which is the easiest possible content, so every cliff here is an OPTIMISTIC bound on
+where real footage stops being recognisable.
+
+The build now stands at 4261 gates.
+
 ## v4260 -- Frame-accurate video: reproducible is not accurate, and measuring it split the goal in two
 
 v4188 gave this tree a live camera as a GL texture and pointed the whole shader chain at it. That was a

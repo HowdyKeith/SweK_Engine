@@ -137,7 +137,7 @@ console.log("\n3. *** A FRAME THAT CARRIES ITS OWN NUMBER: the only authority th
         }
         const g = V.decodeFrameIndex(b, W, H); if (g === -1) caught++; else silent++;
     }
-    ok("a single flipped block is ALWAYS caught by parity, never returned as a number",
+    ok("a single flipped block is ALWAYS caught (parity within a band, then the two bands disagreeing)",
         silent === 0, caught + " caught, " + silent + " silently wrong, over " + (256 * V.FRAME_BITS) + " trials");
 
     // The adaptive threshold, against the degradation a codec actually applies: gain and bias.
@@ -154,8 +154,12 @@ console.log("\n3. *** A FRAME THAT CARRIES ITS OWN NUMBER: the only authority th
         ok("  gain 0.1 (a 25-level range) is refused, not guessed", u === 256, u + "/256 unreadable");
     }
     report("HONEST LIMIT: additive noise below 128 CANNOT flip a full-black or full-white block, so a noise " +
-        "sweep under that amplitude proves nothing about this scheme. At +/-255 the probe measured 13 of 256 " +
-        "SILENTLY WRONG -- one parity bit cannot catch an even number of flipped blocks, and it does not claim to.");
+        "sweep under that amplitude proves nothing about this scheme. *** AND THE FIGURE THIS LINE USED TO " +
+        "CARRY WAS v4260's: at +/-255 the ONE-BAND encoding measured 13 of 256 SILENTLY WRONG, because one " +
+        "parity bit cannot catch an even number of flipped blocks. *** v4261 re-measured the same sweep on " +
+        "the two-band three-row encoding and it is 0 wrong at every amplitude to +/-255, with 220 of 256 " +
+        "correctly refused. The improvement was not sought here -- it came from render/effectLegibility.mjs " +
+        "finding 182 silent errors in 1,248 real effect outputs, and this sweep is where it shows up second.");
 }
 
 // =============================================================================================================

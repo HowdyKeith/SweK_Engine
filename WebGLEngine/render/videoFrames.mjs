@@ -245,10 +245,10 @@ export function runsAgree(a, b) {
 export const FRAME_BITS = 8;                 // 0..255, more frames than any gate here steps
 const BLOCKS = FRAME_BITS + 3;               // white sync + 8 data + parity + black sync
 
-/** Parity over the low FRAME_BITS bits. A single flipped data block changes it, so a misread becomes -1. */
+/** Parity over the low FRAME_BITS bits. Catches any single flipped data block WITHIN one band. */
 export const frameParity = (n) => { let p = 0; for (let b = 0; b < FRAME_BITS; b++) p ^= (n >> b) & 1; return p; };
 
-/** The bit pattern a frame index is drawn as: [white sync][b0..b7][parity][black sync]. */
+/** The bit pattern a band is drawn as: [white sync][b0..b7][parity][black sync]. */
 export function frameBits(n) {
     const bits = [1];
     for (let b = 0; b < FRAME_BITS; b++) bits.push((n >> b) & 1);
@@ -258,17 +258,32 @@ export function frameBits(n) {
 }
 
 /**
- * Draw frame `n`'s index into an RGBA buffer: BLOCKS columns across the top band, white for 1 and black for
- * 0, on a mid-grey field.
+ * Draw frame `n`'s index into an RGBA buffer, in TWO BANDS -- top and bottom.
+ *
+ * *** ONE BAND WITH A PARITY BIT WAS NOT ENOUGH, AND THE EFFECT CENSUS IS WHAT PROVED IT. *** v4260 shipped a
+ * single band and reasoned that parity catches any single flipped block -- which is true, and irrelevant to
+ * the corruption that actually happens. Running 1,248 encoded frames through this tree's own image passes
+ * (render/effectLegibility.mjs, v4261) returned a CONFIDENT WRONG FRAME NUMBER 182 times, 14.58%, and the
+ * pattern named the cause: frame 1 read as 129, frame 2 as 130 -- bit 7 flipped, every time.
+ *
+ * Bit 7 is the last data block and the parity block sits IMMEDIATELY BESIDE IT, both against the right edge.
+ * A warp that pulls the right edge flips the two together, parity stays consistent, and the decode hands back
+ * a plausible number. *** A CHECK BIT PLACED NEXT TO THE BIT IT CHECKS IS DEFEATED BY ANY CORRUPTION THAT IS
+ * *** SPATIALLY LOCAL, which is what every image effect's corruption is. ***
+ *
+ * The second band is drawn in REVERSED column order and INVERTED, so the same physical damage lands on
+ * different bits in the two copies, and a decode requires them to agree. A constant field fails both.
  */
 export function encodeFrameIndex(n, w, h, out = new Uint8ClampedArray(w * h * 4)) {
-    const bandH = Math.max(1, Math.floor(h / 4));
+    const bandH = Math.max(1, Math.floor(h / 5));
     const colW = w / BLOCKS;
     const bits = frameBits(n);
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-            let v = 128;                                                  // the field
-            if (y < bandH) v = bits[Math.min(BLOCKS - 1, Math.floor(x / colW))] ? 255 : 0;
+            let v = 128;                                                  // the field between the bands
+            const b = Math.min(BLOCKS - 1, Math.floor(x / colW));
+            if (y < bandH) v = bits[b] ? 255 : 0;
+            else if (y >= h - bandH) v = bits[BLOCKS - 1 - b] ? 0 : 255;  // reversed AND inverted
             const i = (y * w + x) * 4;
             out[i] = out[i + 1] = out[i + 2] = v; out[i + 3] = 255;
         }
@@ -276,32 +291,70 @@ export function encodeFrameIndex(n, w, h, out = new Uint8ClampedArray(w * h * 4)
     return out;
 }
 
-/**
- * Recover the index from an RGBA buffer, or -1.
- *
- * *** A PIPELINE THAT HANDS BACK THE WRONG FRAME MUST NOT BE ABLE TO HAND BACK A PLAUSIBLE NUMBER. *** Three
- * things have to hold: the white sync is light, the black sync is dark, and the parity matches. Each block is
- * read from a 3x3 average at its centre so the ringing a lossy codec leaves at block edges does not reach the
- * sample. The threshold is the MIDPOINT OF THE TWO SYNC BLOCKS rather than a fixed 128, so a frame the codec
- * has brightened or flattened is still read correctly -- which is the degradation that actually happens, and
- * the one a fixed threshold fails at first.
- */
-export function decodeFrameIndex(rgba, w, h) {
-    const bandH = Math.max(1, Math.floor(h / 4));
+/** Read one band's blocks as levels, from a 3x3 average at each block's centre on pixel row `row`. */
+function bandLevels(rgba, w, h, row) {
     const colW = w / BLOCKS;
-    const cy = Math.max(1, Math.min(h - 2, Math.floor(bandH / 2)));
-    const level = (b) => {
+    const cy = Math.max(1, Math.min(h - 2, row));
+    const out = [];
+    for (let b = 0; b < BLOCKS; b++) {
         const cx = Math.max(1, Math.min(w - 2, Math.floor((b + 0.5) * colW)));
         let sum = 0, count = 0;
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { sum += rgba[((cy + dy) * w + (cx + dx)) * 4]; count++; }
-        return sum / count;
-    };
-    const levels = []; for (let b = 0; b < BLOCKS; b++) levels.push(level(b));
+        out.push(sum / count);
+    }
+    return out;
+}
+
+/** Rows within a band that get sampled -- as fractions of the band's height. See THREE ROWS below. */
+export const BAND_ROWS = Object.freeze([0.25, 0.5, 0.75]);
+
+/**
+ * Decode one band's levels to an index, or -1.
+ *
+ * `reverse` maps a bit position to its COLUMN and `invert` flips the ink, which together are what make the
+ * bottom band land its bits on different pixels from the top one. Positionally the bright sync is always
+ * column 0 and the dark one always the last column, in both bands, so the contrast test is the same.
+ */
+function bandIndex(levels, { reverse = false, invert = false } = {}) {
     const white = levels[0], black = levels[BLOCKS - 1];
     if (!(white - black > 32)) return -1;             // no usable contrast: blank, constant, or inverted
     const mid = (white + black) / 2;
-    let n = 0; for (let b = 0; b < FRAME_BITS; b++) if (levels[1 + b] > mid) n |= 1 << b;
-    return (levels[1 + FRAME_BITS] > mid ? 1 : 0) === frameParity(n) ? n : -1;
+    const bit = (k) => { const lit = levels[reverse ? BLOCKS - 1 - k : k] > mid; return (lit !== invert) ? 1 : 0; };
+    let n = 0; for (let b = 0; b < FRAME_BITS; b++) if (bit(1 + b)) n |= 1 << b;
+    return bit(1 + FRAME_BITS) === frameParity(n) ? n : -1;
+}
+
+/**
+ * Recover the index from an RGBA buffer, or -1.
+ *
+ * *** A PIPELINE THAT HANDS BACK THE WRONG FRAME MUST NOT BE ABLE TO HAND BACK A PLAUSIBLE NUMBER. *** Both
+ * bands must decode -- each with its own sync contrast and its own parity -- AND agree. Each block is read
+ * from a 3x3 average at its centre so the ringing a lossy codec leaves at block edges does not reach the
+ * sample, and the threshold is the MIDPOINT OF THAT BAND'S OWN SYNC BLOCKS rather than a fixed 128, so a
+ * frame the codec has brightened or flattened is still read correctly.
+ */
+export function decodeFrameIndex(rgba, w, h) {
+    const bandH = Math.max(1, Math.floor(h / 5));
+    // *** THREE ROWS PER BAND, BECAUSE A ONE-ROW SAMPLE CANNOT SEE A PER-ROW EFFECT. *** The first census run
+    // scored render/badTvModel.mjs at 312 of 312 frames SURVIVED at every strength up to 3x, which read as
+    // "horizontal tearing is harmless to this encoding" and was nothing of the sort. badTv shifts each ROW by
+    // its own amount, and the decoder was reading exactly two pixel rows: at 3x the tear on the row it
+    // happened to read was 2.17 px while row 24 of the SAME BAND was torn 30.28 px, nearly two whole blocks.
+    // The instrument was blind, not the effect harmless. Requiring three spread rows to agree turns that into
+    // an honest "unreadable" -- which is the true answer, since a frame torn that far HAS lost its identity.
+    const read = (base, dir, opts) => {
+        let first = null;
+        for (const f of BAND_ROWS) {
+            const n = bandIndex(bandLevels(rgba, w, h, base + dir * Math.round(f * bandH)), opts);
+            if (n < 0) return -1;
+            if (first === null) first = n; else if (n !== first) return -1;
+        }
+        return first;
+    };
+    const top = read(0, 1, undefined);
+    if (top < 0) return -1;
+    const bot = read(h - 1, -1, { reverse: true, invert: true });
+    return bot === top ? top : -1;
 }
 
 /** FNV-1a over bytes: a stable digest so "did run 2 produce the same pixels as run 1" is one comparison. */
