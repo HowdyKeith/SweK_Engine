@@ -15,7 +15,8 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, METHOD, runGate, censusCostMs, ENG,
+import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, RECHECK_V4313, RECHECK_V4314,
+         METHOD, runGate, censusCostMs, ENG,
          UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
 
 let fails = 0;
@@ -111,6 +112,21 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
         `${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered - ` +
         `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_SINCE_V4279.length} fixed since = ` +
         `${RED_AT_V4279.length}`);
+    // *** A RECORD OF ONE MOMENT MAY NOT DERIVE FROM A LIST THAT SPANS SEVERAL. *** RECHECK_V4313 read
+    // `FIXED_SINCE_V4279.map(...)` and was correct for exactly one round: v4314 pruned a fourth gate and a
+    // v4313 record started claiming v4314's work. Caught by reading, not by a check -- so here is the check.
+    // Each recheck's own count must equal the length of the list it names, which is false the moment either
+    // one is derived from something wider than itself.
+    for (const R of [RECHECK_V4313, RECHECK_V4314]) {
+        ok("  " + R.at + " names exactly as many now-green gates as it counts",
+            R.nowGreen === R.nowGreenGates.length,
+            R.at + ": nowGreen " + R.nowGreen + " against " + R.nowGreenGates.length + " named (" +
+            R.nowGreenGates.map((g) => g.split("/").pop()).join(", ") + ")");
+    }
+    ok("  ...and the two rounds' now-green sets do not overlap",
+        !RECHECK_V4313.nowGreenGates.some((g) => RECHECK_V4314.nowGreenGates.includes(g)),
+        "a gate cannot be fixed twice; an overlap means one record is reporting the other's round");
+
     ok("  ...and every gate that LEFT the list names its cause and the round it left in",
         FIXED_SINCE_V4279.length > 0 &&
         FIXED_SINCE_V4279.every((e) => typeof e.why === "string" && e.why.length > 40 && e.round),

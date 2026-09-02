@@ -78,8 +78,6 @@ export const METHOD = Object.freeze({
 export const RED_AT_V4279 = Object.freeze([
     { gate: "engine/frameDirtyCensus-selfcheck.mjs", ms: 775,
       fails: "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it *" },
-    { gate: "tools/pageReach-selfcheck.mjs", ms: 129,
-      fails: "!! NO PAGE IS BORN INVISIBLE NEW INVISIBLE PAGES: aquarelle.html, camera-effects.html, destructible.html, doom" },
     { gate: "tools/roundhouse/swekWebviewApk-selfcheck.mjs", ms: 914,
       fails: "...and a failed load offers the prompt, since that is when the address is usually wrong" },
     { gate: "tools/ship/avatarServerViews-selfcheck.mjs", ms: 6352,
@@ -184,30 +182,29 @@ export const FIXED_AT_V4279 = Object.freeze([
            "clean checkout. Fixed at the cause: the walk skips .claude." },
 ]);
 
-/**
- * *** THE LIST SHRANK FOR THE FIRST TIME, AND THE CENSUS'S OWN ARITHMETIC COULD NOT EXPRESS IT. ***
- *
- * redCensus-selfcheck section 2 says, in its own words: "a gate turning green is GOOD NEWS that must be
- * recorded by hand... The list may only shrink, and only on purpose." *** THAT PATH HAD NEVER BEEN WALKED. ***
- * RECHECK at v4295 measured nowGreen: 0, so in sixteen rounds nothing had ever left, and the identity the
- * gate asserts -- confirmedSerially + recoveredFromTimeoutBucket - FIXED_AT_V4279 === RED_AT_V4279.length --
- * was written when the right-hand side could only stay still. Delete one line for a gate somebody FIXED and
- * that identity goes red. *** SO THE CENSUS'S ARITHMETIC PUNISHED THE PRUNING THE CENSUS DEMANDS *** -- the
- * same shape as the Arriving cap that made hiding a page cheaper than linking it (server.html, v4155), and as
- * corroborateFully's "two rejections" that went red when a defect was repaired. A ledger needs a column for
- * good news or it will only ever record bad.
- *
- * The fix is a term, not a looser check: FIXED_SINCE_V4279 is subtracted alongside FIXED_AT_V4279, so the
- * reconciliation still has to balance and pruning is now the way to balance it.
- *
- * *** AND ONE OF THE THREE WAS GREEN BEFORE THIS ROUND TOUCHED ANYTHING, WHICH IS THE INTERESTING ONE. ***
- * deviceModes was fixed by commit 9695918, whose own diff says so in the file: it removed "nuclear" from
- * UNGUARDED_BASELINE because nuclear was THE LAST PROBED DEVICE and now derives its modes from one
- * NUCLEAR_MODES const. That commit fixed the gate and did not prune the census, so the census kept accusing
- * it -- which is precisely the failure the header of this file describes ("thirteen of the nineteen it listed
- * are now GREEN: somebody fixed them and nobody removed the entry"). *** THE MECHANISM WRITTEN TO STOP THAT
- * HAD ALREADY LET IT HAPPEN ONCE MORE, and it took until now to notice because nothing re-ran the list.
- */
+//
+// *** THE LIST SHRANK FOR THE FIRST TIME, AND THE CENSUS'S OWN ARITHMETIC COULD NOT EXPRESS IT. ***
+//
+// redCensus-selfcheck section 2 says, in its own words: "a gate turning green is GOOD NEWS that must be
+// recorded by hand... The list may only shrink, and only on purpose." *** THAT PATH HAD NEVER BEEN WALKED. ***
+// RECHECK at v4295 measured nowGreen: 0, so in sixteen rounds nothing had ever left, and the identity the
+// gate asserts -- confirmedSerially + recoveredFromTimeoutBucket - FIXED_AT_V4279 === RED_AT_V4279.length --
+// was written when the right-hand side could only stay still. Delete one line for a gate somebody FIXED and
+// that identity goes red. *** SO THE CENSUS'S ARITHMETIC PUNISHED THE PRUNING THE CENSUS DEMANDS *** -- the
+// same shape as the Arriving cap that made hiding a page cheaper than linking it (server.html, v4155), and as
+// corroborateFully's "two rejections" that went red when a defect was repaired. A ledger needs a column for
+// good news or it will only ever record bad.
+//
+// The fix is a term, not a looser check: FIXED_SINCE_V4279 is subtracted alongside FIXED_AT_V4279, so the
+// reconciliation still has to balance and pruning is now the way to balance it.
+//
+// *** AND ONE OF THE THREE WAS GREEN BEFORE THIS ROUND TOUCHED ANYTHING, WHICH IS THE INTERESTING ONE. ***
+// deviceModes was fixed by commit 9695918, whose own diff says so in the file: it removed "nuclear" from
+// UNGUARDED_BASELINE because nuclear was THE LAST PROBED DEVICE and now derives its modes from one
+// NUCLEAR_MODES const. That commit fixed the gate and did not prune the census, so the census kept accusing
+// it -- which is precisely the failure the header of this file describes ("thirteen of the nineteen it listed
+// are now GREEN: somebody fixed them and nobody removed the entry"). *** THE MECHANISM WRITTEN TO STOP THAT
+// HAD ALREADY LET IT HAPPEN ONCE MORE, and it took until now to notice because nothing re-ran the list.
 export const FIXED_SINCE_V4279 = Object.freeze([
     { gate: "tools/roundhouse/deviceModes-selfcheck.mjs", round: "9695918 (before this round)",
       why: "nuclear declared no modes at all, so modesOf() fell back to the candidate list and its echoing " +
@@ -224,6 +221,15 @@ export const FIXED_SINCE_V4279 = Object.freeze([
            "pages, because shipRitual reads launch-index.json too. One stale generated file was carried as " +
            "two independent red gates in the census, which is worth knowing about a census: entries are not " +
            "independent, and a count of red gates over-counts the number of causes." },
+    { gate: "tools/pageReach-selfcheck.mjs", round: "v4314",
+      why: "TWELVE PAGES BORN INVISIBLE between v4176 and v4235 -- aquarelle, camera-effects, destructible, " +
+           "doom-fire, drive-brain, mesh-line, odometer, primitive-paint, proc-brush, scene-view, sfx and " +
+           "spellbook -- in the tree, working, and reachable from nothing. All twelve were opened in headless " +
+           "Chromium over a real server first (twelve for twelve loaded clean, no page errors, no failed " +
+           "requests), then linked from server.html and FILED: drive-brain into the GPU Brain drawer, the " +
+           "other eleven into UNPLACED with the reason each is still there. Invisible 96 -> 84 against a " +
+           "baseline of 100; Arriving 47 -> 58 of 440, 13.2% against a 15% cap. Fixed by linking pages, not " +
+           "by touching the ratchet." },
 ]);
 
 /**
@@ -476,15 +482,47 @@ export const MOMENTS = Object.freeze({
     fixedSince: "see FIXED_SINCE_V4279 -- 37 standing at v4279 minus what has been fixed since",
 });
 
-/**
- * The first re-check after the list actually MOVED. v4295 found 37 of 37 still red and called it "exactly true
- * and exactly stalled"; that was accurate then and it stopped being accurate three commits later, without
- * anything noticing, because a stalled list gives nobody a reason to re-run it.
- */
+// v4314, one round later, and the list moved AGAIN -- which is the answer to whether v4313's three were a
+// one-off backlog or the register genuinely lagging the tree. It is the second: pageReach had been naming the
+// same twelve pages every round, so the work it was asking for was legible the whole time and nothing had
+// done it. A census whose entries are actionable and unactioned is a to-do list nobody reads, and the only
+// way to find that out was to act on one.
+export const RECHECK_V4314 = Object.freeze({
+    at: "v4314", method: "the gate's own section-2 re-run, serial, via runGate",
+    checked: 34, stillRed: 33, nowGreen: 1, regressed: 0,
+    nowGreenGates: Object.freeze(["tools/pageReach-selfcheck.mjs"]),
+    causes: "twelve pages linked and filed; the gate was asking for exactly that and had been for rounds",
+    stillRedNearby: "registerResidue-selfcheck went 46 -> 45 in the same edit and stays RED against its " +
+                    "ceiling of 41. THE CEILING WAS NOT MOVED. Lowering it to 45 would have turned the gate " +
+                    "green by rewriting the ratchet, which is the one thing this file exists to refuse",
+    // *** AND THE CLOSING NOTE OF THIS FILE GOT A LIVE INSTANCE IN THE SAME ROUND. *** "redCensus is green"
+    // means "the known red set has not changed", not "the tree is green" -- and a sweep of the 89 gates that
+    // read server.html found ONE red gate outside the census: instruments-selfcheck, which had gone red at
+    // v4313 because krbn-lyapunov.html imports simulation/tomo and was in no instrument index. So `regressed`
+    // below counts CENSUS MEMBERS and there was a regression it could not see, in a gate nobody had run.
+    regressedOutsideTheCensus: Object.freeze([
+        { gate: "tools/ship/instruments-selfcheck.mjs", wentRed: "v4313", fixed: "v4314",
+          why: "a page carrying an EXACT KEY (ln 2 off the GPU) was linked and indexed nowhere. Fixed by " +
+               "registering it in physics/instruments.mjs with a verifier that calls the CPU port -- NOT by " +
+               "adding it to that gate's EXEMPT list beside krbn.html, which the identical import made " +
+               "available and which would have filed an answer as a decoration." },
+    ]),
+});
+
+// The first re-check after the list actually MOVED. v4295 found 37 of 37 still red and called it "exactly true
+// and exactly stalled"; that was accurate then and it stopped being accurate three commits later, without
+// anything noticing, because a stalled list gives nobody a reason to re-run it.
+//
+// *** AND nowGreenGates WAS WRONG WITHIN ONE ROUND OF BEING WRITTEN, IN THE EXACT SHAPE THIS FILE WARNS
+// ABOUT. *** It read `FIXED_SINCE_V4279.map(e => e.gate)` -- the WHOLE list -- which was three gates when
+// v4313 wrote it and four the moment v4314 pruned pageReach, so a record of what happened at v4313 silently
+// started reporting v4314's work as its own. Deriving a value is only safe when the source cannot span more
+// instants than the record does; MOMENTS.standingToday is derived correctly because it deliberately means
+// "now", and this one meant "then". Filtered by round, so it can only ever describe v4313.
 export const RECHECK_V4313 = Object.freeze({
     at: "v4313", method: "the gate's own section-2 re-run, serial, via runGate",
     checked: 37, stillRed: 34, nowGreen: 3, regressed: 0,
-    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.map((e) => e.gate)),
+    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.filter((e) => !/^v43(1[4-9]|[2-9])/.test(e.round)).map((e) => e.gate)),
     causes: "one stale generated file (launch-index.json, 507 against 523) accounted for TWO of the three; the " +
             "third had been green since commit 9695918 and nobody pruned the entry",
     lesson: "a census entry is not a cause. Two of these three were one artefact read by two gates, so the red " +

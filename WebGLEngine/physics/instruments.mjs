@@ -111,6 +111,20 @@ export const INSTRUMENTS = [
       measures: "Iterate a parabola and count periods. The cheapest instrument here and one of the strongest.",
       key: "Feigenbaum's delta = 4.669201, a UNIVERSAL constant obtained by nothing but iterating and counting. And the Lyapunov exponent at r=4 is EXACTLY ln 2.",
       gate: "physics/chaos/logistic-selfcheck.mjs", device: "chaos" },
+    // v4314 -- THE SAME KEY, MEASURED BY DIFFERENT MACHINERY, WHICH IS WHY IT IS A SECOND ENTRY AND NOT A NOTE
+    // ON THE FIRST. logistic.html gets ln 2 from a JS loop; this gets it from a fragment shader that receives r
+    // as a screen coordinate and no uniform carrying the answer. Two independent routes to one exact number is
+    // the strongest shape an instrument index can hold, and collapsing them into one row would hide that.
+    //
+    // It was ALSO the page instruments-selfcheck named as UNLISTED the round after it shipped: v4313 linked it,
+    // filed it nowhere, and this gate -- which sweeps every page importing simulation/tomo -- caught it. The
+    // wrong repair was available and visible: krbn.html sits in this file's EXEMPT list for the identical
+    // import. But krbn.html is a drawing with no key and this page has one, so exempting it would have filed a
+    // page carrying an exact answer as "something to look at".
+    { id: "krbn-lyapunov", page: "krbn-lyapunov.html", name: "Krbn x Lyapunov (GPU)", area: "chaos",
+      measures: "The logistic map run once per pixel on the GPU: the x coordinate IS r, the y coordinate is the seed x0, and the fragment reports the Lyapunov exponent of that orbit over the Krbn drawing.",
+      key: "At r = 4 the exponent is EXACTLY ln 2 = 0.6931472 and the shader is never told it. The gate reads it back off the GPU -- median 0.693226 over 128 seeds, |err| 7.85e-5 -- and the page decodes its own on whatever hardware runs it (0.693103, |err| 4.45e-5 on SwiftShader). The RAW path returns BEFORE the ln 2 constant the display path uses to normalise, so the number read back cannot have come from it.",
+      gate: "tools/ship/swiftShaders-selfcheck.mjs" },
     // ---- rendering / method ---------------------------------------------------------------------------------
     { id: "splat-lab", page: "splat-lab.html", name: "Splat lab", area: "rendering maths",
       measures: "3D Gaussian splatting: EWA projection and alpha compositing, graded as arithmetic rather than as a picture.",
@@ -1403,6 +1417,27 @@ export const KEY_VERIFIERS = {
         const O = await import("../physics/optics/fresnel.js");
         const got = O.knifeEdgeIntensity(0);
         return { quantity: "knife-edge intensity at the shadow boundary", claimed: 0.25, actual: got, ok: Math.abs(got - 0.25) < 1e-12 };
+    },
+    // v4314 -- CALLS THE CPU PORT RATHER THAN RE-DERIVING THE LOOP. render/swiftShaderModel.mjs is the reference
+    // the shader is graded against; re-typing its iteration here would be a second copy of the arithmetic, and
+    // a second copy is never the one that gets updated. WHAT THIS DOES NOT VERIFY, stated rather than implied:
+    // the GPU. Node has no WebGL2 context, so the claim "the FRAGMENT reads ln 2" is checked by
+    // tools/ship/swiftShaders-selfcheck.mjs in a real browser and by the page itself; this verifies that the
+    // key attached to the entry is the number the model produces.
+    "krbn-lyapunov": async () => {
+        const M = await import("../render/swiftShaderModel.mjs");
+        const H = 64, img = { w: 1, h: H, premultiplied: true, data: new Float32Array(H * 4).fill(1) };
+        const out = M.swkLyapunov(img, { rLo: 4, rHi: 4, raw: true });
+        const lam = [];
+        for (let y = 0; y < H; y++) lam.push((out.data[y * 4] + out.data[y * 4 + 1] / 255) * 4 - 3);
+        lam.sort((a, b) => a - b);
+        const got = lam[H >> 1];
+        // 1e-3, not 1e-2: the measured error is 2.1e-4, so a 1e-2 tolerance would have been fifty times the
+        // slack the measurement needs and would pass a model that had lost three digits. Not tightened to the
+        // measured value either -- the CPU port is deterministic, but pinning 2.1e-4 would make a Math.log
+        // implementation difference read as a broken instrument.
+        return { quantity: "Lyapunov exponent at r=4, median over " + H + " seeds, from the CPU port the shader is graded against",
+                 claimed: Math.LN2, actual: got, ok: Math.abs(got - Math.LN2) < 1e-3 };
     },
     "logistic": async () => {
         const L = await import("../physics/chaos/logistic.js");

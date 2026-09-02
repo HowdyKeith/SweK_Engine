@@ -1087,7 +1087,7 @@
    "id": "drive-brain.html",
    "display": "Drive Brain",
    "href": "/drive-brain.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {

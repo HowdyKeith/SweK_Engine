@@ -931,7 +931,7 @@
    "f": "drive-brain.html",
    "t": "GPU Brain: Learn to Drive",
    "d": "A car learns to drive to a goal and stop there, on the real vehicle model: wheels as rays, grip proportional to the load each wheel actually carries, and tyre forces clamped to one friction circle. Trained by evolution strategy against a hand-written driver. Bolt a 400kg turret on the roof and the same policy starts rolling it over -- the loadout, not the driving.",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
