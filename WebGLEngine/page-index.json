@@ -1337,7 +1337,7 @@
    "f": "gpu-rig-check.html",
    "t": "SweK GPU rig check",
    "d": "",
-   "g": "webgpu",
+   "g": "rendertsl",
    "p": 0
   },
   {
@@ -1771,7 +1771,7 @@
    "f": "magmap-bench.html",
    "t": "- magmap kernel A/B bench",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1981,7 +1981,7 @@
    "f": "orrery-gpu.html",
    "t": "SweK Orrery -- on the GPU",
    "d": "",
-   "g": "",
+   "g": "rendertsl",
    "p": 0
   },
   {
@@ -2828,14 +2828,14 @@
    "f": "tsl-probe.html",
    "t": "- TSL probe (three 0.178, WebGPU with the WebGL2 backend)",
    "d": "",
-   "g": "",
+   "g": "rendertsl",
    "p": 0
   },
   {
    "f": "tsl-rig.html",
    "t": "- TSL on the rig",
    "d": "TSL on the rig: three's node shading language and the transplanted device pipelines run on THIS machine's GPU -- the physics keys read off pictures, badTv held to the byte, and the 448-step Lyapunov loop timed on both paths. Save the JSON as tools/ship/tsl-rig.json.",
-   "g": "webgpu",
+   "g": "rendertsl",
    "p": 0
   },
   {

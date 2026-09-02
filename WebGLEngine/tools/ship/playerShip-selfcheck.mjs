@@ -75,8 +75,14 @@ console.log("\n2. THE COCKPIT: land, buy, fly, sell -- the ledger moves by exact
 
 console.log("\n3. TWO PEERS, ONE OF THEM FLYING: the cockpit's interventions cross the wire and both books agree");
 {
-    const pair = runPair({ makeEconomy: () => fresh(7), ticks: 120, interventions: [{ atTick: 10, peer: "a", kind: "land", args: { ship: 22, market: 1 } }, { atTick: 20, peer: "a", kind: "trade", args: { ship: 22, good: "docs", tons: 3 } }, { atTick: 40, peer: "a", kind: "launch", args: { ship: 22 } }, { atTick: 60, peer: "a", kind: "land", args: { ship: 22, market: 4 } }, { atTick: 70, peer: "a", kind: "trade", args: { ship: 22, good: "docs", tons: -3 } }] });
-    ok("*** peer a flies and trades; peer b sees the same universe at every tick -- the same hash, the same earned credits ***", pair.agree && pair.upTo >= 120 && pair.a.applied.length === 5 && pair.b.applied.length === 5 && pair.a.session.economy.ships[22].earned === pair.b.session.economy.ships[22].earned && pair.a.session.economy.ships[22].earned > 0, `earned ${pair.a.session.economy.ships[22].earned} on both`);
+    // *** THIS SAID `ship: MANUAL` AND SECTION 2, TWENTY LINES UP, DERIVES THE SAME THING. *** crew() appends the
+    // manual ship last, so its index is the crew length minus one -- 22 when the orrery held fourteen bodies,
+    // 23 since vendor/three-webgpu arrived and v4329 re-baked. The typed form threw "ship 22 is not a manual
+    // ship" the moment the bake was refreshed, which is the whole shape of this round: a number that was right
+    // once, against data that moved.
+    const MANUAL = fresh(7).ships.length - 1;
+    const pair = runPair({ makeEconomy: () => fresh(7), ticks: 120, interventions: [{ atTick: 10, peer: "a", kind: "land", args: { ship: MANUAL, market: 1 } }, { atTick: 20, peer: "a", kind: "trade", args: { ship: MANUAL, good: "docs", tons: 3 } }, { atTick: 40, peer: "a", kind: "launch", args: { ship: MANUAL } }, { atTick: 60, peer: "a", kind: "land", args: { ship: MANUAL, market: 4 } }, { atTick: 70, peer: "a", kind: "trade", args: { ship: MANUAL, good: "docs", tons: -3 } }] });
+    ok("*** peer a flies and trades; peer b sees the same universe at every tick -- the same hash, the same earned credits ***", pair.agree && pair.upTo >= 120 && pair.a.applied.length === 5 && pair.b.applied.length === 5 && pair.a.session.economy.ships[MANUAL].earned === pair.b.session.economy.ships[MANUAL].earned && pair.a.session.economy.ships[MANUAL].earned > 0, `earned ${pair.a.session.economy.ships[MANUAL].earned} on both`);
 }
 
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4317.

@@ -43,14 +43,30 @@ console.log("1. *** THE PAPERWORK PLANETS: 3 of 14 bodies contain no code at all
         ok("  vendor/" + name + " really holds only paperwork on disk",
             files.length > 0 && files.every((f) => E.isPaperFile(f)), files.join(" ") || "(missing)");
     }
-    ok("and every OTHER body does have code", subs.filter((s) => s.state === E.SUBSTANCE.CODE).length === 11);
+    // *** DERIVED, BECAUSE 11 WAS A NUMBER TYPED AGAINST A BAKE THAT HAD BEEN FROZEN SINCE v4189. *** The tree
+    // gained vendor/three-webgpu on 2026-09-02 and orrery.json did not, so this read 11 of 14 and was right by
+    // accident for forty-five rounds. The statement worth making is not "eleven": it is that every body which
+    // is NOT on the paper-only list has code, which is true at any tree size.
+    ok("and every OTHER body does have code",
+        subs.filter((s) => s.state === E.SUBSTANCE.CODE).length === BODIES.length - E.PAPER_ONLY_BODIES.length,
+        `${subs.filter((s) => s.state === E.SUBSTANCE.CODE).length} of ${BODIES.length}, the other ${E.PAPER_ONLY_BODIES.length} being paperwork`);
     // The consequence: mass. A licence file is not weight.
     const grass = BODIES.find((b) => b.name === "grass");
     ok("*** mass counted as code is 0 for a paper-only body, where total bytes said " + grass.bytes + " ***",
         E.massOf(grass) === 0 && grass.bytes > 0);
-    ok("  and mass is unchanged for a body that is all code", (() => {
-        const b = BODIES.find((x) => x.name === "box3d"); return E.massOf(b) === b.bytes; })(),
-        "box3d " + E.massOf(BODIES.find((x) => x.name === "box3d")) + " bytes, no paperwork to discount");
+    // *** THIS NAMED box3d AND box3d STOPPED BEING ALL CODE. *** Backlog #61 was "box3d and htmx are vendored
+    // with no licence provenance"; both have since gained a LICENSE, so box3d now carries paperwork and its
+    // mass is correctly LESS than its bytes. The example is chosen by measurement now -- the first body with no
+    // paper file at all -- so the check states the property rather than a body that happened to have it.
+    const allCode = BODIES.filter((b) => !(b.files || []).some((f) => E.isPaperFile(f.path)));
+    ok("  and mass is unchanged for a body that is all code",
+        allCode.length > 0 && allCode.every((b) => E.massOf(b) === b.bytes),
+        allCode.map((b) => b.name).join(", ") + " carry no paperwork to discount");
+    ok("  ...and #61's two now DO carry paperwork, which is why neither is the example any more",
+        ["box3d", "htmx"].every((n) => { const b = BODIES.find((x) => x.name === n);
+            return b && (b.files || []).some((f) => E.isPaperFile(f.path)) && E.massOf(b) < b.bytes; }),
+        ["box3d", "htmx"].map((n) => { const b = BODIES.find((x) => x.name === n);
+            return n + " " + E.massOf(b) + " of " + b.bytes + " bytes is code"; }).join(", "));
     report("the orrery has been drawing 3 planets with a radius derived from a LICENSE file. They are not " +
         "captured dependencies -- they are filed licences for sources that were REACHED, and world/" +
         "reachedLicences.mjs is the register that was already meant to hold that shape.");
@@ -89,11 +105,18 @@ console.log("\n2. *** EJECTA: how far each body's material spread into the tree 
     const measured = {};
     for (const b of BODIES) measured[b.name] = E.ejectaOf(b.name, files).length;
     for (const [name, want] of Object.entries(E.EJECTA_BASELINE))
-        ok("  " + name.padEnd(11) + " " + String(measured[name]).padStart(3) + " importers",
+        ok("  " + name.padEnd(13) + " " + String(measured[name]).padStart(3) + " importers",
             measured[name] === want, want === measured[name] ? "" : "recorded " + want);
+    // *** A RATCHET THAT ONLY CHECKS ITS OWN KEYS HAS A HOLE THE SIZE OF THE NEXT DEPENDENCY. *** The loop above
+    // iterates the BASELINE, so a body absent from it is not checked -- it is not even mentioned. vendor/
+    // three-webgpu arrived on 2026-09-02 with seven importers and this gate stayed green over it, because the
+    // baseline had no key to disagree with. The count is now asserted to COVER the tree.
+    const unbaselined = BODIES.map((b) => b.name).filter((n) => !(n in E.EJECTA_BASELINE));
+    ok("*** every body in the bake has a baseline entry -- a new dependency cannot arrive unmeasured ***",
+        unbaselined.length === 0, unbaselined.join(", ") || `${BODIES.length} bodies, all covered`);
     // The SHAPE is the finding: this discriminates, where the orrery's existing axes do not.
     const vals = Object.values(measured);
-    ok("*** the measure discriminates: 0 to " + Math.max(...vals) + " across fourteen bodies ***",
+    ok("*** the measure discriminates: 0 to " + Math.max(...vals) + " across " + BODIES.length + " bodies ***",
         Math.max(...vals) >= 50 && Math.min(...vals) === 0,
         "three at " + measured.three + ", box3d at " + measured.box3d + ", three bodies at 0");
     ok("and every zero is a PAPER-ONLY body -- nothing with code is unimported",

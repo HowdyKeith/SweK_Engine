@@ -7,6 +7,15 @@
 // published one (1e-3) -- read off both of three's backends through the TSL render path, and then AGAIN through
 // gfx/device.js after render/tslSource.mjs transplants the emitted fragments: generated physics in the device's own
 // pipeline, the same keys. Every number is read back from a picture; the shader is never handed the answer.
+// v4329 -- AND IT NOW CHECKS THE SPLIT IT WAS PART OF. render/physicsTsl.mjs was named for physics and had grown
+// three fleet shells and five looks by v4328; they moved to render/fleetTsl.mjs. Section 1 asks the exact question
+// that keeps them apart -- does the physics module contain shader text at all -- because a shell is a vertex stage
+// written out in both languages and a look that drifts back would bring one with it.
+//
+// SABOTAGE P, MEASURED at v4329: a shell put back into render/physicsTsl.mjs (a two-language template on an export
+// named ...Shell) -> exit=1, 2 red here BY NAME, and 5 more in tools/ship/backendParity-selfcheck.mjs, whose census
+// sees the markers arrive: glslBearing 145 -> 146, wgslBearing 56 -> 57, both 13 -> 14, the directive/framework
+// split, and the shader-module list growing to eleven. Seven red for one function in the wrong file.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,8 +36,24 @@ const k = keyCpu(PARAMS.first);
 {
     const src = fs.readFileSync(path.join(ENG, "render/physicsTsl.mjs"), "utf8");
     ok("the Heidler twin says the peak over i0 is 1 at the true eta and 1.0667 at the published eta (the module's finding, not the shader's)", k.atTrueEta === 1 && Math.abs(k.atStandardEta - 1.0667) < 1e-3, `${k.atTrueEta}, ${k.atStandardEta.toFixed(4)}; true eta ${k.trueEta.toFixed(5)}, standard ${k.standard.toFixed(5)}`);
-    ok("the TSL modules take their constants from the modules (imported DEFAULTS, PARAMS, LN2), and the Lyapunov log has its 2", /import \{ LN2, DEFAULTS as LY_DEFAULTS, PERIOD3[^}]*\} from "\.\/lyapunovWgsl\.mjs"/.test(src) && /x\.mul\(2\.0\)/.test(src) && /r\.mul\(x\)\.mul\(float\(1\.0\)\.sub\(x\)\)/.test(src) && /t\.div\(t1\)\.mul\(t\.div\(t1\)\)/.test(src) && !/\b3\.4\b|\b0\.05\b|\b485\b/.test(src.split("// ---- v4322")[0].replace(/\/\/.*$/gm, "")));   // the v4322 look section carries the LOOK's own literals (0.05, 0.9: the seed span), which are lyapunovWgsl's
-    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten and the look's two", (src.match(/\.label\("/g) || []).length === 12);
+    ok("the TSL modules take their constants from the modules (imported DEFAULTS, PARAMS, LN2), and the Lyapunov log has its 2", /import \{ LN2, DEFAULTS as LY_DEFAULTS, PERIOD3[^}]*\} from "\.\/lyapunovWgsl\.mjs"/.test(src) && /x\.mul\(2\.0\)/.test(src) && /r\.mul\(x\)\.mul\(float\(1\.0\)\.sub\(x\)\)/.test(src) && /t\.div\(t1\)\.mul\(t\.div\(t1\)\)/.test(src) && !/\b3\.4\b|\b0\.05\b|\b485\b/.test(src.replace(/\/\/.*$/gm, "")));   // v4329: the look sections that carried the LOOK's own literals (0.05, 0.9: the seed span) left with them, so the whole file is the window now
+    // v4329 -- the LOOKS moved to render/fleetTsl.mjs, so the count that was 12 in one file is 10 here and 8 there.
+    // Counted in BOTH rather than dropped to ten: an unlabelled uniform is a transplant that refuses by name, and
+    // the looks are exactly where that now bites. Two of the fleet labels are .label(name) -- a texture's binding
+    // name passed in -- so the fleet count is of .label( and the key count of .label(" .
+    const fleetSrc = fs.readFileSync(path.join(ENG, "render/fleetTsl.mjs"), "utf8");
+    // *** v4329 -- THE SPLIT, MADE CHECKABLE RATHER THAN ANNOUNCED. *** This module was named for physics and had
+    // grown three fleet SHELLS and five looks; the shells are vertex stages written out in both languages, so the
+    // question "is a look back in the physics module" has an exact answer: does this file contain shader text at
+    // all. It must not, and fleetTsl.mjs must. The markers are assembled at run time for the reason
+    // render/backendParity.mjs's header gives and this session has now relearned twelve times: a file that spells
+    // a marker becomes a file the census counts.
+    const WGSL_TELL = new RegExp("@" + "vertex"), GLSL_TELL = new RegExp("#" + "version 300 es");
+    ok("*** the split holds: the PHYSICS module carries no shader text at all, and the FLEET module carries both languages ***",
+        !WGSL_TELL.test(src) && !GLSL_TELL.test(src) && WGSL_TELL.test(fleetSrc) && GLSL_TELL.test(fleetSrc),
+        `physics wgsl ${WGSL_TELL.test(src)} glsl ${GLSL_TELL.test(src)}; fleet wgsl ${WGSL_TELL.test(fleetSrc)} glsl ${GLSL_TELL.test(fleetSrc)}`);
+    ok("  ...and it exports no shell and no look, which is the same statement said in names", !/export function \w*(Shell|Look\w*Tsl)\b/.test(src) && /export function \w+Shell\b/.test(fleetSrc));
+    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten here, the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 10 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} keys, ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
 }
 
 const skip = webgpuSkipReason();

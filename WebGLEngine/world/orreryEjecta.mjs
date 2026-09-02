@@ -135,8 +135,12 @@ export function ejectaOf(name, files) {
 // import of the real library, not a mention in prose and not the scanner counting itself -- both of which
 // this file's own header records happening before. Established by diffing the importer list at v4266 against
 // HEAD, which returned exactly one added path.
+// *** AND three-webgpu WAS MISSING ENTIRELY UNTIL v4329, WHICH IS A DIFFERENT DEFECT FROM A MOVED COUNT. ***
+// It was vendored on 2026-09-02 with seven importers. The gate loops over THIS object's keys, so a body with
+// no key here is not checked and not reported -- it is invisible, and the gate said ALL GREEN over it. The
+// gate now asserts that every body in the bake has an entry, so the next arrival cannot land unmeasured.
 export const EJECTA_BASELINE = Object.freeze({
-    three: 70, box3d: 21,   /* v4303: 68 -> 69, song-globe.html imports three (the song globe, #141); v4322: 70 -- tools/ship/tsl-selfcheck.mjs NAMES vendor/three/three.module.js in a check that no page mixes the two three builds, and a scanner counts the mention: said here rather than excused */ krbn: 8,   /* v4322: krbn-lyapunov.html (the sweep branch) */ htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
+    three: 70, "three-webgpu": 7, box3d: 21,   /* v4303: 68 -> 69, song-globe.html imports three (the song globe, #141); v4322: 70 -- tools/ship/tsl-selfcheck.mjs NAMES vendor/three/three.module.js in a check that no page mixes the two three builds, and a scanner counts the mention: said here rather than excused */ krbn: 8,   /* v4322: krbn-lyapunov.html (the sweep branch) */ htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
     draco: 2, fonts: 2, heerich: 1, wasm: 1, grass: 0, keyhunt: 0, slug: 0,
 });
 

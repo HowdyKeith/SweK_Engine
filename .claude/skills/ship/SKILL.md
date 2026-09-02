@@ -47,9 +47,18 @@ or the `[knowledge]` line from step 3).
 
 ## 3. Derived files
 
+    node tools/ship/orreryFleetScan.mjs --write        # AFTER the version bump, not before -- see below
     node tools/ship/buildKnowledgeIndex.mjs --write    # prints "[knowledge] NNNN gates" -- this is the count
     node tools/ship/staleness.mjs --fix                # rewrites case-study.html's gate count
     node tools/ship/claimCheck-selfcheck.mjs           # must end "all checks pass"
+
+`orrery-fleet.json` (v4329, #68) holds each vendored body's importers with their sizes and last commits, and
+main.js is an importer of three. So its byte size changes the moment the version note is written, and baking
+it BEFORE the bump leaves orreryFleet-selfcheck red on a size that moved by six hundred bytes. Bake it after
+the bump and before the commit: sizes then match at HEAD, and the only thing left behind is each satellite's
+commit hash, which the gate reports rather than fails because the commit that ships a round cannot know its
+own hash. Re-bake `orrery.json` too (`node tools/ship/orreryBake.mjs --write`) if `vendor/` changed -- it was
+left forty-five rounds at v4189 and two gates sat red on the register the whole time saying so.
 
 ## 4. Verify
 

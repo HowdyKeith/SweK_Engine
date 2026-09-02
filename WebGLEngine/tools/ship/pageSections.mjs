@@ -306,6 +306,21 @@ export const SECTIONS = [
     // *** AND THE POINT OF THE SPLIT IS THE SEVEN PAGES THIS DRAWER CAN NOW HOLD. *** Six render/fx pages have
     // been UNPLACED since v4314 with the reason "Voxel & Render is at 14 of 15, so ONE could go in and five
     // could not, and picking which one would be arbitrary". That sentence is spent: they are in.
+    // *** v4329 -- KEITH NAMED THE DRAWER, AND THAT IS WHAT THE ARGUMENT BELOW WAS WAITING FOR. *** The UNPLACED
+    // register has carried a nine-page render group since v4315 with the note "naming a drawer decides what a panel
+    // is ABOUT, and that is Keith's call". Six went into Renders at v4321. He named this one: "lets make a link
+    // panel section for Render TSL and put all the related TSL links in there, including all the test links I
+    // should and want to click on."
+    //
+    // IT IS A MACHINERY FILING, NOT A SUBJECT ONE, which is the rule this file keeps getting right by keeping it
+    // explicit. orrery-gpu.html is here because it is the page that PAINTS FOUR RACES FROM GRAPHS (?tsl=1), not
+    // because of the astronomy; gpu-rig-check.html is here because the transplanted pipelines run on the route it
+    // measures, and because it and tsl-rig.html are the two pages in this tree that OWE A NUMBER ONLY REAL
+    // HARDWARE CAN GIVE. universe-gpu.html stays in Arriving: it is gpuDriven and no part of it is TSL, and
+    // sweeping it in because it is the third of an old trio would be the subject filing this file warns about.
+    { id: "rendertsl", tab: "rendertsl", label: "Render TSL",
+      note: "three's node language as a SOURCE for gfx/device.js -- the graphs, the pages that draw them, and the two that owe the rig a number",
+      pages: ["tsl-probe.html", "tsl-rig.html", "orrery-gpu.html", "gpu-rig-check.html"] },
     { id: "renders", tab: "renders", label: "Renders", note: "the TECHNIQUE: passes, effects, and how a frame is made",
       pages: ["path-tracer.html", "pom-demo.html", "sphere-impostor.html", "krbn.html", "amplified-diff.html",
               "backend-dom.html",
@@ -487,9 +502,13 @@ export const SECTIONS = [
     { id: "webgpu", tab: "webgpu", label: "WebGPU",
       note: "the unfiled pages that call requestAdapter -- open one and the adapter either answers or it does not",
       pages: [
-          // The three that TEST THE ADAPTER ITSELF rather than using it for a picture. gpu-rig-check is the
-          // front door: it is the page that answers "does this box have WebGPU at all", and it was unfiled.
-          "gpu-rig-check.html", "webgpu-bench.html", "tsl-rig.html",
+          // v4331 -- gpu-rig-check and tsl-rig are NOT here, and that is main's call rather than mine. v4328 put
+          // both in this drawer while main independently built RENDER TSL for exactly them; a page lands in one
+          // drawer, and main's is the better filing -- tsl-rig is the TSL rig, and that drawer was named for
+          // these pages ("the graphs, the pages that draw them, and the two that owe the rig a number"). v4328's
+          // own note said the render group was waiting on a drawer nobody had named. It has been named.
+          // What is left here is the adapter's own benchmark.
+          "webgpu-bench.html",
           // Compute: the pages where WebGPU is doing the arithmetic.
           "fluid-webgpu.html", "fluid-webgpu-3d.html", "blobulator-gpu.html", "celltrack-viewer-gpu.html",
           // v4329 -- TWO FLEET KERNEL BENCHES JOIN, at Keith's ask, and they are the "click and test" case in
@@ -497,7 +516,7 @@ export const SECTIONS = [
           // REPORT. THE THIRD (magmap-bench) IS THE SAME CLASS AND IS NOT HERE FOR ONE REASON ONLY -- this
           // drawer is at 15 of 15 and there is no slot. That is a cap, not a judgement, and its UNPLACED line
           // now says so instead of the wrong reason it used to give.
-          "hmc-bench.html", "ising-bench.html",
+          "hmc-bench.html", "ising-bench.html", "magmap-bench.html",
           // Render: WGSL fragment work, where a wrong adapter shows as a wrong picture rather than a wrong number.
           "blackhole.html", "wormhole.html", "wormhole-jump.html", "nebula.html", "gauges3000.html",
           "anime4k.html",
@@ -575,10 +594,9 @@ export const UNPLACED = new Map([
     // orrery-gpu is the one that would tempt a subject-based filing -- PL: Cosmic & Relativity has room for
     // two. ITS MACHINERY IS THE COMPUTE PASS, NOT THE ASTRONOMY: it is in the tree to show orbits placed by
     // three dispatches, and its own title says "on the GPU". Filed by machinery, like primitive-paint.
-    // v4329 -- magmap-bench: SAME CLASS AS THE TWO THAT LEFT, KEPT OUT BY ARITHMETIC RATHER THAN BY REASON.
-    // Its old line blamed the owed verdict, which was wrong for the reason recorded below. The true reason is
-    // that the WebGPU drawer is full at 15 of 15. It is the first page in if the cap moves or a member leaves.
-    ["magmap-bench.html", "the third fleet kernel bench (magnetostatics against its float-gap floor). Belongs in the WebGPU drawer beside hmc-bench and ising-bench and is out ONLY because that drawer is at 15 of 15 -- a cap, not a judgement. It also owes a device verdict (swek-magmap-bench), which deviceOwed.mjs tracks and which is NOT a filing reason"],
+    // v4331 -- magmap-bench LEAVES THIS LIST TOO, and the merge is what made room. v4329 kept it out at 15 of
+    // 15 and said so; main's Render TSL drawer then took gpu-rig-check and tsl-rig, which frees two slots, so
+    // the third fleet bench joins the other two. The cap was the only thing holding it out, and it moved.
     // *** v4329 -- TWO BENCHES LEAVE THIS LIST, AND THE REASON ALL THREE WERE IN IT WAS WRONG. *** hmc-bench,
     // ising-bench and magmap-bench each carried "OWES A DEVICE VERDICT ... needs one real-GPU run" as their
     // reason for having no drawer. THAT CONFLATES TWO THINGS tools/render-qa/deviceOwed.mjs EXISTS TO KEEP
@@ -588,14 +606,13 @@ export const UNPLACED = new Map([
     // THE TREE ALREADY PROVED IT: floor-atlas.html is in Sampling & Methods AND in OWES_VERDICT, both at once.
     // And the old reading was self-defeating -- it kept the page that would settle the debt out of every drawer,
     // so the only way to open one was to type its filename, which is why "no verdict has ever arrived" sat
-    // inside the reason itself. Two are in the WebGPU drawer now and the third is held out only by that
-    // drawer's cap, not by its debt; deviceOwed.mjs still owes exactly what it owed, for all three.
-    // v4327 -- gpu-rig-check.html LEAVES THIS LIST, into the WebGPU drawer. Its reason here was "part of the
-    // nine-page render group with no drawer", which is a page waiting on a drawer to exist; one does now, and
-    // this page is the one that answers "did this box give us an adapter at all". The render group is EIGHT
-    // now. Naming a render panel is still Keith's call and still places the other eight.
-    ["orrery-gpu.html", "render/gpuOrbits.mjs -- orbital elements to instance records in a compute pass. Cosmic & Relativity has room and would be a SUBJECT filing; the machinery is gpuDriven, so it waits with the render group"],
-    ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. Same render group, same missing drawer"],
+    // inside the reason itself. All three are in the WebGPU drawer now, the third
+    // arriving once the Render TSL merge freed its slot; deviceOwed.mjs still owes exactly what it owed.
+    // v4329 -- gpu-rig-check.html and orrery-gpu.html LEFT for the Render TSL drawer Keith named; the nine-page
+    // group that waited here since v4315 is down to this one. It is not a remainder: universe-gpu is gpuDriven
+    // with no TSL in it at all, and following the other two into a TSL drawer because they used to be a trio
+    // would be exactly the subject filing this register exists to refuse.
+    ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. The other two of its v4315 trio went to Render TSL at v4329 and this one has no TSL in it; it waits for a gpu-driven drawer, or for Keith to say it belongs in one that exists"],
 
     // *** v3358 -- PARKED IN ARRIVING DELIBERATELY, BECAUSE THEY OWE A MEASUREMENT NOBODY BUT KEITH CAN GIVE. ***
     // These four were filed in drawers, which is where a page goes when it is FINISHED. They are not finished:

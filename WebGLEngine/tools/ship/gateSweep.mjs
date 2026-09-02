@@ -210,14 +210,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         ]),
         redOnArrival: Object.freeze([{ gate: "tools/ship/avatarZWander-selfcheck.mjs", why: "z from 0.35 to 0.35 over thirty seconds here, and the same on origin/main's tree in the same shell" }]),
     }),
-    // v4327 -- A THIRD CLOSING, and it is deliberately a third rather than two names appended to since2. That
-    // record says `at: "v4322"` and reports a sweep that happened on that day; adding gates to it would make it
-    // claim it had run files that did not exist yet, which is the retyped-summary failure section 7 exists to
-    // catch. The two gates here arrived with this round and were run alone on this box, not under the sweep's
-    // workers -- both green, both fast (well under the 3 s quick-sweep budget, so the quick sweep covers them
-    // from now on and this entry is a one-round bridge rather than a permanent exemption).
+    // v4329 -- THE THIRD CLOSING, and it is one gate because that is how many this round added. #68's fleet
+    // gate was run repeatedly while it was written and four sabotages were driven through it; the sweep entry
+    // records the state it SHIPS in. The shape is deliberately the same as since2 so the accounting below can
+    // sum a list rather than grow another named term every round -- which is what the equality this replaced
+    // could not survive.
     since3: Object.freeze({
-        at: "v4327", swept: 2, green: 2, red: 0,
+        at: "v4329", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orreryFleet-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+    }),
+    // v4331 -- A FOURTH CLOSING. Both sides of this merge invented a third one in the same week -- main's for
+    // its fleet gate, mine for the two this branch added -- which is the clearest possible argument for main's
+    // shape: `closings` is a LIST, so a round adds an entry instead of another named term. Mine becomes since4
+    // rather than being folded into main's since3, for the same reason since3 was not folded into since2: that
+    // record reports a sweep that ran on a day, and a sweep cannot have run a file that did not exist yet.
+    since4: Object.freeze({
+        at: "v4331", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "render/cubeBake-selfcheck.mjs", "render/valueNoise-selfcheck.mjs",
         ]),

@@ -92,20 +92,12 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: tools/ship/atmosphereHarness.html#c, t" },
     { gate: "tools/ship/definitionGates-selfcheck.mjs", ms: 226,
       fails: "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 6: physics/crypto/sec" },
-    { gate: "tools/ship/gateBudget-selfcheck.mjs", ms: 84,
-      fails: "!! *** the recorded slowest gate is still the slowest one anybody has SEEN *** observed worst in the general p" },
     { gate: "tools/ship/gateReach-selfcheck.mjs", ms: 9808,
       fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
     { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
       fails: "!! it is the only homography in the tree" },
     { gate: "tools/ship/mutationTable-selfcheck.mjs", ms: 58,
       fails: "!! EVERY MUTATION'S FIND-STRING IS STILL PRESENT STALE, MUTATES NOTHING, WOULD REPORT A PHANTOM SURVIVOR: the" },
-    { gate: "tools/ship/orrery-selfcheck.mjs", ms: 4705,
-      fails: "and they are named rather than counted:" },
-    { gate: "tools/ship/orrerySeed-selfcheck.mjs", ms: 9034,
-      fails: "*** orrery.json is current -- run: node tools/ship/orreryBake.mjs --write ***" },
-    { gate: "tools/ship/orreryView-selfcheck.mjs", ms: 10802,
-      fails: "*** the bake and the scan agree on how many bodies are CAPTURED (12 vs 14) -- reading only b.paths made the brow" },
     { gate: "tools/ship/pagePlacement-selfcheck.mjs", ms: 88,
       fails: "!! ...and the silent bucket is the large one, which is the finding 210 silent against 211 placed. pageSections" },
     { gate: "tools/ship/pagePlacements-selfcheck.mjs", ms: 106,
@@ -241,6 +233,33 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/gateBudget-selfcheck.mjs", round: "v4329 -- pruned here; the REPAIR was v4304's",
+      why: "NOT FIXED BY v4329; FOUND STALE BY IT. The failing line this census recorded is 'the recorded " +
+           "slowest gate is still the slowest one anybody has SEEN', and v4304 repaired exactly that by raising " +
+           "SLOWEST_GENERAL to the rig's own opticsBind figure (109,899 ms), where it still stands. The gate has " +
+           "been green since and the red entry outlived it. *** A CENSUS THAT IS ONLY APPENDED TO BECOMES A LIST " +
+           "OF GRIEVANCES *** -- this file's own words about the register it replaced, now true of itself. " +
+           "The round recorded above is the one that PRUNED the entry, not the one that fixed the gate, and " +
+           "the distinction is load-bearing: RECHECK_V4313.nowGreenGates derives itself from this list by " +
+           "excluding later rounds, so an entry stamped with its repair round would have been swept into a " +
+           "record of a moment it was never part of -- the exact defect the comment above that field describes." },
+    { gate: "tools/ship/orrery-selfcheck.mjs", round: "v4329",
+      why: "It asserted that box3d and htmx have no licence provenance, which was true when written and is not " +
+           "now. The gate reads the live SCAN rather than the bake, so it saw the repair immediately and went " +
+           "red saying so, while orrery.html -- reading the forty-five-round-old bake -- kept printing the " +
+           "opposite. Fixed by dropping UNPAPERED_BASELINE to 0, inverting the two claims about #61's pair, and " +
+           "making the comparison EQUALITY rather than `<=` so the next unlicensed body cannot slip under it." },
+    { gate: "tools/ship/orrerySeed-selfcheck.mjs", round: "v4329",
+      why: "ONE STALE GENERATED FILE, TWO RED GATES -- the launchIndex/shipRitual shape below, a second time. " +
+           "orrery.json was baked at v4189 and never again, so both gates spent forty-five rounds saying 'run " +
+           "orreryBake.mjs --write' and nobody did. Fixed by running it. What the refresh then showed is the " +
+           "part worth keeping: a fifteenth dependency (vendor/three-webgpu) the orrery had never drawn, and " +
+           "box3d and htmx PAPERED, so the unpapered ratchet went 2 -> 0 while the page still printed 2." },
+    { gate: "tools/ship/orreryView-selfcheck.mjs", round: "v4329",
+      why: "THE SAME STALE ARTEFACT, SECOND READER, and its four red lines named the drift precisely (bake 12 " +
+           "captured against the scan's 15, and box3d/htmx wrongly unpapered). Re-baking cost four OTHER gates " +
+           "their green -- every one of them a number typed against a quantity derived from the body count, " +
+           "held true by a snapshot that had stopped moving. All four were fixed by deriving." },
     { gate: "tools/roundhouse/deviceModes-selfcheck.mjs", round: "9695918 (before this round)",
       why: "nuclear declared no modes at all, so modesOf() fell back to the candidate list and its echoing " +
            "defaults() accepted all 29 -- the last device the census could only PROBE, which is what made " +

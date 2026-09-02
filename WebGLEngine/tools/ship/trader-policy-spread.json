@@ -1,7 +1,7 @@
 {
  "version": "v4316",
  "days": 60,
- "greedy": 69261.66666666667,
+ "greedy": 42129,
  "runs": [
   {
    "name": "narrow, 14 iterations, seed 3 (Level 16's)",
@@ -12,10 +12,10 @@
    "iters": 14,
    "pop": 8,
    "seed": 3,
-   "ratio": 1.2535264816998337,
-   "heldReturn": 86821.33333333333,
+   "ratio": 1.513106569504775,
+   "heldReturn": 63745.666666666664,
    "params": 145,
-   "ms": 3041
+   "ms": 1954
   },
   {
    "name": "narrow, 30 iterations, seed 5",
@@ -26,10 +26,10 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 0.975878913299805,
-   "heldReturn": 67591,
+   "ratio": 0.8547635437188952,
+   "heldReturn": 36010.333333333336,
    "params": 145,
-   "ms": 9030
+   "ms": 5868
   },
   {
    "name": "wide [16,16], 30 iterations, seed 5",
@@ -40,10 +40,10 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 1.21501070818394,
-   "heldReturn": 84153.66666666667,
+   "ratio": 1.5775435764754284,
+   "heldReturn": 66460.33333333333,
    "params": 417,
-   "ms": 10824
+   "ms": 7241
   }
  ],
  "verdict": "the win is INSIDE THE SPREAD of trainings -- some beat greedy, some do not"

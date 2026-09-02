@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -68,7 +68,36 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    WITHOUT a uv turns the uv-transform matrix on and every clone (textureLoad makes one) keeps it -- the obvious
    spelling emits an unlabelled mat3 into the fragment and is refused. Give the uv at construction and the fragment
    carries no uniform at all. Also measured and not fixed: three fetches the texel twice around a Discard that
-   reads it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   reads it.
+   v4327 -- AND A SAMPLER. A shell may declare one (spriteLookShell's `sampler`, spriteSampledShell: viewProj, the
+   atlas at 1, the sampler at 2), and the transplant rewrites three's own `<tex>_sampler` to it, so a FILTERED
+   sample crosses where only a texel fetch could. Section 7: on both backends the filtered sprite drawn by the
+   generated pipeline is a hand-written twin's picture on 36,864 of 36,864 pixels, and the SAME pipeline draws a
+   different picture (898 pixels) when a point-sampled texture is bound to it. What decides which three emits is
+   the TEXTURE, not the graph -- Linear gives textureSample, Nearest gives textureLoad and leaves the sampler
+   unused, so makeSpriteSampledTsl refuses a Nearest texture. And the refusal is WGSL-side only: GLSL's sampler2D
+   carries its own sampler, so a sampled graph into a sampler-less shell just works on WebGL2. orrery-gpu.html
+   ?tsl=1&soft=1 draws the Glyph race sampled instead of fetched.
+   v4328 -- THE INK LAYOUT, the last one the fleets have. physicsTsl inkLookShell is the Krbn race's strokes on a
+   LINE-LIST: the flat layout (p, colour), no normal and no uv at all, and the first shell whose topology is not
+   the default -- the descriptor carries "line-list" out to the device. makeInkTsl reads the vertex colour and
+   nothing else, three emits exactly one varying for it, and a graph reaching for a uv is refused by name.
+   Section 8: the Krbn strokes painted by the generated pipeline are a hand-written twin's picture on 36,864 of
+   36,864 pixels on both backends. Two limits found and written down: a mistake in the SHELL moves both halves of
+   a twin comparison, so the byte claim is blind to a lost topology and only the named assertion catches it; and
+   the two backends do not rasterise a line the same (467 pixels washed under WebGPU, 415 under WebGL2), so a
+   line-list claim is per-backend by nature. orrery-gpu.html?tsl=1 now paints FOUR races from graphs.
+   With this the three fleet layouts -- lit, sprite, flat -- have all been crossed into.
+   v4329 -- HOUSEKEEPING, WITH ITS PRICE MEASURED. The looks and shells moved out of render/physicsTsl.mjs (named
+   for physics, holding three shells and five looks by v4328) into render/fleetTsl.mjs: physicsTsl keeps
+   lyapunovNodes, heidlerNodes and the two KEYS; fleetTsl keeps the shells, the looks and the hand-written twins.
+   tslPhysics-selfcheck now asks the question that keeps them apart -- does the physics module contain shader
+   text at all -- so the split is checked rather than announced. v4328's note priced this at "four numbers and a
+   list entry" in the backend-parity census; it cost ONE LIST ENTRY AND NO NUMBERS, because physicsTsl carried
+   its markers only through the shells and left the census in the same move fleetTsl entered it. And server.html
+   gains a Render TSL drawer: the four pages, plus the query variants (?tsl=1, its sampled twin, ?webgl=1) written
+   out by hand because the drawer mover files pages and not URLs -- tslRace-selfcheck section 3 checks they are
+   there, since a mode of a page no link reaches is reachable only by someone who already knows it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).

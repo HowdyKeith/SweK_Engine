@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4326
+// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4329
 //
 // GRADES A RACE PAINTED BY A TSL NODE: the Chaos race's look (render/lyapunovWgsl.mjs LYAPUNOV_LOOK -- the hull's own
 // coordinates as r and the seed, the exponent as the shade, lit by the normal) written once as a TSL graph
@@ -23,6 +23,42 @@
 // sampler, refuses by name. The claim this buys is the strongest in this file: the twin is not written for the
 // occasion, it is render/fleets.mjs SPRITE_WGSL itself -- the generated pipeline draws the fleets' OWN Pixel race
 // on every pixel of the frame, with the fleet's own bind hook feeding the generated shader unchanged.
+//
+// v4327 -- AND A SAMPLER (section 7). The shell may now declare one, and three's own `<tex>_sampler` becomes it, so a
+// FILTERED sample crosses where only a texel fetch could before. What decides which of the two three writes is not the
+// graph but the TEXTURE: a Linear-filtered texture makes it emit textureSample, a Nearest one makes the same TSL line
+// emit textureLoad, and the shell's sampler then goes unused -- measured both ways here, and makeSpriteSampledTsl
+// refuses a Nearest texture rather than quietly becoming a fetch. On the device the mirror holds: gfx/device.js hands
+// the pipeline the sampler for the BOUND texture's own filter mode, so one generated pipeline draws hard or soft by
+// what is bound to it (898 pixels apart on this scene, on both backends).
+//
+// v4328 -- THE INK LAYOUT, AND THE LAST ONE THE FLEETS HAVE (section 8). The Krbn race's strokes are the flat layout on
+// a LINE-LIST: p and colour, no normal, no uv -- not even the hull's own x and y standing in for one, as the lit shell
+// does. Its whole shipped fragment is `return v.color;`. A graph crosses here with ONE varying to read, three emits
+// exactly one for it, and a graph reaching for a uv is refused by name. It is also the first shell whose TOPOLOGY is
+// not the default, and the descriptor carries "line-list" out to the device.
+//
+// v4329 -- the shells and looks this file grades moved to render/fleetTsl.mjs, out of render/physicsTsl.mjs which
+// was named for physics and had grown three shells and five looks. Section 3 also checks the FRONT DOOR now: the
+// variants these sections prove (?tsl=1, its sampled twin, the probe forced onto WebGL2) are query strings, and
+// server.html's drawer mover files pages rather than URLs -- so they are written out by hand in the Render TSL
+// panel, and an unwritten one would leave a mode of the page reachable only by somebody who already knew it.
+//
+// *** AND WHAT TWIN-GRADING IS BLIND TO, WHICH THIS LAYOUT MADE PLAIN. *** Sabotage N drops the shell's topology, and
+// the byte claim does not move: 36,864 of 36,864 pixels still agree, because the twin is built from the SAME shell and
+// loses it too. A mistake in a shell moves both halves of the comparison together; only the named assertion on the
+// descriptor (topology === "line-list") catches it. Every "on every pixel" line in this file grades the GRAPH against
+// the twin, never the shell against itself -- read them that way.
+//
+// *** AND THE TWO BACKENDS DO NOT RASTERISE A LINE THE SAME. *** The generated ink parts from the fleets' own flat
+// strokes on 467 pixels under WebGPU and 415 under WebGL2. Both are byte-exact against their own twin, and the two
+// backends' pictures are not each other's -- a line-list claim is per-backend by nature, and this file makes no
+// cross-backend pixel claim about one.
+//
+// *** AND WHAT THE REFUSAL DOES NOT REACH. *** The sampler refusal is WGSL-side only, and correctly so: GLSL's
+// sampler2D carries its own sampler, so a sampled graph into a sampler-less shell simply works on the WebGL2 backend
+// (sabotage M measured exactly that -- the page's soft path drew the fetched picture and only the shell's NAME gave it
+// away). The guard exists for WebGPU, where an undeclared sampler is a binding nothing feeds.
 //
 // *** AND THE ONE-LINE DIFFERENCE THAT COSTS A UNIFORM NOBODY ASKED FOR. *** three's TextureNode constructor runs
 // setUpdateMatrix( uvNode === null ): a texture node built WITHOUT a uv turns the texture's uv-transform matrix ON,
@@ -59,8 +95,8 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell, vertexDisplacement } from "../../render/tslSource.mjs";
-import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell } from "../../render/physicsTsl.mjs";
-import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL } from "../../render/fleets.mjs";
+import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
+import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL, INK_WGSL, INK_VERTEX_GLSL } from "../../render/fleets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const EMITTED = path.join(ENG, "tools/ship/tsl-emitted-race.json");
@@ -93,7 +129,7 @@ else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeLyapunovLookTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -146,6 +182,10 @@ else {
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));
     const chaosPixels = await pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, RACES.findIndex((x) => x.name === "Chaos"));
+    // v4327 -- the same page with &soft=1: the Glyph race's look sampled through the shell's sampler instead of fetched
+    const pg2 = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e).slice(0, 200)));
+    await pg2.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&soft=1&history=0`, { waitUntil: "load" }); await pg2.waitForTimeout(6000);
+    const st2 = await pg2.evaluate(() => (window.__universe && window.__universe.tslLook && window.__universe.tslLook.atlas) || null);
     await br.close(); srv.close();
     ok("*** the page says the Chaos look is GENERATED (a TSL graph, three's language for the backend it is on) and records that the fleet's pipeline IS the generated descriptor ***", !!(st.tsl && st.tsl.language) && st.tsl.applied === true && /GENERATED/.test(st.route), st.route);
     ok("  the language emitted is the device's backend's (WGSL on WebGPU, GLSL on WebGL2)", st.tsl && ((/webgpu/.test(st.route) && st.tsl.language === "wgsl") || (/webgl2/.test(st.route) && st.tsl.language === "glsl")), st.tsl && st.tsl.language);
@@ -153,6 +193,17 @@ else {
     ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
     // v4325 -- the same page, the SECOND shell: the Pixel race's sprite quad painted by the lightning graph
     ok("*** the page also draws the Glyph race's OWN shipped look from a graph, the atlas crossing into the shell it binds ***", !!(st.tsl && st.tsl.atlas) && st.tsl.atlas.applied === true && st.tsl.atlas.textures.join() === "atlas" && st.tsl.atlas.shell === "sprite (atlas)", st.tsl && JSON.stringify(st.tsl.atlas));
+    // v4329 -- THE FRONT DOOR OFFERS WHAT THIS SECTION PROVES. The variants above are QUERY STRINGS, which the
+    // server page's drawer mover files nothing about (it moves page anchors, not URLs) -- so the Render TSL panel
+    // carries them hand-written, and this is the check that they are still there. A page nobody can reach from the
+    // front door is the failure pageReach has been ratcheting against for dozens of rounds; a page you can reach
+    // only in the one mode that does not show the work is the same failure wearing a query string.
+    const front = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+    ok("*** server.html's Render TSL panel links the variants this section just proved: ?tsl=1, its sampled twin, and the probe forced onto WebGL2 ***",
+        /data-panel="rendertsl"/.test(front) && /href="\/orrery-gpu\.html\?tsl=1"/.test(front) && /href="\/orrery-gpu\.html\?tsl=1&amp;soft=1"/.test(front) && /href="\/tsl-probe\.html\?webgl=1"/.test(front),
+        "the drawer moves PAGES; a query variant has to be written out or it is unreachable from the front door");
+        ok("*** and the Krbn race's strokes are GENERATED on a LINE-LIST -- the leanest layout, one varying, no uv (v4328) ***", !!(st.tsl && st.tsl.ink) && st.tsl.ink.applied === true && st.tsl.ink.topology === "line-list" && st.tsl.ink.varyings.join() === "color", st.tsl && JSON.stringify(st.tsl.ink));
+    ok("*** and with &soft=1 the same race is SAMPLED instead: the shell carries a sampler and the page binds a filtered texture to it (v4327) ***", !!st2 && st2.applied === true && st2.soft === true && st2.shell === "sprite (atlas + sampler)" && errs2.length === 0, `${st2 && JSON.stringify(st2)}; page errors ${errs2.slice(0, 1).join(" | ") || "none"}`);
     ok("*** the page also swapped the Pixel race into the SPRITE shell -- a second layout, whose varyings are uv and colour and no normal ***", !!(st.tsl && st.tsl.sprite) && st.tsl.sprite.applied === true && st.tsl.sprite.shell === "heidler sprite" && st.tsl.sprite.varyings.join() === "uv,color", st.tsl && JSON.stringify(st.tsl.sprite));
 }
 
@@ -175,7 +226,7 @@ else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeLyapunovLookTsl(THREE, T, { breathe: a.AMP }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -240,7 +291,7 @@ else {
     const PIX = RACES.findIndex((x) => x.name === "Pixel");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeHeidlerSpriteTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -300,7 +351,7 @@ else {
     const PIX = RACES.findIndex((x) => x.name === "Pixel");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const sb = F.spriteBitmap(0);
         const tex = new THREE.DataTexture(sb.data, sb.width, sb.height); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
         const em = {};
@@ -344,6 +395,139 @@ else {
     }
 }
 
+console.log("\n7. AND A SAMPLER (v4327): the same sprite FILTERED -- three's sampler becomes the shell's, and what filters is the texture, not the shader");
+{
+    const buffers = [{ stride: 36, stepMode: "vertex", attributes: [] }, { stride: 48, stepMode: "instance", attributes: [] }];
+    const shell = spriteSampledShell(buffers);
+    ok("the shell declares the sampler beside the atlas and names it, so the transplant has somewhere to put three's", shell.wgsl.sampler === "samp" && /@group\(0\) @binding\(2\) var samp: sampler;/.test(shell.wgsl.prefix) && shell.name === "sprite (atlas + sampler)", shell.name);
+    const sampled = (t) => ({ wgsl: { vertex: FIX.wgslVertex, fragment: fill(FIX.wgslFragment, {}).replace("// uniforms", `// uniforms\n@binding( 0 ) @group( 1 ) var ${t}_sampler : sampler;\n@binding( 1 ) @group( 1 ) var ${t} : texture_2d<f32>;`).replace("output.color =", `output.color = textureSample( ${t}, ${t}_sampler, vec2<f32>( 0.0 ) ) * 0.0 +`) } });
+    // the fixture fragment is the lit race's (it reads the normal), so the shell it crosses into is the lit one, given the
+    // atlas and a sampler -- the declaration above is the sprite shell's own, checked as text
+    const litS = lyapunovLookShell(buffers); litS.textures = ["atlas"]; litS.wgsl = { ...litS.wgsl, sampler: "samp" };
+    const d = transplantIntoShell(sampled("atlas"), litS);
+    ok("*** three's own sampler name becomes the shell's, and nothing of three's is left in the fragment ***", /textureSample\( atlas, samp,/.test(d.shaders.wgsl) && !/atlas_sampler/.test(d.shaders.wgsl) && validateWgsl(d.shaders.wgsl).length === 0, validateWgsl(d.shaders.wgsl).join("; "));
+    const litNo = lyapunovLookShell(buffers); litNo.textures = ["atlas"];
+    ok("REFUSED: the same sampled fragment into a shell that binds the atlas but declares NO sampler (the v4326 shape)", throwsWith(() => transplantIntoShell(sampled("atlas"), litNo), /through a sampler and the shell "lyapunov look" declares none/));
+    ok("  the hand-written twin validates as WGSL and says the same thing in GLSL", validateWgsl(spriteSampledHand(buffers).shaders.wgsl).length === 0 && /texture\(atlas, vUv\)/.test(spriteSampledHand(buffers).shaders.glsl.fragment));
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const PIX = RACES.findIndex((x) => x.name === "Pixel");
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const sb = F.spriteBitmap(0);
+        const soft = new THREE.DataTexture(sb.data, sb.width, sb.height); soft.magFilter = THREE.LinearFilter; soft.minFilter = THREE.LinearFilter; soft.generateMipmaps = false; soft.needsUpdate = true;
+        const hard = new THREE.DataTexture(sb.data, sb.width, sb.height); hard.magFilter = THREE.NearestFilter; hard.minFilter = THREE.NearestFilter; hard.needsUpdate = true;
+        const em = {}; const out = {};
+        for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+            const look = P.makeSpriteSampledTsl(THREE, T, { texture: soft }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] });
+            if (mode === "webgpu") { const nearestLook = P.makeSpriteSampledTsl(THREE, T, { texture: Object.assign(hard, { magFilter: THREE.LinearFilter }) }); hard.magFilter = THREE.NearestFilter; hard.minFilter = THREE.NearestFilter; hard.needsUpdate = true;
+                const emN = await S.emitShaders(renderer, { scene: nearestLook.scene, camera: nearestLook.camera, mesh: nearestLook.scene.children[0] });
+                out.nearestEmitsFetch = /textureLoad\\(/.test(emN.fragment) && !/textureSample\\(/.test(emN.fragment); } }
+        out.sampled = /textureSample\\(/.test(em.webgpu.fragment); out.samplerName = (em.webgpu.fragment.match(/var (\\w+_sampler) : sampler;/) || [])[1];
+        out.emitted = { wgsl: em.webgpu, glsl: em.webgl2 };
+        const records = G.gridScene({ side: 6, z: -2, spacing: 1.2, radii: [0.45] }), count = records.length / 4; const fleetOf = Uint32Array.from({ length: count }, (_, i) => (i % 2 === 0 ? a.PIX : i % 10));
+        const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 8], [0, 0, 0])), eye: [0, 0, 8] };
+        for (const backend of ["webgpu", "webgl2"]) {
+            const o = {};
+            try {
+                const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N; const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+                const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+                const linearTex = dev.texture({ width: sb.width, height: sb.height, data: sb.data, nearest: false });
+                const pointTex = dev.texture({ width: sb.width, height: sb.height, data: sb.data, nearest: true });
+                const draw = async (pipeline, tex) => { const std = F.standardFleets(dev, { clock: () => 0.5 });
+                    if (pipeline) std.fleets[a.PIX] = { ...std.fleets[a.PIX], pipeline, bind: (pass) => pass.texture("atlas", tex, 0) };
+                    const sc = G.makeGpuDrivenScene(dev, { fleets: std.fleets, fleetOf, thresholds: [0.03], records }); const px = (await sc.frame({ ...cam, read: true, clear: [0.05, 0.05, 0.08, 1] }).pixels).pixels; return { px, sc }; };
+                const buffers = F.standardFleets(dev, { clock: () => 0.5 }).fleets[a.PIX].pipeline.buffers;
+                const desc = S.transplantIntoShell({ wgsl: em.webgpu, glsl: em.webgl2 }, P.spriteSampledShell(buffers));
+                if (backend === "webgpu") out.transplanted = { wgsl: desc.shaders.wgsl, glsl: desc.shaders.glsl.fragment };
+                const gen = await draw(desc, linearTex), tw = (await draw(P.spriteSampledHand(buffers), linearTex)).px, point = (await draw(desc, pointTex)).px;
+                let same = 0, worst = 0, softer = 0, painted = 0; for (let i = 0; i < a.N * a.N; i++) { let d = 0, p = 0; for (let c = 0; c < 3; c++) { d = Math.max(d, Math.abs(gen.px[i * 4 + c] - tw[i * 4 + c])); p = Math.max(p, Math.abs(gen.px[i * 4 + c] - point[i * 4 + c])); }
+                    if (d === 0) same++; worst = Math.max(worst, d); if (p) softer++;
+                    if (Math.abs(gen.px[i * 4] - 13) > 4 || Math.abs(gen.px[i * 4 + 1] - 13) > 4 || Math.abs(gen.px[i * 4 + 2] - 20) > 4) painted++; }
+                const pk = await gen.sc.pickPicture(); let hits = 0; for (const h of pk.hits) if (h && h.fleet === a.PIX) hits++;
+                o.same = same; o.worst = worst; o.softer = softer; o.painted = painted; o.total = a.N * a.N; o.hits = hits; o.errs = errs; o.backend = dev.backend; o.shell = desc.shell;
+            } catch (e) { o.error = String(e && e.message || e).slice(0, 400); }
+            out[backend] = o;
+        }
+        return out;
+    }` });
+    ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
+        const R = r.result;
+        ok("*** WHAT DECIDES IS THE TEXTURE: the same graph emits textureSample for a LinearFilter texture and textureLoad for a Nearest one ***", R.sampled === true && R.samplerName === "atlas_sampler" && R.nearestEmitsFetch === true, `sampled ${R.sampled}, sampler ${R.samplerName}, nearest emits a fetch: ${R.nearestEmitsFetch}`);
+        for (const b of ["webgpu", "webgl2"]) { const o = R[b];
+            ok(`*** ${b}: the FILTERED sprite drawn by the generated pipeline is the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0) -- three's sampler bound as the shell's ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.shell === "sprite (atlas + sampler)", `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);
+            ok(`  ${b}: and the SAME pipeline draws a different picture when a point-sampled texture is bound to it (${o.softer} pixels) -- the device picks the sampler by the texture, not the shader`, o.softer > 100 && o.painted > 300 && o.hits > 100, `${o.softer} differ, ${o.painted} painted, ${o.hits} name Pixel`); }
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.sampled = { note: "v4327 -- the filtered sprite look as three emitted it, and as tslSource transplanted it into the sprite shell with the atlas and a sampler", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        ok("the emitted and transplanted filtered look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).sampled);
+    }
+}
+
+console.log("\n8. THE INK LAYOUT (v4328): a LINE-LIST, one varying, and no uv anywhere -- the leanest shell the fleets have");
+{
+    const buffers = [{ stride: 28, stepMode: "vertex", attributes: [] }, { stride: 48, stepMode: "instance", attributes: [] }];
+    const shell = inkLookShell(buffers);
+    const norm = (t) => t.replace(/\s+/g, " ").trim();
+    const shippedW = norm(INK_WGSL.split("@ver" + "tex")[1].split("@frag" + "ment")[0]);
+    const mineW = norm(shell.wgsl.vertexTemplate.replace("{{DISPLACE}}", "").split("@ver" + "tex")[1]).replace("var pl = p; ", "").replace("turned(pl,", "turned(p,");
+    const shippedG = norm(INK_VERTEX_GLSL.split("void main()")[1]);
+    const mineG = norm(shell.glsl.vertexTemplate.replace("{{DISPLACE}}", "").split("void main()")[1]).replace("vec3 pl = p; ", "").replace("turned(pl,", "turned(p,");
+    ok("*** the shell's vertex stage IS the fleets' own ink vertex stage, in both languages -- the hook and its local are the whole difference ***", mineW === shippedW && mineG === shippedG, mineW === shippedW ? "" : mineW);
+    ok("  and it carries the look's TOPOLOGY, which no shell before it had to", shell.topology === "line-list" && inkHand(buffers).topology === "line-list");
+    // the lit fixture reads uv, the normal and the colour; this shell carries the colour alone
+    const em = { wgsl: { vertex: FIX.wgslVertex, fragment: fill(FIX.wgslFragment, {}) }, glsl: { vertex: FIX.glslVertex, fragment: fill(FIX.glslFragment, {}) } };
+    ok("*** REFUSED: a graph that reads a uv into a layout that has none -- not the hull's x and y standing in for one, a refusal by name ***", throwsWith(() => transplantIntoShell(em, inkLookShell(buffers, { extraUniforms: [{ name: "light", type: "vec4" }, { name: "chaos", type: "vec4" }] })), /which the shell "ink" does not carry \(it carries color\)/));
+    ok("  the hand-written twin validates as WGSL and says the same thing in GLSL", validateWgsl(inkHand(buffers).shaders.wgsl).length === 0 && /mix\(vColor\.rgb, vec3\(lum\), ink\.x\)/.test(inkHand(buffers).shaders.glsl.fragment), validateWgsl(inkHand(buffers).shaders.wgsl).join("; "));
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const KRBN = RACES.findIndex((x) => x.name === "Krbn");
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, KRBN, WASH: 0.6, GAIN: 1.5 }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const em = {};
+        for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+            const look = P.makeInkTsl(THREE, T, { wash: a.WASH, gain: a.GAIN }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
+        const out = { sem: S.varyingSemantics(em.webgpu.vertex, "wgsl"), semG: S.varyingSemantics(em.webgl2.vertex, "glsl"), emitted: { wgsl: em.webgpu, glsl: em.webgl2 } };
+        const records = G.gridScene({ side: 6, z: -2, spacing: 1.2, radii: [0.45] }), count = records.length / 4; const fleetOf = Uint32Array.from({ length: count }, (_, i) => (i % 2 === 0 ? a.KRBN : i % 10));
+        const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 8], [0, 0, 0])), eye: [0, 0, 8] };
+        const knobs = [a.WASH, a.GAIN, 0, 0];
+        for (const backend of ["webgpu", "webgl2"]) {
+            const o = {};
+            try {
+                const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N; const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+                const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+                const draw = async (pipeline) => { const std = F.standardFleets(dev, { clock: () => 0.5 });
+                    if (pipeline) std.fleets[a.KRBN] = { ...std.fleets[a.KRBN], pipeline, bind: (pass) => pass.uniform("ink", knobs) };
+                    const sc = G.makeGpuDrivenScene(dev, { fleets: std.fleets, fleetOf, thresholds: [0.03], records }); const px = (await sc.frame({ ...cam, read: true, clear: [0.05, 0.05, 0.08, 1] }).pixels).pixels; return { px, sc }; };
+                const buffers = F.standardFleets(dev, { clock: () => 0.5 }).fleets[a.KRBN].pipeline.buffers;
+                const desc = S.transplantIntoShell({ wgsl: em.webgpu, glsl: em.webgl2 }, P.inkLookShell(buffers));
+                if (backend === "webgpu") out.transplanted = { wgsl: desc.shaders.wgsl, glsl: desc.shaders.glsl.fragment };
+                const strokes = (await draw(null)).px, gen = await draw(desc), tw = (await draw(P.inkHand(buffers))).px;
+                let same = 0, worst = 0, washed = 0, drawn = 0; for (let i = 0; i < a.N * a.N; i++) { let d = 0, w = 0; for (let c = 0; c < 3; c++) { d = Math.max(d, Math.abs(gen.px[i * 4 + c] - tw[i * 4 + c])); w = Math.max(w, Math.abs(gen.px[i * 4 + c] - strokes[i * 4 + c])); }
+                    if (d === 0) same++; worst = Math.max(worst, d); if (w) washed++;
+                    if (Math.abs(gen.px[i * 4] - 13) > 3 || Math.abs(gen.px[i * 4 + 1] - 13) > 3 || Math.abs(gen.px[i * 4 + 2] - 20) > 3) drawn++; }
+                const pk = await gen.sc.pickPicture(); let hits = 0; for (const h of pk.hits) if (h && h.fleet === a.KRBN) hits++;
+                o.same = same; o.worst = worst; o.washed = washed; o.drawn = drawn; o.total = a.N * a.N; o.hits = hits; o.errs = errs; o.backend = dev.backend; o.topology = desc.topology; o.shell = desc.shell;
+            } catch (e) { o.error = String(e && e.message || e).slice(0, 400); }
+            out[backend] = o;
+        }
+        return out;
+    }` });
+    ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
+        const R = r.result;
+        ok("*** three's vertex stage carried exactly ONE varying for this graph -- the colour, because the graph asks for nothing else ***", JSON.stringify(Object.values(R.sem)) === JSON.stringify(["color"]) && JSON.stringify(Object.values(R.semG)) === JSON.stringify(["color"]), JSON.stringify(R.sem) + " " + JSON.stringify(R.semG));
+        for (const b of ["webgpu", "webgl2"]) { const o = R[b];
+            ok(`*** ${b}: the Krbn race's strokes painted by the GENERATED pipeline are the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0), on a LINE-LIST the descriptor carried out to the device ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.topology === "line-list" && o.shell === "ink", `${o.same}/${o.total}, worst ${o.worst}, topology ${o.topology}; errors ${o.errs.length}`);
+            ok(`  ${b}: the wash did something (${o.washed} pixels differ from the fleets' own flat strokes), the drawing is on the screen (${o.drawn}), and the pick still names the Krbn ships`, o.washed > 100 && o.drawn > 200 && o.hits > 50, `${o.washed} washed, ${o.drawn} drawn, ${o.hits} name Krbn`); }
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.ink = { note: "v4328 -- the ink wash as three's builders emitted it, and as tslSource transplanted it into the fleets' line-list shell", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        ok("the emitted and transplanted ink look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).ink);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4322.
 //   A  varyingSemantics() swapping normal and color -> exit=1, 4 red: the fixture's semantics line, both transplant lines, and on
 //      the device the GLSL refuses to compile (a vec4 assigned to a vec3) -- a wrong map is a type error before it is a wrong picture.
@@ -375,10 +559,28 @@ else {
 //      A shader declaring a binding nothing feeds would throw at draw, in the device's own words, one layer too late.
 //   K  the graph's Discard dropped -> exit=1, 2 red: on both backends the generated race parts from the SHIPPED race on 2,712 of
 //      36,864 pixels (worst 20) -- the transparent texels it should have discarded, painted.
+//   MEASURED at v4327 (a sampler):
+//   L  the sampler rewritten to a name the shell never declares -> exit=1, 3 red: the CPU line, and on WebGPU the frame is wrong
+//      everywhere (0 of 36,864 pixels agree, worst 255, 12 device errors). WebGL2 passes unchanged: it has no separate sampler
+//      to get wrong, which is the asymmetry stated above rather than a gap in the check.
+//   M  the sprite shell built WITHOUT its sampler -> exit=1, 3 red: the declaration line, and the transplant refusing by name on
+//      both of section 7's backends. The page's soft path is the third: on GLSL it does not refuse at all, it falls back to the
+//      fetching shell and only the shell's name says so.
+//   MEASURED at v4328 (the ink layout):
+//   N  the ink shell's topology dropped (line-list -> the default) -> exit=1, 4 red: the CPU line, the page's line, and the two
+//      device lines on the descriptor's topology alone. The PICTURE claim does not move at all -- see the note above; the twin
+//      shares the shell and loses the topology with it. This is the sabotage that found the limit, not a weak one.
+//   O  the graph's wash dropped (the colour passed through with only the gain) -> exit=1, 2 red: the generated ink parts from the
+//      hand-written twin on 467 pixels under WebGPU and 415 under WebGL2, worst 6. Small, because a wash toward luminance is
+//      small on strokes this dark -- and still caught on every one of them.
+//   MEASURED at v4329 (the split, and the front door):
+//   Q  the ?tsl=1&soft=1 link in server.html's Render TSL panel replaced with the plain page -> exit=1, 1 red, by name. A mode of a
+//      page that no link reaches is reachable only by somebody who already knows it exists, which is the whole of pageReach's case.
+//   (P and R are in tools/ship/tslPhysics-selfcheck.mjs and tools/ship/pageSections-selfcheck.mjs, the gates that own those claims.)
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +
-    "so the pictures agree; a page turning the knobs would need a new graph); the INK layout -- a line-list, whose topology no shell here carries and " +
-    "whose fragment has no uv at all to read; a FILTERED sample into a shell (the shell would have to declare a sampler, and no fleet " +
-    "look has one -- the refusal is checked, the crossing is not); the double texel fetch three emits around a Discard, which is measured " +
-    "here and not fixed; and three's camera or model matrices inside a graph, which stay refused because the shell owns the transform.");
+    "so the pictures agree; a page turning the knobs would need a new graph); a MIPPED or anisotropic sample (the device makes one sampler per filter mode, repeat " +
+    "addressing, no mip chain, so a graph asking for a level would find nothing to ask); the double texel fetch three emits around a " +
+    "Discard, measured here and not fixed; and three's camera or model matrices inside a graph, which stay refused because the shell " +
+    "owns the transform.");
 process.exit(fails ? 1 : 0);

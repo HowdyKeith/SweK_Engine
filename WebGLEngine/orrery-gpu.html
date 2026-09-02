@@ -166,7 +166,7 @@ const std = standardFleets(device, { userHull });
 // is built. tslRace-selfcheck holds the generated race to the hand-written one to the byte; this is the same swap, live.
 if (params.get("tsl") === "1") {
     try {
-        const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/physicsTsl.mjs"), import("./render/tslSource.mjs")]);
+        const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/fleetTsl.mjs"), import("./render/tslSource.mjs")]);
         const off = document.createElement("canvas"); off.width = 64; off.height = 64;
         const renderer = new THREE.WebGPURenderer({ canvas: off, forceWebGL: device.backend === "webgl2", antialias: false }); await renderer.init();
         const look = P.makeLyapunovLookTsl(THREE, T, { breathe: 0.06 }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));   // v4324: the hull breathes -- a position node, carried into the fleet's vertex stage
@@ -193,13 +193,31 @@ if (params.get("tsl") === "1") {
         try {
             const GL = RACES.findIndex((r) => r.name === "Glyph");
             const atlas = new THREE.DataTexture(std.atlas.data, std.atlas.width, std.atlas.height); atlas.magFilter = THREE.NearestFilter; atlas.minFilter = THREE.NearestFilter; atlas.needsUpdate = true;
-            const g = P.makeSpriteAtlasTsl(THREE, T, { texture: atlas }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+            // v4327 -- &soft=1 samples the atlas through a sampler instead of fetching its texels: the same graph, one node
+            // apart, and what filters is the TEXTURE (three emits a fetch for a Nearest one), so the soft path hands three a
+            // LinearFilter copy and the device a linear texture to bind.
+            const soft = params.get("soft") === "1";
+            if (soft) { atlas.magFilter = THREE.LinearFilter; atlas.minFilter = THREE.LinearFilter; atlas.generateMipmaps = false; atlas.needsUpdate = true; }
+            const g = soft ? P.makeSpriteSampledTsl(THREE, T, { texture: atlas }) : P.makeSpriteAtlasTsl(THREE, T, { texture: atlas }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
             const emG = await S.emitShaders(renderer, { scene: g.scene, camera: g.camera, mesh: g.scene.children[0] });
-            const dG = S.transplantIntoShell({ [emG.language]: emG }, P.spriteAtlasShell(std.fleets[GL].pipeline.buffers));
-            std.fleets[GL] = { ...std.fleets[GL], pipeline: dG };   // the fleet's own bind hook already binds "atlas" by name
-            tslLook.atlas = { language: emG.language, applied: std.fleets[GL].pipeline === dG, shell: dG.shell, textures: dG.textures };
-            say(`${device.backend} &middot; and the Glyph race's OWN shipped look is GENERATED too -- the atlas crossing into the shell that binds it, texel by texel, transparent ones discarded`);
+            const shellG = soft ? P.spriteSampledShell(std.fleets[GL].pipeline.buffers) : P.spriteAtlasShell(std.fleets[GL].pipeline.buffers);
+            const dG = S.transplantIntoShell({ [emG.language]: emG }, shellG);
+            const softTex = soft ? device.texture({ width: std.atlas.width, height: std.atlas.height, data: std.atlas.data, nearest: false }) : null;
+            std.fleets[GL] = { ...std.fleets[GL], pipeline: dG, ...(soft ? { bind: (pass) => pass.texture("atlas", softTex, 0) } : {}) };   // otherwise the fleet's own bind hook already binds "atlas" by name
+            tslLook.atlas = { language: emG.language, applied: std.fleets[GL].pipeline === dG, shell: dG.shell, textures: dG.textures, soft };
+            say(`${device.backend} &middot; and the Glyph race's OWN shipped look is GENERATED too -- the atlas crossing into the shell that binds it, ${soft ? "sampled through the shell's sampler, softened" : "texel by texel"}, transparent ones discarded`);
         } catch (e) { say("the generated atlas look failed, the Glyph race keeps its own: " + e.message, true); console.warn("tsl atlas:", e); }
+        // v4328 -- and the leanest layout of all: the Krbn race's strokes on a LINE-LIST, p and colour and nothing else.
+        // The graph reads the vertex colour alone (there is no uv here to read) and washes it toward its own luminance.
+        try {
+            const KR = RACES.findIndex((r) => r.name === "Krbn");
+            const inkLook = P.makeInkTsl(THREE, T, { wash: 0.6, gain: 1.5 }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+            const emI = await S.emitShaders(renderer, { scene: inkLook.scene, camera: inkLook.camera, mesh: inkLook.scene.children[0] });
+            const dI = S.transplantIntoShell({ [emI.language]: emI }, P.inkLookShell(std.fleets[KR].pipeline.buffers));
+            std.fleets[KR] = { ...std.fleets[KR], pipeline: dI, bind: (pass, ctx) => pass.uniform("ink", [0.35 + 0.35 * Math.sin(ctx.time * 0.7), 1.5, 0, 0]) };
+            tslLook.ink = { language: emI.language, applied: std.fleets[KR].pipeline === dI, shell: dI.shell, topology: dI.topology, varyings: Object.keys(P.inkLookShell([])[emI.language].varyings) };
+            say(`${device.backend} &middot; and the Krbn race's strokes are GENERATED on a LINE-LIST -- one varying, no uv in the layout at all, the ink washing toward its own grey`);
+        } catch (e) { say("the generated ink look failed, the Krbn race keeps its strokes: " + e.message, true); console.warn("tsl ink:", e); }
     } catch (e) { say("TSL look failed, the hand-written Chaos look stands: " + e.message, true); console.warn("tsl look:", e); }
 }
 const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull

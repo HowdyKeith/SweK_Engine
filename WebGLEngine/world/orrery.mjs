@@ -177,4 +177,20 @@ export function report(system) {
  * *** THE RATCHET. *** A vendored body with no licence provenance is not a rendering problem, it is a thing
  * this repository is shipping without saying it may. The count may only go DOWN.
  */
-export const UNPAPERED_BASELINE = 2;
+/**
+ * *** THE RATCHET REACHED ZERO, AND NOBODY KNEW FOR FORTY-FIVE ROUNDS. ***
+ *
+ * It was 2 -- box3d and htmx, the two bodies backlog #61 named as "vendored with no licence provenance in the
+ * tree". Both have since gained a LICENSE, and this file could not see it: orrery.json was last baked at v4189
+ * and the browser reads the BAKE, not the tree. So the page has been printing "2 of 14 bodies carry no licence
+ * provenance" over a tree where the answer is none of 15, and the two staleness gates that say so
+ * (orrerySeed-selfcheck, orreryView-selfcheck) have been red on the register since v4279 saying exactly that.
+ * v4329 re-baked, because #68's fleet has to enumerate bodies from the same place everything else reads.
+ *
+ * *** AND THE COMPARISON IS NOW EQUALITY, NOT `<=`, WHICH IS v4258'S LESSON APPLIED HERE. *** citedSources
+ * found that a bound is satisfied more easily the looser it gets, so a baseline guarded by `<=` can be edited
+ * upward and nothing says so. The debt is exactly measurable, so the baseline must BE it: a newly vendored
+ * body with no licence goes red on the next run, and clearing one means editing this number down in the same
+ * commit.
+ */
+export const UNPAPERED_BASELINE = 0;
