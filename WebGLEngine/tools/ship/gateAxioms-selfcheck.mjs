@@ -101,9 +101,34 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
        `${net.length} of ${gates.length}. A GATE THAT NEEDS THE INTERNET IS A GATE THAT IS RED ON AN AEROPLANE, and worse, one whose GREEN depends on a stranger's server still saying what it said.`);
     ok("...and few spawn a process", proc < 40,
        `${proc} use child_process. Each assumes a binary exists on THIS machine -- the shape behind every "works on my rig" report.`);
+    // *** v4332 -- THIS WAS A BOUND AND IT HAS BECOME A REGISTER, WHICH IS v4258'S LESSON APPLIED HERE. ***
+    // `< 20` held for as long as the tree had nineteen browser gates. #48's added the twentieth and this went
+    // red -- correctly, because a bound crossed IS news -- but the repair a bound invites is to edit 20 to 21,
+    // and nothing then says which gate moved it or whether it should have. citedSources found the same shape
+    // at v4258: a bound is satisfied more easily the looser it gets. So the set is NAMED and compared for
+    // EQUALITY. A new browser gate must add itself here in the same commit, which is one line and a decision;
+    // and a gate that quietly STOPS needing a context is news too, which a `<` could never report.
+    const GPU_GATES = Object.freeze([
+        "fluid/multigridGPU-selfcheck.mjs", "physics/blobarium-selfcheck.mjs", "render/blobRecorder-selfcheck.mjs",
+        "tools/roundhouse/magmapBenchVerdict-selfcheck.mjs", "tools/roundhouse/magmapDefault-selfcheck.mjs",
+        "tools/roundhouse/magmapTaichiRun-selfcheck.mjs", "tools/ship/browserSafety-selfcheck.mjs",
+        "tools/ship/crtToggle-selfcheck.mjs", "tools/ship/demoChrome-selfcheck.mjs",
+        "tools/ship/domToTexture-selfcheck.mjs", "tools/ship/glBootstrap-selfcheck.mjs",
+        "tools/ship/glCapture-selfcheck.mjs", "tools/ship/meshLine-selfcheck.mjs",
+        "tools/ship/orreryFleet-selfcheck.mjs", "tools/ship/orreryPost-selfcheck.mjs",
+        "tools/ship/orreryReached-selfcheck.mjs", "tools/ship/pageGround-selfcheck.mjs",
+        "tools/ship/postChain-selfcheck.mjs", "tools/ship/verifiedPolygonIntersection-selfcheck.mjs",
+        "tools/ship/voxtralBrowser-selfcheck.mjs",
+    ]);
+    const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
+    const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));
+    const left = GPU_GATES.filter((g) => !gpuNow.includes(g));
     ok("!! and the GPU surface is nearly empty, which is the harness telling the truth",
-       (counts.gpu || 0) < 20,
-       `${counts.gpu || 0} gates touch a graphics context. *** MY FIRST PASS SAID 435, because it ran the probes over RAW SOURCE and matched the WORD "WebGL" in prose -- in files that explain why they CANNOT use one. codeOnly for an IDIOM, and the number fell by more than twenty-fold. A CENSUS OF ASSUMPTIONS THAT COUNTED EXPLANATIONS OF ASSUMPTIONS WOULD HAVE BEEN EXACTLY BACKWARDS. ***`);
+       arrived.length === 0 && left.length === 0,
+       `${gpuNow.length} of ${gates.length} gates touch a graphics context, ${(100 * gpuNow.length / gates.length).toFixed(1)}% of the suite` +
+       (arrived.length ? `. ARRIVED and unregistered: ${arrived.join(", ")} -- add it to GPU_GATES in the commit that adds the gate, and say why it needs a context` : "") +
+       (left.length ? `. GONE: ${left.join(", ")} -- a gate that stopped needing a context is news; remove it here` : "") +
+       `. *** MY FIRST PASS SAID 435, because it ran the probes over RAW SOURCE and matched the WORD "WebGL" in prose -- in files that explain why they CANNOT use one. codeOnly for an IDIOM, and the number fell by more than twenty-fold. A CENSUS OF ASSUMPTIONS THAT COUNTED EXPLANATIONS OF ASSUMPTIONS WOULD HAVE BEEN EXACTLY BACKWARDS. ***`);
 }
 
 // ---- 4. WHAT THIS IS NOT ------------------------------------------------------------------------------------

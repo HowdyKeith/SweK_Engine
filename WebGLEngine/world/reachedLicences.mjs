@@ -977,13 +977,32 @@ export function severityOf(e) {
     return SEVERITY.OPEN;
 }
 
-/** The register as orbital bodies, for world/orrery.mjs -- severity is the body's heft. */
+/**
+ * The register as orbital bodies, for world/orrery.mjs -- severity is the body's heft.
+ *
+ * *** THE `reached` FIELD WAS MISSING FOR ELEVEN ROUNDS AND THAT MADE THIS AN ACCUSATION. *** This function
+ * says in its own name and its own comment that it exists to feed world/orrery.mjs. It was written at v4198
+ * and its only caller until v4332 was its own gate, so nobody ran the sentence it describes. Run, measured:
+ *
+ *     buildOrrery(asBodies())  ->  39 UNPAPERED, 0 REACHED
+ *
+ * buildOrrery decides the state from `b.reached`, and this emitted `vendored: false` instead -- true, and
+ * about a different question. With no `reached` and no `paths`, licenceFor([]) finds nothing, and all
+ * thirty-nine sources were filed as "vendored here with no licence provenance in the tree": the twenty-two
+ * whose licences are OPEN, the four quoted verbatim in LICENCE_TEXTS above, all of them. world/orrery.mjs's
+ * own header calls that outcome "a false accusation against a dependency that is properly licensed", and it
+ * was being produced by the function written to prevent it.
+ *
+ * `vendored` stays, because a reader of THIS register wants the plain fact; `reached` is added because the
+ * consumer reads that name. The two agree by construction -- this register is what was not taken.
+ */
 export function asBodies(sources = REACHED_SOURCES) {
     return sources.map((e) => ({
         name: e.repo,
         severity: severityOf(e),
         posture: e.posture,
         vendored: false,                 // by definition: this register is what was NOT taken
+        reached: true,                   // ...which is exactly what world/orrery.mjs calls REACHED
         took: e.taken || null,
     }));
 }

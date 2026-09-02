@@ -220,13 +220,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         added: Object.freeze(["tools/ship/orreryFleet-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
     }),
-    // v4331 -- A FOURTH CLOSING. Both sides of this merge invented a third one in the same week -- main's for
+    // v4332 -- the fourth closing, and the summing above is why adding it costs one entry rather than an
+    // edit to the arithmetic. #48's gate was driven through four sabotages before it shipped; two of them
+    // went red in the GATE rather than the code, and it ships in the state that survived them.
+    since4: Object.freeze({
+        at: "v4332", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orreryReached-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+    }),
+    // v4335 -- A FIFTH CLOSING, and the SECOND time this exact collision happened in one merge sequence: main
+    // added a fourth for its own gate while this branch's fourth was in flight, so mine moves again. That is the
+    // argument for the list shape twice over -- a round appends an entry and nobody has to renegotiate a name.
+    // v4331 -- (was A FOURTH CLOSING.) Both sides of this merge invented a third one in the same week -- main's for
     // its fleet gate, mine for the two this branch added -- which is the clearest possible argument for main's
     // shape: `closings` is a LIST, so a round adds an entry instead of another named term. Mine becomes since4
     // rather than being folded into main's since3, for the same reason since3 was not folded into since2: that
     // record reports a sweep that ran on a day, and a sweep cannot have run a file that did not exist yet.
-    since4: Object.freeze({
-        at: "v4331", swept: 2, green: 2, red: 0,
+    since5: Object.freeze({
+        at: "v4335", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "render/cubeBake-selfcheck.mjs", "render/valueNoise-selfcheck.mjs",
         ]),
