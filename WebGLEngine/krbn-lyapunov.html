@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Krbn &times; Lyapunov &mdash; SweK</title>
+<meta name="demo:desc" content="The Krbn pencil hologram lit by swk_lyapunov, the one shader in render/swiftShaderPass.js that is ours rather than a port. Every pixel iterates the logistic map for itself -- its x coordinate IS r, its y coordinate is the seed -- and shows the Lyapunov exponent, so the dark vertical bands are the periodic windows. At r = 4 the exponent is exactly ln 2, an answer the fragment is never given and the gate reads back off the GPU." />
+<!--
+  krbn-lyapunov.html -- v4313
+  THE HOLOGRAM, LIT BY OUR OWN PHYSICS. Krbn is drawn to pencil SVG exactly as krbn.html draws him, rasterised,
+  and passed through swk_lyapunov -- the one shader in render/swiftShaderPass.js that is ours rather than a port
+  of krispuckett/SwiftUIShaders, and the one graded against an answer it is never given.
+
+  ---- WHAT THE FIELD ACTUALLY IS, BECAUSE "IT LOOKS LIKE PLASMA" WOULD BE A LIE ---------------------------------
+  Every pixel runs the logistic map x <- r*x*(1-x) for itself. Its x coordinate IS r; its y coordinate is the
+  seed x0. What it displays is the LYAPUNOV EXPONENT of that orbit -- the average of ln|r(1-2x)| -- which is
+  positive where the map is chaotic and negative where it has settled onto a cycle. The dark vertical bands are
+  the PERIODIC WINDOWS. The widest one is the period-3 window, r = 3.8284 to 3.857 -- which at the default
+  r range [3.4, 4.0] is 71% to 76% of the way across, so look a little past seven tenths. Period-3 implies
+  chaos is a theorem with a name (Li and Yorke, 1975).
+
+  *** AND AT r = 4 THE ANSWER IS EXACT -- BUT THE RIGHT-HAND EDGE IS NOT r = 4, WHICH THIS PAGE GOT WRONG
+  FIRST. *** gl_FragCoord samples pixel CENTRES, so with r high at 4.000 the last column is uv.x = 639.5/640
+  and r = 3.999531. Decoded off this page's own canvas before the fix, that column read lambda = 0.683998 --
+  9.1e-3 below ln 2, and NOT an error: it is lambda at a different r, on a curve that is steep there. The page
+  said "the right-hand column is r = 4" and no pixel on it ever was. The "read ln 2 off your GPU" button pins
+  rLo = rHi = 4 so every pixel IS the key, which is exactly what swiftShaders-selfcheck.mjs does, and then
+  decodes the result in front of you instead of quoting the gate.
+
+  At r = 4 the exponent is ln 2 = 0.6931471805599453, which physics/chaos/logistic.js records and
+  tools/ship/swiftShaders-selfcheck.mjs checks BY READING IT BACK OFF THIS SHADER: median 0.693226 over 128
+  seeds, |err| 7.85e-5, from a fragment handed r as a coordinate and no uniform carrying the answer. That is
+  the whole reason this page exists rather than a noise field that looks similar.
+
+  AND THE PAGE DOES NOT QUOTE THAT NUMBER, IT TAKES ITS OWN. The button decodes the two-channel raw output off
+  the canvas and reports the median over its 480 rows. Headless Chromium on SwiftShader, measured here:
+  median 0.693103, |err| 4.45e-5, p10 0.6900 to p90 0.6987. Different hardware will read a slightly different
+  number and that is the point -- it is a measurement on the machine in front of you, not a constant this file
+  was told.
+
+  ---- WHAT THIS PAGE DOES NOT CLAIM ----------------------------------------------------------------------------
+  That the picture is pretty, and that any of it is new mathematics. The logistic map is 1976. What is ours is
+  that the shader computing it is graded against ln 2 rather than against its own CPU port, which is the thing
+  the other 35 shaders in that file cannot do.
+
+  ROWS ARE NOT REDUNDANT AND THE PAGE SAYS SO WHERE IT SHOWS THEM: each row is a different starting x0, every
+  orbit at r = 4 diverges from every other, and they all report the same exponent anyway. If the rows ever look
+  identical pixel-for-pixel, something has stopped iterating.
+
+  ---- WHY THE DEFAULT INK IS noir AND NOT paper, WHICH IS krbn.html's DEFAULT --------------------------------
+  BECAUSE ON PAPER THE FIELD IS VERY NEARLY INVISIBLE, AND THAT WAS MEASURED RATHER THAN EYEBALLED. The shader
+  composites as c*(1 - 0.35*glow) + hot*glow, so on a near-white ground both the periodic windows and the
+  chaotic bands clip against the top of the channel. Green channel, background rows, the middle of the period-3
+  window (r = 3.840) against a chaotic r = 3.99, headless Chromium/SwiftShader:
+
+      ink         window    chaotic    CONTRAST
+      paper          239        255          16      <- eleven times worse, and it was the default
+      blueprint       32        202         170
+      noir            11        187         176
+
+  A page whose whole subject is "the dark bands are the periodic windows" shipped with the one palette that
+  cannot show them. paper is still in the list, second-guessing nobody -- it is just no longer first.
+
+  AND ONE MEASUREMENT THAT LOOKED LIKE A BUG AND IS THE PHYSICS: the first probe sampled r = 3.8284, the
+  window's ONSET, and read 255 against 255 on every ink -- no window at all. That r is the TANGENT BIFURCATION,
+  where convergence onto the 3-cycle is algebraically slow rather than geometric, so 64 warmup iterations do not
+  reach it and the exponent is still positive. Intermittency, correctly rendered. Raise warmup and the window's
+  left edge sharpens; the shader is not wrong, the probe point was.
+-->
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --bg:#06140c; --panel:#0a1c12; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.06em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:980px; font-size:12px; }
+  header b { color:var(--green); }
+  main { display:flex; flex-wrap:wrap; gap:18px; padding:18px; align-items:flex-start; }
+  #stage { border:1px solid var(--line); background:#000; line-height:0; }
+  #stage canvas { display:block; max-width:100%; }
+  aside { flex:1 1 300px; min-width:280px; }
+  fieldset { border:1px solid var(--line); background:var(--panel); margin:0 0 12px; padding:10px 12px; }
+  legend { color:var(--amber); font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:0 6px; }
+  label { display:block; margin:8px 0; color:var(--dim); font-size:12px; }
+  label span { color:var(--ink); float:right; }
+  input[type=range] { width:100%; margin-top:3px; }
+  select, button { background:#0d2418; color:var(--ink); border:1px solid var(--line); font:inherit; padding:5px 9px; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  #stat { color:var(--dim); font-size:11px; white-space:pre-wrap; margin-top:8px; }
+  .key { color:var(--green); }
+  .warn { color:var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Krbn &times; Lyapunov</h1>
+  <p>Krbn drawn to pencil SVG, rasterised, and lit by <b>swk_lyapunov</b> &mdash; every pixel iterating
+     <b>x &larr; r&middot;x(1&minus;x)</b> for itself. Bright is chaotic, dark is a periodic window.
+     At <b>r = 4</b> the exponent is exactly <b class="key">ln 2 = 0.6931472</b>, an answer the shader is never
+     given. <b>Press &ldquo;read ln 2 off your GPU&rdquo;</b> and this page decodes it back off the canvas in
+     front of you &mdash; it does not quote the gate's number, it takes its own.</p>
+</header>
+<main>
+  <div id="stage"><canvas id="out" width="640" height="480"></canvas></div>
+  <aside>
+    <fieldset><legend>the r window</legend>
+      <label>r low <span id="vlo">3.40</span><input id="rlo" type="range" min="2.5" max="3.9" step="0.01" value="3.4"></label>
+      <label>r high <span id="vhi">4.00</span><input id="rhi" type="range" min="3.5" max="4" step="0.005" value="4"></label>
+      <label>intensity <span id="vint">0.80</span><input id="int" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+      <label>samples <span id="vsam">384</span><input id="sam" type="range" min="64" max="768" step="32" value="384"></label>
+    </fieldset>
+    <fieldset><legend>view</legend>
+      <label>spin <span id="vdeg">25&deg;</span><input id="deg" type="range" min="0" max="359" step="1" value="25"></label>
+      <label>ink
+        <select id="ink"><option value="noir">noir</option><option value="blueprint">blueprint</option><option value="paper">paper</option></select>
+      </label>
+      <label>bones
+        <select id="bones"><option value="off">off</option><option value="ghost">ghost (x-ray)</option></select>
+      </label>
+      <button id="raw">show the raw &lambda; field</button>
+      <button id="redraw">redraw</button>
+      <!-- THE KEY, PRESSABLE. Everything else on this page is a picture; this reads a number back. -->
+      <button id="key">read ln 2 off your GPU</button>
+    </fieldset>
+    <div id="stat">loading Krbn&hellip;</div>
+  </aside>
+</main>
+<script type="module">
+import { makeBlobs } from "./simulation/tomo/blobPhantom.js";
+import { blobMeshInput } from "./tools/krbnEmit.mjs";
+import { makeSwiftShaderPass, DEFAULT_KNOBS } from "./render/swiftShaderPass.js";
+
+const $ = (id) => document.getElementById(id);
+const SEED = 20260715;                      // the same seed krbn.html draws, so this is the same creature
+const INKS = { paper: { bg: "#f4efe3", ink: "#22201c" }, blueprint: { bg: "#0d2033", ink: "#cfe4ff" },
+               noir: { bg: "#0b0b0c", ink: "#e8e8ea" } };
+const W = 640, H = 480;
+
+const blobs = makeBlobs(7, SEED);
+// ONCE. The camera moves, he does not -- krbn.html's own GIF path hoists the mesh for exactly this reason, and
+// its interactive build() re-meshes on every frame because there it is one frame per button press. Here a slider
+// drags, so re-meshing per draw would be the marching-cubes pass run at pointer rate for a result that cannot
+// change: nothing in the mesh depends on the spin, the ink, or any lyapunov knob.
+const MESH = blobMeshInput(blobs);
+let K = null, pass = null, showRaw = false, pinned = false, busy = false;
+
+// The framing krbn.html measures rather than guesses: the worst-case screen extent over a whole spin, taken
+// from the lumps themselves, so the creature never walks out of frame at some angle nobody checked.
+const frame = () => {
+  const lo = [0, 1, 2].map((k) => Math.min(...blobs.map((b) => [b.x, b.y, b.z][k] - b.r)));
+  const hi = [0, 1, 2].map((k) => Math.max(...blobs.map((b) => [b.x, b.y, b.z][k] + b.r)));
+  const c = [0, 1, 2].map((k) => (lo[k] + hi[k]) / 2);
+  let u = 0, v = 0;
+  for (let d = 0; d < 360; d += 15) {
+    const a = d * Math.PI / 180;
+    const eye = [c[0] + 5 * Math.sin(a), c[1] - 5 * Math.cos(a), c[2] + 2.2];
+    const fwd = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]];
+    const fl = Math.hypot(...fwd), F = fwd.map((x) => x / fl);
+    const r0 = [F[1], -F[0], 0], rl = Math.hypot(...r0), R = r0.map((x) => x / rl);
+    const U = [R[1] * F[2] - R[2] * F[1], R[2] * F[0] - R[0] * F[2], R[0] * F[1] - R[1] * F[0]];
+    for (const b of blobs) {
+      const rel = [b.x - c[0], b.y - c[1], b.z - c[2]];
+      u = Math.max(u, Math.abs(rel[0] * R[0] + rel[1] * R[1] + rel[2] * R[2]) + b.r);
+      v = Math.max(v, Math.abs(rel[0] * U[0] + rel[1] * U[1] + rel[2] * U[2]) + b.r);
+    }
+  }
+  return { c, scale: Math.max((u * 2 * 1.12) / W, (v * 2 * 1.12) / H) };
+};
+
+const cam = (deg) => {
+  const a = (deg * Math.PI) / 180, f = frame();
+  return { eye: [f.c[0] + 5 * Math.sin(a), f.c[1] - 5 * Math.cos(a), f.c[2] + 2.2],
+           target: f.c, up: [0, 0, 1], projection: "orthographic", scale: f.scale,
+           viewport: { width: W, height: H } };
+};
+
+/** Krbn -> pencil SVG, the same scene krbn.html builds. */
+function buildSvg(deg) {
+  const pal = INKS[$("ink").value] || INKS.paper;
+  const scene = new K.Scene({ svg: { background: pal.bg }, light: { direction: [-0.4, -0.5, -0.7] },
+                              style: { wobble: 0.45 } });
+  scene.add(new K.Mesh(MESH)).setImportance(1, { role: "subject" })
+    .style({ weight: 1.3, color: pal.ink, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
+  const mode = $("bones").value;
+  if (mode !== "off") for (const b of blobs)
+    scene.add(K.sphere([b.x, b.y, b.z], b.r)).setImportance(0.3, { role: "context" })
+      .style({ hidden: mode, color: pal.ink, wobble: 0.5, weight: 0.8 });
+  return { svg: scene.toSVG(cam(deg)), bg: pal.bg };
+}
+
+// SVG -> pixels. Krbn hands back a string and a string is not pixels; an Image with an object URL is the
+// browser's own SVG rasteriser, which is the bridge krbn.html's GIF path already uses.
+async function rasterise(svg, bg) {
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("the SVG did not decode")); img.src = url; });
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.drawImage(img, 0, 0, W, H);
+  } finally { URL.revokeObjectURL(url); }
+  return g.getImageData(0, 0, W, H).data;
+}
+
+/**
+ * Decode the raw two-channel lambda straight back off the canvas and report the median against ln 2.
+ *
+ * THE MEDIAN, NOT THE MEAN, AND NOT THE BEST ROW. Every row is a different seed, a few land on the unstable
+ * fixed points 0 and 0.75 where the orbit never explores the attractor, and one bad row would drag a mean
+ * while nothing would drag a maximum in the honest direction. The spread is printed too: a single number with
+ * no spread beside it is the shape this tree has spent the session removing.
+ */
+function readKey(knobs) {
+  const out = pass.readPixels();                       // image order, RGBA8
+  const lam = [];
+  for (let y = 0; y < H; y++) {
+    const i = (y * W + (W >> 1)) * 4;                  // any column will do -- pinned, they are all r = 4
+    lam.push((out[i] / 255 + out[i + 1] / 65025) * 4 - 3);
+  }
+  lam.sort((a, b) => a - b);
+  const med = lam[lam.length >> 1], LN2 = Math.LN2, err = Math.abs(med - LN2);
+  const p10 = lam[Math.floor(lam.length * 0.1)], p90 = lam[Math.floor(lam.length * 0.9)];
+  return `<span class="key">r PINNED AT 4 — median λ over ${lam.length} seeds = ${med.toFixed(6)}` +
+         `\nln 2 = ${LN2.toFixed(6)}   |err| = ${err.toExponential(2)}</span>` +
+         `\n<span class="dim">p10 ${p10.toFixed(4)} … p90 ${p90.toFixed(4)} — the spread is the 384-sample ` +
+         `budget, not disagreement about the answer. Nothing in the fragment carries ln 2; it gets r as a ` +
+         `coordinate and returns log|r(1−2x)| averaged.</span>` +
+         `\n<span class="dim">16-bit decode: λ = (R/255 + G/65025)·4 − 3, the encoding swiftShaderPass.js writes.</span>`;
+}
+
+async function draw() {
+  if (!K || busy) return;
+  busy = true;
+  const t0 = performance.now();
+  try {
+    const { svg, bg } = buildSvg(+$("deg").value);
+    const px = await rasterise(svg, bg);
+    // *** PINNED MEANS rLo === rHi === 4, WHICH IS THE ONLY WAY THIS PAGE CAN SHOW THE KEY AT ALL. ***
+    // Sliding r high to 4.000 does NOT put r = 4 on screen: gl_FragCoord samples pixel CENTRES, so the
+    // rightmost column is uv.x = 639.5/640 and r = 3.999531, not 4. Measured on this page before the button
+    // existed -- the last column decoded to lambda 0.683998, 9.1e-3 below ln 2, which is not error, it is
+    // lambda AT A DIFFERENT r on a curve that is steep there. tools/ship/swiftShaders-selfcheck.mjs sets
+    // rLo: 4, rHi: 4 for exactly this reason and the button does the same thing.
+    const knobs = { ...DEFAULT_KNOBS.lyapunov,
+      rLo: pinned ? 4 : +$("rlo").value, rHi: pinned ? 4 : +$("rhi").value,
+      intensity: +$("int").value, samples: +$("sam").value,
+      raw: (showRaw || pinned) ? 1 : 0 };
+    if (!pass) pass = makeSwiftShaderPass("lyapunov", W, H, { canvas: $("out") });
+    if (!pass) { $("stat").innerHTML = '<span class="warn">no WebGL2 context -- this page needs one and does not fake it.</span>'; return; }
+    pass.render(new Uint8Array(px.buffer, px.byteOffset, px.length), knobs);
+    const ms = (performance.now() - t0).toFixed(0);
+    const head = `${W}×${H} — ${knobs.samples} samples, ${knobs.warmup} warmup — ${ms} ms\n` +
+                 `r ∈ [${knobs.rLo.toFixed(6)}, ${knobs.rHi.toFixed(6)}]`;
+    $("stat").innerHTML = pinned ? head + "\n" + readKey(knobs) : head +
+      `\n<span class="dim">the rightmost column is NOT r = 4 — pixel centres put it at r = ` +
+      (knobs.rLo + (knobs.rHi - knobs.rLo) * ((W - 0.5) / W)).toFixed(6) +
+      `. Press the button below for the exact one.</span>` +
+      `\n<span class="dim">every ROW is a different seed x0; at r = 4 those orbits share no trajectory and report the same λ.</span>` +
+      (showRaw ? `\n<span class="warn">raw: λ encoded across two channels (16 bits). Red is the high byte.</span>` : "");
+  } catch (e) {
+    $("stat").innerHTML = '<span class="warn">' + String(e && e.message || e) + '</span>';
+  } finally { busy = false; }
+}
+
+for (const [id, out, fmt] of [["rlo", "vlo", (v) => (+v).toFixed(2)], ["rhi", "vhi", (v) => (+v).toFixed(3)],
+                              ["int", "vint", (v) => (+v).toFixed(2)], ["sam", "vsam", (v) => v],
+                              ["deg", "vdeg", (v) => v + "°"]]) {
+  $(id).addEventListener("input", () => {
+    $(out).textContent = fmt($(id).value);
+    if (id !== "deg") { pinned = false; $("key").textContent = "read ln 2 off your GPU"; }
+    draw();
+  });
+}
+for (const id of ["ink", "bones"]) $(id).addEventListener("change", draw);
+$("redraw").addEventListener("click", draw);
+$("raw").addEventListener("click", () => {
+  showRaw = !showRaw; pinned = false;
+  $("raw").textContent = showRaw ? "show Krbn again" : "show the raw λ field";
+  draw();
+});
+$("key").addEventListener("click", () => {
+  pinned = !pinned;
+  $("key").textContent = pinned ? "back to the r sweep" : "read ln 2 off your GPU";
+  draw();
+});
+
+(async () => {
+  try {
+    K = await import("/vendor/krbn/index.js");
+    await draw();
+  } catch (e) {
+    $("stat").innerHTML = '<span class="warn">Krbn did not load from /vendor/krbn/index.js -- ' +
+      String(e && e.message || e) + '. The shader is fine; there is nothing to draw it over.</span>';
+  }
+})();
+</script>
+</body>
+</html>

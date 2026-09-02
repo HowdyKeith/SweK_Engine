@@ -80,8 +80,6 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it *" },
     { gate: "tools/pageReach-selfcheck.mjs", ms: 129,
       fails: "!! NO PAGE IS BORN INVISIBLE NEW INVISIBLE PAGES: aquarelle.html, camera-effects.html, destructible.html, doom" },
-    { gate: "tools/roundhouse/deviceModes-selfcheck.mjs", ms: 207,
-      fails: "!! *** NOTHING IS PROBED ANY MORE -- every device that can declare, exports *** 127 exported, 1 with no defaul" },
     { gate: "tools/roundhouse/swekWebviewApk-selfcheck.mjs", ms: 914,
       fails: "...and a failed load offers the prompt, since that is when the address is usually wrong" },
     { gate: "tools/ship/avatarServerViews-selfcheck.mjs", ms: 6352,
@@ -102,8 +100,6 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
     { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
       fails: "!! it is the only homography in the tree" },
-    { gate: "tools/ship/launchIndex-selfcheck.mjs", ms: 82,
-      fails: "!! launch-index.json exists and agrees with what the builder computes right now 507 entries shipped against 52" },
     { gate: "tools/ship/mutationTable-selfcheck.mjs", ms: 58,
       fails: "!! EVERY MUTATION'S FIND-STRING IS STILL PRESENT STALE, MUTATES NOTHING, WOULD REPORT A PHANTOM SURVIVOR: the" },
     { gate: "tools/ship/orrery-selfcheck.mjs", ms: 4705,
@@ -138,8 +134,6 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "the page renders title, why and how for each" },
     { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
       fails: "!! *** only 4 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebu" },
-    { gate: "tools/ship/shipRitual-selfcheck.mjs", ms: 359,
-      fails: "!! every self-checking step passes against this tree right now launch-index: 507 launchables, 424 pages agains" },
     { gate: "tools/ship/statedRuntime-selfcheck.mjs", ms: 129,
       fails: "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/assumptions-selfch" },
     { gate: "tools/ship/sunshineHost-selfcheck.mjs", ms: 101,
@@ -188,6 +182,48 @@ export const FIXED_AT_V4279 = Object.freeze([
       why: "it walks the filesystem and found two git-ignored agent worktrees under .claude/ that exist on " +
            "this box and in no commit. It looked session-caused only because the v4266 comparison was a " +
            "clean checkout. Fixed at the cause: the walk skips .claude." },
+]);
+
+/**
+ * *** THE LIST SHRANK FOR THE FIRST TIME, AND THE CENSUS'S OWN ARITHMETIC COULD NOT EXPRESS IT. ***
+ *
+ * redCensus-selfcheck section 2 says, in its own words: "a gate turning green is GOOD NEWS that must be
+ * recorded by hand... The list may only shrink, and only on purpose." *** THAT PATH HAD NEVER BEEN WALKED. ***
+ * RECHECK at v4295 measured nowGreen: 0, so in sixteen rounds nothing had ever left, and the identity the
+ * gate asserts -- confirmedSerially + recoveredFromTimeoutBucket - FIXED_AT_V4279 === RED_AT_V4279.length --
+ * was written when the right-hand side could only stay still. Delete one line for a gate somebody FIXED and
+ * that identity goes red. *** SO THE CENSUS'S ARITHMETIC PUNISHED THE PRUNING THE CENSUS DEMANDS *** -- the
+ * same shape as the Arriving cap that made hiding a page cheaper than linking it (server.html, v4155), and as
+ * corroborateFully's "two rejections" that went red when a defect was repaired. A ledger needs a column for
+ * good news or it will only ever record bad.
+ *
+ * The fix is a term, not a looser check: FIXED_SINCE_V4279 is subtracted alongside FIXED_AT_V4279, so the
+ * reconciliation still has to balance and pruning is now the way to balance it.
+ *
+ * *** AND ONE OF THE THREE WAS GREEN BEFORE THIS ROUND TOUCHED ANYTHING, WHICH IS THE INTERESTING ONE. ***
+ * deviceModes was fixed by commit 9695918, whose own diff says so in the file: it removed "nuclear" from
+ * UNGUARDED_BASELINE because nuclear was THE LAST PROBED DEVICE and now derives its modes from one
+ * NUCLEAR_MODES const. That commit fixed the gate and did not prune the census, so the census kept accusing
+ * it -- which is precisely the failure the header of this file describes ("thirteen of the nineteen it listed
+ * are now GREEN: somebody fixed them and nobody removed the entry"). *** THE MECHANISM WRITTEN TO STOP THAT
+ * HAD ALREADY LET IT HAPPEN ONCE MORE, and it took until now to notice because nothing re-ran the list.
+ */
+export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/roundhouse/deviceModes-selfcheck.mjs", round: "9695918 (before this round)",
+      why: "nuclear declared no modes at all, so modesOf() fell back to the candidate list and its echoing " +
+           "defaults() accepted all 29 -- the last device the census could only PROBE, which is what made " +
+           "'nothing is probed any more' false. It now reads a single NUCLEAR_MODES const from both `modes:` " +
+           "and defaults(). Census 127 exported / 1 probed; today 128 exported / 0 probed / 1 with no " +
+           "defaults() to declare from (lbm). NOT fixed by this round -- found by it." },
+    { gate: "tools/ship/launchIndex-selfcheck.mjs", round: "v4313",
+      why: "the SHIPPED launch-index.json was sixteen entries stale -- 507 against the 523 the builder " +
+           "computes -- missing fifteen pages plus this round's own. Fixed by running the builder that " +
+           "writes it (node tools/ship/launchIndex.mjs --write), not by moving a number." },
+    { gate: "tools/ship/shipRitual-selfcheck.mjs", round: "v4313",
+      why: "THE SAME STALE ARTEFACT, SECOND READER. Its failing line quoted the same 507 launchables and 424 " +
+           "pages, because shipRitual reads launch-index.json too. One stale generated file was carried as " +
+           "two independent red gates in the census, which is worth knowing about a census: entries are not " +
+           "independent, and a count of red gates over-counts the number of causes." },
 ]);
 
 /**
@@ -415,11 +451,17 @@ export const RECHECK = Object.freeze({
 /**
  * *** THE TWO NUMBERS DESCRIBE TWO MOMENTS, AND NOTHING SAID SO. ***
  *
- * METHOD.confirmedSerially is 39. RED_AT_V4279 holds 37. A reader comparing them finds a contradiction, and
+ * METHOD.confirmedSerially is 39. RED_AT_V4279 held 37. A reader comparing them finds a contradiction, and
  * there is none: 39 is what the sweep FOUND, 37 is what remained after v4279 fixed the two it had itself
  * introduced (gateQuality and orreryEjecta, both absent from the standing list, correctly).
  *
  *     37 standing + 2 introduced-and-fixed = 39 confirmed
+ *
+ * *** AND THERE IS NOW A THIRD INSTANT, WHICH IS WHY standingToday IS DERIVED AND NOT TYPED. *** v4313 pruned
+ * three gates that had been fixed, so the list holds 34. Writing "34" beside "37" here would have made this
+ * block the very thing it was written to warn about -- two snapshots in one object with nothing saying which
+ * is when -- so the live count comes from RED_AT_V4279 itself and can never go stale, while the two frozen
+ * numbers keep saying what they always said about v4279.
  *
  * Same shape as v4293's ROUND_TRIPS, which described two different draw spans in one frozen object. A record
  * whose fields are snapshots of different instants has to say which instant, or its own reader will treat the
@@ -429,6 +471,25 @@ export const MOMENTS = Object.freeze({
     confirmedBySweep: 39, standingAfterFixes: 37, introducedAndFixedInRound: 2,
     reconciles: "37 + 2 = 39",
     fixedInRound: Object.freeze(["tools/ship/gateQuality-selfcheck.mjs", "tools/ship/orreryEjecta-selfcheck.mjs"]),
+    // DERIVED. The moment this file's own doc-comment says a typed copy would misrepresent.
+    get standingToday() { return RED_AT_V4279.length; },
+    fixedSince: "see FIXED_SINCE_V4279 -- 37 standing at v4279 minus what has been fixed since",
+});
+
+/**
+ * The first re-check after the list actually MOVED. v4295 found 37 of 37 still red and called it "exactly true
+ * and exactly stalled"; that was accurate then and it stopped being accurate three commits later, without
+ * anything noticing, because a stalled list gives nobody a reason to re-run it.
+ */
+export const RECHECK_V4313 = Object.freeze({
+    at: "v4313", method: "the gate's own section-2 re-run, serial, via runGate",
+    checked: 37, stillRed: 34, nowGreen: 3, regressed: 0,
+    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.map((e) => e.gate)),
+    causes: "one stale generated file (launch-index.json, 507 against 523) accounted for TWO of the three; the " +
+            "third had been green since commit 9695918 and nobody pruned the entry",
+    lesson: "a census entry is not a cause. Two of these three were one artefact read by two gates, so the red " +
+            "COUNT overstated the number of things wrong -- in the file whose whole subject is that every " +
+            "number in circulation about redness was somebody's memory",
 });
 
 /**
