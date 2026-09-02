@@ -60,8 +60,13 @@ console.log("\n2. *** THE ONE THAT IS NOT HERE, AND THE ABSENCE IS ASSERTED ***"
     // dead button gets added later by someone reading only the request.
     ok("*** there is NO GitHub Universe button, because there is nothing for it to open ***",
         !/id="bUniverse"|GitHub Universe<|Github Universe</i.test(SERVER));
-    ok("  and no GitHub-universe page exists to link to",
-        !fs.readdirSync(ROOT).some((f) => /universe/i.test(f) && f.endsWith(".html")),
+    // v4303: this matched ANY *universe*.html, and v4300's universe-gpu.html -- the SweK/Endless Sky universe
+    // drawn on the GPU, nothing to do with GitHub -- turned it red for three rounds. A GitHub-universe page
+    // would be named for GitHub; that is what is asserted absent, and the other universe page is named as
+    // what it is rather than counted.
+    ok("  and no GITHUB-universe page exists to link to (universe-gpu.html is the Endless Sky universe, not GitHub's)",
+        !fs.readdirSync(ROOT).some((f) => /github.?universe/i.test(f) && f.endsWith(".html")) &&
+        /SweK Universe/.test(fs.readFileSync(path.join(ROOT, "universe-gpu.html"), "utf8")),
         fs.readdirSync(ROOT).filter((f) => /universe/i.test(f)).join(" ") || "(no universe files at all)");
     // The shape is asserted from the FILE, and the first draft of this line asserted one I had not looked at:
     // it required govts to be an array and govts is an object. Being wrong about the evidence for a correct

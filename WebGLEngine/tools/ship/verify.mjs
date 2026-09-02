@@ -430,5 +430,30 @@ if (process.argv.indexOf("--skip-qa") < 0) {
   } catch (e) { check("qa suite ran", false, e.message); }
 } else { check("qa suite (SKIPPED via --skip-qa)", true, "skipped"); }
 
+// v4303 -- *** THE QUICK SWEEP: THE CHEAP TREE RUNS AT SHIP TIME, AND A NEW RED FAILS THE SHIP. *** (#134.)
+// This file named ONE selfcheck explicitly and ran the physics suites; the 1,300-gate tree was swept by hand,
+// and the v4297 sweep found six gates that had gone red under eighteen rounds of ALL GREEN -- five of them
+// costing under a second. tools/ship/quickSweep.mjs runs every gate under a time budget (from
+// tools/ship/sweep-timings.json, rewritten each run), re-runs reds alone, and reconciles against the red
+// register: a KNOWN red is reported, a NEW red fails here. Skip with SWEK_QUICKSWEEP=0 while iterating;
+// never skip it to ship. The budget is `--sweep-budget <ms>` (default 3000; measured at v4303).
+if (process.env.SWEK_QUICKSWEEP !== "0") {
+  try {
+    // "./quickSweep.mjs", not "./tools/ship/...": import() resolves against THIS file, not the cwd verify runs
+    // from. The first draft had the cwd-shaped path; moduleHistory-selfcheck's missing-import scan named
+    // tools/ship/tools/ship/quickSweep.mjs before verify ever ran it.
+    const { runQuickSweep } = await import("./quickSweep.mjs");
+    const budgetMs = Number(arg("--sweep-budget") || 3000);
+    const r = await runQuickSweep({ budgetMs, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
+      `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
+    for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);
+    for (const d of r.dropped) console.log(`[verify]   over budget now  ${d}`);
+    check("quick sweep: no gate outside the red register is red", r.newRed.length === 0,
+      r.newRed.length ? "NEW RED: " + r.newRed.map((n) => n.gate + " exit " + n.code).join(", ") + " -- fix it or register it in redCensus.mjs with a reason" : `${r.ran} gates, ${r.knownRed.length} known reds on record`);
+    check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
+  } catch (e) { check("quick sweep ran", false, "COULD NOT RUN: " + String(e && e.message).slice(0, 120)); }
+}
+
 console.log(`\n[verify] ${fails === 0 ? "ALL GREEN — safe to present_files" : fails + " FAILURE(S) — DO NOT SHIP"}`);
 process.exit(fails === 0 ? 0 : 1);

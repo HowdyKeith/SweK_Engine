@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 439,
+ "count": 443,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1334,6 +1334,13 @@
    "p": 0
   },
   {
+   "f": "gpu-rig-check.html",
+   "t": "SweK GPU rig check",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "gradient-join.html",
    "t": "Two gradients, one exact key (v3638)",
    "d": "Least-squares and Green-Gauss are both called the gradient. On a linear field the answer is known exactly with nothing to converge - least-squares is exact at every skew, Green-Gauss is not, and a convergence study on a smooth field cannot tell them apart at all.",
@@ -1964,6 +1971,13 @@
    "p": 0
   },
   {
+   "f": "orrery-gpu.html",
+   "t": "SweK Orrery -- on the GPU",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "orrery.html",
    "t": "SweK Orrery &mdash; the tree as a system",
    "d": "",
@@ -2552,6 +2566,13 @@
    "p": 0
   },
   {
+   "f": "song-globe.html",
+   "t": "🌍 Song Globe — SweK Engine",
+   "d": "An audio file wrapped onto a globe: time goes round it, frequency runs pole to pole, loudness is height, silence is sea. A pure tone is a ring; a rising sweep is a spiral.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "spacedesk.html",
    "t": "spacedesk auto-launch",
    "d": "",
@@ -2820,6 +2841,13 @@
   {
    "f": "universal-viewer.html",
    "t": "Universal Viewer — SweK Engine Demos",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "universe-gpu.html",
+   "t": "SweK Universe -- on the GPU",
    "d": "",
    "g": "",
    "p": 0

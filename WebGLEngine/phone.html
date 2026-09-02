@@ -41,6 +41,12 @@
   nav button.active { background:#173656; color:#cfe6ff; border-color:#2f628f; }
   main { padding:2px 14px 60px; max-width:600px; margin:0 auto; }   /* v740 — was 10px top, gap too big between pill + content */
   .tab { display:none; } .tab.active { display:block; }
+  /* v4303 -- the Home launcher's tiles, and the dock's room: header and nav stick BELOW the avatar dock. */
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .tile { background:#161b24; color:var(--ink); border:1px solid var(--edge); border-radius:12px; padding:16px 10px;
+          min-height:64px; font-size:15px; font-weight:700; text-align:center; }
+  .tile.resume { grid-column:1 / -1; background:#173656; border-color:#2f628f; color:#cfe6ff; }
+  header { top:var(--swekDockH, 0px); } nav { top:calc(54px + var(--swekDockH, 0px)); }
   section { background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:12px; margin-bottom:12px; }
   .label { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); margin:0 0 9px; font-weight:700; }
   /* v708 — universal tighten on the gap between the orange tab pill and
@@ -456,12 +462,17 @@
 <div class="appbar">
   <button class="appcaption" id="appCaption" aria-haspopup="true" aria-expanded="false">
     <span class="conn-dot" id="dot" title="connecting…"></span>
-    <span class="conn-label" id="appCaptionLabel">🎤 KPop Listener</span>
+    <span class="conn-label" id="appCaptionLabel">🏠 Home</span>
     <span class="chev">▾</span>
   </button>
 </div>
 <div class="appmenu" id="tabs">
-  <button data-tab="listener" class="active">🎤 KPop Listener</button>
+  <!-- v4303 -- *** THE FRONT DOOR. *** Keith (#87): "the real phone entry point should be a similar view as of
+       server.html ... phone.html is kind of a placement spot for misc panels." Home is a launcher of tiles built
+       from THESE buttons and the Tools list at runtime -- never a second list to drift -- and it is where the
+       page lands. The saved tab is offered as a Resume tile instead of being jumped to. -->
+  <button data-tab="home" class="active">🏠 Home</button>
+  <button data-tab="listener">🎤 KPop Listener</button>
   <button data-tab="control">🎛 Control</button>
   <button data-tab="pcsettings">⚙ PC Settings</button>
   <button data-tab="move">🕹 Move</button>
@@ -522,8 +533,20 @@
            (same set as the bottom-left llama on portrait). -->
       <div id="wanderer" class="wanderer" aria-hidden="true" style="display:none;">🦙</div>
     </div>
-  <!-- LISTENER (default) -->
-  <div class="tab active" id="tab-listener">
+  <!-- v4303 -- HOME: the launcher. Tiles are derived from #tabs and #phoneTools by the script at the end of
+       the page, so a panel added to the menu appears here without anyone remembering to add it twice. -->
+  <div class="tab active" id="tab-home">
+    <section>
+      <div class="label">SweK Engine on this phone</div>
+      <div class="tiles" id="homeTiles"></div>
+    </section>
+    <section>
+      <div class="label">Pages</div>
+      <div class="tiles" id="homePages"></div>
+    </section>
+  </div>
+  <!-- LISTENER -->
+  <div class="tab" id="tab-listener">
     <!-- v883 — heartbeat strip REPLACED by the status ticker. Scrolls the
          global engine debug stream (incl. Shield/AndroidTV returns) plus the
          occasional "Keith needs a job" line. The heartbeat will return in
@@ -1855,13 +1878,32 @@
       try { localStorage.setItem("voxelengine.phoneTab", b.dataset.tab); } catch(e) {}
     });
   });
-  // v639 — restore the saved tab on load (defaults to listener if none).
+  // v639 restored the saved tab on load. v4303: the page LANDS ON HOME (#87 -- a front door is what you land
+  // on), and the saved tab becomes the first tile, "Resume", so the v639 promise -- the user picked it, the
+  // user gets back to it in one tap -- still holds. ?tab=<name> still deep-links a panel directly.
   try {
     var savedTab = localStorage.getItem("voxelengine.phoneTab");
-    if (savedTab) {
-      var savedBtn = document.querySelector('#tabs button[data-tab="' + savedTab + '"]');
-      if (savedBtn) savedBtn.click();
+    var homeTiles = document.getElementById("homeTiles"), homePages = document.getElementById("homePages");
+    var openTool = function (url) { var w = null; try { w = window.open(url, "_blank"); } catch(_) {} if (!w) location.href = url; };
+    var tile = function (host, text, title, onClick) {
+      var t = document.createElement("button"); t.className = "tile"; t.textContent = text; if (title) t.title = title;
+      t.addEventListener("click", onClick); host.appendChild(t); return t;
+    };
+    if (homeTiles) {
+      if (savedTab && savedTab !== "home") {
+        var sb = document.querySelector('#tabs button[data-tab="' + savedTab + '"]');
+        if (sb) { var r = tile(homeTiles, "↩ Resume " + sb.textContent.trim(), "the panel you were on last time", function(){ sb.click(); }); r.classList.add("resume"); }
+      }
+      document.querySelectorAll("#tabs button[data-tab]").forEach(function(b){
+        if (b.dataset.tab === "home") return;
+        tile(homeTiles, b.textContent.trim(), b.title || "", function(){ b.click(); }).dataset.go = b.dataset.tab;
+      });
     }
+    if (homePages) document.querySelectorAll("#phoneTools [data-tool]").forEach(function(b){
+      tile(homePages, b.textContent.trim(), b.getAttribute("data-tool"), function(){ openTool(b.getAttribute("data-tool")); }).dataset.tool = b.getAttribute("data-tool");
+    });
+    var wantTab = new URLSearchParams(location.search).get("tab");
+    if (wantTab) { var wb2 = document.querySelector('#tabs button[data-tab="' + wantTab + '"]'); if (wb2) wb2.click(); }
   } catch(e) {}
   // Listener panel "watch the live avatar" → jump to Watch tab + start the cast
   var lsWatch=document.getElementById("lsWatch");
@@ -5716,6 +5758,20 @@ document.addEventListener("pointerdown", (e) => {
 // not go hunting for a bug here.
 window.swekHaptics = haptics;
 console.log("[haptics] " + haptics.supported().reason);
+</script>
+<!-- v4303 -- *** THE AVATAR DOCK AT THE TOP OF EVERY PHONE PAGE. *** (#87.) ui/pageGauges.js is the dock the
+     other 62 non-render pages already mount with this one line; phone.html, view.html and avatarpreview.html
+     were the phone-facing pages that did not. The body is padded by the dock's measured height, and the
+     sticky header and nav are pushed down by the same amount, so the dock covers nothing. -->
+<script type="module">
+try {
+  const { mountPageGauges } = await import("/ui/pageGauges.js"); mountPageGauges();
+  const dock = document.getElementById("swekPageGauges");
+  if (dock) {
+    const room = () => { const h = dock.offsetHeight + 16; document.body.style.paddingTop = h + "px"; document.documentElement.style.setProperty("--swekDockH", h + "px"); };
+    room(); try { new ResizeObserver(room).observe(dock); } catch {}
+  }
+} catch (e) { console.warn("[phone] dock:", e && e.message); }
 </script>
 </body>
 </html>

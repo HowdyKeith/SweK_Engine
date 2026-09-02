@@ -271,9 +271,12 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // method's output and not a retyped summary of it. Every line below is arithmetic over the frozen record,
     // so a hand-edit that changes one figure and not its parts fails here by name.
     const S = GS.SWEEP_V4297;
-    ok(S.swept === GS.enumerateGates().length - 1,
-       "the swept population is the tree's own count, minus this gate, which did not exist when it ran",
-       `${S.swept} swept; ${GS.enumerateGates().length} in the tree now`);
+    // v4303: this compared `swept` with the LIVE tree, which was right for one round and red for the next five
+    // (v4298 added a gate). The record now carries the tree size it was taken against; the live tree may only
+    // have grown since.
+    ok(S.swept === S.enumeratedAt - 1 && GS.enumerateGates().length >= S.enumeratedAt,
+       "the swept population is the tree's size AT THE SWEEP minus this gate, and the tree has only grown since",
+       `${S.swept} swept of ${S.enumeratedAt} then; ${GS.enumerateGates().length} in the tree now`);
     ok(S.green + S.confirmedRed + S.unmeasuredCount === S.swept,
        "*** green + red + unmeasured = swept, with NO fourth bucket ***",
        `${S.green} + ${S.confirmedRed} + ${S.unmeasuredCount} = ${S.swept}`);

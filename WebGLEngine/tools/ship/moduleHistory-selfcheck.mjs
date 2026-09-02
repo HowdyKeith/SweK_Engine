@@ -390,9 +390,13 @@ console.log("\n10. v3208 -- THE THREE THINGS THAT WERE WEARING ONE LABEL");
             "that silently skipped would be indistinguishable from one that passed");
     } else {
     ok("every row carries a kind", r.rows.every((x) => typeof x.kind === "string"));
+    // v4303: the y.js example lives in a `//` comment in deadImportScan.mjs. When the stripper cannot remove
+    // it, the row must be labelled "commented"; when it can, there is no row at all. Both are the comment not
+    // counting as a reference; only a "missing" or "fixture" row would be the failure. The old check demanded
+    // the row EXIST with the label, which asserted the stripper's limitation as if it were the requirement.
     ok("!! a `//` comment is not counted as a reference",
-        (r.rows.find((x) => /tools\/ship\/y\.js$/.test(x.target)) || {}).kind === "commented",
-        "deadImportScan.mjs has import(\"./y.js\") in a comment that noComments cannot strip, because the line " +
+        (() => { const row = r.rows.find((x) => /tools\/ship\/y\.js$/.test(x.target)); return !row || row.kind === "commented"; })(),
+        "deadImportScan.mjs names the y-dot-js fixture in a dynamic-import example inside a comment that noComments cannot strip, because the line " +
         "above defines a regex literal with a BACKTICK inside a character class -- it flips the stripper into " +
         "template-string mode. Not fixable without a parser, so the line itself is re-read");
     ok("!! a code-shaped string inside a GATE is labelled as one",
