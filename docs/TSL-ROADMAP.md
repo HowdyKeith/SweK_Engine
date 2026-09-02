@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -36,8 +36,11 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    fragment, types the device carries. The emitted pair is written to tools/ship/tsl-emitted.json and the
    WGSL corpus compiles it as generated code. v4322: transplantIntoShell() carries a fragment into a host's own vertex shell (the fleets' lit
    layout: local, n, color), so a graph reading uv, the normal and the vertex colour crosses over; three's
-   camera in the graph still refuses. Not yet: linear-filtered sampling on the device path; the speed of the
-   generated code is what tsl-rig.html measures on a rig.
+   camera in the graph still refuses. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
+   both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
+   graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).
+   The speed of the generated code is what tsl-rig.html measures on a rig.
 
 ## The count that says when step 4 matters
 

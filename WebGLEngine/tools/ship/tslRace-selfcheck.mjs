@@ -13,6 +13,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import http from "node:http";
+import { createRequire } from "node:module";
+import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell } from "../../render/tslSource.mjs";
 import { lyapunovLookShell } from "../../render/physicsTsl.mjs";
@@ -86,12 +89,38 @@ else {
     }
 }
 
+console.log("\n3. THE PAGE (v4323): orrery-gpu.html?tsl=1 swaps the Chaos fleet's pipeline for the generated one, says so, and still names a Chaos ship");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const pw = resolvePlaywright(createRequire(import.meta.url));
+    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
+    const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]); const f = path.join(ENG, u === "/" ? "orrery-gpu.html" : u);
+        if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
+        s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    // the page PRESENTS to a canvas, which loses a WebGPU device on this headless shell (measured at v4319 and again here), so the page
+    // is loaded on the WebGL2 route as every other page gate loads its page: three's WebGL backend emits GLSL, and the swap is graded there
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+    await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
+    const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));
+    const chaosPixels = await pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, RACES.findIndex((x) => x.name === "Chaos"));
+    await br.close(); srv.close();
+    ok("*** the page says the Chaos look is GENERATED (a TSL graph, three's language for the backend it is on) and records that the fleet's pipeline IS the generated descriptor ***", !!(st.tsl && st.tsl.language) && st.tsl.applied === true && /GENERATED/.test(st.route), st.route);
+    ok("  the language emitted is the device's backend's (WGSL on WebGPU, GLSL on WebGL2)", st.tsl && ((/webgpu/.test(st.route) && st.tsl.language === "wgsl") || (/webgl2/.test(st.route) && st.tsl.language === "glsl")), st.tsl && st.tsl.language);
+    ok("  the page threw nothing", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+    ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4322.
 //   A  varyingSemantics() swapping normal and color -> exit=1, 4 red: the fixture's semantics line, both transplant lines, and on
 //      the device the GLSL refuses to compile (a vec4 assigned to a vec3) -- a wrong map is a type error before it is a wrong picture.
 //   B  the TSL look's shade fixed at 1 (the light dropped) -> exit=1, 3 red: three's vertex stage carries TWO varyings now (uv,
 //      color -- the normal is dead and three drops it), and on both backends 36,175 of 36,864 pixels agree: every lit hull pixel
 //      differs from the hand-written race, the background and the other races do not.
+//   MEASURED at v4323 (the page):
+//   C  the page building the generated descriptor but NOT swapping it in (the fleet keeps the hand-written look while the HUD says
+//      GENERATED) -> exit=1, 1 red: window.__universe.tslLook.applied is false, and the gate refuses the HUD's word without it.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the page (orrery-gpu.html draws the hand-written Chaos look; swapping in the generated one needs three loaded on the page, 3 MB, " +
     "which no page does yet); the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +

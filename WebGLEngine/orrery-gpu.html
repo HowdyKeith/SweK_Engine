@@ -112,6 +112,7 @@ say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compu
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
 const params = new URLSearchParams(location.search);
 const history = params.get("history") !== "0", peerId = params.get("peer"), JOURNAL_KEY = "swek.orrery.journal";
+let tslLook = null;   // v4323: set when ?tsl=1 swapped the Chaos look for a generated one (see below)
 // v4317 (Level 17) -- RACES THAT ACT: every owner's race brings its own economy (world/racePolicies.mjs); and YOU: a
 // manual crew member the sim never routes, flown from the keys, trading by interventions (world/playerShip.mjs).
 const crewNames = [...gitTraders().map((t) => t.name || t.id), ...system.bodies.map((b) => "hauler of " + b.name)];
@@ -144,7 +145,7 @@ document.getElementById("live").onclick = async () => { const owner = params.get
         el.textContent = `live: ${feed.records.length} day-records from ${feed.asked.length - feed.failed.length} of ${feed.asked.length} repositories, ${r.applied.length} booked${feed.failed.length ? "; failed: " + feed.failed.slice(0, 3).map((f) => f.repo.split("/").pop() + " (" + f.why + ")").join(", ") : ""}`; }
     catch (e) { el.textContent = "live commits: " + e.message; } };
 if (restored) document.getElementById("persist").textContent = restored.error ? "restore failed: " + restored.error : `restored: replayed ${restored.tick} ticks, replay ${restored.matches ? "MATCHES" : "DOES NOT MATCH"} the saved hash ${restored.saved}`;
-window.__universe = { economy, get tick() { return economy.tick; }, hash: () => economy.hash(), log: () => economy.log(), restored, peer: peerId, history, get inStep() { return peer ? (peer.desync() ? false : true) : null; }, get desync() { return peer ? peer.desync() : null; } };
+window.__universe = { economy, get tslLook() { return tslLook; }, get tick() { return economy.tick; }, hash: () => economy.hash(), log: () => economy.log(), restored, peer: peerId, history, get inStep() { return peer ? (peer.desync() ? false : true) : null; }, get desync() { return peer ? peer.desync() : null; } };
 // v4317 -- THE SCRUBBER: a replay is a function of tick, so the slider replays the journal on a scratch economy to any
 // tick and the sky shows THAT day; the live sim pauses while scrubbed and resumes at the right end
 const scrub = { at: null, ghost: null };
@@ -159,8 +160,27 @@ const lifeSource = { count: economy.ships.length, cpu: () => (scrub.ghost || eco
 let userHull = null;
 try { const src = userModelSources(localStorage).find((x) => x.loadable); if (src) { userHull = await loadUserModel(src); say(`the ${src.kind} model for ${src.cls} (${src.url}) is the raised hull`); } } catch (e) { console.warn("user model:", e.message); }
 const std = standardFleets(device, { userHull });
+// v4323 -- ?tsl=1: the Chaos race painted by a TSL node ON THE PAGE. three (vendor/three-webgpu, 3 MB, loaded only then) runs on
+// the same backend as the device, emits the Lyapunov look from the TSL graph in that backend's language, and
+// render/tslSource.mjs transplants the fragment into the fleet's own shell; the fleet's pipeline is swapped before the scene
+// is built. tslRace-selfcheck holds the generated race to the hand-written one to the byte; this is the same swap, live.
+if (params.get("tsl") === "1") {
+    try {
+        const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/physicsTsl.mjs"), import("./render/tslSource.mjs")]);
+        const off = document.createElement("canvas"); off.width = 64; off.height = 64;
+        const renderer = new THREE.WebGPURenderer({ canvas: off, forceWebGL: device.backend === "webgl2", antialias: false }); await renderer.init();
+        const look = P.makeLyapunovLookTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+        const em = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] });
+        const CH = RACES.findIndex((r) => r.name === "Chaos");
+        const desc = S.transplantIntoShell({ [em.language]: em }, P.lyapunovLookShell(std.fleets[CH].pipeline.buffers));
+        std.fleets[CH] = { ...std.fleets[CH], pipeline: desc };
+        tslLook = { language: em.language, revision: THREE.REVISION, applied: std.fleets[CH].pipeline === desc, shaders: Object.keys(desc.shaders) };
+        say(`${device.backend} &middot; the Chaos race's look is GENERATED: a TSL graph, three ${THREE.REVISION} emitted its ${em.language.toUpperCase()}, transplanted into the fleet's shell`);
+    } catch (e) { say("TSL look failed, the hand-written Chaos look stands: " + e.message, true); console.warn("tsl look:", e); }
+}
 const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull
 const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource, headings: { cpu: () => (scrub.ghost || economy).headings() } });
+window.__lifeScene = lifeScene;   // v4323: the gate counts a race's pixels off the identity picture
 // v4318 -- the twin universe (?twin=1): seed 8, the same crew, stepped beside this one (alone only: the wire carries one universe)
 const twin = params.get("twin") === "1" && !peer;
 const economyB = twin ? makeGitEconomy(system, { seed: 8, history, traders: crewList }) : null;

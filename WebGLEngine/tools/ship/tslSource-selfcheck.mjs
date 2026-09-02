@@ -107,6 +107,55 @@ else {
     }
 }
 
+console.log("\n3. LINEAR SAMPLING (v4323): three's sampler becomes the device's, and the picture is the hand-written linear pass's, to the byte");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 64, TIME: 1.5 }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const B = await import("/render/badTvTsl.mjs"); const S = await import("/render/tslSource.mjs"); const D = await import("/render/badTvDevicePass.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const N = a.N, src = new Uint8Array(N * N * 4); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = (y * N + x) * 4; src[i] = Math.round(x * 255 / (N - 1)); src[i + 1] = Math.round(y * 255 / (N - 1)); src[i + 2] = (x ^ y) & 1 ? 200 : 30; src[i + 3] = 255; }
+        const emitted = {}, three = {};
+        for (const mode of ["webgpu", "webgl2"]) {
+            const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;
+            const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+            const tex = B.sourceTexture(THREE, { pixels: src, width: N, height: N }); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+            const fx = B.makeBadTvTsl(THREE, T, { texture: tex }); fx.setKnobs({ time: a.TIME });
+            const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); renderer.setRenderTarget(rt);
+            emitted[mode] = await S.emitShaders(renderer, { scene: fx.scene, camera: fx.camera, mesh: fx.scene.children[0] });
+            for (let i = 0; i < 2; i++) await renderer.renderAsync(fx.scene, fx.camera); const raw = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N);
+            const isGL = !renderer.backend.isWebGPUBackend; const px = new Uint8Array(N * N * 4); for (let y = 0; y < N; y++) px.set(raw.subarray((isGL ? (N - 1 - y) : y) * N * 4, ((isGL ? (N - 1 - y) : y) + 1) * N * 4), y * N * 4); three[mode] = px;
+        }
+        const out = { samplerInWgsl: emitted.webgpu.fragment.includes("textureSample(") && emitted.webgpu.fragment.includes("_sampler") };
+        let desc; try { desc = S.devicePipelineFromTsl({ wgsl: emitted.webgpu.fragment, glsl: emitted.webgl2.fragment }); } catch (e) { out.error = String(e && e.message || e).slice(0, 300); return out; }
+        out.usesSampler = desc.transplant.wgsl.usesSampler; out.declaresSamp = desc.shaders.wgsl.includes("@binding(1) var samp: sampler");
+        const knobs = D.packKnobs({ time: a.TIME }); out.run = {};
+        for (const backend of ["webgpu", "webgl2"]) {
+            const o = {};
+            try {
+                const cv = document.createElement("canvas"); cv.width = N; cv.height = N; const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+                const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+                const tex = dev.texture({ width: N, height: N, data: src, nearest: false });
+                const draw = (pd, bind) => dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); pass.use(dev.pipeline(pd)); bind(pass); pass.draw(3); }, { read: true, depth: false });
+                const hand = (await draw(D.badTvPipelineDesc(), (pass) => { for (let i = 0; i < D.KNOB_ORDER.length; i++) pass.uniform(D.KNOB_ORDER[i], knobs[i]); pass.texture("tDiffuse", tex, 0); })).pixels;
+                const gen = (await draw(desc, (pass) => { for (const u of desc.uniforms) pass.uniform(u.name, knobs[D.KNOB_ORDER.indexOf(u.name)]); pass.texture("tDiffuse", tex, 0); })).pixels;
+                let same = 0, worst = 0, sameThree = 0, worstThree = 0, blended = 0; const tp = three[backend];
+                for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = (y * N + x) * 4, j = ((N - 1 - y) * N + x) * 4; let d = 0, d3 = 0; for (let c = 0; c < 3; c++) { d = Math.max(d, Math.abs(hand[i + c] - gen[i + c])); d3 = Math.max(d3, Math.abs(tp[j + c] - gen[i + c])); } if (d === 0) same++; worst = Math.max(worst, d); if (d3 === 0) sameThree++; worstThree = Math.max(worstThree, d3); if (gen[i + 2] > 40 && gen[i + 2] < 190) blended++; }
+                o.same = same; o.worst = worst; o.sameThree = sameThree; o.worstThree = worstThree; o.blended = blended; o.total = N * N; o.errs = errs; o.backend = dev.backend;
+            } catch (e) { o.error = String(e && e.message || e).slice(0, 300); }
+            out.run[backend] = o;
+        }
+        return out;
+    }` });
+    ok("the harness ran and the linear graph transplanted", r.ok && r.result && !r.result.error && r.result.run && !r.result.run.webgpu.error && !r.result.run.webgl2.error, r.ok ? (r.result.error || JSON.stringify([r.result.run && r.result.run.webgpu && r.result.run.webgpu.error, r.result.run && r.result.run.webgl2 && r.result.run.webgl2.error])) : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result.run && !r.result.error) {
+        const R = r.result;
+        ok("with a LinearFilter texture three emits textureSample through a sampler (nearest it read with textureLoad), and the transplant declares the device's `samp` for it", R.samplerInWgsl && R.usesSampler && R.declaresSamp);
+        for (const b of ["webgpu", "webgl2"]) { const o = R.run[b]; if (o.error) { ok(`${b} ran`, false, o.error); continue; }
+            ok(`*** ${b}: linear sampling through the generated pipeline is the hand-written linear pass on EVERY pixel (${o.same} of ${o.total}, worst 0) -- and the picture really is blended (a checkerboard's blue lands between its two values) ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.blended > o.total * 0.2 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.blended} blended`);
+            ok(`  ${b}: and three's own linear render, row-mirrored, agrees with the device to a byte or so (two samplers, one filter)`, o.worstThree <= 2 && o.sameThree > o.total * 0.9, `${o.sameThree}/${o.total} identical, worst ${o.worstThree}`); }
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4320.
 //   A  the `object.` rewrite dropped (three's struct name left in the body) -> exit=1, 3 red: the CPU fixture line, and on WebGPU the
 //      generated WGSL no longer compiles, so the device draws the clear (1 of 4,096 pixels agree) and the blackbody finds nothing.
@@ -116,6 +165,10 @@ else {
 //      the v4278 host/shader agreement check catching a generated pair, which is what it was written for.
 //   C  the varying's y turned over in the transplanted body (uv.y -> 1 - uv.y) -> exit=1, 2 red: the CPU fixture line and, on WebGPU,
 //      0 of 4,096 pixels agree with the hand-written pass -- the mirror the device's vertex stage made unnecessary, put back and caught.
+//   MEASURED at v4323 (linear sampling):
+//   D  the transplant no longer renaming three's `<texture>_sampler` to the device's `samp` -> exit=1, 4 red: the fixture line, the
+//      declaration line, and on WebGPU the generated WGSL names a sampler nobody declared, so nothing draws (0 of 4,096 agree with
+//      the hand-written pass and with three's own render). WebGL2 stays green: the GLSL binds its sampler by texture name.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a graph with MORE than one varying or with three's camera in it (refused, not transplanted -- a vertex-stage transplant is " +
     "the next rung); textures sampled with a linear filter through three's sampler (badTv's is nearest, which three reads with textureLoad; the fixture " +
