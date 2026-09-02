@@ -44,6 +44,8 @@ import * as BB from "../../render/blackbodyWgsl.mjs";
 import * as FM from "../../render/fleetMask.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
+const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
+const EMITTED_PHYS = fs.existsSync(EMITTED_PHYS_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PHYS_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -141,6 +143,11 @@ export function corpus() {
         ...(EMITTED ? [
             { id: "tslSource.badTv (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "badTv's fragment as three's WGSL builder wrote it from render/badTvTsl.mjs, in the device's shell -- a pair nobody typed", opts: { code: EMITTED.badTv.transplanted.wgsl, compileOnly: true, outCount: 0 } },
             { id: "tslSource.blackbody (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "the blackbody key as three's WGSL builder wrote it from render/blackbodyTsl.mjs -- a Loop of Newton steps, generated", opts: { code: EMITTED.blackbody.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
+        // v4321 -- the physics as TSL nodes, emitted and transplanted the same way (tslPhysics-selfcheck writes the file)
+        ...(EMITTED_PHYS ? [
+            { id: "tslSource.lyapunov (generated)", from: "tools/ship/tsl-emitted-physics.json", compileOnly: true, why: "the Lyapunov key as three's WGSL builder wrote it from render/physicsTsl.mjs: two Loops of the logistic map, generated", opts: { code: EMITTED_PHYS.lyapunov.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+            { id: "tslSource.heidler (generated)", from: "tools/ship/tsl-emitted-physics.json", compileOnly: true, why: "the Heidler key as three's WGSL builder wrote it: the return-stroke current on a geometric grid, generated", opts: { code: EMITTED_PHYS.heidler.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320

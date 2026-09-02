@@ -24,6 +24,9 @@ are ranked by how cleanly they would become one.
   The sabotage log records two sabotages the gate cannot see (a wrong derivative sign and 2 Newton steps
   both still land on the root) and one it can (a start at x = 1 finds the trivial root x = 0).
   v4319: the same functions as TSL nodes (render/blackbodyTsl.mjs), the key read off both of three's backends.
+- **All three as TSL nodes** (v4321, render/physicsTsl.mjs and render/blackbodyTsl.mjs): the Lyapunov exponent, the
+  Heidler current and the blackbody as `Fn` nodes, the same keys read off three's two backends and, transplanted
+  by render/tslSource.mjs, off gfx/device.js -- docs/TSL-ROADMAP.md step 5.
 
 ## Per-pixel and closed-form: the next ones (a fragment can be a coordinate)
 

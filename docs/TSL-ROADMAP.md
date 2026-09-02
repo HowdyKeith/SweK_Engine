@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319, step 4 built at v4320)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -36,11 +36,15 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    fragment, types the device carries. The emitted pair is written to tools/ship/tsl-emitted.json and the
    WGSL corpus compiles it as generated code. Not yet: a vertex-stage transplant (three's camera in the
    graph), linear-filtered sampling on the device path, and the speed of the generated code.
-5. **Physics as TSL nodes.** STARTED at v4319: render/blackbodyTsl.mjs writes Planck's shape and Wien's
-   root (a TSL `Loop` of 24 Newton steps) as `Fn` nodes any node material can take; tsl-selfcheck section 4
-   reads the key off both backends -- the brightest column on the n = 5 row is x_lambda = 4.965114 within a
-   column, x_nu = 2.821439 for n = 3, the root itself in the blue byte. The Lyapunov and Heidler functions are
-   not yet written as nodes (ln 2 at r = 4 and the Heidler peak 1 are their keys, the same as the WGSL's).
+5. **Physics as TSL nodes.** BUILT at v4321. render/blackbodyTsl.mjs (v4319): Planck's shape and Wien's
+   root by a TSL `Loop`, x_lambda = 4.965114 read off both backends. render/physicsTsl.mjs (v4321): swk_lyapunov's
+   exponent (two Loops of the logistic map) and the Heidler current as `Fn` nodes; tslPhysics-selfcheck reads
+   ln 2 at r = 4 (median 0.693226, within 8e-5), the period-3 window dark, and the lightning's peak over i0 at
+   0.99998 (true eta) and 1.0667 (published eta) off both of three's backends -- and then AGAIN through
+   gfx/device.js after render/tslSource.mjs transplants the emitted fragments, the same numbers to the last
+   digit. The generated pairs go to tools/ship/tsl-emitted-physics.json and the WGSL corpus compiles them.
+   Not yet: a race's hull painted by a TSL node (the fleets are device pipelines; a NodeMaterial fleet would be
+   the next rung), and the cost of the 448-iteration Loop through three, which nobody timed.
 6. **Main scene migration.** NOT PLANNED. main.js renders with r160's WebGLRenderer and nothing on the ladder
    needs WebGPURenderer; the gpuDriven/fleets/terrain stack sits on gfx/device.js, not on three.
 
