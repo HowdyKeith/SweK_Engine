@@ -1129,7 +1129,11 @@ window.addEventListener("load", function () {
              rule as the fluidgpu rename above: data-tab stays "matter". -->
         <button class="gtab" data-tab="matter"><span class="gtabTog">&#9656;</span><span>&#9883;&#65039; PL: Matter &amp; Chaos</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="systools"><span class="gtabTog">&#9656;</span><span>&#128295; System Tools</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="voxelrender"><span class="gtabTog">&#9656;</span><span>&#129513; Voxel &amp; Render</span><span class="gtabState"></span></button>
+        <!-- v4321 -- ONE DRAWER BECOMES TWO. The "&" in "Voxel & Render" was a drawer that could not
+             decide, and it sat at 14 of 15 while nine pages waited for a render panel. Split by MACHINERY
+             read from each page's own imports -- see tools/ship/pageSections.mjs for the reading. -->
+        <button class="gtab" data-tab="voxels"><span class="gtabTog">&#9656;</span><span>&#129482; Voxels</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="renders"><span class="gtabTog">&#9656;</span><span>&#129513; Renders</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1644,10 +1648,15 @@ window.addEventListener("load", function () {
             <div data-panel-pages="thirdparty" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
           </div>
         </div>
-        <div class="gpanel" data-panel="voxelrender" hidden>
-          <div class="gpanelHdr">&#129513; Voxel &amp; Render</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
-          <div data-panel-pages="voxelrender" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        <div class="gpanel" data-panel="voxels" hidden>
+          <div class="gpanelHdr">&#129482; Voxels</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The DATA: storage, meshing and traversal of voxel volumes. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="voxels" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <div class="gpanel" data-panel="renders" hidden>
+          <div class="gpanelHdr">&#129513; Renders</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="renders" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>

@@ -63,7 +63,7 @@
    "f": "amplified-diff.html",
    "t": "SweK &middot; Amplified Diff",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -98,7 +98,7 @@
    "f": "aquarelle.html",
    "t": "Aquarelle Dissolve",
    "d": "Mask-driven watercolour dissolve: one image bleeds into another along a noise-warped mask edge, like ink through paper. Port of Ramotion/aquarelle (MIT).",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -203,7 +203,7 @@
    "f": "backend-dom.html",
    "t": "Third backend — DOM/CSS against WebGL2",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -280,7 +280,7 @@
    "f": "biome-map-demo.html",
    "t": "Worley Biome Map (v2779)",
    "d": "",
-   "g": "voxelrender",
+   "g": "",
    "p": 0
   },
   {
@@ -532,7 +532,7 @@
    "f": "camera-effects.html",
    "t": "SweK &middot; Camera Effects",
    "d": "",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -777,7 +777,7 @@
    "f": "csg.html",
    "t": "CSG — solid modelling with dual contouring",
    "d": "",
-   "g": "voxelrender",
+   "g": "",
    "p": 0
   },
   {
@@ -917,7 +917,7 @@
    "f": "doom-fire.html",
    "t": "DOOM Fire",
    "d": "The PSX DOOM fire: a cellular automaton on a grid of bytes against a fixed 37-colour palette. Seeded, so the same seed gives the same fire frame for frame. Port of filipedeschamps/doom-fire-algorithm (MIT).",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -1603,7 +1603,7 @@
    "f": "krbn-lyapunov.html",
    "t": "Krbn &times; Lyapunov &mdash; SweK",
    "d": "The Krbn pencil hologram lit by swk_lyapunov, the one shader in render/swiftShaderPass.js that is ours rather than a port. Every pixel iterates the logistic map for itself -- its x coordinate IS r, its y coordinate is the seed -- and shows the Lyapunov exponent, so the dark vertical bands are the periodic windows. At r = 4 the exponent is exactly ln 2, an answer the fragment is never given and the gate reads back off the GPU.",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -1617,7 +1617,7 @@
    "f": "krbn.html",
    "t": "Krbn Hologram &mdash; SweK",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -1813,7 +1813,7 @@
    "f": "mesh-line.html",
    "t": "Wide lines: what gl.lineWidth cannot do",
    "d": "gl.lineWidth is clamped to 1 on every desktop driver -- it is in the spec and it silently does nothing. A wide line has to be a triangle strip, with the sideways offset applied in the vertex shader so the width is a number of PIXELS that does not change with distance. Drag the width; watch the same path drawn both ways.",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2051,7 +2051,7 @@
    "f": "path-tracer.html",
    "t": "Path Tracer",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2149,7 +2149,7 @@
    "f": "pom-demo.html",
    "t": "Parallax Occlusion (v2784)",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2184,7 +2184,7 @@
    "f": "primitive-paint.html",
    "t": "Primitive: a picture in a few dozen shapes",
    "d": "Approximates any image with coloured triangles, rectangles and ellipses, one at a time. The colour of each shape is never searched for -- it is solved in closed form, the exact least-squares answer -- and each candidate is scored only over the pixels it covers, which is what makes it fast enough to watch. Drop in your own picture.",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2198,7 +2198,7 @@
    "f": "proc-brush.html",
    "t": "SweK Procedural Brush",
    "d": "Brushes that draw relationships between the points already in a stroke, rather than stamping a dab at each one. Sketchy, fur, shaded and ribbon, over a bounded neighbour search.",
-   "g": "",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2254,7 +2254,7 @@
    "f": "ray-march-demo.html",
    "t": "Voxel Ray Marcher (v2782)",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2268,14 +2268,14 @@
    "f": "raymarch-gl-demo.html",
    "t": "GPU Voxel Ray Marcher (v2783)",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {
    "f": "raymarch-live.html",
    "t": "Live Region Ray March (v3045)",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2352,7 +2352,7 @@
    "f": "rle-mesh-demo.html",
    "t": "RLE Mesh Demo (v2775)",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2604,7 +2604,7 @@
    "f": "sphere-impostor.html",
    "t": "Sphere impostor -- SweK",
    "d": "",
-   "g": "voxelrender",
+   "g": "renders",
    "p": 0
   },
   {
@@ -2877,7 +2877,7 @@
    "f": "volume-cache.html",
    "t": "3D Volume Cache (v3041)",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {
@@ -2905,7 +2905,7 @@
    "f": "voxel-viewer.html",
    "t": "Voxel Viewer / Generator",
    "d": "",
-   "g": "voxelrender",
+   "g": "voxels",
    "p": 0
   },
   {

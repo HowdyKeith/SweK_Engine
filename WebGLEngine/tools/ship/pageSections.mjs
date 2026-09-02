@@ -278,12 +278,42 @@ export const SECTIONS = [
               // page states the exposure and confirms before every start instead of running a patched fork.
               "ws-scrcpy.html"] },
 
-    { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
-      pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",
-              "raymarch-gl-demo.html", "raymarch-live.html", "sphere-impostor.html", "volume-cache.html",
-              "krbn.html", "amplified-diff.html",
-              "csg.html", "biome-map-demo.html",
-              "backend-dom.html"] },
+    // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
+    // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
+    // it is a drawer that could not decide, and this one had been at 14 of 15 for rounds WHILE NINE PAGES
+    // WAITED FOR A RENDER PANEL -- the last slot could place one of nine, chosen arbitrarily, which is why
+    // nothing ever took it. Naming the panel is what places them.
+    //
+    // *** SPLIT BY MACHINERY READ FROM THE IMPORTS, NOT BY THE WORD IN THE FILENAME. *** All fourteen were
+    // opened and their module imports listed before a single page was moved:
+    //
+    //   voxels   voxel-viewer (mesh/voxelMeshGreedy), rle-mesh-demo (voxel/rleMesh + rleRenderMesh +
+    //            rleWorldBridge), ray-march-demo (voxel/voxelDDA), raymarch-live (voxel/rleRegionVolume +
+    //            rleVolumeCache + rleWorldBridge), volume-cache (voxel/rleBrickMap + rleVolumeCache +
+    //            rleWorldBridge + voxelRLE), raymarch-gl-demo (render/voxelRaymarchPass)
+    //   renders  path-tracer (render/microfacetShader), pom-demo (render/parallaxOcclusion), krbn
+    //            (render/gifRecorder + vendor/krbn), amplified-diff (tools/render-qa), sphere-impostor and
+    //            backend-dom (no module imports -- an impostor technique and a DOM-vs-WebGL2 comparison)
+    //
+    // *** raymarch-gl-demo IS THE ONE THAT HAD TO BE ARGUED RATHER THAN READ. *** Its only import is a RENDER
+    // pass -- and that pass is render/voxelRaymarchPass, whose entire subject is voxel data, shared with
+    // raymarch-live and volume-cache which are voxel-heavy beyond doubt. Filed with the volume it marches
+    // THROUGH rather than the technique it marches BY, and the reason is written down because the next reader
+    // will wonder and would otherwise re-litigate it.
+    { id: "voxels", tab: "voxels", label: "Voxels", note: "the DATA: storage, meshing and traversal of voxel volumes",
+      pages: ["voxel-viewer.html", "rle-mesh-demo.html", "ray-march-demo.html",
+              "raymarch-gl-demo.html", "raymarch-live.html", "volume-cache.html"] },
+    // *** AND THE POINT OF THE SPLIT IS THE SEVEN PAGES THIS DRAWER CAN NOW HOLD. *** Six render/fx pages have
+    // been UNPLACED since v4314 with the reason "Voxel & Render is at 14 of 15, so ONE could go in and five
+    // could not, and picking which one would be arbitrary". That sentence is spent: they are in.
+    { id: "renders", tab: "renders", label: "Renders", note: "the TECHNIQUE: passes, effects, and how a frame is made",
+      pages: ["path-tracer.html", "pom-demo.html", "sphere-impostor.html", "krbn.html", "amplified-diff.html",
+              "backend-dom.html",
+              // the six that were waiting -- every one render/* or fx/* by import, see UNPLACED's v4314 note
+              "aquarelle.html", "camera-effects.html", "doom-fire.html", "mesh-line.html",
+              "primitive-paint.html", "proc-brush.html",
+              // and v4313's shader page, which is a render pass over a Krbn drawing
+              "krbn-lyapunov.html"] },
     // v3252 -- amplified-diff joins the render drawer and krbn-compare moves to Arriving: TEN IS THE LIMIT and
     // a comparison tool belongs beside the things it compares. krbn-compare is a SUBJECT comparison; this is the
     // instrument, and Keith can swap them back in one line if that reads wrong on the rig.
@@ -444,9 +474,11 @@ export const UNPLACED = new Map([
     // *** THEY DO NOT LACK A HOME BECAUSE NOBODY LOOKED. THEY LACK A DRAWER THAT EXISTS. *** Read by
     // machinery rather than by title, the twelve fall into four groups:
     //
-    //     render / fx passes   aquarelle, camera-effects, doom-fire, mesh-line, primitive-paint, proc-brush
-    //                          -- six pages importing render/* or fx/*. Voxel & Render holds 14 of 15, so
-    //                          ONE could go in and five could not, and picking which one would be arbitrary.
+    //     render / fx passes   6   *** PLACED AT v4321 INTO THE NEW "Renders" DRAWER. *** This entry read
+    //                          "Voxel & Render holds 14 of 15, so ONE could go in and five could not, and
+    //                          picking which one would be arbitrary." That was true, and it was a description
+    //                          of a MISSING PANEL rather than of six awkward pages. Splitting the drawer
+    //                          placed all six at once.
     //     audio                sfx, spellbook -- audio/sfxModel.mjs and audio/sfxPlay.js. THERE IS NO AUDIO
     //                          DRAWER. This tree has 24 sections and not one of them is about sound.
     //     ui                   odometer -- ui/odometer.js. No UI drawer either.
@@ -456,12 +488,6 @@ export const UNPLACED = new Map([
     // records that as Keith's call ("THE RATCHET IS SUPPOSED TO GO DOWN AGAIN when a new section is named --
     // and naming it is Keith's call"). So the twelve are linked, findable, and each says what it is waiting
     // for, which is a different state from unexamined.
-    ["aquarelle.html", "a render pass (render/aquarellePass.js) with no drawer that has room -- Voxel & Render is at 14 of 15, and the six render/fx pages found together at v4314 want a panel of their own rather than one arbitrary slot"],
-    ["camera-effects.html", "the same render/fx group: it is a GL pass over render/cameraTexture.js. Face & Population is about landmarks and avatars, not about handing camera pixels to a shader, so filing it there would be grouping by the word 'camera'"],
-    ["doom-fire.html", "render/doomFire.mjs -- the render/fx group again. A cellular automaton drawn as a fire is machinery this tree has nowhere to put, and Matter & Chaos is at 15 of 15 besides"],
-    ["mesh-line.html", "render/meshLine.mjs -- render/fx group. Its subject is a driver limitation (gl.lineWidth is clamped to 1 everywhere) rather than a physical system, so no PL drawer fits it either"],
-    ["primitive-paint.html", "fx/primitiveFit.mjs and NO brain import, despite a commit titled 'the GPU Brain paints' -- filed by machinery, not by title. The GPU Brain drawer is at 15 of 15 now in any case"],
-    ["proc-brush.html", "fx/procBrush.mjs with ui/procBrushCanvas.js -- render/fx group, and the only drawing surface in the tree, which is an argument for the panel rather than for a slot in an existing one"],
     ["sfx.html", "audio/sfxModel.mjs -- THERE IS NO AUDIO DRAWER IN THIS TREE. Twenty-four sections and none of them is about sound, which is a gap a placement cannot close"],
     ["spellbook.html", "world/spellBook.mjs over physics/voxel/fracture.js and audio/sfxPlay.js -- it spans world, physics and audio, so any single drawer would be a third of the answer"],
     ["odometer.html", "ui/odometer.js -- a DOM/CSS widget, not a canvas page. There is no UI drawer, and it is the only page of its kind so far, which is not yet a panel"],
@@ -470,6 +496,18 @@ export const UNPLACED = new Map([
     // *** AND ONE THAT IS MINE. *** krbn-lyapunov.html was linked at v4313 and filed nowhere, so it entered
     // registerResidue's list in the same round it left pageReach's. THE GATE THAT WOULD HAVE CAUGHT IT WAS
     // ALREADY RED, which is how a red gate stops being a gate: nothing distinguishes 45 from 46.
+    // *** v4321 -- TWO PAGES CAME OUT OF THE SPLIT DRAWER, AND SAYING WHY IS THE POINT OF SAYING ANYTHING. ***
+    // csg and biome-map-demo were in "Voxel & Render" and are neither: csg imports physics/mesh (BSP mesh
+    // booleans) and biome-map-demo imports world/worleyBiomes (procedural world generation). THE AMPERSAND WAS
+    // CARRYING THEM -- a label broad enough to hold anything hides what it is holding -- and splitting the
+    // drawer is what exposed them. Filing them into whichever half had room would have been the same evasion
+    // in a narrower drawer, and the drawer count would have looked better for it.
+    //
+    // *** AND csg IS NOT ALONE: destructible.html HAS BEEN WAITING SINCE v4314 ON THE IDENTICAL IMPORT. ***
+    // Two pages, one machinery (physics/mesh/meshCSG.mjs), no drawer -- which is now a costed argument for a
+    // Geometry panel rather than a shrug, exactly as the render group's six were before this round.
+    ["csg.html", "BSP mesh booleans (physics/mesh) -- came OUT of Voxel & Render at the v4321 split because it is neither half. destructible.html waits on the SAME import: two pages, one machinery, and the drawer that would hold both does not exist"],
+    ["biome-map-demo.html", "world/worleyBiomes -- procedural world generation, not a voxel format and not a render technique. Came OUT of Voxel & Render at the v4321 split rather than being filed in whichever half happened to have room"],
     // *** v4315 -- THREE MORE FROM main's v4299-v4300, AND THEY MAKE THE RENDER-PANEL CASE CONCRETE. ***
     // All three import render/gpuDriven.mjs and gfx/device.js: they are the GPU-driven rendering path, one
     // coherent group of work. Voxel & Render still holds 14 of 15, so ONE of the three could go in and two
@@ -486,7 +524,6 @@ export const UNPLACED = new Map([
     ["gpu-rig-check.html", "the GPU-driven path's own instrument: which backend and route this box got, the cull/LOD/draw counts, and a readback against the offscreen twin. Part of the nine-page render group with no drawer"],
     ["orrery-gpu.html", "render/gpuOrbits.mjs -- orbital elements to instance records in a compute pass. Cosmic & Relativity has room and would be a SUBJECT filing; the machinery is gpuDriven, so it waits with the render group"],
     ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. Same render group, same missing drawer"],
-    ["krbn-lyapunov.html", "the Krbn hologram lit by swk_lyapunov -- it is a render pass (render/swiftShaderPass.js) over a Krbn drawing, so it belongs with the v4314 render/fx group and waits on the same decision"],
 
     // *** v3358 -- PARKED IN ARRIVING DELIBERATELY, BECAUSE THEY OWE A MEASUREMENT NOBODY BUT KEITH CAN GIVE. ***
     // These four were filed in drawers, which is where a page goes when it is FINISHED. They are not finished:

@@ -95,7 +95,7 @@
    "id": "amplified-diff.html",
    "display": "Amplified Diff",
    "href": "/amplified-diff.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -135,7 +135,7 @@
    "id": "aquarelle.html",
    "display": "Aquarelle",
    "href": "/aquarelle.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -255,7 +255,7 @@
    "id": "backend-dom.html",
    "display": "Backend Dom",
    "href": "/backend-dom.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -343,7 +343,7 @@
    "id": "biome-map-demo.html",
    "display": "Biome Map Demo",
    "href": "/biome-map-demo.html",
-   "section": "Voxel & Render",
+   "section": null,
    "collision": false
   },
   {
@@ -631,7 +631,7 @@
    "id": "camera-effects.html",
    "display": "Camera Effects",
    "href": "/camera-effects.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -911,7 +911,7 @@
    "id": "csg.html",
    "display": "Csg",
    "href": "/csg.html",
-   "section": "Voxel & Render",
+   "section": null,
    "collision": false
   },
   {
@@ -1071,7 +1071,7 @@
    "id": "doom-fire.html",
    "display": "Doom Fire",
    "href": "/doom-fire.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -1855,7 +1855,7 @@
    "id": "krbn-lyapunov.html",
    "display": "Krbn Lyapunov",
    "href": "/krbn-lyapunov.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -1871,7 +1871,7 @@
    "id": "krbn.html",
    "display": "Krbn",
    "href": "/krbn.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2095,7 +2095,7 @@
    "id": "mesh-line.html",
    "display": "Mesh Line",
    "href": "/mesh-line.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2367,7 +2367,7 @@
    "id": "path-tracer.html",
    "display": "Path Tracer",
    "href": "/path-tracer.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2479,7 +2479,7 @@
    "id": "pom-demo.html",
    "display": "Pom Demo",
    "href": "/pom-demo.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2519,7 +2519,7 @@
    "id": "primitive-paint.html",
    "display": "Primitive Paint",
    "href": "/primitive-paint.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2535,7 +2535,7 @@
    "id": "proc-brush.html",
    "display": "Proc Brush",
    "href": "/proc-brush.html",
-   "section": null,
+   "section": "Renders",
    "collision": false
   },
   {
@@ -2599,7 +2599,7 @@
    "id": "ray-march-demo.html",
    "display": "Ray March Demo",
    "href": "/ray-march-demo.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -2615,7 +2615,7 @@
    "id": "raymarch-gl-demo.html",
    "display": "Raymarch Gl Demo",
    "href": "/raymarch-gl-demo.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -2623,7 +2623,7 @@
    "id": "raymarch-live.html",
    "display": "Raymarch Live",
    "href": "/raymarch-live.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -2711,7 +2711,7 @@
    "id": "rle-mesh-demo.html",
    "display": "Rle Mesh Demo",
    "href": "/rle-mesh-demo.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -2999,7 +2999,7 @@
    "id": "sphere-impostor.html",
    "display": "Sphere Impostor",
    "href": "/sphere-impostor.html",
-   "section": "Voxel & Render",
+   "section": "Renders",
    "collision": false
   },
   {
@@ -3311,7 +3311,7 @@
    "id": "volume-cache.html",
    "display": "Volume Cache",
    "href": "/volume-cache.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
@@ -3343,7 +3343,7 @@
    "id": "voxel-viewer.html",
    "display": "Voxel Viewer",
    "href": "/voxel-viewer.html",
-   "section": "Voxel & Render",
+   "section": "Voxels",
    "collision": false
   },
   {
