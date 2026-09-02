@@ -1025,6 +1025,153 @@ void main() {
 
 
 // ==================================================================================================================
+// BATCH 15, v4319 -- THE THREE CELLULAR SHADERS, AND WITH THEM UPSTREAM'S VORONOI FAMILY IS PORTED.
+// All three run a 3x3 neighbourhood of jittered cell points and reach bcs_hash DIRECTLY rather than through
+// valueNoise, so a last-bit disagreement is not interpolated down -- it flips which cell owns the pixel.
+// See render/swiftShaderModel.mjs for what that costs and why they are still worth porting.
+// ==================================================================================================================
+const SHATTER_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uShardCount, uExplode, uRotationAmt, uEdgeGlow, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec2 cellUV = uv * uShardCount;
+    vec2 cellID = floor(cellUV), cellF = fract(cellUV);
+    float minD = 10.0, secD = 10.0;
+    vec2 closest = vec2(0.0);
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+        vec2 nb = vec2(float(i), float(j));
+        vec2 id = cellID + nb;
+        // NOT named "point": it is legal in GLSL ES 3.00 and reads as a type to anyone arriving from HLSL,
+        // and this file has already lost a round to a reserved word (uPremultiplied's neighbour, "active").
+        vec2 jit = vec2(bcs_hash(id), bcs_hash(id + vec2(37.0, 91.0)));
+        vec2 diff = nb + jit - cellF;
+        float d = length(diff);
+        if (d < minD) { secD = minD; minD = d; closest = id; }
+        else if (d < secD) { secD = d; }
+    }
+    float r1 = bcs_hash(closest * 7.3);
+    float r2 = bcs_hash(closest * 13.7 + vec2(5.0, 3.0));
+    float r3 = bcs_hash(closest * 23.1 + vec2(11.0, 7.0));
+    float eased = uExplode * uExplode * (3.0 - 2.0 * uExplode);
+    vec2 shardCenter = (closest + 0.5) / uShardCount;
+    vec2 driftDir = normalize(shardCenter - vec2(0.5) + vec2(0.001));   // the epsilon is upstream's
+    float driftDist = eased * (0.3 + r1 * 0.7) * 120.0 * uPointScale;   // POINTS
+    float ang = (r2 - 0.5) * uRotationAmt * eased;
+    float tiltX = (r3 - 0.5) * eased * 0.15;
+    float ca = cos(ang), sa = sin(ang);
+    vec2 rot = vec2(ca * driftDir.x - sa * driftDir.y, sa * driftDir.x + ca * driftDir.y) * driftDist;
+    float fallEased = max(eased - r1 * 0.3, 0.0);
+    float fall = fallEased * fallEased * 100.0 * uPointScale * (0.4 + r1 * 0.6);   // POINTS
+    vec2 sp = p - rot + vec2(0.0, -fall);
+    float persp = 1.0 - eased * r1 * 0.15;
+    vec2 shardPx = shardCenter * uSize;
+    sp = shardPx + (sp - shardPx) / persp;
+    vec4 c = layerSample(clamp(sp, vec2(0.0), uSize));
+    float grad = dot(normalize(cellF - 0.5), vec2(0.5, -0.3));
+    float glass = smoothstep(-0.3, 0.5, grad) * 0.12 * (1.0 + eased);
+    float tiltDark = max(1.0 - abs(tiltX) * eased * 2.0, 0.6);
+    float edgeDist = secD - minD;
+    float eAmt = (1.0 - smoothstep(0.0, 0.03, edgeDist)) * 0.8 + (1.0 - smoothstep(0.0, 0.1, edgeDist)) * 0.2;
+    vec3 ec = vec3(0.7, 0.85, 1.0) * uEdgeGlow;
+    float shadow = 1.0 - eased * 0.15 * r1, fade = 1.0 - eased * r1 * 0.4;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 v = vec3(toHalf(c.r + toHalf(glass) * k), toHalf(c.g + toHalf(glass) * k), toHalf(c.b + toHalf(glass) * k));
+    v = vec3(toHalf(v.r * toHalf(tiltDark)), toHalf(v.g * toHalf(tiltDark)), toHalf(v.b * toHalf(tiltDark)));
+    v = vec3(toHalf(v.r + toHalf(ec.r) * toHalf(eAmt) * k),
+             toHalf(v.g + toHalf(ec.g) * toHalf(eAmt) * k),
+             toHalf(v.b + toHalf(ec.b) * toHalf(eAmt) * k));
+    fragColor = vec4(toHalf(toHalf(v.r * toHalf(shadow)) * toHalf(fade)),
+                     toHalf(toHalf(v.g * toHalf(shadow)) * toHalf(fade)),
+                     toHalf(toHalf(v.b * toHalf(shadow)) * toHalf(fade)), c.a);
+}`;
+
+const SHATTERGLASS_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uCrackDensity, uGlassRefraction, uPrismStrength, uShatterSpread, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 cellUV = (p / uSize) * uCrackDensity;
+    vec2 iCell = floor(cellUV), fCell = fract(cellUV);
+    float minD = 10.0, secD = 10.0, nHash = 0.0;
+    vec2 nearest = vec2(0.0), second = vec2(0.0);
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 nb = vec2(float(x), float(y));
+        vec2 cell = iCell + nb;
+        vec2 jit = vec2(bcs_hash(cell), bcs_hash(cell + vec2(127.1, 311.7)));
+        vec2 diff = nb + jit - fCell;
+        float d = length(diff);
+        if (d < minD) { secD = minD; second = nearest; minD = d; nearest = diff; nHash = bcs_hash(cell + 500.0); }
+        else if (d < secD) { secD = d; second = diff; }
+    }
+    float edgeDist = secD - minD;
+    float crack = 1.0 - smoothstep(0.0, 0.06, edgeDist);
+    vec2 so = nearest * uShatterSpread * 15.0 * uPointScale;             // POINTS
+    float sang = nHash * 0.3 * uShatterSpread;
+    vec2 disp = clamp(p + vec2(cos(sang) * so.x - sin(sang) * so.y,
+                               sin(sang) * so.x + cos(sang) * so.y), vec2(0.0), uSize);
+    // *** UPSTREAM NORMALISES THIS WITH NO EPSILON AND normalize(vec2(0)) IS NaN. *** minDist == secondDist
+    // is reachable, so the guard below is the port's ONE divergence and it exists to make the two ports agree
+    // with each other rather than to improve on the Metal. Recorded in the model beside the same line.
+    vec2 rd0 = nearest - second;
+    float rl = length(rd0);
+    vec2 rd = rl > 0.0 ? rd0 / rl : vec2(0.0);
+    disp = clamp(disp + rd * uGlassRefraction * uPointScale * crack, vec2(0.0), uSize);   // POINTS
+    vec4 c = layerSample(disp);
+    if (uPrismStrength > 0.01 && crack > 0.1) {
+        float pr = uPrismStrength * 5.0 * uPointScale;                                    // POINTS
+        c.r = layerSample(clamp(disp + rd * pr, vec2(0.0), uSize)).r;
+        c.b = layerSample(clamp(disp - rd * pr, vec2(0.0), uSize)).b;
+    }
+    float hi = crack * (0.5 + 0.5 * sin(edgeDist * 100.0 + uTime));
+    float shardB = nHash * 0.15 - 0.075;
+    float shadow = crack * 0.4;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    float add = (toHalf(hi * 0.6) + toHalf(shardB) - toHalf(shadow)) * k;
+    fragColor = vec4(toHalf(c.r + add), toHalf(c.g + add), toHalf(c.b + add), c.a);
+}`;
+
+const CAUSTICS_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uCausticScale, uCausticIntensity, uWaterDistortion, uWaterDepth, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float n1 = bcs_fbm(uv * 4.0 + vec2(uTime * 0.3, uTime * 0.2), 4);
+    float n2 = bcs_fbm(uv * 4.0 + vec2(-uTime * 0.25, uTime * 0.35) + 10.0, 4);
+    vec4 c = layerSample(clamp(p + vec2(n1 - 0.5, n2 - 0.5) * uWaterDistortion * uPointScale,
+                               vec2(0.0), uSize));                                        // POINTS
+    vec2 a1 = uv * uCausticScale + vec2(uTime * 0.4, uTime * 0.3);
+    vec2 a2 = uv * uCausticScale * 1.3 + vec2(-uTime * 0.35, uTime * 0.45);
+    float c1 = 0.0, c2 = 0.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 nb = vec2(float(x), float(y));
+        // fract() of a site that ALREADY contains its cell index -- upstream's form, kept verbatim. It is not
+        // a distance to a jittered site; it is a wrapped difference. See the model for why it is not "fixed".
+        vec2 e1 = floor(a1) + nb;
+        vec2 s1 = e1 + vec2(bcs_hash(e1), bcs_hash(e1 + 100.0));
+        c1 = max(c1, 1.0 - length(fract(a1) - fract(s1)) * 2.5);
+        vec2 e2 = floor(a2) + nb;
+        vec2 s2 = e2 + vec2(bcs_hash(e2 + 50.0), bcs_hash(e2 + 150.0));
+        c2 = max(c2, 1.0 - length(fract(a2) - fract(s2)) * 2.5);
+    }
+    float caustic = pow(max(c1 * c2, 0.0), 3.0) * uCausticIntensity;
+    float rays = sin(uv.x * 20.0 + uTime * 0.5) * 0.5 + 0.5;
+    rays *= smoothstep(1.0, 0.0, uv.y) * uWaterDepth * 0.1;
+    vec3 cc = vec3(0.95, 0.98, 1.0), tint = vec3(0.2, 0.5, 0.7), rw = vec3(0.3, 0.5, 0.6);
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 v = vec3(toHalf(c.r + toHalf(cc.r) * toHalf(caustic) * k),
+                  toHalf(c.g + toHalf(cc.g) * toHalf(caustic) * k),
+                  toHalf(c.b + toHalf(cc.b) * toHalf(caustic) * k));
+    float dim = toHalf(1.0 - uWaterDepth * 0.3), dw = toHalf(uWaterDepth * 0.15), wd = toHalf(uWaterDepth);
+    vec3 deep = vec3(toHalf(toHalf(v.r * dim) + toHalf(tint.r) * dw * k),
+                     toHalf(toHalf(v.g * dim) + toHalf(tint.g) * dw * k),
+                     toHalf(toHalf(v.b * dim) + toHalf(tint.b) * dw * k));
+    v = vec3(toHalf(mix(v.r, deep.r, wd)), toHalf(mix(v.g, deep.g, wd)), toHalf(mix(v.b, deep.b, wd)));
+    fragColor = vec4(toHalf(v.r + toHalf(rays * rw.r) * k),
+                     toHalf(v.g + toHalf(rays * rw.g) * k),
+                     toHalf(v.b + toHalf(rays * rw.b) * k), c.a);
+}`;
+
+// ==================================================================================================================
 // *** OURS TOO -- swk_fresnelEdge and swk_airyDisk, v4316. *** Both are graded against answers no part of this
 // tree computed: I(0) = 1/4 at a straight edge, and the zeros of the Bessel function J1. See
 // render/swiftShaderModel.mjs for the measured budgets and for what each one deliberately does NOT claim.
@@ -1124,7 +1271,8 @@ const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLA
     liquidChrome: LIQUIDCHROME_FRAG, pixelateStorm: PIXELSTORM_FRAG, magneticField: MAGFIELD_FRAG,
     aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
     morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG,
-    fresnelEdge: FRESNELEDGE_FRAG, airyDisk: AIRYDISK_FRAG };
+    fresnelEdge: FRESNELEDGE_FRAG, airyDisk: AIRYDISK_FRAG,
+    shatter: SHATTER_FRAG, shatterGlass: SHATTERGLASS_FRAG, underwaterCaustics: CAUSTICS_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -1156,6 +1304,9 @@ const KNOBS = {
     morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
     lyapunov: { rLo: "uRLo", rHi: "uRHi", samples: "uSamples", warmup: "uWarmup", intensity: "uIntensity", seedLo: "uSeedLo", seedHi: "uSeedHi", raw: "uRaw", premultiplied: "uPremultiplied" },
     fresnelEdge: { lambda: "uLambda", zLo: "uZLo", zHi: "uZHi", yHalf: "uYHalf", samples: "uSamples", intensity: "uIntensity", raw: "uRaw", premultiplied: "uPremultiplied" },
+    shatter: { time: "uTime", shardCount: "uShardCount", explode: "uExplode", rotationAmt: "uRotationAmt", edgeGlow: "uEdgeGlow", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    shatterGlass: { time: "uTime", crackDensity: "uCrackDensity", glassRefraction: "uGlassRefraction", prismStrength: "uPrismStrength", shatterSpread: "uShatterSpread", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    underwaterCaustics: { time: "uTime", causticScale: "uCausticScale", causticIntensity: "uCausticIntensity", waterDistortion: "uWaterDistortion", waterDepth: "uWaterDepth", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     airyDisk: { xLo: "uXLo", xHi: "uXHi", terms: "uTerms", intensity: "uIntensity", gamma: "uGamma", raw: "uRaw", premultiplied: "uPremultiplied" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
@@ -1226,6 +1377,12 @@ const DEFAULT_KNOBS = {
     // it claims to describe. z 200..2000 with yHalf 1.1 gives |v| <= 4.92 on the nearest row and 1.56 on the
     // farthest, so the fringes still fan visibly and every pixel is inside the budget.
     fresnelEdge:    { lambda: 5e-4, zLo: 200, zHi: 2000, yHalf: 1.1, samples: 128, intensity: 0.85, raw: 0, premultiplied: 1 },
+    // Upstream's own comment ranges, midpoints where it gives one: shard_count 3-30, explode 0-1,
+    // rotation_amt 0-3, edge_glow 0-2; crackDensity 3-15, glassRefraction 0-20, prismStrength 0-1,
+    // shatterSpread 0-1; causticScale 2-15, causticIntensity 0-2, waterDistortion 0-30, waterDepth 0-1.
+    shatter:        { time: 0, shardCount: 8, explode: 0.4, rotationAmt: 1.2, edgeGlow: 0.8, pointScale: 1, premultiplied: 1 },
+    shatterGlass:   { time: 0, crackDensity: 7, glassRefraction: 8, prismStrength: 0.5, shatterSpread: 0.35, pointScale: 1, premultiplied: 1 },
+    underwaterCaustics: { time: 0, causticScale: 8, causticIntensity: 1, waterDistortion: 12, waterDepth: 0.5, pointScale: 1, premultiplied: 1 },
     airyDisk:       { xLo: 0, xHi: 12, terms: 20, intensity: 0.9, gamma: 0.35, raw: 0, premultiplied: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
@@ -1378,5 +1535,6 @@ export {
     WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
     PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
     LYAPUNOV_FRAG, FRESNELEDGE_FRAG, AIRYDISK_FRAG,
+    SHATTER_FRAG, SHATTERGLASS_FRAG, CAUSTICS_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };
