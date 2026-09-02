@@ -39,24 +39,42 @@ export function faceTexelDir(f, i, j, size) {
     return [d[0] * inv, d[1] * inv, d[2] * inv];
 }
 
-// Bake all six faces of a cubemap from a per-direction shading function. `shade(dir, f, i, j)` returns an array
-// of `channels` values in [0, 1]; the result is six Uint8ClampedArrays of size*size*channels bytes.
+// Bake all six faces into ONE OR MORE targets from a single walk. `channelCounts` gives the channels per target
+// (e.g. [3] for RGB, or [3, 3, 1, 1] for albedo/normal/roughness/height); `sample(dir, f, i, j)` returns one
+// array per target, each of values in [0, 1]. The result is { size, targets: [[face x6], ...] } with each face a
+// Uint8ClampedArray of size*size*channels bytes.
 //
-// This is the loop that nebulaSkybox, proceduralStar and planetSurface each wrote out by hand. It is offered
-// here rather than forced on them: the three bakes differ in what they write per texel (RGB, RGB, and four
-// separate targets), and the two that fit are the two that use it.
-export function bakeCubemap(size, channels, shade) {
-    const faces = [];
+// *** WHY THE MULTI-TARGET FORM IS THE PRIMITIVE AND THE SINGLE-TARGET ONE IS THE WRAPPER. *** v4333 shipped
+// only bakeCubemap(size, channels, shade) and it had exactly ONE consumer -- the skybox it was lifted from --
+// which is the "written for one caller" shape this tree keeps flagging in other people's code. The reason the
+// other two did not adopt it is worth recording rather than fixing quietly: proceduralStar fits and simply had
+// not been changed, but planetSurface writes FOUR targets from ONE surfaceSample per texel, and a single-target
+// helper would have made it call that sample four times -- roughly four times the work, to look tidier. THAT IS
+// A HELPER MAKING THE CALLER WORSE, and it is why the honest generalisation is the number of targets rather
+// than the number of callers. One walk, one sample per texel, N buffers written.
+export function bakeCubemapTargets(size, channelCounts, sample) {
+    const targets = channelCounts.map(() => []);
     for (let f = 0; f < 6; f++) {
-        const buf = new Uint8ClampedArray(size * size * channels);
+        const bufs = channelCounts.map((ch) => new Uint8ClampedArray(size * size * ch));
         for (let j = 0; j < size; j++) {
             for (let i = 0; i < size; i++) {
-                const c = shade(faceTexelDir(f, i, j, size), f, i, j);
-                const o = (j * size + i) * channels;
-                for (let k = 0; k < channels; k++) buf[o + k] = c[k] * 255;
+                const out = sample(faceTexelDir(f, i, j, size), f, i, j);
+                const k = j * size + i;
+                for (let t = 0; t < channelCounts.length; t++) {
+                    const ch = channelCounts[t], buf = bufs[t], v = out[t], o = k * ch;
+                    for (let c = 0; c < ch; c++) buf[o + c] = v[c] * 255;
+                }
             }
         }
-        faces.push(buf);
+        for (let t = 0; t < targets.length; t++) targets[t].push(bufs[t]);
     }
-    return { size, faces };
+    return { size, targets };
+}
+
+// The single-target case, which is what the skybox and the star want: six faces of `channels` bytes per texel.
+// A thin wrapper over the walk above rather than a second copy of it -- the answer key in
+// render/cubeBake-selfcheck.mjs is what proves the wrapper did not change a byte.
+export function bakeCubemap(size, channels, shade) {
+    const { targets } = bakeCubemapTargets(size, [channels], (dir, f, i, j) => [shade(dir, f, i, j)]);
+    return { size, faces: targets[0] };
 }

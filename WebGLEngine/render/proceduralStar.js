@@ -11,7 +11,7 @@
 // in render/proceduralStar-selfcheck.mjs.
 
 import { fbm } from "./valueNoise.js";        // v4327 -- the SAME noise the skybox bakes with, from its own file
-import { faceTexelDir } from "./cubeBake.js"; // v4327 -- the SAME cube geometry, likewise
+import { bakeCubemap } from "./cubeBake.js";  // v4336 -- the six-face walk (and with it the cube geometry)
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -72,14 +72,8 @@ export function starSurface(dir, P) {
 
 // Bake the photosphere to six RGB faces (no limb darkening -- that is view-dependent and lives in the shader).
 export function bakeStarCubemap(opts = {}) {
-    const P = makeStarParams(opts), size = opts.size || 128, faces = [];
-    for (let f = 0; f < 6; f++) {
-        const buf = new Uint8ClampedArray(size * size * 3);
-        for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
-            const c = starSurface(faceTexelDir(f, i, j, size), P), o = (j * size + i) * 3;
-            buf[o] = c[0] * 255; buf[o + 1] = c[1] * 255; buf[o + 2] = c[2] * 255;
-        }
-        faces.push(buf);
-    }
-    return { size, faces };
+    const P = makeStarParams(opts);
+    // v4336 -- the six-face walk is cubeBake's. It was hand-written here since v3835 and byte-for-byte the same
+    // loop the skybox and the planet's surface each also carried; what is left is the one line about stars.
+    return bakeCubemap(opts.size || 128, 3, (dir) => starSurface(dir, P));
 }

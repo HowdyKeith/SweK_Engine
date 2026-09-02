@@ -22,9 +22,11 @@
 // Run: node render/cubeBake-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import crypto from "node:crypto";
-import { FACES, faceTexelDir, bakeCubemap } from "./cubeBake.js";
+import { FACES, faceTexelDir, bakeCubemap, bakeCubemapTargets } from "./cubeBake.js";
 import { bakeNebulaCubemap } from "./nebulaSkybox.js";
 import { bakeStarCubemap } from "./proceduralStar.js";
+import { bakeSurfaceCubemap } from "../world/planetSurface.js";
+import { planetSpec } from "../world/procPlanet.js";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
@@ -132,6 +134,33 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     ok(ndef === KEY["nebula:default"], `the nebula bake at SHIPPED DEFAULTS is unchanged (${ndef})`);
     const st = sha(cat(bakeStarCubemap({ size: 24 })));
     ok(st === KEY.star, `the star bake is unchanged (${st})`);
+}
+
+// 6b) THE MULTI-TARGET WALK IS THE SINGLE-TARGET ONE, N TIMES OVER -- and it samples ONCE per texel, which is
+//     the property planetSurface adopted it for. A helper that made its caller sample four times would be a
+//     tidier loop and a slower bake; that is not a refactor, so the sample count is counted here.
+{
+    let calls = 0;
+    const r = bakeCubemapTargets(7, [3, 1], (dir) => { calls++; return [[(dir[0] + 1) / 2, 0, 0], [(dir[1] + 1) / 2]]; });
+    ok(calls === 6 * 7 * 7, `the multi-target walk samples ONCE per texel, not once per target (${calls} calls for ${6 * 7 * 7} texels)`);
+    ok(r.targets.length === 2 && r.targets[0].length === 6 && r.targets[1].length === 6, "it returns six faces per target");
+    ok(r.targets[0][0].length === 7 * 7 * 3 && r.targets[1][0].length === 7 * 7 * 1, "each target carries its own channel count");
+
+    // the single-target wrapper must equal a direct multi-target call with one target
+    const shade = (dir) => [(dir[0] + 1) * 0.5, (dir[1] + 1) * 0.5, (dir[2] + 1) * 0.5];
+    const one = bakeCubemap(9, 3, shade), many = bakeCubemapTargets(9, [3], (d) => [shade(d)]);
+    let same = true;
+    for (let f = 0; f < 6; f++) if (sha(one.faces[f]) !== sha(many.targets[0][f])) same = false;
+    ok(same, "bakeCubemap is exactly bakeCubemapTargets with one target -- a wrapper, not a second copy");
+
+    // AND THE PLANET'S FOUR-TARGET BAKE IS PINNED, because it is the caller that shaped the primitive.
+    const KEY = { albedo: "dae15faad38285c3", normal: "32fc971f247623cd", rough: "1bfeae2167ba90b7", height: "376daeb775cecb22" };
+    const s = bakeSurfaceCubemap(planetSpec(42), { size: 12 });
+    const cat = (fs) => Buffer.concat(fs.map((x) => Buffer.from(x)));
+    const got = { albedo: sha(cat(s.albedo)), normal: sha(cat(s.normal)), rough: sha(cat(s.rough)), height: sha(cat(s.height)) };
+    const drift = Object.keys(KEY).filter((k) => KEY[k] !== got[k]);
+    ok(drift.length === 0, "the planet's four-target surface bake is unchanged by the move to the shared walk",
+       drift.length ? drift.map((k) => `${k}: ${got[k]} != ${KEY[k]}`).join("; ") : "albedo, normal, rough, height all match the pre-move key");
 }
 
 // 7) SABOTAGE -- the checks above have to be able to fail. Each of these is a mistake this move could plausibly

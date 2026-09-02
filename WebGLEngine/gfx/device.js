@@ -16,7 +16,8 @@
 //
 // The same round adds what GPU-driven rendering needs and nothing else: buffers with a declared USAGE (vertex, index,
 // storage, indirect, uniform), compute pipelines, a dispatch that runs BEFORE the frame's render pass, an index
-// buffer, an instance-stepped second vertex buffer, drawIndexed, and drawIndexedIndirect. WebGL2 has no compute and
+// buffer, an instance-stepped second vertex buffer, drawIndexed, and drawIndexedIndirect (v4339 adds
+// dispatchWorkgroupsIndirect, so a pass can size the next one without a readback). WebGL2 has no compute and
 // no indirect draw, so on that backend those two REFUSE BY NAME and point at the CPU twin in render/gpuDriven.mjs,
 // which produces the same per-LOD instance records the compute shader does. Everything else -- index buffers,
 // instancing, drawIndexed -- WebGL2 does natively, so a GPU-driven scene draws on both.
@@ -101,6 +102,7 @@ function nullBackend(opts = {}) {
                 indices: (b) => ops.push(["indices", !!(b && b.__buf)]), uniform: (n) => ops.push(["uniform", n]), texture: (n) => ops.push(["texture", n]),
                 storage: (n) => ops.push(["storage", n]), draw: (n, inst = 1) => ops.push(["draw", n, inst]),
                 drawIndexed: (n, inst = 1, first = 0) => ops.push(["drawIndexed", n, inst, first]),
+                dispatchIndirect: (c, b, off = 0) => { if (cleared) throw new Error("gfx/device: dispatchIndirect() must come before pass.clear() -- compute work runs before the frame's render pass"); ops.push(["dispatchIndirect", c && c.__compute ? "compute" : "?", !!(b && b.__buf), off]); },
                 drawIndexedIndirect: (b, off = 0) => ops.push(["drawIndexedIndirect", !!(b && b.__buf), off]) };
             fn({ pass, device: dev }); ops.push(["submit"]);
             if (o && o.read) return Promise.resolve({ pixels: null, width: 0, height: 0, backend: "null" }); },
@@ -207,6 +209,7 @@ function webgl2Backend(canvas, opts = {}) {
             };
             const pass = {
                 dispatch: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
+                dispatchIndirect: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
                 clear: (c) => { cleared = true; gl.clearColor(c[0], c[1], c[2], c[3] == null ? 1 : c[3]); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
                 // Level 13 -- begin(): draw ON TOP of what the last frame left, colour and depth both kept. GL keeps
                 // them by not clearing; WebGPU says loadOp: "load". A second occlusion phase needs exactly this.
@@ -448,6 +451,15 @@ async function webgpuBackend(canvas, opts = {}) {
                     if (!c || !c.__compute) throw new Error("gfx/device: dispatch() needs a pipeline from device.compute()");
                     if (c.error) throw new Error(c.error);
                     const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); cp.setBindGroup(0, bindGroupFor(c)); const g = Array.isArray(wg) ? wg : [wg]; cp.dispatchWorkgroups(g[0] || 1, g[1] || 1, g[2] || 1); cp.end(); },
+                // v4339 -- THE DISPATCH SIZE ITSELF IN A BUFFER. The cull pass has always been able to fill an indirect
+                // DRAW; this is the other half, and it is what lets one pass decide how much work the next one does
+                // without a readback. The buffer holds three u32 -- workgroupsX, Y, Z -- at `byteOffset`, and the GPU
+                // reads them when the command runs, not when it is encoded.
+                dispatchIndirect: (c, b, byteOffset = 0) => { if (rp) throw new Error("gfx/device: dispatchIndirect() must come before pass.clear() -- a compute pass cannot run inside the frame's render pass; put the compute work first");
+                    if (!c || !c.__compute) throw new Error("gfx/device: dispatchIndirect() needs a pipeline from device.compute()");
+                    if (c.error) throw new Error(c.error);
+                    if (!b || !b.usage || !b.usage.includes("indirect")) throw new Error("gfx/device: dispatchIndirect() needs a buffer created with usage \"indirect\" -- it holds three u32 (workgroupsX, Y, Z) the GPU reads when the command runs");
+                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); cp.setBindGroup(0, bindGroupFor(c)); cp.dispatchWorkgroupsIndirect(b.gpu, byteOffset); cp.end(); },
                 clear: (c) => { const dt = depthTarget(target.width, target.height);
                     rp = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: { r: c[0], g: c[1], b: c[2], a: c[3] == null ? 1 : c[3] }, loadOp: "clear", storeOp: "store" }],
                         ...(dt ? { depthStencilAttachment: { view: dt._view, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } } : {}) }); },

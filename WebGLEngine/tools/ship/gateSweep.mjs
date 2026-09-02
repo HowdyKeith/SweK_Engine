@@ -247,13 +247,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "stronger statement than a green run alone -- a gate that has never been seen to fail is a gate " +
                  "whose green means nothing yet",
     }),
-    // v4336 -- the sixth closing, and the list shape has now absorbed a name collision twice without an edit
+    // v4336 -- A SIXTH CLOSING, for the gate this round added. Same one-line shape as the five before it, which
+    // is the whole benefit of main's list: five rounds have now appended an entry and none has had to touch the
+    // accounting. bakeShrinkGuard-selfcheck was run alone on this box and sabotaged four times against the
+    // module it guards -- three caught, and the fourth recorded in its own header as a no-op rather than
+    // counted as a pass.
+    since6: Object.freeze({
+        at: "v4336", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/bakeShrinkGuard-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 22 pass. Driven against the REAL v4335 accident -- it refuses " +
+                 "the exact orreryBake write that dropped four files, names them, and exits 1",
+    }),
+    // v4350 -- A SEVENTH CLOSING, for the version preflight. Seven entries appended in seven rounds and the
+    // accounting below has never been edited once: that is what the list shape bought, and it is why this
+    // branch's fourth and fifth closings survived two merges with main adding its own in between.
+    since7: Object.freeze({
+        at: "v4350", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/versionPreflight-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 24 pass. All four of the session's real version collisions are " +
+                 "replayed in it and refused; three sabotages caught, one of them the ENOBUFS fault the guard's " +
+                 "own first draft shipped",
+    }),
+    // v4352 -- the eighth closing, and the list shape has now absorbed a THIRD name collision without an edit
     // to the arithmetic, which is what it was for. #40's gate is one file; the round it belongs to also
     // rewired seven of knobLiveness-selfcheck's own budgets from typed round numbers to reads of the measured
     // cost record, so THAT gate was run to completion beside this one rather than left to the quick sweep's
     // cap -- a gate whose budgets changed is exactly the gate a 3 s cap cannot vouch for.
-    since6: Object.freeze({
-        at: "v4336", swept: 1, green: 1, red: 0,
+    since8: Object.freeze({
+        at: "v4352", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/roundhouse/sweepBudget-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, seven sections. Driven RED by four sabotages of the module it " +

@@ -36,7 +36,7 @@ import { SCENARIOS } from "../../physics/blobKelvin.js";
 // would have been a second import of the same names. Only what main genuinely lacked is added here.
 import { sameValue, refusedOnly } from "./knobLiveness.mjs";
 import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
-// v4336, #40 -- the budgets below were typed round numbers; these read the measured sweep record.
+// v4352, #40 -- the budgets below were typed round numbers; these read the measured sweep record.
 import { sweepBudgetFor, sweepBudgetOr } from "./costRecord.mjs";
 
 let fails = 0;

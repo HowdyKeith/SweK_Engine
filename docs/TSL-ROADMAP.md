@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -117,7 +117,49 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    -- by 2.5e-5 after 12 iterations and 4.5e-2 after 448. Two modules compiled separately may round a multiply-add
    differently, and on a chaotic orbit that ulp is the whole difference by the end; the growth rate is the exponent
    the pass computes. Bits are asserted where bits are meaningful and the divergence is measured where they are not.
-   Not built: a compute pass that READS a storage buffer as well as writing one, and workgroup-shared or atomic work.
+   v4336 -- AND ONE THAT READS. Every real compute pass in render/gpuDriven.mjs reads buffers as well as writing
+   them. computeShell's storage entries take an `access` ("read" or the default "read_write"), because three
+   declares every buffer it touches as read_write whether the graph writes to it or not -- the SHELL is where
+   read-only is stated -- and transplantCompute matches a generated buffer to a shell entry BY ROLE, which one the
+   body assigns to, rather than by the order three emitted them in. physicsTsl makeChaosMaskTsl is the second pass:
+   it reads the sweep's buffer and writes 1 where the exponent is positive. Section 5: two dispatches on one frame's
+   encoder, the second bound to the first's buffer, and the mask is the sign of the sweep's own output on all 64
+   elements; every element it calls periodic above r = 3.8 lies inside [1 + sqrt(8), 3.857], the period-3 window
+   whose edge this tree owns exactly. The role mapping's sabotage went 0 RED on its first run and that was the
+   finding: the shell had listed the written buffer first, which is the order three emits, so position and role
+   agreed and the check proved nothing. The shell now declares its input first, as the cull pass does.
+   v4337 -- AND AN ATOMIC ONE. A shell entry may say `atomic: true`, declaring its elements atomic<T>, and the pair
+   must agree: three writes atomicAdd(&buf.value[i], ...) and WGSL takes that pointer only into an atomic<T>, so a
+   shell that forgot is refused by name rather than by the device's compiler. The counter is also a buffer the pass
+   WRITES while nothing assigns to it, so the role detector looks for the atomic call as well. physicsTsl
+   makeChaosTallyTsl counts the chaotic elements of the sweep into one number. Section 6, at 1024 elements over
+   sixteen workgroups: the tally is exactly the number of positive elements in the buffer it read, every run.
+   AND THE ATOMIC IS MEASURED RATHER THAN ASSUMED -- the same module with the atomic taken out by hand compiles,
+   runs, and counts 156 to 171 against a truth of 670, a different wrong number every time: 74% to 77% of the
+   increments lost to contention. At 64 elements there is one workgroup and nothing to lose, which is why the
+   section runs at 1024. This is the cull pass's own shape; what is still missing before a real gpuDriven pass
+   could be regenerated is an INDIRECT dispatch (the count a pass runs at living in a buffer).
+   v4338 -- WORKGROUP-SHARED MEMORY. computeShell takes `shared` ([{ name, element, length }] -> var<workgroup>
+   name: array<element, length>), because three declares its own WorkgroupArray_NNN in a "// locals" section the
+   transplant used to drop -- which left the body naming an array nothing declared, and the device said so.
+   physicsTsl makeChaosReduceTsl is the reduction: each lane writes its 1 or 0 into the shared array, the group
+   waits at a barrier, lane 0 sums 64 slots and contributes ONE atomic increment. Section 7: the same 670 as the
+   per-lane tally with sixteen atomic operations instead of 670, three's generated name replaced by the shell's,
+   and render/wgslSpec.mjs's own parseWorkgroupVars reading array<u32, 64> = 256 bytes out of a shader nobody
+   wrote -- the first generated module that scanner has had to read. THE BARRIER IS MEASURED, NOT CITED: removed,
+   the same module reads 40 against 670 every run, because lane 0 sums before the other 63 have written.
+   v4339 -- AN INDIRECT DISPATCH, and it took a gfx/device.js change first. The device has always had
+   drawIndexedIndirect, so the GPU could decide how many INSTANCES to draw; the number of INVOCATIONS was still a
+   JavaScript number. pass.dispatchIndirect(pipeline, buffer, byteOffset) reads three u32 when the command runs;
+   WebGL2 refuses it by name as it refuses every compute call. physicsTsl makeDispatchSizerTsl is one lane that
+   reads a count and writes those three numbers. Section 8: the sweep writes 1024 exponents, the tally counts 670
+   atomically, the sizer divides by the workgroup size, and the mark pass runs 704 invocations -- 11 x 64 -- with
+   nothing read back to the CPU in between; seed the same buffer with 64 or 200 and the same encoded command runs
+   64 or 256. And the SHELL owns the declarations: three declares the tally atomic<u32> in the sizer's module too,
+   because the flag is on the node rather than the use, and the shell ships it as a plain read-only u32.
+   With this every shape render/gpuDriven.mjs's cull pass has -- reads, writes, an atomic, workgroup memory, an
+   indirect dispatch -- is transplantable. What no round has done yet is write the CULL ITSELF as a graph and hold
+   the fleet's own picture to it, which is what all eight sections are for.
 
 ## The count that says when step 4 matters
 
