@@ -101,6 +101,7 @@ export const UNGRAPHED = Object.freeze({
         "Makio64/advanced-threejs-tsl-webgpu-rendering", "novalain/gi-voxels", "stuinfla/Repo-Explainer",
         "dimartarmizi/threejs-procedural-terrain", "HenryLoM/CliWaifuTamagotchi", "upf-gti/wgpuEngine",
         "node-3d/webgl", "node-3d/bullet", "node-3d/opencl", "node-3d/uv-loop", "node-3d/steam-api",
+        "krispuckett/SwiftUIShaders",   // v4305, same depth-1 reading
     ]),
 });
 

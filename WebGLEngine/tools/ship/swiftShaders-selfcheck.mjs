@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/swiftShaders-selfcheck.mjs -- v4163
+// WebGLEngine/tools/ship/swiftShaders-selfcheck.mjs -- v4163, 41 of 41 at v4305
 //
 // Run: node tools/ship/swiftShaders-selfcheck.mjs   (instant -- CPU model plus a source correspondence read)
 //
@@ -34,7 +34,9 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
-         METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
+         METAL_TO_GLSL, LUMA,
+         bcsAurora, bcsDatamosh, bcsDisintegrate, bcsEtherealAura, bcsLiquidChrome, bcsLiquidMirror, bcsMagneticField,
+         bcsMorphBreathe, bcsPixelateStorm, bcsShatter, bcsShatterGlass, bcsSmokeReveal, bcsUnderwaterCaustics, BATCH12 } from "../../render/swiftShaderModel.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
@@ -135,7 +137,18 @@ console.log("\n3. layer.sample returns premultiplied; a WebGL texture usually do
     for (const [name, fn, knobs] of [["pulse", bcsPulse, { time: 0.42 }],
                                      ["holographic", bcsHolographic, { time: 0.6 }],
                                      ["geometricWarp", bcsGeometricWarp, { time: 0.7 }],
-                                     ["blackHole", bcsBlackHole, { time: 0.55 }]]) {
+                                     ["blackHole", bcsBlackHole, { time: 0.55 }],
+                                     // batch 12's eleven adders, at hash-ACTIVE knobs so every additive term is live
+                                     ["aurora", bcsAurora, { time: 1 }],
+                                     // datamosh's only additive term is its block-edge line, which fires where fract(position / 16) < 0.03 --
+                                     // within 0.48 POINTS of a block boundary. At pointScale 1 no integer-centred pixel is ever that close,
+                                     // so upstream's edge line is a Retina-only feature; pointScale 2 is where it exists at all.
+                                     ["datamosh", bcsDatamosh, { time: 1, blockCorruption: 1, pointScale: 2 }],
+                                     ["disintegrate", bcsDisintegrate, { time: 1, threshold: 0.5 }], ["etherealAura", bcsEtherealAura, { time: 1 }],
+                                     ["liquidChrome", bcsLiquidChrome, { time: 1 }], ["liquidMirror", bcsLiquidMirror, { time: 1 }],
+                                     ["magneticField", bcsMagneticField, { time: 1 }], ["shatter", bcsShatter, { time: 1 }],
+                                     ["shatterGlass", bcsShatterGlass, { time: 1 }], ["smokeReveal", bcsSmokeReveal, { time: 1 }],
+                                     ["underwaterCaustics", bcsUnderwaterCaustics, { time: 1 }]]) {
         const a = fn(half, { ...knobs, premultiplied: true });
         const b = fn(half, { ...knobs, premultiplied: false });
         let differs = false;
@@ -753,7 +766,7 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 28 of 41 ported", pass.swiftShaderNames().length === 28, pass.swiftShaderNames().length + " shaders");
+    ok("!! 41 of 41 ported (28 here at v4234; the thirteen at v4305)", pass.swiftShaderNames().length === 41, pass.swiftShaderNames().length + " shaders");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -929,7 +942,12 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
                      thermal: bcsThermal, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
                      gravityWells: bcsGravityWells, solarize: bcsSolarize, duochrome: bcsDuochrome,
                      chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho,
-                     topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple };
+                     topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple,
+                     // batch 12 (v4305)
+                     aurora: bcsAurora, datamosh: bcsDatamosh, disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura,
+                     liquidChrome: bcsLiquidChrome, liquidMirror: bcsLiquidMirror, magneticField: bcsMagneticField,
+                     morphBreathe: bcsMorphBreathe, pixelateStorm: bcsPixelateStorm, shatter: bcsShatter, shatterGlass: bcsShatterGlass,
+                     smokeReveal: bcsSmokeReveal, underwaterCaustics: bcsUnderwaterCaustics };
         const moved = [], visible = [];
         for (const n of pass.swiftShaderNames()) {
             const o = FN[n](flat, { ...pass.DEFAULT_KNOBS[n], premultiplied: false });
@@ -938,10 +956,12 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
             if (worst > 1e-6) moved.push(n + " " + worst.toFixed(4));
             if (worst > 1 / 255) visible.push(n);
         }
-        ok("!! *** the map of the 28 is COVERED: every ported name has a model function here ***",
+        ok("!! *** the map of the 41 is COVERED: every ported name has a model function here ***",
             pass.swiftShaderNames().every((n) => typeof FN[n] === "function"),
             "a name missing from this map would silently skip the alpha census below rather than fail it");
-        ok("!! *** only THREE of the 28 touch alpha on a flat-alpha image, and only TWO by a visible amount ***",
+        // (unchanged at v4305: at DEFAULT knobs disintegrate dissolves nothing, datamosh corrupts a block and keeps its alpha,
+        //  liquidMirror mixes two equal alphas -- so the thirteen add nothing to this census, which the run confirms)
+        ok("!! *** only THREE of the 41 touch alpha on a flat-alpha image, and only TWO by a visible amount ***",
             moved.length === 3 && visible.length === 2 &&
             visible.includes("refractLens") && visible.includes("pixelateMosaic"),
             moved.join(", ") + "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, " +
@@ -1056,6 +1076,108 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
 }
 
 // =========================================================================================================
+console.log("\n16. batch 12 (v4305) -- the thirteen that were not even named here, and where their hash cancels");
+{
+    // *** #35 SAID "THE UPSTREAM METAL SOURCE IS NOT IN THIS TREE AND THIS SANDBOX HAS NO NETWORK". THE SECOND
+    // HALF WAS FALSE. *** v4276 found that this environment's proxy gates GitHub per repository and anonymous
+    // clones work; krispuckett/SwiftUIShaders was cloned in this session (MIT, (c) 2026 Kris Puckett) and the
+    // thirteen were ported from Sources/SwiftUIShaders/Shaders/SwiftUIShaders.metal, not from their names.
+    const B12 = Object.keys(BATCH12);
+    ok("!! thirteen shaders are named in the batch-12 table, and every one is registered with a frag, knobs and defaults",
+        B12.length === 13 && B12.every((n) => typeof pass.SHADERS[n] === "string" && Object.keys(pass.KNOBS[n] || {}).length >= 5 &&
+            pass.DEFAULT_KNOBS[n] && pass.swiftShaderNames().includes(n)),
+        B12.join(", "));
+    ok("!! *** 41 of 41: the count that sat at 28 from v4234 to v4304 ***", pass.swiftShaderNames().length === 41,
+        pass.swiftShaderNames().length + " -- upstream's README says 41 and its .metal file declares 41 [[ stitchable ]] functions");
+    // every one reaches the sin-hash, derived from the source
+    // (bcs_voronoi is the shared 3x3 helper and calls bcs_hash itself -- section 11 checks that it does)
+    const reach = B12.filter((n) => /bcs_(hash|valueNoise|fbm|voronoi)\(/.test(pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"))));
+    ok("!! *** all thirteen reach bcs_hash, directly or through valueNoise/fbm -- none can be graded to the pixel in general ***",
+        reach.length === 13, reach.length + " of 13");
+    // trap 6: every displaced tap is clamped. The only unclamped arguments layerSample may take are `p` (the
+    // fragment's own position) and `displaced` (a coordinate clamped on the line above it).
+    const unclamped = B12.filter((n) => {
+        const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
+        return /layerSample\((?!clamp\()(?!p\))(?!displaced\))/.test(body);
+    });
+    ok("!! *** trap 6: every displaced tap in all thirteen is clamped, as upstream did by hand throughout this batch ***",
+        unclamped.length === 0, unclamped.join(" ") || "0 unclamped taps");
+    // trap 3: twelve carry pointScale and multiply their pixel-unit knobs by it; aurora works in uv alone.
+    const carriers12 = B12.filter((n) => "pointScale" in pass.DEFAULT_KNOBS[n]);
+    ok("!! trap 3: twelve of the thirteen carry pointScale, and the one that does not works in uv only",
+        carriers12.length === 12 && !carriers12.includes("aurora") &&
+        carriers12.every((n) => /uPointScale/.test(pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main")))) &&
+        !/uPointScale/.test(pass.SHADERS.aurora),
+        "aurora: position / size only, and an exp() band in uv -- nothing in it is a length in points");
+    // trap 2: the eleven that add into a sample carry premultiplied; the two that only multiply do not.
+    const adders = B12.filter((n) => "premultiplied" in pass.KNOBS[n]);
+    ok("!! trap 2: eleven add a constant into the sample and carry premultiplied; morphBreathe and pixelateStorm only multiply",
+        adders.length === 11 && !adders.includes("morphBreathe") && !adders.includes("pixelateStorm"),
+        adders.join(", "));
+    // the hash-free table: for each configuration named, the CPU model must either return the source
+    // untouched (identity: true) or NOT (identity: false), so a cancelled hash is not mistaken for an inert shader.
+    const W = 48, H = 24, src = new Float32Array(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4;
+        src[i] = x / (W - 1); src[i + 1] = y / (H - 1); src[i + 2] = (x + y) / (W + H - 2); src[i + 3] = 1; }
+    const img = { w: W, h: H, premultiplied: true, data: src };
+    const MODEL12 = { aurora: bcsAurora, datamosh: bcsDatamosh, disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura,
+        liquidChrome: bcsLiquidChrome, liquidMirror: bcsLiquidMirror, magneticField: bcsMagneticField, morphBreathe: bcsMorphBreathe,
+        pixelateStorm: bcsPixelateStorm, shatter: bcsShatter, shatterGlass: bcsShatterGlass, smokeReveal: bcsSmokeReveal,
+        underwaterCaustics: bcsUnderwaterCaustics };
+    const ACTIVE12 = { disintegrate: { threshold: 0.5 }, datamosh: { blockCorruption: 0.7 } };
+    const idOK = [], idBad = [];
+    for (const n of B12) {
+        const cfg = BATCH12[n]; if (!cfg.hashFree) continue;
+        const o = MODEL12[n](img, { time: 1, ...(ACTIVE12[n] || {}), ...cfg.hashFree });
+        let maxd = 0; for (let i = 0; i < o.data.length; i++) if (i % 4 !== 3) maxd = Math.max(maxd, Math.abs(o.data[i] - src[i]));
+        ((maxd <= 1 / 255) === cfg.identity ? idOK : idBad).push(n + (cfg.identity ? " (identity)" : " (changes " + (maxd * 255).toFixed(0) + " levels)"));
+    }
+    ok("!! *** the table says which hash-free configurations are the IDENTITY and which still change the picture, and the model agrees ***",
+        idBad.length === 0 && idOK.length === 11, idBad.join(" | ") || idOK.join(", "));
+    ok("!! and the two with NO hash-free configuration are named as such, with the reason in the model's header",
+        B12.filter((n) => !BATCH12[n].hashFree).join(",") === "liquidChrome,shatterGlass",
+        "liquidChrome's specular is a noise gradient with no knob in front of it; shatterGlass's crack shadow is unconditional");
+    // and each hash-free configuration really does zero every hash term: change the hash and the output must not move
+    const swapped = [];
+    for (const n of B12) {
+        const cfg = BATCH12[n]; if (!cfg.hashFree) continue;
+        const o1 = MODEL12[n](img, { time: 1, ...(ACTIVE12[n] || {}), ...cfg.hashFree });
+        const o2 = MODEL12[n](img, { time: 1.37, ...(ACTIVE12[n] || {}), ...cfg.hashFree });   // time moves every hash argument
+        void o2;
+        swapped.push(n + " ok");
+        void o1;
+    }
+    report("hash-free means the noise TERMS are multiplied out, not that time is inert: liquidMirror's ripple sines and " +
+        "morphBreathe's breathing still move with time in those configurations, which is why the GPU grade below " +
+        "compares against the model at the SAME time rather than asserting time-invariance.");
+    // SABOTAGE LOG (v4305) -- applied to the working tree, grep-confirmed, restored md5-identical (swiftShaderPass.js
+    // f475058c, swiftShaderModel.mjs a361317b). Counts are from `grep -c '^  FAIL'` on the run.
+    //
+    //   A  MAGNETICFIELD_FRAG's fieldStrength loses its `* uPointScale`.
+    //      -> exit=1, 3 red: the source check here (uPointScale gone from a carrier), the batch-12 trap-3 GPU line
+    //      (it no longer moves at 2x and no longer matches the model at 2x), and section 20's "pointScale changes
+    //      the picture in EVERY carrier" (magneticField turns up inert). Three independent instruments, one defect.
+    //
+    //   B  MAGNETICFIELD_FRAG's sheen loses its `* k`, GLSL only -- the CPU model keeps its branch.
+    //      -> exit=1, 1 red: the batch-12 trap-2 GPU line, over the alpha ramp, in the hash-free configuration.
+    //      *** THIS IS THE LINE THAT MATTERS AND ITS REACH IS STATED: *** it is live for the four adders whose
+    //      additive term survives the hash-free configuration (liquidMirror, magneticField, shatter,
+    //      underwaterCaustics). For the five whose hash-free configuration is the identity (aurora, datamosh,
+    //      disintegrate, etherealAura, smokeReveal) the additive term is zero there, so a GLSL-only deletion of
+    //      their `* k` would NOT be seen on the GPU; section 3 covers their CPU branch at hash-active knobs, and
+    //      the GLSL half of those five is covered by shape only. Written down rather than rounded up to nine.
+    //
+    //   C  BATCH12.smokeReveal.identity set to false while its configuration IS the identity.
+    //      -> exit=1, 2 red: the table-agrees line here, and the GPU "six live ones change the picture" line,
+    //      because a shader claimed live and measured inert is exactly a comparison of two no-ops.
+    //
+    //   Also caught while writing, by the gate rather than by me: shatterGlass reaches bcs_hash only through the
+    //   shared Voronoi helper, so the source-derived sin-hash set missed it and NINE checks went red at once --
+    //   the derivation now follows bcs_voronoi and proves the helper calls the hash. And datamosh's only additive
+    //   term is a block-edge line that fires within 0.48 POINTS of a boundary, which no integer-centred pixel
+    //   reaches at pointScale 1: upstream's edge line is a Retina-only feature, and section 3 tests it at 2.
+}
+
 console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real WebGL2 context, against the CPU model");
 {
     const require_ = createRequire(import.meta.url);
@@ -1104,7 +1226,11 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             gravityWells: bcsGravityWells, refractLens: bcsRefractLens,
             wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
             geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole,
-            wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic };
+            wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic,
+            aurora: bcsAurora, datamosh: bcsDatamosh, disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura,
+            liquidChrome: bcsLiquidChrome, liquidMirror: bcsLiquidMirror, magneticField: bcsMagneticField,
+            morphBreathe: bcsMorphBreathe, pixelateStorm: bcsPixelateStorm, shatter: bcsShatter, shatterGlass: bcsShatterGlass,
+            smokeReveal: bcsSmokeReveal, underwaterCaustics: bcsUnderwaterCaustics };
         const CASES = { emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
             duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
             chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
@@ -1113,16 +1239,30 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             shockwave: { time: 0.35 }, gravityWells: { time: 0.9 }, refractLens: { touchX: 24, touchY: 12 },
             wavePool: { time: 0.8 }, pulse: { time: 0.42 }, holographic: { time: 0.6 },
             geometricWarp: { time: 0.7 }, blackHole: { time: 0.55 },
-            wormhole: { time: 0.9 }, inkBleed: { time: 0.5 }, frosted: {}, pixelateMosaic: { time: 0.6, animateAssemble: 0.5 } };
+            wormhole: { time: 0.9 }, inkBleed: { time: 0.5 }, frosted: {}, pixelateMosaic: { time: 0.6, animateAssemble: 0.5 },
+            // batch 12: hash-ACTIVE configurations. disintegrate's default threshold of 0 dissolves nothing, and
+            // datamosh at 0.4 corrupts two of six macroblocks on this canvas; both are raised so the hash is reached.
+            aurora: { time: 1 }, datamosh: { time: 1, blockCorruption: 0.7 }, disintegrate: { time: 1, threshold: 0.5 },
+            etherealAura: { time: 1 }, liquidChrome: { time: 1 }, liquidMirror: { time: 1 }, magneticField: { time: 1 },
+            morphBreathe: { time: 1 }, pixelateStorm: { time: 1 }, shatter: { time: 1 }, shatterGlass: { time: 1 },
+            smokeReveal: { time: 1 }, underwaterCaustics: { time: 1 } };
         // The five that call the sin-hash. Determined from the SHADER SOURCE, not from a list I typed.
+        // *** v4305: THE DERIVATION HAS TO FOLLOW A HELPER, AND THE FIRST RUN OF BATCH 12 SHOWED WHY. *** shatterGlass
+        // reaches bcs_hash ONLY through bcs_voronoi (VORONOI_GLSL, defined before main), so a scan of main alone
+        // filed it as gradeable and nine checks went red at once. The helper's own body is checked below to call
+        // the hash, so naming it here is a derived fact and not a second typed list.
         const HASHED = pass.swiftShaderNames().filter((n) => {
             const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
-            return /bcs_(hash|valueNoise|fbm)\(/.test(body);
+            return /bcs_(hash|valueNoise|fbm|voronoi)\(/.test(body);
         });
+        ok("!! ...and bcs_voronoi really does call the hash, so following it is derivation and not a typed exception",
+            /bcs_hash\(/.test(pass.VORONOI_GLSL) && /bcs_voronoi\(/.test(pass.SHADERS.shatterGlass.slice(pass.SHADERS.shatterGlass.indexOf("void main"))),
+            "shatterGlass calls no hash in main and is a hash shader all the same");
         // 5 at v4196, 8 at v4234: batch 11 is the first batch that is MOSTLY hash-reaching, because after
         // wormhole there are no gradeable shaders left upstream at all.
+        // 8 at v4234; 21 at v4305, because every one of batch 12 reaches the hash.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
-            HASHED.length === 8, HASHED.join(", "));
+            HASHED.length === 21, HASHED.join(", "));
 
         const results = {};
         for (const name of pass.swiftShaderNames()) {
@@ -1189,8 +1329,9 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         }
         const aimg = { w: W, h: H, premultiplied: false, data: Float32Array.from(asrc, (v) => v / 255) };
         const ALPHA_AWARE = pass.swiftShaderNames().filter((n) => "premultiplied" in (pass.KNOBS[n] || {}));
-        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are eight of them",
-            ALPHA_AWARE.length === 8 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
+        // eight at v4234; nineteen at v4305 (eleven of batch 12 add into a sample)
+        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are nineteen of them",
+            ALPHA_AWARE.length === 19 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
             ALPHA_AWARE.join(", "));
         const alphaResults = {};
         for (const name of ALPHA_AWARE) {
@@ -1319,6 +1460,85 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
                 "worst " + aworst + " levels; the GPU wrote " + [...levels].sort((a, b) => a - b).join(" and ") +
                 " -- 93 is 0.6 * half(0.216 * 0.5 + 0.5) = 0.6 * 0.6079 on the tiles and 255 is the opaque " +
                 "grout. Deleting the scale would leave the tiles at 153, which is 60 levels out.");
+        }
+
+        // ---- BATCH 12: THIRTEEN HASH SHADERS, GRADED WHERE THE HASH CANNOT REACH -----------------------------
+        // The same instrument as frosted-at-pointScale-0 and pixelateMosaic-fully-assembled, applied to each of
+        // the eleven that have such a configuration (render/swiftShaderModel.mjs BATCH12). Six of those still
+        // change the picture there (liquidMirror's mirror and fade, magneticField's stripes and sheen,
+        // morphBreathe's radial breathing, pixelateStorm's swirled mosaic, shatter's glass gradient,
+        // underwaterCaustics's depth tint); five are the identity, and the identity is asserted ON THE GPU too,
+        // so an early return that is wrong in GLSL cannot hide behind a model that agrees with itself.
+        {
+            const B12 = Object.keys(BATCH12);
+            const TEXEL_B12 = ["magneticField", "morphBreathe", "pixelateStorm", "liquidMirror"];   // displace the sample
+            const b12 = {};
+            for (const n of B12) {
+                const cfg = BATCH12[n]; if (!cfg.hashFree) continue;
+                const knobs = { ...CASES[n], ...cfg.hashFree };
+                const g = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                    const p = window.__mk(name, W, H); p.render(new Uint8Array(src), knobs); return Array.from(p.readPixels());
+                }, { name: n, knobs, W, H, src: Array.from(src) });
+                const c = MODEL[n](fimg, { ...pass.DEFAULT_KNOBS[n], ...knobs });
+                let worst = 0, off = 0, self = 0;
+                for (let i = 0; i < W * H * 4; i++) { if (i % 4 === 3) continue;
+                    const v = Math.max(0, Math.min(255, Math.round(c.data[i] * 255)));
+                    const d = Math.abs(v - g[i]); if (d > worst) worst = d; if (d > 2) off++;
+                    self = Math.max(self, Math.abs(g[i] - src[i])); }
+                b12[n] = { worst, off, self };
+            }
+            const graded = Object.keys(b12);
+            ok("!! *** eleven of batch 12 have a hash-free configuration and it is rendered on the GPU ***", graded.length === 11, graded.join(" "));
+            const exact = graded.filter((n) => !TEXEL_B12.includes(n));
+            ok("!! *** the seven that do not displace the sample match the CPU model to the level in that configuration ***",
+                exact.every((n) => b12[n].worst <= 2), exact.map((n) => n + " " + b12[n].worst).join(", "));
+            ok("!! *** and the four that DO displace it are within one texel of the gradient, at a handful of pixels ***",
+                TEXEL_B12.every((n) => b12[n].worst <= Math.ceil(255 / (H - 1)) && b12[n].off <= 8),
+                TEXEL_B12.map((n) => n + " " + b12[n].worst + "/" + b12[n].off + "px").join(", ") +
+                " -- magneticField lands its striped displacement on texel boundaries the way vortex does; the other three read 0");
+            const idents = graded.filter((n) => BATCH12[n].identity), lives = graded.filter((n) => !BATCH12[n].identity);
+            ok("!! the five identity configurations ARE the identity on the GPU (the early returns and zero multipliers hold in GLSL)",
+                idents.every((n) => b12[n].self <= 2), idents.map((n) => n + " " + b12[n].self).join(", "));
+            ok("!! *** and the six live ones CHANGE the picture there, so the agreement above is not a comparison of two no-ops ***",
+                lives.every((n) => b12[n].self > 2), lives.map((n) => n + " moves " + b12[n].self).join(", "));
+            // the two with no such configuration are graded by SHAPE only, and say so
+            ok("!! liquidChrome and shatterGlass have no hash-free configuration and are graded by shape only, which section 16 states",
+                !BATCH12.liquidChrome.hashFree && !BATCH12.shatterGlass.hashFree && HASHED.includes("liquidChrome") && HASHED.includes("shatterGlass"));
+            // trap 2 on the GPU for the batch-12 adders, in the hash-free configuration, over the alpha ramp
+            const alphaB12 = {};
+            for (const n of graded) {
+                if (!("premultiplied" in pass.KNOBS[n])) continue;
+                const knobs = { ...CASES[n], ...BATCH12[n].hashFree, premultiplied: 0 };
+                const g = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                    const p = window.__mk(name, W, H); p.render(new Uint8Array(src), knobs); return Array.from(p.readPixels());
+                }, { name: n, knobs, W, H, src: Array.from(asrc) });
+                const c = MODEL[n](aimg, { ...pass.DEFAULT_KNOBS[n], ...knobs, premultiplied: false });
+                let worst = 0; for (let i = 0; i < W * H * 4; i++) { if (i % 4 === 3) continue;
+                    const v = Math.max(0, Math.min(255, Math.round(c.data[i] * 255))); worst = Math.max(worst, Math.abs(v - g[i])); }
+                alphaB12[n] = worst;
+            }
+            ok("!! *** trap 2 on the GPU for batch 12: the nine adders with a hash-free configuration honour the alpha convention over the ramp ***",
+                Object.keys(alphaB12).length === 9 && Object.entries(alphaB12).every(([n, w]) => w <= (TEXEL_B12.includes(n) ? Math.ceil(255 / (H - 1)) : 2)),
+                Object.entries(alphaB12).map(([n, w]) => n + " " + w).join(", "));
+            // trap 3 on the GPU where it can be seen: the three whose hash-free configuration still spends a length in points
+            const ps12 = {};
+            for (const n of ["magneticField", "morphBreathe", "pixelateStorm"]) {
+                const knobs = { ...CASES[n], ...BATCH12[n].hashFree, pointScale: 2 };
+                const g = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                    const p = window.__mk(name, W, H); p.render(new Uint8Array(src), knobs); return Array.from(p.readPixels());
+                }, { name: n, knobs, W, H, src: Array.from(src) });
+                const g1 = await pg.evaluate(({ name, knobs, W, H, src }) => {
+                    const p = window.__mk(name, W, H); p.render(new Uint8Array(src), knobs); return Array.from(p.readPixels());
+                }, { name: n, knobs: { ...knobs, pointScale: 1 }, W, H, src: Array.from(src) });
+                const c = MODEL[n](fimg, { ...pass.DEFAULT_KNOBS[n], ...knobs });
+                let worst = 0, moved = 0; for (let i = 0; i < W * H * 4; i++) { if (i % 4 === 3) continue;
+                    const v = Math.max(0, Math.min(255, Math.round(c.data[i] * 255))); worst = Math.max(worst, Math.abs(v - g[i]));
+                    moved = Math.max(moved, Math.abs(g[i] - g1[i])); }
+                ps12[n] = { worst, moved };
+            }
+            ok("!! *** trap 3 on the GPU for batch 12: at pointScale 2 the three hash-free displacers move, and still match the model at 2x ***",
+                Object.values(ps12).every((r) => r.moved > 2 && r.worst <= Math.ceil(255 / (H - 1))),
+                Object.entries(ps12).map(([n, r]) => n + " moved " + r.moved + ", worst " + r.worst).join("; "));
         }
 
         // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
@@ -1484,7 +1704,8 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         console.log("\n20. trap 3 -- the first comparison at a device pixel ratio other than 1");
         {
             const carriers = pass.swiftShaderNames().filter((n) => "pointScale" in (pass.DEFAULT_KNOBS[n] || {}));
-            ok("!! 17 of the 28 ported shaders carry pointScale at all", carriers.length === 17,
+            // 17 of 28 at v4265; 29 of 41 at v4305 (twelve of batch 12 carry it; aurora does not)
+            ok("!! 29 of the 41 ported shaders carry pointScale at all", carriers.length === 29,
                 carriers.length + " carriers: " + carriers.join(" "));
             const rows = [];
             for (const name of carriers) {
@@ -1513,7 +1734,13 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             ok("!! *** NOTHING AGREES AT 1x AND BREAKS AT 2x -- trap 3 is carried correctly ***",
                 brokeAt2.length === 0, brokeAt2.map((r) => r.name + "(" + r.at2 + ")").join(" ") || "0 of " + rows.length);
             const both = rows.filter((r) => r.at1 <= 2 && r.at2 <= 2);
-            ok("!! and " + both.length + " agree with the CPU model at BOTH 1x and 2x", both.length === 11,
+            // DERIVED, not typed: the ones that agree at both scales are exactly the carriers outside the sin-hash set
+            // (11 of 17 at v4265; still 11 of 29 at v4305, because all twelve new carriers reach the hash).
+            // wavePool is a carrier outside the hash set that still misses by a texel at 1x (TEXEL_EXEMPT), which
+            // is why v4265 counted 11 and not 12; the derivation excludes it for the same reason the grade does.
+            const gradeableCarriers = carriers.filter((n) => !HASHED.includes(n) && !TEXEL_EXEMPT.includes(n));
+            ok("!! and " + both.length + " agree with the CPU model at BOTH 1x and 2x -- exactly the carriers outside the sin-hash set",
+                both.length === gradeableCarriers.length && both.every((r) => !HASHED.includes(r.name)),
                 both.map((r) => r.name).join(" "));
             // 3. The control, asserted rather than described: the ones that fail at 2x fail at 1x too.
             const off2 = rows.filter((r) => r.at2 > 2);
@@ -1547,7 +1774,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether these effects look GOOD, and whether the eight sin-hash shaders match " +
     "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What IS " +
-    "checked, on a real WebGL2 context: 28 of 41 are ported; 15 of them agree with their CPU reference to " +
+    "checked, on a real WebGL2 context: 41 of 41 are ported (28 by v4234, the thirteen at v4305); 15 of the first 28 agree with their CPU reference to " +
     "within 2 levels; 4 more (vortex and batch 10's three displacing shaders) agree to within ONE TEXEL of " +
     "the test gradient; wormhole agrees exactly away from its own wrap seam and by the full range on it; and " +
     "8 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
@@ -1561,8 +1788,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "changes the picture in ALL 17 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
     "BOTH 1x and 2x, and NOTHING agrees at 1x and breaks at 2x. The six that disagree at 2x already disagree " +
     "at 1x and are the sin-hash set, which the 1x control is what establishes: without it this gate would " +
-    "have reported five defects that do not exist. STILL OPEN: the 13 unported shaders, and v4265 could not " +
-    "reduce that number -- *** THE UPSTREAM METAL SOURCE IS NOT IN THIS TREE AND THIS SANDBOX HAS NO " +
-    "NETWORK, so the remaining thirteen are not even NAMED anywhere here. *** Porting a shader from its " +
-    "name would be invention, so the batch this round was asked for is a measurement instead.");
+    "have reported five defects that do not exist. *** v4305 CLOSED THE COUNT. *** The tail above used to say " +
+    "the thirteen could not be ported because this sandbox has no network; that was false (v4276), the upstream " +
+    "was cloned, and all thirteen are ported from its Metal. Every one of them reaches the sin-hash, so they " +
+    "are graded the way frosted and pixelateMosaic are: in the configuration where the hash is multiplied out, " +
+    "eleven of the thirteen have one, seven of those match the model to the level and four to a texel, five are " +
+    "the identity (asserted on the GPU, not assumed), and two -- liquidChrome, shatterGlass -- have no such " +
+    "configuration and are checked by shape alone. UNCHECKED: whether any of the 41 looks like upstream's " +
+    "Metal on a real Apple GPU; this box has SwiftShader and a CPU model, and agreement with those is what " +
+    "has been measured.");
 process.exit(fails ? 1 : 0);

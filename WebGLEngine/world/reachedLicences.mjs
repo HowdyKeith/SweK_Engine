@@ -768,6 +768,24 @@ export const REACHED_SOURCES = Object.freeze([
         redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
         why: "Steamworks bindings. Nothing in this tree ships to Steam. Refused, and recorded so the URL is not read twice.",
     },
+    {
+        // v4305 -- cited in a module header since v4163 and registered by nobody (the #137 shape, a fifth time),
+        // found because #35's last thirteen shaders needed the upstream opened, and opening it meant reading its
+        // LICENSE for the first time. The header was right.
+        repo: "krispuckett/SwiftUIShaders", sourceUrl: "https://github.com/krispuckett/SwiftUIShaders",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Kris Puckett", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE (c) 2026 Kris Puckett, 21 lines; README: 'use them, ship them, remix them'. " +
+                     "Second-hand from the README at v4163, FIRST-HAND from the LICENSE at v4305.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The 41 [[ stitchable ]] Metal shaders, each REWRITTEN as a CPU reference in JavaScript and a GLSL ES " +
+             "3.00 fragment, with the six Metal-to-GLSL traps modelled rather than copied. No Metal source is in the tree.",
+        takenPaths: ["render/swiftShaderModel.mjs", "render/swiftShaderPass.js"],
+        citedPaths: ["tools/ship/swiftShaders-selfcheck.mjs", "render/perspectiveWarp.mjs", "render/atmosphere.mjs"],
+        why: "The one source in this ledger whose taking is 41 functions deep and was graded on a GPU before its " +
+             "licence file was ever opened. #35 closed at v4305 with all 41 ported; the register entry closes the " +
+             "paperwork half, and moves the cited-but-unregistered debt from 50 to 49.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
@@ -793,7 +811,9 @@ export const REACHED_SOURCES = Object.freeze([
  * and appeared in no register -- the same shape as #137 and #53, a third time. The debt did not shrink because
  * anybody set out to shrink it; it shrank because a claim was checked and the check ran into a citation.
  */
-export const UNREGISTERED_CITED_BASELINE = 50;
+// v4305 clears a fifth, krispuckett/SwiftUIShaders, leaving 49 -- found the same way as the fourth: a round that
+// had to open the upstream for another reason (#35's last thirteen shaders) read the LICENSE while it was there.
+export const UNREGISTERED_CITED_BASELINE = 49;
 
 export function validateEntry(e) {
     const p = [];

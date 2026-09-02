@@ -1489,3 +1489,524 @@ export function bcsRefractLens(img, { touchX = 0, touchY = 0, lensRadius = 0.25,
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+// ============================================================================================================
+// ---- BATCH 12 (v4305): THE THIRTEEN THAT WERE "NOT EVEN NAMED ANYWHERE HERE" ------------------------------
+//
+// #35 stalled at 28 of 41 because "the upstream Metal source is not in the tree, there is no network, and the
+// remaining thirteen are not named anywhere here -- porting from a name would be invention". The network half
+// was false (v4276 found the proxy gates GitHub per repository and anonymous clones work); the rest was true.
+// krispuckett/SwiftUIShaders was cloned in this session (MIT, LICENSE (c) 2026 Kris Puckett, 21 lines, sha256
+// ea8b7a631013...) and every function below is read from Sources/SwiftUIShaders/Shaders/SwiftUIShaders.metal.
+//
+// *** ALL THIRTEEN REACH THE SIN-HASH. *** Every one calls bcs_hash, bcs_valueNoise or bcs_fbm, so none can be
+// graded pixel-for-pixel against this model on a GPU in general -- the boundary section 11 of the gate has
+// stated since v4196. What CAN be graded is the configuration in which the hash CANCELS: a knob at zero that
+// multiplies every noise term out (magneticField's fieldTurbulence, morphBreathe's organic, liquidMirror's
+// ripple, pixelateStorm's stormAmount, underwaterCaustics's two, shatter's explode+edgeGlow) or that returns the
+// image untouched (aurora's intensity, smokeReveal's smokeAmount, disintegrate's threshold at 0, etherealAura's
+// distortion+auraIntensity, datamosh's blockCorruption). Two have no such configuration -- liquidChrome's
+// specular is a noise gradient with no knob in front of it, and shatterGlass's crack shadow is unconditional --
+// and the gate says so rather than grading them at all.
+//
+// The six traps, as they land here: every pixel-unit knob carries pointScale (12 of the 13; aurora works in uv
+// only); every displaced tap is clamped, as upstream did by hand everywhere in this batch; every scalar cast to
+// half() is toHalf'd on both sides; y is measured DOWN, so aurora's "brightest in the upper portion" and the
+// two shaders' bottom-fading light rays keep upstream's sense; and hsb2rgb's fmod is fed a fract()ed hue again.
+// ============================================================================================================
+
+const b12fract = (v) => v - Math.floor(v);
+const b12step = (e, x) => (x < e ? 0 : 1);
+const b12norm2 = (x, y) => { const m = Math.hypot(x, y); return m > 0 ? [x / m, y / m] : [NaN, NaN]; };
+const b12pre = (img, a) => (img.premultiplied ? 1 : a);     // unused helper guard, see k below
+void b12pre;
+
+/** bcs_aurora -- flowing bands of additive light, strongest in the upper third. uv-only: no pointScale. */
+export function bcsAurora(img, { time = 0, intensity = 0.5, bands = 4.5, speed = 1.65, colorShift = 0.5,
+                                 premultiplied = true } = {}) {
+    const { w, h } = img, out = new Float32Array(w * h * 4);
+    const t = time * speed, nb = Math.trunc(bands);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const uvx = (x + 0.5) / w, uvy = (y + 0.5) / h;
+        let heightMask = smoothstep(0.8, 0.1, uvy);
+        heightMask *= smoothstep(0.0, 0.15, uvy);
+        let auroraVal = 0, hueAccum = 0;
+        for (let k = 0; k < nb; k++) {
+            const fi = k, freq = 2.0 + fi * 1.5, phase = fi * 1.7;
+            let wave = Math.sin(uvx * freq * 3.14159 + t * (0.8 + fi * 0.3) + phase);
+            wave += Math.sin(uvx * freq * 1.7 + t * 0.5 + fi * 2.3) * 0.5;
+            const bandY = 0.3 + fi / bands * 0.4 + wave * 0.08;
+            const bandDist = Math.abs(uvy - bandY);
+            let band = Math.exp(-bandDist * bandDist * 200.0) * (0.6 + fi * 0.1);
+            band *= bcsFbm(uvx * 3.0 + t * 0.3, fi * 5.0 + t * 0.1, 3);
+            auroraVal += band;
+            hueAccum += band * (fi / bands);
+        }
+        auroraVal = clamp(auroraVal, 0, 1) * heightMask * intensity;
+        const hue = b12fract(colorShift + hueAccum * 0.3 + 0.35);
+        const ac = bcsHsb2rgb(toHalf(hue), toHalf(0.7), 1.0);
+        const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2], a = img.data[i + 3];
+        const k = premultiplied || a === 0 ? 1 : a;
+        const gain = toHalf(auroraVal * 0.7);
+        const shimmer = toHalf(Math.sin(uvy * 80.0 + t * 5.0) * 0.02 * auroraVal);
+        out[i] = r + ac[0] * gain * k + shimmer * k;
+        out[i + 1] = g + ac[1] * gain * k + shimmer * k;
+        out[i + 2] = b + ac[2] * gain * k + shimmer * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_datamosh -- 16-POINT macroblocks, a hash picks the corrupted ones, which smear and quantise. */
+export function bcsDatamosh(img, { time = 0, blockCorruption = 0.4, smearAmount = 30, colorBleed = 0.5,
+                                   glitchRate = 2, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const bs = 16.0 * pointScale, nbx = w / bs, nby = h / bs;      // blocks across, in POINTS upstream
+    const tq = Math.floor(time * glitchRate) * 0.1, tq2 = Math.floor(time * glitchRate * 0.5) * 0.3;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const bux = Math.floor(uvx * nbx) / nbx, buy = Math.floor(uvy * nby) / nby;
+        const blockHash = bcsHash(bux * 73.0 + tq, buy * 73.0 + tq);
+        const orig = s(cx, cy);
+        if (b12step(1.0 - blockCorruption, blockHash) < 0.5) {
+            out[i] = orig[0]; out[i + 1] = orig[1]; out[i + 2] = orig[2]; out[i + 3] = orig[3];
+            continue;
+        }
+        const smearAngle = bcsHash(bux * 137.0 + tq2, buy * 137.0 + tq2) * 6.28;
+        const dx = Math.cos(smearAngle), dy = Math.sin(smearAngle);
+        const blockSmear = smearAmount * pointScale * (0.5 + blockHash * 0.5);
+        const ox = dx * blockSmear, oy = dy * blockSmear;
+        const sm = s(clamp(cx + ox, 0, w), clamp(cy + oy, 0, h));
+        const rr = s(clamp(cx + ox * (1.0 + colorBleed * 0.3), 0, w), clamp(cy + oy * (1.0 + colorBleed * 0.3), 0, h));
+        const bb = s(clamp(cx + ox * (1.0 - colorBleed * 0.2), 0, w), clamp(cy + oy * (1.0 - colorBleed * 0.2), 0, h));
+        const cb = toHalf(colorBleed);
+        let r = mix(sm[0], rr[0], cb), g = sm[1], b = mix(sm[2], bb[2], cb);
+        r = Math.floor(r * 16.0) / 16.0; g = Math.floor(g * 16.0) / 16.0; b = Math.floor(b * 16.0) / 16.0;
+        const cellx = b12fract(uvx * nbx), celly = b12fract(uvy * nby);
+        const blockEdge = 1.0 - b12step(0.03, Math.min(cellx, celly));
+        const k = premultiplied || sm[3] === 0 ? 1 : sm[3];
+        const add = toHalf(blockEdge * 0.1) * k;
+        out[i] = r + add; out[i + 1] = g + add; out[i + 2] = b + add; out[i + 3] = sm[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_disintegrate -- fbm dissolve with an ember edge that drifts; the first port that ZEROES a pixel. */
+export function bcsDisintegrate(img, { time = 0, threshold = 0, edgeWidth = 0.12, driftAmount = 25, direction = 1,
+                                       pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const ddx = Math.cos(direction), ddy = Math.sin(direction);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const orig = s(cx, cy);
+        if (orig[3] < 0.01) { out[i] = orig[0]; out[i + 1] = orig[1]; out[i + 2] = orig[2]; out[i + 3] = orig[3]; continue; }
+        const noise = bcsFbm(uvx * 6.0 + time * 0.1, uvy * 6.0 + time * 0.1, 5);
+        const noise2 = bcsFbm(uvx * 12.0 + 17.0, uvy * 12.0 + 31.0, 4);
+        const combined = noise * 0.7 + noise2 * 0.3;
+        const sweep = uvx * 0.4 + (1.0 - uvy) * 0.6;
+        const dv = combined * 0.6 + sweep * 0.4;
+        const edge = smoothstep(threshold - edgeWidth, threshold, dv);
+        const innerEdge = smoothstep(threshold - edgeWidth * 0.3, threshold, dv);
+        if (dv < threshold - edgeWidth * 1.5) { out[i] = 0; out[i + 1] = 0; out[i + 2] = 0; out[i + 3] = 0; continue; }
+        const edgeMask = edge - innerEdge;
+        const gi = toHalf(innerEdge * 0.8);
+        const glow = [mix(1.0, 1.0, gi), mix(0.4, 0.95, gi), mix(0.05, 0.8, gi)];
+        const particleDrift = (1.0 - edge) * driftAmount * pointScale;
+        const scatter = bcsValueNoise(uvx * 30.0 + time * 2.0, uvy * 30.0 + time * 2.0);
+        const ox = ddx * particleDrift + (scatter - 0.5) * particleDrift * 0.5;
+        const oy = ddy * particleDrift + (scatter - 0.5) * particleDrift * 0.5;
+        const dr = s(clamp(cx + ox, 0, w), clamp(cy + oy, 0, h));
+        const e = toHalf(edge);
+        let r = mix(dr[0], orig[0], e), g = mix(dr[1], orig[1], e), b = mix(dr[2], orig[2], e), a = mix(dr[3], orig[3], e);
+        const k = premultiplied || a === 0 ? 1 : a;
+        const m3 = toHalf(edgeMask * 3.0), m2 = toHalf(edgeMask * 2.0);
+        r = mix(r, glow[0] * k, m3) + glow[0] * m2 * k;
+        g = mix(g, glow[1] * k, m3) + glow[1] * m2 * k;
+        b = mix(b, glow[2] * k, m3) + glow[2] * m2 * k;
+        a *= e;
+        const sparkle = b12step(0.97, bcsValueNoise(uvx * 50.0 + time * 5.0, uvy * 50.0 + time * 5.0)) * edgeMask * 5.0;
+        out[i] = r + toHalf(sparkle) * k; out[i + 1] = g + toHalf(sparkle * 0.7) * k; out[i + 2] = b + toHalf(sparkle * 0.3) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_etherealAura -- domain-warped edge glow with displacement and chroma pushed inward from the frame. */
+export function bcsEtherealAura(img, { time = 0, auraWidth = 0.12, auraIntensity = 1, pulseSpeed = 1.5, distortion = 8,
+                                       hueShift = 3.5, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const hs = toHalf(hueShift);
+    const auraColor = [toHalf(toHalf(Math.sin(hs)) * toHalf(0.5) + toHalf(0.5)),
+                       toHalf(toHalf(Math.sin(hs + toHalf(2.094))) * toHalf(0.5) + toHalf(0.5)),
+                       toHalf(toHalf(Math.sin(hs + toHalf(4.189))) * toHalf(0.5) + toHalf(0.5))];
+    const pulse = 0.6 + 0.4 * Math.sin(time * pulseSpeed);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const edgeDist = Math.min(Math.min(uvx, 1.0 - uvx), Math.min(uvy, 1.0 - uvy));
+        const stx = uvx * 6.0, sty = uvy * 6.0;
+        const qx = bcsFbm(stx + time * 0.15, sty + time * 0.1, 5);
+        const qy = bcsFbm(stx + 5.2 + time * 0.12, sty + 1.3 + time * 0.18, 5);
+        const edgeWarp = bcsFbm(stx + 3.0 * qx, sty + 3.0 * qy, 4);
+        const auraMask = smoothstep(auraWidth + edgeWarp * auraWidth, 0.0, edgeDist);
+        const pulsedMask = auraMask * pulse;
+        const dsx = uvx * 4.0, dsy = uvy * 4.0;
+        const dqx = bcsFbm(dsx + time * 0.25, dsy + time * 0.2, 5);
+        const dqy = bcsFbm(dsx + 3.0 + time * 0.2, dsy + 7.0 + time * 0.3, 5);
+        const drx = bcsFbm(dsx + 3.0 * dqx + time * 0.1, dsy + 3.0 * dqy, 4);
+        const dry = bcsFbm(dsx + 3.0 * dqx, dsy + 3.0 * dqy + time * 0.08, 4);
+        const edx = uvx < 0.5 ? 1.0 : -1.0, edy = uvy < 0.5 ? 1.0 : -1.0;
+        let dx = (drx - 0.5) * distortion * pulsedMask + edx * pulsedMask * distortion * 0.3;
+        let dy = (dry - 0.5) * distortion * pulsedMask + edy * pulsedMask * distortion * 0.3;
+        const globalDisp = smoothstep(0.3, 0.0, edgeDist);
+        dx *= globalDisp * pointScale; dy *= globalDisp * pointScale;
+        const px = clamp(cx + dx, 0, w), py = clamp(cy + dy, 0, h);
+        const chromaAmount = pulsedMask * distortion * 0.12 * pointScale;
+        const [nx, ny] = b12norm2(uvx - 0.5 + 0.001, uvy - 0.5 + 0.001);
+        const chx = nx * chromaAmount, chy = ny * chromaAmount;
+        const rr = s(clamp(px + chx, 0, w), clamp(py + chy, 0, h));
+        const gg = s(px, py);
+        const bb = s(clamp(px - chx, 0, w), clamp(py - chy, 0, h));
+        const a = gg[3], k = premultiplied || a === 0 ? 1 : a;
+        const glow = pulsedMask * auraIntensity;
+        const g6 = toHalf(glow * 0.6), g15 = toHalf(glow * 0.15);
+        out[i] = rr[0] + auraColor[0] * g6 * k + g15 * k;
+        out[i + 1] = gg[1] + auraColor[1] * g6 * k + g15 * k;
+        out[i + 2] = bb[2] + auraColor[2] * g6 * k + g15 * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_liquidChrome -- fbm displacement, then a specular from the fbm's own gradient. No hash-free knob. */
+export function bcsLiquidChrome(img, { time = 0, distortion = 15, chromeIntensity = 0.5, flowSpeed = 1.55,
+                                       reflectionScale = 5.5, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const tx = time * flowSpeed * 0.2, ty = time * flowSpeed * 0.15, eps = 0.01;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const stx = (cx / w) * reflectionScale, sty = (cy / h) * reflectionScale;
+        const n1 = bcsFbm(stx + tx, sty + ty, 4);
+        const n2 = bcsFbm(stx + 5.0 + time * flowSpeed * 0.18, sty + 3.0 + time * flowSpeed * 0.22, 4);
+        const c = s(clamp(cx + n1 * distortion * pointScale, 0, w), clamp(cy + n2 * distortion * pointScale, 0, h));
+        const h0 = bcsFbm(stx + tx, sty + ty, 3);
+        const hx = bcsFbm(stx + eps + tx, sty + ty, 3);
+        const hy = bcsFbm(stx + tx, sty + eps + ty, 3);
+        const gx = (h0 - hx) / eps, gy = (h0 - hy) / eps;
+        const nm = Math.hypot(gx, gy, 1.0);
+        const nz = 1.0 / nm;
+        const specular = Math.pow(Math.max(nz, 0.0), 4.0);
+        const highlight = Math.pow(1.0 - Math.abs(nz), 3.0) * chromeIntensity;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const lum = toHalf(luma(c[0], c[1], c[2]));
+        const ci = toHalf(chromeIntensity * 0.5), hl = toHalf(highlight) * k, gain = toHalf(0.8 + specular * 0.4);
+        out[i] = (mix(c[0], lum, ci) + hl) * gain;
+        out[i + 1] = (mix(c[1], lum, ci) + hl) * gain;
+        out[i + 2] = (mix(c[2], lum, ci) + hl) * gain;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_liquidMirror -- a soft-edged reflection below mirrorAxis, rippled by two sines and one value noise. */
+export function bcsLiquidMirror(img, { time = 0, mirrorAxis = 0.55, ripple = 12, speed = 1.5, depth = 0.5,
+                                       pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const tw = 0.08, rs = mirrorAxis - tw, rf = mirrorAxis + tw, t = time * speed;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const reflectionDepth = smoothstep(rs, 1.0, uvy);
+        const reflectionBlend = smoothstep(rs, rf, uvy);
+        const mux = uvx, muy = uvy > rs ? mirrorAxis - (uvy - mirrorAxis) : uvy;
+        const rx = mux * 6.0, ry = muy * 6.0;
+        const r1 = Math.sin(rx * 4.0 + t * 1.3) * Math.cos(ry * 3.0 + t * 0.9);
+        const r2 = Math.sin(rx * 7.0 - t * 1.7) * Math.cos(ry * 5.0 + t * 1.1);
+        const r3 = bcsValueNoise(rx + t * 0.5, ry + t * 0.3);
+        const rippleStrength = reflectionBlend * reflectionDepth;
+        const amp = ripple * pointScale * rippleStrength;
+        const dx = (r1 * 0.5 + r2 * 0.3 + (r3 - 0.5) * 0.4) * amp;
+        const dy = (r1 * 0.3 + r2 * 0.5 + (r3 - 0.5) * 0.3) * amp;
+        const rc = s(clamp(mux * w + dx, 0, w), clamp(muy * h + dy, 0, h));
+        const oc = s(cx, cy);
+        const fade = toHalf(Math.max(1.0 - reflectionDepth * depth, 0.2));
+        let rr = rc[0] * fade, rg = rc[1] * fade, rb = rc[2] * fade;
+        const lum = toHalf(luma(rr, rg, rb)), ds = toHalf(reflectionDepth * 0.2);
+        rr = mix(rr, lum, ds); rg = mix(rg, lum, ds); rb = mix(rb, lum, ds);
+        const bl = toHalf(reflectionBlend);
+        const a = mix(oc[3], rc[3], bl), k = premultiplied || a === 0 ? 1 : a;
+        const caustic = toHalf(Math.pow(Math.max(r1 * r2 + 0.5, 0.0), 10.0) * 0.15 * rippleStrength) * k;
+        out[i] = mix(oc[0], rr, bl) + caustic;
+        out[i + 1] = mix(oc[1], rg, bl) + caustic;
+        out[i + 2] = mix(oc[2], rb, bl) + caustic;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_magneticField -- a dipole (or quadrupole) field's direction drives striped displacement and a sheen. */
+export function bcsMagneticField(img, { time = 0, fieldStrength = 40, lineCount = 8, fieldTurbulence = 0.5, polarity = 0,
+                                        pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const p1x = uvx - 0.25, p1y = uvy - 0.5, p2x = uvx - 0.75, p2y = uvy - 0.5;
+        const r1 = Math.max(Math.hypot(p1x, p1y), 0.001), r2 = Math.max(Math.hypot(p2x, p2y), 0.001);
+        let fx = p1x / (r1 * r1) - p2x / (r2 * r2), fy = p1y / (r1 * r1) - p2y / (r2 * r2);
+        if (polarity > 0.01) {
+            const p3x = uvx - 0.5, p3y = uvy - 0.3, p4x = uvx - 0.5, p4y = uvy - 0.7;
+            const r3 = Math.max(Math.hypot(p3x, p3y), 0.001), r4 = Math.max(Math.hypot(p4x, p4y), 0.001);
+            const qx = p3x / (r3 * r3) - p4x / (r4 * r4), qy = p3y / (r3 * r3) - p4y / (r4 * r4);
+            fx = mix(fx, fx + qx, polarity); fy = mix(fy, fy + qy, polarity);
+        }
+        const fieldMag = Math.hypot(fx, fy);
+        const fdx = fieldMag > 0.001 ? fx / fieldMag : 0, fdy = fieldMag > 0.001 ? fy / fieldMag : 0;
+        const angle = Math.atan2(fy, fx);
+        let stripes = Math.sin(angle * lineCount + time * 2.0);
+        stripes = stripes * stripes;
+        const turb = bcsFbm(uvx * 8.0 + time * 0.5, uvy * 8.0 + time * 0.5, 4) * fieldTurbulence;
+        const fs = fieldStrength * pointScale;
+        let ox = fdx * fs * stripes * (0.5 + turb), oy = fdy * fs * stripes * (0.5 + turb);
+        const perpStripe = Math.sin((uvx * fdx + uvy * fdy) * lineCount * 10.0 + time);
+        ox += -fdy * perpStripe * fs * 0.15; oy += fdx * perpStripe * fs * 0.15;
+        const c = s(clamp(cx + ox, 0, w), clamp(cy + oy, 0, h));
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const sheen = stripes * fieldMag * 0.3;
+        out[i] = c[0] + toHalf(sheen * 0.3) * k; out[i + 1] = c[1] + toHalf(sheen * 0.35) * k; out[i + 2] = c[2] + toHalf(sheen * 0.4) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_morphBreathe -- radial breathing mixed with fbm wander; at organic = 0 the noise is weighted out. */
+export function bcsMorphBreathe(img, { time = 0, breatheDepth = 28, breatheRate = 1.65, warpComplexity = 4.5, organic = 0.5,
+                                       pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const b1 = Math.sin(time * breatheRate) * 0.5 + 0.5;
+    const b2 = Math.sin(time * breatheRate * 0.7 + 1.5) * 0.5 + 0.5;
+    const b3 = Math.sin(time * breatheRate * 1.3 + 3.0) * 0.5 + 0.5;
+    const t = time * breatheRate * 0.3;
+    const radialPulse = b1 * (1.0 - organic) + b2 * organic;
+    const cp = toHalf(1.0 + b1 * 0.05), cm = toHalf(1.0 - b1 * 0.05), bp = toHalf(1.0 + (b1 - 0.5) * 0.08);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const stx = uvx * warpComplexity, sty = uvy * warpComplexity;
+        const qx = bcsFbm(stx + t * 0.5, sty + t * 0.3, 4);
+        const qy = bcsFbm(stx + 5.2 + t * 0.4, sty + 1.3 + t * 0.6, 4);
+        const rdx = (uvx - 0.5) * (radialPulse - 0.5) * 2.0, rdy = (uvy - 0.5) * (radialPulse - 0.5) * 2.0;
+        const odx = (qx - 0.5) * 2.0 * b2, ody = (qy - 0.5) * 2.0 * b3;
+        const edgeFade = smoothstep(0.0, 0.15, Math.min(Math.min(uvx, 1.0 - uvx), Math.min(uvy, 1.0 - uvy)));
+        const dx = mix(rdx, odx, organic) * breatheDepth * pointScale * edgeFade;
+        const dy = mix(rdy, ody, organic) * breatheDepth * pointScale * edgeFade;
+        const c = s(clamp(cx + dx, 0, w), clamp(cy + dy, 0, h));
+        out[i] = c[0] * cp * bp; out[i + 1] = c[1] * bp; out[i + 2] = c[2] * cm * bp; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_pixelateStorm -- a swirled, pulsing mosaic whose blocks scatter by hash; scanline in POINTS. */
+export function bcsPixelateStorm(img, { time = 0, pixelSize = 21, stormAmount = 0.5, swirl = 1.5, pulse = 1.5,
+                                        pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const pxSize = pixelSize * pointScale * (1.0 + Math.sin(time * pulse) * 0.3 * stormAmount);
+    const sw = Math.sin(time * 0.5);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const dx = uvx - 0.5, dy = uvy - 0.5, dist = Math.hypot(dx, dy), angle = Math.atan2(dy, dx);
+        const sa = swirl * (1.0 - dist) * sw;
+        const sux = 0.5 + dist * Math.cos(angle + sa), suy = 0.5 + dist * Math.sin(angle + sa);
+        const bx = Math.floor(sux * w / pxSize), by = Math.floor(suy * h / pxSize);
+        const pux = bx * pxSize / w, puy = by * pxSize / h;
+        const blockRand = bcsHash(bx, by);
+        const stormActive = b12step(1.0 - stormAmount * 0.8, blockRand);
+        const sox = Math.sin(time * 3.0 + blockRand * 20.0) * stormAmount * pxSize * 0.5 * stormActive;
+        const soy = Math.cos(time * 2.5 + blockRand * 15.0) * stormAmount * pxSize * 0.5 * stormActive;
+        const c = s(clamp(pux * w + sox, 0, w), clamp(puy * h + soy, 0, h));
+        const scan = Math.sin((cy / pointScale) * 3.14159 / 2.0) * 0.5 + 0.5;
+        const g = toHalf(0.92 + scan * 0.08);
+        out[i] = c[0] * g; out[i + 1] = c[1] * g; out[i + 2] = c[2] * g; out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** Voronoi over the 3x3 neighbourhood, upstream's two hash seeds. Returns [minDist, secondDist, closestCell, nearestDiff, secondDiff, nearestHash]. */
+function b12voronoi(cux, cuy, seedX, seedY, hashAt) {
+    const idx = Math.floor(cux), idy = Math.floor(cuy), fx = cux - idx, fy = cuy - idy;
+    let minDist = 10.0, secondDist = 10.0, ccx = 0, ccy = 0, ndx = 0, ndy = 0, sdx = 0, sdy = 0, nh = 0;
+    for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
+        const cellx = idx + k, celly = idy + j;
+        const px = bcsHash(cellx, celly), py = bcsHash(cellx + seedX, celly + seedY);
+        const dx = k + px - fx, dy = j + py - fy, d = Math.hypot(dx, dy);
+        if (d < minDist) {
+            secondDist = minDist; sdx = ndx; sdy = ndy;
+            minDist = d; ccx = cellx; ccy = celly; ndx = dx; ndy = dy;
+            if (hashAt) nh = bcsHash(cellx + hashAt, celly + hashAt);
+        } else if (d < secondDist) { secondDist = d; sdx = dx; sdy = dy; }
+    }
+    return { minDist, secondDist, ccx, ccy, ndx, ndy, sdx, sdy, nh, fx, fy };
+}
+
+/** bcs_shatter -- Voronoi shards that fly, tilt, fall and fade; at explode = 0 only the glass gradient is left. */
+export function bcsShatter(img, { time = 0, shardCount = 16, explode = 0.5, rotationAmt = 1.5, edgeGlow = 1,
+                                  pointScale = 1, premultiplied = true } = {}) {
+    void time;                                                  // upstream declares `time` and never reads it
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const eased = explode * explode * (3.0 - 2.0 * explode);
+    const eg = toHalf(edgeGlow);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const v = b12voronoi(uvx * shardCount, uvy * shardCount, 37.0, 91.0, 0);
+        const sr = bcsHash(v.ccx * 7.3, v.ccy * 7.3);
+        const sr2 = bcsHash(v.ccx * 13.7 + 5.0, v.ccy * 13.7 + 3.0);
+        const sr3 = bcsHash(v.ccx * 23.1 + 11.0, v.ccy * 23.1 + 7.0);
+        const scx = (v.ccx + 0.5) / shardCount, scy = (v.ccy + 0.5) / shardCount;
+        const [ddx, ddy] = b12norm2(scx - 0.5 + 0.001, scy - 0.5 + 0.001);
+        const driftDist = eased * (0.3 + sr * 0.7) * 120.0 * pointScale;
+        const angle = (sr2 - 0.5) * rotationAmt * eased;
+        const tiltX = (sr3 - 0.5) * eased * 0.15;
+        const ca = Math.cos(angle), sa = Math.sin(angle);
+        const rox = (ca * ddx - sa * ddy) * driftDist, roy = (sa * ddx + ca * ddy) * driftDist;
+        const fallEased = Math.max(eased - sr * 0.3, 0.0);
+        const fallAmount = fallEased * fallEased * 100.0 * pointScale * (0.4 + sr * 0.6);
+        let spx = cx - rox, spy = cy - roy - fallAmount;
+        const perspectiveScale = 1.0 - eased * sr * 0.15;
+        const scpx = scx * w, scpy = scy * h;
+        spx = scpx + (spx - scpx) / perspectiveScale; spy = scpy + (spy - scpy) / perspectiveScale;
+        const c = s(clamp(spx, 0, w), clamp(spy, 0, h));
+        const [gx, gy] = b12norm2(v.fx - 0.5, v.fy - 0.5);
+        const rg = gx * 0.5 + gy * -0.3;
+        const glass = toHalf(smoothstep(-0.3, 0.5, rg) * 0.12 * (1.0 + eased));
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const tilt = toHalf(Math.max(1.0 - Math.abs(tiltX) * eased * 2.0, 0.6));
+        const ed = v.secondDist - v.minDist;
+        const thinEdge = 1.0 - smoothstep(0.0, 0.03, ed), softEdge = 1.0 - smoothstep(0.0, 0.1, ed);
+        const em = toHalf(thinEdge * 0.8 + softEdge * 0.2);
+        const shadow = toHalf(1.0 - eased * 0.15 * sr), fade = toHalf(1.0 - eased * sr * 0.4);
+        out[i]     = ((c[0] + glass * k) * tilt + 0.7 * eg * em * k) * shadow * fade;
+        out[i + 1] = ((c[1] + glass * k) * tilt + 0.85 * eg * em * k) * shadow * fade;
+        out[i + 2] = ((c[2] + glass * k) * tilt + 1.0 * eg * em * k) * shadow * fade;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_shatterGlass -- Voronoi cracks with refraction and a prism split at the crack lines. No hash-free knob. */
+export function bcsShatterGlass(img, { time = 0, crackDensity = 8, glassRefraction = 10, prismStrength = 0.5, shatterSpread = 0,
+                                       pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const v = b12voronoi(uvx * crackDensity, uvy * crackDensity, 127.1, 311.7, 500.0);
+        const ed = v.secondDist - v.minDist;
+        const crackLine = 1.0 - smoothstep(0.0, 0.06, ed);
+        const sox = v.ndx * shatterSpread * 15.0 * pointScale, soy = v.ndy * shatterSpread * 15.0 * pointScale;
+        const sa = v.nh * 0.3 * shatterSpread;
+        const rpx = Math.cos(sa) * sox - Math.sin(sa) * soy, rpy = Math.sin(sa) * sox + Math.cos(sa) * soy;
+        let dpx = clamp(cx + rpx, 0, w), dpy = clamp(cy + rpy, 0, h);
+        const [rdx, rdy] = b12norm2(v.ndx - v.sdx, v.ndy - v.sdy);
+        const rf = glassRefraction * pointScale * crackLine;
+        dpx = clamp(dpx + rdx * rf, 0, w); dpy = clamp(dpy + rdy * rf, 0, h);
+        const c = s(dpx, dpy);
+        let r = c[0], g = c[1], b = c[2];
+        if (prismStrength > 0.01 && crackLine > 0.1) {
+            const pr = prismStrength * 5.0 * pointScale;
+            r = s(clamp(dpx + rdx * pr, 0, w), clamp(dpy + rdy * pr, 0, h))[0];
+            b = s(clamp(dpx - rdx * pr, 0, w), clamp(dpy - rdy * pr, 0, h))[2];
+        }
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const add = (toHalf(crackLine * (0.5 + 0.5 * Math.sin(ed * 100.0 + time)) * 0.6)
+                   + toHalf(v.nh * 0.15 - 0.075) - toHalf(crackLine * 0.4)) * k;
+        out[i] = r + add; out[i + 1] = g + add; out[i + 2] = b + add; out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_smokeReveal -- three fbm layers of smoke that displace and cover; at smokeAmount = 0 nothing is left. */
+export function bcsSmokeReveal(img, { time = 0, smokeAmount = 0.6, smokeScale = 5, windSpeed = 1.5, smokeTurb = 1.5,
+                                      pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const tw = time * windSpeed;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const orig = s(cx, cy);
+        const sux = uvx * smokeScale, suy = uvy * smokeScale;
+        const w1x = bcsFbm(sux + tw * 0.3, suy + tw * 0.1, 5);
+        const w1y = bcsFbm(sux + tw * 0.1 + 5.2, suy - tw * 0.2 + 5.2, 5);
+        let density = bcsFbm(sux + w1x * smokeTurb + tw * 0.15, suy + w1y * smokeTurb + tw * 0.08, 6);
+        density = clamp(density * density * smokeAmount * 1.5, 0.0, 1.0);
+        const lv = toHalf(bcsValueNoise(uvx * 3.0 + time * 0.2, uvy * 3.0 + time * 0.2));
+        const eg = toHalf((smoothstep(0.2, 0.5, density) - smoothstep(0.5, 0.8, density)) * 0.2);
+        const sc = [toHalf(0.7) + lv * toHalf(0.15) + eg, toHalf(0.68) + lv * toHalf(0.12) + eg, toHalf(0.66) + lv * toHalf(0.1) + eg];
+        const dc = s(clamp(cx + (w1x - 0.5) * 8.0 * pointScale * density, 0, w), clamp(cy + (w1y - 0.5) * 8.0 * pointScale * density, 0, h));
+        const a = orig[3], k = premultiplied || a === 0 ? 1 : a;
+        const d = toHalf(density);
+        let ray = Math.sin(uvx * 8.0 + time * 0.3) * 0.5 + 0.5;
+        ray *= smoothstep(1.0, 0.3, uvy) * density * 0.15;
+        out[i] = mix(dc[0], sc[0] * k, d) + toHalf(ray * 0.8) * k;
+        out[i + 1] = mix(dc[1], sc[1] * k, d) + toHalf(ray * 0.7) * k;
+        out[i + 2] = mix(dc[2], sc[2] * k, d) + toHalf(ray * 0.5) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** bcs_underwaterCaustics -- fbm water displacement, two Voronoi caustic layers multiplied, a depth tint. */
+export function bcsUnderwaterCaustics(img, { time = 0, causticScale = 6, causticIntensity = 1, waterDistortion = 12, waterDepth = 0.4,
+                                             pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const dm = toHalf(waterDepth), d3 = toHalf(waterDepth * 0.3), d15 = toHalf(waterDepth * 0.15);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cx = x + 0.5, cy = y + 0.5, i = (y * w + x) * 4;
+        const uvx = cx / w, uvy = cy / h;
+        const n1 = bcsFbm(uvx * 4.0 + time * 0.3, uvy * 4.0 + time * 0.2, 4);
+        const n2 = bcsFbm(uvx * 4.0 - time * 0.25 + 10.0, uvy * 4.0 + time * 0.35 + 10.0, 4);
+        const c = s(clamp(cx + (n1 - 0.5) * waterDistortion * pointScale, 0, w), clamp(cy + (n2 - 0.5) * waterDistortion * pointScale, 0, h));
+        const a1x = uvx * causticScale + time * 0.4, a1y = uvy * causticScale + time * 0.3;
+        const a2x = uvx * causticScale * 1.3 - time * 0.35, a2y = uvy * causticScale * 1.3 + time * 0.45;
+        let c1 = 0, c2 = 0;
+        const f1x = b12fract(a1x), f1y = b12fract(a1y), f2x = b12fract(a2x), f2y = b12fract(a2y);
+        for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
+            const cell1x = Math.floor(a1x) + k, cell1y = Math.floor(a1y) + j;
+            const p1x = b12fract(cell1x + bcsHash(cell1x, cell1y)), p1y = b12fract(cell1y + bcsHash(cell1x + 100.0, cell1y + 100.0));
+            c1 = Math.max(c1, 1.0 - Math.hypot(f1x - p1x, f1y - p1y) * 2.5);
+            const cell2x = Math.floor(a2x) + k, cell2y = Math.floor(a2y) + j;
+            const p2x = b12fract(cell2x + bcsHash(cell2x + 50.0, cell2y + 50.0)), p2y = b12fract(cell2y + bcsHash(cell2x + 150.0, cell2y + 150.0));
+            c2 = Math.max(c2, 1.0 - Math.hypot(f2x - p2x, f2y - p2y) * 2.5);
+        }
+        const caustic = toHalf(Math.pow(Math.max(c1 * c2, 0.0), 3.0) * causticIntensity);
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        let r = c[0] + 0.95 * caustic * k, g = c[1] + 0.98 * caustic * k, b = c[2] + 1.0 * caustic * k;
+        r = mix(r, r * (1.0 - d3) + 0.2 * d15 * k, dm); g = mix(g, g * (1.0 - d3) + 0.5 * d15 * k, dm); b = mix(b, b * (1.0 - d3) + 0.7 * d15 * k, dm);
+        let rays = Math.sin(uvx * 20.0 + time * 0.5) * 0.5 + 0.5;
+        rays *= smoothstep(1.0, 0.0, uvy) * waterDepth * 0.1;
+        out[i] = r + toHalf(rays * 0.3) * k; out[i + 1] = g + toHalf(rays * 0.5) * k; out[i + 2] = b + toHalf(rays * 0.6) * k;
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/** The thirteen of batch 12, with the configuration (if any) in which every hash term is multiplied out. */
+export const BATCH12 = Object.freeze({
+    aurora:             { hashFree: { intensity: 0 },                          identity: true },
+    datamosh:           { hashFree: { blockCorruption: 0 },                    identity: true },
+    disintegrate:       { hashFree: { threshold: 0 },                          identity: true },
+    etherealAura:       { hashFree: { distortion: 0, auraIntensity: 0 },       identity: true },
+    liquidChrome:       { hashFree: null },
+    liquidMirror:       { hashFree: { ripple: 0 },                             identity: false },
+    magneticField:      { hashFree: { fieldTurbulence: 0 },                    identity: false },
+    morphBreathe:       { hashFree: { organic: 0 },                            identity: false },
+    pixelateStorm:      { hashFree: { stormAmount: 0 },                        identity: false },
+    shatter:            { hashFree: { explode: 0, edgeGlow: 0 },               identity: false },
+    shatterGlass:       { hashFree: null },
+    smokeReveal:        { hashFree: { smokeAmount: 0 },                        identity: true },
+    underwaterCaustics: { hashFree: { causticIntensity: 0, waterDistortion: 0 }, identity: false },
+});

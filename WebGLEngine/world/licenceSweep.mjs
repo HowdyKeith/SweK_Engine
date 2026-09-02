@@ -447,6 +447,13 @@ export const SWEEP = Object.freeze([
       evidence: { file: "LICENSE", sha256: "5c4220e2cd03", lines: 21 }, namedIn: "#122",
       grantor: { named: "Node3D", isRepoOwner: true }, permissive: true,
       note: "Byte-identical to node-3d/uv-loop's. v0.4.0." },
+    // ---- v4305: the upstream of a port this tree has carried since v4163, read first-hand at last -----------
+    { repo: "krispuckett/SwiftUIShaders", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "ea8b7a631013", lines: 21 }, namedIn: "#35",
+      grantor: { named: "Kris Puckett", isRepoOwner: true }, permissive: true,
+      note: "(c) 2026 Kris Puckett; the README's 'use them, ship them, remix them' is the same grant in prose. " +
+            "Cited in render/swiftShaderModel.mjs's header since v4163 on the strength of that README line; the " +
+            "LICENSE file itself was opened at v4305, when the last thirteen of its 41 shaders were ported." },
 ]);
 
 /** Only a nested third-party licence, which is NOT the repository's own and must never be read as one. */
