@@ -15,7 +15,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, METHOD, runGate, censusCostMs, ENG,
+import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_AT_V4304, METHOD, runGate, censusCostMs, ENG,
          UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
 
 let fails = 0;
@@ -98,11 +98,17 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
     // Written first as (confirmed - fixed), which stopped closing the moment referenceKind was recovered
     // out of the timeout bucket: a gate can ENTER the red set without having been in the swept-and-confirmed
     // count. The gate went red on its own bookkeeping, which is the only reason the identity is right now.
+    // v4304: a fifth term, for the same reason as the fourth -- two gates were fixed and DELETED from the list,
+    // as section 2 instructs, and the identity has to name them or it stops closing again.
     ok("  and the census holds confirmed + recovered - fixed, with every term named",
         RED_AT_V4279.length ===
-            METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket - FIXED_AT_V4279.length,
+            METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket - FIXED_AT_V4279.length - FIXED_AT_V4304.length,
         `${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered - ` +
-        `${FIXED_AT_V4279.length} fixed = ${RED_AT_V4279.length}`);
+        `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_AT_V4304.length} fixed at v4304 = ${RED_AT_V4279.length}`);
+    ok("  and each v4304 fix names its cause and its repair, and is no longer in the red list",
+        FIXED_AT_V4304.length === 2 && FIXED_AT_V4304.every((e) => e.cause && e.why && e.why.length > 40 &&
+            !RED_AT_V4279.some((r) => r.gate === e.gate)),
+        FIXED_AT_V4304.map((e) => e.gate.split("/").pop()).join(", "));
 
     // *** THE SECOND FAILURE MODE: ATTRIBUTION ACROSS A CLEAN CHECKOUT. ***
     const falseAttrib = FIXED_AT_V4279.filter((e) => /NOT this session/.test(e.cause));

@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/namedNotChecked-selfcheck.mjs -- v4268
+// WebGLEngine/tools/ship/namedNotChecked-selfcheck.mjs -- v4268, the ratchet turned at v4304
 //
 // GRADES world/namedNotChecked.mjs AND THE NEW reachedLicences ENTRY IT PRODUCED.
 //
@@ -18,9 +18,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NAMED_SOURCES, UNCHECKED, COUNT_DISPUTE, validateNamed, mayTake, promotable, absentFrom,
+import { NAMED_SOURCES, PROMOTED, UNCHECKED, COUNT_DISPUTE, validateNamed, mayTake, promotable, absentFrom,
          describeNamed } from "../../world/namedNotChecked.mjs";
 import { REACHED_SOURCES, validateEntry, severityOf, SEVERITY } from "../../world/reachedLicences.mjs";
+import { SWEEP } from "../../world/licenceSweep.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -41,8 +42,11 @@ const SELF = ["world/namedNotChecked.mjs", "tools/ship/namedNotChecked-selfcheck
 // It is listed rather than folded into SELF, because SELF means "this file's whole job is these names" and
 // the register's job is something else. Section 2 asserts the allowance is EXERCISED and is the ONLY one.
 const ALLOWED = Object.freeze([
-    { file: "world/reachedLicences.mjs", repo: "advanced-threejs-tsl-webgpu-rendering",
-      why: "the v4268 entry for boytchev/tsl-textures quotes #100 to say what it answers" },
+    // (v4268 allowed world/reachedLicences.mjs to name advanced-threejs-tsl-webgpu-rendering, because the
+    // boytchev/tsl-textures entry quotes #100. v4304 OPENED that repository, so it left this register and the
+    // allowance went with it -- a name that has a real record may be said anywhere. The list is empty now, and
+    // the "every allowance is exercised" check below is vacuous until somebody adds one; that is recorded here
+    // rather than hidden by deleting the mechanism.)
     // (v4275 added two allowances for portsmouth/EON-diffuse here. v4276 CHECKED that repository -- it is MIT --
     // so it left this register for world/licenceSweep.mjs, and the allowances went with it. An allowance for a
     // repo the register no longer holds cannot be exercised, which is how this pair announced itself.)
@@ -104,12 +108,17 @@ console.log("\n1. THE REGISTER'S OWN RULES");
     const bySource = NAMED_SOURCES.reduce((a, e) => { a[e.namedIn] = (a[e.namedIn] || 0) + 1; return a; }, {});
     ok("every entry says where it was named", NAMED_SOURCES.every((e) => !!e.namedIn),
         Object.entries(bySource).map(([k, v]) => `${k}:${v}`).join(" "));
-    ok("  #100 contributed one and #132 five, as the items say", bySource["#100"] === 1 && bySource["#132"] === 5);
+    // *** v4304: FOUR OF THE SIX LEFT, SO THE COUNT IS NOW STILL-NAMED + PROMOTED. *** The items' arithmetic is
+    // a fact about the items; the register's shrinking is a fact about this round. Both are kept.
+    const promotedBy = PROMOTED.reduce((a, e) => { a[e.namedIn] = (a[e.namedIn] || 0) + 1; return a; }, {});
+    ok("  #100 contributed one and #132 five, as the items say -- counting the entries that have since left",
+        (bySource["#100"] || 0) + (promotedBy["#100"] || 0) === 1 && (bySource["#132"] || 0) + (promotedBy["#132"] || 0) === 5,
+        `still unchecked ${JSON.stringify(bySource)}, promoted ${JSON.stringify(promotedBy)}`);
     ok("  and the total is their sum, with nothing unattributed",
         Object.values(bySource).reduce((a, b) => a + b, 0) === NAMED_SOURCES.length, String(NAMED_SOURCES.length));
     let bad = [];
     for (const e of NAMED_SOURCES) { const p = validateNamed(e); if (p.length) bad.push(`${e.repo}: ${p[0]}`); }
-    ok("every entry validates", bad.length === 0, bad.join(" | ") || "6/6");
+    ok("every entry validates", bad.length === 0, bad.join(" | ") || `${NAMED_SOURCES.length}/${NAMED_SOURCES.length}`);
     ok("every entry is UNCHECKED and nothing else", NAMED_SOURCES.every((e) => e.established === UNCHECKED));
     ok("*** no entry carries a licence verdict field ***",
         NAMED_SOURCES.every((e) => !["spdx", "licence", "licenceExists", "redistributable", "grantorHoldsRights"]
@@ -124,7 +133,7 @@ console.log("\n1. THE REGISTER'S OWN RULES");
     ok("CONTROL: an entry claiming UNPAPERED here is REJECTED",
         validateNamed(stateless).some((s) => /only state this register holds/.test(s)));
 
-    ok("mayTake is false for all six", NAMED_SOURCES.every((e) => mayTake(e.repo).ok === false));
+    ok("mayTake is false for every remaining entry", NAMED_SOURCES.every((e) => mayTake(e.repo).ok === false));
     ok("*** and its reason never says the source is unlicensed ***",
         NAMED_SOURCES.every((e) => {
             const w = mayTake(e.repo).why;
@@ -154,7 +163,7 @@ console.log("\n2. THE ABSENCE, MEASURED WITHOUT COUNTING THE MEASURER");
             if (!ALLOWED.some((a) => a.file === f && a.repo === repo)) unexplained.push(`${repo} in ${f}`);
         }
     }
-    ok("*** none of the six is named anywhere else in the tree, except by named allowance ***",
+    ok("*** none of the remaining entries is named anywhere else in the tree, except by named allowance ***",
         unexplained.length === 0, unexplained.join(" | ") ||
         `${FILES.length} files scanned, ${ALLOWED.length} allowed occurrence(s), 0 unexplained`);
     ok("  and every allowance is EXERCISED, not merely declared",
@@ -196,7 +205,7 @@ console.log("\n2. THE ABSENCE, MEASURED WITHOUT COUNTING THE MEASURER");
         withSelf[e.repo] = FILES.filter(([, body]) => body.toLowerCase().includes(e.repo.toLowerCase()))
                                 .map(([rel]) => rel);
     }
-    ok("CONTROL: lift the exclusion and the scanner finds all six",
+    ok("CONTROL: lift the exclusion and the scanner finds every remaining entry",
         Object.values(withSelf).every((v) => v.length >= 1),
         Object.entries(withSelf).map(([k, v]) => `${k}=${v.length}`).join(" "));
     ok("  and world/namedNotChecked.mjs is the file every one of them is found in",
@@ -212,13 +221,19 @@ console.log("\n2. THE ABSENCE, MEASURED WITHOUT COUNTING THE MEASURER");
         proceduralTerrain.length >= 5, `${proceduralTerrain.length} files: ${proceduralTerrain.slice(0, 3).join(", ")}...`);
     // main.js is on both lists: it says "procedural terrain" in nine places about the engine's own heightfield,
     // and names the repository once, on its version line. The version-line rule applies here too.
+    // v4304 opened that repository, so the two registers that assessed it now hold its name legitimately; they
+    // are excluded here by name, and the exclusion is proved to be doing work one line further down.
+    const REGISTERS = ["world/reachedLicences.mjs", "world/licenceSweep.mjs"];
     const namesRepo = proceduralTerrain.filter((rel) => {
         const body = FILES.find(([r]) => r === rel)[1];
-        return body.includes("threejs-procedural-terrain") &&
+        return !REGISTERS.includes(rel) && body.includes("threejs-procedural-terrain") &&
                !onlyOnVersionLine(rel, body, "threejs-procedural-terrain");
     });
-    ok("  but none of them names the repository threejs-procedural-terrain", namesRepo.length === 0,
-        namesRepo.join(" ") || `${proceduralTerrain.length} files say the phrase, 0 name the repo outside a version line`);
+    ok("  but none of them names the repository threejs-procedural-terrain, outside the two registers that assessed it", namesRepo.length === 0,
+        namesRepo.join(" ") || `${proceduralTerrain.length} files say the phrase, 0 name the repo outside a version line or a register`);
+    ok("  and both registers DO name it, so the exclusion is exercised",
+        REGISTERS.every((r) => (FILES.find(([x]) => x === r) || ["", ""])[1].includes("threejs-procedural-terrain")),
+        "world/licenceSweep.mjs holds the evidence, world/reachedLicences.mjs the judgement, since v4304");
 }
 
 console.log("\n3. #132's ARITHMETIC, WHICH DOES NOT WORK EITHER WAY");
@@ -226,22 +241,25 @@ console.log("\n3. #132's ARITHMETIC, WHICH DOES NOT WORK EITHER WAY");
     ok("the item states a count and lists a different number of names",
         COUNT_DISPUTE.statedCount !== COUNT_DISPUTE.namedCount,
         `stated ${COUNT_DISPUTE.statedCount}, listed ${COUNT_DISPUTE.namedCount}`);
-    ok("  and the listed count matches the entries actually filed from #132",
-        NAMED_SOURCES.filter((e) => e.namedIn === "#132").length === COUNT_DISPUTE.namedCount);
-    // The second reading, checked against the register rather than asserted.
+    ok("  and the listed count matches the entries actually filed from #132, still here or since promoted",
+        NAMED_SOURCES.filter((e) => e.namedIn === "#132").length + PROMOTED.filter((e) => e.namedIn === "#132").length === COUNT_DISPUTE.namedCount);
+    // The second reading, checked against the register rather than asserted. *** THE DISPUTE'S COUNT IS DATED
+    // (v4268) AND THE LIVE COUNT MAY ONLY BE LARGER: *** v4304 assessed #132's names and filed the unpapered ones,
+    // which is the register doing its job, and a check that pinned the live count to the old one would have
+    // punished exactly that.
     const unpaperedNow = REACHED_SOURCES.filter((e) => e.licenceExists === false);
-    ok("  and the register's current unpapered count is what the dispute records",
-        unpaperedNow.length === COUNT_DISPUTE.registerUnpaperedNow,
-        `${unpaperedNow.length}: ${unpaperedNow.map((e) => e.repo).join(", ")}`);
+    ok("  and the register's unpapered count has only grown since the dispute was written",
+        unpaperedNow.length >= COUNT_DISPUTE.registerUnpaperedAt.count && COUNT_DISPUTE.registerUnpaperedAt.version === "v4268",
+        `${COUNT_DISPUTE.registerUnpaperedAt.count} at ${COUNT_DISPUTE.registerUnpaperedAt.version}, ${unpaperedNow.length} now: ${unpaperedNow.map((e) => e.repo.split("/").pop()).join(", ")}`);
     ok("  so neither reading of 'grows to four' reaches four",
         COUNT_DISPUTE.namedCount !== COUNT_DISPUTE.statedCount &&
-        (COUNT_DISPUTE.registerUnpaperedNow + COUNT_DISPUTE.alsoNamedInProse + COUNT_DISPUTE.namedCount) !== COUNT_DISPUTE.statedCount,
+        (COUNT_DISPUTE.registerUnpaperedAt.count + COUNT_DISPUTE.alsoNamedInProse + COUNT_DISPUTE.namedCount) !== COUNT_DISPUTE.statedCount,
         // *** EVERY NUMBER IN THIS MESSAGE IS READ FROM THE DATA. *** The first draft wrote "4 vs 5 names"
         // as a literal, so under sabotage C -- which sets statedCount to 5 -- the check went red and its own
         // message still said 4. A detail line that does not move with what it describes is the same defect as
         // a comment holding a count, one line away from the check that exists to catch exactly that.
         `${COUNT_DISPUTE.statedCount} vs ${COUNT_DISPUTE.namedCount} names, or ${COUNT_DISPUTE.statedCount} ` +
-        `vs ${COUNT_DISPUTE.registerUnpaperedNow + COUNT_DISPUTE.alsoNamedInProse + COUNT_DISPUTE.namedCount} total`);
+        `vs ${COUNT_DISPUTE.registerUnpaperedAt.count + COUNT_DISPUTE.alsoNamedInProse + COUNT_DISPUTE.namedCount} total`);
     ok("*** and the module does NOT pick a winner ***", COUNT_DISPUTE.readings.length === 2,
         "the tree cannot tell from the text which half is wrong, and says so rather than guessing");
     report("this is the check that could not have existed before this round: the item lived outside the tree, " +
@@ -250,9 +268,15 @@ console.log("\n3. #132's ARITHMETIC, WHICH DOES NOT WORK EITHER WAY");
 
 console.log("\n4. #100 IS ANSWERED BY A SOURCE THE TREE ALREADY HAD");
 {
-    const tsl = NAMED_SOURCES.find((e) => e.namedIn === "#100");
-    ok("#100's checkable claim is recorded verbatim", tsl.checkableClaim === "it is the only TSL reference");
-    ok("*** and it is recorded as FALSE ***", tsl.checkableClaimHolds === false);
+    // v4304: the #100 entry has LEFT the unchecked register (the repository was opened) and its checkable claim
+    // travelled with it into PROMOTED, so this section reads it from there.
+    const tsl = PROMOTED.find((e) => e.namedIn === "#100");
+    ok("#100's checkable claim is recorded verbatim", !!tsl && tsl.checkableClaim === "it is the only TSL reference");
+    const opened = REACHED_SOURCES.find((e) => e.repo === (tsl && tsl.resolvedTo));
+    ok("*** and at v4304 the repository itself was opened: no licence at any depth, and no code either ***",
+        !!opened && opened.licenceExists === false && opened.posture === "refused" && /Markdown/.test(opened.licenceNote),
+        opened ? `${opened.repo}: ${opened.licenceNote.slice(0, 80)}...` : "no register entry");
+    ok("*** and it is recorded as FALSE ***", !!tsl && tsl.checkableClaimHolds === false);
     const solid = fs.readFileSync(path.join(ENG, "render/solidTexture.mjs"), "utf8");
     ok("  because render/solidTexture.mjs names another TSL reference", /boytchev\/tsl-textures/.test(solid),
         "MIT, Pavel Boytchev 2024, read at v4243");
@@ -303,10 +327,17 @@ console.log("\n4. #100 IS ANSWERED BY A SOURCE THE TREE ALREADY HAD");
 console.log("\n5. THE RATCHET: THIS FILE MUST NOT BECOME A PARKING SPACE");
 {
     const p = promotable(REACHED_SOURCES);
-    ok("*** no named entry has since been properly assessed ***", p.length === 0,
-        p.map((e) => e.repo).join(", ") || "0 of 6 -- none has a real record yet, which is the honest state");
+    ok("*** no entry still here has since been properly assessed ***", p.length === 0,
+        p.map((e) => e.repo).join(", ") || `0 of ${NAMED_SOURCES.length} -- the ones that WERE assessed left, which is the ratchet working`);
+    // *** v4304: THE FIRST TIME THE RATCHET TURNED. *** Four entries have a real record now and are gone from
+    // NAMED_SOURCES; PROMOTED says which, and both registers must actually hold each one.
+    ok("*** every PROMOTED entry has a record in BOTH registers it was promoted to ***",
+        PROMOTED.length >= 4 && PROMOTED.every((e) => REACHED_SOURCES.some((r) => r.repo === e.resolvedTo) && SWEEP.some((r) => r.repo === e.resolvedTo)),
+        PROMOTED.map((e) => e.resolvedTo).join(", "));
+    ok("  and none of them is still filed here", PROMOTED.every((e) => !NAMED_SOURCES.some((n) => n.repo === e.repo)));
+    ok("  and each says what the open list's claim turned out to be", PROMOTED.every((e) => typeof e.found === "string" && e.found.length > 20 && e.at === "v4304"));
     ok("CONTROL: promotable DOES fire when a name appears in the register",
-        promotable([...REACHED_SOURCES, { repo: "someone/gi-voxels" }]).length === 1,
+        promotable([...REACHED_SOURCES, { repo: "someone/ar-globe" }]).length === 1,
         "matched on the tail, because registers name repos owner/name and this list mostly carries bare names");
     ok("absentFrom reports every entry against an empty text", absentFrom("").length === NAMED_SOURCES.length,
         String(NAMED_SOURCES.length));
@@ -356,6 +387,12 @@ console.log("\n5. THE RATCHET: THIS FILE MUST NOT BECOME A PARKING SPACE");
 //      narrow rule from the wide one. That is precisely what a control fixture is for, and it is the reason
 //      the control was written as a two-line string with a mention on each line rather than left implicit.
 //      A weaker gate would have shipped the wide rule and never known.
+//
+//   v4304, after the ratchet turned -- E  gi-voxels put BACK into NAMED_SOURCES while its real records stand in
+//      both registers. -> exit=1, 6 red: the per-item count, the absence scan (the registers and
+//      licenceSweep-selfcheck now name it, legitimately), the #132 tally, promotable() firing, the "none still
+//      filed here" line, and the promotable CONTROL (which now finds two). A name that has been assessed and
+//      is still on the unchecked shelf is the exact thing this file exists to refuse, and six lines say so.
 //
 // A, B and C were re-measured after the version-line allowance was added, because the gate they were run
 // against is not the gate that ships. Their counts did not move (3, 2, 2).

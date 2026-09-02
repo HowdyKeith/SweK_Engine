@@ -1,4 +1,4 @@
-// WebGLEngine/world/namedNotChecked.mjs -- v4268
+// WebGLEngine/world/namedNotChecked.mjs -- v4268, shrunk at v4304
 //
 // REPOSITORIES THAT HAVE BEEN NAMED AND NEVER OPENED, WHICH IS NOT THE SAME AS UNLICENSED.
 //
@@ -48,6 +48,18 @@
 // The open list wrote UNPAPERED for all six anyway, where no validator could reach it. The register was
 // right to refuse the entry. What was missing is a place to put it instead, and that is this file.
 //
+// ---- *** v4304: FOUR OF THE SIX LEFT, AND THE TWO THAT STAY ARE STAYING FOR THE REASON v4276 GAVE. *** ----------
+//
+// The four names an owner could be found for were opened -- shallow clones, licence file or its absence at every
+// depth, README, package.json -- and now have real records in world/licenceSweep.mjs (the evidence) and
+// world/reachedLicences.mjs (the judgement). They are listed in PROMOTED below with what the claim turned out to
+// be, and deleted from NAMED_SOURCES, which is what promotable() has said should happen since v4268.
+//
+// The two that remain were searched for by name and nothing with that name could be found under any owner; the
+// candidates that came up were different projects on the same subject, not these. So they are UNCHECKED still,
+// and the honest reading of #132 for them is now "named from memory, address unrecoverable" -- which is a fact
+// about the open list's record, not about any repository.
+//
 // ---- WHAT THIS REGISTER MAY AND MAY NOT SAY ------------------------------------------------------------------
 //
 // It holds ONE fact per repository: this name was written down as a candidate. It carries no spdx, no
@@ -96,50 +108,6 @@ export const NAMED_SOURCES = Object.freeze([
     // claims they are unreachable, only that they are unread.
     // =========================================================================================================
     {
-        repo: "advanced-threejs-tsl-webgpu-rendering", namedIn: "#100",
-        claimedState: "no licence at all",
-        established: UNCHECKED,
-        wanted: "TSL -- three's node material shading language.",
-        // *** THE HALF OF #100 THAT IS CHECKABLE HERE IS FALSE, AND IT IS THE HALF THE ITEM RESTS ON. ***
-        // "it is the only TSL reference" is why the item stayed open: an unpapered source is worth arguing
-        // about when it is the ONLY door to something. It is not the only one. render/solidTexture.mjs:5,
-        // shipped at v4243, opens with "The idea is boytchev/tsl-textures (MIT, Pavel Boytchev 2024)" and
-        // explains at length what TSL is, why that library is written in it, and why the ALGORITHM was
-        // rewritten in GLSL instead. That is a TSL reference, in the tree, with a permissive licence and a
-        // named author -- and it was read a round BEFORE #100's neighbours shipped.
-        //
-        // So the item is not blocked on a licence. It is asking for a source the tree already has a better
-        // version of, and nobody noticed because the better one was recorded in a file header rather than
-        // in a register that anything reads.
-        checkableClaim: "it is the only TSL reference",
-        checkableClaimHolds: false,
-        counterExample: "render/solidTexture.mjs -- boytchev/tsl-textures, MIT, Pavel Boytchev 2024, read at v4243",
-    },
-    {
-        repo: "gi-voxels", namedIn: "#132",
-        claimedState: "unpapered",
-        established: UNCHECKED,
-        wanted: "Voxel global illumination. The tree has voxels (world/) and has no GI of any kind: v4243's " +
-                "atmospheric scattering is sky radiance, not bounced light.",
-    },
-    {
-        repo: "Repo-Explainer", namedIn: "#132",
-        claimedState: "unpapered",
-        established: UNCHECKED,
-        wanted: "Reading a repository as a subject. Overlaps work already shipped from a different direction: " +
-                "ai-bridge/repoTerrainBridge.js scans a tree into entries and world/orrery.mjs models the " +
-                "dependencies as bodies, both written here.",
-    },
-    {
-        repo: "threejs-procedural-terrain", namedIn: "#132",
-        claimedState: "unpapered",
-        established: UNCHECKED,
-        wanted: "Procedural terrain. *** THE ONE NAME ON THIS LIST A GREP APPEARS TO FIND AND DOES NOT: *** " +
-                "nine files say 'procedural terrain' and every one of them is the engine's own heightfield " +
-                "(world/world.js, world/realTerrainStamp.js, engine/ovmGenerator.js). A name search that " +
-                "matched on that phrase would report this repository present when it is absent.",
-    },
-    {
         repo: "ar-globe", namedIn: "#132",
         claimedState: "unpapered",
         established: UNCHECKED,
@@ -176,10 +144,47 @@ export const COUNT_DISPUTE = Object.freeze({
     item: "#132",
     statedCount: 4,
     namedCount: 5,
-    registerUnpaperedNow: 2,
+    // *** THE REGISTER'S COUNT AT THE TIME THE DISPUTE WAS WRITTEN, NOT A LIVE NUMBER. *** It was "Now" until
+    // v4304, when the round that assessed #132's names added unpapered entries to that register and made the
+    // field false. A dispute is dated; its numbers must be too.
+    registerUnpaperedAt: Object.freeze({ version: "v4268", count: 2 }),
     alsoNamedInProse: 1,
     readings: Object.freeze(["four new names, five listed", "four in total, which would be eight"]),
 });
+
+/**
+ * The names that have LEFT this register, with what the open list's claim turned out to be. Each `resolvedTo` is
+ * an entry in both world/licenceSweep.mjs and world/reachedLicences.mjs, and the gate checks that it is. Kept
+ * here rather than deleted outright because "four of the six were checked and this is what they were" is the
+ * ratchet's own record: a register of the unchecked is only honest while it is visibly shrinking.
+ */
+export const PROMOTED = Object.freeze([
+    {
+        repo: "advanced-threejs-tsl-webgpu-rendering", namedIn: "#100", at: "v4304",
+        resolvedTo: "Makio64/advanced-threejs-tsl-webgpu-rendering",
+        claimedState: "no licence at all",
+        found: "TRUE, and there is no code in it to licence: three Markdown files, a 1,838-line guide, no package.json.",
+        // the half of #100 that was checkable at v4268, kept with the entry so section 4 of the gate still reads it
+        checkableClaim: "it is the only TSL reference",
+        checkableClaimHolds: false,
+        counterExample: "render/solidTexture.mjs -- boytchev/tsl-textures, MIT, Pavel Boytchev 2024, read at v4243",
+    },
+    {
+        repo: "gi-voxels", namedIn: "#132", at: "v4304", resolvedTo: "novalain/gi-voxels",
+        claimedState: "unpapered",
+        found: "DECLARED ONLY: package.json says MIT, no licence file at any depth -- the screen-space-reflections shape.",
+    },
+    {
+        repo: "Repo-Explainer", namedIn: "#132", at: "v4304", resolvedTo: "stuinfla/Repo-Explainer",
+        claimedState: "unpapered",
+        found: "DECLARED ONLY: package.json says MIT, no licence file at any depth. The product is called explainmyrepo.",
+    },
+    {
+        repo: "threejs-procedural-terrain", namedIn: "#132", at: "v4304", resolvedTo: "dimartarmizi/threejs-procedural-terrain",
+        claimedState: "unpapered",
+        found: "TRUE: no licence file, no README licence line, and package.json is private with no license field.",
+    },
+]);
 
 /** Entries here may not carry a licence verdict. Growing one is the signal to move the entry, not to widen this. */
 export function validateNamed(e) {

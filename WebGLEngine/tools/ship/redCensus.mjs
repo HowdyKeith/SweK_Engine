@@ -90,14 +90,10 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted camera-effects.html" },
     { gate: "tools/ship/boundaryLint-selfcheck.mjs", ms: 5714,
       fails: "!! no NEW reported boundary tell has appeared 89 sites against a baseline of 88; NEW (1): ai-bridge/vbaArchive" },
-    { gate: "tools/ship/budgetEvidence-selfcheck.mjs", ms: 80,
-      fails: "!! *** every gate carries evidence about its own runtime, or admits that it does not finish *** 67 with none -" },
     { gate: "tools/ship/canvasFill-selfcheck.mjs", ms: 4908,
       fails: "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: tools/ship/atmosphereHarness.html#c, t" },
     { gate: "tools/ship/definitionGates-selfcheck.mjs", ms: 226,
       fails: "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 6: physics/crypto/sec" },
-    { gate: "tools/ship/gateBudget-selfcheck.mjs", ms: 84,
-      fails: "!! *** the recorded slowest gate is still the slowest one anybody has SEEN *** observed worst in the general p" },
     { gate: "tools/ship/gateReach-selfcheck.mjs", ms: 9808,
       fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
     { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
@@ -188,6 +184,18 @@ export const FIXED_AT_V4279 = Object.freeze([
       why: "it walks the filesystem and found two git-ignored agent worktrees under .claude/ that exist on " +
            "this box and in no commit. It looked session-caused only because the v4266 comparison was a " +
            "clean checkout. Fixed at the cause: the walk skips .claude." },
+]);
+
+/** Fixed at v4304 and DELETED from RED_AT_V4279 above, which is that list's own instruction when a re-run goes green. */
+export const FIXED_AT_V4304 = Object.freeze([
+    { gate: "tools/ship/budgetEvidence-selfcheck.mjs", cause: "never anybody's -- 103 gates written after gate-timings.json had no evidence",
+      why: "v4303's ship-time quick sweep gave it a second evidence source (sweep-timings.json, exit 0 only), " +
+           "which left thirteen: eleven the sweep kills at its 20 s cap and the two new at v4304. All thirteen " +
+           "stopwatch-timed serially to exit 0; twelve fed into gate-timings.json, redCensus into MEASURED." },
+    { gate: "tools/ship/gateBudget-selfcheck.mjs", cause: "the rig's v4279 gate-timings.json outran the recorded bases",
+      why: "opticsBind at 109.9 s in the general population against a recorded 103.1 s, and nineteen MEASURED " +
+           "bases under their observed runtimes. Fixed the way both checks say to: SLOWEST_GENERAL raised to the " +
+           "new measurement (default budget 309 s -> 330 s) and every under-basis raised to its observation." },
 ]);
 
 /**

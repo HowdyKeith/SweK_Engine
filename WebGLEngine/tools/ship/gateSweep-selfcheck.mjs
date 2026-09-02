@@ -233,8 +233,11 @@ sec("5. *** THE RE-CHECK REPORTED A FIELD ITS OWN METHOD COULD NOT HAVE MEASURED
        `amongChecked ${R.regressedAmongChecked}; overall: ${R.regressedOverall}`);
     ok(/unmeasur|unknown/i.test(R.regressedOverall),
        "and the unmeasured one says so in the word a reader greps for");
-    ok(R.checked === standing.length,
-       "the checked count still matches the list it checked", `${R.checked}`);
+    // v4304: two of the standing reds were FIXED and deleted from the register (redCensus.FIXED_AT_V4304), so the
+    // frozen RECHECK count is the live list plus those; a frozen record compares against the population it saw.
+    const fixedSince = RC.FIXED_AT_V4304.length;
+    ok(R.checked === standing.length + fixedSince,
+       "the checked count still matches the list it checked, counting the reds fixed since", `${R.checked} = ${standing.length} + ${fixedSince}`);
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -286,9 +289,11 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(S.stillRed + S.fromSlowBucket.length + S.regressions.length === S.confirmedRed,
        "*** the red count splits into still-red + slow-bucket + REGRESSIONS, and the split reconciles ***",
        `${S.stillRed} + ${S.fromSlowBucket.length} + ${S.regressions.length} = ${S.confirmedRed}`);
-    ok(S.stillRed === RC.RED_AT_V4279.length - S.repaired.length,
-       "still-red is the v4279 register minus what was repaired, so the two files describe one population",
-       `${RC.RED_AT_V4279.length} - ${S.repaired.length} = ${S.stillRed}`);
+    // v4304: the register shrank by two (redCensus.FIXED_AT_V4304), so the v4297 still-red population is the live
+    // register plus the reds fixed since; the record is frozen and the register is not.
+    ok(S.stillRed === RC.RED_AT_V4279.length + RC.FIXED_AT_V4304.length - S.repaired.length,
+       "still-red is the v4279 register (plus what was fixed since) minus what was repaired, so the two files describe one population",
+       `${RC.RED_AT_V4279.length} + ${RC.FIXED_AT_V4304.length} - ${S.repaired.length} = ${S.stillRed}`);
     ok(S.falseRedList.length === S.falseReds && S.unmeasured.length === S.unmeasuredCount,
        "the counts equal the lists they summarise", "a count beside a list it does not match is the v4296 mistake again");
 
@@ -322,9 +327,10 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // The cover figure is the thing RECHECK could not claim. It is derived here from the record, not read.
     const cover = GS.coversRegressions(Array(S.swept).fill(0).map((_, i) => "g" + i), []);
     const c = GS.coversRegressions(named.concat(RC.RED_AT_V4279.map((e) => e.gate)), RC.RED_AT_V4279.map((e) => e.gate));
-    ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - RC.RED_AT_V4279.length,
+    const redAtSweep = RC.RED_AT_V4279.length + RC.FIXED_AT_V4304.length;   // the register as it stood when the sweep ran
+    ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - redAtSweep,
        "*** the sweep COVERS regressions: it ran gates that were not already red ***",
-       `eligible ${S.cover.eligible} = ${S.swept} - ${RC.RED_AT_V4279.length}; ` + cover.reason);
+       `eligible ${S.cover.eligible} = ${S.swept} - ${redAtSweep}; ` + cover.reason);
     ok(S.falseRedList.every((e) => e.serialMs > 0 && e.parallelMs > 0),
        "and each false red carries both timings, so the starvation claim can be re-read later",
        `${S.falseReds} of ${S.candidates} candidates, ${Math.round(100 * S.falseReds / S.candidates)}% of phase 1's reds were starvation`);

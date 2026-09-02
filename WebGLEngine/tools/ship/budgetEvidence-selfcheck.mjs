@@ -50,16 +50,32 @@ const timings = record.timings || {};
 // early has not exercised its full path, so its time understates. This gate's WALL is about budget evidence.
 // The failures are REPORTED, loudly and by name, and they are not this wall's business.
 const failingAt = record.failingAt || {};
+// v4304 -- *** A SECOND SOURCE OF EVIDENCE: THE QUICK SWEEP'S OWN OBSERVATIONS. *** gate-timings.json was
+// captured at v3211 and hand-fed since; 103 gates written after it had no evidence at all, every one of
+// them run at v4303 by the sweep that now runs at ship time and rewrites tools/ship/sweep-timings.json with
+// what it saw. A gate the sweep timed to completion (exit 0) is TIMED; one it killed at the cap (124) is
+// still unknown, and one that exited non-zero has not exercised its full path -- the same rule that keeps
+// failures out of `timings` above, applied to the new file.
+const sweepFile = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8")); } catch { return {}; } })();
+const swept = {}, sweptFailing = {};
+for (const [g, ms] of Object.entries(sweepFile.timings || {})) {
+    const code = (sweepFile.codes || {})[g];
+    if (code === 0) swept[g] = ms;                       // timed to completion
+    else if (code !== 124 && code != null) sweptFailing[g] = ms;   // exited non-zero: a failure, reported, not evidence of its full path; a 124 is a kill and says nothing
+}
 
 const gates = walk(ENG);
 const evidence = (g) => typeof timings[g] === "number" ? "timed"
+                      : typeof swept[g] === "number" ? "swept"
                       : MEASURED[g] !== undefined ? "measured"
                       : UNRESOLVED[g] !== undefined ? "unresolved"
-                      : typeof failingAt[g] === "number" ? "failing" : null;
+                      : typeof failingAt[g] === "number" ? "failing"
+                      : typeof sweptFailing[g] === "number" ? "failing" : null;
 const noEvidence = gates.filter((g) => !evidence(g));
 
 // ---- 1. THE POPULATION, DERIVED ----------------------------------------------------------------------------
 say(gates.length + " gates: " + gates.filter((g) => evidence(g) === "timed").length + " with a recorded time, " +
+    gates.filter((g) => evidence(g) === "swept").length + " timed to completion by the quick sweep, " +
     MEASURED_COUNT() + " curated in MEASURED, " + Object.keys(UNRESOLVED).length + " admitted in UNRESOLVED, " +
     noEvidence.length + " with NO evidence at all");
 function MEASURED_COUNT() { return gates.filter((g) => evidence(g) === "measured").length; }

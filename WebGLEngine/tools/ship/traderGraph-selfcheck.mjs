@@ -79,9 +79,14 @@ console.log("\n2. *** THE THREE REFUSALS, RE-PROBED AGAINST GITHUB THIS RUN ***"
 
 console.log("\n3. THE SWEEP, AND THAT IT COVERS WHAT IT CLAIMS");
 {
-    ok("*** every repository in the licence sweep was cloned and read ***",
-        T.SWEEP.repos === LICENCE.length && T.SWEEP.cloneFailures === 0,
-        `${T.SWEEP.repos} of ${LICENCE.length}, ${T.SWEEP.commits} commits, ${T.SWEEP.cloneFailures} failures`);
+    // v4304: the licence sweep grew by eighteen (depth-1 clones, licence only) and the graph did not; those are
+    // named in T.UNGRAPHED, and the invariant is that every swept repository is graphed OR named as owed.
+    ok("*** every repository in the licence sweep was cloned and read, or is named as still owed ***",
+        T.SWEEP.repos + T.UNGRAPHED.repos.length === LICENCE.length && T.SWEEP.cloneFailures === 0,
+        `${T.SWEEP.repos} graphed + ${T.UNGRAPHED.repos.length} owed of ${LICENCE.length}, ${T.SWEEP.commits} commits, ${T.SWEEP.cloneFailures} failures`);
+    ok("  and every owed repository IS in the licence sweep and is NOT in the graph -- owed, not forgotten and not double-counted",
+        T.UNGRAPHED.repos.every((r) => LICENCE.some((e) => e.repo === r) && !T.REPOS.some((g) => g.repo === r)) && !!T.UNGRAPHED.why,
+        `${T.UNGRAPHED.repos.length} owed since ${T.UNGRAPHED.at}: ${T.UNGRAPHED.why}`);
     ok("  and the per-repo rows match that count", T.REPOS.length === T.SWEEP.repos);
     const named = new Set(LICENCE.map((e) => e.repo));
     ok("  with no repository the licence sweep does not also hold",

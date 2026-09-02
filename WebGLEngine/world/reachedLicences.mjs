@@ -547,6 +547,227 @@ export const REACHED_SOURCES = Object.freeze([
              "bodies and no life; spaceprojectsim is the worked example of a self-running economy with no " +
              "script, and the SHAPE of its loops (treasury, recipes, upkeep, bankruptcy) is what v4300 closed.",
     },
+    // =========================================================================================================
+    // v4304 -- THE BACKLOG'S LICENCE VERDICTS, MOVED INTO THE TREE. #106 said in as many words that this file
+    // "holds EIGHT entries and has not been added to since v4203, while every batch since has been assessed
+    // in the changelog only", and world/namedNotChecked.mjs was built at v4268 because six of those verdicts
+    // named repositories that appeared nowhere in the tree. Every entry below was read from a shallow clone in
+    // this session; the licence EVIDENCE (file, hash, line count) is in world/licenceSweep.mjs beside the
+    // thirty-five it already held, and this register carries the JUDGEMENT -- what was taken, what was refused,
+    // and why. Two of #132's five names could not be resolved to an owner by any search and stay UNCHECKED where
+    // they were; the four that could are here and have left that register.
+    // =========================================================================================================
+    {
+        repo: "shajidhasan/spoilerjs", sourceUrl: "https://github.com/shajidhasan/spoilerjs",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Shajid Hasan", year: 2025,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE (c) 2025 Shajid Hasan; README and the component package agree. Dependency-free.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "A <spoiler-span> web component: text hidden under a particle cloud until clicked, after Telegram's " +
+             "spoilers. Refused on fit, not on paperwork: nothing in this tree hides text, and a DOM particle " +
+             "overlay is page chrome rather than an engine capability -- the tree's particle systems are GPU " +
+             "and scene-space. The one thing worth noting is how little it needs (no dependencies, one custom " +
+             "element), a standard this tree's ui/ modules already hold themselves to.",
+    },
+    {
+        repo: "evanw/node-source-map-support", sourceUrl: "https://github.com/evanw/node-source-map-support",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Evan Wallace", year: 2014,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE.md (c) 2014 Evan Wallace; package.json agrees. v0.5.21, last commit 2022.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Source-map-aware stack traces for Node through the V8 stack-trace API. Refused for two reasons, " +
+             "one of which its own README gives: Node 12.12 added --enable-source-maps and the package says it " +
+             "is no longer required; and this tree has no source maps to support -- it ships the .js and .mjs " +
+             "it is written in, with no bundler or transpiler, and a grep for sourceMappingURL outside vendor/ " +
+             "finds nothing. Not a judgement on the library, which is the one that taught Node the trick.",
+    },
+    {
+        repo: "evanw/webgl-vr-editor", sourceUrl: "https://github.com/evanw/webgl-vr-editor",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Evan Wallace", year: 2017,
+        spdx: null, licence: null,
+        licenceNote: "No licence file at the root or in v1/, v2/ or v3/; no README licence line; no package.json " +
+                     "license field. Read this time, not only listed, and the answer is the same.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "#106 refused it on provenance from the file listing alone -- the right call on the wrong-shaped " +
+             "evidence, because a listing says nothing about nested licences and this tree has been caught by " +
+             "nested licences in both directions (world/licenceSweep.mjs: SDFGen, and the CTM loader). Opened " +
+             "and searched at every depth: three generations of a WebGL VR editor and not one grant. Refused, " +
+             "with the evidence this time.",
+    },
+    {
+        repo: "evanw/node-flatbuffers", sourceUrl: "https://github.com/evanw/node-flatbuffers",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Evan Wallace", year: 2016,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "Apache-2.0 by its 13-line short notice (LICENSE.txt: 'Copyright 2016 Evan Wallace / Licensed " +
+                     "under the Apache License, Version 2.0'); package.json agrees. #106 could not confirm the " +
+                     "type from the listing; the notice form is why.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Pure-JS FlatBuffers that JIT-compiles a reader from a binary schema, two commits in 2016. The one " +
+             "idea in it -- a format should be readable from data rather than from generated code -- arrived " +
+             "here independently at v4228 as engine/binaryHeader.mjs. Nothing to take; the paperwork question " +
+             "that kept it open closes the other way (it is papered, and Apache).",
+    },
+    {
+        repo: "brunosimon/three.js-tsl-sandbox", sourceUrl: "https://github.com/brunosimon/three.js-tsl-sandbox",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Bruno Simon", year: 2026,
+        spdx: null, licence: null,
+        licenceNote: "No licence file at the root or in any of the 40 project folders, no root package.json, and " +
+                     "the readme's 'code is provided as it is ... use at your own risk' is a disclaimer, not a grant.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "A personal TSL practice collection, and it says so. Unpapered, so no bytes; and the tree has no " +
+             "TSL to teach, having rewritten the one TSL idea it wanted (boytchev/tsl-textures) in GLSL. Its " +
+             "readme points at tsl-textures and at three.js's own wiki, both of which this tree has already read.",
+    },
+    {
+        repo: "Ramotion/vr-menu-demo", sourceUrl: "https://github.com/Ramotion/vr-menu-demo",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Ramotion", year: 2019,
+        spdx: null, licence: null,
+        licenceNote: "No licence file, no package.json, and a README with no licence word ending in an App Store " +
+                     "advert. Read first-hand at v4304; #117 (v4247) took its reading from the listing and was right.",
+        redistributable: false, posture: POSTURE.REACHED,
+        taken: "The interaction only: look at a thing, hold the look, and it selects -- a dwell timer with a " +
+             "visible fill. No code, no asset, no number; ui/gazeDwell.mjs is written here.",
+        takenPaths: ["ui/gazeDwell.mjs"],
+        citedPaths: ["tools/ship/gazeDwell-selfcheck.mjs", "tools/ship/citedSources-selfcheck.mjs"],
+        why: "The idea was worth having because VR parts 1-3 all assumed controllers, and an unlicensed " +
+             "repository cannot licence an interaction anybody can describe in a sentence. Recorded per-repo: " +
+             "Ramotion/aquarelle (#50) is a different repository with a different answer.",
+    },
+    {
+        repo: "cmhhelgeson/Threejs_TSL_Tutorials", sourceUrl: "https://github.com/cmhhelgeson/Threejs_TSL_Tutorials",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Christian Helgeson", year: 2025,
+        spdx: null, licence: null,
+        licenceNote: "No licence file, package.json has no license field, README has no licence word.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "The tutorials are Medium posts the README links to; the repository is the sketchbook behind them " +
+             "and says of one folder 'not intended to be used for educational purposes'. Unpapered, and the " +
+             "third unpapered TSL reference of four -- the class #106 named, now with the evidence per repo.",
+    },
+    {
+        repo: "Makio64/advanced-threejs-tsl-webgpu-rendering", sourceUrl: "https://github.com/Makio64/advanced-threejs-tsl-webgpu-rendering",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Makio64", year: 2025,
+        spdx: null, licence: null,
+        licenceNote: "Three Markdown files, no package.json, no licence file, and no licence or copyright word in " +
+                     "any of the three. There is no code in it to licence; it is a 1,838-line guide.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "#100 called it 'the only TSL reference' and v4268 showed that false (render/solidTexture.mjs " +
+             "credits boytchev/tsl-textures). Opened at v4304: it is a document about TSL caching, loops, " +
+             "compute and texture access patterns, not a library -- so 'no licence at all' is exactly right " +
+             "and matters less than it sounded, since a technique read from a guide is not a taking. Refused " +
+             "as a source of bytes; there are none.",
+    },
+    {
+        repo: "novalain/gi-voxels", sourceUrl: "https://github.com/novalain/gi-voxels",
+        grantorHoldsRights: true, licenceExists: false, publisher: "Michael Novén", year: 2018,
+        spdx: "MIT", licence: null,
+        licenceNote: "DECLARED, NOT GRANTED: package.json says \"license\": \"MIT\" and there is no licence file at " +
+                     "any depth and no licence word in the readme. The third such entry in world/licenceSweep.mjs: " +
+                     "spdx records the declaration, licenceExists records the absence, and redistributable follows " +
+                     "the absence, because a field in a manifest is not the notice MIT requires be carried in copies.",
+        redistributable: false, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: [],
+        why: "WebGL2 voxel cone tracing after Crassin et al. 2011 -- indirect diffuse, specular, ambient " +
+             "occlusion -- and the one repository in either batch whose idea this tree has in no form (#132: " +
+             "the only GI hit in the whole tree is inside vendor/three). REACHED and worth reaching: the " +
+             "honest route to GI here is Crassin's paper over the tree's own voxel/ and volume-texture " +
+             "substrate, which is a round of its own and is not this one.",
+    },
+    {
+        repo: "stuinfla/Repo-Explainer", sourceUrl: "https://github.com/stuinfla/Repo-Explainer",
+        grantorHoldsRights: true, licenceExists: false, publisher: "ISOvision", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "DECLARED, NOT GRANTED: package.json \"license\": \"MIT\", author ISOvision; no licence file at " +
+                     "any depth, no licence word in a 230-line README.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "It is explainmyrepo: an agent pipeline (a CLAUDE.md, capabilities.json, a kb/ of prompts) that " +
+             "writes an explainer site for a repository and refuses to ship one until it grades well. The " +
+             "direction -- a repository as a subject -- this tree took from the other end " +
+             "(ai-bridge/repoTerrainBridge.js, world/orrery.mjs); the mechanism is prompts to a model, which " +
+             "is not an engine idea. Refused on fit, and unpapered besides.",
+    },
+    {
+        repo: "dimartarmizi/threejs-procedural-terrain", sourceUrl: "https://github.com/dimartarmizi/threejs-procedural-terrain",
+        grantorHoldsRights: true, licenceExists: false, publisher: "dimartarmizi", year: 2026,
+        spdx: null, licence: null,
+        licenceNote: "No licence file, README has no licence word, package.json is \"private\": true with no license field.",
+        redistributable: false, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "A Vite starter: seeded fractal noise (simplex-noise over alea) into chunked tiles with a " +
+             "lil-gui panel. Duplicate of world/ChunkStreamer, world/biomeTerrain and the erosion stack, as " +
+             "#132 said, and unpapered besides -- and its own README calls it 'intentionally small' and lists " +
+             "chunk streaming and biomes as next steps this tree already has.",
+    },
+    {
+        repo: "HenryLoM/CliWaifuTamagotchi", sourceUrl: "https://github.com/HenryLoM/CliWaifuTamagotchi",
+        grantorHoldsRights: true, licenceExists: true, publisher: "HenryLoM", year: 2025,
+        spdx: "GPL-3.0-only", licence: null,
+        licenceNote: "GPL-3.0: the FSF's 674-line text verbatim as LICENSE, with no copyright line naming a grantor " +
+                     "of this work; README carries the GitHub licence badge. The grant is real, the name is not in it.",
+        redistributable: true, posture: POSTURE.REACHED, taken: null, takenPaths: [], citedPaths: ["fx/procBrush.mjs"],
+        why: "#63's whole question, now on the register with its severity: RECIPROCAL, the first copyleft entry " +
+             "here. Every vendored body in this tree is MIT or OFL; vendoring this would make it the first GPL " +
+             "byte and the combined work would carry it. So REACHED and never CAPTURED: a Go TUI (tview/tcell, " +
+             "module 'cliwt') run at arm's length behind a PTY and piped into terminal.html is a separate " +
+             "program, and that is the only shape it may take here. It writes per-user state to " +
+             "~/.config/cliwaifutamagotchi/ (utils/encouragements-handler.go:26), so a hosted instance shares " +
+             "one pet across viewers unless each gets its own HOME.",
+    },
+    {
+        repo: "upf-gti/wgpuEngine", sourceUrl: "https://github.com/upf-gti/wgpuEngine",
+        grantorHoldsRights: true, licenceExists: true, publisher: "UPF-GTI (Universitat Pompeu Fabra)", year: 2023,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE (c) 2023 UPF-GTI. C++ on Dawn with OpenXR (src/xr/openxr/) and an emscripten web export.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: ["world/nodeGlPlatforms.mjs"],
+        why: "A native engine, not a library: taking anything means reading C++ to reimplement an idea, and " +
+             "#122 named no idea. The one that would earn a round is its OpenXR path against #88, since this " +
+             "tree's VR is WebXR-only and cannot be run headless here; until somebody names that round it is " +
+             "refused for want of a consumer, which is #133's rule. Papered cleanly, which #122 was right about.",
+    },
+    {
+        repo: "node-3d/webgl", sourceUrl: "https://github.com/node-3d/webgl",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Luis Blanco (Node3D)", year: 2025,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE (c) 2025 Luis Blanco, the organisation's maintainer and every package.json's " +
+                     "author; byte-identical to node-3d/bullet's and node-3d/opencl's.",
+        redistributable: true, posture: POSTURE.REACHED, taken: null,
+        takenPaths: [], citedPaths: ["world/nodeGlPlatforms.mjs", "ai-bridge/install_catalog.json"],
+        why: "The one of the six with a real argument, and v4291 ran it to ground: installed in 3 s from " +
+             "prebuilt binaries with no compiler, gl.getParameter answered -- and the reason for wanting it did " +
+             "not hold, because GLFW opens a WINDOW and the gates need a headless context. Recorded in " +
+             "world/nodeGlPlatforms.mjs with the platform pairs it ships for; this entry is so that 'all six " +
+             "MIT' is evidence in the tree rather than a sentence in a backlog.",
+    },
+    {
+        repo: "node-3d/bullet", sourceUrl: "https://github.com/node-3d/bullet",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Luis Blanco (Node3D)", year: 2025,
+        spdx: "MIT", licence: null, licenceNote: "MIT, LICENSE (c) 2025 Luis Blanco; package.json agrees. v5.0.0.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Bullet from Node. The tree can already step a physics world from Node (physics/box3d/box3dNode.mjs, " +
+             "used by gates), so this is a second engine behind the same backendConformance interface, and " +
+             "#93 chose Jolt for the constraints and soft bodies box3d lacks. Refused as a duplicate of a decision.",
+    },
+    {
+        repo: "node-3d/uv-loop", sourceUrl: "https://github.com/node-3d/uv-loop",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Node3D", year: 2026,
+        spdx: "MIT", licence: null, licenceNote: "MIT, LICENSE (c) 2026 Node3D; package.json agrees, author Luis Blanco. v0.1.0.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "libuv loop scheduling from Node. Looked at against #120 (a deterministic rAF) and it is the wrong " +
+             "layer: #120 needs a controllable frame clock INSIDE a page, and this schedules work on Node's own " +
+             "loop. The tree built its deterministic rAF without it.",
+    },
+    {
+        repo: "node-3d/opencl", sourceUrl: "https://github.com/node-3d/opencl",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Luis Blanco (Node3D)", year: 2025,
+        spdx: "MIT", licence: null, licenceNote: "MIT, LICENSE (c) 2025 Luis Blanco; package.json agrees. v3.0.0.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "OpenCL bindings. The tree's GPGPU is WebGL2 transform feedback and WebGPU compute; OpenCL reaches " +
+             "neither and adds a driver dependency. Refused.",
+    },
+    {
+        repo: "node-3d/steam-api", sourceUrl: "https://github.com/node-3d/steam-api",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Node3D", year: 2026,
+        spdx: "MIT", licence: null, licenceNote: "MIT, LICENSE (c) 2026 Node3D; package.json agrees, author Luis Blanco. v0.4.0.",
+        redistributable: true, posture: POSTURE.REFUSED, taken: null, takenPaths: [], citedPaths: [],
+        why: "Steamworks bindings. Nothing in this tree ships to Steam. Refused, and recorded so the URL is not read twice.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
