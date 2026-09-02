@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -55,7 +55,20 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    away from the race's own bitmap look, and the pick still names it; orrery-gpu.html?tsl=1 paints it live.
    What the byte claim CANNOT see, measured: two algebraically-equal but not bit-equal rewrites of the twin
    ((i0/eta)*shape/i0 as (i0*shape)/(eta*i0); exp(log(r)*x) as pow(r, x)) moved no byte at all. The picture is
-   eight bits a channel and a difference under 1/255 is below it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   eight bits a channel and a difference under 1/255 is below it.
+   v4326 -- A TEXTURE CROSSES. Until now a shell transplant refused every texture, so the fleets' own bitmap sprite
+   was the one race a graph could not paint. The SHELL now lists the textures its prefix binds (physicsTsl
+   spriteAtlasShell: viewProj alone and the atlas at binding 1, exactly the fleets' sprite pipeline), the transplant
+   keeps the graph's own label for them, and a texture the shell does not bind -- or a sampled one where it declares
+   no sampler -- refuses by name. makeSpriteAtlasTsl is render/fleets.mjs SPRITE_WGSL written as nodes, so the twin
+   is SHIPPED CODE: tslRace-selfcheck section 6 draws the fleets' own Pixel race beside the generated one and they
+   agree on 36,864 of 36,864 pixels on both backends, transparent texels discarded the same, with the fleet's own
+   bind hook feeding the generated shader unchanged. orrery-gpu.html?tsl=1 now paints three races from graphs.
+   The finding: three's TextureNode constructor runs setUpdateMatrix(uvNode === null), so a texture node built
+   WITHOUT a uv turns the uv-transform matrix on and every clone (textureLoad makes one) keeps it -- the obvious
+   spelling emits an unlabelled mat3 into the fragment and is refused. Give the uv at construction and the fragment
+   carries no uniform at all. Also measured and not fixed: three fetches the texel twice around a Discard that
+   reads it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).

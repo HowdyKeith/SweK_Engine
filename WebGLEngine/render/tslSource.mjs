@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -154,7 +154,9 @@ export function vertexDisplacement(vertex, language) {
  * (version, precision, uniforms, ins, out), varyings: { uv: "vLocal", normal: "vN", color: "vColor" } }, buffers, topology }.
  * Each language may name its own `locals` (v4325) -- what it calls three's positionLocal, normalLocal, position and normal --
  * and a shell that leaves one out (the sprite layout has no normal) refuses a displacement that reads it.
- * Returns a device pipeline descriptor. Refuses by name: a varying the shell does not carry, a uniform the shell's struct lacks, a texture.
+ * A shell may also list the `textures` its prefix binds (v4326); a texture the fragment samples that the shell does not
+ * bind, or a sampled texture where the shell declares no `sampler`, refuses by name.
+ * Returns a device pipeline descriptor. Refuses by name: a varying the shell does not carry, a uniform the shell's struct lacks.
  */
 export function transplantIntoShell({ wgsl, glsl }, shell) {
     const desc = {};
@@ -167,7 +169,12 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         if (typeof em.fragment !== "string" || typeof em.vertex !== "string") throw new Error(`tslSource: transplantIntoShell needs the emitted { vertex, fragment } for ${language}`);
         if (/\brender\./.test(em.fragment) || /cameraProjectionMatrix|modelViewMatrix/.test(em.fragment)) throw new Error("tslSource: the fragment reads camera or object matrices; a shell transplant carries only what its vertex stage passes");
         const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
-        if (textures.length) throw new Error(`tslSource: a shell transplant carries no textures (the fragment samples ${textures.join(", ")})`);
+        // v4326 -- a texture crosses when the SHELL declares it. The shell lists the names its own prefix binds
+        // (`textures`), and the transplant keeps the fragment's name as it is, because the graph labelled the texture
+        // node with the shell's binding name. One it does not bind is refused by name rather than left dangling: the
+        // device reads the bindings out of the shader and would throw at draw with nothing bound to it.
+        const carried = shell.textures || [];
+        for (const t of textures) if (!carried.includes(t)) throw new Error(`tslSource: the fragment samples "${t}", which the shell "${shell.name}" does not bind (it binds ${carried.join(", ") || "no textures"})`);
         for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
         const sem = varyingSemantics(em.vertex, language), S = shell[language];
         // the vertex stage: a displacement crosses only into a shell that says where ({{DISPLACE}} in its vertexTemplate)
@@ -190,6 +197,10 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
             for (const p of params) { const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
             b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`);
+            for (const t of textures) if (new RegExp(`\\b${t}_sampler\\b`).test(b)) {   // a SAMPLED texture needs the shell's own sampler; a textureLoad does not
+                if (!S.sampler) throw new Error(`tslSource: the fragment samples "${t}" through a sampler and the shell "${shell.name}" declares none (a textureLoad graph needs no sampler; a filtered one does)`);
+                b = b.replace(new RegExp(`\\b${t}_sampler\\b`, "g"), S.sampler);
+            }
             const prefix = vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix;
             if (vertexText && prefix === S.prefix) throw new Error("tslSource: the shell's prefix does not contain its own vertexTemplate, so the vertex could not be replaced");
             desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
@@ -203,5 +214,5 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
-    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
+    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), ...(shell.textures && shell.textures.length ? { textures: shell.textures } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
 }

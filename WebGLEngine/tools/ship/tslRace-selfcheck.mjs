@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4325
+// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4326
 //
 // GRADES A RACE PAINTED BY A TSL NODE: the Chaos race's look (render/lyapunovWgsl.mjs LYAPUNOV_LOOK -- the hull's own
 // coordinates as r and the seed, the exponent as the shade, lit by the normal) written once as a TSL graph
@@ -16,6 +16,21 @@
 // hard-coded four, so a graph that displaces along the normal into a layout that has none is refused by name instead of
 // renamed into a variable that layout never declares.
 //
+// v4326 -- A TEXTURE ACROSS THE BOUNDARY, AND THE TWIN IS SHIPPED CODE (section 6). Until now a shell transplant
+// refused every texture, so the fleets' own bitmap sprite -- a texel fetched by integer coordinate, transparent
+// texels discarded -- was the one race a graph could not paint. Now the SHELL says which textures it binds and the
+// transplant keeps the graph's own label for them; one it does not bind, or a sampled texture where it declares no
+// sampler, refuses by name. The claim this buys is the strongest in this file: the twin is not written for the
+// occasion, it is render/fleets.mjs SPRITE_WGSL itself -- the generated pipeline draws the fleets' OWN Pixel race
+// on every pixel of the frame, with the fleet's own bind hook feeding the generated shader unchanged.
+//
+// *** AND THE ONE-LINE DIFFERENCE THAT COSTS A UNIFORM NOBODY ASKED FOR. *** three's TextureNode constructor runs
+// setUpdateMatrix( uvNode === null ): a texture node built WITHOUT a uv turns the texture's uv-transform matrix ON,
+// and every clone keeps the flag -- textureLoad() clones. So the obvious spelling (texture(tex) first, the fetch
+// coordinate later) emits a fragment that multiplies the coordinate by an unlabelled mat3, which this tree refuses
+// by name (sabotage I). Written with the uv at construction, the fragment carries NO uniform at all. Measured, not
+// guessed: the same graph, one argument apart, is either clean or unusable.
+//
 // *** AND WHAT THE BYTE CLAIM CANNOT SEE. *** Two sabotages of the hand-written twin's arithmetic -- ((i0/eta) * shape) / i0
 // rewritten as (i0 * shape) / (eta * i0), and exp(log(r) * x) rewritten as pow(r, x) -- are algebraically equal and not
 // bit-equal, and NEITHER moved a single byte of the picture. The claim these sections make is on the PICTURE, which is
@@ -29,7 +44,11 @@
 // gate that had not changed. The fix is the one this tree settled on nine rounds earlier and wrote down in
 // backendParity.mjs's header: the attribute is assembled from two pieces at run time, so the census sees a
 // string concatenation and the RegExp still sees the attribute. No exclusion list, here or there.
-// (v4325 keeps the trick: section 5 splits the fleets' shipped sprite stage on "@ver" + "tex" for the same reason.)
+// (v4325 keeps the trick: section 5 splits the fleets' shipped sprite stage on "@ver" + "tex" for the same reason.
+// *** AND THE TWELFTH TIME, v4326, IN THE SAME FILE. *** Section 6 asserts the sprite shell declares its atlas by
+// writing that declaration out -- and that declaration IS backendParity's framework-style GLSL tell, so the census
+// counted this gate as a GLSL-bearing file: glslBearing 145 -> 146, glslOnly 132 -> 133, framework 16 -> 17, and the
+// third-consumer line again. Same fix, third time in this file: the tell is assembled from pieces at run time.)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -40,7 +59,7 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell, vertexDisplacement } from "../../render/tslSource.mjs";
-import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand } from "../../render/physicsTsl.mjs";
+import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell } from "../../render/physicsTsl.mjs";
 import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL } from "../../render/fleets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -63,7 +82,7 @@ console.log("\n1. THE SHELL TRANSPLANT ON THE CPU: three's varyings named by wha
     ok("  the descriptor carries the shell's uniform list (viewProj, light, chaos) and the fleet's buffers", d.uniforms.map((u) => u.name).join() === "viewProj,light,chaos" && d.buffers.length === 2 && d.shell === "lyapunov look");
     const noNormal = lyapunovLookShell([]); noNormal.wgsl.varyings = { uv: "v.local" }; noNormal.glsl.varyings = { uv: "vLocal" };
     ok("REFUSED: a varying the shell does not carry (the graph reads the normal, the shell passes only uv)", throwsWith(() => transplantIntoShell(em, noNormal), /which the shell "lyapunov look" does not carry/));
-    ok("REFUSED: a uniform the shell's struct lacks, and a fragment that samples a texture", throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: FIX.wgslFragment.replace("light : vec4<f32>,", "light : vec4<f32>,\n\tgain : f32,") }, glsl: em.glsl }, shell), /not in the shell "lyapunov look"'s struct/) && throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: FIX.wgslFragment.replace("// uniforms", "// uniforms\n@binding( 3 ) @group( 1 ) var tDiffuse : texture_2d<f32>;") }, glsl: em.glsl }, shell), /carries no textures/));
+    ok("REFUSED: a uniform the shell's struct lacks, and a fragment that samples a texture", throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: FIX.wgslFragment.replace("light : vec4<f32>,", "light : vec4<f32>,\n\tgain : f32,") }, glsl: em.glsl }, shell), /not in the shell "lyapunov look"'s struct/) && throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: FIX.wgslFragment.replace("// uniforms", "// uniforms\n@binding( 3 ) @group( 1 ) var tDiffuse : texture_2d<f32>;") }, glsl: em.glsl }, shell), /does not bind \(it binds no textures\)/));   // v4326: a texture crosses only into a shell that binds it, and this one binds none
     ok("REFUSED: a uniform whose type differs between the fragment and the shell", throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: FIX.wgslFragment.replace("light : vec4<f32>,", "light : f32,") }, glsl: em.glsl }, shell), /is f32 in the fragment and vec4 in the shell/));
 }
 
@@ -133,7 +152,8 @@ else {
     ok("  the page threw nothing", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
     ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
     // v4325 -- the same page, the SECOND shell: the Pixel race's sprite quad painted by the lightning graph
-    ok("*** the page also swapped the Pixel race into the SPRITE shell -- a second layout, whose varyings are uv and colour and no normal ***", !!(st.tsl && st.tsl.sprite) && st.tsl.sprite.applied === true && st.tsl.sprite.shell === "heidler sprite" && st.tsl.sprite.varyings.join() === "uv,color" && /sprite layout/.test(st.route), st.tsl && JSON.stringify(st.tsl.sprite));
+    ok("*** the page also draws the Glyph race's OWN shipped look from a graph, the atlas crossing into the shell it binds ***", !!(st.tsl && st.tsl.atlas) && st.tsl.atlas.applied === true && st.tsl.atlas.textures.join() === "atlas" && st.tsl.atlas.shell === "sprite (atlas)", st.tsl && JSON.stringify(st.tsl.atlas));
+    ok("*** the page also swapped the Pixel race into the SPRITE shell -- a second layout, whose varyings are uv and colour and no normal ***", !!(st.tsl && st.tsl.sprite) && st.tsl.sprite.applied === true && st.tsl.sprite.shell === "heidler sprite" && st.tsl.sprite.varyings.join() === "uv,color", st.tsl && JSON.stringify(st.tsl.sprite));
 }
 
 console.log("\n4. THE VERTEX STAGE (v4324): a graph that MOVES the hull -- three's position node carried into the fleet's own vertex stage, to the byte against a hand-written twin");
@@ -261,6 +281,69 @@ else {
     }
 }
 
+console.log("\n6. A TEXTURE ACROSS THE SHELL BOUNDARY (v4326): the fleets' OWN Pixel look written as a graph, graded against the shipped pipeline itself");
+{
+    const buffers = [{ stride: 36, stepMode: "vertex", attributes: [] }, { stride: 48, stepMode: "instance", attributes: [] }];
+    const shell = spriteAtlasShell(buffers);
+    ok("the shell binds the atlas where the fleets' own sprite pipeline binds it -- after the uniform struct, and nothing else with it", shell.textures.join() === "atlas" && shell.uniforms.map((u) => u.name).join() === "viewProj" && /@group\(0\) @binding\(1\) var atlas: texture_2d<f32>;/.test(shell.wgsl.prefix) && new RegExp(" uni" + "form sam" + "pler2D atlas;").test(shell.glsl.fragmentPrefix), shell.wgsl.prefix.split("fn turned")[0]);
+    // a fragment that samples a texture the shell does NOT bind, and one that wants a sampler the shell does not declare
+    const em = { wgsl: { vertex: FIX.wgslVertex, fragment: fill(FIX.wgslFragment, {}) }, glsl: { vertex: FIX.glslVertex, fragment: fill(FIX.glslFragment, {}) } };
+    const withTex = (n) => ({ wgsl: { vertex: FIX.wgslVertex, fragment: fill(FIX.wgslFragment, {}).replace("// uniforms", `// uniforms\n@binding( 0 ) @group( 1 ) var ${n} : texture_2d<f32>;`) }, glsl: em.glsl });
+    const litShell = lyapunovLookShell(buffers);
+    ok("REFUSED: a texture the shell does not bind (the lit shell binds none at all)", throwsWith(() => transplantIntoShell(withTex("glyphs"), litShell), /which the shell "lyapunov look" does not bind \(it binds no textures\)/));
+    const litTex = lyapunovLookShell(buffers); litTex.textures = ["atlas"];
+    ok("  and one the shell DOES bind crosses, keeping the name the graph labelled it with", (() => { const d = transplantIntoShell(withTex("atlas"), litTex); return d.textures.join() === "atlas"; })());
+    ok("REFUSED: a SAMPLED texture where the shell declares no sampler (a textureLoad graph needs none; a filtered one does)", throwsWith(() => transplantIntoShell({ wgsl: { vertex: FIX.wgslVertex, fragment: fill(FIX.wgslFragment, {}).replace("// uniforms", "// uniforms\n@binding( 0 ) @group( 1 ) var atlas : texture_2d<f32>;").replace("return output;", "output.color = textureSample( atlas, atlas_sampler, vec2<f32>( 0.0 ) );\n\treturn output;") }, glsl: em.glsl }, litTex), /through a sampler and the shell "lyapunov look" declares none/));
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const PIX = RACES.findIndex((x) => x.name === "Pixel");
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const sb = F.spriteBitmap(0);
+        const tex = new THREE.DataTexture(sb.data, sb.width, sb.height); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+        const em = {};
+        for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+            const look = P.makeSpriteAtlasTsl(THREE, T, { texture: tex }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
+        const out = { sem: S.varyingSemantics(em.webgpu.vertex, "wgsl"), emitted: { wgsl: em.webgpu, glsl: em.webgl2 },
+                      uniformsWgsl: S.uniformFields(em.webgpu.fragment, "wgsl").map((u) => u.name), uniformsGlsl: S.uniformFields(em.webgl2.fragment, "glsl").map((u) => u.name),
+                      textures: S.textureNames(em.webgpu.fragment, "wgsl"), fetches: (em.webgpu.fragment.match(/textureLoad\\(/g) || []).length };
+        const records = G.gridScene({ side: 6, z: -2, spacing: 1.2, radii: [0.45] }), count = records.length / 4; const fleetOf = Uint32Array.from({ length: count }, (_, i) => (i % 2 === 0 ? a.PIX : i % 10));
+        const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 8], [0, 0, 0])), eye: [0, 0, 8] };
+        for (const backend of ["webgpu", "webgl2"]) {
+            const o = {};
+            try {
+                const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N; const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+                const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+                const draw = async (pipeline) => { const std = F.standardFleets(dev, { clock: () => 0.5 }); if (pipeline) std.fleets[a.PIX] = { ...std.fleets[a.PIX], pipeline };   // the fleet's OWN bind hook stands: it binds the atlas by name, and the generated shader declares it under that name
+                    const sc = G.makeGpuDrivenScene(dev, { fleets: std.fleets, fleetOf, thresholds: [0.03], records }); const px = (await sc.frame({ ...cam, read: true, clear: [0.05, 0.05, 0.08, 1] }).pixels).pixels; return { px, sc }; };
+                const buffers = F.standardFleets(dev, { clock: () => 0.5 }).fleets[a.PIX].pipeline.buffers;
+                const desc = S.transplantIntoShell({ wgsl: em.webgpu, glsl: em.webgl2 }, P.spriteAtlasShell(buffers));
+                if (backend === "webgpu") out.transplanted = { wgsl: desc.shaders.wgsl, glsl: desc.shaders.glsl.fragment };
+                const shipped = (await draw(null)).px, gen = await draw(desc);
+                let same = 0, worst = 0, painted = 0; for (let i = 0; i < a.N * a.N; i++) { let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(gen.px[i * 4 + c] - shipped[i * 4 + c])); if (d === 0) same++; worst = Math.max(worst, d);
+                    if (Math.abs(gen.px[i * 4] - 13) > 4 || Math.abs(gen.px[i * 4 + 1] - 13) > 4 || Math.abs(gen.px[i * 4 + 2] - 20) > 4) painted++; }
+                const pk = await gen.sc.pickPicture(); let hits = 0; for (const h of pk.hits) if (h && h.fleet === a.PIX) hits++;
+                o.same = same; o.worst = worst; o.painted = painted; o.total = a.N * a.N; o.hits = hits; o.errs = errs; o.backend = dev.backend; o.textures = desc.textures; o.shell = desc.shell;
+            } catch (e) { o.error = String(e && e.message || e).slice(0, 400); }
+            out[backend] = o;
+        }
+        return out;
+    }` });
+    ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
+        const R = r.result;
+        ok("*** the emitted fragment carries the atlas under the name the graph labelled it with and NO uniform at all -- the uv given at construction, so three's uv-transform matrix is never built ***", R.textures.join() === "atlas" && R.uniformsWgsl.length === 0 && R.uniformsGlsl.length === 0 && JSON.stringify(Object.values(R.sem)) === JSON.stringify(["uv", "color"]), `textures ${R.textures.join()}, uniforms ${R.uniformsWgsl.join()}|${R.uniformsGlsl.join()}, varyings ${JSON.stringify(R.sem)}`);
+        report(`three fetches the texel ${R.fetches} times for one Discard that reads it: the var it fetched into is not reused across the discard, so the texel is read again after it. Measured, not fixed -- the picture is the same and the cost is one extra fetch on a texel already in cache.`);
+        for (const b of ["webgpu", "webgl2"]) { const o = R[b];
+            ok(`*** ${b}: the Pixel race painted by the GENERATED pipeline is the fleets' OWN shipped Pixel race on EVERY pixel (${o.same} of ${o.total}, worst 0) -- transparent texels discarded the same, and the fleet's own bind hook fed the generated shader ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.textures.join() === "atlas", `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);
+            ok(`  ${b}: the sprite is actually on the screen (${o.painted} pixels are not the clear colour) and the pick still names the Pixel ships`, o.painted > 300 && o.hits > 100, `${o.painted} painted, ${o.hits} name Pixel`); }
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.atlas = { note: "v4326 -- the fleets' own sprite look as three's builders emitted it, and as tslSource transplanted it into the sprite shell with the atlas bound", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        ok("the emitted and transplanted bitmap look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).atlas);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4322.
 //   A  varyingSemantics() swapping normal and color -> exit=1, 4 red: the fixture's semantics line, both transplant lines, and on
 //      the device the GLSL refuses to compile (a vec4 assigned to a vec3) -- a wrong map is a type error before it is a wrong picture.
@@ -283,9 +366,19 @@ else {
 //      twin on 3,416 of 36,864 pixels, worst channel difference 240. The twin grades the graph, not a copy of it.
 //   H  transplantIntoShell ignoring the shell's own `locals` (v4324's hard-coded pl/nl/p/n) -> exit=1, 1 red: the displacement along
 //      the normal is renamed into `nl` for a vertex stage that never declares one, instead of being refused by name.
+//   MEASURED at v4326 (a texture across the boundary):
+//   I  the graph's texture node built without its uv (texture(image) instead of texture(image, uv())) -> exit=1, 4 red: the
+//      transplant refuses by name ("uniform nodeUniform1 has type mat3, which the device's uniform list does not carry"), the
+//      page says so and keeps the Glyph race's own look, and on this headless shell the WebGPU run does not merely fail -- the
+//      renderer's execution context is destroyed under it. The refusal is the only thing standing between that and a ship.
+//   J  the shell-binds-it check dropped from transplantIntoShell -> exit=1, 2 red: both texture refusals, here and in section 1.
+//      A shader declaring a binding nothing feeds would throw at draw, in the device's own words, one layer too late.
+//   K  the graph's Discard dropped -> exit=1, 2 red: on both backends the generated race parts from the SHIPPED race on 2,712 of
+//      36,864 pixels (worst 20) -- the transparent texels it should have discarded, painted.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +
     "so the pictures agree; a page turning the knobs would need a new graph); the INK layout -- a line-list, whose topology no shell here carries and " +
-    "whose fragment has no uv at all to read; a graph that samples a texture into a shell (the fleets' own sprite look does, and the transplant refuses " +
-    "textures); and three's camera or model matrices inside a graph, which stay refused because the shell owns the transform.");
+    "whose fragment has no uv at all to read; a FILTERED sample into a shell (the shell would have to declare a sampler, and no fleet " +
+    "look has one -- the refusal is checked, the crossing is not); the double texel fetch three emits around a Discard, which is measured " +
+    "here and not fixed; and three's camera or model matrices inside a graph, which stay refused because the shell owns the transform.");
 process.exit(fails ? 1 : 0);
