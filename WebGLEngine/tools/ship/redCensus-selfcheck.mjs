@@ -15,7 +15,8 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, RECHECK_V4313, RECHECK_V4314,
+import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, RECOVERED_SINCE_V4279,
+         RECHECK_V4313, RECHECK_V4314,
          METHOD, runGate, censusCostMs, ENG,
          UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
 
@@ -34,9 +35,30 @@ console.log("1. *** THE CENSUS IS A MEASUREMENT, AND EVERY ENTRY CARRIES WHAT IT
     ok("every entry records WHAT fails, not merely that something does",
         RED_AT_V4279.every((e) => typeof e.fails === "string" && e.fails.length > 10));
     ok("every entry records its own measured runtime", RED_AT_V4279.every((e) => e.ms > 0));
-    ok("*** so re-verifying the WHOLE census is affordable, and it is not sampled ***", censusCostMs() < 180000,
+    // *** v4318 RAISED THIS FROM 180 s TO 600 s, AND THE RAISE IS THE POINT RATHER THAN A CONCESSION. ***
+    // Recovering shaderRefs out of the timeout bucket added a gate that takes 379.8 s -- more than TWICE the
+    // entire former budget in one entry -- and the census cost went 141 s to 521 s. The budget exists so the
+    // full list stays re-runnable, because this file's founding complaint is that nobody re-ran it while the
+    // full sweep was BELIEVED to cost ninety minutes. 8.7 minutes is an order of magnitude under that, so the
+    // list is still affordable and the raise is honest. What would NOT be honest is raising it silently, or
+    // raising it to just above whatever the new number happens to be.
+    ok("*** so re-verifying the WHOLE census is affordable, and it is not sampled ***", censusCostMs() < 600000,
         (censusCostMs() / 1000).toFixed(1) + "s for all " + RED_AT_V4279.length +
-        " -- a census that spot-checks can be wrong about what it skipped");
+        " -- a census that spot-checks can be wrong about what it skipped. The founding complaint was a full " +
+        "sweep BELIEVED to cost ninety minutes and never run; this is under ten");
+    // *** AND A SUM HIDES A DOMINANT TERM, WHICH IS EXACTLY WHAT JUST HAPPENED. *** 379.8 s of the 520.9 s is
+    // ONE GATE. A budget on the total would let a single entry become the census while the number crept up
+    // round by round and every raise looked small. So the outliers are NAMED rather than summed away.
+    const heavy = RED_AT_V4279.filter((e) => e.ms > 0.25 * censusCostMs())
+        .sort((a, b) => b.ms - a.ms);
+    ok("...and any gate that is a QUARTER of the whole cost is named, not summed away",
+        heavy.every((e) => e.ms > 0) && heavy.length <= 2,
+        heavy.length
+            ? heavy.map((e) => e.gate.split("/").pop() + " " + (e.ms / 1000).toFixed(1) + "s = " +
+                (100 * e.ms / censusCostMs()).toFixed(0) + "% of the census").join("; ") +
+              ". A THIRD such entry would fail this: at that point the list is one slow gate wearing a census " +
+              "as a hat, and the answer is to make that gate cheaper rather than to widen the budget again."
+            : "no single gate exceeds a quarter of the total");
     ok("no gate is listed twice", new Set(RED_AT_V4279.map((e) => e.gate)).size === RED_AT_V4279.length);
 }
 
@@ -106,12 +128,26 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
     // asked to survive a prune, AND IT COULD NOT: deleting a line for a fixed gate moved the left-hand side
     // and nothing on the right. The census's arithmetic punished the pruning the census demands. Both fix
     // terms are subtracted now, so the reconciliation still has to balance and pruning is how it balances.
-    ok("  and the census holds confirmed + recovered - fixed - fixedSince, with every term named",
+    // *** A SIXTH TERM AT v4318, FOR THE DIRECTION THE FIFTH DID NOT COVER. *** FIXED_SINCE_V4279 lets the
+    // register SHRINK when somebody repairs a gate. Nothing let it GROW when somebody finally MEASURES one --
+    // and shaderRefs, filed as a timeout since v4279, turns out to run in 379.8 s and exit 1. It was never
+    // unmeasured; it was cut off at a 120 s cap before it could fail. Incrementing
+    // METHOD.recoveredFromTimeoutBucket would have been the cheap fix and the wrong one: METHOD describes how
+    // the v4279 measurement was taken, and a v4318 recovery is not part of it.
+    ok("  and the census holds confirmed + recovered - fixed - fixedSince + recoveredSince, every term named",
         RED_AT_V4279.length === METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket -
-            FIXED_AT_V4279.length - FIXED_SINCE_V4279.length,
+            FIXED_AT_V4279.length - FIXED_SINCE_V4279.length + RECOVERED_SINCE_V4279.length,
         `${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered - ` +
-        `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_SINCE_V4279.length} fixed since = ` +
-        `${RED_AT_V4279.length}`);
+        `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_SINCE_V4279.length} fixed since + ` +
+        `${RECOVERED_SINCE_V4279.length} recovered since = ${RED_AT_V4279.length}`);
+    ok("  ...and every RECOVERED gate is IN the red set and OUT of the timeout bucket, with its measurement",
+        RECOVERED_SINCE_V4279.every((r) =>
+            RED_AT_V4279.some((e) => e.gate === r.gate && e.ms === r.ms) &&
+            !UNCONFIRMED_SLOW.includes(r.gate) && r.ms > 0 && r.method && r.why.length > 40),
+        RECOVERED_SINCE_V4279.map((r) => r.gate.split("/").pop() + " " + r.verdict + " at " +
+            (r.ms / 1000).toFixed(1) + "s (" + r.round + ")").join(", ") +
+        ". A gate cannot be in both lists: unmeasured and measured-red are different states, and the whole " +
+        "point of the bucket is that they were being confused.");
     // *** A RECORD OF ONE MOMENT MAY NOT DERIVE FROM A LIST THAT SPANS SEVERAL. *** RECHECK_V4313 read
     // `FIXED_SINCE_V4279.map(...)` and was correct for exactly one round: v4314 pruned a fourth gate and a
     // v4313 record started claiming v4314's work. Caught by reading, not by a check -- so here is the check.

@@ -132,6 +132,9 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "the page renders title, why and how for each" },
     { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
       fails: "!! *** only 4 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebu" },
+    // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
+    { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
+      fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },
     { gate: "tools/ship/statedRuntime-selfcheck.mjs", ms: 129,
       fails: "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/assumptions-selfch" },
     { gate: "tools/ship/sunshineHost-selfcheck.mjs", ms: 101,
@@ -205,6 +208,38 @@ export const FIXED_AT_V4279 = Object.freeze([
 // it -- which is precisely the failure the header of this file describes ("thirteen of the nineteen it listed
 // are now GREEN: somebody fixed them and nobody removed the entry"). *** THE MECHANISM WRITTEN TO STOP THAT
 // HAD ALREADY LET IT HAPPEN ONCE MORE, and it took until now to notice because nothing re-ran the list.
+// *** GATES THAT LEFT THE TIMEOUT BUCKET AND ENTERED THE RED SET, WHICH IS THE OTHER DIRECTION ENTIRELY. ***
+//
+// FIXED_SINCE_V4279 records the register SHRINKING because somebody repaired a gate. This records it GROWING
+// because somebody finally measured one. v4279 had exactly one of these -- referenceKind, filed as a timeout
+// and confirmed RED serially -- and METHOD.recoveredFromTimeoutBucket counts it. *** THAT FIELD MUST NOT BE
+// INCREMENTED FOR A LATER ONE. *** METHOD is "how the v4279 measurement was taken"; bumping it to 2 would
+// make a frozen snapshot describe an instant it does not, which is the defect v4315 corrected in
+// RECHECK_V4313 and v4297 corrected in RECHECK. A later recovery is a later term.
+export const RECOVERED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/shaderRefs-selfcheck.mjs", round: "v4318", verdict: "RED", ms: 379838,
+      method: "serial, alone on an idle box, after the v4317 sweep had finished rather than while it ran",
+      why: "IT WAS NEVER A TIMEOUT. It runs in 379.8 s and exits 1 -- the v4279 sweep capped candidates at " +
+           "120 s under eight workers, so it was cut off before it could fail and read as unmeasured. Third " +
+           "confirmation of the verdict (exit 1 at ~380 s, ~450 s and 379.8 s across three runs); the " +
+           "timing is the one taken with nothing else on the box. Its failure names 16 callers that spell " +
+           "/\\.(js|mjs|html)$/ by hand instead of using the corpus filter, and none of them is anything " +
+           "this branch has touched -- it was red before this session and is red for its own reason." },
+]);
+
+/**
+ * *** THE REGISTER'S SIZE AT THE MOMENT THE LAST FULL SWEEP RAN, DERIVED IN ONE PLACE. ***
+ *
+ * Five assertions across three gate files reconcile a frozen v4296/v4297 figure against RED_AT_V4279, and at
+ * v4315 all five needed the same missing term when the list first SHRANK. They now need a second one, because
+ * it has GROWN as well -- and five copies of a two-term correction is five chances to update four of them.
+ * THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED, so there is one copy, here, and every consumer calls it.
+ *
+ *     33 standing today + 4 fixed and pruned since - 1 recovered into it since = 37 when the sweep ran
+ */
+export const registerAtSweep = () =>
+    RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
+
 export const FIXED_SINCE_V4279 = Object.freeze([
     { gate: "tools/roundhouse/deviceModes-selfcheck.mjs", round: "9695918 (before this round)",
       why: "nuclear declared no modes at all, so modesOf() fell back to the candidate list and its echoing " +
@@ -310,7 +345,6 @@ export const UNCONFIRMED_SLOW = Object.freeze([
     "tools/ship/moduleRefs-selfcheck.mjs",
     "tools/ship/orphanDisposition-selfcheck.mjs",
     "tools/ship/orphanTriage-selfcheck.mjs",
-    "tools/ship/shaderRefs-selfcheck.mjs",
     "tools/ship/toolFrontDoor-selfcheck.mjs"
 ]);
 
@@ -403,6 +437,14 @@ export const SLOW_PARTIAL = Object.freeze({
     "tools/roundhouse/compose-selfcheck.mjs": {
         "verdict": "GREEN",
         "ms": 111202
+    },
+    // v4318 -- MEASURED SERIALLY AND STILL WITHOUT A VERDICT, which is a fact about the gate rather than
+    // about the sweep. The v4279 run capped at 120 s; a serial run alone on an idle box does not finish it
+    // at 500 s either, and it produces ZERO BYTES of output before the cap because it buffers. It stays in
+    // UNCONFIRMED_SLOW: unmeasured is a third state and this is what one actually looks like.
+    "tools/ship/toolFrontDoor-selfcheck.mjs": {
+        "verdict": "SLOW500",
+        "ms": 500000
     }
 });
 

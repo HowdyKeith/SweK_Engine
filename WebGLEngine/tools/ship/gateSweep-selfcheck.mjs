@@ -239,9 +239,13 @@ sec("5. *** THE RE-CHECK REPORTED A FIELD ITS OWN METHOD COULD NOT HAVE MEASURED
     // the mechanism redCensus demands ("a gate turning green is GOOD NEWS that must be recorded by hand").
     // A check with no term for that punishes the repair, which is the shape v4155's Arriving cap had and
     // corroborateFully's "two rejections" had. The term, not a looser comparison.
-    ok(R.checked === standing.length + RC.FIXED_SINCE_V4279.length,
-       "the checked count still matches the list it checked, plus what has been fixed OUT of it since",
-       `${R.checked} checked = ${standing.length} standing + ${RC.FIXED_SINCE_V4279.length} fixed since`);
+    // v4318: the register has now moved in BOTH directions, so this reads the ONE derived size rather than
+    // rebuilding it here. Five assertions across three files reconcile against it; five copies of a two-term
+    // correction is five chances to update four of them.
+    ok(R.checked === RC.registerAtSweep(),
+       "the checked count still matches the register AS IT STOOD when the re-check ran",
+       `${R.checked} checked = registerAtSweep() ${RC.registerAtSweep()} (${standing.length} standing + ` +
+       `${RC.FIXED_SINCE_V4279.length} fixed since - ${RC.RECOVERED_SINCE_V4279.length} recovered since)`);
 
     // *** AND THE RULE IS APPLIED TO EVERY RECHECK RECORD, DERIVED RATHER THAN NAMED. *** v4297 checked
     // RECHECK because RECHECK was the record that had the defect. Two more re-check records were written on a
@@ -354,9 +358,9 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // Same correction as section 6's: the register shrinks when somebody FIXES a gate and prunes the entry,
     // so the reconciliation needs that term or it fails on progress. `repaired` is what THIS sweep found
     // repaired; `FIXED_SINCE_V4279` is what rounds after it repaired and removed.
-    ok(S.stillRed === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length - S.repaired.length,
-       "still-red is the v4279 register, plus what was pruned from it since, minus what this sweep repaired",
-       `${RC.RED_AT_V4279.length} + ${RC.FIXED_SINCE_V4279.length} - ${S.repaired.length} = ${S.stillRed}`);
+    ok(S.stillRed === RC.registerAtSweep() - S.repaired.length,
+       "still-red is the register as it stood at the sweep, minus what this sweep repaired",
+       `registerAtSweep() ${RC.registerAtSweep()} - ${S.repaired.length} repaired = ${S.stillRed}`);
     ok(S.falseRedList.length === S.falseReds && S.unmeasured.length === S.unmeasuredCount,
        "the counts equal the lists they summarise", "a count beside a list it does not match is the v4296 mistake again");
 
@@ -396,11 +400,12 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // enumerateGates() and now cover.eligible -- four assertions, one missing term, all four red on the first
     // round that repaired and pruned four gates. The register's own rule is that it MAY ONLY SHRINK, so a
     // reader of this file should expect the term everywhere the register appears, and its absence is the bug.
-    const registerAtV4297 = RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length;
+    const registerAtV4297 = RC.registerAtSweep();
     ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - registerAtV4297,
        "*** the sweep COVERS regressions: it ran gates that were not already red ***",
        `eligible ${S.cover.eligible} = ${S.swept} - ${registerAtV4297} (${RC.RED_AT_V4279.length} standing + ` +
-       `${RC.FIXED_SINCE_V4279.length} fixed since v4297 ran); ` + cover.reason);
+       `${RC.FIXED_SINCE_V4279.length} fixed since - ${RC.RECOVERED_SINCE_V4279.length} recovered since); ` +
+       cover.reason);
     ok(S.falseRedList.every((e) => e.serialMs > 0 && e.parallelMs > 0),
        "and each false red carries both timings, so the starvation claim can be re-read later",
        `${S.falseReds} of ${S.candidates} candidates, ${Math.round(100 * S.falseReds / S.candidates)}% of phase 1's reds were starvation`);
