@@ -14,18 +14,20 @@
 # not export that variable -- a path baked into an env var here would go stale the next time the browser bundle
 # version changes, and the module's own lookup would not. One install, no configuration.
 #
-# ---- ASYNC, AND ONLY WHERE ASYNC COSTS SOMETHING -------------------------------------------------------------
+# ---- SYNCHRONOUS, AND THE ASYNC VERSION IS WHY -----------------------------------------------------------------
 #
-# The session does not wait for this. That buys a faster start and BUYS A RACE: for the few seconds the install
-# takes, a gate that reaches for a native adapter will find none and skip or go red -- and it will say so
-# accurately, because headlessGpuSkipReason() reports the state at the moment it is asked. A red in the first
-# seconds of a session is worth re-running before it is believed.
+# This ran async for one commit and was reverted, so the reason is recorded here rather than lost to a diff.
+# Async does not wait, which buys a faster start and BUYS A RACE: for the few seconds the install takes, a gate
+# reaching for a native adapter finds none and goes red -- AND SAYS SO ACCURATELY, because
+# headlessGpuSkipReason() reports the state at the moment it is asked. That is the bad kind of wrong answer. A
+# red that is obviously broken gets re-run; a red with a correct, specific, well-worded reason gets BELIEVED,
+# and this exact reason already cost a session: pathTracerWgsl sat red through several ships while its skip
+# text named the missing package the whole time. Re-introducing a window where that same message is true for a
+# few seconds, in a tree whose gates are read carefully, trades a real risk of a wrong conclusion for a few
+# seconds of startup.
 #
-# *** SO THE ASYNC DECLARATION IS MADE ONLY WHEN THERE IS WORK TO DO. *** A warm container -- the common case,
-# since container state is cached after this completes -- finds the package already present, prints one line and
-# exits synchronously, with no window at all. Declaring async unconditionally would hand every warm start a race
-# in exchange for nothing, which is the worst of both. The window exists on a cold start because that is the only
-# time it is paid for.
+# The warm path still exits immediately, which is where most of the latency argument lived anyway: container
+# state is cached after this completes, so the common case is one `require` and a line of output.
 #
 # WHAT THIS BUYS, AND WHAT IT DOES NOT: a SOFTWARE adapter. It lets the native-WebGPU gates execute and be
 # graded against their CPU twins. It settles nothing about real-hardware floats -- the fleet kernel benches in
@@ -44,9 +46,7 @@ if node -e 'require("/opt/node22/lib/node_modules/webgpu")' >/dev/null 2>&1; the
   exit 0
 fi
 
-# The cold path is the only one that waits on a network, so it is the only one that goes async.
-echo '{"async": true, "asyncTimeout": 300000}'
-
+# The cold path waits. It is the only path that touches the network, and it is measured in seconds.
 echo "[session-start] installing node-webgpu (pinned to the version tools/ship/headlessGpu.mjs records)"
 npm install -g webgpu@0.6.0 --no-fund --no-audit
 
