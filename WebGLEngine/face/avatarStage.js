@@ -508,7 +508,13 @@ export function mountStage(canvas, opts = {}){
   // v894 — wander/glance behavior. The avatar patrols toward whichever gauge is
   // hottest (or just spiked) and turns to face it.
   const roamMin = -0.6, roamMax = actors.length ? Math.max(-0.4, actors[actors.length-1].x - 0.55) : 0.4;
-  const A = { x: roamMin, z: 0.35, yaw: 0, desiredYaw: 0, targetX: roamMin, moving: false, clip: -1, retargetAt: 0, prev: actors.map(()=>0), look: 0, carry: -1, _wantPick: -1, pickupAt: 6, carryUntil: 0 };
+  // v4304 -- #85, Keith: "the walking avatar could walk away from the front of the room; it could get smaller
+  // back there." The wander was X-only; the room is D=1.8 deep (back wall at z=-0.9) and the avatar has had a z
+  // since v894 that nothing ever changed. targetZ joins targetX: the avatar now picks a depth with every
+  // retarget, from just in front of the back wall to the front of the dial row, and perspective does the
+  // scaling for free -- no scale hack, the camera is untouched.
+  const ROAM_Z_MIN = -0.55, ROAM_Z_MAX = 0.45, ROAM_Z_HOME = 0.35;
+  const A = { x: roamMin, z: ROAM_Z_HOME, yaw: 0, desiredYaw: 0, targetX: roamMin, targetZ: ROAM_Z_HOME, moving: false, clip: -1, retargetAt: 0, prev: actors.map(()=>0), look: 0, carry: -1, _wantPick: -1, pickupAt: 6, carryUntil: 0 };
   // v1011 — GRABBABLE REGISTRY. The pickup loop fetches from `grabbables`, not
   // `actors`: the dials are grabbable by default and extras (orb / splat / GLB
   // prop) push on. The avatar still WATCHES only the gauges (`actors`).
@@ -854,19 +860,26 @@ export function mountStage(canvas, opts = {}){
     // v1252 — mood paces retargeting: alarmed darts about (short interval), souring
     // lingers (long interval), beyond the existing timeScale + walk-speed pacing.
     const RT = TARGET_INTERVAL * (_mood==="alarm" ? 0.45 : _mood==="souring" ? 1.8 : 1.0);
-    if(spiked>=0 && !inPickup){ A.targetX = clamp(actors[spiked].x - 0.7, roamMin, roamMax); A.retargetAt = tSec + RT; A.focus = spiked; }
+    if(spiked>=0 && !inPickup){ A.targetX = clamp(actors[spiked].x - 0.7, roamMin, roamMax); A.targetZ = ROAM_Z_HOME; A.retargetAt = tSec + RT; A.focus = spiked; }   // a spike brings it to the front
     else if(tSec >= A.retargetAt && !inPickup){
       const pick = (hot.val < 0.1) ? (Math.random()*actors.length|0) : hot.idx;
       A.targetX = clamp(actors[pick].x - 0.7, roamMin, roamMax); A.retargetAt = tSec + RT; A.focus = pick;
+      // v4304 -- a depth with every retarget: a quiet room wanders anywhere in it, a hot gauge keeps the
+      // avatar near the front so it is not read from the back wall.
+      A.targetZ = (hot.val < 0.1) ? (ROAM_Z_MIN + Math.random() * (ROAM_Z_MAX - ROAM_Z_MIN)) : clamp(ROAM_Z_HOME - Math.random() * 0.35, ROAM_Z_MIN, ROAM_Z_MAX);
     }
-    if(_visorMode){ A.targetX=(roamMin+roamMax)/2; A.focus=null; A._wantPick=-1; }   // v1364 — pin front-and-centre
-    if(_compact){ A.targetX = 0; A._wantPick = -1; }   // v1875 — dock: stand centered among the gauges (still glances/animates)
-    // move toward target
-    const dx = A.targetX - A.x, dist = Math.abs(dx);
+    if(inPickup) A.targetZ = ROAM_Z_HOME;   // dials are picked up from the front row
+    if(_visorMode){ A.targetX=(roamMin+roamMax)/2; A.targetZ=ROAM_Z_HOME; A.focus=null; A._wantPick=-1; }   // v1364 — pin front-and-centre
+    if(_compact){ A.targetX = 0; A._wantPick = -1; A.targetZ = clamp(A.targetZ, -0.25, ROAM_Z_MAX); }   // v1875 — dock: stand centered among the gauges; v4304: a small step back is allowed, it keeps the whole figure in a tight frame
+    // move toward target -- v4304: in x AND z, one speed along the path, so a diagonal walk is not faster
+    const dx = A.targetX - A.x, dz = A.targetZ - A.z, dist = Math.hypot(dx, dz);
     if(dist > 0.05){
-      A.x += Math.sign(dx) * Math.min(dist, WALK_SPEED*(_mood==="alarm"?1.6:_mood==="souring"?0.6:1.0)*dt);   // v1226 — mood paces the moose
+      const step = Math.min(dist, WALK_SPEED*(_mood==="alarm"?1.6:_mood==="souring"?0.6:1.0)*dt);   // v1226 — mood paces the moose
+      A.x += dx / dist * step; A.z += dz / dist * step;
       A.moving = true;
-      A.desiredYaw = Math.sign(dx) * 0.8;                 // face travel direction
+      // face travel direction: sideways stays the v894 partial turn (0.8 rad); walking away turns further, toward
+      // a profile, and walking back toward the camera turns to face it -- atan2 scaled so pure +x is still 0.8
+      A.desiredYaw = clamp(Math.atan2(dx, dz) * (0.8 / (Math.PI / 2)), -1.6, 1.6);
     } else {
       A.moving = false;
       const f = (A.focus!=null && actors[A.focus]) ? actors[A.focus].x : (hot.idx>=0?actors[hot.idx].x:A.x);
@@ -2834,7 +2847,12 @@ export function mountStage(canvas, opts = {}){
     _morphActive = true; return true;
   }
 
-  return { destroy, setAvatar, talkFor, setTalking, selfie, registerGrabbable, clearGrabbables, cheerleader, avatarMood, setVisorHud, setHeadView, setTalkLevel, setEffect, setJaw, setChannelAxis, setAccessory, peerVisit, setMorph, morphInfo, setPaused(v){ extPaused=!!v; }, ok:true };
+  // v4304 -- the wander, readable: where the avatar is and where it is going, plus the depth range it may use.
+  // A gate that watches z change over a few seconds needs this; nothing else reads it.
+  const avatar = () => ({ x: A.x, z: A.z, targetX: A.targetX, targetZ: A.targetZ, yaw: A.yaw, moving: A.moving, roamZ: [ROAM_Z_MIN, ROAM_Z_MAX], compact: _compact });
+  const api = { destroy, setAvatar, talkFor, setTalking, selfie, registerGrabbable, clearGrabbables, cheerleader, avatarMood, setVisorHud, setHeadView, setTalkLevel, setEffect, setJaw, setChannelAxis, setAccessory, peerVisit, setMorph, morphInfo, setPaused(v){ extPaused=!!v; }, avatar, ok:true };
+  try { if (typeof window !== "undefined") (window.__avatarStages = window.__avatarStages || []).push(api); } catch {}
+  return api;
 }
 
 export default mountStage;

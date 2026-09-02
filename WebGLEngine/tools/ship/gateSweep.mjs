@@ -272,10 +272,33 @@ export function parseSweepTsv(text, { timeoutMs = 180000 } = {}) {
 // at v4279 and are red now: those are the regressions, and they are the only entries a fix should be aimed
 // at first, because each one is a thing that WORKED and was broken by a round that shipped ALL GREEN.
 // ---------------------------------------------------------------------------------------------------------
+/**
+ * v4303: every regression SWEEP_V4297 named is green again, and this says which round did what. Kept as data
+ * beside the record it answers, so "next: the six regressions, cheapest first" has a closing line. Three were
+ * repaired by rounds that never said so (a repair that is not recorded is the register rotting in the good
+ * direction, v4279's failure mode); the other three were repaired by the round that wrote this.
+ */
+export const REGRESSIONS_REPAIRED = Object.freeze({
+    at: "v4303",
+    gates: Object.freeze({
+        "tools/ship/backendParity-selfcheck.mjs": "green by v4300 (v4299 rewrote the WGSL/GLSL marker set it counts); unrecorded until v4303",
+        "tools/ship/copiedOutsideVendor-selfcheck.mjs": "v4301: the permission-notice census excludes quoters by name and lets a registered copy carry its notice in-file",
+        "tools/ship/gateQuality-selfcheck.mjs": "green by v4300; unrecorded until v4303",
+        "tools/ship/postChain-selfcheck.mjs": "v4303: the SSAO draw line is derived from the on/off diff and confirmed in bloomPass.js's source, never typed (750 until v4288, 754 since)",
+        "tools/ship/staleness-selfcheck.mjs": "green by v4300 once the derived files were regenerated; red mid-round by design",
+        "tools/ship/windowsImport-selfcheck.mjs": "v4303: roughDiffuseWired-selfcheck imports its scratch module by pathToFileURL, not a raw path",
+    }),
+});
+
 export const SWEEP_V4297 = Object.freeze({
     at: "v4297",
     baseline: "v4279",
     swept: 1366,
+    // v4303: the tree's size WHEN THE SWEEP RAN. gateSweep-selfcheck compared `swept` with enumerateGates() - 1
+    // live, which was true for exactly one round; v4298 added a gate and the check went red for five rounds --
+    // my own regression, in the gate written to catch regressions. A frozen record compares against a frozen
+    // count; the live tree is only asserted to have grown.
+    enumeratedAt: 1367,
     candidates: 107,
     parallelTimeouts: 56,
     confirmedRed: 48,

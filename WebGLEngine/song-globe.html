@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Song Globe">
+<meta name="demo:desc" content="An audio file wrapped onto a globe: time goes round it, frequency runs pole to pole, loudness is height, silence is sea. A pure tone is a ring; a rising sweep is a spiral.">
+<title>🌍 Song Globe — SweK Engine</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>
+  * { box-sizing: border-box; } html, body { margin: 0; height: 100%; overflow: hidden; background: #04070f; }
+  #view { position: fixed; inset: 0; }
+  #hud { position: fixed; left: 12px; top: 10px; z-index: 5; font: 12px/1.5 ui-monospace, Consolas, monospace; color: #9fd8ff; pointer-events: none; }
+  #hud b { color: #8effc4; }
+  #chooser { position: fixed; right: 16px; top: 16px; z-index: 6; padding: 10px 14px; border-radius: 10px; background: #12230f; color: #8effc4;
+             border: 1px solid #2a5a3a; font: 13px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 12px #0008; user-select: none; }
+  #chooser input { display: none; }
+  #legend { position: fixed; left: 12px; bottom: 10px; z-index: 5; font: 11px/1.5 ui-monospace, Consolas, monospace; color: #7fa0c0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="hud"><b>SONG GLOBE</b> · <span id="what">a rising sweep</span><br><span id="stats">building…</span></div>
+<label id="chooser">🎵 Choose a song to wrap… <input type="file" accept="audio/*"></label>
+<div id="legend">time goes round · bass at the south pole, treble at the north · loud stands proud, silence is sea · drag to orbit, wheel to zoom</div>
+<script type="module">
+/* v4302 -- *** A SONG AS A PLANET. *** Keith: "could we wrap an audio file terrain into a globe?" The field is
+   world/songHeightfield.mjs's, the same one ?song=1 stamps flat into the engine at v4298; world/songGlobe.mjs
+   wraps it (time round the equator, frequency pole to pole, loudness as radius) and this page only draws the
+   arrays it returns. ?song=<url> wraps that file; no query, or ?song=1, wraps the rising sweep the engine's own
+   deep link flies; the chooser and a dropped file wrap a song on this machine. window.songGlobe.last is the
+   gate's window into what was built. */
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as S from "/world/songHeightfield.mjs";
+import * as G from "/world/songGlobe.mjs";
+
+const $ = (id) => document.getElementById(id);
+const view = $("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.setSize(innerWidth, innerHeight);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04070f);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(0, 1.2, 3.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 1.2;
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x203040, 0.9));
+const sun = new THREE.DirectionalLight(0xfff2d0, 1.4); sun.position.set(3, 4, 2); scene.add(sun);
+const stars = (() => {
+    const n = 1500, p = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, t = Math.random() * 2 * Math.PI, r = 30 + Math.random() * 20, s = Math.sqrt(1 - u * u);
+        p[i * 3] = r * s * Math.cos(t); p[i * 3 + 1] = r * u; p[i * 3 + 2] = r * s * Math.sin(t); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x8fa8c8, size: 0.06, sizeAttenuation: true }));
+})();
+scene.add(stars);
+
+let mesh = null;
+window.songGlobe = {
+    last: null, lastRender: null,
+    /** Build the globe from samples. Returns the pure module's result plus the field's stats. */
+    build(samples, sampleRate, label, opts = {}) {
+        const field = S.songHeightfield(samples, { sampleRate, grid: opts.grid || 128 });
+        if (!field) throw new Error("song-globe: too short -- a frame is " + S.DEFAULTS.frameSize + " samples");
+        const globe = G.globeFromField(field, { radius: 1, amp: opts.amp ?? 0.25 });
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(globe.positions, 3));
+        geo.setAttribute("normal", new THREE.BufferAttribute(globe.normals, 3));
+        geo.setAttribute("color", new THREE.BufferAttribute(globe.colors, 3));
+        geo.setIndex(new THREE.BufferAttribute(globe.indices, 1));
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.05, flatShading: false });
+        if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+        mesh = new THREE.Mesh(geo, mat); scene.add(mesh);
+        const st = field.stats;
+        this.last = { label, grid: field.grid, vertexCount: globe.vertexCount, triangleCount: globe.triangleCount,
+                      radiusMin: globe.radiusMin, radiusMax: globe.radiusMax, waterVertices: globe.waterVertices,
+                      seconds: st.seconds, frameCount: st.frameCount, binCount: st.binCount, hzPerBin: st.hzPerBin, waterCells: st.waterCells,
+                      peaks: field.peaks.slice(0, 3), mapping: globe.mapping, outward: globe.outward };
+        $("what").textContent = label;
+        $("stats").textContent = st.seconds.toFixed(1) + " s · " + st.frameCount + " frames × " + st.binCount + " bins · " +
+            globe.vertexCount + " vertices · " + globe.waterVertices + " at sea · peak " + (field.peaks[0] ? field.peaks[0].hz.toFixed(0) + " Hz" : "-");
+        return this.last;
+    },
+    /** load({ url } | { file } | {}) -> decodes with the browser's own decoder, then build(). */
+    async load(o = {}) {
+        let samples = null, sampleRate = 8000, label = "";
+        if (o.url || o.file) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) throw new Error("song-globe: no AudioContext");
+            const ctx = new Ctx();
+            const bytes = o.file ? await o.file.arrayBuffer() : await (await fetch(o.url)).arrayBuffer();
+            const buf = await ctx.decodeAudioData(bytes);
+            samples = buf.getChannelData(0); sampleRate = buf.sampleRate; label = o.file ? o.file.name : o.url.split("/").pop();
+            try { ctx.close(); } catch {}
+        }
+        if (!samples) { samples = S.sweep(200, 2000, 4, sampleRate); label = "a rising sweep"; }   // the engine's own default, unchanged
+        return this.build(samples, sampleRate, label, o);
+    },
+};
+
+const input = document.querySelector("#chooser input"), box = $("chooser");
+const walk = (file) => { if (!file) return; box.firstChild.textContent = "🎵 " + file.name + " — decoding… ";
+    window.songGlobe.load({ file }).then(() => { box.firstChild.textContent = "🎵 " + file.name + " — choose another… "; })
+        .catch((e) => { box.firstChild.textContent = "🎵 could not wrap " + file.name + ": " + (e && e.message) + " "; }); };
+input.addEventListener("change", () => walk(input.files && input.files[0]));
+box.addEventListener("dragover", (e) => { e.preventDefault(); box.style.borderColor = "#8effc4"; });
+box.addEventListener("dragleave", () => { box.style.borderColor = "#2a5a3a"; });
+box.addEventListener("drop", (e) => { e.preventDefault(); box.style.borderColor = "#2a5a3a"; walk(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); });
+
+const q = new URLSearchParams(location.search).get("song");
+window.songGlobe.load(q && q !== "1" && q !== "true" ? { url: q } : {})
+    .catch((e) => { $("stats").textContent = "could not build: " + (e && e.message); console.warn("[song-globe]", e); });
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function frame() {
+    requestAnimationFrame(frame);
+    controls.update();
+    renderer.render(scene, camera);
+    window.songGlobe.lastRender = { triangles: renderer.info.render.triangles, calls: renderer.info.render.calls, frame: renderer.info.render.frame };
+})();
+</script>
+</body>
+</html>

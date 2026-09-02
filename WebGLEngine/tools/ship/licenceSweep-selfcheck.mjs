@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/licenceSweep-selfcheck.mjs -- v4276
+// WebGLEngine/tools/ship/licenceSweep-selfcheck.mjs -- v4276, counts moved at v4304
 //
 // GRADES world/licenceSweep.mjs -- thirty-five repositories actually opened, the premise that said they could
 // not be, and the questions the batches raised as they arrived: WHO IS GRANTING THE LICENCE, WHAT IF THE
@@ -30,7 +30,8 @@ console.log("\n1. EVERY VERDICT CARRIES ITS EVIDENCE");
     const T = tally();
     console.log(`        ${T.total} repositories: ${T.papered} papered, ${T.unpapered} not. ` +
                 `${JSON.stringify(T.bySpdx)}`);
-    ok("thirty-five repositories were swept", T.total === 35);
+    // thirty-five at v4276-v4277; eighteen more at v4304, the backlog's own verdicts (#106, #100, #132, #63, #122)
+    ok("thirty-five repositories were swept, then eighteen more, then the SwiftUIShaders upstream", T.total === 54, `${T.total}`);
     ok("*** a papered entry names the FILE its licence was read from ***",
         SWEEP.filter((e) => e.licenceExists).every((e) => !!e.evidence.file && !!e.evidence.sha256 && e.evidence.lines > 0),
         "file, hash prefix and line count -- so a later round can tell a reading from a recollection");
@@ -45,8 +46,9 @@ console.log("\n1. EVERY VERDICT CARRIES ITS EVIDENCE");
     // nobody granted it in the words the licence itself requires be carried in all copies. So the rule is now
     // "they agree, EXCEPT for the declared-only entries, of which there is exactly one, and it is named".
     const declared = declaredOnly();
-    ok("*** two entries declare an spdx with no licence text behind them ***", declared.length === 2,
-        declared.map((e) => e.repo + " " + e.spdx).join(", ") + " -- package.json only, and NOT the same spdx");
+    // Two at v4277; v4304 added two more from #132 (gi-voxels, Repo-Explainer), both package.json-MIT with no text.
+    ok("*** four entries declare an spdx with no licence text behind them ***", declared.length === 4,
+        declared.map((e) => e.repo + " " + e.spdx).join(", ") + " -- package.json only, and NOT all the same spdx");
     ok("  and they are not the same licence, so this is a SHAPE and not one repository's quirk",
         new Set(declared.map((e) => e.spdx)).size === 2, declared.map((e) => e.spdx).join(" vs "));
     ok("  and it is recorded as NOT papered, which is the honest half of the pair",
@@ -65,7 +67,7 @@ console.log("\n1. EVERY VERDICT CARRIES ITS EVIDENCE");
     ok("  every OTHER entry has spdx and licenceExists agreeing",
         SWEEP.filter((e) => !special.has(e)).every((e) => (e.spdx === null) === (e.licenceExists === false)),
         (SWEEP.length - special.size) + " of " + SWEEP.length + ", with " + special.size + " named exceptions");
-    ok("  and the exceptions are EXERCISED, not a hole left open for convenience", special.size === 3,
+    ok("  and the exceptions are EXERCISED, not a hole left open for convenience", special.size === 5,
         [...special].map((e) => e.repo.split("/").pop()).join(", "));
     report("collapsing the declared-only entry into either shelf loses the thing worth knowing about it. " +
         "Called papered, the tree would believe it holds a grant it has never seen. Called unpapered, the " +
@@ -206,16 +208,27 @@ console.log("\n5. *** TWENTY-SIX PERMISSIVE IN A ROW, AND THEN ONE THAT IS NOT. 
     // file -- and grants only educational, research and non-profit use, with commercial use available by
     // asking UNC Chapel Hill. A reader keyed on shape takes it. A reader that read the grant does not.
     const np = nonPermissive();
+    // *** v4304: TWO WAYS TO BE NON-PERMISSIVE, AND THEY ARE OPPOSITES. *** rvo2.js restricts the PURPOSE -- use
+    // itself is gated. CliWaifuTamagotchi's GPL-3.0 restricts nothing about use and everything about what a
+    // combined work must carry. One bucket for both would say "restricted" and mean two different things, so the
+    // purpose checks below apply to the LicenseRef entries and the copyleft one is asserted separately.
+    const purpose = np.filter((e) => /^LicenseRef-/.test(e.spdx)), reciprocal = np.filter((e) => /GPL/.test(e.spdx));
     ok("*** at least one entry is NOT permissive, so the field is not decoration ***", np.length >= 1,
         np.map((e) => `${e.repo} -- ${e.spdx}`).join("; "));
-    ok("  and it is the one whose licence text restricts the PURPOSE, not the attribution",
-        np.every((e) => /non-profit|educational|research/.test(e.note || "")),
+    ok("  and the PURPOSE-restricted one's licence text restricts the purpose, not the attribution",
+        purpose.length >= 1 && purpose.every((e) => /non-profit|educational|research/.test(e.note || "")),
         "'for educational, research, and non-profit purposes' -- and commercial use by arrangement");
     ok("  its spdx is a LicenseRef rather than a standard identifier, because no standard one fits",
-        np.every((e) => /^LicenseRef-/.test(e.spdx)),
-        np.map((e) => e.spdx).join(", ") + " -- inventing 'BSD-3-Clause' here would have been the whole error");
-    ok("*** and it has THREE parties, which is one more than the grantor field alone can hold ***",
-        np.some((e) => /three parties|THREE PARTIES/i.test(e.note || "")),
+        purpose.every((e) => /^LicenseRef-/.test(e.spdx)),
+        purpose.map((e) => e.spdx).join(", ") + " -- inventing 'BSD-3-Clause' here would have been the whole error");
+    ok("*** the RECIPROCAL one is a standard identifier, its note says copyleft, and it does not restrict purpose ***",
+        reciprocal.length === 1 && /copyleft/.test(reciprocal[0].note || "") && !/^LicenseRef-/.test(reciprocal[0].spdx) &&
+        !/non-profit|educational/.test(reciprocal[0].note || ""),
+        reciprocal.map((e) => `${e.repo} -- ${e.spdx}, ${e.evidence.lines} lines`).join("; ") || "no reciprocal entry");
+    ok("  and every non-permissive entry is one kind or the other, never neither",
+        purpose.length + reciprocal.length === np.length, `${purpose.length} purpose + ${reciprocal.length} reciprocal = ${np.length}`);
+    ok("*** and the purpose-restricted one has THREE parties, which is one more than the grantor field alone can hold ***",
+        purpose.some((e) => /three parties|THREE PARTIES/i.test(e.note || "")),
         "UNC holds the copyright, package.json names the porter, the account is a third -- and nobody " +
         "downstream can grant more than the first party did");
 
@@ -258,8 +271,9 @@ console.log("\n6. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HA
 {
     ok("*** none of the swept repositories is still filed as unchecked ***", settles(NAMED_SOURCES).length === 0,
         settles(NAMED_SOURCES).join(", ") || `0 of ${SWEEP.length}`);
-    ok("  the register still holds the entries nobody has attempted", NAMED_SOURCES.length === 6,
-        `${NAMED_SOURCES.length} left, all from #100 and #132`);
+    // six at v4276; four left at v4304 (see world/namedNotChecked.mjs PROMOTED), and the two that remain have no owner
+    ok("  the register still holds the entries nobody has been able to attempt", NAMED_SOURCES.length === 2,
+        `${NAMED_SOURCES.length} left, all from #132; ${settles(NAMED_SOURCES).length} of them settled here`);
     ok("  and it says so about itself rather than being quietly emptied",
         NAMED_SOURCES.every((e) => e.namedIn === "#100" || e.namedIn === "#132"));
 
@@ -288,7 +302,15 @@ console.log("\n6. THE REGISTER OF THE UNCHECKED SHRANK, WHICH IS THE POINT OF HA
 
 // =============================================================================================================
 // SABOTAGE LOG -- each edit grep-confirmed BEFORE the result was read, exit code and the FAIL summary line both
-// read, both files restored md5-identical (licenceSweep.mjs 52cfab6650a3, namedNotChecked.mjs 3ae299ba13f2).
+// read, both files restored md5-identical (licenceSweep.mjs 52cfab6650a3, namedNotChecked.mjs 3ae299ba13f2).//
+//   v4304 (eighteen entries added) -- F  the GPL-3.0 entry marked permissive: true.
+//      -> exit=1, 1 red: "the RECIPROCAL one ... no reciprocal entry". The purpose-restriction lines stay green
+//      because rvo2.js still satisfies them; only the copyleft line notices, which is why the two kinds of
+//      non-permissive are asserted separately rather than as one bucket.
+//   G  gi-voxels' declared-only MIT given licenceExists: true with no evidence file.
+//      -> exit=1, 4 red: the papered-entry-names-its-file line, the declared-only count, the exceptions-exercised
+//      count, and the permissive-null-where-unread rule. A declaration promoted to a grant trips four checks
+//      from four directions, which is the property a declared-only shelf needs.
 // Every count below was measured by running the gate, not predicted from reading it.
 //
 //   A  snellytracer flipped to spdx "MIT", licenceExists true, evidence left null -- a verdict with nothing

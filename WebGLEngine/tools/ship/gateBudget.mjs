@@ -81,7 +81,12 @@
 // the tail is for gates whose cost is a FIXTURE (the Kelvin-Helmholtz cluster, 527-690s). A 103s gate in
 // a table whose smallest entry is 49.9s would be the tail absorbing the general population instead of
 // standing apart from it -- and then nothing would be left measuring what an ordinary gate costs.
-export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 103141 };
+// *** v4304 -- RAISED FROM THE RIG'S OWN RECORD, WHICH IS WHAT THE INSTRUCTION SAYS TO DO. *** The v4279
+// gate-timings.json recorded opticsBind at 109,899 ms and menuScope at 109,708 ms in the general population,
+// both above the 103,141 ms recorded here, and gateBudget-selfcheck has been red on exactly that line since
+// (redCensus.RED_AT_V4279). The same pass raised nineteen MEASURED bases to their observed runtimes, per that
+// table's own rule; the default budget moves from 309 s to 330 s with this line, and nothing else changes.
+export const SLOWEST_GENERAL = { gate: "tools/roundhouse/opticsBind-selfcheck.mjs", ms: 109899 };
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
@@ -119,7 +124,27 @@ export const MEASURED = {
     // from the record. Left on the 309s default they had 1.21x and 1.07x of headroom, THE TWO THINNEST
     // MARGINS IN THE TREE, and shaderRefs duly timed out on Keith's rig this session. A DEFAULT IS NOT A
     // MEASUREMENT: it is what a gate gets while nobody knows, and these are no longer unknown.
-    "tools/ship/orphanTriage-selfcheck.mjs":         255851,
+    // *** v4304 -- #34, MEASURED TO COMPLETION TWICE. *** knobLiveness sat in the general population on the
+    // 309 s default and was the slowest gate anybody had SEEN there: gate-timings.json records 291,628 ms from
+    // Keith's rig (129 devices at 20 s), and gateBudget-selfcheck went red on exactly that line. Stopwatch-timed
+    // to completion here at v4304: 179,345 ms, EXIT 0, all checks passing, in this sandbox's idle box. The
+    // basis is the RIG'S figure, the larger of the two, because the rig is where the budget is spent; the
+    // sandbox number is recorded so the ratio between the boxes (1.63x) is known rather than guessed.
+    // *** AND THEN #38 MADE THE REAL-PLANT ASSERTION UNCONDITIONAL, WHICH CHANGES WHAT THE GATE IS. *** The
+    // figures above are for the gate WITHOUT its section-3i live probeKnob pair (it was behind KNOB_REAL_PLANT=1).
+    // Stopwatch-timed here with the pair on: 423,693 ms, EXIT 0 -- 244 s of stability builds on top. That is
+    // the only measurement of the gate as it now ships, so it is the basis. The rig has no figure for this
+    // shape yet; at the 1.63x ratio it would run ~690 s, inside the 847 s this basis buys, and the
+    // gate-timings.json cross-check below will raise the basis again the day the rig records more.
+    "tools/roundhouse/knobLiveness-selfcheck.mjs":   423693,
+    // *** v4304 -- #15's REMAINDER. *** budgetEvidence-selfcheck named thirteen gates with no runtime evidence:
+    // eleven the ship-time quick sweep kills at its 20 s cap every run (a 124 is not evidence) and the two new
+    // this round. All thirteen were stopwatch-timed serially to EXIT 0 in this sandbox. Twelve are under
+    // SLOWEST_GENERAL and went into gate-timings.json as the general population; redCensus is not -- it is the
+    // census, it RUNS gates -- so it is measured here. Basis 140,941 ms, the run overlapping the last two minutes
+    // of the knobLiveness stopwatch; the rig at 1.63x would be ~230 s, inside the 282 s this basis buys.
+    "tools/ship/redCensus-selfcheck.mjs":            140941,
+    "tools/ship/orphanTriage-selfcheck.mjs":         297764,
     "tools/ship/shaderRefs-selfcheck.mjs":           288017,
     "tools/ship/windTunnel-selfcheck.mjs":            63300,
     "simulation/lbm/inflow-selfcheck.mjs":           111804,
@@ -140,7 +165,7 @@ export const MEASURED = {
     // numeric observable of every scannable device and compares them PAIRWISE, so its cost grows with the
     // SQUARE of the lab -- the same growth corroborationCensus and labResults' entries already warn about,
     // and steeper. This is a real completion on a real box, not a ceiling.
-    "tools/roundhouse/valueMatch-selfcheck.mjs":     632549,
+    "tools/roundhouse/valueMatch-selfcheck.mjs":     833705,
     // *** v3973 -- THE FIFTH TIME THIS TABLE HAS HIDDEN A FAILURE BEHIND A MISSING ENTRY, AND THE SAME SHAPE
     // AS valueMatch DIRECTLY ABOVE. *** sensitivity sat in UNRESOLVED on the 139.9s general default since v3924
     // ("exceeded a 150s cap; never timed before that"). Stopwatch-timed on this box across three runs at v3973:
@@ -162,12 +187,12 @@ export const MEASURED = {
     // otherwise idle box this round. gateBudget-selfcheck had been red for exactly this -- "no gate in the
     // general population has crept past a third of the default" -- and the red was right for four hundred
     // versions while nobody moved the gates it was pointing at.
-    "tools/roundhouse/observableUnits-selfcheck.mjs":     167714,
-    "physics/thermal/stefan-selfcheck.mjs":               137186,
+    "tools/roundhouse/observableUnits-selfcheck.mjs":     215814,
+    "physics/thermal/stefan-selfcheck.mjs":               141746,
     "physics/sph/poolFixture-selfcheck.mjs":              119027,
     "tools/roundhouse/detectionMap-selfcheck.mjs":         99710,
-    "tools/roundhouse/compose-selfcheck.mjs":              107435,
-    "simulation/lbm/settleCurve-selfcheck.mjs":            88041,
+    "tools/roundhouse/compose-selfcheck.mjs":              109896,
+    "simulation/lbm/settleCurve-selfcheck.mjs":            89237,
     // v4075 -- RE-MEASURED after a timeout on Keith's rig: 91924ms here against the 76003ms recorded in the
     // v3211 session. The table's own rule is that "a number with its measurement attached CAN BE
     // CONTRADICTED BY A RE-MEASURE", and this is that contradiction -- the entry understated the gate by
@@ -178,29 +203,29 @@ export const MEASURED = {
     "tools/roundhouse/hydrostatic-selfcheck.mjs":          132215,
     "tools/ship/doorKinds-selfcheck.mjs":                  100047,
     "physics/astroparticle/jeans-selfcheck.mjs":           98899,
-    "tools/render-qa/terminatorOracle-selfcheck.mjs":      87294,
-    "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       62594,
-    "tools/roundhouse/stabilityBind-selfcheck.mjs":        67972,
-    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         84529,
+    "tools/render-qa/terminatorOracle-selfcheck.mjs":      91559,
+    "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       70538,
+    "tools/roundhouse/stabilityBind-selfcheck.mjs":        86618,
+    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         108706,
     "physics/sph/tiltPower-selfcheck.mjs":                 65440,
     "physics/sph/wideTilt-selfcheck.mjs":                  64162,
-    "physics/mesh/weightScaling-selfcheck.mjs":            76808,
-    "tools/ship/loopSearch-selfcheck.mjs":                 54912,
+    "physics/mesh/weightScaling-selfcheck.mjs":            85072,
+    "tools/ship/loopSearch-selfcheck.mjs":                 98059,
     // MEASURED AT v3913, stopwatch-timed, each run alone:
     // assumptionMap PASSES at 284s. It was the SLOWEST_GENERAL pin at 47729ms and had grown 6x underneath it.
-    "tools/roundhouse/assumptionMap-selfcheck.mjs":  296688,
+    "tools/roundhouse/assumptionMap-selfcheck.mjs":  333639,
     // *** census FAILS at 717s, AND THAT IS THE FINDING. *** It was reported as TIMEOUT, and a timeout is not a
     // failure -- but it is not a pass either, and here it was hiding a REAL RED for as long as the budget killed
     // it. A gate that cannot finish cannot tell you it is broken. The failure is not fixed here; it is now
     // VISIBLE, which is the prerequisite.
     "tools/roundhouse/census-selfcheck.mjs":         761728,
     // v3917 -- measured at 534s on the run that first made it pass: 66 declared mode plants, two builds each.
-    "tools/roundhouse/plantDirection-selfcheck.mjs": 559532,
+    "tools/roundhouse/plantDirection-selfcheck.mjs": 839022,
     // v3924 -- twoFBind was NEVER TIMED AND NEVER BUDGETED, so it silently took the 139.9s general default while
     // taking 249s. It passes when nothing is watching a clock and is killed by the ritual and the rig alike. It
     // is absent from gate-timings.json for the reason that matters: A GATE THAT COULD NOT FINISH LEAVES NO ENTRY,
     // so the record cannot contain the gates it most needs to describe.
-    "tools/roundhouse/twoFBind-selfcheck.mjs":       352294,
+    "tools/roundhouse/twoFBind-selfcheck.mjs":       506311,
     // v3924 -- measured to completion at 195s, and it PASSES. Another gate that was never timed, never budgeted,
     // and silently killed at 139.9s by every runner.
     "physics/sph/packingTransfer-selfcheck.mjs":     252000,
@@ -211,7 +236,7 @@ export const MEASURED = {
     // six minutes granted to gates that finish in forty milliseconds, and every future regression hidden under
     // it. OF THE 24 NEWLY-TIMED GATES ONLY THIS ONE IS OVER 46.6s; THE NEXT IS 23s. It is the slow tail, not the
     // population, and the tail is what MEASURED is for. Measured to completion, and it PASSES.
-    "physics/sph/materialKnobs-selfcheck.mjs":       172841,
+    "physics/sph/materialKnobs-selfcheck.mjs":       179037,
     // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
     // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
     // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
@@ -234,7 +259,7 @@ export const MEASURED = {
     // *** MEASURED AT v3213 AND MOVED HERE FROM UNRESOLVED, WHICH IS WHAT THAT TABLE SAID SHOULD HAPPEN. ***
     // 573s on an idle box, and it PASSES. Its own header said ~90s. The antidote fired on its own round: the
     // line below in UNRESOLVED was DELETED, not edited in place.
-    "tools/roundhouse/khMichalke-selfcheck.mjs":     572948,
+    "tools/roundhouse/khMichalke-selfcheck.mjs":     670254,
     // *** MEASURED LESS PRECISELY THAN THE REST, AND SAYING SO IS THE POINT. *** It PASSES, but the run that
     // proved it was not stopwatch-timed: the start is known to the second (17:08:26) and the finish only to the
     // minute from the log's mtime, so this is ~690s +/- 30s rather than a figure like khMichalke's 572948.
@@ -300,7 +325,7 @@ export const MEASURED = {
     // TOOL_CAP_OVERRIDE, 1500000ms -- roughly 2x the 744s measurement, this table's own MEASURED
     // convention), the WHOLE GATE now measures 1302s (21m42s) stopwatch, exit 0, all pass -- up from 555s
     // because it previously never waited long enough for knobLiveness to answer at all.
-    "tools/ship/toolFrontDoor-selfcheck.mjs":        1302000,
+    "tools/ship/toolFrontDoor-selfcheck.mjs":        1450142,
 
     // ================================================================================================================
     // *** v3939 -- THE ROUNDHOUSE CENSUS CLUSTER, AND IT IS ONE DEVICE RATHER THAN FIVE GATES. ***
@@ -321,7 +346,7 @@ export const MEASURED = {
     //
     // MEASURED ON THIS BOX, wall-clock, each run to completion:
     "tools/roundhouse/configContract-selfcheck.mjs":  72509,
-    "tools/roundhouse/compose-selfcheck.mjs":         107435,
+    "tools/roundhouse/compose-selfcheck.mjs":         109896,
     // *** v4136 -- WHERE THIS 278s ACTUALLY GOES, because "either a longer budget or a smaller fixture" is a
     // choice nobody could make without it. Keith's rig TIMED OUT at 557s (this entry x2) with the progress log
     // ending on "80/129 (last: twof)". Timed per device on this box: 250.9s total, and TWOF ALONE IS 178.1s --
@@ -333,7 +358,7 @@ export const MEASURED = {
     // what gets classified, and the classification IS the verdict this gate exists to produce -- a round must
     // not move a verdict it is not about (this table's own rule, stated at the configContract entry above).
     // The measurement is recorded so the choice is informed; the choice is Keith's.
-    "tools/roundhouse/assumptionMap-selfcheck.mjs":  296688,
+    "tools/roundhouse/assumptionMap-selfcheck.mjs":  333639,
     "tools/roundhouse/census-selfcheck.mjs":         761728,
     // *** NOT GIVEN A BUDGET, AND SAYING SO IS THE POINT: corroborationCensus ran past 1500s and was KILLED
     // rather than finishing, so there is no completion time to double. An entry here would be a guess wearing a
@@ -355,7 +380,7 @@ export const MEASURED = {
     // twoF is the same 12,000-step lattice that makes the census cluster expensive -- so it belongs beside
     // twoFBind-selfcheck (already here at 256s) rather than setting the pace for a thousand gates that finish
     // in milliseconds. MEASURED 92.8s, and it PASSES; it was never broken, only mis-populated.
-    "tools/roundhouse/twoF-selfcheck.mjs":            116199,
+    "tools/roundhouse/twoF-selfcheck.mjs":            177771,
     // *** v4060 -- claimTrace MOVES OUT OF UNRESOLVED, WHICH TOLD ME EXACTLY WHAT TO DO NEXT AND NAMED IT
     // BEFORE I DID IT: "THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER." *** The v3913
     // note only knew a lower bound (>=1800000ms, no output, on an idle box) and refused to guess whether that

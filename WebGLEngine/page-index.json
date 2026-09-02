@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 444,
+ "count": 445,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2570,6 +2570,13 @@
    "t": "Solar",
    "d": "",
    "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "song-globe.html",
+   "t": "🌍 Song Globe — SweK Engine",
+   "d": "An audio file wrapped onto a globe: time goes round it, frequency runs pole to pole, loudness is height, silence is sea. A pure tone is a ring; a rising sweep is a spiral.",
+   "g": "",
    "p": 0
   },
   {

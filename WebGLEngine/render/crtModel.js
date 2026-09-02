@@ -22,6 +22,14 @@
 // claim rather than a look: the scanline period is countable, the barrel displacement is a distance, the
 // phosphor pitch is a pixel count.
 //
+// *** "MASK" HERE IS THE APERTURE GRILLE -- NOT render/aquarellePass.js's DISSOLVE MASK. *** (v4302, #144.) Two
+// unrelated meanings of one word in adjacent files. mask(), maskPitch and maskDepth below are the PHOSPHOR
+// pattern: vertical R,G,B stripes that TINT every pixel, a pitch in output pixels and a depth in 0..1.
+// Aquarelle's mask is a TEXTURE whose ALPHA decides where one image has given way to another. A phosphor
+// pitch read as a per-region strength, or the reverse, is the confusing bug this paragraph exists to
+// prevent; the per-region strength this pass DOES take is render/strengthField.mjs, and it is called a
+// FIELD so that a third meaning is never added to "mask".
+//
 // *** SAMPLING IS NEAREST, DELIBERATELY, AND THAT IS WHAT MAKES THE TWO COMPARABLE. *** With bilinear
 // filtering the GPU interpolates in hardware at a precision this file cannot reproduce exactly, and the
 // comparison would become "close enough" -- which is the kind of tolerance a real disagreement hides inside.
@@ -168,6 +176,7 @@ function crtOnly(px, py, w, h, sample, p) {
 
 /** Whole-image convenience: RGBA in, RGBA out, both Uint8ClampedArray. The gate's CPU side.
  * @param {Uint8ClampedArray} src @param {number} w @param {number} h @param {CrtParams} [p]
+ * @param {{ width: number, height: number, data: ArrayLike<number> }|null} [field] a strength field (Level 11), or null for 1 everywhere
  * @returns {Uint8ClampedArray} */
 export function crtImage(src, w, h, p = DEFAULTS, field = null) {
     const out = new Uint8ClampedArray(w * h * 4);
@@ -177,6 +186,8 @@ export function crtImage(src, w, h, p = DEFAULTS, field = null) {
         return [src[i] / 255, src[i + 1] / 255, src[i + 2] / 255];
     };
     // Level 11 -- `field` is a strength field (render/strengthField.mjs); null means strength 1 everywhere.
+    // v4303: typed, because this file is @ts-check and typecheck-selfcheck went red on the implicit any (TS7006).
+    /** @param {number} u @param {number} v */
     const fieldAt = (u, v) => { if (!field) return 1;
         const fx = Math.max(0, Math.min(field.width - 1, Math.floor(u * field.width))), fy = Math.max(0, Math.min(field.height - 1, Math.floor(v * field.height)));
         return field.data[(fy * field.width + fx) * 4] / 255; };

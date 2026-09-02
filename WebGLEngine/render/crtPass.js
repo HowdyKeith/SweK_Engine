@@ -166,16 +166,18 @@ export function makeCrtPass(width, height, opts = {}) {
     const GL = gl, CV = canvas;
 
     /** @param {TexImageSource | Uint8Array | Uint8ClampedArray} source
-     * @param {import("./crtModel.js").CrtParams} [params] @returns {HTMLCanvasElement} */
+     * @param {import("./crtModel.js").CrtParams} [params] @returns {HTMLCanvasElement} * @param {{ width: number, height: number, data?: ArrayLike<number> }|TexImageSource|null} [field] v4303: typed for @ts-check
+     */
     function render(source, params = DEFAULTS, field = null) {
         const p = { ...DEFAULTS, ...params };
         // Level 11 -- an optional strength field: { width, height, data } from render/strengthField.mjs, or any
         // TexImageSource. Omitted, the last field uploaded stays bound (white until one is given).
         if (field) {
+            const f = /** @type {{ width: number, height: number, data?: any }} */ (/** @type {any} */ (field));   // v4303: one narrowing for @ts-check
             GL.activeTexture(GL.TEXTURE1);
             GL.bindTexture(GL.TEXTURE_2D, fieldTex);
             GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
-            if (field.data) GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, field.width, field.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, field.data instanceof Uint8Array ? field.data : new Uint8Array(field.data));
+            if (f.data) GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, f.width, f.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, f.data instanceof Uint8Array ? f.data : new Uint8Array(f.data));
             else GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, /** @type {TexImageSource} */ (field));
             GL.activeTexture(GL.TEXTURE0);
         }

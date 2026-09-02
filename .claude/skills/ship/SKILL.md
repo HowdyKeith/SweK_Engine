@@ -56,9 +56,15 @@ or the `[knowledge]` line from step 3).
     node tools/ship/verify.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"
 
 Must end `[verify] ALL GREEN`. The PASS count is environment-conditional (SwiftShader, Playwright, WASM
-availability) and is NOT a number to assert or compare between boxes. verify.mjs runs a smaller, different
-set than the 1,300+ gate sweep; ALL GREEN here does not mean the tree is green. If a gate is known red at
-HEAD it belongs in `tools/ship/redCensus.mjs`, not in silence.
+availability) and is NOT a number to assert or compare between boxes.
+
+Since v4303 verify runs the QUICK SWEEP (`tools/ship/quickSweep.mjs`): every gate under the budget in
+`tools/ship/sweep-timings.json` (default 3000 ms), 8-way parallel with reds re-run alone, reconciled against
+the red register. A KNOWN red is listed; a NEW red -- one no register names -- fails the ship. Expect it to
+add a few minutes. Fix the new red or, if it is a real standing red, record it in `tools/ship/redCensus.mjs`
+with a reason; never widen the register to get green. `SWEK_QUICKSWEEP=0` skips it while iterating and is
+not a way to ship. The timings file is rewritten by the run and ships with the round (`git add -A WebGLEngine`
+covers it). Gates OVER the budget are still only covered by the full two-phase sweep.
 
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 

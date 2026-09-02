@@ -46,6 +46,17 @@ console.log("crtPass-selfcheck -- two implementations of the same optics, compar
     // reason as missing. gateQuality named this line; the target really is a comment, so prose() is the fit.
     ok("!! ...and the reason for writing rather than lifting is the GATE, not licence-avoidance",
         /can be graded/i.test(prose(src)) || /can only ever be looked at/i.test(prose(src)));
+    // v4302 (#144) -- the NAMING TRAP. mask() here is the aperture grille; render/aquarellePass.js's mask is a
+    // dissolve texture. Both headers must say so and name each other, so a grep for "mask" under render/
+    // lands on the disambiguation and not on the collision; and the per-region strength must be a FIELD, not
+    // a third "mask".
+    const aq = fs.readFileSync(path.join(ENG, "render", "aquarellePass.js"), "utf8");
+    ok("!! *** crtModel.js says its mask is the APERTURE GRILLE and names aquarellePass.js's dissolve mask as the other thing ***",
+        /APERTURE GRILLE/.test(src) && /aquarellePass\.js/.test(src) && /DISSOLVE MASK/i.test(src));
+    ok("   ...and aquarellePass.js says the reverse, naming crtModel.js",
+        /DISSOLVE MASK/.test(aq) && /crtModel\.js/.test(aq) && /APERTURE GRILLE/.test(aq));
+    ok("   ...and both point the per-region strength at strengthField.mjs rather than a third \"mask\"",
+        /strengthField\.mjs/.test(src) && /strengthField\.mjs/.test(aq) && !/strengthMask|maskStrength/.test(src + aq));
 }
 
 // ---- 2. *** THE PARAMETERS ARE MEASUREMENTS: COUNT WHAT ACTUALLY APPEARS *** ---------------------------------

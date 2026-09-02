@@ -1,6 +1,7 @@
 // WebGLEngine/world/licenceSweep.mjs -- v4276
 //
-// THIRTY-FIVE REPOSITORIES, ACTUALLY OPENED, WITH THE EVIDENCE THAT SAYS SO.
+// THIRTY-FIVE REPOSITORIES, ACTUALLY OPENED, WITH THE EVIDENCE THAT SAYS SO -- AND EIGHTEEN MORE AT v4304, the
+// ones whose licence verdicts had lived only in the backlog (#106, #100, #132, #63, #122). Same method, same fields.
 //
 // ---- *** THE PREMISE THIS CORRECTS WAS MINE, AND IT SHIPPED ONE ROUND AGO. *** ------------------------------------
 //
@@ -336,6 +337,123 @@ export const SWEEP = Object.freeze([
       note: "GENUINELY UNPAPERED. No licence file at any depth, no package.json licence field, and no " +
             "licence word in the README -- all three checked, because SDFGen taught this sweep that the " +
             "root directory is not the whole answer." },
+    // ---- v4304: THE BACKLOG'S VERDICTS, READ OFF SHALLOW CLONES IN THIS SESSION -------------------------------
+    // #106, #100, #132, #63 and #122 each asserted a licence state that no gate could see. Every entry below was
+    // read the way the thirty-five above were: the file, its hash prefix, its line count, and the two other
+    // places a licence hides (README, package.json). Two of #132's five names could not be resolved to an owner
+    // by any search and stay in world/namedNotChecked.mjs as what they are; the other four left it.
+    { repo: "shajidhasan/spoilerjs", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "7cd7798ba3dc", lines: 20 }, namedIn: "#106",
+      grantor: { named: "Shajid Hasan", isRepoOwner: true }, permissive: true,
+      note: "(c) 2025 Shajid Hasan. README badge, README section and packages/components/package.json all say MIT; " +
+            "the root package.json of the pnpm workspace declares none, which is the workspace and not the library." },
+    { repo: "evanw/node-source-map-support", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE.md", sha256: "3a7d3bb198e9", lines: 21 }, namedIn: "#106",
+      grantor: { named: "Evan Wallace", isRepoOwner: true }, permissive: true,
+      note: "(c) 2014 Evan Wallace; package.json agrees. Named LICENSE.md, which a scan for LICENSE exactly would miss." },
+    { repo: "evanw/webgl-vr-editor", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#106", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED, at every depth. Nothing at the root but three directories v1/ v2/ v3/; each was " +
+            "searched for a licence file, a README licence line and a package.json license field, and none has any. " +
+            "#106 refused it on provenance without reading past the listing; reading past it changes nothing." },
+    { repo: "evanw/node-flatbuffers", spdx: "Apache-2.0", licenceExists: true,
+      evidence: { file: "LICENSE.txt", sha256: "8c0f9526f62a", lines: 13 }, namedIn: "#106",
+      grantor: { named: "Evan Wallace", isRepoOwner: true }, permissive: true,
+      note: "*** THIRTEEN LINES, NOT 201: THE APACHE SHORT NOTICE. *** 'Copyright 2016 Evan Wallace / Licensed under " +
+            "the Apache License, Version 2.0' with the URL, the form Apache itself prescribes for a file header. #106 " +
+            "recorded 'LICENSE.txt exists but its type could not be confirmed'; it is Apache-2.0, and a length-keyed " +
+            "reader could not confirm it because it is a sixth the size of OpenPBR's." },
+    { repo: "brunosimon/three.js-tsl-sandbox", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#106", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED. No licence file at the root or in any of the 40 project folders, no root " +
+            "package.json, and the readme's only words on the subject -- 'code is provided as it is ... use at your " +
+            "own risk' -- are a disclaimer and not a grant." },
+    { repo: "Ramotion/vr-menu-demo", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#106", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED, now first-hand: no licence file, no package.json, and a 45-line README with no " +
+            "licence word that ends in an App Store advert. #117 took the INTERACTION (look-to-select with a dwell) " +
+            "into ui/gazeDwell.mjs on a second-hand reading; the reading was right." },
+    { repo: "cmhhelgeson/Threejs_TSL_Tutorials", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#106", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED. No licence file on master, package.json has no license field, README has no " +
+            "licence word. The tutorials are Medium posts the README links to; the repository is their sketchbook." },
+    { repo: "Makio64/advanced-threejs-tsl-webgpu-rendering", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#100", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED, and there is no code in it to licence: three Markdown files (a 1,838-line guide " +
+            "and two shorter ones), no package.json, no licence file, and not one licence or copyright word in any " +
+            "of the three. A document about TSL optimisation. So #100's 'no licence at all' was right, and its " +
+            "'only TSL reference' was not (world/namedNotChecked.mjs, v4268)." },
+    { repo: "novalain/gi-voxels", spdx: "MIT", licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#132", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "DECLARED ONLY -- the redcamel/screen-space-reflections shape, a third time. package.json says " +
+            "\"license\": \"MIT\" and names Michael Novén as author; there is no licence file at any depth and no " +
+            "licence word in the readme. Somebody named MIT and nobody granted it in the words MIT requires be " +
+            "carried in all copies. 2018, WebGL2 voxel cone tracing after Crassin et al., and the one repository in " +
+            "the two batches whose idea this tree has in no form." },
+    { repo: "stuinfla/Repo-Explainer", spdx: "MIT", licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#132", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "DECLARED ONLY, a fourth time: package.json \"license\": \"MIT\", author ISOvision; no licence file at any " +
+            "depth, no licence word in a 230-line README. It is explainmyrepo, an agent pipeline that writes an " +
+            "explainer site for a repository -- the name on the open list is the repository's, the product has another." },
+    { repo: "dimartarmizi/threejs-procedural-terrain", spdx: null, licenceExists: false,
+      evidence: { file: null, sha256: null, lines: 0 }, namedIn: "#132", permissive: null,
+      grantor: { named: null, isRepoOwner: false },
+      note: "GENUINELY UNPAPERED. No licence file, README has no licence word, and package.json is \"private\": true " +
+            "with no license field -- a Vite starter (three 0.164, simplex-noise, alea) never meant to be a package." },
+    { repo: "HenryLoM/CliWaifuTamagotchi", spdx: "GPL-3.0-only", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "3972dc9744f6", lines: 674 }, namedIn: "#63",
+      grantor: { named: null, isRepoOwner: false }, permissive: false,
+      note: "*** THE FIRST COPYLEFT LICENCE THE SWEEP HAS READ, AND IT IS 674 LINES BECAUSE IT IS THE FSF'S TEXT " +
+            "VERBATIM. *** GPLv3 carries no copyright line naming a grantor of THIS work -- the only (C) in the file " +
+            "is the Free Software Foundation's on the licence text itself -- so grantor.named is null: the grant is " +
+            "real and the person granting is nowhere in it. README shows the GitHub licence badge and nothing more. " +
+            "Not permissive in the sense every entry above is, and not restricted in rvo2.js's sense either: use is " +
+            "unrestricted, and a combined work must carry the same terms -- copyleft, which #63 said was the whole " +
+            "question. Go, module 'cliwt'; writes ~/.config/cliwaifutamagotchi/ (utils/encouragements-handler.go:26)." },
+    { repo: "upf-gti/wgpuEngine", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "d2034e2770fb", lines: 21 }, namedIn: "#122",
+      grantor: { named: "UPF-GTI", isRepoOwner: true }, permissive: true,
+      note: "(c) 2023 UPF-GTI, the group whose account it sits under. C++ on Dawn, OpenXR under src/xr/openxr/, web " +
+            "export through emscripten; a published engine (doi 10.1145/3746237.3746305), unusual for this ledger." },
+    { repo: "node-3d/webgl", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "fe5979f0923c", lines: 21 }, namedIn: "#122",
+      grantor: { named: "Luis Blanco", isRepoOwner: true }, permissive: true,
+      note: "*** THE OWNER UNDER A DIFFERENT NAME, THE but0n/Ashes SHAPE, FIVE TIMES OVER. *** Every node-3d " +
+            "package.json names Luis Blanco as author and the organisation is his; three of the five licence files " +
+            "are byte-identical and say his name, the other two are byte-identical to each other and say 'Node3D'. " +
+            "isRepoOwner is true for both spellings, decided from the package.json and not from the URL. v6.0.1; " +
+            "installed and measured at v4291 (world/nodeGlPlatforms.mjs)." },
+    { repo: "node-3d/bullet", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "fe5979f0923c", lines: 21 }, namedIn: "#122",
+      grantor: { named: "Luis Blanco", isRepoOwner: true }, permissive: true,
+      note: "Byte-identical to node-3d/webgl's. v5.0.0." },
+    { repo: "node-3d/opencl", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "fe5979f0923c", lines: 21 }, namedIn: "#122",
+      grantor: { named: "Luis Blanco", isRepoOwner: true }, permissive: true,
+      note: "The third copy of that file. v3.0.0." },
+    { repo: "node-3d/uv-loop", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "5c4220e2cd03", lines: 21 }, namedIn: "#122",
+      grantor: { named: "Node3D", isRepoOwner: true }, permissive: true,
+      note: "(c) 2026 Node3D -- the organisation's name rather than the maintainer's, and a different file from the " +
+            "three above by exactly that line. v0.1.0." },
+    { repo: "node-3d/steam-api", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "5c4220e2cd03", lines: 21 }, namedIn: "#122",
+      grantor: { named: "Node3D", isRepoOwner: true }, permissive: true,
+      note: "Byte-identical to node-3d/uv-loop's. v0.4.0." },
+    // ---- v4305: the upstream of a port this tree has carried since v4163, read first-hand at last -----------
+    { repo: "krispuckett/SwiftUIShaders", spdx: "MIT", licenceExists: true,
+      evidence: { file: "LICENSE", sha256: "ea8b7a631013", lines: 21 }, namedIn: "#35",
+      grantor: { named: "Kris Puckett", isRepoOwner: true }, permissive: true,
+      note: "(c) 2026 Kris Puckett; the README's 'use them, ship them, remix them' is the same grant in prose. " +
+            "Cited in render/swiftShaderModel.mjs's header since v4163 on the strength of that README line; the " +
+            "LICENSE file itself was opened at v4305, when the last thirteen of its 41 shaders were ported." },
 ]);
 
 /** Only a nested third-party licence, which is NOT the repository's own and must never be read as one. */

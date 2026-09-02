@@ -13,8 +13,9 @@
 // pass. What CAN name a file is the CALL STACK, so this file wraps drawArrays on the real page and reads it.
 //
 // *** AND THEN v4241, HOLDING CORRECT PER-LINE ATTRIBUTION, STILL DESCRIBED THE RESULT WRONG. *** It called
-// the five bloomPass draws "one pass's downsample and upsample ladder". Read the attributed lines: 719 is
-// the brightness extract, 729 the horizontal blur, 736 the vertical blur, 750 is SSAO, 818 the composite.
+// the five bloomPass draws "one pass's downsample and upsample ladder". Read the attributed lines (at v4242;
+// v4288 moved them by four): 719 is the brightness extract, 729 the horizontal blur, 736 the vertical blur,
+// 750 is SSAO, 818 the composite. v4303: the SSAO line is no longer typed anywhere below -- see ssaoOwns().
 // There is no ladder. There is a single half-res two-tap blur -- and a draw that is not part of bloom at all.
 //
 // *** THE FOURTH MISTAKE WAS MANUFACTURED BY THIS FILE'S OWN CHECK, AND IT IS THE ONE WORTH KEEPING. *** The
@@ -139,6 +140,15 @@ if (skip) {
     const sitesOf = (d) => new Set(d.map((x) => x.site.split(" <- ")[0]));
     const bloomLines = (d) => [...new Set(d.filter((x) => /bloomPass\.js/.test(x.site))
         .map((x) => (x.site.match(/bloomPass\.js:(\d+)/) || [])[1]))].sort((a, b) => a - b);
+    // v4303 -- *** THE SSAO LINE IS DERIVED FROM THE DIFF, NEVER TYPED. *** This gate said "750" in five
+    // places; v4288 added four lines above the draw and the SSAO draw became 754, and the gate went red
+    // for fifteen rounds (one of the six regressions the v4297 sweep named) over a number that had been
+    // correct once. The line that disappears when SSAO is turned off IS the SSAO draw; bloomPass.js's own
+    // source is then asked whether ssaoProg is bound just above it, so a wrong line cannot pass by luck.
+    let ssaoLine = null;
+    const bloomSrc = fs.readFileSync(path.join(ENG, "render", "bloomPass.js"), "utf8").split("\n");
+    const ssaoOwns = (line) => { const n = Number(line); if (!n) return false;
+        return bloomSrc.slice(Math.max(0, n - 12), n).some((l) => /useProgram\(this\.ssaoProg\)/.test(l)); };
 
     // #86 DISCIPLINE: THE SAME CONFIGURATION TWICE, BEFORE ANY DELTA IS READ. Two windows over one unchanged
     // page bound what "no change" looks like here, and every comparison below is read against that bound.
@@ -199,12 +209,15 @@ if (skip) {
     // 736 the vertical blur, 750 is SSAO, and 818 is the composite. There is no ladder -- one half-res
     // two-tap blur, and a draw that is not part of bloom at all.
     const base5 = bloomLines(baseA), off4 = bloomLines(offSSAO), on5 = bloomLines(onSSAO);
+    const gone = base5.filter((l) => !off4.includes(l));
+    ssaoLine = gone.length === 1 ? gone[0] : null;
     ok("!! *** THE FIFTH bloomPass DRAW IS SSAO, AND TURNING SSAO OFF REMOVES EXACTLY IT ***",
-        afterOff.ssao === 0 && base5.length === 5 && off4.length === 4 && !off4.includes("750") && base5.includes("750"),
+        afterOff.ssao === 0 && base5.length === 5 && off4.length === 4 && gone.length === 1 && ssaoOwns(gone[0]),
         "bloomPass lines " + base5.join(",") + " at boot; " + off4.join(",") + " with window.ssao.off() " +
         "(strength read back as " + afterOff.ssao + ", so the toggle demonstrably took). " +
-        "Line 750 and only line 750 disappears. That is the SSAO draw named by the frame rather than by me " +
-        "reading the file -- and it is the check that would have caught the mistake below.");
+        "Line " + (gone.join("/") || "none") + " and only that line disappears, and bloomPass.js binds ssaoProg " +
+        "within twelve lines above it. That is the SSAO draw named by the frame and confirmed by the source, " +
+        "not typed -- it was 750 until v4288 moved it -- and it is the check that would have caught the mistake below.");
     ok("!! ...and switching it back on restores the same five sites",
         afterOn.ssao > 0 && on5.join(",") === base5.join(","),
         on5.join(",") + " against " + base5.join(",") + ", strength back to " + afterOn.ssao);
@@ -219,7 +232,7 @@ if (skip) {
         probe.ssaoHasEnabled === false && probe.ssaoEnabledRead === false && probe.ssaoStrength > 0,
         "window.ssao has no 'enabled' key (its keys are " + probe.ssaoKeys.join(", ") + "), so the old " +
         "check's !!window.ssao.enabled read " + probe.ssaoEnabledRead + " and passed. The value that decides " +
-        "the draw is strength = " + probe.ssaoStrength + ", and the draw at bloomPass.js:750 is in every " +
+        "the draw is strength = " + probe.ssaoStrength + ", and the draw at bloomPass.js:" + ssaoLine + " is in every " +
         "default frame above.");
     ok("!! ...so the frame is 6 draws WITH SSAO and 5 without -- the count was never a constant",
         sitesOf(baseA).size === 6 && sitesOf(offSSAO).size === 5,
@@ -417,7 +430,8 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "fullscreen triangle is measurably FASTER, which nothing here times; and what a REAL chain would cost, " +
     "because building one is a change to main.js and not a measurement of it. What IS checked: that the " +
     "same configuration twice gives the same call sites, before any delta is read; that SSAO is on at boot " +
-    "and owns exactly bloomPass.js:750, with the strength read back so a dead setter cannot pose as a " +
+    "and owns exactly one bloomPass.js line, derived from the diff rather than typed (750 until v4288, 754 since; " +
+    "typing it cost this gate fifteen red rounds), with the strength read back so a dead setter cannot pose as a " +
     "finding; that phosphor is the only named optional pass that adds a draw; that swiftShader's canvas is " +
     "detached with its own context and therefore unmergeable in principle; that transitions has no mount " +
     "path; and that converting the one real quad to a triangle is byte-identical over every pixel.");

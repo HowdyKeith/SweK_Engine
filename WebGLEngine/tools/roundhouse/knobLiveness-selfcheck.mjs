@@ -670,7 +670,15 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
     // to make it opt-in, not a reason to go back to prose. Run with KNOB_REAL_PLANT=1 and the paragraph above
     // stops being taken on trust. WHEN THE TIMEOUT IS FIXED THIS SHOULD BECOME UNCONDITIONAL; it is written
     // to need no other change when it does.
-    if (process.env.KNOB_REAL_PLANT === "1") {
+    //
+    // *** v4304 -- UNCONDITIONAL, WHICH IS WHAT THE PARAGRAPH ABOVE SAID SHOULD HAPPEN (#38). *** #34 moved this
+    // gate off the 309 s default and onto a MEASURED basis in tools/ship/gateBudget.mjs, and the real-plant run
+    // was then stopwatch-timed to completion WITH this block on: 423,693 ms, EXIT 0, in this sandbox, against
+    // 179,345 ms without it -- so the block costs ~244 s of stability builds, not the "~2 minutes" guessed
+    // above. That figure is the gate's basis now (the budget is twice it), and the env guard is gone: the
+    // report() that stood in for it when the flag was unset is deleted rather than kept as a second path,
+    // because a check with an opt-out is a check that is off on every box that forgot to opt in.
+    {
         const rDef = stabilityDefaults({ mode: "response" });
         const rBase = await stabilityDevice.build({ mode: "response", config: rDef.config });
         const rResponse = await probeKnob(stabilityDevice, "response", rDef.config, "visc", rBase);
@@ -684,11 +692,6 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
             "(moved [\"ratioLadder\"]) -- the mode built to be caught was masked by its own rebuilt array. " +
             "stabilityBind-selfcheck already proves the plant flattens the ladder; the separate claim here " +
             "is that the GENERIC per-knob census can see what that direct check sees.");
-    } else {
-        report("   the real-plant assertion is OPT-IN and did not run",
-            "set KNOB_REAL_PLANT=1 to assert the paragraph above against the live stability device rather " +
-            "than quoting a past run. It is skipped by default because it costs ~2 minutes of builds and " +
-            "this gate is over budget already -- A SKIP THAT NAMES ITSELF, not a check quietly switched off.");
     }
 }
 

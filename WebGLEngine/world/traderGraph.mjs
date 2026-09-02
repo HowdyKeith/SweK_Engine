@@ -83,6 +83,28 @@ export const SWEEP = Object.freeze({ repos: 35, commits: 11172, cloneFailures: 0
     distinctNames: 473, distinctEmails: 466,
     crossingsByName: 13, crossingsByEmail: 10 });
 
+/**
+ * *** v4304: THE LICENCE SWEEP GREW BY EIGHTEEN AND THIS GRAPH DID NOT. *** Those eighteen were opened for
+ * their LICENCE (world/licenceSweep.mjs) from depth-1 clones, which is enough to read a LICENSE file and is
+ * not history. Graphing them means full-history clones of all eighteen AND a recomputation of the crossings
+ * over all fifty-three, because a trader is somebody who appears in more than one repository and the
+ * question cannot be answered eighteen at a time. That is a round, not a footnote, so the debt is recorded
+ * here BY NAME and the gate holds SWEEP.repos + UNGRAPHED.length to the licence sweep's length: an
+ * assessed repository may be ungraphed, but it may not be silently absent from both.
+ */
+export const UNGRAPHED = Object.freeze({
+    at: "v4304",
+    why: "opened for licence only, from depth-1 clones; the crossings need every repository's full history at once",
+    repos: Object.freeze([
+        "shajidhasan/spoilerjs", "evanw/node-source-map-support", "evanw/webgl-vr-editor", "evanw/node-flatbuffers",
+        "brunosimon/three.js-tsl-sandbox", "Ramotion/vr-menu-demo", "cmhhelgeson/Threejs_TSL_Tutorials",
+        "Makio64/advanced-threejs-tsl-webgpu-rendering", "novalain/gi-voxels", "stuinfla/Repo-Explainer",
+        "dimartarmizi/threejs-procedural-terrain", "HenryLoM/CliWaifuTamagotchi", "upf-gti/wgpuEngine",
+        "node-3d/webgl", "node-3d/bullet", "node-3d/opencl", "node-3d/uv-loop", "node-3d/steam-api",
+        "krispuckett/SwiftUIShaders",   // v4305, same depth-1 reading
+    ]),
+});
+
 /** Per repository: how much of it the owner actually wrote. ownerShare 0 means a fork. */
 export const REPOS = Object.freeze([
     {"repo": "AcademySoftwareFoundation/OpenPBR", "commits": 151, "ownerCommits": 0, "ownerShare": 0.0, "topAuthor": "Jamie Portsmouth"},

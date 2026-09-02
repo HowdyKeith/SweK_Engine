@@ -78,7 +78,7 @@ console.log("1. *** THE GAP IS STRUCTURAL, and both halves of it are asserted ag
 console.log("\n2. *** THE POPULATION, and every entry's evidence is greppable in the file it names ***");
 {
     ok("the register holds " + C.COPIED.length + " copies and " + C.DERIVED.length + " derived works",
-        C.COPIED.length === 2 && C.DERIVED.length === 9);
+        C.COPIED.length === 2 && C.DERIVED.length === 10);   // v4301: ui/qrDecode.mjs joined DERIVED
     for (const c of C.COPIED) {
         const src = read(c.path);
         ok("  " + c.path + " exists and contains the evidence recorded for it",
@@ -88,7 +88,7 @@ console.log("\n2. *** THE POPULATION, and every entry's evidence is greppable in
     // The DERIVED list must not be quietly wrong either -- a register with a fabricated row is worse than none.
     let bad = [];
     for (const d of C.DERIVED) { const src = read(d.path); if (src === null || !src.includes(d.evidence)) bad.push(d.path); }
-    ok("every DERIVED entry's evidence is present in its file too", bad.length === 0, bad.join(" ") || "all 9");
+    ok("every DERIVED entry's evidence is present in its file too", bad.length === 0, bad.join(" ") || "all " + C.DERIVED.length);
     ok("no path appears in both lists", C.COPIED.every((c) => !C.DERIVED.some((d) => d.path === c.path)));
 }
 
@@ -100,19 +100,37 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
         "--exclude-dir=node_modules || true", { cwd: ROOT, maxBuffer: 1 << 24 })
         .toString().trim().split("\n").filter(Boolean).map((s) => s.replace(/^\.\//, "")).sort();
     const underVendor = all.filter((f) => f.startsWith("vendor/"));
-    // *** AND THE COUNT MOVES AS THIS ROUND WRITES, so it is split rather than quoted as one number. *** The
-    // gate, the register and the two new notice files all contain the clause; counting them with the rest
-    // would be the self-counting error v4262 hit three times in one round.
-    const mine = /^(shaders\/ASHIMA-LICENSE\.txt|ui\/vendor\/LICENSE|world\/copiedOutsideVendor\.mjs|tools\/ship\/copiedOutsideVendor-selfcheck\.mjs)$/;
-    const preexisting = all.filter((f) => !mine.test(f));
-    ok("the tree held " + preexisting.length + " MIT permission notices before this round",
+    // *** AND THE COUNT MOVES AS THE TREE WRITES, so the QUOTERS are excluded by name rather than the
+    // number quoted once. *** Files that carry the clause as DATA -- this register and its gate, the two
+    // notice files, world/licenceBodies.mjs (which keys its matcher on the sentence) and its gate (a test
+    // fixture), and qrChannel-selfcheck.mjs (which asserts a copy carries it) -- are not copies of anything.
+    // Counting them with the rest was the self-counting error v4262 hit three times in one round, and it is
+    // how this gate went red at v4281 and stayed red until v4301: licenceBodies quoted the clause, the
+    // frozen 15 became 17, and nobody was looking. The v4297 sweep named it as one of six regressions.
+    const quoters = /^(shaders\/ASHIMA-LICENSE\.txt|ui\/vendor\/LICENSE|world\/copiedOutsideVendor\.mjs|tools\/ship\/copiedOutsideVendor-selfcheck\.mjs|world\/licenceBodies\.mjs|tools\/ship\/licenceBodies-selfcheck\.mjs|tools\/ship\/qrChannel-selfcheck\.mjs)$/;
+    // And a registered copy may carry its notice IN THE FILE -- that is what MIT asks of a copy -- so those
+    // are excluded by the register's own say-so, not by name here.
+    const inFile = new Set([...C.COPIED, ...C.DERIVED].filter((e) => e.noticeInFile).map((e) => e.path));
+    const preexisting = all.filter((f) => !quoters.test(f) && !inFile.has(f));
+    ok("the tree held " + preexisting.length + " MIT permission notices before v4263, quoters and in-file copies aside",
         preexisting.length === 15, preexisting.join(" ").slice(0, 120) + "...");
     ok("*** and 14 of those 15 were under vendor/ -- the 15th is a packaged dependency, not engine code ***",
         underVendor.length === 14 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
-    ok("  so NO engine-source copy outside vendor/ carried one", 
+    ok("  so NO engine-source copy outside vendor/ carried one",
         preexisting.filter((f) => !f.startsWith("vendor/") && !f.startsWith("tools/strict-libm-pkg/")).length === 0);
+    // *** THE ONES THAT DO NOW ARE REGISTERED AND SAY SO. *** Every in-file notice outside vendor/ must be a
+    // register entry with noticeInFile, and every such entry must really carry the clause.
+    const outside = all.filter((f) => !f.startsWith("vendor/") && !f.startsWith("tools/strict-libm-pkg/") && !quoters.test(f));
+    ok("every remaining notice outside vendor/ is a REGISTERED copy that declares noticeInFile: " + [...inFile].join(", "),
+        outside.every((f) => inFile.has(f)) && [...inFile].every((f) => outside.includes(f)),
+        "found: " + (outside.join(" ") || "none") + " -- an unregistered one here is a copy nobody papered");
+    for (const f of inFile) {
+        const src = read(f);
+        ok("  " + f + " carries the full clause and the warranty disclaimer",
+            src !== null && src.includes("Permission is hereby granted, free of charge") && src.includes("WITHOUT WARRANTY OF ANY KIND"));
+    }
     // Each copy recorded what it carried BEFORE. That is a historical claim, so it is checked against git.
     for (const c of C.COPIED) {
         ok("  " + c.path + " is recorded as having carried only a " + c.noticeBefore,

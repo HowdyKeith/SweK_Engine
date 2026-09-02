@@ -271,7 +271,11 @@ function classifyReference(engRoot, referrers, target) {
     for (const rel of referrers) {
         let src; try { src = fs.readFileSync(path.join(engRoot, rel), "utf8"); } catch { everyMentionCommented = false; break; }
         const base = target.split("/").pop();
-        const lines = src.split("\n").filter((l) => l.includes(base));
+        // v4303: a PATH match, not a substring -- "y.js" is inside "MemoryHeatmapOverlay.js", and that substring
+        // put two ordinary code lines of moduleHistory-selfcheck into the "mentions" of the y.js fixture, so the
+        // fixture read as uncommented and the gate went red on its own text. The needle is the base name
+        // preceded by a slash or a quote, which is the only way a specifier can be written.
+        const lines = src.split("\n").filter((l) => l.includes("/" + base) || l.includes("\"" + base) || l.includes("'" + base));
         if (!lines.length || !lines.every((l) => l.trim().startsWith("//"))) { everyMentionCommented = false; break; }
     }
     if (everyMentionCommented) return { kind: "commented", note: "every mention is on a // comment line" };

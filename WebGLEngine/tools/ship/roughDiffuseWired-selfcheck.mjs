@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { render } from "../../physics/render/pathTracer.mjs";
 import { energyLoss, orenNayarAB, orenNayarBrdf, SIGMA_MAX } from "../../physics/render/roughDiffuse.mjs";
 
@@ -144,7 +144,8 @@ console.log("\n3. *** THE ENERGY COMPENSATION, MEASURED IN A RENDER FOR THE FIRS
     fs.writeFileSync(uncompPath, src.replace(/diffuseTable\(sig\)/g, "null")
                                     .replace(/diffuseTable\(hit\.sphere\.sigma\)/g, "null"));
     let uncomp = null;
-    try { uncomp = (await import(uncompPath)).render; } catch { /* reported below */ }
+    // v4303: pathToFileURL, not the raw path -- a bare C:\... crashes import() on Windows (windowsImport-selfcheck).
+    try { uncomp = (await import(pathToFileURL(uncompPath).href)).render; } catch { /* reported below */ }
     const L = shot(undefined);
     ok("the uncompensated lobe can be built for comparison", !!uncomp);
     if (uncomp) {

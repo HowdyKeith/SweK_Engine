@@ -136,7 +136,7 @@ export function ejectaOf(name, files) {
 // this file's own header records happening before. Established by diffing the importer list at v4266 against
 // HEAD, which returned exactly one added path.
 export const EJECTA_BASELINE = Object.freeze({
-    three: 68, box3d: 21, krbn: 7, htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
+    three: 69, box3d: 21,   /* v4303: 68 -> 69, song-globe.html imports three (the song globe, #141) */ krbn: 7, htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
     draco: 2, fonts: 2, heerich: 1, wasm: 1, grass: 0, keyhunt: 0, slug: 0,
 });
 
