@@ -1,0 +1,60 @@
+{
+ "built": "deterministic",
+ "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
+ "head": "345728a09f5d4899846f1d90e84a2a1917b0c76d",
+ "catalogue": 150,
+ "coverage": {
+  "total": 150,
+  "read": 16,
+  "unread": 134,
+  "byPosture": {
+   "attribution": 10,
+   "public-domain": 4,
+   "restricted": 2
+  }
+ },
+ "visited": [
+  {
+   "name": "Fox",
+   "by": [
+    "glb_viewer.html"
+   ]
+  }
+ ],
+ "wideCount": 13,
+ "wideTop": [
+  {
+   "name": "DirectionalLight",
+   "hits": 65
+  },
+  {
+   "name": "Fox",
+   "hits": 39
+  },
+  {
+   "name": "Box",
+   "hits": 33
+  },
+  {
+   "name": "Cameras",
+   "hits": 28
+  },
+  {
+   "name": "Cube",
+   "hits": 23
+  },
+  {
+   "name": "BrainStem",
+   "hits": 17
+  },
+  {
+   "name": "Triangle",
+   "hits": 14
+  },
+  {
+   "name": "CesiumMan",
+   "hits": 13
+  }
+ ],
+ "registerSources": 39
+}

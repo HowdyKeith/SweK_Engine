@@ -16,6 +16,7 @@ import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
 import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
 import { satelliteAt } from "../world/orreryFleet.mjs";   // v4329, #68 -- a satellite's position is a pure function of (seed, t)
+import { flybyAt, MAY_TAKE, MAY_NOT_TAKE, NOT_ASKED } from "../world/orreryReached.mjs";   // v4330, #48
 
 /** Licence posture is the one thing in this picture that is a JUDGEMENT, so it gets the loudest channel. */
 export const STATE_COLOUR = Object.freeze({
@@ -396,6 +397,60 @@ export function drawFleet(ctx, fleet, x, y, scale, tDays = 0, opts = {}) {
         }
     }
     return { satellites: (fleet.satellites || []).length, debris: (fleet.debris || []).length, drawn };
+}
+
+/**
+ * *** THE FLYBYS, AT SYSTEM ZOOM: WHAT SweK READ AND DID NOT TAKE. *** (#48, v4330)
+ *
+ * These are drawn as ARCS, not rings, and that is the whole point of the picture. A captured body is on a
+ * closed orbit because it is bound; a reached source passes once on a parabola and leaves, because nothing
+ * was taken and nothing holds it. world/orreryReached.mjs derives that from physics/orbits/kepler.js rather
+ * than from a preference, and this function only paints the difference.
+ *
+ * The COLOUR is the second fact and it is a different one: how close it came is the position, what SweK is
+ * permitted to do with it is the hue. A model whose licence has never been read is drawn in its own colour
+ * rather than in the forbidden one -- gpu/khronosSamples.mjs fails closed on vendoring and this fails closed
+ * on the picture, because drawing 134 unread models as refused would report a decision nobody has made.
+ *
+ * @param bodies  from world/orreryReached.mjs
+ * @param view    { cx, cy, pxPerUnit }, the same view drawSystem is given
+ * @param opts.maxR  the frame's own radius in units; anything further out is off the picture and not drawn
+ */
+export const REACHED_COLOUR = Object.freeze({
+    [MAY_TAKE]: "#33ccff",       // the REACHED colour orreryDraw has carried since v4189 with nothing to use it on
+    [MAY_NOT_TAKE]: "#c06bff",   // read, and the terms say no
+    [NOT_ASKED]: "#6b7d8c",      // nobody has opened the licence -- not an accusation, an absence
+});
+
+export function drawFlybys(ctx, bodies, tDays, view, opts = {}) {
+    if (!bodies || !bodies.length) return { total: 0, drawn: 0, arcs: 0 };
+    const { cx, cy, pxPerUnit } = view;
+    const maxR = Number(opts.maxR) > 0 ? Number(opts.maxR) : Infinity;
+    const trail = opts.trail ?? 0;          // time units of path drawn behind each body, 0 for none
+    const steps = Math.max(2, opts.trailSteps ?? 24);
+    let drawn = 0, arcs = 0;
+    for (const b of bodies) {
+        const p = flybyAt(b, tDays);
+        if (!(p.r <= maxR)) continue;       // NaN-safe: an unplaceable body is not drawn rather than drawn at 0
+        const colour = REACHED_COLOUR[b.may] || REACHED_COLOUR[NOT_ASKED];
+        if (trail > 0) {
+            // the trail is the same hue at low alpha rather than a second colour: it is the SAME body's path
+            ctx.strokeStyle = colour;
+            ctx.globalAlpha = 0.22; ctx.lineWidth = 1; ctx.beginPath();
+            for (let i = 0; i <= steps; i++) {
+                const q = flybyAt(b, tDays - trail * (1 - i / steps));
+                const X = cx + q.x * pxPerUnit, Y = cy + q.y * pxPerUnit;
+                if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+            }
+            ctx.stroke(); ctx.globalAlpha = 1; arcs++;
+        }
+        ctx.fillStyle = colour;
+        ctx.beginPath();
+        ctx.arc(cx + p.x * pxPerUnit, cy + p.y * pxPerUnit, Math.max(1.4, (b.radius || 0.15) * pxPerUnit), 0, 2 * Math.PI);
+        ctx.fill();
+        drawn++;
+    }
+    return { total: bodies.length, drawn, arcs };
 }
 
 export function levelOf(body, pxPerUnit) { return levelFor(apparentPx(body, pxPerUnit)); }

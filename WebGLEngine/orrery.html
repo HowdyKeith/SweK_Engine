@@ -47,13 +47,16 @@
   <h1>SweK ORRERY</h1>
   <p>Everything <code>vendor/</code> holds, in orbit around the engine that took it in. Distance is how long ago it arrived; the period follows from that distance through <code>physics/orbits/kepler.js</code>, so the picture cannot drift from the physics. Colour is licence posture.</p>
   <p>Scroll to zoom, click a body to follow it. <span class="warn">Keep zooming</span> and it becomes a micro planet, then its own file tree as ground.</p>
+  <p>The faint arcs are what SweK <b>read and did not take</b> &mdash; 39 registered sources and the 150 Khronos sample models. They are on <b>parabolas, not orbits</b>: nothing was captured, so nothing holds them, and they pass once and leave. How close one comes is how many files here exist because of it.</p>
   <div id="scale">scale: <b id="lvl">system</b> <span id="lvlpx"></span> <span id="fleet"></span></div>
 </div>
 
 <div class="card" id="legend">
   <div><i style="background:#9fe6c0"></i>captured &mdash; licence found</div>
   <div><i style="background:#ff6b5e"></i>unpapered &mdash; vendored, none found</div>
-  <div><i style="background:#33ccff"></i>reached &mdash; never copied in</div>
+  <div><i style="background:#33ccff"></i>reached, may take &mdash; open, never copied in</div>
+  <div><i style="background:#c06bff"></i>reached, may not &mdash; the terms say no</div>
+  <div><i style="background:#6b7d8c"></i>reached, unread &mdash; nobody has opened the licence</div>
   <div><i style="border:1.5px dashed #ffcc66;background:none"></i>undated &mdash; inner orbit is a default</div>
   <div style="margin-top:8px"><button id="surf" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:11px">surface: file tree (measured)</button></div>
   <div style="margin-top:8px"><button id="fxbtn" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:12px">&#9680; signal: off</button> <span id="fxwhy" style="font-size:11px;opacity:.7"></span></div>
@@ -74,8 +77,11 @@ import { buildOrrery, UNPAPERED_BASELINE, UNPAPERED } from "./world/orrery.mjs";
 import { positionAt, apparentPx, levelFor, extentOf, slowestPeriod,
          ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "./world/orreryView.mjs";
 import { drawSystem, drawPlanet, drawTerrain, fieldFor, drawSeededPlanet, seededPlanetFor,
-         drawFleet, SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
+         drawFleet, drawFlybys, SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
 import { fleetsFor } from "./world/orreryFleet.mjs";
+import { reachedBodies, fromReachedRegister, fromKhronos, reachedDigest } from "./world/orreryReached.mjs";
+import { REACHED_SOURCES, severityOf } from "./world/reachedLicences.mjs";
+import { models, mayVendor } from "./gpu/khronosSamples.mjs";
 
 const cv = document.getElementById("stage"), ctx = cv.getContext("2d");
 let system = null, hits = [], focus = null, hover = null;
@@ -84,6 +90,10 @@ let seeded = false;      // which SURFACE a micro planet wears -- measured file 
 // #68: the importers of each body, in orbit around it. Baked because a browser cannot run git; POSITIONS are
 // not baked -- they come from (last commit, t) here, so the file changes only when the repository does.
 let fleets = null;
+// #48: what SweK READ AND DID NOT TAKE, on flybys rather than orbits. The registers are in the tree and pure,
+// so the browser builds these itself; only "which models does this tree ask for by name" needs a scan, and
+// that is the one thing orrery-reached.json carries.
+let flybys = [];
 
 // pxPerUnit is the ONE camera number. The zoom level is read off it rather than set beside it, so there is no
 // second variable that could say "planet" while the body on screen is four pixels wide.
@@ -112,9 +122,32 @@ if (!raw) {
     system = buildOrrery(raw.bodies);
     const fleetRaw = await fetch("./orrery-fleet.json").then((r) => r.json()).catch(() => null);
     if (fleetRaw) fleets = fleetsFor(system, fleetRaw.bodies);
+    const reachedRaw = await fetch("./orrery-reached.json").then((r) => r.json()).catch(() => null);
+    const visited = reachedRaw ? (reachedRaw.visited || []).map((v) => v.name) : [];
     const far = extentOf(system);
-    pxPerUnit = Math.min(innerWidth, innerHeight) * 0.42 / Math.max(1e-6, far);
+    // *** THE FRAME OPENS ON THE PASSING TRAFFIC, NOT ON THE HOLDINGS, AND THAT IS THE TRUE PROPORTION. ***
+    // Framing on extentOf() alone put the captured system across 42% of the viewport and left 186 of the 189
+    // flybys permanently outside it -- a picture of "what SweK read and did not take" showing three of them.
+    // Opening on the flyby extent instead makes vendor/ a small bright core inside a wide field of things
+    // that passed, which is what the two counts actually are: fifteen against a hundred and eighty-nine.
+    const Q_NEAR = far * 1.3, Q_FAR = far * 3.2;
+    pxPerUnit = Math.min(innerWidth, innerHeight) * 0.42 / Math.max(1e-6, Q_FAR);
     SPAN = slowestPeriod(system) / 24;                 // one slow orbit in about 24 seconds
+    // *** THE CLOSEST A PASSING BODY COMES IS OUTSIDE EVERY CAPTURED ORBIT, AND THAT IS DERIVED FROM THE
+    // SYSTEM RATHER THAN TYPED. *** extentOf() is the furthest captured orbit plus its body's radius; a
+    // flyby's perihelion floor is set from it, so a newly vendored dependency pushes the passing traffic out
+    // rather than being overtaken by it. The epochs are spread over the slowest captured period so they do
+    // not all arrive at once -- without it every one of the 189 would sit at perihelion at t = 0.
+    flybys = reachedBodies([...fromReachedRegister(REACHED_SOURCES, severityOf),
+                            ...fromKhronos(models(), visited, mayVendor)],
+                           { nearest: Q_NEAR, farthest: Q_FAR, qGain: (Q_FAR - Q_NEAR) / Math.log1p(8),
+                             // *** SPREAD OVER THE TIMELINE THE PAGE CAN ACTUALLY SCRUB, NOT OVER ONE ORBIT.
+                             // *** A body this far out and unbound moves SLOWLY -- that is not a defect, it
+                             // is what an unbound trajectory at q = 40 does -- so over one captured orbit the
+                             // whole population barely stirs and then leaves in convoy. Spread over the scrub
+                             // range (the same slowestPeriod * 10 the slider below already uses) they arrive
+                             // staggered: measured, 50 in frame at t = 0, 96 at t = 800, 54 at the far end.
+                             loop: slowestPeriod(system) * 10 });
     document.getElementById("scrub").max = String(Math.round(slowestPeriod(system) * 10));
     const bad = system.unpapered;
     document.getElementById("rtext").innerHTML = bad.length
@@ -222,7 +255,16 @@ function draw() {
     // SYSTEM: if a body is followed, keep it on screen by centring on it rather than on SweK
     let cx = innerWidth / 2, cy = innerHeight / 2;
     if (focus) { const p = positionAt(focus, t); cx -= p.x * pxPerUnit; cy -= p.y * pxPerUnit; }
+    // *** THE PASSING TRAFFIC IS DRAWN UNDER THE CAPTURED SYSTEM, NOT OVER IT. *** What this repository holds
+    // is the subject; what it read and left is the context. maxR is the frame's own half-diagonal in units, so
+    // a body already gone is not drawn at all rather than drawn at the edge -- they LEAVE, and a picture that
+    // pinned them to the border would be saying they are still here.
+    const maxR = Math.hypot(innerWidth, innerHeight) / 2 / pxPerUnit;
+    const fb = drawFlybys(ctx, flybys, t, { cx, cy, pxPerUnit }, { maxR, trail: SPAN * 2.5 });
     hits = drawSystem(ctx, system, t, { cx, cy, pxPerUnit }, { hover });
+    document.getElementById("fleet").textContent = fb.total
+        ? `${fb.drawn} of ${fb.total} passing in frame \u00b7 read, not taken`
+        : "";
 }
 
 function caption(s) {

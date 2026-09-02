@@ -48,6 +48,7 @@ or the `[knowledge]` line from step 3).
 ## 3. Derived files
 
     node tools/ship/orreryFleetScan.mjs --write        # AFTER the version bump, not before -- see below
+    node tools/ship/orreryReachedScan.mjs --write     # same rule, same reason
     node tools/ship/buildKnowledgeIndex.mjs --write    # prints "[knowledge] NNNN gates" -- this is the count
     node tools/ship/staleness.mjs --fix                # rewrites case-study.html's gate count
     node tools/ship/claimCheck-selfcheck.mjs           # must end "all checks pass"
@@ -59,6 +60,12 @@ the bump and before the commit: sizes then match at HEAD, and the only thing lef
 commit hash, which the gate reports rather than fails because the commit that ships a round cannot know its
 own hash. Re-bake `orrery.json` too (`node tools/ship/orreryBake.mjs --write`) if `vendor/` changed -- it was
 left forty-five rounds at v4189 and two gates sat red on the register the whole time saying so.
+
+`orrery-reached.json` (v4330, #48) is the same shape for what SweK read and did NOT take: it holds which
+Khronos sample models this tree asks for by name, plus the wide count that measurement rejected. It carries
+no byte sizes, so the version bump does not move it -- but it carries the head commit, and its drift check
+demands POPULATION currency the same way, so bake it in the same step rather than remembering which of the
+two is sensitive to what.
 
 ## 4. Verify
 

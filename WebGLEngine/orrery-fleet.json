@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "062c98ce25dc1aa835a1ce4334792eccf043c3a6",
+ "head": "345728a09f5d4899846f1d90e84a2a1917b0c76d",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2649407,
-    "sha": "fe96784e8ff7c55884c0e83388db67aa7a2bdc55"
+    "bytes": 2650754,
+    "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
    },
    {
     "path": "mpm3d.html",
@@ -625,7 +625,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 35178,
-    "sha": "b9c7744040268fca3fccabe94e91eef4f120ba16"
+    "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -640,7 +640,7 @@
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
     "bytes": 74950,
-    "sha": "b9c7744040268fca3fccabe94e91eef4f120ba16"
+    "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
