@@ -319,11 +319,29 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(surplus >= 0,
        "the sweep's population is not larger than the tree it swept",
        `${S.swept} swept + this gate = ${S.swept + 1}; ${gatesNow} in the tree now`);
-    ok(true, "...and the gates added since v4297 are COUNTED rather than assumed to be none",
-       surplus === 0 ? "none added since the sweep -- the record is current"
-                     : surplus + " gate file(s) added since v4297 have never been swept. THAT IS THE HONEST " +
-                       "STALENESS OF SWEEP_V4297 and it is a number, not a feeling: the next full sweep is " +
-                       "what clears it, and re-pinning this equality would only hide it");
+
+    // *** v4317 -- THE SURPLUS IS NOT MERELY COUNTED NOW, IT IS ACCOUNTED FOR. *** v4315 stopped pinning this
+    // equality and started naming the gap, which was the right first move and left a to-do behind: fourteen
+    // gates the sweep had never executed. SWEEP_SINCE_V4297 is that sweep. So the check is no longer "is the
+    // surplus named" but "is EVERY gate in the tree covered by one measurement or the other", which is the
+    // property the original equality was reaching for and could not survive a growing tree to state.
+    const SS = GS.SWEEP_SINCE_V4297;
+    const uncovered = surplus - SS.swept;
+    ok(uncovered <= 0,
+       "!! *** every gate in the tree has been swept by v4297 or by the round that closed its surplus ***",
+       `${gatesNow} in the tree = ${S.swept} swept at v4297 + this gate + ${SS.swept} swept since` +
+       (uncovered > 0 ? `. ${uncovered} STILL UNSWEPT -- name them and run them; a surplus that is only ` +
+                        `counted goes stale the way the equality it replaced did`
+                      : `. Nothing is unaccounted for, and the next gate added makes this red until it is run.`));
+    ok(SS.green === SS.swept && SS.red === 0 && SS.regressions === 0,
+       "...and none of them is red, so nothing has regressed since v4297 either",
+       `${SS.green} green of ${SS.swept}, ${SS.falseReds} false red and ${SS.unmeasuredAtCap} unmeasured at ` +
+       `the phase-1 cap, both resolved GREEN by the serial pass. ` + SS.verdict);
+    ok(SS.resolvedByPhase2.every((r) => r.phase1 !== r.phase2 && typeof r.why === "string" && r.why.length > 40),
+       "...and every candidate phase 2 overturned says so, with the reason",
+       SS.resolvedByPhase2.map((r) => r.gate.split("/").pop() + ": " + r.phase1 + " -> " + r.phase2).join("; ") +
+       ". A SWEEP THAT NEVER OVERTURNS ITS OWN PHASE 1 IS A SWEEP WITH ONE PHASE, and this one overturned both " +
+       "of its candidates in the same direction the method predicts -- starvation manufactures failures.");
     ok(S.green + S.confirmedRed + S.unmeasuredCount === S.swept,
        "*** green + red + unmeasured = swept, with NO fourth bucket ***",
        `${S.green} + ${S.confirmedRed} + ${S.unmeasuredCount} = ${S.swept}`);
