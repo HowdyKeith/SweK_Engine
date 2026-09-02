@@ -179,6 +179,90 @@ export function sweepCostFor(device, rec = null) {
 }
 
 /**
+ * *** THE MEASURED STALENESS OF THIS RECORD, WHICH IS ONE DEVICE'S AND IS SAID SO. ***
+ *
+ * v4173 re-ran the census to completion on the machine that froze the record and measured twof at 712.7 s
+ * against the 458.9 s stored for it: the record is stale by 1.553x locally, and no host scaling fixes a hint
+ * that was already wrong about its own machine. That is the ONLY measured staleness figure the tree has, from
+ * ONE device, and applying it lab-wide is an assumption rather than a measurement. It is stated here rather
+ * than folded silently into a margin so a later round can measure the other 115 and replace it.
+ */
+export const RECORD_STALENESS = 712.7 / 458.9;
+
+/**
+ * *** A BUDGET FOR SWEEPING NAMED DEVICES, READ FROM THE RECORD INSTEAD OF TYPED. ***
+ *
+ * v4361, backlog #40. The sweep half of this file was ORPHANED AT BOTH ENDS. sweepCostFor() has been exported
+ * and documented since v4051 -- "when a proxy spans two orders of magnitude, the measurement is the model" --
+ * with ZERO call sites anywhere in the tree; writeSweepCosts() likewise, so there was no path to refresh what
+ * 4.79 hours of measurement bought. And where the BUILD half got scaledCostFor at v4173 because "a frozen
+ * cost and a live deadline are different clocks", the sweep half never got the conversion.
+ *
+ * Meanwhile the gate that runs the sweeps carried NINE HAND-TYPED ROUND NUMBERS. Measured against the record
+ * they are inconsistent by three orders of magnitude -- and the interesting one is not the waste:
+ *
+ *     compose      200 s budget,   0.3 s measured   729.9x over
+ *     galaxy       120 s budget,   0.4 s measured   322.6x over
+ *     blackhole    200 s budget,  29.5 s measured     6.8x over
+ *     quantum      120 s budget, 100.6 s measured     1.2x over   <-- 19% headroom
+ *
+ * One device was given seven hundred times what it needs and another nineteen percent. A round number cannot
+ * be wrong in a way anybody notices, which is the whole argument for reading the record instead.
+ *
+ * *** WHAT THIS BUYS IS NOT SPEED. *** An over-provisioned budget costs no wall time when the sweep finishes
+ * early -- it caps, it does not spend. What it costs is the ability to NOTICE: a 730x budget cannot tell that
+ * a device became a hundred times slower, so the cut that would have said so never happens. A derived budget
+ * is a claim about that device, and a claim can be falsified.
+ *
+ * *** AND IT FAILS CLOSED. *** A device with no sweep record returns ms: null and names itself in `unmeasured`
+ * rather than falling back to a number. A silent guess is exactly what the typed budgets already were, and
+ * replacing nine of them with one would not be progress. The caller decides what to do about an unknown
+ * device; this reports that it is unknown.
+ *
+ * @param devices  one device name or a list of them -- the budget is per-device in knobLiveness, so a list
+ *                 returns the largest rather than the sum: the loop guards each device against `budgetMs`
+ *                 separately, and summing would hand the dearest device the whole group's allowance.
+ * @returns { ms, measured, unmeasured, worst, scale, headroom, why }
+ */
+export function sweepBudgetFor(devices, { rec = null, scale = null, headroom = RECORD_STALENESS * 1.3 } = {}) {
+    const names = (Array.isArray(devices) ? devices : [devices]).map((d) => String(d || ""));
+    const r = rec || readCostRecord();
+    let s = scale;
+    if (!Number.isFinite(s)) { try { s = hostScale().scale; } catch { s = 1; } }
+    if (!(Number.isFinite(s) && s > 0)) s = 1;
+    const measured = [], unmeasured = [];
+    for (const n of names) {
+        const v = sweepCostFor(n, r);
+        if (v == null) unmeasured.push(n); else measured.push({ device: n, ms: v });
+    }
+    // THE LARGEST, NOT THE SUM -- see @param devices. knobLiveness resets its per-device stopwatch inside the
+    // loop (v4044's "THE BUDGET IS CUMULATIVE PER DEVICE"), so the number it wants is what the dearest of the
+    // group needs, and a sum would be the right answer to a question nobody is asking.
+    const worst = measured.length ? measured.reduce((a, b) => (a.ms >= b.ms ? a : b)) : null;
+    const ms = worst ? Math.round(worst.ms * s * headroom) : null;
+    return {
+        ms, measured, unmeasured, worst, scale: s, headroom,
+        why: !worst
+            ? `no sweep cost on record for ${names.join(", ")} -- freeze one before budgeting it`
+            : `${worst.device} measured ${(worst.ms / 1000).toFixed(1)} s, x${s} host, x${headroom.toFixed(2)} ` +
+              `headroom (${RECORD_STALENESS.toFixed(3)} measured staleness, 1.3 slack)`,
+    };
+}
+
+/**
+ * The same, for a caller that must have a number: the derived budget where the record has one, and an
+ * explicitly-passed floor where it does not. Separate from sweepBudgetFor so that "I accepted a fallback" is
+ * a thing the CALLER wrote down rather than something the record quietly did on its behalf.
+ */
+export function sweepBudgetOr(devices, floorMs, opts = {}) {
+    const b = sweepBudgetFor(devices, opts);
+    if (b.ms != null && b.ms >= floorMs) return { ...b, ms: b.ms, floored: false };
+    return { ...b, ms: floorMs, floored: true,
+             why: b.ms == null ? b.why + `; caller's floor of ${floorMs} ms used`
+                               : b.why + `; below the caller's floor of ${floorMs} ms, floored` };
+}
+
+/**
  * Freeze measured exhaustive-sweep costs. Separate from writeCostRecord because they are measured by a
  * different run -- build cost comes from corroborationCensus, sweep cost from knobLiveness --- and merging
  * them into one freeze would mean neither could be refreshed without paying for both.
