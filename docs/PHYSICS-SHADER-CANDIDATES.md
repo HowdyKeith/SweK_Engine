@@ -14,12 +14,20 @@ are ranked by how cleanly they would become one.
   Keys: peak over i0 is exactly 1 at the shape's true peak, and 1.0667 at the published eta (the reference
   formula's own approximation, the module's finding). Compute probe; both numbers read off the GPU.
 
+## Done at v4318
+
+- **Blackbody** (physics/thermal/blackbody.mjs -> render/blackbodyWgsl.mjs): Planck's dimensionless shape
+  x^n / (e^x - 1) and Wien's root x = n(1 - e^-x) by Newton IN THE SHADER (24 steps from x = n). Keys the
+  device is never handed: x_lambda = 4.965114231744276 and x_nu = 2.8214393721220787, read off the WebGPU
+  probe to 2e-6 with residual 0; the peak of the shape over the root (21.2014, 1.42144) to 1e-4; and on
+  BOTH backends the full-screen key's brightest column on the n = 5 row is x_lambda to within a column.
+  The sabotage log records two sabotages the gate cannot see (a wrong derivative sign and 2 Newton steps
+  both still land on the root) and one it can (a start at x = 1 finds the trivial root x = 0).
+
 ## Per-pixel and closed-form: the next ones (a fragment can be a coordinate)
 
-1. **Blackbody** (physics/thermal/blackbody.mjs): the Planck spectrum, Wien's root by Newton per pixel.
-   Keys: the Wien displacement constant and the Stefan-Boltzmann sigma, derivable to full precision from
-   exact SI constants. A pixel is (temperature, wavelength). The strongest candidate after these two, and
-   the natural colour of a star in the universe page.
+1. ~~**Blackbody**~~ -- done at v4318, above. The temperature-to-colour ramp (a pixel as (T, lambda)) is not
+   built; the key pipeline draws x across and n down.
 2. **Diffraction** (physics/optics/diffraction.js): single slit, double slit, circular aperture. Keys:
    sinc squared, the Airy first minimum at 1.22 lambda / D. A pixel is sin(theta). A hologram race that
    diffracts.

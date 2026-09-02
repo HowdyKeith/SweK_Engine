@@ -17,7 +17,7 @@ import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { webgpuSkipReason } from "./webgpuHarness.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { makeGitEconomy, replayEconomy, GOODS, BASE } from "../../world/gitEconomy.mjs";
-import { applyCommitsFeed, fixtureFeed, marketForRepo } from "../../world/commitsFeed.mjs";
+import { applyCommitsFeed, fixtureFeed, marketForRepo, liveFeed } from "../../world/commitsFeed.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -108,6 +108,32 @@ console.log("\n3. THE UNIVERSE REACTS TO GITHUB: commits as production, journale
     ok("  the feed is in the journal (commits interventions), and the universe with it replays to its hash", lg.interventions.filter((iv) => iv.kind === "commits").length === feed.length && rp.matches === true);
 }
 
+console.log("\n3b. THE LIVE SOURCE (v4318): the bridge's /github/commits per repository, grouped by day, booked through the same intervention");
+{
+    const e = fresh(7, { history: true }); for (let i = 0; i < 60; i++) e.step(0.25);
+    const page = fs.readFileSync(path.join(ENG, "orrery-gpu.html"), "utf8");
+    const m0 = e.markets[0], m1 = e.markets[1], m2 = e.markets[2];
+    const answers = { [m0.name]: { ok: true, commits: [{ sha: "a1", date: "2026-08-30T10:00:00Z" }, { sha: "a2", date: "2026-08-30T12:00:00Z" }, { sha: "a3", date: "2026-08-29T09:00:00Z" }] },
+                      [m1.name]: { ok: false, error: "HTTP 404: Not Found" }, [m2.name]: { ok: true, commits: [] } };
+    const urls = [];
+    const mock = async (u) => { urls.push(u); const repo = decodeURIComponent(u.split("repo=")[1]); const name = repo.split("/").pop(); if (name === e.markets[3].name) throw new Error("the bridge is down");
+        return { json: async () => answers[name] || { ok: true, commits: [{ sha: "z", date: "2026-08-31T00:00:00Z" }] } }; };
+    const feed = await liveFeed(e.markets, { fetchFn: mock, owner: "HowdyKeith" });
+    ok("every market is asked once, under the owner, through the bridge's route", urls.length === e.markets.length && urls.every((u) => u.startsWith("/github/commits?repo=HowdyKeith%2F")), urls[0]);
+    const r0 = feed.records.filter((r) => r.repo === "HowdyKeith/" + m0.name);
+    ok("*** three commits on two days become two day-records with the right counts, dated by the calendar day ***", r0.length === 2 && r0.find((r) => r.date === "2026-08-30").commits === 2 && r0.find((r) => r.date === "2026-08-29").commits === 1, r0.map((r) => `${r.date}: ${r.commits}`).join(", "));
+    ok("  a bridge error and a thrown fetch are failure LINES naming the repository, and the feed goes on", feed.failed.length === 2 && feed.failed.some((f) => f.repo.endsWith(m1.name) && /404/.test(f.why)) && feed.failed.some((f) => f.repo.endsWith(e.markets[3].name) && /down/.test(f.why)) && feed.records.length === 2 + (e.markets.length - 4), feed.failed.map((f) => `${f.repo.split("/").pop()}: ${f.why}`).join("; "));
+    ok("  a repository with no commits makes no record", !feed.records.some((r) => r.repo.endsWith("/" + m2.name)));
+    const src0 = e.accounting().ledger.produced.source, t0 = e.tick;
+    const a = applyCommitsFeed(e, feed.records); e.step(0.25);
+    const iv = e.log().interventions.filter((x) => x.kind === "commits");
+    ok("*** the live records book through the SAME intervention the fixture does: one 'commits' journal entry per record, at the right market, and production moved ***", a.applied.length === feed.records.length && iv.length === feed.records.length && iv.filter((x) => x.args.market === m0.id).length === 2 && e.accounting().ledger.produced.source > src0, `${iv.length} interventions at tick ${t0}, source ${src0} -> ${e.accounting().ledger.produced.source}`);
+    const again = applyCommitsFeed(e, feed.records, { seen: a.seen });
+    ok("  asked twice, nothing is booked twice", again.applied.length === 0 && again.skipped.every((x) => x.why === "already counted"));
+    ok("REFUSED: no fetch, no owner", await liveFeed(e.markets, { owner: "x" }).then(() => false, (x) => /needs a fetch/.test(x.message)) && await liveFeed(e.markets, { fetchFn: mock }).then(() => false, (x) => /needs the GitHub owner/.test(x.message)));
+    ok("  the page's live button asks the bridge with an owner from ?owner= and books through applyCommitsFeed, and its peer path matches repositories by name (marketForRepo)", /liveFeed\(economy\.markets, \{ fetchFn: \(u\) => fetch\(u\), owner \}\)/.test(page) && /marketForRepo\(f\.repo, economy\.markets\)/.test(page) && /id="live"/.test(page));
+}
+
 console.log("\n4. THE PAGE: git time on the HUD, a save, a restore that says its replay matched");
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
@@ -150,6 +176,6 @@ else {
 //      "a ship's cargo: BLIND"; the lockstep gate itself stays green, since its cheat is a gift, not a hold.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the sky itself under history (orbits are today's; a body's orbit does not shrink back to its arrival day); " +
-    "a live commits source (the ai-bridge does not expose one yet -- the feed here is a fixture, and says so); and the universe " +
+    "the live commits source against the REAL bridge (section 3b mocks the fetch; the bridge route is ai-bridge/server.js /github/commits, untested here without a token); and the universe " +
     "page's restore across a browser restart, which localStorage promises and this shell cannot show.");
 process.exit(fails ? 1 : 0);

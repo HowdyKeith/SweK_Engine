@@ -1,4 +1,4 @@
-# Level 17 -- a preview, written before Level 16 starts (built at v4317: items 1-5 shipped, item 6's page half at v4316; see docs/CHANGELOG.md)
+# Level 17 -- a preview, written before Level 16 starts (built at v4317: items 1-5 shipped, item 6's page half at v4316; the constructions below built at v4318; see docs/CHANGELOG.md)
 
 Written at v4301 (Level 15 shipped). A preview is a claim about what the rung two above this one
 would hold, so that Level 16 is built knowing what has to sit on top of it. Nothing here is built;
@@ -109,21 +109,40 @@ Each of these needs several rungs at once, which is why none existed before Leve
   integers, whole populations of policies could be evaluated in one compute dispatch -- each thread a
   hauler in its own universe, the evolution-strategy update a reduction. Level 16's two seconds of
   training would be frames.
+  *v4318: the SCORING half is built -- world/populationPolicy.mjs scores ten thousand learners' eight
+  candidates each in one dispatch, every score and every choice the CPU policy's (gate:
+  populationPolicy-selfcheck). The economies are not stepped in lockstep (step() asks its policy
+  synchronously), so the trainer still runs one economy at a time; that is the half left.*
 - **The journal as a time machine you can scrub.** A replay is a deterministic function of tick, so a
   scrubber can move the whole universe backward and forward, and the pick picture names what was under
   the pointer on any day. Level 16's journal is the whole mechanism; the slider is the work.
 - **Two universes drawn as one picture.** Lockstep hashes are integers, so two peers could each draw
   half the fleets and composite through the identity picture, splitting a scene across machines
   without either owning the whole state.
+  *v4318: built in one tab -- render/fleetMask.mjs makeMaskRig composites universe A where a race's
+  silhouette is and universe B elsewhere, to the byte on both backends (gate: fleetMask-selfcheck
+  section 4); the page's ?twin=1 runs a second economy beside the first and the masked race is the
+  window. Across two PEERS it is not: the wire carries one universe.*
 - **A race that lives in the depth pyramid.** Hi-Z is a max-depth image of the previous frame. A fleet
   whose shader reads it could hide behind whatever occluded it last frame -- a stealth race with no
   CPU logic at all.
+  *v4318: built as a per-record stealth bias (extra.w) the cull reads against the pyramid: a record
+  within the bias of being occluded vanishes, never against open sky; WebGPU only, the twin agrees
+  record by record on the device's own pyramid (gate: stealthRace-selfcheck). No race wears it yet.*
 - **Git time on the GPU.** With headings and arrival days in the record (item 2), the orbit pass could
   open and close markets itself, and the cull would reject a body that has not been vendored yet with
   no CPU decision.
+  *v4318: built -- every body record carries its opening day in extra.z, the cull is handed the sim day
+  (Cull.clock) and drops a body not yet vendored, on both backends, counted against the markets open
+  that day (gate: gpuGitTime-selfcheck). The orbit pass still computes a closed body's position; the
+  cull refuses it, so the saving is the draw.*
 - **Physics as paint.** swk_lyapunov and the Heidler current are shaders with exact keys at v4315
   (docs/PHYSICS-SHADER-CANDIDATES.md lists the next sixteen). Every race could wear a physical law,
   and every law could be graded on the hull it is painted on.
+  *v4318: the blackbody joins them -- Planck's shape and Wien's root by the device's own Newton,
+  x_lambda = 4.965114 read off WebGPU to 2e-6 and the picture's brightest column on both backends
+  (render/blackbodyWgsl.mjs). The mask on the device (frame targets, a pick-to-mask pass) and the live
+  commits source (the ai-bridge's /github/commits) shipped in the same round.*
 
 ## What Level 17 does NOT need
 

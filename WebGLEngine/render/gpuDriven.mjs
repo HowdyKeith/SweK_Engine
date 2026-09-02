@@ -53,7 +53,7 @@ export const RECORD_FLOATS = 4;
 export const OUT_RECORD_FLOATS = 12;
 /**
  * v4317 (Level 17) -- A HEADING IN THE RECORD. The compacted record grows a third vec4, `extra` = (yaw, pitch, a
- * race-specific parameter, 0), copied by the cull from an `extras` buffer the scene owns: the caller's headings when
+ * race-specific parameter, stealth bias -- v4318), copied by the cull from an `extras` buffer the scene owns: the caller's headings when
  * it has them (a trader faces its next market), else the golden angle times the id -- the Level 15 stand-in, now
  * computed ONCE on the CPU into the buffer instead of inside every fleet shader, so a shader only ever reads a
  * heading and never invents one. SPIN is that constant, kept here so nothing types it twice.
@@ -69,7 +69,9 @@ export const MAX_LODS = 5;
  * The cull uniform block: planes[6] + eye + thresholds + info(count, lodCount, cap, phase), all vec4 -- 144 bytes.
  * v4301: eye.w carries the FLEET COUNT (it was the padding 0 before; the shader and the twin both read 0 as 1).
  */
-export const CULL_UNIFORM_FLOATS = 36;
+// v4318: + clock = (t, enabled, 0, 0). GIT TIME ON THE GPU: with clock.y set, a record whose extra.z (its opening day)
+// is later than t is culled -- a body not yet vendored on day t is rejected by the cull, with no CPU decision.
+export const CULL_UNIFORM_FLOATS = 40;
 export const CULL_UNIFORM_BYTES = CULL_UNIFORM_FLOATS * 4;
 
 // ---- the shared WGSL: ONE cull function, spliced into the real shader and the probe ------------------------------
@@ -79,7 +81,7 @@ export const CULL_UNIFORM_BYTES = CULL_UNIFORM_FLOATS * 4;
  * probe is driven through a Float32Array uniform buffer and the real shader shares the struct with it exactly.
  */
 export const CULL_FN_WGSL = `
-struct Cull { planes: array<vec4<f32>, 6>, eye: vec4<f32>, thresholds: vec4<f32>, info: vec4<f32> };
+struct Cull { planes: array<vec4<f32>, 6>, eye: vec4<f32>, thresholds: vec4<f32>, info: vec4<f32>, clock: vec4<f32> };
 
 fn cullLod(c: vec4<f32>, cull: Cull) -> i32 {
   for (var p = 0u; p < 6u; p = p + 1u) {
@@ -120,7 +122,10 @@ fn hizLevelOffset(w: u32, h: u32, level: u32) -> u32 {
 fn hizLevelDim(d: u32, level: u32) -> u32 { var v = d; for (var l = 0u; l < level; l = l + 1u) { v = max(1u, (v + 1u) / 2u); } return v; }
 
 // true when the sphere (world xyz, radius w) cannot be seen past what the pyramid recorded.
-fn hizOccluded(c: vec4<f32>, occ: Occ, hiz: ptr<storage, array<f32>, read>) -> bool {
+// v4318 -- bias: the STEALTH margin (extra.w). 0 is the plain test: hidden when the nearest point is behind everything in
+// front. A positive bias hides the record when it is within bias of being occluded -- behind, level with, or just in front
+// of whatever covers its footprint -- but never against the open sky (a tile the clear reached has far = 1 and hides nothing).
+fn hizOccluded(c: vec4<f32>, occ: Occ, hiz: ptr<storage, array<f32>, read>, bias: f32) -> bool {
   if (occ.dims.w < 0.5) { return false; }
   let vc = occ.view * vec4<f32>(c.xyz, 1.0);
   let zn = vc.z + c.w;                       // the sphere's nearest view-space z (camera looks down -z)
@@ -143,6 +148,7 @@ fn hizOccluded(c: vec4<f32>, occ: Occ, hiz: ptr<storage, array<f32>, read>) -> b
   let tx1 = min(u32(floor(x1)) >> level, lw - 1u); let ty1 = min(u32(floor(y1)) >> level, lh - 1u);
   var far = 0.0;
   for (var ty = ty0; ty <= ty1; ty = ty + 1u) { for (var tx = tx0; tx <= tx1; tx = tx + 1u) { far = max(far, (*hiz)[off + ty * lw + tx]); } }
+  if (bias > 0.0) { return far < 1.0 && depth + bias > far; }
   return depth > far;
 }
 `;
@@ -213,9 +219,10 @@ ${fleets ? `@group(0) @binding(${occlusion ? 7 : 4}) var<storage, read> fleetOf:
   let phase = u32(cull.info.w);
 ${occlusion ? "  if (phase == 1u && rejected[i] == 0u) { return; }" : ""}
   let c = inst[i];
+  if (cull.clock.y > 0.5 && extras[i].z > cull.clock.x) { return; }   // v4318: not yet vendored on day t
   let lod = cullLod(c, cull);
   if (lod < 0) { return; }
-${occlusion ? `  let hidden = hizOccluded(c, occ, &hiz);
+${occlusion ? `  let hidden = hizOccluded(c, occ, &hiz, extras[i].w);
   if (phase == 0u) { rejected[i] = select(0u, 1u, hidden); }
   if (hidden) { return; }` : ""}
   let cap = u32(cull.info.z);
@@ -449,12 +456,13 @@ export function rankLods(lods, thresholds, { shader = RENDER_WGSL } = {}) {
 
 // ---- the CPU twin -------------------------------------------------------------------------------------------------
 /** Pack the cull uniforms exactly as the WGSL struct lays them out. */
-export function packCullUniforms({ planes, eye, thresholds, count, lodCount, cap, phase = 0, fleetCount = 1 }) {
+export function packCullUniforms({ planes, eye, thresholds, count, lodCount, cap, phase = 0, fleetCount = 1, clock = null }) {
     const u = new Float32Array(CULL_UNIFORM_FLOATS);
     u.set(planes.subarray ? planes.subarray(0, 24) : planes.slice(0, 24), 0);
     u[24] = eye[0]; u[25] = eye[1]; u[26] = eye[2]; u[27] = fleetCount;
     for (let k = 0; k < 4; k++) u[28 + k] = thresholds[k] == null ? 0 : thresholds[k];
     u[32] = count; u[33] = lodCount; u[34] = cap; u[35] = phase;
+    u[36] = clock == null ? 0 : clock; u[37] = clock == null ? 0 : 1; u[38] = 0; u[39] = 0;
     return u;
 }
 /** The six planes of a column-major view-projection, normalised, as render/frustum.js extracts them. */
@@ -481,6 +489,7 @@ export function cullLodCpu(records, u, fleetOf = null, extras = null) {
     const ids = Array.from({ length: regions }, () => []);
     for (let i = 0; i < count; i++) {
         const c = [records[i * 4], records[i * 4 + 1], records[i * 4 + 2], records[i * 4 + 3]];
+        if (u[37] > 0.5 && extras && extras[i * EXTRA_FLOATS + 2] > u[36]) continue;   // v4318: not yet vendored on day t
         const lod = cullLodCpuOne(c, u);
         if (lod < 0) continue;
         const fleet = fleetOf ? Math.min(fleetOf[i], fleetCount - 1) : 0;
@@ -522,7 +531,7 @@ export function packOccUniforms({ view, proj, w, h, levels, enabled }) {
 }
 const mulPoint = (m, x, y, z) => [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14], m[3] * x + m[7] * y + m[11] * z + m[15]];
 /** The twin of hizOccluded(): returns { occluded, depth, far, level } so a gate can see the margin, not just the verdict. */
-export function hizOccludedCpu(c, u, pyramid) {
+export function hizOccludedCpu(c, u, pyramid, bias = 0) {
     if (u[35] < 0.5) return { occluded: false, reason: "no pyramid" };
     const view = u.subarray(0, 16), proj = u.subarray(16, 32), w = u[32] | 0, h = u[33] | 0, levels = u[34] | 0;
     const vc = mulPoint(view, c[0], c[1], c[2]);
@@ -542,7 +551,7 @@ export function hizOccludedCpu(c, u, pyramid) {
     const tx1 = Math.min(Math.floor(x1) >> level, L.w - 1), ty1 = Math.min(Math.floor(y1) >> level, L.h - 1);
     let far = 0;
     for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) far = Math.max(far, pyramid[L.off + ty * L.w + tx]);
-    return { occluded: depth > far, depth, far, level, rect: [x0, y0, x1, y1] };
+    return { occluded: bias > 0 ? (far < 1 && depth + bias > far) : depth > far, depth, far, level, bias, rect: [x0, y0, x1, y1] };
 }
 
 /** The indirect command template: per REGION (fleet-major, then LOD), its mesh range with instanceCount 0. Written fresh every frame. */
@@ -593,7 +602,7 @@ const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]
  * whose vertex stage moves the hull passes `pickPipeline` (and `pickBind`) so the identity picture moves it too --
  * the fleets gate found the default pick drawing unspun hulls under spun ones, and named the wrong pixels.
  */
-export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null, headings = null }) {
+export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null, headings = null, clock = null }) {
     // Level 12 -- `records` may be a Float32Array (static instances) or a SOURCE produced elsewhere each frame:
     //   { count, buffer }   a gfx/device.js buffer another compute pass writes (WebGPU: the cull reads it directly)
     //   { count, cpu }      a function returning the Float32Array for this frame (the twin route, any backend)
@@ -704,7 +713,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         });
         pyramidReady = true; return true;
     }
-    const clock = () => (typeof time === "function" ? time() : (typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000));
+    const clockNow = () => (typeof time === "function" ? time() : (typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000));
     /**
      * The draws of one phase: every fleet's pipeline, then every one of its regions. Shared by the colour frame
      * and the pick frame (`picking` swaps in each fleet's pick pipeline; the fleet's bind hook is skipped there,
@@ -726,10 +735,11 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
             }
         }
     }
-    function frame({ viewProj, view = null, proj = null, eye, clear = [0, 0, 0, 1], read = false }) {
+    function frame({ viewProj, view = null, proj = null, eye, clear = [0, 0, 0, 1], read = false, target = null }) {
         if (occ && (!view || !proj)) throw new Error("gpuDriven: an occluding scene needs `view` and `proj` separately -- the Hi-Z test works in view space");
-        const u = packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, fleetCount });
-        const ctx = { viewProj, eye, time: clock() };
+        const day = typeof clock === "function" ? clock() : null;
+        const u = packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, fleetCount, clock: day });
+        const ctx = { viewProj, eye, time: clockNow(), day };
         lastCam = ctx;
         let twin = null, occU = null;
         if (!extraSrc.static) { extrasNow = extraSrc.cpu(); if (gpuPath) extraBuf.write(extrasNow); }
@@ -744,7 +754,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
             // the same canvas, such as the traders over the orrery's bodies.
             if (clear === null) pass.begin(); else pass.clear(clear);
             drawPhase(pass, outBuf, cmdBuf, twin && twin.counts, ctx);
-        }, (read && !twoPhase) ? { read: true } : undefined);
+        }, (read && !twoPhase) || target ? { ...((read && !twoPhase) ? { read: true } : {}), ...(target ? { target } : {}) } : undefined);
         // the pyramid for the NEXT frame comes from this frame's depth -- classic two-pass occlusion
         const built = occ ? buildHiz() : false;
         let readback2 = null, phase2 = false;
@@ -753,15 +763,15 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
             phase2 = true;
             const occU2 = packOccUniforms({ view, proj, w: hizDims[0], h: hizDims[1], levels: hizLayoutNow.levels.length, enabled: true });
             occBuf.write(occU2);
-            ubuf2.write(packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, phase: 1, fleetCount })); cmdBuf2.write(template);
+            ubuf2.write(packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, phase: 1, fleetCount, clock: day })); cmdBuf2.write(template);
             readback2 = device.frame(({ pass }) => {
                 pass.dispatch(cullPipe2, Math.ceil(count / CULL_WORKGROUP));
                 pass.begin();
                 drawPhase(pass, outBuf2, cmdBuf2, null, ctx);
-            }, read ? { read: true } : undefined);
+            }, read || target ? { ...(read ? { read: true } : {}), ...(target ? { target } : {}) } : undefined);
         } else if (twoPhase && read) {
             // no pyramid yet (first frame): nothing to re-test, and the readback the caller asked for is the phase-0 picture
-            readback2 = device.frame(({ pass }) => { pass.begin(); }, { read: true });
+            readback2 = device.frame(({ pass }) => { pass.begin(); }, { read: true, ...(target ? { target } : {}) });
         }
         return { backend: device.backend, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed", lodCount, fleetCount, regionCount, count, uniforms: u,
                  occlusion: occ, twoPhase, phase2Ran: phase2, occUniforms: occU, pyramidUsed: !!(occU && occU[35] > 0), pyramidBuilt: built,
@@ -795,6 +805,13 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         for (let i = 0; i < hits.length; i++) hits[i] = decodePick(p.pixels, i * 4);
         return { width: p.width, height: p.height, hits };
     }
+    /** v4318 -- the identity picture drawn INTO A TARGET texture (device.texture({ render: true })): the mask on the device reads it, no readback. */
+    function pickTo(target) {
+        if (!lastCam) return null;
+        device.frame(({ pass }) => { pass.clear([0, 0, 0, 0]); drawPhase(pass, outBuf, cmdBuf, last && last.counts, lastCam, true);
+            if (twoPhase && cmdBuf2) drawPhase(pass, outBuf2, cmdBuf2, null, lastCam, true); }, { target, depth: false });
+        return target;
+    }
     async function readPyramid() { if (!occ || !hizBuf) return null; return { pyramid: new Float32Array(await device.read(hizBuf)), layout: hizLayoutNow, dims: hizDims }; }
     /** The instance count of every region, fleet-major (region = fleet * lodCount + lod). One fleet: one count per LOD, as before. */
     async function readCounts() {
@@ -817,7 +834,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         if (!gpuPath) return last ? last.compact : null;
         return new Float32Array(await device.read(outBuf));
     }
-    return { frame, pick, pickPicture, readCounts, readCounts2, readCountsByFleet, readRecords, readPyramid, order: ranked, ranges, count, cap, lodCount, fleetCount, regionCount,
+    return { frame, pick, pickPicture, pickTo, readCounts, readCounts2, readCountsByFleet, readRecords, readPyramid, order: ranked, ranges, count, cap, lodCount, fleetCount, regionCount,
              fleets: perFleet.map((f) => ({ name: f.name, index: f.index, layout: f.layout, topology: f.topology, order: f.ranked, ranges: f.packed.ranges, missing: f.packed.missing, pipe: f.pipe })),
              occlusion: occ, twoPhase, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed",
              destroy() { for (const b of [ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, fleetBuf, extraBuf, hizBuf, occBuf, ...lvlBufs, ...perFleet.flatMap((f) => [f.vbuf, f.ibuf])]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };

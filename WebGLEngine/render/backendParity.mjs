@@ -147,16 +147,18 @@ export const PARITY_BASELINE = Object.freeze({
     // shaders in both languages (+1 to glslBearing, wgslBearing and both).
     // v4315 -- render/lyapunovWgsl.mjs (both languages: the key and the look) and render/heidlerWgsl.mjs (WGSL only,
     // a compute probe): our own physics, each with an exact key, graded on the device path.
-    glslBearing: 141,
-    glslDirective: 125,  // raw WebGL2 -- the file writes its own version header
+    // v4318 -- render/blackbodyWgsl.mjs: both languages (the key on either backend, the probe on WebGPU), Wien's root by
+    // the device's own Newton; the third physics module with an exact key.
+    glslBearing: 142,
+    glslDirective: 126,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 51,
-    both: 9,
+    wgslBearing: 52,
+    both: 10,
     glslOnly: 132,
     wgslOnly: 42,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/physicsShaders-selfcheck.mjs -- v4315
+// WebGLEngine/tools/ship/physicsShaders-selfcheck.mjs -- v4315, v4318 (the blackbody)
 //
 // OUR OWN PHYSICS AT LEVEL 11: two shaders that are ours rather than ports, each with an answer the GPU is never
 // handed. swk_lyapunov (render/lyapunovWgsl.mjs): the logistic map's Lyapunov exponent, ln 2 at r = 4 -- read back
@@ -7,6 +7,8 @@
 // period-3 window dark on both; the WGSL against its CPU twin element for element. The Heidler return-stroke
 // current (render/heidlerWgsl.mjs), the lightning: its peak over i0 an exact 1 at the true eta and 1.0667 at the
 // published one, both read off the GPU. Then the Chaos race: the Lyapunov look drawn through the fleet path.
+// v4318: the blackbody (render/blackbodyWgsl.mjs): Planck's shape and Wien's root found by the device's own Newton,
+// x_lambda = 4.965114 and x_nu = 2.821439 read back off WebGPU, and the picture's brightest column on both backends.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +16,7 @@ import { runInEngineOrigin, runWgslCompute, webgpuSkipReason } from "./webgpuHar
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import * as L from "../../render/lyapunovWgsl.mjs";
 import * as H from "../../render/heidlerWgsl.mjs";
+import * as BB from "../../render/blackbodyWgsl.mjs";
 import { RACES, LOOKS } from "../../render/fleets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -105,6 +108,53 @@ else {
     }
 }
 
+console.log("\n4. THE BLACKBODY (v4318): Wien's root found by the device's own Newton, the spectrum against the twin, the peak column on both backends");
+{
+    const k = BB.keyCpu();
+    const t5 = BB.probeCpu({ xLo: 0, xHi: 12, n: 5, count: 3, mode: 1 }), t3 = BB.probeCpu({ xLo: 0, xHi: 12, n: 3, count: 3, mode: 1 });
+    ok("the f32 twin's Newton lands on the module's f64 roots to 1e-6: x_lambda 4.965114, x_nu 2.821439, residual 0 at each", Math.abs(t5[0] - k.xLambda) < 1e-6 && Math.abs(t3[0] - k.xNu) < 1e-6 && Math.abs(t5[1]) < 1e-5 && Math.abs(t3[1]) < 1e-5, `twin ${t5[0].toFixed(7)} / ${t3[0].toFixed(7)} vs ${k.xLambda.toFixed(7)} / ${k.xNu.toFixed(7)}`);
+    ok("  the probe and the key validate", validateWgsl(BB.blackbodyProbeWgsl()).length === 0 && validateWgsl(BB.BLACKBODY_KEY_WGSL).length === 0);
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const k = BB.keyCpu();
+    const r5 = await runWgslCompute({ code: BB.blackbodyProbeWgsl(), entryPoint: "probe", outCount: 64, uniforms: BB.packProbeUniforms({ xLo: 0, xHi: 12, n: 5, count: 64, mode: 1 }), workgroups: 1 });
+    const r3 = await runWgslCompute({ code: BB.blackbodyProbeWgsl(), entryPoint: "probe", outCount: 64, uniforms: BB.packProbeUniforms({ xLo: 0, xHi: 12, n: 3, count: 64, mode: 1 }), workgroups: 1 });
+    ok("the blackbody probe ran in key mode for n = 5 and n = 3", r5.ok && r3.ok && r5.values && r3.values, (r5.ok && r3.ok) ? "" : (r5.reason || r3.reason || (r5.errors || []).join("; ")));
+    if (r5.ok && r3.ok) {
+        ok("*** WEBGPU FINDS WIEN'S ROOTS ITSELF: x_lambda = 4.965114 and x_nu = 2.821439 within 2e-6 of the f64 module's, residual under 1e-5 ***", Math.abs(r5.values[0] - k.xLambda) < 2e-6 && Math.abs(r3.values[0] - k.xNu) < 2e-6 && Math.abs(r5.values[1]) < 1e-5 && Math.abs(r3.values[1]) < 1e-5, `${r5.values[0].toFixed(7)} (residual ${r5.values[1].toExponential(1)}), ${r3.values[0].toFixed(7)} (residual ${r3.values[1].toExponential(1)})`);
+        ok("  the shape at the root is the module's peak (21.2014 for n = 5, 1.42144 for n = 3) to 1e-4 relative", Math.abs(r5.values[2] / k.peakLambda - 1) < 1e-4 && Math.abs(r3.values[2] / k.peakNu - 1) < 1e-4, `${r5.values[2].toFixed(5)}, ${r3.values[2].toFixed(6)}`);
+    }
+    const gu = { xLo: 0, xHi: 12, n: 5, count: 2048 };
+    const gr = await runWgslCompute({ code: BB.blackbodyProbeWgsl(), entryPoint: "probe", outCount: 2048, uniforms: BB.packProbeUniforms(gu), workgroups: 32 });
+    if (gr.ok) { const twin = BB.probeCpu(gu); let maxd = 0, bi = 0; for (let i = 0; i < 2048; i++) { maxd = Math.max(maxd, Math.abs(twin[i] - gr.values[i]) / Math.max(1, twin[i])); if (gr.values[i] > gr.values[bi]) bi = i; }
+        ok("  the spectrum on a grid of 2,048 is the twin's element for element (1e-5 relative), and its brightest sample sits within a grid step of the root", maxd < 1e-5 && Math.abs(12 * (bi + 0.5) / 2048 - k.xLambda) < 12 / 2048, `max rel |diff| ${maxd.toExponential(2)}, argmax x ${(12 * (bi + 0.5) / 2048).toFixed(4)}`); }
+    else ok("the blackbody grid probe ran", false, gr.reason || (gr.errors || []).join("; "));
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 256 }, script: `async (a) => {
+        const B = await import("/render/blackbodyWgsl.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        for (const backend of ["webgpu", "webgl2"]) {
+            const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N;
+            const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
+            const k5 = await B.readKey(dev, { n: 5 }), k3 = await B.readKey(dev, { n: 3 }), sweep = await B.readKey(dev, {});
+            const pic = await B.readKey(dev, { n: 5, raw: false }); let lit = 0; for (let i = 0; i < pic.pixels.length; i += 4) if (pic.pixels[i] > 128) lit++;
+            out[backend] = { backend: dev.backend, bin: k5.binWidth, x5: k5.rows.map((r) => r.peakX), x3: k3.rows.map((r) => r.peakX), peak5: k5.rows.map((r) => r.peak), sweep: sweep.rows.map((r) => [r.n, r.peakX]), lit, total: pic.pixels.length / 4 };
+        }
+        return out;
+    }` });
+    ok("the harness ran both backends for the blackbody key", r.ok && r.result && r.result.webgpu && r.result.webgl2, r.ok ? "" : (r.reason || (r.pageErrors || []).join("; ") || r.error));
+    if (r.ok && r.result.webgpu && r.result.webgl2) {
+        for (const b of ["webgpu", "webgl2"]) {
+            const R = r.result[b], med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+            ok(`*** ${b}: the picture's brightest column on every row of n = 5 is Wien's x_lambda to within a column (${R.bin.toFixed(3)}), and on n = 3 x_nu ***`, R.backend === b && R.x5.every((x) => Math.abs(x - k.xLambda) <= R.bin) && R.x3.every((x) => Math.abs(x - k.xNu) <= R.bin), `median ${med(R.x5).toFixed(4)} / ${med(R.x3).toFixed(4)} over ${R.x5.length} rows`);
+            ok(`  ${b}: the peak column decodes to 1 (the shape over the device's own root), and the sweep's peak moves with n (x_peak rises with n, row by row)`, R.peak5.every((p) => p > 0.995) && R.sweep.every((s, i) => i === 0 || s[1] <= R.sweep[i - 1][1] + R.bin), `peak ${med(R.peak5).toFixed(4)}; sweep from n ${R.sweep[R.sweep.length - 1][0].toFixed(2)} (x ${R.sweep[R.sweep.length - 1][1].toFixed(2)}) to n ${R.sweep[0][0].toFixed(2)} (x ${R.sweep[0][1].toFixed(2)})`);
+            ok(`  ${b}: the colour picture is warm where the spectrum is and dark elsewhere (between a tenth and nine tenths lit)`, R.lit > R.total * 0.1 && R.lit < R.total * 0.9, `${R.lit} of ${R.total}`);
+        }
+        let maxd = 0; for (let i = 0; i < r.result.webgpu.sweep.length; i++) maxd = Math.max(maxd, Math.abs(r.result.webgpu.sweep[i][1] - r.result.webgl2.sweep[i][1]));
+        ok("the two backends' peak columns agree across the sweep to one column", maxd <= r.result.webgpu.bin + 1e-9, `max row diff ${maxd.toFixed(4)}`);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4315.
 //   A  the WGSL exponent's log(abs(r * (1 - 2x))) with the 2 dropped -> exit=1, 6 red: the compute probe's median
 //      reads 0.000089 against ln 2, the WebGPU key pipeline 0.000077, the picture never lights, and the two
@@ -116,6 +166,16 @@ else {
 //      lands 6.9e-3 off ln 2 (a 4/255 bin), the framebuffer measured instead of the shader. WebGPU's floor bin
 //      happened to sit within the bound -- an 8-bit quantisation can pass by where the bin edge falls, which is
 //      why the encoding is 16 bits and the bound is what the iteration budget earns, not what a byte does.
+//   MEASURED at v4318 (the blackbody):
+//   D  the WGSL Newton started at x = 1 instead of n -> exit=1, 6 red: the device converges to the TRIVIAL root x = 0 (-1e-7,
+//      residual 5e-7 -- a root, the wrong one), the shape there is 0, every row's brightest column is the first, the whole
+//      picture is lit, and the backends part by 5.95 (the GLSL, untouched, still finds 4.965). Two sabotages the gate does
+//      NOT see, recorded as such: the derivative's sign flipped (x -= f / (1 + n e^-x)) still converges -- a damped step
+//      to the same root -- and 2 Newton steps from x = n already land within 2e-6, because Newton is quadratic and n is a
+//      good start. The gate grades the ROOT, not the route; a wrong route that arrives is not a wrong answer.
+//   E  planckShape with e^x for e^x - 1 -> exit=1, 2 red: the shape at the root reads 21.054 for 21.201 and 1.3368 for 1.4214,
+//      and the grid parts from the twin by 31% relative with its peak at x = 5.001. The root lines stay green -- Wien's
+//      root is the derivative condition's, which this sabotage does not touch -- which is why the peak is graded too.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the Chaos race's PIXELS (fleets-selfcheck draws it with the other nine and grades identity and distinctness; " +
     "nothing here reads an exponent off a hull); the look at its cheaper knobs (96 samples, 32 warmup) against ln 2, which it would miss by " +

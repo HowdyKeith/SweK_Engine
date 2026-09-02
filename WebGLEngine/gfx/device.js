@@ -91,7 +91,7 @@ function nullBackend(opts = {}) {
                            bindTexture: function (n, t) { this._bound[n] = t; ops.push(["bindTexture", n, !!(t && t.__tex)]); return this; } }),
         depthTexture: () => null,
         texture: (d) => ({ __tex: true, w: d.width || (d.source && d.source.width) || 0, h: d.height || (d.source && d.source.height) || 0,
-                           nearest: !!d.nearest, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }),
+                           nearest: !!d.nearest, render: !!d.render, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }),
         frame: (fn, o) => {
             let cleared = false;
             const pass = {
@@ -157,12 +157,33 @@ function webgl2Backend(canvas, opts = {}) {
         // handle carries update() and destroy() so a per-frame source re-uploads into ONE texture instead of
         // allocating a new one every frame and never freeing it, which is what orreryPost did until this round.
         texture: (d) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest);
-            return { gl: t, nearest: !!d.nearest, update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, ...nd }, d.nearest); }, destroy: () => gl.deleteTexture(t) }; },
+            const w = d.width || (d.source && d.source.width) || 0, h = d.height || (d.source && d.source.height) || 0;
+            const tex = { gl: t, w, h, nearest: !!d.nearest, render: !!d.render, update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, ...nd }, d.nearest); },
+                          destroy: () => { gl.deleteTexture(t); for (const k of ["_fb", "_fbOut"]) if (tex[k]) gl.deleteFramebuffer(tex[k]); if (tex._rb) gl.deleteRenderbuffer(tex._rb); if (tex._scratch) gl.deleteTexture(tex._scratch); } };
+            return tex; },
         frame: (fn, o) => {
             let cur = null, idx = null, cleared = false;
             // Level 13 -- an offscreen frame draws into an owned framebuffer (colour texture + depth renderbuffer)
             // sized to the canvas, so a pick picture is read back without touching what the page shows.
-            if (o && o.offscreen) {
+            // v4318 -- `target`: a device texture (RENDER_ATTACHMENT on WebGPU, a framebuffer here) receives the frame
+            // *** AND THE ROWS ARE TURNED OVER, SO A TARGET SAMPLES THE SAME WAY ON BOTH BACKENDS. *** GL stores a framebuffer's
+            // row 0 at the BOTTOM; WebGPU's row 0 is the top, and every uploaded texture's row 0 is the top. A shader sampling
+            // a target at v = 0 would read the bottom of the picture here and the top there. So the frame draws into a scratch
+            // texture and is blitted into the target upside down (blitFramebuffer with an inverted destination): the target's
+            // row 0 is the top, as a WebGPU target's is, and one shader reads both.
+            if (o && o.target) {
+                const t = o.target; if (!t || !t.gl) throw new Error("gfx/device: frame target must be a texture from device.texture()");
+                if (!t._fb) { const w = t.w || 1, h = t.h || 1;
+                    const sc = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, sc); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                    const rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, rb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h);
+                    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sc, 0); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+                    const fbOut = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fbOut); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.gl, 0);
+                    t._fb = fb; t._rb = rb; t._scratch = sc; t._fbOut = fbOut; }
+                // a target that is loaded rather than cleared (pass.begin) keeps what it holds: copy it back into the scratch, upside down again
+                gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t._fbOut); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t._fb); gl.blitFramebuffer(0, 0, t.w, t.h, 0, t.h, t.w, 0, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, t._fb); gl.viewport(0, 0, t.w, t.h);
+            } else if (o && o.offscreen) {
                 const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
                 if (!fbo || fboW !== w || fboH !== h) {
                     if (fbo) { gl.deleteFramebuffer(fbo.fb); gl.deleteTexture(fbo.tex); gl.deleteRenderbuffer(fbo.rb); }
@@ -174,7 +195,7 @@ function webgl2Backend(canvas, opts = {}) {
                     fbo = { fb, tex, rb }; fboW = w; fboH = h;
                 }
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.fb);
-            } else gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            } else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight); }
             const bindSlot = (b, slot, byteOffset) => {
                 const lay = cur.layouts[slot]; if (!lay) throw new Error(`gfx/device: pipeline declares ${cur.layouts.length} vertex buffer slot(s) and slot ${slot} was bound`);
                 gl.bindBuffer(gl.ARRAY_BUFFER, b.gl);
@@ -212,14 +233,16 @@ function webgl2Backend(canvas, opts = {}) {
             // Level 11 -- READ THE FRAME BACK, IN THE SAME TASK. Without preserveDrawingBuffer the buffer is gone
             // once the frame presents, so this is the only moment a caller can have the pixels. Rows come back
             // bottom-first from readPixels and are flipped here, so both backends hand back the same picture.
+            const finishTarget = () => { const t = o.target; gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t._fb); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t._fbOut);
+                gl.blitFramebuffer(0, 0, t.w, t.h, 0, t.h, t.w, 0, gl.COLOR_BUFFER_BIT, gl.NEAREST); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight); };
             if (o && o.read) {
-                const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, raw = new Uint8Array(w * h * 4), px = new Uint8Array(w * h * 4);
+                const w = o.target ? o.target.w : gl.drawingBufferWidth, h = o.target ? o.target.h : gl.drawingBufferHeight, raw = new Uint8Array(w * h * 4), px = new Uint8Array(w * h * 4);
                 gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
                 for (let y = 0; y < h; y++) px.set(raw.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
-                if (o.offscreen) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                if (o.target) finishTarget(); else if (o.offscreen) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight); }
                 return Promise.resolve({ pixels: px, width: w, height: h, backend: "webgl2" });
             }
-            if (o && o.offscreen) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            if (o && o.target) finishTarget(); else if (o && o.offscreen) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight); }
         },
         destroy: () => {}
     };
@@ -401,19 +424,22 @@ async function webgpuBackend(canvas, opts = {}) {
         },
         texture: (d) => {
             const w = d.width || (d.source && (d.source.width || d.source.videoWidth)) || 0, h = d.height || (d.source && (d.source.height || d.source.videoHeight)) || 0;
-            const t = gpu.createTexture({ size: [w, h], format: "rgba8unorm", usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().RENDER_ATTACHMENT });
+            // v4318 -- `render: true`: a target for frame({ target }), in the CANVAS format so every render pipeline (built for fmt)
+            // can draw into it; never uploaded to (a bgra8unorm target would take RGBA bytes the wrong way round), sampled as any texture
+            const t = gpu.createTexture({ size: [w, h], format: d.render ? fmt : "rgba8unorm", usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().COPY_SRC | TU().RENDER_ATTACHMENT });
             const put = (nd) => {
                 if (nd.source) gpu.queue.copyExternalImageToTexture({ source: nd.source, flipY: !!(nd.flipY != null ? nd.flipY : d.flipY) }, { texture: t }, [w, h]);
                 else if (nd.data) gpu.queue.writeTexture({ texture: t }, nd.data, { bytesPerRow: w * 4 }, { width: w, height: h });
             };
             put(d);
-            return { gpu: t, view: t.createView(), w, h, nearest: !!d.nearest, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
+            return { gpu: t, view: t.createView(), w, h, nearest: !!d.nearest, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
         },
         frame: (fn, o) => {
             // Level 13 -- `offscreen` per FRAME: a pick picture is drawn to the owned texture and read back, and the
             // presented canvas never sees it. The depth attachment is shared, so a pick frame that begin()s on
             // a drawn frame's depth would be wrong -- a pick frame clears, as its caller must.
-            const enc = gpu.createCommandEncoder(); const target = (offscreen || (o && o.offscreen)) ? ownTarget() : ctx.getCurrentTexture(); const view = target.createView(); let rp = null, cur = null, idx = null;
+            if (o && o.target && !(o.target.gpu && o.target.view)) throw new Error("gfx/device: frame target must be a texture from device.texture()");
+            const enc = gpu.createCommandEncoder(); const target = (o && o.target) ? o.target.gpu : (offscreen || (o && o.offscreen)) ? ownTarget() : ctx.getCurrentTexture(); const view = target.createView(); let rp = null, cur = null, idx = null;
             const ready = () => { if (!rp) throw new Error("gfx/device: draw before pass.clear() -- the render pass begins at clear()"); rp.setBindGroup(0, bindGroupFor(cur)); };
             const pass = {
                 // Compute runs on the SAME encoder, before the render pass, so a cull that fills an indirect buffer

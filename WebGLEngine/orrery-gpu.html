@@ -38,6 +38,13 @@
   open ?peer=a in one and ?peer=b in another and both trade in lockstep over a BroadcastChannel, every tick's
   hash checked (world/economyLockstep.mjs). "a week of commits" feeds the fixture commits (world/commitsFeed.mjs)
   in as production -- journaled, so it replays and lockstops like anything else.
+
+  v4318 -- GIT TIME ON THE GPU (a body not yet vendored on day t is dropped in the cull, both backends), the LIVE
+  commits source ("live commits" asks the ai-bridge's /github/commits for every vendored repository, ?owner=),
+  the MASK ON THE DEVICE (the masked look draws the sky and the traders into a target, the identity picture into
+  another, the mask from it in a pass, badTv through it -- no readback), and TWO UNIVERSES COMPOSITED: ?twin=1
+  runs a second economy (seed 8, the same crew) beside this one, and the masked race is the window through which
+  the other universe shows (A where the race is, B everywhere else; render/fleetMask.mjs makeMaskRig).
 -->
 <canvas id="stage"></canvas>
 <div id="hud">
@@ -52,10 +59,10 @@
   <div style="color:#9fb8a8">races: <span id="races"></span></div>
   <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
   <div style="color:#9fb8a8"><span id="date"></span> &middot; tick <span id="tick">0</span> &middot; hash <span id="hash"></span> &middot; <span id="peer">alone</span></div>
-  <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <span id="persist" style="color:#f0e29e"></span></div>
+  <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <button id="live">live commits (the bridge)</button> <span id="persist" style="color:#f0e29e"></span></div>
   <div id="key" style="color:#9fb8a8">cross-browser key: computing&hellip;</div>
   <div id="cockpit" style="color:#f0e29e">you: starting&hellip;</div>
-  <div><label>mask a race with badTv <select id="mask"><option value="">none</option></select></label> &middot; <label><input id="landmode" type="checkbox"> land on the pointed body (or press G)</label> <span id="landing" style="color:#9fb8a8"></span></div>
+  <div><label>mask a race with badTv (or, with ?twin=1, the window onto the twin universe) <select id="mask"><option value="">none</option></select></label> &middot; <label><input id="landmode" type="checkbox"> land on the pointed body (or press G)</label> <span id="landing" style="color:#9fb8a8"></span></div>
   <div><label>scrub <input id="scrub" type="range" min="0" max="0" value="0" style="width:40%"></label> <span id="scrubAt" style="color:#9fb8a8">live</span></div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
@@ -75,8 +82,8 @@ import { makeFlight, makeCockpit } from "./world/playerShip.mjs";
 import { traders as gitTraders } from "./world/traderGraph.mjs";
 import { bodyHeightfield, landingRecords, fileOfChunk } from "./render/bodyTerrain.mjs";
 import * as T from "./render/gpuTerrain.mjs";
-import { maskFromPick, maskedBadTv } from "./render/fleetMask.mjs";
-import { applyCommitsFeed, fixtureFeed } from "./world/commitsFeed.mjs";
+import { makeMaskRig } from "./render/fleetMask.mjs";
+import { applyCommitsFeed, fixtureFeed, liveFeed, marketForRepo } from "./world/commitsFeed.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
 const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
@@ -96,7 +103,10 @@ if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is av
 // LODs: a finer disc up close, a coarser one far away; the ORDER is derived from the meshes, not typed here.
 const lods = [{ name: "far", mesh: G.quadMesh(1, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: G.quadMesh(6, [0.62, 0.94, 0.71, 1]) }];
 const source = makeOrbitSource(device, system);
-const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.012], records: source, occlusion: true });
+// v4318 -- GIT TIME ON THE GPU: every body record carries its market's opening day in extra.z and the cull is handed the
+// sim day; a body not yet vendored on day t is not drawn, not picked, not counted -- decided in the cull, not by the page.
+const bodyExtras = G.defaultExtras(source.count);
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.012], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null) });
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
 
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
@@ -110,6 +120,7 @@ const crewList = crewForRaces(crewNames, crewFleet, RACES);   // a hauler's join
 crewList.push({ name: "you", manual: true, joins: 0 });
 const YOU = crewList.length - 1;
 const economy = makeGitEconomy(system, { seed: 7, history, traders: crewList });
+for (const m of economy.markets) bodyExtras[m.id * G.EXTRA_FLOATS + 2] = m.opens || 0;   // v4318: record m.id is body m.id - 1 (the centre is record 0)
 // v4314 -- restore: replay the saved journal on this fresh economy before anything moves
 let restored = null;
 if (params.get("restore") === "1") { try { const lg = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null"); if (lg) { const r = economy.replay(lg); restored = { ...r, saved: lg.hash, tick: lg.tick }; } } catch (e) { restored = { error: e.message }; } }
@@ -126,7 +137,12 @@ const intervene = (kind, args) => { if (peer) peer.queue(kind, args); else econo
 document.getElementById("save").onclick = () => { try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(economy.log())); document.getElementById("persist").textContent = `saved at tick ${economy.tick}, hash ${economy.hash()}`; } catch (e) { document.getElementById("persist").textContent = "save failed: " + e.message; } };
 document.getElementById("restore").onclick = () => { const u = new URL(location.href); u.searchParams.set("restore", "1"); location.href = u.toString(); };
 document.getElementById("commits").onclick = () => { const feed = fixtureFeed(economy.markets, { seed: 5 + economy.tick }); const r = peer ? applyCommitsFeedQueued(feed) : applyCommitsFeed(economy, feed, { seen: feedSeen }); feedSeen = r.seen; document.getElementById("persist").textContent = `${r.applied.length} commit record(s) fed as production`; };
-function applyCommitsFeedQueued(feed) { const r = { applied: [], seen: new Set(feedSeen) }; for (const f of feed) { const m = economy.markets.find((x) => "vendor/" + x.name === f.repo); if (m) { peer.queue("commits", { market: m.id, commits: f.commits }); r.applied.push(f); } } return r; }
+function applyCommitsFeedQueued(feed) { const r = { applied: [], seen: new Set(feedSeen) }; for (const f of feed) { const m = marketForRepo(f.repo, economy.markets); if (m) { peer.queue("commits", { market: m.id, commits: f.commits }); r.applied.push(f); } } return r; }
+// v4318 -- the LIVE source: the ai-bridge's /github/commits per vendored repository (?owner=<github account>, default HowdyKeith)
+document.getElementById("live").onclick = async () => { const owner = params.get("owner") || "HowdyKeith", el = document.getElementById("persist"); el.textContent = `asking the bridge for ${economy.markets.length} repositories under ${owner}...`;
+    try { const feed = await liveFeed(economy.markets, { fetchFn: (u) => fetch(u), owner }); const r = peer ? applyCommitsFeedQueued(feed.records) : applyCommitsFeed(economy, feed.records, { seen: feedSeen }); feedSeen = r.seen;
+        el.textContent = `live: ${feed.records.length} day-records from ${feed.asked.length - feed.failed.length} of ${feed.asked.length} repositories, ${r.applied.length} booked${feed.failed.length ? "; failed: " + feed.failed.slice(0, 3).map((f) => f.repo.split("/").pop() + " (" + f.why + ")").join(", ") : ""}`; }
+    catch (e) { el.textContent = "live commits: " + e.message; } };
 if (restored) document.getElementById("persist").textContent = restored.error ? "restore failed: " + restored.error : `restored: replayed ${restored.tick} ticks, replay ${restored.matches ? "MATCHES" : "DOES NOT MATCH"} the saved hash ${restored.saved}`;
 window.__universe = { economy, get tick() { return economy.tick; }, hash: () => economy.hash(), log: () => economy.log(), restored, peer: peerId, history, get inStep() { return peer ? (peer.desync() ? false : true) : null; }, get desync() { return peer ? peer.desync() : null; } };
 // v4317 -- THE SCRUBBER: a replay is a function of tick, so the slider replays the journal on a scratch economy to any
@@ -144,7 +160,13 @@ let userHull = null;
 try { const src = userModelSources(localStorage).find((x) => x.loadable); if (src) { userHull = await loadUserModel(src); say(`the ${src.kind} model for ${src.cls} (${src.url}) is the raised hull`); } } catch (e) { console.warn("user model:", e.message); }
 const std = standardFleets(device, { userHull });
 const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull
-const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource, headings: { cpu: () => (scrub.ghost || economy).headings() } });   // v4317: a trader faces its next market
+const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource, headings: { cpu: () => (scrub.ghost || economy).headings() } });
+// v4318 -- the twin universe (?twin=1): seed 8, the same crew, stepped beside this one (alone only: the wire carries one universe)
+const twin = params.get("twin") === "1" && !peer;
+const economyB = twin ? makeGitEconomy(system, { seed: 8, history, traders: crewList }) : null;
+const lifeSceneB = twin ? G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: { count: economyB.ships.length, cpu: () => economyB.records(0.14) }, headings: { cpu: () => economyB.headings() } }) : null;
+let maskRig = null, rigOther = null;
+const rigFor = () => { if (!maskRig || maskRig.width !== cv.width || maskRig.height !== cv.height) { if (maskRig) maskRig.destroy(); maskRig = makeMaskRig(device, { width: cv.width, height: cv.height }); rigOther = twin ? maskRig.target() : null; } return maskRig; };   // v4317: a trader faces its next market
 document.getElementById("races").textContent = std.fleets.map((f, i) => `${f.name} ${fleetOf.reduce((n, x) => n + (x === i), 0)}`).join(" / ");
 const bodyNames = ["SweK", ...system.bodies.map((b) => b.name)];
 let pointer = null, lastSimT = economy.t;
@@ -201,17 +223,23 @@ async function frame(now) {
         if (pointer && (frames & 3) === 0) { try { const hit = await landing.scene.pick(pointer[0], pointer[1]); const f = hit ? fileOfChunk(landing.bt, landing.side, hit.id) : null; document.getElementById("pick").textContent = f && f.file ? `${landing.name}/${f.file.path} (${f.file.bytes} bytes, height ${f.height.toFixed(2)})` : hit ? "a valley between files" : "off the field"; } catch (e) {} }
         document.getElementById("t").textContent = t.toFixed(1); frames++; requestAnimationFrame(frame); return;
     }
-    scene.frame({ viewProj: cam.viewProj, view: cam.view, proj: cam.proj, eye: cam.eye, clear: [0.024, 0.07, 0.043, 1] });
     const life = document.getElementById("life").checked;
+    // v4318 -- the masked look draws through the rig's targets instead of the canvas: nothing is read back
+    const masked = maskSel.value && life ? RACES.findIndex((r) => r.name === maskSel.value) : -1;
+    const drawSky = (target) => scene.frame({ viewProj: cam.viewProj, view: cam.view, proj: cam.proj, eye: cam.eye, clear: [0.024, 0.07, 0.043, 1], ...(target ? { target } : {}) });
+    if (masked < 0) drawSky(null);
     if (life) {
         // the sim steps in orrery days, a quarter day at a time, however fast the wall clock runs
         // Level 16: alone, step; as a peer, pump -- the net steps when every peer's inputs for the tick are in
-        if (scrub.at == null) { while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else economy.step(0.25); lastSimT += 0.25; } }
+        if (scrub.at == null) { while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else { economy.step(0.25); if (economyB) economyB.step(0.25); } lastSimT += 0.25; } }
         flyYou(now);
         if ((frames & 7) === 0) { document.getElementById("date").textContent = economy.date ? economy.date + ` (${economy.openMarkets()} markets open, ${economy.joinedShips()} ships)` : "no calendar"; document.getElementById("tick").textContent = economy.tick; document.getElementById("hash").textContent = economy.hash();
             scrubEl.max = economy.tick; if (scrub.at == null) scrubEl.value = economy.tick;
             if (peer) { const d = peer.desync(); document.getElementById("peer").textContent = d ? `peer ${peerId}: DESYNC at tick ${d.tick} (ours ${d.ours}, theirs ${d.theirs})` : `peer ${peerId} over ${chosen.kind}${chosen.kind === "webrtc" ? " (" + chosen.wire.connections() + " connected)" : ""}: in step, lead ${peer.lead()}`; } }
-        lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
+        if (masked < 0) lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
+        else { const rig = rigFor(); const colourA = (tg) => { drawSky(tg); lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null, target: tg }); };
+            if (twin) rig.composite({ a: colourA, b: (tg) => { drawSky(tg); lifeSceneB.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null, target: tg }); }, pick: (tg) => lifeScene.pickTo(tg), fleets: masked, other: rigOther });
+            else rig.draw({ colour: colourA, pick: (tg) => lifeScene.pickTo(tg), fleets: masked, time: t * 0.05 }); }
         if ((frames & 15) === 0) { const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
     }
     if (pointer && (frames & 3) === 0) {
@@ -223,10 +251,6 @@ async function frame(now) {
             else if (hit && life) { /* a trader */ } else if (!hit) {}
         } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }
     }
-    // v4317 -- the masked look: after the frame, read the colour and pick pictures back, mask one race, draw badTv through it
-    if (maskSel.value && life && (frames & 1) === 0) { try { const fleet = RACES.findIndex((r) => r.name === maskSel.value);
-        const src = await device.frame(({ pass }) => { pass.begin(); }, { read: true }); const pk = await lifeScene.pickPicture();
-        if (src && pk) await maskedBadTv(device, { source: src, mask: maskFromPick(pk, fleet), time: t * 0.05 }); } catch (e) { console.warn("mask:", e.message); } }
     document.getElementById("t").textContent = t.toFixed(1);
     if ((frames++ & 31) === 0) { try { const c = await scene.readCounts(); if (c) document.getElementById("drawn").textContent = c.join(" + ") + " of " + source.count + (life ? " bodies, " + economy.ships.length + " traders" : ""); } catch (e) {} }
     requestAnimationFrame(frame);
