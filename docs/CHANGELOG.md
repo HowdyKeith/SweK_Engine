@@ -14,6 +14,25 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4351 -- the collision guard refused its own shipped build, one commit after it shipped
+
+v4350 added tools/ship/versionPreflight.mjs to give rule 3 a mechanism, and THE VERY NEXT VERIFY IN THE SAME
+TREE WAS REFUSED BY IT: origin/main carried v4350 because this build had just pushed v4350 there. The check
+compared NUMBERS, and rule 3 is about "two builds with the same number but DIFFERENT BYTES" -- so a follow-up
+commit to a round already on main, which is the most ordinary thing that happens after a ship, read as a
+fleet-jamming collision. THAT IS THE EXACT FALSE-FAULT THIS FILE'S OWN GATE WARNS ABOUT, in the words already
+written in it: "a guard that fires on the next legitimate number teaches people to skip it, and then the rule is
+unenforced again with extra steps." Committed inside the guard that says it, and found by using the guard rather
+than by reading it. The same-number case now compares the BUILDS: identical bytes under one number is what
+shipping means and passes with a note saying so, one changed byte still refuses, and a pair that cannot be read
+refuses rather than assuming a match, because "cannot compare" is not "they match".
+AND FIXING IT TURNED FIVE OF THE GATE'S OWN CHECKS GREEN AT ONCE, WHICH WAS THE SECOND FINDING. The historical
+collisions are driven through a stub that overrode main's VERSION and let its SOURCE fall through to the real
+file -- so once bytes mattered, every one of them compared this tree with itself, found them identical, and
+passed. The checks would have been measuring the working tree instead of the rule, silently, in the direction
+that looks like success. The stub now supplies two DIFFERENT sources, because a collision is two builds and a
+fixture that models it with one is not modelling it. Two sabotages: same number always allowed, and unreadable
+builds treated as matching -- both caught. This round adds no gate; it repairs one. The tree stands at 1413 gates.
 ## v4350 -- three follow-ups, rule 3 finally gets a mechanism, and the mechanism catches its fifth collision on day one
 
 THREE ROUNDS' WORTH, AND THE THIRD ONE ENDS A RED THAT HAS BLOCKED EVERY SHIP THIS SESSION.

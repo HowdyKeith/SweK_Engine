@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4350
+// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4351
 //
 // The preflight exists because rule 3 -- never reuse a version number -- was enforced by memory and was broken
 // FIVE TIMES IN ONE SESSION. So the checks that matter are not "does it return an object": they are the five
@@ -36,7 +36,15 @@ import { preflight, versionNumber, engineVersionOf, mainVersion, ENG } from "./v
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
-const against = (main) => (v) => preflight(v, { mainVersionOverride: main, skipFreshness: true });
+// A collision is TWO BUILDS wearing one number, so the stub supplies two DIFFERENT sources. Leaving them to
+// fall through to the real files would compare this tree with itself, find them identical, and turn every
+// historical collision below into a pass -- the check would then be measuring the working tree rather than the
+// rule. (That is exactly what happened when the byte comparison was added: five of these went green at once.)
+const against = (main) => (v) => preflight(v, {
+    mainVersionOverride: main, skipFreshness: true,
+    mainSourceOverride: `const ENGINE_VERSION = "${main}";   // the other line's build\n`,
+    localSourceOverride: `const ENGINE_VERSION = "${v}";   // this branch's build\n`,
+});
 
 // 1) THE FOUR COLLISIONS THIS SESSION ACTUALLY HAD, replayed against the main that existed at the time.
 {
@@ -66,6 +74,30 @@ const against = (main) => (v) => preflight(v, { mainVersionOverride: main, skipF
        "*** shipping main's OWN number is refused as two builds with one number ***");
     ok(/Supersede FORWARD: v4338/.test(same.refusal), "...and the refusal names the next number that would work",
        (same.refusal.match(/Supersede FORWARD: v\d+/) || [""])[0]);
+}
+
+// 1b) *** SAME NUMBER, SAME BYTES, IS NOT A COLLISION -- the false-fault this guard shipped with. ***
+//     v4350 went to main and the next verify in the same tree was refused, because main carried v4350 for the
+//     reason that THIS BUILD had just put it there. Rule 3 is about two builds with one number and DIFFERENT
+//     bytes. Both directions are pinned here: identical passes, and one changed byte still refuses.
+{
+    const src = "const ENGINE_VERSION = \"v4350\";   // v4350 -- a round\n";
+    const shipped = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: src,
+                                         localSourceOverride: src, skipFreshness: true });
+    ok(shipped.ok === true && shipped.refusal === null,
+       "*** shipping v4350 when main's v4350 IS this build, byte for byte, is permitted ***");
+    ok(/byte for byte/.test(shipped.note || ""), "...and it says why rather than passing silently",
+       (shipped.note || "").slice(0, 60));
+
+    const drifted = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: src + "// and one more line\n",
+                                         localSourceOverride: src, skipFreshness: true });
+    ok(drifted.ok === false && /THE SAME NUMBER/.test(drifted.refusal),
+       "*** but ONE CHANGED BYTE under the same number is still refused -- the rule is bytes, not numbers ***");
+
+    // and an unreadable pair falls back to refusing, because "cannot compare" is not "they match"
+    const unknown = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: null,
+                                         localSourceOverride: null, skipFreshness: true });
+    ok(unknown.ok === false, "if neither build can be read, the same number is refused rather than assumed equal");
 }
 
 // 2) THE FALSE-FAULT HALF. The next number, and any number beyond it, must pass -- including a big jump, which

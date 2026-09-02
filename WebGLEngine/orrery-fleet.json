@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ef78f206c04292ee3b650792a22f6bbac1cc9fa3",
+ "head": "1c5487d53807a772ddb972d4bcd3a3c729342001",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2653711,
-    "sha": "3e088a6503fa59ef4fdf0f24fb0d0aa0707dda66"
+    "bytes": 2647677,
+    "sha": "5a746f6372b41dfde10877f6b30701705eb01570"
    },
    {
     "path": "mpm3d.html",
@@ -635,7 +635,7 @@
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
     "bytes": 56838,
-    "sha": "2232ac2f5eaa761aa8175fe420ee1baa76a680c9"
+    "sha": "5a746f6372b41dfde10877f6b30701705eb01570"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
