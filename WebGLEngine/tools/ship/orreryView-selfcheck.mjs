@@ -253,7 +253,7 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 // 10) THE RATCHET STILL HOLDS, read through the view's own path.
 {
     const sys = buildOrrery(readBaked().bodies, { today: "2026-08-30" });
-    ok(sys.unpapered.length <= UNPAPERED_BASELINE,
+    ok(sys.unpapered.length === UNPAPERED_BASELINE,
         `${sys.unpapered.length} bodies with no licence provenance against a baseline of ${UNPAPERED_BASELINE}: ${sys.unpapered.join(", ") || "none"}`);
     ok(Object.keys(STATE_COLOUR).length === 3, "every posture has a colour, so none of the three can render as an unstyled default");
     ok(STATE_COLOUR[UNPAPERED] !== STATE_COLOUR[CAPTURED], "and unpapered does not share a colour with captured");

@@ -18,6 +18,8 @@
 // Strikes are visual + particle for round 266; actual damage hookup
 // to KaijuManager is held for a follow-up round.
 
+import { rng } from "../world/procPlanet.js";   // mulberry32, the same one the orrery's planets are seeded with
+
 const WORLD_EDGE      = 200;        // |x| or |z| past which a sat is "off-frame"
 const SAT_ALTITUDE_Y  = 85;         // well above the tallest snow cap (~75)
 const SAT_SPEED       = 4.0;        // u/s — slow drift; takes ~100s to cross
@@ -80,10 +82,26 @@ const ALL_TYPE_KEYS = Object.keys(SATELLITE_TYPES);
 let _nextSatId = 1;
 
 export class SatelliteFleet {
+    /**
+     * *** v4325 -- `seed`, BECAUSE SEVEN Math.random CALLS MADE THIS DEMO UNREPRODUCIBLE AND NONE OF THEM NEEDED
+     * TO BE RANDOM. *** Backlog #68 counted them and said it exactly: "None NEED randomness; they need variety,
+     * which a hash gives." Two runs of this fleet could not be compared, so a change to its motion could not be
+     * told from a different roll of the dice -- and #68's whole promise is "two runs match unless the repo
+     * changed".
+     *
+     * The default is UNCHANGED: with no seed, Math.random is used and the kaiju game behaves exactly as it did.
+     * Pass a seed and every choice below comes from world/procPlanet.js's mulberry32 instead -- the same
+     * generator the orrery's planets are baked with, imported rather than a second copy, so a seeded fleet and
+     * a seeded planet cannot drift apart in how they consume their stream.
+     */
     constructor({ router, world, particles = null, audio = null,
-                  kaijuManager = null, kpop = null,
+                  kaijuManager = null, kpop = null, seed = null,
                   launchIntervalMs = 25_000 } = {}) {
         this.router = router;
+        // A stream, not a number: every draw below goes through this one function, so a seeded fleet is
+        // reproducible in the ORDER it draws as well as in what it draws.
+        this.seed = seed;
+        this._rnd = (seed == null) ? Math.random : rng(seed >>> 0);
         this.world = world;
         this.particles = particles;
         this.audio = audio;
@@ -132,7 +150,7 @@ export class SatelliteFleet {
 
     /** Launch a satellite of a random type, entering from a random edge. */
     launchRandom(typeKey = null) {
-        const key = typeKey || ALL_TYPE_KEYS[Math.floor(Math.random() * ALL_TYPE_KEYS.length)];
+        const key = typeKey || ALL_TYPE_KEYS[Math.floor(this._rnd() * ALL_TYPE_KEYS.length)];
         return this.launch(key);
     }
 
@@ -145,11 +163,11 @@ export class SatelliteFleet {
         // Pick a random edge entry point. Velocity heads roughly toward
         // the opposite edge with some XZ angle so trajectories don't
         // all line up.
-        const angle = Math.random() * Math.PI * 2;
+        const angle = this._rnd() * Math.PI * 2;
         const startX = Math.cos(angle) * WORLD_EDGE;
         const startZ = Math.sin(angle) * WORLD_EDGE;
         // Velocity points roughly toward opposite side with ±25° jitter
-        const targetAngle = angle + Math.PI + (Math.random() - 0.5) * 0.9;
+        const targetAngle = angle + Math.PI + (this._rnd() - 0.5) * 0.9;
         const vx = Math.cos(targetAngle) * SAT_SPEED;
         const vz = Math.sin(targetAngle) * SAT_SPEED;
         const sat = {
@@ -214,7 +232,7 @@ export class SatelliteFleet {
                 sat.z = mirror(sat.z);
                 // Re-pick a velocity heading toward another edge so it
                 // crosses again (not a perfect mirror — feels more alive)
-                const targetAngle = Math.atan2(-sat.z, -sat.x) + (Math.random() - 0.5) * 1.4;
+                const targetAngle = Math.atan2(-sat.z, -sat.x) + (this._rnd() - 0.5) * 1.4;
                 sat.vx = Math.cos(targetAngle) * SAT_SPEED;
                 sat.vz = Math.sin(targetAngle) * SAT_SPEED;
                 sat.state = "crossing";
@@ -234,7 +252,7 @@ export class SatelliteFleet {
         this._applyEffect(sat, now);
 
         // Emit a faint trail particle so the type is visible
-        if (this.particles?.spawn && Math.random() < 0.35) {
+        if (this.particles?.spawn && this._rnd() < 0.35) {
             const [r, g, b] = sat.spec.color;
             this.particles.spawn({
                 x: sat.x - sat.vx * 0.1,
@@ -281,7 +299,7 @@ export class SatelliteFleet {
                 const dx = kp.x - sat.x;
                 const dz = kp.z - sat.z;
                 if (dx * dx + dz * dz <= sat.spec.radius * sat.spec.radius) {
-                    if (this.particles?.spawn && Math.random() < 0.05) {
+                    if (this.particles?.spawn && this._rnd() < 0.05) {
                         const [r, g, b] = sat.spec.color;
                         this.particles.spawn({
                             x: kp.x, y: kp.y + 5, z: kp.z,
@@ -344,7 +362,7 @@ export class SatelliteFleet {
                 const a = (i / 24) * Math.PI * 2;
                 this.particles.spawn({
                     x: tp.x, y: tp.y + 3, z: tp.z,
-                    vx: Math.cos(a) * 3, vy: Math.random() * 4 + 1, vz: Math.sin(a) * 3,
+                    vx: Math.cos(a) * 3, vy: this._rnd() * 4 + 1, vz: Math.sin(a) * 3,
                     r, g, b, a: 0.95,
                     size: 1.1, lifeMs: 1100,
                 });

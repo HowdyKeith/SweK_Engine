@@ -332,15 +332,20 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     const SS = GS.SWEEP_SINCE_V4297;
     // v4322 -- a SECOND closing (SS.since2): the gates added after v4317's sweep, swept and named the same way; a red among
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
+    // v4329 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
+    // closing, and reading only since2 meant the next one had to edit this arithmetic as well as the record.
+    const closings = [SS.since2, SS.since3, SS.since4].filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
-    const uncovered = surplus - SS.swept - S2.swept;
+    const closed = closings.reduce((n, c) => n + (c.swept || 0), 0);
+    const uncovered = surplus - SS.swept - closed;
     ok(uncovered <= 0,
        "!! *** every gate in the tree has been swept by v4297 or by the round that closed its surplus ***",
-       `${gatesNow} in the tree = ${S.swept} swept at v4297 + this gate + ${SS.swept} swept since + ${S2.swept} at the second closing` +
+       `${gatesNow} in the tree = ${S.swept} swept at v4297 + this gate + ${SS.swept} swept since + ${closed} across ${closings.length} closing(s)` +
        (uncovered > 0 ? `. ${uncovered} STILL UNSWEPT -- name them and run them; a surplus that is only ` +
                         `counted goes stale the way the equality it replaced did`
                       : `. Nothing is unaccounted for, and the next gate added makes this red until it is run.`));
-    ok(S2.green + S2.red === S2.swept && S2.red === S2.redOnArrival.length && S2.redOnArrival.every((r) => S2.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40),
+    ok(closings.every((c) => c.green + c.red === c.swept && c.red === c.redOnArrival.length && c.added.length === c.swept &&
+                             c.redOnArrival.every((r) => c.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40)),
        "...the second closing's reds are named with why (red on arrival, red on origin/main too), and its count adds up",
        `${S2.green} green, ${S2.red} red of ${S2.swept}: ` + S2.redOnArrival.map((r) => r.gate.split("/").pop() + " -- " + r.why).join("; "));
     ok(SS.green === SS.swept && SS.red === 0 && SS.regressions === 0,

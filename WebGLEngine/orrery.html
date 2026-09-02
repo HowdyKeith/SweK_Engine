@@ -47,7 +47,7 @@
   <h1>SweK ORRERY</h1>
   <p>Everything <code>vendor/</code> holds, in orbit around the engine that took it in. Distance is how long ago it arrived; the period follows from that distance through <code>physics/orbits/kepler.js</code>, so the picture cannot drift from the physics. Colour is licence posture.</p>
   <p>Scroll to zoom, click a body to follow it. <span class="warn">Keep zooming</span> and it becomes a micro planet, then its own file tree as ground.</p>
-  <div id="scale">scale: <b id="lvl">system</b> <span id="lvlpx"></span></div>
+  <div id="scale">scale: <b id="lvl">system</b> <span id="lvlpx"></span> <span id="fleet"></span></div>
 </div>
 
 <div class="card" id="legend">
@@ -74,12 +74,16 @@ import { buildOrrery, UNPAPERED_BASELINE, UNPAPERED } from "./world/orrery.mjs";
 import { positionAt, apparentPx, levelFor, extentOf, slowestPeriod,
          ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "./world/orreryView.mjs";
 import { drawSystem, drawPlanet, drawTerrain, fieldFor, drawSeededPlanet, seededPlanetFor,
-         SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
+         drawFleet, SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
+import { fleetsFor } from "./world/orreryFleet.mjs";
 
 const cv = document.getElementById("stage"), ctx = cv.getContext("2d");
 let system = null, hits = [], focus = null, hover = null;
 let t = 0, playing = true, last = performance.now();
 let seeded = false;      // which SURFACE a micro planet wears -- measured file tree, or generated from the commit
+// #68: the importers of each body, in orbit around it. Baked because a browser cannot run git; POSITIONS are
+// not baked -- they come from (last commit, t) here, so the file changes only when the repository does.
+let fleets = null;
 
 // pxPerUnit is the ONE camera number. The zoom level is read off it rather than set beside it, so there is no
 // second variable that could say "planet" while the body on screen is four pixels wide.
@@ -106,6 +110,8 @@ if (!raw) {
     document.getElementById("rtext").textContent = "orrery.json not found -- run: node tools/ship/orreryBake.mjs --write";
 } else {
     system = buildOrrery(raw.bodies);
+    const fleetRaw = await fetch("./orrery-fleet.json").then((r) => r.json()).catch(() => null);
+    if (fleetRaw) fleets = fleetsFor(system, fleetRaw.bodies);
     const far = extentOf(system);
     pxPerUnit = Math.min(innerWidth, innerHeight) * 0.42 / Math.max(1e-6, far);
     SPAN = slowestPeriod(system) / 24;                 // one slow orbit in about 24 seconds
@@ -176,6 +182,7 @@ function draw() {
         ? `— ${focus.name} is ${px.toFixed(0)}px across (planet at ${PLANET_PX}, terrain at ${TERRAIN_PX})`
         : "— no body followed";
     cv.className = focus ? "zoomed" : "";
+    if (level !== ZOOM_PLANET) document.getElementById("fleet").textContent = "";
 
     if (level === ZOOM_TERRAIN) {
         const field = fieldFor(focus);
@@ -197,6 +204,17 @@ function draw() {
         } else {
             drawPlanet(ctx, focus, fieldFor(focus), innerWidth / 2, innerHeight / 2, px / 2, spin);
             caption(`${focus.name} — ${SURFACE_MEASURED}: every ridge is a real file, every lake a data file.`);
+        }
+        // *** AND THE FLEET OVER THE TOP: one mark per engine file that imports this body. *** px/2 is the
+        // planet's radius in pixels and a satellite's axis is measured from the same centre in body units, so
+        // dividing gives pixels per unit and a craft's height above the surface is drawn at the magnification
+        // you are actually looking at.
+        if (fleets && fleets.has(focus.name)) {
+            const f = fleets.get(focus.name);
+            const c = drawFleet(ctx, f, innerWidth / 2, innerHeight / 2, (px / 2) / Math.max(1e-9, focus.radius), t);
+            document.getElementById("fleet").textContent = c.satellites
+                ? `${c.satellites} importers in orbit \u00b7 ${c.debris} paperwork`
+                : `nothing imports ${focus.name} \u00b7 ${c.debris} paperwork, which is all it holds`;
         }
         return;
     }

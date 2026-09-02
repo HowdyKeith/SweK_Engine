@@ -58,7 +58,14 @@ console.log("\n1. THE JOURNAL: seed + log reproduces the universe, and one missi
     probe("a price", () => { p1.markets[2].trade.source += 1; }, () => { p1.markets[2].trade.source -= 1; });
     probe("a ship's cargo", () => { p1.ships[0].player.cargo.docs = (p1.ships[0].player.cargo.docs || 0) + 1; }, () => { p1.ships[0].player.cargo.docs -= 1; });
     probe("a ship's credits", () => { p1.ships[1].store.add("credits", 1); }, () => { p1.ships[1].store.add("credits", -1); });
-    probe("where a ship is", () => { p1.ships[2].at = p1.ships[2].at === 1 ? 2 : 1; }, () => { p1.ships[2].at = p1.ships[2].at === 1 ? 2 : 1; });
+    // *** THE UNDO RE-DERIVED THE OLD VALUE INSTEAD OF REMEMBERING IT, AND THAT ONLY WORKS FROM 1 OR 2. ***
+    // With `at` at anything else -- a ship in flight, or simply a different berth -- mutate sets it to 1 and
+    // the undo, seeing 1, sets it to 2: the probe leaves the universe changed and the final hash check fails
+    // for a reason that has nothing to do with the hash. It survived because ship 2 happened to sit at berth 1
+    // or 2 while the orrery held fourteen bodies; the re-bake at v4329 moved the crew along by one and it did
+    // not. A probe must restore what it SAW, not what it assumes it saw.
+    const wasAt = p1.ships[2].at;
+    probe("where a ship is", () => { p1.ships[2].at = wasAt === 1 ? 2 : 1; }, () => { p1.ships[2].at = wasAt; });
     ok("*** the hash sees every integer: stock, treasury, price, cargo, credits, position -- a change to any one changes it ***", touched.every((x) => x.endsWith("seen")) && p1.hash() === h0, touched.join(", "));
 }
 
