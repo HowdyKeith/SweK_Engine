@@ -1552,3 +1552,153 @@ export function bcsLiquidChrome(img, { time = 0, distortion = 12, chromeIntensit
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+/**
+ * bcs_pixelateStorm -- BATCH 13, v4310. A swirled pixel grid whose blocks are randomly kicked by the hash.
+ *
+ * TRAP 3 APPEARS TWICE HERE AND IN OPPOSITE DIRECTIONS, which is the reason this one is worth reading.
+ *   - `pixel_size` is a BLOCK SIZE IN POINTS, so it is MULTIPLIED by pointScale to become device pixels.
+ *   - the scanline reads `position.y` directly, and a frequency per point becomes half the frequency per
+ *     device pixel, so that coordinate is DIVIDED by pointScale. Same treatment glitch's scanline gets.
+ * Everything between them is pointScale-INVARIANT and that is worth stating rather than leaving to be
+ * re-derived: the block index is `swirledUV * size / pxSize`, and size and pxSize scale together, so the
+ * grid, the hash argument and therefore the storm pattern are identical at 1x and 2x. Only the block's
+ * SIZE ON SCREEN and the scanline's pitch move -- which is exactly what should move.
+ *
+ * NO premultiplied KNOB, and that is a decision rather than an omission: the only colour operation is
+ * `color.rgb *= half(...)`, a MULTIPLY. Scaling commutes with premultiplication, so it is alpha-safe in
+ * both spaces. Compare magneticField below, which adds and therefore needs one.
+ */
+export function bcsPixelateStorm(img, { time = 0, pixelSize = 12, stormAmount = 0.5, swirl = 1, pulse = 1,
+                                        pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const pxSize = pixelSize * pointScale * (1 + Math.sin(time * pulse) * 0.3 * stormAmount);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const dx = uvx - 0.5, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const swirlAngle = swirl * (1 - dist) * Math.sin(time * 0.5);
+        const sux = 0.5 + dist * Math.cos(angle + swirlAngle);
+        const suy = 0.5 + dist * Math.sin(angle + swirlAngle);
+        // The block index -- invariant under pointScale, because size and pxSize scale together.
+        const bx = Math.floor(sux * w / pxSize), by = Math.floor(suy * h / pxSize);
+        const pux = bx * pxSize / w, puy = by * pxSize / h;
+        const blockRand = bcsHash(bx, by);
+        const stormActive = blockRand >= 1 - stormAmount * 0.8 ? 1 : 0;   // step(edge, x)
+        const ox = Math.sin(time * 3 + blockRand * 20) * stormAmount * pxSize * 0.5 * stormActive;
+        const oy = Math.cos(time * 2.5 + blockRand * 15) * stormAmount * pxSize * 0.5 * stormActive;
+        const c = s(clamp(pux * w + ox, 0, w), clamp(puy * h + oy, 0, h));
+        const scan = Math.sin((py / pointScale) * Math.PI / 2) * 0.5 + 0.5;
+        const gain = toHalf(0.92 + scan * 0.08);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * gain);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_magneticField -- BATCH 13, v4310. A dipole (optionally quadrupole) field, displaced along its own
+ * direction and banded by the field angle.
+ *
+ * *** THE POLARITY KNOB IS A BRANCH WITH A DEAD ZONE, AND THE PORT KEEPS IT. *** Upstream guards the
+ * quadrupole with `if (polarity > 0.01)` and then blends with `mix(field, field + quadField, polarity)`.
+ * At polarity exactly 0.01 the blend contributes 1% of quadField, but at 0.009 the branch is skipped and it
+ * contributes nothing -- so the knob has a small discontinuity at its own guard. Reproduced rather than
+ * smoothed: a port that replaced the branch with the mix alone would be a DIFFERENT shader that happens to
+ * look similar, and the difference is exactly at the value a caller sweeping from 0 passes through.
+ *
+ * `fieldStrength` is a displacement in POINTS -- trap 3, so it carries pointScale. The stripes and the
+ * perpendicular ripple are functions of uv and the field angle, both resolution-independent, so they do not.
+ * ALPHA-AWARE: `color.rgb += half3(sheen...)` adds into the sample, so the added term takes k.
+ */
+export function bcsMagneticField(img, { time = 0, fieldStrength = 30, lineCount = 8, fieldTurbulence = 0.4,
+                                        polarity = 0, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const p1x = uvx - 0.25, p1y = uvy - 0.5;       // uv - (center + (-0.25, 0))
+        const p2x = uvx - 0.75, p2y = uvy - 0.5;       // uv - (center + ( 0.25, 0))
+        const r1 = Math.max(Math.hypot(p1x, p1y), 0.001), r2 = Math.max(Math.hypot(p2x, p2y), 0.001);
+        let fx = p1x / (r1 * r1) - p2x / (r2 * r2);
+        let fy = p1y / (r1 * r1) - p2y / (r2 * r2);
+        if (polarity > 0.01) {
+            const p3x = uvx - 0.5, p3y = uvy - 0.3, p4x = uvx - 0.5, p4y = uvy - 0.7;
+            const r3 = Math.max(Math.hypot(p3x, p3y), 0.001), r4 = Math.max(Math.hypot(p4x, p4y), 0.001);
+            const qx = p3x / (r3 * r3) - p4x / (r4 * r4), qy = p3y / (r3 * r3) - p4y / (r4 * r4);
+            fx = mix(fx, fx + qx, polarity); fy = mix(fy, fy + qy, polarity);
+        }
+        const fieldMag = Math.hypot(fx, fy);
+        const dirx = fieldMag > 0.001 ? fx / fieldMag : 0, diry = fieldMag > 0.001 ? fy / fieldMag : 0;
+        const angle = Math.atan2(fy, fx);
+        let stripes = Math.sin(angle * lineCount + time * 2);
+        stripes = stripes * stripes;
+        // Metal broadcasts the scalar over both components of uv * 8.0 + time * 0.5.
+        const turb = bcsFbm(uvx * 8 + time * 0.5, uvy * 8 + time * 0.5, 4) * fieldTurbulence;
+        const fs = fieldStrength * pointScale;         // trap 3: a POINT displacement
+        let offx = dirx * fs * stripes * (0.5 + turb), offy = diry * fs * stripes * (0.5 + turb);
+        const perp = Math.sin((uvx * dirx + uvy * diry) * lineCount * 10 + time);
+        offx += -diry * perp * fs * 0.15; offy += dirx * perp * fs * 0.15;
+        const c = s(clamp(px + offx, 0, w), clamp(py + offy, 0, h));
+        const sheen = stripes * fieldMag * 0.3;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const add = [sheen * 0.3, sheen * 0.35, sheen * 0.4];
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] + toHalf(add[j]) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_aurora -- BATCH 13, v4310. Layered sine bands, noise-modulated, additively composited over the layer.
+ *
+ * *** `bands` IS A LOOP COUNT AND A DIVISOR AT THE SAME TIME, which is the interesting thing about it. ***
+ * Upstream runs `for (int i = 0; i < int(bands); i++)` and inside divides by the UNTRUNCATED `bands`
+ * (`fi / bands`). So a fractional bands -- 4.5 -- runs four iterations while spacing them as if there were
+ * four and a half, and the knob moves the picture CONTINUOUSLY between integers even though the loop count
+ * is a step function. Reproduced exactly: truncating both, or rounding both, would each be a different
+ * shader, and a caller animating `bands` would see the difference immediately.
+ *
+ * *** THE ONLY PORTED SHADER SO FAR THAT CARRIES NO pointScale AT ALL, and that is a measurement rather
+ * than an oversight: every coordinate it reads is uv, and it samples `layer.sample(position)` UNDISPLACED.
+ * There is no length in points anywhere in it, so there is nothing for the scale to multiply.
+ * ALPHA-AWARE: two additive terms, the aurora colour and the shimmer, so both take k.
+ */
+export function bcsAurora(img, { time = 0, intensity = 0.7, bands = 4, speed = 1, colorShift = 0,
+                                 premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const t = time * speed;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const c = s(px, py);
+        let heightMask = smoothstep(0.8, 0.1, uvy) * smoothstep(0.0, 0.15, uvy);
+        let auroraVal = 0, hueAccum = 0;
+        for (let bi = 0; bi < Math.trunc(bands); bi++) {   // int(bands) truncates; the divisor below does not
+            const fi = bi;
+            const freq = 2 + fi * 1.5, phase = fi * 1.7;
+            let wave = Math.sin(uvx * freq * Math.PI + t * (0.8 + fi * 0.3) + phase);
+            wave += Math.sin(uvx * freq * 1.7 + t * 0.5 + fi * 2.3) * 0.5;
+            const bandY = 0.3 + fi / bands * 0.4 + wave * 0.08;
+            const bandDist = Math.abs(uvy - bandY);
+            let band = Math.exp(-bandDist * bandDist * 200) * (0.6 + fi * 0.1);
+            band *= bcsFbm(uvx * 3 + t * 0.3, fi * 5 + t * 0.1, 3);
+            auroraVal += band; hueAccum += band * (fi / bands);
+        }
+        auroraVal = clamp(auroraVal, 0, 1) * heightMask * intensity;
+        const hueRaw = colorShift + hueAccum * 0.3 + 0.35;
+        const hue = toHalf(hueRaw - Math.floor(hueRaw));
+        const ac = bcsHsb2rgb(hue, toHalf(0.7), toHalf(1.0));
+        const shimmer = Math.sin(uvy * 80 + t * 5) * 0.02 * auroraVal;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const amt = toHalf(auroraVal * 0.7);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] + (toHalf(ac[j] * amt) + toHalf(shimmer)) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}

@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, bcsLiquidChrome,
+         bcsPixelateStorm, bcsMagneticField, bcsAurora,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -58,9 +59,13 @@ import { codeOnly } from "./sourceScan.mjs";
 // tree ports, difference thirteen and no residue in either direction (nothing is ported that upstream lacks).
 // KEPT AS DATA rather than prose so the next batch can be picked without another clone, and so this file can
 // say WHICH thirteen the closing note has been counting for eleven batches.
+// v4309 ported liquidChrome; v4310 ported pixelateStorm, magneticField and aurora. NINE remain, and ALL
+// NINE reach the sin-hash -- confirmed from the source at v4310, which is what batch 11 could only assert
+// when it wrote "after wormhole there are no gradeable shaders left upstream at all". None of the nine can
+// ever be graded pixel-for-pixel against its CPU model; they can only be graded structurally.
 export const UNPORTED = [
-    "aurora", "datamosh", "disintegrate", "etherealAura", "liquidChrome", "liquidMirror", "magneticField",
-    "morphBreathe", "pixelateStorm", "shatter", "shatterGlass", "smokeReveal", "underwaterCaustics",
+    "datamosh", "disintegrate", "etherealAura", "liquidMirror", "morphBreathe",
+    "shatter", "shatterGlass", "smokeReveal", "underwaterCaustics",
 ];
 
 let fails = 0;
@@ -765,7 +770,7 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 29 of 41 ported", pass.swiftShaderNames().length === 29, pass.swiftShaderNames().length + " shaders");
+    ok("!! 32 of 41 ported", pass.swiftShaderNames().length === 32, pass.swiftShaderNames().length + " shaders");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -942,7 +947,8 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
                      gravityWells: bcsGravityWells, solarize: bcsSolarize, duochrome: bcsDuochrome,
                      chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho,
                      topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple,
-                     liquidChrome: bcsLiquidChrome };
+                     liquidChrome: bcsLiquidChrome, pixelateStorm: bcsPixelateStorm,
+                     magneticField: bcsMagneticField, aurora: bcsAurora };
         const moved = [], visible = [];
         for (const n of pass.swiftShaderNames()) {
             const o = FN[n](flat, { ...pass.DEFAULT_KNOBS[n], premultiplied: false });
@@ -1118,10 +1124,12 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
             geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole,
             wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic,
-            liquidChrome: bcsLiquidChrome };
+            liquidChrome: bcsLiquidChrome, pixelateStorm: bcsPixelateStorm,
+            magneticField: bcsMagneticField, aurora: bcsAurora };
         // liquidChrome at time 0.4: both fbm fields are animated, so a non-zero time is what makes the
         // displacement and the height field disagree with each other rather than sharing one sample.
-        const CASES = { liquidChrome: { time: 0.4 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
+        const CASES = { liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
+            magneticField: { time: 0.6, polarity: 0.5 }, aurora: { time: 0.7 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
             duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
             chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
             melt: { time: 1 }, topographic: { time: 1 }, thermal: { time: 1 }, neonEdge: { time: 1 },
@@ -1142,7 +1150,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // cannot join the set by my saying so, or be kept out of it by my forgetting. liquidChrome landed in
         // it without being told to, which is the independent check on the port's own claim to be in it.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
-            HASHED.length === 9, HASHED.join(", "));
+            HASHED.length === 12, HASHED.join(", "));
 
         const results = {};
         for (const name of pass.swiftShaderNames()) {
@@ -1213,8 +1221,12 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // operations -- the desaturating mix and the specular gain -- are LINEAR and commute with
         // premultiplication, so they take no k. Deciding which of the three needed it is the port's one real
         // alpha decision, and this line is what makes the answer checkable rather than asserted.
-        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are nine of them",
-            ALPHA_AWARE.length === 9 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
+        // ELEVEN at v4310. Batch 13 splits cleanly on this and the split was PREDICTED FROM THE SOURCE before
+        // the gate was run: magneticField adds a sheen and aurora adds two terms, so both take k; pixelateStorm
+        // only ever MULTIPLIES (color.rgb *= gain), which commutes with premultiplication and needs no knob.
+        // The derived list is what turns that reading into a check.
+        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are eleven of them",
+            ALPHA_AWARE.length === 11 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
             ALPHA_AWARE.join(", "));
         const alphaResults = {};
         for (const name of ALPHA_AWARE) {
@@ -1508,7 +1520,9 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         console.log("\n20. trap 3 -- the first comparison at a device pixel ratio other than 1");
         {
             const carriers = pass.swiftShaderNames().filter((n) => "pointScale" in (pass.DEFAULT_KNOBS[n] || {}));
-            ok("!! 18 of the 29 ported shaders carry pointScale at all", carriers.length === 18,
+            // 20 of 32. aurora is the FIRST PORTED SHADER THAT CARRIES NONE -- every coordinate it reads is
+            // uv and it samples the layer undisplaced, so there is no length in points for a scale to touch.
+            ok("!! 20 of the 32 ported shaders carry pointScale at all", carriers.length === 20,
                 carriers.length + " carriers: " + carriers.join(" "));
             const rows = [];
             for (const name of carriers) {
@@ -1571,18 +1585,18 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether these effects look GOOD, and whether the eight sin-hash shaders match " +
     "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What IS " +
-    "checked, on a real WebGL2 context: 29 of 41 are ported; 15 of them agree with their CPU reference to " +
+    "checked, on a real WebGL2 context: 32 of 41 are ported; 15 of them agree with their CPU reference to " +
     "within 2 levels; 4 more (vortex and batch 10's three displacing shaders) agree to within ONE TEXEL of " +
     "the test gradient; wormhole agrees exactly away from its own wrap seam and by the full range on it; and " +
-    "9 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
+    "12 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
     "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero. *** THE " +
     "HOLE v4233's SABOTAGE FOUND IS CLOSED AT v4234: a second comparison image carries a diagonal alpha ramp " +
     "and is rendered with premultiplied = 0, so deleting a `* k` from a fragment shader now turns this red " +
     "for the six gradeable alpha-aware shaders, and the two hash ones are graded in the configurations where " +
     "the hash cancels (frosted at pointScale 0, pixelateMosaic fully assembled and on a flat alpha). *** " +
     "*** TRAP 3 IS NO LONGER ARGUED FROM THE SOURCE: v4265 MEASURED IT. *** Section 20 renders every one of " +
-    "the 18 pointScale-carrying shaders at ps=2 and compares against the CPU model at ps=2. The parameter " +
-    "changes the picture in ALL 18 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
+    "the 20 pointScale-carrying shaders at ps=2 and compares against the CPU model at ps=2. The parameter " +
+    "changes the picture in ALL 20 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
     "BOTH 1x and 2x, and NOTHING agrees at 1x and breaks at 2x. The six that disagree at 2x already disagree " +
     "at 1x and are the sin-hash set, which the 1x control is what establishes: without it this gate would " +
     "have reported five defects that do not exist. " +
