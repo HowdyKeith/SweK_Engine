@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -170,6 +170,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    five fields with one atomic, and three vec4s per survivor at a region-major offset. computeShell has no struct
    element, so that is the next capability. Also unbuilt: the occlusion and fleet variants, where hizOccluded reads
    a depth pyramid through a pointer argument no graph here has emitted.
+   v4363 -- AND THE STRUCT ELEMENT, WHICH IS THE WHOLE PASS. computeShell's storage entries take
+   `struct: { name, fields: [{ name, type, atomic }] }` instead of an element, the shell declares that struct, and the
+   atomic lives on a FIELD -- array<Cmd> is not an atomic buffer; one of Cmd's five members is. physicsTsl
+   makeCullPassTsl is render/gpuDriven.mjs cullLodWgsl() entire: the count guard, the day-t clock gate, the frustum,
+   the ladder, an atomicAdd into the region's indirect draw command and three vec4s per survivor at a region-major
+   offset. Held to the SHIPPED text on one scene: the same per-region counts (96/246/210 of 768) with every one of the
+   552 survivor records identical to the float, and again with the clock gate on (58/135/122, 237 bodies not yet
+   vendored on day 3). The four non-atomic Cmd fields the CPU seeded come back untouched, which is where a wrong
+   layout would have shown -- the atomicAdd landing on indexCount instead. WHAT IS NOT CLAIMED, because it is not
+   true: the SLOT a survivor lands in. An atomicAdd hands slots out in arrival order, so the claim is the per-region
+   counts and the sorted set of records, and the gate says so rather than sorting quietly.
+   *** AND THE BUFFER MAPPING CHANGED, BECAUSE THIS PASS BROKE THE OLD ONE. *** three declares its storage buffers in
+   the order the BODY FIRST USES them, not the order the graph created them. This pass reads extras before planes, so
+   v4336's role-and-order mapping crossed the frustum buffer with the per-instance one -- two array<vec4<f32>> with
+   nothing else to tell them apart. A .label()ed TSL storage node is emitted under that name, so the graph names its
+   buffers and the transplant maps by name, with the roles still checked by name rather than inferred from position.
+   Measured, not argued: the same module with its labels stripped draws NOTHING, 0/0/0 against 96/246/210.
+   STILL HAND-WRITTEN: the occlusion and fleet variants (hizOccluded's ptr<storage, array<f32>, read> argument, and a
+   two-dimensional region index), and struct Cull's `array<vec4<f32>, 6>` -- a fixed-size array in a UNIFORM struct,
+   which is why the six planes arrive in a storage buffer.
 
 ## The count that says when step 4 matters
 

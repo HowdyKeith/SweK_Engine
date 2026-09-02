@@ -257,3 +257,79 @@ export function makeCullLodTsl(TSL, { count, lodCount = 3 } = {}) {
     })().compute(count);
     return { node, inst, planes, outv, uniforms, count, lodCount };
 }
+
+/**
+ * v4363 -- THE WHOLE CULL PASS, BOOKKEEPING AND ALL. makeCullLodTsl is the DECISION; render/gpuDriven.mjs
+ * cullLodWgsl() is that decision plus what the fleet actually does with it, and this is the whole thing as nodes:
+ * the count guard, the vendored-on-day-t clock gate, the frustum and the ladder, then an atomicAdd into the
+ * (fleet, LOD) region's indirect-draw command and three vec4s per surviving instance written at a region-major
+ * offset. The command is a STRUCT of five u32 with ONE of them atomic -- array<Cmd> -- which is the element type
+ * render/tslSource.mjs computeShell gained this round and the reason this pass could not be written before it.
+ *
+ * Two differences from the shipped text, both in the SHELL and both deliberate: the six frustum planes arrive in a
+ * storage buffer rather than in struct Cull's `array<vec4<f32>, 6>` field (a fixed-size array field is still not a
+ * shell feature), and the plane loop sets a flag over all six rather than returning on the first rejection. The
+ * early returns of the shipped pass are flags here for the same reason -- a graph is arithmetic, not control flow --
+ * and the verdicts are the same either way, which is what the gate measures.
+ *
+ * `cap` is the per-region slot budget: a survivor whose slot lands past it still counts (the command is what tells
+ * the CPU how many there were) and writes no record, exactly as the shipped pass does.
+ */
+export function makeCullPassTsl(TSL, { count, lodCount = 3, regions = 3, cap } = {}) {
+    const { Fn, If, Loop, int, uint, float, vec4, uniform, instanceIndex, instancedArray, struct, atomicAdd, dot, distance, max } = TSL;
+    if (lodCount < 1 || lodCount > 4) throw new Error("physicsTsl: makeCullPassTsl unrolls the ladder at lodCount, and the thresholds live in one vec4, so 1..4");
+    if (!(cap > 0) || !(regions > 0)) throw new Error("physicsTsl: makeCullPassTsl needs a per-region cap and a region count, because the record offset is region-major and both are in it");
+    // the indirect draw command, field for field as render/gpuDriven.mjs cullLodWgsl declares it
+    const Cmd = struct({ indexCount: "uint", instanceCount: { type: "uint", atomic: true }, firstIndex: "uint", baseVertex: "uint", firstInstance: "uint" }, "Cmd");
+    const uniforms = {
+        eye: uniform(vec4(0, 0, 0, 0)).label("eye"),
+        thresholds: uniform(vec4(0, 0, 0, 0)).label("thresholds"),
+        info: uniform(vec4(0, 0, 0, 0)).label("info"),      // count, lodCount, cap, phase
+        clock: uniform(vec4(0, 0, 0, 0)).label("clock"),    // day t, and whether the gate is on
+    };
+    const inst = instancedArray(count, "vec4").label("inst");             // xyz centre, w radius
+    const planes = instancedArray(6, "vec4").label("planes");               // the frustum, one plane per row
+    const extras = instancedArray(count, "vec4").label("extras");           // z is the day the body was vendored, w its occlusion bias
+    const cmds = instancedArray(regions, Cmd).label("cmds");              // one indirect draw command per (fleet, LOD) region
+    const records = instancedArray(regions * cap * 3, "vec4").label("records");
+    const node = Fn(() => {
+        const c = inst.element(instanceIndex).toVar();
+        const ex = extras.element(instanceIndex).toVar();
+        const inside = int(1).toVar();
+        Loop({ start: 0, end: 6 }, ({ i }) => {
+            const pl = planes.element(int(i));
+            If(dot(pl.xyz, c.xyz).add(pl.w).lessThan(c.w.negate()), () => { inside.assign(int(0)); });
+        });
+        const dist = max(distance(c.xyz, uniforms.eye.xyz), float(1e-6));
+        const metric = c.w.div(dist);
+        const lod = int(0).toVar();
+        const th = [uniforms.thresholds.x, uniforms.thresholds.y, uniforms.thresholds.z, uniforms.thresholds.w];
+        for (let k = 0; k + 1 < lodCount; k++) If(metric.lessThan(th[k]), () => { lod.assign(int(k + 1)); });
+        If(inside.equal(int(0)), () => { lod.assign(int(-1)); });
+        // the three refusals the shipped pass writes as early returns: past the count, not yet vendored on day t, not in view
+        const draws = int(1).toVar();
+        If(float(instanceIndex).greaterThanEqual(uniforms.info.x), () => { draws.assign(int(0)); });
+        If(uniforms.clock.y.greaterThan(float(0.5)).and(ex.z.greaterThan(uniforms.clock.x)), () => { draws.assign(int(0)); });
+        If(lod.lessThan(int(0)), () => { draws.assign(int(0)); });
+        If(draws.equal(int(1)), () => {
+            const region = uint(lod).toVar();
+            const slot = atomicAdd(cmds.element(region).get("instanceCount"), uint(1)).toVar();
+            If(float(slot).lessThan(uniforms.info.z), () => {
+                const base = region.mul(uint(uniforms.info.z)).add(slot).mul(uint(3)).toVar();
+                records.element(base).assign(c);
+                records.element(base.add(uint(1))).assign(vec4(float(instanceIndex), float(lod), uniforms.info.w, float(0)));
+                records.element(base.add(uint(2))).assign(ex);
+            });
+        });
+    })().compute(count);
+    return { node, inst, planes, extras, cmds, records, uniforms, count, lodCount, regions, cap };
+}
+
+/** The five fields of render/gpuDriven.mjs's struct Cmd, as a computeShell storage entry declares them. */
+export const CMD_STRUCT = Object.freeze({ name: "Cmd", fields: Object.freeze([
+    Object.freeze({ name: "indexCount", type: "u32" }),
+    Object.freeze({ name: "instanceCount", type: "u32", atomic: true }),
+    Object.freeze({ name: "firstIndex", type: "u32" }),
+    Object.freeze({ name: "baseVertex", type: "u32" }),
+    Object.freeze({ name: "firstInstance", type: "u32" }),
+]) });

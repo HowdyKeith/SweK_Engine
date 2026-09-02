@@ -248,12 +248,45 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * this file is held to does not apply here because the pair does not exist.
  */
 export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
+    // v4363 -- the STRUCT element. An entry may give `struct: { name, fields: [{ name, type, atomic }] }` instead of an
+    // element, and the shell declares that struct itself. Two rules, both refusals rather than compiler errors:
+    // the atomic belongs to a FIELD (array<Cmd> is not an atomic buffer, one of Cmd's members is), and two entries
+    // naming one struct must declare the same fields, because a struct name in a module is one layout.
+    const structDecls = [], seenStruct = new Map();
+    for (const b of storage) {
+        if (!b.struct) continue;
+        const t = b.struct;
+        if (!t.name || !Array.isArray(t.fields) || !t.fields.length) throw new Error(`tslSource: storage "${b.name}" says struct and gives no { name, fields } for the shell to declare`);
+        if (b.atomic) throw new Error(`tslSource: storage "${b.name}" is a struct element, so the atomic belongs to a FIELD (fields: [{ name, type, atomic: true }]) and not to the buffer`);
+        if (b.element) throw new Error(`tslSource: storage "${b.name}" gives both an element and a struct; the struct IS the element`);
+        const text = `struct ${t.name} { ${t.fields.map((f) => `${f.name}: ${f.atomic ? `atomic<${f.type}>` : f.type}`).join(", ")} };`;
+        const had = seenStruct.get(t.name);
+        if (had === undefined) { seenStruct.set(t.name, text); structDecls.push(text); }
+        else if (had !== text) throw new Error(`tslSource: two storage entries declare a different struct ${t.name}; one name is one layout`);
+    }
+    const elementOf = (b) => b.struct ? b.struct.name : (b.atomic ? `atomic<${b.element || "u32"}>` : (b.element || "f32"));
     const decls = [
-        ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${b.atomic ? `atomic<${b.element || "u32"}>` : (b.element || "f32")}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
+        ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${elementOf(b)}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
         ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
     ];
     const sharedDecls = shared.map((w) => `var<workgroup> ${w.name}: array<${w.element || "u32"}, ${w.length}>;`);
-    return { name, storage, shared, uniforms, uniformVar, workgroupSize, prefix: [...sharedDecls, ...decls].join("\n") };
+    return { name, storage, shared, uniforms, uniformVar, workgroupSize, structs: structDecls, prefix: [...sharedDecls, ...structDecls, ...decls].join("\n") };
+}
+
+/**
+ * Read a struct declaration out of a WGSL text as { name, type, atomic } fields, normalising the whitespace three
+ * emits (`instanceCount : atomic< u32 >`). Used to hold the shell's declaration to the graph's own: a struct is a
+ * LAYOUT, and two spellings under one name is the CPU and the module disagreeing about bytes with nothing to say so.
+ */
+export function readStructDecl(wgsl, name) {
+    const m = new RegExp(`struct\\s+${name}\\s*\\{([^}]*)\\}`).exec(wgsl);
+    if (!m) return null;
+    return m[1].split(",").map((f) => f.trim()).filter(Boolean).map((f) => {
+        const i = f.indexOf(":");
+        const fname = f.slice(0, i).trim(), t = f.slice(i + 1).replace(/\s+/g, "");
+        const a = /^atomic<(.+)>$/.exec(t);
+        return { name: fname, type: a ? a[1] : t, atomic: !!a };
+    });
 }
 /**
  * Transplant three's emitted COMPUTE shader into that shell. three writes its own storage buffers under generated
@@ -276,15 +309,60 @@ export function transplantCompute(wgsl, shell) {
     const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*=`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
     const readOnly = found.filter((g) => !written.includes(g));
     const wantW = shell.storage.filter((b) => b.access !== "read"), wantR = shell.storage.filter((b) => b.access === "read");
-    if (written.length !== wantW.length || readOnly.length !== wantR.length) throw new Error(`tslSource: the graph writes ${written.length} buffer(s) and reads ${readOnly.length}, and the shell "${shell.name}" declares ${wantW.length} read_write and ${wantR.length} read (${shell.storage.map((b) => `${b.name}:${b.access || "read_write"}`).join(", ")})`);
-    const rename = new Map([...written.map((g, i) => [g, wantW[i].name]), ...readOnly.map((g, i) => [g, wantR[i].name])]);
+    // v4363 -- BY NAME WHERE THE GRAPH GIVES ONE. A TSL storage node that was .label()ed is emitted under that label
+    // instead of NodeBuffer_NNN, and then nothing has to be inferred. It matters more than it looks: three declares its
+    // buffers in the order the BODY FIRST USES them, not the order the graph created them, so two read-only buffers of
+    // the same element type are told apart by position alone -- measured, and it crossed the frustum planes with the
+    // per-instance extras in exactly this pass. Role and order stay the fallback for a graph that names nothing, and
+    // the roles are still checked here, by name, so the read-only guarantee is not traded away for the convenience.
+    const named = found.filter((g) => shell.storage.some((b) => b.name === g));
+    let rename;
+    if (named.length && named.length !== found.length) throw new Error(`tslSource: the graph names ${named.length} of its ${found.length} storage buffers (${named.join(", ")}) and leaves the rest generated; label them all or none, because a half-named set is matched half by name and half by guess`);
+    if (named.length === found.length && found.length) {
+        for (const b of shell.storage) if (!found.includes(b.name)) throw new Error(`tslSource: the shell "${shell.name}" names "${b.name}" and the graph's named buffers are ${found.join(", ")}`);
+        for (const g of found) {
+            const want = shell.storage.find((b) => b.name === g);
+            const isW = written.includes(g);
+            if (isW && want.access === "read") throw new Error(`tslSource: the pass writes "${g}" and the shell "${shell.name}" declares it read`);
+            if (!isW && want.access !== "read") throw new Error(`tslSource: the shell "${shell.name}" declares "${g}" read_write and the pass never writes it`);
+        }
+        rename = new Map(found.map((g) => [g, g]));
+    } else {
+        if (written.length !== wantW.length || readOnly.length !== wantR.length) throw new Error(`tslSource: the graph writes ${written.length} buffer(s) and reads ${readOnly.length}, and the shell "${shell.name}" declares ${wantW.length} read_write and ${wantR.length} read (${shell.storage.map((b) => `${b.name}:${b.access || "read_write"}`).join(", ")})`);
+        rename = new Map([...written.map((g, i) => [g, wantW[i].name]), ...readOnly.map((g, i) => [g, wantR[i].name])]);
+    }
     // an atomic buffer must be declared atomic on BOTH sides or the module will not compile: three writes atomicAdd(&b.value[i])
     // and WGSL takes that pointer only into an atomic<T>. A shell that forgot is refused here, by name, not by the compiler.
     for (const [g, name] of rename) {
         const isAtomic = new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl);
         const want = shell.storage.find((b) => b.name === name);
-        if (isAtomic && !want.atomic) throw new Error(`tslSource: the pass touches "${name}" atomically and the shell "${shell.name}" does not declare it atomic (atomic: true)`);
-        if (!isAtomic && want.atomic) throw new Error(`tslSource: the shell "${shell.name}" declares "${name}" atomic and the pass never touches it atomically`);
+        if (want.struct) {
+            // v4363 -- a struct element carries its atomic on a MEMBER, so the agreement is per field and by name.
+            const members = [...new Set([...wgsl.matchAll(new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\.(\\w+)`, "g"))].map((m) => m[1]))];
+            const atomicMembers = [...new Set([...wgsl.matchAll(new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[[^\\]]*\\]\\.(\\w+)`, "g"))].map((m) => m[1]))];
+            for (const mm of members) {
+                const f = want.struct.fields.find((x) => x.name === mm);
+                if (!f) throw new Error(`tslSource: the pass touches "${name}.${mm}" and the shell "${shell.name}"'s struct ${want.struct.name} has no such field (${want.struct.fields.map((x) => x.name).join(", ")})`);
+                if (atomicMembers.includes(mm) && !f.atomic) throw new Error(`tslSource: the pass touches "${name}.${mm}" atomically and the shell "${shell.name}" declares that field ${f.type} rather than atomic<${f.type}>`);
+                if (!atomicMembers.includes(mm) && f.atomic) throw new Error(`tslSource: the shell "${shell.name}" declares "${name}.${mm}" atomic and the pass reaches it plainly, which WGSL does not allow`);
+            }
+            if (isAtomic && !atomicMembers.length) throw new Error(`tslSource: the pass touches "${name}" atomically without naming a member, and its shell element is the struct ${want.struct.name}`);
+        } else {
+            if (isAtomic && !want.atomic) throw new Error(`tslSource: the pass touches "${name}" atomically and the shell "${shell.name}" does not declare it atomic (atomic: true)`);
+            if (!isAtomic && want.atomic) throw new Error(`tslSource: the shell "${shell.name}" declares "${name}" atomic and the pass never touches it atomically`);
+        }
+    }
+    // v4363 -- and the struct the SHELL declares must be the one the graph built, field for field. The transplant keeps
+    // the shell's declaration and drops three's, so a difference here is not a compile error later: it is the CPU writing
+    // one layout while the module reads another, silently, which is the whole reason the shell owns declarations at all.
+    for (const b of shell.storage) {
+        if (!b.struct) continue;
+        const got = readStructDecl(wgsl, b.struct.name);
+        const spell = (fs2) => fs2.map((f) => `${f.name}: ${f.atomic ? `atomic<${f.type}>` : f.type}`).join(", ");
+        if (!got) throw new Error(`tslSource: the shell "${shell.name}" declares struct ${b.struct.name} for "${b.name}" and the graph's shader declares no such struct`);
+        const wantF = b.struct.fields.map((f) => ({ name: f.name, type: String(f.type).replace(/\s+/g, ""), atomic: !!f.atomic }));
+        const same = got.length === wantF.length && got.every((f, i) => f.name === wantF[i].name && f.type === wantF[i].type && f.atomic === wantF[i].atomic);
+        if (!same) throw new Error(`tslSource: struct ${b.struct.name} is { ${spell(got)} } in the graph and { ${spell(wantF)} } in the shell "${shell.name}" -- one name, two layouts`);
     }
     const uniforms = uniformFields(wgsl, "wgsl");
     for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the compute pass's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ") || "none"})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the pass and ${h.type} in the shell`); }
