@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic), v4338 (and a fourth that reduces in WORKGROUP memory)
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic), v4338 (and a fourth that reduces in WORKGROUP memory), v4339 (a fifth that SIZES the next dispatch)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -182,4 +182,33 @@ export function makeChaosReduceTsl(TSL, { sweep, count, workgroupSize = 64 } = {
         });
     })().compute(count);
     return { node, total, count, workgroupSize };
+}
+
+/**
+ * v4339 -- THE SIZER: one invocation that reads a count another pass produced and writes the three u32 an INDIRECT
+ * DISPATCH reads -- workgroupsX, Y, Z. Nothing comes back to the CPU in between. This is the half of the GPU-driven
+ * shape that gfx/device.js could not do until this round: it has always been able to fill an indirect DRAW, so the
+ * GPU decided how many instances to draw, and the number of INVOCATIONS was still a JavaScript number.
+ *
+ * The tally buffer is declared atomic<u32> by the pass that fills it and a plain u32 here, which is legal and is the
+ * point: a binding is a buffer, and the atomic is a property of how a shader touches it, not of the memory.
+ */
+export function makeDispatchSizerTsl(TSL, { tally, groupSize = 64 } = {}) {
+    const { Fn, uint, instancedArray } = TSL;
+    if (!tally || typeof tally.element !== "function") throw new Error("physicsTsl: makeDispatchSizerTsl needs the tally's own buffer node");
+    const dims = instancedArray(3, "uint");
+    const node = Fn(() => {
+        const n = tally.element(uint(0));
+        dims.element(uint(0)).assign(n.add(uint(groupSize - 1)).div(uint(groupSize)));   // ceil(n / groupSize), in integers
+        dims.element(uint(1)).assign(uint(1));
+        dims.element(uint(2)).assign(uint(1));
+    })().compute(1);
+    return { node, dims, groupSize };
+}
+/** A pass that leaves a 1 wherever an invocation ran, so a readback can COUNT how many the GPU actually launched. */
+export function makeMarkTsl(TSL, { count } = {}) {
+    const { Fn, uint, instanceIndex, instancedArray } = TSL;
+    const marks = instancedArray(count, "uint");
+    const node = Fn(() => { marks.element(instanceIndex).assign(uint(1)); })().compute(count);
+    return { node, marks, count };
 }

@@ -68,6 +68,18 @@
 // into it. If that check ever goes GREEN on other hardware it is a finding, not a fix -- WGSL guarantees nothing
 // there without the barrier, and the answer is to record where it stopped being observable.
 //
+// v4339 -- AND AN INDIRECT DISPATCH (section 8), which took a gfx/device.js change first: it has always had
+// drawIndexedIndirect, so the GPU could decide how many INSTANCES to draw, and the number of INVOCATIONS was still a
+// JavaScript number. pass.dispatchIndirect(pipeline, buffer, byteOffset) reads three u32 -- workgroupsX, Y, Z -- when
+// the command runs. Measured: the sweep writes 1024 exponents, the tally counts 670 of them atomically, a one-lane
+// sizer divides that by the workgroup size into an indirect buffer, and the mark pass runs 704 invocations (11 x 64)
+// without anything coming back to the CPU. Seed the same buffer with 64 or 200 instead and the same encoded command
+// runs 64 or 256 invocations. That is every shape render/gpuDriven.mjs's cull pass has.
+//
+// *** AND THE SHELL OWNS THE DECLARATIONS, WHICH IS WHAT MAKES THE READ-ONLY VIEW POSSIBLE. *** three declares the
+// tally as atomic<u32> in the SIZER's module too, because the flag lives on the node rather than on the use. The
+// shell declares it a plain read-only u32 there, and the device runs it: one buffer, two views.
+//
 // SABOTAGES, MEASURED at v4331:
 //   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
 //      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
@@ -91,6 +103,12 @@
 //   MEASURED at v4338 (workgroup-shared memory):
 //   Y  the shell's var<workgroup> declaration left out of its prefix -> exit=1, 4 red: the module names an array nothing
 //      declares, the device refuses it, the total reads 0, and render/wgslSpec.mjs's scanner finds nothing to read.
+//   MEASURED at v4339 (the indirect dispatch):
+//   AA dispatchIndirect() dispatching a fixed 1x1x1 instead of reading the buffer -> exit=1, 2 red: 64 invocations where the
+//      buffer said 704, and the seeded runs stop moving with it. The two claims that say the BUFFER decides are the two that go.
+//   AB the "usage must include indirect" guard removed -> exit=1, 2 red -- BUT IT WENT 0 RED FIRST, the second sabotage in
+//      three rounds to prove a check nobody was exercising. The gate only ever passed a correctly-made buffer, so the guard
+//      was unreachable; a check that hands it a plain storage buffer was added, and only then did removing it cost anything.
 //   Z  the rename of three's WorkgroupArray_NNN skipped -> exit=1, 3 red: the shell declares "lane", the body still names the
 //      generated identifier, and the device refuses that too. The generated name binds to nothing, so this one is about the
 //      module being readable and stable rather than about it working -- but it does not work either, which settles it.
@@ -504,6 +522,100 @@ else {
     }
 }
 
+console.log("\n8. AN INDIRECT DISPATCH (v4339): the number of invocations decided by a buffer another pass wrote, never by JavaScript");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const NBIG = 1024;
+    const r5 = await runInEngineOrigin({ engineRoot: ENG, args: { N: NBIG }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4 }); await renderer.computeAsync(g.node);
+        const t = P.makeChaosTallyTsl(T, { sweep: g.buffer, count: a.N }); await renderer.computeAsync(t.node);
+        const sz = P.makeDispatchSizerTsl(T, { tally: t.tally }); await renderer.computeAsync(sz.node);
+        const mk = P.makeMarkTsl(T, { count: a.N }); await renderer.computeAsync(mk.node);
+        const em = { sweep: renderer._nodes.getForCompute(g.node).computeShader, tally: renderer._nodes.getForCompute(t.node).computeShader,
+                     sizer: renderer._nodes.getForCompute(sz.node).computeShader, mark: renderer._nodes.getForCompute(mk.node).computeShader };
+        // the SAME buffer is atomic<u32> where the tally increments it and a plain u32 where the sizer reads it
+        // three declares the tally atomic in BOTH modules -- the flag lives on the node, not on the use -- so the sizer,
+        // which only reads it, gets an atomic declaration it never needed. The SHELL is what fixes that.
+        out.tallyAtomicThere = /array< atomic<u32> >/.test(em.tally);
+        out.tallyAtomicInSizerToo = /array< atomic<u32> >/.test(em.sizer);
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const shells = {
+                sweep: S.computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] }),
+                tally: S.computeShell({ name: "tally", storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "tally", element: "u32", atomic: true }], uniforms: [] }),
+                sizer: S.computeShell({ name: "sizer", storage: [{ name: "tally", element: "u32", access: "read" }, { name: "dims", element: "u32" }], uniforms: [] }),
+                mark: S.computeShell({ name: "mark", storage: [{ name: "marks", element: "u32" }], uniforms: [] }),
+            };
+            const gen = { sweep: S.transplantCompute(em.sweep, shells.sweep), tally: S.transplantCompute(em.tally, shells.tally),
+                          sizer: S.transplantCompute(em.sizer, shells.sizer), mark: S.transplantCompute(em.mark, shells.mark) };
+            out.sizerWgsl = gen.sizer.wgsl;
+            const sweepBuf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+            const ubuf = dev.buffer({ data: Float32Array.from(g.knobs), usage: "uniform" });
+            const groups = Math.ceil(a.N / 64);
+            const pSweep = dev.compute({ wgsl: gen.sweep.wgsl }); pSweep.bind("out", sweepBuf).bind("u", ubuf);
+            // one run: sweep -> tally -> sizer -> the mark pass dispatched INDIRECTLY from what the sizer wrote
+            const run = async (seedTally) => {
+                const tallyBuf = dev.buffer({ data: new Uint32Array([seedTally == null ? 0 : seedTally]), usage: ["storage"] });
+                const dimsBuf = dev.buffer({ data: new Uint32Array([0, 0, 0]), usage: ["indirect"] });
+                const marksBuf = dev.buffer({ data: new Uint32Array(a.N), usage: ["storage"] });
+                const pTally = dev.compute({ wgsl: gen.tally.wgsl }); pTally.bind("sweep", sweepBuf).bind("tally", tallyBuf);
+                const pSizer = dev.compute({ wgsl: gen.sizer.wgsl }); pSizer.bind("tally", tallyBuf).bind("dims", dimsBuf);
+                const pMark = dev.compute({ wgsl: gen.mark.wgsl }); pMark.bind("marks", marksBuf);
+                dev.frame(({ pass }) => {
+                    pass.dispatch(pSweep, groups);
+                    if (seedTally == null) pass.dispatch(pTally, groups);   // let the GPU count; otherwise the count is seeded
+                    pass.dispatch(pSizer, 1);
+                    pass.dispatchIndirect(pMark, dimsBuf);
+                    pass.clear([0, 0, 0, 1]);
+                }, { offscreen: true });
+                const dims = [...new Uint32Array(await dev.read(dimsBuf))];
+                const marks = new Uint32Array(await dev.read(marksBuf));
+                const tally = new Uint32Array(await dev.read(tallyBuf))[0];
+                tallyBuf.destroy(); dimsBuf.destroy(); marksBuf.destroy();
+                let ran = 0, past = 0; for (let i = 0; i < a.N; i++) { if (marks[i]) { ran++; if (i >= dims[0] * 64) past++; } }
+                return { dims, tally, ran, past };
+            };
+            // a buffer without "indirect" usage cannot hold a dispatch size, and saying so here is cheaper than a driver error
+            out.plainRefusal = (() => { const plain = dev.buffer({ data: new Uint32Array([1, 1, 1]), usage: ["storage"] });
+                const p = dev.compute({ wgsl: gen.mark.wgsl }); p.bind("marks", dev.buffer({ usage: ["storage"], size: a.N * 4 }));
+                try { dev.frame(({ pass }) => { pass.dispatchIndirect(p, plain); pass.clear([0, 0, 0, 1]); }, { offscreen: true }); return null; }
+                catch (e) { return String(e.message).slice(0, 200); } })();
+            out.counted = await run(null);        // the GPU counts, sizes and dispatches, with nothing read back between
+            out.seeded64 = await run(64);         // and a different number in the same buffer moves the dispatch
+            out.seeded200 = await run(200);
+            out.sweep = [...new Float32Array(await dev.read(sweepBuf))];
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        // and the other backend says so by name rather than doing nothing
+        try { const cv2 = document.createElement("canvas"); cv2.width = 8; cv2.height = 8; const gl = await requestDevice(cv2, { backend: "webgl2" });
+              gl.frame(({ pass }) => { try { pass.dispatchIndirect(null, null); } catch (e) { out.webgl2Refusal = String(e.message).slice(0, 160); } pass.clear([0,0,0,1]); }, {});
+        } catch (e) { out.webgl2Refusal = out.webgl2Refusal || ("outer: " + String(e && e.message || e)).slice(0, 160); }
+        return out;
+    }` });
+    ok("the harness ran the chain", r5.ok && r5.result && !r5.result.error && r5.result.counted, r5.ok ? (r5.result && r5.result.error) : (r5.reason || (r5.pageErrors || []).join("; ")));
+    if (r5.ok && r5.result && !r5.result.error) {
+        const E = r5.result, C = E.counted;
+        const truth = E.sweep.filter((v) => v > 0).length, want = Math.ceil(truth / 64);
+        ok(`*** the GPU counted ${C.tally}, sized its own next dispatch to ${C.dims.join("x")} workgroups, and ran ${C.ran} invocations -- nothing came back to the CPU in between ***`,
+            C.tally === truth && C.dims[0] === want && C.dims[1] === 1 && C.dims[2] === 1 && C.ran === want * 64 && C.past === 0 && (E.errs || []).length === 0,
+            `tally ${C.tally} (truth ${truth}), dims ${C.dims.join(",")} (ceil(${truth}/64) = ${want}), ${C.ran} invocations = ${want} x 64, none past the edge; device errors ${(E.errs || []).length}`);
+        ok(`*** and it is the BUFFER that decides: seed the same buffer with 64 and 200 instead and the dispatch becomes ${E.seeded64.dims[0]} and ${E.seeded200.dims[0]} workgroups (${E.seeded64.ran} and ${E.seeded200.ran} invocations), with no JavaScript number changed ***`,
+            E.seeded64.dims[0] === 1 && E.seeded64.ran === 64 && E.seeded200.dims[0] === 4 && E.seeded200.ran === 256,
+            `64 -> ${E.seeded64.dims[0]} group, ${E.seeded64.ran} invocations; 200 -> ${E.seeded200.dims[0]} groups, ${E.seeded200.ran}. The same encoded command, three different amounts of work`);
+        ok("*** and the SHELL owns the declaration, not three: three declares the tally atomic<u32> in both modules because the flag is on the node, and the transplanted sizer -- which only reads it -- ships it as a plain read-only u32 ***",
+            E.tallyAtomicThere && E.tallyAtomicInSizerToo && /var<storage, read> tally: tallyBuf;/.test(E.sizerWgsl) && /struct tallyBuf \{ value: array<u32> \};/.test(E.sizerWgsl),
+            "one buffer, two views: atomic where it is incremented, plain and read-only where it is read. A binding is memory; the atomic is how a shader touches it, and the shell is where that is said");
+        ok('REFUSED: a dispatch size in a buffer that was not created with usage "indirect"', /usage "indirect"/.test(E.plainRefusal || ""), (E.plainRefusal || "NOT REFUSED -- a plain storage buffer was accepted as a dispatch size").slice(0, 150));
+        ok("  and WebGL2 refuses an indirect dispatch BY NAME rather than doing nothing", /webgl2/.test(E.webgl2Refusal || "") && /compute/.test(E.webgl2Refusal || ""), (E.webgl2Refusal || "no refusal seen").slice(0, 120));
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -512,7 +624,8 @@ else {
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against " +
-    "SwiftShader's -- the same question the chaotic five ask, one machine further out; and an INDIRECT dispatch, where the count a pass runs at is itself " +
-    "in a buffer, which gfx/device.js cannot do at all today (it has drawIndexedIndirect and no dispatchWorkgroupsIndirect) and is the last thing standing " +
-    "between this transplant and regenerating a real render/gpuDriven.mjs pass rather than a demonstration of one.");
+    "SwiftShader's -- the same question the chaotic five ask, one machine further out; and the thing all eight sections are FOR, which is regenerating " +
+    "render/gpuDriven.mjs's actual cull pass from a graph rather than demonstrating each of its shapes beside it. Every shape is now transplantable -- " +
+    "reads, writes, an atomic, workgroup memory, an indirect dispatch -- and no round has yet written the cull itself as TSL and held the fleet's own " +
+    "picture to it.");
 process.exit(fails ? 1 : 0);
