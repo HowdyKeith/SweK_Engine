@@ -1025,6 +1025,113 @@ void main() {
 
 
 // ==================================================================================================================
+// BATCH 16, v4320 -- THE LAST THREE, AND WITH THEM ALL 41 OF UPSTREAM'S STITCHABLE SHADERS ARE PORTED.
+// disintegrate is the ONLY one of the 41 that writes alpha; etherealAura has the heaviest noise budget
+// upstream ships (six fbm calls, ~120 sin-hash evaluations per pixel); liquidMirror is the only one whose
+// geometry is a FOLD. See render/swiftShaderModel.mjs for each one's traps.
+// ==================================================================================================================
+const DISINTEGRATE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uThreshold, uEdgeWidth, uDriftAmount, uDirection, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec4 orig = layerSample(p);
+    if (orig.a < 0.01) { fragColor = orig; return; }
+    float n1 = bcs_fbm(uv * 6.0 + vec2(uTime * 0.1), 5);
+    float n2 = bcs_fbm(uv * 12.0 + vec2(17.0, 31.0), 4);
+    float dv = (n1 * 0.7 + n2 * 0.3) * 0.6 + (uv.x * 0.4 + (1.0 - uv.y) * 0.6) * 0.4;
+    if (dv < uThreshold - uEdgeWidth * 1.5) { fragColor = vec4(0.0); return; }
+    float edge = smoothstep(uThreshold - uEdgeWidth, uThreshold, dv);
+    float inner = smoothstep(uThreshold - uEdgeWidth * 0.3, uThreshold, dv);
+    float edgeMask = edge - inner;
+    vec3 glow = mix(vec3(1.0, 0.4, 0.05), vec3(1.0, 0.95, 0.8), toHalf(inner * 0.8));
+    float drift = (1.0 - edge) * uDriftAmount * uPointScale;                    // POINTS
+    float scatter = bcs_valueNoise(uv * 30.0 + uTime * 2.0);
+    vec2 off = vec2(cos(uDirection), sin(uDirection)) * drift + vec2(scatter - 0.5) * drift * 0.5;
+    vec4 dc = layerSample(clamp(p + off, vec2(0.0), uSize));
+    float sparkle = step(0.97, bcs_valueNoise(uv * 50.0 + uTime * 5.0)) * edgeMask * 5.0;
+    vec3 sw = vec3(1.0, 0.7, 0.3);
+    float k = (uPremultiplied > 0.5 || orig.a == 0.0) ? 1.0 : orig.a;
+    vec3 v = mix(dc.rgb, orig.rgb, toHalf(edge));
+    v = mix(v, glow, toHalf(edgeMask * 3.0));
+    v = vec3(toHalf(v.r + toHalf(glow.r * toHalf(edgeMask * 2.0)) * k),
+             toHalf(v.g + toHalf(glow.g * toHalf(edgeMask * 2.0)) * k),
+             toHalf(v.b + toHalf(glow.b * toHalf(edgeMask * 2.0)) * k));
+    // *** ALPHA IS THE EFFECT, NOT A PASSTHROUGH. *** The only fragment in this file that writes it.
+    fragColor = vec4(toHalf(v.r + toHalf(sparkle * sw.r) * k),
+                     toHalf(v.g + toHalf(sparkle * sw.g) * k),
+                     toHalf(v.b + toHalf(sparkle * sw.b) * k), toHalf(orig.a * toHalf(edge)));
+}`;
+
+const ETHEREALAURA_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uAuraWidth, uAuraIntensity, uPulseSpeed, uDistortion, uHueShift, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float edgeDist = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    vec2 st = uv * 6.0;
+    vec2 q = vec2(bcs_fbm(st + vec2(uTime * 0.15, uTime * 0.1), 5),
+                  bcs_fbm(st + vec2(5.2, 1.3) + vec2(uTime * 0.12, uTime * 0.18), 5));
+    float warp = bcs_fbm(st + 3.0 * q, 4);
+    float auraMask = smoothstep(uAuraWidth + warp * uAuraWidth, 0.0, edgeDist);
+    float pm = auraMask * (0.6 + 0.4 * sin(uTime * uPulseSpeed));
+    vec2 dst = uv * 4.0;
+    vec2 dq = vec2(bcs_fbm(dst + vec2(uTime * 0.25, uTime * 0.2), 5),
+                   bcs_fbm(dst + vec2(3.0, 7.0) + vec2(uTime * 0.2, uTime * 0.3), 5));
+    vec2 dr = vec2(bcs_fbm(dst + 3.0 * dq + vec2(uTime * 0.1, 0.0), 4),
+                   bcs_fbm(dst + 3.0 * dq + vec2(0.0, uTime * 0.08), 4));
+    vec2 edgeDir = vec2(uv.x < 0.5 ? 1.0 : -1.0, uv.y < 0.5 ? 1.0 : -1.0);
+    vec2 disp = (dr - 0.5) * uDistortion * pm + edgeDir * pm * uDistortion * 0.3;
+    disp *= smoothstep(0.3, 0.0, edgeDist) * uPointScale;                        // POINTS
+    vec2 dp = clamp(p + disp, vec2(0.0), uSize);
+    vec2 cd = normalize(vec2(uv.x - 0.5, uv.y - 0.5) + 0.001) * (pm * uDistortion * 0.12 * uPointScale);
+    vec4 rr = layerSample(clamp(dp + cd, vec2(0.0), uSize));
+    vec4 gg = layerSample(dp);
+    vec4 bb = layerSample(clamp(dp - cd, vec2(0.0), uSize));
+    // The hue is quantised to HALF upstream -- sin(half(hue_shift)) -- which is a real narrowing of the
+    // phase, not an accident of typing, so toHalf lands on the argument and not on the result.
+    float hs = toHalf(uHueShift);
+    vec3 aura = vec3(toHalf(sin(hs) * 0.5 + 0.5), toHalf(sin(hs + 2.094) * 0.5 + 0.5),
+                     toHalf(sin(hs + 4.189) * 0.5 + 0.5));
+    float glow = pm * uAuraIntensity;
+    vec3 col = vec3(rr.r, gg.g, bb.b);
+    float k = (uPremultiplied > 0.5 || gg.a == 0.0) ? 1.0 : gg.a;
+    fragColor = vec4(toHalf(col.r + toHalf(aura.r * toHalf(glow * 0.6)) * k + toHalf(glow * 0.15) * k),
+                     toHalf(col.g + toHalf(aura.g * toHalf(glow * 0.6)) * k + toHalf(glow * 0.15) * k),
+                     toHalf(col.b + toHalf(aura.b * toHalf(glow * 0.6)) * k + toHalf(glow * 0.15) * k), gg.a);
+}`;
+
+const LIQUIDMIRROR_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uMirrorAxis, uRipple, uSpeed, uDepth, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float tw = 0.08, rStart = uMirrorAxis - tw, rFull = uMirrorAxis + tw;
+    float rDepth = smoothstep(rStart, 1.0, uv.y);
+    float rBlend = smoothstep(rStart, rFull, uv.y);
+    float mvy = uv.y > rStart ? uMirrorAxis - (uv.y - uMirrorAxis) : uv.y;
+    float t = uTime * uSpeed;
+    vec2 rs = vec2(uv.x, mvy) * 6.0;
+    float r1 = sin(rs.x * 4.0 + t * 1.3) * cos(rs.y * 3.0 + t * 0.9);
+    float r2 = sin(rs.x * 7.0 - t * 1.7) * cos(rs.y * 5.0 + t * 1.1);
+    float r3 = bcs_valueNoise(rs + vec2(t * 0.5, t * 0.3));
+    float strength = rBlend * rDepth * uPointScale;                              // POINTS
+    vec2 d = vec2(r1 * 0.5 + r2 * 0.3 + (r3 - 0.5) * 0.4,
+                  r1 * 0.3 + r2 * 0.5 + (r3 - 0.5) * 0.3) * uRipple * strength;
+    vec4 rc = layerSample(clamp(vec2(uv.x, mvy) * uSize + d, vec2(0.0), uSize));
+    vec4 oc = layerSample(p);
+    float fade = max(1.0 - rDepth * uDepth, 0.2);
+    rc.rgb = vec3(toHalf(rc.r * toHalf(fade)), toHalf(rc.g * toHalf(fade)), toHalf(rc.b * toHalf(fade)));
+    float lum = toHalf(luma601(rc.rgb));   // HELPERS' own 0.299/0.587/0.114, the same weights the model uses
+    rc.rgb = mix(rc.rgb, vec3(lum), toHalf(rDepth * 0.2));
+    float caustic = pow(max(r1 * r2 + 0.5, 0.0), 10.0) * 0.15 * rBlend * rDepth;
+    float k = (uPremultiplied > 0.5 || oc.a == 0.0) ? 1.0 : oc.a;
+    fragColor = vec4(toHalf(mix(oc.r, rc.r, toHalf(rBlend)) + toHalf(caustic) * k),
+                     toHalf(mix(oc.g, rc.g, toHalf(rBlend)) + toHalf(caustic) * k),
+                     toHalf(mix(oc.b, rc.b, toHalf(rBlend)) + toHalf(caustic) * k), oc.a);
+}`;
+
+// ==================================================================================================================
 // BATCH 15, v4319 -- THE THREE CELLULAR SHADERS, AND WITH THEM UPSTREAM'S VORONOI FAMILY IS PORTED.
 // All three run a 3x3 neighbourhood of jittered cell points and reach bcs_hash DIRECTLY rather than through
 // valueNoise, so a last-bit disagreement is not interpolated down -- it flips which cell owns the pixel.
@@ -1272,7 +1379,8 @@ const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLA
     aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
     morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG,
     fresnelEdge: FRESNELEDGE_FRAG, airyDisk: AIRYDISK_FRAG,
-    shatter: SHATTER_FRAG, shatterGlass: SHATTERGLASS_FRAG, underwaterCaustics: CAUSTICS_FRAG };
+    shatter: SHATTER_FRAG, shatterGlass: SHATTERGLASS_FRAG, underwaterCaustics: CAUSTICS_FRAG,
+    disintegrate: DISINTEGRATE_FRAG, etherealAura: ETHEREALAURA_FRAG, liquidMirror: LIQUIDMIRROR_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -1304,6 +1412,9 @@ const KNOBS = {
     morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
     lyapunov: { rLo: "uRLo", rHi: "uRHi", samples: "uSamples", warmup: "uWarmup", intensity: "uIntensity", seedLo: "uSeedLo", seedHi: "uSeedHi", raw: "uRaw", premultiplied: "uPremultiplied" },
     fresnelEdge: { lambda: "uLambda", zLo: "uZLo", zHi: "uZHi", yHalf: "uYHalf", samples: "uSamples", intensity: "uIntensity", raw: "uRaw", premultiplied: "uPremultiplied" },
+    disintegrate: { time: "uTime", threshold: "uThreshold", edgeWidth: "uEdgeWidth", driftAmount: "uDriftAmount", direction: "uDirection", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    etherealAura: { time: "uTime", auraWidth: "uAuraWidth", auraIntensity: "uAuraIntensity", pulseSpeed: "uPulseSpeed", distortion: "uDistortion", hueShift: "uHueShift", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    liquidMirror: { time: "uTime", mirrorAxis: "uMirrorAxis", ripple: "uRipple", speed: "uSpeed", depth: "uDepth", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     shatter: { time: "uTime", shardCount: "uShardCount", explode: "uExplode", rotationAmt: "uRotationAmt", edgeGlow: "uEdgeGlow", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     shatterGlass: { time: "uTime", crackDensity: "uCrackDensity", glassRefraction: "uGlassRefraction", prismStrength: "uPrismStrength", shatterSpread: "uShatterSpread", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     underwaterCaustics: { time: "uTime", causticScale: "uCausticScale", causticIntensity: "uCausticIntensity", waterDistortion: "uWaterDistortion", waterDepth: "uWaterDepth", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -1380,6 +1491,11 @@ const DEFAULT_KNOBS = {
     // Upstream's own comment ranges, midpoints where it gives one: shard_count 3-30, explode 0-1,
     // rotation_amt 0-3, edge_glow 0-2; crackDensity 3-15, glassRefraction 0-20, prismStrength 0-1,
     // shatterSpread 0-1; causticScale 2-15, causticIntensity 0-2, waterDistortion 0-30, waterDepth 0-1.
+    // Upstream's comment ranges: threshold 0-1, edgeWidth 0.05-0.3, driftAmount 0-50, direction 0-6.28;
+    // mirror_axis 0.3-0.7, ripple 2-30, speed 0.5-3, depth 0-1.
+    disintegrate:   { time: 0, threshold: 0.5, edgeWidth: 0.15, driftAmount: 20, direction: 0.8, pointScale: 1, premultiplied: 1 },
+    etherealAura:   { time: 0, auraWidth: 0.25, auraIntensity: 1, pulseSpeed: 1.5, distortion: 14, hueShift: 0.6, pointScale: 1, premultiplied: 1 },
+    liquidMirror:   { time: 0, mirrorAxis: 0.5, ripple: 12, speed: 1.5, depth: 0.6, pointScale: 1, premultiplied: 1 },
     shatter:        { time: 0, shardCount: 8, explode: 0.4, rotationAmt: 1.2, edgeGlow: 0.8, pointScale: 1, premultiplied: 1 },
     shatterGlass:   { time: 0, crackDensity: 7, glassRefraction: 8, prismStrength: 0.5, shatterSpread: 0.35, pointScale: 1, premultiplied: 1 },
     underwaterCaustics: { time: 0, causticScale: 8, causticIntensity: 1, waterDistortion: 12, waterDepth: 0.5, pointScale: 1, premultiplied: 1 },
@@ -1536,5 +1652,6 @@ export {
     PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
     LYAPUNOV_FRAG, FRESNELEDGE_FRAG, AIRYDISK_FRAG,
     SHATTER_FRAG, SHATTERGLASS_FRAG, CAUSTICS_FRAG,
+    DISINTEGRATE_FRAG, ETHEREALAURA_FRAG, LIQUIDMIRROR_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

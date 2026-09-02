@@ -34,6 +34,7 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
          bcsPixelateStorm, bcsMagneticField, bcsAurora, bcsDatamosh, bcsSmokeReveal, bcsMorphBreathe,
          swkLyapunov, swkFresnel, swkAiry,
          bcsShatter, bcsShatterGlass, bcsUnderwaterCaustics,
+         bcsDisintegrate, bcsEtherealAura, bcsLiquidMirror,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -64,20 +65,21 @@ import { codeOnly } from "./sourceScan.mjs";
 // thirteen" was true at v4308 and is now 38 and three; the numbers are derived below rather than typed here.
 // KEPT AS DATA rather than prose so the next batch can be picked without another clone, and so this file can
 // say WHICH thirteen the closing note has been counting for eleven batches.
-// v4309 ported liquidChrome; v4310 ported pixelateStorm, magneticField and aurora; v4311 ported datamosh,
-// smokeReveal and morphBreathe; v4319 ports shatter, shatterGlass and underwaterCaustics. THREE remain, and
-// all three reach the sin-hash -- confirmed from the source, which is what batch 11 could only assert when it
-// wrote "after wormhole there are no gradeable shaders left upstream at all". None can be graded
-// pixel-for-pixel against its CPU model; they are graded structurally.
+// v4309 ported liquidChrome; v4310 pixelateStorm, magneticField and aurora; v4311 datamosh, smokeReveal and
+// morphBreathe; v4319 shatter, shatterGlass and underwaterCaustics; *** v4320 THE LAST THREE -- disintegrate,
+// etherealAura and liquidMirror -- SO THIS LIST IS EMPTY AND ALL 41 ARE PORTED. ***
+//
+// *** AN EMPTY LIST IS NOT A REASON TO DELETE THE MACHINERY, AND THIS IS THE ROUND WHERE THAT MATTERS. ***
+// The identity below (ported + unported = 41, no residue either way) is what catches a shader being invented
+// or a name being dropped, and it is exactly as load-bearing at zero as it was at thirteen. If upstream ever
+// adds a 42nd, this list going non-empty is how anybody finds out.
 //
 // *** THE PROSE ABOVE THIS LIST SAID "NINE REMAIN" WHILE THE LIST HELD SIX, and had since v4311. *** The
 // array was updated three times and the sentence beside it was not, so this file's own header disagreed with
 // its own data for eight rounds and nothing noticed -- the same shape as the premultiplied count that said
-// thirteen and tested fourteen (fixed at v4316). The count is DERIVED from the list below now, everywhere it
-// is stated, so the sentence cannot drift from the array again.
-export const UNPORTED = [
-    "disintegrate", "etherealAura", "liquidMirror",
-];
+// thirteen and tested fourteen (fixed at v4316). The count is DERIVED from the list now, everywhere it is
+// stated, so a sentence cannot drift from the array again.
+export const UNPORTED = [];
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -961,7 +963,8 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
             flat.data[i + 2] = ((x + y) % 7) / 6; flat.data[i + 3] = 0.6;
         }
         const FN = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry,
-            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
+            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics,
+            disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura, liquidMirror: bcsLiquidMirror, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
                      pixelateMosaic: bcsPixelateMosaic, refractLens: bcsRefractLens, emboss: bcsEmboss,
                      vortex: bcsVortex, melt: bcsMelt, glitch: bcsGlitch, heatShimmer: bcsHeatShimmer,
                      wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
@@ -984,11 +987,25 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
         ok("!! *** the map of the 28 is COVERED: every ported name has a model function here ***",
             pass.swiftShaderNames().every((n) => typeof FN[n] === "function"),
             "a name missing from this map would silently skip the alpha census below rather than fail it");
-        ok("!! *** only THREE of the 28 touch alpha on a flat-alpha image, and only TWO by a visible amount ***",
-            moved.length === 3 && visible.length === 2 &&
-            visible.includes("refractLens") && visible.includes("pixelateMosaic"),
-            moved.join(", ") + "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, " +
-            "which is under a level of 255 and is not a write");
+        // *** v4320 -- THIS CENSUS CAUGHT BATCH 16 BEFORE ANY PROSE ABOUT IT WAS WRITTEN, WHICH IS THE
+        // WHOLE POINT OF RUNNING IT OVER EVERY SHADER RATHER THAN OVER A LIST. *** It was "THREE of the 28,
+        // TWO visibly" and disintegrate made it four and three, at 0.6000 -- the largest alpha move in the
+        // file. That is not a defect: bcs_disintegrate DISSOLVES the image, so `result.a *= half(edge)` is
+        // the effect and not a compositing artefact, and below the burn front it returns half4(0) outright.
+        //
+        // The count is no longer typed. What is asserted is the DIVISION: alpha movement is either an
+        // accident of quantisation (under one level of 255, like frosted's 0.0001 from toHalf on a mix of
+        // two equal alphas) or a DELIBERATE WRITE by a shader whose stated purpose includes it. Every visible
+        // mover must be one of the four named here, so a shader that starts eating alpha by accident still
+        // fails -- which is what this line has always been for.
+        const ALPHA_WRITERS = ["refractLens", "pixelateMosaic", "disintegrate"];
+        const strays = visible.filter((n) => !ALPHA_WRITERS.includes(n));
+        ok("!! *** every VISIBLE alpha move belongs to a shader whose effect is alpha -- and there are three ***",
+            strays.length === 0 && visible.length === ALPHA_WRITERS.length,
+            moved.join(", ") + (strays.length ? "  -- STRAY WRITERS: " + strays.join(", ") : "") +
+            "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, which is under a " +
+            "level of 255 and is not a write. disintegrate's 0.6000 is the largest in the file and is the " +
+            "shader's entire subject: it is the ONLY one of the 41 that writes alpha as its effect.");
         ok("!! ...so 'the first shader that writes alpha' was WRONG: refractLens got there at v4196",
             (() => {
                 const o = bcsRefractLens(flat, { ...pass.DEFAULT_KNOBS.refractLens });
@@ -1140,7 +1157,8 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         await pg.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 
         const MODEL = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry,
-            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
+            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics,
+            disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura, liquidMirror: bcsLiquidMirror, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
             duochrome: bcsDuochrome, vortex: bcsVortex, kaleidoscope: bcsKaleidoscope,
             chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
             melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
@@ -1156,6 +1174,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // displacement and the height field disagree with each other rather than sharing one sample.
         const CASES = { lyapunov: {}, fresnelEdge: {}, airyDisk: {},
             shatter: { time: 0.5, explode: 0.4 }, shatterGlass: { time: 0.5 }, underwaterCaustics: { time: 0.5 },
+            disintegrate: { time: 0.5 }, etherealAura: { time: 0.5 }, liquidMirror: { time: 0.5 },
             liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
             magneticField: { time: 0.6, polarity: 0.5 }, aurora: { time: 0.7 },
             datamosh: { time: 0.4, blockCorruption: 0.7 }, smokeReveal: { time: 0.5 },
