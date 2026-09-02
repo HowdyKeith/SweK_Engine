@@ -30,7 +30,7 @@ console.log("\n1. IDENTITY SURVIVES COMPACTION");
     const twin = G.cullLodCpu(records, u);
     let idsOk = true; for (let l = 0; l < 3; l++) for (let s = 0; s < twin.counts[l]; s++) { const o = (l * COUNT + s) * 8; if (twin.compact[o + 4] !== twin.ids[l][s] || twin.compact[o + 5] !== l) idsOk = false; }
     ok("the twin writes the input index and the LOD into every compacted record", idsOk);
-    ok("decodePick reads back what the shader encodes, and null for background", JSON.stringify(G.decodePick(new Uint8Array([0x34, 0x12, 2, 128]), 0)) === JSON.stringify({ id: 0x1234, lod: 2 }) && G.decodePick(new Uint8Array([9, 9, 9, 0]), 0) === null);
+    ok("decodePick reads back what the shader encodes, and null for background", JSON.stringify(G.decodePick(new Uint8Array([0x34, 0x12, 2, 128]), 0)) === JSON.stringify({ id: 0x1234, lod: 2, fleet: 0 }) && G.decodePick(new Uint8Array([9, 9, 9, 0]), 0) === null);
     ok("  v4300: a third byte rides in alpha, so an id above 65,535 decodes", G.decodePick(new Uint8Array([0x70, 0x11, 1, 128 + 1]), 0).id === 0x11170 + 0 && G.decodePick(new Uint8Array([0, 0, 0, 128 + 127]), 0).id === 127 * 65536, "ids to 8,388,607; the universe's 6,211 needed one more than two bytes' worth of room to be honest about");
 }
 

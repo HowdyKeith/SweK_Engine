@@ -84,7 +84,7 @@ function nullBackend(opts = {}) {
                      write: (v, off = 0) => { ops.push(["write", usage[0], off]); if (data && v && v.byteLength) new Uint8Array(data.buffer, data.byteOffset).set(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), off); },
                      destroy: () => ops.push(["destroyBuffer"]) }; },
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
-        pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d),
+        pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
                             bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? parseBindings(d.shaders.wgsl) : [] }),
         compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? parseBindings(d.wgsl) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
@@ -145,7 +145,8 @@ function webgl2Backend(canvas, opts = {}) {
         },
         read: async (b) => { const out = new Uint8Array(b.size); gl.bindBuffer(b.tgt, b.gl); gl.getBufferSubData(b.tgt, 0, out); return out.buffer; },
         depthTexture: () => null,
-        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw" }),
+        // v4301 -- `topology: "line-list"` draws gl.LINES, the same word the WebGPU pipeline takes; anything else is triangles.
+        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES }),
         compute: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
         // *** `source` ACCEPTS A CANVAS OR IMAGE, WHICH v4273's FIRST REAL CONSUMER NEEDED AND THIS DID NOT HAVE.
         // *** ui/orreryPost.mjs feeds the orrery's 2D canvas through a post effect, and a post stage's source is
@@ -198,12 +199,13 @@ function webgl2Backend(canvas, opts = {}) {
                 uniform: (n, v) => { const loc = gl.getUniformLocation(cur.prog, n); if (loc == null) return; if (Array.isArray(v) || v instanceof Float32Array) { const fn = { 2: "uniform2fv", 3: "uniform3fv", 4: "uniform4fv", 16: "uniformMatrix4fv" }[v.length]; if (v.length === 16) gl.uniformMatrix4fv(loc, false, v); else gl[fn || "uniform1fv"](loc, v); } else gl.uniform1f(loc, v); },
                 texture: (n, t, unit = 0) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t.gl); gl.uniform1i(gl.getUniformLocation(cur.prog, n), unit); },
                 storage: () => { throw _refuse("webgl2", "storage buffers", CPU_TWIN); },
-                draw: (n, instances = 1) => { if (instances > 1) gl.drawArraysInstanced(gl.TRIANGLES, 0, n, instances); else gl.drawArrays(gl.TRIANGLES, 0, n); },
+                draw: (n, instances = 1) => { const mode = cur ? cur.mode : gl.TRIANGLES; if (instances > 1) gl.drawArraysInstanced(mode, 0, n, instances); else gl.drawArrays(mode, 0, n); },
                 drawIndexed: (n, instances = 1, firstIndex = 0, baseVertex = 0, firstInstance = 0) => {
                     if (!idx) throw new Error("gfx/device: drawIndexed() with no index buffer bound -- call pass.indices(buf) first");
                     if (baseVertex || firstInstance) throw _refuse("webgl2", "baseVertex / firstInstance (WEBGL_draw_instanced_base_vertex_base_instance is not assumed)", "Pack meshes with absolute indices -- render/gpuDriven.mjs packMeshes() does -- so both are 0.");
                     const bytes = idx.indexType === gl.UNSIGNED_SHORT ? 2 : 4;
-                    if (instances > 1) gl.drawElementsInstanced(gl.TRIANGLES, n, idx.indexType, firstIndex * bytes, instances); else gl.drawElements(gl.TRIANGLES, n, idx.indexType, firstIndex * bytes); },
+                    const mode = cur ? cur.mode : gl.TRIANGLES;
+                    if (instances > 1) gl.drawElementsInstanced(mode, n, idx.indexType, firstIndex * bytes, instances); else gl.drawElements(mode, n, idx.indexType, firstIndex * bytes); },
                 drawIndexedIndirect: () => { throw _refuse("webgl2", "indirect draws", CPU_TWIN); }
             };
             fn({ pass, device: dev });

@@ -37,6 +37,7 @@ import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL } from "../../render/gpuTerrain.mjs";
+import * as FL from "../../render/fleets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -102,6 +103,14 @@ export function corpus() {
         { id: "gpuDriven.PICK_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
           why: "a flat-interpolated identity output and u32 bit slicing in the vertex stage -- the pick picture's encoding",
           opts: { code: GD.PICK_WGSL, compileOnly: true, outCount: 0 } },
+        // v4301 (Level 15) -- the fleet looks: vertex/fragment pairs, compile-only here (fleets-selfcheck draws them).
+        { id: "fleets.LIT_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "a lambert hull over a per-vertex normal at location 4 -- the first fleet with a normal", opts: { code: FL.LIT_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.SPRITE_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "textureLoad by uv in the fragment stage with discard -- a sprite's shape from its alpha", opts: { code: FL.SPRITE_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.HOLO_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "the HOLOGRAPHIC rainbow phase over @builtin(position) in a fragment, plus a scanline", opts: { code: FL.HOLO_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.INK_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "the line-list look: the one pipeline whose topology is not triangles", opts: { code: FL.INK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.ASCII_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "screen cells from @builtin(position), a glyph per lit shade, textureLoad from a tile atlas", opts: { code: FL.ASCII_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.SPIN_PICK_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "the looks' pick shader: the same spin as the looks, gpuDriven's identity encoding lifted by pattern", opts: { code: FL.SPIN_PICK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleets.SPRITE_PICK_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "a pick that discards where the sprite is transparent -- identity in the shape of the art, not its quad", opts: { code: FL.SPRITE_PICK_WGSL, compileOnly: true, outCount: 0 } },
         { id: "gpuTerrain.TERRAIN_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
           why: "textureLoad and textureDimensions in the VERTEX stage -- the heightfield lift, which no other shader here does",
           opts: { code: TERRAIN_WGSL, compileOnly: true, outCount: 0 } },

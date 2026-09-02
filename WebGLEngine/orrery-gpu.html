@@ -41,6 +41,7 @@
     <label><input id="occ" type="checkbox" checked> occlusion (WebGPU)</label>
   </div>
   <div><label><input id="life" type="checkbox" checked> life: the economy's traders</label> <span id="pick" style="color:#f0e29e">point at something</span></div>
+  <div style="color:#9fb8a8">races: <span id="races"></span></div>
   <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
@@ -51,6 +52,7 @@ import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
+import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
 const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
@@ -76,7 +78,15 @@ say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compu
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
 const economy = makeGitEconomy(system, { seed: 7 });
 const lifeSource = { count: economy.ships.length, cpu: () => economy.records(0.14) };
-const lifeScene = G.makeGpuDrivenScene(device, { lods: [{ name: "ship", mesh: G.quadMesh(1, [1, 0.85, 0.35, 1]) }], thresholds: [], records: lifeSource });
+// v4301 (Level 15) -- FLEETS: every owner in the git graph is a race, and every race is its own architecture and
+// shader (render/fleets.mjs). If the person assigned a ship model in Escape Velocity or a plane on the radar,
+// the raised hull is theirs: the Wedge race wears it, the Krbn race skins it, the Glyph race pins glyphs to it.
+let userHull = null;
+try { const src = userModelSources(localStorage).find((x) => x.loadable); if (src) { userHull = await loadUserModel(src); say(`the ${src.kind} model for ${src.cls} (${src.url}) is the raised hull`); } } catch (e) { console.warn("user model:", e.message); }
+const std = standardFleets(device, { userHull });
+const fleetOf = fleetsForNames(economy.names, std.fleets.length);
+const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource });
+document.getElementById("races").textContent = std.fleets.map((f, i) => `${f.name} ${fleetOf.reduce((n, x) => n + (x === i), 0)}`).join(" / ");
 const bodyNames = ["SweK", ...system.bodies.map((b) => b.name)];
 let pointer = null, lastSimT = 0;
 cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
@@ -107,7 +117,7 @@ async function frame(now) {
     if (pointer && (frames & 3) === 0) {
         try {
             let hit = life ? await lifeScene.pick(pointer[0], pointer[1]) : null;
-            document.getElementById("pick").textContent = hit ? economy.describe(hit.id)
+            document.getElementById("pick").textContent = hit ? `[${hit.fleetName}: ${RACES[hit.fleet].architecture}] ` + economy.describe(hit.id)
                 : ((hit = await scene.pick(pointer[0], pointer[1])) ? `${bodyNames[hit.id]}${hit.id ? " -- " + Object.entries(economy.markets[hit.id - 1].trade).map(([g, p]) => g + " " + p).join(", ") : ""}` : "nothing under the pointer");
         } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }
     }

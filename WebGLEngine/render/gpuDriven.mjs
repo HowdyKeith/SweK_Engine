@@ -1,4 +1,4 @@
-// WebGLEngine/render/gpuDriven.mjs -- v4299 (Level 11)
+// WebGLEngine/render/gpuDriven.mjs -- v4299 (Level 11) .. v4301 (Level 15)
 //
 // LEVEL 11: GPU-DRIVEN RENDERING. A compute pass culls every instance against the view frustum, picks its level
 // of detail from its angular size, and writes the draw commands; the render pass then draws each LOD with ONE
@@ -25,6 +25,16 @@
 // rankLods() sorts the levels by a cost derived from each one -- triangles times the encoded complexity of the
 // shader it draws with (render/shaderComplexity.mjs) -- and the thresholds are sorted to match. Hand the same
 // levels over in any order and LOD 0 is still the most expensive one, which is the only meaning "LOD 0" has.
+//
+// ---- v4301 (Level 15): FLEETS -- ONE SCENE, MANY ARCHITECTURES ----------------------------------------------------
+//
+// Every instance may carry a FLEET number (a `fleetOf` u32 per record), and the cull writes one region per
+// (fleet, LOD) instead of one per LOD: region = fleet * lodCount + lod. Each fleet brings its OWN meshes, its
+// own vertex layout, its own pipeline and its own bind hook, so one fleet is flat quads, the next a lit 3D
+// hull, the next a textured sprite, the next ink strokes on a line-list -- and the draw loop is unchanged:
+// use the fleet's pipeline, then one indirect draw per region. The identity picture carries the fleet too
+// (render/fleets.mjs has the architectures; the pick's blue channel packs lod + fleet * 8). A scene with no
+// fleets is a scene with one, and every region index it ever computed is the same number as before.
 "use strict";
 
 import { complexityOf } from "./shaderComplexity.mjs";
@@ -37,7 +47,7 @@ export const INDIRECT_BYTES = INDIRECT_STRIDE_U32 * 4;
 export const RECORD_FLOATS = 4;
 /**
  * One COMPACTED record, what the cull writes and the vertex stage reads per instance: the input record, then
- * (id, lod, phase, 0) -- the `ident` attribute; `meta` is a reserved word in WGSL, found by the compile watcher. Level 13 -- the id survives compaction so a pick can name what it hit; before this the
+ * (id, lod, phase, fleet) -- the `ident` attribute (fleet since v4301, 0 before); `meta` is a reserved word in WGSL, found by the compile watcher. Level 13 -- the id survives compaction so a pick can name what it hit; before this the
  * slot was all a drawn instance knew about itself, and a slot is whatever the atomics made it.
  */
 export const OUT_RECORD_FLOATS = 8;
@@ -45,7 +55,10 @@ export const RECORD_BYTES = OUT_RECORD_FLOATS * 4;
 export const CULL_WORKGROUP = 64;
 /** thresholds is one vec4, so at most four boundaries: five levels. */
 export const MAX_LODS = 5;
-/** The cull uniform block: planes[6] + eye + thresholds + info(count, lodCount, cap, 0), all vec4 -- 144 bytes. */
+/**
+ * The cull uniform block: planes[6] + eye + thresholds + info(count, lodCount, cap, phase), all vec4 -- 144 bytes.
+ * v4301: eye.w carries the FLEET COUNT (it was the padding 0 before; the shader and the twin both read 0 as 1).
+ */
 export const CULL_UNIFORM_FLOATS = 36;
 export const CULL_UNIFORM_BYTES = CULL_UNIFORM_FLOATS * 4;
 
@@ -161,8 +174,12 @@ export function hizReduceWgsl() {
 `;
 }
 
-/** The real cull shader: reads instances, appends survivors to their LOD's region, bumps that LOD's command. */
-export function cullLodWgsl({ occlusion = false } = {}) {
+/**
+ * The real cull shader: reads instances, appends survivors to their (fleet, LOD) region, bumps that region's
+ * command. `fleets: true` adds the per-instance fleet buffer; without it the text is what Levels 11-14 shipped
+ * and every instance is in fleet 0.
+ */
+export function cullLodWgsl({ occlusion = false, fleets = false } = {}) {
     return `${CULL_FN_WGSL}${occlusion ? OCC_FN_WGSL : ""}
 struct Cmd { indexCount: u32, instanceCount: atomic<u32>, firstIndex: u32, baseVertex: u32, firstInstance: u32 };
 
@@ -173,6 +190,7 @@ struct Cmd { indexCount: u32, instanceCount: atomic<u32>, firstIndex: u32, baseV
 ${occlusion ? `@group(0) @binding(4) var<uniform> occ: Occ;
 @group(0) @binding(5) var<storage, read> hiz: array<f32>;
 @group(0) @binding(6) var<storage, read_write> rejected: array<u32>;` : ""}
+${fleets ? `@group(0) @binding(${occlusion ? 7 : 4}) var<storage, read> fleetOf: array<u32>;` : ""}
 
 // info.w is the PHASE: 0 = the only or first pass; 1 = the second phase, which looks only at what phase 0
 // rejected for occlusion and tests it against the pyramid built from phase 0's own draw. A body that last
@@ -190,10 +208,12 @@ ${occlusion ? `  let hidden = hizOccluded(c, occ, &hiz);
   if (phase == 0u) { rejected[i] = select(0u, 1u, hidden); }
   if (hidden) { return; }` : ""}
   let cap = u32(cull.info.z);
-  let slot = atomicAdd(&cmds[u32(lod)].instanceCount, 1u);
+${fleets ? `  let fleet = min(fleetOf[i], max(1u, u32(cull.eye.w)) - 1u);
+  let region = fleet * u32(cull.info.y) + u32(lod);` : "  let fleet = 0u;\n  let region = u32(lod);"}
+  let slot = atomicAdd(&cmds[region].instanceCount, 1u);
   if (slot < cap) {
-    records[(u32(lod) * cap + slot) * 2u] = c;
-    records[(u32(lod) * cap + slot) * 2u + 1u] = vec4<f32>(f32(i), f32(lod), f32(phase), 0.0);
+    records[(region * cap + slot) * 2u] = c;
+    records[(region * cap + slot) * 2u + 1u] = vec4<f32>(f32(i), f32(lod), f32(phase), f32(fleet));
   }
 }
 `;
@@ -259,8 +279,8 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat)
   var o: VOut;
   o.pos = cam.viewProj * vec4<f32>(rec.xyz + p * rec.w, 1.0);
   let id = u32(ident.x);
-  // r, g: the id's low two bytes; b: the LOD; a: 128 + the id's third byte -- never 0, so "something" survives
-  o.id = vec4<f32>(f32(id & 255u) / 255.0, f32((id >> 8u) & 255u) / 255.0, ident.y / 255.0, f32(128u + ((id >> 16u) & 127u)) / 255.0);
+  // r, g: the id's low two bytes; b: the LOD + 8 x the fleet (v4301); a: 128 + the id's third byte -- never 0, so "something" survives
+  o.id = vec4<f32>(f32(id & 255u) / 255.0, f32((id >> 8u) & 255u) / 255.0, (ident.y + ident.w * 8.0) / 255.0, f32(128u + ((id >> 16u) & 127u)) / 255.0);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> { return v.id; }
@@ -273,7 +293,7 @@ flat out vec4 vId;
 void main() {
   gl_Position = viewProj * vec4(rec.xyz + p * rec.w, 1.0);
   int id = int(ident.x);
-  vId = vec4(float(id & 255) / 255.0, float((id >> 8) & 255) / 255.0, ident.y / 255.0, float(128 + ((id >> 16) & 127)) / 255.0);
+  vId = vec4(float(id & 255) / 255.0, float((id >> 8) & 255) / 255.0, (ident.y + ident.w * 8.0) / 255.0, float(128 + ((id >> 16) & 127)) / 255.0);
 }
 `;
 export const PICK_FRAGMENT_GLSL = `#version 300 es
@@ -281,8 +301,12 @@ precision highp float;
 flat in vec4 vId; out vec4 fragColor;
 void main() { fragColor = vId; }
 `;
-/** Decode a pick pixel: null for background, else { id, lod }. v4300: ids up to 8,388,607 (a third byte in alpha). */
-export function decodePick(px, i) { if (px[i + 3] < 128) return null; return { id: px[i] + px[i + 1] * 256 + (px[i + 3] - 128) * 65536, lod: px[i + 2] }; }
+/**
+ * Decode a pick pixel: null for background, else { id, lod, fleet }. v4300: ids up to 8,388,607 (a third byte in
+ * alpha). v4301: blue is lod + fleet * 8 -- five LODs fit in three bits, so thirty-two fleets fit in the rest.
+ */
+export const MAX_FLEETS = 32;
+export function decodePick(px, i) { if (px[i + 3] < 128) return null; return { id: px[i] + px[i + 1] * 256 + (px[i + 3] - 128) * 65536, lod: px[i + 2] & 7, fleet: px[i + 2] >> 3 }; }
 export const RENDER_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
@@ -297,46 +321,75 @@ void main() { fragColor = vColor; }
 `;
 /** Vertex: position xyz + color rgba, 28 bytes. Instance: one record, 16 bytes, advanced per instance. */
 export const VERTEX_FLOATS = 7;
-export function renderPipelineDesc() {
+/**
+ * v4301 -- VERTEX LAYOUTS. A layout is the list of per-vertex attributes in slot 0, each drawn from a field of the
+ * mesh (`from`): "positions" and "normals" and "uvs" are per-vertex arrays, "color" is the mesh's one colour.
+ * Every layout starts with `p` at location 0, because the pick shader reads only that and the instance slot.
+ */
+export const LAYOUTS = Object.freeze({
+    flat: Object.freeze([{ name: "p", size: 3, from: "positions" }, { name: "color", size: 4, from: "color" }]),
+    lit: Object.freeze([{ name: "p", size: 3, from: "positions" }, { name: "color", size: 4, from: "color" }, { name: "n", size: 3, from: "normals" }]),
+    sprite: Object.freeze([{ name: "p", size: 3, from: "positions" }, { name: "color", size: 4, from: "color" }, { name: "uv", size: 2, from: "uvs" }]),
+});
+/** The two vertex-buffer slots of a layout: the per-vertex slot, then the instance slot every pipeline shares. */
+export function layoutBuffers(layout = LAYOUTS.flat) {
+    // Locations are EXPLICIT: p 0, color 1, the instance slot 2 (rec) and 3 (ident) as every shader here reads
+    // them, and a layout's extras from 4 up -- so a richer layout never shifts the instance attributes, and the
+    // pick shader (which reads p, rec, ident only) draws over any of them.
+    let off = 0; const attributes = layout.map((a, i) => { const o = off; off += a.size * 4; return { name: a.name, size: a.size, offset: o, location: i < 2 ? i : i + 2 }; });
+    return [
+        { stride: off, stepMode: "vertex", attributes },
+        { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0, location: 2 }, { name: "ident", size: 4, offset: 16, location: 3 }] },
+    ];
+}
+export function renderPipelineDesc({ layout = LAYOUTS.flat, shaders = null, uniforms = null, topology = null, cull = null, frontFace = null } = {}) {
     return {
-        shaders: { wgsl: RENDER_WGSL, glsl: { vertex: RENDER_VERTEX_GLSL, fragment: RENDER_FRAGMENT_GLSL } },
+        shaders: shaders || { wgsl: RENDER_WGSL, glsl: { vertex: RENDER_VERTEX_GLSL, fragment: RENDER_FRAGMENT_GLSL } },
         vs: "vs", fs: "fs",
-        buffers: [
-            { stride: VERTEX_FLOATS * 4, stepMode: "vertex", attributes: [{ name: "p", size: 3, offset: 0 }, { name: "color", size: 4, offset: 12 }] },
-            { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0 }, { name: "ident", size: 4, offset: 16 }] },
-        ],
-        uniforms: [{ name: "viewProj", type: "mat4" }],
+        buffers: layoutBuffers(layout),
+        uniforms: uniforms || [{ name: "viewProj", type: "mat4" }],
+        ...(topology ? { topology } : {}), ...(cull ? { cull } : {}), ...(frontFace ? { frontFace } : {}),
     };
 }
-/** The pick pipeline: the SAME buffers and uniform, identity for colour. Any consumer pipeline can be picked. */
-export function pickPipelineDesc() {
-    return { ...renderPipelineDesc(), shaders: { wgsl: PICK_WGSL, glsl: { vertex: PICK_VERTEX_GLSL, fragment: PICK_FRAGMENT_GLSL } } };
+/**
+ * The pick pipeline: the SAME buffers and uniform, identity for colour. Any consumer pipeline can be picked; a
+ * fleet with its own layout or topology gets a pick pipeline over that layout, reading `p` and the instance slot.
+ */
+export function pickPipelineDesc({ layout = LAYOUTS.flat, topology = null } = {}) {
+    return { ...renderPipelineDesc({ layout, topology }), shaders: { wgsl: PICK_WGSL, glsl: { vertex: PICK_VERTEX_GLSL, fragment: PICK_FRAGMENT_GLSL } }, uniforms: [{ name: "viewProj", type: "mat4" }] };
 }
 
 // ---- meshes -------------------------------------------------------------------------------------------------------
 /**
  * Pack the LOD meshes into ONE vertex buffer and ONE index buffer with ABSOLUTE indices, so every draw has
  * baseVertex 0 -- WebGL2 has no base vertex without an extension, and gfx/device.js refuses a non-zero one there.
- * Each mesh: { positions: Float32Array(3n), indices: (Uint16|Uint32)Array, color: [r,g,b,a] }.
+ * Each mesh: { positions: Float32Array(3n), indices: (Uint16|Uint32)Array, color: [r,g,b,a], normals?, uvs?, colors? } --
+ * per-vertex `colors` (rgb or rgba per vertex, a voxel mesh's) win over the one `color` where present.
+ * v4301: `layout` (LAYOUTS.*) says which fields travel per vertex; the default is the 7-float flat layout of
+ * Levels 11-14, byte for byte. A mesh missing a field the layout wants gets zeros there, and says so in `missing`.
  */
-export function packMeshes(meshes) {
+export function packMeshes(meshes, layout = LAYOUTS.flat) {
+    const floats = layout.reduce((s, a) => s + a.size, 0);
     let nv = 0, ni = 0;
     for (const m of meshes) { nv += m.positions.length / 3; ni += m.indices.length; }
-    const vertexData = new Float32Array(nv * VERTEX_FLOATS), indexData = new Uint32Array(ni);
-    const ranges = [];
+    const vertexData = new Float32Array(nv * floats), indexData = new Uint32Array(ni);
+    const ranges = [], missing = [];
     let vb = 0, ib = 0;
     for (const m of meshes) {
         const n = m.positions.length / 3, col = m.color || [1, 1, 1, 1];
         for (let v = 0; v < n; v++) {
-            const o = (vb + v) * VERTEX_FLOATS;
-            vertexData[o] = m.positions[v * 3]; vertexData[o + 1] = m.positions[v * 3 + 1]; vertexData[o + 2] = m.positions[v * 3 + 2];
-            vertexData[o + 3] = col[0]; vertexData[o + 4] = col[1]; vertexData[o + 5] = col[2]; vertexData[o + 6] = col[3] == null ? 1 : col[3];
+            let o = (vb + v) * floats;
+            for (const a of layout) {
+                if (a.from === "color") { const pv = m.colors, cs = pv ? pv.length / n : 0; for (let k = 0; k < a.size; k++) vertexData[o + k] = (pv && k < cs) ? pv[v * cs + k] : (col[k] == null ? 1 : col[k]); }
+                else { const src = m[a.from]; if (!src) { if (v === 0 && !missing.includes(a.from)) missing.push(a.from); } else for (let k = 0; k < a.size; k++) vertexData[o + k] = src[v * a.size + k]; }
+                o += a.size;
+            }
         }
         for (let k = 0; k < m.indices.length; k++) indexData[ib + k] = m.indices[k] + vb;
         ranges.push({ indexCount: m.indices.length, firstIndex: ib, baseVertex: 0, triangles: m.indices.length / 3 });
         vb += n; ib += m.indices.length;
     }
-    return { vertexData, indexData, ranges };
+    return { vertexData, indexData, ranges, stride: floats * 4, floats, missing };
 }
 
 /** A unit quad in the XY plane, as a mesh with `subdiv` cells per side -- a cheap way to give LODs real triangle counts. */
@@ -384,10 +437,10 @@ export function rankLods(lods, thresholds, { shader = RENDER_WGSL } = {}) {
 
 // ---- the CPU twin -------------------------------------------------------------------------------------------------
 /** Pack the cull uniforms exactly as the WGSL struct lays them out. */
-export function packCullUniforms({ planes, eye, thresholds, count, lodCount, cap, phase = 0 }) {
+export function packCullUniforms({ planes, eye, thresholds, count, lodCount, cap, phase = 0, fleetCount = 1 }) {
     const u = new Float32Array(CULL_UNIFORM_FLOATS);
     u.set(planes.subarray ? planes.subarray(0, 24) : planes.slice(0, 24), 0);
-    u[24] = eye[0]; u[25] = eye[1]; u[26] = eye[2]; u[27] = 0;
+    u[24] = eye[0]; u[25] = eye[1]; u[26] = eye[2]; u[27] = fleetCount;
     for (let k = 0; k < 4; k++) u[28 + k] = thresholds[k] == null ? 0 : thresholds[k];
     u[32] = count; u[33] = lodCount; u[34] = cap; u[35] = phase;
     return u;
@@ -405,25 +458,30 @@ export function cullLodCpuOne(c, u) {
     return lod;
 }
 /**
- * The twin of cullLodWgsl(): for every instance record, which LOD (or none). Returns per-LOD id lists, the
- * counts, and the compacted record buffer laid out exactly as the compute shader lays it out (LOD-major regions
- * of `cap` records), so a WebGL2 path can upload it as-is and a gate can compare it as a set.
+ * The twin of cullLodWgsl(): for every instance record, which LOD (or none). Returns per-REGION id lists, the
+ * counts, and the compacted record buffer laid out exactly as the compute shader lays it out (region-major, `cap`
+ * records each), so a WebGL2 path can upload it as-is and a gate can compare it as a set. v4301: a region is
+ * (fleet, LOD) -- fleet * lodCount + lod -- with `fleetOf` a u32 per record and the fleet count in the uniforms;
+ * without either, every record is fleet 0 and region == LOD, as before.
  */
-export function cullLodCpu(records, u) {
-    const count = u[32] | 0, lodCount = u[33] | 0, cap = u[34] | 0;
-    const ids = Array.from({ length: lodCount }, () => []);
+export function cullLodCpu(records, u, fleetOf = null) {
+    const count = u[32] | 0, lodCount = u[33] | 0, cap = u[34] | 0, fleetCount = Math.max(1, u[27] | 0), regions = lodCount * fleetCount;
+    const ids = Array.from({ length: regions }, () => []);
     for (let i = 0; i < count; i++) {
         const c = [records[i * 4], records[i * 4 + 1], records[i * 4 + 2], records[i * 4 + 3]];
         const lod = cullLodCpuOne(c, u);
-        if (lod >= 0) ids[lod].push(i);
+        if (lod < 0) continue;
+        const fleet = fleetOf ? Math.min(fleetOf[i], fleetCount - 1) : 0;
+        ids[fleet * lodCount + lod].push(i);
     }
-    const counts = new Uint32Array(lodCount), compact = new Float32Array(lodCount * cap * OUT_RECORD_FLOATS);
-    for (let l = 0; l < lodCount; l++) {
-        counts[l] = ids[l].length;
-        for (let s = 0; s < Math.min(cap, ids[l].length); s++) { const o = (l * cap + s) * OUT_RECORD_FLOATS;
-            compact.set(records.subarray(ids[l][s] * 4, ids[l][s] * 4 + 4), o); compact[o + 4] = ids[l][s]; compact[o + 5] = l; compact[o + 6] = 0; compact[o + 7] = 0; }
+    const counts = new Uint32Array(regions), compact = new Float32Array(regions * cap * OUT_RECORD_FLOATS);
+    for (let r = 0; r < regions; r++) {
+        counts[r] = ids[r].length;
+        const lod = r % lodCount, fleet = Math.floor(r / lodCount);
+        for (let s = 0; s < Math.min(cap, ids[r].length); s++) { const o = (r * cap + s) * OUT_RECORD_FLOATS;
+            compact.set(records.subarray(ids[r][s] * 4, ids[r][s] * 4 + 4), o); compact[o + 4] = ids[r][s]; compact[o + 5] = lod; compact[o + 6] = 0; compact[o + 7] = fleet; }
     }
-    return { ids, counts, compact, visible: ids.reduce((a, b) => a + b.length, 0) };
+    return { ids, counts, compact, visible: ids.reduce((a, b) => a + b.length, 0), lodCount, fleetCount, regions };
 }
 // ---- the Hi-Z twin: the same pyramid from the same depth image, the same test in the same order ---------------
 /** Level dimensions and buffer offsets for a w x h depth image reduced to 1x1. */
@@ -474,7 +532,7 @@ export function hizOccludedCpu(c, u, pyramid) {
     return { occluded: depth > far, depth, far, level, rect: [x0, y0, x1, y1] };
 }
 
-/** The indirect command template: per LOD, its mesh range with instanceCount 0. Written fresh every frame. */
+/** The indirect command template: per REGION (fleet-major, then LOD), its mesh range with instanceCount 0. Written fresh every frame. */
 export function indirectTemplate(ranges) {
     const t = new Uint32Array(ranges.length * INDIRECT_STRIDE_U32);
     ranges.forEach((r, l) => { const o = l * INDIRECT_STRIDE_U32; t[o] = r.indexCount; t[o + 1] = 0; t[o + 2] = r.firstIndex; t[o + 3] = r.baseVertex || 0; t[o + 4] = 0; });
@@ -507,12 +565,22 @@ const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]
  *   lods:       [{ name, mesh }] in ANY order -- rankLods() decides which is LOD 0
  *   thresholds: lods.length - 1 angular-size boundaries (radius / distance), any order
  *   records:    Float32Array of 4 per instance (center.xyz, radius)
- *   cap:        records per LOD region; defaults to the instance count, so no region can overflow
+ *   cap:        records per region; defaults to the instance count, so no region can overflow
  * frame({ viewProj, eye, clear }) culls and draws. On WebGPU that is a dispatch and one drawIndexedIndirect per
- * LOD; elsewhere it is the twin and one drawIndexed per LOD. readCounts() reads the instance counts back from
- * wherever they were produced -- the indirect buffer on WebGPU, the twin's result otherwise.
+ * region; elsewhere it is the twin and one drawIndexed per region. readCounts() reads the instance counts back
+ * from wherever they were produced -- the indirect buffer on WebGPU, the twin's result otherwise.
+ *
+ * v4301 -- FLEETS. Instead of `lods` (+ pipeline, bind), pass
+ *   fleets:  [{ name, lods, layout?, pipeline?, bind?, topology? }]   each fleet its own meshes, layout and shaders
+ *   fleetOf: Uint32Array(count)                                         which fleet each record belongs to
+ * All fleets share the thresholds, so each must bring thresholds.length + 1 levels (the ladder is the scene's;
+ * the rungs are the fleet's). A fleet's `bind(pass, ctx)` runs after use() each draw, with ctx = { viewProj,
+ * eye, time } so a shader can take its light or its clock. The pick pipeline is per fleet, over that fleet's
+ * layout and topology, so what is under the pointer is answered for every architecture the same way; a fleet
+ * whose vertex stage moves the hull passes `pickPipeline` (and `pickBind`) so the identity picture moves it too --
+ * the fleets gate found the default pick drawing unspun hulls under spun ones, and named the wrong pixels.
  */
-export function makeGpuDrivenScene(device, { lods, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null }) {
+export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null }) {
     // Level 12 -- `records` may be a Float32Array (static instances) or a SOURCE produced elsewhere each frame:
     //   { count, buffer }   a gfx/device.js buffer another compute pass writes (WebGPU: the cull reads it directly)
     //   { count, cpu }      a function returning the Float32Array for this frame (the twin route, any backend)
@@ -522,16 +590,37 @@ export function makeGpuDrivenScene(device, { lods, thresholds, records, cap = nu
     const src = records instanceof Float32Array ? { count: records.length / RECORD_FLOATS, cpu: () => records, static: records } : records;
     if (!src || !(src.count > 0) || (!src.cpu && !src.static)) throw new Error("gpuDriven: records must be a Float32Array or { count, cpu() } (with an optional GPU `buffer`) -- the twin needs a CPU copy");
     const count = src.count;
-    const ranked = rankLods(lods, thresholds);
-    const lodCount = ranked.lods.length;
+    // one fleet or many: a scene without fleets is a scene with one, named "all", carrying the legacy pipeline/bind
+    const fleetDefs = fleets && fleets.length ? fleets : [{ name: "all", lods, pipeline, bind }];
+    if (fleetDefs.length > MAX_FLEETS) throw new Error(`gpuDriven: ${fleetDefs.length} fleets; the pick picture packs the fleet in five bits, so at most ${MAX_FLEETS}`);
+    const fleetCount = fleetDefs.length, hasFleets = !!(fleets && fleets.length);
+    if (hasFleets && !(fleetOf && fleetOf.length >= count)) throw new Error(`gpuDriven: ${fleetCount} fleets need a fleetOf (Uint32Array) with one entry per record (${count}); without it nobody knows which architecture an instance is`);
+    if (fleetOf) for (let i = 0; i < count; i++) if (!(fleetOf[i] < fleetCount)) throw new Error(`gpuDriven: record ${i} names fleet ${fleetOf[i]}, and there are ${fleetCount} fleets`);
+    const perFleet = fleetDefs.map((f, fi) => {
+        if (!f.lods || !f.lods.length) throw new Error(`gpuDriven: fleet ${JSON.stringify(f.name || fi)} brings no levels`);
+        const desc = f.pipeline || renderPipelineDesc({ layout: f.layout || LAYOUTS.flat, topology: f.topology || null });
+        const ranked = rankLods(f.lods, thresholds, { shader: desc.shaders.wgsl });
+        const packed = packMeshes(ranked.lods.map((l) => l.lod.mesh), f.layout || LAYOUTS.flat);
+        return { name: f.name || String(fi), index: fi, ranked, packed, desc, bind: f.bind || null, layout: f.layout || LAYOUTS.flat, topology: f.topology || desc.topology || null,
+                 // a fleet whose vertex stage moves its hull (a spin, a lift) brings a pick pipeline that moves it the same way,
+                 // and a pickBind for what that pick shader reads (a sprite's atlas, so the pick discards where the sprite does)
+                 pickDesc: f.pickPipeline || null, pickBind: f.pickBind || null, vbuf: null, ibuf: null, pipe: null, pickPipe: null };
+    });
+    const lodCount = perFleet[0].ranked.lods.length;
+    for (const f of perFleet) if (f.ranked.lods.length !== lodCount) throw new Error(`gpuDriven: fleet ${JSON.stringify(f.name)} has ${f.ranked.lods.length} levels and fleet ${JSON.stringify(perFleet[0].name)} has ${lodCount}; the thresholds are shared, so every fleet climbs the same ladder`);
+    const ranked = perFleet[0].ranked;
+    const regionCount = lodCount * fleetCount;
     cap = cap == null ? count : cap;
-    if (cap < count) throw new Error(`gpuDriven: cap ${cap} is below the instance count ${count}; a LOD region that can overflow drops instances silently`);
-    const packed = packMeshes(ranked.lods.map((l) => l.lod.mesh));
+    if (cap < count) throw new Error(`gpuDriven: cap ${cap} is below the instance count ${count}; a region that can overflow drops instances silently`);
     const gpuPath = device.backend === "webgpu";
-    const vbuf = device.buffer({ data: packed.vertexData, usage: "vertex" });
-    const ibuf = device.buffer({ data: packed.indexData, usage: "index" });
-    const pipe = device.pipeline(pipeline || renderPipelineDesc());
-    const template = indirectTemplate(packed.ranges);
+    for (const f of perFleet) {
+        f.vbuf = device.buffer({ data: f.packed.vertexData, usage: "vertex" });
+        f.ibuf = device.buffer({ data: f.packed.indexData, usage: "index" });
+        f.pipe = device.pipeline(f.desc);
+    }
+    // the region ranges, fleet-major: region r = fleet * lodCount + lod draws that fleet's mesh for that LOD
+    const ranges = perFleet.flatMap((f) => f.packed.ranges);
+    const template = indirectTemplate(ranges);
     const regionBytes = cap * RECORD_BYTES;
     // Occlusion is a WebGPU feature: it needs the depth image reduced by compute. Elsewhere the flag is
     // recorded and ignored, and the picture is the same because the depth test hides what Hi-Z would have
@@ -542,30 +631,33 @@ export function makeGpuDrivenScene(device, { lods, thresholds, records, cap = nu
     // A body that was hidden last frame and is not hidden now is missed by a single phase for one frame; two
     // phases close that gap, at the cost of a second cull over the rejected set and a second draw.
     const twoPhase = occ && occlusion === "twoPhase";
-    let cullPipe = null, cullPipe2 = null, ubuf = null, ubuf2 = null, inBuf = null, cmdBuf = null, cmdBuf2 = null, outBuf = null, outBuf2 = null, rejBuf = null, last = null, lastCam = null;
-    let hizPipe = null, hizBuf = null, occBuf = null, hizLayoutNow = null, lvlBufs = [], pyramidReady = false, hizDims = null, pickPipe = null;
+    let cullPipe = null, cullPipe2 = null, ubuf = null, ubuf2 = null, inBuf = null, cmdBuf = null, cmdBuf2 = null, outBuf = null, outBuf2 = null, rejBuf = null, fleetBuf = null, last = null, lastCam = null;
+    let hizPipe = null, hizBuf = null, occBuf = null, hizLayoutNow = null, lvlBufs = [], pyramidReady = false, hizDims = null;
+    const fleetOfU32 = hasFleets ? (fleetOf instanceof Uint32Array ? fleetOf : Uint32Array.from(fleetOf)) : null;
     if (gpuPath) {
-        cullPipe = device.compute({ wgsl: cullLodWgsl({ occlusion: occ }), entryPoint: "main" });
+        cullPipe = device.compute({ wgsl: cullLodWgsl({ occlusion: occ, fleets: hasFleets }), entryPoint: "main" });
         ubuf = device.buffer({ size: CULL_UNIFORM_BYTES, usage: "uniform" });
         inBuf = (src.buffer && src.buffer.gpu) ? src.buffer : device.buffer({ data: src.static || src.cpu(), usage: "storage" });
         cmdBuf = device.buffer({ data: template, usage: "indirect" });
-        outBuf = device.buffer({ size: lodCount * regionBytes, usage: ["storage", "vertex"] });
+        outBuf = device.buffer({ size: regionCount * regionBytes, usage: ["storage", "vertex"] });
         cullPipe.bind("cull", ubuf).bind("inst", inBuf).bind("cmds", cmdBuf).bind("records", outBuf);
+        if (hasFleets) { fleetBuf = device.buffer({ data: fleetOfU32, usage: "storage" }); cullPipe.bind("fleetOf", fleetBuf); }
         if (occ) {
             occBuf = device.buffer({ size: OCC_UNIFORM_FLOATS * 4, usage: "uniform" });
             rejBuf = device.buffer({ size: count * 4, usage: "storage" });
             cullPipe.bind("rejected", rejBuf);
             hizPipe = { level0: device.compute({ wgsl: hizLevel0Wgsl(), entryPoint: "level0" }), reduce: device.compute({ wgsl: hizReduceWgsl(), entryPoint: "reduce" }) };
             if (twoPhase) {
-                cullPipe2 = device.compute({ wgsl: cullLodWgsl({ occlusion: true }), entryPoint: "main" });
+                cullPipe2 = device.compute({ wgsl: cullLodWgsl({ occlusion: true, fleets: hasFleets }), entryPoint: "main" });
                 ubuf2 = device.buffer({ size: CULL_UNIFORM_BYTES, usage: "uniform" });
                 cmdBuf2 = device.buffer({ data: template, usage: "indirect" });
-                outBuf2 = device.buffer({ size: lodCount * regionBytes, usage: ["storage", "vertex"] });
+                outBuf2 = device.buffer({ size: regionCount * regionBytes, usage: ["storage", "vertex"] });
                 cullPipe2.bind("cull", ubuf2).bind("inst", inBuf).bind("cmds", cmdBuf2).bind("records", outBuf2).bind("occ", occBuf).bind("rejected", rejBuf);
+                if (hasFleets) cullPipe2.bind("fleetOf", fleetBuf);
             }
         }
     } else {
-        outBuf = device.buffer({ size: lodCount * regionBytes, usage: "vertex" });
+        outBuf = device.buffer({ size: regionCount * regionBytes, usage: "vertex" });
     }
     /** (Re)allocate the pyramid for the current frame size. */
     function ensureHiz(w, h) {
@@ -592,35 +684,45 @@ export function makeGpuDrivenScene(device, { lods, thresholds, records, cap = nu
         });
         pyramidReady = true; return true;
     }
-    /** The draws of one phase: every LOD's region and command. Shared by the colour frame and the pick frame. */
-    function drawPhase(pass, out, cmds, twinCounts) {
-        for (let l = 0; l < lodCount; l++) {
-            pass.instances(out, l * regionBytes);
-            if (gpuPath) pass.drawIndexedIndirect(cmds, l * INDIRECT_BYTES);
-            else if (twinCounts[l] > 0) pass.drawIndexed(packed.ranges[l].indexCount, twinCounts[l], packed.ranges[l].firstIndex);
+    const clock = () => (typeof time === "function" ? time() : (typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000));
+    /**
+     * The draws of one phase: every fleet's pipeline, then every one of its regions. Shared by the colour frame
+     * and the pick frame (`picking` swaps in each fleet's pick pipeline; the fleet's bind hook is skipped there,
+     * because the pick shader declares nothing to bind).
+     */
+    function drawPhase(pass, out, cmds, twinCounts, ctx, picking = false) {
+        for (const f of perFleet) {
+            if (picking && !f.pickPipe) f.pickPipe = device.pipeline(f.pickDesc || pickPipelineDesc({ layout: f.layout, topology: f.topology }));
+            pass.use(picking ? f.pickPipe : f.pipe);
+            pass.uniform("viewProj", ctx.viewProj);
+            if (picking ? f.pickBind : f.bind) (picking ? f.pickBind : f.bind)(pass, ctx);
+            pass.vertices(f.vbuf, 0);
+            pass.indices(f.ibuf);
+            for (let l = 0; l < lodCount; l++) {
+                const r = f.index * lodCount + l;
+                pass.instances(out, r * regionBytes);
+                if (gpuPath) pass.drawIndexedIndirect(cmds, r * INDIRECT_BYTES);
+                else if (twinCounts && twinCounts[r] > 0) pass.drawIndexed(ranges[r].indexCount, twinCounts[r], ranges[r].firstIndex);
+            }
         }
     }
     function frame({ viewProj, view = null, proj = null, eye, clear = [0, 0, 0, 1], read = false }) {
         if (occ && (!view || !proj)) throw new Error("gpuDriven: an occluding scene needs `view` and `proj` separately -- the Hi-Z test works in view space");
-        const u = packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap });
-        lastCam = { viewProj };
+        const u = packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, fleetCount });
+        const ctx = { viewProj, eye, time: clock() };
+        lastCam = ctx;
         let twin = null, occU = null;
         if (gpuPath) { ubuf.write(u); cmdBuf.write(template);
             if (occ) { const en = pyramidReady && hizLayoutNow; occU = packOccUniforms({ view, proj, w: en ? hizDims[0] : 0, h: en ? hizDims[1] : 0, levels: en ? hizLayoutNow.levels.length : 0, enabled: !!en });
                 if (!hizBuf) { ensureHiz(1, 1); pyramidReady = false; }   // a binding must exist before the first dispatch
                 occBuf.write(occU); cullPipe.bind("occ", occBuf); } }
-        else { twin = cullLodCpu(src.static || src.cpu(), u); outBuf.write(twin.compact); last = twin; }
+        else { twin = cullLodCpu(src.static || src.cpu(), u, fleetOfU32); outBuf.write(twin.compact); last = twin; }
         const readback = device.frame(({ pass }) => {
             if (gpuPath) pass.dispatch(cullPipe, Math.ceil(count / CULL_WORKGROUP));
             // Level 13 -- clear: null draws OVER whatever the last frame left (colour and depth): a second scene on
             // the same canvas, such as the traders over the orrery's bodies.
             if (clear === null) pass.begin(); else pass.clear(clear);
-            pass.use(pipe);
-            pass.uniform("viewProj", viewProj);
-            if (bind) bind(pass);
-            pass.vertices(vbuf, 0);
-            pass.indices(ibuf);
-            drawPhase(pass, outBuf, cmdBuf, twin && twin.counts);
+            drawPhase(pass, outBuf, cmdBuf, twin && twin.counts, ctx);
         }, (read && !twoPhase) ? { read: true } : undefined);
         // the pyramid for the NEXT frame comes from this frame's depth -- classic two-pass occlusion
         const built = occ ? buildHiz() : false;
@@ -630,64 +732,72 @@ export function makeGpuDrivenScene(device, { lods, thresholds, records, cap = nu
             phase2 = true;
             const occU2 = packOccUniforms({ view, proj, w: hizDims[0], h: hizDims[1], levels: hizLayoutNow.levels.length, enabled: true });
             occBuf.write(occU2);
-            ubuf2.write(packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, phase: 1 })); cmdBuf2.write(template);
+            ubuf2.write(packCullUniforms({ planes: frustumPlanes(viewProj), eye, thresholds: ranked.thresholds, count, lodCount, cap, phase: 1, fleetCount })); cmdBuf2.write(template);
             readback2 = device.frame(({ pass }) => {
                 pass.dispatch(cullPipe2, Math.ceil(count / CULL_WORKGROUP));
                 pass.begin();
-                pass.use(pipe);
-                pass.uniform("viewProj", viewProj);
-                if (bind) bind(pass);
-                pass.vertices(vbuf, 0);
-                pass.indices(ibuf);
-                drawPhase(pass, outBuf2, cmdBuf2, null);
+                drawPhase(pass, outBuf2, cmdBuf2, null, ctx);
             }, read ? { read: true } : undefined);
         } else if (twoPhase && read) {
             // no pyramid yet (first frame): nothing to re-test, and the readback the caller asked for is the phase-0 picture
             readback2 = device.frame(({ pass }) => { pass.begin(); }, { read: true });
         }
-        return { backend: device.backend, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed", lodCount, count, uniforms: u,
+        return { backend: device.backend, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed", lodCount, fleetCount, regionCount, count, uniforms: u,
                  occlusion: occ, twoPhase, phase2Ran: phase2, occUniforms: occU, pyramidUsed: !!(occU && occU[35] > 0), pyramidBuilt: built,
                  ...(read ? { pixels: twoPhase ? readback2 : readback } : {}) };
     }
     /**
      * Level 13 -- PICK: what is under pixel (x, y) of the last frame. The pick picture is the last compacted records
      * drawn through the pick pipeline into an OFFSCREEN target (the page never sees it), one pixel decoded.
-     * Returns { id, lod, phase } or null. `id` is the INPUT record's index -- what the caller gave the scene.
+     * Returns { id, lod, fleet } or null. `id` is the INPUT record's index -- what the caller gave the scene.
      */
     async function pick(x, y) {
         if (!lastCam) return null;
-        if (!pickPipe) pickPipe = device.pipeline(pickPipelineDesc());
         const fr = device.frame(({ pass }) => {
             pass.clear([0, 0, 0, 0]);
-            pass.use(pickPipe);
-            pass.uniform("viewProj", lastCam.viewProj);
-            pass.vertices(vbuf, 0);
-            pass.indices(ibuf);
-            drawPhase(pass, outBuf, cmdBuf, last && last.counts);
-            if (twoPhase && cmdBuf2) drawPhase(pass, outBuf2, cmdBuf2, null);
+            drawPhase(pass, outBuf, cmdBuf, last && last.counts, lastCam, true);
+            if (twoPhase && cmdBuf2) drawPhase(pass, outBuf2, cmdBuf2, null, lastCam, true);
         }, { read: true, offscreen: true, depth: false });
         const p = await fr;
         if (!p || !p.pixels) return null;   // the null backend records and draws nothing
         const px = Math.max(0, Math.min(p.width - 1, Math.floor(x))), py = Math.max(0, Math.min(p.height - 1, Math.floor(y)));
         const hit = decodePick(p.pixels, (py * p.width + px) * 4);
-        return hit ? { ...hit, x: px, y: py } : null;
+        return hit ? { ...hit, x: px, y: py, fleetName: perFleet[hit.fleet] ? perFleet[hit.fleet].name : null } : null;
+    }
+    /** v4301 -- the whole pick picture, decoded: { width, height, hits: (null | {id, lod, fleet})[] }. A gate reads it to ask where each fleet is. */
+    async function pickPicture() {
+        if (!lastCam) return null;
+        const p = await device.frame(({ pass }) => { pass.clear([0, 0, 0, 0]); drawPhase(pass, outBuf, cmdBuf, last && last.counts, lastCam, true);
+            if (twoPhase && cmdBuf2) drawPhase(pass, outBuf2, cmdBuf2, null, lastCam, true); }, { read: true, offscreen: true, depth: false });
+        if (!p || !p.pixels) return null;
+        const hits = new Array(p.width * p.height);
+        for (let i = 0; i < hits.length; i++) hits[i] = decodePick(p.pixels, i * 4);
+        return { width: p.width, height: p.height, hits };
     }
     async function readPyramid() { if (!occ || !hizBuf) return null; return { pyramid: new Float32Array(await device.read(hizBuf)), layout: hizLayoutNow, dims: hizDims }; }
+    /** The instance count of every region, fleet-major (region = fleet * lodCount + lod). One fleet: one count per LOD, as before. */
     async function readCounts() {
         if (!gpuPath) return last ? Array.from(last.counts) : null;
         const raw = new Uint32Array(await device.read(cmdBuf));
-        return Array.from({ length: lodCount }, (_, l) => raw[l * INDIRECT_STRIDE_U32 + 1]);
+        return Array.from({ length: regionCount }, (_, r) => raw[r * INDIRECT_STRIDE_U32 + 1]);
     }
     /** The second phase's counts, or null when there is no second phase. */
     async function readCounts2() {
         if (!twoPhase || !cmdBuf2) return null;
         const raw = new Uint32Array(await device.read(cmdBuf2));
-        return Array.from({ length: lodCount }, (_, l) => raw[l * INDIRECT_STRIDE_U32 + 1]);
+        return Array.from({ length: regionCount }, (_, r) => raw[r * INDIRECT_STRIDE_U32 + 1]);
+    }
+    /** v4301 -- the counts folded per fleet: [{ name, counts: [per LOD], total }]. */
+    async function readCountsByFleet() {
+        const c = await readCounts(); if (!c) return null;
+        return perFleet.map((f) => { const counts = c.slice(f.index * lodCount, (f.index + 1) * lodCount); return { name: f.name, counts, total: counts.reduce((a, b) => a + b, 0) }; });
     }
     async function readRecords() {
         if (!gpuPath) return last ? last.compact : null;
         return new Float32Array(await device.read(outBuf));
     }
-    return { frame, pick, readCounts, readCounts2, readRecords, readPyramid, order: ranked, ranges: packed.ranges, count, cap, lodCount, occlusion: occ, twoPhase, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed",
-             destroy() { for (const b of [vbuf, ibuf, ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, hizBuf, occBuf, ...lvlBufs]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };
+    return { frame, pick, pickPicture, readCounts, readCounts2, readCountsByFleet, readRecords, readPyramid, order: ranked, ranges, count, cap, lodCount, fleetCount, regionCount,
+             fleets: perFleet.map((f) => ({ name: f.name, index: f.index, layout: f.layout, topology: f.topology, order: f.ranked, ranges: f.packed.ranges, missing: f.packed.missing, pipe: f.pipe })),
+             occlusion: occ, twoPhase, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed",
+             destroy() { for (const b of [ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, fleetBuf, hizBuf, occBuf, ...lvlBufs, ...perFleet.flatMap((f) => [f.vbuf, f.ibuf])]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };
 }

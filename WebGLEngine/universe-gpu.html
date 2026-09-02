@@ -37,6 +37,7 @@ import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import { makeUniverseEconomy } from "./world/universeEconomy.mjs";
 import { makeHaulSource } from "./render/gpuHaul.mjs";
+import { standardFleets, fleetsForNames, userModelSources, loadUserModel } from "./render/fleets.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route"), pickEl = document.getElementById("pick");
 const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
@@ -57,7 +58,12 @@ const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.004, 0.012], r
 // each flight is a function of time and render/gpuHaul.mjs evaluates it on the GPU; the CPU only trades.
 const economy = makeUniverseEconomy(slimUniverse(raw), { haulers: 300, seed: 11 });
 const haul = makeHaulSource(device, economy, { radius: 0.35, lift: 1.2 });
-const lifeScene = G.makeGpuDrivenScene(device, { lods: [{ name: "ship", mesh: G.quadMesh(1, [1, 0.85, 0.35, 1]) }], thresholds: [], records: haul });
+// v4301 (Level 15) -- the haulers in nine architectures (render/fleets.mjs), a race per hauler name; the person's
+// own EV ship or radar plane, if assigned, is the raised hull four of the races are built on.
+let userHull = null;
+try { const src = userModelSources(localStorage).find((x) => x.loadable); if (src) userHull = await loadUserModel(src); } catch (e) { console.warn("user model:", e.message); }
+const std = standardFleets(device, { userHull });
+const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf: fleetsForNames(economy.names, std.fleets.length), thresholds: [0.02], records: haul });
 say(`${device.backend} &middot; ${scene.path}${scene.occlusion ? " &middot; two-phase Hi-Z" : ""} &middot; flight by ${device.backend === "webgpu" ? "compute" : "the CPU twin"}`);
 let simT = 0, lastSim = 0;
 

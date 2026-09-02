@@ -56,6 +56,8 @@ function genHeli() {
     return v;
 }
 const GEN = { jet: genJet, airliner: genAirliner, turboprop: genProp, prop: genProp, heli: genHeli, unknown: genJet };
+/** v4301 -- the generators, exported: render/fleets.mjs builds the Voxel race from the same jet the radar flies. */
+export const PLANE_GENERATORS = GEN;
 
 const DEG = Math.PI / 180;
 const LS_KEY = "voxelengine.planeModels";
