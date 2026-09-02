@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -42,7 +42,20 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    stage takes them with its own transform (the fleet's record placement, its turn, the device's viewProj).
    tslRace-selfcheck section 4: the Chaos race breathing along its own normal by the generated vertex stage
    equals a hand-written twin on 36,864 of 36,864 pixels on both backends, ~720 pixels moved from the still
-   race, and amp 0 draws the still race exactly; orrery-gpu.html?tsl=1 breathes. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   race, and amp 0 draws the still race exactly; orrery-gpu.html?tsl=1 breathes.
+   v4325 -- A SECOND SHELL, so that "any shell" stops being an untested word: the SPRITE layout (p, color, uv;
+   no normal, and a uv that is a real attribute rather than the hull's own x and y), with the Heidler
+   return-stroke current (physicsTsl makeHeidlerSpriteTsl) as the graph that suits it. physicsTsl
+   heidlerSpriteShell is the fleets' own shipped sprite vertex stage plus the {{DISPLACE}} hook and its local,
+   and the gate holds it to that text in both languages. The rename of three's locals is now the SHELL's map
+   (tslSource DEFAULT_LOCALS, `locals` per language), so a graph that displaces along the normal into a layout
+   that has none is refused BY NAME instead of renamed into a variable that layout never declares -- as is a
+   fragment reading the normal there. tslRace-selfcheck section 5: the Pixel race painted by the generated
+   sprite pipeline is a hand-written twin's picture on 36,864 of 36,864 pixels on both backends, 4,018 pixels
+   away from the race's own bitmap look, and the pick still names it; orrery-gpu.html?tsl=1 paints it live.
+   What the byte claim CANNOT see, measured: two algebraically-equal but not bit-equal rewrites of the twin
+   ((i0/eta)*shape/i0 as (i0*shape)/(eta*i0); exp(log(r)*x) as pow(r, x)) moved no byte at all. The picture is
+   eight bits a channel and a difference under 1/255 is below it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).

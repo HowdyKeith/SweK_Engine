@@ -155,6 +155,10 @@ export function corpus() {
         ...(EMITTED_RACE && EMITTED_RACE.transplanted ? [
             { id: "tslSource.lyapunovLook (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "the Chaos race painted by a TSL node: the look's own vertex stage around a fragment three's WGSL builder wrote", opts: { code: EMITTED_RACE.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),
+        // v4325 -- the second shell: the Pixel race's sprite quad painted by the lightning graph, the sprite layout's vertex stage around it
+        ...(EMITTED_RACE && EMITTED_RACE.sprite && EMITTED_RACE.sprite.transplanted ? [
+            { id: "tslSource.heidlerSprite (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "a race in a SECOND shell: the sprite layout (p, color, uv, no normal) around a fragment three's WGSL builder wrote", opts: { code: EMITTED_RACE.sprite.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320
         { id: "fleetMask.PICK_MASK_WGSL", from: "render/fleetMask.mjs", compileOnly: true, why: "the identity picture -> the strength field: the fleet decoded from the blue byte against a bitmask, on the device", opts: { code: FM.PICK_MASK_WGSL, compileOnly: true, outCount: 0 } },
