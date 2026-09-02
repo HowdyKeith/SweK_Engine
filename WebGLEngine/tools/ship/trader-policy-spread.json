@@ -1,0 +1,50 @@
+{
+ "version": "v4316",
+ "days": 60,
+ "greedy": 69261.66666666667,
+ "runs": [
+  {
+   "name": "narrow, 14 iterations, seed 3 (Level 16's)",
+   "hidden": [
+    8,
+    8
+   ],
+   "iters": 14,
+   "pop": 8,
+   "seed": 3,
+   "ratio": 1.2535264816998337,
+   "heldReturn": 86821.33333333333,
+   "params": 145,
+   "ms": 1804
+  },
+  {
+   "name": "narrow, 30 iterations, seed 5",
+   "hidden": [
+    8,
+    8
+   ],
+   "iters": 30,
+   "pop": 12,
+   "seed": 5,
+   "ratio": 0.975878913299805,
+   "heldReturn": 67591,
+   "params": 145,
+   "ms": 5517
+  },
+  {
+   "name": "wide [16,16], 30 iterations, seed 5",
+   "hidden": [
+    16,
+    16
+   ],
+   "iters": 30,
+   "pop": 12,
+   "seed": 5,
+   "ratio": 1.21501070818394,
+   "heldReturn": 84153.66666666667,
+   "params": 417,
+   "ms": 6641
+  }
+ ],
+ "verdict": "the win is INSIDE THE SPREAD of trainings -- some beat greedy, some do not"
+}

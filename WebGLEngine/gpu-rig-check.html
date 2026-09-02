@@ -57,6 +57,25 @@ try {
         lines.push(`against the sandbox's offscreen ${expected.from}: largest per-colour count difference <b>${worst}</b> on ${worstKey || "-"} (tolerance ${tol}, edges only)`);
         lines.push(result.pass ? `<span class="pass">PASS -- the picture that reached this canvas is the picture the gates graded</span>` : `<span class="fail">FAIL -- the presented picture differs beyond edge pixels; paste the JSON below into a round</span>`);
     } else lines.push(`<span class="warn">no tools/ship/rig-expected.json to compare with -- run node tools/ship/rigCanvas-selfcheck.mjs first</span>`);
+    // v4316 -- THE TIMING TABLE: frame time per route at the universe's size and ten times it, on this machine. The
+    // sandbox has no GPU to time; this is the number the rig signs. Each cell: mean ms of 20 frames after 3 warm
+    // ones, the count readback awaited so the GPU has finished (a frame that is only submitted is not a frame).
+    const timing = [];
+    const routes = [device];
+    try { const other = document.createElement("canvas"); other.width = 256; other.height = 256; const alt = await requestDevice(other, { backend: device.backend === "webgpu" ? "webgl2" : "webgpu" }); if (alt && alt.backend !== "null" && alt.backend !== device.backend) routes.push(alt); } catch (e) {}
+    for (const dev of routes) for (const side of [79, 250]) {
+        const recs = G.gridScene({ side, z: -2, spacing: 12 / side, radii: [3 / side] });
+        const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "mid", mesh: G.quadMesh(2) }, { name: "coarse", mesh: G.quadMesh(1) }, { name: "fine", mesh: G.quadMesh(4) }], thresholds: [0.025, 0.04], records: recs, occlusion: dev.backend === "webgpu" ? "twoPhase" : false });
+        for (let i = 0; i < 3; i++) { sc.frame({ viewProj, view, proj, eye: CAM.eye }); await sc.readCounts(); }
+        const t0 = performance.now(); const N = 20;
+        for (let i = 0; i < N; i++) { sc.frame({ viewProj, view, proj, eye: CAM.eye }); }
+        await sc.readCounts(); const ms = (performance.now() - t0) / N;
+        timing.push({ backend: dev.backend, path: sc.path, records: side * side, msPerFrame: +ms.toFixed(3), fps: +(1000 / ms).toFixed(1) });
+        sc.destroy();
+    }
+    result.timing = timing; result.gpu = (navigator.gpu && device.backend === "webgpu") ? "webgpu" : "none";
+    lines.push("timing (ms per frame, 20 frames, counts awaited): " + timing.map((t) => `${t.backend} ${t.path} at ${t.records.toLocaleString()} records: <b>${t.msPerFrame}</b> ms (${t.fps} fps)`).join("; "));
+    lines.push(`<span class="warn">save the JSON below as tools/ship/rig-timing.json and rigTiming-selfcheck will read it: until then the tree's speed claim is RIG-PENDING</span>`);
     document.getElementById("json").value = JSON.stringify(result);
     say(lines.join("<br>"));
 } catch (e) { lines.push(`<span class="fail">failed: ${String(e && e.message || e)}</span>`); say(lines.join("<br>")); document.getElementById("json").value = JSON.stringify({ failed: String(e && e.message || e) }); }

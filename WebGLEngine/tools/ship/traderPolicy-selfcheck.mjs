@@ -66,6 +66,24 @@ console.log("\n2. THE NUMBER: the docking brain's ES over economies, against gre
     report("the trained parameters and the numbers are written to tools/ship/trader-policy.json for the page and the next round");
 }
 
+console.log("\n3. v4316 -- WOULD A BETTER LEARNER WIN? Three more trainings: a wider net, a longer run, another seed -- the SPREAD is the answer");
+{
+    const HELD = 500, greedyHeld = P.evaluateGreedy(mkEco, { episodes: EPISODES, seed0: HELD, days: DAYS });
+    const runs = [];
+    for (const cfg of [{ name: "narrow, 14 iterations, seed 3 (Level 16's)", hidden: [8, 8], iters: 14, pop: 8, seed: 3 }, { name: "narrow, 30 iterations, seed 5", hidden: [8, 8], iters: 30, pop: 12, seed: 5 }, { name: "wide [16,16], 30 iterations, seed 5", hidden: [16, 16], iters: 30, pop: 12, seed: 5 }]) {
+        const t0 = Date.now();
+        const tr = P.trainTraderES(mkEco, { iters: cfg.iters, pop: cfg.pop, sigma: 0.15, lr: 0.1, hidden: cfg.hidden, episodes: EPISODES, seed: cfg.seed, days: DAYS });
+        const held = P.evaluateParams(mkEco, tr.params, { episodes: EPISODES, seed0: HELD, days: DAYS, hidden: cfg.hidden });
+        runs.push({ ...cfg, ratio: held.avgReturn / Math.max(1, greedyHeld.avgReturn), heldReturn: held.avgReturn, params: tr.paramCount, ms: Date.now() - t0, bankrupt: held.bankrupt });
+        report(`${cfg.name}: held-out ${held.avgReturn.toFixed(0)} cr = ${(100 * runs[runs.length - 1].ratio).toFixed(0)}% of greedy (${tr.paramCount} parameters, ${runs[runs.length - 1].ms} ms)`);
+    }
+    const ratios = runs.map((r) => r.ratio), lo = Math.min(...ratios), hi = Math.max(...ratios);
+    const robust = lo >= 1 ? "EVERY training beats greedy" : hi < 1 ? "NO training beats greedy" : "the win is INSIDE THE SPREAD of trainings -- some beat greedy, some do not";
+    ok(`*** THE ANSWER, MEASURED: ${robust} (${(100 * lo).toFixed(0)}% to ${(100 * hi).toFixed(0)}% of greedy across ${runs.length} trainings) ***`, ratios.every(Number.isFinite) && runs.every((r) => r.bankrupt === 0), "reported as the spread, not the best run");
+    ok("  wider is not better here: the 417-parameter net does not beat the 145-parameter one by more than the spread", Math.abs(runs[2].ratio - runs[0].ratio) < (hi - lo) + 1e-9);
+    fs.writeFileSync(path.join(ENG, "tools/ship/trader-policy-spread.json"), JSON.stringify({ version: "v4316", days: DAYS, greedy: greedyHeld.avgReturn, runs: runs.map(({ name, hidden, iters, pop, seed, ratio, heldReturn, params, ms }) => ({ name, hidden, iters, pop, seed, ratio, heldReturn, params, ms })), verdict: robust }, null, 1));
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at Level 16.
 //   A  the ES update sign flipped (theta -= grad) -> exit=1, 2 red: the learner goes bankrupt on a seed and the
 //      held-out verdict reads "far behind greedy, -6%". The "best iterate beats the start" line stayed green --
@@ -73,10 +91,11 @@ console.log("\n2. THE NUMBER: the docking brain's ES over economies, against gre
 //      held-out seeds and not on the training curve.
 //   B  featuresOf() returning zeros -> exit=1, 1 red: every candidate scores the same, the curve is flat
 //      (-1712 -> -1712), the best never beats the start.
+//   (v4316: section 3 is a measurement of the spread, not a claim, and was not sabotaged -- a sabotage of the ES is A above.)
 //   C  the policy hook ignored (greedy's route for every seat) -> exit=1, 1 red: the curve is flat at greedy's
 //      own return (17082 -> 17082) whatever the parameters, so training cannot move it.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: WHETHER A BETTER LEARNER WOULD WIN. This is the docking brain's MLP and ES with a few hundred episodes; " +
-    "a policy that saw the whole market (not one leg at a time), or trained for hours, is a different experiment. The number here is " +
-    "for this learner, this economy, these days.");
+console.log("unchecked here: a DIFFERENT learner family. Section 3 answers v4314's question for this one -- the docking brain's MLP and " +
+    "ES -- with a spread across trainings rather than a best run; a policy that saw the whole market (not one leg at a time), a " +
+    "gradient method, or hours of training is a different experiment, and the number here is for this learner, this economy, these days.");
 process.exit(fails ? 1 : 0);

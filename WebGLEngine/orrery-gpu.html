@@ -53,6 +53,7 @@
   <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
   <div style="color:#9fb8a8"><span id="date"></span> &middot; tick <span id="tick">0</span> &middot; hash <span id="hash"></span> &middot; <span id="peer">alone</span></div>
   <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <span id="persist" style="color:#f0e29e"></span></div>
+  <div id="key" style="color:#9fb8a8">cross-browser key: computing&hellip;</div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
 <script type="module">
@@ -64,6 +65,8 @@ import { makeOrbitSource } from "./render/gpuOrbits.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
 import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
+import { wireFromParams, hashKey, compareKey } from "./world/universeWire.mjs";
+import { p2pTransport } from "./ev/p2p.js";
 import { applyCommitsFeed, fixtureFeed } from "./world/commitsFeed.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
@@ -95,8 +98,13 @@ const economy = makeGitEconomy(system, { seed: 7, history });
 let restored = null;
 if (params.get("restore") === "1") { try { const lg = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null"); if (lg) { const r = economy.replay(lg); restored = { ...r, saved: lg.hash, tick: lg.tick }; } } catch (e) { restored = { error: e.message }; } }
 // v4314 -- two tabs, one universe: this tab is peer a or b over a BroadcastChannel, and steps only in lockstep
-let peer = null;
-if (peerId === "a" || peerId === "b") { const wire = broadcastWire("swek-universe"); peer = makePeer({ economy, selfId: peerId, peers: ["a", "b"], send: (m) => wire.send(m), inputDelay: 3, dt: 0.25 }); wire.onMessage = (m) => peer.receive(m); }
+// v4316 -- the wire from the params: two tabs (BroadcastChannel) or two machines (?webrtc=<rendezvous>&room=<room>, ev/p2p.js)
+let peer = null, chosen = { kind: "none" };
+try { chosen = wireFromParams(params, { broadcast: broadcastWire, p2p: p2pTransport }); } catch (e) { say("wire: " + e.message, true); }
+if (chosen.wire) { const wire = chosen.wire; peer = makePeer({ economy, selfId: chosen.peer, peers: ["a", "b"], send: (m) => wire.send(m), inputDelay: chosen.kind === "webrtc" ? 6 : 3, dt: 0.25 }); wire.onMessage = (m) => peer.receive(m); }
+// v4316 -- the cross-browser key: a fresh economy to tick 400 from seed 7, its hash beside the one Node recorded
+try { const mine = hashKey((seed, today) => makeGitEconomy(buildOrrery(raw.bodies, { today }), { seed, history: true }), { seed: 7, ticks: 400 }); const expected = await fetch("./tools/ship/universe-hash-expected.json").then((r) => r.json()).catch(() => null);
+    const cmp = compareKey(mine, expected); document.getElementById("key").textContent = `cross-browser key: ${cmp.verdict} -- ${cmp.detail}`; window.__universeKey = { mine, expected, ...cmp }; } catch (e) { document.getElementById("key").textContent = "key: " + e.message; }
 let feedSeen = new Set();
 const intervene = (kind, args) => { if (peer) peer.queue(kind, args); else economy.intervene(kind, args); };
 document.getElementById("save").onclick = () => { try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(economy.log())); document.getElementById("persist").textContent = `saved at tick ${economy.tick}, hash ${economy.hash()}`; } catch (e) { document.getElementById("persist").textContent = "save failed: " + e.message; } };
@@ -141,7 +149,7 @@ async function frame(now) {
         // Level 16: alone, step; as a peer, pump -- the net steps when every peer's inputs for the tick are in
         while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else economy.step(0.25); lastSimT += 0.25; }
         if ((frames & 7) === 0) { document.getElementById("date").textContent = economy.date ? economy.date + ` (${economy.openMarkets()} markets open, ${economy.joinedShips()} ships)` : "no calendar"; document.getElementById("tick").textContent = economy.tick; document.getElementById("hash").textContent = economy.hash();
-            if (peer) { const d = peer.desync(); document.getElementById("peer").textContent = d ? `peer ${peerId}: DESYNC at tick ${d.tick} (ours ${d.ours}, theirs ${d.theirs})` : `peer ${peerId}: in step, lead ${peer.lead()}`; } }
+            if (peer) { const d = peer.desync(); document.getElementById("peer").textContent = d ? `peer ${peerId}: DESYNC at tick ${d.tick} (ours ${d.ours}, theirs ${d.theirs})` : `peer ${peerId} over ${chosen.kind}${chosen.kind === "webrtc" ? " (" + chosen.wire.connections() + " connected)" : ""}: in step, lead ${peer.lead()}`; } }
         lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
         if ((frames & 15) === 0) { const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
     }
