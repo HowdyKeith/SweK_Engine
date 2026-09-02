@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319)
+# TSL and SweK -- the roadmap (written at v4319, step 4 built at v4320)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -25,13 +25,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    on BOTH backends the TSL picture, row-mirrored, equals the device pipeline's on every one of 4,096 pixels
    (worst difference 0) and equals the CPU model's texel on every pixel. Three's WGSL builder and our
    hand-written WGSL, three's GLSL builder and our GLSL, agree to the byte on this effect.
-4. **TSL as a SOURCE for gfx/device.js.** NOT BUILT. Three's node builders (WGSLNodeBuilder, GLSLNodeBuilder)
-   produce the shader text the renderer compiles; a tool that runs a TSL graph through both builders and
-   hands the two strings to device.js's pipeline descriptor would turn every hand-written pair into a
-   generated pair, with corpus entries and the parity census counted from generated code. The builders keep
-   their output inside the renderer; reading it out (renderer.backend / material.needsUpdate hooks, or
-   `nodeBuilder.build()` on a bare material) is the work, and the gate is the existing pair gates run on the
-   generated text. This is the step that changes the engine's economics.
+4. **TSL as a SOURCE for gfx/device.js.** BUILT at v4320, for fragment-only effects. render/tslSource.mjs
+   reads the builders' output through `WebGPURenderer.debug.getShaderAsync` (WGSL on the WebGPU backend,
+   GLSL on the WebGL2 one), transplants the emitted fragment -- its helper functions and the body of main(),
+   with three's names rewritten to the device's -- into the device's own full-screen shell, and hands back a
+   pipeline descriptor. tslSource-selfcheck: on both backends the pipeline whose fragment three generated
+   draws the hand-written pair's picture on 4,096 of 4,096 pixels, worst 0, no mirror (the device's vertex
+   stage); the blackbody key transplants too. The rules are narrow and refuse by name: a bare NodeMaterial
+   with fragmentNode, every uniform and texture labelled, one varying, no camera or object matrix in the
+   fragment, types the device carries. The emitted pair is written to tools/ship/tsl-emitted.json and the
+   WGSL corpus compiles it as generated code. Not yet: a vertex-stage transplant (three's camera in the
+   graph), linear-filtered sampling on the device path, and the speed of the generated code.
 5. **Physics as TSL nodes.** STARTED at v4319: render/blackbodyTsl.mjs writes Planck's shape and Wien's
    root (a TSL `Loop` of 24 Newton steps) as `Fn` nodes any node material can take; tsl-selfcheck section 4
    reads the key off both backends -- the brightest column on the n = 5 row is x_lambda = 4.965114 within a

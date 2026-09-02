@@ -41,6 +41,9 @@ import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
 import * as BB from "../../render/blackbodyWgsl.mjs";
+import * as FM from "../../render/fleetMask.mjs";
+const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
+const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -132,6 +135,17 @@ export function corpus() {
           why: "Planck's dimensionless shape x^n / (e^x - 1) one x per invocation, and in key mode Wien's root by Newton on the device",
           opts: { code: BB.blackbodyProbeWgsl(), entryPoint: "probe", outCount: 2048, uniforms: BB.packProbeUniforms({ xLo: 0, xHi: 12, n: 5, count: 2048 }), workgroups: 32 } },
         { id: "blackbodyWgsl.BLACKBODY_KEY_WGSL", from: "render/blackbodyWgsl.mjs", compileOnly: true, why: "the full-screen key: the spectrum over the device's own Wien peak, in 16 bits, on either backend", opts: { code: BB.BLACKBODY_KEY_WGSL, compileOnly: true, outCount: 0 } },
+        // v4320 -- GENERATED code: the WGSL three's node builder emitted from a TSL graph and render/tslSource.mjs transplanted into the
+        // device's shell, written down by tslSource-selfcheck on its last run. Compiled here as any hand-written module is; absent
+        // until that gate has run once, and said so rather than faked.
+        ...(EMITTED ? [
+            { id: "tslSource.badTv (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "badTv's fragment as three's WGSL builder wrote it from render/badTvTsl.mjs, in the device's shell -- a pair nobody typed", opts: { code: EMITTED.badTv.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+            { id: "tslSource.blackbody (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "the blackbody key as three's WGSL builder wrote it from render/blackbodyTsl.mjs -- a Loop of Newton steps, generated", opts: { code: EMITTED.blackbody.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
+        // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
+        // added after that round's corpus run and the crossBackend gate named them at v4320
+        { id: "fleetMask.PICK_MASK_WGSL", from: "render/fleetMask.mjs", compileOnly: true, why: "the identity picture -> the strength field: the fleet decoded from the blue byte against a bitmask, on the device", opts: { code: FM.PICK_MASK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fleetMask.COMPOSITE_WGSL", from: "render/fleetMask.mjs", compileOnly: true, why: "two universes as one picture: mix(B, A, mask) through the identity picture's mask", opts: { code: FM.COMPOSITE_WGSL, compileOnly: true, outCount: 0 } },
         { id: "gpuTerrain.TERRAIN_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
           why: "textureLoad and textureDimensions in the VERTEX stage -- the heightfield lift, which no other shader here does",
           opts: { code: TERRAIN_WGSL, compileOnly: true, outCount: 0 } },
@@ -164,6 +178,7 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "lyapunovWgsl.LYAPUNOV_FN_WGSL", kind: "source fragment", why: "the lyapunov() function every Lyapunov shape splices in; the probe, key and look are the modules" }),
     Object.freeze({ id: "heidlerWgsl.HEIDLER_FN_WGSL", kind: "source fragment", why: "the Heidler shape and current functions the probe splices in" }),
     Object.freeze({ id: "blackbodyWgsl.PLANCK_FN_WGSL", kind: "source fragment", why: "the Planck shape, Wien root and residual functions the probe and key splice in" }),
+    Object.freeze({ id: "tslSource.TRI_VS_WGSL", kind: "source fragment", why: "the device's full-screen vertex stage render/tslSource.mjs wraps around a fragment three generated; the generated pairs themselves are in the corpus from tools/ship/tsl-emitted.json" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
                     why: "assembled in its own gate by concatenation to dodge a self-counting trap; copying it here would defeat that",
                     keeps: "tools/ship/wgslLayout-selfcheck.mjs stays on the browser harness" }),

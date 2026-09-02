@@ -27,9 +27,9 @@ export function blackbodyNodes(TSL) {
 export function makeBlackbodyKeyTsl(THREE, TSL, { xLo = 0, xHi = 12, nLo = 5, nHi = 5, rootScale = 8 } = {}) {
     const { Fn, float, vec4, uv, uniform } = TSL;
     const nodes = blackbodyNodes(TSL);
-    const uniforms = { xLo: uniform(float(xLo)), xHi: uniform(float(xHi)), nLo: uniform(float(nLo)), nHi: uniform(float(nHi)), rootScale: uniform(float(rootScale)) };
-    const material = new THREE.MeshBasicNodeMaterial();
-    material.colorNode = Fn(() => {
+    const uniforms = { xLo: uniform(float(xLo)).label("xLo"), xHi: uniform(float(xHi)).label("xHi"), nLo: uniform(float(nLo)).label("nLo"), nHi: uniform(float(nHi)).label("nHi"), rootScale: uniform(float(rootScale)).label("rootScale") };
+    const material = new THREE.NodeMaterial();   // bare: the graph is the fragment, the uniforms labelled, so render/tslSource.mjs can transplant it
+    material.fragmentNode = Fn(() => {
         const x = uniforms.xLo.add(uniforms.xHi.sub(uniforms.xLo).mul(uv().x));
         const n = uniforms.nLo.add(uniforms.nHi.sub(uniforms.nLo).mul(uv().y));
         const root = nodes.wienRoot(n);

@@ -29,7 +29,8 @@ export function makeBadTvTsl(THREE, TSL, { texture = null, knobs = {} } = {}) {
     const { Fn, float, vec2, vec3, vec4, uv, floor, fract, dot, max, abs, select, uniform, texture: sampleTex } = TSL;
     for (const n of ["Fn", "float", "vec2", "vec3", "vec4", "uv", "floor", "fract", "dot", "max", "abs", "select", "uniform", "texture"]) if (typeof TSL[n] !== "function") throw new Error(`badTvTsl: the TSL namespace has no ${n}()`);
     const k0 = { ...DEFAULTS, time: 0, rows: 16, ...knobs };
-    const uniforms = {}; for (const n of TSL_KNOBS) uniforms[n] = uniform(float(k0[n]));
+    // labelled, so the emitted struct field is the knob's name (render/tslSource.mjs binds by it); unlabelled it would be nodeUniformN
+    const uniforms = {}; for (const n of TSL_KNOBS) uniforms[n] = uniform(float(k0[n])).label(n);
 
     // Ashima's 2D simplex as TSL: mod289, permute and snoise2, the WGSL's arithmetic node for node (no overloads, no
     // swizzle assignment -- vectors are rebuilt; select(cond, TRUE, FALSE) in TSL's order, the reverse of WGSL's)
@@ -64,9 +65,11 @@ export function makeBadTvTsl(THREE, TSL, { texture = null, knobs = {} } = {}) {
     });
     const sampleAt = Fn(([p]) => vec2(fract(p.x.add(offsetAt(p.y))), fract(p.y.sub(uniforms.time.mul(uniforms.rollSpeed)))));
 
-    const material = new THREE.MeshBasicNodeMaterial();
+    // a bare NodeMaterial with fragmentNode: the graph IS the fragment (MeshBasicNodeMaterial would add an opacity uniform
+    // and a clamp), and the texture node is labelled with the device pass's binding name so a transplant binds it as tDiffuse
+    const material = new THREE.NodeMaterial();
     let tex = texture;
-    const rebuild = () => { material.colorNode = tex ? sampleTex(tex, sampleAt(uv())) : vec4(sampleAt(uv()), 0.0, 1.0); material.needsUpdate = true; };
+    const rebuild = () => { material.fragmentNode = tex ? sampleTex(tex, sampleAt(uv())).label("tDiffuse") : vec4(sampleAt(uv()), 0.0, 1.0); material.needsUpdate = true; };
     rebuild();
     const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
