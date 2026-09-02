@@ -36,6 +36,8 @@ import { SCENARIOS } from "../../physics/blobKelvin.js";
 // would have been a second import of the same names. Only what main genuinely lacked is added here.
 import { sameValue, refusedOnly } from "./knobLiveness.mjs";
 import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
+// v4336, #40 -- the budgets below were typed round numbers; these read the measured sweep record.
+import { sweepBudgetFor, sweepBudgetOr } from "./costRecord.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -67,7 +69,10 @@ console.log("1. THE LADDERS ARE REAL LADDERS");
 
 console.log("\n2. *** SABOTAGE: THREE KNOBS WHOSE LIVENESS IS KNOWN, EACH HIDING WHERE A NAIVE PROBE DOES NOT LOOK ***");
 {
-    const { rows } = await knobLiveness({ only: ["quantum", "inspiral", "powder", "structureFactor"], budgetMs: 120000 });
+    // *** THE TIGHTEST OF THE NINE TYPED BUDGETS, AND NOBODY KNEW IT WAS TIGHT. *** 120 s against quantum's
+    // measured 100.5 s is 19% headroom, where `compose` two sections down had 730x. Derived, it is 203 s.
+    const DEVS_2 = ["quantum", "inspiral", "powder", "structureFactor"];
+    const { rows } = await knobLiveness({ only: DEVS_2, budgetMs: sweepBudgetFor(DEVS_2).ms });
 
     const omega = rowFor(rows, "quantum", "omega");
     ok("!! *** A KNOB LIVE IN ONE MODE OF SEVEN IS LIVE -- quantum.omega, read only by `osc` ***",
@@ -134,7 +139,11 @@ console.log("\n2. *** SABOTAGE: THREE KNOBS WHOSE LIVENESS IS KNOWN, EACH HIDING
 
 console.log("\n3. THE WIDE LADDER SEPARATES 'FLAT NEARBY' FROM 'READ BY NOBODY'");
 {
-    const { rows } = await knobLiveness({ only: ["galaxy"], budgetMs: 120000 });
+    const { rows } = await knobLiveness({ only: ["galaxy"], budgetMs: sweepBudgetFor("galaxy").ms });
+    // *** widenStill KEEPS ITS OWN NUMBER, AND THE BOUNDARY IS THE POINT. *** The record measures the SWEEP;
+    // the wide ladder is a second pass over the rows it produced and no measurement of it exists. Budgeting it
+    // from the sweep's cost would be reading one number as an answer to a different question -- the shape this
+    // round is repairing -- so it stays typed until somebody freezes it.
     await widenStill(rows, { budgetMs: 60000 });
     const zt = rowFor(rows, "galaxy", "zeroTol");
     ok("!! galaxy.zeroTol is flat over its working range and wakes at the sign flip",
@@ -220,7 +229,20 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     // the escape hatch working end to end, which is a different claim from the rule and needs its own check.
     const rescued = [...withChoices.keys()].filter((k) => withChoices.get(k) && !bare.get(k)).sort();
     const devs = [...new Set([...unanswerable, ...rescued].map((x) => x.split(".")[0]))];
-    const { rows } = await knobLiveness({ only: [...new Set([...devs, "blackhole"])], budgetMs: 200000 });
+    // *** THIS ONE STAYS TYPED, AND FINDING OUT WHY COST A FORTY-MINUTE RUN. *** Every other budget in this
+    // file names a fixed handful of devices and wants them to FINISH, which is the quantity costRecord
+    // measures. This call is the opposite: `devs` is computed from the scan above and can name any device in
+    // the lab, and 200 000 ms is a deliberate CAP on a broad probe -- "spend at most this looking for
+    // unanswerable knobs", not "let an exhaustive sweep of the dearest member complete".
+    //
+    // Derived, it was 8187 s: sweepBudgetFor takes the group's dearest member, the set can contain twof at
+    // 4053 s, and knobLiveness spends its budget PER DEVICE. The run was killed at forty minutes against a
+    // gate whose whole measured cost is 424 s. The record is not wrong; it answers a different question, the
+    // same way it does for widenStill and jointlyLive below. A number that caps a broad scan is not a
+    // prediction of what a full sweep costs, and reading one as the other is the defect this round removed
+    // from the other seven sites.
+    const DEVS_4 = [...new Set([...devs, "blackhole"])];
+    const { rows } = await knobLiveness({ only: DEVS_4, budgetMs: 200000 });
     const un = unprobedKnobs(rows);
     const named = (k) => un.some((u) => u === k || u.startsWith(k + " "));
 
@@ -390,7 +412,8 @@ console.log("\n3f. *** v4033 -- A KNOB WITH NO ORDERING CAN STILL HAVE ALTERNATI
         "probing a knob at the value it already has measures nothing and would read as dead. Choices win for " +
         "numbers too, because a device may know its own range better than a blind 1.5x does.");
 
-    const { rows } = await knobLiveness({ only: ["compose"], budgetMs: 200000 });
+    // 200 s against a measured 0.3 s: 730x, the widest of the nine, and it read exactly like the 120 s above.
+    const { rows } = await knobLiveness({ only: ["compose"], budgetMs: sweepBudgetFor("compose").ms });
     const live = rows.filter((r) => r.live.length).map((r) => r.knob).sort();
     ok("!! *** ALL SIX OF compose's KNOBS NOW READ LIVE, WHERE ALL SIX READ 'not probed (string)' BEFORE ***",
         live.join(",") === "devA,devB,keyA,keyB,modeA,modeB" && unprobedKnobs(rows).length === 0,
@@ -458,7 +481,7 @@ console.log("\n3g. *** v4034 -- THE OTHER FOUR NAME KNOBS, DERIVED FROM THE TABL
             if (Object.keys(base).every((k) => Object.is(base[k], out[k])))
                 coerced.push(name + "." + knob + "=" + ch);
         }
-        const { rows } = await knobLiveness({ only: [name], budgetMs: 200000 });
+        const { rows } = await knobLiveness({ only: [name], budgetMs: sweepBudgetOr(name, 200000).ms });
         const r = rows.find((x) => x.knob === knob);
         if (!r || !r.live.length) dead.push(name + "." + knob);
     }
@@ -553,8 +576,8 @@ console.log("\n3h. *** v4035 -- A LIST OF NUMBERS HAS A SCALING, AND THREE QUANT
         "different direction, not a longer vector, and the declared choices are three that are parallel " +
         "neither to the default nor to each other.");
 
-    const { rows } = await knobLiveness({
-        only: ["fragmentRotation", "entropy", "nbench", "strokeMorph"], budgetMs: 200000 });
+    const DEVS_8 = ["fragmentRotation", "entropy", "nbench", "strokeMorph"];
+    const { rows } = await knobLiveness({ only: DEVS_8, budgetMs: sweepBudgetFor(DEVS_8).ms });
     const named = ["fragmentRotation.axis", "entropy.weights", "nbench.sizes", "strokeMorph.lineA"];
     const answered = rows.filter((r) => r.live.length).map((r) => r.device + "." + r.knob);
     ok("!! *** ALL FOUR NOW READ LIVE, AND NO ARRAY KNOB IN THE LAB IS UNPROBED ***",
@@ -885,7 +908,7 @@ console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
     const stale = [];
     for (const key of Object.keys(STILL_OK)) {
         const [dev, knob] = key.split(".");
-        const { rows } = await knobLiveness({ only: [dev], budgetMs: 90000 });
+        const { rows } = await knobLiveness({ only: [dev], budgetMs: sweepBudgetOr(dev, 90000).ms });
         await widenStill(rows, { budgetMs: 60000 });
         const r = rows.find((x) => x.knob === knob);
         if (!r) { stale.push(key + " (knob no longer declared)"); continue; }

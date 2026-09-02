@@ -247,6 +247,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "stronger statement than a green run alone -- a gate that has never been seen to fail is a gate " +
                  "whose green means nothing yet",
     }),
+    // v4336 -- the sixth closing, and the list shape has now absorbed a name collision twice without an edit
+    // to the arithmetic, which is what it was for. #40's gate is one file; the round it belongs to also
+    // rewired seven of knobLiveness-selfcheck's own budgets from typed round numbers to reads of the measured
+    // cost record, so THAT gate was run to completion beside this one rather than left to the quick sweep's
+    // cap -- a gate whose budgets changed is exactly the gate a 3 s cap cannot vouch for.
+    since6: Object.freeze({
+        at: "v4336", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/sweepBudget-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections. Driven RED by four sabotages of the module it " +
+                 "guards (1/2/2/1 by name) and restored md5-identical; one of the four is red only on a box " +
+                 "whose hostScale is not 1, which is said in the log rather than left as a silent pass",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
