@@ -270,13 +270,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "replayed in it and refused; three sabotages caught, one of them the ENOBUFS fault the guard's " +
                  "own first draft shipped",
     }),
-    // v4352 -- the eighth closing, and the list shape has now absorbed a THIRD name collision without an edit
+    // v4361 -- the eighth closing, and the list shape has now absorbed a THIRD name collision without an edit
     // to the arithmetic, which is what it was for. #40's gate is one file; the round it belongs to also
     // rewired seven of knobLiveness-selfcheck's own budgets from typed round numbers to reads of the measured
     // cost record, so THAT gate was run to completion beside this one rather than left to the quick sweep's
     // cap -- a gate whose budgets changed is exactly the gate a 3 s cap cannot vouch for.
     since8: Object.freeze({
-        at: "v4352", swept: 1, green: 1, red: 0,
+        at: "v4361", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/roundhouse/sweepBudget-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, seven sections. Driven RED by four sabotages of the module it " +

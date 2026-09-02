@@ -302,7 +302,7 @@ export const COMMIT_BELT_V4329 = Object.freeze({
                         // re-measurement corrects the NUMBER and leaves the name of the round that took it.
     repoCommits: 858,   // likewise the v4329 figure. The merged head stands at 863; the gate prints this one,
                         // so read it as "the belt measured at v4329" rather than as a live count.
-    perBody: Object.freeze({ three: 1, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
+    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),
     why: "twelve of fifteen vendored bodies have been touched by exactly one commit in the repository's life -- " +
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +

@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/versionPreflight.mjs — v4350
+// WebGLEngine/tools/ship/versionPreflight.mjs — v4360
 //
 // *** RULE 3 SAYS NEVER REUSE A VERSION NUMBER, AND NOTHING CHECKED IT. ***
 //
@@ -48,6 +48,12 @@ export function versionNumber(v) {
 export function engineVersionOf(text) {
     const m = /^const ENGINE_VERSION = "(v\d+)"/m.exec(String(text || ""));
     return m ? m[1] : null;
+}
+
+/** The whole of origin/main's main.js, so a same-number case can ask whether the BYTES differ too. */
+export function mainSource({ run = null } = {}) {
+    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    try { return exec(["show", "origin/main:WebGLEngine/main.js"]); } catch { return null; }
 }
 
 /** The version origin/main carries, or null with a reason when it cannot be read. */
@@ -106,6 +112,27 @@ export function preflight(shipping, opts = {}) {
                  refusal: null, note: "main's version could not be read: " + reason + " -- nothing to compare, so nothing refused" };
     }
     const have = versionNumber(mv);
+
+    // *** SAME NUMBER, SAME BYTES, IS NOT A COLLISION -- AND THE FIRST VERSION OF THIS REFUSED IT. *** v4350 was
+    // pushed to main, and the very next verify in the same tree was refused: main carried v4350 because THIS
+    // BUILD had just put it there. Rule 3 is about "two builds with the same number but DIFFERENT BYTES", and
+    // this checked only the number, so it fired on every follow-up commit to a round already shipped. That is
+    // the exact false-fault this file's own gate warns about -- "a guard that fires on the next legitimate
+    // number teaches people to skip it, and then the rule is unenforced again with extra steps" -- committed
+    // in the guard that says it. Found by using it, one commit after it shipped. So the same-number case now
+    // compares the builds, and only a DIFFERENT build wearing main's number is refused.
+    if (have != null && want === have) {
+        const localPath = path.join(ENG, "main.js");
+        const mine = opts.localSourceOverride !== undefined ? opts.localSourceOverride
+                   : (() => { try { return fs.readFileSync(localPath, "utf8"); } catch { return null; } })();
+        const theirs = opts.mainSourceOverride !== undefined ? opts.mainSourceOverride : mainSource(opts);
+        if (mine != null && theirs != null && mine === theirs) {
+            return { ok: true, shipping, mainVersion: mv, freshness, refusal: null,
+                     note: `origin/main carries ${mv} and it is THIS build, byte for byte -- the same build under ` +
+                           `one number is what shipping means, not a collision` };
+        }
+    }
+
     if (have != null && want <= have) {
         const same = want === have;
         return { ok: false, shipping, mainVersion: mv, freshness,

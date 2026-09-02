@@ -192,7 +192,7 @@ export const RECORD_STALENESS = 712.7 / 458.9;
 /**
  * *** A BUDGET FOR SWEEPING NAMED DEVICES, READ FROM THE RECORD INSTEAD OF TYPED. ***
  *
- * v4352, backlog #40. The sweep half of this file was ORPHANED AT BOTH ENDS. sweepCostFor() has been exported
+ * v4361, backlog #40. The sweep half of this file was ORPHANED AT BOTH ENDS. sweepCostFor() has been exported
  * and documented since v4051 -- "when a proxy spans two orders of magnitude, the measurement is the model" --
  * with ZERO call sites anywhere in the tree; writeSweepCosts() likewise, so there was no path to refresh what
  * 4.79 hours of measurement bought. And where the BUILD half got scaledCostFor at v4173 because "a frozen
