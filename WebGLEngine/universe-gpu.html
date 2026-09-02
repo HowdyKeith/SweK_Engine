@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK Universe -- on the GPU</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #030811; color: #cfd9e6; font: 13px ui-monospace, monospace; overflow: hidden; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  #hud { position: absolute; left: 12px; top: 10px; background: rgba(3, 8, 17, .84); border: 1px solid #1a2a44; padding: 8px 10px; max-width: 560px; line-height: 1.5; }
+  #hud b { color: #9ec6f0; } .warn { color: #f0c66a; }
+  label { display: inline-block; margin-right: 12px; } input[type=range] { width: 150px; vertical-align: middle; }
+  #pick { color: #f0e29e; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<!--
+  Level 13 -- THE UNIVERSE ON THE GPU-DRIVEN PATH. Endless Sky's 694 systems and every stellar object in them
+  (world/universeBodies.mjs) as instance records: culled, LOD-picked and, on WebGPU, Hi-Z occluded in two phases
+  by render/gpuDriven.mjs, drawn with one drawIndexedIndirect per LOD, and PICKED -- move the pointer and the HUD
+  names the system or body under it, from a one-pixel readback of an identity picture the page never shows.
+  The 16 MB es-universe.json is fetched as ev.html fetches it; only systems and objects are read.
+-->
+<canvas id="stage"></canvas>
+<div id="hud">
+  <div><b>SweK universe, GPU-driven</b> &mdash; <span id="route">loading es-universe.json&hellip;</span></div>
+  <div id="bodies"></div>
+  <div><label>tilt <input id="tilt" type="range" min="5" max="89" value="60"></label><label>zoom <input id="zoom" type="range" min="1" max="60" value="10"></label></div>
+  <div><label><input id="life" type="checkbox" checked> life: <span id="haulers">300</span> haulers trading</label> <span id="haul" style="color:#9fb8a8"></span></div>
+  <div id="pick">point at something</div>
+  <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
+  <div>drawn <span id="drawn">?</span> &middot; <a href="./ev.html" style="color:#9ec6f0">the Endless Sky pages</a></div>
+</div>
+<script type="module">
+import { universeRecords, slimUniverse } from "./world/universeBodies.mjs";
+import { requestDevice } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+import { makeUniverseEconomy } from "./world/universeEconomy.mjs";
+import { makeHaulSource } from "./render/gpuHaul.mjs";
+
+const cv = document.getElementById("stage"), route = document.getElementById("route"), pickEl = document.getElementById("pick");
+const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
+const raw = await fetch("./es-universe.json").then((r) => r.json()).catch(() => null);
+if (!raw) { say("es-universe.json not found -- run node es-build.mjs", true); throw new Error("no universe"); }
+const U = universeRecords(raw);
+document.getElementById("bodies").textContent = `${U.systems} systems, ${U.count - U.systems} stellar objects, ${U.count} records`;
+
+function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
+size();
+let device = null;
+try { device = await requestDevice(cv, {}); } catch (e) { say("requestDevice threw: " + e.message, true); throw e; }
+if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is available on this origin -- nothing can be drawn (WebGPU needs https or localhost)", true); throw new Error("no device"); }
+
+const lods = [{ name: "far", mesh: G.quadMesh(1, [0.35, 0.5, 0.8, 1]) }, { name: "mid", mesh: G.quadMesh(2, [0.55, 0.7, 0.95, 1]) }, { name: "near", mesh: G.quadMesh(5, [0.85, 0.92, 1, 1]) }];
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.004, 0.012], records: U.records, occlusion: "twoPhase" });
+// v4300 -- LIFE: 300 haulers trading between the 694 systems (world/universeEconomy.mjs). The systems stand still, so
+// each flight is a function of time and render/gpuHaul.mjs evaluates it on the GPU; the CPU only trades.
+const economy = makeUniverseEconomy(slimUniverse(raw), { haulers: 300, seed: 11 });
+const haul = makeHaulSource(device, economy, { radius: 0.35, lift: 1.2 });
+const lifeScene = G.makeGpuDrivenScene(device, { lods: [{ name: "ship", mesh: G.quadMesh(1, [1, 0.85, 0.35, 1]) }], thresholds: [], records: haul });
+say(`${device.backend} &middot; ${scene.path}${scene.occlusion ? " &middot; two-phase Hi-Z" : ""} &middot; flight by ${device.backend === "webgpu" ? "compute" : "the CPU twin"}`);
+let simT = 0, lastSim = 0;
+
+let cam = null, frames = 0, pointer = null;
+function camera() {
+    const tilt = Number(document.getElementById("tilt").value) * Math.PI / 180, dist = U.extent * 3 / Number(document.getElementById("zoom").value);
+    // the map is XY; the camera sits on +z and tilts toward -y, exactly as orrery-gpu.html looks at its plane
+    const eye = [0, -Math.sin(tilt) * dist, Math.cos(tilt) * dist], aspect = cv.width / Math.max(1, cv.height);
+    const proj = G.perspective(0.9, aspect, 0.05, dist * 6), view = G.lookAt(eye, [0, 0, 0], [0, 1, 0]);
+    return { eye, proj, view, viewProj: G.multiply(proj, view) };
+}
+cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
+async function frame() {
+    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) size();
+    cam = camera();
+    scene.frame({ viewProj: cam.viewProj, view: cam.view, proj: cam.proj, eye: cam.eye, clear: [0.012, 0.031, 0.067, 1] });
+    const life = document.getElementById("life").checked;
+    if (life) {
+        simT += 0.05;                                       // a twentieth of a day per frame
+        while (lastSim + 0.25 <= simT) { economy.step(0.25); lastSim += 0.25; }
+        const h = haul.advance(simT);
+        lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
+        if ((frames & 15) === 0) { document.getElementById("haul").textContent = `day ${simT.toFixed(0)}, flight by ${h.path}, ${h.uploads} uploads`; const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
+    }
+    if (pointer && (frames & 3) === 0) { try {
+        let hit = life ? await lifeScene.pick(pointer[0], pointer[1]) : null;
+        if (hit) pickEl.textContent = economy.describe(hit.id);
+        else { hit = await scene.pick(pointer[0], pointer[1]); pickEl.textContent = hit ? `${U.kinds[hit.id]}: ${U.names[hit.id]} (record ${hit.id}, LOD ${hit.lod}${hit.id >= U.systems ? ", in " + U.names[U.systemOf[hit.id]] : ""})${hit.id < U.systems ? " -- " + economy.describeMarket(hit.id + 1) : ""}` : "nothing under the pointer"; }
+    } catch (e) { pickEl.textContent = "pick failed: " + e.message; } }
+    if ((frames++ & 31) === 0) { try { const c = await scene.readCounts(); const c2 = await scene.readCounts2(); if (c) document.getElementById("drawn").textContent = c.join(" + ") + (c2 ? " (+ phase 2: " + c2.join(" + ") + ")" : "") + " of " + U.count; } catch (e) {} }
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

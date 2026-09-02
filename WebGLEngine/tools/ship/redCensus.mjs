@@ -441,13 +441,30 @@ export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e
 // the 37 reds take between 89 ms and 7.5 s with the spread you would expect from real work. They are running
 // and they are failing.
 //
-// WHAT DID NOT HAPPEN IS AS IMPORTANT: nothing REGRESSED either. No gate that was green went red. The register
-// is not rotting in the direction it rotted last time -- at v4279 THIRTEEN of the nineteen previously recorded
-// were found already fixed with nobody removing the entry. This time the list is exactly true and exactly
-// stalled, which is a different failure and needs a different fix: not a correction, a RATCHET.
+// WHAT DID NOT HAPPEN IS AS IMPORTANT: nothing among the 37 was fixed. The register is not rotting in the
+// direction it rotted last time -- at v4279 THIRTEEN of the nineteen previously recorded were found already
+// fixed with nobody removing the entry. This time the list is exactly true and exactly stalled, which is a
+// different failure and needs a different fix: not a correction, a RATCHET.
+//
+// *** CORRECTED AT v4297: THIS RECORD ORIGINALLY CARRIED `regressed: 0`, AND IT HAD NO RIGHT TO. ***
+//
+// A regression is a gate that was GREEN and is now red. All 37 gates this re-check ran were already red, so
+// not one of them was eligible; the zero was a claim about the 1,329 gates the method never executed. The
+// prose shipped in the same round said the honest state of that question was UNKNOWN -- so the caveat and the
+// field contradicted each other inside one commit, and the field is the half a reader greps.
+//
+// The rule that catches it is gateSweep.coversRegressions(): a method may report on regressions only if the
+// gates it ran include gates that were not already red. The two figures are split below so that the measured
+// one and the unmeasured one cannot be read as the same kind of thing. The full sweep that IS entitled to the
+// answer ran at v4297; see gateSweep.SWEEP_V4297.
 export const RECHECK = Object.freeze({
-    at: "v4295", roundsSince: 16, method: "serial, one gate at a time, via runGate",
-    checked: 37, stillRed: 37, nowGreen: 0, regressed: 0,
+    at: "v4296", roundsSince: 16, method: "serial, one gate at a time, via runGate", // ran in the round that shipped as v4296; the header said v4295 then
+    checked: 37, stillRed: 37, nowGreen: 0,
+    // MEASURED: of the 37 re-run, none had gone from red to red-for-a-new-reason or otherwise moved.
+    regressedAmongChecked: 0,
+    // NOT MEASURED, and originally shipped as a bare `regressed: 0`. See the correction above.
+    regressedOverall: "unmeasurable by this method -- all 37 gates it ran were already red, so no gate " +
+                      "eligible to regress was executed; answered by the full sweep at v4297",
     controlled: Object.freeze(["tools/ship/frameGraph-selfcheck.mjs", "tools/ship/crossBackend-selfcheck.mjs",
                                "tools/ship/claimCheck-selfcheck.mjs"]),
     controlVerdict: "all three report GREEN, so 37-of-37 is not a runner that reports red for everything",
@@ -487,26 +504,52 @@ export const MOMENTS = Object.freeze({
 // same twelve pages every round, so the work it was asking for was legible the whole time and nothing had
 // done it. A census whose entries are actionable and unactioned is a to-do list nobody reads, and the only
 // way to find that out was to act on one.
+// *** MERGED FROM main AT v4315 AND IMMEDIATELY CORRECTED BY IT. *** This record shipped `regressed: 0`, and
+// main's v4297 had just deleted that exact field from RECHECK for the exact reason: a section-2 re-run executes
+// ONLY the gates already known red, so no gate eligible to regress is ever run and the zero is a claim about
+// the ~1,330 the method never touched. gateSweep.coversRegressions() is the rule, and it refuses this method.
+//
+// v4314 DID have a method entitled to the answer, and it was a different one -- so it is recorded as a
+// different one rather than folded into the same object. Two methods, two coverages, two verdicts.
 export const RECHECK_V4314 = Object.freeze({
     at: "v4314", method: "the gate's own section-2 re-run, serial, via runGate",
-    checked: 34, stillRed: 33, nowGreen: 1, regressed: 0,
+    checked: 34, stillRed: 33, nowGreen: 1,
+    // MEASURED: none of the 34 had moved except the one that went green.
+    regressedAmongChecked: 0,
+    // NOT MEASURED BY THIS METHOD, and it shipped as a bare `regressed: 0` for one round.
+    regressedOverall: "unmeasurable by the section-2 re-run -- every gate it runs is already red, so no gate " +
+                      "eligible to regress was executed. ANSWERED SEPARATELY BY sweptOutsideTheCensus below, " +
+                      "which is a different method with real coverage and which found one",
     nowGreenGates: Object.freeze(["tools/pageReach-selfcheck.mjs"]),
     causes: "twelve pages linked and filed; the gate was asking for exactly that and had been for rounds",
     stillRedNearby: "registerResidue-selfcheck went 46 -> 45 in the same edit and stays RED against its " +
                     "ceiling of 41. THE CEILING WAS NOT MOVED. Lowering it to 45 would have turned the gate " +
                     "green by rewriting the ratchet, which is the one thing this file exists to refuse",
-    // *** AND THE CLOSING NOTE OF THIS FILE GOT A LIVE INSTANCE IN THE SAME ROUND. *** "redCensus is green"
-    // means "the known red set has not changed", not "the tree is green" -- and a sweep of the 89 gates that
-    // read server.html found ONE red gate outside the census: instruments-selfcheck, which had gone red at
-    // v4313 because krbn-lyapunov.html imports simulation/tomo and was in no instrument index. So `regressed`
-    // below counts CENSUS MEMBERS and there was a regression it could not see, in a gate nobody had run.
-    regressedOutsideTheCensus: Object.freeze([
-        { gate: "tools/ship/instruments-selfcheck.mjs", wentRed: "v4313", fixed: "v4314",
-          why: "a page carrying an EXACT KEY (ln 2 off the GPU) was linked and indexed nowhere. Fixed by " +
-               "registering it in physics/instruments.mjs with a verifier that calls the CPU port -- NOT by " +
-               "adding it to that gate's EXEMPT list beside krbn.html, which the identical import made " +
-               "available and which would have filed an answer as a decoration." },
-    ]),
+    // *** THE METHOD THAT IS ENTITLED TO THE REGRESSION ANSWER. *** All 89 gates that read server.html, swept
+    // six-way then confirmed serially -- 87 returned, and the great majority were NOT in the census, so a
+    // green-gone-red was visible to it. It found one, which is why the split above is not pedantry: the
+    // entitled method's answer is 1 and the unentitled method's would have been 0.
+    sweptOutsideTheCensus: Object.freeze({
+        population: "the 89 gates whose source reads server.html", returned: 87, red: 8, inCensusAlready: 7,
+        regressedFound: 1,
+        found: Object.freeze([
+            { gate: "tools/ship/instruments-selfcheck.mjs", wentRed: "v4313", fixed: "v4314",
+              why: "a page carrying an EXACT KEY (ln 2 off the GPU) was linked and indexed nowhere. Fixed by " +
+                   "registering it in physics/instruments.mjs with a verifier that calls the CPU port -- NOT " +
+                   "by adding it to that gate's EXEMPT list beside krbn.html, which the identical import made " +
+                   "available and which would have filed an answer as a decoration." },
+        ]),
+        didNotReturn: Object.freeze([
+            { gate: "tools/ship/shaderRefs-selfcheck.mjs", verdict: "RED serially, first verdict it has ever had",
+              note: "in UNCONFIRMED_SLOW, so the census had no verdict either way. Fails on \"16 callers still " +
+                    "spell /\\.(js|mjs|html)$/ by hand\" and names none of v4314's pages. Promoting it into " +
+                    "RED_AT_V4279 is the documented next step and needs a RECOVERED_SINCE_V4279 term rather " +
+                    "than a bump to METHOD.recoveredFromTimeoutBucket, which is a v4279 snapshot" },
+            { gate: "tools/ship/toolFrontDoor-selfcheck.mjs", verdict: "UNMEASURED -- exit 124 at 500s, zero output",
+              note: "also UNCONFIRMED_SLOW. The v4279 sweep capped at 120s; a serial run on an idle box does " +
+                    "not finish it at 500s either, which is a fact about the gate and not about the sweep" },
+        ]),
+    }),
 });
 
 // The first re-check after the list actually MOVED. v4295 found 37 of 37 still red and called it "exactly true
@@ -521,7 +564,15 @@ export const RECHECK_V4314 = Object.freeze({
 // "now", and this one meant "then". Filtered by round, so it can only ever describe v4313.
 export const RECHECK_V4313 = Object.freeze({
     at: "v4313", method: "the gate's own section-2 re-run, serial, via runGate",
-    checked: 37, stillRed: 34, nowGreen: 3, regressed: 0,
+    checked: 37, stillRed: 34, nowGreen: 3,
+    // Corrected at v4315 by main's v4297 rule, same as RECHECK and RECHECK_V4314 above. This round has NO
+    // entitled method to offer in its place: it ran the red set and nothing else, so the honest answer is that
+    // it does not know -- and the regression it did not see was its own, found one round later.
+    regressedAmongChecked: 0,
+    regressedOverall: "unmeasurable by this method -- every gate it ran was already red. AND THERE WAS ONE: " +
+                      "instruments-selfcheck went green-to-red in this very round, found at v4314 by a sweep " +
+                      "with actual coverage. The zero this record used to carry would have been read as its " +
+                      "denial",
     nowGreenGates: Object.freeze(FIXED_SINCE_V4279.filter((e) => !/^v43(1[4-9]|[2-9])/.test(e.round)).map((e) => e.gate)),
     causes: "one stale generated file (launch-index.json, 507 against 523) accounted for TWO of the three; the " +
             "third had been green since commit 9695918 and nobody pruned the entry",

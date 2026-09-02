@@ -174,7 +174,9 @@ console.log("\n4. WHAT IS STILL NOT WIRED, AND WHY THAT IS NOT A HEDGE");
         "a pass a renderer COULD call is not a pass a renderer DOES call, and the difference is a device");
     const gate = fs.readFileSync(path.join(ENG, "tools/ship/bloomFusedTexture-selfcheck.mjs"), "utf8");
     ok("  and this file says so in its own header rather than only in a changelog",
-        /STILL RUNS ITS THREE DRAWS/.test(gate));
+        // \s+ rather than literal spaces: this matches PROSE in a header, and prose wraps. gateQuality flagged
+        // the literal-space form at Level 11 as the one new prose-matching offender since v4279.
+        /STILL\s+RUNS\s+ITS\s+THREE\s+DRAWS/.test(gate));
     report("*** NO TIMING, AGAIN, AND FOR THE SAME REASON. *** The payoff of fusing three passes is memory " +
         "traffic; the only WebGPU device here is google/swiftshader, a software rasteriser; timing memory " +
         "traffic on a CPU measures the CPU. Building the wiring before the measurement is defensible -- it " +

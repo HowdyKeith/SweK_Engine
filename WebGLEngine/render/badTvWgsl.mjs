@@ -197,6 +197,37 @@ fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
 }`;
 
 /**
+ * Level 11 -- EFFECT STRENGTH AS A SPATIAL FIELD.
+ *
+ * *** badTv TOOK SCALAR KNOBS ONLY: one distortion for the whole frame. *** A strength that varies across the
+ * picture -- tearing at the edges and a clean centre, a band that follows the cursor, a mask painted by hand --
+ * had no way in. This variant adds ONE binding, `tField`, a texture whose red channel is the per-pixel strength
+ * s in [0, 1], and scales the DISPLACEMENT by it before the wrap: the tear offset and the roll both multiply by
+ * s, so s = 0 is the untouched source and s = 1 is exactly the scalar effect. A constant white field reproduces
+ * FRAGMENT_WGSL pixel for pixel, which tools/ship/strengthField-selfcheck.mjs requires.
+ *
+ * *** DERIVED FROM FRAGMENT_WGSL BY SUBSTITUTION, NOT RETYPED. *** Two copies of the shader would agree until
+ * one was edited. Each substitution below throws at module load if its anchor is gone, so an edit to the base
+ * that breaks the derivation is a load error and not a silent divergence.
+ */
+function _derive(src, from, to, what) {
+    if (!src.includes(from)) throw new Error("badTvWgsl: FIELD_FRAGMENT_WGSL cannot be derived -- FRAGMENT_WGSL no longer contains " + what);
+    return src.replace(from, to);
+}
+export const FIELD_FRAGMENT_WGSL = _derive(_derive(FRAGMENT_WGSL,
+    "@group(0) @binding(2) var tDiffuse: texture_2d<f32>;",
+    `@group(0) @binding(2) var tDiffuse: texture_2d<f32>;
+@group(0) @binding(3) var tField: texture_2d<f32>;
+
+// The scalar effect at strength s: both displacements scale BEFORE the wrap, so s = 0 is the identity.
+fn badTvSampleAtField(uv: vec2f, k: Knobs, s: f32) -> vec2f {
+  return vec2f(fract(uv.x + badTvOffsetAt(uv.y, k) * s), fract(uv.y - k.time * k.rollSpeed * s));
+}`, "the tDiffuse declaration"),
+    "  return textureSample(tDiffuse, samp, badTvSampleAt(uv, k));",
+    `  let s = textureSample(tField, samp, uv).r;
+  return textureSample(tDiffuse, samp, badTvSampleAtField(uv, k, s));`, "the fragment's sample line");
+
+/**
  * The knob order the uniform struct expects, so a caller cannot pack them in the wrong sequence by guessing.
  *
  * *** THIS WAS ITSELF A GUESS UNTIL v4278. *** It was a frozen literal hand-copied from `struct U` below,

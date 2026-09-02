@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/redCensusFresh-selfcheck.mjs -- v4295
+// WebGLEngine/tools/ship/redCensusFresh-selfcheck.mjs -- v4297
 //
 // *** THE CENSUS WAS TAKEN AT v4279 AND NOBODY LOOKED AGAIN FOR SIXTEEN ROUNDS. *** This is the thing that
 // looks. It cannot be a full re-run -- the list costs 142 s serially and a gate that expensive gets skipped,
@@ -46,8 +46,16 @@ sec("2. THE RECORD RECONCILES WITH ITSELF, AND SAYS WHICH MOMENT EACH NUMBER DES
 // ---------------------------------------------------------------------------------------------------------
 {
     const M = RC.MOMENTS;
-    ok(M.standingAfterFixes === RC.RED_AT_V4279.length,
-       "the standing count equals the list", `${M.standingAfterFixes}`);
+    // FIFTH AND SIXTH INSTANCES OF THE MISSING TERM (four are in gateSweep-selfcheck): a frozen v4279 figure
+    // compared to a list that MAY ONLY SHRINK by the register's own rule. MOMENTS.standingAfterFixes is what
+    // stood AT v4279 and never moves; RED_AT_V4279 is what stands NOW. The record itself already says this --
+    // MOMENTS carries a derived `standingToday` for exactly this reason -- so the check is written against the
+    // field that means "now" and the frozen one is reconciled with the fixed-since term beside it.
+    ok(M.standingToday === RC.RED_AT_V4279.length,
+       "the LIVE standing count equals the list", `${M.standingToday}`);
+    ok(M.standingAfterFixes === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length,
+       "...and the v4279 figure reconciles with it through what has been fixed and pruned since",
+       `${RC.RED_AT_V4279.length} standing + ${RC.FIXED_SINCE_V4279.length} fixed since = ${M.standingAfterFixes} at v4279`);
     ok(M.standingAfterFixes + M.introducedAndFixedInRound === M.confirmedBySweep,
        "*** and 37 + 2 = 39, so the two numbers are two MOMENTS rather than a contradiction ***",
        `${M.standingAfterFixes} standing + ${M.introducedAndFixedInRound} fixed in round = ${M.confirmedBySweep} found by the sweep`);
@@ -100,11 +108,18 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
 // ---------------------------------------------------------------------------------------------------------
 {
     const R = RC.RECHECK;
-    ok(R.checked === RC.RED_AT_V4279.length && R.stillRed + R.nowGreen === R.checked,
-       "the recorded re-check adds up", `${R.stillRed} red + ${R.nowGreen} green = ${R.checked}`);
-    ok(R.nowGreen === 0 && R.regressed === 0,
-       "*** sixteen rounds, nothing fixed and nothing regressed ***",
+    ok(R.checked === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length && R.stillRed + R.nowGreen === R.checked,
+       "the recorded re-check adds up, against the register as it stood WHEN IT RAN",
+       `${R.stillRed} red + ${R.nowGreen} green = ${R.checked}; register now ${RC.RED_AT_V4279.length} + ` +
+       `${RC.FIXED_SINCE_V4279.length} fixed since`);
+    // v4297: this line used to read `R.regressed === 0` and asserted a field the re-check could not measure.
+    // A gate that checks a record is only as honest as the record, and this one repeated its error verbatim.
+    ok(R.nowGreen === 0 && R.regressedAmongChecked === 0,
+       "*** sixteen rounds, nothing fixed among the thirty-seven ***",
        "the previous register rotted by accusing fixed code; this one is exactly true and exactly stalled");
+    ok(!Object.prototype.hasOwnProperty.call(R, "regressed") && /unmeasur/i.test(R.regressedOverall),
+       "*** and the REGRESSION question is recorded as unmeasurable rather than as a zero ***",
+       "all 37 it ran were already red, so none was eligible; answered by the full sweep at v4297");
     ok(typeof R.whyShipsWereHonest === "string" && /verify\.mjs/.test(R.whyShipsWereHonest),
        "and it explains why every ALL GREEN was honest anyway",
        "verify.mjs runs a smaller, different set -- the sweep is not what a ship gate executes");
@@ -127,7 +142,8 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: THE OTHER 17 ENTRIES. This re-runs twenty of thirty-seven, chosen by cost, so a " +
     "gate fixed among the seventeen slow ones will not be noticed until somebody re-runs the full list -- " +
-    "which costs 142 s and is a deliberate trade, not an oversight. Also unchecked: whether any gate that was " +
-    "GREEN at v4279 has since gone red. That needs the full 1,348-gate sweep this file explicitly does not " +
-    "attempt, and the honest state of that question is UNKNOWN rather than fine.");
+    "which costs 142 s and is a deliberate trade, not an oversight. Also unchecked HERE: whether any gate that " +
+    "was GREEN at v4279 has since gone red. That question was UNKNOWN until v4297; the full 1,366-gate two-phase " +
+    "sweep answered it -- SIX regressions, named in gateSweep.SWEEP_V4297 and reconciled by " +
+    "gateSweep-selfcheck.mjs section 7. This file still cannot see the next one; that needs the sweep re-run.");
 process.exit(fails ? 1 : 0);

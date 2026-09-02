@@ -1,0 +1,23 @@
+{
+ "from": "the sandbox's WebGPU backend, offscreen (SwiftShader), v4300",
+ "scene": "gridScene 16x16, three LODs, camera [0,0,6], two-phase Hi-Z, 256x256",
+ "hist": {
+  "0,0,255": 2176,
+  "0,0,0": 43656,
+  "0,255,0": 5712,
+  "255,0,0": 13992
+ },
+ "webgl2": {
+  "0,0,255": 2176,
+  "0,0,0": 43656,
+  "0,255,0": 5712,
+  "255,0,0": 13992
+ },
+ "counts": [
+  33,
+  33,
+  34
+ ],
+ "tolerance": 600,
+ "written": "2026-09-01T23:24:01.317Z"
+}

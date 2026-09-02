@@ -71,9 +71,11 @@ export function fract(x) { return x - Math.floor(x); }
  * wraps top to bottom. Using a JavaScript % here instead would return a NEGATIVE value for a negative input
  * and sample outside the texture, which reads as a black band rolling through the picture.
  */
-export function sampleAt(u, v, time, knobs = {}) {
+export function sampleAt(u, v, time, knobs = {}, strength = 1) {
     const rollSpeed = knobs.rollSpeed ?? DEFAULTS.rollSpeed;
-    return [fract(u + offsetAt(v, time, knobs)), fract(v - time * rollSpeed)];
+    // Level 11 -- `strength` is the spatial field's value at this pixel (render/strengthField.mjs): both
+    // displacements scale by it BEFORE the wrap, so 0 is the identity and 1 is the scalar effect exactly.
+    return [fract(u + offsetAt(v, time, knobs) * strength), fract(v - time * rollSpeed * strength)];
 }
 
 /**

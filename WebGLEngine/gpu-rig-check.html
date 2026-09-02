@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK GPU rig check</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; background: #0b0f14; color: #d7dde6; font: 13px ui-monospace, monospace; }
+  #stage { display: block; width: 256px; height: 256px; image-rendering: pixelated; border: 1px solid #263140; margin: 12px; }
+  #out { margin: 12px; white-space: pre-wrap; line-height: 1.5; max-width: 900px; }
+  .pass { color: #7ee2a8; } .fail { color: #f08a8a; } .warn { color: #f0c66a; }
+  textarea { width: 900px; height: 90px; background: #0e141c; color: #b9c4d2; border: 1px solid #263140; font: 11px ui-monospace, monospace; margin: 0 12px; }
+</style>
+</head>
+<body>
+<!--
+  v4300 -- THE RIG CHECK. Every WebGPU frame the sandbox has ever graded went to an offscreen texture, because the
+  headless shell there loses the device on any render pass that targets a canvas. Nothing has confirmed the
+  canvas-presenting path on a browser with a compositor. This page IS that confirmation: open it on a real box,
+  it requests the default device (WebGPU when the origin allows it, else WebGL2), draws the same GPU-driven
+  scene the gates draw -- gridScene, three LODs, two-phase Hi-Z -- INTO THE CANVAS, reads it back through the
+  canvas path, and compares the per-colour pixel counts to what the sandbox recorded offscreen
+  (tools/ship/rig-expected.json). PASS means the picture that reached the screen is the picture the gates graded.
+  Copy the JSON below into a round if it disagrees; the numbers are the evidence.
+-->
+<canvas id="stage" width="256" height="256"></canvas>
+<div id="out">starting&hellip;</div>
+<textarea id="json" readonly></textarea>
+<script type="module">
+import { requestDevice, CAPABILITIES } from "./gfx/device.js";
+import * as G from "./render/gpuDriven.mjs";
+const out = document.getElementById("out"), say = (h) => { out.innerHTML = h; };
+const lines = [];
+try {
+    const expected = await fetch("./tools/ship/rig-expected.json").then((r) => r.json()).catch(() => null);
+    const cv = document.getElementById("stage");
+    const device = await requestDevice(cv, {});                       // the DEFAULT: WebGPU presenting to the canvas when it can
+    if (!device || device.backend === "null") throw new Error("no WebGPU or WebGL2 on this origin (WebGPU needs https or localhost)");
+    lines.push(`backend: <b>${device.backend}</b>${device.backend === "webgpu" ? " presenting to the canvas (offscreen: " + !!device.offscreen + ")" : ""}`);
+    const records = G.gridScene({});
+    const lods = [{ name: "mid", mesh: G.quadMesh(2, [0, 1, 0, 1]) }, { name: "coarse", mesh: G.quadMesh(1, [0, 0, 1, 1]) }, { name: "fine", mesh: G.quadMesh(4, [1, 0, 0, 1]) }];
+    const CAM = { eye: [0, 0, 6], target: [0, 0, 0], fov: Math.PI / 3, near: 0.1, far: 100 };
+    const proj = G.perspective(CAM.fov, 1, CAM.near, CAM.far), view = G.lookAt(CAM.eye, CAM.target), viewProj = G.multiply(proj, view);
+    const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.025, 0.04], records, occlusion: "twoPhase" });
+    scene.frame({ viewProj, view, proj, eye: CAM.eye });                                 // frame 1 builds the pyramid
+    const f = scene.frame({ viewProj, view, proj, eye: CAM.eye, read: true }); const p = await f.pixels;
+    const counts = await scene.readCounts(), counts2 = await scene.readCounts2();
+    const hist = {}; for (let i = 0; i < p.pixels.length; i += 4) { const k = p.pixels[i] + "," + p.pixels[i + 1] + "," + p.pixels[i + 2]; hist[k] = (hist[k] || 0) + 1; }
+    lines.push(`route: ${scene.path}${scene.occlusion ? ", two-phase Hi-Z (phase 2 ran: " + f.phase2Ran + ")" : ""}; counts ${counts.join("/")}${counts2 ? " + " + counts2.join("/") : ""}`);
+    lines.push(`readback: ${p.width}x${p.height} through ${device.backend === "webgpu" && !device.offscreen ? "the CANVAS texture" : "the drawing buffer"}`);
+    const result = { backend: device.backend, path: scene.path, phase2Ran: f.phase2Ran, counts, counts2, hist, ua: navigator.userAgent, when: new Date().toISOString() };
+    if (expected) {
+        const keys = [...new Set([...Object.keys(hist), ...Object.keys(expected.hist)])]; let worst = 0, worstKey = "";
+        for (const k of keys) { const d = Math.abs((hist[k] || 0) - (expected.hist[k] || 0)); if (d > worst) { worst = d; worstKey = k; } }
+        const tol = expected.tolerance || 600;
+        result.expectedFrom = expected.from; result.worstDiff = worst; result.pass = worst <= tol;
+        lines.push(`against the sandbox's offscreen ${expected.from}: largest per-colour count difference <b>${worst}</b> on ${worstKey || "-"} (tolerance ${tol}, edges only)`);
+        lines.push(result.pass ? `<span class="pass">PASS -- the picture that reached this canvas is the picture the gates graded</span>` : `<span class="fail">FAIL -- the presented picture differs beyond edge pixels; paste the JSON below into a round</span>`);
+    } else lines.push(`<span class="warn">no tools/ship/rig-expected.json to compare with -- run node tools/ship/rigCanvas-selfcheck.mjs first</span>`);
+    document.getElementById("json").value = JSON.stringify(result);
+    say(lines.join("<br>"));
+} catch (e) { lines.push(`<span class="fail">failed: ${String(e && e.message || e)}</span>`); say(lines.join("<br>")); document.getElementById("json").value = JSON.stringify({ failed: String(e && e.message || e) }); }
+</script>
+</body>
+</html>

@@ -132,18 +132,29 @@ export const DEVICE_CONTRACT = Object.freeze({
 export const PARITY_BASELINE = Object.freeze({
     // *** v4269 RECORDED 118 AND THAT WAS AN UNDERCOUNT OF 16. *** See GLSL_TELL: the directive-only marker
     // could not see a three.js ShaderMaterial pass, which is exactly the population this census is about.
-    glslBearing: 135,    // v4271 +1: render/badTvDevicePass.mjs, the GLSL half of the first device pipeline
-    glslDirective: 119,  // raw WebGL2 -- the file writes its own version header
+    //
+    // *** Level 11 -- THE RECORD WAS STALE FROM v4272 AND NOBODY LOOKED. *** Re-measured at HEAD before this round's
+    // files existed: 137 GLSL, 43 WGSL, both 5 -- two GLSL and four WGSL files had arrived over 25 rounds with
+    // this gate red and unlisted in redCensus (it was green at v4279, so v4296's honest UNKNOWN -- "whether any
+    // gate green at v4279 has since gone red" -- had at least this one instance). Then Level 11 itself: +1 to
+    // every column for render/gpuDriven.mjs, the first shader MODULE that ships both languages on purpose for
+    // gfx/device.js (a cull pass in WGSL, a render pair in both), and +1 WGSL for a gate that embeds a
+    // fragment-stage literal to rank it.
+    // Level 12 -- Level 12: render/gpuTerrain.mjs is the second deliberate dual-language shader module (its vertex
+    // stage lifts a heightfield in both languages), render/gpuOrbits.mjs is WGSL-only (a compute pass has no
+    // WebGL2 half; its twin is JavaScript), and one more gate embeds a fragment literal.
+    glslBearing: 139,
+    glslDirective: 123,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 39,     // v4270 +1: render/badTvWgsl.mjs, the first shader deliberately carried across
-    both: 5,
-    glslOnly: 130,
-    wgslOnly: 34,        // v4270 +1, same file
+    wgslBearing: 48,
+    both: 7,
+    glslOnly: 132,
+    wgslOnly: 41,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/gpuDriven.mjs", "render/gpuTerrain.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
-    wgslRawVsCode: Object.freeze({ raw: 40, code: 39 }),
+    wgslRawVsCode: Object.freeze({ raw: 51, code: 48 }),
 });
 
 /**

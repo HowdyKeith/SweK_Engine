@@ -470,6 +470,22 @@ export const UNPLACED = new Map([
     // *** AND ONE THAT IS MINE. *** krbn-lyapunov.html was linked at v4313 and filed nowhere, so it entered
     // registerResidue's list in the same round it left pageReach's. THE GATE THAT WOULD HAVE CAUGHT IT WAS
     // ALREADY RED, which is how a red gate stops being a gate: nothing distinguishes 45 from 46.
+    // *** v4315 -- THREE MORE FROM main's v4299-v4300, AND THEY MAKE THE RENDER-PANEL CASE CONCRETE. ***
+    // All three import render/gpuDriven.mjs and gfx/device.js: they are the GPU-driven rendering path, one
+    // coherent group of work. Voxel & Render still holds 14 of 15, so ONE of the three could go in and two
+    // could not -- the identical arithmetic that left v4314's six render/fx pages here.
+    //
+    // WHICH IS NOW A NUMBER RATHER THAN A COMPLAINT: 6 render/fx + 3 GPU-driven = NINE PAGES waiting on one
+    // decision. Naming a render panel would place nine; the last slot in Voxel & Render places one, chosen
+    // arbitrarily from nine. That is the whole argument, and it is Keith's call because naming a drawer
+    // decides what a panel is ABOUT.
+    //
+    // orrery-gpu is the one that would tempt a subject-based filing -- PL: Cosmic & Relativity has room for
+    // two. ITS MACHINERY IS THE COMPUTE PASS, NOT THE ASTRONOMY: it is in the tree to show orbits placed by
+    // three dispatches, and its own title says "on the GPU". Filed by machinery, like primitive-paint.
+    ["gpu-rig-check.html", "the GPU-driven path's own instrument: which backend and route this box got, the cull/LOD/draw counts, and a readback against the offscreen twin. Part of the nine-page render group with no drawer"],
+    ["orrery-gpu.html", "render/gpuOrbits.mjs -- orbital elements to instance records in a compute pass. Cosmic & Relativity has room and would be a SUBJECT filing; the machinery is gpuDriven, so it waits with the render group"],
+    ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. Same render group, same missing drawer"],
     ["krbn-lyapunov.html", "the Krbn hologram lit by swk_lyapunov -- it is a render pass (render/swiftShaderPass.js) over a Krbn drawing, so it belongs with the v4314 render/fx group and waits on the same decision"],
 
     // *** v3358 -- PARKED IN ARRIVING DELIBERATELY, BECAUSE THEY OWE A MEASUREMENT NOBODY BUT KEITH CAN GIVE. ***

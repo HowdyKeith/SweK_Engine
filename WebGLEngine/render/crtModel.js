@@ -125,7 +125,17 @@ export function vignette(u, v, strength) {
  * @param {(x: number, y: number) => [number, number, number]} sample
  * @param {CrtParams} [p] @returns {[number, number, number]}
  */
-export function crtPixel(px, py, w, h, sample, p = DEFAULTS) {
+export function crtPixel(px, py, w, h, sample, p = DEFAULTS, strength = 1) {
+    const crt = crtOnly(px, py, w, h, sample, p);
+    if (strength >= 1) return crt;
+    // Level 11 -- strength < 1 blends back toward the UNTOUCHED source pixel at the same position, exactly as the
+    // GLSL's mix(fetch(px, py), crt, s). At 0 the CRT is gone and the picture is the input.
+    const raw = sample(px, py);
+    return [clamp01(raw[0] + (crt[0] - raw[0]) * strength), clamp01(raw[1] + (crt[1] - raw[1]) * strength), clamp01(raw[2] + (crt[2] - raw[2]) * strength)];
+}
+/** @param {number} px @param {number} py @param {number} w @param {number} h
+ * @param {(x: number, y: number) => [number, number, number]} sample @param {CrtParams} p @returns {[number, number, number]} */
+function crtOnly(px, py, w, h, sample, p) {
     const u = (px + 0.5) / w, v = (py + 0.5) / h;
     const b = barrel(u, v, p.curvature);
     if (!b) return [0, 0, 0];
@@ -159,16 +169,20 @@ export function crtPixel(px, py, w, h, sample, p = DEFAULTS) {
 /** Whole-image convenience: RGBA in, RGBA out, both Uint8ClampedArray. The gate's CPU side.
  * @param {Uint8ClampedArray} src @param {number} w @param {number} h @param {CrtParams} [p]
  * @returns {Uint8ClampedArray} */
-export function crtImage(src, w, h, p = DEFAULTS) {
+export function crtImage(src, w, h, p = DEFAULTS, field = null) {
     const out = new Uint8ClampedArray(w * h * 4);
     /** @param {number} x @param {number} y @returns {[number, number, number]} */
     const sample = (x, y) => {
         const i = (y * w + x) * 4;
         return [src[i] / 255, src[i + 1] / 255, src[i + 2] / 255];
     };
+    // Level 11 -- `field` is a strength field (render/strengthField.mjs); null means strength 1 everywhere.
+    const fieldAt = (u, v) => { if (!field) return 1;
+        const fx = Math.max(0, Math.min(field.width - 1, Math.floor(u * field.width))), fy = Math.max(0, Math.min(field.height - 1, Math.floor(v * field.height)));
+        return field.data[(fy * field.width + fx) * 4] / 255; };
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-            const c = crtPixel(x, y, w, h, sample, p);
+            const c = crtPixel(x, y, w, h, sample, p, fieldAt((x + 0.5) / w, (y + 0.5) / h));
             const i = (y * w + x) * 4;
             out[i] = Math.round(c[0] * 255);
             out[i + 1] = Math.round(c[1] * 255);

@@ -661,3 +661,53 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
         srv.close();
     }
 }
+
+/**
+ * Level 11 -- RUN A SCRIPT INSIDE THE ENGINE'S OWN ORIGIN, WITH BOTH WebGPU AND WebGL2 LIVE.
+ *
+ * Every runner above builds its own GPU objects by hand, which is right for grading a shader and wrong for grading
+ * gfx/device.js: a gate that re-implements texture binding in the page proves the page can bind a texture, not that
+ * the device can. This serves the engine tree over 127.0.0.1 (a secure origin -- see the header) and evaluates
+ * `script`, an async function SOURCE taking one argument, in that page, so the script can `import("/gfx/device.js")`
+ * and drive the SHIPPING module through both backends in one launch. --enable-unsafe-webgpu alone gives both
+ * contexts here; measured at Level 11 rather than assumed.
+ *
+ * Returns { ok, result, pageErrors, reason }. A thrown error inside the script is a RESULT with its message.
+ */
+export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000 }) {
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [] };
+    const pw = resolvePlaywright(requireFn);
+    const root = path.resolve(engineRoot);
+    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json", ".wgsl": "text/plain" };
+    const srv = http.createServer((q, s) => {
+        let u = decodeURIComponent(String(q.url).split("?")[0]);
+        if (u === "/") { s.writeHead(200, { "Content-Type": "text/html" }); return s.end("<!doctype html><title>engine-origin</title>"); }
+        const f = path.join(root, u);
+        if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s.writeHead(404); return s.end("no"); }
+        s.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" });
+        s.end(fs.readFileSync(f));
+    });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    let browser = null;
+    try {
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        const page = await browser.newPage();
+        const pageErrors = [];
+        page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));
+        page.on("console", (m) => { if (m.type() === "error") pageErrors.push("console: " + m.text().slice(0, 300)); });
+        page.setDefaultTimeout(timeoutMs);
+        await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+        // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
+        // in some Playwright versions and a callable in others, and a function that returns a function comes
+        // back unserialisable as undefined. new Function makes the contract explicit.
+        const out = await page.evaluate(async ({ src, a }) => {
+            try { const fn = new Function("return (" + src + ")")(); return { ok: true, result: await fn(a) }; }
+            catch (e) { return { ok: false, reason: String(e && e.stack || e).slice(0, 600) }; }
+        }, { src: String(script), a: args });
+        return { skipped: false, ok: out.ok, result: out.ok ? out.result : null, reason: out.ok ? null : out.reason, pageErrors };
+    } catch (e) {
+        return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 300), result: null, pageErrors: [] };
+    } finally { try { await browser?.close(); } catch {} srv.close(); }
+}
