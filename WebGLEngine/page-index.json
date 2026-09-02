@@ -1435,7 +1435,7 @@
    "f": "hmc-bench.html",
    "t": "HMC leapfrog kernel bench (GPU proposes, CPU adjudicates)",
    "d": "The second fleet kernel: HMC's batch leapfrog in WGSL, one thread per chain, pure + - * / arithmetic (no transcendentals to argue rounding about). The device rolls 4096 chains; the CPU recomputes the f64 reference and grades every endpoint against the earned tolerance. The verdict is never the device's — a REJECTED kernel's timing is irrelevant. Submit sends the raw measurement to the fleet ledger; the hub re-grades from the same numbers.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1533,7 +1533,7 @@
    "f": "ising-bench.html",
    "t": "Ising kernel bench (Philox, zero tolerance)",
    "d": "The third fleet kernel and the first with ZERO-tolerance adjudication: checkerboard Metropolis driven by counter-based Philox4x32-10, integer arithmetic end to end. The device runs hundreds of sweeps; the CPU mirror recomputes every spin and a single differing bit anywhere is a rejection. Magnetisation is overlaid on Yang's exact curve so the physics is visible while the bits are graded.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {

@@ -492,6 +492,12 @@ export const SECTIONS = [
           "gpu-rig-check.html", "webgpu-bench.html", "tsl-rig.html",
           // Compute: the pages where WebGPU is doing the arithmetic.
           "fluid-webgpu.html", "fluid-webgpu-3d.html", "blobulator-gpu.html", "celltrack-viewer-gpu.html",
+          // v4329 -- TWO FLEET KERNEL BENCHES JOIN, at Keith's ask, and they are the "click and test" case in
+          // its purest form: each one's whole purpose is to run a WGSL kernel on a real adapter and SUBMIT A
+          // REPORT. THE THIRD (magmap-bench) IS THE SAME CLASS AND IS NOT HERE FOR ONE REASON ONLY -- this
+          // drawer is at 15 of 15 and there is no slot. That is a cap, not a judgement, and its UNPLACED line
+          // now says so instead of the wrong reason it used to give.
+          "hmc-bench.html", "ising-bench.html",
           // Render: WGSL fragment work, where a wrong adapter shows as a wrong picture rather than a wrong number.
           "blackhole.html", "wormhole.html", "wormhole-jump.html", "nebula.html", "gauges3000.html",
           "anime4k.html",
@@ -569,6 +575,21 @@ export const UNPLACED = new Map([
     // orrery-gpu is the one that would tempt a subject-based filing -- PL: Cosmic & Relativity has room for
     // two. ITS MACHINERY IS THE COMPUTE PASS, NOT THE ASTRONOMY: it is in the tree to show orbits placed by
     // three dispatches, and its own title says "on the GPU". Filed by machinery, like primitive-paint.
+    // v4329 -- magmap-bench: SAME CLASS AS THE TWO THAT LEFT, KEPT OUT BY ARITHMETIC RATHER THAN BY REASON.
+    // Its old line blamed the owed verdict, which was wrong for the reason recorded below. The true reason is
+    // that the WebGPU drawer is full at 15 of 15. It is the first page in if the cap moves or a member leaves.
+    ["magmap-bench.html", "the third fleet kernel bench (magnetostatics against its float-gap floor). Belongs in the WebGPU drawer beside hmc-bench and ising-bench and is out ONLY because that drawer is at 15 of 15 -- a cap, not a judgement. It also owes a device verdict (swek-magmap-bench), which deviceOwed.mjs tracks and which is NOT a filing reason"],
+    // *** v4329 -- TWO BENCHES LEAVE THIS LIST, AND THE REASON ALL THREE WERE IN IT WAS WRONG. *** hmc-bench,
+    // ising-bench and magmap-bench each carried "OWES A DEVICE VERDICT ... needs one real-GPU run" as their
+    // reason for having no drawer. THAT CONFLATES TWO THINGS tools/render-qa/deviceOwed.mjs EXISTS TO KEEP
+    // APART -- its own header says these pages "appear only as links in a pageSections drawer, which records
+    // WHERE a page lives and not WHETHER IT HAS EVER SAID ANYTHING", so being in a drawer was always expected
+    // and never implied a verdict. The register is the accountability; the drawer is the address.
+    // THE TREE ALREADY PROVED IT: floor-atlas.html is in Sampling & Methods AND in OWES_VERDICT, both at once.
+    // And the old reading was self-defeating -- it kept the page that would settle the debt out of every drawer,
+    // so the only way to open one was to type its filename, which is why "no verdict has ever arrived" sat
+    // inside the reason itself. Two are in the WebGPU drawer now and the third is held out only by that
+    // drawer's cap, not by its debt; deviceOwed.mjs still owes exactly what it owed, for all three.
     // v4327 -- gpu-rig-check.html LEAVES THIS LIST, into the WebGPU drawer. Its reason here was "part of the
     // nine-page render group with no drawer", which is a page waiting on a drawer to exist; one does now, and
     // this page is the one that answers "did this box give us an adapter at all". The render group is EIGHT
@@ -582,10 +603,12 @@ export const UNPLACED = new Map([
     // A drawer is where a page goes to be found once; Arriving is where it stays until somebody acts on it, and
     // that is the correct shelf for a page holding an open obligation. Each moves to a drawer the day its verdict
     // lands, and `node tools/render-qa/deviceOwed.mjs` prints which are still outstanding.
-    ["hmc-bench.html", "OWES A DEVICE VERDICT (swek-hmc-bench): the WGSL leapfrog kernel graded against the CPU mirror at a measured f32 floor. Needs one real-GPU run; no verdict has ever arrived"],
-    ["ising-bench.html", "OWES A DEVICE VERDICT (swek-ising-bench): the Philox checkerboard kernel at ZERO tolerance -- bit-exact or rejected, no margin to interpret. Needs one real-GPU run"],
-    ["magmap-bench.html", "OWES A DEVICE VERDICT (swek-magmap-bench): the magnetostatics kernel against its float-gap floor. Needs one real-GPU run"],
-    ["consistency-fleet.html", "OWES A DEVICE VERDICT (swek-consistency-route): one side of a consistency-board pair, run on a peer. The board cannot assemble a cross-machine pair until at least one arrives"],
+    // v4329 -- REASON CORRECTED, PLACEMENT UNCHANGED. This line used to say the owed verdict was why the page
+    // was unfiled, which is the same conflation the three benches above were freed from: owing a measurement is
+    // tracked by tools/render-qa/deviceOwed.mjs and says nothing about which drawer a page belongs in. This one
+    // stays unplaced for the ordinary reason -- a consistency-board pair run across two peers is not a subject
+    // any existing drawer is about, and naming that drawer is a decision nobody has made yet.
+    ["consistency-fleet.html", "one side of a consistency-board pair, run across two peers -- no existing drawer is about that, and naming one is an open decision. It ALSO owes a device verdict (swek-consistency-route), which deviceOwed.mjs tracks and which is not a filing reason"],
 
     ["predict.html", "Keith: 'i assume predictions are physics labs items, if we are not sure they can stay in Arriving Pages and I will move those later.' NOT SURE -- these read as project-record pages rather than instruments"],
     ["predictions.html", "same: an open-predictions record, which is a different kind of thing from a lab device"],

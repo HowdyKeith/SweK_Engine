@@ -8,6 +8,46 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4329 -- the two benches join the WebGPU drawer, and the reason they were kept out was wrong
+
+Keith: "add hmc-bench and ising-bench too if they do not have a panel that it is in already." They did not, and
+THE REASON THEY DID NOT WAS A CONFLATION THIS TREE ALREADY BUILT A REGISTER TO PREVENT. Both sat in UNPLACED --
+the "deliberately not filed, and here is why" list -- under the reason "OWES A DEVICE VERDICT ... needs one
+real-GPU run; no verdict has ever arrived", and so did magmap-bench, which v4328 left out ON THAT SAME REASONING
+AND SAID SO OUT LOUD. That reasoning was mine and it was wrong. tools/render-qa/deviceOwed.mjs (v3339) exists to
+separate exactly these two questions, and its own header says these pages "appear only as links in a
+pageSections drawer, which records WHERE a page lives and not WHETHER IT HAS EVER SAID ANYTHING" -- being in a
+drawer was always expected and never implied a verdict. THE TREE ALREADY HELD THE PROOF: floor-atlas.html is in
+Sampling & Methods AND in OWES_VERDICT, both at once, and has been for a thousand versions. The old reading was
+also self-defeating in a way the entry itself recorded: keeping a page out of every drawer leaves typing its
+filename as the only way to open it, which is why "no verdict has ever arrived" sat INSIDE the reason for hiding
+it. The register is the accountability; the drawer is the address. deviceOwed still owes exactly what it owed --
+all five entries, unchanged -- and hmc-bench and ising-bench are now reachable by clicking.
+AND THE GATE REFUSED MY FIRST FIX, USING KEITH'S OWN WORDS. Three benches into a drawer of thirteen is sixteen
+against a cap of fifteen, so I moved celltrack-viewer-gpu.html out to the Cell Tracking drawer, which sits at 1
+of 15, calling it a subject filing. pageSections-selfcheck went red: "celltrack holds ONLY celltrack, on purpose
+-- Keith: 'celltrack is a big button item, it is it's own very large science project'", and paramecium, flesh and
+mc-flesh were pulled OUT of it because grouping BY SUBJECT rather than by machinery is "the keyword probe that
+has misled this project three times". So the move was the fourth instance of a mistake the gate was written to
+catch, and it caught it. Reverted: celltrack-viewer-gpu is filed by MACHINERY and stays in the WebGPU drawer,
+which is the rule this tree files by and the rule v4328's own panel note claims to follow.
+WHICH LEAVES THE THIRD BENCH OUT ON ARITHMETIC RATHER THAN ON REASON, and its UNPLACED line now says that instead
+of the wrong thing it used to say: magmap-bench belongs beside the other two and is out ONLY because the drawer
+is at 15 of 15. A cap is not a judgement. It is the first page in if the cap moves or a member leaves.
+consistency-fleet.html keeps its place in UNPLACED and loses the same false reason -- it is unfiled because a
+consistency-board pair run across two peers is not a subject any drawer is about, which is an open decision
+rather than a debt.
+Driven in Chromium against the real page rather than asserted from the markup: the chip renders, the panel is
+hidden until its own chip is clicked and open after, the slot holds 15 anchors, hmc-bench and ising-bench arrive
+carrying THE TITLES SOMEBODY ALREADY WROTE FOR THEM ("HMC against its own answer key", "Ising against its answer
+key") because the mover moves the node rather than rebuilding it, pageSections reports no registry entry without
+an anchor, and there are zero page errors on load. page-index.json was re-derived, not hand-patched.
+The panel now states the distinction where a reader will meet it: three of its pages owe a real-GPU verdict, and
+opening one does not by itself verify anything -- deviceOwed is the register, the drawer is the address.
+Not checked and said plainly: still nothing opened against a real adapter here, so the drawer's promise remains a
+promise; this box has no GPU, which is the same reason pathTracerWgsl stays red and the same reason those three
+verdicts are still owed. gates 1409 -> 1409, no gate added -- and none was needed, because the gate that already
+existed refused the wrong fix by name. The tree stands at 1409 gates.
 ## v4328 -- a WebGPU drawer, filled by what a page DOES rather than by what it is called
 
 Keith: "can we make a link panel section on the Server.html page called WebGPU, and put any related links and any
