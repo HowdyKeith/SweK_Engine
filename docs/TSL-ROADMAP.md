@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -148,8 +148,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    and render/wgslSpec.mjs's own parseWorkgroupVars reading array<u32, 64> = 256 bytes out of a shader nobody
    wrote -- the first generated module that scanner has had to read. THE BARRIER IS MEASURED, NOT CITED: removed,
    the same module reads 40 against 670 every run, because lane 0 sums before the other 63 have written.
-   What is left before a real gpuDriven pass could be regenerated: an INDIRECT dispatch, which gfx/device.js
-   cannot do at all today -- it has drawIndexedIndirect and no dispatchWorkgroupsIndirect.
+   v4339 -- AN INDIRECT DISPATCH, and it took a gfx/device.js change first. The device has always had
+   drawIndexedIndirect, so the GPU could decide how many INSTANCES to draw; the number of INVOCATIONS was still a
+   JavaScript number. pass.dispatchIndirect(pipeline, buffer, byteOffset) reads three u32 when the command runs;
+   WebGL2 refuses it by name as it refuses every compute call. physicsTsl makeDispatchSizerTsl is one lane that
+   reads a count and writes those three numbers. Section 8: the sweep writes 1024 exponents, the tally counts 670
+   atomically, the sizer divides by the workgroup size, and the mark pass runs 704 invocations -- 11 x 64 -- with
+   nothing read back to the CPU in between; seed the same buffer with 64 or 200 and the same encoded command runs
+   64 or 256. And the SHELL owns the declarations: three declares the tally atomic<u32> in the sizer's module too,
+   because the flag is on the node rather than the use, and the shell ships it as a plain read-only u32.
+   With this every shape render/gpuDriven.mjs's cull pass has -- reads, writes, an atomic, workgroup memory, an
+   indirect dispatch -- is transplantable. What no round has done yet is write the CULL ITSELF as a graph and hold
+   the fleet's own picture to it, which is what all eight sections are for.
 
 ## The count that says when step 4 matters
 

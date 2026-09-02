@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4351
+// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4360
 //
 // The preflight exists because rule 3 -- never reuse a version number -- was enforced by memory and was broken
 // FIVE TIMES IN ONE SESSION. So the checks that matter are not "does it return an object": they are the five
