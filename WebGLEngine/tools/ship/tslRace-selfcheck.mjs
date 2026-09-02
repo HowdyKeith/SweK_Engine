@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4328
+// WebGLEngine/tools/ship/tslRace-selfcheck.mjs -- v4329
 //
 // GRADES A RACE PAINTED BY A TSL NODE: the Chaos race's look (render/lyapunovWgsl.mjs LYAPUNOV_LOOK -- the hull's own
 // coordinates as r and the seed, the exponent as the shade, lit by the normal) written once as a TSL graph
@@ -37,6 +37,12 @@
 // does. Its whole shipped fragment is `return v.color;`. A graph crosses here with ONE varying to read, three emits
 // exactly one for it, and a graph reaching for a uv is refused by name. It is also the first shell whose TOPOLOGY is
 // not the default, and the descriptor carries "line-list" out to the device.
+//
+// v4329 -- the shells and looks this file grades moved to render/fleetTsl.mjs, out of render/physicsTsl.mjs which
+// was named for physics and had grown three shells and five looks. Section 3 also checks the FRONT DOOR now: the
+// variants these sections prove (?tsl=1, its sampled twin, the probe forced onto WebGL2) are query strings, and
+// server.html's drawer mover files pages rather than URLs -- so they are written out by hand in the Render TSL
+// panel, and an unwritten one would leave a mode of the page reachable only by somebody who already knew it.
 //
 // *** AND WHAT TWIN-GRADING IS BLIND TO, WHICH THIS LAYOUT MADE PLAIN. *** Sabotage N drops the shell's topology, and
 // the byte claim does not move: 36,864 of 36,864 pixels still agree, because the twin is built from the SAME shell and
@@ -89,7 +95,7 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell, vertexDisplacement } from "../../render/tslSource.mjs";
-import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/physicsTsl.mjs";
+import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
 import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL, INK_WGSL, INK_VERTEX_GLSL } from "../../render/fleets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -123,7 +129,7 @@ else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeLyapunovLookTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -187,7 +193,16 @@ else {
     ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
     // v4325 -- the same page, the SECOND shell: the Pixel race's sprite quad painted by the lightning graph
     ok("*** the page also draws the Glyph race's OWN shipped look from a graph, the atlas crossing into the shell it binds ***", !!(st.tsl && st.tsl.atlas) && st.tsl.atlas.applied === true && st.tsl.atlas.textures.join() === "atlas" && st.tsl.atlas.shell === "sprite (atlas)", st.tsl && JSON.stringify(st.tsl.atlas));
-    ok("*** and the Krbn race's strokes are GENERATED on a LINE-LIST -- the leanest layout, one varying, no uv (v4328) ***", !!(st.tsl && st.tsl.ink) && st.tsl.ink.applied === true && st.tsl.ink.topology === "line-list" && st.tsl.ink.varyings.join() === "color", st.tsl && JSON.stringify(st.tsl.ink));
+    // v4329 -- THE FRONT DOOR OFFERS WHAT THIS SECTION PROVES. The variants above are QUERY STRINGS, which the
+    // server page's drawer mover files nothing about (it moves page anchors, not URLs) -- so the Render TSL panel
+    // carries them hand-written, and this is the check that they are still there. A page nobody can reach from the
+    // front door is the failure pageReach has been ratcheting against for dozens of rounds; a page you can reach
+    // only in the one mode that does not show the work is the same failure wearing a query string.
+    const front = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+    ok("*** server.html's Render TSL panel links the variants this section just proved: ?tsl=1, its sampled twin, and the probe forced onto WebGL2 ***",
+        /data-panel="rendertsl"/.test(front) && /href="\/orrery-gpu\.html\?tsl=1"/.test(front) && /href="\/orrery-gpu\.html\?tsl=1&amp;soft=1"/.test(front) && /href="\/tsl-probe\.html\?webgl=1"/.test(front),
+        "the drawer moves PAGES; a query variant has to be written out or it is unreachable from the front door");
+        ok("*** and the Krbn race's strokes are GENERATED on a LINE-LIST -- the leanest layout, one varying, no uv (v4328) ***", !!(st.tsl && st.tsl.ink) && st.tsl.ink.applied === true && st.tsl.ink.topology === "line-list" && st.tsl.ink.varyings.join() === "color", st.tsl && JSON.stringify(st.tsl.ink));
     ok("*** and with &soft=1 the same race is SAMPLED instead: the shell carries a sampler and the page binds a filtered texture to it (v4327) ***", !!st2 && st2.applied === true && st2.soft === true && st2.shell === "sprite (atlas + sampler)" && errs2.length === 0, `${st2 && JSON.stringify(st2)}; page errors ${errs2.slice(0, 1).join(" | ") || "none"}`);
     ok("*** the page also swapped the Pixel race into the SPRITE shell -- a second layout, whose varyings are uv and colour and no normal ***", !!(st.tsl && st.tsl.sprite) && st.tsl.sprite.applied === true && st.tsl.sprite.shell === "heidler sprite" && st.tsl.sprite.varyings.join() === "uv,color", st.tsl && JSON.stringify(st.tsl.sprite));
 }
@@ -211,7 +226,7 @@ else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeLyapunovLookTsl(THREE, T, { breathe: a.AMP }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -276,7 +291,7 @@ else {
     const PIX = RACES.findIndex((x) => x.name === "Pixel");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeHeidlerSpriteTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -336,7 +351,7 @@ else {
     const PIX = RACES.findIndex((x) => x.name === "Pixel");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const sb = F.spriteBitmap(0);
         const tex = new THREE.DataTexture(sb.data, sb.width, sb.height); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
         const em = {};
@@ -400,7 +415,7 @@ else {
     const PIX = RACES.findIndex((x) => x.name === "Pixel");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, PIX }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const sb = F.spriteBitmap(0);
         const soft = new THREE.DataTexture(sb.data, sb.width, sb.height); soft.magFilter = THREE.LinearFilter; soft.minFilter = THREE.LinearFilter; soft.generateMipmaps = false; soft.needsUpdate = true;
         const hard = new THREE.DataTexture(sb.data, sb.width, sb.height); hard.magFilter = THREE.NearestFilter; hard.minFilter = THREE.NearestFilter; hard.needsUpdate = true;
@@ -471,7 +486,7 @@ else {
     const KRBN = RACES.findIndex((x) => x.name === "Krbn");
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, KRBN, WASH: 0.6, GAIN: 1.5 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
         for (const mode of ["webgpu", "webgl2"]) { const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64; const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
             const look = P.makeInkTsl(THREE, T, { wash: a.WASH, gain: a.GAIN }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64)); em[mode] = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] }); }
@@ -558,6 +573,10 @@ else {
 //   O  the graph's wash dropped (the colour passed through with only the gain) -> exit=1, 2 red: the generated ink parts from the
 //      hand-written twin on 467 pixels under WebGPU and 415 under WebGL2, worst 6. Small, because a wash toward luminance is
 //      small on strokes this dark -- and still caught on every one of them.
+//   MEASURED at v4329 (the split, and the front door):
+//   Q  the ?tsl=1&soft=1 link in server.html's Render TSL panel replaced with the plain page -> exit=1, 1 red, by name. A mode of a
+//      page that no link reaches is reachable only by somebody who already knows it exists, which is the whole of pageReach's case.
+//   (P and R are in tools/ship/tslPhysics-selfcheck.mjs and tools/ship/pageSections-selfcheck.mjs, the gates that own those claims.)
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +
     "so the pictures agree; a page turning the knobs would need a new graph); a MIPPED or anisotropic sample (the device makes one sampler per filter mode, repeat " +

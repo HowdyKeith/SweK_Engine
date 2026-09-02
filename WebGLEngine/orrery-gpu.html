@@ -166,7 +166,7 @@ const std = standardFleets(device, { userHull });
 // is built. tslRace-selfcheck holds the generated race to the hand-written one to the byte; this is the same swap, live.
 if (params.get("tsl") === "1") {
     try {
-        const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/physicsTsl.mjs"), import("./render/tslSource.mjs")]);
+        const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/fleetTsl.mjs"), import("./render/tslSource.mjs")]);
         const off = document.createElement("canvas"); off.width = 64; off.height = 64;
         const renderer = new THREE.WebGPURenderer({ canvas: off, forceWebGL: device.backend === "webgl2", antialias: false }); await renderer.init();
         const look = P.makeLyapunovLookTsl(THREE, T, { breathe: 0.06 }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));   // v4324: the hull breathes -- a position node, carried into the fleet's vertex stage
