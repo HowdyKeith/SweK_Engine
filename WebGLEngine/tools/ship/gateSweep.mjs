@@ -259,6 +259,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         verdict: "green on this box, run singly: 22 pass. Driven against the REAL v4335 accident -- it refuses " +
                  "the exact orreryBake write that dropped four files, names them, and exits 1",
     }),
+    // v4338 -- A SEVENTH CLOSING, for the version preflight. Seven entries appended in seven rounds and the
+    // accounting below has never been edited once: that is what the list shape bought, and it is why this
+    // branch's fourth and fifth closings survived two merges with main adding its own in between.
+    since7: Object.freeze({
+        at: "v4338", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/versionPreflight-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 24 pass. All four of the session's real version collisions are " +
+                 "replayed in it and refused; three sabotages caught, one of them the ENOBUFS fault the guard's " +
+                 "own first draft shipped",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

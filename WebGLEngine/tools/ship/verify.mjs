@@ -29,6 +29,19 @@ function check(label, ok, detail) {
   if (!ok) fails++;
 }
 
+// 1a. *** AND THE NUMBER IS NOT ONE main ALREADY SPENT. *** v4338 -- the marker check below proves the tree
+// wears the number it claims; it cannot see that ANOTHER LINE already shipped that number with different
+// bytes, which happened four times in one session and cost two merge-and-renumber cycles. Rule 3 had no
+// mechanism; this is the mechanism. An unreadable main reports and stands aside rather than blocking a ship.
+if (version) {
+  try {
+    const { preflight } = await import("./versionPreflight.mjs");
+    const pf = preflight(version);
+    if (pf.freshness && pf.freshness.stale) console.log("[verify] NOTE  origin/main is behind the remote -- git fetch origin main");
+    check(`version is not one origin/main already carries (main: ${pf.mainVersion || "unreadable"})`, pf.ok, pf.refusal || "");
+  } catch (e) { console.log("[verify] NOTE  version preflight could not run: " + String(e.message).slice(0, 100)); }
+}
+
 // 1. version marker matches what we claim
 if (version) {
   let mv = null;

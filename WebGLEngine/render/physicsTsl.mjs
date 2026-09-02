@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass)
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -111,4 +111,44 @@ export function lyapunovSweepCpu({ count = 64, rLo = LY_DEFAULTS.rLo, rHi = LY_D
         out[i] = acc / samples;
     }
     return out;
+}
+
+/**
+ * v4336 -- THE SECOND PASS, WHICH READS WHAT THE FIRST WROTE. One invocation per element: it reads the exponent the
+ * sweep left in its buffer and writes 1 where that exponent is POSITIVE (chaotic) and 0 where it is not. Nothing here
+ * is arithmetic worth grading -- a sign test is a sign test. What is worth grading is the DEPENDENCY: two dispatches
+ * in one frame, the second reading the first's output, which is the shape every real pass in render/gpuDriven.mjs has
+ * and no transplant in this tree had until now.
+ *
+ * `sweep` must be the buffer node makeLyapunovComputeTsl handed back, not a copy of its values.
+ */
+export function makeChaosMaskTsl(TSL, { sweep, count } = {}) {
+    const { Fn, float, select, instanceIndex, instancedArray } = TSL;
+    if (!sweep || typeof sweep.element !== "function") throw new Error("physicsTsl: makeChaosMaskTsl needs the sweep's own buffer node (the one makeLyapunovComputeTsl returned), so the second pass reads what the first wrote");
+    const mask = instancedArray(count, "float");
+    const node = Fn(() => {
+        const v = sweep.element(instanceIndex);
+        mask.element(instanceIndex).assign(select(v.greaterThan(0.0), float(1.0), float(0.0)));
+    })().compute(count);
+    return { node, mask, count };
+}
+
+/**
+ * v4337 -- THE THIRD PASS, WHICH COUNTS. Every invocation that finds a positive exponent increments ONE counter, and
+ * the increment is atomic. This is the shape render/gpuDriven.mjs's cull pass has -- an indirect draw's instanceCount
+ * that every surviving instance bumps at once -- and it is the only kind of write where dropping the atomic still
+ * compiles, still runs, and quietly returns a smaller number than the truth.
+ *
+ * `count` here is deliberately larger than one workgroup. At 64 there is no contention to lose: a plain add would
+ * pass. The claim is only worth making across workgroups, so the gate runs it at 1024 (sixteen of them).
+ */
+export function makeChaosTallyTsl(TSL, { sweep, count } = {}) {
+    const { Fn, If, uint, instanceIndex, instancedArray, atomicAdd } = TSL;
+    for (const n of ["atomicAdd", "If", "uint"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (!sweep || typeof sweep.element !== "function") throw new Error("physicsTsl: makeChaosTallyTsl needs the sweep's own buffer node, so the tally counts what the sweep actually wrote");
+    const tally = instancedArray(1, "uint").toAtomic();
+    const node = Fn(() => {
+        If(sweep.element(instanceIndex).greaterThan(0.0), () => { atomicAdd(tally.element(uint(0)), uint(1)); });
+    })().compute(count);
+    return { node, tally, count };
 }
