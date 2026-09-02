@@ -1,5 +1,5 @@
 #!/bin/bash
-# .claude/hooks/session-start.sh -- v4350
+# .claude/hooks/session-start.sh -- v4360
 #
 # WHAT A FRESH WEB SESSION IS MISSING, AND IT IS EXACTLY ONE THING.
 #
@@ -14,6 +14,19 @@
 # not export that variable -- a path baked into an env var here would go stale the next time the browser bundle
 # version changes, and the module's own lookup would not. One install, no configuration.
 #
+# ---- ASYNC, AND ONLY WHERE ASYNC COSTS SOMETHING -------------------------------------------------------------
+#
+# The session does not wait for this. That buys a faster start and BUYS A RACE: for the few seconds the install
+# takes, a gate that reaches for a native adapter will find none and skip or go red -- and it will say so
+# accurately, because headlessGpuSkipReason() reports the state at the moment it is asked. A red in the first
+# seconds of a session is worth re-running before it is believed.
+#
+# *** SO THE ASYNC DECLARATION IS MADE ONLY WHEN THERE IS WORK TO DO. *** A warm container -- the common case,
+# since container state is cached after this completes -- finds the package already present, prints one line and
+# exits synchronously, with no window at all. Declaring async unconditionally would hand every warm start a race
+# in exchange for nothing, which is the worst of both. The window exists on a cold start because that is the only
+# time it is paid for.
+#
 # WHAT THIS BUYS, AND WHAT IT DOES NOT: a SOFTWARE adapter. It lets the native-WebGPU gates execute and be
 # graded against their CPU twins. It settles nothing about real-hardware floats -- the fleet kernel benches in
 # tools/render-qa/deviceOwed.mjs still owe a verdict that only a real GPU can give.
@@ -25,13 +38,17 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-# Idempotent: the container state is cached after the hook completes, so a warm start finds this already there.
+# The warm path: synchronous, instant, no race. Nothing below this line runs on a cached container.
 if node -e 'require("/opt/node22/lib/node_modules/webgpu")' >/dev/null 2>&1; then
   echo "[session-start] node-webgpu already present -- nothing to install"
-else
-  echo "[session-start] installing node-webgpu (pinned to the version tools/ship/headlessGpu.mjs records)"
-  npm install -g webgpu@0.6.0 --no-fund --no-audit
+  exit 0
 fi
+
+# The cold path is the only one that waits on a network, so it is the only one that goes async.
+echo '{"async": true, "asyncTimeout": 300000}'
+
+echo "[session-start] installing node-webgpu (pinned to the version tools/ship/headlessGpu.mjs records)"
+npm install -g webgpu@0.6.0 --no-fund --no-audit
 
 # Report what the tree itself concludes, rather than assuming the install worked. headlessGpuSkipReason() is the
 # same function every native-WebGPU gate consults, so this line is the gates' own answer and not a proxy for it.
