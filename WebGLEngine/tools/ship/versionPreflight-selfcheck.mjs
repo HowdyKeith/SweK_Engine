@@ -1,8 +1,13 @@
-// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4338
+// WebGLEngine/tools/ship/versionPreflight-selfcheck.mjs — v4350
 //
 // The preflight exists because rule 3 -- never reuse a version number -- was enforced by memory and was broken
-// FOUR TIMES IN ONE SESSION. So the checks that matter are not "does it return an object": they are the four
+// FIVE TIMES IN ONE SESSION. So the checks that matter are not "does it return an object": they are the five
 // real collisions, replayed, plus the two ways a guard like this fails in practice.
+//
+// *** THE FIFTH IS THE ONE THIS FILE CAUGHT ITSELF, WITHIN AN HOUR OF BEING WRITTEN. *** The round was being
+// verified as v4338 when main shipped its own v4338; verify called the preflight and it refused by name. The
+// round took the headroom jump to v4350 rather than the next seat, which is v3900's own habit. A guard whose
+// first live act is to refuse the thing it was written for needs no argument about whether it earns its run.
 //
 //   IT REFUSES WHAT ACTUALLY HAPPENED.   v4327/v4331/v4336 against a main that had moved, and the same number
 //                                        against itself. All four are driven below against a stubbed main.
@@ -47,6 +52,13 @@ const against = (main) => (v) => preflight(v, { mainVersionOverride: main, skipF
     ok(vsMain4332("v4332").ok === false, "v4332 against a main at v4332 is REFUSED");
     // and v4336, the fourth
     ok(against("v4337")("v4336").ok === false, "v4336 against a main at v4337 is REFUSED");
+    // *** AND THE FIFTH, WHICH THIS FILE CAUGHT LIVE: main shipped v4338 while this round was verifying as
+    // v4338. Replayed here from the real numbers rather than described in the header alone.
+    const fifth = against("v4338")("v4338");
+    ok(fifth.ok === false && /THE SAME NUMBER/.test(fifth.refusal),
+       "*** the FIFTH collision, the one this guard refused in the wild, is refused here too ***");
+    ok(/Supersede FORWARD: v4339/.test(fifth.refusal), "...naming v4339 as the next free seat, which is what it said at the time");
+    ok(against("v4338")("v4350").ok === true, "...and the headroom jump this round actually took is permitted");
 
     // *** THE SAME NUMBER IS NAMED AS THE FLEET PROBLEM, not merely as "not greater". ***
     const same = against("v4337")("v4337");

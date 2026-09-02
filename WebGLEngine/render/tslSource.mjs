@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one), v4337 (an ATOMIC one)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one), v4337 (an ATOMIC one), v4338 (one with WORKGROUP-SHARED memory)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -232,6 +232,12 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * device errors from assigning a read-only binding. It went 0 red first, when the shell happened to list the written
  * buffer first and position and role agreed -- which is why the sentence names a shell shape and not a universal.)
  *
+ * v4338 -- `shared` declares the pass's workgroup-scoped arrays: [{ name, element, length }] becomes
+ * `var<workgroup> name: array<element, length>;`. three names its own WorkgroupArray_NNN, which is module-local and
+ * binds to nothing, so nothing would break by carrying that name through -- and the shell names it anyway, because a
+ * generated identifier in a shipped module is a name that changes when three does. The count, element and length
+ * must match what the pass actually declared, or it is refused by name.
+ *
  * v4337 -- an entry may also say `atomic: true`, which declares its elements as atomic<T>. An atomic buffer is one a
  * pass WRITES even though nothing assigns to it: the write is inside atomicAdd(&buf.value[i], ...), so the role
  * detector looks for that too. It is the shape the cull pass has -- an instanceCount every invocation may increment
@@ -241,12 +247,13 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * (`compute() needs { wgsl } -- a compute pipeline is WGSL-only`), and the pair contract every other transplant in
  * this file is held to does not apply here because the pair does not exist.
  */
-export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
+export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
     const decls = [
         ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${b.atomic ? `atomic<${b.element || "u32"}>` : (b.element || "f32")}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
         ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
     ];
-    return { name, storage, uniforms, uniformVar, workgroupSize, prefix: decls.join("\n") };
+    const sharedDecls = shared.map((w) => `var<workgroup> ${w.name}: array<${w.element || "u32"}, ${w.length}>;`);
+    return { name, storage, shared, uniforms, uniformVar, workgroupSize, prefix: [...sharedDecls, ...decls].join("\n") };
 }
 /**
  * Transplant three's emitted COMPUTE shader into that shell. three writes its own storage buffers under generated
@@ -281,13 +288,21 @@ export function transplantCompute(wgsl, shell) {
     }
     const uniforms = uniformFields(wgsl, "wgsl");
     for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the compute pass's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ") || "none"})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the pass and ${h.type} in the shell`); }
+    // v4338 -- the workgroup-scoped arrays. three declares them above its entry, in a "// locals" section this
+    // transplant used to drop entirely -- which would have left the body naming an array nothing declared.
+    const sharedFound = [...wgsl.matchAll(/var<workgroup>\s*(\w+)\s*:\s*array<\s*(\w+)\s*,\s*(\d+)\s*>/g)].map((m) => ({ name: m[1], element: m[2], length: Number(m[3]) }));
+    const wantShared = shell.shared || [];
+    if (sharedFound.length !== wantShared.length) throw new Error(`tslSource: the pass declares ${sharedFound.length} workgroup array(s) and the shell "${shell.name}" declares ${wantShared.length} (${wantShared.map((w) => w.name).join(", ") || "none"})`);
+    sharedFound.forEach((f, i) => { const w = wantShared[i];
+        if ((w.element || "u32") !== f.element || Number(w.length) !== f.length) throw new Error(`tslSource: the pass's workgroup array is array<${f.element}, ${f.length}> and the shell "${shell.name}" says array<${w.element || "u32"}, ${w.length}>`); });
     const bodyAll = wgsl.slice(wgsl.indexOf(at[0]));
     let entry = bodyAll.slice(bodyAll.indexOf("fn main("));
     // three asks for a WGSL extension the device never requested, and takes a builtin only that extension defines
     entry = entry.replace(/,?\s*@builtin\(\s*subgroup_size\s*\)\s*\w+\s*:\s*u32/g, "");
     let b = entry;
     for (const [g, name] of rename) b = b.replace(new RegExp(`\\b${g}\\b`, "g"), name);
+    sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\nvar<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
-    return { wgsl: code, storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, workgroupSize: shell.workgroupSize, shell: shell.name };
+    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, workgroupSize: shell.workgroupSize, shell: shell.name };
 }

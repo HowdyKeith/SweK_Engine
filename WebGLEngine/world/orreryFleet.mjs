@@ -284,13 +284,18 @@ export function systemDigest(fleets, opts = {}) {
 // re-measures is a sentence" is this record's own argument), so the number is corrected here to what
 // `git log -- WebGLEngine/vendor/three` returns and `at` still names the round that took it. The finding is
 // untouched: htmx and box3d are still 2, so the busiest vendored body has still been touched by two commits.
+// v4350 -- AND THE MERGE PUT IT BACK TO 2 AGAIN, for the third time, which is the record behaving correctly
+// rather than drifting. This count is a property of the HISTORY YOU ARE STANDING ON: origin/main's line sees
+// one commit touching WebGLEngine/vendor/three, this branch's merged history sees two (e08b1b6 and 66db97c).
+// Every merge in either direction flips it, and the gate re-measures rather than trusting, so it flips loudly.
+// `at` stays v4329 -- correcting a number does not rename the round that took it.
 export const COMMIT_BELT_V4329 = Object.freeze({
     at: "v4329",        // the record's IDENTITY is the v4329 belt, not the date of its last correction --
                         // main kept this through v4330's correction on purpose and the gate pins it, so a
                         // re-measurement corrects the NUMBER and leaves the name of the round that took it.
     repoCommits: 858,   // likewise the v4329 figure. The merged head stands at 863; the gate prints this one,
                         // so read it as "the belt measured at v4329" rather than as a live count.
-    perBody: Object.freeze({ three: 1, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
+    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),
     why: "twelve of fifteen vendored bodies have been touched by exactly one commit in the repository's life -- " +
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +

@@ -29,7 +29,7 @@ function check(label, ok, detail) {
   if (!ok) fails++;
 }
 
-// 1a. *** AND THE NUMBER IS NOT ONE main ALREADY SPENT. *** v4338 -- the marker check below proves the tree
+// 1a. *** AND THE NUMBER IS NOT ONE main ALREADY SPENT. *** v4350 -- the marker check below proves the tree
 // wears the number it claims; it cannot see that ANOTHER LINE already shipped that number with different
 // bytes, which happened four times in one session and cost two merge-and-renumber cycles. Rule 3 had no
 // mechanism; this is the mechanism. An unreadable main reports and stands aside rather than blocking a ship.
