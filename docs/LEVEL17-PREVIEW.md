@@ -1,4 +1,4 @@
-# Level 17 -- a preview, written before Level 16 starts
+# Level 17 -- a preview, written before Level 16 starts (built at v4317: items 1-5 shipped, item 6's page half at v4316; see docs/CHANGELOG.md)
 
 Written at v4301 (Level 15 shipped). A preview is a claim about what the rung two above this one
 would hold, so that Level 16 is built knowing what has to sit on top of it. Nothing here is built;

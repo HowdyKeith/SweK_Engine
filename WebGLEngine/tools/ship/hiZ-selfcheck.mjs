@@ -32,8 +32,8 @@ const proj = G.perspective(CAM.fov, 1, CAM.near, CAM.far), view = G.lookAt(CAM.e
 console.log("\n1. THE SHADERS, THE BINDINGS, THE TWIN");
 {
     ok("the occluding cull validates", validateWgsl(G.cullLodWgsl({ occlusion: true })).length === 0);
-    ok("  and adds exactly three bindings to the plain one: the occlusion uniforms, the pyramid, the rejected set",
-        parseBindings(G.cullLodWgsl({ occlusion: true })).map((b) => `${b.binding}:${b.name}`).join(",") === "0:cull,1:inst,2:cmds,3:records,4:occ,5:hiz,6:rejected" && parseBindings(G.cullLodWgsl()).length === 4);
+    ok("  and adds exactly three bindings to the plain one: the occlusion uniforms, the pyramid, the rejected set (the extras, v4317's headings, come last in both)",
+        parseBindings(G.cullLodWgsl({ occlusion: true })).map((b) => `${b.binding}:${b.name}`).join(",") === "0:cull,1:inst,2:cmds,3:records,4:occ,5:hiz,6:rejected,7:extras" && parseBindings(G.cullLodWgsl()).length === 5);
     ok("  the two pyramid builders validate and declare only what they read", validateWgsl(G.hizLevel0Wgsl()).length === 0 && validateWgsl(G.hizReduceWgsl()).length === 0 &&
         parseBindings(G.hizLevel0Wgsl()).some((b) => b.type === "texture_depth_2d") && !parseBindings(G.hizReduceWgsl()).some((b) => /texture/.test(b.type)));
     const un = census().filter((f) => !f.accounted && /gpuDriven/.test(f.file));

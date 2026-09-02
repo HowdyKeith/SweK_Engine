@@ -43,7 +43,7 @@ console.log("\n1. THE SHADERS ARE VALID, SHARE ONE CULL FUNCTION, AND ARE ACCOUN
         ok(`${n} passes render/wgslSpec.mjs`, validateWgsl(src).length === 0, validateWgsl(src).join("; "));
     ok("*** the real shader and the probe splice in the SAME cullLod text ***", G.cullLodWgsl().includes(G.CULL_FN_WGSL) && G.cullProbeWgsl().includes(G.CULL_FN_WGSL));
     const b = parseBindings(G.cullLodWgsl());
-    ok("  the cull pass declares uniform, instances, commands, records at bindings 0..3", b.map((x) => `${x.binding}:${x.name}`).join(",") === "0:cull,1:inst,2:cmds,3:records");
+    ok("  the cull pass declares uniform, instances, commands, records at bindings 0..3, and (v4317) the extras -- the headings -- at 4", b.map((x) => `${x.binding}:${x.name}`).join(",") === "0:cull,1:inst,2:cmds,3:records,4:extras");
     ok("  the indirect command is five u32 with instanceCount second, as drawIndexedIndirect reads it", G.INDIRECT_STRIDE_U32 === 5 && /instanceCount: atomic<u32>/.test(G.cullLodWgsl()) && /struct Cmd \{ indexCount: u32, instanceCount/.test(G.cullLodWgsl()));
     const un = census().filter((f) => !f.accounted && /gpuDriven/.test(f.file));
     ok("  every WGSL producer in render/gpuDriven.mjs is in the cross-backend corpus or excluded with a reason", un.length === 0, un.map((u) => u.symbol).join(", ") || "all accounted");

@@ -54,11 +54,14 @@
   <div style="color:#9fb8a8"><span id="date"></span> &middot; tick <span id="tick">0</span> &middot; hash <span id="hash"></span> &middot; <span id="peer">alone</span></div>
   <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <span id="persist" style="color:#f0e29e"></span></div>
   <div id="key" style="color:#9fb8a8">cross-browser key: computing&hellip;</div>
+  <div id="cockpit" style="color:#f0e29e">you: starting&hellip;</div>
+  <div><label>mask a race with badTv <select id="mask"><option value="">none</option></select></label> &middot; <label><input id="landmode" type="checkbox"> land on the pointed body (or press G)</label> <span id="landing" style="color:#9fb8a8"></span></div>
+  <div><label>scrub <input id="scrub" type="range" min="0" max="0" value="0" style="width:40%"></label> <span id="scrubAt" style="color:#9fb8a8">live</span></div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
 <script type="module">
 import { buildOrrery } from "./world/orrery.mjs";
-import { extentOf, slowestPeriod } from "./world/orreryView.mjs";
+import { extentOf, slowestPeriod, positionAt } from "./world/orreryView.mjs";
 import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
@@ -67,6 +70,12 @@ import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES 
 import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
 import { wireFromParams, hashKey, compareKey } from "./world/universeWire.mjs";
 import { p2pTransport } from "./ev/p2p.js";
+import { crewForRaces } from "./world/racePolicies.mjs";
+import { makeFlight, makeCockpit } from "./world/playerShip.mjs";
+import { traders as gitTraders } from "./world/traderGraph.mjs";
+import { bodyHeightfield, landingRecords, fileOfChunk } from "./render/bodyTerrain.mjs";
+import * as T from "./render/gpuTerrain.mjs";
+import { maskFromPick, maskedBadTv } from "./render/fleetMask.mjs";
 import { applyCommitsFeed, fixtureFeed } from "./world/commitsFeed.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
@@ -93,7 +102,14 @@ say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compu
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
 const params = new URLSearchParams(location.search);
 const history = params.get("history") !== "0", peerId = params.get("peer"), JOURNAL_KEY = "swek.orrery.journal";
-const economy = makeGitEconomy(system, { seed: 7, history });
+// v4317 (Level 17) -- RACES THAT ACT: every owner's race brings its own economy (world/racePolicies.mjs); and YOU: a
+// manual crew member the sim never routes, flown from the keys, trading by interventions (world/playerShip.mjs).
+const crewNames = [...gitTraders().map((t) => t.name || t.id), ...system.bodies.map((b) => "hauler of " + b.name)];
+const crewFleet = fleetsForNames(crewNames, RACES.length);
+const crewList = crewForRaces(crewNames, crewFleet, RACES);   // a hauler's joining day is its market's (makeGitEconomy fills it under history)
+crewList.push({ name: "you", manual: true, joins: 0 });
+const YOU = crewList.length - 1;
+const economy = makeGitEconomy(system, { seed: 7, history, traders: crewList });
 // v4314 -- restore: replay the saved journal on this fresh economy before anything moves
 let restored = null;
 if (params.get("restore") === "1") { try { const lg = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null"); if (lg) { const r = economy.replay(lg); restored = { ...r, saved: lg.hash, tick: lg.tick }; } } catch (e) { restored = { error: e.message }; } }
@@ -113,18 +129,54 @@ document.getElementById("commits").onclick = () => { const feed = fixtureFeed(ec
 function applyCommitsFeedQueued(feed) { const r = { applied: [], seen: new Set(feedSeen) }; for (const f of feed) { const m = economy.markets.find((x) => "vendor/" + x.name === f.repo); if (m) { peer.queue("commits", { market: m.id, commits: f.commits }); r.applied.push(f); } } return r; }
 if (restored) document.getElementById("persist").textContent = restored.error ? "restore failed: " + restored.error : `restored: replayed ${restored.tick} ticks, replay ${restored.matches ? "MATCHES" : "DOES NOT MATCH"} the saved hash ${restored.saved}`;
 window.__universe = { economy, get tick() { return economy.tick; }, hash: () => economy.hash(), log: () => economy.log(), restored, peer: peerId, history, get inStep() { return peer ? (peer.desync() ? false : true) : null; }, get desync() { return peer ? peer.desync() : null; } };
-const lifeSource = { count: economy.ships.length, cpu: () => economy.records(0.14) };
+// v4317 -- THE SCRUBBER: a replay is a function of tick, so the slider replays the journal on a scratch economy to any
+// tick and the sky shows THAT day; the live sim pauses while scrubbed and resumes at the right end
+const scrub = { at: null, ghost: null };
+const scrubEl = document.getElementById("scrub");
+scrubEl.addEventListener("input", () => { const at = Number(scrubEl.value); if (at >= economy.tick) { scrub.at = null; scrub.ghost = null; document.getElementById("scrubAt").textContent = "live"; return; }
+    const lg = economy.log(); const cut = { ...lg, interventions: lg.interventions.filter((iv) => iv.tick < at), steps: [[0.25, at]] };
+    const g = makeGitEconomy(system, { seed: 7, history, traders: crewList }); g.replay(cut); scrub.at = at; scrub.ghost = g; document.getElementById("scrubAt").textContent = `tick ${at} of ${economy.tick}${g.date ? ", " + g.date : ""} (replayed)`; });
+const lifeSource = { count: economy.ships.length, cpu: () => (scrub.ghost || economy).records(0.14) };
 // v4301 (Level 15) -- FLEETS: every owner in the git graph is a race, and every race is its own architecture and
 // shader (render/fleets.mjs). If the person assigned a ship model in Escape Velocity or a plane on the radar,
 // the raised hull is theirs: the Wedge race wears it, the Krbn race skins it, the Glyph race pins glyphs to it.
 let userHull = null;
 try { const src = userModelSources(localStorage).find((x) => x.loadable); if (src) { userHull = await loadUserModel(src); say(`the ${src.kind} model for ${src.cls} (${src.url}) is the raised hull`); } } catch (e) { console.warn("user model:", e.message); }
 const std = standardFleets(device, { userHull });
-const fleetOf = fleetsForNames(economy.names, std.fleets.length);
-const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource });
+const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull
+const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource, headings: { cpu: () => (scrub.ghost || economy).headings() } });   // v4317: a trader faces its next market
 document.getElementById("races").textContent = std.fleets.map((f, i) => `${f.name} ${fleetOf.reduce((n, x) => n + (x === i), 0)}`).join(" / ");
 const bodyNames = ["SweK", ...system.bodies.map((b) => b.name)];
 let pointer = null, lastSimT = economy.t;
+// v4317 -- LANDING: the pointed body becomes the heightfield of its own file tree, drawn through gpuTerrain's pipeline
+// with the same LOD ladder and pick; a pick on a ridge names the file. G toggles; the sky view pauses meanwhile.
+const landing = { on: false, body: null, scene: null, bt: null, tex: null, side: 8, last: null };
+function landOn(bodyIndex) {
+    const b = system.bodies[bodyIndex - 1]; if (!b || !b.files || !b.files.length) { document.getElementById("landing").textContent = b ? `${b.name} has no files to land on` : ""; return; }
+    if (landing.scene) { try { landing.scene.destroy(); landing.tex.destroy(); } catch (e) {} }
+    const bt = bodyHeightfield(b), L = landingRecords(bt, landing.side);
+    const tex = device.texture({ width: bt.field.width, height: bt.field.height, data: bt.field.data, nearest: true });
+    const scene = G.makeGpuDrivenScene(device, { lods: [{ name: "coarse", mesh: T.skirtedQuadMesh(1) }, { name: "fine", mesh: T.skirtedQuadMesh(6) }], thresholds: [0.08], records: L.records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", L.params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); } });
+    Object.assign(landing, { on: true, body: b, scene, bt, tex, name: b.name });
+    document.getElementById("landing").textContent = `landed on ${b.name}: ${bt.files.length} files as hills -- point at a ridge; G returns to the sky`;
+}
+addEventListener("keydown", (e) => { if (e.key === "g" || e.key === "G") { if (landing.on) { landing.on = false; document.getElementById("landing").textContent = "back in the sky"; } else if (landing.last) landOn(landing.last); } });
+// v4317 -- THE MASK: the pick picture as a strength field; badTv through it over one race, both pictures read back this round
+const maskSel = document.getElementById("mask"); for (const r of RACES) { const o = document.createElement("option"); o.value = r.name; o.textContent = r.name; maskSel.appendChild(o); }
+// v4317 -- the cockpit: arrows fly, L lands or launches, B/S buy or sell the first good on the screen (a demo of the interventions)
+const flight = makeFlight({ x: 0, y: 0, yaw: 0 }), cockpit = makeCockpit(economy, YOU, { intervene: (k, a) => intervene(k, a) });
+const keys = new Set(); addEventListener("keydown", (e) => { keys.add(e.key); if (e.key === "l" || e.key === "L") { const s = economy.ships[YOU]; if (s.landed) { cockpit.launch(); flight.launch(); } else { const m = flight.nearest(economy.markets, (m) => economy.uni.systemById[m.id] && (() => { const p = positionAt(m.body, economy.t); return [p.x, p.y]; })()); if (m) { cockpit.land(m.id); flight.land(m, () => { const p = positionAt(m.body, economy.t); return [p.x, p.y]; }); } } }
+    if (e.key === "b" || e.key === "B") { const sc = cockpit.screen(); const g = sc && sc.goods.find((x) => x.canBuy > 0); if (g) cockpit.buy(g.good, Math.min(10, g.canBuy)); }
+    if (e.key === "s" || e.key === "S") { const sc = cockpit.screen(); const g = sc && sc.goods.find((x) => x.canSell > 0); if (g) cockpit.sell(g.good, g.canSell); } });
+addEventListener("keyup", (e) => keys.delete(e.key));
+let lastFlight = performance.now();
+function flyYou(now) { const dt = Math.min(0.05, (now - lastFlight) / 1000); lastFlight = now; const s = economy.ships[YOU];
+    if (s.landed) { const m = economy.uni.systemById[s.at]; const p = positionAt(m.body, economy.t); flight.state.x = p.x; flight.state.y = p.y; }
+    else flight.step(dt, { thrust: keys.has("ArrowUp") ? 1 : 0, turn: (keys.has("ArrowLeft") ? 1 : 0) - (keys.has("ArrowRight") ? 1 : 0) });
+    s.x = flight.state.x; s.y = flight.state.y; s.yaw = flight.state.yaw;
+    const sc = cockpit.screen(), near = s.landed ? null : flight.nearest(economy.markets, (m) => { const p = positionAt(m.body, economy.t); return [p.x, p.y]; });
+    document.getElementById("cockpit").textContent = sc ? `landed at ${sc.market}: ${sc.credits} cr, hold ${sc.held}/${sc.holdTons}; ` + sc.goods.map((g) => `${g.good} ${g.price} (buy ${g.canBuy}, sell ${g.canSell})`).join(", ") + " -- B buys, S sells, L launches"
+        : `you: ${s.store.get("credits")} cr, ${near ? "over " + near.name + " -- L lands" : "flying (arrows)"}`; }
 cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
 const ext = Math.max(1, extentOf(system)), span = slowestPeriod(system) / 24;
 let t = economy.t, last = performance.now();
@@ -142,13 +194,22 @@ async function frame(now) {
     if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) size();
     source.advance(t);
     const cam = camera();
+    if (landing.on && landing.scene) {
+        // the landing view: the field from above and a little in front, y up (gpuTerrain's plane is XZ)
+        const eye = [0, 9, 9], viewProj = G.multiply(G.perspective(0.9, cv.width / Math.max(1, cv.height), 0.1, 100), G.lookAt(eye, [0, 0, 0]));
+        landing.scene.frame({ viewProj, eye, clear: [0.03, 0.05, 0.08, 1] });
+        if (pointer && (frames & 3) === 0) { try { const hit = await landing.scene.pick(pointer[0], pointer[1]); const f = hit ? fileOfChunk(landing.bt, landing.side, hit.id) : null; document.getElementById("pick").textContent = f && f.file ? `${landing.name}/${f.file.path} (${f.file.bytes} bytes, height ${f.height.toFixed(2)})` : hit ? "a valley between files" : "off the field"; } catch (e) {} }
+        document.getElementById("t").textContent = t.toFixed(1); frames++; requestAnimationFrame(frame); return;
+    }
     scene.frame({ viewProj: cam.viewProj, view: cam.view, proj: cam.proj, eye: cam.eye, clear: [0.024, 0.07, 0.043, 1] });
     const life = document.getElementById("life").checked;
     if (life) {
         // the sim steps in orrery days, a quarter day at a time, however fast the wall clock runs
         // Level 16: alone, step; as a peer, pump -- the net steps when every peer's inputs for the tick are in
-        while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else economy.step(0.25); lastSimT += 0.25; }
+        if (scrub.at == null) { while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else economy.step(0.25); lastSimT += 0.25; } }
+        flyYou(now);
         if ((frames & 7) === 0) { document.getElementById("date").textContent = economy.date ? economy.date + ` (${economy.openMarkets()} markets open, ${economy.joinedShips()} ships)` : "no calendar"; document.getElementById("tick").textContent = economy.tick; document.getElementById("hash").textContent = economy.hash();
+            scrubEl.max = economy.tick; if (scrub.at == null) scrubEl.value = economy.tick;
             if (peer) { const d = peer.desync(); document.getElementById("peer").textContent = d ? `peer ${peerId}: DESYNC at tick ${d.tick} (ours ${d.ours}, theirs ${d.theirs})` : `peer ${peerId} over ${chosen.kind}${chosen.kind === "webrtc" ? " (" + chosen.wire.connections() + " connected)" : ""}: in step, lead ${peer.lead()}`; } }
         lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
         if ((frames & 15) === 0) { const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
@@ -158,8 +219,14 @@ async function frame(now) {
             let hit = life ? await lifeScene.pick(pointer[0], pointer[1]) : null;
             document.getElementById("pick").textContent = hit ? `[${hit.fleetName}: ${RACES[hit.fleet].architecture}] ` + economy.describe(hit.id)
                 : ((hit = await scene.pick(pointer[0], pointer[1])) ? `${bodyNames[hit.id]}${hit.id ? " -- " + Object.entries(economy.markets[hit.id - 1].trade).map(([g, p]) => g + " " + p).join(", ") : ""}` : "nothing under the pointer");
+            if (hit && !life && hit.id > 0) { landing.last = hit.id; if (document.getElementById("landmode").checked) landOn(hit.id); }
+            else if (hit && life) { /* a trader */ } else if (!hit) {}
         } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }
     }
+    // v4317 -- the masked look: after the frame, read the colour and pick pictures back, mask one race, draw badTv through it
+    if (maskSel.value && life && (frames & 1) === 0) { try { const fleet = RACES.findIndex((r) => r.name === maskSel.value);
+        const src = await device.frame(({ pass }) => { pass.begin(); }, { read: true }); const pk = await lifeScene.pickPicture();
+        if (src && pk) await maskedBadTv(device, { source: src, mask: maskFromPick(pk, fleet), time: t * 0.05 }); } catch (e) { console.warn("mask:", e.message); } }
     document.getElementById("t").textContent = t.toFixed(1);
     if ((frames++ & 31) === 0) { try { const c = await scene.readCounts(); if (c) document.getElementById("drawn").textContent = c.join(" + ") + " of " + source.count + (life ? " bodies, " + economy.ships.length + " traders" : ""); } catch (e) {} }
     requestAnimationFrame(frame);

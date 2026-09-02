@@ -170,16 +170,15 @@ export const LYAPUNOV_LOOK_WGSL = `
 struct Cam { viewProj: mat4x4<f32>, light: vec4<f32>, chaos: vec4<f32> };
 @group(0) @binding(0) var<uniform> cam: Cam;
 ${LYAPUNOV_FN_WGSL}
-fn spun(p: vec3<f32>, id: f32) -> vec3<f32> {
-  let a = id * 2.399963;
-  let ca = cos(a); let sa = sin(a);
+fn turned(p: vec3<f32>, yaw: f32) -> vec3<f32> {
+  let ca = cos(yaw); let sa = sin(yaw);
   return vec3<f32>(p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z);
 }
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32>, @location(2) local: vec2<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
-  o.color = color; o.n = spun(n, ident.x); o.local = p.xy;
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
+  o.color = color; o.n = turned(n, extra.x); o.local = p.xy;
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
@@ -196,10 +195,10 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, 
 export const LYAPUNOV_LOOK_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj; uniform vec4 light; uniform vec4 chaos;
-in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec3 n;
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra; in vec3 n;
 out vec4 vColor; out vec3 vN; out vec2 vLocal;
-vec3 spun(vec3 q, float id) { float a = id * 2.399963; float ca = cos(a), sa = sin(a); return vec3(q.x * ca - q.y * sa, q.x * sa + q.y * ca, q.z); }
-void main() { gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0); vColor = color; vN = spun(n, ident.x); vLocal = p.xy; }
+vec3 turned(vec3 q, float yaw) { float ca = cos(yaw), sa = sin(yaw); return vec3(q.x * ca - q.y * sa, q.x * sa + q.y * ca, q.z); }
+void main() { gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0); vColor = color; vN = turned(n, extra.x); vLocal = p.xy; }
 `;
 export const LYAPUNOV_LOOK_FRAGMENT_GLSL = `#version 300 es
 precision highp float;

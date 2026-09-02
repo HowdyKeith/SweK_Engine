@@ -38,7 +38,7 @@ console.log("\n1. THE SCENE KNOWS FLEETS: regions per (fleet, LOD), the twin agr
     ok("the twin makes lodCount x fleetCount regions", twin.regions === 2 * FLEETS && twin.counts.length === twin.regions, `${twin.regions} regions`);
     const perLod = [0, 1].map((l) => Array.from({ length: FLEETS }, (_, f) => twin.counts[f * 2 + l]).reduce((a, b) => a + b, 0));
     ok("  summed over fleets, each LOD's count is the one-fleet count (fleets partition; they do not add)", perLod[0] === one.counts[0] && perLod[1] === one.counts[1], `${perLod.join("/")} vs ${Array.from(one.counts).join("/")}`);
-    let right = true; for (let r = 0; r < twin.regions; r++) for (let s = 0; s < twin.counts[r]; s++) { const o = (r * COUNT + s) * 8; if (twin.compact[o + 7] !== Math.floor(r / 2) || fleetOf[twin.compact[o + 4]] !== twin.compact[o + 7] || twin.compact[o + 5] !== r % 2) right = false; }
+    let right = true; for (let r = 0; r < twin.regions; r++) for (let s = 0; s < twin.counts[r]; s++) { const o = (r * COUNT + s) * G.OUT_RECORD_FLOATS; if (twin.compact[o + 7] !== Math.floor(r / 2) || fleetOf[twin.compact[o + 4]] !== twin.compact[o + 7] || twin.compact[o + 5] !== r % 2) right = false; }
     ok("  every compacted record carries its fleet in ident.w, and it is the fleet its id was given", right);
     const u1 = G.packCullUniforms({ planes: G.frustumPlanes(viewProj), eye: CAM.eye, thresholds: [0.03], count: COUNT, lodCount: 2, cap: COUNT }), u0 = Float32Array.from(u1); u0[27] = 0;
     ok("  the fleet count rides in eye.w (1 by default); a 0 there, the pre-Level-15 padding, reads as one fleet", u1[27] === 1 && G.cullLodCpu(records, u0).fleetCount === 1 && G.cullLodCpu(records, u0).counts.length === 2 && G.CULL_UNIFORM_FLOATS === 36);
@@ -54,14 +54,14 @@ console.log("\n1. THE SCENE KNOWS FLEETS: regions per (fleet, LOD), the twin agr
     const sc = G.makeGpuDrivenScene(dev, { fleets: [{ name: "a", lods: lods() }, { name: "b", lods: lods(), layout: G.LAYOUTS.lit }], fleetOf: Uint32Array.from([0, 1, 1, 0]), thresholds: [0.03], records: G.gridScene({ side: 2 }) });
     ok("a two-fleet scene on the null device: 4 regions, ranges per region, the lit fleet's stride is 40 bytes and it says what its meshes lacked", sc.regionCount === 4 && sc.ranges.length === 4 && sc.fleets[1].layout === G.LAYOUTS.lit && G.packMeshes([G.quadMesh(1)], G.LAYOUTS.lit).stride === 40 && sc.fleets[1].missing.includes("normals"), JSON.stringify(sc.fleets.map((f) => f.missing)));
     const lb = G.layoutBuffers(G.LAYOUTS.sprite);
-    ok("  layout locations: p 0, color 1, the instance slot 2 and 3, extras from 4 -- so a richer layout never moves rec/ident", lb[0].attributes.map((a) => a.location).join() === "0,1,4" && lb[1].attributes.map((a) => a.location).join() === "2,3");
+    ok("  layout locations: p 0, color 1, the instance slot 2, 3 and (v4317) 5 for the heading, extras from 4 -- so a richer layout never moves rec/ident", lb[0].attributes.map((a) => a.location).join() === "0,1,4" && lb[1].attributes.map((a) => a.location).join() === "2,3,5");
 }
 
 console.log("\n2. THE ARCHITECTURES, ON THE CPU: hulls, skins, sprites, glyphs, and the user's files");
 {
     for (const k of ["LIT_WGSL", "SPRITE_WGSL", "HOLO_WGSL", "INK_WGSL", "ASCII_WGSL", "SPIN_PICK_WGSL", "SPRITE_PICK_WGSL"]) ok(`${k} validates`, validateWgsl(F[k]).length === 0, validateWgsl(F[k]).join("; "));
     const enc = /o\.id = [^\n]*;/.exec(G.PICK_WGSL)[0];
-    ok("the looks' pick shaders carry gpuDriven's identity encoding line verbatim (lifted by pattern, not retyped) and the same spin as their looks", F.SPIN_PICK_WGSL.includes(enc) && F.SPRITE_PICK_WGSL.includes(enc) && F.SPIN_PICK_WGSL.includes("spun(p, ident.x)") && F.LIT_WGSL.includes("spun(p, ident.x)") && F.SPIN_PICK_VERTEX_GLSL.includes(/vId = [^\n]*;/.exec(G.PICK_VERTEX_GLSL)[0]));
+    ok("the looks' pick shaders carry gpuDriven's identity encoding line verbatim (lifted by pattern, not retyped) and the same spin as their looks", F.SPIN_PICK_WGSL.includes(enc) && F.SPRITE_PICK_WGSL.includes(enc) && F.SPIN_PICK_WGSL.includes("turned(p, extra.x)") && F.LIT_WGSL.includes("turned(p, extra.x)") && F.SPIN_PICK_VERTEX_GLSL.includes(/vId = [^\n]*;/.exec(G.PICK_VERTEX_GLSL)[0]));
     const w = F.wedgeMesh();
     let unit = true; for (let i = 0; i < w.normals.length; i += 3) if (Math.abs(Math.hypot(w.normals[i], w.normals[i + 1], w.normals[i + 2]) - 1) > 1e-5) unit = false;
     let far = 0; for (let i = 0; i < w.positions.length; i += 3) far = Math.max(far, Math.hypot(w.positions[i], w.positions[i + 1], w.positions[i + 2]));

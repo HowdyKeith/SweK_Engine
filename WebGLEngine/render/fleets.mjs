@@ -39,7 +39,7 @@
 // reported and skipped: the loft lives on three.js and does not travel here.
 "use strict";
 
-import { LAYOUTS, PICK_WGSL, PICK_VERTEX_GLSL, PICK_FRAGMENT_GLSL } from "./gpuDriven.mjs";
+import { LAYOUTS, PICK_WGSL, PICK_VERTEX_GLSL, PICK_FRAGMENT_GLSL, SPIN } from "./gpuDriven.mjs";
 import { svgToShapes } from "./svgExtrudeCore.js";
 import { extrudePolygon, watertight } from "../mesh/extrudePolygon.mjs";
 import { alphaMask, radialContour, extrude as extrudeContour } from "../fx/spritemesh/spriteMesh.js";
@@ -54,19 +54,19 @@ import { LYAPUNOV_LOOK_WGSL, LYAPUNOV_LOOK_VERTEX_GLSL, LYAPUNOV_LOOK_FRAGMENT_G
 
 // ---- the looks: five vertex/fragment pairs, WGSL and GLSL --------------------------------------------------------
 /**
- * Every fleet shader spins its hull by the golden angle times the record's id, so a race is not a parade of
- * identical headings. The scene's records carry no heading (four floats: centre and radius); this is the
- * deterministic stand-in until a heading travels in the record, and both backends compute the same angle.
+ * v4317: every fleet shader turns its hull by the HEADING the compacted record carries (extra.x). When a scene has
+ * no headings the record carries the golden angle times the id (gpuDriven.defaultExtras), so a race is still not a
+ * parade -- but the shader reads it and never computes it, which is what let the heading move to the record.
  */
-export const SPIN = 2.399963;
+export { SPIN };
+/** v4317 -- the hull turns by the heading the record carries (extra.x, yaw about z); the shader never invents one. */
 const WGSL_SPIN = `
-fn spun(p: vec3<f32>, id: f32) -> vec3<f32> {
-  let a = id * ${SPIN};
-  let ca = cos(a); let sa = sin(a);
+fn turned(p: vec3<f32>, yaw: f32) -> vec3<f32> {
+  let ca = cos(yaw); let sa = sin(yaw);
   return vec3<f32>(p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z);
 }`;
 const GLSL_SPIN = `
-vec3 spun(vec3 p, float id) { float a = id * ${SPIN}; float ca = cos(a), sa = sin(a); return vec3(p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z); }`;
+vec3 turned(vec3 p, float yaw) { float ca = cos(yaw), sa = sin(yaw); return vec3(p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z); }`;
 
 /** A lit 3D hull: lambert over the vertex normal, `light` = (direction xyz, ambient). */
 export const LIT_WGSL = `
@@ -74,11 +74,11 @@ struct Cam { viewProj: mat4x4<f32>, light: vec4<f32> };
 @group(0) @binding(0) var<uniform> cam: Cam;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   o.color = color;
-  o.n = spun(n, ident.x);
+  o.n = turned(n, extra.x);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
@@ -89,10 +89,10 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, 
 export const LIT_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj; uniform vec4 light;
-in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec3 n;
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra; in vec3 n;
 out vec4 vColor; out vec3 vN;
 ${GLSL_SPIN}
-void main() { gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0); vColor = color; vN = spun(n, ident.x); }
+void main() { gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0); vColor = color; vN = turned(n, extra.x); }
 `;
 export const LIT_FRAGMENT_GLSL = `#version 300 es
 precision highp float;
@@ -108,9 +108,9 @@ struct Cam { viewProj: mat4x4<f32> };
 @group(0) @binding(1) var atlas: texture_2d<f32>;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) uv: vec2<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) uv: vec2<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) uv: vec2<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   o.color = color; o.uv = uv;
   return o;
 }
@@ -124,10 +124,10 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, 
 export const SPRITE_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
-in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec2 uv;
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra; in vec2 uv;
 out vec4 vColor; out vec2 vUv;
 ${GLSL_SPIN}
-void main() { gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0); vColor = color; vUv = uv; }
+void main() { gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0); vColor = color; vUv = uv; }
 `;
 export const SPRITE_FRAGMENT_GLSL = `#version 300 es
 precision highp float;
@@ -152,10 +152,10 @@ struct Cam { viewProj: mat4x4<f32>, light: vec4<f32>, holo: vec4<f32> };
 @group(0) @binding(0) var<uniform> cam: Cam;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
-  o.color = color; o.n = spun(n, ident.x);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
+  o.color = color; o.n = turned(n, extra.x);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
@@ -194,9 +194,9 @@ struct Cam { viewProj: mat4x4<f32> };
 @group(0) @binding(0) var<uniform> cam: Cam;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   o.color = color;
   return o;
 }
@@ -205,10 +205,10 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32> }
 export const INK_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
-in vec3 p; in vec4 color; in vec4 rec; in vec4 ident;
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra;
 out vec4 vColor;
 ${GLSL_SPIN}
-void main() { gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0); vColor = color; }
+void main() { gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0); vColor = color; }
 `;
 export const INK_FRAGMENT_GLSL = `#version 300 es
 precision highp float;
@@ -226,10 +226,10 @@ struct Cam { viewProj: mat4x4<f32>, light: vec4<f32>, cell: vec4<f32> };
 @group(0) @binding(1) var glyphs: texture_2d<f32>;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) n: vec3<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
-  o.color = color; o.n = spun(n, ident.x);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
+  o.color = color; o.n = turned(n, extra.x);
   return o;
 }
 @fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
@@ -285,9 +285,9 @@ struct Cam { viewProj: mat4x4<f32> };
 @group(0) @binding(0) var<uniform> cam: Cam;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat) id: vec4<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   let id = u32(ident.x);
   ${ENCODE_WGSL}
   return o;
@@ -297,11 +297,11 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat)
 export const SPIN_PICK_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
-in vec3 p; in vec4 rec; in vec4 ident;
+in vec3 p; in vec4 rec; in vec4 ident; in vec4 extra;
 flat out vec4 vId;
 ${GLSL_SPIN}
 void main() {
-  gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   int id = int(ident.x);
   ${ENCODE_GLSL}
 }
@@ -312,9 +312,9 @@ struct Cam { viewProj: mat4x4<f32> };
 @group(0) @binding(1) var atlas: texture_2d<f32>;
 ${WGSL_SPIN}
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat) id: vec4<f32>, @location(1) uv: vec2<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(4) uv: vec2<f32>) -> VOut {
+@vertex fn vs(@location(0) p: vec3<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) uv: vec2<f32>) -> VOut {
   var o: VOut;
-  o.pos = cam.viewProj * vec4<f32>(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   let id = u32(ident.x);
   ${ENCODE_WGSL}
   o.uv = uv;
@@ -330,11 +330,11 @@ struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat)
 export const SPRITE_PICK_VERTEX_GLSL = `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
-in vec3 p; in vec4 rec; in vec4 ident; in vec2 uv;
+in vec3 p; in vec4 rec; in vec4 ident; in vec4 extra; in vec2 uv;
 flat out vec4 vId; out vec2 vUv;
 ${GLSL_SPIN}
 void main() {
-  gl_Position = viewProj * vec4(rec.xyz + spun(p, ident.x) * rec.w, 1.0);
+  gl_Position = viewProj * vec4(rec.xyz + turned(p, extra.x) * rec.w, 1.0);
   int id = int(ident.x);
   ${ENCODE_GLSL}
   vUv = uv;

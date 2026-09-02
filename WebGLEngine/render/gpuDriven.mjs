@@ -47,10 +47,20 @@ export const INDIRECT_BYTES = INDIRECT_STRIDE_U32 * 4;
 export const RECORD_FLOATS = 4;
 /**
  * One COMPACTED record, what the cull writes and the vertex stage reads per instance: the input record, then
- * (id, lod, phase, fleet) -- the `ident` attribute (fleet since v4301, 0 before); `meta` is a reserved word in WGSL, found by the compile watcher. Level 13 -- the id survives compaction so a pick can name what it hit; before this the
+ * (id, lod, phase, fleet) -- the `ident` attribute (fleet since v4301, 0 before) -- then (yaw, pitch, param, 0), the `extra` attribute (v4317); `meta` is a reserved word in WGSL, found by the compile watcher. Level 13 -- the id survives compaction so a pick can name what it hit; before this the
  * slot was all a drawn instance knew about itself, and a slot is whatever the atomics made it.
  */
-export const OUT_RECORD_FLOATS = 8;
+export const OUT_RECORD_FLOATS = 12;
+/**
+ * v4317 (Level 17) -- A HEADING IN THE RECORD. The compacted record grows a third vec4, `extra` = (yaw, pitch, a
+ * race-specific parameter, 0), copied by the cull from an `extras` buffer the scene owns: the caller's headings when
+ * it has them (a trader faces its next market), else the golden angle times the id -- the Level 15 stand-in, now
+ * computed ONCE on the CPU into the buffer instead of inside every fleet shader, so a shader only ever reads a
+ * heading and never invents one. SPIN is that constant, kept here so nothing types it twice.
+ */
+export const SPIN = 2.399963;
+export const EXTRA_FLOATS = 4;
+export function defaultExtras(count) { const e = new Float32Array(count * EXTRA_FLOATS); for (let i = 0; i < count; i++) e[i * EXTRA_FLOATS] = i * SPIN; return e; }
 export const RECORD_BYTES = OUT_RECORD_FLOATS * 4;
 export const CULL_WORKGROUP = 64;
 /** thresholds is one vec4, so at most four boundaries: five levels. */
@@ -191,6 +201,7 @@ ${occlusion ? `@group(0) @binding(4) var<uniform> occ: Occ;
 @group(0) @binding(5) var<storage, read> hiz: array<f32>;
 @group(0) @binding(6) var<storage, read_write> rejected: array<u32>;` : ""}
 ${fleets ? `@group(0) @binding(${occlusion ? 7 : 4}) var<storage, read> fleetOf: array<u32>;` : ""}
+@group(0) @binding(${(occlusion ? 7 : 4) + (fleets ? 1 : 0)}) var<storage, read> extras: array<vec4<f32>>;
 
 // info.w is the PHASE: 0 = the only or first pass; 1 = the second phase, which looks only at what phase 0
 // rejected for occlusion and tests it against the pyramid built from phase 0's own draw. A body that last
@@ -212,8 +223,9 @@ ${fleets ? `  let fleet = min(fleetOf[i], max(1u, u32(cull.eye.w)) - 1u);
   let region = fleet * u32(cull.info.y) + u32(lod);` : "  let fleet = 0u;\n  let region = u32(lod);"}
   let slot = atomicAdd(&cmds[region].instanceCount, 1u);
   if (slot < cap) {
-    records[(region * cap + slot) * 2u] = c;
-    records[(region * cap + slot) * 2u + 1u] = vec4<f32>(f32(i), f32(lod), f32(phase), f32(fleet));
+    records[(region * cap + slot) * 3u] = c;
+    records[(region * cap + slot) * 3u + 1u] = vec4<f32>(f32(i), f32(lod), f32(phase), f32(fleet));
+    records[(region * cap + slot) * 3u + 2u] = extras[i];
   }
 }
 `;
@@ -339,7 +351,7 @@ export function layoutBuffers(layout = LAYOUTS.flat) {
     let off = 0; const attributes = layout.map((a, i) => { const o = off; off += a.size * 4; return { name: a.name, size: a.size, offset: o, location: i < 2 ? i : i + 2 }; });
     return [
         { stride: off, stepMode: "vertex", attributes },
-        { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0, location: 2 }, { name: "ident", size: 4, offset: 16, location: 3 }] },
+        { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0, location: 2 }, { name: "ident", size: 4, offset: 16, location: 3 }, { name: "extra", size: 4, offset: 32, location: 5 }] },
     ];
 }
 export function renderPipelineDesc({ layout = LAYOUTS.flat, shaders = null, uniforms = null, topology = null, cull = null, frontFace = null } = {}) {
@@ -464,7 +476,7 @@ export function cullLodCpuOne(c, u) {
  * (fleet, LOD) -- fleet * lodCount + lod -- with `fleetOf` a u32 per record and the fleet count in the uniforms;
  * without either, every record is fleet 0 and region == LOD, as before.
  */
-export function cullLodCpu(records, u, fleetOf = null) {
+export function cullLodCpu(records, u, fleetOf = null, extras = null) {
     const count = u[32] | 0, lodCount = u[33] | 0, cap = u[34] | 0, fleetCount = Math.max(1, u[27] | 0), regions = lodCount * fleetCount;
     const ids = Array.from({ length: regions }, () => []);
     for (let i = 0; i < count; i++) {
@@ -479,7 +491,8 @@ export function cullLodCpu(records, u, fleetOf = null) {
         counts[r] = ids[r].length;
         const lod = r % lodCount, fleet = Math.floor(r / lodCount);
         for (let s = 0; s < Math.min(cap, ids[r].length); s++) { const o = (r * cap + s) * OUT_RECORD_FLOATS;
-            compact.set(records.subarray(ids[r][s] * 4, ids[r][s] * 4 + 4), o); compact[o + 4] = ids[r][s]; compact[o + 5] = lod; compact[o + 6] = 0; compact[o + 7] = fleet; }
+            compact.set(records.subarray(ids[r][s] * 4, ids[r][s] * 4 + 4), o); compact[o + 4] = ids[r][s]; compact[o + 5] = lod; compact[o + 6] = 0; compact[o + 7] = fleet;
+            if (extras) compact.set(extras.subarray(ids[r][s] * EXTRA_FLOATS, ids[r][s] * EXTRA_FLOATS + EXTRA_FLOATS), o + 8); else compact[o + 8] = ids[r][s] * SPIN; }
     }
     return { ids, counts, compact, visible: ids.reduce((a, b) => a + b.length, 0), lodCount, fleetCount, regions };
 }
@@ -580,7 +593,7 @@ const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]
  * whose vertex stage moves the hull passes `pickPipeline` (and `pickBind`) so the identity picture moves it too --
  * the fleets gate found the default pick drawing unspun hulls under spun ones, and named the wrong pixels.
  */
-export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null }) {
+export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null, headings = null }) {
     // Level 12 -- `records` may be a Float32Array (static instances) or a SOURCE produced elsewhere each frame:
     //   { count, buffer }   a gfx/device.js buffer another compute pass writes (WebGPU: the cull reads it directly)
     //   { count, cpu }      a function returning the Float32Array for this frame (the twin route, any backend)
@@ -634,6 +647,11 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
     let cullPipe = null, cullPipe2 = null, ubuf = null, ubuf2 = null, inBuf = null, cmdBuf = null, cmdBuf2 = null, outBuf = null, outBuf2 = null, rejBuf = null, fleetBuf = null, last = null, lastCam = null;
     let hizPipe = null, hizBuf = null, occBuf = null, hizLayoutNow = null, lvlBufs = [], pyramidReady = false, hizDims = null;
     const fleetOfU32 = hasFleets ? (fleetOf instanceof Uint32Array ? fleetOf : Uint32Array.from(fleetOf)) : null;
+    // v4317 -- the extras: a static Float32Array (count x 4), a { cpu() } source read every frame, or nothing (the golden angle)
+    const extraSrc = headings instanceof Float32Array ? { cpu: () => headings, static: true } : (headings && typeof headings.cpu === "function") ? headings : { cpu: () => defaultExtras(count), static: true };
+    let extrasNow = extraSrc.cpu();
+    if (extrasNow.length < count * EXTRA_FLOATS) throw new Error(`gpuDriven: headings must carry ${EXTRA_FLOATS} floats per record (${count * EXTRA_FLOATS}), got ${extrasNow.length}`);
+    let extraBuf = null;
     if (gpuPath) {
         cullPipe = device.compute({ wgsl: cullLodWgsl({ occlusion: occ, fleets: hasFleets }), entryPoint: "main" });
         ubuf = device.buffer({ size: CULL_UNIFORM_BYTES, usage: "uniform" });
@@ -642,6 +660,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         outBuf = device.buffer({ size: regionCount * regionBytes, usage: ["storage", "vertex"] });
         cullPipe.bind("cull", ubuf).bind("inst", inBuf).bind("cmds", cmdBuf).bind("records", outBuf);
         if (hasFleets) { fleetBuf = device.buffer({ data: fleetOfU32, usage: "storage" }); cullPipe.bind("fleetOf", fleetBuf); }
+        extraBuf = device.buffer({ data: extrasNow, usage: "storage" }); cullPipe.bind("extras", extraBuf);
         if (occ) {
             occBuf = device.buffer({ size: OCC_UNIFORM_FLOATS * 4, usage: "uniform" });
             rejBuf = device.buffer({ size: count * 4, usage: "storage" });
@@ -654,6 +673,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
                 outBuf2 = device.buffer({ size: regionCount * regionBytes, usage: ["storage", "vertex"] });
                 cullPipe2.bind("cull", ubuf2).bind("inst", inBuf).bind("cmds", cmdBuf2).bind("records", outBuf2).bind("occ", occBuf).bind("rejected", rejBuf);
                 if (hasFleets) cullPipe2.bind("fleetOf", fleetBuf);
+                cullPipe2.bind("extras", extraBuf);
             }
         }
     } else {
@@ -712,11 +732,12 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         const ctx = { viewProj, eye, time: clock() };
         lastCam = ctx;
         let twin = null, occU = null;
+        if (!extraSrc.static) { extrasNow = extraSrc.cpu(); if (gpuPath) extraBuf.write(extrasNow); }
         if (gpuPath) { ubuf.write(u); cmdBuf.write(template);
             if (occ) { const en = pyramidReady && hizLayoutNow; occU = packOccUniforms({ view, proj, w: en ? hizDims[0] : 0, h: en ? hizDims[1] : 0, levels: en ? hizLayoutNow.levels.length : 0, enabled: !!en });
                 if (!hizBuf) { ensureHiz(1, 1); pyramidReady = false; }   // a binding must exist before the first dispatch
                 occBuf.write(occU); cullPipe.bind("occ", occBuf); } }
-        else { twin = cullLodCpu(src.static || src.cpu(), u, fleetOfU32); outBuf.write(twin.compact); last = twin; }
+        else { twin = cullLodCpu(src.static || src.cpu(), u, fleetOfU32, extrasNow); outBuf.write(twin.compact); last = twin; }
         const readback = device.frame(({ pass }) => {
             if (gpuPath) pass.dispatch(cullPipe, Math.ceil(count / CULL_WORKGROUP));
             // Level 13 -- clear: null draws OVER whatever the last frame left (colour and depth): a second scene on
@@ -799,5 +820,5 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
     return { frame, pick, pickPicture, readCounts, readCounts2, readCountsByFleet, readRecords, readPyramid, order: ranked, ranges, count, cap, lodCount, fleetCount, regionCount,
              fleets: perFleet.map((f) => ({ name: f.name, index: f.index, layout: f.layout, topology: f.topology, order: f.ranked, ranges: f.packed.ranges, missing: f.packed.missing, pipe: f.pipe })),
              occlusion: occ, twoPhase, path: gpuPath ? "compute+drawIndexedIndirect" : "cpu-twin+drawIndexed",
-             destroy() { for (const b of [ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, fleetBuf, hizBuf, occBuf, ...lvlBufs, ...perFleet.flatMap((f) => [f.vbuf, f.ibuf])]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };
+             destroy() { for (const b of [ubuf, ubuf2, (src.buffer ? null : inBuf), cmdBuf, cmdBuf2, outBuf, outBuf2, rejBuf, fleetBuf, extraBuf, hizBuf, occBuf, ...lvlBufs, ...perFleet.flatMap((f) => [f.vbuf, f.ibuf])]) { try { b && b.destroy && b.destroy(); } catch (e) {} } } };
 }
