@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -102,6 +102,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).
    The speed of the generated code is what tsl-rig.html measures on a rig.
+
+6. **TSL COMPUTE.** BUILT at v4331, and it is the one place this tree's pair contract does not apply: WebGL2 has no
+   compute stage, so gfx/device.js refuses a compute pipeline without WGSL by name and there is no GLSL half to be
+   held to. render/tslSource.mjs computeShell() declares what a device compute module needs -- storage buffers bound
+   BY NAME, one uniform struct -- and transplantCompute() carries three's emitted compute shader into it: the
+   generated NodeBuffer_NNN becomes the shell's buffer, objectStruct becomes its uniform struct, and `enable
+   subgroups;` with its @builtin(subgroup_size) is DROPPED, because three's renderer asks the adapter for that
+   feature and the device never did (left in, the device refuses the module: sabotage S, 6 red).
+   render/physicsTsl.mjs makeLyapunovComputeTsl sweeps r across a storage buffer; render/lyapunovWgsl.mjs
+   lyapunovComputeWgsl is the hand-written twin, the module's own lyapunov() in the same shell.
+   THE CLAIM IS NOT "TO THE BYTE", AND WHY IS THE FINDING: on every element whose exponent is negative the two passes
+   are bit-identical (22 of 22, at both sample counts), and they part on the same five chaotic elements at both counts
+   -- by 2.5e-5 after 12 iterations and 4.5e-2 after 448. Two modules compiled separately may round a multiply-add
+   differently, and on a chaotic orbit that ulp is the whole difference by the end; the growth rate is the exponent
+   the pass computes. Bits are asserted where bits are meaningful and the divergence is measured where they are not.
+   Not built: a compute pass that READS a storage buffer as well as writing one, and workgroup-shared or atomic work.
 
 ## The count that says when step 4 matters
 

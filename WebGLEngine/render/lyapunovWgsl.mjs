@@ -52,6 +52,25 @@ float lyapunov(float r, float x0, int warm, int n) {
 `;
 
 /** The probe: invocation i sweeps r across [rLo, rHi] and the seed across [seedLo, seedHi] on a cols x rows grid. */
+/**
+ * v4331 -- THE HAND-WRITTEN COMPUTE TWIN, in the shell a transplant lands in. One invocation per r, the module's own
+ * lyapunov() above, the counts passed in because the generated pass BAKES them (a TSL Loop bound is a constant) and a
+ * twin that read them from a uniform would be a different program, not the same one written by hand.
+ */
+export function lyapunovComputeWgsl({ prefix, uniformVar = "u", storage = "out", workgroupSize = 64, warmup, samples }) {
+    return `${prefix}
+${LYAPUNOV_FN_WGSL}
+@compute @workgroup_size(${workgroupSize})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  if (f32(i) >= ${uniformVar}.span.z) { return; }
+  let t = f32(i) / (${uniformVar}.span.z - 1.0);
+  let r = ${uniformVar}.span.x + (${uniformVar}.span.y - ${uniformVar}.span.x) * t;
+  ${storage}.value[i] = lyapunov(r, ${uniformVar}.span.w, ${warmup}u, ${samples}u);
+}
+`;
+}
+
 export const PROBE_UNIFORM_FLOATS = 8;
 export function packProbeUniforms({ rLo, rHi, samples, warmup, seedLo, seedHi, cols, rows }) {
     return new Float32Array([rLo, rHi, samples, warmup, seedLo, seedHi, cols, rows]);

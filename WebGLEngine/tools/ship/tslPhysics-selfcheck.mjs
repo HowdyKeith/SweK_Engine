@@ -16,16 +16,42 @@
 // named ...Shell) -> exit=1, 2 red here BY NAME, and 5 more in tools/ship/backendParity-selfcheck.mjs, whose census
 // sees the markers arrive: glslBearing 145 -> 146, wgslBearing 56 -> 57, both 13 -> 14, the directive/framework
 // split, and the shader-module list growing to eleven. Seven red for one function in the wrong file.
+// v4331 -- AND THE COMPUTE STAGE, WHICH IS THE ONE PLACE THIS TREE'S PAIR CONTRACT DOES NOT APPLY. Every other
+// transplant in this arc is held to a WGSL/GLSL pair; WebGL2 has no compute stage, so a compute pass has no pair to
+// be held to and gfx/device.js says so by name. What it can still be held to is a hand-written twin and the CPU
+// model, and section 4 does both.
+//
+// *** AND THE CLAIM IS NOT "BIT FOR BIT", BECAUSE THE SUBJECT IS A CHAOTIC MAP. *** Measured, on the same 64-element
+// sweep: the generated pass and the hand-written one are bit-identical on every element whose exponent is NEGATIVE
+// (22 of 22, at both sample counts), and part on the same five chaotic elements at both counts -- by 2.5e-5 after 12
+// iterations and 4.5e-2 after 448. Two modules compiled separately may round a multiply-add differently, and on a
+// chaotic orbit that one ulp is the whole difference by the end; the growth rate IS the Lyapunov exponent this pass
+// computes. So the gate asserts bits where bits are meaningful, measures the divergence where they are not, and
+// claims no bound at all against the CPU's f64 on the chaotic elements -- a tolerance wide enough to cover that
+// would assert nothing.
+//
+// SABOTAGES, MEASURED at v4331:
+//   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
+//      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
+//      renderer asks the adapter for that feature; gfx/device.js never did, and nothing but this drop bridges them.
+//   T  the storage rename skipped, so the module keeps three's generated NodeBuffer_NNN -> exit=1, 6 red: the CPU line
+//      by name, and on the device a buffer nothing is bound to, so every element reads zero.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { LN2, PERIOD3, LY_DEFAULTS, truePeak, etaStandard, PARAMS } from "../../render/physicsTsl.mjs";
+import { LN2, PERIOD3, LY_DEFAULTS, truePeak, etaStandard, PARAMS, lyapunovSweepCpu } from "../../render/physicsTsl.mjs";
+import { computeShell, transplantCompute } from "../../render/tslSource.mjs";
+import { lyapunovComputeWgsl } from "../../render/lyapunovWgsl.mjs";
+import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import { keyCpu } from "../../render/heidlerWgsl.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const EMITTED = path.join(ENG, "tools/ship/tsl-emitted-physics.json");
+const EMITTED_C = path.join(ENG, "tools/ship/tsl-emitted-compute.json");   // v4331 -- the compute pass, for the corpus
+const FIXC = JSON.parse(fs.readFileSync(path.join(ENG, "tools/ship/tslCompute-fixture.json"), "utf8")).wgsl;
+const throwsWith = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
@@ -53,7 +79,7 @@ const k = keyCpu(PARAMS.first);
         !WGSL_TELL.test(src) && !GLSL_TELL.test(src) && WGSL_TELL.test(fleetSrc) && GLSL_TELL.test(fleetSrc),
         `physics wgsl ${WGSL_TELL.test(src)} glsl ${GLSL_TELL.test(src)}; fleet wgsl ${WGSL_TELL.test(fleetSrc)} glsl ${GLSL_TELL.test(fleetSrc)}`);
     ok("  ...and it exports no shell and no look, which is the same statement said in names", !/export function \w*(Shell|Look\w*Tsl)\b/.test(src) && /export function \w+Shell\b/.test(fleetSrc));
-    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten here, the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 10 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} keys, ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
+    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten and the compute sweep's one here, the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 11 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys + the compute sweep's span), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
 }
 
 const skip = webgpuSkipReason();
@@ -130,6 +156,95 @@ else {
     }
 }
 
+console.log("\n4. THE COMPUTE STAGE (v4331): the exponent as a TSL COMPUTE pass, transplanted into a gfx/device.js compute pipeline");
+{
+    const shell = computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] });
+    ok("the shell declares the storage buffer the device will bind by name, and the uniform struct after it", /var<storage, read_write> out: outBuf;/.test(shell.prefix) && /var<uniform> u: uStruct;/.test(shell.prefix) && parseBindings(shell.prefix + "\n").length === 2, shell.prefix.replace(/\n/g, " | "));
+    const twin = lyapunovComputeWgsl({ prefix: shell.prefix, warmup: LY_DEFAULTS.warmup, samples: LY_DEFAULTS.samples });
+    ok("  the hand-written twin is the module's own lyapunov() in that shell, and it validates", validateWgsl(twin).length === 0 && /fn lyapunov\(r: f32/.test(twin), validateWgsl(twin).join("; "));
+    // the marker is assembled, for the reason render/backendParity.mjs's header gives and this session has relearned twelve times
+    const notCompute = "// Three.js r178 - Node System\n@" + "fragment fn main() -> @location(0) vec4<f32> { return vec4<f32>(0.0); }";
+    ok("REFUSED: a fragment handed to the compute transplant, and a graph whose storage count the shell does not name", throwsWith(() => transplantCompute(notCompute, shell), /has no compute entry point/) && throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [], uniforms: [{ name: "span", type: "vec4" }] })), /writes 1 storage buffer\(s\) and the shell "compute" names 0/));
+    ok("REFUSED: a uniform the shell's struct lacks, and a workgroup size the shell disagrees with", throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [] })), /is not in the shell "compute"'s struct \(none\)/) && throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }], workgroupSize: 32 })), /@workgroup_size\(64\) and the shell "compute" says 32/));
+    const t = transplantCompute(FIXC, shell);
+    ok("*** three asks for an extension the device never requested -- `enable subgroups;` and a @builtin(subgroup_size) it does not use -- and the transplant drops both ***", !/enable subgroups/.test(t.wgsl) && !/subgroup_size/.test(t.wgsl) && /enable subgroups/.test(FIXC), "left in, the device refuses the module: measured as sabotage S");
+    ok("  and the generated pass is the shell's own buffer and struct, with nothing of three's naming left", /out\.value\[ instanceIndex \]/.test(t.wgsl) && /u\.span\.x/.test(t.wgsl) && !/NodeBuffer_|object\./.test(t.wgsl) && validateWgsl(t.wgsl).length === 0, validateWgsl(t.wgsl).join("; "));
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const N = 64;
+    const cpu = lyapunovSweepCpu({ count: N, seed: 0.4 });
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const L = await import("/render/lyapunovWgsl.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        out.threeBackend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2";
+        // TWO configurations, and the second is the point: SHORT (the map has not had time to separate) and FULL.
+        const mk = async (opts) => { const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4, ...opts }); await renderer.computeAsync(g.node);
+            return { g, emitted: renderer._nodes.getForCompute(g.node).computeShader, three: [...new Float32Array(await renderer.getArrayBufferAsync(g.buffer.value))] }; };
+        const full = await mk({}), short = await mk({ samples: 8, warmup: 4 });
+        const g = full.g, emitted = full.emitted;
+        out.emitted = emitted; out.threeValues = full.three;
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            out.deviceBackend = dev.backend;
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const shell = S.computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] });
+            const gen = S.transplantCompute(emitted, shell);
+            out.transplanted = gen.wgsl;
+            const hand = L.lyapunovComputeWgsl({ prefix: shell.prefix, warmup: g.warmup, samples: g.samples });
+            // the uniform struct is a BUFFER the caller fills, the way every compute pass in render/gpuDriven.mjs binds its own
+            const ubuf = dev.buffer({ data: Float32Array.from(g.knobs), usage: "uniform" });
+            const run = async (wgsl) => {
+                const buf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+                const pipe = dev.compute({ wgsl });
+                pipe.bind("out", buf).bind("u", ubuf);
+                dev.frame(({ pass }) => { pass.dispatch(pipe, Math.ceil(a.N / 64)); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+                const back = new Float32Array(await dev.read(buf)); buf.destroy(); return [...back];
+            };
+            out.genValues = await run(gen.wgsl);
+            out.handValues = await run(hand);
+            // the same pair at a sample count too short for the map to separate two roundings
+            const genS = S.transplantCompute(short.emitted, shell);
+            const handS = L.lyapunovComputeWgsl({ prefix: shell.prefix, warmup: short.g.warmup, samples: short.g.samples });
+            out.shortGen = await run(genS.wgsl); out.shortHand = await run(handS);
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran three's compute and the device's", r.ok && r.result && !r.result.error && r.result.genValues && r.result.handValues, r.ok ? (r.result && r.result.error) : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result && !r.result.error) {
+        const R = r.result;
+        const short_it = 4 + 8, full_it = LY_DEFAULTS.warmup + LY_DEFAULTS.samples;
+        const partOf = (A, B) => A.map((v, i) => i).filter((i) => A[i] !== B[i]);
+        const partedShort = partOf(R.shortGen, R.shortHand), parted = partOf(R.genValues, R.handValues);
+        const worstOf = (A, B, idx) => (idx.length ? Math.max(...idx.map((i) => Math.abs(A[i] - B[i]))) : 0);
+        const periodic = cpu.map((v, i) => i).filter((i) => cpu[i] <= 0);
+        const periodicSame = periodic.filter((i) => R.genValues[i] === R.handValues[i] && R.shortGen[i] === R.shortHand[i]).length;
+        ok(`*** on the PERIODIC part of the sweep the generated compute pass and the hand-written one agree BIT FOR BIT, at both sample counts (${periodicSame} of ${periodic.length}) ***`,
+            periodicSame === periodic.length && periodic.length > 10 && (R.errs || []).length === 0,
+            `${periodicSame}/${periodic.length} elements whose exponent is negative; device errors ${(R.errs || []).length}`);
+        // and where they part, they part on the CHAOTIC elements -- the same ones at both counts, by a difference that grows
+        const sameSet = partedShort.join() === parted.join();
+        const allChaotic = parted.every((i) => cpu[i] > 0) && partedShort.every((i) => cpu[i] > 0);
+        ok(`*** and where they part it is the SAME ${parted.length} elements at both counts, every one of them chaotic, by a difference that grows from ${worstOf(R.shortGen, R.shortHand, partedShort).toExponential(1)} at ${short_it} iterations to ${worstOf(R.genValues, R.handValues, parted).toExponential(1)} at ${full_it} ***`,
+            sameSet && allChaotic && parted.length > 0 && worstOf(R.genValues, R.handValues, parted) > 100 * worstOf(R.shortGen, R.shortHand, partedShort),
+            `parted ${JSON.stringify(parted)}; same set at both counts: ${sameSet}. TWO MODULES COMPILED SEPARATELY MAY ROUND A MULTIPLY-ADD DIFFERENTLY, and on a chaotic orbit one ulp is the whole difference by the end -- which is what physics/chaos/logistic.js measures. This gate does not identify the ulp; it measures the consequence, and it does NOT claim bit equality on a chaotic map`);
+        const worstCpu = Math.max(...R.genValues.map((v, i) => Math.abs(v - cpu[i])));
+        const worstCpuPeriodic = Math.max(...periodic.map((i) => Math.abs(R.genValues[i] - cpu[i])));
+        ok(`  and the generated pass agrees with the CPU's f64 sweep to ${worstCpuPeriodic.toExponential(2)} on the periodic elements`, worstCpuPeriodic < 1e-3,
+            `f32 against f64 over ${LY_DEFAULTS.samples} logs of near-zero slopes; the bound is measured, not chosen. NO BOUND IS CLAIMED on the chaotic elements, where the worst is ${worstCpu.toExponential(2)}: a single-precision orbit and a double-precision one separate there for the same reason the two GPU passes do, and a tolerance wide enough to cover it would assert nothing`);
+        const atFour = R.genValues[R.genValues.length - 1], cpuFour = cpu[cpu.length - 1];
+        ok(`  and r = 4 reads ${atFour.toFixed(6)} against the CPU's ${cpuFour.toFixed(6)} and ln 2 = ${LN2.toFixed(6)}`, Math.abs(atFour - LN2) < 0.05,
+            `${LY_DEFAULTS.samples} samples is a FINITE-SAMPLE value and r = 4 is the most chaotic point in the sweep: the CPU itself sits ${Math.abs(cpuFour - LN2).toFixed(6)} from ln 2, and no bit claim is made at this end of it`);
+        ok("  three's own renderer read the same buffer back, so the transplant is graded against the graph's own output too", R.threeValues && Math.max(...R.threeValues.map((v, i) => Math.abs(v - R.genValues[i]))) < 1e-6 && R.threeBackend === "webgpu" && R.deviceBackend === "webgpu", `three ${R.threeBackend}, device ${R.deviceBackend}`);
+        fs.writeFileSync(EMITTED_C, JSON.stringify({ at: "v4331", three: "0.178.0", note: "the Lyapunov sweep as a TSL compute pass, as three emitted it and as render/tslSource.mjs transplanted it into a gfx/device.js compute pipeline; rewritten by this gate on every run", emitted: R.emitted, transplanted: R.transplanted }, null, 1));
+        ok("the emitted and transplanted compute pass is written to tools/ship/tsl-emitted-compute.json for the WGSL corpus", fs.existsSync(EMITTED_C));
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -137,6 +252,7 @@ else {
 //   B  the Heidler shape with (t/t1) for (t/t1)^2 -> exit=1, 5 red: the source line, and on every path and backend the peak
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the Chaos race's hull painted by the TSL node (the race is a device pipeline; a NodeMaterial version would be the next rung); " +
-    "the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); and a real GPU's log() and exp() against SwiftShader's.");
+console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against SwiftShader's -- " +
+    "which is the same question the chaotic five ask, one machine further out; a compute pass that READS a storage buffer as well as writing one (this one takes a uniform and " +
+    "writes an array, and the fleets' own cull pass reads three buffers); and a workgroup-shared or atomic pass, which three can emit and this transplant has never seen.");
 process.exit(fails ? 1 : 0);

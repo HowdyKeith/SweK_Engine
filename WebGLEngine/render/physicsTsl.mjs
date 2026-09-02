@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs)
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -70,3 +70,45 @@ export function decodeHeidler(px, i) { return ((px[i] + px[i + 1] / 255) / 255) 
 
 // v4329 -- the looks and shells that USE these functions moved to render/fleetTsl.mjs: a shell is a fleet's
 // vertex stage, not a physics function, and this module was holding three of them and five looks besides.
+
+// ---- v4331: the exponent as a COMPUTE pass ---------------------------------------------------------------------------
+/**
+ * THE LYAPUNOV EXPONENT AS A TSL COMPUTE PASS: invocation i sweeps r across [rLo, rHi] and writes the exponent into a
+ * storage buffer. Same lyapunovNodes() the keys and the looks use, so the arithmetic is the module's; what is new is
+ * the STAGE. render/tslSource.mjs transplantCompute() carries the emitted WGSL into a gfx/device.js compute pipeline,
+ * and render/lyapunovWgsl.mjs lyapunovComputeWgsl() is the hand-written twin it is graded against.
+ *
+ * WebGPU ONLY, and said rather than discovered: WebGL2 has no compute stage, so this is the one transplant in the tree
+ * with no pair to be held to. The claim it can still make is the one that matters -- the generated pass and the
+ * hand-written one write the same floats, and both agree with the CPU model at the same sample count.
+ *
+ * The seed is NOT 0.5. At r = 4 that seed maps to the fixed point 0 in one step and every later slope is r itself, so
+ * the exponent reads ln 4 rather than ln 2 -- a right answer to a question nobody meant to ask. Measured here first.
+ */
+export function makeLyapunovComputeTsl(TSL, { count = 64, rLo = LY_DEFAULTS.rLo, rHi = LY_DEFAULTS.rHi, seed = 0.4, samples = LY_DEFAULTS.samples, warmup = LY_DEFAULTS.warmup } = {}) {
+    const { Fn, float, uniform, vec4, instanceIndex, instancedArray } = TSL;
+    for (const n of ["instancedArray"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (seed === 0.5) throw new Error("physicsTsl: seed 0.5 lands on the logistic map's fixed point at r = 4 and reads ln 4, not ln 2; pick another seed");
+    const { lyapunov } = lyapunovNodes(TSL, { samples, warmup });
+    const uniforms = { span: uniform(vec4(rLo, rHi, count, seed)).label("span") };
+    const buffer = instancedArray(count, "float");
+    const node = Fn(() => {
+        const t = float(instanceIndex).div(float(count - 1));
+        const r = uniforms.span.x.add(uniforms.span.y.sub(uniforms.span.x).mul(t));
+        buffer.element(instanceIndex).assign(lyapunov(r, uniforms.span.w));
+    })().compute(count);
+    return { node, buffer, uniforms, knobs: [rLo, rHi, count, seed], count, samples, warmup };
+}
+/** The same sweep on the CPU, at the SAME sample count, so the GPU is graded against a number and not against a limit. */
+export function lyapunovSweepCpu({ count = 64, rLo = LY_DEFAULTS.rLo, rHi = LY_DEFAULTS.rHi, seed = 0.4, samples = LY_DEFAULTS.samples, warmup = LY_DEFAULTS.warmup } = {}) {
+    const out = new Float64Array(count);
+    for (let i = 0; i < count; i++) {
+        const r = rLo + (rHi - rLo) * (i / (count - 1));
+        let x = seed;
+        for (let k = 0; k < warmup; k++) x = r * x * (1 - x);
+        let acc = 0;
+        for (let k = 0; k < samples; k++) { acc += Math.log(Math.abs(r * (1 - 2 * x))); x = r * x * (1 - x); }
+        out[i] = acc / samples;
+    }
+    return out;
+}
