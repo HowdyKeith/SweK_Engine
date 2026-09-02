@@ -626,6 +626,22 @@ window.addEventListener("load", function () {
                  physics, every number comes from the module its gate checks" in their own header comments --
                  built, gated, and reachable only by typing the filename. Titles below are each page's own
                  demo:desc, unchanged. -->
+            <!-- v4327 -- ELEVEN WEBGPU PAGES THAT server.html MENTIONED ZERO TIMES. Same class as
+                 voxel-viewer.html at v3226 and the four at v3002: they ship, they work, and the only way to open one
+                 was to type its filename. They are anchored HERE rather than in the panel because the mover MOVES an
+                 existing node -- the title below is the one hand-written place the text lives, and a registry that
+                 rebuilt it would guarantee drift. tools/ship/pageSections.mjs assigns them to the WebGPU drawer. -->
+            <a href="/webgpu-bench.html" target="_blank" rel="noopener" title="WebGPU Lab: matmul, reduction and bandwidth microbenchmarks timed on THIS machine's adapter, in GFLOP/s and GB/s. The page that tells you what the GPU is actually worth rather than whether it exists.">WebGPU Lab</a>
+            <a href="/fluid-webgpu.html" target="_blank" rel="noopener" title="FLIP/PIC Fluid (WebGPU): particle-in-cell fluid with the grid transfer and pressure solve running as compute passes.">FLIP Fluid (WebGPU)</a>
+            <a href="/fluid-webgpu-3d.html" target="_blank" rel="noopener" title="FLIP/PIC Fluid 3D (WebGPU): the same solver in three dimensions -- the heavier of the two, and the one that will find a weak adapter.">FLIP Fluid 3D (WebGPU)</a>
+            <a href="/blobulator-gpu.html" target="_blank" rel="noopener" title="Blobulator GPU: raymarched SDF metaballs evaluated per-pixel in WGSL -- a fragment-bound load rather than a compute one.">Blobulator GPU</a>
+            <a href="/celltrack-viewer-gpu.html" target="_blank" rel="noopener" title="Cell Volume Viewer (WebGPU): volumetric microscopy data raymarched on the GPU, the accelerated twin of the Canvas viewer.">Cell Viewer (WebGPU)</a>
+            <a href="/blackhole.html" target="_blank" rel="noopener" title="Schwarzschild Black Hole (WebGPU): null geodesics integrated in the fragment shader -- a photon ring and an accretion disc lensed by the real metric.">Black Hole (WebGPU)</a>
+            <a href="/wormhole.html" target="_blank" rel="noopener" title="Ellis Wormhole (WebGPU): traversable-wormhole lensing, integrating rays through the throat rather than faking it with a warp.">Wormhole (WebGPU)</a>
+            <a href="/wormhole-jump.html" target="_blank" rel="noopener" title="Wormhole Jump: Ellis-metric lensing showing the living nebula of each system -- the far one through the throat, the near one bending around it. Hit Jump to fly through. WebGPU with WebGL2 and Canvas2D fallbacks.">Wormhole Jump</a>
+            <a href="/nebula.html" target="_blank" rel="noopener" title="Nebula: a parallax volumetric nebula -- domain-warped gas, a starfield, and depth from a drifting camera, with ships flying inside the cloud. WebGPU, with WebGL2 and Canvas2D fallbacks.">Nebula</a>
+            <a href="/gauges3000.html" target="_blank" rel="noopener" title="Gauges 3000: a WebGPU glowing avatar core ringed by an LCARS gauge cluster, with live core and memory readings where available. WebGPU for the core, Canvas2D for the gauges.">Gauges 3000</a>
+            <a href="/anime4k.html" target="_blank" rel="noopener" title="Anime4K Upscaler: bilinear 2x then a DoG deblur and line-darkening, reimplemented natively. WebGPU compute on a rig, CPU reference otherwise -- compare nearest / bilinear / Anime4K side by side.">Anime4K</a>
             <a href="/cartpole.html" target="_blank" rel="noopener" title="Cart-Pole with LQR: an inverted pendulum held upright by an optimal regulator, live. Crank the gain multiplier to a hundred times and it still balances -- LQR guarantees an INFINITE gain margin, and you can watch the guarantee hold. Then switch the controller to one designed on the hanging equilibrium: every self-consistency check it can run still passes, and it drops the pole in under two seconds." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Cart-Pole (LQR)</a>
             <a href="/ecology.html" target="_blank" rel="noopener" title="Predator and Prey: predator and prey chase each other round a closed loop forever. Drag the harvest slider -- which kills BOTH species at once, a pesticide or a fishing fleet -- and watch the average PREY population go UP. That is Volterra's principle, it is exact, and it is the answer to why the fraction of predatory fish in the Adriatic rose when the First World War stopped the fishing." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Predator and Prey</a>
             <a href="/lensing.html" target="_blank" rel="noopener" title="Gravitational Microlensing: a point mass passing in front of a background star splits it into two images and brightens it -- watch the images move and the light curve rise as the alignment tightens. Every number is read straight from physics/astroparticle/lensing.js: nothing on this page is a second copy of the physics." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Microlensing</a>
@@ -1140,6 +1156,10 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="gametheory"><span class="gtabTog">&#9656;</span><span>&#127918; Game Theory</span><span class="gtabState"></span></button>
+        <!-- v4327 -- WebGPU. NOT pinned in CHIP_PINNED on purpose: the pin list is for SERVICE drawers with
+             live state you check by position, and this is a subject drawer, so it takes the alphabetised
+             default like every other subject. -->
+        <button class="gtab" data-tab="webgpu"><span class="gtabTog">&#9656;</span><span>&#9650; WebGPU</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="petfbi"><span class="gtabTog">&#9656;</span><span>&#128062; PetFBI</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="brain"><span class="gtabTog">&#9656;</span><span>&#129504; GPU Brain</span><span class="gtabState" id="brainTabState"></span></button>
         <!-- v4127 -- Keith: '"Fluid -- verify the GPU" can be renamed "PL: Fluids"'. VISIBLE LABEL ONLY:
@@ -1664,6 +1684,16 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#127922; Box3D</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="box3d" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- v4327 -- WEBGPU. The membership is DERIVED (tools/ship/pageSections.mjs): a page is here because it
+             reaches navigator.gpu and calls requestAdapter, not because its name says gpu. The note below says
+             out loud that this is the UNFILED subset, because a drawer named after a capability invites the
+             reading that it holds every page with that capability -- and twelve more do, filed under the
+             subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D, opt-in). -->
+        <div class="gpanel" data-panel="webgpu" hidden>
+          <div class="gpanelHdr">&#9650; WebGPU</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages that ask this machine for a GPU adapter -- open one and it either answers or it does not, which is the whole test. These are the ones no other drawer owned: twelve more WebGPU pages are filed under their subject (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D) and stay there, because a page is filed by what it is ABOUT. Start with <b>GPU rig check</b>. MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div data-panel-pages="webgpu" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="blobs" hidden>
           <div class="gpanelHdr">&#129514; Blobs</div>

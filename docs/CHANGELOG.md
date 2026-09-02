@@ -8,6 +8,57 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4328 -- a WebGPU drawer, filled by what a page DOES rather than by what it is called
+
+Keith: "can we make a link panel section on the Server.html page called WebGPU, and put any related links and any
+page it should and would want to click and test?" THE MEMBERSHIP IS DERIVED AND THE DERIVATION IS THE ROUND. A
+drawer named after a CAPABILITY cannot be filled by reading filenames: "gpu" in a name is not a WebGPU page
+(euler-gpu-check drives a CPU twin as often as an adapter) and a WebGPU page need not say so anywhere in its name
+(gauges3000, nebula, blackhole). The rule used is the mechanism -- THE PAGE REACHES AN ADAPTER -- and it has two
+routes, which matters because THE FIRST DRAFT OF THIS COMMENT STATED A RULE ITS OWN LIST BROKE: it said "reaches
+navigator.gpu AND calls requestAdapter" and then named gpu-rig-check and tsl-rig, which call requestAdapter ZERO
+times and reach the adapter through gfx/device.js instead. A rule written one line above a list that contradicts
+it would have read as true forever, because the list looks right; it is the prose-read-as-fact species this tree
+keeps finding in its own comments, and it is now stated as the two routes that actually exist. 25 pages call
+requestAdapter directly; TWELVE OF THEM ARE DELIBERATELY NOT IN THE DRAWER. mpm-gpu, lbm3d-gpu, multigrid and
+euler-gpu-check belong to PL: Fluids, flight-gpu to Endless Sky, brain-bench to GPU Brain, webgpu-llm to System
+Tools, magmap-android to Box3D, webrtx to the opt-in drawer -- and the mover MOVES a node, so claiming one here
+would EMPTY the subject drawer that owns it. A capability drawer that eats the fluids panel to fill itself is not
+a drawer, it is a re-filing; a page is filed by what it is ABOUT, and this one takes only what nothing else had.
+The panel says that on its own face rather than leaving the reader to infer it, because a drawer named after a
+capability invites exactly the wrong reading -- that it holds every page with that capability.
+THIRTEEN PAGES, AND ELEVEN OF THEM WERE UNREACHABLE FROM server.html ENTIRELY: webgpu-bench, fluid-webgpu,
+fluid-webgpu-3d, blobulator-gpu, celltrack-viewer-gpu, blackhole, wormhole, wormhole-jump, nebula, gauges3000 and
+anime4k ship, work, and server.html mentioned them ZERO times -- the only way to open one was to type its
+filename, which is the same class as voxel-viewer.html at v3226 and the four at v3002. They are anchored in
+Arriving with hand-written titles and ASSIGNED to the drawer, rather than being rendered from the registry,
+because the mover moves an existing node: gpu-rig-check and tsl-rig kept the titles somebody already wrote for
+them, which is the whole reason that design exists.
+TWO PAGES COLLIDED WITH UNPLACED AND THE GATE WAS RIGHT BOTH TIMES -- a page cannot be both deliberately unplaced
+and assigned, that is two answers to one question -- AND THEY RESOLVE DIFFERENTLY BECAUSE THEIR REASONS DIFFER.
+gpu-rig-check's reason was "part of the nine-page render group WITH NO DRAWER", a page waiting on a drawer to
+exist; one exists now and this is the page that answers whether the box gave us an adapter at all, so it is
+placed and its UNPLACED line is removed rather than left to contradict the new one. The render group is EIGHT
+now, and naming a render panel is still Keith's call and still places the other eight. magmap-bench goes the
+other way and STAYS unplaced: its reason is "OWES A DEVICE VERDICT ... needs one real-GPU run", an owed
+measurement rather than a missing drawer, and filing it would discharge nothing while quietly answering a
+question that is still open. hmc-bench and ising-bench are left out too -- sampling benches whose GPU is the
+method rather than the subject -- and they are the first candidates if the drawer should be wider at 13 of 15.
+DRIVEN IN CHROMIUM AGAINST THE REAL PAGE rather than asserted from the markup: the chip renders, the panel is
+hidden until its own chip is clicked and open after, the slot holds 13 anchors with their titles, pageSections
+reports NO registry entry without an anchor, and there are zero page errors on load. page-index.json is a built
+artefact and went red for the right reason -- a page's group and its drawer cannot disagree -- and was re-derived
+rather than hand-patched; all 13 now carry g:"webgpu".
+AND A FINDING I ALMOST REPORTED AND WAS WRONG ABOUT, recorded because a retracted claim is cheaper than a false
+one that ships: browserSkipReason() looked like it was reporting "playwright is not installed here" on a box
+where resolvePlaywright() succeeds, which is exactly the v3940 fault of a skip naming a cause that is not true.
+It is not. The function takes the resolved chromium as its first argument and my probe called it with none, so it
+answered the question I actually asked. Called correctly it returns "" -- no skip. The bug was in the probe.
+Not checked and said plainly: no page in the drawer was OPENED this round, so "the adapter either answers or it
+does not" is the drawer's promise and not a measurement -- this box has no adapter, which is the same reason
+pathTracerWgsl stays red. gates 1409 -> 1409, no gate added: the membership is enforced by the gate that already
+existed, which is why it caught both UNPLACED collisions and the stale index without being asked.
+The tree stands at 1409 gates.
 ## v4327 -- the sky stopped owning the noise, and the "one hash" was two all along
 
 *** THE CORRECTION FIRST, AND IT IS MINE. *** Asked which of TheLongSilence's elements this tree had, I answered

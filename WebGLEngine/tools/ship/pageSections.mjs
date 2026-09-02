@@ -448,6 +448,54 @@ export const SECTIONS = [
     { id: "gametheory", tab: "gametheory", label: "Game Theory", note: "appended -- pages with no chip of their own",
       pages: ["wadmap.html", "uvtt.html", "skyrim.html", "slotmachine.html", "pachinko.html", "pipboy-models.html",
               "fallout.html", "flight.html", "fpscontrol.html", "fpsmirror.html", "eve.html"] },
+    // v4327 -- WEBGPU, at Keith's ask: a drawer of "any page it should and would want to click and test".
+    //
+    // *** THE MEMBERSHIP IS DERIVED, NOT REMEMBERED. *** A drawer named after a CAPABILITY cannot be filled by
+    // reading filenames -- "gpu" in a name is not a WebGPU page (euler-gpu-check drives a CPU twin as often as
+    // an adapter) and a WebGPU page need not say so (gauges3000, nebula, blackhole). The rule is the mechanism:
+    // THE PAGE REACHES AN ADAPTER. 25 pages call navigator.gpu.requestAdapter directly.
+    //
+    // *** AND THE FIRST DRAFT OF THIS COMMENT STATED A RULE ITS OWN MEMBERSHIP BROKE. *** It said "reaches
+    // navigator.gpu AND calls requestAdapter", and then listed gpu-rig-check and tsl-rig, which call
+    // requestAdapter ZERO times -- they reach navigator.gpu through gfx/device.js, which requests the adapter
+    // on their behalf. A rule written one line above a list that contradicts it is the prose-read-as-fact
+    // failure this tree keeps finding in its own comments, and it would have read as true forever because the
+    // list looks right. So the rule is stated as the two routes that exist: requestAdapter directly, or
+    // gfx/device.js doing it for the page. Both are "open it and the adapter either answers or it does not".
+    //
+    // *** AND TWELVE OF THE 25 ARE DELIBERATELY NOT HERE. *** mpm-gpu, lbm3d-gpu, multigrid and euler-gpu-check
+    // belong to PL: Fluids; flight-gpu to Endless Sky; brain-bench to GPU Brain; webgpu-llm to System Tools;
+    // magmap-android to Box3D & Cross-Arch; webrtx to the opt-in drawer. The mover MOVES a node, so claiming
+    // one here would EMPTY the subject drawer that owns it -- a capability drawer would eat the fluids panel to
+    // fill itself. A page is filed by what it is ABOUT; this drawer takes only the ones nothing else had.
+    // (That is also why the panel says so on its face: the pages here are the unfiled ones, not all of them.)
+    //
+    // hmc-bench and ising-bench pass the mechanism test and are still left out: they are SAMPLING benches whose
+    // GPU is the method rather than the subject, and this file's own "Sampling & Methods" note already names
+    // them as belonging there. They are the first two candidates if Keith wants the drawer wider -- 13 of 15.
+    //
+    // *** TWO PAGES COLLIDED WITH UNPLACED, AND THEY RESOLVE DIFFERENTLY BECAUSE THEIR REASONS DIFFER. *** The
+    // gate refuses a page that is both deliberately unplaced and assigned -- two answers to one question -- and
+    // it was right both times. gpu-rig-check's recorded reason was "part of the nine-page render group WITH NO
+    // DRAWER": a page waiting on a drawer to exist. One exists now and it is the adapter instrument itself, so
+    // it is placed and its UNPLACED line is removed rather than left to contradict this one. The render group
+    // is EIGHT now, not nine, and the panel it is waiting for is still Keith's call -- placing the instrument
+    // does not name a render panel, and the other eight are untouched.
+    // magmap-bench goes the other way and STAYS unplaced: its reason is "OWES A DEVICE VERDICT ... needs one
+    // real-GPU run", which is an owed measurement rather than a missing drawer. Filing it here would discharge
+    // nothing and would quietly answer a question that is still open, so it keeps its line and loses its slot.
+    { id: "webgpu", tab: "webgpu", label: "WebGPU",
+      note: "the unfiled pages that call requestAdapter -- open one and the adapter either answers or it does not",
+      pages: [
+          // The three that TEST THE ADAPTER ITSELF rather than using it for a picture. gpu-rig-check is the
+          // front door: it is the page that answers "does this box have WebGPU at all", and it was unfiled.
+          "gpu-rig-check.html", "webgpu-bench.html", "tsl-rig.html",
+          // Compute: the pages where WebGPU is doing the arithmetic.
+          "fluid-webgpu.html", "fluid-webgpu-3d.html", "blobulator-gpu.html", "celltrack-viewer-gpu.html",
+          // Render: WGSL fragment work, where a wrong adapter shows as a wrong picture rather than a wrong number.
+          "blackhole.html", "wormhole.html", "wormhole-jump.html", "nebula.html", "gauges3000.html",
+          "anime4k.html",
+      ] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -521,7 +569,10 @@ export const UNPLACED = new Map([
     // orrery-gpu is the one that would tempt a subject-based filing -- PL: Cosmic & Relativity has room for
     // two. ITS MACHINERY IS THE COMPUTE PASS, NOT THE ASTRONOMY: it is in the tree to show orbits placed by
     // three dispatches, and its own title says "on the GPU". Filed by machinery, like primitive-paint.
-    ["gpu-rig-check.html", "the GPU-driven path's own instrument: which backend and route this box got, the cull/LOD/draw counts, and a readback against the offscreen twin. Part of the nine-page render group with no drawer"],
+    // v4327 -- gpu-rig-check.html LEAVES THIS LIST, into the WebGPU drawer. Its reason here was "part of the
+    // nine-page render group with no drawer", which is a page waiting on a drawer to exist; one does now, and
+    // this page is the one that answers "did this box give us an adapter at all". The render group is EIGHT
+    // now. Naming a render panel is still Keith's call and still places the other eight.
     ["orrery-gpu.html", "render/gpuOrbits.mjs -- orbital elements to instance records in a compute pass. Cosmic & Relativity has room and would be a SUBJECT filing; the machinery is gpuDriven, so it waits with the render group"],
     ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. Same render group, same missing drawer"],
 

@@ -91,7 +91,7 @@
    "f": "anime4k.html",
    "t": "Anime4K Upscaler",
    "d": "Anime4K's classic real-time upscaler, reimplemented natively in SweK: bilinear 2x then a DoG deblur (overshoot-clamped) and line-darkening. WebGPU compute on a rig, CPU reference here. Compare nearest / bilinear / Anime4K side by side; upload your own image.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -287,7 +287,7 @@
    "f": "blackhole.html",
    "t": "SweK &middot; Schwarzschild Black Hole (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -350,7 +350,7 @@
    "f": "blobulator-gpu.html",
    "t": "SweK &middot; Blobulator GPU (WebGPU raymarched SDF)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -588,7 +588,7 @@
    "f": "celltrack-viewer-gpu.html",
    "t": "Cell Volume Viewer (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1204,14 +1204,14 @@
    "f": "fluid-webgpu-3d.html",
    "t": "SweK &middot; FLIP/PIC Fluid 3D (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
    "f": "fluid-webgpu.html",
    "t": "SweK &middot; FLIP/PIC Fluid (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1295,7 +1295,7 @@
    "f": "gauges3000.html",
    "t": "Gauges 3000",
    "d": "A WebGPU glowing avatar core ringed by an LCARS gauge cluster -- animated arcs, needles, and a status ticker, with live core/memory readings where available. WebGPU for the avatar, Canvas2D for the gauges, graceful fallback everywhere.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1337,7 +1337,7 @@
    "f": "gpu-rig-check.html",
    "t": "SweK GPU rig check",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -1904,7 +1904,7 @@
    "f": "nebula.html",
    "t": "Nebula",
    "d": "A parallax volumetric nebula for the EV flight view: domain-warped colored gas, a starfield, and depth from a drifting camera -- with ships flying through it so combat happens INSIDE the cloud. WebGPU, WebGL2 fallback, Canvas2D fallback. Drag to steer the camera.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -2835,7 +2835,7 @@
    "f": "tsl-rig.html",
    "t": "- TSL on the rig",
    "d": "TSL on the rig: three's node shading language and the transplanted device pipelines run on THIS machine's GPU -- the physics keys read off pictures, badTv held to the byte, and the 448-step Lyapunov loop timed on both paths. Save the JSON as tools/ship/tsl-rig.json.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -3031,7 +3031,7 @@
    "f": "webgpu-bench.html",
    "t": "WebGPU Lab",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
@@ -3080,14 +3080,14 @@
    "f": "wormhole-jump.html",
    "t": "Wormhole Jump",
    "d": "Ellis-metric wormhole with real gravitational lensing, now showing the LIVING vorton-swirled nebula of each system -- the far one through the throat, the near one bending around it. Hit Jump to fly through. WebGPU / WebGL2 / Canvas2D, all from one verified reference.",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
    "f": "wormhole.html",
    "t": "SweK &middot; Ellis Wormhole (WebGPU)",
    "d": "",
-   "g": "",
+   "g": "webgpu",
    "p": 0
   },
   {
