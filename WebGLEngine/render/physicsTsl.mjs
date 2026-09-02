@@ -337,3 +337,84 @@ void main() {
 `;
     return { shaders: { wgsl, glsl: { vertex: shell.glsl.vertex, fragment: glsl } }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, textures: shell.textures, shell: shell.name };
 }
+
+// ---- v4328: the INK layout -- a line-list, one varying, and no uv anywhere ------------------------------------------
+/** The ink shell's uniform struct: the camera and the wash knobs (wash, gain). */
+export const INK_UNIFORMS = Object.freeze([{ name: "viewProj", type: "mat4" }, { name: "ink", type: "vec4" }]);
+/**
+ * THE THIRD SHELL, AND THE LEAN ONE: the fleets' ink look (render/fleets.mjs INK_WGSL -- the Krbn race's strokes on a
+ * LINE-LIST) has the flat layout, p and colour and nothing else. No normal, no uv, not even the hull's own x and y
+ * standing in for one: its whole fragment is `return v.color;`. A graph transplanted here may read the vertex colour
+ * and no other varying, and one that reaches for a uv is refused by name rather than handed something that is not one.
+ *
+ * It is also the first shell whose TOPOLOGY is not the default. The descriptor carries "line-list" out to the device,
+ * where a triangle-list pipeline over the same vertices would draw a different picture entirely.
+ */
+export function inkLookShell(buffers, { extraUniforms = [], displace = "" } = {}) {
+    const uniforms = [...INK_UNIFORMS.map((u) => ({ ...u })), ...extraUniforms];
+    const wgslType = { mat4: "mat4x4<f32>", vec4: "vec4<f32>", vec3: "vec3<f32>", vec2: "vec2<f32>", f32: "f32" };
+    const camStruct = `struct Cam { ${uniforms.map((u) => `${u.name}: ${wgslType[u.type]}`).join(", ")} };`;
+    const rest = LYAPUNOV_LOOK_WGSL.split("@fragment")[0];
+    const turned = rest.slice(rest.indexOf("fn turned"), rest.indexOf("struct VOut")).trim();
+    const vout = `struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32> };`;
+    const vertexTemplate = `@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>) -> VOut {
+  var o: VOut; var pl = p;
+  {{DISPLACE}}
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(pl, extra.x) * rec.w, 1.0);
+  o.color = color;
+  return o;
+}`;
+    const prefix = `${camStruct}\n@group(0) @binding(0) var<uniform> cam: Cam;\n${turned}\n${vout}\n${displace ? vertexTemplate.replace("{{DISPLACE}}", displace) : vertexTemplate}`;
+    const glslUniforms = uniforms.map((u) => `uniform ${{ mat4: "mat4", vec4: "vec4", vec3: "vec3", vec2: "vec2", f32: "float" }[u.type]} ${u.name};`).join(" ");
+    const glslTemplate = `#version 300 es
+precision highp float;
+${glslUniforms}
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra;
+out vec4 vColor;
+vec3 turned(vec3 q, float yaw) { float ca = cos(yaw), sa = sin(yaw); return vec3(q.x * ca - q.y * sa, q.x * sa + q.y * ca, q.z); }
+void main() { vec3 pl = p;
+  {{DISPLACE}}
+  gl_Position = viewProj * vec4(rec.xyz + turned(pl, extra.x) * rec.w, 1.0); vColor = color; }
+`;
+    const locals = { positionLocal: "pl", position: "p" };   // a line has no normal to move along either
+    return { name: "ink", uniforms, buffers, topology: "line-list", textures: [],
+             wgsl: { prefix, vertexTemplate, uniformVar: "cam", varyingParam: "v", varyings: { color: "v.color" }, locals },
+             glsl: { vertex: glslTemplate.replace("{{DISPLACE}}", displace), vertexTemplate: glslTemplate, fragmentPrefix: `#version 300 es\nprecision highp float;\n${glslUniforms}\nin vec4 vColor; out vec4 fragColor;`, varyings: { color: "vColor" }, locals } };
+}
+/**
+ * THE INK WASH as a TSL graph: the stroke's own colour washed toward its luminance by `wash` and lifted by `gain`.
+ * It is a function of the vertex colour and nothing else, because that is all the layout carries -- which is the
+ * point of grading it: a graph with one varying to read still crosses, and three emits exactly one varying for it.
+ */
+export function makeInkTsl(THREE, TSL, { wash = 0.5, gain = 1.6 } = {}) {
+    const { Fn, vec3, vec4, uniform, vertexColor, mix, dot } = TSL;
+    const uniforms = { ink: uniform(vec4(wash, gain, 0, 0)).label("ink") };
+    const material = new THREE.NodeMaterial();
+    material.fragmentNode = Fn(() => {
+        const c = vertexColor();
+        const lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+        return vec4(mix(c.rgb, vec3(lum), uniforms.ink.x).mul(uniforms.ink.y), c.a);
+    })();
+    // a mesh carrying ONLY a colour: no uv read, no normal read, so three emits one varying and no more
+    const geo = new THREE.PlaneGeometry(2, 2); geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array([0.9, 0.4, 0.2, 1, 0.2, 0.8, 0.5, 1, 0.3, 0.3, 0.9, 1, 1, 1, 1, 1]), 4));
+    const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    scene.add(new THREE.Mesh(geo, material));
+    return { material, scene, camera, uniforms, knobs: [wash, gain, 0, 0] };
+}
+/** The HAND-WRITTEN twin of makeInkTsl in that shell, both languages -- every grouping the graph's own. */
+export function inkHand(buffers, opts = {}) {
+    const shell = inkLookShell(buffers, opts);
+    const wgsl = `${shell.wgsl.prefix.replace("{{DISPLACE}}", opts.displace || "")}
+@fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
+  let lum = dot(v.color.rgb, vec3<f32>(0.299, 0.587, 0.114));
+  return vec4<f32>(mix(v.color.rgb, vec3<f32>(lum), cam.ink.x) * cam.ink.y, v.color.a);
+}
+`;
+    const glsl = `${shell.glsl.fragmentPrefix}
+void main() {
+  float lum = dot(vColor.rgb, vec3(0.299, 0.587, 0.114));
+  fragColor = vec4(mix(vColor.rgb, vec3(lum), ink.x) * ink.y, vColor.a);
+}
+`;
+    return { shaders: { wgsl, glsl: { vertex: shell.glsl.vertex, fragment: glsl } }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, topology: shell.topology, shell: shell.name };
+}

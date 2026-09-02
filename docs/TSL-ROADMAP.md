@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -77,7 +77,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    the TEXTURE, not the graph -- Linear gives textureSample, Nearest gives textureLoad and leaves the sampler
    unused, so makeSpriteSampledTsl refuses a Nearest texture. And the refusal is WGSL-side only: GLSL's sampler2D
    carries its own sampler, so a sampled graph into a sampler-less shell just works on WebGL2. orrery-gpu.html
-   ?tsl=1&soft=1 draws the Glyph race sampled instead of fetched. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   ?tsl=1&soft=1 draws the Glyph race sampled instead of fetched.
+   v4328 -- THE INK LAYOUT, the last one the fleets have. physicsTsl inkLookShell is the Krbn race's strokes on a
+   LINE-LIST: the flat layout (p, colour), no normal and no uv at all, and the first shell whose topology is not
+   the default -- the descriptor carries "line-list" out to the device. makeInkTsl reads the vertex colour and
+   nothing else, three emits exactly one varying for it, and a graph reaching for a uv is refused by name.
+   Section 8: the Krbn strokes painted by the generated pipeline are a hand-written twin's picture on 36,864 of
+   36,864 pixels on both backends. Two limits found and written down: a mistake in the SHELL moves both halves of
+   a twin comparison, so the byte claim is blind to a lost topology and only the named assertion catches it; and
+   the two backends do not rasterise a line the same (467 pixels washed under WebGPU, 415 under WebGL2), so a
+   line-list claim is per-backend by nature. orrery-gpu.html?tsl=1 now paints FOUR races from graphs.
+   With this the three fleet layouts -- lit, sprite, flat -- have all been crossed into. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).
