@@ -1,6 +1,8 @@
 // FILE: render/aquarelleModel.mjs -- v4177
 //
 // CPU reference for render/aquarellePass.js, ported from Ramotion/aquarelle (MIT (c) 2016 Ramotion).
+// *** NOT crtModel.js's MASK. *** (v4302, #144.) The mask here is aquarelle's dissolve texture; crtModel.js's
+// mask() is the aperture grille. Same word, unrelated things -- see the paragraph in render/aquarellePass.js.
 //
 // What the effect is: one image dissolves into another along a MASK, and the mask's edge is warped by two
 // octaves of simplex noise so it creeps and feathers like ink through paper instead of cross-fading. Three

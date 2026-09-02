@@ -2171,6 +2171,10 @@ A password fetches a token from the list server; an unregistered callsign needs 
              dialog by itself -- that needs a gesture the boot does not have -- so the engine flies a rising
              sweep immediately and puts a chooser on screen; the SECOND click is the one that picks the song. -->
         <button id="bSongTerrain" class="go-link" title="An audio file as walkable terrain: rows are time, columns are frequency, height is loudness, silence is water. An engine DEEP-LINK (?song=1) -- it flies a rising sweep at once and shows a chooser for a song on this machine.">&#127925; Song Terrain</button>
+        <!-- v4302 -- Keith: "could we wrap an audio file terrain into a globe?" The same field, wrapped: time round
+             the equator, frequency pole to pole, loudness as radius. A real page this time (song-globe.html), so a
+             plain button and not a go-link. -->
+        <button id="bSongGlobe" title="An audio file wrapped onto a globe: time goes round it, bass at the south pole and treble at the north, loudness is height, silence is sea. A pure tone is a ring, a rising sweep is a spiral. Opens song-globe.html with a chooser for a song on this machine.">&#127757; Song Globe</button>
         <!-- v3552 -- ONE INDEX, THREE KINDS. These were three pills listing three DIFFERENT KINDS of thing and
              calling them all demos: 56 demos_code scripts (?go= deep-links), 58 inline DEMO_MODES (engine
              states), and 15 real .html apps. THIRTEEN OF THOSE FIFTEEN APPS WERE IN NO PANEL AT ALL -- reachable
@@ -3261,6 +3265,8 @@ A password fetches a token from the list server; an unregistered callsign needs 
       if (_rt) _rt.onclick = function () { location.href = "/index.html?terrain=1"; };
       var _st = document.getElementById("bSongTerrain");
       if (_st) _st.onclick = function () { location.href = "/index.html?song=1"; };
+      var _sg = document.getElementById("bSongGlobe");
+      if (_sg) _sg.onclick = function () { window.open("/song-globe.html", "_blank", "noopener"); };
     } catch (e) {}
     var pfDemo = { pfResumeFx:"resume_fx" };
     Object.keys(pfDemo).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open("/index.html?forceEngine=1&go=" + pfDemo[id], "_blank"); }; });

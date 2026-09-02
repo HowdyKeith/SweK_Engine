@@ -6,6 +6,13 @@
 // A mask-driven dissolve: one image gives way to another along a mask whose edge is warped by two octaves of
 // simplex noise, so it creeps and feathers like ink through paper rather than cross-fading.
 //
+// *** "MASK" HERE IS THE DISSOLVE MASK -- NOT render/crtModel.js's APERTURE GRILLE. *** (v4302, #144.) The mask
+// in this file is a TEXTURE: its ALPHA, sampled at a noise-warped position, decides where the source image
+// has given way to the target. crtModel.js's mask(), maskPitch and maskDepth are the PHOSPHOR GRILLE, a
+// stripe pattern that tints every pixel, and share nothing with this but the word. Anyone grepping "mask"
+// under render/ lands on both; this paragraph and its twin in crtModel.js are where the grep should stop.
+// A per-region strength for either effect is render/strengthField.mjs, deliberately not a third "mask".
+//
 // ---- *** WHAT HAD TO CHANGE, AND IT IS FOUR THINGS, NOT ONE. *** ------------------------------------------
 // The original is nine years old and every one of these is dead API rather than a matter of taste. This tree
 // has done exactly this job once before -- physics/fire/fireMesh.js ports mattatz/THREE.Fire and its header

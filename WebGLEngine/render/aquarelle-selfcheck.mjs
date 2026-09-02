@@ -124,4 +124,17 @@ console.log("unchecked here: the pass RENDERING. That needs a GL context and a G
             "is that the maths matches the original digit for digit, that the shader is generated from the same\n" +
             "constants the CPU model exports so the two cannot drift, and that all four dead three.js APIs are\n" +
             "gone -- including the two that would have failed silently.");
+// ---- v4302 (#144): THE NAMING TRAP, asserted from this side too -------------------------------------------
+// This file's "mask" is a dissolve texture; render/crtModel.js's mask() is the aperture grille. The paragraph
+// that says so lives in both headers and each names the other, so the grep stops at the disambiguation.
+{
+    const pass = src("./aquarellePass.js"), model = src("./aquarelleModel.mjs"), crt = src("./crtModel.js");
+    ok(/DISSOLVE MASK/.test(pass) && /crtModel\.js/.test(pass) && /APERTURE GRILLE/.test(pass),
+       "aquarellePass.js names crtModel.js's aperture grille as the OTHER mask");
+    ok(/crtModel\.js/.test(model) && /aperture grille/i.test(model),
+       "aquarelleModel.mjs says the same in two lines");
+    ok(/APERTURE GRILLE/.test(crt) && /aquarellePass\.js/.test(crt),
+       "and crtModel.js points back here");
+}
+console.log(fail ? "\n" + fail + " FAILED" : "\nnaming trap (#144): both headers disambiguate and name each other");
 process.exit(fail ? 1 : 0);

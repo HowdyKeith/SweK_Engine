@@ -22,6 +22,14 @@
 // claim rather than a look: the scanline period is countable, the barrel displacement is a distance, the
 // phosphor pitch is a pixel count.
 //
+// *** "MASK" HERE IS THE APERTURE GRILLE -- NOT render/aquarellePass.js's DISSOLVE MASK. *** (v4302, #144.) Two
+// unrelated meanings of one word in adjacent files. mask(), maskPitch and maskDepth below are the PHOSPHOR
+// pattern: vertical R,G,B stripes that TINT every pixel, a pitch in output pixels and a depth in 0..1.
+// Aquarelle's mask is a TEXTURE whose ALPHA decides where one image has given way to another. A phosphor
+// pitch read as a per-region strength, or the reverse, is the confusing bug this paragraph exists to
+// prevent; the per-region strength this pass DOES take is render/strengthField.mjs, and it is called a
+// FIELD so that a third meaning is never added to "mask".
+//
 // *** SAMPLING IS NEAREST, DELIBERATELY, AND THAT IS WHAT MAKES THE TWO COMPARABLE. *** With bilinear
 // filtering the GPU interpolates in hardware at a precision this file cannot reproduce exactly, and the
 // comparison would become "close enough" -- which is the kind of tolerance a real disagreement hides inside.
