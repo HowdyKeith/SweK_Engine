@@ -247,7 +247,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * (`compute() needs { wgsl } -- a compute pipeline is WGSL-only`), and the pair contract every other transplant in
  * this file is held to does not apply here because the pair does not exist.
  */
-export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
+export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformArrays = [], uniformVar = "u", workgroupSize = 64 } = {}) {
     // v4363 -- the STRUCT element. An entry may give `struct: { name, fields: [{ name, type, atomic }] }` instead of an
     // element, and the shell declares that struct itself. Two rules, both refusals rather than compiler errors:
     // the atomic belongs to a FIELD (array<Cmd> is not an atomic buffer, one of Cmd's members is), and two entries
@@ -269,8 +269,12 @@ export function computeShell({ name = "compute", storage = [{ name: "out", eleme
         ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${elementOf(b)}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
         ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
     ];
+    // v4364 -- a UNIFORM whose element is a FIXED-SIZE ARRAY, which is what struct Cull's `planes: array<vec4<f32>, 6>`
+    // is and what a storage buffer stood in for until now. three emits a TSL uniformArray() as its own uniform BINDING
+    // rather than as a member of the scalar struct, so the shell declares it as one too -- a second uniform, not a field.
+    const arrayDecls = uniformArrays.map((a, i) => `struct ${a.name}Buf { value: array<${a.element || "vec4<f32>"}, ${a.length}> };\n@group(0) @binding(${storage.length + (uniforms.length ? 1 : 0) + i}) var<uniform> ${a.name}: ${a.name}Buf;`);
     const sharedDecls = shared.map((w) => `var<workgroup> ${w.name}: array<${w.element || "u32"}, ${w.length}>;`);
-    return { name, storage, shared, uniforms, uniformVar, workgroupSize, structs: structDecls, prefix: [...sharedDecls, ...structDecls, ...decls].join("\n") };
+    return { name, storage, shared, uniforms, uniformArrays, uniformVar, workgroupSize, structs: structDecls, prefix: [...sharedDecls, ...structDecls, ...decls, ...arrayDecls].join("\n") };
 }
 
 /**
@@ -364,6 +368,21 @@ export function transplantCompute(wgsl, shell) {
         const same = got.length === wantF.length && got.every((f, i) => f.name === wantF[i].name && f.type === wantF[i].type && f.atomic === wantF[i].atomic);
         if (!same) throw new Error(`tslSource: struct ${b.struct.name} is { ${spell(got)} } in the graph and { ${spell(wantF)} } in the shell "${shell.name}" -- one name, two layouts`);
     }
+    // v4364 -- the uniform ARRAYS three declared, each its own binding: `struct nameBuf { value : array< T, N > }`.
+    // Refused by name when the shell does not carry it, when the element or the length differ, or when the graph left
+    // it unlabelled -- a uniform nothing can bind by name is a buffer the device will ask for and never be handed.
+    const uaFound = wgsl.split("var<uniform>").slice(1).map((t) => t.split(":")[0].trim()).filter((n) => n !== "object");
+    const wantUA = shell.uniformArrays || [];
+    if (uaFound.length !== wantUA.length) throw new Error(`tslSource: the graph declares ${uaFound.length} uniform array(s) (${uaFound.join(", ") || "none"}) and the shell "${shell.name}" declares ${wantUA.length} (${wantUA.map((a) => a.name).join(", ") || "none"})`);
+    for (const n of uaFound) {
+        if (/^(NodeBuffer_|nodeUniform)/.test(n)) throw new Error(`tslSource: the graph carries an UNLABELLED uniform array (${n}); label it (uniformArray(v, "vec4").label("planes")) so the device can bind it by name`);
+        const want = wantUA.find((a) => a.name === n);
+        if (!want) throw new Error(`tslSource: the graph's uniform array "${n}" is not in the shell "${shell.name}" (${wantUA.map((a) => a.name).join(", ") || "none"})`);
+        const decl = new RegExp(`struct\\s+${n}Struct\\s*\\{\\s*value\\s*:\\s*array<\\s*([^,]+?)\\s*,\\s*(\\d+)\\s*>`).exec(wgsl);
+        if (!decl) throw new Error(`tslSource: the graph's uniform "${n}" is not a fixed-size array, and the shell "${shell.name}" declares it one`);
+        if (decl[1].replace(/\s+/g, "") !== String(want.element || "vec4<f32>").replace(/\s+/g, "") || Number(decl[2]) !== Number(want.length))
+            throw new Error(`tslSource: the graph's "${n}" is array<${decl[1]}, ${decl[2]}> and the shell "${shell.name}" says array<${want.element || "vec4<f32>"}, ${want.length}>`);
+    }
     const uniforms = uniformFields(wgsl, "wgsl");
     for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the compute pass's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ") || "none"})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the pass and ${h.type} in the shell`); }
     // v4338 -- the workgroup-scoped arrays. three declares them above its entry, in a "// locals" section this
@@ -382,5 +401,5 @@ export function transplantCompute(wgsl, shell) {
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\nvar<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
-    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, workgroupSize: shell.workgroupSize, shell: shell.name };
+    return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
 }

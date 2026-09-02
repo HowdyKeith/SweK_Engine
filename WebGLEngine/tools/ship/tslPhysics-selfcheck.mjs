@@ -134,6 +134,16 @@
 //      culled ones. frustumPlanes() returns 24 FLOATS, not six vec4 arrays, so `planeF.set(planes[p], p * 4)` filled the
 //      plane buffer with nothing. The graph was right; the harness feeding it was wrong, and the shape of the disagreement
 //      (only the frustum-dependent verdicts) is what named it.
+//   MEASURED at v4364 (the fleets variant, and the frustum in a uniform):
+//   AJ the fleet index taken as given instead of clamped to the fleet count -> exit=1, 2 red: the 110 instances asking for
+//      fleet 7 against a count of 2 aim at region 21 and up, which is off the end of a six-region buffer, and the device
+//      folds those atomicAdds into the last region -- 129 becomes 193 and the total is still 552, so the ONLY thing that
+//      says anything went wrong is the comparison with the shipped pass. A clamp is not defensive here; it is the answer.
+//   AK the uniform array's element-and-length agreement not checked -> exit=1, 1 red: a shell declaring array<vec4<f32>, 5>
+//      for a graph that reads six stops being refused, and what it costs is a uniform buffer read past its own end.
+//   AL the uniform array left out of the shell's prefix -> exit=1, 1 red, and gfx/device.js is what says so: "the shader
+//      declares no storage or uniform binding named planes". The module names it, nothing declares it, and the refusal
+//      arrives by name from the device rather than from a WGSL compiler diagnostic.
 //   MEASURED at v4363 (the struct element, and the whole pass):
 //   AE the struct-layout agreement dropped, so the shell's struct is taken on trust rather than held to the graph's ->
 //      exit=1, 1 red: a field renamed in the shell stops being refused, and what it would then cost is not a compile error
@@ -166,6 +176,25 @@
 // with nothing else to tell them apart. A TSL storage node that is .label()ed is emitted under that name, so the graph
 // names its buffers and the transplant maps by name, with the roles still checked. Measured, not argued: the same module
 // with its labels stripped draws NOTHING -- 0/0/0 against 96/246/210 -- because the frustum test is reading the extras.
+// v4364 -- AND THE FLEETS VARIANT, WITH THE FRUSTUM IN A UNIFORM (section 11). cullLodWgsl({ fleets: true }) is the
+// configuration the orrery actually runs: a per-instance fleet index in its own array<u32>, clamped to the fleet count
+// the uniforms carry, and a region that is fleet * lodCount + lod rather than lod alone. Generated and held to the
+// shipped text over two fleets and three LODs: the same instance count in every one of the six regions
+// (38/103/81/58/143/129) and all 552 records identical to the float. The 110 instances that ask for fleet 7 against a
+// count of 2 land in fleet 1 in both passes -- and THAT is only visible in the records: with the clamp dropped the six
+// counts still summed to 552 because the device folded the out-of-range increments into the last region.
+//
+// AND ONE FINDING FROM THE BUILD, WHICH IS THE SAME LESSON TWICE: the first run agreed on all six per-region COUNTS and
+// differed on 330 of 552 RECORDS, because the graph wrote a constant 0 into the record's fleet field where the shipped
+// pass writes the clamped fleet. Counts are a weaker claim than records, and this round has now been saved by the
+// stronger one twice in a row.
+//
+// computeShell also gained `uniformArrays`: a uniform whose element is a FIXED-SIZE array, which is the type struct
+// Cull gives its six planes and what a storage buffer stood in for. three emits a TSL uniformArray as its own uniform
+// BINDING rather than as a member of the scalar struct, so struct Cull is still two bindings here and that is said
+// rather than glossed -- but it is the same 40 floats: packCullUniforms lays the planes out first and the four vec4s
+// after, so the gate slices ONE packing to drive both passes instead of packing a second copy. The graph is unmoved by
+// the change: the two transplants' bodies are the same text, because planes.element(i) is one node either way.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -210,7 +239,7 @@ const k = keyCpu(PARAMS.first);
         !WGSL_TELL.test(src) && !GLSL_TELL.test(src) && WGSL_TELL.test(fleetSrc) && GLSL_TELL.test(fleetSrc),
         `physics wgsl ${WGSL_TELL.test(src)} glsl ${GLSL_TELL.test(src)}; fleet wgsl ${WGSL_TELL.test(fleetSrc)} glsl ${GLSL_TELL.test(fleetSrc)}`);
     ok("  ...and it exports no shell and no look, which is the same statement said in names", !/export function \w*(Shell|Look\w*Tsl)\b/.test(src) && /export function \w+Shell\b/.test(fleetSrc));
-    ok("  the uniforms AND the storage buffers are labelled (render/tslSource.mjs binds by the label): the two keys' ten, the compute sweep's span, the cull decision's two, and the cull PASS's four uniforms and five named buffers here; the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 22 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys, the sweep's span, the decision's eye and thresholds, the pass's eye/thresholds/info/clock and inst/planes/extras/cmds/records), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
+    ok("  the uniforms AND the storage buffers are labelled (render/tslSource.mjs binds by the label): the two keys' ten, the compute sweep's span, the cull decision's two, and the cull PASS's four uniforms and five named buffers here; the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 24 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys, the sweep's span, the decision's eye and thresholds, the pass's eye/thresholds/info/clock and inst/extras/cmds/records/fleetOf with planes labelled on BOTH of its two bindings), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
 }
 
 const skip = webgpuSkipReason();
@@ -859,11 +888,114 @@ else {
             /atomicAdd\(\s*&cmds\.value\[[^\]]*\]\.instanceCount/.test(F.gen) && (F.gen.match(/struct Cmd \{/g) || []).length === 1 &&
             !/NodeBuffer_|object\./.test(F.gen) && validateWgsl(F.gen).length === 0,
             `${validateWgsl(F.gen).join("; ") || "validates"}`);
-        report("STILL HAND-WRITTEN, AND NOW IT IS THE VARIANTS RATHER THAN THE PASS: cullLodWgsl({ occlusion: true }) reads a depth " +
-            "pyramid through a pointer argument (hizOccluded takes ptr<storage, array<f32>, read>) that no graph here has emitted, and " +
-            "{ fleets: true } adds a per-instance fleet buffer and a region that is fleet * lodCount + lod. The BASE pass -- the one " +
-            "Levels 11-14 shipped -- is generated end to end. Also still shell-side: struct Cull's `array<vec4<f32>, 6>` planes field, " +
-            "which is why the six planes arrive here in a storage buffer instead.");
+        report("THIS SECTION KEEPS THE FRUSTUM IN A STORAGE BUFFER ON PURPOSE, and v4364 did not change it: the crossing measured just " +
+            "above is only visible in a shell whose declaration order differs from three's emission order, and moving the planes into a " +
+            "uniform (section 11, where struct Cull's own `array<vec4<f32>, 6>` type is used) makes the two orders agree and the hazard " +
+            "invisible. A configuration that still demonstrates a live failure mode is worth keeping beside the tidier one. The fleets " +
+            "variant and the uniform frustum are section 11; { occlusion: true } is the one variant left.");
+    }
+}
+
+console.log("\n11. THE FLEETS VARIANT, AND THE FRUSTUM IN A UNIFORM (v4364): the configuration the orrery actually runs");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const N = 768, LODS = 3, FLEETS = 2, CAP = 512, REG = LODS * FLEETS;
+    const r8 = await runInEngineOrigin({ engineRoot: ENG, args: { N, LODS, FLEETS, CAP, REG }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const opts = { count: a.N, lodCount: a.LODS, regions: a.REG, cap: a.CAP, fleets: true };
+        const gU = P.makeCullPassTsl(T, Object.assign({ planesUniform: true }, opts));
+        const gS = P.makeCullPassTsl(T, Object.assign({ planesUniform: false }, opts));
+        await renderer.computeAsync(gU.node); await renderer.computeAsync(gS.node);
+        const emitted = renderer._nodes.getForCompute(gU.node).computeShader;
+        const emittedS = renderer._nodes.getForCompute(gS.node).computeShader;
+        const CMDS = { name: "cmds", struct: P.CMD_STRUCT }, RECS = { name: "records", element: "vec4<f32>" };
+        const RD = (n) => ({ name: n, element: "vec4<f32>", access: "read" });
+        const UNI = [{ name: "eye", type: "vec4" }, { name: "thresholds", type: "vec4" }, { name: "info", type: "vec4" }, { name: "clock", type: "vec4" }];
+        const mkShell = (over) => S.computeShell(Object.assign({ name: "cull pass (fleets)", workgroupSize: G.CULL_WORKGROUP,
+            storage: [RD("inst"), RD("extras"), { name: "fleetOf", element: "u32", access: "read" }, CMDS, RECS],
+            uniforms: UNI, uniformArrays: [{ name: "planes", element: "vec4<f32>", length: 6 }] }, over || {}));
+        const refuse = (fn) => { try { fn(); return null; } catch (e) { return String(e.message).slice(0, 400); } };
+        try {
+            const shell = mkShell();
+            const gen = S.transplantCompute(emitted, shell);
+            out.gen = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes; out.ua = gen.uniformArrays;
+            out.uaDecl = (gen.wgsl.split("struct planesBuf {")[1] || "").split("}")[0].trim();
+            // the SAME graph with the frustum in a storage buffer instead, to see whether the body moved
+            const shellS = S.computeShell({ name: "cull pass (fleets, storage planes)", workgroupSize: G.CULL_WORKGROUP,
+                storage: [RD("inst"), RD("planes"), RD("extras"), { name: "fleetOf", element: "u32", access: "read" }, CMDS, RECS], uniforms: UNI });
+            const genS = S.transplantCompute(emittedS, shellS);
+            const body = (w) => w.slice(w.indexOf("fn main("));
+            out.sameBody = body(gen.wgsl) === body(genS.wgsl);
+            out.refusals = {
+                noArray: refuse(() => S.transplantCompute(emitted, S.computeShell({ name: "cull pass (fleets)", workgroupSize: G.CULL_WORKGROUP,
+                    storage: [RD("inst"), RD("extras"), { name: "fleetOf", element: "u32", access: "read" }, CMDS, RECS], uniforms: UNI }))),
+                wrongLength: refuse(() => S.transplantCompute(emitted, mkShell({ uniformArrays: [{ name: "planes", element: "vec4<f32>", length: 5 }] }))),
+                unlabelled: refuse(() => S.transplantCompute(emitted.split("planes").join("NodeBuffer_907"), mkShell())),
+            };
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32;
+            const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const viewProj = G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 6], [0, 0, 0]));
+            const planes = G.frustumPlanes(viewProj), eye = [0, 0, 6], thresholds = [0.04, 0.025];
+            const insts = new Float32Array(a.N * 4), extras = new Float32Array(a.N * 4), fleetOf = new Uint32Array(a.N);
+            // every fifth instance asks for fleet 7 against a fleet count of 2, which the pass must CLAMP rather than trust
+            for (let i = 0; i < a.N; i++) { insts.set(G.probeInstance(i), i * 4); extras.set([0.5, 0.25, i % 7, 0.125], i * 4); fleetOf[i] = (i % 5 === 0) ? 7 : (i % a.FLEETS); }
+            // ONE packing, the SHIPPED one: floats 0..24 are struct Cull's planes and 24..40 its four vec4s, so the
+            // generated pass is driven by the same bytes the shipped pass reads rather than by a second copy of them.
+            const packed = G.packCullUniforms({ planes, eye, thresholds, count: a.N, lodCount: a.LODS, cap: a.CAP, fleetCount: a.FLEETS });
+            out.packedLen = packed.length;
+            const instBuf = dev.buffer({ data: insts, usage: ["storage"] }), exBuf = dev.buffer({ data: extras, usage: ["storage"] });
+            const fBuf = dev.buffer({ data: fleetOf, usage: ["storage"] });
+            const gCmds = dev.buffer({ data: new Uint32Array(a.REG * 5), usage: ["storage"] }), hCmds = dev.buffer({ data: new Uint32Array(a.REG * 5), usage: ["storage"] });
+            const gRec = dev.buffer({ usage: ["storage"], size: a.REG * a.CAP * 3 * 16 }), hRec = dev.buffer({ usage: ["storage"], size: a.REG * a.CAP * 3 * 16 });
+            const gPl = dev.buffer({ data: packed.slice(0, 24), usage: "uniform" }), gUni = dev.buffer({ data: packed.slice(24, 40), usage: "uniform" });
+            const hU = dev.buffer({ data: packed, usage: "uniform" });
+            const pG = dev.compute({ wgsl: gen.wgsl }); pG.bind("inst", instBuf).bind("extras", exBuf).bind("fleetOf", fBuf).bind("cmds", gCmds).bind("records", gRec).bind("u", gUni).bind("planes", gPl);
+            const pH = dev.compute({ wgsl: G.cullLodWgsl({ fleets: true }) }); pH.bind("inst", instBuf).bind("extras", exBuf).bind("fleetOf", fBuf).bind("cmds", hCmds).bind("records", hRec).bind("cull", hU);
+            const groups = Math.ceil(a.N / G.CULL_WORKGROUP);
+            dev.frame(({ pass }) => { pass.dispatch(pG, groups); pass.dispatch(pH, groups); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+            out.gCmds = [...new Uint32Array(await dev.read(gCmds))]; out.hCmds = [...new Uint32Array(await dev.read(hCmds))];
+            out.gRec = [...new Float32Array(await dev.read(gRec))]; out.hRec = [...new Float32Array(await dev.read(hRec))];
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran the fleets configuration on both passes", r8.ok && r8.result && !r8.result.error && r8.result.gCmds, r8.ok ? (r8.result && r8.result.error) : (r8.reason || (r8.pageErrors || []).join("; ")));
+    if (r8.ok && r8.result && !r8.result.error) {
+        const F = r8.result;
+        const counts = (c) => [...Array(REG)].map((_, i) => c[i * 5 + 1]);
+        const rows = (rec, c) => { const out = [];
+            for (let q = 0; q < REG; q++) for (let sl = 0; sl < c[q]; sl++) { const b = ((q * CAP) + sl) * 12; out.push(rec.slice(b, b + 12)); }
+            return out.sort((x, y) => x[4] - y[4]); };
+        const g = counts(F.gCmds), h = counts(F.hCmds), G2 = rows(F.gRec, g), H2 = rows(F.hRec, h);
+        let bad = 0; for (let i = 0; i < Math.max(G2.length, H2.length); i++) { const a2 = G2[i] || [], b2 = H2[i] || [];
+            if (a2.length !== b2.length || a2.some((v, j) => v !== b2[j])) bad++; }
+        ok(`*** the FLEETS configuration -- the one the orrery runs -- generated: the same instance count in every one of the ${REG} regions (${g.join("/")}), all ${G2.length} records identical to the float, and BOTH passes driven by ONE packCullUniforms output ***`,
+            g.join() === h.join() && bad === 0 && G2.length === H2.length && G2.length > 0 && F.packedLen === 40 && (F.errs || []).length === 0,
+            `counts gen ${g.join("/")} vs hand ${h.join("/")}, ${G2.length} records each, ${bad} differing; the shipped packer's 40 floats sliced 0..24 to the planes uniform and 24..40 to the scalar struct; device errors ${(F.errs || []).length}`);
+        const odd = G2.filter((r2) => r2[4] % 5 === 0), even = G2.filter((r2) => r2[4] % 5 !== 0);
+        ok(`  and the fleet index is CLAMPED rather than trusted: ${odd.length} records asked for fleet 7 against a fleet count of ${FLEETS} and all of them landed in fleet ${FLEETS - 1}, in both passes`,
+            odd.length > 0 && odd.every((r2) => r2[7] === FLEETS - 1) && even.every((r2) => r2[7] === r2[4] % FLEETS) && G2.every((r2, i) => r2[7] === H2[i][7]),
+            `${odd.length} clamped, ${even.length} taken as given; the record's own fleet field, which is where a wrong one shows -- the six per-region COUNTS agree either way`);
+        ok(`*** the frustum moved out of a storage buffer and into a UNIFORM whose element is array<vec4<f32>, 6> -- the type struct Cull gives it -- and the GRAPH did not change: the two transplants' bodies are the same text ***`,
+            F.sameBody === true && F.ua && F.ua.join() === "planes" && /value:\s*array<vec4<f32>,\s*6>/.test(F.uaDecl || "") && F.reads.join() === "inst,extras,fleetOf",
+            `shell declares ${F.uaDecl}; bodies identical ${F.sameBody}. Where the frustum lives is the SHELL's business -- planes.element(i) is one node either way`);
+        const R8 = F.refusals || {};
+        ok("REFUSED by name: a uniform array the shell does not declare, one whose length disagrees, and one the graph left unlabelled",
+            /declares 1 uniform array\(s\).*and the shell .* declares 0/.test(R8.noArray || "") && /array<vec4<f32>, 6> and the shell .* says array<vec4<f32>, 5>/.test(R8.wrongLength || "") && /UNLABELLED uniform array/.test(R8.unlabelled || ""),
+            `${(R8.noArray || "NOT REFUSED").slice(0, 80)} | ${(R8.wrongLength || "NOT REFUSED").slice(0, 80)} | ${(R8.unlabelled || "NOT REFUSED").slice(0, 80)}`);
+        ok("the generated module validates and carries none of three's names",
+            !/NodeBuffer_|object\./.test(F.gen) && validateWgsl(F.gen).length === 0 && /var<uniform> planes: planesBuf;/.test(F.gen),
+            `${validateWgsl(F.gen).join("; ") || "validates"}`);
+        report("WHAT IS LEFT OF cullLodWgsl IS ONE VARIANT: { occlusion: true }. It is NOT blocked by the pointer argument this file " +
+            "and the roadmap have both called a blocker -- hizOccluded takes ptr<storage, array<f32>, read> because the HAND-WRITTEN " +
+            "side factored the test into a function, and a graph inlines it and reads the buffer directly. What it does need is a mat4x4 " +
+            "uniform (the view and projection separately), two while-loops whose bounds are computed, and a nested tile loop -- none of " +
+            "which any graph here has emitted. Saying it is a pointer problem was wrong, and it is corrected here rather than repeated.");
     }
 }
 
@@ -874,10 +1006,12 @@ else {
 //   B  the Heidler shape with (t/t1) for (t/t1)^2 -> exit=1, 5 red: the source line, and on every path and backend the peak
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the OCCLUSION and FLEET variants of cullLodWgsl -- the base pass is generated end to end at v4363, and hizOccluded " +
-    "reads a depth pyramid through a ptr<storage, array<f32>, read> argument no graph here has emitted, while { fleets: true } adds a per-instance " +
-    "fleet buffer and a two-dimensional region index; struct Cull's `array<vec4<f32>, 6>` planes field, a fixed-size array in a UNIFORM struct, which " +
-    "is why the six planes arrive in a storage buffer instead; whether the record SLOTS a survivor lands in are the same in both passes, which they are " +
-    "not and cannot be -- an atomicAdd hands them out in whatever order the lanes arrive, so the claim is over the sorted set and the per-region counts, " +
-    "and it says so; the Lyapunov Loop's cost through three, timed by nobody; and a real GPU's log() and exp() against SwiftShader's.");
+console.log("unchecked here: cullLodWgsl({ occlusion: true }), the ONE variant left -- and NOT because of the pointer argument this file called a " +
+    "blocker for two rounds: hizOccluded takes ptr<storage, array<f32>, read> because the hand-written side factored the test into a function, and a " +
+    "graph inlines it and reads the buffer. What it actually needs is a mat4x4 uniform, two while-loops whose bounds are computed, and a nested tile " +
+    "loop, none of which any graph here has emitted; whether struct Cull can be ONE binding for the generated pass, which it cannot while three emits a " +
+    "uniformArray as its own uniform rather than as a struct member -- the bytes are the same 40 floats, the bindings are two; whether the record SLOTS " +
+    "a survivor lands in are the same in both passes, which they are not and cannot be -- an atomicAdd hands them out in whatever order the lanes " +
+    "arrive, so the claim is over the sorted set and the per-region counts, and it says so; the Lyapunov Loop's cost through three, timed by nobody; " +
+    "and a real GPU's log() and exp() against SwiftShader's.");
 process.exit(fails ? 1 : 0);

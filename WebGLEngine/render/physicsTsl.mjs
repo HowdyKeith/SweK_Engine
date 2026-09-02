@@ -274,9 +274,21 @@ export function makeCullLodTsl(TSL, { count, lodCount = 3 } = {}) {
  *
  * `cap` is the per-region slot budget: a survivor whose slot lands past it still counts (the command is what tells
  * the CPU how many there were) and writes no record, exactly as the shipped pass does.
+ *
+ * v4364 -- `fleets` is cullLodWgsl({ fleets: true }): a per-instance fleet index in its own array<u32>, clamped to the
+ * fleet count the uniforms carry, and a region that is fleet * lodCount + lod rather than lod alone. It is the
+ * configuration the orrery actually runs, and the only one where the region index is two-dimensional.
+ *
+ * v4364 -- `planesUniform` puts the six planes in a UNIFORM whose element is a fixed-size array, which is the type
+ * struct Cull gives them, instead of the storage buffer that stood in for it. Not the same BINDING -- three emits a TSL
+ * uniformArray as its own uniform rather than as a member of the scalar struct, so struct Cull is still two bindings
+ * here. But it is the same 40 floats: render/gpuDriven.mjs packCullUniforms lays the planes out first and the four
+ * vec4s after, so a caller slices its output rather than packing a second copy for the graph to read. The NODE that
+ * reads them is the same either way -- planes.element(i) -- so where the frustum lives is the shell's business and not
+ * the graph's, which is the whole point of the shell and is measured rather than asserted.
  */
-export function makeCullPassTsl(TSL, { count, lodCount = 3, regions = 3, cap } = {}) {
-    const { Fn, If, Loop, int, uint, float, vec4, uniform, instanceIndex, instancedArray, struct, atomicAdd, dot, distance, max } = TSL;
+export function makeCullPassTsl(TSL, { count, lodCount = 3, regions = 3, cap, fleets = false, planesUniform = false } = {}) {
+    const { Fn, If, Loop, int, uint, float, vec4, uniform, uniformArray, instanceIndex, instancedArray, struct, atomicAdd, dot, distance, max, min } = TSL;
     if (lodCount < 1 || lodCount > 4) throw new Error("physicsTsl: makeCullPassTsl unrolls the ladder at lodCount, and the thresholds live in one vec4, so 1..4");
     if (!(cap > 0) || !(regions > 0)) throw new Error("physicsTsl: makeCullPassTsl needs a per-region cap and a region count, because the record offset is region-major and both are in it");
     // the indirect draw command, field for field as render/gpuDriven.mjs cullLodWgsl declares it
@@ -288,10 +300,16 @@ export function makeCullPassTsl(TSL, { count, lodCount = 3, regions = 3, cap } =
         clock: uniform(vec4(0, 0, 0, 0)).label("clock"),    // day t, and whether the gate is on
     };
     const inst = instancedArray(count, "vec4").label("inst");             // xyz centre, w radius
-    const planes = instancedArray(6, "vec4").label("planes");               // the frustum, one plane per row
+    // the frustum, one plane per row -- in a storage buffer, or as struct Cull types it: a uniform holding a fixed-size
+    // array of six. The seed values never reach the device (the transplant takes the TEXT and the caller binds the bytes),
+    // but three needs six of them to build the node.
+    const planes = planesUniform
+        ? uniformArray([0, 0, 0, 0, 0, 0].map(() => ({ x: 0, y: 0, z: 0, w: 0 })), "vec4").label("planes")
+        : instancedArray(6, "vec4").label("planes");
     const extras = instancedArray(count, "vec4").label("extras");           // z is the day the body was vendored, w its occlusion bias
     const cmds = instancedArray(regions, Cmd).label("cmds");              // one indirect draw command per (fleet, LOD) region
     const records = instancedArray(regions * cap * 3, "vec4").label("records");
+    const fleetOf = fleets ? instancedArray(count, "uint").label("fleetOf") : null;
     const node = Fn(() => {
         const c = inst.element(instanceIndex).toVar();
         const ex = extras.element(instanceIndex).toVar();
@@ -312,17 +330,22 @@ export function makeCullPassTsl(TSL, { count, lodCount = 3, regions = 3, cap } =
         If(uniforms.clock.y.greaterThan(float(0.5)).and(ex.z.greaterThan(uniforms.clock.x)), () => { draws.assign(int(0)); });
         If(lod.lessThan(int(0)), () => { draws.assign(int(0)); });
         If(draws.equal(int(1)), () => {
-            const region = uint(lod).toVar();
+            // the region: lod alone, or fleet * lodCount + lod with the fleet index clamped to the count the uniforms carry.
+            // The fleet is held in a var because the RECORD carries it too -- and that is not a tidiness: with it written as
+            // a constant 0 the six per-region counts still agreed exactly and 330 of 552 records differed, which is the
+            // whole reason the claim is over the records and not over the counts alone.
+            const fleet = (fleets ? min(fleetOf.element(instanceIndex), max(uint(1), uint(uniforms.eye.w)).sub(uint(1))) : uint(0)).toVar();
+            const region = (fleets ? fleet.mul(uint(uniforms.info.y)).add(uint(lod)) : uint(lod)).toVar();
             const slot = atomicAdd(cmds.element(region).get("instanceCount"), uint(1)).toVar();
             If(float(slot).lessThan(uniforms.info.z), () => {
                 const base = region.mul(uint(uniforms.info.z)).add(slot).mul(uint(3)).toVar();
                 records.element(base).assign(c);
-                records.element(base.add(uint(1))).assign(vec4(float(instanceIndex), float(lod), uniforms.info.w, float(0)));
+                records.element(base.add(uint(1))).assign(vec4(float(instanceIndex), float(lod), uniforms.info.w, float(fleet)));
                 records.element(base.add(uint(2))).assign(ex);
             });
         });
     })().compute(count);
-    return { node, inst, planes, extras, cmds, records, uniforms, count, lodCount, regions, cap };
+    return { node, inst, planes, extras, cmds, records, fleetOf, uniforms, count, lodCount, regions, cap, fleets, planesUniform };
 }
 
 /** The five fields of render/gpuDriven.mjs's struct Cmd, as a computeShell storage entry declares them. */

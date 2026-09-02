@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363, the fleets variant and a uniform frustum at v4364)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -190,6 +190,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    STILL HAND-WRITTEN: the occlusion and fleet variants (hizOccluded's ptr<storage, array<f32>, read> argument, and a
    two-dimensional region index), and struct Cull's `array<vec4<f32>, 6>` -- a fixed-size array in a UNIFORM struct,
    which is why the six planes arrive in a storage buffer.
+   v4364 -- THE FLEETS VARIANT, AND THE FRUSTUM IN A UNIFORM. cullLodWgsl({ fleets: true }) is the configuration the
+   orrery actually runs: a per-instance fleet index in its own array<u32>, clamped to the fleet count the uniforms
+   carry, and a region that is fleet * lodCount + lod rather than lod alone. Generated and held to the shipped text
+   over two fleets and three LODs: the same instance count in every one of the six regions (38/103/81/58/143/129) and
+   all 552 records identical to the float. The 110 instances asking for fleet 7 against a count of 2 land in fleet 1
+   in both passes -- and that is visible ONLY in the records: with the clamp dropped, the six counts still summed to
+   552, because the device folded the out-of-range increments into the last region. The same lesson landed twice in
+   one round: the first build agreed on all six counts and differed on 330 of 552 records, because the graph wrote a
+   constant 0 where the shipped pass writes the clamped fleet.
+   computeShell also gained `uniformArrays` -- a uniform whose ELEMENT is a fixed-size array, the type struct Cull
+   gives its planes. three emits a TSL uniformArray as its own uniform BINDING rather than as a member of the scalar
+   struct, so struct Cull is still two bindings for a generated pass and that is a limit, not a detail. The BYTES are
+   the same forty floats: packCullUniforms lays the planes out first and the four vec4s after, so the gate slices one
+   packing to drive both passes rather than packing a second copy. The graph is unmoved by where the frustum lives --
+   the two transplants' bodies are the same text, because planes.element(i) is one node either way.
+   AND A CORRECTION TO WHAT THIS FILE SAID TWICE: { occlusion: true } is not blocked by hizOccluded's pointer
+   argument. That ptr<storage, array<f32>, read> exists because the HAND-WRITTEN side factored the test into a
+   function; a graph inlines it and reads the buffer directly. What it does need is a mat4x4 uniform, two while-loops
+   whose bounds are computed, and a nested tile loop -- none of which any graph here has emitted. It is the one
+   variant left.
 
 ## The count that says when step 4 matters
 
