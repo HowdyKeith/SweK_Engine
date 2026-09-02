@@ -189,6 +189,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     verdict: "nothing added since v4297 is red. The fourteen include all seven of main's GPU-driven gates, " +
              "which pass on a box with NO WebGPU adapter -- they take the CPU-twin route and grade THAT, " +
              "rather than skipping, which is why they had a verdict to give at all",
+    // v4322 -- THE SECOND CLOSING: the 26 gates present now and absent from both the v4297 tree and the list above,
+    // swept serially on this box after the merge of origin/main (v4301-v4305) and the sweep branch. 25 green; ONE red:
+    // avatarZWander-selfcheck.mjs, main's own thirty-second observation of the avatar's z, red on this box AND red on
+    // origin/main's own tree run here (a worktree, the same shell) -- red on arrival, not a regression of this branch.
+    // songGlobe-selfcheck.mjs was red on the first pass because the merge had taken this branch's main.js wholesale and
+    // dropped main's songTerrain.globe(); main.js was rebuilt from main's with this tree's marker, and it is green.
+    since2: Object.freeze({
+        at: "v4322", swept: 26, green: 25, red: 1,
+        added: Object.freeze([
+            "tools/ship/avatarZWander-selfcheck.mjs", "tools/ship/dockFraming-selfcheck.mjs", "tools/ship/economyLockstep-selfcheck.mjs",
+            "tools/ship/fleetMask-selfcheck.mjs", "tools/ship/fleets-selfcheck.mjs", "tools/ship/gpuGitTime-selfcheck.mjs",
+            "tools/ship/landing-selfcheck.mjs", "tools/ship/phoneFrontDoor-selfcheck.mjs", "tools/ship/physicsShaders-selfcheck.mjs",
+            "tools/ship/playerShip-selfcheck.mjs", "tools/ship/populationPolicy-selfcheck.mjs", "tools/ship/qrChannel-selfcheck.mjs",
+            "tools/ship/quickSweep-selfcheck.mjs", "tools/ship/racesAct-selfcheck.mjs", "tools/ship/rangefinder-selfcheck.mjs",
+            "tools/ship/rigTiming-selfcheck.mjs", "tools/ship/songGlobe-selfcheck.mjs", "tools/ship/stealthRace-selfcheck.mjs",
+            "tools/ship/traderPolicy-selfcheck.mjs", "tools/ship/tsl-selfcheck.mjs", "tools/ship/tslPhysics-selfcheck.mjs",
+            "tools/ship/tslRace-selfcheck.mjs", "tools/ship/tslRig-selfcheck.mjs", "tools/ship/tslSource-selfcheck.mjs",
+            "tools/ship/universeJournal-selfcheck.mjs", "tools/ship/universeWire-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([{ gate: "tools/ship/avatarZWander-selfcheck.mjs", why: "z from 0.35 to 0.35 over thirty seconds here, and the same on origin/main's tree in the same shell" }]),
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

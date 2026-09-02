@@ -15,7 +15,7 @@
    "ratio": 1.2535264816998337,
    "heldReturn": 86821.33333333333,
    "params": 145,
-   "ms": 1804
+   "ms": 3041
   },
   {
    "name": "narrow, 30 iterations, seed 5",
@@ -29,7 +29,7 @@
    "ratio": 0.975878913299805,
    "heldReturn": 67591,
    "params": 145,
-   "ms": 5517
+   "ms": 9030
   },
   {
    "name": "wide [16,16], 30 iterations, seed 5",
@@ -43,7 +43,7 @@
    "ratio": 1.21501070818394,
    "heldReturn": 84153.66666666667,
    "params": 417,
-   "ms": 6641
+   "ms": 10824
   }
  ],
  "verdict": "the win is INSIDE THE SPREAD of trainings -- some beat greedy, some do not"

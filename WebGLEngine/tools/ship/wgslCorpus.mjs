@@ -46,6 +46,8 @@ const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "ts
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
 const EMITTED_PHYS = fs.existsSync(EMITTED_PHYS_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PHYS_PATH, "utf8")) : null;
+const EMITTED_RACE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-race.json");
+const EMITTED_RACE = fs.existsSync(EMITTED_RACE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_RACE_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -148,6 +150,10 @@ export function corpus() {
         ...(EMITTED_PHYS ? [
             { id: "tslSource.lyapunov (generated)", from: "tools/ship/tsl-emitted-physics.json", compileOnly: true, why: "the Lyapunov key as three's WGSL builder wrote it from render/physicsTsl.mjs: two Loops of the logistic map, generated", opts: { code: EMITTED_PHYS.lyapunov.transplanted.wgsl, compileOnly: true, outCount: 0 } },
             { id: "tslSource.heidler (generated)", from: "tools/ship/tsl-emitted-physics.json", compileOnly: true, why: "the Heidler key as three's WGSL builder wrote it: the return-stroke current on a geometric grid, generated", opts: { code: EMITTED_PHYS.heidler.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
+        // v4322 -- the Chaos race's look as three emitted it, transplanted into the fleet's own shell (tslRace-selfcheck writes the file)
+        ...(EMITTED_RACE && EMITTED_RACE.transplanted ? [
+            { id: "tslSource.lyapunovLook (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "the Chaos race painted by a TSL node: the look's own vertex stage around a fragment three's WGSL builder wrote", opts: { code: EMITTED_RACE.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320

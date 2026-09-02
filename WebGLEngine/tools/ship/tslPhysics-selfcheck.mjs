@@ -27,8 +27,8 @@ const k = keyCpu(PARAMS.first);
 {
     const src = fs.readFileSync(path.join(ENG, "render/physicsTsl.mjs"), "utf8");
     ok("the Heidler twin says the peak over i0 is 1 at the true eta and 1.0667 at the published eta (the module's finding, not the shader's)", k.atTrueEta === 1 && Math.abs(k.atStandardEta - 1.0667) < 1e-3, `${k.atTrueEta}, ${k.atStandardEta.toFixed(4)}; true eta ${k.trueEta.toFixed(5)}, standard ${k.standard.toFixed(5)}`);
-    ok("the TSL modules take their constants from the modules (imported DEFAULTS, PARAMS, LN2), and the Lyapunov log has its 2", /import \{ LN2, DEFAULTS as LY_DEFAULTS, PERIOD3 \} from "\.\/lyapunovWgsl\.mjs"/.test(src) && /x\.mul\(2\.0\)/.test(src) && /r\.mul\(x\)\.mul\(float\(1\.0\)\.sub\(x\)\)/.test(src) && /t\.div\(t1\)\.mul\(t\.div\(t1\)\)/.test(src) && !/\b3\.4\b|\b0\.05\b|\b485\b/.test(src.replace(/\/\/.*$/gm, "")));
-    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label)", (src.match(/\.label\("/g) || []).length === 10);
+    ok("the TSL modules take their constants from the modules (imported DEFAULTS, PARAMS, LN2), and the Lyapunov log has its 2", /import \{ LN2, DEFAULTS as LY_DEFAULTS, PERIOD3[^}]*\} from "\.\/lyapunovWgsl\.mjs"/.test(src) && /x\.mul\(2\.0\)/.test(src) && /r\.mul\(x\)\.mul\(float\(1\.0\)\.sub\(x\)\)/.test(src) && /t\.div\(t1\)\.mul\(t\.div\(t1\)\)/.test(src) && !/\b3\.4\b|\b0\.05\b|\b485\b/.test(src.split("// ---- v4322")[0].replace(/\/\/.*$/gm, "")));   // the v4322 look section carries the LOOK's own literals (0.05, 0.9: the seed span), which are lyapunovWgsl's
+    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten and the look's two", (src.match(/\.label\("/g) || []).length === 12);
 }
 
 const skip = webgpuSkipReason();

@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -103,4 +103,54 @@ export function devicePipelineFromTsl({ wgsl, glsl }) {
     if (W.textures.join() !== G.textures.join()) throw new Error(`tslSource: the WGSL and GLSL builders emitted different textures (${W.textures.join(",")} vs ${G.textures.join(",")})`);
     return { shaders: { wgsl: W.code, glsl: { vertex: VERTEX_GLSL, fragment: G.code } }, vs: "vs", fs: "fs", attributes: [], stride: 0,
              uniforms: W.uniforms.map((u) => ({ name: u.name, type: u.type })), textures: W.textures, transplant: { wgsl: W, glsl: G } };
+}
+
+// ---- v4322: the transplant into a HOST SHELL -- a fleet look's vertex stage, its uniform struct, its varyings -------------
+/**
+ * The semantic each of three's varyings carries, read from the VERTEX shader it emitted: { nodeVarying3: "uv", nodeVarying4: "normal", ... }.
+ * three writes `varyings.nodeVaryingN = <attribute>;` (WGSL) or `nodeVaryingN = <attribute>;` (GLSL); an attribute this shell cannot supply refuses later.
+ */
+export function varyingSemantics(vertex, language) {
+    const out = {};
+    const re = language === "wgsl" ? /varyings\.(nodeVarying\d+)\s*=\s*(\w+);/g : /^\s*(nodeVarying\d+)\s*=\s*(\w+);/gm;
+    for (const m of vertex.matchAll(re)) out[m[1]] = m[2];
+    return out;
+}
+/**
+ * Transplant an emitted fragment into a host shell. `shell` = { name, uniforms: [{ name, type }] (the shell's struct, in order --
+ * the fragment's labelled uniforms must be among them), wgsl: { prefix (struct + bindings + helpers + VOut + the vertex stage),
+ * uniformVar ("cam"), varyingParam ("v"), varyings: { uv: "v.local", normal: "v.n", color: "v.color" } }, glsl: { vertex, fragmentPrefix
+ * (version, precision, uniforms, ins, out), varyings: { uv: "vLocal", normal: "vN", color: "vColor" } }, buffers, topology }.
+ * Returns a device pipeline descriptor. Refuses by name: a varying the shell does not carry, a uniform the shell's struct lacks, a texture.
+ */
+export function transplantIntoShell({ wgsl, glsl }, shell) {
+    const desc = {};
+    for (const language of ["wgsl", "glsl"]) {
+        const em = language === "wgsl" ? wgsl : glsl;
+        if (!em || typeof em.fragment !== "string" || typeof em.vertex !== "string") throw new Error(`tslSource: transplantIntoShell needs the emitted { vertex, fragment } for ${language}`);
+        if (/\brender\./.test(em.fragment) || /cameraProjectionMatrix|modelViewMatrix/.test(em.fragment)) throw new Error("tslSource: the fragment reads camera or object matrices; a shell transplant carries only what its vertex stage passes");
+        const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
+        if (textures.length) throw new Error(`tslSource: a shell transplant carries no textures (the fragment samples ${textures.join(", ")})`);
+        for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
+        const sem = varyingSemantics(em.vertex, language), S = shell[language];
+        if (language === "wgsl") {
+            const params = [...((em.fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
+            const codes = (em.fragment.split("// codes")[1] || "").split("@fragment")[0].trim();
+            const bodyAll = em.fragment.split("fn main(")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+            b = b.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
+            if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
+            for (const p of params) { const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
+            b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`);
+            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${S.prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
+        } else {
+            const ins = [...em.fragment.matchAll(/^in\s+\w+\s+(nodeVarying\d+);/gm)].map((m) => m[1]);
+            const codes = (em.fragment.split("// codes")[1] || "").split("// structs")[0].trim();
+            const bodyAll = em.fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+            if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
+            for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
+            for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
+            desc.glsl = { vertex: S.vertex, fragment: `${S.fragmentPrefix}\n${codes}\nvoid main() {${b}}\n` };
+        }
+    }
+    return { shaders: { wgsl: desc.wgsl, glsl: desc.glsl }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), shell: shell.name };
 }

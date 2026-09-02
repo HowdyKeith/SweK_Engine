@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 445,
+ "count": 446,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2828,6 +2828,13 @@
    "f": "tsl-probe.html",
    "t": "- TSL probe (three 0.178, WebGPU with the WebGL2 backend)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "tsl-rig.html",
+   "t": "- TSL on the rig",
+   "d": "TSL on the rig: three's node shading language and the transplanted device pipelines run on THIS machine's GPU -- the physics keys read off pictures, badTv held to the byte, and the 448-step Lyapunov loop timed on both paths. Save the JSON as tools/ship/tsl-rig.json.",
    "g": "",
    "p": 0
   },

@@ -158,16 +158,18 @@ export const PARITY_BASELINE = Object.freeze({
     // generated fragment (+1 GLSL, +1 WGSL, +1 both). Its gate carries a fixture in both languages with the markers
     // assembled by concatenation, so it does not count. The GENERATED pair itself lives in tools/ship/tsl-emitted.json,
     // which no census scans -- the first shader pair in this tree that is data rather than source.
-    glslBearing: 144,
-    glslDirective: 128,  // raw WebGL2 -- the file writes its own version header
+    // v4322 -- render/physicsTsl.mjs: the Lyapunov look's shell for the transplant carries the look's WGSL prefix and a GLSL
+    // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
+    glslBearing: 145,
+    glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 55,
-    both: 12,
+    wgslBearing: 56,
+    both: 13,
     glslOnly: 132,
     wgslOnly: 43,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs", "render/physicsTsl.mjs", "render/tslSource.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

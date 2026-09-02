@@ -8,7 +8,7 @@
 // so render/tslSource.mjs can transplant the emitted fragments into gfx/device.js pipelines.
 "use strict";
 
-import { LN2, DEFAULTS as LY_DEFAULTS, PERIOD3 } from "./lyapunovWgsl.mjs";
+import { LN2, DEFAULTS as LY_DEFAULTS, PERIOD3, LOOK_KNOBS, LOOK_UNIFORMS, LYAPUNOV_LOOK_WGSL, LYAPUNOV_LOOK_VERTEX_GLSL } from "./lyapunovWgsl.mjs";
 import { PARAMS, etaStandard, truePeak } from "../physics/discharge/heidler.mjs";
 
 export { LN2, LY_DEFAULTS, PERIOD3, PARAMS, etaStandard, truePeak };
@@ -67,3 +67,38 @@ export function makeHeidlerKeyTsl(THREE, TSL, { i0 = PARAMS.first.i0, t1 = PARAM
     return { material, scene, camera, uniforms, trueEta: truePeak(t1, t2).peak, standardEta: etaStandard(t1, t2) };
 }
 export function decodeHeidler(px, i) { return ((px[i] + px[i + 1] / 255) / 255) * 2; }
+
+// ---- v4322: the Chaos race painted by the TSL node ---------------------------------------------------------------------
+/**
+ * The Lyapunov LOOK as a TSL graph, the arithmetic of lyapunovWgsl's LYAPUNOV_LOOK: r across the hull's local x, the seed
+ * down local y, the exponent as the shade, lit by the normal against `light`, times the vertex colour. The iteration counts
+ * are BAKED (a Loop bound is a constant) at the fleet's own knobs (LOOK_KNOBS: 96 samples, 32 warmup), where the WGSL reads
+ * them from chaos.zw at run time; the fleet binds the same numbers, so the pictures can be compared to the byte.
+ */
+export function makeLyapunovLookTsl(THREE, TSL, { rLo = LOOK_KNOBS[0], rHi = LOOK_KNOBS[1], samples = LOOK_KNOBS[2], warmup = LOOK_KNOBS[3], light = [0.4, 0.7, 0.6, 0.35] } = {}) {
+    const { Fn, float, vec3, vec4, uv, uniform, normalLocal, vertexColor, max, dot, normalize, mix } = TSL;
+    const { lyapunov } = lyapunovNodes(TSL, { samples, warmup });
+    const uniforms = { light: uniform(vec4(...light)).label("light"), chaos: uniform(vec4(rLo, rHi, samples, warmup)).label("chaos") };
+    const material = new THREE.NodeMaterial();
+    material.fragmentNode = Fn(() => {
+        const r = uniforms.chaos.x.add(uniforms.chaos.y.sub(uniforms.chaos.x).mul(uv().x.mul(0.5).add(0.5).clamp(0.0, 1.0)));
+        const x0 = float(0.05).add(uv().y.mul(0.5).add(0.5).clamp(0.0, 1.0).mul(0.9));
+        const chaos = lyapunov(r, x0).div(LN2).clamp(-1.0, 1.0);
+        const l = max(dot(normalize(normalLocal), normalize(uniforms.light.xyz)), 0.0);
+        const shade = uniforms.light.w.add(float(1.0).sub(uniforms.light.w).mul(l));
+        const hot = vec3(0.35, 0.95, 0.85), cold = vec3(0.08, 0.06, 0.2);
+        return vec4(mix(cold, hot, max(chaos, 0.0)).mul(shade).mul(vertexColor().rgb), vertexColor().a);
+    })();
+    // a mesh that carries every attribute the graph reads (uv, normal, colour), so three emits every varying
+    const geo = new THREE.PlaneGeometry(2, 2); geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(16).fill(1), 4));
+    const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    scene.add(new THREE.Mesh(geo, material));
+    return { material, scene, camera, uniforms, samples, warmup };
+}
+/** The Lyapunov look's shell for render/tslSource.mjs transplantIntoShell: its vertex stage, struct Cam, VOut and varyings, in both languages. */
+export function lyapunovLookShell(buffers) {
+    const prefix = LYAPUNOV_LOOK_WGSL.split("@fragment")[0].trim();
+    return { name: "lyapunov look", uniforms: LOOK_UNIFORMS.map((u) => ({ ...u })), buffers, topology: null,
+             wgsl: { prefix, uniformVar: "cam", varyingParam: "v", varyings: { uv: "v.local", normal: "v.n", color: "v.color" } },
+             glsl: { vertex: LYAPUNOV_LOOK_VERTEX_GLSL, fragmentPrefix: "#version 300 es\nprecision highp float;\nuniform vec4 light; uniform vec4 chaos;\nin vec4 vColor; in vec3 vN; in vec2 vLocal; out vec4 fragColor;", varyings: { uv: "vLocal", normal: "vN", color: "vColor" } } };
+}

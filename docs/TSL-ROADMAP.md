@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -34,19 +34,10 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    stage); the blackbody key transplants too. The rules are narrow and refuse by name: a bare NodeMaterial
    with fragmentNode, every uniform and texture labelled, one varying, no camera or object matrix in the
    fragment, types the device carries. The emitted pair is written to tools/ship/tsl-emitted.json and the
-   WGSL corpus compiles it as generated code. Not yet: a vertex-stage transplant (three's camera in the
-   graph), linear-filtered sampling on the device path, and the speed of the generated code.
-5. **Physics as TSL nodes.** BUILT at v4321. render/blackbodyTsl.mjs (v4319): Planck's shape and Wien's
-   root by a TSL `Loop`, x_lambda = 4.965114 read off both backends. render/physicsTsl.mjs (v4321): swk_lyapunov's
-   exponent (two Loops of the logistic map) and the Heidler current as `Fn` nodes; tslPhysics-selfcheck reads
-   ln 2 at r = 4 (median 0.693226, within 8e-5), the period-3 window dark, and the lightning's peak over i0 at
-   0.99998 (true eta) and 1.0667 (published eta) off both of three's backends -- and then AGAIN through
-   gfx/device.js after render/tslSource.mjs transplants the emitted fragments, the same numbers to the last
-   digit. The generated pairs go to tools/ship/tsl-emitted-physics.json and the WGSL corpus compiles them.
-   Not yet: a race's hull painted by a TSL node (the fleets are device pipelines; a NodeMaterial fleet would be
-   the next rung), and the cost of the 448-iteration Loop through three, which nobody timed.
-6. **Main scene migration.** NOT PLANNED. main.js renders with r160's WebGLRenderer and nothing on the ladder
-   needs WebGPURenderer; the gpuDriven/fleets/terrain stack sits on gfx/device.js, not on three.
+   WGSL corpus compiles it as generated code. v4322: transplantIntoShell() carries a fragment into a host's own vertex shell (the fleets' lit
+   layout: local, n, color), so a graph reading uv, the normal and the vertex colour crosses over; three's
+   camera in the graph still refuses. Not yet: linear-filtered sampling on the device path; the speed of the
+   generated code is what tsl-rig.html measures on a rig.
 
 ## The count that says when step 4 matters
 

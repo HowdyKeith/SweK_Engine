@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="demo:desc" content="TSL on the rig: three's node shading language and the transplanted device pipelines run on THIS machine's GPU -- the physics keys read off pictures, badTv held to the byte, and the 448-step Lyapunov loop timed on both paths. Save the JSON as tools/ship/tsl-rig.json.">
+<title>SweK -- TSL on the rig</title>
+<style>
+  html, body { margin: 0; background: #06080a; color: #d7e0d9; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #out { padding: 14px 16px; max-width: 70em; }
+  .ok { color: #9fe0b8; } .fail { color: #f08080; } .warn { color: #f0e29e; } b { color: #fff; }
+  textarea { width: 100%; height: 9em; background: #0b1010; color: #9fb8a8; border: 1px solid #23302a; font: 11px ui-monospace, monospace; }
+  canvas { display: none; }
+</style>
+</head>
+<body>
+<!--
+  v4322 -- TSL ON THE RIG. tools/ship/tsl-selfcheck.mjs, tslSource-selfcheck.mjs, tslPhysics-selfcheck.mjs and
+  tslRace-selfcheck.mjs grade everything below on SwiftShader, which is not a GPU. This page runs the same
+  measurements on the machine it is opened on: the backend WebGPURenderer took, the physics keys read off pictures
+  (ln 2 at r = 4, the Heidler peaks, Wien's root), badTv as TSL against the hand-written device pipeline to the
+  byte, and -- the number nobody had -- the 448-iteration Lyapunov loop's frame time through three's node path and
+  through the transplanted gfx/device.js pipeline, on WebGPU and on WebGL2 where the box has both. Save the JSON as
+  tools/ship/tsl-rig.json and tslRig-selfcheck reads it back; until then the timing is RIG-PENDING.
+-->
+<div id="out">starting&hellip;</div>
+<textarea id="json" readonly></textarea>
+<script type="module">
+import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
+import * as TSL from "./vendor/three-webgpu/three.tsl.js";
+import * as P from "./render/physicsTsl.mjs";
+import * as BB from "./render/blackbodyTsl.mjs";
+import * as B from "./render/badTvTsl.mjs";
+import * as S from "./render/tslSource.mjs";
+import * as D from "./render/badTvDevicePass.mjs";
+import { requestDevice } from "./gfx/device.js";
+const out = document.getElementById("out"), lines = [];
+const say = () => { out.innerHTML = lines.join("<br>"); };
+const result = { page: "tsl-rig.html", at: "v4322", three: THREE.REVISION, ua: navigator.userAgent, when: new Date().toISOString(), backends: {}, keys: {}, timing: [] };
+result.n = null;
+const N = Math.max(64, Math.min(1024, Number(new URLSearchParams(location.search).get("n")) || 256)), LN2 = P.LN2;   // ?n= for a quicker run (the ship gate uses 128 on SwiftShader)
+result.n = N;
+const median = (a) => { const s = Array.from(a).sort((x, y) => x - y); return s[s.length >> 1]; };
+try {
+    lines.push(`<b>TSL on the rig</b> -- three ${THREE.REVISION}, ${navigator.gpu ? "navigator.gpu present" : "no WebGPU in this browser"}`); say();
+    const modes = navigator.gpu ? ["webgpu", "webgl2"] : ["webgl2"];
+    const emitted = { lyapunov: {}, badTv: {} };
+    const src = new Uint8Array(64 * 64 * 4); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const i = (y * 64 + x) * 4; src[i] = Math.round(x * 255 / 63); src[i + 1] = Math.round(y * 255 / 63); src[i + 2] = 0; src[i + 3] = 255; }
+    for (const mode of modes) {
+        const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;   // never presented: a render target is read back (presenting a WebGPU canvas loses the device on a headless shell, and no picture is needed)
+        let renderer; try { renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init(); } catch (e) { lines.push(`<span class="fail">${mode}: WebGPURenderer could not start: ${e.message}</span>`); result.backends[mode] = { error: e.message }; say(); continue; }
+        const backend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2"; result.backends[mode] = { got: backend };
+        const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+        const draw = async (kit, times = 1) => { renderer.setRenderTarget(rt); for (let i = 0; i < times; i++) await renderer.renderAsync(kit.scene, kit.camera); return renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N); };
+        // keys through three
+        const ly = P.makeLyapunovKeyTsl(THREE, TSL, { rLo: 4, rHi: 4 }); const p4 = await draw(ly, 2); const lams = []; for (let i = 0; i < N * N; i++) lams.push(P.decodeLyapunov(p4, i * 4));
+        const hT = P.makeHeidlerKeyTsl(THREE, TSL, {}); const pT = await draw(hT, 2); let hMax = 0; for (let i = 0; i < N * N; i++) hMax = Math.max(hMax, P.decodeHeidler(pT, i * 4));
+        const bb = BB.makeBlackbodyKeyTsl(THREE, TSL, { nLo: 5, nHi: 5 }); const pb = await draw(bb, 2); let best = -1, bx = 0; for (let x = 0; x < N; x++) { const i = (10 * N + x) * 4; const v = (pb[i] + pb[i + 1] / 255) / 255; if (v > best) { best = v; bx = x; } }
+        const keys = { lyapunovMedian: median(lams), heidlerPeak: hMax, wienPeakX: 12 * (bx + 0.5) / N };
+        result.keys[`three:${backend}`] = keys;
+        lines.push(`three's ${backend}: ln 2 reads <b>${keys.lyapunovMedian.toFixed(6)}</b> (${Math.abs(keys.lyapunovMedian - LN2) < 2e-3 ? "<span class=ok>within 2e-3</span>" : "<span class=fail>OFF</span>"}), the Heidler peak <b>${keys.heidlerPeak.toFixed(5)}</b> (${Math.abs(keys.heidlerPeak - 1) < 1e-4 ? "<span class=ok>1 within 1e-4</span>" : "<span class=fail>OFF</span>"}), Wien's x_lambda at column <b>${keys.wienPeakX.toFixed(3)}</b> (${Math.abs(keys.wienPeakX - 4.965114) <= 12 / N ? "<span class=ok>within a column</span>" : "<span class=fail>OFF</span>"})`); say();
+        // timing through three: the 448-step loop at 256x256, mean of 10 frames after 3
+        const sweep = P.makeLyapunovKeyTsl(THREE, TSL, {}); await draw(sweep, 3); let t0 = performance.now(); for (let i = 0; i < 10; i++) await renderer.renderAsync(sweep.scene, sweep.camera); await renderer.readRenderTargetPixelsAsync(rt, 0, 0, 4, 4).catch(() => null); const msThree = (performance.now() - t0) / 10;
+        result.timing.push({ path: "three TSL", backend, work: "lyapunov key 256x256, 448 iterations a pixel", msPerFrame: +msThree.toFixed(3) });
+        emitted.lyapunov[backend] = (await S.emitShaders(renderer, { scene: sweep.scene, camera: sweep.camera, mesh: sweep.scene.children[0] })).fragment;
+        const fx = B.makeBadTvTsl(THREE, TSL, { texture: B.sourceTexture(THREE, { pixels: src, width: 64, height: 64 }) }); fx.setKnobs({ time: 1.5 });
+        emitted.badTv[backend] = (await S.emitShaders(renderer, { scene: fx.scene, camera: fx.camera, mesh: fx.scene.children[0] })).fragment;
+        lines.push(`  three's ${backend} path: <b>${msThree.toFixed(2)} ms</b> a frame for the Lyapunov sweep`); say();
+    }
+    // the transplanted device pipelines, where both languages were emitted
+    if (emitted.lyapunov.webgpu && emitted.lyapunov.webgl2) {
+        const descLy = S.devicePipelineFromTsl({ wgsl: emitted.lyapunov.webgpu, glsl: emitted.lyapunov.webgl2 }), descTv = S.devicePipelineFromTsl({ wgsl: emitted.badTv.webgpu, glsl: emitted.badTv.webgl2 });
+        for (const backend of modes) {
+            const cv = document.createElement("canvas"); cv.width = N; cv.height = N;
+            let dev; try { dev = await requestDevice(cv, { backend, offscreen: true }); } catch (e) { lines.push(`<span class="fail">device ${backend}: ${e.message}</span>`); continue; }
+            if (dev.backend !== backend) { lines.push(`<span class="warn">device asked for ${backend}, got ${dev.backend}</span>`); continue; }
+            const pipe = dev.pipeline(descLy);
+            const frame = (rLo, rHi, read) => dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); pass.use(pipe); pass.uniform("rLo", rLo); pass.uniform("rHi", rHi); pass.uniform("seedLo", 0.05); pass.uniform("seedHi", 0.95); pass.draw(3); }, read ? { read: true, depth: false } : undefined);
+            const p4 = (await frame(4, 4, true)).pixels; const lams = []; for (let i = 0; i < N * N; i++) lams.push(P.decodeLyapunov(p4, i * 4)); const m = median(lams);
+            result.keys[`device:${backend}`] = { lyapunovMedian: m };
+            for (let i = 0; i < 3; i++) frame(3.4, 4.0, false); await frame(3.4, 4.0, true);
+            const t0 = performance.now(); for (let i = 0; i < 10; i++) frame(3.4, 4.0, false); await frame(3.4, 4.0, true); const ms = (performance.now() - t0) / 11;
+            result.timing.push({ path: "device transplanted", backend, work: "lyapunov key 256x256, 448 iterations a pixel", msPerFrame: +ms.toFixed(3) });
+            // badTv to the byte against the hand-written pipeline
+            const knobs = D.packKnobs({ time: 1.5 }); const tex = dev.texture({ width: 64, height: 64, data: src, nearest: true });
+            const cv2 = document.createElement("canvas"); cv2.width = 64; cv2.height = 64; const dev2 = await requestDevice(cv2, { backend, offscreen: true });
+            const tex2 = dev2.texture({ width: 64, height: 64, data: src, nearest: true });
+            const drawTv = (pd, bind) => dev2.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); pass.use(dev2.pipeline(pd)); bind(pass); pass.draw(3); }, { read: true, depth: false });
+            const hand = (await drawTv(D.badTvPipelineDesc(), (pass) => { for (let i = 0; i < D.KNOB_ORDER.length; i++) pass.uniform(D.KNOB_ORDER[i], knobs[i]); pass.texture("tDiffuse", tex2, 0); })).pixels;
+            const gen = (await drawTv(descTv, (pass) => { for (const u of descTv.uniforms) pass.uniform(u.name, knobs[D.KNOB_ORDER.indexOf(u.name)]); pass.texture("tDiffuse", tex2, 0); })).pixels;
+            let same = 0; for (let i = 0; i < 64 * 64; i++) if (hand[i * 4] === gen[i * 4] && hand[i * 4 + 1] === gen[i * 4 + 1] && hand[i * 4 + 2] === gen[i * 4 + 2]) same++;
+            result.keys[`device:${backend}`].badTvSame = same; result.keys[`device:${backend}`].badTvTotal = 4096;
+            lines.push(`device ${backend}, the pipeline three generated: ln 2 reads <b>${m.toFixed(6)}</b> (${Math.abs(m - LN2) < 2e-3 ? "<span class=ok>within 2e-3</span>" : "<span class=fail>OFF</span>"}); badTv generated vs hand-written <b>${same} of 4096</b> pixels identical (${same === 4096 ? "<span class=ok>to the byte</span>" : "<span class=warn>not identical here</span>"}); the Lyapunov sweep <b>${ms.toFixed(2)} ms</b> a frame`); say();
+        }
+    } else lines.push(`<span class="warn">only one of three's backends ran here, so the transplant (which needs both languages emitted) was not built on this box</span>`);
+    result.gpu = navigator.gpu ? "webgpu" : "none";
+    lines.push(`<span class="warn">save the JSON below as tools/ship/tsl-rig.json and tslRig-selfcheck will read it: until then the loop's cost on a real GPU is RIG-PENDING</span>`);
+    document.getElementById("json").value = JSON.stringify(result);
+    say();
+} catch (e) { lines.push(`<span class="fail">failed: ${String(e && e.message || e)}</span>`); say(); document.getElementById("json").value = JSON.stringify({ failed: String(e && e.message || e), partial: result }); }
+</script>
+</body>
+</html>

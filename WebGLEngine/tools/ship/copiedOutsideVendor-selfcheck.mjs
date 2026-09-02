@@ -112,10 +112,12 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
     // are excluded by the register's own say-so, not by name here.
     const inFile = new Set([...C.COPIED, ...C.DERIVED].filter((e) => e.noticeInFile).map((e) => e.path));
     const preexisting = all.filter((f) => !quoters.test(f) && !inFile.has(f));
-    ok("the tree held " + preexisting.length + " MIT permission notices before v4263, quoters and in-file copies aside",
-        preexisting.length === 15, preexisting.join(" ").slice(0, 120) + "...");
-    ok("*** and 14 of those 15 were under vendor/ -- the 15th is a packaged dependency, not engine code ***",
-        underVendor.length === 14 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
+    // v4322 -- sixteen: vendor/three-webgpu/LICENSE arrived at v4319 (three 0.178's WebGPU build and TSL, beside r160), under
+    // vendor/ where a vendored copy's notice belongs; the count moved by one and this line says why.
+    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319), quoters and in-file copies aside",
+        preexisting.length === 16, preexisting.join(" ").slice(0, 120) + "...");
+    ok("*** and 15 of those 16 are under vendor/ -- the 16th is a packaged dependency, not engine code ***",
+        underVendor.length === 15 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
     ok("  so NO engine-source copy outside vendor/ carried one",
