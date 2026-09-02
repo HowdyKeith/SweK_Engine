@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -36,7 +36,13 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    fragment, types the device carries. The emitted pair is written to tools/ship/tsl-emitted.json and the
    WGSL corpus compiles it as generated code. v4322: transplantIntoShell() carries a fragment into a host's own vertex shell (the fleets' lit
    layout: local, n, color), so a graph reading uv, the normal and the vertex colour crosses over; three's
-   camera in the graph still refuses. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   camera in the graph still refuses -- and at v4324 it need not cross: a graph that MOVES vertices (a
+   positionNode) crosses without it. Three writes the displacement as statements on positionLocal before its
+   camera matrices; vertexDisplacement() lifts them, and a shell that says {{DISPLACE}} in its own vertex
+   stage takes them with its own transform (the fleet's record placement, its turn, the device's viewProj).
+   tslRace-selfcheck section 4: the Chaos race breathing along its own normal by the generated vertex stage
+   equals a hand-written twin on 36,864 of 36,864 pixels on both backends, ~720 pixels moved from the still
+   race, and amp 0 draws the still race exactly; orrery-gpu.html?tsl=1 breathes. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).

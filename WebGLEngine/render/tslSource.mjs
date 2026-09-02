@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -117,6 +117,30 @@ export function varyingSemantics(vertex, language) {
     return out;
 }
 /**
+ * v4324 -- THE VERTEX STAGE. A graph with a positionNode makes three's vertex shader compute `positionLocal = position;`
+ * then reassign positionLocal from the graph (and normalLocal = normal beside it), BEFORE the varyings and the camera
+ * matrices. Those statements -- the displacement -- are what a host shell can take: its own vertex stage keeps its own
+ * transform (the fleet's record placement, its turn, the device's viewProj) and splices the displacement in where it
+ * says `{{DISPLACE}}`, with three's names rewritten: positionLocal -> pl, normalLocal -> nl, position -> p, normal -> n,
+ * object.<u> -> the shell's struct. Three's camera and model matrices never cross: they are the shell's.
+ * Returns { statements, decls, uniforms } or null when the vertex only copies (no displacement).
+ */
+export function vertexDisplacement(vertex, language) {
+    const bodyAll = vertex.split(language === "wgsl" ? "fn main(" : "void main()")[1] || "";
+    const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+    const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
+    const start = lines.findIndex((l) => /^positionLocal\s*=\s*position;/.test(l));
+    if (start < 0) return null;
+    const stop = lines.findIndex((l, i) => i > start && (/^varyings\.|^modelViewMatrix|^nodeVarying\d+\s*=|^gl_Position|^v_modelViewProjection/.test(l)));
+    const mid = lines.slice(start + 1, stop < 0 ? lines.length : stop).filter((l) => !/^normalLocal\s*=\s*normal;/.test(l));
+    const statements = mid.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
+    if (!statements.length) return null;
+    const decls = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint) \w+;$/.test(l)).filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
+    const used = decls.filter((d) => { const name = (d.match(language === "wgsl" ? /^var (\w+)/ : /(\w+);$/) || [])[1]; return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); });
+    const uniforms = [...new Set([...statements.join(" ").matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(\w+)/g)].map((m) => m[1]))];
+    return { statements, decls: used, uniforms };
+}
+/**
  * Transplant an emitted fragment into a host shell. `shell` = { name, uniforms: [{ name, type }] (the shell's struct, in order --
  * the fragment's labelled uniforms must be among them), wgsl: { prefix (struct + bindings + helpers + VOut + the vertex stage),
  * uniformVar ("cam"), varyingParam ("v"), varyings: { uv: "v.local", normal: "v.n", color: "v.color" } }, glsl: { vertex, fragmentPrefix
@@ -137,6 +161,15 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         if (textures.length) throw new Error(`tslSource: a shell transplant carries no textures (the fragment samples ${textures.join(", ")})`);
         for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the fragment's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ")})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the fragment and ${h.type} in the shell`); }
         const sem = varyingSemantics(em.vertex, language), S = shell[language];
+        // the vertex stage: a displacement crosses only into a shell that says where ({{DISPLACE}} in its vertexTemplate)
+        const disp = vertexDisplacement(em.vertex, language);
+        let vertexText = null;
+        if (disp) {
+            if (!S.vertexTemplate || !S.vertexTemplate.includes("{{DISPLACE}}")) throw new Error(`tslSource: the graph moves vertices (a positionNode) and the shell "${shell.name}" has no {{DISPLACE}} in its vertex stage to take it`);
+            for (const u of disp.uniforms) { if (/^nodeUniform\d+$/.test(u)) throw new Error(`tslSource: the vertex displacement reads an UNLABELLED uniform (${u}); label it`); const h = shell.uniforms.find((x) => x.name === u); if (!h) throw new Error(`tslSource: the displacement's uniform "${u}" is not in the shell "${shell.name}"'s struct`); }
+            const rename = (t) => t.replace(/\bpositionLocal\b/g, "pl").replace(/\bnormalLocal\b/g, "nl").replace(/\bposition\b/g, "p").replace(/\bnormal\b/g, "n").replace(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(\w+)/g, language === "wgsl" ? `${S.uniformVar}.$1` : "$1");
+            vertexText = S.vertexTemplate.replace("{{DISPLACE}}", [...disp.decls, ...disp.statements].map(rename).join("\n  "));
+        } else if (S.vertexTemplate) vertexText = S.vertexTemplate.replace("{{DISPLACE}}", "");
         if (language === "wgsl") {
             const params = [...((em.fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
             const codes = (em.fragment.split("// codes")[1] || "").split("@fragment")[0].trim();
@@ -145,7 +178,9 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
             for (const p of params) { const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
             b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`);
-            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${S.prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
+            const prefix = vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix;
+            if (vertexText && prefix === S.prefix) throw new Error("tslSource: the shell's prefix does not contain its own vertexTemplate, so the vertex could not be replaced");
+            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
         } else {
             const ins = [...em.fragment.matchAll(/^in\s+\w+\s+(nodeVarying\d+);/gm)].map((m) => m[1]);
             const codes = (em.fragment.split("// codes")[1] || "").split("// structs")[0].trim();
@@ -153,8 +188,8 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
-            desc.glsl = { vertex: S.vertex, fragment: `${S.fragmentPrefix}\n${codes}\nvoid main() {${b}}\n` };
+            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
-    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), shell: shell.name, languages };
+    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
 }

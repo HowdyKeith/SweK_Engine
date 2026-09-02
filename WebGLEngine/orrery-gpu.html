@@ -169,13 +169,13 @@ if (params.get("tsl") === "1") {
         const [THREE, T, P, S] = await Promise.all([import("./vendor/three-webgpu/three.webgpu.js"), import("./vendor/three-webgpu/three.tsl.js"), import("./render/physicsTsl.mjs"), import("./render/tslSource.mjs")]);
         const off = document.createElement("canvas"); off.width = 64; off.height = 64;
         const renderer = new THREE.WebGPURenderer({ canvas: off, forceWebGL: device.backend === "webgl2", antialias: false }); await renderer.init();
-        const look = P.makeLyapunovLookTsl(THREE, T, {}); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+        const look = P.makeLyapunovLookTsl(THREE, T, { breathe: 0.06 }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));   // v4324: the hull breathes -- a position node, carried into the fleet's vertex stage
         const em = await S.emitShaders(renderer, { scene: look.scene, camera: look.camera, mesh: look.scene.children[0] });
         const CH = RACES.findIndex((r) => r.name === "Chaos");
-        const desc = S.transplantIntoShell({ [em.language]: em }, P.lyapunovLookShell(std.fleets[CH].pipeline.buffers));
-        std.fleets[CH] = { ...std.fleets[CH], pipeline: desc };
-        tslLook = { language: em.language, revision: THREE.REVISION, applied: std.fleets[CH].pipeline === desc, shaders: Object.keys(desc.shaders) };
-        say(`${device.backend} &middot; the Chaos race's look is GENERATED: a TSL graph, three ${THREE.REVISION} emitted its ${em.language.toUpperCase()}, transplanted into the fleet's shell`);
+        const desc = S.transplantIntoShell({ [em.language]: em }, P.lyapunovLookShell(std.fleets[CH].pipeline.buffers, { extraUniforms: [{ name: "amp", type: "f32" }] }));
+        const ob = std.fleets[CH].bind; std.fleets[CH] = { ...std.fleets[CH], pipeline: desc, bind: (pass, ctx) => { ob(pass, ctx); pass.uniform("amp", 0.06 * (1 + Math.sin(ctx.time * 2))); } };
+        tslLook = { language: em.language, revision: THREE.REVISION, applied: std.fleets[CH].pipeline === desc, shaders: Object.keys(desc.shaders), displaced: desc.displaced };
+        say(`${device.backend} &middot; the Chaos race's look is GENERATED: a TSL graph, three ${THREE.REVISION} emitted its ${em.language.toUpperCase()}, transplanted into the fleet's shell${desc.displaced ? ", and its hull breathes by the graph's position node" : ""}`);
     } catch (e) { say("TSL look failed, the hand-written Chaos look stands: " + e.message, true); console.warn("tsl look:", e); }
 }
 const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull
