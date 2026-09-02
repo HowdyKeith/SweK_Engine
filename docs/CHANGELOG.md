@@ -14,6 +14,50 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4336 -- the walk gets its other two callers, a bake can no longer delete quietly, and the standing red was one npm package
+
+THREE ROUNDS' WORTH, AND THE THIRD ONE ENDS A RED THAT HAS BLOCKED EVERY SHIP THIS SESSION.
+(1) THE HELPER v4333 ADDED HAD EXACTLY ONE CALLER, WHICH IS THE SHAPE IT WAS WRITTEN TO REMOVE. cubeBake's
+six-face walk was lifted out of the skybox and then used by the skybox and nothing else, while proceduralStar
+and planetSurface went on carrying their own copies of the same loop -- a helper written for one caller is the
+fault this tree keeps finding in other people's code, committed here one round after arguing against it. Both
+adopt it now, and the interesting half is WHY THEY HAD NOT. proceduralStar fits and simply had not been changed.
+planetSurface DOES NOT FIT: it writes FOUR targets -- albedo, normal, roughness, height -- out of ONE
+surfaceSample per texel, and a single-target helper would have made it sample four times, roughly four times the
+work TO LOOK TIDIER. A helper that makes its caller worse is not a refactor, so the primitive is now
+bakeCubemapTargets(size, channelCounts, sample) -- one walk, one sample per texel, N buffers -- and the original
+bakeCubemap is a thin wrapper over it rather than a second copy. The gate pins the sample COUNT (6*7*7 calls for
+6*7*7 texels), that the wrapper equals a one-target call byte for byte, and the planet's four digests. Measured
+across star, surface and skybox at several sizes and seeds: every digest identical before and after.
+(2) A BAKE THAT READS THE TREE CAN NO LONGER DELETE WITHOUT SAYING SO. v4335 ran orreryBake --write in this
+sandbox, which does not carry the rig-only build artefacts, and the bake dropped native/gate_probe,
+gate_probe.c, libbox3d.a and shim.o -- orrery.json from 3,767,005 bytes to 1,226,434, REPORTING "15 bodies"
+EITHER WAY. It surfaced two gates downstream in playerShip, because the git economy is built from orrery.json and
+a smaller world has different ports, so a five-tonne purchase stopped conserving. tools/ship/bakeShrinkGuard.mjs
+now refuses a write that loses a NAMED entry, and the choice of identities over bytes is the whole design: bytes
+false-fault on a legitimate shrink AND miss a loss that happens while growing, whereas what actually went wrong
+is that names disappeared. The walk is shape-agnostic, so it serves orrery.json (bodies as an array) and
+orrery-fleet.json (bodies as an object) without being taught either, and a deliberate removal passes with
+--allow-shrink, which PRINTS the refusal it overrode. Driven against the real accident: the guard refuses the
+exact v4335 write, names all four files, exits 1, and leaves orrery.json byte-identical.
+(3) *** AND THE STANDING RED WAS NOT A MISSING GPU. *** pathTracerWgsl has failed every verify this session and
+was reported each time as environmental. It is, and the skip reason was more precise than the summary it was
+being folded into: "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at
+/opt/pw-browsers/chromium-1194/chrome-linux/vk_swiftshader_icd.json)". The driver was already on the box, inside
+the Playwright bundle; the tree's own headlessGpu.mjs already records the licence position and a MEASURED
+adapter of google/swiftshader. One package later the gate is ALL GREEN, and its own frozen numbers match the run
+to the digit -- maxDirErr recorded 9.474e-8, measured 9.474e-8. bloomFused, the other native-path gate, stops
+SKIPPING and runs its real dispatch. THE DISTINCTION THAT MUST NOT BE LOST: this is a SOFTWARE adapter, so it
+settles "does this execute and agree with the CPU twin" and settles NOTHING about the rig's floats. The three
+fleet-kernel verdicts in deviceOwed are still owed and still need Galaxina.
+Also: a sabotage of the new guard went 0 RED and is recorded as a finding rather than dropped -- replacing
+`if (before == null) return null` with `before = {}` changes nothing, because an empty baseline has no
+identities to lose either, so my check was aimed at a line that decides nothing. It was replaced with one that
+reaches a branch that does (a "tolerate a few losses" threshold, which would have passed v4335's four).
+Not checked and said plainly: the npm install lives in THIS container and does not persist -- a fresh session
+starts red again until it runs `npm i -g webgpu`, and that is a environment question rather than a tree one.
+Nothing here was rendered on real hardware. gates 1410 -> 1412 (bakeShrinkGuard, and the merge's own arrival).
+The tree stands at 1412 gates.
 ## v4335 -- the two benches join the WebGPU drawer, and the reason they were kept out was wrong
 
 *** MERGED WITH main AT v4332, AND THE MERGE CHANGED THIS ROUND'S OUTCOME, SO IT IS RECORDED HERE RATHER THAN

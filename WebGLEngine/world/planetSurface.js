@@ -20,7 +20,7 @@
 // PURE: no Three, no GL, no DOM, no Math.random. Same spec -> byte-identical faces. Gated headless in
 // world/planetSurface-selfcheck.mjs.
 
-import { faceTexelDir } from "../render/cubeBake.js";   // the SAME cube geometry the skybox and star bake on
+import { faceTexelDir, bakeCubemapTargets } from "../render/cubeBake.js";   // the SAME cube geometry, and its walk
 import { heightAt, surfaceColor } from "./procPlanet.js";   // the SAME height field and biome rule as the equirect bake
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -125,20 +125,16 @@ export function surfaceSample(spec, dir, P) {
 // encoded 0.5 + 0.5*n, so the front door samples them by the same direction it samples the albedo with.
 export function bakeSurfaceCubemap(spec, opts = {}) {
     const P = makeSurfaceParams(opts), size = P.size;
-    const albedo = [], normal = [], rough = [], height = [];
-    for (let f = 0; f < 6; f++) {
-        const a = new Uint8ClampedArray(size * size * 3), n = new Uint8ClampedArray(size * size * 3);
-        const r = new Uint8ClampedArray(size * size), h = new Uint8ClampedArray(size * size);
-        for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
-            const s = surfaceSample(spec, faceTexelDir(f, i, j, size), P);
-            const k = j * size + i, o = k * 3;
-            a[o] = s.color[0] * 255; a[o + 1] = s.color[1] * 255; a[o + 2] = s.color[2] * 255;
-            n[o] = (s.normal[0] * 0.5 + 0.5) * 255; n[o + 1] = (s.normal[1] * 0.5 + 0.5) * 255; n[o + 2] = (s.normal[2] * 0.5 + 0.5) * 255;
-            r[k] = s.rough * 255; h[k] = s.height * 255;
-        }
-        albedo.push(a); normal.push(n); rough.push(r); height.push(h);
-    }
-    return { size, albedo, normal, rough, height };
+    // v4336 -- the walk is cubeBake's MULTI-TARGET form, and this bake is the reason that form exists. Four
+    // targets come out of ONE surfaceSample per texel; a single-target helper would have called it four times,
+    // so the generalisation is the number of targets rather than a fourth copy of the loop. Byte-for-byte the
+    // same output as the hand-written version -- the digests in the gate were taken before the change.
+    const { targets } = bakeCubemapTargets(size, [3, 3, 1, 1], (dir) => {
+        const s = surfaceSample(spec, dir, P);
+        return [s.color, [s.normal[0] * 0.5 + 0.5, s.normal[1] * 0.5 + 0.5, s.normal[2] * 0.5 + 0.5],
+                [s.rough], [s.height]];
+    });
+    return { size, albedo: targets[0], normal: targets[1], rough: targets[2], height: targets[3] };
 }
 
 // ---- the projection claim, as arithmetic ----

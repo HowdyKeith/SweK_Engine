@@ -247,6 +247,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "stronger statement than a green run alone -- a gate that has never been seen to fail is a gate " +
                  "whose green means nothing yet",
     }),
+    // v4336 -- A SIXTH CLOSING, for the gate this round added. Same one-line shape as the five before it, which
+    // is the whole benefit of main's list: five rounds have now appended an entry and none has had to touch the
+    // accounting. bakeShrinkGuard-selfcheck was run alone on this box and sabotaged four times against the
+    // module it guards -- three caught, and the fourth recorded in its own header as a no-op rather than
+    // counted as a pass.
+    since6: Object.freeze({
+        at: "v4336", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/bakeShrinkGuard-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 22 pass. Driven against the REAL v4335 accident -- it refuses " +
+                 "the exact orreryBake write that dropped four files, names them, and exits 1",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
