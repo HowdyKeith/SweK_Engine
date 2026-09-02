@@ -12,12 +12,17 @@
 //
 // STATELESS, NOT A STREAM. Every split decision is a hash of the panel's own path through the recursion, so the
 // result does not depend on traversal order and a subtree can be regenerated without replaying the ones before
-// it. The hash is render/nebulaSkybox.js's -- the same integer hash the skybox, the star and the planet already
-// share, rather than a fourth PRNG in the tree.
+// it. The hash is render/valueNoise.js's -- the same integer hash the skybox and the star share, rather than
+// growing another PRNG in the tree.
+//
+// *** v4327 -- THIS COMMENT USED TO SAY "THE SKYBOX, THE STAR AND THE PLANET". THE PLANET IS NOT IN THAT LIST. ***
+// world/procPlanet.js has always carried its OWN hash3, on a different mix and a quintic fade, and the two agree
+// on none of 360 sampled lattice points. The tree has two value noises on purpose; render/valueNoise.js's header
+// explains why converging them is a look change and not a cleanup.
 //
 // PURE: no Three, no GL, no DOM, no Math.random. Same seed -> identical panels. Gated in render/greeble-selfcheck.mjs.
 
-import { hash3 } from "./nebulaSkybox.js";   // the tree's one integer hash
+import { hash3 } from "./valueNoise.js";   // v4327 -- the skybox lineage's integer hash, from its own file
 
 const DEFAULTS = {
     seed: 4242,

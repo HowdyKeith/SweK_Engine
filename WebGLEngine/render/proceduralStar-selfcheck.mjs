@@ -8,7 +8,7 @@
 // Run: node render/proceduralStar-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import { temperatureColor, limbDarkening, starSurface, bakeStarCubemap, makeStarParams } from "./proceduralStar.js";
-import { faceTexelDir } from "./nebulaSkybox.js";
+import { faceTexelDir } from "./cubeBake.js";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };

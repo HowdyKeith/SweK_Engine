@@ -14,12 +14,13 @@
 //
 // ONE OWNER, TWO BAKES. The type, the palette, the noise and the biome rule all still live in world/procPlanet.js
 // -- this file imports heightAt and surfaceColor rather than growing a second copy, exactly as the star imports
-// the skybox's fbm. The cube geometry (faceTexelDir) is imported from render/nebulaSkybox.js for the same reason.
+// the skybox's fbm. The cube geometry (faceTexelDir) comes from render/cubeBake.js for the same reason (v4327;
+// it lived in render/nebulaSkybox.js until then, which had this file reaching into a backdrop for its geometry).
 //
 // PURE: no Three, no GL, no DOM, no Math.random. Same spec -> byte-identical faces. Gated headless in
 // world/planetSurface-selfcheck.mjs.
 
-import { faceTexelDir } from "../render/nebulaSkybox.js";   // the SAME cube geometry the skybox and star bake on
+import { faceTexelDir } from "../render/cubeBake.js";   // the SAME cube geometry the skybox and star bake on
 import { heightAt, surfaceColor } from "./procPlanet.js";   // the SAME height field and biome rule as the equirect bake
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);

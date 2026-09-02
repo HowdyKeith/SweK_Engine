@@ -7,7 +7,8 @@
 //
 // Run: node render/nebulaSkybox-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
-import { bakeNebulaCubemap, shadeDirection, faceTexelDir, makeParams } from "./nebulaSkybox.js";
+import { bakeNebulaCubemap, shadeDirection, makeParams } from "./nebulaSkybox.js";
+import { faceTexelDir } from "./cubeBake.js";   // v4327 -- the cube geometry moved to its own file
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };

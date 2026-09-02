@@ -11,8 +11,10 @@
 // TWO THINGS ARE DELIBERATELY NOT COPIED.
 //   1. Math.random. cockpit picks every angle and speed from it; a burst here is a pure function of its seed, so
 //      the same hit throws the same debris and the gate can hold a burst still and measure it. The hash is
-//      render/nebulaSkybox.js's -- the tree's one integer hash, already shared by the skybox, star, planet and
-//      greeble.
+//      render/valueNoise.js's, already shared by the skybox, the star and greeble. *** v4327 -- THIS LINE USED
+//      TO CALL IT "THE TREE'S ONE INTEGER HASH ... SHARED BY THE SKYBOX, STAR, PLANET AND GREEBLE", AND THE
+//      PLANET WAS NEVER IN IT: *** world/procPlanet.js carries a different hash on a quintic fade, agreeing with
+//      this one on none of 360 sampled points. Two noises, deliberately -- see render/valueNoise.js's header.
 //   2. THE PER-FRAME DRAG. cockpit does `q.vx *= 0.94` once per frame, which means its spray travels FURTHER ON A
 //      FASTER MACHINE -- the decay is per frame, not per second. Here drag is exponential in TIME and the position
 //      is its analytic integral, so splitting a step into substeps lands on the same place to float precision.
@@ -25,7 +27,7 @@
 //
 // Gated in render/hitBurst-selfcheck.mjs.
 
-import { hash3 } from "./nebulaSkybox.js";   // the tree's one integer hash
+import { hash3 } from "./valueNoise.js";   // v4327 -- the skybox lineage's integer hash, from its own file
 
 // The three tiers, straight off cockpit.html's hit(): counts 6 / 12 / 40 and its cyan / red / amber, converted
 // from its hex to linear-ish floats. Speeds and lifetimes are scaled for the 3D scene's units, which are not

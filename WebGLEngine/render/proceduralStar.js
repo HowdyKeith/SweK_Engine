@@ -10,7 +10,8 @@
 // view-dependent and is applied by the front-door shader from the limbDarkening() law pinned here. Gated headless
 // in render/proceduralStar-selfcheck.mjs.
 
-import { fbm, faceTexelDir } from "./nebulaSkybox.js";   // the SAME generator the skybox uses
+import { fbm } from "./valueNoise.js";        // v4327 -- the SAME noise the skybox bakes with, from its own file
+import { faceTexelDir } from "./cubeBake.js"; // v4327 -- the SAME cube geometry, likewise
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const lerp = (a, b, t) => a + (b - a) * t;

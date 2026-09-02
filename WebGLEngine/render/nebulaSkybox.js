@@ -10,56 +10,17 @@
 // RGB byte buffers; uploading them to a THREE.CubeTexture and setting scene.background is the browser half, thin
 // and Keith's to see. The SAME generator feeds the next round's procedural star. Gated headless in
 // render/nebulaSkybox-selfcheck.mjs.
+//
+// v4327 -- THE NOISE AND THE CUBE GEOMETRY LEFT THIS FILE, and this file is the reason they had to. They were
+// written here because the sky needed them first, and by v3843 the star, the planet's surface, the greeble and
+// the hit-burst were all importing them FROM THE BACKDROP GENERATOR. They now live at render/valueNoise.js and
+// render/cubeBake.js, which is where a reader would look. Nothing about the bake changed: the digests in
+// render/cubeBake-selfcheck.mjs were measured before the move and hold after it. This file is no longer the
+// owner of anything but the sky, and it deliberately does NOT re-export what it used to own -- a re-export
+// would leave the old wrong import path working and the graph still saying the sky owns the noise.
 
-// Deterministic hash of an integer lattice cell -> [0, 1). Integer math only, so it is identical across engines.
-export function hash3(ix, iy, iz, seed) {
-    let h = (Math.imul(ix | 0, 374761393) + Math.imul(iy | 0, 668265263) + Math.imul(iz | 0, 1610612741) + Math.imul(seed | 0, 362437)) | 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h = (h ^ (h >>> 16)) >>> 0;
-    return h / 4294967296;
-}
-
-const fade = (t) => t * t * (3 - 2 * t);   // smoothstep fade for value-noise interpolation
-const lerp = (a, b, t) => a + (b - a) * t;
-
-// Trilinear value noise at a 3D point, in [0, 1].
-function valueNoise(x, y, z, seed) {
-    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
-    const fx = fade(x - ix), fy = fade(y - iy), fz = fade(z - iz);
-    const c = (dx, dy, dz) => hash3(ix + dx, iy + dy, iz + dz, seed);
-    const x00 = lerp(c(0, 0, 0), c(1, 0, 0), fx), x10 = lerp(c(0, 1, 0), c(1, 1, 0), fx);
-    const x01 = lerp(c(0, 0, 1), c(1, 0, 1), fx), x11 = lerp(c(0, 1, 1), c(1, 1, 1), fx);
-    return lerp(lerp(x00, x10, fy), lerp(x01, x11, fy), fz);
-}
-
-// Fractal Brownian motion in [0, 1]: octaves of value noise, lacunarity 2, gain 0.5, normalised by amplitude sum.
-export function fbm(x, y, z, seed, octaves) {
-    let sum = 0, amp = 0.5, norm = 0, f = 1;
-    for (let o = 0; o < octaves; o++) {
-        sum += amp * valueNoise(x * f, y * f, z * f, seed + o * 1013);
-        norm += amp; amp *= 0.5; f *= 2;
-    }
-    return sum / norm;
-}
-
-// The six cubemap faces, in GL order. Each maps (u, v) in [-1, 1] to a 3D direction (pre-normalisation).
-const FACES = [
-    (u, v) => [1, -v, -u],   // +X
-    (u, v) => [-1, -v, u],   // -X
-    (u, v) => [u, 1, v],     // +Y
-    (u, v) => [u, -1, -v],   // -Y
-    (u, v) => [u, -v, 1],    // +Z
-    (u, v) => [-u, -v, -1],  // -Z
-];
-
-// Unit direction for texel (i, j) of face `f` in a size x size face. Texel CENTRES, so (i+0.5)/size.
-export function faceTexelDir(f, i, j, size) {
-    const u = ((i + 0.5) / size) * 2 - 1;
-    const v = ((j + 0.5) / size) * 2 - 1;
-    const d = FACES[f](u, v);
-    const inv = 1 / Math.hypot(d[0], d[1], d[2]);
-    return [d[0] * inv, d[1] * inv, d[2] * inv];
-}
+import { hash3, fbm, lerp } from "./valueNoise.js";       // v4327 -- the noise's own file
+import { bakeCubemap } from "./cubeBake.js";            // v4327 -- the cube's own file (the six-face walk)
 
 const DEFAULTS = {
     seed: 1337,
@@ -136,20 +97,8 @@ export function shadeDirection(dir, P) {
 export function makeParams(opts = {}) { return { ...DEFAULTS, ...opts }; }
 
 // Bake all six faces at `size` x `size`. Returns { size, faces:[Uint8ClampedArray×6] } with 3 bytes/texel (RGB).
+// The six-face walk is cubeBake's (v4327); what is left here is the one line that is actually about the sky.
 export function bakeNebulaCubemap(opts = {}) {
     const P = makeParams(opts);
-    const size = opts.size || 128;
-    const faces = [];
-    for (let f = 0; f < 6; f++) {
-        const buf = new Uint8ClampedArray(size * size * 3);
-        for (let j = 0; j < size; j++) {
-            for (let i = 0; i < size; i++) {
-                const c = shadeDirection(faceTexelDir(f, i, j, size), P);
-                const o = (j * size + i) * 3;
-                buf[o] = c[0] * 255; buf[o + 1] = c[1] * 255; buf[o + 2] = c[2] * 255;
-            }
-        }
-        faces.push(buf);
-    }
-    return { size, faces };
+    return bakeCubemap(opts.size || 128, 3, (dir) => shadeDirection(dir, P));
 }

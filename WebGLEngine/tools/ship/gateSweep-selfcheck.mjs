@@ -333,16 +333,24 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // v4322 -- a SECOND closing (SS.since2): the gates added after v4317's sweep, swept and named the same way; a red among
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
-    const uncovered = surplus - SS.swept - S2.swept;
+    // v4327 -- a THIRD closing (SS.since3), read the same way. Each closing is its own frozen record of a sweep
+    // that actually ran on a day; a new gate is accounted for by adding a closing, never by editing an older
+    // one to say it swept a file that did not exist when it ran.
+    const S3 = SS.since3 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
+    const uncovered = surplus - SS.swept - S2.swept - S3.swept;
     ok(uncovered <= 0,
        "!! *** every gate in the tree has been swept by v4297 or by the round that closed its surplus ***",
-       `${gatesNow} in the tree = ${S.swept} swept at v4297 + this gate + ${SS.swept} swept since + ${S2.swept} at the second closing` +
+       `${gatesNow} in the tree = ${S.swept} swept at v4297 + this gate + ${SS.swept} swept since + ${S2.swept} at the second closing + ${S3.swept} at the third` +
        (uncovered > 0 ? `. ${uncovered} STILL UNSWEPT -- name them and run them; a surplus that is only ` +
                         `counted goes stale the way the equality it replaced did`
                       : `. Nothing is unaccounted for, and the next gate added makes this red until it is run.`));
     ok(S2.green + S2.red === S2.swept && S2.red === S2.redOnArrival.length && S2.redOnArrival.every((r) => S2.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40),
        "...the second closing's reds are named with why (red on arrival, red on origin/main too), and its count adds up",
        `${S2.green} green, ${S2.red} red of ${S2.swept}: ` + S2.redOnArrival.map((r) => r.gate.split("/").pop() + " -- " + r.why).join("; "));
+    ok(S3.green + S3.red === S3.swept && S3.red === S3.redOnArrival.length && S3.added.length === S3.swept &&
+       S3.redOnArrival.every((r) => S3.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40),
+       "...and the third closing's count adds up, names as many gates as it swept, and states why for any red",
+       `${S3.green} green, ${S3.red} red of ${S3.swept}: ` + (S3.added.map((g) => g.split("/").pop()).join(", ") || "none"));
     ok(SS.green === SS.swept && SS.red === 0 && SS.regressions === 0,
        "...and none of them is red, so nothing has regressed since v4297 either",
        `${SS.green} green of ${SS.swept}, ${SS.falseReds} false red and ${SS.unmeasuredAtCap} unmeasured at ` +
@@ -391,7 +399,13 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(S.regressions.every((g) => !unm.has(g)) && S.fromSlowBucket.every((g) => !unm.has(g)),
        "nothing red is also unmeasured", "a gate that did not finish has no verdict to be red with");
 
-    const named = [...S.fromSlowBucket, ...S.regressions, ...S.unmeasured, ...S.falseRedList.map((e) => e.gate)];
+    // v4327 -- THE CLOSINGS' OWN NAMES WERE NEVER IN THIS LIST, and adding since3 is what showed it. Sabotaging
+    // the new closing to name `render/noSuchGate-selfcheck.mjs` left this section GREEN: it checked the v4297
+    // record's names and nothing else, so since2's twenty-six and since3's two could name deleted files forever
+    // and stay falsifiable-looking. A record whose names are not checked is a record that cannot go stale out
+    // loud. The closings' `added` lists join the list, which closes it for since2 as well as for this round.
+    const named = [...S.fromSlowBucket, ...S.regressions, ...S.unmeasured, ...S.falseRedList.map((e) => e.gate),
+                   ...SS.added, ...S2.added, ...S3.added];
     const missing = named.filter((g) => !fs.existsSync(path.join(GS.ENG, g)));
     ok(missing.length === 0,
        "*** every gate the record names still exists, so every entry stays falsifiable ***",

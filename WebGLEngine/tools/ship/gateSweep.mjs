@@ -210,6 +210,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         ]),
         redOnArrival: Object.freeze([{ gate: "tools/ship/avatarZWander-selfcheck.mjs", why: "z from 0.35 to 0.35 over thirty seconds here, and the same on origin/main's tree in the same shell" }]),
     }),
+    // v4327 -- A THIRD CLOSING, and it is deliberately a third rather than two names appended to since2. That
+    // record says `at: "v4322"` and reports a sweep that happened on that day; adding gates to it would make it
+    // claim it had run files that did not exist yet, which is the retyped-summary failure section 7 exists to
+    // catch. The two gates here arrived with this round and were run alone on this box, not under the sweep's
+    // workers -- both green, both fast (well under the 3 s quick-sweep budget, so the quick sweep covers them
+    // from now on and this entry is a one-round bridge rather than a permanent exemption).
+    since3: Object.freeze({
+        at: "v4327", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "render/cubeBake-selfcheck.mjs", "render/valueNoise-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "both green on this box, run singly: cubeBake-selfcheck 16 pass, valueNoise-selfcheck 23 pass. " +
+                 "Each was also driven RED by three sabotages of the module it guards and restored, which is a " +
+                 "stronger statement than a green run alone -- a gate that has never been seen to fail is a gate " +
+                 "whose green means nothing yet",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

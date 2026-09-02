@@ -8,7 +8,7 @@
 // Run: node world/planetSurface-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import { planetSpec, heightAt, surfaceColor } from "./procPlanet.js";
-import { faceTexelDir } from "../render/nebulaSkybox.js";
+import { faceTexelDir } from "../render/cubeBake.js";
 import {
     makeSurfaceParams, tangentFrame, heightAtDir, surfaceGradient, surfaceNormal, roughnessAt, surfaceSample,
     bakeSurfaceCubemap, cubeTexelSolidAngle, equirectTexelSolidAngle, texelAreaSpread, cubeTotalSolidAngle,

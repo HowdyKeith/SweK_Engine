@@ -8,6 +8,74 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## v4327 -- the sky stopped owning the noise, and the "one hash" was two all along
+
+*** THE CORRECTION FIRST, AND IT IS MINE. *** Asked which of TheLongSilence's elements this tree had, I answered
+that three of eight were shipped and that Planet.js / Surface.js / planetBakeShader.js were "the real gap --
+nothing here generates a planet". THAT WAS WRONG ABOUT THE PROJECT. world/procPlanet.js is stamped v3830 and
+world/planetSurface.js v3842, both at or before the v3841 zip I was reading it out of; the zip came off one of
+the three development lines that were not consolidated until v3900, so the tree in front of me was not the tree.
+I read one line and reported it as the project, which is the same mistake as measuring one machine and shipping
+the number. All eight elements exist and all eight gates are green: procPlanet v3830, nebulaSkybox v3833,
+proceduralStar v3835, foldTunnel v3836, planetSurface v3842, greeble v3843, spaceStructures v3843, and the GLSL
+noise consolidated at ashimaNoise v4177. Then the round, which is what was actually left. THE CUBE GEOMETRY AND
+THE VALUE NOISE HAD NO OWNER EXCEPT THE BACKDROP: faceTexelDir, hash3 and fbm were written in
+render/nebulaSkybox.js because the sky needed them first, and by v3843 the star, the planet's SURFACE, the
+greeble and the hit-burst were all importing them out of a backdrop generator -- four modules reaching into the
+sky for things that are not about skies, and a reader deleting the skybox would have taken the star and the
+planet with it. They are now render/cubeBake.js (the six faces, faceTexelDir, and bakeCubemap, the six-face walk
+that nebulaSkybox, proceduralStar and planetSurface had each written out by hand) and render/valueNoise.js (the
+integer hash, the trilinear value noise, the fBm). Every consumer is repointed and NOTHING IS RE-EXPORTED from
+the old home on purpose: a back-compat re-export would leave the wrong import path working and the graph still
+saying the sky owns the noise. THE FINDING, and it was sitting in a comment: render/greeble.js and
+render/hitBurst.js each imported the hash under the words "the tree's one integer hash", and hitBurst spelled the
+claim out -- "already shared by the skybox, star, planet and greeble". THE PLANET WAS NEVER IN IT.
+world/procPlanet.js has carried its own hash3 since v3830 on a different mix (raw multiply and XOR, not imul and
+add) and a QUINTIC fade where this one is cubic, and its fbm3 takes a configurable gain and lacunarity the other
+does not. Measured rather than eyeballed: the two hashes agree on 0 of 360 sampled lattice points, and fbm and
+fbm3 differ at all 200 of 200 shared inputs. So the tree holds TWO value noises deliberately and a third in GLSL,
+and the obvious cleanup -- point one at the other, delete a file, call it a refactor -- WOULD SILENTLY RESKIN
+EVERY PLANET, every asteroid's displacement and every texel of every baked surface, with no test anywhere going
+red. render/valueNoise-selfcheck.mjs therefore PINS THE DISAGREEMENT, which reads backwards for a gate and is the
+point: converging them is allowed, it is just not allowed to happen by accident. Byte-neutrality is not asserted,
+it is measured: 20 digests over the primitives, the nebula bake at three seeds and at the SHIPPED defaults, the
+star bake, the planet's spec, its equirect and cubemap bakes, greeble panels, a two-step hit-burst and the
+structure exports were taken on the v4326 tree BEFORE the move and are identical after it, and four of them are
+frozen into the new gates as an answer key so a later round has to rewrite them knowingly. Six sabotages, six
+caught by name: texel corners for centres, +X and -X swapped, a bake tinted by face index (the only one that
+leaves every direction a unit vector and every face the right way up -- caught ONLY by the answer key), one hash
+constant moved, the fade "unified" onto procPlanet's quintic, and fbm's gain retuned to 0.55. Caught in my own
+diff on re-reading it: bakeCubemap absorbing the loop left faceTexelDir as a dead import in nebulaSkybox.js.
+THEN THE TWO NEW GATES TURNED gateSweep RED, WHICH IS THE GATE WORKING: it holds that every gate in the tree has
+been swept by the v4297 run or by a round that closed the surplus, and two had not. Accounted for with a THIRD
+closing (since3) rather than by appending two names to since2 -- that record says at:"v4322" and reports a sweep
+that ran on a day, and editing it would make it claim it had executed files that did not exist yet, which is the
+retyped-summary failure its own section 7 exists to catch. AND SABOTAGING THE NEW CLOSING FOUND A HOLE THAT WAS
+ALREADY THERE: naming a gate file that does not exist left the section GREEN, because "every gate the record
+names still exists" was built from the v4297 record alone and never read the closings' own added lists -- so
+since2's twenty-six names could have gone stale silently since v4322. The list now includes all three closings,
+112 paths checked against 70, and the same sabotage is caught on since2 and since3 both. Four sabotages against
+this file, three caught and the fourth a finding rather than a pass, which is the rule this tree keeps.
+Not checked and said plainly: nothing was rendered this round -- the backdrop, the star, the planet and the
+station are unchanged BY THE DIGESTS rather than by a browser having drawn them, es-box3d-fly3d.html is untouched
+and still imports only bakeNebulaCubemap, and no number here is signed by the rig. AND VERIFY IS NOT ALL GREEN,
+which is stated here rather than left for the next reader to discover. The quick sweep named FIVE new reds and
+only one was this round's -- gateSweep, fixed above. The other four were this BOX and not this tree, each checked
+against a clean v4326 worktree rather than assumed, and three of them turned out to be a mess on the floor rather
+than a fault: ai-bridge/vendor existed here as an EMPTY directory with zero tracked files, which made
+copiedOutsideVendor count three directories named vendor; and TODO.md.bak, a gitignored backup whose mtime is
+nine minutes older than this clone's own HEAD, was named by both strayBackups and rootLayout. Both are gone and
+those three are green, and the .bak was shown to be a strict subset BEFORE it was removed rather than after --
+TODO.md is exactly its newest 789-byte entry prepended to that backup, byte for byte, so nothing was lost.
+THE ONE THAT REMAINS IS pathTracerWgsl, and it stays red on purpose: every number in it came off a real adapter,
+this box has none, and it holds that a gate which skips is not a gate that passes. It is NOT registered in
+redCensus to buy a green -- an environmental red is not a standing red, and the register is not a place to put a
+sandbox. So this round is committed and pushed and NOT fast-forwarded onto main, because the ritual's own rule is
+that verify decides that and verify says one failure. ALSO MINE AND ALSO SAID: the ritual's `rm -f` of the changelog tool's own backup took
+BACKLOG.md.bak with it, and that file predated this session rather than being the tool's output; it was
+untracked and gitignored so nothing shipped differently, and BACKLOG.md itself is byte-untouched, but the file
+is gone and cannot be restored from git. gates 1407 -> 1409. The tree stands at 1409 gates.
+
 ## v4326 -- a texture across the shell boundary: the fleets' own bitmap look as a graph, graded against the shipped pipeline itself
 
 *** A TEXTURE CROSSES, AND THE TWIN IS SHIPPED CODE. *** The correction first, twice: v4325 named the sprite shell after the one graph that used it (heidlerSpriteShell), and one round later a second graph wants the same layout, so it is spriteLookShell(buffers, { uniforms, textures, extraUniforms, displace }) now with the old name kept as a wrapper -- a shell is a LAYOUT, not a look; and tslRace-selfcheck counted itself in the backend-parity census for the TWELFTH time in this tree and the third time in this one file, because section 6 asserts the sprite shell declares its atlas by writing that declaration out, and that declaration is exactly backendParity's framework-style GLSL tell (glslBearing 145 -> 146, glslOnly 132 -> 133, framework 16 -> 17, and the two-consumer contract showing three). Same fix as the eleven before it: the tell is assembled from pieces at run time, no exclusion list. Then the round. Until now a shell transplant refused every texture, so the fleets' own bitmap sprite -- a texel fetched by integer coordinate, no sampler, transparent texels discarded -- was the one race a graph could not paint. The SHELL now lists the textures its prefix binds (physicsTsl spriteAtlasShell: viewProj alone and the atlas at binding 1, which is exactly the fleets' sprite pipeline), render/tslSource.mjs transplantIntoShell keeps the graph's own label for them, and a texture the shell does not bind -- or a SAMPLED texture where the shell declares no sampler -- refuses by name. What that buys is the strongest claim in this file: makeSpriteAtlasTsl is render/fleets.mjs SPRITE_WGSL written as nodes, so the twin is not written for the occasion, it is shipped code -- on WebGPU and on WebGL2 the Pixel race painted by the GENERATED pipeline is the fleets' OWN Pixel race on 36,864 of 36,864 pixels (worst 0), transparent texels discarded the same, 2,198 pixels painted, the pick still naming it, and the fleet's own bind hook feeding the generated shader unchanged because the graph labelled the texture with the name that hook binds. THE FINDING, one argument wide: three's TextureNode constructor runs setUpdateMatrix(uvNode === null), so a texture node built WITHOUT a uv turns the texture's uv-transform matrix on, and every clone keeps the flag -- textureLoad() clones. Spelled the obvious way the emitted fragment multiplies its fetch coordinate by an unlabelled mat3 and is refused by name; spelled with the uv at construction it carries no uniform at all. orrery-gpu.html?tsl=1 now paints THREE races from graphs: the Chaos hull breathing, the Pixel quad lit by the lightning, and the Glyph race drawing its own shipped look. Sabotaged and measured: the texture node built without its uv (4 red -- and on this headless shell the WebGPU run's execution context is destroyed rather than merely failing), the shell-binds-it check dropped (2 red), and the graph's Discard dropped (2 red -- 2,712 pixels part from the shipped race, worst 20). Measured and NOT fixed: three fetches the texel twice around a Discard that reads it, because the var it fetched into is not reused across the discard. Not built and said: the INK layout (a line-list, whose topology no shell here carries and whose fragment has no uv to read); a filtered sample into a shell (no fleet look declares a sampler, so the refusal is checked and the crossing is not); three's camera and model matrices inside a graph, still refused because the shell owns the transform; that render/physicsTsl.mjs is now holding shells and looks that are not physics and wants a split of its own; and every number the rig has not signed. The tree stands at 1407 gates.
