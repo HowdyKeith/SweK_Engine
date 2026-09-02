@@ -33,6 +33,8 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
          bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, bcsLiquidChrome,
          bcsPixelateStorm, bcsMagneticField, bcsAurora, bcsDatamosh, bcsSmokeReveal, bcsMorphBreathe,
          swkLyapunov, swkFresnel, swkAiry,
+         bcsShatter, bcsShatterGlass, bcsUnderwaterCaustics,
+         bcsDisintegrate, bcsEtherealAura, bcsLiquidMirror,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -56,17 +58,28 @@ import { codeOnly } from "./sourceScan.mjs";
 // *** v4308 -- THE THIRTEEN UNPORTED SHADERS, READ FROM UPSTREAM RATHER THAN GUESSED. ***
 // v4265 could not name them: its sandbox had no network and the Metal source is not vendored here. This one
 // reaches GitHub, so krispuckett/swiftuishaders was cloned at 6b644a8 and the roster taken from
-// Sources/SwiftUIShaders/Shaders/SwiftUIShaders.metal -- 41 [[stitchable]] entry points, against the 28 this
-// tree ports, difference thirteen and no residue in either direction (nothing is ported that upstream lacks).
+// Sources/SwiftUIShaders/Shaders/SwiftUIShaders.metal -- 41 [[stitchable]] entry points, and no residue in
+// either direction (nothing is ported that upstream lacks). *** RE-READ FROM THE CLONE AT v4319 AND THE 41
+// HOLDS: a naive grep counts 42 because line 4 of the file is a COMMENT containing "[[stitchable]]". The
+// count was right and worth re-deriving rather than trusting. "against the 28 this tree ports, difference
+// thirteen" was true at v4308 and is now 38 and three; the numbers are derived below rather than typed here.
 // KEPT AS DATA rather than prose so the next batch can be picked without another clone, and so this file can
 // say WHICH thirteen the closing note has been counting for eleven batches.
-// v4309 ported liquidChrome; v4310 ported pixelateStorm, magneticField and aurora. NINE remain, and ALL
-// NINE reach the sin-hash -- confirmed from the source at v4310, which is what batch 11 could only assert
-// when it wrote "after wormhole there are no gradeable shaders left upstream at all". None of the nine can
-// ever be graded pixel-for-pixel against its CPU model; they can only be graded structurally.
-export const UNPORTED = [
-    "disintegrate", "etherealAura", "liquidMirror", "shatter", "shatterGlass", "underwaterCaustics",
-];
+// v4309 ported liquidChrome; v4310 pixelateStorm, magneticField and aurora; v4311 datamosh, smokeReveal and
+// morphBreathe; v4319 shatter, shatterGlass and underwaterCaustics; *** v4320 THE LAST THREE -- disintegrate,
+// etherealAura and liquidMirror -- SO THIS LIST IS EMPTY AND ALL 41 ARE PORTED. ***
+//
+// *** AN EMPTY LIST IS NOT A REASON TO DELETE THE MACHINERY, AND THIS IS THE ROUND WHERE THAT MATTERS. ***
+// The identity below (ported + unported = 41, no residue either way) is what catches a shader being invented
+// or a name being dropped, and it is exactly as load-bearing at zero as it was at thirteen. If upstream ever
+// adds a 42nd, this list going non-empty is how anybody finds out.
+//
+// *** THE PROSE ABOVE THIS LIST SAID "NINE REMAIN" WHILE THE LIST HELD SIX, and had since v4311. *** The
+// array was updated three times and the sentence beside it was not, so this file's own header disagreed with
+// its own data for eight rounds and nothing noticed -- the same shape as the premultiplied count that said
+// thirteen and tested fourteen (fixed at v4316). The count is DERIVED from the list now, everywhere it is
+// stated, so a sentence cannot drift from the array again.
+export const UNPORTED = [];
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -772,8 +785,16 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
     }
     // portedShaderNames() excludes ours -- see SWK_OWN in swiftShaderPass.js. swk_lyapunov renders and is
     // graded here, and it is not one of upstream's 41, so it must not appear in this number.
-    ok("!! 35 of 41 ported", pass.portedShaderNames().length === 35,
-        pass.portedShaderNames().length + " ported + " + pass.SWK_OWN.length + " of our own (" + pass.SWK_OWN.join(", ") + ")");
+    // *** FOURTH PINNED COUNT IN THIS FILE, AND IT IS THE ONE THAT MATTERS LEAST AS A NUMBER. *** "35 of 41"
+    // was raised at every batch and its LABEL is what a reader greps. The real property is that ported + still
+    // unported = upstream's 41, with no residue in either direction -- which is an identity that holds at
+    // every batch size and goes red only if a shader is invented or a name is dropped.
+    ok("!! ported + unported = upstream's 41, with no residue in either direction",
+        pass.portedShaderNames().length + UNPORTED.length === 41 &&
+        !UNPORTED.some((n) => pass.portedShaderNames().includes(n)),
+        pass.portedShaderNames().length + " ported + " + UNPORTED.length + " unported = 41, plus " +
+        pass.SWK_OWN.length + " of our own (" + pass.SWK_OWN.join(", ") + ") which are NOT upstream's and " +
+        "must never be counted into that 41");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -941,7 +962,9 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
             flat.data[i] = x / (W - 1); flat.data[i + 1] = y / (H - 1);
             flat.data[i + 2] = ((x + y) % 7) / 6; flat.data[i + 3] = 0.6;
         }
-        const FN = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
+        const FN = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry,
+            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics,
+            disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura, liquidMirror: bcsLiquidMirror, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
                      pixelateMosaic: bcsPixelateMosaic, refractLens: bcsRefractLens, emboss: bcsEmboss,
                      vortex: bcsVortex, melt: bcsMelt, glitch: bcsGlitch, heatShimmer: bcsHeatShimmer,
                      wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
@@ -964,11 +987,25 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
         ok("!! *** the map of the 28 is COVERED: every ported name has a model function here ***",
             pass.swiftShaderNames().every((n) => typeof FN[n] === "function"),
             "a name missing from this map would silently skip the alpha census below rather than fail it");
-        ok("!! *** only THREE of the 28 touch alpha on a flat-alpha image, and only TWO by a visible amount ***",
-            moved.length === 3 && visible.length === 2 &&
-            visible.includes("refractLens") && visible.includes("pixelateMosaic"),
-            moved.join(", ") + "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, " +
-            "which is under a level of 255 and is not a write");
+        // *** v4320 -- THIS CENSUS CAUGHT BATCH 16 BEFORE ANY PROSE ABOUT IT WAS WRITTEN, WHICH IS THE
+        // WHOLE POINT OF RUNNING IT OVER EVERY SHADER RATHER THAN OVER A LIST. *** It was "THREE of the 28,
+        // TWO visibly" and disintegrate made it four and three, at 0.6000 -- the largest alpha move in the
+        // file. That is not a defect: bcs_disintegrate DISSOLVES the image, so `result.a *= half(edge)` is
+        // the effect and not a compositing artefact, and below the burn front it returns half4(0) outright.
+        //
+        // The count is no longer typed. What is asserted is the DIVISION: alpha movement is either an
+        // accident of quantisation (under one level of 255, like frosted's 0.0001 from toHalf on a mix of
+        // two equal alphas) or a DELIBERATE WRITE by a shader whose stated purpose includes it. Every visible
+        // mover must be one of the four named here, so a shader that starts eating alpha by accident still
+        // fails -- which is what this line has always been for.
+        const ALPHA_WRITERS = ["refractLens", "pixelateMosaic", "disintegrate"];
+        const strays = visible.filter((n) => !ALPHA_WRITERS.includes(n));
+        ok("!! *** every VISIBLE alpha move belongs to a shader whose effect is alpha -- and there are three ***",
+            strays.length === 0 && visible.length === ALPHA_WRITERS.length,
+            moved.join(", ") + (strays.length ? "  -- STRAY WRITERS: " + strays.join(", ") : "") +
+            "  -- frosted's 0.0001 is toHalf quantising a mix between two equal alphas, which is under a " +
+            "level of 255 and is not a write. disintegrate's 0.6000 is the largest in the file and is the " +
+            "shader's entire subject: it is the ONLY one of the 41 that writes alpha as its effect.");
         ok("!! ...so 'the first shader that writes alpha' was WRONG: refractLens got there at v4196",
             (() => {
                 const o = bcsRefractLens(flat, { ...pass.DEFAULT_KNOBS.refractLens });
@@ -1119,7 +1156,9 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         await pg.goto("http://127.0.0.1:" + port + "/g.html", { waitUntil: "load" });
         await pg.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 
-        const MODEL = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
+        const MODEL = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry,
+            shatter: bcsShatter, shatterGlass: bcsShatterGlass, underwaterCaustics: bcsUnderwaterCaustics,
+            disintegrate: bcsDisintegrate, etherealAura: bcsEtherealAura, liquidMirror: bcsLiquidMirror, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
             duochrome: bcsDuochrome, vortex: bcsVortex, kaleidoscope: bcsKaleidoscope,
             chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
             melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
@@ -1133,7 +1172,10 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             smokeReveal: bcsSmokeReveal, morphBreathe: bcsMorphBreathe };
         // liquidChrome at time 0.4: both fbm fields are animated, so a non-zero time is what makes the
         // displacement and the height field disagree with each other rather than sharing one sample.
-        const CASES = { lyapunov: {}, fresnelEdge: {}, airyDisk: {}, liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
+        const CASES = { lyapunov: {}, fresnelEdge: {}, airyDisk: {},
+            shatter: { time: 0.5, explode: 0.4 }, shatterGlass: { time: 0.5 }, underwaterCaustics: { time: 0.5 },
+            disintegrate: { time: 0.5 }, etherealAura: { time: 0.5 }, liquidMirror: { time: 0.5 },
+            liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
             magneticField: { time: 0.6, polarity: 0.5 }, aurora: { time: 0.7 },
             datamosh: { time: 0.4, blockCorruption: 0.7 }, smokeReveal: { time: 0.5 },
             morphBreathe: { time: 0.8 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
@@ -1156,8 +1198,19 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // *** THIS LINE IS WHY THE COUNT IS TRUSTWORTHY: it is DERIVED from the fragment source, so a shader
         // cannot join the set by my saying so, or be kept out of it by my forgetting. liquidChrome landed in
         // it without being told to, which is the independent check on the port's own claim to be in it.
+        // *** v4319 -- AND HERE IS THE THIRD PINNED COUNT IN THIS FILE, CAUGHT BY THE SAME BATCH THAT TRIPPED
+        // IT. *** The set is DERIVED and the assertion was `=== 15`, so every batch that ports a hash-reaching
+        // shader has to raise it by hand -- 5, 8, 9, 15, and now 18. The derivation was always the good part;
+        // the equality added nothing except a number to maintain. What is actually worth asserting is the
+        // PROPERTY: this set may only GROW, because a shader cannot stop calling the sin-hash without being
+        // rewritten, and everything left upstream reaches it. A ratchet, not an equality.
+        const HASH_FLOOR = 15;   // MAY RISE, MAY NEVER FALL: 15 at v4316, 18 after batch 15.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
-            HASHED.length === 15, HASHED.join(", "));
+            HASHED.length >= HASH_FLOOR && HASHED.every((n) => /bcs_(hash|valueNoise|fbm)\(/.test(
+                pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main")))),
+            HASHED.length + " of " + pass.swiftShaderNames().length + " reach it, floor " + HASH_FLOOR + ": " +
+            HASHED.join(", ") + ". A shader cannot join by my saying so or be kept out by my forgetting, and " +
+            "the number no longer has to be raised by hand every batch.");
 
         // *** TWO DIFFERENT REASONS A SHADER CANNOT BE GRADED TO THE PIXEL, AND THEY ARE NOT THE SAME THING. ***
         //   HASHED   -- fract(sin(x) * 43758.5453) at large x is IMPLEMENTATION-DEFINED. Two implementations
@@ -1788,10 +1841,21 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         console.log("\n20. trap 3 -- the first comparison at a device pixel ratio other than 1");
         {
             const carriers = pass.swiftShaderNames().filter((n) => "pointScale" in (pass.DEFAULT_KNOBS[n] || {}));
-            // 20 of 32. aurora is the FIRST PORTED SHADER THAT CARRIES NONE -- every coordinate it reads is
-            // uv and it samples the layer undisplaced, so there is no length in points for a scale to touch.
-            ok("!! 23 of the 35 ported shaders carry pointScale at all", carriers.length === 23,
-                carriers.length + " carriers: " + carriers.join(" "));
+            // 20 of 32, then 23 of 35, then 26 of 38. *** FIFTH PINNED COUNT, SAME BATCH, SAME FIX. *** aurora
+            // is the first ported shader that carries none -- every coordinate it reads is uv and it samples
+            // the layer undisplaced, so there is no length in points for a scale to touch. THAT is the
+            // property: a shader declares pointScale exactly when its fragment reads uPointScale, and a
+            // declaration without a use is a dead knob whose uniform location is null and whose writes are
+            // silent no-ops -- the same defect the premultiplied derivation caught at v4316.
+            const psDisagree = pass.swiftShaderNames().filter((n) => {
+                const src = pass.SHADERS[n], body = src.slice(src.indexOf("void main"));
+                return ("pointScale" in (pass.DEFAULT_KNOBS[n] || {})) !== /uPointScale/.test(body);
+            });
+            ok("!! every pointScale knob is DECLARED and USED -- derived, never counted",
+                psDisagree.length === 0,
+                psDisagree.length ? "DISAGREE: " + psDisagree.join(", ")
+                    : carriers.length + " of " + pass.swiftShaderNames().length + " carry it and every one " +
+                      "reads it: " + carriers.join(" "));
             const rows = [];
             for (const name of carriers) {
                 const shot = (ps) => pg.evaluate(({ name, knobs, W, H, src }) => {
@@ -1872,9 +1936,14 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "AND THIS SANDBOX HAS NO NETWORK, so the remaining thirteen are not even NAMED anywhere here', and that " +
     "was true of the sandbox it ran in. IT IS NOT TRUE OF EVERY SANDBOX: this session reaches GitHub, so " +
     "krispuckett/swiftuishaders was cloned at 6b644a8 (MIT, Copyright 2026 Kris Puckett) and the roster read " +
-    "off the source instead of guessed. UPSTREAM DECLARES 41 [[stitchable]] SHADERS, this tree ports 28, and " +
-    "the difference is exactly thirteen: " + UNPORTED.join(", ") + ". " +
+    "off the source instead of guessed. UPSTREAM DECLARES 41 [[stitchable]] SHADERS, this tree ports " +
+    pass.portedShaderNames().length + ", and the difference is exactly " + UNPORTED.length + ": " +
+    UNPORTED.join(", ") + ". " +
     "The count 41 was right all along; what was missing was which. Porting from a name would still be " +
     "invention -- these are names READ FROM THE SOURCE, and the source is now reachable, which is a different " +
-    "thing from the list being invented.");
+    "thing from the list being invented. *** v4319 -- BOTH NUMBERS IN THIS SENTENCE WERE TYPED AND BOTH WENT " +
+    "STALE: it said 28 ported and thirteen remaining while the roster below it held six. They are derived " +
+    "now. And 41 was RE-DERIVED from the clone rather than trusted -- a naive grep for [[stitchable]] counts " +
+    "42, because line 4 of the Metal file is a COMMENT containing the attribute. The count was right; the " +
+    "check that it was right did not exist until somebody re-ran it.");
 process.exit(fails ? 1 : 0);

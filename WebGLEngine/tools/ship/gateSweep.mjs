@@ -132,6 +132,65 @@ export function finalize(rows) {
  * A regression is a gate that was green and is now red. A sweep that ran only gates already known red has no
  * eligible population and must report `unmeasurable`, not zero. This is the check v4296's RECHECK failed.
  */
+/**
+ * *** THE FOURTEEN GATES ADDED SINCE THE v4297 SWEEP, RUN AT LAST -- AND ALL FOURTEEN ARE GREEN. ***
+ *
+ * gateSweep-selfcheck stopped pinning `swept === enumerateGates().length - 1` at v4315 and started NAMING the
+ * surplus instead, because a frozen count went red the moment anybody added a gate. The number it named was
+ * the honest staleness of SWEEP_V4297: fourteen gate files in the tree that the sweep had never executed,
+ * thirteen from main's v4297-v4300 rounds and one from this branch. NAMING IT IS NOT THE SAME AS CLOSING IT,
+ * so this is the closing.
+ *
+ * *** AND THE TWO-PHASE METHOD EARNED ITS KEEP ON A POPULATION OF FOURTEEN. *** Phase 1, five workers:
+ * twelve green, ONE RED (gitEconomy, 38.4 s) and ONE that never finished (modeDistinct, killed at a 200 s
+ * cap). Phase 2, serially, one at a time:
+ *
+ *     gitEconomy      RED at 38.4 s in parallel  ->  GREEN at 7.35 s alone, reproduced twice (7.347 s, 7.358 s)
+ *     modeDistinct    unmeasured at the 200 s cap ->  GREEN, and it needs about NINE MINUTES to run
+ *
+ * gitEconomy is a FALSE RED FROM STARVATION -- the phenomenon v4279 measured at a 15% rate, here at 1 of 1.
+ * It ran five times slower under contention than alone. Had phase 2 been skipped, this round would have
+ * reported a regression that does not exist, in the file whose subject is that every number in circulation
+ * about redness was somebody's memory.
+ *
+ * modeDistinct is the other half of the same asymmetry: a 200 s cap on a gate that takes nine minutes says
+ * something about the cap. UNMEASURED IS A THIRD STATE, and it resolved green.
+ *
+ * *** WHY GREEN-UNDER-CONTENTION IS STILL SOUND, WHICH IS WHAT MAKES THIS AFFORDABLE. *** The clean pass was
+ * itself briefly contended -- two of my own runs of modeDistinct overlapped, so its 519 s and 547 s timings
+ * are inflated and are NOT recorded as clean. The VERDICTS are, because the asymmetry PHASES.phase1 already
+ * states runs one way: starvation manufactures failures and never passes. A green measured while the box was
+ * busy is a green on an idle one. Only the reds needed the second pass, and only the timings needed quiet.
+ */
+export const SWEEP_SINCE_V4297 = Object.freeze({
+    at: "v4317", population: "every gate file present now and absent from the tree at the v4297 sweep",
+    swept: 14, green: 14, red: 0, falseReds: 1, unmeasuredAtCap: 1, regressions: 0,
+    parallelWorkers: 5, phase1CapMs: 200000, phase2CapMs: 900000,
+    added: Object.freeze([
+        "tools/roundhouse/modeDistinct-selfcheck.mjs", "tools/ship/deviceTexture-selfcheck.mjs",
+        "tools/ship/gitEconomy-selfcheck.mjs", "tools/ship/gpuDriven-selfcheck.mjs",
+        "tools/ship/gpuOrbits-selfcheck.mjs", "tools/ship/gpuPick-selfcheck.mjs",
+        "tools/ship/gpuTerrain-selfcheck.mjs", "tools/ship/gpuUniverse-selfcheck.mjs",
+        "tools/ship/hiZ-selfcheck.mjs", "tools/ship/qualityTiers-selfcheck.mjs",
+        "tools/ship/rigCanvas-selfcheck.mjs", "tools/ship/shaderComplexity-selfcheck.mjs",
+        "tools/ship/songButton-selfcheck.mjs", "tools/ship/strengthField-selfcheck.mjs",
+    ]),
+    resolvedByPhase2: Object.freeze([
+        { gate: "tools/ship/gitEconomy-selfcheck.mjs", phase1: "RED", phase1Ms: 38404,
+          phase2: "GREEN", phase2Ms: 7358, reproducedMs: 7347,
+          why: "five times slower under five workers than alone -- the starvation signature. A FALSE RED." },
+        { gate: "tools/roundhouse/modeDistinct-selfcheck.mjs", phase1: "UNMEASURED", phase1Ms: 200037,
+          phase2: "GREEN", phase2Ms: null,
+          why: "it needs roughly nine minutes; the phase-1 cap was 200 s. The timings taken were contended " +
+               "(519 s and 547 s across two overlapping runs of my own) so no clean figure is recorded here -- " +
+               "a number measured under contention is not a number about the gate." },
+    ]),
+    // *** THE ANSWER TO THE QUESTION THE SURPLUS COUNT WAS ASKING. ***
+    verdict: "nothing added since v4297 is red. The fourteen include all seven of main's GPU-driven gates, " +
+             "which pass on a box with NO WebGPU adapter -- they take the CPU-twin route and grade THAT, " +
+             "rather than skipping, which is why they had a verdict to give at all",
+});
+
 export function coversRegressions(sweptGates, knownRedGates) {
     const known = new Set(knownRedGates);
     const eligible = sweptGates.filter((g) => !known.has(g));

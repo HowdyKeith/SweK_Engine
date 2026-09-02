@@ -1853,6 +1853,386 @@ export function bcsMorphBreathe(img, { time = 0, breatheDepth = 20, breatheRate 
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
 
+/**
+ * bcs_disintegrate -- BATCH 16, v4320. *** THE ONLY SHADER IN ALL 41 THAT WRITES ALPHA. ***
+ *
+ * Every other port in this file ends `out[i + 3] = a` -- the layer's alpha, passed through untouched. This
+ * one dissolves the image, so alpha is the effect: `result.a *= half(edge)` fades a pixel out as the burn
+ * front passes it, and below the front it returns half4(0) outright. Two early returns, both load-bearing:
+ *
+ *     if (original.a < 0.01h) return original;                     already transparent, nothing to dissolve
+ *     if (dissolveValue < threshold - edgeWidth * 1.5) return 0;    fully burnt away
+ *
+ * *** THAT MAKES THE PREMULTIPLIED KNOB MEAN SOMETHING DIFFERENT HERE, AND THE DIFFERENCE IS NOT COSMETIC. ***
+ * Elsewhere `k` scales an additive term so the add lands correctly on straight alpha. Here the ADD is scaled
+ * the same way -- ember glow and sparkle both take k -- but the alpha MULTIPLY is unconditional, because it
+ * is the effect rather than a compositing artefact. A port that made the fade conditional on `premultiplied`
+ * would be inventing behaviour upstream does not have.
+ *
+ * The dissolve field is fbm at two scales plus a spatial sweep, so it reaches the sin-hash and cannot be
+ * graded pixel-for-pixel; and its threshold comparison is a step, so a last-bit disagreement does not shade,
+ * it FLIPS a pixel between burnt and unburnt. Same categorical shape batch 15's cell loops have, from a
+ * different direction.
+ */
+export function bcsDisintegrate(img, { time = 0, threshold = 0.5, edgeWidth = 0.15, driftAmount = 20,
+                                       direction = 0.8, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const orig = s(px, py);
+        if (orig[3] < 0.01) { out[i] = orig[0]; out[i + 1] = orig[1]; out[i + 2] = orig[2]; out[i + 3] = orig[3]; continue; }
+        const n1 = bcsFbm(uvx * 6 + time * 0.1, uvy * 6 + time * 0.1, 5);
+        const n2 = bcsFbm(uvx * 12 + 17, uvy * 12 + 31, 4);
+        const comb = n1 * 0.7 + n2 * 0.3;
+        const sweep = uvx * 0.4 + (1 - uvy) * 0.6;
+        const dv = comb * 0.6 + sweep * 0.4;
+        if (dv < threshold - edgeWidth * 1.5) { out[i] = out[i + 1] = out[i + 2] = out[i + 3] = 0; continue; }
+        const edge = smoothstep(threshold - edgeWidth, threshold, dv);
+        const inner = smoothstep(threshold - edgeWidth * 0.3, threshold, dv);
+        const edgeMask = edge - inner;
+        const ember = [1.0, 0.4, 0.05], hot = [1.0, 0.95, 0.8];
+        const glow = ember.map((v, j) => mix(v, hot[j], toHalf(inner * 0.8)));
+        const ddx = Math.cos(direction), ddy = Math.sin(direction);
+        const drift = (1 - edge) * driftAmount * pointScale;                   // POINTS
+        const scatter = bcsValueNoise(uvx * 30 + time * 2, uvy * 30 + time * 2);
+        const ox = ddx * drift + (scatter - 0.5) * drift * 0.5;
+        const oy = ddy * drift + (scatter - 0.5) * drift * 0.5;
+        const dc = s(clamp(px + ox, 0, w), clamp(py + oy, 0, h));
+        const sparkle = (bcsValueNoise(uvx * 50 + time * 5, uvy * 50 + time * 5) >= 0.97 ? 1 : 0) * edgeMask * 5;
+        const sw = [1.0, 0.7, 0.3];
+        const a = orig[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++) {
+            let v = mix(dc[j], orig[j], toHalf(edge));
+            v = mix(v, glow[j], toHalf(edgeMask * 3));
+            v = toHalf(v + toHalf(glow[j] * toHalf(edgeMask * 2)) * k);
+            out[i + j] = toHalf(v + toHalf(sparkle * sw[j]) * k);
+        }
+        // ALPHA IS THE EFFECT HERE, not a passthrough -- see the note above.
+        out[i + 3] = toHalf(a * toHalf(edge));
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_etherealAura -- BATCH 16, v4320. THE HEAVIEST NOISE BUDGET UPSTREAM SHIPS: SIX fbm CALLS PER PIXEL.
+ *
+ * A domain-warped edge field (2 fbm at 5 octaves, warped by a third at 4), then a SECOND domain warp for the
+ * displacement (2 more at 5, warped into 2 at 4), then a chromatic aberration that samples the layer three
+ * times. At 5 octaves each fbm is 5 valueNoise calls and each valueNoise is 4 bcs_hash calls, so a single
+ * pixel evaluates the sin-hash on the order of a hundred and twenty times.
+ *
+ * *** ITS AURA COLOUR IS A sin() TRIPLE AND NOT bcs_hsb2rgb, WHICH IS WORTH SAYING BECAUSE THE FILE HAS BOTH. ***
+ * auraColor = sin(hue + {0, 2.094, 4.189}) * 0.5 + 0.5 -- the 2.094 and 4.189 are 2pi/3 and 4pi/3 to three
+ * decimals, so it is a cheap cosine-palette hue rather than a colour-space conversion. Upstream computes it
+ * in HALF precision (`sin(half(hue_shift))`), which is a real quantisation of the phase and not an accident
+ * of typing, so the port rounds through toHalf at the same point rather than computing a float32 hue the
+ * GLSL cannot reach.
+ *
+ * The edgeDir term is a per-quadrant sign that pushes the displacement INWARD from whichever edge is nearest;
+ * it is a branch on uv, so it is exactly reproducible and is not part of the hash problem.
+ */
+export function bcsEtherealAura(img, { time = 0, auraWidth = 0.25, auraIntensity = 1, pulseSpeed = 1.5,
+                                       distortion = 14, hueShift = 0.6, pointScale = 1,
+                                       premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const edgeDist = Math.min(Math.min(uvx, 1 - uvx), Math.min(uvy, 1 - uvy));
+        const stx = uvx * 6, sty = uvy * 6;
+        const qx = bcsFbm(stx + time * 0.15, sty + time * 0.1, 5);
+        const qy = bcsFbm(stx + 5.2 + time * 0.12, sty + 1.3 + time * 0.18, 5);
+        const warp = bcsFbm(stx + 3 * qx, sty + 3 * qy, 4);
+        const auraMask = smoothstep(auraWidth + warp * auraWidth, 0, edgeDist);
+        const pulse = 0.6 + 0.4 * Math.sin(time * pulseSpeed);
+        const pm = auraMask * pulse;
+        const dsx = uvx * 4, dsy = uvy * 4;
+        const dqx = bcsFbm(dsx + time * 0.25, dsy + time * 0.2, 5);
+        const dqy = bcsFbm(dsx + 3 + time * 0.2, dsy + 7 + time * 0.3, 5);
+        const drx = bcsFbm(dsx + 3 * dqx + time * 0.1, dsy + 3 * dqy, 4);
+        const dry = bcsFbm(dsx + 3 * dqx, dsy + 3 * dqy + time * 0.08, 4);
+        const edx = uvx < 0.5 ? 1 : -1, edy = uvy < 0.5 ? 1 : -1;
+        let dx = (drx - 0.5) * distortion * pm + edx * pm * distortion * 0.3;
+        let dy = (dry - 0.5) * distortion * pm + edy * pm * distortion * 0.3;
+        const globalDisp = smoothstep(0.3, 0, edgeDist);
+        dx *= globalDisp * pointScale; dy *= globalDisp * pointScale;          // POINTS
+        const dpx = clamp(px + dx, 0, w), dpy = clamp(py + dy, 0, h);
+        const chroma = pm * distortion * 0.12 * pointScale;                    // POINTS
+        let cdx = uvx - 0.5 + 0.001, cdy = uvy - 0.5 + 0.001;
+        const cl = Math.hypot(cdx, cdy) || 1;
+        cdx = (cdx / cl) * chroma; cdy = (cdy / cl) * chroma;
+        const rr = s(clamp(dpx + cdx, 0, w), clamp(dpy + cdy, 0, h));
+        const gg = s(dpx, dpy);
+        const bb = s(clamp(dpx - cdx, 0, w), clamp(dpy - cdy, 0, h));
+        const col = [rr[0], gg[1], bb[2]];
+        const hs = toHalf(hueShift);
+        const aura = [toHalf(Math.sin(hs) * 0.5 + 0.5), toHalf(Math.sin(hs + 2.094) * 0.5 + 0.5),
+                      toHalf(Math.sin(hs + 4.189) * 0.5 + 0.5)];
+        const glow = pm * auraIntensity;
+        const a = gg[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++)
+            out[i + j] = toHalf(col[j] + toHalf(aura[j] * toHalf(glow * 0.6)) * k + toHalf(glow * 0.15) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_liquidMirror -- BATCH 16, v4320, AND THE FORTY-FIRST. The port is complete with this one.
+ *
+ * A reflection about a horizontal axis with a liquid ripple, and the only shader here whose geometry is a
+ * FOLD: below mirror_axis the sampled y is reflected back across it, so the bottom of the frame shows the top
+ * of the image rippling. Three ripple terms -- two products of sines and one valueNoise -- displace the
+ * reflected sample; the reflection is dimmed, partly desaturated toward its own luma, and crossfaded into the
+ * original over a soft 0.08 transition band rather than at a hard line.
+ *
+ * *** THE CAUSTIC HIGHLIGHT IS THE ONE TERM THAT NEEDS k, AND WORKING OUT WHY IS THE PORT'S ONE REAL ALPHA
+ * DECISION. *** Everything else is a multiply or a mix: `reflectedColor.rgb *= fade`, the desaturation mix,
+ * and the final crossfade all commute with premultiplication and take no k. `color.rgb += half3(caustic)` is
+ * an ADD, so on straight alpha it must be scaled by the coverage it is being added into. Fifth batch in a row
+ * where that split was predicted from reading which operations are linear, and the derived premultiplied
+ * check (v4316) is what turns the reading into a test.
+ *
+ * pow(max(ripple1 * ripple2 + 0.5, 0), 10) is a sharp highlight: an exponent of ten on a value that peaks at
+ * 1.5 means the caustic is essentially zero except where both ripple trains crest together.
+ */
+export function bcsLiquidMirror(img, { time = 0, mirrorAxis = 0.5, ripple = 12, speed = 1.5, depth = 0.6,
+                                       pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const tw = 0.08, rStart = mirrorAxis - tw, rFull = mirrorAxis + tw;
+        const rDepth = smoothstep(rStart, 1.0, uvy);
+        const rBlend = smoothstep(rStart, rFull, uvy);
+        const mvy = uvy > rStart ? mirrorAxis - (uvy - mirrorAxis) : uvy;
+        const t = time * speed;
+        const rsx = uvx * 6, rsy = mvy * 6;
+        const r1 = Math.sin(rsx * 4 + t * 1.3) * Math.cos(rsy * 3 + t * 0.9);
+        const r2 = Math.sin(rsx * 7 - t * 1.7) * Math.cos(rsy * 5 + t * 1.1);
+        const r3 = bcsValueNoise(rsx + t * 0.5, rsy + t * 0.3);
+        const strength = rBlend * rDepth * pointScale;                          // POINTS
+        const dx = (r1 * 0.5 + r2 * 0.3 + (r3 - 0.5) * 0.4) * ripple * strength;
+        const dy = (r1 * 0.3 + r2 * 0.5 + (r3 - 0.5) * 0.3) * ripple * strength;
+        const rc = s(clamp(uvx * w + dx, 0, w), clamp(mvy * h + dy, 0, h)).slice();
+        const oc = s(px, py);
+        const fade = Math.max(1 - rDepth * depth, 0.2);
+        for (let j = 0; j < 3; j++) rc[j] = toHalf(rc[j] * toHalf(fade));
+        const lum = toHalf(luma(rc[0], rc[1], rc[2]));
+        for (let j = 0; j < 3; j++) rc[j] = mix(rc[j], lum, toHalf(rDepth * 0.2));
+        const caustic = Math.pow(Math.max(r1 * r2 + 0.5, 0), 10) * 0.15 * rBlend * rDepth;
+        const a = oc[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++)
+            out[i + j] = toHalf(mix(oc[j], rc[j], toHalf(rBlend)) + toHalf(caustic) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_shatter -- BATCH 15, v4319. THE FIRST OF THREE VORONOI SHADERS, AND THE FIRST CELL LOOP IN THIS FILE.
+ *
+ * A 3x3 neighbourhood of jittered cell points; the nearest one owns the pixel and gives it a deterministic
+ * per-shard random, the gap to the SECOND nearest draws the crack line. That structure -- minDist and
+ * secondDist tracked together -- is what the remaining three upstream shaders have in common, and it is why
+ * they are ported as one batch rather than by name.
+ *
+ * *** ALL THREE REACH bcs_hash DIRECTLY RATHER THAN THROUGH fbm, WHICH MAKES THEM WORSE, NOT BETTER. *** The
+ * fifteen already-hashed shaders feed the sin-hash SMOOTHED coordinates through valueNoise, so a last-bit
+ * disagreement is interpolated down. Here the hash decides which CELL a pixel belongs to, through a
+ * comparison: one ULP can flip `d < minDist` and hand the pixel to a different shard entirely, with a
+ * different random, a different drift and a different colour. THE DISAGREEMENT IS NOT SMOOTH, IT IS
+ * CATEGORICAL, and no tolerance expresses it.
+ *
+ * *** SO THE CPU MODEL IS STILL WORTH WRITING, AND ITS PURPOSE IS DIFFERENT. *** It is not a comparand -- the
+ * gate cannot grade these pixel-for-pixel and says so. It is the READABLE STATEMENT of what the GLSL does, in
+ * a language where the arithmetic can be inspected, and it is what makes "the port is faithful" a claim a
+ * reader can check by diffing two files rather than by trusting a screenshot.
+ *
+ * Traps handled: `point` renamed (it is not reserved in GLSL ES 3.00, but it reads as a type to anyone coming
+ * from HLSL and this file has already lost a round to `active`); half() casts kept where upstream has them;
+ * driftDir normalised against a +0.001 epsilon exactly as upstream does, because shardCenter == center is
+ * reachable at odd shard counts and normalize(0) is NaN.
+ */
+export function bcsShatter(img, { time = 0, shardCount = 8, explode = 0.4, rotationAmt = 1.2, edgeGlow = 0.8,
+                                  pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const cux = uvx * shardCount, cuy = uvy * shardCount;
+        const cidx = Math.floor(cux), cidy = Math.floor(cuy);
+        const cfx = cux - cidx, cfy = cuy - cidy;
+        let minD = 10, secD = 10, ccx = 0, ccy = 0;
+        for (let jj = -1; jj <= 1; jj++) for (let ii = -1; ii <= 1; ii++) {
+            const idx = cidx + ii, idy = cidy + jj;
+            const qx = bcsHash(idx, idy), qy = bcsHash(idx + 37, idy + 91);
+            const dx = ii + qx - cfx, dy = jj + qy - cfy;
+            const d = Math.hypot(dx, dy);
+            if (d < minD) { secD = minD; minD = d; ccx = idx; ccy = idy; }
+            else if (d < secD) { secD = d; }
+        }
+        const r1 = bcsHash(ccx * 7.3, ccy * 7.3);
+        const r2 = bcsHash(ccx * 13.7 + 5, ccy * 13.7 + 3);
+        const r3 = bcsHash(ccx * 23.1 + 11, ccy * 23.1 + 7);
+        const eased = explode * explode * (3 - 2 * explode);
+        const scx = (ccx + 0.5) / shardCount, scy = (ccy + 0.5) / shardCount;
+        let ddx = scx - 0.5 + 0.001, ddy = scy - 0.5 + 0.001;
+        const dl = Math.hypot(ddx, ddy) || 1; ddx /= dl; ddy /= dl;
+        const driftDist = eased * (0.3 + r1 * 0.7) * 120 * pointScale;    // POINTS
+        const ang = (r2 - 0.5) * rotationAmt * eased;
+        const tiltX = (r3 - 0.5) * eased * 0.15;
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const rox = (ca * ddx - sa * ddy) * driftDist, roy = (sa * ddx + ca * ddy) * driftDist;
+        const fallEased = Math.max(eased - r1 * 0.3, 0);
+        const fall = fallEased * fallEased * 100 * pointScale * (0.4 + r1 * 0.6);   // POINTS
+        let spx = px - rox, spy = py - roy - fall;
+        const persp = 1 - eased * r1 * 0.15;
+        const shx = scx * w, shy = scy * h;
+        spx = shx + (spx - shx) / persp; spy = shy + (spy - shy) / persp;
+        const c = s(clamp(spx, 0, w), clamp(spy, 0, h));
+        const gx = cfx - 0.5, gy = cfy - 0.5, gl = Math.hypot(gx, gy) || 1;
+        const grad = (gx / gl) * 0.5 + (gy / gl) * -0.3;
+        const glass = smoothstep(-0.3, 0.5, grad) * 0.12 * (1 + eased);
+        const tiltDark = Math.max(1 - Math.abs(tiltX) * eased * 2, 0.6);
+        const edgeDist = secD - minD;
+        const thinEdge = 1 - smoothstep(0, 0.03, edgeDist);
+        const softEdge = 1 - smoothstep(0, 0.1, edgeDist);
+        const ec = [0.7, 0.85, 1.0].map((v) => v * edgeGlow);
+        const eAmt = thinEdge * 0.8 + softEdge * 0.2;
+        const shadow = 1 - eased * 0.15 * r1, fade = 1 - eased * r1 * 0.4;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++) {
+            let v = toHalf(c[j] + toHalf(glass) * k);
+            v = toHalf(v * toHalf(tiltDark));
+            v = toHalf(v + toHalf(ec[j]) * toHalf(eAmt) * k);
+            out[i + j] = toHalf(toHalf(v * toHalf(shadow)) * toHalf(fade));
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_shatterGlass -- BATCH 15, v4319. The same cell loop, spent on refraction instead of on flight.
+ *
+ * *** AND IT CARRIES AN UPSTREAM NaN THAT THIS PORT REPRODUCES RATHER THAN QUIETLY FIXES. ***
+ * `normalize(nearestPoint - secondPoint)` has NO epsilon, unlike bcs_shatter's driftDir which has +0.001 and
+ * bcs_etherealAura's chromaDir which has the same. Two cell points at equal distance make that a normalize of
+ * the zero vector, which is NaN in Metal and in GLSL alike -- and NaN propagates through the refraction
+ * offset into a black pixel. It is reachable: it needs only minDist == secondDist, which the equality branch
+ * in the loop does not exclude.
+ *
+ * The port keeps it, and the reason is the rule this file has followed for fifteen batches: A PORT THAT FIXES
+ * A BUG STOPS BEING A PORT. Diverging here would make the CPU model and the GLSL agree with each other and
+ * disagree with the Metal, which is the one comparison nobody in this tree can run. The behaviour is recorded
+ * instead, so the next reader meets it as a known property rather than as a mystery black pixel -- and the
+ * GLSL guards it the same way the model does, by falling back to (0,0) so the two ports match each other.
+ */
+export function bcsShatterGlass(img, { time = 0, crackDensity = 7, glassRefraction = 8, prismStrength = 0.5,
+                                       shatterSpread = 0.35, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const cux = (px / w) * crackDensity, cuy = (py / h) * crackDensity;
+        const icx = Math.floor(cux), icy = Math.floor(cuy);
+        const fcx = cux - icx, fcy = cuy - icy;
+        let minD = 10, secD = 10, npx = 0, npy = 0, spx2 = 0, spy2 = 0, nHash = 0;
+        for (let yy = -1; yy <= 1; yy++) for (let xx = -1; xx <= 1; xx++) {
+            const cx = icx + xx, cy = icy + yy;
+            const qx = bcsHash(cx, cy), qy = bcsHash(cx + 127.1, cy + 311.7);
+            const dx = xx + qx - fcx, dy = yy + qy - fcy;
+            const d = Math.hypot(dx, dy);
+            if (d < minD) { secD = minD; spx2 = npx; spy2 = npy; minD = d; npx = dx; npy = dy; nHash = bcsHash(cx + 500, cy + 500); }
+            else if (d < secD) { secD = d; spx2 = dx; spy2 = dy; }
+        }
+        const edgeDist = secD - minD;
+        const crack = 1 - smoothstep(0, 0.06, edgeDist);
+        const sox = npx * shatterSpread * 15 * pointScale, soy = npy * shatterSpread * 15 * pointScale;  // POINTS
+        const sang = nHash * 0.3 * shatterSpread, cs = Math.cos(sang), ss = Math.sin(sang);
+        let dpx = clamp(px + (cs * sox - ss * soy), 0, w), dpy = clamp(py + (ss * sox + cs * soy), 0, h);
+        // The undefended normalize -- see the note above. len 0 falls back to (0,0) in BOTH ports.
+        const rdx0 = npx - spx2, rdy0 = npy - spy2, rl = Math.hypot(rdx0, rdy0);
+        const rdx = rl > 0 ? rdx0 / rl : 0, rdy = rl > 0 ? rdy0 / rl : 0;
+        dpx = clamp(dpx + rdx * glassRefraction * pointScale * crack, 0, w);                              // POINTS
+        dpy = clamp(dpy + rdy * glassRefraction * pointScale * crack, 0, h);
+        const c = s(dpx, dpy).slice();
+        if (prismStrength > 0.01 && crack > 0.1) {
+            const pr = prismStrength * 5 * pointScale;                                                    // POINTS
+            c[0] = s(clamp(dpx + rdx * pr, 0, w), clamp(dpy + rdy * pr, 0, h))[0];
+            c[2] = s(clamp(dpx - rdx * pr, 0, w), clamp(dpy - rdy * pr, 0, h))[2];
+        }
+        const hi = crack * (0.5 + 0.5 * Math.sin(edgeDist * 100 + time));
+        const shardB = nHash * 0.15 - 0.075;
+        const shadow = crack * 0.4;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++)
+            out[i + j] = toHalf(c[j] + (toHalf(hi * 0.6) + toHalf(shardB) - toHalf(shadow)) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_underwaterCaustics -- BATCH 15, v4319. THE LAST UPSTREAM SHADER THAT REACHES BOTH FAMILIES OF NOISE.
+ *
+ * An fbm displacement for the water surface, then TWO cellular caustic fields multiplied together, then a
+ * depth tint and light rays. It is the only one of the 41 that uses bcs_fbm and a bcs_hash cell loop in the
+ * same fragment, which is why it closes this batch rather than opening it.
+ *
+ * *** THE CAUSTIC LOOP IS NOT THE VORONOI THE OTHER TWO USE, AND THE DIFFERENCE IS EASY TO PORT WRONGLY. ***
+ * Upstream writes `1.0 - length(fract(animUV1) - fract(point1)) * 2.5` where point1 = cell + hash. Taking
+ * fract of a point that already contains its cell index is NOT the neighbour-offset form -- it discards the
+ * integer part of the cell, so the field is not a distance to a jittered site at all but a wrapped
+ * difference. Ported verbatim. It looks like a bug and it may be one; it is upstream's, the picture is what
+ * it is because of it, and the rule is unchanged: a port that fixes a bug stops being a port.
+ */
+export function bcsUnderwaterCaustics(img, { time = 0, causticScale = 8, causticIntensity = 1,
+                                             waterDistortion = 12, waterDepth = 0.5, pointScale = 1,
+                                             premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const n1 = bcsFbm(uvx * 4 + time * 0.3, uvy * 4 + time * 0.2, 4);
+        const n2 = bcsFbm(uvx * 4 - time * 0.25 + 10, uvy * 4 + time * 0.35 + 10, 4);
+        const dsp = waterDistortion * pointScale;                                     // POINTS
+        const c = s(clamp(px + (n1 - 0.5) * dsp, 0, w), clamp(py + (n2 - 0.5) * dsp, 0, h));
+        const a1x = uvx * causticScale + time * 0.4, a1y = uvy * causticScale + time * 0.3;
+        const a2x = uvx * causticScale * 1.3 - time * 0.35, a2y = uvy * causticScale * 1.3 + time * 0.45;
+        const fr = (v) => v - Math.floor(v);
+        let c1 = 0, c2 = 0;
+        for (let yy = -1; yy <= 1; yy++) for (let xx = -1; xx <= 1; xx++) {
+            const e1x = Math.floor(a1x) + xx, e1y = Math.floor(a1y) + yy;
+            const p1x = e1x + bcsHash(e1x, e1y), p1y = e1y + bcsHash(e1x + 100, e1y + 100);
+            c1 = Math.max(c1, 1 - Math.hypot(fr(a1x) - fr(p1x), fr(a1y) - fr(p1y)) * 2.5);
+            const e2x = Math.floor(a2x) + xx, e2y = Math.floor(a2y) + yy;
+            const p2x = e2x + bcsHash(e2x + 50, e2y + 50), p2y = e2y + bcsHash(e2x + 150, e2y + 150);
+            c2 = Math.max(c2, 1 - Math.hypot(fr(a2x) - fr(p2x), fr(a2y) - fr(p2y)) * 2.5);
+        }
+        const caustic = Math.pow(Math.max(c1 * c2, 0), 3) * causticIntensity;
+        let rays = Math.sin(uvx * 20 + time * 0.5) * 0.5 + 0.5;
+        rays *= smoothstep(1.0, 0.0, uvy) * waterDepth * 0.1;
+        const cc = [0.95, 0.98, 1.0], tint = [0.2, 0.5, 0.7], rw = [0.3, 0.5, 0.6];
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++) {
+            let v = toHalf(c[j] + toHalf(cc[j]) * toHalf(caustic) * k);
+            const deep = toHalf(toHalf(v * toHalf(1 - waterDepth * 0.3)) + toHalf(tint[j]) * toHalf(waterDepth * 0.15) * k);
+            v = toHalf(mix(v, deep, toHalf(waterDepth)));
+            out[i + j] = toHalf(v + toHalf(rays * rw[j]) * k);
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
 // ==================================================================================================================
 // *** OURS, NOT UPSTREAM'S. *** Everything above this line is a port of krispuckett/SwiftUIShaders (MIT) and is
 // named bcs_*. Everything below is SweK's own and is named swk_*, so the provenance is readable from the call

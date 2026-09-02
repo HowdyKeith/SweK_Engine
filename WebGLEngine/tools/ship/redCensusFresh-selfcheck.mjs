@@ -53,9 +53,11 @@ sec("2. THE RECORD RECONCILES WITH ITSELF, AND SAYS WHICH MOMENT EACH NUMBER DES
     // field that means "now" and the frozen one is reconciled with the fixed-since term beside it.
     ok(M.standingToday === RC.RED_AT_V4279.length,
        "the LIVE standing count equals the list", `${M.standingToday}`);
-    ok(M.standingAfterFixes === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length,
-       "...and the v4279 figure reconciles with it through what has been fixed and pruned since",
-       `${RC.RED_AT_V4279.length} standing + ${RC.FIXED_SINCE_V4279.length} fixed since = ${M.standingAfterFixes} at v4279`);
+    ok(M.standingAfterFixes === RC.registerAtSweep(),
+       "...and the v4279 figure reconciles with it through everything that has entered or left since",
+       `registerAtSweep() ${RC.registerAtSweep()} = ${RC.RED_AT_V4279.length} standing + ` +
+       `${RC.FIXED_SINCE_V4279.length} fixed since - ${RC.RECOVERED_SINCE_V4279.length} recovered since ` +
+       `= ${M.standingAfterFixes} at v4279`);
     ok(M.standingAfterFixes + M.introducedAndFixedInRound === M.confirmedBySweep,
        "*** and 37 + 2 = 39, so the two numbers are two MOMENTS rather than a contradiction ***",
        `${M.standingAfterFixes} standing + ${M.introducedAndFixedInRound} fixed in round = ${M.confirmedBySweep} found by the sweep`);
@@ -108,10 +110,9 @@ sec("5. THE RE-CHECK IS RECORDED, INCLUDING THAT NOTHING WAS FIXED");
 // ---------------------------------------------------------------------------------------------------------
 {
     const R = RC.RECHECK;
-    ok(R.checked === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length && R.stillRed + R.nowGreen === R.checked,
+    ok(R.checked === RC.registerAtSweep() && R.stillRed + R.nowGreen === R.checked,
        "the recorded re-check adds up, against the register as it stood WHEN IT RAN",
-       `${R.stillRed} red + ${R.nowGreen} green = ${R.checked}; register now ${RC.RED_AT_V4279.length} + ` +
-       `${RC.FIXED_SINCE_V4279.length} fixed since`);
+       `${R.stillRed} red + ${R.nowGreen} green = ${R.checked} = registerAtSweep()`);
     // v4297: this line used to read `R.regressed === 0` and asserted a field the re-check could not measure.
     // A gate that checks a record is only as honest as the record, and this one repeated its error verbatim.
     ok(R.nowGreen === 0 && R.regressedAmongChecked === 0,

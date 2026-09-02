@@ -125,7 +125,28 @@ ok("!! *** no chip the group mover took away has been sorted back into the top r
 // ---- and the chips still WORK after being moved ---------------------------------------------------------
 // appendChild carries the listener, the live state span and the data-tab pairing -- that is a claim about the
 // DOM, not about this page. So three chips that ended up far from where the markup put them are CLICKED.
-for (const tab of ["blobs", "em", "voxelrender"]) {
+// *** v4321 -- THIS SAMPLE WAS A TYPED LIST OF SECTION IDS AND ONE OF THEM STOPPED EXISTING. *** It read
+// ["blobs", "em", "voxelrender"], and when "Voxel & Render" was split into Voxels and Renders the click test
+// went red reporting "NO PANEL -> NO PANEL" -- a gate failing because a drawer was RENAMED, not because a
+// chip stopped working. Fifth typed reference to a section id caught this session, after the sin-hash count,
+// the ported total, the pointScale carriers and the premultiplied set.
+//
+// DERIVED, AND DERIVED TO THE STATED INTENT. The comment above says the sample exists because chips "ended up
+// far from where the markup put them", so the sample IS that: the three chips the sort MOVED FURTHEST from
+// their markup position. It cannot name a dead drawer, and it tests the chips most likely to have lost their
+// listener rather than three somebody happened to pick.
+const markupSrc = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
+const markupOrder = [...markupSrc.matchAll(/class="gtab"[^>]*data-tab="([^"]+)"/g)].map((m) => m[1]);
+const moved = row
+    .map((c, i) => ({ tab: c.tab, shift: Math.abs(i - markupOrder.indexOf(c.tab)) }))
+    .filter((c) => markupOrder.includes(c.tab))
+    .sort((a, b) => b.shift - a.shift || a.tab.localeCompare(b.tab))
+    .slice(0, 3);
+ok("the click sample is DERIVED from how far the sort moved each chip, not typed",
+    moved.length === 3 && moved[0].shift > 0,
+    moved.map((m) => m.tab + " moved " + m.shift).join(", ") +
+    " -- a typed sample named voxelrender until v4321 split that drawer, and went red for the rename");
+for (const tab of moved.map((m) => m.tab)) {
     const sel = '#gaugeTabBar .gtab[data-tab="' + tab + '"]';
     const read = () => page.evaluate((t) => {
         const p = document.querySelector('.gpanel[data-panel="' + t + '"]');
