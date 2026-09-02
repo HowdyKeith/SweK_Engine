@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic)
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic), v4338 (and a fourth that reduces in WORKGROUP memory)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -151,4 +151,35 @@ export function makeChaosTallyTsl(TSL, { sweep, count } = {}) {
         If(sweep.element(instanceIndex).greaterThan(0.0), () => { atomicAdd(tally.element(uint(0)), uint(1)); });
     })().compute(count);
     return { node, tally, count };
+}
+
+/**
+ * v4338 -- THE SAME COUNT, REDUCED IN WORKGROUP MEMORY. Each lane writes its own 1 or 0 into an array the workgroup
+ * shares, the workgroup waits at a barrier, and lane 0 adds the 64 slots and contributes ONE atomic increment for the
+ * whole group. The answer is the same as makeChaosTallyTsl's; what changes is the traffic -- sixteen atomic
+ * operations for 1024 elements instead of one per element that finds a positive.
+ *
+ * That is the shape a real reduction has, and the reason to transplant it is that three's builder emits BOTH halves:
+ * a var<workgroup> declaration above the entry and a workgroupBarrier() in the body. The declaration lives in a
+ * section render/tslSource.mjs used to drop on the floor, which would have left the body naming an array nothing
+ * declared -- the device refuses that, loudly, which is how it was found.
+ */
+export function makeChaosReduceTsl(TSL, { sweep, count, workgroupSize = 64 } = {}) {
+    const { Fn, If, Loop, uint, instanceIndex, instancedArray, workgroupArray, workgroupBarrier, atomicAdd, localId } = TSL;
+    for (const n of ["workgroupArray", "workgroupBarrier", "atomicAdd"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (!sweep || typeof sweep.element !== "function") throw new Error("physicsTsl: makeChaosReduceTsl needs the sweep's own buffer node");
+    const total = instancedArray(1, "uint").toAtomic();
+    const lane = workgroupArray("uint", workgroupSize);
+    const node = Fn(() => {
+        const me = localId.x;
+        lane.element(me).assign(uint(0));
+        If(sweep.element(instanceIndex).greaterThan(0.0), () => { lane.element(me).assign(uint(1)); });
+        workgroupBarrier();
+        If(me.equal(uint(0)), () => {
+            const sum = uint(0).toVar();
+            Loop({ start: 0, end: workgroupSize }, ({ i }) => { sum.addAssign(lane.element(uint(i))); });
+            atomicAdd(total.element(uint(0)), sum);
+        });
+    })().compute(count);
+    return { node, total, count, workgroupSize };
 }

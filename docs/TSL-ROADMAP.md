@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -138,8 +138,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    runs, and counts 156 to 171 against a truth of 670, a different wrong number every time: 74% to 77% of the
    increments lost to contention. At 64 elements there is one workgroup and nothing to lose, which is why the
    section runs at 1024. This is the cull pass's own shape; what is still missing before a real gpuDriven pass
-   could be regenerated is an INDIRECT dispatch (the count a pass runs at living in a buffer) and workgroup-SHARED
-   memory, which three can emit and no shell here declares.
+   could be regenerated is an INDIRECT dispatch (the count a pass runs at living in a buffer).
+   v4338 -- WORKGROUP-SHARED MEMORY. computeShell takes `shared` ([{ name, element, length }] -> var<workgroup>
+   name: array<element, length>), because three declares its own WorkgroupArray_NNN in a "// locals" section the
+   transplant used to drop -- which left the body naming an array nothing declared, and the device said so.
+   physicsTsl makeChaosReduceTsl is the reduction: each lane writes its 1 or 0 into the shared array, the group
+   waits at a barrier, lane 0 sums 64 slots and contributes ONE atomic increment. Section 7: the same 670 as the
+   per-lane tally with sixteen atomic operations instead of 670, three's generated name replaced by the shell's,
+   and render/wgslSpec.mjs's own parseWorkgroupVars reading array<u32, 64> = 256 bytes out of a shader nobody
+   wrote -- the first generated module that scanner has had to read. THE BARRIER IS MEASURED, NOT CITED: removed,
+   the same module reads 40 against 670 every run, because lane 0 sums before the other 63 have written.
+   What is left before a real gpuDriven pass could be regenerated: an INDIRECT dispatch, which gfx/device.js
+   cannot do at all today -- it has drawIndexedIndirect and no dispatchWorkgroupsIndirect.
 
 ## The count that says when step 4 matters
 

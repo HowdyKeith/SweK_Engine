@@ -56,6 +56,18 @@
 // non-atomic variant replaced NOTHING, leaving an atomicAdd on a plain u32 -- caught only because the device refused
 // the module by name. The replacement is done by index and plain string now, with no pattern to escape.
 //
+// v4338 -- AND WORKGROUP-SHARED MEMORY (section 7). The same count again, reduced the way a real reduction is: each
+// lane writes its 1 or 0 into an array the workgroup shares, the group waits at a barrier, and lane 0 contributes ONE
+// atomic increment for all 64 -- sixteen atomics for 1024 elements instead of one per positive element. three emits
+// BOTH halves, a var<workgroup> declaration above the entry and a workgroupBarrier() in the body, and the declaration
+// lives in a "// locals" section this transplant used to drop on the floor. The shell declares the array (name,
+// element, length), the transplant renames three's WorkgroupArray_NNN to it, and a mismatch is refused by name.
+//
+// *** THE BARRIER IS LOAD-BEARING AND THAT IS MEASURED, NOT CITED. *** The same module with workgroupBarrier()
+// removed reads 40 against a truth of 670, every run: lane 0 sums the shared array before the other 63 have written
+// into it. If that check ever goes GREEN on other hardware it is a finding, not a fix -- WGSL guarantees nothing
+// there without the barrier, and the answer is to record where it stopped being observable.
+//
 // SABOTAGES, MEASURED at v4331:
 //   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
 //      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
@@ -76,6 +88,12 @@
 //      would have been caught by name is left for the device's WGSL parser to reject at pipeline creation instead.
 //   X  the tally graph built without .toAtomic() and counting with a plain add -> exit=1, 1 red, refused by name before the
 //      device sees it ("the shell declares tally atomic and the pass never touches it atomically").
+//   MEASURED at v4338 (workgroup-shared memory):
+//   Y  the shell's var<workgroup> declaration left out of its prefix -> exit=1, 4 red: the module names an array nothing
+//      declares, the device refuses it, the total reads 0, and render/wgslSpec.mjs's scanner finds nothing to read.
+//   Z  the rename of three's WorkgroupArray_NNN skipped -> exit=1, 3 red: the shell declares "lane", the body still names the
+//      generated identifier, and the device refuses that too. The generated name binds to nothing, so this one is about the
+//      module being readable and stable rather than about it working -- but it does not work either, which settles it.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -417,6 +435,75 @@ else {
     }
 }
 
+console.log("\n7. WORKGROUP-SHARED MEMORY (v4338): the same count reduced in a shared array behind a barrier, sixteen atomics instead of 670");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const NBIG = 1024;
+    const r4 = await runInEngineOrigin({ engineRoot: ENG, args: { N: NBIG }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const W = await import("/render/wgslSpec.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4 }); await renderer.computeAsync(g.node);
+        const red = P.makeChaosReduceTsl(T, { sweep: g.buffer, count: a.N }); await renderer.computeAsync(red.node);
+        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
+        const redEmitted = renderer._nodes.getForCompute(red.node).computeShader;
+        out.threeShared = (redEmitted.match(/var<workgroup>/g) || []).length;
+        out.threeBarrier = /workgroupBarrier\\(\\)/.test(redEmitted);
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const sweepShell = S.computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] });
+            const redShell = S.computeShell({ name: "chaos reduce", shared: [{ name: "lane", element: "u32", length: 64 }],
+                                              storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "total", element: "u32", atomic: true }], uniforms: [] });
+            const genSweep = S.transplantCompute(sweepEmitted, sweepShell);
+            const genRed = S.transplantCompute(redEmitted, redShell);
+            out.redWgsl = genRed.wgsl; out.sharedNames = genRed.shared;
+            out.scanned = W.parseWorkgroupVars(genRed.wgsl);   // the tree's own scanner, reading a shader nobody wrote
+            out.refusedNoShared = (() => { try { S.transplantCompute(redEmitted, S.computeShell({ name: "chaos reduce", storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "total", element: "u32", atomic: true }], uniforms: [] })); return null; } catch (e) { return e.message; } })();
+            out.refusedWrongSize = (() => { try { S.transplantCompute(redEmitted, S.computeShell({ name: "chaos reduce", shared: [{ name: "lane", element: "u32", length: 32 }], storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "total", element: "u32", atomic: true }], uniforms: [] })); return null; } catch (e) { return e.message; } })();
+            const sweepBuf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+            const ubuf = dev.buffer({ data: Float32Array.from(g.knobs), usage: "uniform" });
+            const groups = Math.ceil(a.N / 64);
+            const runTotal = async (wgsl) => { const tb = dev.buffer({ data: new Uint32Array([0]), usage: ["storage"] });
+                const pA = dev.compute({ wgsl: genSweep.wgsl }); pA.bind("out", sweepBuf).bind("u", ubuf);
+                const pB = dev.compute({ wgsl }); pB.bind("sweep", sweepBuf).bind("total", tb);
+                dev.frame(({ pass }) => { pass.dispatch(pA, groups); pass.dispatch(pB, groups); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+                const v = new Uint32Array(await dev.read(tb))[0]; tb.destroy(); return v; };
+            out.groups = groups;
+            out.total = await runTotal(genRed.wgsl);
+            // the SAME module with the barrier taken out -- by index and plain string, never a regex (v4337's lesson)
+            const barAt = genRed.wgsl.indexOf("workgroupBarrier()");
+            const noBar = genRed.wgsl.slice(0, barAt) + "/* barrier removed */" + genRed.wgsl.slice(barAt + "workgroupBarrier()".length);
+            out.noBarIsPlain = !/workgroupBarrier\\(\\)/.test(noBar);
+            out.noBarRuns = []; for (let i = 0; i < 5; i++) out.noBarRuns.push(await runTotal(noBar));
+            out.sweep = [...new Float32Array(await dev.read(sweepBuf))];
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran the sweep and the reduction", r4.ok && r4.result && !r4.result.error && r4.result.total != null, r4.ok ? (r4.result && r4.result.error) : (r4.reason || (r4.pageErrors || []).join("; ")));
+    if (r4.ok && r4.result && !r4.result.error) {
+        const D = r4.result;
+        const truth = D.sweep.filter((v) => v > 0).length;
+        ok(`*** the reduction gets the same answer with ${D.groups} atomic increments instead of ${truth}: total ${D.total}, and ${truth} of ${NBIG} elements are positive ***`,
+            D.total === truth && D.groups > 1 && (D.errs || []).length === 0,
+            `total ${D.total}, truth ${truth}; one atomic per workgroup, ${D.groups} of them, against one per positive element in section 6`);
+        ok("*** three emitted BOTH halves and the transplant carried both: a var<workgroup> array above the entry and a workgroupBarrier() in the body, under the SHELL's name ***",
+            D.threeShared === 1 && D.threeBarrier && D.sharedNames.join() === "lane" && /var<workgroup> lane: array<u32, 64>;/.test(D.redWgsl) && !/WorkgroupArray_/.test(D.redWgsl) && /workgroupBarrier\(\)/.test(D.redWgsl),
+            `three declared ${D.threeShared} workgroup array(s) as WorkgroupArray_NNN; the module ships it as "${D.sharedNames.join()}"`);
+        ok("  and render/wgslSpec.mjs's own scanner reads it out of the generated module at the right size", D.scanned.length === 1 && D.scanned[0].name === "lane" && D.scanned[0].bytes === 256,
+            `parseWorkgroupVars: ${JSON.stringify(D.scanned)} -- 64 u32 is 256 bytes, and this is the first generated shader that scanner has ever had to read`);
+        ok("REFUSED: a shell with no workgroup array for a pass that declares one, and one that declares it the wrong size",
+            /declares 1 workgroup array\(s\) and the shell "chaos reduce" declares 0/.test(D.refusedNoShared || "") && /array<u32, 64> and the shell "chaos reduce" says array<u32, 32>/.test(D.refusedWrongSize || ""),
+            `${(D.refusedNoShared || "none").slice(0, 70)} | ${(D.refusedWrongSize || "none").slice(0, 70)}`);
+        ok(`*** and the BARRIER is load-bearing, measured rather than cited: the same module with workgroupBarrier() removed reads ${D.noBarRuns.join(", ")} against ${truth} ***`,
+            D.noBarIsPlain && D.noBarRuns.every((v) => v !== truth),
+            `lane 0 sums the shared array before the other 63 lanes have written into it. If this ever goes GREEN on other hardware -- a device whose lanes happen to finish in order -- that is a FINDING and not a fix: WGSL guarantees nothing here without the barrier, and the right response is to record where it stopped being observable, not to drop the check`);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -424,8 +511,8 @@ else {
 //   B  the Heidler shape with (t/t1) for (t/t1)^2 -> exit=1, 5 red: the source line, and on every path and backend the peak
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against SwiftShader's -- " +
-    "which is the same question the chaotic five ask, one machine further out; a workgroup-shared or ATOMIC pass, which three can emit and this transplant has never seen (the " +
-    "an INDIRECT dispatch, where the count a pass runs at is itself in a buffer, which is the last thing between this and " +
-    "regenerating a real gpuDriven pass; and workgroup-SHARED memory, which three can emit and no shell here declares.");
+console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against " +
+    "SwiftShader's -- the same question the chaotic five ask, one machine further out; and an INDIRECT dispatch, where the count a pass runs at is itself " +
+    "in a buffer, which gfx/device.js cannot do at all today (it has drawIndexedIndirect and no dispatchWorkgroupsIndirect) and is the last thing standing " +
+    "between this transplant and regenerating a real render/gpuDriven.mjs pass rather than a demonstration of one.");
 process.exit(fails ? 1 : 0);
