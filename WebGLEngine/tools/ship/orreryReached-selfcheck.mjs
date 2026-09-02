@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/orreryReached-selfcheck.mjs -- v4330
+// WebGLEngine/tools/ship/orreryReached-selfcheck.mjs -- v4332
 //
 // GRADES world/orreryReached.mjs and tools/ship/orreryReachedScan.mjs -- backlog #48, "Little Prince
 // micro-planets: cast the Khronos catalogue as the inhabitants".
@@ -365,7 +365,7 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
 //
 // *** TWO OF THE FOUR CAUGHT A DEFECT IN THIS GATE RATHER THAN IN THE CODE, which is what they are for. ***
 //
-//   A  asBodies() drops `reached: true` again -- the shape v4198 shipped and v4330 fixed.
+//   A  asBodies() drops `reached: true` again -- the shape v4198 shipped and v4332 fixed.
 //      -> exit=1, 2 red: "buildOrrery(asBodies()) reports every register source as REACHED" (0 reached, 39
 //      unpapered) and the line asserting the state the renderer colours. The CONTROL beside them stayed
 //      GREEN and correctly so -- it strips the field itself, so it reads the same either way. A control that

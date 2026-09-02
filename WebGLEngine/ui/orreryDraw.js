@@ -16,7 +16,7 @@ import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
 import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
 import { satelliteAt } from "../world/orreryFleet.mjs";   // v4329, #68 -- a satellite's position is a pure function of (seed, t)
-import { flybyAt, MAY_TAKE, MAY_NOT_TAKE, NOT_ASKED } from "../world/orreryReached.mjs";   // v4330, #48
+import { flybyAt, MAY_TAKE, MAY_NOT_TAKE, NOT_ASKED } from "../world/orreryReached.mjs";   // v4332, #48
 
 /** Licence posture is the one thing in this picture that is a JUDGEMENT, so it gets the loudest channel. */
 export const STATE_COLOUR = Object.freeze({
@@ -400,7 +400,7 @@ export function drawFleet(ctx, fleet, x, y, scale, tDays = 0, opts = {}) {
 }
 
 /**
- * *** THE FLYBYS, AT SYSTEM ZOOM: WHAT SweK READ AND DID NOT TAKE. *** (#48, v4330)
+ * *** THE FLYBYS, AT SYSTEM ZOOM: WHAT SweK READ AND DID NOT TAKE. *** (#48, v4332)
  *
  * These are drawn as ARCS, not rings, and that is the whole point of the picture. A captured body is on a
  * closed orbit because it is bound; a reached source passes once on a parabola and leaves, because nothing

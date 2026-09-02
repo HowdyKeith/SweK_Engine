@@ -61,7 +61,7 @@ commit hash, which the gate reports rather than fails because the commit that sh
 own hash. Re-bake `orrery.json` too (`node tools/ship/orreryBake.mjs --write`) if `vendor/` changed -- it was
 left forty-five rounds at v4189 and two gates sat red on the register the whole time saying so.
 
-`orrery-reached.json` (v4330, #48) is the same shape for what SweK read and did NOT take: it holds which
+`orrery-reached.json` (v4332, #48) is the same shape for what SweK read and did NOT take: it holds which
 Khronos sample models this tree asks for by name, plus the wide count that measurement rejected. It carries
 no byte sizes, so the version bump does not move it -- but it carries the head commit, and its drift check
 demands POPULATION currency the same way, so bake it in the same step rather than remembering which of the

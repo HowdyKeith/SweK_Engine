@@ -260,10 +260,16 @@ export function systemDigest(fleets, opts = {}) {
  * check that the numbers a future round reads are the numbers this round measured, and so that a body which
  * suddenly starts being edited shows up as a change to this record instead of going unnoticed.
  */
+// v4330 -- `three` WAS RECORDED AS 2 AND GIT SAYS 1, AT THE HEAD THIS RECORD SHIPPED ON. The gate that reads this
+// re-takes the count from git rather than trusting the number, and it went red on origin/main itself the moment
+// that round merged -- not on anything a later round did. The measurement is the authority ("a record nobody
+// re-measures is a sentence" is this record's own argument), so the number is corrected here to what
+// `git log -- WebGLEngine/vendor/three` returns and `at` still names the round that took it. The finding is
+// untouched: htmx and box3d are still 2, so the busiest vendored body has still been touched by two commits.
 export const COMMIT_BELT_V4329 = Object.freeze({
     at: "v4329",
     repoCommits: 858,
-    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
+    perBody: Object.freeze({ three: 1, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),
     why: "twelve of fifteen vendored bodies have been touched by exactly one commit in the repository's life -- " +
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +

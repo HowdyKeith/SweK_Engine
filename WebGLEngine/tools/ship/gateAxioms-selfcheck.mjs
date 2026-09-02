@@ -101,7 +101,7 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
        `${net.length} of ${gates.length}. A GATE THAT NEEDS THE INTERNET IS A GATE THAT IS RED ON AN AEROPLANE, and worse, one whose GREEN depends on a stranger's server still saying what it said.`);
     ok("...and few spawn a process", proc < 40,
        `${proc} use child_process. Each assumes a binary exists on THIS machine -- the shape behind every "works on my rig" report.`);
-    // *** v4330 -- THIS WAS A BOUND AND IT HAS BECOME A REGISTER, WHICH IS v4258'S LESSON APPLIED HERE. ***
+    // *** v4332 -- THIS WAS A BOUND AND IT HAS BECOME A REGISTER, WHICH IS v4258'S LESSON APPLIED HERE. ***
     // `< 20` held for as long as the tree had nineteen browser gates. #48's added the twentieth and this went
     // red -- correctly, because a bound crossed IS news -- but the repair a bound invites is to edit 20 to 21,
     // and nothing then says which gate moved it or whether it should have. citedSources found the same shape

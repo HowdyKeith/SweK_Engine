@@ -982,7 +982,7 @@ export function severityOf(e) {
  *
  * *** THE `reached` FIELD WAS MISSING FOR ELEVEN ROUNDS AND THAT MADE THIS AN ACCUSATION. *** This function
  * says in its own name and its own comment that it exists to feed world/orrery.mjs. It was written at v4198
- * and its only caller until v4330 was its own gate, so nobody ran the sentence it describes. Run, measured:
+ * and its only caller until v4332 was its own gate, so nobody ran the sentence it describes. Run, measured:
  *
  *     buildOrrery(asBodies())  ->  39 UNPAPERED, 0 REACHED
  *

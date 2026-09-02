@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "345728a09f5d4899846f1d90e84a2a1917b0c76d",
+ "head": "d2e9e6347eb34457019d477c5c5309bfe2fce00f",
  "bodies": {
   "box3d": [
    {
@@ -172,7 +172,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 824004,
+    "bytes": 828601,
     "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
    },
    {
@@ -443,7 +443,7 @@
    {
     "path": "main.js",
     "bytes": 2650754,
-    "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
+    "sha": "d2e9e6347eb34457019d477c5c5309bfe2fce00f"
    },
    {
     "path": "mpm3d.html",
@@ -487,7 +487,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 824004,
+    "bytes": 828601,
     "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
    },
    {
@@ -624,7 +624,7 @@
   "three-webgpu": [
    {
     "path": "orrery-gpu.html",
-    "bytes": 35178,
+    "bytes": 35176,
     "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
    },
    {
@@ -634,12 +634,12 @@
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 13292,
+    "bytes": 29723,
     "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 74950,
+    "bytes": 77070,
     "sha": "a4c431ee2289aa14415ea8c82d33d879da00d1f3"
    },
    {

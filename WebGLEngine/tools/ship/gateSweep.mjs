@@ -220,11 +220,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         added: Object.freeze(["tools/ship/orreryFleet-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
     }),
-    // v4330 -- the fourth closing, and the summing above is why adding it costs one entry rather than an
+    // v4332 -- the fourth closing, and the summing above is why adding it costs one entry rather than an
     // edit to the arithmetic. #48's gate was driven through four sabotages before it shipped; two of them
     // went red in the GATE rather than the code, and it ships in the state that survived them.
     since4: Object.freeze({
-        at: "v4330", swept: 1, green: 1, red: 0,
+        at: "v4332", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/orreryReached-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
     }),

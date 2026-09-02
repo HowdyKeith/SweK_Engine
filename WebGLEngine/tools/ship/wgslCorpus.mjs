@@ -48,6 +48,9 @@ const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url))
 const EMITTED_PHYS = fs.existsSync(EMITTED_PHYS_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PHYS_PATH, "utf8")) : null;
 const EMITTED_RACE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-race.json");
 const EMITTED_RACE = fs.existsSync(EMITTED_RACE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_RACE_PATH, "utf8")) : null;
+import { computeShell } from "../../render/tslSource.mjs";
+const EMITTED_COMPUTE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-compute.json");
+const EMITTED_COMPUTE = fs.existsSync(EMITTED_COMPUTE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_COMPUTE_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -170,6 +173,15 @@ export function corpus() {
         // v4328 -- the ink wash: a generated fragment inside the fleets' LINE-LIST shell, one varying and no uv
         ...(EMITTED_RACE && EMITTED_RACE.ink && EMITTED_RACE.ink.transplanted ? [
             { id: "tslSource.inkWash (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "the leanest shell the fleets have: p and colour, a line-list topology, a graph with one varying to read", opts: { code: EMITTED_RACE.ink.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
+        // v4331 -- the hand-written compute twin the generated pass is graded against: the module's own lyapunov() in the
+        // shell a transplant lands in. It is a FUNCTION of that shell, so the corpus builds one to compile it.
+        { id: "lyapunovWgsl.lyapunovComputeWgsl", from: "render/lyapunovWgsl.mjs", compileOnly: true,
+          why: "the hand-written half of the compute claim: one invocation per r, the module's own lyapunov(), a storage buffer out",
+          opts: { code: LY.lyapunovComputeWgsl({ prefix: computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] }).prefix, warmup: 64, samples: 384 }), compileOnly: true, outCount: 0 } },
+        // v4331 -- the first GENERATED COMPUTE pass in the corpus: three's node builder wrote it, tslSource transplanted it
+        ...(EMITTED_COMPUTE && EMITTED_COMPUTE.transplanted ? [
+            { id: "tslSource.lyapunovCompute (generated)", from: "tools/ship/tsl-emitted-compute.json", compileOnly: true, why: "a compute stage nobody wrote by hand: a storage buffer, a uniform struct and two baked Loops, inside a gfx/device.js compute module", opts: { code: EMITTED_COMPUTE.transplanted, compileOnly: true, outCount: 0 } },
         ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320

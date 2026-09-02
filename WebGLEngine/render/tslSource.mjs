@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -215,4 +215,51 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
         }
     }
     return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), ...(shell.textures && shell.textures.length ? { textures: shell.textures } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
+}
+
+// ---- v4331: A COMPUTE PASS CROSSES ---------------------------------------------------------------------------------
+/**
+ * THE SHELL A COMPUTE TRANSPLANT LANDS IN: what gfx/device.js expects of a compute module. `storage` is the buffers
+ * it will bind BY NAME (device.compute() reads the bindings out of the shader text and refuses one nothing is bound
+ * to), `uniforms` the fields of its single uniform struct, `uniformVar` what the body calls it.
+ *
+ * There is NO GLSL HALF, and that is not an omission. WebGL2 has no compute stage; gfx/device.js says so by name
+ * (`compute() needs { wgsl } -- a compute pipeline is WGSL-only`), and the pair contract every other transplant in
+ * this file is held to does not apply here because the pair does not exist.
+ */
+export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
+    const decls = [
+        ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${b.element || "f32"}> };\n@group(0) @binding(${i}) var<storage, read_write> ${b.name}: ${b.name}Buf;`),
+        ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
+    ];
+    return { name, storage, uniforms, uniformVar, workgroupSize, prefix: decls.join("\n") };
+}
+/**
+ * Transplant three's emitted COMPUTE shader into that shell. three writes its own storage buffers under generated
+ * names (NodeBuffer_529), its uniforms in an objectStruct, and -- measured, not guessed -- an `enable subgroups;`
+ * directive with a @builtin(subgroup_size) parameter it never uses, because its own renderer asks the adapter for
+ * that feature and gfx/device.js does not. Left in, the device refuses the module. Both are dropped here.
+ *
+ * Returns { wgsl, storage, uniforms, workgroupSize }. Refuses by name: a shader that is not a compute one, a
+ * storage buffer the shell does not name, an unlabelled uniform, a type the device's uniform list does not carry.
+ */
+export function transplantCompute(wgsl, shell) {
+    if (typeof wgsl !== "string" || !wgsl.includes("Three.js")) throw new Error("tslSource: not a three.js node-system shader");
+    const ENTRY = new RegExp("@" + "compute\\s+@workgroup_size\\(\\s*(\\d+)");
+    const at = wgsl.match(ENTRY);
+    if (!at) throw new Error("tslSource: that shader has no compute entry point (a fragment or vertex belongs in transplantIntoShell)");
+    if (Number(at[1]) !== shell.workgroupSize) throw new Error(`tslSource: three emitted @workgroup_size(${at[1]}) and the shell "${shell.name}" says ${shell.workgroupSize}; the dispatch count is computed from one of them and they must agree`);
+    const found = [...wgsl.matchAll(/var<storage,\s*read_write>\s*(\w+)\s*:/g)].map((m) => m[1]);
+    if (found.length !== shell.storage.length) throw new Error(`tslSource: the graph writes ${found.length} storage buffer(s) and the shell "${shell.name}" names ${shell.storage.length} (${shell.storage.map((b) => b.name).join(", ") || "none"})`);
+    const uniforms = uniformFields(wgsl, "wgsl");
+    for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the compute pass's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ") || "none"})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the pass and ${h.type} in the shell`); }
+    const bodyAll = wgsl.slice(wgsl.indexOf(at[0]));
+    let entry = bodyAll.slice(bodyAll.indexOf("fn main("));
+    // three asks for a WGSL extension the device never requested, and takes a builtin only that extension defines
+    entry = entry.replace(/,?\s*@builtin\(\s*subgroup_size\s*\)\s*\w+\s*:\s*u32/g, "");
+    let b = entry;
+    found.forEach((g, i) => { b = b.replace(new RegExp(`\\b${g}\\b`, "g"), shell.storage[i].name); });
+    b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
+    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\nvar<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
+    return { wgsl: code, storage: shell.storage.map((b2) => b2.name), uniforms, workgroupSize: shell.workgroupSize, shell: shell.name };
 }

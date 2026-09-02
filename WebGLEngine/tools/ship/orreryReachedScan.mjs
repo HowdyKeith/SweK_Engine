@@ -1,4 +1,4 @@
-// FILE: tools/ship/orreryReachedScan.mjs -- v4330
+// FILE: tools/ship/orreryReachedScan.mjs -- v4332
 //
 // The fs half of world/orreryReached.mjs. That module is pure so a browser and a gate see the same numbers;
 // this walks the tree to answer the one question the model cannot ask for itself: WHICH Khronos sample models

@@ -19,6 +19,14 @@
 // IN EXACTLY ONE PLACE BECAUSE IT IS ASSIGNED -- not because anybody remembered a second edit. That is the whole
 // design, and it is why brain-bench.html (which was in BOTH the brain panel and Arriving) can only be in one now.
 
+// v4329 -- THE RENDER TSL DRAWER, AND THE ARGUMENT THAT WAITED FOR IT. The UNPLACED register carried a nine-page
+// render group from v4315 with the note that naming a drawer decides what a panel is ABOUT and that the naming was
+// Keith's to do. He named this one. Two of that group left for it; the third (universe-gpu.html) stayed, because it
+// has no TSL in it and following the other two would be the subject filing this register exists to refuse.
+//
+// SABOTAGE R, MEASURED: the section's `tab` pointed at a chip that does not exist -> exit=1, 1 red, naming it. A
+// section whose chip is missing renders into nothing and looks exactly like a page that vanished, which is the
+// twenty-seven-round failure this file was written after.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
