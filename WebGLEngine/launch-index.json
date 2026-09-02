@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 440,
+  "page": 443,
   "demo": 49,
   "builtin": 34
  },
@@ -1087,7 +1087,7 @@
    "id": "drive-brain.html",
    "display": "Drive Brain",
    "href": "/drive-brain.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -1543,6 +1543,14 @@
    "id": "govee.html",
    "display": "Govee",
    "href": "/govee.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gpu-rig-check.html",
+   "display": "Gpu Rig Check",
+   "href": "/gpu-rig-check.html",
    "section": null,
    "collision": false
   },
@@ -2271,6 +2279,14 @@
    "id": "orbs.html",
    "display": "Orbs",
    "href": "/orbs.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "orrery-gpu.html",
+   "display": "Orrery Gpu",
+   "href": "/orrery-gpu.html",
    "section": null,
    "collision": false
   },
@@ -3255,6 +3271,14 @@
    "id": "universal-viewer.html",
    "display": "Universal Viewer",
    "href": "/universal-viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "universe-gpu.html",
+   "display": "Universe Gpu",
+   "href": "/universe-gpu.html",
    "section": null,
    "collision": false
   },

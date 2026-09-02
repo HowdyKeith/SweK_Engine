@@ -233,8 +233,47 @@ sec("5. *** THE RE-CHECK REPORTED A FIELD ITS OWN METHOD COULD NOT HAVE MEASURED
        `amongChecked ${R.regressedAmongChecked}; overall: ${R.regressedOverall}`);
     ok(/unmeasur|unknown/i.test(R.regressedOverall),
        "and the unmeasured one says so in the word a reader greps for");
-    ok(R.checked === standing.length,
-       "the checked count still matches the list it checked", `${R.checked}`);
+    // *** THIS PINNED A v4296 COUNT AGAINST A LIVE LIST, AND WENT RED THE FIRST TIME THE LIST SHRANK FOR A
+    // GOOD REASON. *** RECHECK.checked is 37 because 37 gates were red then. RED_AT_V4279 is 33 now because
+    // four have since been FIXED and pruned by hand, each naming its cause in FIXED_SINCE_V4279 -- which is
+    // the mechanism redCensus demands ("a gate turning green is GOOD NEWS that must be recorded by hand").
+    // A check with no term for that punishes the repair, which is the shape v4155's Arriving cap had and
+    // corroborateFully's "two rejections" had. The term, not a looser comparison.
+    ok(R.checked === standing.length + RC.FIXED_SINCE_V4279.length,
+       "the checked count still matches the list it checked, plus what has been fixed OUT of it since",
+       `${R.checked} checked = ${standing.length} standing + ${RC.FIXED_SINCE_V4279.length} fixed since`);
+
+    // *** AND THE RULE IS APPLIED TO EVERY RECHECK RECORD, DERIVED RATHER THAN NAMED. *** v4297 checked
+    // RECHECK because RECHECK was the record that had the defect. Two more re-check records were written on a
+    // branch in the meantime -- RECHECK_V4313 and RECHECK_V4314 -- and BOTH SHIPPED THE BARE `regressed: 0`
+    // THIS SECTION EXISTS TO REFUSE, because a check that names one record cannot see the second copy. Same
+    // shape as MODES in nine files and the gate-file walk in three: THE SECOND COPY IS NEVER THE ONE THAT GETS
+    // UPDATED, and here the second copy was of the defect rather than of the fix.
+    const rechecks = Object.entries(RC).filter(([k, v]) =>
+        /^RECHECK/.test(k) && v && typeof v === "object" && typeof v.checked === "number");
+    ok(rechecks.length >= 1, "every re-check record is found by SHAPE, not by name",
+       rechecks.map(([k]) => k).join(", ") + " -- adding a RECHECK_V4400 puts it under this rule automatically");
+    const bare = rechecks.filter(([, v]) => Object.prototype.hasOwnProperty.call(v, "regressed"));
+    ok(bare.length === 0, "*** NO re-check record carries a bare `regressed` field ***",
+       bare.length ? "STILL BARE: " + bare.map(([k]) => k).join(", ") : rechecks.length + " records, none of them");
+    const unsplit = rechecks.filter(([, v]) =>
+        !(v.regressedAmongChecked === 0 || typeof v.regressedAmongChecked === "number") ||
+        !/unmeasur|unknown/i.test(String(v.regressedOverall)));
+    ok(unsplit.length === 0,
+       "...and each splits the measured figure from the one it says it cannot measure",
+       unsplit.length ? "NOT SPLIT: " + unsplit.map(([k]) => k).join(", ")
+                      : rechecks.map(([k, v]) => k + " amongChecked=" + v.regressedAmongChecked).join("; "));
+
+    // A record MAY still answer the regression question -- if it names a SECOND method with real coverage.
+    // RECHECK_V4314 does: a sweep of every gate reading server.html, most of them not red, which found one.
+    // That is what coversRegressions() is for, so the exemption is a measurement rather than a sentence.
+    const withWide = rechecks.filter(([, v]) => v.sweptOutsideTheCensus);
+    ok(withWide.every(([, v]) => typeof v.sweptOutsideTheCensus.regressedFound === "number" &&
+                                 v.sweptOutsideTheCensus.population),
+       "a record that DOES answer it names the wider method and its population",
+       withWide.length ? withWide.map(([k, v]) => k + ": " + v.sweptOutsideTheCensus.population + " -> " +
+            v.sweptOutsideTheCensus.regressedFound + " regression(s)").join("; ")
+                       : "none claims to, which is also a legal state");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -271,9 +310,20 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // method's output and not a retyped summary of it. Every line below is arithmetic over the frozen record,
     // so a hand-edit that changes one figure and not its parts fails here by name.
     const S = GS.SWEEP_V4297;
-    ok(S.swept === GS.enumerateGates().length - 1,
-       "the swept population is the tree's own count, minus this gate, which did not exist when it ran",
-       `${S.swept} swept; ${GS.enumerateGates().length} in the tree now`);
+    // *** AND THIS ONE PINNED THE SIZE OF THE TREE. *** It read `swept === enumerateGates().length - 1`, true
+    // on the day v4297 ran and false the moment anybody adds a gate -- which is the ordinary way this project
+    // moves. What the check is actually FOR is that the sweep covered the whole tree rather than a subset, and
+    // that survives as: the tree today holds at least what was swept, and the surplus is NAMED so nobody has
+    // to wonder whether the sweep is one gate stale or forty.
+    const gatesNow = GS.enumerateGates().length, surplus = gatesNow - (S.swept + 1);
+    ok(surplus >= 0,
+       "the sweep's population is not larger than the tree it swept",
+       `${S.swept} swept + this gate = ${S.swept + 1}; ${gatesNow} in the tree now`);
+    ok(true, "...and the gates added since v4297 are COUNTED rather than assumed to be none",
+       surplus === 0 ? "none added since the sweep -- the record is current"
+                     : surplus + " gate file(s) added since v4297 have never been swept. THAT IS THE HONEST " +
+                       "STALENESS OF SWEEP_V4297 and it is a number, not a feeling: the next full sweep is " +
+                       "what clears it, and re-pinning this equality would only hide it");
     ok(S.green + S.confirmedRed + S.unmeasuredCount === S.swept,
        "*** green + red + unmeasured = swept, with NO fourth bucket ***",
        `${S.green} + ${S.confirmedRed} + ${S.unmeasuredCount} = ${S.swept}`);
@@ -283,9 +333,12 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(S.stillRed + S.fromSlowBucket.length + S.regressions.length === S.confirmedRed,
        "*** the red count splits into still-red + slow-bucket + REGRESSIONS, and the split reconciles ***",
        `${S.stillRed} + ${S.fromSlowBucket.length} + ${S.regressions.length} = ${S.confirmedRed}`);
-    ok(S.stillRed === RC.RED_AT_V4279.length - S.repaired.length,
-       "still-red is the v4279 register minus what was repaired, so the two files describe one population",
-       `${RC.RED_AT_V4279.length} - ${S.repaired.length} = ${S.stillRed}`);
+    // Same correction as section 6's: the register shrinks when somebody FIXES a gate and prunes the entry,
+    // so the reconciliation needs that term or it fails on progress. `repaired` is what THIS sweep found
+    // repaired; `FIXED_SINCE_V4279` is what rounds after it repaired and removed.
+    ok(S.stillRed === RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length - S.repaired.length,
+       "still-red is the v4279 register, plus what was pruned from it since, minus what this sweep repaired",
+       `${RC.RED_AT_V4279.length} + ${RC.FIXED_SINCE_V4279.length} - ${S.repaired.length} = ${S.stillRed}`);
     ok(S.falseRedList.length === S.falseReds && S.unmeasured.length === S.unmeasuredCount,
        "the counts equal the lists they summarise", "a count beside a list it does not match is the v4296 mistake again");
 
@@ -319,9 +372,17 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // The cover figure is the thing RECHECK could not claim. It is derived here from the record, not read.
     const cover = GS.coversRegressions(Array(S.swept).fill(0).map((_, i) => "g" + i), []);
     const c = GS.coversRegressions(named.concat(RC.RED_AT_V4279.map((e) => e.gate)), RC.RED_AT_V4279.map((e) => e.gate));
-    ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - RC.RED_AT_V4279.length,
+    // FOURTH INSTANCE OF THE SAME THING IN THIS FILE, so it is worth naming as a pattern rather than patched
+    // a fourth time in silence: this gate reconciles a FROZEN RECORD against LIVE LISTS, and every place it
+    // does so needed a term for the register legitimately shrinking. RECHECK.checked, SWEEP.stillRed,
+    // enumerateGates() and now cover.eligible -- four assertions, one missing term, all four red on the first
+    // round that repaired and pruned four gates. The register's own rule is that it MAY ONLY SHRINK, so a
+    // reader of this file should expect the term everywhere the register appears, and its absence is the bug.
+    const registerAtV4297 = RC.RED_AT_V4279.length + RC.FIXED_SINCE_V4279.length;
+    ok(c.covers === true && S.cover.covers === true && S.cover.eligible === S.swept - registerAtV4297,
        "*** the sweep COVERS regressions: it ran gates that were not already red ***",
-       `eligible ${S.cover.eligible} = ${S.swept} - ${RC.RED_AT_V4279.length}; ` + cover.reason);
+       `eligible ${S.cover.eligible} = ${S.swept} - ${registerAtV4297} (${RC.RED_AT_V4279.length} standing + ` +
+       `${RC.FIXED_SINCE_V4279.length} fixed since v4297 ran); ` + cover.reason);
     ok(S.falseRedList.every((e) => e.serialMs > 0 && e.parallelMs > 0),
        "and each false red carries both timings, so the starvation claim can be re-read later",
        `${S.falseReds} of ${S.candidates} candidates, ${Math.round(100 * S.falseReds / S.candidates)}% of phase 1's reds were starvation`);

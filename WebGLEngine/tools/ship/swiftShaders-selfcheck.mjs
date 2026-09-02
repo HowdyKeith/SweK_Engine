@@ -32,7 +32,7 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, bcsLiquidChrome,
          bcsPixelateStorm, bcsMagneticField, bcsAurora, bcsDatamosh, bcsSmokeReveal, bcsMorphBreathe,
-         swkLyapunov,
+         swkLyapunov, swkFresnel, swkAiry,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -941,7 +941,7 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
             flat.data[i] = x / (W - 1); flat.data[i + 1] = y / (H - 1);
             flat.data[i + 2] = ((x + y) % 7) / 6; flat.data[i + 3] = 0.6;
         }
-        const FN = { lyapunov: swkLyapunov, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
+        const FN = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
                      pixelateMosaic: bcsPixelateMosaic, refractLens: bcsRefractLens, emboss: bcsEmboss,
                      vortex: bcsVortex, melt: bcsMelt, glitch: bcsGlitch, heatShimmer: bcsHeatShimmer,
                      wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
@@ -1119,7 +1119,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         await pg.goto("http://127.0.0.1:" + port + "/g.html", { waitUntil: "load" });
         await pg.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 
-        const MODEL = { lyapunov: swkLyapunov, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
+        const MODEL = { lyapunov: swkLyapunov, fresnelEdge: swkFresnel, airyDisk: swkAiry, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
             duochrome: bcsDuochrome, vortex: bcsVortex, kaleidoscope: bcsKaleidoscope,
             chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
             melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
@@ -1133,7 +1133,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             smokeReveal: bcsSmokeReveal, morphBreathe: bcsMorphBreathe };
         // liquidChrome at time 0.4: both fbm fields are animated, so a non-zero time is what makes the
         // displacement and the height field disagree with each other rather than sharing one sample.
-        const CASES = { lyapunov: {}, liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
+        const CASES = { lyapunov: {}, fresnelEdge: {}, airyDisk: {}, liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
             magneticField: { time: 0.6, polarity: 0.5 }, aurora: { time: 0.7 },
             datamosh: { time: 0.4, blockCorruption: 0.7 }, smokeReveal: { time: 0.5 },
             morphBreathe: { time: 0.8 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
@@ -1248,9 +1248,31 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // datamosh adds a block edge and smokeReveal adds a light ray, so both take k; morphBreathe only
         // MULTIPLIES (r, b and rgb gains) and needs no knob. Four batches, four correct predictions from
         // reading which operations are linear.
-        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are thirteen of them",
-            ALPHA_AWARE.length === 14 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
-            ALPHA_AWARE.join(", "));
+        // *** v4316 -- THIS LINE HAS BEEN RAISED FOUR TIMES AND ITS LABEL WAS ALREADY STALE. *** It SAID
+        // "thirteen of them" and TESTED === 14: lyapunov made it fourteen at v4312, the number was updated and
+        // the sentence was not, so the gate's own headline disagreed with its own assertion for four rounds and
+        // passed the whole time. Then fresnelEdge and airyDisk made it sixteen and the raise was due again.
+        //
+        // *** THE COUNT WAS NEVER THE PROPERTY. *** What matters is that a shader declaring the knob is exactly
+        // one whose fragment USES it, in both directions -- a knob declared for a fragment that never reads
+        // uPremultiplied is a DEAD KNOB: getUniformLocation returns null, the write is a silent no-op, and the
+        // caller thinks it set something. That is checkable from the source and never needs raising. Derived in
+        // three ways that must all agree: the KNOBS entry, the uniform declaration, and a use in the body.
+        const ALPHA_DERIVED = pass.swiftShaderNames().map((n) => {
+            const src = pass.SHADERS[n], body = src.slice(src.indexOf("void main"));
+            return { n, knob: "premultiplied" in (pass.KNOBS[n] || {}),
+                     uni: /uniform[^;]*uPremultiplied/.test(src), used: /uPremultiplied/.test(body) };
+        });
+        const alphaDisagree = ALPHA_DERIVED.filter((r) => !(r.knob === r.uni && r.uni === r.used));
+        ok("!! every premultiplied knob is DECLARED, WIRED and USED -- derived from the source, never counted",
+            alphaDisagree.length === 0 && ALPHA_AWARE.length === ALPHA_DERIVED.filter((r) => r.used).length,
+            alphaDisagree.length
+                ? "DISAGREE: " + alphaDisagree.map((r) => r.n + " knob=" + r.knob + " uniform=" + r.uni + " used=" + r.used).join(", ")
+                : ALPHA_AWARE.length + " of " + ALPHA_DERIVED.length + " shaders take the knob and all three " +
+                  "views agree on every one: " + ALPHA_AWARE.join(", ") + ". A NUMBER TYPED HERE WOULD BE " +
+                  "RAISED EVERY BATCH -- it already was, four times, and the sentence beside it went stale " +
+                  "anyway. emboss is why the derivation reads uPremultiplied rather than the '* k' idiom: it " +
+                  "applies alpha through a ternary instead, which is the same decision spelled differently.");
         const alphaResults = {};
         for (const name of ALPHA_AWARE) {
             const knobs = { ...CASES[name], premultiplied: 0 };
@@ -1589,6 +1611,165 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
                 fsrc.indexOf("return;") < fsrc.indexOf("0.6931471805599453"),
                 "the display path normalises by ln 2 to colour the field; the RAW path -- the one this section " +
                 "reads -- is r, x, log and abs only. A key the shader could have been told is not a key.");
+        }
+
+        // ---- 19c. *** THE SECOND EXTERNAL KEY: swk_fresnelEdge READS 1/4 OFF THE GPU *** -------------------
+        //
+        // physics/optics/fresnel.js records that the intensity at the geometric shadow boundary of a straight
+        // edge is EXACTLY 0.25, because C(0) = S(0) = 0. The fragment is handed a transverse position and a
+        // propagation distance; nothing tells it a quarter.
+        //
+        // *** AND THIS KEY IS SHARPER THAN ln 2 FOR A STRUCTURAL REASON, NOT A LUCKIER ONE. *** lambda at
+        // r = 4 survives float32 only because the average is ergodic, so its tolerance had to be measured
+        // from a distribution. I(0) needs NO INTEGRATION AT ALL -- the integral has zero width there -- so no
+        // budget, no rounding mode and no precision choice can move it. Measured in float32 at every interval
+        // count tried, the CPU model reads 0.25000000000000000 with |err| 0.00e+0.
+        {
+            const RW = 4, RH = 128;
+            // yHalf = 0 puts the shadow boundary on EVERY pixel, the same mechanism rLo = rHi = 4 uses above.
+            const RAW = { ...pass.DEFAULT_KNOBS.fresnelEdge, yHalf: 0, raw: 1 };
+            const flatSrc = new Uint8Array(RW * RH * 4).fill(128);
+            const gpuRaw = await pg.evaluate(({ knobs, W, H, src }) => {
+                const q = window.__mk("fresnelEdge", W, H);
+                q.render(new Uint8Array(src), knobs);
+                return Array.from(q.readPixels());
+            }, { knobs: RAW, W: RW, H: RH, src: Array.from(flatSrc) });
+            // The encode spans [0, 2] because I reaches 1.370443 at the first maximum; 16 bits over that span
+            // resolves 3.1e-5, and the round trip at the key was measured at 3.8e-6 before this was written.
+            const Is = [];
+            for (let yy = 0; yy < RH; yy++) { const i = (yy * RW) * 4; Is.push(((gpuRaw[i] + gpuRaw[i + 1] / 255) / 255) * 2); }
+            const errs = Is.map((v) => Math.abs(v - 0.25));
+            const worst = Math.max(...errs);
+
+            // *** EVERY ROW, NOT A MEDIAN. *** The rows are 128 different PROPAGATION DISTANCES and v = 0 for
+            // all of them, so this key is not a statistic the way ln 2 had to be -- it is an identity that
+            // holds pixel for pixel, and the right assertion is the worst case rather than the centre.
+            ok("!! *** THE GPU READS 1/4 AT THE SHADOW BOUNDARY -- AND IT HOLDS ON EVERY ROW ***",
+                worst < 2e-5,
+                "worst |I - 0.25| over " + RH + " propagation distances is " + worst.toExponential(2) +
+                " (framebuffer resolution 3.1e-5 / 16 bits over a span of 2). THE FRAGMENT RECEIVES A " +
+                "TRANSVERSE POSITION AND A DISTANCE -- no uniform carries a quarter. Unlike ln 2 this is a " +
+                "WORST CASE and not a median, because I(0) costs no integration and so cannot be perturbed " +
+                "by the budget.");
+
+            // *** THE DEFAULTS MUST PUT THE WHOLE FRAME INSIDE THE RANGE THE BUDGET IS HONEST IN, AND THE
+            // FIRST SET DID NOT. *** With zLo 30 and yHalf 4 the corner of the default picture sat at v = 46,
+            // forty times past the v ~ 6 the shader's own comment names -- and the probe below, which
+            // originally sampled there, reported a CLIPPED 2.0000 as evidence of non-redundant rows and
+            // passed. A number measured outside the configuration it describes is not evidence, which is this
+            // session's own lesson arriving inside a gate written the same afternoon. So the limit is
+            // asserted rather than commented.
+            const DK = pass.DEFAULT_KNOBS.fresnelEdge;
+            const vCorner = Math.abs(DK.yHalf * Math.sqrt(2 / (DK.lambda * DK.zLo)));
+            ok("!! the DEFAULT frame stays inside the v range a fixed Simpson count can resolve",
+                vCorner <= 5.5,
+                "the corner of the default picture is v = " + vCorner.toFixed(3) + " (near row) and v = " +
+                Math.abs(DK.yHalf * Math.sqrt(2 / (DK.lambda * DK.zHi))).toFixed(3) + " (far row), against " +
+                "the v ~ 6 where n = " + DK.samples + " stops resolving the t^2 oscillation. THE FIRST " +
+                "DEFAULTS PUT IT AT 46 and nothing here would have noticed, because the key at v = 0 is exact " +
+                "no matter how wrong the rest of the frame is.");
+
+            // NOT AN ARGUMENT -- MEASURED. Two rows at different z are read at a transverse position OFF the
+            // boundary; if the picture were the same on every row this would find them equal, and the "holds
+            // on every row" claim above would be about 128 copies of one row rather than 128 distinct ones.
+            const spread = await (async () => {
+                const K = { ...pass.DEFAULT_KNOBS.fresnelEdge, raw: 1 };
+                const g = await pg.evaluate(({ k, W, H, src }) => {
+                    const q = window.__mk("fresnelEdge", W, H);
+                    q.render(new Uint8Array(src), k);
+                    return Array.from(q.readPixels());
+                }, { k: K, W: 64, H: 64, src: Array.from(new Uint8Array(64 * 64 * 4).fill(128)) });
+                const at = (row, col) => { const i = (row * 64 + col) * 4; return ((g[i] + g[i + 1] / 255) / 255) * 2; };
+                return { top: at(2, 56), bottom: at(61, 56) };
+            })();
+            ok("...and the rows are NOT redundant -- the fringe spacing changes with distance",
+                Math.abs(spread.top - spread.bottom) > 1e-2,
+                "at the same transverse position, the nearest row reads I = " + spread.top.toFixed(4) +
+                " and the farthest reads " + spread.bottom.toFixed(4) + " -- a difference of " +
+                Math.abs(spread.top - spread.bottom).toExponential(2) + ". z runs " + DK.zLo + " to " + DK.zHi +
+                " down the frame, so v = y*sqrt(2/(lambda*z)) compresses as the wave " +
+                "propagates and the fringes fan out. A key that reads the same on every row while the PICTURE " +
+                "changes on every row is the shape swk_lyapunov's ergodic claim has, arrived at from the " +
+                "opposite direction: there the trajectory differed and the average did not, here the pattern " +
+                "differs and the boundary does not.");
+
+            // A key the shader could have been told is not a key.
+            // *** THIS ASSERTION WAS WRONG ON ITS FIRST RUN AND THE SHADER WAS FINE. *** It read
+            // indexOf("uRaw > 0.5") < indexOf("uIntensity") to mean "the raw path returns before the display
+            // path", and uIntensity's FIRST occurrence is the uniform DECLARATION at the top of the file --
+            // so it compared the raw branch against a line that is not the display path at all and went red
+            // on correct code. A source-order check has to name something that only appears where it is used;
+            // layerSample() is the display path's first act and appears nowhere else.
+            const fsrc = pass.SHADERS.fresnelEdge;
+            const bodyF = fsrc.slice(fsrc.indexOf("void main"));
+            ok("...and the raw path contains NO quarter for it to have copied",
+                !/\b0\.25\b/.test(fsrc) && bodyF.indexOf("return;") < bodyF.indexOf("layerSample"),
+                "the fragment's only constants are pi, the Simpson and phase halves, and the display tint. " +
+                "0.25 appears NOWHERE in the source, and the raw branch returns before layerSample() -- the " +
+                "display path's first act -- ever runs. A key the shader could have been told is not a key.");
+
+            report("WHAT THIS SHADER DELIBERATELY DOES NOT CLAIM",
+                "the I -> 1 limit far into the light is TRUE OF THE PHYSICS AND NOT OF THIS SHADER. A " +
+                "fragment cannot scale its loop with the coordinate, and the module's own comment says the " +
+                "Simpson count must grow as v^2 -- so at a fixed n = 128 the error against the float64 module " +
+                "is 1.1e-5 at v = 4, 1.9e-4 at v = 6, 1.9e-3 at v = 8 and 1.9e-2 at v = 10, getting WORSE " +
+                "rather than settling. Default vHi is inside the honest range. Listing that limit beside " +
+                "I(0) = 0.25 would have been a key the shader cannot hold.");
+        }
+
+        // ---- 19d. *** THE THIRD EXTERNAL KEY: swk_airyDisk READS THE ZEROS OF J1 OFF THE GPU *** -----------
+        //
+        // The far-field pattern of a circular aperture is I(x) = (2 J1(x)/x)^2, and its dark rings sit at the
+        // zeros of the Bessel function J1 -- numbers that exist independently of optics, of this tree, and of
+        // any float format. Four keys on one picture, and three of them are zeros.
+        //
+        // *** THE CONTROLS ARE LOAD-BEARING, NOT DECORATIVE. *** A SHADER THAT RETURNED ZERO EVERYWHERE WOULD
+        // PASS ALL THREE ZEROS. So a pass requires both halves: near-zero where the zeros are, and measurably
+        // NOT near-zero between them. This is the same shape as the lab's rule that a bit-identical result may
+        // not pass without a live control (corroborateFully, v3083).
+        {
+            const Z = [3.8317059702075123, 7.015586669815619, 10.173468135062722];
+            const CTRL = [[0, 1, "the centre, where 2 J1(x)/x -> 1"],
+                          [1.8412, 3.995e-1, "the first J1 maximum"],
+                          [5.1356, 1.750e-2, "the first bright ring, between zeros one and two"]];
+            const RW = 4, RH = 4;
+            const flatSrc = new Uint8Array(RW * RH * 4).fill(128);
+            const readAt = async (xa) => {
+                // xLo == xHi pins EVERY pixel at one argument -- the same mechanism as rLo == rHi and yHalf = 0.
+                const knobs = { ...pass.DEFAULT_KNOBS.airyDisk, xLo: xa, xHi: xa, raw: 1 };
+                const g = await pg.evaluate(({ k, W, H, src }) => {
+                    const q = window.__mk("airyDisk", W, H);
+                    q.render(new Uint8Array(src), k);
+                    return Array.from(q.readPixels().slice(0, 4));
+                }, { k: knobs, W: RW, H: RH, src: Array.from(flatSrc) });
+                return (g[0] + g[1] / 255) / 255;
+            };
+            const atZeros = [];
+            for (const z of Z) atZeros.push(await readAt(z));
+            const atCtrl = [];
+            for (const [x] of CTRL) atCtrl.push(await readAt(x));
+
+            ok("!! *** THE GPU READS ZERO AT ALL THREE ZEROS OF J1 -- ANSWERS THE SHADER WAS NEVER GIVEN ***",
+                atZeros.every((v) => v < 1 / 512),
+                Z.map((z, i) => "x=" + z.toFixed(10) + " -> I=" + atZeros[i].toExponential(2)).join("; ") +
+                ". The framebuffer resolves 1/65535, and the CPU model reads 3.7e-16, 3.9e-15 and 3.7e-11 at " +
+                "these arguments in float32 -- so the read-back is limited by the 16-bit encode and not by the " +
+                "shader. THE FRAGMENT RECEIVES x AS A RADIAL COORDINATE; no uniform carries a Bessel zero.");
+
+            ok("!! ...AND IT IS NOT ZERO IN BETWEEN, WHICH IS WHAT MAKES THE THREE ZEROS EVIDENCE",
+                Math.abs(atCtrl[0] - 1) < 2e-4 && atCtrl[1] > 0.35 && atCtrl[1] < 0.45 &&
+                atCtrl[2] > 0.012 && atCtrl[2] < 0.024,
+                CTRL.map(([x, want, what], i) => "I(" + x + ") = " + atCtrl[i].toPrecision(4) +
+                    " against " + want + " -- " + what).join("; ") +
+                ". A SHADER RETURNING ZERO EVERYWHERE PASSES THE ASSERTION ABOVE AND FAILS THIS ONE, which is " +
+                "the only reason the assertion above is worth making.");
+
+            const asrc = pass.SHADERS.airyDisk;
+            ok("...and no Bessel zero appears anywhere in the fragment source",
+                !/3\.83|7\.015|10\.17/.test(asrc),
+                "the source's only numbers are the series ratio m(m+1), the halves, and the display tint and " +
+                "gamma. The zeros are a PROPERTY OF THE SERIES, produced by summing it, not a constant it was " +
+                "handed -- which is the whole distinction between Tier 2 and a mirror.");
         }
 
         // ---- 20. TRAP 3, MEASURED AT LAST -----------------------------------------------------------------

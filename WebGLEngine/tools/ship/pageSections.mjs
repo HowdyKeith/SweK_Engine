@@ -325,6 +325,15 @@ export const SECTIONS = [
     { id: "brain", tab: "brain", label: "GPU Brain", note: "appended to the existing panel",
       pages: ["panel-brain.html", "brain-bench.html", "brain-replay.html", "agent-arena.html", "fleet-arena.html",
               "policy-mass.html",
+              // v4314 -- drive-brain.html, and it is the ONLY one of the twelve born-invisible pages placed in
+              // a drawer, because it is the only one MACHINERY settles without a judgement: it imports
+              // brain/rl/dockPolicy.js and brain/rl/driveEnv.js and nothing else. This drawer is now at
+              // MAX_PER_PANEL, which is why primitive-paint.html is NOT here -- its commit was titled "the GPU
+              // Brain paints" and it imports fx/primitiveFit.mjs and no brain module at all. THE TITLE WOULD
+              // HAVE PUT IT IN THIS DRAWER AND THE IMPORTS SAY OTHERWISE, which is this file's own rule
+              // (group by machinery, not by subject -- "the keyword probe that has misled this project three
+              // times") arriving as a live case rather than as a warning.
+              "drive-brain.html",
               // *** v3927 -- EIGHT BRAIN PAGES WERE LINKED FROM server.html AND FILED NOWHERE. ***
               // registerResidue has been red since before v3904, saying 52 pages are linked but appear in
               // neither a section nor UNPLACED -- and nobody saw it, because that gate had never been timed and
@@ -424,6 +433,61 @@ export const MAX_PER_PANEL = 15;
  * look identical, and the second one gets placed by a guess.
  */
 export const UNPLACED = new Map([
+    // *** v4314 -- ELEVEN OF THE TWELVE PAGES pageReach CALLED BORN-INVISIBLE, PLUS ONE OF MY OWN. ***
+    //
+    // They are linked from server.html now, which is what pageReach was asking for. They are ALSO here,
+    // because registerResidue asks a second question pageReach does not: a page that is linked but in neither
+    // a section nor this map is RESIDUE -- "an unplaced page and a page nobody got to look identical, and the
+    // second one gets placed by a guess". Linking twelve pages and filing none would have moved that gate from
+    // 46 to 58 while turning pageReach green, which is trading one register against another.
+    //
+    // *** THEY DO NOT LACK A HOME BECAUSE NOBODY LOOKED. THEY LACK A DRAWER THAT EXISTS. *** Read by
+    // machinery rather than by title, the twelve fall into four groups:
+    //
+    //     render / fx passes   aquarelle, camera-effects, doom-fire, mesh-line, primitive-paint, proc-brush
+    //                          -- six pages importing render/* or fx/*. Voxel & Render holds 14 of 15, so
+    //                          ONE could go in and five could not, and picking which one would be arbitrary.
+    //     audio                sfx, spellbook -- audio/sfxModel.mjs and audio/sfxPlay.js. THERE IS NO AUDIO
+    //                          DRAWER. This tree has 24 sections and not one of them is about sound.
+    //     ui                   odometer -- ui/odometer.js. No UI drawer either.
+    //     geometry / scene     destructible (physics/mesh/meshCSG.mjs), scene-view (three GLTFLoader)
+    //
+    // Naming a drawer decides what a panel is ABOUT rather than merely where things go, and this file already
+    // records that as Keith's call ("THE RATCHET IS SUPPOSED TO GO DOWN AGAIN when a new section is named --
+    // and naming it is Keith's call"). So the twelve are linked, findable, and each says what it is waiting
+    // for, which is a different state from unexamined.
+    ["aquarelle.html", "a render pass (render/aquarellePass.js) with no drawer that has room -- Voxel & Render is at 14 of 15, and the six render/fx pages found together at v4314 want a panel of their own rather than one arbitrary slot"],
+    ["camera-effects.html", "the same render/fx group: it is a GL pass over render/cameraTexture.js. Face & Population is about landmarks and avatars, not about handing camera pixels to a shader, so filing it there would be grouping by the word 'camera'"],
+    ["doom-fire.html", "render/doomFire.mjs -- the render/fx group again. A cellular automaton drawn as a fire is machinery this tree has nowhere to put, and Matter & Chaos is at 15 of 15 besides"],
+    ["mesh-line.html", "render/meshLine.mjs -- render/fx group. Its subject is a driver limitation (gl.lineWidth is clamped to 1 everywhere) rather than a physical system, so no PL drawer fits it either"],
+    ["primitive-paint.html", "fx/primitiveFit.mjs and NO brain import, despite a commit titled 'the GPU Brain paints' -- filed by machinery, not by title. The GPU Brain drawer is at 15 of 15 now in any case"],
+    ["proc-brush.html", "fx/procBrush.mjs with ui/procBrushCanvas.js -- render/fx group, and the only drawing surface in the tree, which is an argument for the panel rather than for a slot in an existing one"],
+    ["sfx.html", "audio/sfxModel.mjs -- THERE IS NO AUDIO DRAWER IN THIS TREE. Twenty-four sections and none of them is about sound, which is a gap a placement cannot close"],
+    ["spellbook.html", "world/spellBook.mjs over physics/voxel/fracture.js and audio/sfxPlay.js -- it spans world, physics and audio, so any single drawer would be a third of the answer"],
+    ["odometer.html", "ui/odometer.js -- a DOM/CSS widget, not a canvas page. There is no UI drawer, and it is the only page of its kind so far, which is not yet a panel"],
+    ["destructible.html", "physics/mesh/meshCSG.mjs. csg.html sits in Voxel & Render and this would join it, but that drawer is at 14 of 15 and five other v4314 pages have an equal claim on the last slot"],
+    ["scene-view.html", "three's GLTFLoader and OrbitControls -- a scene VIEWER rather than a render technique. Voxel & Render is the near fit and it has one slot; see the note above about why nothing took it"],
+    // *** AND ONE THAT IS MINE. *** krbn-lyapunov.html was linked at v4313 and filed nowhere, so it entered
+    // registerResidue's list in the same round it left pageReach's. THE GATE THAT WOULD HAVE CAUGHT IT WAS
+    // ALREADY RED, which is how a red gate stops being a gate: nothing distinguishes 45 from 46.
+    // *** v4315 -- THREE MORE FROM main's v4299-v4300, AND THEY MAKE THE RENDER-PANEL CASE CONCRETE. ***
+    // All three import render/gpuDriven.mjs and gfx/device.js: they are the GPU-driven rendering path, one
+    // coherent group of work. Voxel & Render still holds 14 of 15, so ONE of the three could go in and two
+    // could not -- the identical arithmetic that left v4314's six render/fx pages here.
+    //
+    // WHICH IS NOW A NUMBER RATHER THAN A COMPLAINT: 6 render/fx + 3 GPU-driven = NINE PAGES waiting on one
+    // decision. Naming a render panel would place nine; the last slot in Voxel & Render places one, chosen
+    // arbitrarily from nine. That is the whole argument, and it is Keith's call because naming a drawer
+    // decides what a panel is ABOUT.
+    //
+    // orrery-gpu is the one that would tempt a subject-based filing -- PL: Cosmic & Relativity has room for
+    // two. ITS MACHINERY IS THE COMPUTE PASS, NOT THE ASTRONOMY: it is in the tree to show orbits placed by
+    // three dispatches, and its own title says "on the GPU". Filed by machinery, like primitive-paint.
+    ["gpu-rig-check.html", "the GPU-driven path's own instrument: which backend and route this box got, the cull/LOD/draw counts, and a readback against the offscreen twin. Part of the nine-page render group with no drawer"],
+    ["orrery-gpu.html", "render/gpuOrbits.mjs -- orbital elements to instance records in a compute pass. Cosmic & Relativity has room and would be a SUBJECT filing; the machinery is gpuDriven, so it waits with the render group"],
+    ["universe-gpu.html", "render/gpuHaul.mjs over 694 systems and 300 haulers -- a flight integrated on the GPU because a still world makes position a function of the clock alone. Same render group, same missing drawer"],
+    ["krbn-lyapunov.html", "the Krbn hologram lit by swk_lyapunov -- it is a render pass (render/swiftShaderPass.js) over a Krbn drawing, so it belongs with the v4314 render/fx group and waits on the same decision"],
+
     // *** v3358 -- PARKED IN ARRIVING DELIBERATELY, BECAUSE THEY OWE A MEASUREMENT NOBODY BUT KEITH CAN GIVE. ***
     // These four were filed in drawers, which is where a page goes when it is FINISHED. They are not finished:
     // each exists to produce a report from real hardware and none ever has (deviceOwed.mjs: received kinds NONE).
