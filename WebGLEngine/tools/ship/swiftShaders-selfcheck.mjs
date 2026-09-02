@@ -51,6 +51,18 @@ import * as pass from "../../render/swiftShaderPass.js";
 // missing when it was present. noComments() keeps string literals and drops comments; codeOnly() drops both.
 // "noComments for string literals, codeOnly for code shapes" -- and an import statement is a code shape.
 import { codeOnly } from "./sourceScan.mjs";
+// *** v4308 -- THE THIRTEEN UNPORTED SHADERS, READ FROM UPSTREAM RATHER THAN GUESSED. ***
+// v4265 could not name them: its sandbox had no network and the Metal source is not vendored here. This one
+// reaches GitHub, so krispuckett/swiftuishaders was cloned at 6b644a8 and the roster taken from
+// Sources/SwiftUIShaders/Shaders/SwiftUIShaders.metal -- 41 [[stitchable]] entry points, against the 28 this
+// tree ports, difference thirteen and no residue in either direction (nothing is ported that upstream lacks).
+// KEPT AS DATA rather than prose so the next batch can be picked without another clone, and so this file can
+// say WHICH thirteen the closing note has been counting for eleven batches.
+export const UNPORTED = [
+    "aurora", "datamosh", "disintegrate", "etherealAura", "liquidChrome", "liquidMirror", "magneticField",
+    "morphBreathe", "pixelateStorm", "shatter", "shatterGlass", "smokeReveal", "underwaterCaustics",
+];
+
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
@@ -1561,8 +1573,14 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "changes the picture in ALL 17 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
     "BOTH 1x and 2x, and NOTHING agrees at 1x and breaks at 2x. The six that disagree at 2x already disagree " +
     "at 1x and are the sin-hash set, which the 1x control is what establishes: without it this gate would " +
-    "have reported five defects that do not exist. STILL OPEN: the 13 unported shaders, and v4265 could not " +
-    "reduce that number -- *** THE UPSTREAM METAL SOURCE IS NOT IN THIS TREE AND THIS SANDBOX HAS NO " +
-    "NETWORK, so the remaining thirteen are not even NAMED anywhere here. *** Porting a shader from its " +
-    "name would be invention, so the batch this round was asked for is a measurement instead.");
+    "have reported five defects that do not exist. " +
+    "*** v4308 -- THE THIRTEEN ARE NAMED. *** v4265 recorded 'THE UPSTREAM METAL SOURCE IS NOT IN THIS TREE " +
+    "AND THIS SANDBOX HAS NO NETWORK, so the remaining thirteen are not even NAMED anywhere here', and that " +
+    "was true of the sandbox it ran in. IT IS NOT TRUE OF EVERY SANDBOX: this session reaches GitHub, so " +
+    "krispuckett/swiftuishaders was cloned at 6b644a8 (MIT, Copyright 2026 Kris Puckett) and the roster read " +
+    "off the source instead of guessed. UPSTREAM DECLARES 41 [[stitchable]] SHADERS, this tree ports 28, and " +
+    "the difference is exactly thirteen: " + UNPORTED.join(", ") + ". " +
+    "The count 41 was right all along; what was missing was which. Porting from a name would still be " +
+    "invention -- these are names READ FROM THE SOURCE, and the source is now reachable, which is a different " +
+    "thing from the list being invented.");
 process.exit(fails ? 1 : 0);
