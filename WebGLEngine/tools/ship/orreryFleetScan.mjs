@@ -17,6 +17,7 @@
 "use strict";
 
 import fs from "node:fs";
+import { guardWrite } from "./bakeShrinkGuard.mjs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -214,7 +215,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const before = (() => { try { return fs.readFileSync(file, "utf8"); } catch { return null; } })();
     const n = Object.values(payload.bodies).reduce((a, v) => a + v.length, 0);
     if (before === text) console.log(`${FLEET_BAKE} is current (${n} satellites across ${Object.keys(payload.bodies).length} bodies)`);
-    else if (process.argv.includes("--write")) { fs.writeFileSync(file, text); console.log(`${FLEET_BAKE} written: ${n} satellites, ${text.length} bytes`); }
+    else if (process.argv.includes("--write")) {
+        // v4336 -- same guard as orreryBake: this scan reads the tree, so an incomplete tree would quietly
+        // drop importers. See tools/ship/bakeShrinkGuard.mjs.
+        const g = guardWrite(before, payload, process.argv);
+        if (!g.ok) { console.log(`${FLEET_BAKE} NOT written (${n} satellites)`); process.exit(1); }
+        fs.writeFileSync(file, text); console.log(`${FLEET_BAKE} written: ${n} satellites, ${text.length} bytes`);
+    }
     else { console.log(`${FLEET_BAKE} would change (${n} satellites). Re-run with --write.`);
            for (const d of fleetDrift()) console.log("  " + d); }
 }

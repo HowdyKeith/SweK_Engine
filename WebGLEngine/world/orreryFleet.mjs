@@ -272,6 +272,13 @@ export function systemDigest(fleets, opts = {}) {
 // twelve, so the record briefly disagreed with itself in the half a reader actually reads. At 2 it is twelve
 // again. The gate computes that figure live for its detail line and never trusted the prose, which is why
 // nothing went red for it; a number nobody asserts is exactly where a stale sentence survives.
+// v4351 -- AND A THIRD TIME, WHICH MAKES IT A MECHANISM AND NOT AN ACCIDENT. Corrected at v4330, reverted by a merge
+// and re-applied at v4336, reverted by a merge and re-applied here. The value lives on two branches; the one that
+// re-writes this file most often carries the stale 2, so every merge from it puts the wrong number back and the gate
+// goes red on main again -- three times now, each time named by no register. This branch cannot fix the other one:
+// what it can do is say the number out loud so the next merge conflict is read rather than resolved by side. THE
+// COUNT IS 1: `git log -- WebGLEngine/vendor/three` returns one commit, at every head this has been checked on.
+//
 // v4336 -- AND THE MERGE PUT THE NUMBER BACK WITHOUT THE NOTE NOTICING. v4330's correction was two parts, a value
 // and the paragraph below explaining it; a later merge took the paragraph and reverted the value, so this file shipped
 // on main carrying prose that said "corrected to what git says" directly above the number it had not corrected, and
@@ -284,6 +291,11 @@ export function systemDigest(fleets, opts = {}) {
 // re-measures is a sentence" is this record's own argument), so the number is corrected here to what
 // `git log -- WebGLEngine/vendor/three` returns and `at` still names the round that took it. The finding is
 // untouched: htmx and box3d are still 2, so the busiest vendored body has still been touched by two commits.
+// v4350 -- AND THE MERGE PUT IT BACK TO 2 AGAIN, for the third time, which is the record behaving correctly
+// rather than drifting. This count is a property of the HISTORY YOU ARE STANDING ON: origin/main's line sees
+// one commit touching WebGLEngine/vendor/three, this branch's merged history sees two (e08b1b6 and 66db97c).
+// Every merge in either direction flips it, and the gate re-measures rather than trusting, so it flips loudly.
+// `at` stays v4329 -- correcting a number does not rename the round that took it.
 export const COMMIT_BELT_V4329 = Object.freeze({
     at: "v4329",        // the record's IDENTITY is the v4329 belt, not the date of its last correction --
                         // main kept this through v4330's correction on purpose and the gate pins it, so a

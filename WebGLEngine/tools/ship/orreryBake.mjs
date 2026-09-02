@@ -16,6 +16,7 @@
 "use strict";
 
 import fs from "node:fs";
+import { guardWrite } from "./bakeShrinkGuard.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scanVendor } from "./orreryScan.mjs";
@@ -82,7 +83,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const text = serialise(payload);
     const before = (() => { try { return fs.readFileSync(BAKE_PATH, "utf8"); } catch { return null; } })();
     if (before === text) { console.log(`orrery.json is current (${payload.bodies.length} bodies)`); }
-    else if (write) { fs.writeFileSync(BAKE_PATH, text); console.log(`orrery.json written: ${payload.bodies.length} bodies, ${text.length} bytes`); }
+    else if (write) {
+        // v4336 -- REFUSE A WRITE THAT LOSES A BODY OR A FILE. This bake reads the working tree, so running it
+        // where the tree is incomplete deletes rather than bakes; v4335 did exactly that and it surfaced two
+        // gates away. See tools/ship/bakeShrinkGuard.mjs.
+        const g = guardWrite(before, payload, process.argv);
+        if (!g.ok) { console.log(`orrery.json NOT written (${payload.bodies.length} bodies, ${text.length} bytes)`); process.exit(1); }
+        fs.writeFileSync(BAKE_PATH, text); console.log(`orrery.json written: ${payload.bodies.length} bodies, ${text.length} bytes`);
+    }
     else {
         console.log(`orrery.json would change (${payload.bodies.length} bodies, ${text.length} bytes). Re-run with --write.`);
         for (const d of drift()) console.log("  " + d);
