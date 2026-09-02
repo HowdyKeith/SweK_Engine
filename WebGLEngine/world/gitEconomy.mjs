@@ -109,6 +109,11 @@ export function makeEconomy(world, opts = {}) {
     const o = { ...DEFAULTS, ...opts }, seed = o.seed == null ? 7 : o.seed;
     const rnd = rng(seed);
     const markets = world.markets;
+    // v4314 (Level 16) -- HISTORY: a market carries `opens` (the sim day it exists from) and a ship `joins`; before
+    // that day the market is not a destination, does not produce, and the ship is not in the sky. The world sets
+    // them (makeGitEconomy from git's own dates); a world that sets none is the v4300 world, tick for tick.
+    const history = markets.some((m) => (m.opens || 0) > 0) || (world.crew || []).some((c) => (c.joins || 0) > 0);
+    const isOpen = (m) => t >= (m.opens || 0);
     if (!markets.length) throw new Error("economy: no bodies to trade between");
     const uni = { commodities: {}, systems: markets, systemById: {}, spobs: {}, ships: [], outfits: {}, outfitByName: {}, shipByName: {}, shipyards: {}, outfitters: {} };
     for (const g of GOODS) uni.commodities[g] = { id: g, name: g, low: BASE[g] * PRICE_FLOOR, high: BASE[g] * PRICE_CEIL, basePrice: BASE[g] };
@@ -118,12 +123,20 @@ export function makeEconomy(world, opts = {}) {
         const player = { conditions: {}, credits: o.credits, cargo: {}, ship: makeFlagship(hull), fleet: [] };
         const store = createConditionStore(player, uni);
         const econ = createEconomy(uni, store, player);
-        const at = 1 + Math.floor(rnd() * markets.length);
-        return { id: i, name: c.name, player, store, econ, at, to: null, from: null, progress: 0, x: 0, y: 0, cargoGood: null, log: [], trips: 0, spent: 0, earned: 0, upkeepPaid: 0, idle: 0, bankrupt: false, t0: 0, arriveT: 0, fromPos: [0, 0], toPos: [0, 0] };
+        // without history every ship is placed now, from the seeded stream, exactly as v4300 did; with it a ship is
+        // placed on the day it joins, among the markets open that day (a ship cannot start where nothing is yet)
+        const at = history ? 0 : 1 + Math.floor(rnd() * markets.length);
+        return { id: i, name: c.name, player, store, econ, at, to: null, from: null, progress: 0, x: 0, y: 0, cargoGood: null, log: [], trips: 0, spent: 0, earned: 0, upkeepPaid: 0, idle: 0, bankrupt: false, t0: 0, arriveT: 0, fromPos: [0, 0], toPos: [0, 0],
+                 joins: c.joins || 0, joined: !history, policy: typeof c.policy === "function" ? c.policy : null };
     });
     const ledger = { produced: { source: 0, binaries: 0, data: 0, docs: 0 }, consumed: { source: 0, binaries: 0, data: 0, docs: 0 }, upkeep: 0, minted: 0, recipesRun: 0, bankruptcies: 0 };
     let t = 0, tick = 0, dayPaid = 0, flightDirty = true;
     const events = [];
+    // v4314 -- THE JOURNAL: everything that is not the seed. Steps as run-lengths of dt, interventions with the tick
+    // they apply at. seed + journal reproduces this economy exactly (replayEconomy below), which is what a saved
+    // universe IS -- a log, not a state -- and what two peers exchange to stay in step (world/lockstep.mjs).
+    const journal = { version: 1, seed, steps: [], interventions: [] };
+    const pending = [];   // scheduled interventions, applied at the start of the step whose tick they name
     const posOf = (m, td) => world.positionOf(m, td);
     const initialTons = GOODS.reduce((a, g) => a + markets.reduce((s, m) => s + m.stock[g], 0), 0);
     const initialCredits = ships.length * o.credits + markets.reduce((s, m) => s + m.credits, 0);
@@ -136,12 +149,29 @@ export function makeEconomy(world, opts = {}) {
     const hashNoise = (a, b, c, d) => { let h = (a * 374761393 + b * 668265263 + c * 2246822519 + d * 3266489917 + seed) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return (h ^ (h >>> 16)) / 4294967296; };
     function bestRoute(ship) {
         const here = uni.systemById[ship.at]; let best = null;
-        for (const m of markets) { if (m.id === here.id) continue;
+        for (const m of markets) { if (m.id === here.id || !isOpen(m)) continue;
             for (let gi = 0; gi < GOODS.length; gi++) { const g = GOODS[gi]; const buyP = here.trade[g], sellP = m.trade[g], margin = sellP - buyP; if (margin <= 0 || here.stock[g] <= 0) continue;
                 if (m.credits < sellP) continue;                     // a market that cannot pay is not a destination
                 const score = margin * (1 + 0.05 * hashNoise(tick, ship.id, m.id, gi));
                 if (!best || score > best.score) best = { good: g, to: m.id, margin, score, buyP, sellP }; } }
         return best;
+    }
+    /**
+     * v4314 -- what a ship at a market could do: every (good, destination) with stock here and a destination that
+     * can pay, with the same numbers bestRoute() sees plus the distance. A ship with a `policy` chooses among
+     * these by its own scoring (world/traderPolicy.mjs: a learned one); greedy is "the largest margin".
+     */
+    function candidates(ship) {
+        const here = uni.systemById[ship.at], hp = posOf(here, t), out = [];
+        for (const m of markets) { if (m.id === here.id || !isOpen(m)) continue; const mp = posOf(m, t), dist = Math.hypot(mp[0] - hp[0], mp[1] - hp[1]);
+            for (let gi = 0; gi < GOODS.length; gi++) { const g = GOODS[gi]; if (here.stock[g] <= 0) continue; const buyP = here.trade[g], sellP = m.trade[g]; if (m.credits < sellP) continue;
+                out.push({ good: g, gi, to: m.id, buyP, sellP, margin: sellP - buyP, dist, treasury: m.credits, stockHere: here.stock[g], stockThere: m.stock[g], needThere: m.need[g] }); } }
+        return out;
+    }
+    function policyRoute(ship) {
+        const cs = candidates(ship); if (!cs.length) return null;
+        const k = ship.policy(cs, { credits: ship.store.get("credits"), holdTons: o.holdTons, t, tick, id: ship.id });
+        return (k == null || !cs[k]) ? null : cs[k];
     }
     function dock(ship, atId) {
         const m = uni.systemById[atId];
@@ -152,10 +182,11 @@ export function makeEconomy(world, opts = {}) {
         reprice(m); ship.at = atId; ship.to = null; ship.trips++; flightDirty = true;
     }
     function depart(ship) {
-        const route = bestRoute(ship); const here = uni.systemById[ship.at];
+        const route = ship.policy ? policyRoute(ship) : bestRoute(ship); const here = uni.systemById[ship.at];
         const go = (toId) => { ship.from = ship.at; ship.to = toId; ship.progress = 0; ship.idle = 0; ship.t0 = t; ship.fromPos = posOf(here, t); ship.toPos = posOf(uni.systemById[toId], t);
             const dist = Math.max(1e-6, Math.hypot(ship.toPos[0] - ship.fromPos[0], ship.toPos[1] - ship.fromPos[1])); ship.arriveT = t + dist / o.speed; flightDirty = true; };
-        if (!route) { ship.idle++; if (ship.idle > 3 && markets.length > 1) { let to; do { to = 1 + Math.floor(rnd() * markets.length); } while (to === ship.at); go(to); events.push(`${ship.name} wanders from ${here.name} to ${uni.systemById[to].name}`); } return; }
+        if (!route) { ship.idle++; const openIds = history ? markets.filter(isOpen).map((m) => m.id) : null;
+            if (ship.idle > 3 && (history ? openIds.length > 1 : markets.length > 1)) { let to; do { to = history ? openIds[Math.floor(rnd() * openIds.length)] : 1 + Math.floor(rnd() * markets.length); } while (to === ship.at); go(to); events.push(`${ship.name} wanders from ${here.name} to ${uni.systemById[to].name}`); } return; }
         const want = Math.min(o.holdTons, here.stock[route.good]);
         const r = ship.econ.buy(route.good, want, here.id);
         if (!r.ok) { ship.idle++; return; }
@@ -167,6 +198,7 @@ export function makeEconomy(world, opts = {}) {
     /** Production: every market runs every recipe it can, once, when the output is not already a glut. */
     function produce() {
         for (const m of markets) {
+            if (!isOpen(m)) continue;
             let moved = false;
             for (const rc of RECIPES) {
                 if (!GOODS.every((g) => (m.stock[g] || 0) >= (rc.in[g] || 0))) continue;
@@ -182,19 +214,55 @@ export function makeEconomy(world, opts = {}) {
     }
     /** Upkeep, once per whole day, paid to the market the ship is at or came from; one that cannot pay and holds nothing is finished. */
     function upkeep() {
-        for (const ship of ships) { if (ship.bankrupt) continue;
+        for (const ship of ships) { if (ship.bankrupt || !ship.joined) continue;
             const due = o.upkeep, have = ship.store.get("credits"), pay = Math.min(due, Math.max(0, have));
             if (pay > 0) { ship.store.add("credits", -pay); ship.upkeepPaid += pay; ledger.upkeep += pay; uni.systemById[ship.to != null ? ship.from : ship.at].credits += pay; }
             const holds = GOODS.reduce((a, g) => a + (ship.player.cargo[g] || 0), 0);
             if (pay < due && holds === 0 && ship.to == null) { ship.bankrupt = true; ledger.bankruptcies++; flightDirty = true; events.push(`${ship.name} is bankrupt at ${uni.systemById[ship.at].name} with ${ship.store.get("credits")} cr`); } }
     }
-    /** One step of `dtDays`. */
+    // ---- v4314: interventions -- the only way in from outside, and every one of them journaled ----------------------
+    /**
+     * kinds: gift {ship, credits} -- credits to a trader (minted); credits {market, credits} -- to a treasury (minted);
+     *        stock {market, good, tons} -- tons appear (booked as produced) or vanish (consumed), never below 0;
+     *        commits {market, commits} -- Level 16's GitHub feed: each commit is `tonsPerCommit` of source made and
+     *        its base value minted, at the market of that repository. `market` is an id or a name.
+     */
+    function marketOf(ref) { const m = typeof ref === "number" ? uni.systemById[ref] : markets.find((x) => x.name === ref); if (!m) throw new Error(`economy: no market ${JSON.stringify(ref)}`); return m; }
+    function apply(iv) {
+        const a = iv.args || {};
+        switch (iv.kind) {
+            case "gift": { const s = ships[a.ship]; if (!s) throw new Error(`economy: no ship ${a.ship}`); const c = Math.round(a.credits || 0); s.store.add("credits", c); s.earned += c; ledger.minted += c; events.push(`${s.name} is gifted ${c} cr`); break; }
+            case "credits": { const m = marketOf(a.market); const c = Math.round(a.credits || 0); m.credits += c; ledger.minted += c; events.push(`${m.name}'s treasury receives ${c} cr`); break; }
+            case "stock": { const m = marketOf(a.market), g = a.good; if (!GOODS.includes(g)) throw new Error(`economy: no good ${g}`); const n = Math.round(a.tons || 0), d = Math.max(-m.stock[g], n); m.stock[g] += d; if (d > 0) ledger.produced[g] += d; else ledger.consumed[g] += -d; reprice(m); events.push(`${m.name}: ${d >= 0 ? "+" : ""}${d} t of ${g}`); break; }
+            case "commits": { const m = marketOf(a.market); const n = Math.max(0, Math.round(a.commits || 0)) * (o.tonsPerCommit || 1); m.stock.source += n; ledger.produced.source += n; const mint = BASE.source * n; m.credits += mint; ledger.minted += mint; reprice(m); events.push(`${m.name}: ${a.commits} commit(s) -> ${n} t of source`); break; }
+            default: throw new Error(`economy: unknown intervention ${JSON.stringify(iv.kind)}`);
+        }
+    }
+    /** Schedule an intervention for a tick (default: applied at the start of the next step). Journaled when applied. */
+    function intervene(kind, args = {}, atTick = tick) {
+        if (atTick < tick) throw new Error(`economy: intervention at tick ${atTick} is in the past (tick ${tick}); a peer that late has already diverged`);
+        const iv = { tick: atTick, kind, args: JSON.parse(JSON.stringify(args)) };
+        pending.push(iv); pending.sort((x, y) => x.tick - y.tick); return iv;
+    }
+    function applyPending() {
+        while (pending.length && pending[0].tick <= tick) { const iv = pending.shift(); apply(iv); journal.interventions.push(iv); }
+    }
+    function noteStep(dt) { const last = journal.steps[journal.steps.length - 1]; if (last && last[0] === dt) last[1]++; else journal.steps.push([dt, 1]); }
+    /** A ship joins the sky: placed among the markets open today, from the seeded stream. */
+    function join(ship) {
+        const open = markets.filter(isOpen); if (!open.length) return false;
+        ship.at = open[Math.floor(rnd() * open.length)].id; ship.joined = true; flightDirty = true;
+        events.push(`${ship.name} joins at ${uni.systemById[ship.at].name} on day ${Math.floor(t)}`); return true;
+    }
+    /** One step of `dtDays`. Interventions scheduled for this tick apply first, then the world moves. */
     function step(dtDays = 0.25) {
+        applyPending(); noteStep(dtDays);
         t += dtDays; tick++;
+        if (history) for (const ship of ships) if (!ship.joined && t >= ship.joins) join(ship);
         if (tick % o.productionEvery === 0) produce();
         if (Math.floor(t) > dayPaid) { dayPaid = Math.floor(t); upkeep(); }
         for (const ship of ships) {
-            if (ship.bankrupt) continue;
+            if (ship.bankrupt || !ship.joined) continue;
             if (ship.to == null) { depart(ship); const p = posOf(uni.systemById[ship.at], t); ship.x = p[0]; ship.y = p[1]; continue; }
             if (world.moving) {
                 const a = posOf(uni.systemById[ship.from], t), b = posOf(uni.systemById[ship.to], t);
@@ -220,8 +288,37 @@ export function makeEconomy(world, opts = {}) {
         return { stock, holds, ledger, total, initialTons, tonsConserved: total === initialTons, traderCredits, treasuries, creditsTotal, initialCredits, creditsConserved: creditsTotal === initialCredits, creditsOk: perShipOk && creditsTotal === initialCredits,
                  bankrupt: ships.filter((s) => s.bankrupt).length, active: ships.filter((s) => !s.bankrupt).length, brokeMarkets: markets.filter((m) => m.credits < Math.min(...GOODS.map((g) => m.trade[g]))).length };
     }
-    /** Instance records for a GPU-driven scene: one small quad per ship, bankrupt ships at radius 0. */
-    function records(radius = 0.12) { const r = new Float32Array(ships.length * 4); ships.forEach((s, i) => r.set([s.x, s.y, 0.05, s.bankrupt ? 0 : radius], i * 4)); return r; }
+    /** Instance records for a GPU-driven scene: one small quad per ship, bankrupt (or not yet joined) ships at radius 0. */
+    function records(radius = 0.12) { const r = new Float32Array(ships.length * 4); ships.forEach((s, i) => r.set([s.x, s.y, 0.05, (s.bankrupt || !s.joined) ? 0 : radius], i * 4)); return r; }
+    /**
+     * v4314 -- THE STATE HASH: every integer the sim owns (stocks, treasuries, prices, where each ship is and what
+     * it holds), and the tick. Positions are left out ON PURPOSE: they are sines and cosines of the orbit, and two
+     * browsers' Math.sin may differ in the last bit; the integers cannot. Two economies with equal hashes have
+     * traded identically. FNV-1a over the state string, as a hex string.
+     */
+    function hash() {
+        let h = 2166136261;
+        const eat = (str) => { for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } };
+        eat(`t${tick}|`);
+        for (const m of markets) eat(`${m.id}:${GOODS.map((g) => m.stock[g] + "/" + m.trade[g]).join(",")}:${m.credits}:${m.made}|`);
+        for (const s of ships) eat(`${s.id}:${s.at}:${s.to}:${s.store.get("credits")}:${GOODS.map((g) => s.player.cargo[g] || 0).join(",")}:${s.trips}:${s.bankrupt ? 1 : 0}:${s.joined ? 1 : 0}|`);
+        eat(`m${ledger.minted}|u${ledger.upkeep}|r${ledger.recipesRun}`);
+        return (h >>> 0).toString(16).padStart(8, "0");
+    }
+    /** The journal, copied: seed, the steps as run-lengths, the interventions applied so far, and the hash at this tick. */
+    function log() { return { ...journal, steps: journal.steps.map((r) => [r[0], r[1]]), interventions: journal.interventions.map((iv) => ({ tick: iv.tick, kind: iv.kind, args: iv.args })), tick, hash: hash() }; }
+    /**
+     * Replay a journal on THIS economy, which must be fresh (tick 0). Schedules every intervention at its tick and
+     * steps the recorded dts. Returns { tick, hash, matches } -- matches is whether the hash the log carried is the
+     * hash this replay reached.
+     */
+    function replay(lg) {
+        if (tick !== 0) throw new Error("economy: replay needs a fresh economy (tick 0); this one has moved");
+        if (lg.seed !== seed) throw new Error(`economy: the log was made with seed ${lg.seed}, this economy has ${seed}`);
+        for (const iv of lg.interventions || []) intervene(iv.kind, iv.args, iv.tick);
+        for (const [dt, n] of lg.steps || []) for (let i = 0; i < n; i++) step(dt);
+        return { tick, hash: hash(), matches: lg.hash == null ? null : hash() === lg.hash };
+    }
     /**
      * v4300 -- the flight as a function of time, for a STILL world: per ship (fromX, fromY, toX, toY, t0, arriveT,
      * radius, active). A GPU pass evaluates the same lerp from these and the clock; dirty flips when any ship
@@ -230,15 +327,35 @@ export function makeEconomy(world, opts = {}) {
     function flightElements(radius = 0.12) { const e = new Float32Array(ships.length * 8); ships.forEach((s, i) => { const inFlight = s.to != null && !s.bankrupt; const at = inFlight ? null : posOf(uni.systemById[s.at], t);
         e.set(inFlight ? [s.fromPos[0], s.fromPos[1], s.toPos[0], s.toPos[1], s.t0, s.arriveT, radius, 1] : [at[0], at[1], at[0], at[1], t, t + 1, s.bankrupt ? 0 : radius, s.bankrupt ? 0 : 1], i * 8); }); return e; }
     return { markets, ships, uni, step, accounting, records, flightElements, events, bestRoute, produce, get t() { return t; }, get tick() { return tick; }, get flightDirty() { return flightDirty; }, clearFlightDirty() { flightDirty = false; },
-             names: ships.map((s) => s.name), moving: !!world.moving, opts: o,
+             names: ships.map((s) => s.name), moving: !!world.moving, opts: o, history, seed,
+             intervene, hash, log, replay, candidates, get pending() { return pending.map((iv) => ({ ...iv })); },
+             openMarkets() { return markets.filter(isOpen).length; }, joinedShips() { return ships.filter((s) => s.joined).length; },
+             dateAt: world.dateAt || null, get date() { return world.dateAt ? world.dateAt(t) : null; },
              describe(i) { const s = ships[i]; if (!s) return ""; if (s.bankrupt) return `${s.name}: bankrupt`; const m = uni.systemById[s.at], d = s.to ? uni.systemById[s.to] : null; const cargo = Object.entries(s.player.cargo).map(([g, n]) => `${n} t ${g}`).join(", ") || "empty";
                  return d ? `${s.name}: ${cargo}, ${m.name} -> ${d.name}, ${(s.progress * 100).toFixed(0)}%, ${s.store.get("credits")} cr` : `${s.name}: docked at ${m.name}, ${cargo}, ${s.store.get("credits")} cr`; },
              describeMarket(id) { const m = uni.systemById[id]; return m ? `${m.name}: ${GOODS.map((g) => g + " " + m.trade[g] + " (" + m.stock[g] + " t)").join(", ")}, treasury ${m.credits} cr, ${m.made} runs` : ""; } };
 }
 
-/** The orrery's economy: repositories as moving markets, git's contributors plus a hauler per body as crew. */
+/**
+ * The orrery's economy: repositories as moving markets, git's contributors plus a hauler per body as crew.
+ * v4314 -- `history: true` makes TIME GIT TIME: sim day 0 is the day the first body arrived (git's date for the
+ * vendoring), a market opens on its own body's arrival day, its hauler joins with it, and the contributors are
+ * there from day 0. The sky is still today's (orbits are as built); what history changes is WHEN each market
+ * exists, and so where every route can go. dateAt(t) names the calendar day of a sim day.
+ */
 export function makeGitEconomy(system, opts = {}) {
     const markets = marketsOf(system, opts.treasury);
-    const crew = opts.traders || [...gitTraders().map((t) => ({ name: t.name || t.id, from: t.repos })), ...markets.map((m) => ({ name: "hauler of " + m.name, from: [] }))];
-    return makeEconomy({ markets, crew, moving: true, positionOf: (m, td) => { const p = positionAt(m.body, td); return [p.x, p.y]; } }, opts);
+    let dateAt = null;
+    if (opts.history) {
+        const dated = markets.filter((m) => m.body && m.body.arrived);
+        if (!dated.length) throw new Error("gitEconomy: history needs bodies with an `arrived` date, and none has one");
+        const day = (s) => Math.floor(new Date(s + "T00:00:00Z").getTime() / 86400000);
+        const epoch = Math.min(...dated.map((m) => day(m.body.arrived)));
+        for (const m of markets) m.opens = m.body && m.body.arrived ? day(m.body.arrived) - epoch : 0;
+        dateAt = (t) => new Date((epoch + Math.floor(t)) * 86400000).toISOString().slice(0, 10);
+    }
+    const crew = opts.traders || [...gitTraders().map((t) => ({ name: t.name || t.id, from: t.repos, joins: 0 })), ...markets.map((m) => ({ name: "hauler of " + m.name, from: [], joins: m.opens || 0 }))];
+    return makeEconomy({ markets, crew, moving: true, dateAt, positionOf: (m, td) => { const p = positionAt(m.body, td); return [p.x, p.y]; } }, opts);
 }
+/** v4314 -- a fresh economy from the same world, replayed from a log: the saved universe, back. */
+export function replayEconomy(makeFresh, lg) { const e = makeFresh(lg.seed); const r = e.replay(lg); return { economy: e, ...r }; }

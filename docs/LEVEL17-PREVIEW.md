@@ -14,7 +14,7 @@ every item names what it would measure, what its twin would be, and what it need
   terrain gets light; the rig gets a question it can answer.
 - Level 15 (v4301): fleets in their own architectures. Nine races, each a re-skinner the tree already
   had; the user's own EV ship or radar plane as the raised hull; the pick picture carries the race.
-- Level 16 (sketched, not built): other people, other minds, a universe that persists. Two browsers
+- Level 16 (v4314, built after this preview was written): other people, other minds, a universe that persists. Two browsers
   on one universe over the lockstep layer; the brain as a trader scored against the greedy haulers;
   seed + tick + intervention log so a reload returns to the same place; new commits as production.
   Level 16 must also absorb "time is git time" (bodies arrive on the day they were vendored, markets

@@ -30,6 +30,14 @@
   market stocked from its own files, each of git's contributors a hauler chasing the best margin. The traders
   are a second GPU-driven scene drawn over the first without clearing; the pointer names a body or a trader
   from a one-pixel pick, and the log shows what was just bought and sold, and where it is bound.
+
+  Level 16 (v4314) -- A UNIVERSE THAT PERSISTS, AND IS SHARED. Time is git time: sim day 0 is the day the first
+  body was vendored and each market opens on its own day (?history=0 for the v4300 sky where everything is
+  there at once). The universe is a seed and a journal: "save" keeps the journal in localStorage, "restore"
+  reloads and REPLAYS it (the HUD says whether the replay reached the saved hash). Two tabs share one universe:
+  open ?peer=a in one and ?peer=b in another and both trade in lockstep over a BroadcastChannel, every tick's
+  hash checked (world/economyLockstep.mjs). "a week of commits" feeds the fixture commits (world/commitsFeed.mjs)
+  in as production -- journaled, so it replays and lockstops like anything else.
 -->
 <canvas id="stage"></canvas>
 <div id="hud">
@@ -43,6 +51,8 @@
   <div><label><input id="life" type="checkbox" checked> life: the economy's traders</label> <span id="pick" style="color:#f0e29e">point at something</span></div>
   <div style="color:#9fb8a8">races: <span id="races"></span></div>
   <div id="trade" style="color:#9fb8a8; max-height: 4.5em; overflow: hidden"></div>
+  <div style="color:#9fb8a8"><span id="date"></span> &middot; tick <span id="tick">0</span> &middot; hash <span id="hash"></span> &middot; <span id="peer">alone</span></div>
+  <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <span id="persist" style="color:#f0e29e"></span></div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
 <script type="module">
@@ -53,6 +63,8 @@ import * as G from "./render/gpuDriven.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
+import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
+import { applyCommitsFeed, fixtureFeed } from "./world/commitsFeed.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
 const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
@@ -76,7 +88,23 @@ const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.012], records:
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
 
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
-const economy = makeGitEconomy(system, { seed: 7 });
+const params = new URLSearchParams(location.search);
+const history = params.get("history") !== "0", peerId = params.get("peer"), JOURNAL_KEY = "swek.orrery.journal";
+const economy = makeGitEconomy(system, { seed: 7, history });
+// v4314 -- restore: replay the saved journal on this fresh economy before anything moves
+let restored = null;
+if (params.get("restore") === "1") { try { const lg = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null"); if (lg) { const r = economy.replay(lg); restored = { ...r, saved: lg.hash, tick: lg.tick }; } } catch (e) { restored = { error: e.message }; } }
+// v4314 -- two tabs, one universe: this tab is peer a or b over a BroadcastChannel, and steps only in lockstep
+let peer = null;
+if (peerId === "a" || peerId === "b") { const wire = broadcastWire("swek-universe"); peer = makePeer({ economy, selfId: peerId, peers: ["a", "b"], send: (m) => wire.send(m), inputDelay: 3, dt: 0.25 }); wire.onMessage = (m) => peer.receive(m); }
+let feedSeen = new Set();
+const intervene = (kind, args) => { if (peer) peer.queue(kind, args); else economy.intervene(kind, args); };
+document.getElementById("save").onclick = () => { try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(economy.log())); document.getElementById("persist").textContent = `saved at tick ${economy.tick}, hash ${economy.hash()}`; } catch (e) { document.getElementById("persist").textContent = "save failed: " + e.message; } };
+document.getElementById("restore").onclick = () => { const u = new URL(location.href); u.searchParams.set("restore", "1"); location.href = u.toString(); };
+document.getElementById("commits").onclick = () => { const feed = fixtureFeed(economy.markets, { seed: 5 + economy.tick }); const r = peer ? applyCommitsFeedQueued(feed) : applyCommitsFeed(economy, feed, { seen: feedSeen }); feedSeen = r.seen; document.getElementById("persist").textContent = `${r.applied.length} commit record(s) fed as production`; };
+function applyCommitsFeedQueued(feed) { const r = { applied: [], seen: new Set(feedSeen) }; for (const f of feed) { const m = economy.markets.find((x) => "vendor/" + x.name === f.repo); if (m) { peer.queue("commits", { market: m.id, commits: f.commits }); r.applied.push(f); } } return r; }
+if (restored) document.getElementById("persist").textContent = restored.error ? "restore failed: " + restored.error : `restored: replayed ${restored.tick} ticks, replay ${restored.matches ? "MATCHES" : "DOES NOT MATCH"} the saved hash ${restored.saved}`;
+window.__universe = { economy, get tick() { return economy.tick; }, hash: () => economy.hash(), log: () => economy.log(), restored, peer: peerId, history, get inStep() { return peer ? (peer.desync() ? false : true) : null; }, get desync() { return peer ? peer.desync() : null; } };
 const lifeSource = { count: economy.ships.length, cpu: () => economy.records(0.14) };
 // v4301 (Level 15) -- FLEETS: every owner in the git graph is a race, and every race is its own architecture and
 // shader (render/fleets.mjs). If the person assigned a ship model in Escape Velocity or a plane on the radar,
@@ -88,10 +116,10 @@ const fleetOf = fleetsForNames(economy.names, std.fleets.length);
 const lifeScene = G.makeGpuDrivenScene(device, { fleets: std.fleets, fleetOf, thresholds: [0.02], records: lifeSource });
 document.getElementById("races").textContent = std.fleets.map((f, i) => `${f.name} ${fleetOf.reduce((n, x) => n + (x === i), 0)}`).join(" / ");
 const bodyNames = ["SweK", ...system.bodies.map((b) => b.name)];
-let pointer = null, lastSimT = 0;
+let pointer = null, lastSimT = economy.t;
 cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
 const ext = Math.max(1, extentOf(system)), span = slowestPeriod(system) / 24;
-let t = 0, last = performance.now();
+let t = economy.t, last = performance.now();
 function camera() {
     const tilt = Number(document.getElementById("tilt").value) * Math.PI / 180, dist = ext * 2.4;
     const eye = [0, Math.sin(tilt) * dist, Math.cos(tilt) * dist];
@@ -110,7 +138,10 @@ async function frame(now) {
     const life = document.getElementById("life").checked;
     if (life) {
         // the sim steps in orrery days, a quarter day at a time, however fast the wall clock runs
-        while (lastSimT + 0.25 <= t) { economy.step(0.25); lastSimT += 0.25; }
+        // Level 16: alone, step; as a peer, pump -- the net steps when every peer's inputs for the tick are in
+        while (lastSimT + 0.25 <= t) { if (peer) peer.pump(); else economy.step(0.25); lastSimT += 0.25; }
+        if ((frames & 7) === 0) { document.getElementById("date").textContent = economy.date ? economy.date + ` (${economy.openMarkets()} markets open, ${economy.joinedShips()} ships)` : "no calendar"; document.getElementById("tick").textContent = economy.tick; document.getElementById("hash").textContent = economy.hash();
+            if (peer) { const d = peer.desync(); document.getElementById("peer").textContent = d ? `peer ${peerId}: DESYNC at tick ${d.tick} (ours ${d.ours}, theirs ${d.theirs})` : `peer ${peerId}: in step, lead ${peer.lead()}`; } }
         lifeScene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: null });
         if ((frames & 15) === 0) { const ev = economy.events.slice(-3).reverse(); document.getElementById("trade").innerHTML = ev.map((x) => `<div>${x.replace(/</g, "&lt;")}</div>`).join(""); }
     }
