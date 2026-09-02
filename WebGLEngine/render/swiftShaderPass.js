@@ -1023,13 +1023,108 @@ void main() {
                      toHalf(c.b * (1.0 - 0.35 * glow) + hot.b * glow * k), c.a);
 }`;
 
+
+// ==================================================================================================================
+// *** OURS TOO -- swk_fresnelEdge and swk_airyDisk, v4316. *** Both are graded against answers no part of this
+// tree computed: I(0) = 1/4 at a straight edge, and the zeros of the Bessel function J1. See
+// render/swiftShaderModel.mjs for the measured budgets and for what each one deliberately does NOT claim.
+// ==================================================================================================================
+const FRESNELEDGE_FRAG = PREAMBLE + `
+uniform float uLambda, uZLo, uZHi, uYHalf, uSamples, uIntensity, uRaw, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float yy = uYHalf * (2.0 * uv.x - 1.0);           // transverse position across the edge
+    float z  = uZLo + (uZHi - uZLo) * uv.y;           // propagation distance, DOWN the frame
+    float v  = yy * sqrt(2.0 / (uLambda * z));        // the dimensionless knife-edge coordinate
+    // C(v), S(v) by composite Simpson at a FIXED interval count. The CPU module scales its count with v^2
+    // because the integrand oscillates as t^2; a fragment cannot, so uSamples is one number for every pixel
+    // and the honest range is bounded. v = 0 returns C = S = 0 WITHOUT INTEGRATING, which is exactly why the
+    // key at the shadow boundary is exact rather than merely accurate.
+    float C = 0.0, S = 0.0;
+    float av = abs(v);
+    if (av > 0.0) {
+        int n = int(uSamples);
+        float step = av / uSamples;
+        float sc = 0.0, ss = 0.0;
+        for (int k = 0; k <= n; k++) {
+            float t = float(k) * step;
+            float ph = 3.14159265358979 * (t * t) * 0.5;
+            float wt = (k == 0 || k == n) ? 1.0 : (mod(float(k), 2.0) == 1.0 ? 4.0 : 2.0);
+            sc += wt * cos(ph);
+            ss += wt * sin(ph);
+        }
+        float sgn = v < 0.0 ? -1.0 : 1.0;
+        C = sgn * (sc * step / 3.0);
+        S = sgn * (ss * step / 3.0);
+    }
+    float a = 0.5 + C, b = 0.5 + S;
+    float I = 0.5 * (a * a + b * b);
+    if (uRaw > 0.5) {
+        // I reaches 1.370443 at the first maximum, so the encode spans [0, 2] rather than [0, 1]: a unit
+        // scale would clip the brightest fringe, and a key read off a clipped channel is not read at all.
+        float e = clamp(I / 2.0, 0.0, 1.0);
+        fragColor = vec4(floor(e * 255.0) / 255.0, fract(e * 255.0), 0.0, 1.0);
+        return;
+    }
+    vec4 c = layerSample(p);
+    float lit = clamp(I, 0.0, 1.5) * uIntensity;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 tint = vec3(1.0, 0.86, 0.62);
+    fragColor = vec4(toHalf(c.r * (1.0 - 0.5 * lit) + tint.r * lit * 0.7 * k),
+                     toHalf(c.g * (1.0 - 0.5 * lit) + tint.g * lit * 0.7 * k),
+                     toHalf(c.b * (1.0 - 0.5 * lit) + tint.b * lit * 0.7 * k), c.a);
+}`;
+
+const AIRYDISK_FRAG = PREAMBLE + `
+uniform float uXLo, uXHi, uTerms, uIntensity, uGamma, uRaw, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 ctr = uSize * 0.5;
+    float minDim = min(uSize.x, uSize.y);
+    float rad = length(p - ctr) * 2.0 / minDim;
+    float xa = uXLo + (uXHi - uXLo) * rad;
+    // J1 by its power series, built by the RATIO so no factorial is ever formed. Setting uXLo == uXHi pins
+    // every pixel at one argument, which is how the gate reads a Bessel zero back off the framebuffer --
+    // the same mechanism swk_lyapunov uses to put r = 4 on every pixel.
+    float I;
+    if (xa == 0.0) {
+        I = 1.0;
+    } else {
+        float hh = xa * 0.5;
+        float term = hh, sum = hh;
+        int nt = int(uTerms);
+        for (int m = 1; m < nt; m++) {
+            term = -term * (hh * hh) / float(m * (m + 1));
+            sum += term;
+        }
+        float u = 2.0 * sum / xa;
+        I = u * u;
+    }
+    if (uRaw > 0.5) {
+        float e = clamp(I, 0.0, 1.0);
+        fragColor = vec4(floor(e * 255.0) / 255.0, fract(e * 255.0), 0.0, 1.0);
+        return;
+    }
+    vec4 c = layerSample(p);
+    // The first bright ring is 1.75e-2 of the core, so a linear ramp shows one disk and a black frame. The
+    // gamma lift is DISPLAY ONLY and the raw path returns above it, before this line runs.
+    float lit = clamp(pow(clamp(I, 0.0, 1.0), uGamma), 0.0, 1.0) * uIntensity;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 tint = vec3(0.62, 0.80, 1.0);
+    fragColor = vec4(toHalf(c.r * (1.0 - 0.6 * lit) + tint.r * lit * k),
+                     toHalf(c.g * (1.0 - 0.6 * lit) + tint.g * lit * k),
+                     toHalf(c.b * (1.0 - 0.6 * lit) + tint.b * lit * k), c.a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
     geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
     wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG,
     liquidChrome: LIQUIDCHROME_FRAG, pixelateStorm: PIXELSTORM_FRAG, magneticField: MAGFIELD_FRAG,
     aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
-    morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG };
+    morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG,
+    fresnelEdge: FRESNELEDGE_FRAG, airyDisk: AIRYDISK_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -1060,6 +1155,8 @@ const KNOBS = {
     smokeReveal: { time: "uTime", smokeAmount: "uSmokeAmount", smokeScale: "uSmokeScale", windSpeed: "uWindSpeed", smokeTurb: "uSmokeTurb", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
     lyapunov: { rLo: "uRLo", rHi: "uRHi", samples: "uSamples", warmup: "uWarmup", intensity: "uIntensity", seedLo: "uSeedLo", seedHi: "uSeedHi", raw: "uRaw", premultiplied: "uPremultiplied" },
+    fresnelEdge: { lambda: "uLambda", zLo: "uZLo", zHi: "uZHi", yHalf: "uYHalf", samples: "uSamples", intensity: "uIntensity", raw: "uRaw", premultiplied: "uPremultiplied" },
+    airyDisk: { xLo: "uXLo", xHi: "uXHi", terms: "uTerms", intensity: "uIntensity", gamma: "uGamma", raw: "uRaw", premultiplied: "uPremultiplied" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
@@ -1121,6 +1218,15 @@ const DEFAULT_KNOBS = {
     morphBreathe:   { time: 0, breatheDepth: 20, breatheRate: 1, warpComplexity: 4, organic: 0.5, pointScale: 1 },
     // OURS -- swk_lyapunov. The budget is the measured knee; see swiftShaderModel.mjs for why 128 is worse.
     lyapunov:       { rLo: 3.4, rHi: 4.0, samples: 384, warmup: 64, intensity: 0.8, seedLo: 0.05, seedHi: 0.95, raw: 0, premultiplied: 1 },
+    // *** THESE DEFAULTS ARE CHOSEN SO THE WHOLE FRAME STAYS INSIDE |v| <= 5, AND THE FIRST SET DID NOT. ***
+    // The original zLo 30 / yHalf 4 put the corner of the default picture at v = 46, where a fixed n = 128
+    // Simpson has stopped resolving the t^2 oscillation entirely -- the shader's own comment said the honest
+    // range ended near 6 and the defaults drove forty times past it. Found by a gate probe that sampled at
+    // v = 35, reported a clipped value as evidence, and PASSED: a number measured outside the configuration
+    // it claims to describe. z 200..2000 with yHalf 1.1 gives |v| <= 4.92 on the nearest row and 1.56 on the
+    // farthest, so the fringes still fan visibly and every pixel is inside the budget.
+    fresnelEdge:    { lambda: 5e-4, zLo: 200, zHi: 2000, yHalf: 1.1, samples: 128, intensity: 0.85, raw: 0, premultiplied: 1 },
+    airyDisk:       { xLo: 0, xHi: 12, terms: 20, intensity: 0.9, gamma: 0.35, raw: 0, premultiplied: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
@@ -1259,7 +1365,7 @@ function swiftShaderNames() { return Object.keys(SHADERS); }
 // pass and is graded by the same gate, but it is NOT one of krispuckett/SwiftUIShaders' 41 -- so "35 of 41
 // ported" must not quietly become 36 because we added a shader of our own. A coverage number that counts
 // our own work as upstream's is the same defect as a baseline that absorbs its own drift.
-const SWK_OWN = ["lyapunov"];
+const SWK_OWN = ["lyapunov", "fresnelEdge", "airyDisk"];
 /** The upstream ports only -- what "N of 41" is allowed to count. */
 function portedShaderNames() { return Object.keys(SHADERS).filter((n) => !SWK_OWN.includes(n)); }
 
@@ -1271,6 +1377,6 @@ export {
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
     WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
     PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
-    LYAPUNOV_FRAG,
+    LYAPUNOV_FRAG, FRESNELEDGE_FRAG, AIRYDISK_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

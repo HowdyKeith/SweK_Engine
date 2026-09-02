@@ -125,6 +125,18 @@ export const INSTRUMENTS = [
       measures: "The logistic map run once per pixel on the GPU: the x coordinate IS r, the y coordinate is the seed x0, and the fragment reports the Lyapunov exponent of that orbit over the Krbn drawing.",
       key: "At r = 4 the exponent is EXACTLY ln 2 = 0.6931472 and the shader is never told it. The gate reads it back off the GPU -- median 0.693226 over 128 seeds, |err| 7.85e-5 -- and the page decodes its own on whatever hardware runs it (0.693103, |err| 4.45e-5 on SwiftShader). The RAW path returns BEFORE the ln 2 constant the display path uses to normalise, so the number read back cannot have come from it.",
       gate: "tools/ship/swiftShaders-selfcheck.mjs" },
+    // v4316 -- TWO MORE SHADERS GRADED AGAINST ANSWERS THEY WERE NEVER GIVEN, AND NEITHER HAS A PAGE. `page:
+    // null` is a DECLARED STATE in this file, not a missing field (v3382): these are fragments in
+    // render/swiftShaderPass.js reached through any page that mounts the pass, so inventing a door for them
+    // to satisfy a schema would be worse than saying they have none.
+    { id: "swk-fresnel-edge", page: null, name: "Fresnel edge (GPU)", area: "optics",
+      measures: "Near-field diffraction at a straight edge, computed per pixel: the x coordinate is transverse position and the y coordinate is the PROPAGATION DISTANCE, so the fringes fan out down the frame.",
+      key: "I at the geometric shadow boundary is EXACTLY 0.25, because C(0) = S(0) = 0 -- and the key needs NO INTEGRATION, so no budget or rounding can move it. Read back off the GPU at worst |I - 0.25| = 3.84e-6 over 128 different propagation distances, a WORST CASE rather than a median. What is deliberately NOT claimed: the I -> 1 limit far into the light, which is true of the physics and false of this shader, because a fragment cannot scale its Simpson count with v^2 the way physics/optics/fresnel.js does.",
+      gate: "tools/ship/swiftShaders-selfcheck.mjs" },
+    { id: "swk-airy-disk", page: null, name: "Airy disk (GPU)", area: "optics",
+      measures: "The far-field pattern of a circular aperture, I = (2 J1(x)/x)^2, with J1 summed from its power series in the fragment and the radius as the argument.",
+      key: "THE ZEROS OF J1 -- 3.8317059702, 7.0155866698, 10.1734681351 -- numbers that exist independently of optics and of this tree. All three read 0 off the GPU at the framebuffer's 1/65535 floor. AND THE CONTROLS ARE LOAD-BEARING: a shader returning zero everywhere passes all three zeros, so a pass also requires I(0) = 1 exactly, I(1.8412) = 0.3995 and I(5.1356) = 0.0175. Three zeros plus three non-zeros, not three zeros.",
+      gate: "tools/ship/swiftShaders-selfcheck.mjs" },
     // ---- rendering / method ---------------------------------------------------------------------------------
     { id: "splat-lab", page: "splat-lab.html", name: "Splat lab", area: "rendering maths",
       measures: "3D Gaussian splatting: EWA projection and alpha compositing, graded as arithmetic rather than as a picture.",

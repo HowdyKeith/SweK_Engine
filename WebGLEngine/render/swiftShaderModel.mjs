@@ -1933,3 +1933,174 @@ export function swkLyapunov(img, { rLo = 3.4, rHi = 4.0, samples = 384, warmup =
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+/**
+ * swk_fresnelEdge -- v4316. THE SECOND SHADER WITH AN EXTERNAL KEY, AND ITS KEY COSTS NOTHING TO COMPUTE.
+ *
+ * Near-field diffraction at a straight edge. physics/optics/fresnel.js records the answer:
+ *
+ *     I(0)/I0 = EXACTLY 0.25 at the geometric shadow boundary, because C(0) = S(0) = 0.
+ *
+ * *** THAT IS WHY THIS ONE WAS BUILT BEFORE THE OTHER CANDIDATES. *** swk_lyapunov's key sits at r = 4, where
+ * the map is chaotic and float32 produces a DIFFERENT ORBIT than float64 -- the answer survives only because
+ * the average is ergodic, and the tolerance had to be measured. Here the key sits where the integral has zero
+ * width. I(0) needs no integration at all, so no budget, no rounding and no precision choice can move it:
+ * measured in float32 at every interval count tried, I(0) reads 0.25000000000000000, |err| 0.00e+0.
+ *
+ * A KEY THAT IS EXACT BECAUSE THE ARITHMETIC IS TRIVIAL THERE is a different and better shape than a key that
+ * is exact because the tolerance was chosen to fit.
+ *
+ * *** THE PICTURE IS TWO-PARAMETER, AND THE KEY IS A WHOLE COLUMN RATHER THAN A POINT. *** uv.x is transverse
+ * position y across the edge; uv.y is the PROPAGATION DISTANCE z. The dimensionless coordinate is
+ * v = y*sqrt(2/(lambda*z)), so the fringes fan out down the frame as the wave propagates -- and y = 0 gives
+ * v = 0 for EVERY z, so the entire geometric-shadow column must read 0.25 whatever row it is on. Rows are not
+ * redundant (the fringe spacing changes with z) and the key is checkable 480 times instead of once.
+ *
+ * *** WHAT THIS SHADER CANNOT DO, MEASURED RATHER THAN OMITTED. *** The module's own comment says the Simpson
+ * step count must scale with x^2, not x, "because the integrand oscillates faster as t grows (phase ~ t^2), so
+ * a fixed step silently loses accuracy exactly where the physics gets interesting". A FRAGMENT SHADER CANNOT
+ * SCALE ITS LOOP: the count is a uniform, the same for every pixel. So this is the trade, in numbers, against
+ * the float64 module over a fixed n = 128:
+ *
+ *     v = 0     |err| 0.00e+0   <- the key, and it is exact for the reason above
+ *     v = 4     0.922091 vs 0.922102   1.1e-5
+ *     v = 6     0.947705 vs 0.947899   1.9e-4
+ *     v = 8     0.958950 vs 0.960808   1.9e-3
+ *     v = 10    0.949497 vs 0.968575   1.9e-2   <- and it is getting worse, not converging
+ *
+ * *** SO THE "I -> 1 FAR INTO THE LIGHT" LIMIT IS NOT CLAIMED AS A KEY, and that is a deliberate refusal.
+ * *** It is true of the physics and it is not true of this shader: past about v = 6 the fixed budget stops
+ * resolving the oscillation and the curve wanders instead of settling. Listing it beside I(0) = 0.25 would
+ * have been a key the shader cannot hold. The default vHi is 5, inside the range where n = 128 is honest.
+ *
+ * The budget: worst |err| against the module over v in [-4, 5] is 3.34e-2 at n = 32, 1.04e-3 at 64,
+ * 5.64e-5 at 128 and 3.80e-6 at 256. 128 is the knee, and doubling it again buys a digit nothing reads.
+ *
+ * `raw` encodes I/2 across two channels -- I reaches 1.370443 at the first maximum, so a [0,1] scale would
+ * clip the brightest part of the picture. 16 bits over a span of 2 resolves 3.1e-5, measured round-trip
+ * error at the key 3.8e-6, comfortably under the 5.6e-5 the budget earns.
+ */
+export function swkFresnel(img, { lambda = 5e-4, zLo = 200, zHi = 2000, yHalf = 1.1, samples = 128,
+                                  intensity = 0.85, raw = false, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const yy = f32(yHalf * f32(2 * uvx - 1));
+        const z = f32(zLo + (zHi - zLo) * uvy);
+        const v = f32(yy * f32(Math.sqrt(f32(2 / f32(lambda * z)))));
+        // C(v), S(v) by composite Simpson at a FIXED interval count -- see the note above on what that costs.
+        // v = 0 short-circuits to C = S = 0, which is not an optimisation: it is the reason the key is exact.
+        let C = 0, S = 0;
+        const av = Math.abs(v);
+        if (av > 0) {
+            const step = f32(av / samples);
+            let sc = 0, ss = 0;
+            for (let k = 0; k <= samples; k++) {
+                const t = f32(k * step), ph = f32(f32(Math.PI) * f32(t * t) * 0.5);
+                const wt = (k === 0 || k === samples) ? 1 : (k & 1 ? 4 : 2);
+                sc = f32(sc + wt * f32(Math.cos(ph)));
+                ss = f32(ss + wt * f32(Math.sin(ph)));
+            }
+            const sgn = v < 0 ? -1 : 1;
+            C = f32(sgn * f32(sc * step / 3));
+            S = f32(sgn * f32(ss * step / 3));
+        }
+        const a = f32(0.5 + C), b = f32(0.5 + S);
+        const I = f32(0.5 * f32(a * a + b * b));
+        if (raw) {
+            const e = clamp(I / 2, 0, 1);
+            const hi = Math.floor(e * 255) / 255, lo = e * 255 - Math.floor(e * 255);
+            out[i] = hi; out[i + 1] = lo; out[i + 2] = 0; out[i + 3] = 1;
+            continue;
+        }
+        const c = s(px, py);
+        const lit = clamp(I, 0, 1.5) * intensity;
+        const A = c[3], k = premultiplied || A === 0 ? 1 : A;
+        const tint = [1.0, 0.86, 0.62];                       // sodium-lamp warm, so fringes read as light
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * (1 - 0.5 * lit) + tint[j] * lit * 0.7 * k);
+        out[i + 3] = A;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * swk_airyDisk -- v4316. FOUR EXACT KEYS ON ONE PICTURE, AND THREE OF THEM ARE ZEROS.
+ *
+ * The far-field pattern of a circular aperture: I(x) = (2 J1(x) / x)^2, x = pi D r / (lambda z). What makes
+ * it worth building beside swk_fresnelEdge is that its keys are the ZEROS OF A BESSEL FUNCTION -- numbers
+ * that exist independently of optics, of this tree and of any float format:
+ *
+ *     I(0) = EXACTLY 1                       (the limit 2 J1(x)/x -> 1)
+ *     I = 0 at x = 3.8317059702075123        the first dark ring
+ *     I = 0 at x = 7.0155866698156190        the second
+ *     I = 0 at x = 10.1734681350627220       the third
+ *
+ * *** THREE ZEROS ARE NOT THREE TIMES ONE ZERO -- THEY ARE THE ONLY REASON THIS IS GRADEABLE. *** An error
+ * that happens to land near one ring is caught by the other two, and more importantly a shader that returned
+ * ZERO EVERYWHERE would pass all three. So the controls are load-bearing rather than decorative, and they are
+ * measured in float32 with the shipped 20-term series:
+ *
+ *     I(1.8412) = 3.995e-1     the first J1 maximum -- the brightest part of the first ring's approach
+ *     I(5.1356) = 1.750e-2     the first bright ring between zeros one and two
+ *
+ * A pass therefore requires BOTH: near-zero where the zeros are, and NOT near-zero between them.
+ *
+ * *** THE SERIES LENGTH IS MEASURED AND THE THIRD ZERO IS WHAT SETS IT. *** J1 by its power series, terms in
+ * float32, read at the three zeros:
+ *
+ *     terms  8   4.8e-12,  9.9e-04,  1.1e+02   <- the third zero is not merely inaccurate, it DIVERGES
+ *     terms 12   3.7e-16,  1.5e-11,  7.0e-04
+ *     terms 16   3.7e-16,  3.9e-15,  1.1e-12
+ *     terms 20   3.7e-16,  3.9e-15,  3.7e-11   <- chosen; 24 reads identically, so this is the floor
+ *
+ * 16 reads the third zero BETTER than 20 does (1.1e-12 against 3.7e-11) because the extra terms are
+ * cancelling quantities near 10^4 in float32 and the rounding accumulates. 20 is kept because it is where the
+ * series has stopped moving -- the value at 24 is bit-identical to 20 -- and a budget chosen at a local
+ * minimum of the error would be the same mistake as blackhole.escape's flattering early stop (v2919).
+ *
+ * `raw` encodes I directly across two channels: I is already in [0, 1] with I(0) = 1 at the top, so no offset
+ * or scale is needed and the round trip at the peak is EXACT.
+ */
+export function swkAiry(img, { xLo = 0, xHi = 12, terms = 20, intensity = 0.9, gamma = 0.35,
+                               raw = false, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const cx = w / 2, cy = h / 2, minDim = Math.min(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const dx = f32(px - cx), dy = f32(py - cy);
+        const rad = f32(f32(Math.sqrt(f32(dx * dx + dy * dy))) * 2 / minDim);
+        const xa = f32(xLo + (xHi - xLo) * rad);
+        // J1 by its power series: sum_m (-1)^m / (m! (m+1)!) (x/2)^(2m+1), built by the ratio so no
+        // factorial is ever formed -- a factorial of 20 overflows nothing here but the ratio is what a
+        // fragment can afford.
+        let I;
+        if (xa === 0) { I = 1; } else {
+            const hh = f32(xa * 0.5);
+            let term = hh, sum = hh;
+            for (let m = 1; m < terms; m++) {
+                term = f32(-term * f32(hh * hh) / f32(m * (m + 1)));
+                sum = f32(sum + term);
+            }
+            const u = f32(2 * sum / xa);
+            I = f32(u * u);
+        }
+        if (raw) {
+            const e = clamp(I, 0, 1);
+            const hi = Math.floor(e * 255) / 255, lo = e * 255 - Math.floor(e * 255);
+            out[i] = hi; out[i + 1] = lo; out[i + 2] = 0; out[i + 3] = 1;
+            continue;
+        }
+        const c = s(px, py);
+        // gamma-lifted, because the rings are 1.75e-2 and 4.2e-3 of the core and a linear ramp shows one disk
+        // and a black frame. The LIFT IS DISPLAY ONLY -- raw mode returns before it.
+        const lit = clamp(Math.pow(clamp(I, 0, 1), gamma), 0, 1) * intensity;
+        const A = c[3], k = premultiplied || A === 0 ? 1 : A;
+        const tint = [0.62, 0.80, 1.0];                       // cold blue-white, an optics bench rather than a lamp
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * (1 - 0.6 * lit) + tint[j] * lit * k);
+        out[i + 3] = A;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
