@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -68,7 +68,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    WITHOUT a uv turns the uv-transform matrix on and every clone (textureLoad makes one) keeps it -- the obvious
    spelling emits an unlabelled mat3 into the fragment and is refused. Give the uv at construction and the fragment
    carries no uniform at all. Also measured and not fixed: three fetches the texel twice around a Discard that
-   reads it. v4323: linear-filtered sampling crosses too -- three's sampler becomes
+   reads it.
+   v4327 -- AND A SAMPLER. A shell may declare one (spriteLookShell's `sampler`, spriteSampledShell: viewProj, the
+   atlas at 1, the sampler at 2), and the transplant rewrites three's own `<tex>_sampler` to it, so a FILTERED
+   sample crosses where only a texel fetch could. Section 7: on both backends the filtered sprite drawn by the
+   generated pipeline is a hand-written twin's picture on 36,864 of 36,864 pixels, and the SAME pipeline draws a
+   different picture (898 pixels) when a point-sampled texture is bound to it. What decides which three emits is
+   the TEXTURE, not the graph -- Linear gives textureSample, Nearest gives textureLoad and leaves the sampler
+   unused, so makeSpriteSampledTsl refuses a Nearest texture. And the refusal is WGSL-side only: GLSL's sampler2D
+   carries its own sampler, so a sampled graph into a sampler-less shell just works on WebGL2. orrery-gpu.html
+   ?tsl=1&soft=1 draws the Glyph race sampled instead of fetched. v4323: linear-filtered sampling crosses too -- three's sampler becomes
    the device's, and the generated linear badTv is the hand-written linear pass on 4,096 of 4,096 pixels on
    both backends (tslSource-selfcheck section 3); and orrery-gpu.html?tsl=1 paints the Chaos race with a
    graph three compiles at load, on whichever backend the page has (transplantIntoShell takes one language).

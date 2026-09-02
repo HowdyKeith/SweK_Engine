@@ -193,12 +193,19 @@ if (params.get("tsl") === "1") {
         try {
             const GL = RACES.findIndex((r) => r.name === "Glyph");
             const atlas = new THREE.DataTexture(std.atlas.data, std.atlas.width, std.atlas.height); atlas.magFilter = THREE.NearestFilter; atlas.minFilter = THREE.NearestFilter; atlas.needsUpdate = true;
-            const g = P.makeSpriteAtlasTsl(THREE, T, { texture: atlas }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+            // v4327 -- &soft=1 samples the atlas through a sampler instead of fetching its texels: the same graph, one node
+            // apart, and what filters is the TEXTURE (three emits a fetch for a Nearest one), so the soft path hands three a
+            // LinearFilter copy and the device a linear texture to bind.
+            const soft = params.get("soft") === "1";
+            if (soft) { atlas.magFilter = THREE.LinearFilter; atlas.minFilter = THREE.LinearFilter; atlas.generateMipmaps = false; atlas.needsUpdate = true; }
+            const g = soft ? P.makeSpriteSampledTsl(THREE, T, { texture: atlas }) : P.makeSpriteAtlasTsl(THREE, T, { texture: atlas }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
             const emG = await S.emitShaders(renderer, { scene: g.scene, camera: g.camera, mesh: g.scene.children[0] });
-            const dG = S.transplantIntoShell({ [emG.language]: emG }, P.spriteAtlasShell(std.fleets[GL].pipeline.buffers));
-            std.fleets[GL] = { ...std.fleets[GL], pipeline: dG };   // the fleet's own bind hook already binds "atlas" by name
-            tslLook.atlas = { language: emG.language, applied: std.fleets[GL].pipeline === dG, shell: dG.shell, textures: dG.textures };
-            say(`${device.backend} &middot; and the Glyph race's OWN shipped look is GENERATED too -- the atlas crossing into the shell that binds it, texel by texel, transparent ones discarded`);
+            const shellG = soft ? P.spriteSampledShell(std.fleets[GL].pipeline.buffers) : P.spriteAtlasShell(std.fleets[GL].pipeline.buffers);
+            const dG = S.transplantIntoShell({ [emG.language]: emG }, shellG);
+            const softTex = soft ? device.texture({ width: std.atlas.width, height: std.atlas.height, data: std.atlas.data, nearest: false }) : null;
+            std.fleets[GL] = { ...std.fleets[GL], pipeline: dG, ...(soft ? { bind: (pass) => pass.texture("atlas", softTex, 0) } : {}) };   // otherwise the fleet's own bind hook already binds "atlas" by name
+            tslLook.atlas = { language: emG.language, applied: std.fleets[GL].pipeline === dG, shell: dG.shell, textures: dG.textures, soft };
+            say(`${device.backend} &middot; and the Glyph race's OWN shipped look is GENERATED too -- the atlas crossing into the shell that binds it, ${soft ? "sampled through the shell's sampler, softened" : "texel by texel"}, transparent ones discarded`);
         } catch (e) { say("the generated atlas look failed, the Glyph race keeps its own: " + e.message, true); console.warn("tsl atlas:", e); }
     } catch (e) { say("TSL look failed, the hand-written Chaos look stands: " + e.message, true); console.warn("tsl look:", e); }
 }

@@ -163,6 +163,10 @@ export function corpus() {
         ...(EMITTED_RACE && EMITTED_RACE.atlas && EMITTED_RACE.atlas.transplanted ? [
             { id: "tslSource.spriteAtlas (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "a TEXTURE across the shell boundary: textureLoad and discard in a generated fragment, inside the fleets' sprite vertex stage", opts: { code: EMITTED_RACE.atlas.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),
+        // v4327 -- the same sprite look FILTERED: a sampler in a fleet shell, three's sampler bound as the shell's
+        ...(EMITTED_RACE && EMITTED_RACE.sampled && EMITTED_RACE.sampled.transplanted ? [
+            { id: "tslSource.spriteSampled (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "a SAMPLER across the shell boundary: textureSample and discard in a generated fragment, inside the fleets' sprite vertex stage", opts: { code: EMITTED_RACE.sampled.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+        ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320
         { id: "fleetMask.PICK_MASK_WGSL", from: "render/fleetMask.mjs", compileOnly: true, why: "the identity picture -> the strength field: the fleet decoded from the blue byte against a bitmask, on the device", opts: { code: FM.PICK_MASK_WGSL, compileOnly: true, outCount: 0 } },
