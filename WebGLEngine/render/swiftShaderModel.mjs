@@ -1702,3 +1702,153 @@ export function bcsAurora(img, { time = 0, intensity = 0.7, bands = 4, speed = 1
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+/**
+ * bcs_datamosh -- BATCH 14, v4311. Corrupted 16-point blocks, smeared along a per-block random angle,
+ * channel-bled, quantised to 16 levels, with a grid edge drawn on.
+ *
+ * *** THIS IS THE FIRST PORTED SHADER WITH AN ALPHA-SENSITIVE OPERATION THE k CONVENTION CANNOT EXPRESS,
+ * AND IT IS SAID HERE RATHER THAN QUIETLY APPROXIMATED. *** Every alpha-aware shader so far has been
+ * alpha-sensitive in exactly one place -- an ADD into the sample -- and `k` corrects it exactly, because
+ * addition is the only thing premultiplication distributes over cleanly. datamosh has TWO:
+ *   - `result.rgb += half3(blockEdge * 0.1)` -- an add. Corrected by k, as everywhere else.
+ *   - `result.rgb = floor(result.rgb * 16) / 16` -- a QUANTISATION, which is NOT linear and does NOT
+ *     commute with premultiplication: floor(c*a*16)/16 is not a*floor(c*16)/16. The levels land in
+ *     different places in the two spaces and no scalar can reconcile them.
+ * The quantise is left operating on the sampled colour, which reproduces upstream exactly in premultiplied
+ * space and is APPROXIMATE in straight space. Straightening it first would be a different shader; pretending
+ * k covers it would be a false claim about what the knob does.
+ *
+ * `blockSize` is 16 POINTS, and `smearAmount`'s comment calls it "pixel displacement" while `position` is
+ * in points -- the same mislabel chromaticSplit carries, and trap 3 applies to both. The BLOCK GRID is
+ * invariant under pointScale (size and blockSize scale together, so size/blockSize does not move), which is
+ * what keeps the corruption pattern identical at 1x and 2x while the blocks grow on screen.
+ */
+export function bcsDatamosh(img, { time = 0, blockCorruption = 0.3, smearAmount = 24, colorBleed = 0.5,
+                                   glitchRate = 2, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const blockSize = 16 * pointScale;
+    const gx = w / blockSize, gy = h / blockSize;      // invariant under pointScale
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const bux = Math.floor(uvx * gx) / gx, buy = Math.floor(uvy * gy) / gy;
+        const t1 = Math.floor(time * glitchRate) * 0.1;
+        const blockHash = bcsHash(bux * 73 + t1, buy * 73 + t1);
+        const orig = s(px, py);
+        if (blockHash < 1 - blockCorruption) {          // step(1 - corruption, hash) < 0.5
+            out[i] = orig[0]; out[i + 1] = orig[1]; out[i + 2] = orig[2]; out[i + 3] = orig[3];
+            continue;
+        }
+        const t2 = Math.floor(time * glitchRate * 0.5) * 0.3;
+        const ang = bcsHash(bux * 137 + t2, buy * 137 + t2) * 6.28;
+        const blockSmear = smearAmount * pointScale * (0.5 + blockHash * 0.5);
+        const sox = Math.cos(ang) * blockSmear, soy = Math.sin(ang) * blockSmear;
+        const sm = s(clamp(px + sox, 0, w), clamp(py + soy, 0, h));
+        const rB = 1 + colorBleed * 0.3, bB = 1 - colorBleed * 0.2;
+        const rS = s(clamp(px + sox * rB, 0, w), clamp(py + soy * rB, 0, h));
+        const bS = s(clamp(px + sox * bB, 0, w), clamp(py + soy * bB, 0, h));
+        const cb = toHalf(colorBleed);
+        const rgb = [mix(sm[0], rS[0], cb), sm[1], mix(sm[2], bS[2], cb)];
+        const cellx = uvx * gx - Math.floor(uvx * gx), celly = uvy * gy - Math.floor(uvy * gy);
+        const blockEdge = Math.min(cellx, celly) < 0.03 ? 1 : 0;   // 1 - step(0.03, min)
+        const a = sm[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++) {
+            const q = Math.floor(toHalf(rgb[j]) * 16) / 16;        // NOT k-corrected -- see the note above
+            out[i + j] = toHalf(q + toHalf(blockEdge * 0.1) * k);
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_smokeReveal -- BATCH 14, v4311. Domain-warped fbm smoke composited over a displaced sample.
+ *
+ * *** THE ALPHA COMES FROM ONE SAMPLE AND THE COLOUR FROM ANOTHER, WHICH IS UPSTREAM'S CHOICE AND IS KEPT. ***
+ * `result.rgb` is built from `displacedColor` -- the layer read through the smoke displacement -- while
+ * `result.a = original.a` is the alpha at the UNDISPLACED position. On an opaque layer that is invisible;
+ * on a cut-out it means the smoke can move colour across an edge that the alpha does not follow. Reproduced
+ * rather than tidied, because tidying it would change which pixels the effect can reach.
+ *
+ * TWO alpha-sensitive terms, both corrected by k: the mix TOWARDS the opaque smoke colour (mixing a
+ * premultiplied sample toward an unpremultiplied constant is exactly the case k exists for) and the additive
+ * light ray. The 8.0 in the displacement is POINTS, so it carries pointScale; smokeScale multiplies uv and
+ * does not. Octave counts are 5, 5 and 6 -- upstream uses three different depths and the port keeps each.
+ */
+export function bcsSmokeReveal(img, { time = 0, smokeAmount = 0.6, smokeScale = 4, windSpeed = 1,
+                                      smokeTurb = 1, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const sux = uvx * smokeScale, suy = uvy * smokeScale;
+        const w1x = bcsFbm(sux + time * windSpeed * 0.3, suy + time * windSpeed * 0.1, 5);
+        const w1y = bcsFbm(sux + time * windSpeed * 0.1 + 5.2, suy - time * windSpeed * 0.2 + 5.2, 5);
+        const wx = sux + w1x * smokeTurb, wy = suy + w1y * smokeTurb;
+        let dens = bcsFbm(wx + time * windSpeed * 0.15, wy + time * windSpeed * 0.08, 6);
+        dens = clamp(dens * dens * smokeAmount * 1.5, 0, 1);
+        const lv = bcsValueNoise(uvx * 3 + time * 0.2, uvy * 3 + time * 0.2);
+        const edgeGlow = smoothstep(0.2, 0.5, dens) - smoothstep(0.5, 0.8, dens);
+        const sc = [toHalf(0.7 + toHalf(lv) * 0.15), toHalf(0.68 + toHalf(lv) * 0.12),
+                    toHalf(0.66 + toHalf(lv) * 0.1)].map((v) => toHalf(v + toHalf(edgeGlow * 0.2)));
+        const dsp = 8 * pointScale * dens;                       // the 8.0 is POINTS
+        const dc = s(clamp(px + (w1x - 0.5) * dsp, 0, w), clamp(py + (w1y - 0.5) * dsp, 0, h));
+        const orig = s(px, py);
+        let ray = Math.sin(uvx * 8 + time * 0.3) * 0.5 + 0.5;
+        ray *= smoothstep(1.0, 0.3, uvy) * dens * 0.15;
+        const a = orig[3], k = premultiplied || a === 0 ? 1 : a;  // alpha from the UNDISPLACED sample
+        const rw = [0.8, 0.7, 0.5], t = toHalf(dens);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(mix(dc[j], sc[j] * k, t) + toHalf(ray * rw[j]) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_morphBreathe -- BATCH 14, v4311. Three sine rhythms driving a blend between a radial pulse and an
+ * fbm warp, with the displacement faded out near the edges.
+ *
+ * NO premultiplied KNOB, and again that is a decision rather than an omission: every colour operation is a
+ * MULTIPLY (`color.r *= ...`, `color.b *= ...`, `color.rgb *= ...`), and scaling commutes with
+ * premultiplication. Third shader in three batches where reading which operations are linear settles the
+ * question before the gate is run -- pixelateStorm and this one need no knob, magneticField and aurora do.
+ *
+ * `breathe_depth` is a displacement in POINTS, so it carries pointScale. `warp_complexity` scales uv into
+ * the noise field and is resolution-independent, so it does not -- one knob of each kind in one shader.
+ * `organic` blends the two displacement fields AND selects which breathing rhythm drives the radial one,
+ * so at 0 and 1 it is two different animations rather than two amplitudes of the same one.
+ */
+export function bcsMorphBreathe(img, { time = 0, breatheDepth = 20, breatheRate = 1, warpComplexity = 4,
+                                       organic = 0.5, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const b1 = Math.sin(time * breatheRate) * 0.5 + 0.5;
+    const b2 = Math.sin(time * breatheRate * 0.7 + 1.5) * 0.5 + 0.5;
+    const b3 = Math.sin(time * breatheRate * 1.3 + 3.0) * 0.5 + 0.5;
+    const t = time * breatheRate * 0.3;
+    const colorPulse = b1 * 0.05, brightPulse = 1 + (b1 - 0.5) * 0.08;
+    const rGain = toHalf(1 + colorPulse), bGain = toHalf(1 - colorPulse), gGain = toHalf(brightPulse);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const stx = uvx * warpComplexity, sty = uvy * warpComplexity;
+        const qx = bcsFbm(stx + t * 0.5, sty + t * 0.3, 4);
+        const qy = bcsFbm(stx + 5.2 + t * 0.4, sty + 1.3 + t * 0.6, 4);
+        const fcx = uvx - 0.5, fcy = uvy - 0.5;
+        const radialPulse = b1 * (1 - organic) + b2 * organic;
+        const rdx = fcx * (radialPulse - 0.5) * 2, rdy = fcy * (radialPulse - 0.5) * 2;
+        const odx = (qx - 0.5) * 2 * b2, ody = (qy - 0.5) * 2 * b3;
+        const edgeFade = smoothstep(0, 0.15, Math.min(Math.min(uvx, 1 - uvx), Math.min(uvy, 1 - uvy)));
+        const dep = breatheDepth * pointScale * edgeFade;        // POINTS
+        const c = s(clamp(px + mix(rdx, odx, organic) * dep, 0, w),
+                    clamp(py + mix(rdy, ody, organic) * dep, 0, h));
+        out[i] = toHalf(toHalf(c[0] * rGain) * gGain);
+        out[i + 1] = toHalf(c[1] * gGain);
+        out[i + 2] = toHalf(toHalf(c[2] * bGain) * gGain);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}

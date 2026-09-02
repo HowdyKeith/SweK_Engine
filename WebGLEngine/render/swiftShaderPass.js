@@ -907,12 +907,92 @@ void main() {
                      toHalf(c.b + (toHalf(ac.b * amt) + shimmer) * k), c.a);
 }`;
 
+const DATAMOSH_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uBlockCorruption, uSmearAmount, uColorBleed, uGlitchRate, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float blockSize = 16.0 * uPointScale;            // 16 POINTS
+    vec2 g = uSize / blockSize;                      // invariant: both scale together
+    vec2 blockUV = floor(uv * g) / g;
+    float blockHash = bcs_hash(blockUV * 73.0 + floor(uTime * uGlitchRate) * 0.1);
+    vec4 orig = layerSample(p);
+    if (step(1.0 - uBlockCorruption, blockHash) < 0.5) { fragColor = orig; return; }
+    float ang = bcs_hash(blockUV * 137.0 + floor(uTime * uGlitchRate * 0.5) * 0.3) * 6.28;
+    float blockSmear = uSmearAmount * uPointScale * (0.5 + blockHash * 0.5);
+    vec2 so = vec2(cos(ang), sin(ang)) * blockSmear;
+    vec4 sm = layerSample(clamp(p + so, vec2(0.0), uSize));
+    vec4 rS = layerSample(clamp(p + so * (1.0 + uColorBleed * 0.3), vec2(0.0), uSize));
+    vec4 bS = layerSample(clamp(p + so * (1.0 - uColorBleed * 0.2), vec2(0.0), uSize));
+    float cb = toHalf(uColorBleed);
+    vec3 rgb = vec3(mix(sm.r, rS.r, cb), sm.g, mix(sm.b, bS.b, cb));
+    vec2 cell = fract(uv * g);
+    float blockEdge = 1.0 - step(0.03, min(cell.x, cell.y));
+    float k = (uPremultiplied > 0.5 || sm.a == 0.0) ? 1.0 : sm.a;
+    // The quantise is NOT k-corrected: floor() does not commute with premultiplication and no scalar can
+    // reconcile the two spaces. Exact upstream in premultiplied, approximate in straight -- see the model.
+    vec3 q = floor(vec3(toHalf(rgb.r), toHalf(rgb.g), toHalf(rgb.b)) * 16.0) / 16.0;
+    float e = toHalf(blockEdge * 0.1) * k;
+    fragColor = vec4(toHalf(q.r + e), toHalf(q.g + e), toHalf(q.b + e), sm.a);
+}`;
+
+const SMOKEREVEAL_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uSmokeAmount, uSmokeScale, uWindSpeed, uSmokeTurb, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec2 su = uv * uSmokeScale;
+    float w1x = bcs_fbm(su + vec2(uTime * uWindSpeed * 0.3, uTime * uWindSpeed * 0.1), 5);
+    float w1y = bcs_fbm(su + vec2(uTime * uWindSpeed * 0.1, -uTime * uWindSpeed * 0.2) + 5.2, 5);
+    vec2 warped = su + vec2(w1x, w1y) * uSmokeTurb;
+    float dens = bcs_fbm(warped + vec2(uTime * uWindSpeed * 0.15, uTime * uWindSpeed * 0.08), 6);
+    dens = clamp(dens * dens * uSmokeAmount * 1.5, 0.0, 1.0);
+    float lv = bcs_valueNoise(uv * 3.0 + uTime * 0.2);
+    float edgeGlow = smoothstep(0.2, 0.5, dens) - smoothstep(0.5, 0.8, dens);
+    vec3 sc = vec3(toHalf(0.7 + toHalf(lv) * 0.15), toHalf(0.68 + toHalf(lv) * 0.12), toHalf(0.66 + toHalf(lv) * 0.1));
+    sc = vec3(toHalf(sc.r + toHalf(edgeGlow * 0.2)), toHalf(sc.g + toHalf(edgeGlow * 0.2)), toHalf(sc.b + toHalf(edgeGlow * 0.2)));
+    float dsp = 8.0 * uPointScale * dens;            // the 8.0 is POINTS
+    vec4 dc = layerSample(clamp(p + vec2(w1x - 0.5, w1y - 0.5) * dsp, vec2(0.0), uSize));
+    vec4 orig = layerSample(p);                      // ALPHA comes from here, colour from dc -- upstream's choice
+    float ray = sin(uv.x * 8.0 + uTime * 0.3) * 0.5 + 0.5;
+    ray *= smoothstep(1.0, 0.3, uv.y) * dens * 0.15;
+    float k = (uPremultiplied > 0.5 || orig.a == 0.0) ? 1.0 : orig.a;
+    float t = toHalf(dens);
+    fragColor = vec4(toHalf(mix(dc.r, sc.r * k, t) + toHalf(ray * 0.8) * k),
+                     toHalf(mix(dc.g, sc.g * k, t) + toHalf(ray * 0.7) * k),
+                     toHalf(mix(dc.b, sc.b * k, t) + toHalf(ray * 0.5) * k), orig.a);
+}`;
+
+const MORPHBREATHE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uBreatheDepth, uBreatheRate, uWarpComplexity, uOrganic, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float b1 = sin(uTime * uBreatheRate) * 0.5 + 0.5;
+    float b2 = sin(uTime * uBreatheRate * 0.7 + 1.5) * 0.5 + 0.5;
+    float b3 = sin(uTime * uBreatheRate * 1.3 + 3.0) * 0.5 + 0.5;
+    float t = uTime * uBreatheRate * 0.3;
+    vec2 st = uv * uWarpComplexity;
+    vec2 q = vec2(bcs_fbm(st + vec2(t * 0.5, t * 0.3), 4),
+                  bcs_fbm(st + vec2(5.2, 1.3) + vec2(t * 0.4, t * 0.6), 4));
+    vec2 fc = uv - vec2(0.5);
+    float radialPulse = b1 * (1.0 - uOrganic) + b2 * uOrganic;
+    vec2 rd = fc * (radialPulse - 0.5) * 2.0;
+    vec2 od = vec2((q.x - 0.5) * 2.0 * b2, (q.y - 0.5) * 2.0 * b3);
+    float edgeFade = smoothstep(0.0, 0.15, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
+    vec2 disp = mix(rd, od, uOrganic) * uBreatheDepth * uPointScale * edgeFade;   // POINTS
+    vec4 c = layerSample(clamp(p + disp, vec2(0.0), uSize));
+    float rG = toHalf(1.0 + b1 * 0.05), bG = toHalf(1.0 - b1 * 0.05), gG = toHalf(1.0 + (b1 - 0.5) * 0.08);
+    fragColor = vec4(toHalf(toHalf(c.r * rG) * gG), toHalf(c.g * gG), toHalf(toHalf(c.b * bG) * gG), c.a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
     geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
     wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG,
     liquidChrome: LIQUIDCHROME_FRAG, pixelateStorm: PIXELSTORM_FRAG, magneticField: MAGFIELD_FRAG,
-    aurora: AURORA_FRAG };
+    aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
+    morphBreathe: MORPHBREATHE_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -939,6 +1019,9 @@ const KNOBS = {
     pixelateStorm: { time: "uTime", pixelSize: "uPixelSize", stormAmount: "uStormAmount", swirl: "uSwirl", pulse: "uPulse", pointScale: "uPointScale" },
     magneticField: { time: "uTime", fieldStrength: "uFieldStrength", lineCount: "uLineCount", fieldTurbulence: "uFieldTurbulence", polarity: "uPolarity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     aurora: { time: "uTime", intensity: "uIntensity", bands: "uBands", speed: "uSpeed", colorShift: "uColorShift", premultiplied: "uPremultiplied" },
+    datamosh: { time: "uTime", blockCorruption: "uBlockCorruption", smearAmount: "uSmearAmount", colorBleed: "uColorBleed", glitchRate: "uGlitchRate", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    smokeReveal: { time: "uTime", smokeAmount: "uSmokeAmount", smokeScale: "uSmokeScale", windSpeed: "uWindSpeed", smokeTurb: "uSmokeTurb", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
@@ -994,6 +1077,10 @@ const DEFAULT_KNOBS = {
     pixelateStorm:  { time: 0, pixelSize: 12, stormAmount: 0.5, swirl: 1, pulse: 1, pointScale: 1 },
     magneticField:  { time: 0, fieldStrength: 30, lineCount: 8, fieldTurbulence: 0.4, polarity: 0, pointScale: 1, premultiplied: 1 },
     aurora:         { time: 0, intensity: 0.7, bands: 4, speed: 1, colorShift: 0, premultiplied: 1 },
+    // Batch 14 -- copied from each function's own defaults in swiftShaderModel.mjs.
+    datamosh:       { time: 0, blockCorruption: 0.3, smearAmount: 24, colorBleed: 0.5, glitchRate: 2, pointScale: 1, premultiplied: 1 },
+    smokeReveal:    { time: 0, smokeAmount: 0.6, smokeScale: 4, windSpeed: 1, smokeTurb: 1, pointScale: 1, premultiplied: 1 },
+    morphBreathe:   { time: 0, breatheDepth: 20, breatheRate: 1, warpComplexity: 4, organic: 0.5, pointScale: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
@@ -1136,6 +1223,6 @@ export {
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
     WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
-    PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG,
+    PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };
