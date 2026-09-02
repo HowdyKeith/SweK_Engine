@@ -1,11 +1,11 @@
-// FILE: tools/ship/orreryFleetScan.mjs -- v4325
+// FILE: tools/ship/orreryFleetScan.mjs -- v4328
 //
 // The git and filesystem half of world/orreryFleet.mjs, kept here for tools/ship/orreryScan.mjs's stated
 // reason: "world/orrery.mjs stays pure so a browser can import it". This file shells to git and reads sizes;
 // the model it feeds does neither.
 //
 // *** ONE `git log --name-only` PASS, NOT ONE CALL PER FILE. *** A satellite is an engine file that imports a
-// vendored body, and it carries the commit that LAST touched it. There are 128 such files at v4325 and the
+// vendored body, and it carries the commit that LAST touched it. There are 128 such files at v4328 and the
 // obvious implementation is `git log -1 --format=%H -- <path>` for each: MEASURED at 947 ms for ten, so
 // ~12 seconds for the set, and it grows with every importer added. A single `git log --format=%H --name-only`
 // over all 858 commits takes 4.0 s once and yields the last-touching commit for all 5,434 tracked paths.
@@ -126,7 +126,7 @@ export function bakedNames(engineRoot) {
  *
  * *** BAKED FOR THE SAME REASON orrery.json IS: A BROWSER CANNOT RUN git. *** And baked SEPARATELY from
  * orrery.json rather than folded into it, because fourteen gates read that file and its shape is load-bearing
- * for all of them -- v4325 learned what a change to it costs by re-baking it after forty-five rounds and
+ * for all of them -- v4328 learned what a change to it costs by re-baking it after forty-five rounds and
  * turning four gates red. A new fact goes in a new file.
  *
  * What is NOT baked is any position: those are a pure function of (seed, t) in world/orreryFleet.mjs, computed
@@ -138,7 +138,14 @@ export function fleetPayload(engineRoot = ENG_DEFAULT, repoRoot = REPO_DEFAULT) 
     const ejecta = scanFleets(engineRoot, repoRoot, names);
     const bodies = {};
     for (const n of names) bodies[n] = ejecta[n].map((f) => ({ path: f.path, bytes: f.bytes, sha: f.sha }));
-    return { built: "deterministic", source: "importers of WebGLEngine/vendor/<name>/, with each one's last commit", bodies };
+    return { built: "deterministic", source: "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
+             head: headCommit(repoRoot), bodies };
+}
+
+/** The commit this bake was taken at, so the snapshot carries its own date rather than implying it is now. */
+export function headCommit(repoRoot) {
+    try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null; }
+    catch { return null; }
 }
 
 export const FLEET_BAKE = "orrery-fleet.json";
@@ -150,7 +157,23 @@ export function readFleetBake(engineRoot = ENG_DEFAULT) {
     try { return JSON.parse(fs.readFileSync(path.join(engineRoot, FLEET_BAKE), "utf8")); } catch { return null; }
 }
 
-/** Differences between the baked fleet and the tree, named rather than counted. */
+/**
+ * *** TWO KINDS OF DRIFT, AND ONLY ONE OF THEM IS A DEFECT. ***
+ *
+ * tools/ship/orreryBake.mjs bakes each body's FIRST commit, which never changes once the body is in, so its
+ * drift check can demand the file be exactly current. This file bakes each importer's LAST commit, which
+ * changes every time anybody edits that file -- including the very commit that ships a round. Demanding
+ * instantaneous currency of it is not a stricter check, it is an impossible one: the round that edits main.js
+ * cannot know main.js's next commit hash before making it, so the bake is one commit behind by construction
+ * the moment it ships, and the gate would be red on arrival every single round.
+ *
+ * So the two are separated. POPULATION drift -- a body appearing, an importer added or removed, a size
+ * changing -- is a defect and fails: those are facts about the tree that a re-bake was supposed to capture.
+ * COMMIT drift is REPORTED with the bake's own head, because a snapshot of a moving quantity is honest
+ * exactly as long as it says when it was taken. This is orreryBake's own reasoning about positions ("the file
+ * would begin lying the next morning") applied one level up: do not assert currency of something that cannot
+ * be current.
+ */
 export function fleetDrift(engineRoot = ENG_DEFAULT, repoRoot = REPO_DEFAULT) {
     const baked = readFleetBake(engineRoot);
     if (!baked) return [FLEET_BAKE + " is missing -- run: node tools/ship/orreryFleetScan.mjs --write"];
@@ -159,14 +182,29 @@ export function fleetDrift(engineRoot = ENG_DEFAULT, repoRoot = REPO_DEFAULT) {
     for (const n of Object.keys(live.bodies)) {
         const b = baked.bodies[n];
         if (!b) { out.push(`${n} is in the tree but not in ${FLEET_BAKE}`); continue; }
-        if (b.length !== live.bodies[n].length) out.push(`${n}: baked ${b.length} importers, tree has ${live.bodies[n].length}`);
-        else for (let i = 0; i < b.length; i++) {
+        if (b.length !== live.bodies[n].length) { out.push(`${n}: baked ${b.length} importers, tree has ${live.bodies[n].length}`); continue; }
+        for (let i = 0; i < b.length; i++) {
             if (b[i].path !== live.bodies[n][i].path) out.push(`${n}[${i}]: baked ${b[i].path}, tree has ${live.bodies[n][i].path}`);
-            else if (b[i].sha !== live.bodies[n][i].sha) out.push(`${n}/${b[i].path}: baked commit ${String(b[i].sha).slice(0, 12)}, git says ${String(live.bodies[n][i].sha).slice(0, 12)}`);
+            else if (b[i].bytes !== live.bodies[n][i].bytes) out.push(`${n}/${b[i].path}: baked ${b[i].bytes} bytes, tree has ${live.bodies[n][i].bytes}`);
         }
     }
     for (const n of Object.keys(baked.bodies)) if (!live.bodies[n]) out.push(`${FLEET_BAKE} still carries ${n}`);
     return out;
+}
+
+/** How many satellites carry a commit the log has since moved past. Reported, never failed -- see above. */
+export function commitDrift(engineRoot = ENG_DEFAULT, repoRoot = REPO_DEFAULT) {
+    const baked = readFleetBake(engineRoot);
+    if (!baked) return { behind: [], head: null, bakedHead: null };
+    const live = fleetPayload(engineRoot, repoRoot);
+    const behind = [];
+    for (const n of Object.keys(live.bodies)) {
+        const b = baked.bodies[n] || [];
+        for (let i = 0; i < Math.min(b.length, live.bodies[n].length); i++) {
+            if (b[i].path === live.bodies[n][i].path && b[i].sha !== live.bodies[n][i].sha) behind.push(n + "/" + b[i].path);
+        }
+    }
+    return { behind, head: headCommit(repoRoot), bakedHead: baked.head || null };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

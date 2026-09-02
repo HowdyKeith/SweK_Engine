@@ -210,13 +210,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         ]),
         redOnArrival: Object.freeze([{ gate: "tools/ship/avatarZWander-selfcheck.mjs", why: "z from 0.35 to 0.35 over thirty seconds here, and the same on origin/main's tree in the same shell" }]),
     }),
-    // v4325 -- THE THIRD CLOSING, and it is one gate because that is how many this round added. #68's fleet
+    // v4328 -- THE THIRD CLOSING, and it is one gate because that is how many this round added. #68's fleet
     // gate was run repeatedly while it was written and four sabotages were driven through it; the sweep entry
     // records the state it SHIPS in. The shape is deliberately the same as since2 so the accounting below can
     // sum a list rather than grow another named term every round -- which is what the equality this replaced
     // could not survive.
     since3: Object.freeze({
-        at: "v4325", swept: 1, green: 1, red: 0,
+        at: "v4328", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/orreryFleet-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
     }),

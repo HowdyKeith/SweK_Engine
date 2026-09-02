@@ -15,7 +15,7 @@ import { repoHeightfield, BIOME_ORDER } from "../world/repoHeightfield.js";
 import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
 import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
-import { satelliteAt } from "../world/orreryFleet.mjs";   // v4325, #68 -- a satellite's position is a pure function of (seed, t)
+import { satelliteAt } from "../world/orreryFleet.mjs";   // v4328, #68 -- a satellite's position is a pure function of (seed, t)
 
 /** Licence posture is the one thing in this picture that is a JUDGEMENT, so it gets the loudest channel. */
 export const STATE_COLOUR = Object.freeze({
@@ -366,7 +366,7 @@ export function drawTerrain(ctx, field, x, y, size, opts = {}) {
 
 /** Which of the three the current magnification is, given the focused body and scale. Re-exported for the page. */
 /**
- * *** THE FLEET, AT PLANET ZOOM: EVERY ENGINE FILE THAT IMPORTS THIS BODY, IN ORBIT AROUND IT. *** (#68, v4325)
+ * *** THE FLEET, AT PLANET ZOOM: EVERY ENGINE FILE THAT IMPORTS THIS BODY, IN ORBIT AROUND IT. *** (#68, v4328)
  *
  * Nothing is invented here. The count is world/orreryEjecta.mjs's importer measurement, the ring radius is the
  * satellite's own axis, and the angle is a pure function of (its last commit, t) -- all from

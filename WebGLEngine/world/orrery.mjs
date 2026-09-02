@@ -185,7 +185,7 @@ export function report(system) {
  * and the browser reads the BAKE, not the tree. So the page has been printing "2 of 14 bodies carry no licence
  * provenance" over a tree where the answer is none of 15, and the two staleness gates that say so
  * (orrerySeed-selfcheck, orreryView-selfcheck) have been red on the register since v4279 saying exactly that.
- * v4325 re-baked, because #68's fleet has to enumerate bodies from the same place everything else reads.
+ * v4328 re-baked, because #68's fleet has to enumerate bodies from the same place everything else reads.
  *
  * *** AND THE COMPARISON IS NOW EQUALITY, NOT `<=`, WHICH IS v4258'S LESSON APPLIED HERE. *** citedSources
  * found that a bound is satisfied more easily the looser it gets, so a baseline guarded by `<=` can be edited

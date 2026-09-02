@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/orreryFleet-selfcheck.mjs -- v4325
+// WebGLEngine/tools/ship/orreryFleet-selfcheck.mjs -- v4328
 //
 // GRADES world/orreryFleet.mjs and tools/ship/orreryFleetScan.mjs -- backlog #68, "ES space demos into the
 // orrery, seeded by the git log", whose promise is one sentence: "re-run with no new commits -> identical
@@ -213,7 +213,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
 {
     // The record says a per-body commit belt would be one or two rocks. That is the reason the obvious reading
     // of #68 was refused, so it is re-taken from git here: a record nobody re-measures is a sentence.
-    const R = F.COMMIT_BELT_V4325;
+    const R = F.COMMIT_BELT_V4328;
     const live = {};
     for (const n of names) {
         try {
@@ -229,7 +229,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     ok("*** and the finding holds: the busiest vendored body has been touched by two commits ***",
         Math.max(...Object.values(live)) <= 2 && Object.values(live).filter((v) => v === 1).length >= 10,
         `${Object.values(live).filter((v) => v === 1).length} of ${names.length} bodies touched exactly once, against ${R.repoCommits} commits in the repository`);
-    ok("  so the refusal is recorded with its reason rather than left as an absence", /belt/i.test(R.why) && R.at === "v4325");
+    ok("  so the refusal is recorded with its reason rather than left as an absence", /belt/i.test(R.why) && R.at === "v4328");
     report("VENDORED CODE DOES NOT CHANGE; THE CODE THAT USES IT DOES. That is why a satellite is an importer " +
         "and not a commit, and it is a measurement rather than a preference.");
 }
@@ -259,9 +259,17 @@ console.log("\n9. *** THE BAKE MUST NOT GO STALE -- THIS ROUND EXISTS PARTLY BEC
     // orrery.json was baked at v4189 and read by fourteen gates for forty-five rounds while the tree gained a
     // dependency, box3d and htmx gained licences, and two gates sat red on the register saying exactly that.
     // A second baked file with no freshness check would be the same trap with a new name.
+    // POPULATION currency is demanded; COMMIT currency is reported. See orreryFleetScan's note on why the
+    // second cannot be demanded of a bake of last-commits without going red on arrival every round.
     const drift = S.fleetDrift(ENG, REPO);
-    ok("*** orrery-fleet.json on disk IS what the tree says right now ***", drift.length === 0,
+    ok("*** orrery-fleet.json holds the tree's own importers, at their current sizes ***", drift.length === 0,
         drift.slice(0, 3).join("; ") || "run: node tools/ship/orreryFleetScan.mjs --write");
+    const cd = S.commitDrift(ENG, REPO);
+    ok("  and the snapshot names the commit it was taken at, so 'behind' is a measurable number and not a worry",
+        !!cd.bakedHead && /^[0-9a-f]{40}$/.test(cd.bakedHead),
+        `baked at ${String(cd.bakedHead).slice(0, 12)}, head is ${String(cd.head).slice(0, 12)}, ` +
+        `${cd.behind.length} satellite(s) carrying a commit the log has moved past` +
+        (cd.behind.length ? ": " + cd.behind.slice(0, 3).join(", ") : ""));
     const baked = S.readFleetBake(ENG);
     ok("  and it holds every body the orrery bake holds, so the two files describe one system",
         !!baked && names.every((n) => Array.isArray(baked.bodies[n])),
@@ -340,7 +348,8 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
 //   C  the scan's NOT_IMPORTERS self-exclusion emptied.
 //      -> exit=1, 3 red -- one MORE than this log first guessed, and the third is the interesting one:
 //      section 1's box3d count (22 against the recorded 21), the exercised-exclusion line, AND the bake
-//      staleness check, because the baked fleet and the live scan now disagree about box3d. The two gates that
+//      POPULATION drift check, because the baked fleet holds 21 importers for box3d and the live scan finds 22.
+//      The two gates that
 //      measure this tree would have parted company by one file, which is the shape orreryEjecta-selfcheck's
 //      header records hitting four times before this.
 //

@@ -1,4 +1,4 @@
-// FILE: world/orreryFleet.mjs -- v4325
+// FILE: world/orreryFleet.mjs -- v4328
 //
 // *** THE THINGS THAT MOVE AROUND A VENDORED BODY, AND WHAT THEY ACTUALLY ARE. ***
 //
@@ -11,7 +11,7 @@
 //
 // ---- *** THE OBVIOUS READING OF "DRIVEN BY THE GIT LOG" IS DEAD, AND IT WAS KILLED BY MEASUREMENT. *** -----
 //
-// The obvious asteroid belt is "one rock per commit that touched this body". Counted, at v4325, over 858
+// The obvious asteroid belt is "one rock per commit that touched this body". Counted, at v4328, over 858
 // commits of history:
 //
 //     three 2    htmx 2    box3d 2    and ONE each for the other twelve
@@ -260,8 +260,8 @@ export function systemDigest(fleets, opts = {}) {
  * check that the numbers a future round reads are the numbers this round measured, and so that a body which
  * suddenly starts being edited shows up as a change to this record instead of going unnoticed.
  */
-export const COMMIT_BELT_V4325 = Object.freeze({
-    at: "v4325",
+export const COMMIT_BELT_V4328 = Object.freeze({
+    at: "v4328",
     repoCommits: 858,
     perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),

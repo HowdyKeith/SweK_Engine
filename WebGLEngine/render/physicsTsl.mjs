@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4322 (the Lyapunov look and its shell), v4324 (a position node), v4325 (a SECOND shell: the sprite layout, the lightning as a race), v4326 (the sprite shell binds a texture, and the fleets' own bitmap look as a graph), v4327 (and a sampler: a FILTERED sample crosses)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -128,7 +128,212 @@ void main() { vec3 pl = p; vec3 nl = n;
   {{DISPLACE}}
   gl_Position = viewProj * vec4(rec.xyz + turned(pl, extra.x) * rec.w, 1.0); vColor = color; vN = turned(n, extra.x); vLocal = p.xy; }
 `;
+    // v4325 -- `locals`: what this shell calls three's positionLocal, normalLocal, position and normal. The lit layout carries
+    // all four; the sprite shell below carries two, and a displacement reading the normal is refused there by name.
+    const locals = { positionLocal: "pl", normalLocal: "nl", position: "p", normal: "n" };
     return { name: "lyapunov look", uniforms, buffers, topology: null,
-             wgsl: { prefix, vertexTemplate, uniformVar: "cam", varyingParam: "v", varyings: { uv: "v.local", normal: "v.n", color: "v.color" } },
-             glsl: { vertex: glslTemplate.replace("{{DISPLACE}}", displace), vertexTemplate: glslTemplate, fragmentPrefix: `#version 300 es\nprecision highp float;\n${glslUniforms}\nin vec4 vColor; in vec3 vN; in vec2 vLocal; out vec4 fragColor;`, varyings: { uv: "vLocal", normal: "vN", color: "vColor" } } };
+             wgsl: { prefix, vertexTemplate, uniformVar: "cam", varyingParam: "v", varyings: { uv: "v.local", normal: "v.n", color: "v.color" }, locals },
+             glsl: { vertex: glslTemplate.replace("{{DISPLACE}}", displace), vertexTemplate: glslTemplate, fragmentPrefix: `#version 300 es\nprecision highp float;\n${glslUniforms}\nin vec4 vColor; in vec3 vN; in vec2 vLocal; out vec4 fragColor;`, varyings: { uv: "vLocal", normal: "vN", color: "vColor" }, locals } };
+}
+
+// ---- v4325: a race that is NOT the Lyapunov one -- the SPRITE layout, and the lightning painted on its quad ----------
+/**
+ * The Heidler return-stroke current as a SPRITE race's look: the quad's own uv is the picture -- t runs across uv.x on a
+ * geometric grid from `tLo` to `tHi`, the current over i0 is the brightness, and uv.y fades it to the quad's edges. The
+ * peak is an exact 1 at the true eta, the same key physics/discharge/heidler.mjs and render/heidlerWgsl.mjs are held to.
+ *
+ * It reads uv and the vertex colour and NOTHING ELSE -- no normal, because the sprite layout (p, color, uv) has none.
+ * That is the point of it: the shell transplant is not welded to the lit layout, and a graph that asked for the normal
+ * here would be refused by name rather than drawn wrong.
+ *
+ * The knobs are packed as two labelled vec4s (bolt = i0, t1, t2, eta; span = tLo, tHi), the way the fleet's own looks
+ * pack theirs, so the shell's uniform struct stays short and the page binds the same numbers the graph was built with.
+ */
+export function makeHeidlerSpriteTsl(THREE, TSL, { i0 = PARAMS.first.i0, t1 = PARAMS.first.t1, t2 = PARAMS.first.t2, eta = null, tLo = PARAMS.first.t1 / 50, tHi = PARAMS.first.t2 * 8 } = {}) {
+    const { Fn, float, vec3, vec4, uv, uniform, exp, log, mix, abs, vertexColor } = TSL;
+    for (const n of ["vertexColor", "mix", "abs", "exp", "log"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    const { heidler } = heidlerNodes(TSL);
+    const e0 = eta == null ? truePeak(t1, t2).peak : eta;
+    const uniforms = { bolt: uniform(vec4(i0, t1, t2, e0)).label("bolt"), span: uniform(vec4(tLo, tHi, 0, 0)).label("span") };
+    const material = new THREE.NodeMaterial();
+    material.fragmentNode = Fn(() => {
+        const t = uniforms.span.x.mul(exp(log(uniforms.span.y.div(uniforms.span.x)).mul(uv().x)));
+        const cur = heidler(t, uniforms.bolt.x, uniforms.bolt.y, uniforms.bolt.z, uniforms.bolt.w).div(uniforms.bolt.x).clamp(0.0, 1.0);
+        const glow = float(1.0).sub(abs(uv().y.mul(2.0).sub(1.0))).clamp(0.0, 1.0);
+        const hot = vec3(1.0, 0.95, 0.7), cold = vec3(0.05, 0.05, 0.16);
+        return vec4(mix(cold, hot, cur.mul(glow)).mul(vertexColor().rgb), vertexColor().a);
+    })();
+    // a mesh carrying exactly what the graph reads -- uv and colour, no normals asked for
+    const geo = new THREE.PlaneGeometry(2, 2); geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(16).fill(1), 4));
+    const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    scene.add(new THREE.Mesh(geo, material));
+    return { material, scene, camera, uniforms, knobs: heidlerSpriteKnobs({ i0, t1, t2, eta: e0, tLo, tHi }) };
+}
+/** The two vec4s the graph was built with, for the fleet's bind hook: { bolt, span }. */
+export function heidlerSpriteKnobs({ i0 = PARAMS.first.i0, t1 = PARAMS.first.t1, t2 = PARAMS.first.t2, eta = null, tLo = PARAMS.first.t1 / 50, tHi = PARAMS.first.t2 * 8 } = {}) {
+    return { bolt: [i0, t1, t2, eta == null ? truePeak(t1, t2).peak : eta], span: [tLo, tHi, 0, 0] };
+}
+/** The sprite look's uniform struct: the camera and the two knob vectors. */
+export const SPRITE_UNIFORMS = Object.freeze([{ name: "viewProj", type: "mat4" }, { name: "bolt", type: "vec4" }, { name: "span", type: "vec4" }]);
+/**
+ * THE SECOND SHELL (docs/TSL-ROADMAP.md, the thing tslRace-selfcheck said was unchecked at v4324): the SPRITE layout's
+ * vertex stage -- p, color, uv, the instance record -- its Cam struct, its two varyings, and a {{DISPLACE}} hook. It is
+ * the fleets' own sprite vertex stage (render/fleets.mjs SPRITE_WGSL / SPRITE_VERTEX_GLSL) with the hook and its local
+ * added; the gate holds the emptied template to that shipped text. `turned` is the same spin every look shares.
+ */
+export function spriteLookShell(buffers, { uniforms: base = SPRITE_UNIFORMS, textures = [], sampler = null, extraUniforms = [], displace = "" } = {}) {
+    const uniforms = [...base.map((u) => ({ ...u })), ...extraUniforms];
+    const wgslType = { mat4: "mat4x4<f32>", vec4: "vec4<f32>", vec3: "vec3<f32>", vec2: "vec2<f32>", f32: "f32" };
+    const camStruct = `struct Cam { ${uniforms.map((u) => `${u.name}: ${wgslType[u.type]}`).join(", ")} };`;
+    const rest = LYAPUNOV_LOOK_WGSL.split("@fragment")[0];
+    const turned = rest.slice(rest.indexOf("fn turned"), rest.indexOf("struct VOut")).trim();   // the spin helper, shared by every look
+    const vout = `struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) uv: vec2<f32> };`;
+    const vertexTemplate = `@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>, @location(5) extra: vec4<f32>, @location(4) uv: vec2<f32>) -> VOut {
+  var o: VOut; var pl = p;
+  {{DISPLACE}}
+  o.pos = cam.viewProj * vec4<f32>(rec.xyz + turned(pl, extra.x) * rec.w, 1.0);
+  o.color = color; o.uv = uv;
+  return o;
+}`;
+    // v4326 -- the textures this shell BINDS, at the bindings the fleets' own sprite pipeline uses (the atlas at 1, after the
+    // uniform struct). A graph whose texture node is labelled with one of these names transplants; any other is refused.
+    const texDecl = [...textures.map((t, i) => `@group(0) @binding(${1 + i}) var ${t}: texture_2d<f32>;`),
+                     // v4327 -- the SAMPLER, when the shell has one. gfx/device.js reads the bindings out of the shader and
+                     // hands this one the sampler for the bound texture's own filter mode, so what it does is the texture's
+                     // choice (device.texture({ nearest }) ), not the shader's: the same pipeline fetches or filters.
+                     ...(sampler ? [`@group(0) @binding(${1 + textures.length}) var ${sampler}: sampler;`] : [])].join("\n");
+    const prefix = `${camStruct}\n@group(0) @binding(0) var<uniform> cam: Cam;\n${texDecl}${texDecl ? "\n" : ""}${turned}\n${vout}\n${displace ? vertexTemplate.replace("{{DISPLACE}}", displace) : vertexTemplate}`;
+    const glslUniforms = uniforms.map((u) => `uniform ${{ mat4: "mat4", vec4: "vec4", vec3: "vec3", vec2: "vec2", f32: "float" }[u.type]} ${u.name};`).join(" ");
+    const glslTemplate = `#version 300 es
+precision highp float;
+${glslUniforms}
+in vec3 p; in vec4 color; in vec4 rec; in vec4 ident; in vec4 extra; in vec2 uv;
+out vec4 vColor; out vec2 vUv;
+vec3 turned(vec3 q, float yaw) { float ca = cos(yaw), sa = sin(yaw); return vec3(q.x * ca - q.y * sa, q.x * sa + q.y * ca, q.z); }
+void main() { vec3 pl = p;
+  {{DISPLACE}}
+  gl_Position = viewProj * vec4(rec.xyz + turned(pl, extra.x) * rec.w, 1.0); vColor = color; vUv = uv; }
+`;
+    // no normal in this layout, so `locals` has no name for one: a graph displacing along normalLocal is refused here
+    const locals = { positionLocal: "pl", position: "p" };
+    return { name: textures.length ? `sprite (${textures.join(", ")}${sampler ? " + sampler" : ""})` : "heidler sprite", uniforms, buffers, topology: null, textures,
+             wgsl: { prefix, vertexTemplate, uniformVar: "cam", varyingParam: "v", varyings: { uv: "v.uv", color: "v.color" }, locals, ...(sampler ? { sampler } : {}) },
+             glsl: { vertex: glslTemplate.replace("{{DISPLACE}}", displace), vertexTemplate: glslTemplate, fragmentPrefix: `#version 300 es\nprecision highp float;\nprecision highp sampler2D;\n${glslUniforms}${textures.map((t) => ` uniform sampler2D ${t};`).join("")}\nin vec4 vColor; in vec2 vUv; out vec4 fragColor;`, varyings: { uv: "vUv", color: "vColor" }, locals } };
+}
+/** v4325's name for it, when the shell is the lightning's: the sprite layout with the bolt and span knobs and no texture. */
+export function heidlerSpriteShell(buffers, opts = {}) { return spriteLookShell(buffers, opts); }
+/**
+ * The HAND-WRITTEN twin of makeHeidlerSpriteTsl, in both languages, in the same shell: the grader's other half. Every
+ * grouping is the node graph's own -- ((i0 / eta) * shape) / i0, ((t / t1) * (t / t1)), clamp last -- because float
+ * addition is not associative and the claim is byte equality, not likeness.
+ */
+export function heidlerSpriteHand(buffers, opts = {}) {
+    const shell = heidlerSpriteShell(buffers, opts);
+    const wgsl = `${shell.wgsl.prefix.replace("{{DISPLACE}}", opts.displace || "")}
+@fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
+  let t = cam.span.x * exp(log(cam.span.y / cam.span.x) * v.uv.x);
+  let x = (t / cam.bolt.y) * (t / cam.bolt.y);
+  let shape = select(0.0, (x / (1.0 + x)) * exp(-t / cam.bolt.z), t > 0.0);
+  let cur = clamp(((cam.bolt.x / cam.bolt.w) * shape) / cam.bolt.x, 0.0, 1.0);
+  let glow = clamp(1.0 - abs((v.uv.y * 2.0) - 1.0), 0.0, 1.0);
+  return vec4<f32>(mix(vec3<f32>(0.05, 0.05, 0.16), vec3<f32>(1.0, 0.95, 0.7), cur * glow) * v.color.rgb, v.color.a);
+}
+`;
+    const glsl = `${shell.glsl.fragmentPrefix}
+void main() {
+  float t = span.x * exp(log(span.y / span.x) * vUv.x);
+  float x = (t / bolt.y) * (t / bolt.y);
+  float shape = t > 0.0 ? (x / (1.0 + x)) * exp(-t / bolt.z) : 0.0;
+  float cur = clamp(((bolt.x / bolt.w) * shape) / bolt.x, 0.0, 1.0);
+  float glow = clamp(1.0 - abs((vUv.y * 2.0) - 1.0), 0.0, 1.0);
+  fragColor = vec4(mix(vec3(0.05, 0.05, 0.16), vec3(1.0, 0.95, 0.7), cur * glow) * vColor.rgb, vColor.a);
+}
+`;
+    return { shaders: { wgsl, glsl: { vertex: shell.glsl.vertex, fragment: glsl } }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, shell: shell.name };
+}
+
+// ---- v4326: the fleets' OWN bitmap look as a graph, and a texture across the shell boundary -------------------------
+/**
+ * THE SPRITE RACE'S SHIPPED LOOK, WRITTEN AS A GRAPH: the atlas texel fetched by integer coordinate (no sampler, no
+ * filtering), transparent texels discarded, times the vertex colour -- the arithmetic of render/fleets.mjs SPRITE_WGSL
+ * and SPRITE_FRAGMENT_GLSL, node for node. Nothing here is a twin written for the occasion: the grader draws the fleets'
+ * own Pixel race beside it and holds the two to each other, so the hand-written half of the claim is shipped code.
+ *
+ * THE UV IS GIVEN AT CONSTRUCTION, and that is not a style choice. three's TextureNode constructor runs
+ * setUpdateMatrix(uvNode === null): a texture node built WITHOUT a uv turns on the texture's uv-transform matrix, and
+ * every clone of it -- textureLoad() makes one -- keeps the flag. Spelled the obvious way (texture(tex) first, the
+ * coordinate later) the emitted fragment multiplies the fetch coordinate by an unlabelled mat3, which the transplant
+ * refuses by name and should. Spelled with the uv up front there is no matrix and no uniform at all.
+ */
+export function makeSpriteAtlasTsl(THREE, TSL, { texture: image, name = "atlas", cutoff = 0.5, color = [1, 1, 1, 1] } = {}) {
+    const { Fn, vec2, vec4, ivec2, uv, texture, textureLoad, textureSize, vertexColor, clamp, Discard } = TSL;
+    for (const n of ["textureLoad", "textureSize", "Discard", "ivec2"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (!image) throw new Error("physicsTsl: makeSpriteAtlasTsl needs a THREE texture to fetch from");
+    const base = texture(image, uv());
+    const material = new THREE.NodeMaterial();
+    material.fragmentNode = Fn(() => {
+        const dim = vec2(textureSize(base, 0));
+        const t = textureLoad(base, ivec2(clamp(uv().mul(dim), vec2(0.0), dim.sub(1.0)))).label(name);
+        Discard(t.a.lessThan(cutoff));
+        return vec4(t.rgb.mul(vertexColor().rgb), 1.0);
+    })();
+    const geo = new THREE.PlaneGeometry(2, 2); geo.setAttribute("color", new THREE.BufferAttribute(Float32Array.from([...color, ...color, ...color, ...color]), 4));
+    const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    scene.add(new THREE.Mesh(geo, material));
+    return { material, scene, camera, texture: base, name };
+}
+/** The shell the fleets' sprite pipeline actually has: viewProj alone, the atlas bound at 1, and the sprite layout's vertex stage. */
+export function spriteAtlasShell(buffers, { name = "atlas", displace = "" } = {}) {
+    return spriteLookShell(buffers, { uniforms: [{ name: "viewProj", type: "mat4" }], textures: [name], displace });
+}
+
+// ---- v4327: a SAMPLER in a fleet shell -- the same picture, filtered ------------------------------------------------
+/**
+ * THE SAME SPRITE, SAMPLED INSTEAD OF FETCHED: the atlas read through a sampler at the quad's uv, transparent texels
+ * discarded, times the vertex colour. Beside makeSpriteAtlasTsl (v4326, which fetches a texel by integer coordinate)
+ * this is the one node's difference between a hard bitmap and a smooth one.
+ *
+ * WHAT DECIDES IS THE TEXTURE, NOT THE GRAPH. three emits textureLoad() for a texture whose filters are Nearest and
+ * textureSample() for one whose filters are Linear -- the same TSL line, two different shaders -- so a graph asking
+ * for a filtered sample must be handed a filtered texture or it silently becomes a fetch and the shell's sampler goes
+ * unused. On the device the mirror of that holds: gfx/device.js picks the sampler by the BOUND texture's `nearest`
+ * flag, so one generated pipeline draws hard or smooth by what is bound to it.
+ */
+export function makeSpriteSampledTsl(THREE, TSL, { texture: image, name = "atlas", cutoff = 0.5, color = [1, 1, 1, 1] } = {}) {
+    const { Fn, vec4, uv, texture, vertexColor, Discard } = TSL;
+    if (!image) throw new Error("physicsTsl: makeSpriteSampledTsl needs a THREE texture to sample");
+    if (image.magFilter === THREE.NearestFilter) throw new Error("physicsTsl: makeSpriteSampledTsl was handed a NEAREST texture; three would emit a texel fetch and the shell's sampler would go unused. Hand it a LinearFilter texture, or use makeSpriteAtlasTsl.");
+    const material = new THREE.NodeMaterial();
+    material.fragmentNode = Fn(() => {
+        const t = texture(image, uv()).label(name);   // the uv at construction, as v4326's finding requires
+        Discard(t.a.lessThan(cutoff));
+        return vec4(t.rgb.mul(vertexColor().rgb), 1.0);
+    })();
+    const geo = new THREE.PlaneGeometry(2, 2); geo.setAttribute("color", new THREE.BufferAttribute(Float32Array.from([...color, ...color, ...color, ...color]), 4));
+    const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    scene.add(new THREE.Mesh(geo, material));
+    return { material, scene, camera, name };
+}
+/** The sprite shell with a sampler beside the atlas: viewProj, the atlas at 1, the sampler at 2. */
+export function spriteSampledShell(buffers, { name = "atlas", sampler = "samp", displace = "" } = {}) {
+    return spriteLookShell(buffers, { uniforms: [{ name: "viewProj", type: "mat4" }], textures: [name], sampler, displace });
+}
+/** The HAND-WRITTEN twin of makeSpriteSampledTsl in that shell, both languages -- the grader's other half. */
+export function spriteSampledHand(buffers, opts = {}) {
+    const shell = spriteSampledShell(buffers, opts);
+    const wgsl = `${shell.wgsl.prefix.replace("{{DISPLACE}}", opts.displace || "")}
+@fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
+  let t = textureSample(atlas, samp, v.uv);
+  if (t.a < 0.5) { discard; }
+  return vec4<f32>(t.rgb * v.color.rgb, 1.0);
+}
+`;
+    const glsl = `${shell.glsl.fragmentPrefix}
+void main() {
+  vec4 t = texture(atlas, vUv);
+  if (t.a < 0.5) discard;
+  fragColor = vec4(t.rgb * vColor.rgb, 1.0);
+}
+`;
+    return { shaders: { wgsl, glsl: { vertex: shell.glsl.vertex, fragment: glsl } }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, textures: shell.textures, shell: shell.name };
 }

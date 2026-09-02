@@ -62,7 +62,7 @@ console.log("\n1. THE JOURNAL: seed + log reproduces the universe, and one missi
     // With `at` at anything else -- a ship in flight, or simply a different berth -- mutate sets it to 1 and
     // the undo, seeing 1, sets it to 2: the probe leaves the universe changed and the final hash check fails
     // for a reason that has nothing to do with the hash. It survived because ship 2 happened to sit at berth 1
-    // or 2 while the orrery held fourteen bodies; the re-bake at v4325 moved the crew along by one and it did
+    // or 2 while the orrery held fourteen bodies; the re-bake at v4328 moved the crew along by one and it did
     // not. A probe must restore what it SAW, not what it assumes it saw.
     const wasAt = p1.ships[2].at;
     probe("where a ship is", () => { p1.ships[2].at = wasAt === 1 ? 2 : 1; }, () => { p1.ships[2].at = wasAt; });
