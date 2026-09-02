@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -117,7 +117,19 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    -- by 2.5e-5 after 12 iterations and 4.5e-2 after 448. Two modules compiled separately may round a multiply-add
    differently, and on a chaotic orbit that ulp is the whole difference by the end; the growth rate is the exponent
    the pass computes. Bits are asserted where bits are meaningful and the divergence is measured where they are not.
-   Not built: a compute pass that READS a storage buffer as well as writing one, and workgroup-shared or atomic work.
+   v4336 -- AND ONE THAT READS. Every real compute pass in render/gpuDriven.mjs reads buffers as well as writing
+   them. computeShell's storage entries take an `access` ("read" or the default "read_write"), because three
+   declares every buffer it touches as read_write whether the graph writes to it or not -- the SHELL is where
+   read-only is stated -- and transplantCompute matches a generated buffer to a shell entry BY ROLE, which one the
+   body assigns to, rather than by the order three emitted them in. physicsTsl makeChaosMaskTsl is the second pass:
+   it reads the sweep's buffer and writes 1 where the exponent is positive. Section 5: two dispatches on one frame's
+   encoder, the second bound to the first's buffer, and the mask is the sign of the sweep's own output on all 64
+   elements; every element it calls periodic above r = 3.8 lies inside [1 + sqrt(8), 3.857], the period-3 window
+   whose edge this tree owns exactly. The role mapping's sabotage went 0 RED on its first run and that was the
+   finding: the shell had listed the written buffer first, which is the order three emits, so position and role
+   agreed and the check proved nothing. The shell now declares its input first, as the cull pass does.
+   Not built: workgroup-shared or ATOMIC work (the cull pass counts into an atomic<u32> and nothing here does), and
+   an INDIRECT dispatch, where the count a pass runs at is itself in a buffer.
 
 ## The count that says when step 4 matters
 

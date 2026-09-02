@@ -30,12 +30,30 @@
 // claims no bound at all against the CPU's f64 on the chaotic elements -- a tolerance wide enough to cover that
 // would assert nothing.
 //
+// v4336 -- AND A PASS THAT READS ONE (section 5). Every real compute pass in render/gpuDriven.mjs reads buffers as
+// well as writing them; until now this transplant had only ever written. The shell is where READ-ONLY is stated,
+// because three declares every buffer it touches as read_write whether the graph writes to it or not, and the
+// transplant matches a generated buffer to a shell entry BY ROLE -- which one the body assigns to -- rather than by
+// the order three emitted them in. Two dispatches on one frame's encoder, the second bound to the first's buffer,
+// and the mask it writes is the sign of the sweep's own output on all 64 elements. The keyed part: every element the
+// mask calls periodic above r = 3.8 lies inside [1 + sqrt(8), 3.857] -- the period-3 window, whose edge this tree
+// owns exactly.
+//
 // SABOTAGES, MEASURED at v4331:
 //   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
 //      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
 //      renderer asks the adapter for that feature; gfx/device.js never did, and nothing but this drop bridges them.
 //   T  the storage rename skipped, so the module keeps three's generated NodeBuffer_NNN -> exit=1, 6 red: the CPU line
 //      by name, and on the device a buffer nothing is bound to, so every element reads zero.
+//   MEASURED at v4336 (a pass that reads one):
+//   U  the storage buffers mapped by ORDER instead of by role -> exit=1, 2 red: the mask pass writes into the buffer it was
+//      meant to read (6 device errors, a read-only binding assigned to), every element reads periodic, and the period-3
+//      claim goes with it. *** THIS SABOTAGE WENT 0 RED ON ITS FIRST RUN AND THAT WAS THE FINDING. *** The shell listed
+//      the WRITTEN buffer first, which is the order three happened to emit, so position and role agreed and the check
+//      proved nothing. The shell now declares its input first -- the order render/gpuDriven.mjs's own cull pass uses --
+//      and the claim beside it says "measured as sabotage U" rather than asserting what a positional mapping would do.
+//   V  the second pass reading its OWN buffer instead of the first's (a one-word typo) -> exit=1, 1 red, refused by name
+//      before the device sees it: the graph then touches one buffer and the shell names two.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -164,7 +182,7 @@ console.log("\n4. THE COMPUTE STAGE (v4331): the exponent as a TSL COMPUTE pass,
     ok("  the hand-written twin is the module's own lyapunov() in that shell, and it validates", validateWgsl(twin).length === 0 && /fn lyapunov\(r: f32/.test(twin), validateWgsl(twin).join("; "));
     // the marker is assembled, for the reason render/backendParity.mjs's header gives and this session has relearned twelve times
     const notCompute = "// Three.js r178 - Node System\n@" + "fragment fn main() -> @location(0) vec4<f32> { return vec4<f32>(0.0); }";
-    ok("REFUSED: a fragment handed to the compute transplant, and a graph whose storage count the shell does not name", throwsWith(() => transplantCompute(notCompute, shell), /has no compute entry point/) && throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [], uniforms: [{ name: "span", type: "vec4" }] })), /writes 1 storage buffer\(s\) and the shell "compute" names 0/));
+    ok("REFUSED: a fragment handed to the compute transplant, and a graph whose storage count the shell does not name", throwsWith(() => transplantCompute(notCompute, shell), /has no compute entry point/) && throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [], uniforms: [{ name: "span", type: "vec4" }] })), /touches 1 storage buffer\(s\) and the shell "compute" names 0/));
     ok("REFUSED: a uniform the shell's struct lacks, and a workgroup size the shell disagrees with", throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [] })), /is not in the shell "compute"'s struct \(none\)/) && throwsWith(() => transplantCompute(FIXC, computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }], workgroupSize: 32 })), /@workgroup_size\(64\) and the shell "compute" says 32/));
     const t = transplantCompute(FIXC, shell);
     ok("*** three asks for an extension the device never requested -- `enable subgroups;` and a @builtin(subgroup_size) it does not use -- and the transplant drops both ***", !/enable subgroups/.test(t.wgsl) && !/subgroup_size/.test(t.wgsl) && /enable subgroups/.test(FIXC), "left in, the device refuses the module: measured as sabotage S");
@@ -245,6 +263,66 @@ else {
     }
 }
 
+console.log("\n5. A COMPUTE PASS THAT READS ONE (v4336): two dispatches in one frame, the second reading what the first wrote");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const N = 64;
+    const r2 = await runInEngineOrigin({ engineRoot: ENG, args: { N, P3LO: PERIOD3.lo, P3HI: PERIOD3.hi }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4 });
+        await renderer.computeAsync(g.node);
+        const m = P.makeChaosMaskTsl(T, { sweep: g.buffer, count: a.N });
+        await renderer.computeAsync(m.node);
+        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
+        const maskEmitted = renderer._nodes.getForCompute(m.node).computeShader;
+        out.bothReadWrite = (maskEmitted.match(/var<storage, read_write>/g) || []).length;   // three declares BOTH as read_write
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const sweepShell = S.computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] });
+            // the shell is where read-only is STATED: three emitted both as read_write, and the mask pass only reads the sweep
+            // the INPUT is declared first, the way render/gpuDriven.mjs's cull pass declares its reads before its writes --
+            // which is the opposite of the order three emitted them in, so the role mapping is load-bearing here
+            const maskShell = S.computeShell({ name: "chaos mask", storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "mask", element: "f32" }], uniforms: [] });
+            const genSweep = S.transplantCompute(sweepEmitted, sweepShell);
+            const genMask = S.transplantCompute(maskEmitted, maskShell);
+            out.maskWgsl = genMask.wgsl; out.reads = genMask.reads; out.writes = genMask.writes;
+            const sweepBuf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+            const maskBuf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+            const ubuf = dev.buffer({ data: Float32Array.from(g.knobs), usage: "uniform" });
+            const pipeA = dev.compute({ wgsl: genSweep.wgsl }); pipeA.bind("out", sweepBuf).bind("u", ubuf);
+            const pipeB = dev.compute({ wgsl: genMask.wgsl }); pipeB.bind("mask", maskBuf).bind("sweep", sweepBuf);
+            // BOTH DISPATCHES IN ONE FRAME, in order: the device runs compute on the frame's own encoder before the render pass
+            dev.frame(({ pass }) => { pass.dispatch(pipeA, 1); pass.dispatch(pipeB, 1); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+            out.sweep = [...new Float32Array(await dev.read(sweepBuf))];
+            out.mask = [...new Float32Array(await dev.read(maskBuf))];
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran both dispatches", r2.ok && r2.result && !r2.result.error && r2.result.mask, r2.ok ? (r2.result && r2.result.error) : (r2.reason || (r2.pageErrors || []).join("; ")));
+    if (r2.ok && r2.result && !r2.result.error) {
+        const M = r2.result;
+        const agree = M.mask.filter((v, i) => v === (M.sweep[i] > 0 ? 1 : 0)).length;
+        ok(`*** the second pass read what the first wrote: its mask is the SIGN of the sweep's own output on every element (${agree} of ${N}) ***`, agree === N && (M.errs || []).length === 0 && M.mask.some((v) => v === 1) && M.mask.some((v) => v === 0),
+            `${agree}/${N}, ${M.mask.filter((v) => v === 1).length} chaotic; device errors ${(M.errs || []).length}. Two dispatches on ONE frame's encoder, the second bound to the first's buffer`);
+        ok("*** and the shell is where read-only is stated: three declared BOTH buffers read_write, and the transplant matched them BY ROLE -- mask written, sweep read ***",
+            M.bothReadWrite === 2 && M.writes.join() === "mask" && M.reads.join() === "sweep" && /var<storage, read> sweep:/.test(M.maskWgsl) && /var<storage, read_write> mask:/.test(M.maskWgsl),
+            `three: ${M.bothReadWrite} read_write; transplanted writes ${M.writes.join()}, reads ${M.reads.join()}. three gave binding 0 to the buffer it WRITES and this shell declares the one it READS first, so a positional mapping binds them backwards -- measured as sabotage U, not assumed`);
+        // the keyed claim: the periodic elements above 3.8 are the period-3 window, and the tree owns its edge exactly
+        const rOf = (i) => LY_DEFAULTS.rLo + (LY_DEFAULTS.rHi - LY_DEFAULTS.rLo) * (i / (N - 1));
+        const highPeriodic = M.mask.map((v, i) => i).filter((i) => M.mask[i] === 0 && rOf(i) > 3.8);
+        const inWindow = highPeriodic.filter((i) => rOf(i) >= PERIOD3.lo && rOf(i) <= PERIOD3.hi);
+        ok(`*** and the mask finds the PERIOD-3 WINDOW: every periodic element above r = 3.8 lies inside [1 + sqrt(8), 3.857] -- ${highPeriodic.length} of them, at r = ${highPeriodic.map((i) => rOf(i).toFixed(4)).join(", ")} ***`,
+            highPeriodic.length > 0 && inWindow.length === highPeriodic.length,
+            `1 + sqrt(8) = ${PERIOD3.lo.toFixed(6)}, the window's own edge from render/lyapunovWgsl.mjs. A sign test on a buffer another pass wrote, landing on a constant this tree owns exactly`);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -253,6 +331,6 @@ else {
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against SwiftShader's -- " +
-    "which is the same question the chaotic five ask, one machine further out; a compute pass that READS a storage buffer as well as writing one (this one takes a uniform and " +
-    "writes an array, and the fleets' own cull pass reads three buffers); and a workgroup-shared or atomic pass, which three can emit and this transplant has never seen.");
+    "which is the same question the chaotic five ask, one machine further out; a workgroup-shared or ATOMIC pass, which three can emit and this transplant has never seen (the " +
+    "fleets' own cull pass counts into an atomic<u32> and nothing here does); and an INDIRECT dispatch, where the count a pass runs at is itself in a buffer.");
 process.exit(fails ? 1 : 0);

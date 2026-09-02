@@ -272,6 +272,12 @@ export function systemDigest(fleets, opts = {}) {
 // twelve, so the record briefly disagreed with itself in the half a reader actually reads. At 2 it is twelve
 // again. The gate computes that figure live for its detail line and never trusted the prose, which is why
 // nothing went red for it; a number nobody asserts is exactly where a stale sentence survives.
+// v4336 -- AND THE MERGE PUT THE NUMBER BACK WITHOUT THE NOTE NOTICING. v4330's correction was two parts, a value
+// and the paragraph below explaining it; a later merge took the paragraph and reverted the value, so this file shipped
+// on main carrying prose that said "corrected to what git says" directly above the number it had not corrected, and
+// the gate was red on main again with nothing in the red register naming it. Re-applied, and recorded here because a
+// note and the datum it describes living in one file is exactly what let a merge keep one and drop the other.
+//
 // v4330 -- `three` WAS RECORDED AS 2 AND GIT SAYS 1, AT THE HEAD THIS RECORD SHIPPED ON. The gate that reads this
 // re-takes the count from git rather than trusting the number, and it went red on origin/main itself the moment
 // that round merged -- not on anything a later round did. The measurement is the authority ("a record nobody
@@ -284,7 +290,7 @@ export const COMMIT_BELT_V4329 = Object.freeze({
                         // re-measurement corrects the NUMBER and leaves the name of the round that took it.
     repoCommits: 858,   // likewise the v4329 figure. The merged head stands at 863; the gate prints this one,
                         // so read it as "the belt measured at v4329" rather than as a live count.
-    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
+    perBody: Object.freeze({ three: 1, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),
     why: "twelve of fifteen vendored bodies have been touched by exactly one commit in the repository's life -- " +
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +
