@@ -788,10 +788,42 @@ void main() {
     fragColor = vec4(c.rgb + vec3(add) * k, a);
 }`;
 
+const LIQUIDCHROME_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uDistortion, uChromeIntensity, uFlowSpeed, uReflectionScale, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 st = (p / uSize) * uReflectionScale;
+    vec2 t1 = vec2(uTime * uFlowSpeed * 0.2, uTime * uFlowSpeed * 0.15);
+    vec2 t2 = vec2(uTime * uFlowSpeed * 0.18, uTime * uFlowSpeed * 0.22);
+    float n1 = bcs_fbm(st + t1, 4);
+    float n2 = bcs_fbm(st + vec2(5.0, 3.0) + t2, 4);
+    float d = uDistortion * uPointScale;                 // POINTS upstream -- scaled, not assumed pixels
+    vec4 c = layerSample(clamp(p + vec2(n1, n2) * d, vec2(0.0), uSize));
+    float eps = 0.01;
+    float h0 = bcs_fbm(st + t1, 3);
+    float hx = bcs_fbm(st + vec2(eps, 0.0) + t1, 3);
+    float hy = bcs_fbm(st + vec2(0.0, eps) + t1, 3);
+    // normalize((gx,gy,1)).z is 1/sqrt(gx*gx+gy*gy+1) and is ALWAYS POSITIVE, so upstream's max(z,0.0) and
+    // abs(dot(n,(0,0,1))) are both dead. Written as the value they reduce to -- see the model's note.
+    float nz = normalize(vec3((h0 - hx) / eps, (h0 - hy) / eps, 1.0)).z;
+    float specular = pow(nz, 4.0);
+    float highlight = pow(1.0 - nz, 3.0) * uChromeIntensity;
+    float lum = toHalf(dot(c.rgb, ${LUMA}));
+    float kMix = toHalf(uChromeIntensity * 0.5);
+    float gain = toHalf(0.8 + specular * 0.4);
+    // Only the ADD is alpha-sensitive: the desaturating mix and the gain are linear and commute with
+    // premultiplication. Scaling all three by k would be wrong in the other direction.
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 desat = vec3(toHalf(mix(c.r, lum, kMix)), toHalf(mix(c.g, lum, kMix)), toHalf(mix(c.b, lum, kMix)));
+    vec3 m = vec3(toHalf(desat.r + highlight * k), toHalf(desat.g + highlight * k), toHalf(desat.b + highlight * k));
+    fragColor = vec4(toHalf(m.r * gain), toHalf(m.g * gain), toHalf(m.b * gain), c.a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
     geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
-    wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG };
+    wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG,
+    liquidChrome: LIQUIDCHROME_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -814,6 +846,7 @@ const KNOBS = {
     gravityWells: { time: "uTime", wellStrength: "uWellStrength", wellCount: "uWellCount", orbitSpeed: "uOrbitSpeed", warpFalloff: "uWarpFalloff", pointScale: "uPointScale" },
     refractLens: { touchX: "uTouchX", touchY: "uTouchY", lensRadius: "uLensRadius", refraction: "uRefraction", aberration: "uAberration", wobble: "uWobble", pointScale: "uPointScale" },
     wavePool: { time: "uTime", amplitude: "uAmplitude", wavelength: "uWavelength", speed: "uSpeed", complexity: "uComplexity", pointScale: "uPointScale" },
+    liquidChrome: { time: "uTime", distortion: "uDistortion", chromeIntensity: "uChromeIntensity", flowSpeed: "uFlowSpeed", reflectionScale: "uReflectionScale", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
@@ -863,6 +896,8 @@ const DEFAULT_KNOBS = {
     // Batch 10 -- copied from each function's own parameter defaults in swiftShaderModel.mjs, which is the
     // reference the GPU is graded against, so the two agree by construction rather than by my memory.
     wavePool:       { time: 0, amplitude: 10, wavelength: 20, speed: 2, complexity: 3, pointScale: 1 },
+    // Batch 12 -- copied from bcsLiquidChrome's own parameter defaults in swiftShaderModel.mjs.
+    liquidChrome:   { time: 0, distortion: 12, chromeIntensity: 0.6, flowSpeed: 1, reflectionScale: 4, pointScale: 1, premultiplied: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
@@ -1004,6 +1039,6 @@ export {
     EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
-    WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG,
+    WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

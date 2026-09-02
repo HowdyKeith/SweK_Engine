@@ -30,7 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampler,
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
-         bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens,
+         bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, bcsLiquidChrome,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -765,7 +765,7 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 28 of 41 ported", pass.swiftShaderNames().length === 28, pass.swiftShaderNames().length + " shaders");
+    ok("!! 29 of 41 ported", pass.swiftShaderNames().length === 29, pass.swiftShaderNames().length + " shaders");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -941,7 +941,8 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
                      thermal: bcsThermal, liveRipple: bcsLiveRipple, shockwave: bcsShockwave,
                      gravityWells: bcsGravityWells, solarize: bcsSolarize, duochrome: bcsDuochrome,
                      chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho,
-                     topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple };
+                     topographic: bcsTopographic, neonEdge: bcsNeonEdge, touchRipple: bcsTouchRipple,
+                     liquidChrome: bcsLiquidChrome };
         const moved = [], visible = [];
         for (const n of pass.swiftShaderNames()) {
             const o = FN[n](flat, { ...pass.DEFAULT_KNOBS[n], premultiplied: false });
@@ -1116,8 +1117,11 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             gravityWells: bcsGravityWells, refractLens: bcsRefractLens,
             wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
             geometricWarp: bcsGeometricWarp, blackHole: bcsBlackHole,
-            wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic };
-        const CASES = { emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
+            wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted, pixelateMosaic: bcsPixelateMosaic,
+            liquidChrome: bcsLiquidChrome };
+        // liquidChrome at time 0.4: both fbm fields are animated, so a non-zero time is what makes the
+        // displacement and the height field disagree with each other rather than sharing one sample.
+        const CASES = { liquidChrome: { time: 0.4 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
             duochrome: { time: 1 }, vortex: { time: 0.7 }, kaleidoscope: { time: 1 },
             chromaticSplit: { spread: 6 }, plasma: { time: 1 }, echo: { time: 1 }, glitch: { time: 1 },
             melt: { time: 1 }, topographic: { time: 1 }, thermal: { time: 1 }, neonEdge: { time: 1 },
@@ -1131,10 +1135,14 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             const body = pass.SHADERS[n].slice(pass.SHADERS[n].indexOf("void main"));
             return /bcs_(hash|valueNoise|fbm)\(/.test(body);
         });
-        // 5 at v4196, 8 at v4234: batch 11 is the first batch that is MOSTLY hash-reaching, because after
-        // wormhole there are no gradeable shaders left upstream at all.
+        // 5 at v4196, 8 at v4234, 9 at v4309: batch 11 is the first batch that is MOSTLY hash-reaching, because
+        // after wormhole there are no gradeable shaders left upstream at all -- and batch 12's liquidChrome is
+        // the same story, reaching bcs_fbm twice (a 4-octave displacement field and a 3-octave height field).
+        // *** THIS LINE IS WHY THE COUNT IS TRUSTWORTHY: it is DERIVED from the fragment source, so a shader
+        // cannot join the set by my saying so, or be kept out of it by my forgetting. liquidChrome landed in
+        // it without being told to, which is the independent check on the port's own claim to be in it.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
-            HASHED.length === 8, HASHED.join(", "));
+            HASHED.length === 9, HASHED.join(", "));
 
         const results = {};
         for (const name of pass.swiftShaderNames()) {
@@ -1201,8 +1209,12 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         }
         const aimg = { w: W, h: H, premultiplied: false, data: Float32Array.from(asrc, (v) => v / 255) };
         const ALPHA_AWARE = pass.swiftShaderNames().filter((n) => "premultiplied" in (pass.KNOBS[n] || {}));
-        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are eight of them",
-            ALPHA_AWARE.length === 8 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
+        // NINE at v4309: liquidChrome adds half3(highlight) into the sampled colour. Its OTHER two colour
+        // operations -- the desaturating mix and the specular gain -- are LINEAR and commute with
+        // premultiplication, so they take no k. Deciding which of the three needed it is the port's one real
+        // alpha decision, and this line is what makes the answer checkable rather than asserted.
+        ok("!! the shaders that add into a sample declare a premultiplied knob, and there are nine of them",
+            ALPHA_AWARE.length === 9 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
             ALPHA_AWARE.join(", "));
         const alphaResults = {};
         for (const name of ALPHA_AWARE) {
@@ -1496,7 +1508,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         console.log("\n20. trap 3 -- the first comparison at a device pixel ratio other than 1");
         {
             const carriers = pass.swiftShaderNames().filter((n) => "pointScale" in (pass.DEFAULT_KNOBS[n] || {}));
-            ok("!! 17 of the 28 ported shaders carry pointScale at all", carriers.length === 17,
+            ok("!! 18 of the 29 ported shaders carry pointScale at all", carriers.length === 18,
                 carriers.length + " carriers: " + carriers.join(" "));
             const rows = [];
             for (const name of carriers) {
@@ -1559,18 +1571,18 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether these effects look GOOD, and whether the eight sin-hash shaders match " +
     "upstream's Metal PIXEL FOR PIXEL -- they cannot be made to, on any two implementations. What IS " +
-    "checked, on a real WebGL2 context: 28 of 41 are ported; 15 of them agree with their CPU reference to " +
+    "checked, on a real WebGL2 context: 29 of 41 are ported; 15 of them agree with their CPU reference to " +
     "within 2 levels; 4 more (vortex and batch 10's three displacing shaders) agree to within ONE TEXEL of " +
     "the test gradient; wormhole agrees exactly away from its own wrap seam and by the full range on it; and " +
-    "8 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
+    "9 provably cannot agree at all. Also checked: that a knob which is a coordinate needs the same flip a " +
     "fragment coordinate does, and that toHalf no longer returns NaN for a value a half calls zero. *** THE " +
     "HOLE v4233's SABOTAGE FOUND IS CLOSED AT v4234: a second comparison image carries a diagonal alpha ramp " +
     "and is rendered with premultiplied = 0, so deleting a `* k` from a fragment shader now turns this red " +
     "for the six gradeable alpha-aware shaders, and the two hash ones are graded in the configurations where " +
     "the hash cancels (frosted at pointScale 0, pixelateMosaic fully assembled and on a flat alpha). *** " +
     "*** TRAP 3 IS NO LONGER ARGUED FROM THE SOURCE: v4265 MEASURED IT. *** Section 20 renders every one of " +
-    "the 17 pointScale-carrying shaders at ps=2 and compares against the CPU model at ps=2. The parameter " +
-    "changes the picture in ALL 17 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
+    "the 18 pointScale-carrying shaders at ps=2 and compares against the CPU model at ps=2. The parameter " +
+    "changes the picture in ALL 18 -- it is load-bearing everywhere it appears -- 11 agree with the model at " +
     "BOTH 1x and 2x, and NOTHING agrees at 1x and breaks at 2x. The six that disagree at 2x already disagree " +
     "at 1x and are the sin-hash set, which the 1x control is what establishes: without it this gate would " +
     "have reported five defects that do not exist. " +

@@ -1489,3 +1489,66 @@ export function bcsRefractLens(img, { touchX = 0, touchY = 0, lensRadius = 0.25,
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+/**
+ * bcs_liquidChrome -- BATCH 12, v4309. Flowing fbm displacement, then a metallic desaturate-and-highlight
+ * driven by the NORMAL of the same noise field read as a height map.
+ *
+ * *** TWO GUARDS IN THE UPSTREAM SOURCE ARE DEAD CODE, AND THE PORT SAYS SO RATHER THAN COPYING THEM. ***
+ * The normal is `normalize(float3(gx, gy, 1.0))`, whose z component is 1/sqrt(gx^2+gy^2+1) and is therefore
+ * STRICTLY POSITIVE for every finite gradient. So upstream's `max(normal.z, 0.0)` can never clamp and its
+ * `abs(dot(normal, float3(0,0,1)))` can never flip a sign -- both reduce to normal.z. Reproduced as the
+ * plain value, with this note, because carrying a guard that cannot fire is how a reader learns to expect a
+ * negative z that the arithmetic forbids. Same shape as batch 11's pixelateMosaic grout branch, which drew
+ * zero pixels: a branch nothing takes is not caution, it is a false statement about the domain.
+ *
+ * WHICH TRAPS THIS ONE EXERCISES, of the six in this file's header:
+ *   3 (POINTS)  `distortion` is added to `position`, which is in points -- so it carries pointScale. At 2x
+ *               a direct port would displace by half the intended distance.
+ *   4 (half)    lum, the mix factor, the highlight add and the final gain are all half in the source, and
+ *               each is quantised here rather than left in highp.
+ *   6 (EDGES)   upstream clamps the displaced coordinate to [0, size] BY HAND -- the author knew.
+ *   2 (ALPHA)   and this is the only interesting one. `metallic *= gain` and the desaturating mix are both
+ *               LINEAR, so they commute with premultiplication and are alpha-safe either way. `metallic +=
+ *               half3(highlight)` is NOT: it adds a constant to a premultiplied colour, which is a change of
+ *               highlight/alpha in the colour a person sees. ONLY THAT TERM IS SCALED BY k, and working out
+ *               which of the three operations needed it is the whole of the port's alpha decision.
+ *
+ * IT JOINS THE SIN-HASH SET, which is why it is graded structurally rather than pixel-for-pixel: bcs_fbm
+ * bottoms out in fract(sin(dot(...)) * 43758.5453), and sin at those magnitudes is implementation-defined.
+ */
+export function bcsLiquidChrome(img, { time = 0, distortion = 12, chromeIntensity = 0.6, flowSpeed = 1,
+                                       reflectionScale = 4, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const t1x = time * flowSpeed * 0.2, t1y = time * flowSpeed * 0.15;
+    const t2x = time * flowSpeed * 0.18, t2y = time * flowSpeed * 0.22;
+    const EPS = 0.01;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const stx = (px / w) * reflectionScale, sty = (py / h) * reflectionScale;
+        const n1 = bcsFbm(stx + t1x, sty + t1y, 4);
+        const n2 = bcsFbm(stx + 5 + t2x, sty + 3 + t2y, 4);
+        const d = distortion * pointScale;          // trap 3: a point displacement, not a pixel one
+        const c = s(clamp(px + n1 * d, 0, w), clamp(py + n2 * d, 0, h));
+        // The height field is the FOUR-octave field's three-octave sibling -- upstream re-evaluates at 3, it
+        // does not reuse n1, and the difference is visible in the normal.
+        const h0 = bcsFbm(stx + t1x, sty + t1y, 3);
+        const hx = bcsFbm(stx + EPS + t1x, sty + t1y, 3);
+        const hy = bcsFbm(stx + t1x, sty + EPS + t1y, 3);
+        const nz = 1 / Math.hypot((h0 - hx) / EPS, (h0 - hy) / EPS, 1);   // normalize((gx,gy,1)).z, always > 0
+        const specular = Math.pow(nz, 4);
+        const highlight = Math.pow(1 - nz, 3) * chromeIntensity;
+        const lum = toHalf(luma(c[0], c[1], c[2]));
+        const kMix = toHalf(chromeIntensity * 0.5);
+        const gain = toHalf(0.8 + specular * 0.4);
+        const a = c[3];
+        const k = premultiplied || a === 0 ? 1 : a;   // trap 2: only the ADD is alpha-sensitive
+        for (let j = 0; j < 3; j++) {
+            const desat = toHalf(mix(c[j], lum, kMix));
+            out[i + j] = toHalf(toHalf(desat + highlight * k) * gain);
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
