@@ -207,6 +207,17 @@ if (params.get("tsl") === "1") {
             tslLook.atlas = { language: emG.language, applied: std.fleets[GL].pipeline === dG, shell: dG.shell, textures: dG.textures, soft };
             say(`${device.backend} &middot; and the Glyph race's OWN shipped look is GENERATED too -- the atlas crossing into the shell that binds it, ${soft ? "sampled through the shell's sampler, softened" : "texel by texel"}, transparent ones discarded`);
         } catch (e) { say("the generated atlas look failed, the Glyph race keeps its own: " + e.message, true); console.warn("tsl atlas:", e); }
+        // v4328 -- and the leanest layout of all: the Krbn race's strokes on a LINE-LIST, p and colour and nothing else.
+        // The graph reads the vertex colour alone (there is no uv here to read) and washes it toward its own luminance.
+        try {
+            const KR = RACES.findIndex((r) => r.name === "Krbn");
+            const inkLook = P.makeInkTsl(THREE, T, { wash: 0.6, gain: 1.5 }); renderer.setRenderTarget(new THREE.RenderTarget(64, 64));
+            const emI = await S.emitShaders(renderer, { scene: inkLook.scene, camera: inkLook.camera, mesh: inkLook.scene.children[0] });
+            const dI = S.transplantIntoShell({ [emI.language]: emI }, P.inkLookShell(std.fleets[KR].pipeline.buffers));
+            std.fleets[KR] = { ...std.fleets[KR], pipeline: dI, bind: (pass, ctx) => pass.uniform("ink", [0.35 + 0.35 * Math.sin(ctx.time * 0.7), 1.5, 0, 0]) };
+            tslLook.ink = { language: emI.language, applied: std.fleets[KR].pipeline === dI, shell: dI.shell, topology: dI.topology, varyings: Object.keys(P.inkLookShell([])[emI.language].varyings) };
+            say(`${device.backend} &middot; and the Krbn race's strokes are GENERATED on a LINE-LIST -- one varying, no uv in the layout at all, the ink washing toward its own grey`);
+        } catch (e) { say("the generated ink look failed, the Krbn race keeps its strokes: " + e.message, true); console.warn("tsl ink:", e); }
     } catch (e) { say("TSL look failed, the hand-written Chaos look stands: " + e.message, true); console.warn("tsl look:", e); }
 }
 const fleetOf = Uint32Array.from(economy.names, (n, i) => (i === YOU ? 1 : crewFleet[i]));   // you fly the Wedge race: the user's hull

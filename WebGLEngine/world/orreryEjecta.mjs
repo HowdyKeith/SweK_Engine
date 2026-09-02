@@ -135,7 +135,7 @@ export function ejectaOf(name, files) {
 // import of the real library, not a mention in prose and not the scanner counting itself -- both of which
 // this file's own header records happening before. Established by diffing the importer list at v4266 against
 // HEAD, which returned exactly one added path.
-// *** AND three-webgpu WAS MISSING ENTIRELY UNTIL v4328, WHICH IS A DIFFERENT DEFECT FROM A MOVED COUNT. ***
+// *** AND three-webgpu WAS MISSING ENTIRELY UNTIL v4329, WHICH IS A DIFFERENT DEFECT FROM A MOVED COUNT. ***
 // It was vendored on 2026-09-02 with seven importers. The gate loops over THIS object's keys, so a body with
 // no key here is not checked and not reported -- it is invisible, and the gate said ALL GREEN over it. The
 // gate now asserts that every body in the bake has an entry, so the next arrival cannot land unmeasured.

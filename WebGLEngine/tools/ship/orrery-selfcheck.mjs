@@ -115,7 +115,7 @@ const REPO = path.resolve(ENG, "..");
     ok(sys.unpapered.length === UNPAPERED_BASELINE,
         `UNPAPERED is ${sys.unpapered.length}, at or below the baseline of ${UNPAPERED_BASELINE} -- vendoring something new without licence provenance pushes this over and the check goes red`);
     // *** THESE TWO USED TO ASSERT THAT box3d AND htmx HAVE NO LICENCE, AND THE DEBT IS PAID. *** Backlog #61
-    // named them; both now carry a LICENSE in the tree. The claim could not be seen here until v4328 re-baked
+    // named them; both now carry a LICENSE in the tree. The claim could not be seen here until v4329 re-baked
     // orrery.json, which had been frozen at v4189 -- so this gate has been reading a fourteen-body snapshot
     // that predates the fix, and asserting the defect was still there. The check is INVERTED rather than
     // deleted: a regression that re-introduced an unpapered body would go red on the line above, and this one

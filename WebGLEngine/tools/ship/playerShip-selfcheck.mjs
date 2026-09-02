@@ -77,7 +77,7 @@ console.log("\n3. TWO PEERS, ONE OF THEM FLYING: the cockpit's interventions cro
 {
     // *** THIS SAID `ship: MANUAL` AND SECTION 2, TWENTY LINES UP, DERIVES THE SAME THING. *** crew() appends the
     // manual ship last, so its index is the crew length minus one -- 22 when the orrery held fourteen bodies,
-    // 23 since vendor/three-webgpu arrived and v4328 re-baked. The typed form threw "ship 22 is not a manual
+    // 23 since vendor/three-webgpu arrived and v4329 re-baked. The typed form threw "ship 22 is not a manual
     // ship" the moment the bake was refreshed, which is the whole shape of this round: a number that was right
     // once, against data that moved.
     const MANUAL = fresh(7).ships.length - 1;

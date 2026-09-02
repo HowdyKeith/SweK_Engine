@@ -332,7 +332,7 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     const SS = GS.SWEEP_SINCE_V4297;
     // v4322 -- a SECOND closing (SS.since2): the gates added after v4317's sweep, swept and named the same way; a red among
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
-    // v4328 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
+    // v4329 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
     // closing, and reading only since2 meant the next one had to edit this arithmetic as well as the record.
     const closings = [SS.since2, SS.since3, SS.since4].filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };

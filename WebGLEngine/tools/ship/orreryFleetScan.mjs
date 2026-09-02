@@ -1,11 +1,11 @@
-// FILE: tools/ship/orreryFleetScan.mjs -- v4328
+// FILE: tools/ship/orreryFleetScan.mjs -- v4329
 //
 // The git and filesystem half of world/orreryFleet.mjs, kept here for tools/ship/orreryScan.mjs's stated
 // reason: "world/orrery.mjs stays pure so a browser can import it". This file shells to git and reads sizes;
 // the model it feeds does neither.
 //
 // *** ONE `git log --name-only` PASS, NOT ONE CALL PER FILE. *** A satellite is an engine file that imports a
-// vendored body, and it carries the commit that LAST touched it. There are 128 such files at v4328 and the
+// vendored body, and it carries the commit that LAST touched it. There are 128 such files at v4329 and the
 // obvious implementation is `git log -1 --format=%H -- <path>` for each: MEASURED at 947 ms for ten, so
 // ~12 seconds for the set, and it grows with every importer added. A single `git log --format=%H --name-only`
 // over all 858 commits takes 4.0 s once and yields the last-touching commit for all 5,434 tracked paths.
@@ -126,7 +126,7 @@ export function bakedNames(engineRoot) {
  *
  * *** BAKED FOR THE SAME REASON orrery.json IS: A BROWSER CANNOT RUN git. *** And baked SEPARATELY from
  * orrery.json rather than folded into it, because fourteen gates read that file and its shape is load-bearing
- * for all of them -- v4328 learned what a change to it costs by re-baking it after forty-five rounds and
+ * for all of them -- v4329 learned what a change to it costs by re-baking it after forty-five rounds and
  * turning four gates red. A new fact goes in a new file.
  *
  * What is NOT baked is any position: those are a pure function of (seed, t) in world/orreryFleet.mjs, computed

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/orreryFleet-selfcheck.mjs -- v4328
+// WebGLEngine/tools/ship/orreryFleet-selfcheck.mjs -- v4329
 //
 // GRADES world/orreryFleet.mjs and tools/ship/orreryFleetScan.mjs -- backlog #68, "ES space demos into the
 // orrery, seeded by the git log", whose promise is one sentence: "re-run with no new commits -> identical
@@ -213,7 +213,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
 {
     // The record says a per-body commit belt would be one or two rocks. That is the reason the obvious reading
     // of #68 was refused, so it is re-taken from git here: a record nobody re-measures is a sentence.
-    const R = F.COMMIT_BELT_V4328;
+    const R = F.COMMIT_BELT_V4329;
     const live = {};
     for (const n of names) {
         try {
@@ -229,7 +229,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     ok("*** and the finding holds: the busiest vendored body has been touched by two commits ***",
         Math.max(...Object.values(live)) <= 2 && Object.values(live).filter((v) => v === 1).length >= 10,
         `${Object.values(live).filter((v) => v === 1).length} of ${names.length} bodies touched exactly once, against ${R.repoCommits} commits in the repository`);
-    ok("  so the refusal is recorded with its reason rather than left as an absence", /belt/i.test(R.why) && R.at === "v4328");
+    ok("  so the refusal is recorded with its reason rather than left as an absence", /belt/i.test(R.why) && R.at === "v4329");
     report("VENDORED CODE DOES NOT CHANGE; THE CODE THAT USES IT DOES. That is why a satellite is an importer " +
         "and not a commit, and it is a measurement rather than a preference.");
 }

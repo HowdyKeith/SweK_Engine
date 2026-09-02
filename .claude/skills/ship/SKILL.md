@@ -52,7 +52,7 @@ or the `[knowledge]` line from step 3).
     node tools/ship/staleness.mjs --fix                # rewrites case-study.html's gate count
     node tools/ship/claimCheck-selfcheck.mjs           # must end "all checks pass"
 
-`orrery-fleet.json` (v4328, #68) holds each vendored body's importers with their sizes and last commits, and
+`orrery-fleet.json` (v4329, #68) holds each vendored body's importers with their sizes and last commits, and
 main.js is an importer of three. So its byte size changes the moment the version note is written, and baking
 it BEFORE the bump leaves orreryFleet-selfcheck red on a size that moved by six hundred bytes. Bake it after
 the bump and before the commit: sizes then match at HEAD, and the only thing left behind is each satellite's
