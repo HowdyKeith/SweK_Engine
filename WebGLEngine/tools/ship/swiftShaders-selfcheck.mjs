@@ -32,6 +32,7 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
          bcsHash, bcsValueNoise, bcsFbm, bcsHsb2rgb, bcsSolarize, bcsDuochrome, bcsVortex, bcsKaleidoscope, bcsChromaticSplit, bcsPlasma, plasmaPalette, bcsEcho, bcsGlitch, bcsMelt, bcsTopographic, topoColor, bcsThermal, bcsNeonEdge, thermalColor, bcsHsb2rgb as _hsb,
          bcsTouchRipple, bcsLiveRipple, bcsShockwave, bcsGravityWells, bcsRefractLens, bcsLiquidChrome,
          bcsPixelateStorm, bcsMagneticField, bcsAurora, bcsDatamosh, bcsSmokeReveal, bcsMorphBreathe,
+         swkLyapunov,
     bcsWavePool, bcsPulse, bcsHolographic, bcsGeometricWarp, bcsBlackHole,
     bcsWormhole, bcsInkBleed, bcsFrosted, bcsPixelateMosaic, smoothstep,
          HALF_MAX, HALF_MIN_SUBNORMAL,
@@ -769,7 +770,10 @@ console.log("\n10. batch 9 (v4196) -- five radial displacement shaders, and a kn
             undeclared.length === 0, undeclared.length ? undeclared.join(", ")
             : "checked against the `uniform` declaration itself, so a knob mentioned only in prose goes red");
     }
-    ok("!! 35 of 41 ported", pass.swiftShaderNames().length === 35, pass.swiftShaderNames().length + " shaders");
+    // portedShaderNames() excludes ours -- see SWK_OWN in swiftShaderPass.js. swk_lyapunov renders and is
+    // graded here, and it is not one of upstream's 41, so it must not appear in this number.
+    ok("!! 35 of 41 ported", pass.portedShaderNames().length === 35,
+        pass.portedShaderNames().length + " ported + " + pass.SWK_OWN.length + " of our own (" + pass.SWK_OWN.join(", ") + ")");
 
     // --- THE NEW TRAP: touchPos is a coordinate arriving as a knob ---
     ok("!! *** touchRipple and refractLens take their CENTRE as a knob -- the first coordinate this port does " +
@@ -937,7 +941,7 @@ console.log("\n15. batch 11 (v4234) -- a wrap, an upstream that never clamps, an
             flat.data[i] = x / (W - 1); flat.data[i + 1] = y / (H - 1);
             flat.data[i + 2] = ((x + y) % 7) / 6; flat.data[i + 3] = 0.6;
         }
-        const FN = { wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
+        const FN = { lyapunov: swkLyapunov, wormhole: bcsWormhole, inkBleed: bcsInkBleed, frosted: bcsFrosted,
                      pixelateMosaic: bcsPixelateMosaic, refractLens: bcsRefractLens, emboss: bcsEmboss,
                      vortex: bcsVortex, melt: bcsMelt, glitch: bcsGlitch, heatShimmer: bcsHeatShimmer,
                      wavePool: bcsWavePool, pulse: bcsPulse, holographic: bcsHolographic,
@@ -1115,7 +1119,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         await pg.goto("http://127.0.0.1:" + port + "/g.html", { waitUntil: "load" });
         await pg.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 
-        const MODEL = { emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
+        const MODEL = { lyapunov: swkLyapunov, emboss: bcsEmboss, heatShimmer: bcsHeatShimmer, solarize: bcsSolarize,
             duochrome: bcsDuochrome, vortex: bcsVortex, kaleidoscope: bcsKaleidoscope,
             chromaticSplit: bcsChromaticSplit, plasma: bcsPlasma, echo: bcsEcho, glitch: bcsGlitch,
             melt: bcsMelt, topographic: bcsTopographic, thermal: bcsThermal, neonEdge: bcsNeonEdge,
@@ -1129,7 +1133,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             smokeReveal: bcsSmokeReveal, morphBreathe: bcsMorphBreathe };
         // liquidChrome at time 0.4: both fbm fields are animated, so a non-zero time is what makes the
         // displacement and the height field disagree with each other rather than sharing one sample.
-        const CASES = { liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
+        const CASES = { lyapunov: {}, liquidChrome: { time: 0.4 }, pixelateStorm: { time: 0.5 },
             magneticField: { time: 0.6, polarity: 0.5 }, aurora: { time: 0.7 },
             datamosh: { time: 0.4, blockCorruption: 0.7 }, smokeReveal: { time: 0.5 },
             morphBreathe: { time: 0.8 }, emboss: { strength: 2 }, heatShimmer: { time: 1 }, solarize: { time: 1 },
@@ -1154,6 +1158,18 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // it without being told to, which is the independent check on the port's own claim to be in it.
         ok("!! the sin-hash users are derived from the shader source, not typed into this gate",
             HASHED.length === 15, HASHED.join(", "));
+
+        // *** TWO DIFFERENT REASONS A SHADER CANNOT BE GRADED TO THE PIXEL, AND THEY ARE NOT THE SAME THING. ***
+        //   HASHED   -- fract(sin(x) * 43758.5453) at large x is IMPLEMENTATION-DEFINED. Two implementations
+        //               disagree about the SAME trajectory, and nothing can make them agree.
+        //   CHAOTIC  -- swk_lyapunov's trajectory is perfectly well defined; it is EXPONENTIALLY SENSITIVE.
+        //               float32 on the GPU and float32 modelled in float64 on the CPU diverge within a few
+        //               dozen iterations, by construction: a positive Lyapunov exponent is the STATEMENT that
+        //               they must. *** AND ITS AVERAGE IS REPRODUCIBLE ANYWAY, which is the whole point of the
+        //               shader -- so it is excluded from the per-pixel comparison and graded on the ergodic
+        //               statistic instead, against ln 2, in its own section below. ***
+        const CHAOTIC = pass.SWK_OWN.filter((n) => n === "lyapunov");
+        const UNGRADEABLE = HASHED.concat(CHAOTIC);
 
         const results = {};
         for (const name of pass.swiftShaderNames()) {
@@ -1233,7 +1249,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // MULTIPLIES (r, b and rgb gains) and needs no knob. Four batches, four correct predictions from
         // reading which operations are linear.
         ok("!! the shaders that add into a sample declare a premultiplied knob, and there are thirteen of them",
-            ALPHA_AWARE.length === 13 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
+            ALPHA_AWARE.length === 14 && ALPHA_AWARE.includes("emboss") && ALPHA_AWARE.includes("pixelateMosaic"),
             ALPHA_AWARE.join(", "));
         const alphaResults = {};
         for (const name of ALPHA_AWARE) {
@@ -1265,7 +1281,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         // pixelateMosaic scales alpha by an assemble progress driven straight off bcs_hash -- so for those two
         // the alpha is as hash-dependent as the colour. They are graded in the CONFIGURATIONS where the hash
         // cancels instead: see the three targeted checks immediately below.
-        const GRADEABLE_ALPHA = ALPHA_AWARE.filter((n) => !HASHED.includes(n));
+        const GRADEABLE_ALPHA = ALPHA_AWARE.filter((n) => !UNGRADEABLE.includes(n));
         const alphaBound = (n) => TEXEL_EXEMPT.includes(n) ? Math.ceil(255 / (H - 1)) : 2;
         for (const n of GRADEABLE_ALPHA) {
             ok("   " + n.padEnd(14) + " honours the alpha convention ON THE GPU too",
@@ -1365,7 +1381,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         }
 
         // A) the twelve with no sin-hash and no boundary sensitivity must be essentially EXACT.
-        const EXACTISH = pass.swiftShaderNames().filter((n) => !HASHED.includes(n) && !TEXEL_EXEMPT.includes(n));
+        const EXACTISH = pass.swiftShaderNames().filter((n) => !UNGRADEABLE.includes(n) && !TEXEL_EXEMPT.includes(n));
         for (const n of EXACTISH) {
             ok("   " + n.padEnd(15) + " GPU matches the CPU model", results[n].worst <= 2,
                 "worst " + results[n].worst + " levels, " + results[n].off + " pixels over 2");
@@ -1499,17 +1515,81 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             "and float32 and float64 round across it. Nearest sampling, not a port error.");
 
         // D) the five that CANNOT agree, and the reason, measured.
-        for (const n of HASHED) {
+        for (const n of UNGRADEABLE) {
             ok("   " + n.padEnd(15) + " DISAGREES, as the sin-hash requires", results[n].off > 100,
                 "worst " + results[n].worst + " levels over " + results[n].off + " pixels");
         }
         ok("!! *** the CPU model can never verify a sin-hash shader, and this is the boundary ***",
-            HASHED.every((n) => results[n].off > 100) && EXACTISH.every((n) => results[n].worst <= 2),
+            UNGRADEABLE.every((n) => results[n].off > 100) && EXACTISH.every((n) => results[n].worst <= 2),
             "bcs_hash is fract(sin(dot(p, (12.9898, 78.233))) * 43758.5453). Multiplying sin's output by 43758 " +
             "turns one float32 ULP into a DIFFERENT RANDOM NUMBER: measured divergence up to 0.68 on a 0..1 " +
             "value, i.e. 68% of the range. Not a tolerance to widen -- a limit to state. The source-shape " +
             "sections are what check these eight, and they check the SHAPE rather than the pixels -- plus, " +
             "since v4234, the two configurations above in which frosted's and pixelateMosaic's hash cancels.");
+
+        // ---- 19b. *** THE EXTERNAL KEY: swk_lyapunov READS ln 2 OFF THE GPU *** ---------------------------
+        //
+        // Every shader above this is graded against its own CPU port -- a MIRROR. It shows the GLSL and the JS
+        // agree; it cannot show either is RIGHT, and for the fifteen sin-hash shaders it cannot show even that.
+        // This section is different in kind: physics/chaos/logistic.js records that the Lyapunov exponent of
+        // the logistic map at r = 4 is EXACTLY ln 2, and the fragment is handed r as a COORDINATE and nothing
+        // else. If the column at r = 4 reads ln 2, the shader agreed with an answer it was never given.
+        {
+            const RAW = { ...pass.DEFAULT_KNOBS.lyapunov, rLo: 4, rHi: 4, raw: 1 };
+            const RW = 4, RH = 128;
+            const flatSrc = new Uint8Array(RW * RH * 4).fill(128);
+            const gpuRaw = await pg.evaluate(({ knobs, W, H, src }) => {
+                const q = window.__mk("lyapunov", W, H);
+                q.render(new Uint8Array(src), knobs);
+                return Array.from(q.readPixels());
+            }, { knobs: RAW, W: RW, H: RH, src: Array.from(flatSrc) });
+            // Two channels, 16 bits: one 8-bit channel resolves lambda to 1.6e-2, coarser than the 8.3e-3 the
+            // budget earns, so a single channel would measure the framebuffer rather than the shader.
+            const lams = [];
+            for (let yy = 0; yy < RH; yy++) {
+                const i = (yy * RW) * 4;
+                lams.push(((gpuRaw[i] + gpuRaw[i + 1] / 255) / 255) * 4 - 3);
+            }
+            const errs = lams.map((v) => Math.abs(v - Math.LN2)).sort((x, y) => x - y);
+            const sortedL = [...lams].sort((x, y) => x - y);
+            const median = sortedL[Math.floor(RH / 2)];
+            const p90 = errs[Math.floor(0.9 * (RH - 1))];
+            const outliers = errs.filter((e) => e > 2e-2).length / RH;
+
+            // *** THE TOLERANCE IS THE MEASURED SPREAD, NOT A ROUND NUMBER. *** In float32 at r = 4 over 128
+            // seeds the CPU model reads median |err| 1.36e-3, p90 5.85e-3, and 4.7% of seeds are ergodic
+            // OUTLIERS up to 3.07e-1. The average is a random walk centred on ln 2, not a convergent sequence,
+            // so the robust statistic is the one that can carry a claim and the worst case is not.
+            ok("!! *** THE GPU READS ln 2 AT r = 4 -- AN ANSWER THE SHADER WAS NEVER GIVEN ***",
+                Math.abs(median - Math.LN2) < 2e-3,
+                "median lambda over " + RH + " seeds is " + median.toFixed(6) + " against ln 2 = " +
+                Math.LN2.toFixed(6) + ", |err| " + Math.abs(median - Math.LN2).toExponential(2) + ". THE " +
+                "FRAGMENT RECEIVES r AS A COORDINATE AND NOTHING ELSE -- no uniform carries the answer. This " +
+                "is the first shader in this file graded against something other than its own port.");
+
+            ok("...and the ergodic claim holds: every row runs a DIFFERENT orbit and reports the SAME lambda",
+                p90 < 1.2e-2,
+                "p90 |lambda - ln2| = " + p90.toExponential(2) + " across " + RH + " seeds. A POSITIVE " +
+                "LYAPUNOV EXPONENT IS THE STATEMENT THAT THOSE ORBITS DIVERGE -- they share no trajectory at " +
+                "all after a few dozen iterations -- and the average is reproducible anyway. That is the exact " +
+                "opposite of the sin-hash family, where the trajectory is well defined and the two " +
+                "implementations still cannot be made to agree.");
+
+            report("THE OUTLIERS ARE A MEASUREMENT, NOT A FAILURE",
+                (100 * outliers).toFixed(1) + "% of seeds land more than 2e-2 from ln 2, worst " +
+                errs[RH - 1].toExponential(2) + ". Those are seeds whose finite orbit happens to spend time " +
+                "near a slope of zero, where log|slope| dives. Reporting the worst case as the shader's " +
+                "accuracy would be reporting the tail of a distribution as its centre.");
+
+            // The key is only external if the path that produces it does not contain the answer. In raw mode
+            // the fragment returns BEFORE the ln2 literal the display path uses to normalise.
+            const fsrc = pass.SHADERS.lyapunov;
+            ok("...and the raw path RETURNS BEFORE the ln 2 constant, so the read-back value never saw it",
+                fsrc.indexOf("uRaw > 0.5") < fsrc.indexOf("0.6931471805599453") &&
+                fsrc.indexOf("return;") < fsrc.indexOf("0.6931471805599453"),
+                "the display path normalises by ln 2 to colour the field; the RAW path -- the one this section " +
+                "reads -- is r, x, log and abs only. A key the shader could have been told is not a key.");
+        }
 
         // ---- 20. TRAP 3, MEASURED AT LAST -----------------------------------------------------------------
         //
@@ -1565,7 +1645,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
             ok("!! *** every shader that disagrees at 2x ALREADY disagrees at 1x -- the hash, not the scale ***",
                 off2.every((r) => r.at1 > 2), off2.map((r) => r.name + " 1x=" + r.at1 + " 2x=" + r.at2).join(", "));
             ok("   and each of those is a known sin-hash user, derived from the source",
-                off2.every((r) => HASHED.includes(r.name)), off2.map((r) => r.name).join(" "));
+                off2.every((r) => UNGRADEABLE.includes(r.name)), off2.map((r) => r.name).join(" "));
             report("*** WITHOUT THE 1x CONTROL THIS SECTION WOULD HAVE REPORTED FIVE DEFECTS THAT DO NOT " +
                 "EXIST. *** A measurement at one scale is not a comparison; it becomes one only when the " +
                 "other scale is measured the same way.");

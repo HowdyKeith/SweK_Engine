@@ -986,13 +986,50 @@ void main() {
     fragColor = vec4(toHalf(toHalf(c.r * rG) * gG), toHalf(c.g * gG), toHalf(toHalf(c.b * bG) * gG), c.a);
 }`;
 
+// ==================================================================================================================
+// *** OURS, NOT UPSTREAM'S. *** Everything above is a port of krispuckett/SwiftUIShaders (MIT), named bcs_*.
+// This one is SweK's own, named swk_*, and it is the first shader here with an EXTERNAL KEY -- see the model.
+// ==================================================================================================================
+const LYAPUNOV_FRAG = PREAMBLE + `
+uniform float uRLo, uRHi, uSamples, uWarmup, uIntensity, uSeedLo, uSeedHi, uRaw, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float r = uRLo + (uRHi - uRLo) * uv.x;
+    float x = uSeedLo + (uSeedHi - uSeedLo) * uv.y;
+    for (int i = 0; i < int(uWarmup); i++) x = r * x * (1.0 - x);
+    float acc = 0.0;
+    int n = int(uSamples);
+    for (int i = 0; i < n; i++) {
+        acc += log(abs(r * (1.0 - 2.0 * x)));
+        x = r * x * (1.0 - x);
+    }
+    float lam = acc / float(n);
+    if (uRaw > 0.5) {
+        // 16 bits across two channels. ONE 8-bit channel resolves lambda to 4/255 = 1.6e-2, which is coarser
+        // than the 8.3e-3 the iteration budget earns -- reading the key at 8 bits would measure the
+        // framebuffer instead of the shader.
+        float e = clamp((lam + 3.0) / 4.0, 0.0, 1.0);
+        fragColor = vec4(floor(e * 255.0) / 255.0, fract(e * 255.0), 0.0, 1.0);
+        return;
+    }
+    vec4 c = layerSample(p);
+    float chaos = clamp(lam / 0.6931471805599453, -1.0, 1.0);   // exactly 1 at the r = 4 key
+    float glow = max(chaos, 0.0) * uIntensity;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 hot = vec3(0.35, 0.95, 0.85);
+    fragColor = vec4(toHalf(c.r * (1.0 - 0.35 * glow) + hot.r * glow * k),
+                     toHalf(c.g * (1.0 - 0.35 * glow) + hot.g * glow * k),
+                     toHalf(c.b * (1.0 - 0.35 * glow) + hot.b * glow * k), c.a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
     geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
     wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG,
     liquidChrome: LIQUIDCHROME_FRAG, pixelateStorm: PIXELSTORM_FRAG, magneticField: MAGFIELD_FRAG,
     aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
-    morphBreathe: MORPHBREATHE_FRAG };
+    morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -1022,6 +1059,7 @@ const KNOBS = {
     datamosh: { time: "uTime", blockCorruption: "uBlockCorruption", smearAmount: "uSmearAmount", colorBleed: "uColorBleed", glitchRate: "uGlitchRate", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     smokeReveal: { time: "uTime", smokeAmount: "uSmokeAmount", smokeScale: "uSmokeScale", windSpeed: "uWindSpeed", smokeTurb: "uSmokeTurb", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
+    lyapunov: { rLo: "uRLo", rHi: "uRHi", samples: "uSamples", warmup: "uWarmup", intensity: "uIntensity", seedLo: "uSeedLo", seedHi: "uSeedHi", raw: "uRaw", premultiplied: "uPremultiplied" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
@@ -1081,6 +1119,8 @@ const DEFAULT_KNOBS = {
     datamosh:       { time: 0, blockCorruption: 0.3, smearAmount: 24, colorBleed: 0.5, glitchRate: 2, pointScale: 1, premultiplied: 1 },
     smokeReveal:    { time: 0, smokeAmount: 0.6, smokeScale: 4, windSpeed: 1, smokeTurb: 1, pointScale: 1, premultiplied: 1 },
     morphBreathe:   { time: 0, breatheDepth: 20, breatheRate: 1, warpComplexity: 4, organic: 0.5, pointScale: 1 },
+    // OURS -- swk_lyapunov. The budget is the measured knee; see swiftShaderModel.mjs for why 128 is worse.
+    lyapunov:       { rLo: 3.4, rHi: 4.0, samples: 384, warmup: 64, intensity: 0.8, seedLo: 0.05, seedHi: 0.95, raw: 0, premultiplied: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
@@ -1215,14 +1255,22 @@ function makeSwiftShaderPass(name, width, height, opts = {}) {
 
 /** The shaders this file can build, for a caller that wants to offer a list without importing SHADERS. */
 function swiftShaderNames() { return Object.keys(SHADERS); }
+// *** OURS, AND KEPT OUT OF EVERY COUNT ABOUT UPSTREAM COVERAGE. *** swk_lyapunov renders through the same
+// pass and is graded by the same gate, but it is NOT one of krispuckett/SwiftUIShaders' 41 -- so "35 of 41
+// ported" must not quietly become 36 because we added a shader of our own. A coverage number that counts
+// our own work as upstream's is the same defect as a baseline that absorbs its own drift.
+const SWK_OWN = ["lyapunov"];
+/** The upstream ports only -- what "N of 41" is allowed to count. */
+function portedShaderNames() { return Object.keys(SHADERS).filter((n) => !SWK_OWN.includes(n)); }
 
 export {
-    makeSwiftShaderPass, swiftShaderNames, DEFAULT_KNOBS,
+    makeSwiftShaderPass, swiftShaderNames, portedShaderNames, SWK_OWN, DEFAULT_KNOBS,
     VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA,
     EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
     WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
     PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
+    LYAPUNOV_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

@@ -1852,3 +1852,84 @@ export function bcsMorphBreathe(img, { time = 0, breatheDepth = 20, breatheRate 
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+// ==================================================================================================================
+// *** OURS, NOT UPSTREAM'S. *** Everything above this line is a port of krispuckett/SwiftUIShaders (MIT) and is
+// named bcs_*. Everything below is SweK's own and is named swk_*, so the provenance is readable from the call
+// site and no future reader has to check a licence to know which is which.
+// ==================================================================================================================
+
+/** float32, the precision a GLSL `highp float` actually has. The analogue of toHalf for a full-precision path. */
+export const f32 = Math.fround;
+
+/**
+ * swk_lyapunov -- v4312. THE FIRST SHADER IN THIS FILE WITH AN EXTERNAL KEY.
+ *
+ * *** WHAT MAKES IT DIFFERENT FROM THE 35 ABOVE IT. *** Every ported shader is graded against its own CPU
+ * port -- a mirror. It proves the GLSL and the JS agree; it cannot prove either is RIGHT, and for the fifteen
+ * sin-hash shaders it cannot prove even that. This one computes the LYAPUNOV EXPONENT of the logistic map,
+ * and physics/chaos/logistic.js records the answer the shader is never told:
+ *
+ *     at r = 4, lambda is EXACTLY ln 2 = 0.6931471805599453.
+ *
+ * The fragment receives r as a coordinate and nothing else. If the column at r = 4 reads ln 2, the shader got
+ * an answer from outside itself -- which is what this tree means by Tier 2.
+ *
+ * *** AND THE ERGODIC CLAIM IS THE SECOND KEY, WHICH IS SHARPER THAN THE FIRST. *** uv.y seeds x0, so every
+ * ROW runs a different orbit. At r = 4 those orbits diverge completely -- that is what a positive Lyapunov
+ * exponent MEANS -- and yet every row must report the SAME lambda. A chaotic computation whose trajectory is
+ * irreproducible and whose average is not. That is the exact opposite of the sin-hash family, where the
+ * trajectory is reproducible in principle and the tree cannot make two implementations agree at all.
+ *
+ * *** THE BUDGET IS MEASURED, NOT CHOSEN, and more warmup is NOT more accuracy. *** In float32 at r = 4,
+ * over 64 seeds:
+ *     warmup  64, samples 192  worst |lambda - ln2| 2.623e-2, mean 5.287e-3
+ *     warmup  64, samples 384  worst 8.307e-3, mean 1.710e-3, COLUMN MEAN 3.72e-4
+ *     warmup 128, samples 384  worst 8.792e-2   <-- WORSE, and that is not a typo
+ * The average is ergodic, not convergent: it is a random walk that happens to be centred on ln 2, so a longer
+ * warmup lands somewhere else on the walk rather than closer to the answer. 64/384 is the measured knee and
+ * the gate's tolerances come from these numbers rather than from a tidy-looking constant.
+ *
+ * *** float32 IS MODELLED, BECAUSE AT r = 4 IT IS NOT A ROUNDING DETAIL. *** The map is chaotic, so single
+ * precision does not merely perturb the orbit, it produces a DIFFERENT one -- and at long budgets it can
+ * collapse onto a fixed point entirely (measured: warmup 1000 / samples 3000 reads lambda 0.327, wrong by
+ * 3.66e-1, over half the answer). The CPU reference therefore rounds through Math.fround at every step, the
+ * way the GPU's highp float does, rather than computing a float64 answer the GLSL can never reach.
+ *
+ * `raw` EXISTS SO THE KEY CAN BE READ BACK. An 8-bit colour channel resolves lambda to 4/255 = 1.6e-2, which
+ * is COARSER than the 8.3e-3 the budget earns -- the gate would be measuring the framebuffer, not the shader.
+ * So raw mode encodes lambda across two channels, 16 bits, resolving 6.2e-5. A key that cannot be read at the
+ * precision it is claimed to is not a key.
+ */
+export function swkLyapunov(img, { rLo = 3.4, rHi = 4.0, samples = 384, warmup = 64, intensity = 0.8,
+                                   seedLo = 0.05, seedHi = 0.95, raw = false, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const r = f32(rLo + (rHi - rLo) * uvx);
+        let xv = f32(seedLo + (seedHi - seedLo) * uvy);
+        for (let k = 0; k < warmup; k++) xv = f32(r * xv * f32(1 - xv));
+        let acc = 0;
+        for (let k = 0; k < samples; k++) {
+            acc += Math.log(Math.abs(f32(r * f32(1 - 2 * xv))));
+            xv = f32(r * xv * f32(1 - xv));
+        }
+        const lam = acc / samples;
+        if (raw) {
+            const e = clamp((lam + 3) / 4, 0, 1);
+            const hi = Math.floor(e * 255) / 255, lo = e * 255 - Math.floor(e * 255);
+            out[i] = hi; out[i + 1] = lo; out[i + 2] = 0; out[i + 3] = 1;
+            continue;
+        }
+        const c = s(px, py);
+        const chaos = clamp(lam / Math.LN2, -1, 1);          // 1 exactly at the r = 4 key
+        const glow = Math.max(chaos, 0) * intensity;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const hot = [0.35, 0.95, 0.85];                       // the hologram's own cyan-green
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * (1 - 0.35 * glow) + hot[j] * glow * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
