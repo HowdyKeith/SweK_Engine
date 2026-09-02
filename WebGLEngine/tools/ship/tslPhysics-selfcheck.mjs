@@ -80,6 +80,25 @@
 // tally as atomic<u32> in the SIZER's module too, because the flag lives on the node rather than on the use. The
 // shell declares it a plain read-only u32 there, and the device runs it: one buffer, two views.
 //
+// v4361 -- AND THE THING ALL EIGHT SECTIONS WERE FOR: THE FLEET'S OWN CULL DECISION, GENERATED (section 9).
+// render/gpuDriven.mjs cullLod() is what every draw in the GPU-driven scene passes through -- six frustum-plane
+// tests, a distance to the eye, an angular-size metric and a threshold ladder that returns a LOD or -1. It is now a
+// TSL graph (physicsTsl makeCullLodTsl), transplanted into a device compute module, and it decides what the SHIPPED
+// pass decides for all 768 instances of the probe's own scene: same LOD on every one, and the metric identical to
+// the last bit. Not a tolerance -- 0.
+//
+// AND THE DECISION IS NOT TWO CONSTANTS AGREEING: 216 of the 768 are rejected by the frustum and the survivors land
+// 96 / 246 / 210 across the three LODs, so the two passes agree while disagreeing about individual instances 768
+// different ways.
+//
+// *** WHAT IS STILL HAND-WRITTEN, SAID HERE RATHER THAN LEFT TO BE NOTICED. *** The other half of cullLodWgsl is the
+// bookkeeping: an atomicAdd into array<Cmd> -- a STRUCT of five fields, one of them atomic -- and three vec4s per
+// survivor at a region-major offset. computeShell declares array<T> for a scalar or vector T and has no struct
+// element, so that half is not transplantable yet. Two smaller differences, both deliberate and both in the shell:
+// the six planes arrive in a storage buffer rather than the `array<vec4<f32>, 6>` field of struct Cull (a fixed-size
+// array field is a shell feature this round did not build), and the plane loop sets a flag over all six instead of
+// returning on the first rejection. Same verdict; the flag reads as arithmetic, which is what a graph is.
+//
 // SABOTAGES, MEASURED at v4331:
 //   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
 //      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
@@ -106,6 +125,15 @@
 //   MEASURED at v4339 (the indirect dispatch):
 //   AA dispatchIndirect() dispatching a fixed 1x1x1 instead of reading the buffer -> exit=1, 2 red: 64 invocations where the
 //      buffer said 704, and the seeded runs stop moving with it. The two claims that say the BUFFER decides are the two that go.
+//   MEASURED at v4361 (the cull decision):
+//   AC the plane loop shortened to five planes -> exit=1, 2 red: the module no longer carries the six-plane loop, and the
+//      verdicts part on the instances the sixth plane was the one to reject.
+//   AD the ladder's comparison inverted (metric > threshold instead of <) -> exit=1, 2 red: 216 of 768 LODs still agree --
+//      exactly the culled ones, which never reach the ladder -- and every drawn instance takes the wrong LOD.
+//   AND A BUG IN THE GATE ITSELF, FOUND BY ITS OWN FIRST RUN: 552 of 768 agreed and the 216 that did not were exactly the
+//      culled ones. frustumPlanes() returns 24 FLOATS, not six vec4 arrays, so `planeF.set(planes[p], p * 4)` filled the
+//      plane buffer with nothing. The graph was right; the harness feeding it was wrong, and the shape of the disagreement
+//      (only the frustum-dependent verdicts) is what named it.
 //   AB the "usage must include indirect" guard removed -> exit=1, 2 red -- BUT IT WENT 0 RED FIRST, the second sabotage in
 //      three rounds to prove a check nobody was exercising. The gate only ever passed a correctly-made buffer, so the guard
 //      was unreachable; a check that hands it a plain storage buffer was added, and only then did removing it cost anything.
@@ -155,7 +183,7 @@ const k = keyCpu(PARAMS.first);
         !WGSL_TELL.test(src) && !GLSL_TELL.test(src) && WGSL_TELL.test(fleetSrc) && GLSL_TELL.test(fleetSrc),
         `physics wgsl ${WGSL_TELL.test(src)} glsl ${GLSL_TELL.test(src)}; fleet wgsl ${WGSL_TELL.test(fleetSrc)} glsl ${GLSL_TELL.test(fleetSrc)}`);
     ok("  ...and it exports no shell and no look, which is the same statement said in names", !/export function \w*(Shell|Look\w*Tsl)\b/.test(src) && /export function \w+Shell\b/.test(fleetSrc));
-    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten and the compute sweep's one here, the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 11 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys + the compute sweep's span), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
+    ok("  the uniforms are labelled (render/tslSource.mjs binds by the label): the two keys' ten, the compute sweep's span and the cull's eye and thresholds here, the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 13 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys, the compute sweep's span, the cull's eye and thresholds), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
 }
 
 const skip = webgpuSkipReason();
@@ -616,6 +644,76 @@ else {
     }
 }
 
+console.log("\n9. THE FLEET'S OWN CULL DECISION, GENERATED (v4352): every draw in the GPU-driven scene passes through this");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const N = 768, LODS = 3;
+    const r6 = await runInEngineOrigin({ engineRoot: ENG, args: { N, LODS }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const g = P.makeCullLodTsl(T, { count: a.N, lodCount: a.LODS });
+        await renderer.computeAsync(g.node);
+        const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+        out.emitted = emitted;
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const shell = S.computeShell({ name: "cull decision", workgroupSize: G.CULL_WORKGROUP,
+                storage: [{ name: "inst", element: "vec4<f32>", access: "read" }, { name: "planes", element: "vec4<f32>", access: "read" }, { name: "outv", element: "f32" }],
+                uniforms: [{ name: "eye", type: "vec4" }, { name: "thresholds", type: "vec4" }] });
+            const gen = S.transplantCompute(emitted, shell);
+            out.genWgsl = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
+            // THE SAME SCENE BOTH PASSES SEE: the probe's own procedural instances, from its exported CPU twin
+            const viewProj = G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt([0, 0, 6], [0, 0, 0]));
+            const planes = G.frustumPlanes(viewProj), eye = [0, 0, 6], thresholds = [0.04, 0.025];
+            const insts = new Float32Array(a.N * 4);
+            for (let i = 0; i < a.N; i++) { const c = G.probeInstance(i); insts.set(c, i * 4); }
+            const planeF = Float32Array.from(planes);   // frustumPlanes returns 24 FLOATS, plane-major -- six vec4 rows, which is what array<vec4<f32>> wants
+            const instBuf = dev.buffer({ data: insts, usage: ["storage"] });
+            const planeBuf = dev.buffer({ data: planeF, usage: ["storage"] });
+            const genOut = dev.buffer({ usage: ["storage"], size: a.N * 2 * 4 });
+            const ubuf = dev.buffer({ data: Float32Array.from([...eye, 0, ...thresholds, 0, 0].slice(0, 8)), usage: "uniform" });
+            const pGen = dev.compute({ wgsl: gen.wgsl }); pGen.bind("inst", instBuf).bind("planes", planeBuf).bind("outv", genOut).bind("u", ubuf);
+            // and the SHIPPED pass, as render/gpuDriven.mjs writes it, on the same scene through its own uniform packing
+            const handOut = dev.buffer({ usage: ["storage"], size: a.N * 2 * 4 });
+            const cullU = dev.buffer({ data: G.packCullUniforms({ planes, eye, thresholds, count: a.N, lodCount: a.LODS, cap: a.N }), usage: "uniform" });
+            const pHand = dev.compute({ wgsl: G.cullProbeWgsl(), entryPoint: "probe" }); pHand.bind("outv", handOut).bind("cull", cullU);
+            const groups = Math.ceil(a.N / G.CULL_WORKGROUP);
+            dev.frame(({ pass }) => { pass.dispatch(pGen, groups); pass.dispatch(pHand, groups); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+            out.gen = [...new Float32Array(await dev.read(genOut))];
+            out.hand = [...new Float32Array(await dev.read(handOut))];
+            out.errs = errs; out.groups = groups;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran the generated cull and the shipped one", r6.ok && r6.result && !r6.result.error && r6.result.gen, r6.ok ? (r6.result && r6.result.error) : (r6.reason || (r6.pageErrors || []).join("; ")));
+    if (r6.ok && r6.result && !r6.result.error) {
+        const F = r6.result;
+        const lodGen = F.gen.filter((_, i) => i % 2 === 0), lodHand = F.hand.filter((_, i) => i % 2 === 0);
+        const metGen = F.gen.filter((_, i) => i % 2 === 1), metHand = F.hand.filter((_, i) => i % 2 === 1);
+        const sameLod = lodGen.filter((v, i) => v === lodHand[i]).length;
+        const worstMetric = Math.max(...metGen.map((v, i) => Math.abs(v - metHand[i])));
+        const culled = lodHand.filter((v) => v < 0).length, drawn = lodHand.length - culled;
+        const spread = [0, 1, 2].map((l) => lodHand.filter((v) => v === l).length);
+        ok(`*** the GENERATED cull decides what the SHIPPED cull decides, for every one of ${N} instances: same LOD on ${sameLod}, and the metric agrees to ${worstMetric.toExponential(1)} ***`,
+            sameLod === N && worstMetric === 0 && (F.errs || []).length === 0,
+            `${sameLod}/${N} LODs identical, worst metric difference ${worstMetric}; ${culled} culled, ${drawn} drawn, LOD spread ${spread.join("/")}; device errors ${(F.errs || []).length}`);
+        ok("  and the decision is not trivial: instances are rejected by the frustum AND spread across every LOD, so agreement is not two constants matching",
+            culled > 50 && spread.every((n) => n > 20), `culled ${culled}, LOD 0/1/2 = ${spread.join("/")} of ${N}`);
+        ok("*** the generated module is the shell's own: three's buffers renamed to inst, planes and outv, the plane loop and the ladder intact, and it validates ***",
+            F.reads.join() === "inst,planes" && F.writes.join() === "outv" && /var<storage, read> inst:/.test(F.genWgsl) && /var<storage, read> planes:/.test(F.genWgsl) &&
+            /for \( var i : i32 = 0; i < 6; i \+\+ \)/.test(F.genWgsl) && !/NodeBuffer_|object\./.test(F.genWgsl) && validateWgsl(F.genWgsl).length === 0,
+            `reads ${F.reads.join()}, writes ${F.writes.join()}; ${validateWgsl(F.genWgsl).join("; ") || "validates"}`);
+        report("WHAT IS STILL HAND-WRITTEN, AND IT IS THE OTHER HALF OF cullLodWgsl: the bookkeeping. The shipped pass takes the " +
+            "verdict this graph produces and does an atomicAdd into array<Cmd> -- a STRUCT of five fields, one of them atomic -- then " +
+            "writes three vec4s per surviving instance at a region-major offset. computeShell declares array<T> for a scalar or vector T " +
+            "and has no struct element, so that half is not transplantable yet. The DECISION is, and it is the half that chooses what draws.");
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -623,9 +721,8 @@ else {
 //   B  the Heidler shape with (t/t1) for (t/t1)^2 -> exit=1, 5 red: the source line, and on every path and backend the peak
 //      over i0 reads 0.85081 at the true eta and 0.9076 at the published one -- heidlerWgsl's sabotage B, reproduced in TSL.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against " +
-    "SwiftShader's -- the same question the chaotic five ask, one machine further out; and the thing all eight sections are FOR, which is regenerating " +
-    "render/gpuDriven.mjs's actual cull pass from a graph rather than demonstrating each of its shapes beside it. Every shape is now transplantable -- " +
-    "reads, writes, an atomic, workgroup memory, an indirect dispatch -- and no round has yet written the cull itself as TSL and held the fleet's own " +
-    "picture to it.");
+console.log("unchecked here: the cull's BOOKKEEPING half -- the atomicAdd into array<Cmd> and the region-major record writes -- which needs a " +
+    "struct element in computeShell's storage declarations and is the next capability rather than the next round's decision; the OCCLUSION and FLEET " +
+    "variants of cullLodWgsl (this is the base pass, and hizOccluded reads a depth pyramid through a pointer argument no graph here has emitted); the " +
+    "Lyapunov Loop's cost through three, timed by nobody; and a real GPU's log() and exp() against SwiftShader's.");
 process.exit(fails ? 1 : 0);

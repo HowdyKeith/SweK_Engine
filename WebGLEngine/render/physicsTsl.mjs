@@ -1,4 +1,4 @@
-// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic), v4338 (and a fourth that reduces in WORKGROUP memory), v4339 (a fifth that SIZES the next dispatch)
+// WebGLEngine/render/physicsTsl.mjs -- v4321, v4329 (the fleets' looks and shells moved out to render/fleetTsl.mjs), v4331 (the exponent as a COMPUTE pass), v4336 (a second pass that READS what the first wrote), v4337 (a third that COUNTS with an atomic), v4338 (and a fourth that reduces in WORKGROUP memory), v4339 (a fifth that SIZES the next dispatch), v4352 (and the fleet's own CULL DECISION)
 //
 // PHYSICS AS TSL NODES, THE OTHER TWO (docs/TSL-ROADMAP.md step 5): swk_lyapunov's exponent (render/lyapunovWgsl.mjs,
 // physics/chaos/logistic.js) and the Heidler return-stroke current (render/heidlerWgsl.mjs, physics/discharge/
@@ -211,4 +211,49 @@ export function makeMarkTsl(TSL, { count } = {}) {
     const marks = instancedArray(count, "uint");
     const node = Fn(() => { marks.element(instanceIndex).assign(uint(1)); })().compute(count);
     return { node, marks, count };
+}
+
+// ---- v4352: the cull's own decision, as a graph -----------------------------------------------------------------------
+/**
+ * THE DECISION EVERY DRAW IN THIS ENGINE PASSES THROUGH, WRITTEN AS NODES. render/gpuDriven.mjs cullLod() is six
+ * frustum-plane tests, a distance to the eye, an angular-size metric (radius / distance) and a ladder of thresholds
+ * that picks a LOD -- or -1 for "not in view". Every instance the GPU-driven scene draws is chosen by it. Until now
+ * this arc had transplanted every SHAPE that pass uses (a read, a write, an atomic, workgroup memory, an indirect
+ * dispatch) beside the real thing; this is the arithmetic itself.
+ *
+ * TWO DIFFERENCES FROM THE HAND-WRITTEN PASS, BOTH DELIBERATE AND BOTH VISIBLE IN THE SHELL:
+ *   - the six planes come in a STORAGE buffer, not the uniform struct. cullLodWgsl declares them as
+ *     `array<vec4<f32>, 6>` inside `struct Cull`, and render/tslSource.mjs's computeShell builds a uniform struct
+ *     from scalar and vector fields only. A fixed-size array field is a shell feature this round did not build.
+ *   - the plane loop has no early return. The hand-written one returns -1 the moment a plane rejects; this sets a
+ *     flag and finishes the six. Same verdict, and the reason it is written that way is that the flag reads as
+ *     arithmetic rather than control flow -- which is what a node graph is.
+ * The LOD ladder is UNROLLED at `lodCount`, the way every Loop bound in this file is baked: a graph is built for a
+ * fleet's knobs and the fleet binds the same ones.
+ */
+export function makeCullLodTsl(TSL, { count, lodCount = 3 } = {}) {
+    const { Fn, If, Loop, int, float, vec3, vec4, uniform, instanceIndex, instancedArray, dot, distance, max } = TSL;
+    if (lodCount < 1 || lodCount > 4) throw new Error("physicsTsl: makeCullLodTsl unrolls the ladder at lodCount, and the thresholds live in one vec4, so 1..4");
+    const uniforms = { eye: uniform(vec4(0, 0, 0, 0)).label("eye"), thresholds: uniform(vec4(0, 0, 0, 0)).label("thresholds") };
+    const inst = instancedArray(count, "vec4");     // the instance records: xyz centre, w radius
+    const planes = instancedArray(6, "vec4");       // the frustum, one plane per row
+    const outv = instancedArray(count * 2, "float");// (lod, metric) per instance, the probe's own layout
+    const node = Fn(() => {
+        const c = inst.element(instanceIndex).toVar();
+        const inside = int(1).toVar();
+        Loop({ start: 0, end: 6 }, ({ i }) => {
+            const pl = planes.element(int(i));
+            If(dot(pl.xyz, c.xyz).add(pl.w).lessThan(c.w.negate()), () => { inside.assign(int(0)); });
+        });
+        const dist = max(distance(c.xyz, uniforms.eye.xyz), float(1e-6));
+        const metric = c.w.div(dist);
+        const lod = int(0).toVar();
+        // the ladder, unrolled: for k in 0 .. lodCount-2, if (metric < thresholds[k]) lod = k + 1
+        const th = [uniforms.thresholds.x, uniforms.thresholds.y, uniforms.thresholds.z, uniforms.thresholds.w];
+        for (let k = 0; k + 1 < lodCount; k++) If(metric.lessThan(th[k]), () => { lod.assign(int(k + 1)); });
+        If(inside.equal(int(0)), () => { lod.assign(int(-1)); });
+        outv.element(instanceIndex.mul(2)).assign(float(lod));
+        outv.element(instanceIndex.mul(2).add(1)).assign(metric);
+    })().compute(count);
+    return { node, inst, planes, outv, uniforms, count, lodCount };
 }

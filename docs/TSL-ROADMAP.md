@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -158,8 +158,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    64 or 256. And the SHELL owns the declarations: three declares the tally atomic<u32> in the sizer's module too,
    because the flag is on the node rather than the use, and the shell ships it as a plain read-only u32.
    With this every shape render/gpuDriven.mjs's cull pass has -- reads, writes, an atomic, workgroup memory, an
-   indirect dispatch -- is transplantable. What no round has done yet is write the CULL ITSELF as a graph and hold
-   the fleet's own picture to it, which is what all eight sections are for.
+   indirect dispatch -- is transplantable.
+   v4361 -- AND THE CULL ITSELF. physicsTsl makeCullLodTsl is render/gpuDriven.mjs cullLod() as nodes: six
+   frustum-plane tests, a distance to the eye, an angular-size metric and a threshold ladder returning a LOD or -1.
+   Transplanted into a device compute module it decides what the SHIPPED pass decides on all 768 instances of the
+   probe's own scene -- same LOD on every one, metric identical to the last bit, 0 and not a tolerance -- with 216
+   rejected by the frustum and the survivors spread 96/246/210 across three LODs, so the agreement is not two
+   constants matching. Two deliberate differences live in the shell: the planes arrive in a storage buffer rather
+   than struct Cull's `array<vec4<f32>, 6>` field, and the plane loop sets a flag over all six rather than returning
+   on the first rejection. STILL HAND-WRITTEN: the bookkeeping half -- an atomicAdd into array<Cmd>, a struct of
+   five fields with one atomic, and three vec4s per survivor at a region-major offset. computeShell has no struct
+   element, so that is the next capability. Also unbuilt: the occlusion and fleet variants, where hizOccluded reads
+   a depth pyramid through a pointer argument no graph here has emitted.
 
 ## The count that says when step 4 matters
 

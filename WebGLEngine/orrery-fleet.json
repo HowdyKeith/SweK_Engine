@@ -1,98 +1,98 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "5c243fd5ae710089ac78c92a080eb3d2783f26c5",
+ "head": "b3ea7f9feabd88f9bae5ef9fc194807aaa6ed044",
  "bodies": {
   "box3d": [
    {
     "path": "box3d-info.html",
     "bytes": 32827,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/blobarium-selfcheck.mjs",
     "bytes": 17306,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
     "bytes": 12052,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
     "bytes": 24649,
-    "sha": "713679f4c6fb11350bbccba6756ddcc70eac84d6"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/box3dFingerprint-selfcheck.mjs",
     "bytes": 4795,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/box3dMathImports-selfcheck.mjs",
     "bytes": 5739,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/tankStability-selfcheck.mjs",
     "bytes": 9953,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "predictions.html",
     "bytes": 607753,
-    "sha": "a3ea4835855c99bb870275f3ac69e8924943bd54"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "servicesdash.html",
     "bytes": 15306,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "simulation/life/paramecium3d-selfcheck.mjs",
     "bytes": 8767,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "simulation/life/parameciumBox3d-selfcheck.mjs",
     "bytes": 8846,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "simulation/life/parameciumDrive-selfcheck.mjs",
     "bytes": 8403,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/crossarch-box3d.mjs",
     "bytes": 5467,
-    "sha": "d73ce32cb8b1e572809616407d15b59fa6323fda"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/crossarchBox3d-selfcheck.mjs",
     "bytes": 7250,
-    "sha": "d73ce32cb8b1e572809616407d15b59fa6323fda"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/macSession.mjs",
     "bytes": 16446,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/render-qa/pageFingerprint-selfcheck.mjs",
     "bytes": 7293,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/roundhouse/box3dBind-selfcheck.mjs",
     "bytes": 11663,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/box3dFilter-selfcheck.mjs",
@@ -114,41 +114,41 @@
    {
     "path": "gpu/gltfDraco.js",
     "bytes": 3654,
-    "sha": "7985f885e6a11a92c2e43c70cba25b76779262fd"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
     "bytes": 27704,
-    "sha": "2554626076d948f193a471b6ee3d493f28a3ace0"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "fonts": [
    {
     "path": "ev/esShipLabels.js",
     "bytes": 6752,
-    "sha": "d5475f4ba5d9d952d57cb44ab872c89a4e197fb3"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "slug-text.html",
     "bytes": 12133,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "gifenc": [
    {
     "path": "predictions.html",
     "bytes": 607753,
-    "sha": "a3ea4835855c99bb870275f3ac69e8924943bd54"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "render/gifRecorder-selfcheck.mjs",
     "bytes": 9706,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "render/gifRecorder.js",
     "bytes": 5467,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "grass": [],
@@ -156,19 +156,19 @@
    {
     "path": "heerich-avatar.html",
     "bytes": 10899,
-    "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "htmx": [
    {
     "path": "ai-bridge/server.js",
     "bytes": 1483588,
-    "sha": "35efe3368e14636f5d42d674e1dfc3c481183c1a"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "clients.html",
     "bytes": 8329,
-    "sha": "aa8a7a9ea40b00726069200b77a117aa99707e75"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "server.html",
@@ -178,7 +178,7 @@
    {
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/vendoredLicences-selfcheck.mjs",
@@ -190,12 +190,12 @@
    {
     "path": "physics/jolt/joltLoader.js",
     "bytes": 11150,
-    "sha": "713679f4c6fb11350bbccba6756ddcc70eac84d6"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/verify.mjs",
@@ -208,12 +208,12 @@
    {
     "path": "krbn-avatar.html",
     "bytes": 13148,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn-compare.html",
     "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn-lyapunov.html",
@@ -223,27 +223,27 @@
    {
     "path": "krbn-rigged.html",
     "bytes": 12823,
-    "sha": "e08b1b69f736e9335ea4bd59fd48f0dd2aef1d8d"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn.html",
     "bytes": 22669,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "predictions.html",
     "bytes": 607753,
-    "sha": "a3ea4835855c99bb870275f3ac69e8924943bd54"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "render/holoGif-selfcheck.mjs",
     "bytes": 11903,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/krbnVendor-selfcheck.mjs",
     "bytes": 6881,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "slug": [],
@@ -251,49 +251,49 @@
    {
     "path": "tools/roundhouse/androidPeer-selfcheck.mjs",
     "bytes": 10867,
-    "sha": "ff463bc332e2efd6362a0566fc593128bd1f43db"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/roundhouse/magmapTaichi-selfcheck.mjs",
     "bytes": 9723,
-    "sha": "e6d46a775e89e71ac5d41f5318b925b2a05c4649"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/roundhouse/magmapTaichi.mjs",
     "bytes": 14644,
-    "sha": "7122d9b310a073bca8c491986b3ae23f6b6b49c4"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
     "bytes": 14006,
-    "sha": "7122d9b310a073bca8c491986b3ae23f6b6b49c4"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "three": [
    {
     "path": "ai-bridge/server.js",
     "bytes": 1483588,
-    "sha": "35efe3368e14636f5d42d674e1dfc3c481183c1a"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "aquarelle.html",
     "bytes": 6971,
-    "sha": "22dd961165d358d15814c8fe839236ef9ba047c2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "ascii-avatar.html",
     "bytes": 16283,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "ascii-object.html",
     "bytes": 5272,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "asset2voxels.html",
     "bytes": 10489,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "avatarpreview.html",
@@ -303,187 +303,187 @@
    {
     "path": "battleship3d.html",
     "bytes": 55019,
-    "sha": "da0664aca46b17045570e9fe798f782e7650e21d"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "blob-selfie.html",
     "bytes": 20959,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "blob-shock.html",
     "bytes": 10707,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "blobulator.html",
     "bytes": 24038,
-    "sha": "e5ca1a78f59b2ebe65c0958bc42ed55b687bfa78"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "box3d-blobs.html",
     "bytes": 19797,
-    "sha": "e5ca1a78f59b2ebe65c0958bc42ed55b687bfa78"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "brain-3d.html",
     "bytes": 14259,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "celltrack-viewer.html",
     "bytes": 13141,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "codemap.html",
     "bytes": 12143,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "cosmic-web.html",
     "bytes": 8724,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "es-box3d-3d.html",
     "bytes": 13429,
-    "sha": "a564e66ca47f2ff4519aa8955ec0985370ebaf63"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "es-box3d-fly3d.html",
     "bytes": 88473,
-    "sha": "a564e66ca47f2ff4519aa8955ec0985370ebaf63"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "ev/esShipModels.js",
     "bytes": 9883,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "ev/spriteHull.js",
     "bytes": 3400,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "eve.html",
     "bytes": 6766,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "face/robotFaceAvatar.js",
     "bytes": 112513,
-    "sha": "6dfaf2c4ed4e84b51f0b0537d7e215e02716af86"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "fire-demo.html",
     "bytes": 5560,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "fluid-selfie.html",
     "bytes": 12045,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "fog-of-war.html",
     "bytes": 5840,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "fpscontrol.html",
     "bytes": 12834,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "fpsmirror.html",
     "bytes": 5213,
-    "sha": "eedff6cc083a6e82b511dbcf82d88bb1d28d90b7"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "glb_viewer.html",
     "bytes": 14049,
-    "sha": "22dd961165d358d15814c8fe839236ef9ba047c2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "graph_viewer.html",
     "bytes": 17025,
-    "sha": "aa8a7a9ea40b00726069200b77a117aa99707e75"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "heerich-avatar.html",
     "bytes": 10899,
-    "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn-avatar.html",
     "bytes": 13148,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn-compare.html",
     "bytes": 37383,
-    "sha": "294ae6f3444cb7608db3d84725daadcb4c6dd583"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "krbn-rigged.html",
     "bytes": 12823,
-    "sha": "e08b1b69f736e9335ea4bd59fd48f0dd2aef1d8d"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "lbm3d-flow.html",
     "bytes": 9188,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "lbm3d-gpu.html",
     "bytes": 14332,
-    "sha": "ac8b6205f87234d1bf2d9506d9c540cc4c4feeb2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "main.js",
-    "bytes": 2648222,
+    "bytes": 2650013,
     "sha": "5c243fd5ae710089ac78c92a080eb3d2783f26c5"
    },
    {
     "path": "mpm3d.html",
     "bytes": 5045,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/box3dMeshOverlay.js",
     "bytes": 7240,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "physics/fire/fireMesh.js",
     "bytes": 7232,
-    "sha": "d2e1ca617aa2c855bedc7abd4f2bbd48037a6c90"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "pipboy-models.html",
     "bytes": 107632,
-    "sha": "a8e63be48bd09ad1587373c5321be7985733066c"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "render/svgExtrude.js",
     "bytes": 2450,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "render/tools/meshopt-selfcheck.mjs",
     "bytes": 2364,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "rle-mesh-demo.html",
     "bytes": 4501,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "scene-view.html",
     "bytes": 13118,
-    "sha": "22dd961165d358d15814c8fe839236ef9ba047c2"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "server.html",
@@ -493,12 +493,12 @@
    {
     "path": "shipavatar.html",
     "bytes": 4586,
-    "sha": "714d440a28693f2923ebce0b662bae20493706a4"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "shipview.js",
     "bytes": 10037,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "song-globe.html",
@@ -508,52 +508,52 @@
    {
     "path": "splat_viewer.html",
     "bytes": 8700,
-    "sha": "1cb720b14edf8a867ab1b576af919226445083e6"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "svg-forge.html",
     "bytes": 9529,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "thead.html",
     "bytes": 36973,
-    "sha": "27332a7234321c2162109bef307a74ccd8d39caa"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "thermal3d-cells.html",
     "bytes": 8570,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tomography.html",
     "bytes": 7891,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/krbn/krbnCompareLive-selfcheck.mjs",
     "bytes": 54534,
-    "sha": "027f8c02e1a02af868ed197a62eaaf6edd3dd6c4"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
     "bytes": 17160,
-    "sha": "80520bd5e7b140b731db8d644e4c2938d6099fd7"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
     "bytes": 27704,
-    "sha": "2554626076d948f193a471b6ee3d493f28a3ace0"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/threeImportmap-selfcheck.mjs",
     "bytes": 4644,
-    "sha": "20def417cf805f7ad0050cdb3ebcf70a8d6d0e11"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -568,22 +568,22 @@
    {
     "path": "toroidal-wave.html",
     "bytes": 6036,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "torrents.html",
     "bytes": 8793,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "universal-viewer.html",
     "bytes": 100927,
-    "sha": "678a74f1bee36cd10c323d887a7e88d108f0df3d"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "uvtt.html",
     "bytes": 54979,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "view.html",
@@ -593,32 +593,32 @@
    {
     "path": "voxearth.html",
     "bytes": 10332,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "voxel-photo-cube.html",
     "bytes": 26384,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "wallpaper.html",
     "bytes": 10182,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "warp-map.html",
     "bytes": 9356,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "wasm-bench.html",
     "bytes": 19835,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    },
    {
     "path": "wear-field.html",
     "bytes": 5794,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ],
   "three-webgpu": [
@@ -634,8 +634,8 @@
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 68381,
-    "sha": "5a746f6372b41dfde10877f6b30701705eb01570"
+    "bytes": 77905,
+    "sha": "7f95103319df0bad2f132dd55d7afb0179fd7ddd"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
@@ -662,7 +662,7 @@
    {
     "path": "wasm-bench.html",
     "bytes": 19835,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20"
    }
   ]
  }

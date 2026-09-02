@@ -272,6 +272,18 @@ export function systemDigest(fleets, opts = {}) {
 // twelve, so the record briefly disagreed with itself in the half a reader actually reads. At 2 it is twelve
 // again. The gate computes that figure live for its detail line and never trusted the prose, which is why
 // nothing went red for it; a number nobody asserts is exactly where a stale sentence survives.
+// v4361 -- A FOURTH TIME, AND SAYING IT LOUDER IS NOT WORKING. v4330 corrected it, v4336 re-applied it, v4351
+// re-applied it and wrote the paragraph below asking that the next merge conflict be READ rather than resolved by
+// side; the next merge resolved it by side anyway. Notes do not survive a merge -- only the value does, and the
+// value is on the losing side of every merge from the branch that rewrites this file most often.
+//
+// SO THIS ROUND STOPS RE-APPLYING IT BY HAND AND SAYS WHAT WOULD ACTUALLY FIX IT: either that branch takes the
+// correction into its own copy (one character), or COMMIT_BELT_V4329's per-body counts stop being a hand-typed
+// literal and become a bake output like orrery-fleet.json -- which costs the drift check its meaning, so it is a
+// trade and not a cleanup. Until one of those, this line will keep coming back as 2 and this gate will keep going
+// red on main, roughly every other round. THE MEASURED COUNT IS 1, at every head this has ever been checked on:
+// `git log -- WebGLEngine/vendor/three` returns one commit, 6ba6776.
+//
 // v4351 -- AND A THIRD TIME, WHICH MAKES IT A MECHANISM AND NOT AN ACCIDENT. Corrected at v4330, reverted by a merge
 // and re-applied at v4336, reverted by a merge and re-applied here. The value lives on two branches; the one that
 // re-writes this file most often carries the stale 2, so every merge from it puts the wrong number back and the gate
@@ -302,7 +314,7 @@ export const COMMIT_BELT_V4329 = Object.freeze({
                         // re-measurement corrects the NUMBER and leaves the name of the round that took it.
     repoCommits: 858,   // likewise the v4329 figure. The merged head stands at 863; the gate prints this one,
                         // so read it as "the belt measured at v4329" rather than as a live count.
-    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
+    perBody: Object.freeze({ three: 1, htmx: 2, box3d: 2, "three-webgpu": 1, wasm: 1, "taichi-js": 1, slug: 1,
                              krbn: 1, keyhunt: 1, jolt: 1, heerich: 1, grass: 1, gifenc: 1, fonts: 1, draco: 1 }),
     why: "twelve of fifteen vendored bodies have been touched by exactly one commit in the repository's life -- " +
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +
