@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 443,
+ "count": 444,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2815,6 +2815,13 @@
    "t": "Triangles - where the argument finally does not run (v3637)",
    "d": "On a square the offset from cell centre to furthest evaluation point is exactly half the lever the gradient was built on. On a triangle it is sqrt(5/2) = 1.5811 - above one - so the escape is forced by geometry rather than by the limiter, and only the centroid conserves.",
    "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "tsl-probe.html",
+   "t": "- TSL probe (three 0.178, WebGPU with the WebGL2 backend)",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {

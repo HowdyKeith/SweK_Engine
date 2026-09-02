@@ -23,6 +23,7 @@ are ranked by how cleanly they would become one.
   BOTH backends the full-screen key's brightest column on the n = 5 row is x_lambda to within a column.
   The sabotage log records two sabotages the gate cannot see (a wrong derivative sign and 2 Newton steps
   both still land on the root) and one it can (a start at x = 1 finds the trivial root x = 0).
+  v4319: the same functions as TSL nodes (render/blackbodyTsl.mjs), the key read off both of three's backends.
 
 ## Per-pixel and closed-form: the next ones (a fragment can be a coordinate)
 

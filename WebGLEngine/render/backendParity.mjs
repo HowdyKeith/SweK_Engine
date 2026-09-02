@@ -149,16 +149,21 @@ export const PARITY_BASELINE = Object.freeze({
     // a compute probe): our own physics, each with an exact key, graded on the device path.
     // v4318 -- render/blackbodyWgsl.mjs: both languages (the key on either backend, the probe on WebGPU), Wien's root by
     // the device's own Newton; the third physics module with an exact key.
-    glslBearing: 142,
-    glslDirective: 126,  // raw WebGL2 -- the file writes its own version header
+    // v4319 -- render/fleetMask.mjs grew a WGSL+GLSL pair at v4318 (the pick-to-mask pass and the composite) and
+    // world/populationPolicy.mjs a WGSL compute pass, AFTER v4318's parity run -- the baseline shipped one round stale
+    // and this round's run caught it. Re-measured: +1 GLSL, +2 WGSL, +1 both, +1 WGSL-only. (render/badTvTsl.mjs and
+    // render/blackbodyTsl.mjs carry NEITHER language: TSL is JavaScript, and three writes the shaders at run time --
+    // which is exactly what this census cannot see, said in docs/TSL-ROADMAP.md step 4.)
+    glslBearing: 143,
+    glslDirective: 127,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 52,
-    both: 10,
+    wgslBearing: 54,
+    both: 11,
     glslOnly: 132,
-    wgslOnly: 42,
+    wgslOnly: 43,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/lyapunovWgsl.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

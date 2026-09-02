@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK -- TSL probe (three 0.178, WebGPU with the WebGL2 backend)</title>
+<style>
+  html, body { margin: 0; background: #06080a; color: #d7e0d9; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  #stage { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; left: 10px; top: 10px; max-width: 46em; background: rgba(6, 8, 10, 0.78); padding: 8px 10px; border: 1px solid #23302a; }
+  #hud label { display: inline-block; margin-right: 10px; }
+  a { color: #9fe0b8; }
+</style>
+</head>
+<body>
+<!--
+  v4319 -- THE TSL PROBE. The first page in this tree that runs three's node shading language: three 0.178's
+  WebGPU build (vendor/three-webgpu, beside the r160 module main.js uses -- never both in one page) with
+  WebGPURenderer, which takes WebGPU where the browser has it and its own WebGL2 backend where it does not
+  (?webgl=1 forces the WebGL2 backend). The effect is badTv written ONCE as TSL nodes (render/badTvTsl.mjs);
+  three compiles the graph to WGSL or GLSL for whichever backend it is on, and tools/ship/tsl-selfcheck.mjs
+  holds the picture to the device pipeline's (render/badTvDevicePass.mjs) to the byte, after the row mirror
+  three's uv convention implies. The source is a procedural test card drawn on a 2D canvas.
+-->
+<canvas id="stage"></canvas>
+<div id="hud">
+  <div><b>SweK TSL probe</b> &mdash; <span id="route">starting&hellip;</span></div>
+  <div><label>distortion <input id="distortion" type="range" min="0" max="10" step="0.1" value="3"></label><label>distortion2 <input id="distortion2" type="range" min="0" max="10" step="0.1" value="5"></label><label>roll <input id="rollSpeed" type="range" min="0" max="0.5" step="0.01" value="0.1"></label></div>
+  <div style="color:#9fb8a8">badTv as TSL nodes: one graph, compiled by three to WGSL here or GLSL there; the ship gate holds it to the hand-written pair to the byte. <a href="./gfx-device.html">the device page</a></div>
+</div>
+<script type="module">
+import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
+import * as TSL from "./vendor/three-webgpu/three.tsl.js";
+import { makeBadTvTsl, sourceTexture } from "./render/badTvTsl.mjs";
+const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
+const cv = document.getElementById("stage");
+const params = new URLSearchParams(location.search);
+function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
+size();
+// the test card: a 2D canvas, so the effect has something to tear
+const N = 512, card = document.createElement("canvas"); card.width = N; card.height = N; const g = card.getContext("2d");
+for (let i = 0; i < 8; i++) { g.fillStyle = `hsl(${i * 45}, 70%, ${i % 2 ? 45 : 60}%)`; g.fillRect(i * N / 8, 0, N / 8, N * 0.7); }
+g.fillStyle = "#111"; g.fillRect(0, N * 0.7, N, N * 0.3); g.fillStyle = "#eee"; g.font = "bold 64px sans-serif"; g.fillText("SweK TSL", 40, N * 0.9);
+for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? "#fff" : "#000"; g.fillRect(i * N / 16, N * 0.7, N / 16, 20); }
+const pixels = new Uint8Array(g.getImageData(0, 0, N, N).data.buffer);
+let renderer = null;
+try {
+    renderer = new THREE.WebGPURenderer({ canvas: cv, forceWebGL: params.get("webgl") === "1", antialias: false });
+    await renderer.init();
+} catch (e) { say("WebGPURenderer could not start: " + e.message, true); throw e; }
+const backend = renderer.backend.isWebGPUBackend ? "WebGPU (WGSL from the TSL graph)" : "WebGL2 backend (GLSL from the TSL graph)";
+const fx = makeBadTvTsl(THREE, TSL, { texture: sourceTexture(THREE, { pixels, width: N, height: N }) });
+const knob = (n) => document.getElementById(n);
+say(`three ${THREE.REVISION} &middot; ${backend} &middot; badTv as TSL`);
+let t0 = performance.now();
+function frame(now) {
+    if (cv.width !== Math.round(innerWidth * (window.devicePixelRatio || 1))) { size(); renderer.setSize(cv.width, cv.height, false); }
+    fx.setKnobs({ time: (now - t0) / 1000, distortion: Number(knob("distortion").value), distortion2: Number(knob("distortion2").value), rollSpeed: Number(knob("rollSpeed").value) });
+    renderer.render(fx.scene, fx.camera);
+    requestAnimationFrame(frame);
+}
+renderer.setSize(cv.width, cv.height, false);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
