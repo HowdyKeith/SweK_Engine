@@ -495,6 +495,58 @@ export const REACHED_SOURCES = Object.freeze([
              "artwork is a third party's and the library is not open source. Recorded as the second worked " +
              "ENCUMBERED case, and the first found by reading rather than by asking.",
     },
+    {
+        repo: "ruvnet/batvu", sourceUrl: "https://github.com/ruvnet/batvu",
+        grantorHoldsRights: true, licenceExists: true, publisher: "rUv", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE in the repository, copyright rUv. TypeScript with a Rust/WASM backend.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The question and its shape: a 17.5-20.5 kHz chirp, a matched filter, pulse compression, an " +
+             "ordered-statistic CFAR detector, ranges from the direct-path clock. No bytes -- audio/rangefinder.mjs " +
+             "is written here over physics/fft.js and tools/strictTrig.mjs.",
+        takenPaths: ["audio/rangefinder.mjs"],
+        citedPaths: ["tools/ship/rangefinder-selfcheck.mjs"],
+        why: "The tree had a speaker (three files call createOscillator) and a processed microphone (#73) and " +
+             "had never asked how long a sound took to come back. batvu's numbers are checked as arithmetic rather " +
+             "than repeated: 10 log10(3000 x 0.005) = 11.76 dB against its 11.8; c/2B = 5.7 cm against its 9.6 cm " +
+             "achieved. NOT taken: the occupancy grid, which needs the phone to move; the 0.6 m floor, which needs " +
+             "direct-path subtraction this tree does not do (its blind zone is the chirp's own 0.94 m).",
+    },
+    {
+        repo: "ruvnet/rvQR", sourceUrl: "https://github.com/ruvnet/rvQR",
+        grantorHoldsRights: true, licenceExists: true, publisher: "rUv", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE in the repository, copyright (c) 2026 rUv. JavaScript.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The protocol shape: a manifest at sequence 0 with length and SHA-256, numbered data frames, " +
+             "out-of-order and duplicate arrival free, reassembly only when complete and verified. No bytes -- " +
+             "ui/qrChannel.mjs is written here over the vendored encoder and a decoder of this tree's own.",
+        takenPaths: ["ui/qrChannel.mjs"],
+        citedPaths: ["ui/qrDecode.mjs", "tools/ship/qrChannel-selfcheck.mjs"],
+        why: "ui/phoneConnectQR.js had used the encoder since v525 for ONE symbol carrying a URL -- a QR as a " +
+             "link -- and nothing here could decode a symbol at all. rvQR's 2.5 KB/s is 256 bytes x 10 fps, " +
+             "asserted as that product. NOT taken: the camera half. Nothing in this tree locates a symbol in a " +
+             "video frame; the channel is proven matrix-to-bytes in Node and says so.",
+    },
+    {
+        // v4301: cited by world/gitEconomy.mjs since v4299 and registered by nobody, which put the cited-source
+        // debt at 51 against a baseline of 50 and left citedSources-selfcheck red on main for two rounds.
+        // Registered here in the round that noticed, which is the habit #53 asked for.
+        repo: "Kalcode/spaceprojectsim", sourceUrl: "https://github.com/Kalcode/spaceprojectsim",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Kalcode (David Clausen)", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, LICENSE in the repository, copyright (c) 2026 Kalcode (David Clausen). Rust and Bevy; " +
+             "its dependencies are ordinary open-source crates under their own licences.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The shape only: markets that price off coverage with shortage urgency, ships that chase the " +
+             "best margin, facilities that run recipes and go broke. Rust and an ECS; none of it vendored. " +
+             "The trading code in world/gitEconomy.mjs is ev/esEconomy.js's, unchanged.",
+        takenPaths: [],
+        citedPaths: ["world/gitEconomy.mjs"],
+        why: "Keith: 'could the simulator start their own trade routes among github planets?' The orrery had " +
+             "bodies and no life; spaceprojectsim is the worked example of a self-running economy with no " +
+             "script, and the SHAPE of its loops (treasury, recipes, upkeep, bankruptcy) is what v4300 closed.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */

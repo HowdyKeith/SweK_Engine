@@ -118,6 +118,9 @@ export const DERIVED = Object.freeze([
     { path: "render/aquarelleModel.mjs", upstream: "Ramotion/aquarelle", spdx: "MIT", evidence: "CPU reference" },
     { path: "render/doomFire.mjs", upstream: "filipedeschamps/doom-fire-algorithm", spdx: "MIT", evidence: "ported from" },
     { path: "ui/odometer.js", upstream: "coderitual/bounty", spdx: "MIT", evidence: "Ported from" },
+    // v4301: the decoder carries the encoder's two ISO 18004 tables, with the full MIT notice this time.
+    { path: "ui/qrDecode.mjs", upstream: "kazuhikoarase/qrcode-generator", spdx: "MIT", evidence: "reproduced unchanged",
+      noticeInFile: true },   // the only engine-source file outside vendor/ that carries the full MIT text, on purpose
     { path: "ui/odometerModel.mjs", upstream: "coderitual/bounty", spdx: "MIT", evidence: "ported from" },
     { path: "world/procPlanet.js", upstream: "TheLongSilence", spdx: "MIT", evidence: "lifted (not copied)" },
     { path: "world/spaceStructures.js", upstream: "TheLongSilence", spdx: "MIT", evidence: "Technique from" },
