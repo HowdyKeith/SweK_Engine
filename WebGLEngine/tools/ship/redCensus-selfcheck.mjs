@@ -15,7 +15,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, METHOD, runGate, censusCostMs, ENG,
+import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, METHOD, runGate, censusCostMs, ENG,
          UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
 
 let fails = 0;
@@ -98,11 +98,24 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
     // Written first as (confirmed - fixed), which stopped closing the moment referenceKind was recovered
     // out of the timeout bucket: a gate can ENTER the red set without having been in the swept-and-confirmed
     // count. The gate went red on its own bookkeeping, which is the only reason the identity is right now.
-    ok("  and the census holds confirmed + recovered - fixed, with every term named",
-        RED_AT_V4279.length ===
-            METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket - FIXED_AT_V4279.length,
+    //
+    // *** AND A FIFTH, ADDED AT v4313 FOR THE OPPOSITE DIRECTION: A GATE LEAVING BECAUSE SOMEBODY FIXED IT. ***
+    // Section 2 above demands exactly that ("the list may only shrink, and only on purpose") and until v4313
+    // NOTHING EVER HAD -- RECHECK measured nowGreen: 0 across sixteen rounds -- so the identity had never been
+    // asked to survive a prune, AND IT COULD NOT: deleting a line for a fixed gate moved the left-hand side
+    // and nothing on the right. The census's arithmetic punished the pruning the census demands. Both fix
+    // terms are subtracted now, so the reconciliation still has to balance and pruning is how it balances.
+    ok("  and the census holds confirmed + recovered - fixed - fixedSince, with every term named",
+        RED_AT_V4279.length === METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket -
+            FIXED_AT_V4279.length - FIXED_SINCE_V4279.length,
         `${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered - ` +
-        `${FIXED_AT_V4279.length} fixed = ${RED_AT_V4279.length}`);
+        `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_SINCE_V4279.length} fixed since = ` +
+        `${RED_AT_V4279.length}`);
+    ok("  ...and every gate that LEFT the list names its cause and the round it left in",
+        FIXED_SINCE_V4279.length > 0 &&
+        FIXED_SINCE_V4279.every((e) => typeof e.why === "string" && e.why.length > 40 && e.round),
+        FIXED_SINCE_V4279.map((e) => e.gate.replace(/^.*\//, "") + " (" + e.round + ")").join(", ") +
+        " -- a line deleted without a reason is indistinguishable from a line deleted to make a gate green");
 
     // *** THE SECOND FAILURE MODE: ATTRIBUTION ACROSS A CLEAN CHECKOUT. ***
     const falseAttrib = FIXED_AT_V4279.filter((e) => /NOT this session/.test(e.cause));

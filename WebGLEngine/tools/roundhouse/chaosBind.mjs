@@ -32,6 +32,12 @@
 // Measured: 0.000001 / 0.000000 / 0.000091, all "chaotic = true". THE SIGN OF A NUMBER THAT SHOULD BE ZERO IS
 // ARBITRARY, AND A BOOLEAN LATCHED ONTO IT INHERITS THAT ARBITRARINESS -- the plant is caught by the
 // MAGNITUDE against ln 2, never by the flag. ***
+//
+// v4302 -- RE-DRIVEN AND EXACT, all three, all still "chaotic = true". The honest arm is the other half of the
+// argument and is worth having beside them: r = 4 reads +0.6931468 (ln 2 to seven places), r = 3.2 reads
+// -0.9162907 and r = 3.83 reads -0.3697549, so the two the plant miscalls are NOT MARGINAL -- they are deeply
+// negative and the plant still reports them chaotic. Unwatched: `lyapunov` runs at DEF.r, so the r = 3.2 and
+// r = 3.83 rungs are produced by no declared mode, in either arm.
 import { FEIGENBAUM_DELTA, LN2, orbit, fixedPoint, secondDoubling, periodOf, lyapunov, bifurcationPoint, cascade, deltaEstimates, LOGISTIC_SLOPE } from "../../physics/chaos/logistic.js";
 
 /** The true slope; the plant swaps in the map-over-x form, which telescopes to zero. */
@@ -118,8 +124,25 @@ export const chaosDevice = {
     // things wearing one word, and gates read the second by name, so it is NOT renamed here. ***
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose.
     // NOT listed: fixed / doubling / feigenbaum, which never call lyapunov and are bit-identical under the knob.
-    planted: { knob: "slopeOfMap", observable: "lyapunovErr",
-               note: "r(1-x) instead of r(1-2x); the logs telescope, so the exponent reads ~0 at EVERY r -- and the tiny positive residual makes `chaotic` read TRUE even on stable cycles" },
+    //
+    // *** v4182 -- `lyapunovValue`, NOT `lyapunovErr`, AND THE OLD DECLARATION WAS DEAD AT THIS DEVICE'S OWN
+    // DEFAULT. *** lyapunovExact is ln 2 at r = 4 and `undefined` everywhere else -- correctly, because the
+    // exponent HAS no closed form off that point -- so lyapunovErr, computed as
+    // `exact !== undefined ? |l - exact| : undefined`, is undefined at every r but 4. DEF.r IS 2.5. And
+    // probeLiveness filters its candidate keys with `typeof a[k] === "number" && Number.isFinite(a[k])`
+    // BEFORE testing whether anything moved, so an undefined observable is dropped and can never be counted:
+    // MEASURED at the default, lyapunovErr is undefined in BOTH arms while lyapunovValue goes
+    // -0.6931471806 -> -1.110e-16. The plant fires and the census reads the mode live -- on a DIFFERENT
+    // observable than the one declared, which is the DECLARED BUT DEAD shape melt (v3850) and mpmrefine
+    // (v3849/v3851) each cost a round to. THE OBSERVABLE HAD TO BE ONE THAT SURVIVES THE DEFECT.
+    //
+    // lyapunovValue is that observable and it is also the one this note's own sentence describes: "the
+    // exponent" IS lyapunovValue. Finite at every r, and it collapses to ~0 under the plant wherever it is
+    // asked -- MEASURED -0.6931 -> -1.11e-16 at r=2.5 and 0.6931 -> 1.33e-6 at r=4. lyapunovErr stays
+    // declared and reported, and remains the sharper reading AT r = 4 (4.19e-7 -> 0.6931) where a closed
+    // form exists to subtract; it is simply not what a census at the defaults can grade.
+    planted: { knob: "slopeOfMap", observable: "lyapunovValue",
+               note: "r(1-x) instead of r(1-2x); the logs telescope, so the exponent reads ~0 at EVERY r -- and the tiny positive residual makes `chaotic` read TRUE even on stable cycles (verified: false -> true at r = 3.2, 3.55 and 3.83, all stable in the honest arm). lyapunovErr is the sharper reading at r = 4, where ln 2 gives it a closed form to subtract, but it is undefined at every other r including this device's default of 2.5, so it cannot carry the declaration" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a

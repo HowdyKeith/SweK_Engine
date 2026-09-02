@@ -86,7 +86,12 @@ for (const name of D.DEVICE_NAMES) {
     // same round, on splatBind, where a SECOND COPY of the mode list inside defaults() coerced a new plant
     // mode to the primary and made both arms read bit-identical numbers.
     const UNGUARDED_BASELINE = [
-        "acoustics", "seismic", "nuclear", "clocks", "kuramoto", "hmc", "landauzener",
+        // v4183 -- "nuclear" REMOVED, per this list's own instruction below. It now derives its modes from a
+        // single NUCLEAR_MODES const read by both `modes:` and `defaults()`, so checkMode refuses an
+        // undeclared name. It was also the LAST probed device in the census: it declared no modes at all, so
+        // modesOf() fell back to the candidate list and its echoing defaults() accepted all 29 -- which is
+        // what made the "nothing is probed any more" assertion below fail.
+        "acoustics", "seismic", "clocks", "kuramoto", "hmc", "landauzener",
         "langevin", "rmt", "percolation", "diffusion", "wolff",
         "twof", "tempering", "blobbodies",
         // v3501 -- xpbd and compose were ALREADY unguarded on the pristine v3500 extract (this gate was red there,

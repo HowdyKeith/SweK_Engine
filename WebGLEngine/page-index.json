@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 439,
+ "count": 440,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1589,6 +1589,13 @@
    "f": "krbn-compare.html",
    "t": "- Krbn compare (our obj vs Krbn, + lift to 3D)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "krbn-lyapunov.html",
+   "t": "Krbn &times; Lyapunov &mdash; SweK",
+   "d": "The Krbn pencil hologram lit by swk_lyapunov, the one shader in render/swiftShaderPass.js that is ours rather than a port. Every pixel iterates the logistic map for itself -- its x coordinate IS r, its y coordinate is the seed -- and shows the Lyapunov exponent, so the dark vertical bands are the periodic windows. At r = 4 the exponent is exactly ln 2, an answer the fragment is never given and the gate reads back off the GPU.",
    "g": "",
    "p": 0
   },

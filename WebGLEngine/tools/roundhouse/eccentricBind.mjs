@@ -37,11 +37,22 @@
 // MEASURED HONEST, at e0 = 0.01 down to eStop = 1e-4: t = 1.626996e+1 against a closed form of 1.627590e+1 --
 // a ratio of 0.999634952, IDENTICAL at m 3/1 a0 10 and at m 5/2 a0 7.
 // *** AND THE 3.65e-4 RESIDUE IS NOT THE INTEGRATOR, WHICH WAS CHECKED RATHER THAN ASSUMED: sweeping `safety`
-// across 4e-4 / 2e-4 / 1e-4 / 5e-5 -- an EIGHTFOLD change in step, 7266 to 58168 steps -- moves it 3.647e-4 ->
+// across 4e-4 / 2e-4 / 1e-4 / 5e-5 -- an EIGHTFOLD change in step, 8555 to 68474 steps -- moves it 3.647e-4 ->
 // 3.651e-4. FLAT. It is the O(e^2) ECCENTRIC ENHANCEMENT, real physics: an eccentric orbit radiates faster, so
 // the true time is BELOW the circular closed form. The first draft of this comment called it truncation. ***
+// (v4298: the residues re-measure to every digit; THE STEP COUNTS DID NOT -- this line said "7266 to 58168",
+// 17.7% low at both ends, while the EIGHTFOLD ratio it is quoted for is exact in either pair.)
+//
 // The enhancement is monotone in e0 and large: t/closed reads 0.999635 / 0.964002 / 0.710636 / 0.357798 /
 // 0.094493 / 0.003407 at e0 = 0.01 / 0.1 / 0.3 / 0.5 / 0.7 / 0.9.
+//
+// *** THAT LADDER IS SIX RUNGS AND THIS DEVICE CAN PRODUCE EXACTLY ONE OF THEM. *** `time` and `slowrate` pin
+// e0 = 0.01 on purpose -- the closed form is a near-circular result and the residue is the whole point -- so
+// EVERY DECLARED MODE RETURNS THE FIRST RUNG AND NO CONFIGURATION REACHES THE OTHER FIVE. The value freeze
+// covers declared modes at their defaults, so five of these six numbers are watched by nothing in the lab and
+// only a deliberate re-run can confirm them. RE-RUN AT v4298 BY DRIVING integrateEccentric DIRECTLY: all six
+// hold to every digit. Recorded rather than left implicit, because nbench carried a ladder of exactly this
+// shape whose unwatched rung was 40% wrong for 389 versions, and the only way to tell the two apart is to look.
 
 import { integrateEccentric, dadt, dedt, gOfE, massTerm } from "../../physics/orbits/eccentricInspiral.js";
 

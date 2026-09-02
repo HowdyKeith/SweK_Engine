@@ -21,7 +21,9 @@
 // exact choice its own engine's two physics backends may or may not have made.
 //
 // AND EVERY CONSERVATION OBSERVABLE IS BLIND TO IT, WORSE THAN BLIND: with the term gone w is CONSTANT, so
-// driftE and driftL read EXACTLY ZERO against the true solver's ~1e-14 of integrator error. A DEVICE GRADED ON
+// driftE and driftL read EXACTLY ZERO against the true solver's 1.16e-13 and 5.77e-14 of integrator error
+// (re-measured v4298; this line said "~1e-14", which is right for driftL and an order of magnitude low for
+// driftE -- the CONTRAST is the claim, and understating the honest side understates it). A DEVICE GRADED ON
 // CONSERVATION ALONE WOULD RATE THE PLANT A SUPERIOR MODEL. Only `sigma` and `growthFactor` separate them, and
 // `sigma` is the sharper of the two because it is a PREDICTED RATE rather than a sign.
 "use strict";
@@ -132,7 +134,7 @@ export const freeRotationDevice = {
     // config.planted -- plantedCoverage.mjs's probeLiveness turns both spellings (v3685's fix) so this is
     // covered either way, but a caller declaring the knob by name should use the field this file actually reads.
     planted: { knob: "planted", observable: "sigmaRelErr",
-               note: "the gyroscopic term -w x (Iw), the whole right-hand side of Euler's equations, is deleted -- not a hypothetical fault, but the exact omission a stiff real-time solver makes when the term is left opt-in. Every conservation observable (driftE, driftL) is worse than blind to it: with the term gone w is constant, so drift reads EXACTLY ZERO against the honest solver's ~1e-14 of integrator error, and a device graded on conservation alone would rate the plant a superior model" },
+               note: "the gyroscopic term -w x (Iw), the whole right-hand side of Euler's equations, is deleted -- not a hypothetical fault, but the exact omission a stiff real-time solver makes when the term is left opt-in. Every conservation observable (driftE, driftL) is worse than blind to it: with the term gone w is constant, so drift reads EXACTLY ZERO against the honest solver's 1.16e-13 (driftE) and 5.77e-14 (driftL) of integrator error, and a device graded on conservation alone would rate the plant a superior model" },
     modes: FR_MODES, name: "torque-free-rigid-rotation",
     observables: FR_OBSERVABLES, build, defaults,
 };

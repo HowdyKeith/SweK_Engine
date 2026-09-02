@@ -1489,3 +1489,447 @@ export function bcsRefractLens(img, { touchX = 0, touchY = 0, lensRadius = 0.25,
     }
     return { w, h, data: out, premultiplied: img.premultiplied };
 }
+
+/**
+ * bcs_liquidChrome -- BATCH 12, v4309. Flowing fbm displacement, then a metallic desaturate-and-highlight
+ * driven by the NORMAL of the same noise field read as a height map.
+ *
+ * *** TWO GUARDS IN THE UPSTREAM SOURCE ARE DEAD CODE, AND THE PORT SAYS SO RATHER THAN COPYING THEM. ***
+ * The normal is `normalize(float3(gx, gy, 1.0))`, whose z component is 1/sqrt(gx^2+gy^2+1) and is therefore
+ * STRICTLY POSITIVE for every finite gradient. So upstream's `max(normal.z, 0.0)` can never clamp and its
+ * `abs(dot(normal, float3(0,0,1)))` can never flip a sign -- both reduce to normal.z. Reproduced as the
+ * plain value, with this note, because carrying a guard that cannot fire is how a reader learns to expect a
+ * negative z that the arithmetic forbids. Same shape as batch 11's pixelateMosaic grout branch, which drew
+ * zero pixels: a branch nothing takes is not caution, it is a false statement about the domain.
+ *
+ * WHICH TRAPS THIS ONE EXERCISES, of the six in this file's header:
+ *   3 (POINTS)  `distortion` is added to `position`, which is in points -- so it carries pointScale. At 2x
+ *               a direct port would displace by half the intended distance.
+ *   4 (half)    lum, the mix factor, the highlight add and the final gain are all half in the source, and
+ *               each is quantised here rather than left in highp.
+ *   6 (EDGES)   upstream clamps the displaced coordinate to [0, size] BY HAND -- the author knew.
+ *   2 (ALPHA)   and this is the only interesting one. `metallic *= gain` and the desaturating mix are both
+ *               LINEAR, so they commute with premultiplication and are alpha-safe either way. `metallic +=
+ *               half3(highlight)` is NOT: it adds a constant to a premultiplied colour, which is a change of
+ *               highlight/alpha in the colour a person sees. ONLY THAT TERM IS SCALED BY k, and working out
+ *               which of the three operations needed it is the whole of the port's alpha decision.
+ *
+ * IT JOINS THE SIN-HASH SET, which is why it is graded structurally rather than pixel-for-pixel: bcs_fbm
+ * bottoms out in fract(sin(dot(...)) * 43758.5453), and sin at those magnitudes is implementation-defined.
+ */
+export function bcsLiquidChrome(img, { time = 0, distortion = 12, chromeIntensity = 0.6, flowSpeed = 1,
+                                       reflectionScale = 4, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const t1x = time * flowSpeed * 0.2, t1y = time * flowSpeed * 0.15;
+    const t2x = time * flowSpeed * 0.18, t2y = time * flowSpeed * 0.22;
+    const EPS = 0.01;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const stx = (px / w) * reflectionScale, sty = (py / h) * reflectionScale;
+        const n1 = bcsFbm(stx + t1x, sty + t1y, 4);
+        const n2 = bcsFbm(stx + 5 + t2x, sty + 3 + t2y, 4);
+        const d = distortion * pointScale;          // trap 3: a point displacement, not a pixel one
+        const c = s(clamp(px + n1 * d, 0, w), clamp(py + n2 * d, 0, h));
+        // The height field is the FOUR-octave field's three-octave sibling -- upstream re-evaluates at 3, it
+        // does not reuse n1, and the difference is visible in the normal.
+        const h0 = bcsFbm(stx + t1x, sty + t1y, 3);
+        const hx = bcsFbm(stx + EPS + t1x, sty + t1y, 3);
+        const hy = bcsFbm(stx + t1x, sty + EPS + t1y, 3);
+        const nz = 1 / Math.hypot((h0 - hx) / EPS, (h0 - hy) / EPS, 1);   // normalize((gx,gy,1)).z, always > 0
+        const specular = Math.pow(nz, 4);
+        const highlight = Math.pow(1 - nz, 3) * chromeIntensity;
+        const lum = toHalf(luma(c[0], c[1], c[2]));
+        const kMix = toHalf(chromeIntensity * 0.5);
+        const gain = toHalf(0.8 + specular * 0.4);
+        const a = c[3];
+        const k = premultiplied || a === 0 ? 1 : a;   // trap 2: only the ADD is alpha-sensitive
+        for (let j = 0; j < 3; j++) {
+            const desat = toHalf(mix(c[j], lum, kMix));
+            out[i + j] = toHalf(toHalf(desat + highlight * k) * gain);
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_pixelateStorm -- BATCH 13, v4310. A swirled pixel grid whose blocks are randomly kicked by the hash.
+ *
+ * TRAP 3 APPEARS TWICE HERE AND IN OPPOSITE DIRECTIONS, which is the reason this one is worth reading.
+ *   - `pixel_size` is a BLOCK SIZE IN POINTS, so it is MULTIPLIED by pointScale to become device pixels.
+ *   - the scanline reads `position.y` directly, and a frequency per point becomes half the frequency per
+ *     device pixel, so that coordinate is DIVIDED by pointScale. Same treatment glitch's scanline gets.
+ * Everything between them is pointScale-INVARIANT and that is worth stating rather than leaving to be
+ * re-derived: the block index is `swirledUV * size / pxSize`, and size and pxSize scale together, so the
+ * grid, the hash argument and therefore the storm pattern are identical at 1x and 2x. Only the block's
+ * SIZE ON SCREEN and the scanline's pitch move -- which is exactly what should move.
+ *
+ * NO premultiplied KNOB, and that is a decision rather than an omission: the only colour operation is
+ * `color.rgb *= half(...)`, a MULTIPLY. Scaling commutes with premultiplication, so it is alpha-safe in
+ * both spaces. Compare magneticField below, which adds and therefore needs one.
+ */
+export function bcsPixelateStorm(img, { time = 0, pixelSize = 12, stormAmount = 0.5, swirl = 1, pulse = 1,
+                                        pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const pxSize = pixelSize * pointScale * (1 + Math.sin(time * pulse) * 0.3 * stormAmount);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const dx = uvx - 0.5, dy = uvy - 0.5;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const swirlAngle = swirl * (1 - dist) * Math.sin(time * 0.5);
+        const sux = 0.5 + dist * Math.cos(angle + swirlAngle);
+        const suy = 0.5 + dist * Math.sin(angle + swirlAngle);
+        // The block index -- invariant under pointScale, because size and pxSize scale together.
+        const bx = Math.floor(sux * w / pxSize), by = Math.floor(suy * h / pxSize);
+        const pux = bx * pxSize / w, puy = by * pxSize / h;
+        const blockRand = bcsHash(bx, by);
+        const stormActive = blockRand >= 1 - stormAmount * 0.8 ? 1 : 0;   // step(edge, x)
+        const ox = Math.sin(time * 3 + blockRand * 20) * stormAmount * pxSize * 0.5 * stormActive;
+        const oy = Math.cos(time * 2.5 + blockRand * 15) * stormAmount * pxSize * 0.5 * stormActive;
+        const c = s(clamp(pux * w + ox, 0, w), clamp(puy * h + oy, 0, h));
+        const scan = Math.sin((py / pointScale) * Math.PI / 2) * 0.5 + 0.5;
+        const gain = toHalf(0.92 + scan * 0.08);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * gain);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_magneticField -- BATCH 13, v4310. A dipole (optionally quadrupole) field, displaced along its own
+ * direction and banded by the field angle.
+ *
+ * *** THE POLARITY KNOB IS A BRANCH WITH A DEAD ZONE, AND THE PORT KEEPS IT. *** Upstream guards the
+ * quadrupole with `if (polarity > 0.01)` and then blends with `mix(field, field + quadField, polarity)`.
+ * At polarity exactly 0.01 the blend contributes 1% of quadField, but at 0.009 the branch is skipped and it
+ * contributes nothing -- so the knob has a small discontinuity at its own guard. Reproduced rather than
+ * smoothed: a port that replaced the branch with the mix alone would be a DIFFERENT shader that happens to
+ * look similar, and the difference is exactly at the value a caller sweeping from 0 passes through.
+ *
+ * `fieldStrength` is a displacement in POINTS -- trap 3, so it carries pointScale. The stripes and the
+ * perpendicular ripple are functions of uv and the field angle, both resolution-independent, so they do not.
+ * ALPHA-AWARE: `color.rgb += half3(sheen...)` adds into the sample, so the added term takes k.
+ */
+export function bcsMagneticField(img, { time = 0, fieldStrength = 30, lineCount = 8, fieldTurbulence = 0.4,
+                                        polarity = 0, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const p1x = uvx - 0.25, p1y = uvy - 0.5;       // uv - (center + (-0.25, 0))
+        const p2x = uvx - 0.75, p2y = uvy - 0.5;       // uv - (center + ( 0.25, 0))
+        const r1 = Math.max(Math.hypot(p1x, p1y), 0.001), r2 = Math.max(Math.hypot(p2x, p2y), 0.001);
+        let fx = p1x / (r1 * r1) - p2x / (r2 * r2);
+        let fy = p1y / (r1 * r1) - p2y / (r2 * r2);
+        if (polarity > 0.01) {
+            const p3x = uvx - 0.5, p3y = uvy - 0.3, p4x = uvx - 0.5, p4y = uvy - 0.7;
+            const r3 = Math.max(Math.hypot(p3x, p3y), 0.001), r4 = Math.max(Math.hypot(p4x, p4y), 0.001);
+            const qx = p3x / (r3 * r3) - p4x / (r4 * r4), qy = p3y / (r3 * r3) - p4y / (r4 * r4);
+            fx = mix(fx, fx + qx, polarity); fy = mix(fy, fy + qy, polarity);
+        }
+        const fieldMag = Math.hypot(fx, fy);
+        const dirx = fieldMag > 0.001 ? fx / fieldMag : 0, diry = fieldMag > 0.001 ? fy / fieldMag : 0;
+        const angle = Math.atan2(fy, fx);
+        let stripes = Math.sin(angle * lineCount + time * 2);
+        stripes = stripes * stripes;
+        // Metal broadcasts the scalar over both components of uv * 8.0 + time * 0.5.
+        const turb = bcsFbm(uvx * 8 + time * 0.5, uvy * 8 + time * 0.5, 4) * fieldTurbulence;
+        const fs = fieldStrength * pointScale;         // trap 3: a POINT displacement
+        let offx = dirx * fs * stripes * (0.5 + turb), offy = diry * fs * stripes * (0.5 + turb);
+        const perp = Math.sin((uvx * dirx + uvy * diry) * lineCount * 10 + time);
+        offx += -diry * perp * fs * 0.15; offy += dirx * perp * fs * 0.15;
+        const c = s(clamp(px + offx, 0, w), clamp(py + offy, 0, h));
+        const sheen = stripes * fieldMag * 0.3;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const add = [sheen * 0.3, sheen * 0.35, sheen * 0.4];
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] + toHalf(add[j]) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_aurora -- BATCH 13, v4310. Layered sine bands, noise-modulated, additively composited over the layer.
+ *
+ * *** `bands` IS A LOOP COUNT AND A DIVISOR AT THE SAME TIME, which is the interesting thing about it. ***
+ * Upstream runs `for (int i = 0; i < int(bands); i++)` and inside divides by the UNTRUNCATED `bands`
+ * (`fi / bands`). So a fractional bands -- 4.5 -- runs four iterations while spacing them as if there were
+ * four and a half, and the knob moves the picture CONTINUOUSLY between integers even though the loop count
+ * is a step function. Reproduced exactly: truncating both, or rounding both, would each be a different
+ * shader, and a caller animating `bands` would see the difference immediately.
+ *
+ * *** THE ONLY PORTED SHADER SO FAR THAT CARRIES NO pointScale AT ALL, and that is a measurement rather
+ * than an oversight: every coordinate it reads is uv, and it samples `layer.sample(position)` UNDISPLACED.
+ * There is no length in points anywhere in it, so there is nothing for the scale to multiply.
+ * ALPHA-AWARE: two additive terms, the aurora colour and the shimmer, so both take k.
+ */
+export function bcsAurora(img, { time = 0, intensity = 0.7, bands = 4, speed = 1, colorShift = 0,
+                                 premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const t = time * speed;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const c = s(px, py);
+        let heightMask = smoothstep(0.8, 0.1, uvy) * smoothstep(0.0, 0.15, uvy);
+        let auroraVal = 0, hueAccum = 0;
+        for (let bi = 0; bi < Math.trunc(bands); bi++) {   // int(bands) truncates; the divisor below does not
+            const fi = bi;
+            const freq = 2 + fi * 1.5, phase = fi * 1.7;
+            let wave = Math.sin(uvx * freq * Math.PI + t * (0.8 + fi * 0.3) + phase);
+            wave += Math.sin(uvx * freq * 1.7 + t * 0.5 + fi * 2.3) * 0.5;
+            const bandY = 0.3 + fi / bands * 0.4 + wave * 0.08;
+            const bandDist = Math.abs(uvy - bandY);
+            let band = Math.exp(-bandDist * bandDist * 200) * (0.6 + fi * 0.1);
+            band *= bcsFbm(uvx * 3 + t * 0.3, fi * 5 + t * 0.1, 3);
+            auroraVal += band; hueAccum += band * (fi / bands);
+        }
+        auroraVal = clamp(auroraVal, 0, 1) * heightMask * intensity;
+        const hueRaw = colorShift + hueAccum * 0.3 + 0.35;
+        const hue = toHalf(hueRaw - Math.floor(hueRaw));
+        const ac = bcsHsb2rgb(hue, toHalf(0.7), toHalf(1.0));
+        const shimmer = Math.sin(uvy * 80 + t * 5) * 0.02 * auroraVal;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const amt = toHalf(auroraVal * 0.7);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] + (toHalf(ac[j] * amt) + toHalf(shimmer)) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_datamosh -- BATCH 14, v4311. Corrupted 16-point blocks, smeared along a per-block random angle,
+ * channel-bled, quantised to 16 levels, with a grid edge drawn on.
+ *
+ * *** THIS IS THE FIRST PORTED SHADER WITH AN ALPHA-SENSITIVE OPERATION THE k CONVENTION CANNOT EXPRESS,
+ * AND IT IS SAID HERE RATHER THAN QUIETLY APPROXIMATED. *** Every alpha-aware shader so far has been
+ * alpha-sensitive in exactly one place -- an ADD into the sample -- and `k` corrects it exactly, because
+ * addition is the only thing premultiplication distributes over cleanly. datamosh has TWO:
+ *   - `result.rgb += half3(blockEdge * 0.1)` -- an add. Corrected by k, as everywhere else.
+ *   - `result.rgb = floor(result.rgb * 16) / 16` -- a QUANTISATION, which is NOT linear and does NOT
+ *     commute with premultiplication: floor(c*a*16)/16 is not a*floor(c*16)/16. The levels land in
+ *     different places in the two spaces and no scalar can reconcile them.
+ * The quantise is left operating on the sampled colour, which reproduces upstream exactly in premultiplied
+ * space and is APPROXIMATE in straight space. Straightening it first would be a different shader; pretending
+ * k covers it would be a false claim about what the knob does.
+ *
+ * `blockSize` is 16 POINTS, and `smearAmount`'s comment calls it "pixel displacement" while `position` is
+ * in points -- the same mislabel chromaticSplit carries, and trap 3 applies to both. The BLOCK GRID is
+ * invariant under pointScale (size and blockSize scale together, so size/blockSize does not move), which is
+ * what keeps the corruption pattern identical at 1x and 2x while the blocks grow on screen.
+ */
+export function bcsDatamosh(img, { time = 0, blockCorruption = 0.3, smearAmount = 24, colorBleed = 0.5,
+                                   glitchRate = 2, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const blockSize = 16 * pointScale;
+    const gx = w / blockSize, gy = h / blockSize;      // invariant under pointScale
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const bux = Math.floor(uvx * gx) / gx, buy = Math.floor(uvy * gy) / gy;
+        const t1 = Math.floor(time * glitchRate) * 0.1;
+        const blockHash = bcsHash(bux * 73 + t1, buy * 73 + t1);
+        const orig = s(px, py);
+        if (blockHash < 1 - blockCorruption) {          // step(1 - corruption, hash) < 0.5
+            out[i] = orig[0]; out[i + 1] = orig[1]; out[i + 2] = orig[2]; out[i + 3] = orig[3];
+            continue;
+        }
+        const t2 = Math.floor(time * glitchRate * 0.5) * 0.3;
+        const ang = bcsHash(bux * 137 + t2, buy * 137 + t2) * 6.28;
+        const blockSmear = smearAmount * pointScale * (0.5 + blockHash * 0.5);
+        const sox = Math.cos(ang) * blockSmear, soy = Math.sin(ang) * blockSmear;
+        const sm = s(clamp(px + sox, 0, w), clamp(py + soy, 0, h));
+        const rB = 1 + colorBleed * 0.3, bB = 1 - colorBleed * 0.2;
+        const rS = s(clamp(px + sox * rB, 0, w), clamp(py + soy * rB, 0, h));
+        const bS = s(clamp(px + sox * bB, 0, w), clamp(py + soy * bB, 0, h));
+        const cb = toHalf(colorBleed);
+        const rgb = [mix(sm[0], rS[0], cb), sm[1], mix(sm[2], bS[2], cb)];
+        const cellx = uvx * gx - Math.floor(uvx * gx), celly = uvy * gy - Math.floor(uvy * gy);
+        const blockEdge = Math.min(cellx, celly) < 0.03 ? 1 : 0;   // 1 - step(0.03, min)
+        const a = sm[3], k = premultiplied || a === 0 ? 1 : a;
+        for (let j = 0; j < 3; j++) {
+            const q = Math.floor(toHalf(rgb[j]) * 16) / 16;        // NOT k-corrected -- see the note above
+            out[i + j] = toHalf(q + toHalf(blockEdge * 0.1) * k);
+        }
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_smokeReveal -- BATCH 14, v4311. Domain-warped fbm smoke composited over a displaced sample.
+ *
+ * *** THE ALPHA COMES FROM ONE SAMPLE AND THE COLOUR FROM ANOTHER, WHICH IS UPSTREAM'S CHOICE AND IS KEPT. ***
+ * `result.rgb` is built from `displacedColor` -- the layer read through the smoke displacement -- while
+ * `result.a = original.a` is the alpha at the UNDISPLACED position. On an opaque layer that is invisible;
+ * on a cut-out it means the smoke can move colour across an edge that the alpha does not follow. Reproduced
+ * rather than tidied, because tidying it would change which pixels the effect can reach.
+ *
+ * TWO alpha-sensitive terms, both corrected by k: the mix TOWARDS the opaque smoke colour (mixing a
+ * premultiplied sample toward an unpremultiplied constant is exactly the case k exists for) and the additive
+ * light ray. The 8.0 in the displacement is POINTS, so it carries pointScale; smokeScale multiplies uv and
+ * does not. Octave counts are 5, 5 and 6 -- upstream uses three different depths and the port keeps each.
+ */
+export function bcsSmokeReveal(img, { time = 0, smokeAmount = 0.6, smokeScale = 4, windSpeed = 1,
+                                      smokeTurb = 1, pointScale = 1, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const sux = uvx * smokeScale, suy = uvy * smokeScale;
+        const w1x = bcsFbm(sux + time * windSpeed * 0.3, suy + time * windSpeed * 0.1, 5);
+        const w1y = bcsFbm(sux + time * windSpeed * 0.1 + 5.2, suy - time * windSpeed * 0.2 + 5.2, 5);
+        const wx = sux + w1x * smokeTurb, wy = suy + w1y * smokeTurb;
+        let dens = bcsFbm(wx + time * windSpeed * 0.15, wy + time * windSpeed * 0.08, 6);
+        dens = clamp(dens * dens * smokeAmount * 1.5, 0, 1);
+        const lv = bcsValueNoise(uvx * 3 + time * 0.2, uvy * 3 + time * 0.2);
+        const edgeGlow = smoothstep(0.2, 0.5, dens) - smoothstep(0.5, 0.8, dens);
+        const sc = [toHalf(0.7 + toHalf(lv) * 0.15), toHalf(0.68 + toHalf(lv) * 0.12),
+                    toHalf(0.66 + toHalf(lv) * 0.1)].map((v) => toHalf(v + toHalf(edgeGlow * 0.2)));
+        const dsp = 8 * pointScale * dens;                       // the 8.0 is POINTS
+        const dc = s(clamp(px + (w1x - 0.5) * dsp, 0, w), clamp(py + (w1y - 0.5) * dsp, 0, h));
+        const orig = s(px, py);
+        let ray = Math.sin(uvx * 8 + time * 0.3) * 0.5 + 0.5;
+        ray *= smoothstep(1.0, 0.3, uvy) * dens * 0.15;
+        const a = orig[3], k = premultiplied || a === 0 ? 1 : a;  // alpha from the UNDISPLACED sample
+        const rw = [0.8, 0.7, 0.5], t = toHalf(dens);
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(mix(dc[j], sc[j] * k, t) + toHalf(ray * rw[j]) * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+/**
+ * bcs_morphBreathe -- BATCH 14, v4311. Three sine rhythms driving a blend between a radial pulse and an
+ * fbm warp, with the displacement faded out near the edges.
+ *
+ * NO premultiplied KNOB, and again that is a decision rather than an omission: every colour operation is a
+ * MULTIPLY (`color.r *= ...`, `color.b *= ...`, `color.rgb *= ...`), and scaling commutes with
+ * premultiplication. Third shader in three batches where reading which operations are linear settles the
+ * question before the gate is run -- pixelateStorm and this one need no knob, magneticField and aurora do.
+ *
+ * `breathe_depth` is a displacement in POINTS, so it carries pointScale. `warp_complexity` scales uv into
+ * the noise field and is resolution-independent, so it does not -- one knob of each kind in one shader.
+ * `organic` blends the two displacement fields AND selects which breathing rhythm drives the radial one,
+ * so at 0 and 1 it is two different animations rather than two amplitudes of the same one.
+ */
+export function bcsMorphBreathe(img, { time = 0, breatheDepth = 20, breatheRate = 1, warpComplexity = 4,
+                                       organic = 0.5, pointScale = 1 } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    const b1 = Math.sin(time * breatheRate) * 0.5 + 0.5;
+    const b2 = Math.sin(time * breatheRate * 0.7 + 1.5) * 0.5 + 0.5;
+    const b3 = Math.sin(time * breatheRate * 1.3 + 3.0) * 0.5 + 0.5;
+    const t = time * breatheRate * 0.3;
+    const colorPulse = b1 * 0.05, brightPulse = 1 + (b1 - 0.5) * 0.08;
+    const rGain = toHalf(1 + colorPulse), bGain = toHalf(1 - colorPulse), gGain = toHalf(brightPulse);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const stx = uvx * warpComplexity, sty = uvy * warpComplexity;
+        const qx = bcsFbm(stx + t * 0.5, sty + t * 0.3, 4);
+        const qy = bcsFbm(stx + 5.2 + t * 0.4, sty + 1.3 + t * 0.6, 4);
+        const fcx = uvx - 0.5, fcy = uvy - 0.5;
+        const radialPulse = b1 * (1 - organic) + b2 * organic;
+        const rdx = fcx * (radialPulse - 0.5) * 2, rdy = fcy * (radialPulse - 0.5) * 2;
+        const odx = (qx - 0.5) * 2 * b2, ody = (qy - 0.5) * 2 * b3;
+        const edgeFade = smoothstep(0, 0.15, Math.min(Math.min(uvx, 1 - uvx), Math.min(uvy, 1 - uvy)));
+        const dep = breatheDepth * pointScale * edgeFade;        // POINTS
+        const c = s(clamp(px + mix(rdx, odx, organic) * dep, 0, w),
+                    clamp(py + mix(rdy, ody, organic) * dep, 0, h));
+        out[i] = toHalf(toHalf(c[0] * rGain) * gGain);
+        out[i + 1] = toHalf(c[1] * gGain);
+        out[i + 2] = toHalf(toHalf(c[2] * bGain) * gGain);
+        out[i + 3] = c[3];
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}
+
+// ==================================================================================================================
+// *** OURS, NOT UPSTREAM'S. *** Everything above this line is a port of krispuckett/SwiftUIShaders (MIT) and is
+// named bcs_*. Everything below is SweK's own and is named swk_*, so the provenance is readable from the call
+// site and no future reader has to check a licence to know which is which.
+// ==================================================================================================================
+
+/** float32, the precision a GLSL `highp float` actually has. The analogue of toHalf for a full-precision path. */
+export const f32 = Math.fround;
+
+/**
+ * swk_lyapunov -- v4312. THE FIRST SHADER IN THIS FILE WITH AN EXTERNAL KEY.
+ *
+ * *** WHAT MAKES IT DIFFERENT FROM THE 35 ABOVE IT. *** Every ported shader is graded against its own CPU
+ * port -- a mirror. It proves the GLSL and the JS agree; it cannot prove either is RIGHT, and for the fifteen
+ * sin-hash shaders it cannot prove even that. This one computes the LYAPUNOV EXPONENT of the logistic map,
+ * and physics/chaos/logistic.js records the answer the shader is never told:
+ *
+ *     at r = 4, lambda is EXACTLY ln 2 = 0.6931471805599453.
+ *
+ * The fragment receives r as a coordinate and nothing else. If the column at r = 4 reads ln 2, the shader got
+ * an answer from outside itself -- which is what this tree means by Tier 2.
+ *
+ * *** AND THE ERGODIC CLAIM IS THE SECOND KEY, WHICH IS SHARPER THAN THE FIRST. *** uv.y seeds x0, so every
+ * ROW runs a different orbit. At r = 4 those orbits diverge completely -- that is what a positive Lyapunov
+ * exponent MEANS -- and yet every row must report the SAME lambda. A chaotic computation whose trajectory is
+ * irreproducible and whose average is not. That is the exact opposite of the sin-hash family, where the
+ * trajectory is reproducible in principle and the tree cannot make two implementations agree at all.
+ *
+ * *** THE BUDGET IS MEASURED, NOT CHOSEN, and more warmup is NOT more accuracy. *** In float32 at r = 4,
+ * over 64 seeds:
+ *     warmup  64, samples 192  worst |lambda - ln2| 2.623e-2, mean 5.287e-3
+ *     warmup  64, samples 384  worst 8.307e-3, mean 1.710e-3, COLUMN MEAN 3.72e-4
+ *     warmup 128, samples 384  worst 8.792e-2   <-- WORSE, and that is not a typo
+ * The average is ergodic, not convergent: it is a random walk that happens to be centred on ln 2, so a longer
+ * warmup lands somewhere else on the walk rather than closer to the answer. 64/384 is the measured knee and
+ * the gate's tolerances come from these numbers rather than from a tidy-looking constant.
+ *
+ * *** float32 IS MODELLED, BECAUSE AT r = 4 IT IS NOT A ROUNDING DETAIL. *** The map is chaotic, so single
+ * precision does not merely perturb the orbit, it produces a DIFFERENT one -- and at long budgets it can
+ * collapse onto a fixed point entirely (measured: warmup 1000 / samples 3000 reads lambda 0.327, wrong by
+ * 3.66e-1, over half the answer). The CPU reference therefore rounds through Math.fround at every step, the
+ * way the GPU's highp float does, rather than computing a float64 answer the GLSL can never reach.
+ *
+ * `raw` EXISTS SO THE KEY CAN BE READ BACK. An 8-bit colour channel resolves lambda to 4/255 = 1.6e-2, which
+ * is COARSER than the 8.3e-3 the budget earns -- the gate would be measuring the framebuffer, not the shader.
+ * So raw mode encodes lambda across two channels, 16 bits, resolving 6.2e-5. A key that cannot be read at the
+ * precision it is claimed to is not a key.
+ */
+export function swkLyapunov(img, { rLo = 3.4, rHi = 4.0, samples = 384, warmup = 64, intensity = 0.8,
+                                   seedLo = 0.05, seedHi = 0.95, raw = false, premultiplied = true } = {}) {
+    const { w, h } = img, s = sampler(img), out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const px = x + 0.5, py = y + 0.5;
+        const uvx = px / w, uvy = py / h;
+        const r = f32(rLo + (rHi - rLo) * uvx);
+        let xv = f32(seedLo + (seedHi - seedLo) * uvy);
+        for (let k = 0; k < warmup; k++) xv = f32(r * xv * f32(1 - xv));
+        let acc = 0;
+        for (let k = 0; k < samples; k++) {
+            acc += Math.log(Math.abs(f32(r * f32(1 - 2 * xv))));
+            xv = f32(r * xv * f32(1 - xv));
+        }
+        const lam = acc / samples;
+        if (raw) {
+            const e = clamp((lam + 3) / 4, 0, 1);
+            const hi = Math.floor(e * 255) / 255, lo = e * 255 - Math.floor(e * 255);
+            out[i] = hi; out[i + 1] = lo; out[i + 2] = 0; out[i + 3] = 1;
+            continue;
+        }
+        const c = s(px, py);
+        const chaos = clamp(lam / Math.LN2, -1, 1);          // 1 exactly at the r = 4 key
+        const glow = Math.max(chaos, 0) * intensity;
+        const a = c[3], k = premultiplied || a === 0 ? 1 : a;
+        const hot = [0.35, 0.95, 0.85];                       // the hologram's own cyan-green
+        for (let j = 0; j < 3; j++) out[i + j] = toHalf(c[j] * (1 - 0.35 * glow) + hot[j] * glow * k);
+        out[i + 3] = a;
+    }
+    return { w, h, data: out, premultiplied: img.premultiplied };
+}

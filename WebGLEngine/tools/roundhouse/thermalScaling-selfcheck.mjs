@@ -92,14 +92,37 @@ const dev = await getDevice("thermal");
         "rather than being quietly renamed out from under them");
 }
 
-// ---- 3. THE OBSERVABLE THAT IS DECLARED AND NEVER PRODUCED -----------------------------------------------------------
+// ---- 3. THE OBSERVABLE THAT WAS DECLARED AND NEVER PRODUCED, AND THE MISDIAGNOSIS THAT FROZE IT -------------------
+//
+// *** v4184 -- THIS SECTION USED TO ASSERT `o.rayleigh === undefined`, AND THE ASSERTION WAS RIGHT ABOUT THE
+// SYMPTOM AND WRONG ABOUT THE CAUSE -- WHICH IS WHAT KEPT THE DEFECT ALIVE. *** Its stated reason was
+// "thermal2d exposes no rayleigh member, so the field is absent in every mode". The first clause is true and
+// the second does not follow: thermal2d exposes the Rayleigh number as `Ra`, and thermalBind's own `rayleigh`
+// MODE has been reading `sim.Ra` the whole time to build its onset sweep. The convect branch tested
+// `sim.rayleigh` -- a name that has never existed -- in BOTH arms of a type guard, so it emitted nothing and
+// failed silently. MEASURED before changing anything: typeof sim.Ra is "number", typeof sim.rayleigh is
+// "undefined", and `Ra` is the only Ra-ish key the object carries.
+//
+// A CORRECT OBSERVATION WITH A WRONG INFERENCE IS WORSE THAN NO OBSERVATION, because it converts a fixable
+// bug into a documented fact and pins it there: this gate was PASSING, by certifying the absence. The
+// diagnosis was one Object.keys(sim) away.
+//
+// So the assertion is inverted, and it grades a PROPERTY rather than presence -- the Rayleigh number is
+// g*beta*dT*L^3/(nu*alpha), so it must be exactly LINEAR IN THE BUOYANCY PRODUCT. Measured at 1200 steps:
+// 8305.84 at (g=1e-4, beta=1), 16611.68 at double either one, 33223.36 at 4x g. Doubling g and doubling beta
+// give the SAME number, which is the statement that only the product matters.
 {
     const o = await dev.build({ mode: "convect", config: { gravity: 1e-4, beta: 1, steps: 1200 } });
-    ok("!! `rayleigh` is declared and NEVER computed",
-        o.rayleigh === undefined,
-        "thermal2d exposes no rayleigh member, so the field is absent in every mode. Declared-and-absent reads " +
-        "as available in a catalogue -- the same shape as kerr's mode-gated schwarz* fields, which is why this " +
-        "is asserted rather than left for the next census to trip over");
+    const o2g = await dev.build({ mode: "convect", config: { gravity: 2e-4, beta: 1, steps: 1200 } });
+    const o2b = await dev.build({ mode: "convect", config: { gravity: 1e-4, beta: 2, steps: 1200 } });
+    ok("!! `rayleigh` IS computed now, and it is linear in the buoyancy product g*beta",
+        Number.isFinite(o.rayleigh) && o.rayleigh > 0 &&
+        Math.abs(o2g.rayleigh / o.rayleigh - 2) < 1e-9 &&
+        Math.abs(o2b.rayleigh / o.rayleigh - 2) < 1e-9,
+        "Ra " + o.rayleigh.toFixed(2) + " at g=1e-4/beta=1; doubling g gives " + o2g.rayleigh.toFixed(2) +
+        " and doubling beta gives " + o2b.rayleigh.toFixed(2) + " -- THE SAME NUMBER, because Ra depends on " +
+        "the PRODUCT and not on either factor separately. Declared-and-absent used to be asserted here as a " +
+        "permanent fact on the strength of a name that did not match; the value was available as sim.Ra all along");
     console.log("  NOTE   thermal now has TWO real keys: alphaErrFrac (value vs Chapman-Enskog) and the scaling");
     console.log("         above (the LAW, by ratio). What it does NOT have is a graded bifurcation -- the setup");
     console.log("         imposes no heated-bottom / cooled-top walls, so there is no onset to grade. Adding one");

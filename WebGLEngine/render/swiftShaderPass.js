@@ -788,10 +788,248 @@ void main() {
     fragColor = vec4(c.rgb + vec3(add) * k, a);
 }`;
 
+const LIQUIDCHROME_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uDistortion, uChromeIntensity, uFlowSpeed, uReflectionScale, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 st = (p / uSize) * uReflectionScale;
+    vec2 t1 = vec2(uTime * uFlowSpeed * 0.2, uTime * uFlowSpeed * 0.15);
+    vec2 t2 = vec2(uTime * uFlowSpeed * 0.18, uTime * uFlowSpeed * 0.22);
+    float n1 = bcs_fbm(st + t1, 4);
+    float n2 = bcs_fbm(st + vec2(5.0, 3.0) + t2, 4);
+    float d = uDistortion * uPointScale;                 // POINTS upstream -- scaled, not assumed pixels
+    vec4 c = layerSample(clamp(p + vec2(n1, n2) * d, vec2(0.0), uSize));
+    float eps = 0.01;
+    float h0 = bcs_fbm(st + t1, 3);
+    float hx = bcs_fbm(st + vec2(eps, 0.0) + t1, 3);
+    float hy = bcs_fbm(st + vec2(0.0, eps) + t1, 3);
+    // normalize((gx,gy,1)).z is 1/sqrt(gx*gx+gy*gy+1) and is ALWAYS POSITIVE, so upstream's max(z,0.0) and
+    // abs(dot(n,(0,0,1))) are both dead. Written as the value they reduce to -- see the model's note.
+    float nz = normalize(vec3((h0 - hx) / eps, (h0 - hy) / eps, 1.0)).z;
+    float specular = pow(nz, 4.0);
+    float highlight = pow(1.0 - nz, 3.0) * uChromeIntensity;
+    float lum = toHalf(dot(c.rgb, ${LUMA}));
+    float kMix = toHalf(uChromeIntensity * 0.5);
+    float gain = toHalf(0.8 + specular * 0.4);
+    // Only the ADD is alpha-sensitive: the desaturating mix and the gain are linear and commute with
+    // premultiplication. Scaling all three by k would be wrong in the other direction.
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 desat = vec3(toHalf(mix(c.r, lum, kMix)), toHalf(mix(c.g, lum, kMix)), toHalf(mix(c.b, lum, kMix)));
+    vec3 m = vec3(toHalf(desat.r + highlight * k), toHalf(desat.g + highlight * k), toHalf(desat.b + highlight * k));
+    fragColor = vec4(toHalf(m.r * gain), toHalf(m.g * gain), toHalf(m.b * gain), c.a);
+}`;
+
+const PIXELSTORM_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uPixelSize, uStormAmount, uSwirl, uPulse, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    // pixel_size is a BLOCK SIZE IN POINTS -> multiplied. The scanline below reads position.y, a FREQUENCY
+    // per point -> divided. Trap 3 in both directions in one shader.
+    float pxSize = uPixelSize * uPointScale * (1.0 + sin(uTime * uPulse) * 0.3 * uStormAmount);
+    vec2 d = uv - vec2(0.5);
+    float dist = length(d);
+    float ang = atan(d.y, d.x);
+    float sa = uSwirl * (1.0 - dist) * sin(uTime * 0.5);
+    vec2 su = vec2(0.5) + dist * vec2(cos(ang + sa), sin(ang + sa));
+    vec2 blk = floor(su * uSize / pxSize);          // invariant: uSize and pxSize scale together
+    vec2 pu = blk * pxSize / uSize;
+    float br = bcs_hash(blk);
+    // NOT named 'active' -- that is a RESERVED WORD in GLSL ES and the shader failed to compile on it.
+    float storming = step(1.0 - uStormAmount * 0.8, br);
+    vec2 off = vec2(sin(uTime * 3.0 + br * 20.0), cos(uTime * 2.5 + br * 15.0)) * uStormAmount * pxSize * 0.5 * storming;
+    vec4 c = layerSample(clamp(pu * uSize + off, vec2(0.0), uSize));
+    float scan = sin((p.y / uPointScale) * 1.5707963267948966) * 0.5 + 0.5;
+    float gain = toHalf(0.92 + scan * 0.08);
+    fragColor = vec4(toHalf(c.r * gain), toHalf(c.g * gain), toHalf(c.b * gain), c.a);
+}`;
+
+const MAGFIELD_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uFieldStrength, uLineCount, uFieldTurbulence, uPolarity, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec2 t1 = uv - vec2(0.25, 0.5), t2 = uv - vec2(0.75, 0.5);
+    float r1 = max(length(t1), 0.001), r2 = max(length(t2), 0.001);
+    vec2 field = t1 / (r1 * r1) - t2 / (r2 * r2);
+    // Upstream's own guard, kept: below 0.01 the quadrupole is skipped entirely, so the knob has a small
+    // discontinuity AT its own guard. Replacing the branch with the mix alone would be a different shader.
+    if (uPolarity > 0.01) {
+        vec2 t3 = uv - vec2(0.5, 0.3), t4 = uv - vec2(0.5, 0.7);
+        float r3 = max(length(t3), 0.001), r4 = max(length(t4), 0.001);
+        vec2 q = t3 / (r3 * r3) - t4 / (r4 * r4);
+        field = mix(field, field + q, uPolarity);
+    }
+    float mag = length(field);
+    vec2 dir = mag > 0.001 ? field / mag : vec2(0.0);
+    float stripes = sin(atan(field.y, field.x) * uLineCount + uTime * 2.0);
+    stripes *= stripes;
+    float turb = bcs_fbm(uv * 8.0 + uTime * 0.5, 4) * uFieldTurbulence;
+    float fs = uFieldStrength * uPointScale;        // POINTS
+    vec2 off = dir * fs * stripes * (0.5 + turb);
+    off += vec2(-dir.y, dir.x) * sin(dot(uv, dir) * uLineCount * 10.0 + uTime) * fs * 0.15;
+    vec4 c = layerSample(clamp(p + off, vec2(0.0), uSize));
+    float sheen = stripes * mag * 0.3;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    fragColor = vec4(toHalf(c.r + toHalf(sheen * 0.3) * k), toHalf(c.g + toHalf(sheen * 0.35) * k),
+                     toHalf(c.b + toHalf(sheen * 0.4) * k), c.a);
+}`;
+
+const AURORA_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uIntensity, uBands, uSpeed, uColorShift, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec4 c = layerSample(p);                        // undisplaced -- no length in points anywhere here
+    float t = uTime * uSpeed;
+    float heightMask = smoothstep(0.8, 0.1, uv.y) * smoothstep(0.0, 0.15, uv.y);
+    float auroraVal = 0.0, hueAccum = 0.0;
+    // int(uBands) truncates the LOOP; fi / uBands does NOT truncate the SPACING. A fractional bands runs
+    // four iterations spaced as if there were four and a half, and upstream means it.
+    for (int i = 0; i < int(uBands); i++) {
+        float fi = float(i);
+        float freq = 2.0 + fi * 1.5;
+        float wave = sin(uv.x * freq * 3.14159 + t * (0.8 + fi * 0.3) + fi * 1.7)
+                   + sin(uv.x * freq * 1.7 + t * 0.5 + fi * 2.3) * 0.5;
+        float bandDist = abs(uv.y - (0.3 + fi / uBands * 0.4 + wave * 0.08));
+        float band = exp(-bandDist * bandDist * 200.0) * (0.6 + fi * 0.1);
+        band *= bcs_fbm(vec2(uv.x * 3.0 + t * 0.3, fi * 5.0 + t * 0.1), 3);
+        auroraVal += band; hueAccum += band * (fi / uBands);
+    }
+    auroraVal = clamp(auroraVal, 0.0, 1.0) * heightMask * uIntensity;
+    float hue = toHalf(fract(uColorShift + hueAccum * 0.3 + 0.35));
+    vec3 ac = bcs_hsb2rgb(vec3(hue, toHalf(0.7), toHalf(1.0)));
+    float shimmer = toHalf(sin(uv.y * 80.0 + t * 5.0) * 0.02 * auroraVal);
+    float amt = toHalf(auroraVal * 0.7);
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    fragColor = vec4(toHalf(c.r + (toHalf(ac.r * amt) + shimmer) * k),
+                     toHalf(c.g + (toHalf(ac.g * amt) + shimmer) * k),
+                     toHalf(c.b + (toHalf(ac.b * amt) + shimmer) * k), c.a);
+}`;
+
+const DATAMOSH_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uBlockCorruption, uSmearAmount, uColorBleed, uGlitchRate, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float blockSize = 16.0 * uPointScale;            // 16 POINTS
+    vec2 g = uSize / blockSize;                      // invariant: both scale together
+    vec2 blockUV = floor(uv * g) / g;
+    float blockHash = bcs_hash(blockUV * 73.0 + floor(uTime * uGlitchRate) * 0.1);
+    vec4 orig = layerSample(p);
+    if (step(1.0 - uBlockCorruption, blockHash) < 0.5) { fragColor = orig; return; }
+    float ang = bcs_hash(blockUV * 137.0 + floor(uTime * uGlitchRate * 0.5) * 0.3) * 6.28;
+    float blockSmear = uSmearAmount * uPointScale * (0.5 + blockHash * 0.5);
+    vec2 so = vec2(cos(ang), sin(ang)) * blockSmear;
+    vec4 sm = layerSample(clamp(p + so, vec2(0.0), uSize));
+    vec4 rS = layerSample(clamp(p + so * (1.0 + uColorBleed * 0.3), vec2(0.0), uSize));
+    vec4 bS = layerSample(clamp(p + so * (1.0 - uColorBleed * 0.2), vec2(0.0), uSize));
+    float cb = toHalf(uColorBleed);
+    vec3 rgb = vec3(mix(sm.r, rS.r, cb), sm.g, mix(sm.b, bS.b, cb));
+    vec2 cell = fract(uv * g);
+    float blockEdge = 1.0 - step(0.03, min(cell.x, cell.y));
+    float k = (uPremultiplied > 0.5 || sm.a == 0.0) ? 1.0 : sm.a;
+    // The quantise is NOT k-corrected: floor() does not commute with premultiplication and no scalar can
+    // reconcile the two spaces. Exact upstream in premultiplied, approximate in straight -- see the model.
+    vec3 q = floor(vec3(toHalf(rgb.r), toHalf(rgb.g), toHalf(rgb.b)) * 16.0) / 16.0;
+    float e = toHalf(blockEdge * 0.1) * k;
+    fragColor = vec4(toHalf(q.r + e), toHalf(q.g + e), toHalf(q.b + e), sm.a);
+}`;
+
+const SMOKEREVEAL_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uSmokeAmount, uSmokeScale, uWindSpeed, uSmokeTurb, uPointScale, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    vec2 su = uv * uSmokeScale;
+    float w1x = bcs_fbm(su + vec2(uTime * uWindSpeed * 0.3, uTime * uWindSpeed * 0.1), 5);
+    float w1y = bcs_fbm(su + vec2(uTime * uWindSpeed * 0.1, -uTime * uWindSpeed * 0.2) + 5.2, 5);
+    vec2 warped = su + vec2(w1x, w1y) * uSmokeTurb;
+    float dens = bcs_fbm(warped + vec2(uTime * uWindSpeed * 0.15, uTime * uWindSpeed * 0.08), 6);
+    dens = clamp(dens * dens * uSmokeAmount * 1.5, 0.0, 1.0);
+    float lv = bcs_valueNoise(uv * 3.0 + uTime * 0.2);
+    float edgeGlow = smoothstep(0.2, 0.5, dens) - smoothstep(0.5, 0.8, dens);
+    vec3 sc = vec3(toHalf(0.7 + toHalf(lv) * 0.15), toHalf(0.68 + toHalf(lv) * 0.12), toHalf(0.66 + toHalf(lv) * 0.1));
+    sc = vec3(toHalf(sc.r + toHalf(edgeGlow * 0.2)), toHalf(sc.g + toHalf(edgeGlow * 0.2)), toHalf(sc.b + toHalf(edgeGlow * 0.2)));
+    float dsp = 8.0 * uPointScale * dens;            // the 8.0 is POINTS
+    vec4 dc = layerSample(clamp(p + vec2(w1x - 0.5, w1y - 0.5) * dsp, vec2(0.0), uSize));
+    vec4 orig = layerSample(p);                      // ALPHA comes from here, colour from dc -- upstream's choice
+    float ray = sin(uv.x * 8.0 + uTime * 0.3) * 0.5 + 0.5;
+    ray *= smoothstep(1.0, 0.3, uv.y) * dens * 0.15;
+    float k = (uPremultiplied > 0.5 || orig.a == 0.0) ? 1.0 : orig.a;
+    float t = toHalf(dens);
+    fragColor = vec4(toHalf(mix(dc.r, sc.r * k, t) + toHalf(ray * 0.8) * k),
+                     toHalf(mix(dc.g, sc.g * k, t) + toHalf(ray * 0.7) * k),
+                     toHalf(mix(dc.b, sc.b * k, t) + toHalf(ray * 0.5) * k), orig.a);
+}`;
+
+const MORPHBREATHE_FRAG = PREAMBLE + HELPERS + `
+uniform float uTime, uBreatheDepth, uBreatheRate, uWarpComplexity, uOrganic, uPointScale;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float b1 = sin(uTime * uBreatheRate) * 0.5 + 0.5;
+    float b2 = sin(uTime * uBreatheRate * 0.7 + 1.5) * 0.5 + 0.5;
+    float b3 = sin(uTime * uBreatheRate * 1.3 + 3.0) * 0.5 + 0.5;
+    float t = uTime * uBreatheRate * 0.3;
+    vec2 st = uv * uWarpComplexity;
+    vec2 q = vec2(bcs_fbm(st + vec2(t * 0.5, t * 0.3), 4),
+                  bcs_fbm(st + vec2(5.2, 1.3) + vec2(t * 0.4, t * 0.6), 4));
+    vec2 fc = uv - vec2(0.5);
+    float radialPulse = b1 * (1.0 - uOrganic) + b2 * uOrganic;
+    vec2 rd = fc * (radialPulse - 0.5) * 2.0;
+    vec2 od = vec2((q.x - 0.5) * 2.0 * b2, (q.y - 0.5) * 2.0 * b3);
+    float edgeFade = smoothstep(0.0, 0.15, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
+    vec2 disp = mix(rd, od, uOrganic) * uBreatheDepth * uPointScale * edgeFade;   // POINTS
+    vec4 c = layerSample(clamp(p + disp, vec2(0.0), uSize));
+    float rG = toHalf(1.0 + b1 * 0.05), bG = toHalf(1.0 - b1 * 0.05), gG = toHalf(1.0 + (b1 - 0.5) * 0.08);
+    fragColor = vec4(toHalf(toHalf(c.r * rG) * gG), toHalf(c.g * gG), toHalf(toHalf(c.b * bG) * gG), c.a);
+}`;
+
+// ==================================================================================================================
+// *** OURS, NOT UPSTREAM'S. *** Everything above is a port of krispuckett/SwiftUIShaders (MIT), named bcs_*.
+// This one is SweK's own, named swk_*, and it is the first shader here with an EXTERNAL KEY -- see the model.
+// ==================================================================================================================
+const LYAPUNOV_FRAG = PREAMBLE + `
+uniform float uRLo, uRHi, uSamples, uWarmup, uIntensity, uSeedLo, uSeedHi, uRaw, uPremultiplied;
+void main() {
+    vec2 p = swPos();
+    vec2 uv = p / uSize;
+    float r = uRLo + (uRHi - uRLo) * uv.x;
+    float x = uSeedLo + (uSeedHi - uSeedLo) * uv.y;
+    for (int i = 0; i < int(uWarmup); i++) x = r * x * (1.0 - x);
+    float acc = 0.0;
+    int n = int(uSamples);
+    for (int i = 0; i < n; i++) {
+        acc += log(abs(r * (1.0 - 2.0 * x)));
+        x = r * x * (1.0 - x);
+    }
+    float lam = acc / float(n);
+    if (uRaw > 0.5) {
+        // 16 bits across two channels. ONE 8-bit channel resolves lambda to 4/255 = 1.6e-2, which is coarser
+        // than the 8.3e-3 the iteration budget earns -- reading the key at 8 bits would measure the
+        // framebuffer instead of the shader.
+        float e = clamp((lam + 3.0) / 4.0, 0.0, 1.0);
+        fragColor = vec4(floor(e * 255.0) / 255.0, fract(e * 255.0), 0.0, 1.0);
+        return;
+    }
+    vec4 c = layerSample(p);
+    float chaos = clamp(lam / 0.6931471805599453, -1.0, 1.0);   // exactly 1 at the r = 4 key
+    float glow = max(chaos, 0.0) * uIntensity;
+    float k = (uPremultiplied > 0.5 || c.a == 0.0) ? 1.0 : c.a;
+    vec3 hot = vec3(0.35, 0.95, 0.85);
+    fragColor = vec4(toHalf(c.r * (1.0 - 0.35 * glow) + hot.r * glow * k),
+                     toHalf(c.g * (1.0 - 0.35 * glow) + hot.g * glow * k),
+                     toHalf(c.b * (1.0 - 0.35 * glow) + hot.b * glow * k), c.a);
+}`;
+
 const SHADERS = { emboss: EMBOSS_FRAG, heatShimmer: SHIMMER_FRAG, solarize: SOLARIZE_FRAG, duochrome: DUOCHROME_FRAG, vortex: VORTEX_FRAG, kaleidoscope: KALEIDO_FRAG, chromaticSplit: CHROMA_FRAG, plasma: PLASMA_FRAG, echo: ECHO_FRAG, glitch: GLITCH_FRAG, melt: MELT_FRAG, topographic: TOPO_FRAG, thermal: THERMAL_FRAG, neonEdge: NEON_FRAG, touchRipple: TOUCHRIPPLE_FRAG, liveRipple: LIVERIPPLE_FRAG, shockwave: SHOCKWAVE_FRAG, gravityWells: GRAVITYWELLS_FRAG, refractLens: REFRACTLENS_FRAG,
     wavePool: WAVEPOOL_FRAG, pulse: PULSE_FRAG, holographic: HOLOGRAPHIC_FRAG,
     geometricWarp: GEOWARP_FRAG, blackHole: BLACKHOLE_FRAG,
-    wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG };
+    wormhole: WORMHOLE_FRAG, inkBleed: INKBLEED_FRAG, frosted: FROSTED_FRAG, pixelateMosaic: MOSAIC_FRAG,
+    liquidChrome: LIQUIDCHROME_FRAG, pixelateStorm: PIXELSTORM_FRAG, magneticField: MAGFIELD_FRAG,
+    aurora: AURORA_FRAG, datamosh: DATAMOSH_FRAG, smokeReveal: SMOKEREVEAL_FRAG,
+    morphBreathe: MORPHBREATHE_FRAG, lyapunov: LYAPUNOV_FRAG };
 
 const KNOBS = {
     emboss: { strength: "uStrength", angle: "uAngle", mixAmount: "uMixAmount", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
@@ -814,6 +1052,14 @@ const KNOBS = {
     gravityWells: { time: "uTime", wellStrength: "uWellStrength", wellCount: "uWellCount", orbitSpeed: "uOrbitSpeed", warpFalloff: "uWarpFalloff", pointScale: "uPointScale" },
     refractLens: { touchX: "uTouchX", touchY: "uTouchY", lensRadius: "uLensRadius", refraction: "uRefraction", aberration: "uAberration", wobble: "uWobble", pointScale: "uPointScale" },
     wavePool: { time: "uTime", amplitude: "uAmplitude", wavelength: "uWavelength", speed: "uSpeed", complexity: "uComplexity", pointScale: "uPointScale" },
+    liquidChrome: { time: "uTime", distortion: "uDistortion", chromeIntensity: "uChromeIntensity", flowSpeed: "uFlowSpeed", reflectionScale: "uReflectionScale", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    pixelateStorm: { time: "uTime", pixelSize: "uPixelSize", stormAmount: "uStormAmount", swirl: "uSwirl", pulse: "uPulse", pointScale: "uPointScale" },
+    magneticField: { time: "uTime", fieldStrength: "uFieldStrength", lineCount: "uLineCount", fieldTurbulence: "uFieldTurbulence", polarity: "uPolarity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    aurora: { time: "uTime", intensity: "uIntensity", bands: "uBands", speed: "uSpeed", colorShift: "uColorShift", premultiplied: "uPremultiplied" },
+    datamosh: { time: "uTime", blockCorruption: "uBlockCorruption", smearAmount: "uSmearAmount", colorBleed: "uColorBleed", glitchRate: "uGlitchRate", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    smokeReveal: { time: "uTime", smokeAmount: "uSmokeAmount", smokeScale: "uSmokeScale", windSpeed: "uWindSpeed", smokeTurb: "uSmokeTurb", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
+    morphBreathe: { time: "uTime", breatheDepth: "uBreatheDepth", breatheRate: "uBreatheRate", warpComplexity: "uWarpComplexity", organic: "uOrganic", pointScale: "uPointScale" },
+    lyapunov: { rLo: "uRLo", rHi: "uRHi", samples: "uSamples", warmup: "uWarmup", intensity: "uIntensity", seedLo: "uSeedLo", seedHi: "uSeedHi", raw: "uRaw", premultiplied: "uPremultiplied" },
     pulse: { time: "uTime", amplitude: "uAmplitude", bpm: "uBpm", sharpness: "uSharpness", glowIntensity: "uGlowIntensity", pointScale: "uPointScale", premultiplied: "uPremultiplied" },
     holographic: { time: "uTime", intensity: "uIntensity", scale: "uScale", speed: "uSpeed", angleOffset: "uAngleOffset", premultiplied: "uPremultiplied" },
     geometricWarp: { time: "uTime", spiralTight: "uSpiralTight", zoomRepeat: "uZoomRepeat", rotation: "uRotation", blend: "uBlend", premultiplied: "uPremultiplied" },
@@ -863,6 +1109,18 @@ const DEFAULT_KNOBS = {
     // Batch 10 -- copied from each function's own parameter defaults in swiftShaderModel.mjs, which is the
     // reference the GPU is graded against, so the two agree by construction rather than by my memory.
     wavePool:       { time: 0, amplitude: 10, wavelength: 20, speed: 2, complexity: 3, pointScale: 1 },
+    // Batch 12 -- copied from bcsLiquidChrome's own parameter defaults in swiftShaderModel.mjs.
+    liquidChrome:   { time: 0, distortion: 12, chromeIntensity: 0.6, flowSpeed: 1, reflectionScale: 4, pointScale: 1, premultiplied: 1 },
+    // Batch 13 -- copied from each function's own defaults in swiftShaderModel.mjs.
+    pixelateStorm:  { time: 0, pixelSize: 12, stormAmount: 0.5, swirl: 1, pulse: 1, pointScale: 1 },
+    magneticField:  { time: 0, fieldStrength: 30, lineCount: 8, fieldTurbulence: 0.4, polarity: 0, pointScale: 1, premultiplied: 1 },
+    aurora:         { time: 0, intensity: 0.7, bands: 4, speed: 1, colorShift: 0, premultiplied: 1 },
+    // Batch 14 -- copied from each function's own defaults in swiftShaderModel.mjs.
+    datamosh:       { time: 0, blockCorruption: 0.3, smearAmount: 24, colorBleed: 0.5, glitchRate: 2, pointScale: 1, premultiplied: 1 },
+    smokeReveal:    { time: 0, smokeAmount: 0.6, smokeScale: 4, windSpeed: 1, smokeTurb: 1, pointScale: 1, premultiplied: 1 },
+    morphBreathe:   { time: 0, breatheDepth: 20, breatheRate: 1, warpComplexity: 4, organic: 0.5, pointScale: 1 },
+    // OURS -- swk_lyapunov. The budget is the measured knee; see swiftShaderModel.mjs for why 128 is worse.
+    lyapunov:       { rLo: 3.4, rHi: 4.0, samples: 384, warmup: 64, intensity: 0.8, seedLo: 0.05, seedHi: 0.95, raw: 0, premultiplied: 1 },
     pulse:          { time: 0, amplitude: 15, bpm: 70, sharpness: 4, glowIntensity: 0.5, pointScale: 1, premultiplied: 1 },
     holographic:    { time: 0, intensity: 0.6, scale: 8, speed: 1, angleOffset: 0.785, premultiplied: 1 },
     geometricWarp:  { time: 0, spiralTight: 3, zoomRepeat: 1, rotation: 0, blend: 0.5, premultiplied: 1 },
@@ -997,13 +1255,22 @@ function makeSwiftShaderPass(name, width, height, opts = {}) {
 
 /** The shaders this file can build, for a caller that wants to offer a list without importing SHADERS. */
 function swiftShaderNames() { return Object.keys(SHADERS); }
+// *** OURS, AND KEPT OUT OF EVERY COUNT ABOUT UPSTREAM COVERAGE. *** swk_lyapunov renders through the same
+// pass and is graded by the same gate, but it is NOT one of krispuckett/SwiftUIShaders' 41 -- so "35 of 41
+// ported" must not quietly become 36 because we added a shader of our own. A coverage number that counts
+// our own work as upstream's is the same defect as a baseline that absorbs its own drift.
+const SWK_OWN = ["lyapunov"];
+/** The upstream ports only -- what "N of 41" is allowed to count. */
+function portedShaderNames() { return Object.keys(SHADERS).filter((n) => !SWK_OWN.includes(n)); }
 
 export {
-    makeSwiftShaderPass, swiftShaderNames, DEFAULT_KNOBS,
+    makeSwiftShaderPass, swiftShaderNames, portedShaderNames, SWK_OWN, DEFAULT_KNOBS,
     VERT, SHADERS, KNOBS, PREAMBLE, HELPERS, LUMA,
     EMBOSS_FRAG, SHIMMER_FRAG, SOLARIZE_FRAG, DUOCHROME_FRAG, VORTEX_FRAG, KALEIDO_FRAG, CHROMA_FRAG,
     PLASMA_FRAG, ECHO_FRAG, GLITCH_FRAG, MELT_FRAG, TOPO_FRAG, THERMAL_FRAG, NEON_FRAG,
     TOUCHRIPPLE_FRAG, LIVERIPPLE_FRAG, SHOCKWAVE_FRAG, GRAVITYWELLS_FRAG, REFRACTLENS_FRAG,
-    WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG,
+    WAVEPOOL_FRAG, PULSE_FRAG, HOLOGRAPHIC_FRAG, GEOWARP_FRAG, BLACKHOLE_FRAG, LIQUIDCHROME_FRAG,
+    PIXELSTORM_FRAG, MAGFIELD_FRAG, AURORA_FRAG, DATAMOSH_FRAG, SMOKEREVEAL_FRAG, MORPHBREATHE_FRAG,
+    LYAPUNOV_FRAG,
     WORMHOLE_FRAG, INKBLEED_FRAG, FROSTED_FRAG, MOSAIC_FRAG,
 };

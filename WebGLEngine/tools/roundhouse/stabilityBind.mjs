@@ -6,16 +6,30 @@
 // anything above it is the solver INVENTING energy. That is a physical law the code is never told, and it is
 // an INEQUALITY, so there is no tolerance to argue about. ***
 //
-// *** THE SHIPPED VISCOSITY FAILS IT, AND THAT IS NOT NEWS -- IT IS WHY viscosityThreshold EXISTS. MEASURED at
-// c=15, dt=1e-3: visc 0.1 reads 2.7340 at T=1 and 4.3305 at T=2; 0.3 reads 1.5497 / 1.5078; 0.47 reads
-// 0.7755 / 0.8182; 0.7 reads 0.6916 / 0.6094; 1.5 reads 0.3461 / 0.2511. What the device adds is that these
-// are RE-DERIVED EVERY RUN instead of sitting in MEASURED_V3542 as numbers somebody once took. ***
+// *** THE SHIPPED VISCOSITY FAILS IT, AND THAT IS NOT NEWS -- IT IS WHY viscosityThreshold EXISTS. What the
+// device adds is that the numbers are RE-DERIVED EVERY RUN instead of sitting in MEASURED_V3542 as readings
+// somebody once took -- which is exactly why this paragraph had to be re-measured at v4194. ***
+//
+// MEASURED at c=15, dt=1e-3, T=1 / T=2, WITH THE v3783 READING BESIDE IT:
+//     visc 0.1    2.6897 / 4.1595     (was 2.7340 / 4.3305)   grows with T, as before
+//     visc 0.3    1.2557 / 1.5962     (was 1.5497 / 1.5078)   *** DIRECTION REVERSED: it shrank, now it grows
+//     visc 0.47   0.9194 / 0.9107     (was 0.7755 / 0.8182)   nearly flat, and flatter than before
+//     visc 0.7    0.6385 / 0.6478     (was 0.6916 / 0.6094)   *** DIRECTION REVERSED: it shrank, now it grows
+//     visc 1.5    0.3662 / 0.2282     (was 0.3461 / 0.2511)   shrinks with T, as before
+// The cause is not this file: v4193 traced every moved SPH value in the lab to f350286's direct-indexed spatial
+// grid and 1efe978's pinned equation of state. THE OLD NUMBERS ARE KEPT BESIDE THE NEW ONES rather than
+// overwritten, because two of the five REVERSED and a bare refresh would have hidden that.
+//
+// *** AND THE MARGIN AT THE DEFAULT VISCOSITY HAS SHRUNK BY MOST OF WHAT IT HAD. *** The law is E(T)/E(0) <= 1
+// and 0.47 is the device's default: it read 0.7755, 22.4% clear of the bound, and now reads 0.9194, 8.1% clear.
+// Nothing is violated and no gate is red. IT IS RECORDED BECAUSE THE DIRECTION IS TOWARDS THE BOUND and the
+// quantity is one this device exists to watch -- the same shape as plastic's budget sitting at 0.93 of 1.
 //
 // *** AND THE MODULE'S OWN SHARPEST FINDING IS REPORTED RATHER THAN GRADED: THE THRESHOLD DOES NOT SURVIVE
-// REFINING THE HORIZON. At visc 0.1 the ratio GROWS with T (2.7340 -> 4.3305) while at 0.47 it is nearly flat
-// (0.7755 -> 0.8182). A THRESHOLD THAT MOVES WITH RUN LENGTH IS NOT A CONSTANT OF THE SOLVER, so this device
+// REFINING THE HORIZON. At visc 0.1 the ratio GROWS with T (2.6897 -> 4.1595) while at 0.47 it is nearly flat
+// (0.9194 -> 0.9107). A THRESHOLD THAT MOVES WITH RUN LENGTH IS NOT A CONSTANT OF THE SOLVER, so this device
 // grades the DIRECTION and the RESPONSE, and leaves the threshold's numeric value to the module that already
-// records how it drifts. ***
+// records how it drifts. THE CROSSING SURVIVES: 0.47 reads 1.0931 at T=4 (recorded 1.0631), still above 1. ***
 
 import { energyRatio, mechanicalEnergy, MEASURED_V3542 } from "../../physics/sph/stability.mjs";
 

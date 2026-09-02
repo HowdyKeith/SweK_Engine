@@ -1,6 +1,7 @@
 // tools/roundhouse/plastic-selfcheck.mjs
 //
-// Run: node tools/roundhouse/plastic-selfcheck.mjs   (~0.2s)
+// Run: node tools/roundhouse/plastic-selfcheck.mjs   (~0.3s -- 261ms measured at v4191, up from 0.2s: section 4a
+//      builds creepFree at five yieldStrains so the budget is checked over a grid rather than at one point)
 //
 // v3211 -- PLASTICITY GRADED, AND BOTH OF ITS PARAMETERS RECOVERED FROM BEHAVIOUR.
 //
@@ -101,10 +102,12 @@ const cf = await dev.build({ mode: "creepFree" });
 {
     ok("!! *** creep does not decide WHETHER the material yields -- and the residue is eps, shown not assumed ***",
         cf.creepFreeWorstBudgetUsed <= 1 && cf.creepFreeSamples === 5,
-        "worst budget usage " + cf.creepFreeWorstBudgetUsed.toFixed(3) + " of eps/(2*creep) + 8 ULP, raw spread " +
+        "worst budget usage " + cf.creepFreeWorstBudgetUsed.toFixed(4) + " of eps/(2*creep) + eps, raw spread " +
         cf.creepFreeSpread.toExponential(2) + ". md's alphaFree pointed at a different question: VARY THE " +
         "PARAMETER THAT HAS NO BUSINESS AFFECTING THE ANSWER AND DEMAND THE ANSWER NOT MOVE. The budget is " +
-        "DERIVED FROM eps, not chosen -- 0.96 at its worst, so it is snug rather than padded");
+        "DERIVED FROM eps, not chosen. *** AND THIS LINE QUOTED 0.96 AND PASSED WHILE THE OLD BUDGET WAS BEING " +
+        "EXCEEDED BY 41% AT A YIELDSTRAIN IT NEVER RAN -- see section 4a, which is why the claim is no longer " +
+        "checked at a single point ***");
 
     ok("!! *** and the residue FALLS AS 1/creep, which is what tells a resolution limit from an entanglement ***",
         cf.creepFreeFallsWithCreep === 1,
@@ -122,6 +125,71 @@ const cf = await dev.build({ mode: "creepFree" });
         proseHas(src, /applied HERE and never in the module being graded/i),
         "A DEVICE MUST NOT EDIT THE THING IT GRADES (v3197). creepFree varies a legitimate, exported parameter; " +
         "plastic.js is imported unchanged");
+}
+
+// ---- 4a. THE BUDGET, CHECKED OVER THE GRID IT IS CLAIMED OVER AND NOT AT ONE POINT ----------------------------------
+//
+// *** v4191 -- THE CLAIM ABOVE WAS TRUE AT THE ONE CONFIGURATION ANYBODY EVER RAN IT AT. *** creepFree varies
+// creep at a SINGLE yieldStrain -- its own default 0.1 -- and the old budget's second term was `8 * |yieldStrain|
+// * eps`, an allowance RELATIVE to a quantity the residual it covers does not depend on. So the allowance shrank
+// as the yield got smaller and the residual did not, and MEASURED on the shipped module the old budget was
+// exceeded: usage 1.4101 at yieldStrain 0.02 / creep 2.0 and 1.0577 at yieldStrain 0.05 / creep 2.0.
+//
+// *** AND THE OBSERVABLE NAMED FOR EXACTLY THIS WAS DEAD. *** `yieldWorstBudgetUsed` has been in
+// PLASTIC_OBSERVABLES since the list was written and was ASSIGNED BY NO MODE -- it read the NONE sentinel -1 in
+// all five modes and both arms, and -1 is what lab-results-baseline.json froze. The `yield` mode's sweep already
+// runs yieldStrain 0.02 and 0.05, the two settings where the old budget fails, and never formed the ratio.
+{
+    const YS = [0.02, 0.05, 0.1, 0.2, 0.35];
+    const grid = [];
+    for (const ys of YS) {
+        const g = await dev.build({ mode: "creepFree", config: { yieldStrain: ys } });
+        grid.push({ ys, used: g.creepFreeWorstBudgetUsed, falling: g.creepFreeFallsWithCreep });
+    }
+    const worst = grid.reduce((a, g) => (g.used > a.used ? g : a));
+
+    ok("!! *** THE BUDGET HOLDS ACROSS THE WHOLE yieldStrain x creep GRID, NOT AT ITS DEFAULT ***",
+        grid.every((g) => g.used <= 1),
+        "5 yieldStrains x 5 creeps = 25 points, worst usage " + worst.used.toFixed(4) + " at yieldStrain " +
+        worst.ys + ". Per yieldStrain: " + grid.map((g) => g.ys + "->" + g.used.toFixed(4)).join(", ") + ". " +
+        "THE SAME SWEEP AGAINST THE OLD eps/(2*creep) + 8*|yieldStrain|*eps REACHED 1.4101, while the line above " +
+        "quoted 0.96 in prose and computed 0.9144, because it only ever asked at yieldStrain 0.1");
+
+    ok("...and the residue still falls with creep at EVERY yieldStrain, not just the default",
+        grid.every((g) => g.falling === 1),
+        "the 1/creep signature is what separates a resolution limit from an entanglement, and a budget repair " +
+        "that quietly broke it would be a wider allowance wearing a physics explanation");
+
+    // THE CODE HALF. A prose correction with the old formula still in the source would be the v4170 shape: the
+    // sentence says one thing and the arithmetic does another.
+    const fn = noComments(src).match(/function resolutionBudget[\s\S]*?\n}/);
+    ok("!! *** and the allowance is ABSOLUTE in the source, not scaled by the yield being recovered ***",
+        !!fn && !/yieldStrain/.test(fn[0]) && /Number\.EPSILON \/ \(2 \* creep\) \+ Number\.EPSILON/.test(fn[0]) &&
+        /resolutionBudget\(creep\)/.test(noComments(src)),
+        "yieldStrain IS NOT IN THE FUNCTION AT ALL, signature included -- a parameter the body ignores is a " +
+        "vestigial field (v4170) and this is the exact one that carried the fault. permanentSet feeds the " +
+        "strain in as the POSITION `1 + s`, so the finest representable step is one ULP " +
+        "of 1 -- eps, flat, whatever yieldStrain is. MEASURED: once eps/(2*creep) drops below that floor the " +
+        "residual stops falling and sits at 0.578, 0.688, 0.875, 1.250 and 1.000 eps for the five yieldStrains, " +
+        "ABSOLUTE and flat in creep across 0.5, 0.9 and 2.0");
+}
+
+// ---- 4b. THE DEAD OBSERVABLE IS LIVE, AND IT IS SHARPER UNDER THE PLANT ---------------------------------------------
+{
+    const ty = await dev.build({ mode: "tensiononly" });
+    ok("!! *** yieldWorstBudgetUsed CARRIES A READING -- it was declared and assigned by no mode ***",
+        Number.isFinite(y.yieldWorstBudgetUsed) && y.yieldWorstBudgetUsed > 0 && y.yieldWorstBudgetUsed < 1,
+        "yield mode reports " + y.yieldWorstBudgetUsed.toFixed(6) + " across yieldStrain 0.02 to 0.35 at creep " +
+        "0.5. IT READ -1 -- the NONE sentinel -- IN ALL FIVE MODES AND BOTH ARMS, and -1 is what the lab's " +
+        "value baseline froze. A DECLARED OBSERVABLE THAT IS A SENTINEL EVERYWHERE IS A VESTIGIAL FIELD (v4170): " +
+        "it inflates the observable count and answers nothing");
+
+    ok("...and the plant drives it 15 orders of magnitude over budget, so it separates the arms too",
+        ty.yieldWorstBudgetUsed > 1e12 && y.yieldWorstBudgetUsed < 1,
+        "honest " + y.yieldWorstBudgetUsed.toFixed(6) + " -> planted " + ty.yieldWorstBudgetUsed.toExponential(3) +
+        ". `tensiononly` measures the compression onset with sign = +1, so the sweep's worst |c + y| becomes 2y " +
+        "rather than ~1e-16 -- against an eps-scale budget that is a ratio of order 1e15. The device's declared " +
+        "plantFlips stays yieldWorstErrAbs; this is a second reading of the same separation, in budget units");
 }
 
 // ---- 5. THE MODES, AND THE COUNT MOVED AGAIN ------------------------------------------------------------------------

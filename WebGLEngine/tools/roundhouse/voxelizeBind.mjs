@@ -12,6 +12,9 @@
 //       relative error against meshVolume is NON-MONOTONE AND MESH-DEPENDENT: at segments 64 it reads
 //       1.317e-3, 1.313e-3, 1.908e-3 over n = 16/32/64 (flat, then RISING), and at segments 32 it reads
 //       9.199e-4, 1.450e-3, 2.730e-4 (the MIDDLE point is the worst). A RATE KEY HERE WOULD SIMPLY FAIL, and
+//       (v4300: BOTH SEQUENCES RE-RUN AND EXACT, non-monotone and bounded in each. Only the segments=32 one is
+//       watched -- it is the default and the device emits `ladder` -- so the segments=64 half of the argument
+//       for reporting a BOUND AND A SHAPE rather than a rate is confirmed by nothing but a deliberate re-run.)
 //       a two-sample "last beats first" test called those two sequences TRUE and FALSE for the same
 //       underlying behaviour. THE HONEST READING IS A BOUND PLUS A SHAPE. That is not a defect:
 //       a cell-CENTRE membership test has an O(h) SIGNED error that oscillates as centres fall in and out of

@@ -1,6 +1,21 @@
 // tools/roundhouse/responseCensus-selfcheck.mjs
 //
-// Run: node tools/roundhouse/responseCensus-selfcheck.mjs   (~5 min: it rebuilds the lab once per config knob)
+// Run: node tools/roundhouse/responseCensus-selfcheck.mjs
+//
+// *** COST: THIS LINE SAID "~5 min" AND THE GATE HAD NOT FINISHED AT NINETY-NINE MINUTES. ***
+// MEASURED at v4306 on one core at 100% CPU, uncontended: still running at 5944 s against a claim of 300 s,
+// so the stated figure is wrong by AT LEAST TWENTYFOLD and the true number is a lower bound, not a reading.
+//
+// THE REASON IS STRUCTURAL AND THE LINE COULD NOT HAVE STAYED RIGHT. responseCensus walks
+// DEVICE_NAMES x modes x config keys and REBUILDS FOR EVERY ONE -- so its cost tracks the size of the lab,
+// which is now 129 devices and 484 declared device-mode pairs. The ~5 min was true of a smaller lab and was
+// never re-measured. A STATED RUNTIME NOBODY RE-MEASURES IS A MEMORY (v3211-v3213, which found stated
+// runtimes wrong in 59 of 82 gate headers and did not reach this file).
+//
+// PRACTICAL CONSEQUENCE, stated because it changes how this gate should be used: at this cost it does not
+// belong in a run-everything pass. Run it deliberately and in the background, the way plantedCoverage
+// --verify is run. 163 of the lab's 815 gate files state a runtime at all; this one now states a measured
+// bound instead of a remembered guess.
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2910 -- OPEN ITEM 2, AND THE THING THE SWEEP FOUND WAS A HOLE IN THE SWEEPS.
@@ -23,13 +38,25 @@ const row = (d, m) => c.rows.find((r) => r.device === d && r.mode === m);
 {
     const dev = await getDevice("thermal");
     const a = [];
-    for (const tauG of [0.8, 0.9, 1.1]) a.push(await dev.build({ mode: "diffusion", config: { tauG } }));
+    // *** v4304 -- THIS ASKED FOR MODE "diffusion" AND THERMAL DECLARES "diffuse". *** thermalDefaults does not
+    // refuse an unknown mode, it SUBSTITUTES THE DEFAULT -- and the default happens to be `diffuse`, so this
+    // control has been testing the right thing BY LUCK for its whole life. Verified: the two builds are
+    // byte-identical by labExport's canonical form. If the default ever moved, the control would silently start
+    // measuring another mode and still pass. Named correctly now; this is v3806's silent-substitution shape.
+    const MODE = "diffuse";
+    for (const tauG of [0.8, 0.9, 1.1]) a.push(await dev.build({ mode: MODE, config: { tauG } }));
     const tracks = a.every((o) => Math.abs(o.alphaMeasured - o.alphaTheory) / o.alphaTheory < 5e-3);
     ok("!! a knob that SHOULD move an observable does",
         a[0].alphaMeasured !== a[2].alphaMeasured && tracks,
-        "thermal tauG 0.8 -> 0.9 -> 1.1 moves alphaMeasured 0.0999983, 0.1333015, 0.1992345 and alphaTheory " +
-        "tracks it at 0.1, 0.13333, 0.2 -- the emergent diffusivity follows (tau_g - 1/2)/3 out of the collision. " +
-        "Without this control an inert verdict anywhere would be indistinguishable from a broken sweep");
+        // AND THE NUMBERS ARE PRINTED FROM THE RUN THIS LINE JUST DID, not typed beside it. They were
+        // "0.0999983, 0.1333015, 0.1992345" as literals -- correct when re-measured at v4304, and correct is
+        // the point: a gate that BUILDS the sweep and then quotes a remembered answer has a second copy that
+        // can rot while the assertion above it stays green.
+        "thermal tauG 0.8 -> 0.9 -> 1.1 moves alphaMeasured " +
+        a.map((o) => o.alphaMeasured.toPrecision(7)).join(", ") + " and alphaTheory tracks it at " +
+        a.map((o) => o.alphaTheory.toPrecision(5)).join(", ") + " -- the emergent diffusivity follows " +
+        "(tau_g - 1/2)/3 out of the collision. Without this control an inert verdict anywhere would be " +
+        "indistinguishable from a broken sweep");
 }
 
 // ---- 2. THE PRE-REGISTERED PREDICTIONS ---------------------------------------------------------------------------------
@@ -73,13 +100,34 @@ const row = (d, m) => c.rows.find((r) => r.device === d && r.mode === m);
 // ---- 4. TWO CANDIDATES INSPECTED, TWO FALSE POSITIVES, ONE SHARED CAUSE -------------------------------------------------
 {
     // Recorded because the alarming version of both was drafted first.
+    // *** v4307 -- THE REASONING WAS ABOUT THE STILL MODES AND THE ASSERTION WAS ABOUT ALL OF THEM. *** This
+    // read `th.every(...)` across EVERY thermal row and went red, because thermal declares a `rayleigh` mode
+    // that SWEEPS GRAVITY ON PURPOSE to find the critical point -- and Ra runs through the viscosity, which is
+    // what tau sets. MEASURED per mode: diffuse, convect and onedmoment move NOTHING under tau; rayleigh moves
+    // raCritMeasured and raCritErrFrac. The prose already said which case it meant -- "the diffusion test runs
+    // with gravity 0 and beta 0 and walls injecting nothing, so there is no flow for it to act on" -- and that
+    // sentence is exactly false of the rayleigh mode. A CLAIM STATED WIDER THAN WHAT WAS MEASURED, which is the
+    // defect this branch has been chasing, in the file that reports on other devices doing it.
+    //
+    // NOT MINE, AND THAT WAS CHECKED RATHER THAN ASSUMED: `rayleigh` has always been in deviceModes'
+    // CANDIDATE_MODES, so that row has always been swept, and the dependence is structural -- alpha =
+    // c_s^2 (tau_g - 1/2) by thermalBind's own header, with Ra inversely in the viscosity tau sets. The
+    // `rayleigh` observable v4184 added lives in `convect`, which reads gravity 0 and moves under nothing.
+    //
+    // The response is now asserted BOTH WAYS, because "tau is dead here" is only worth saying if tau is alive
+    // somewhere: a suite where tau moved nothing anywhere would be a broken sweep, not a physics result.
     const th = c.rows.filter((r) => r.device === "thermal");
-    ok("thermal's dead tau is correct physics, not a defect",
-        th.every((r) => !r.movedBy.tau || r.movedBy.tau.length === 0),
-        "tau is the MOMENTUM relaxation time; the diffusion test runs with gravity 0 and beta 0 and walls " +
-        "injecting nothing, so there is no flow for it to act on. thermalBind's own header says the diffusivity " +
-        "comes from tau_g. I had drafted this as 'the measured diffusivity ignores the relaxation time that " +
-        "defines it' before reading the file");
+    const still = th.filter((r) => r.mode !== "rayleigh");
+    const ray = th.filter((r) => r.mode === "rayleigh");
+    const movedIn = (rs) => rs.filter((r) => r.movedBy.tau && r.movedBy.tau.length);
+    ok("thermal's dead tau is correct physics in the STILL modes -- and rayleigh responds, as it must",
+        still.length > 0 && movedIn(still).length === 0 && ray.length > 0 && movedIn(ray).length > 0,
+        "tau is the MOMENTUM relaxation time; the still modes (" + still.map((r) => r.mode).join(", ") +
+        ") run with gravity 0 and beta 0 and walls injecting nothing, so there is no flow for it to act on, and " +
+        "tau moves nothing in them. `rayleigh` sweeps gravity to locate the critical point, so tau reaches it " +
+        "through the viscosity: " + (movedIn(ray)[0] ? movedIn(ray)[0].movedBy.tau.join(", ") : "") + ". " +
+        "thermalBind's own header says the diffusivity comes from tau_g. I had drafted this as 'the measured " +
+        "diffusivity ignores the relaxation time that defines it' before reading the file");
 
     ok("chaos's dead warmup is convergence, not a defect",
         (row("chaos", "lyapunov").movedBy.warmup || []).length === 0,
