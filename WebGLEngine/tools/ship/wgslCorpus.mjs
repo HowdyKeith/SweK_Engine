@@ -38,6 +38,8 @@ import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL } from "../../render/gpuTerrain.mjs";
 import * as FL from "../../render/fleets.mjs";
+import * as LY from "../../render/lyapunovWgsl.mjs";
+import * as HD from "../../render/heidlerWgsl.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -111,6 +113,19 @@ export function corpus() {
         { id: "fleets.ASCII_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "screen cells from @builtin(position), a glyph per lit shade, textureLoad from a tile atlas", opts: { code: FL.ASCII_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.SPIN_PICK_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "the looks' pick shader: the same spin as the looks, gpuDriven's identity encoding lifted by pattern", opts: { code: FL.SPIN_PICK_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.SPRITE_PICK_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "a pick that discards where the sprite is transparent -- identity in the shape of the art, not its quad", opts: { code: FL.SPRITE_PICK_WGSL, compileOnly: true, outCount: 0 } },
+        // v4315 -- OUR OWN PHYSICS, WITH KEYS. The two probes RUN (one f32 per invocation, uniforms at binding 1), so the
+        // crossBackend gate compares native and browser element for element; physicsShaders-selfcheck holds each to
+        // its exact answer (ln 2 at r = 4; the Heidler peak over i0 = 1 at the true eta).
+        { id: "lyapunovWgsl.lyapunovProbeWgsl", from: "render/lyapunovWgsl.mjs",
+          why: "the logistic map iterated 448 times per invocation and the mean log-slope -- swk_lyapunov's arithmetic, ours, with an external key",
+          opts: { code: LY.lyapunovProbeWgsl(), entryPoint: "probe", outCount: 64 * 32,
+                  uniforms: LY.packProbeUniforms({ rLo: 3.4, rHi: 4.0, samples: 384, warmup: 64, seedLo: 0.05, seedHi: 0.95, cols: 64, rows: 32 }), workgroups: 32 } },
+        { id: "lyapunovWgsl.LYAPUNOV_KEY_WGSL", from: "render/lyapunovWgsl.mjs", compileOnly: true, why: "the full-screen key: the exponent in 16 bits across two channels, on either backend", opts: { code: LY.LYAPUNOV_KEY_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "lyapunovWgsl.LYAPUNOV_LOOK_WGSL", from: "render/lyapunovWgsl.mjs", compileOnly: true, why: "the Chaos race: the hull's own coordinates as r and the seed, the exponent as the shade", opts: { code: LY.LYAPUNOV_LOOK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "heidlerWgsl.heidlerProbeWgsl", from: "render/heidlerWgsl.mjs",
+          why: "the Heidler return-stroke current -- the lightning -- one time per invocation on a geometric grid, i(t)/i0 with its peak an exact 1",
+          opts: { code: HD.heidlerProbeWgsl(), entryPoint: "probe", outCount: 2048,
+                  uniforms: HD.packProbeUniforms({ i0: HD.PARAMS.first.i0, t1: HD.PARAMS.first.t1, t2: HD.PARAMS.first.t2, eta: HD.etasFor().trueEta, tLo: HD.PARAMS.first.t1 / 50, tHi: HD.PARAMS.first.t2 * 8, count: 2048, geometric: 1 }), workgroups: 32 } },
         { id: "gpuTerrain.TERRAIN_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
           why: "textureLoad and textureDimensions in the VERTEX stage -- the heightfield lift, which no other shader here does",
           opts: { code: TERRAIN_WGSL, compileOnly: true, outCount: 0 } },
@@ -139,6 +154,9 @@ export function corpus() {
 
 /** Shaders the tree runs that this corpus cannot, each with the reason it cannot rather than a shrug. */
 export const EXCLUDED = Object.freeze([
+    // v4315 -- the physics functions each probe splices in: source fragments, not modules
+    Object.freeze({ id: "lyapunovWgsl.LYAPUNOV_FN_WGSL", kind: "source fragment", why: "the lyapunov() function every Lyapunov shape splices in; the probe, key and look are the modules" }),
+    Object.freeze({ id: "heidlerWgsl.HEIDLER_FN_WGSL", kind: "source fragment", why: "the Heidler shape and current functions the probe splices in" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
                     why: "assembled in its own gate by concatenation to dodge a self-counting trap; copying it here would defeat that",
                     keeps: "tools/ship/wgslLayout-selfcheck.mjs stays on the browser harness" }),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/fleets-selfcheck.mjs -- v4301 (Level 15)
 //
-// GRADES FLEETS IN THEIR OWN ARCHITECTURES: one GPU-driven scene whose instances belong to nine fleets, each fleet
+// GRADES FLEETS IN THEIR OWN ARCHITECTURES: one GPU-driven scene whose instances belong to ten fleets, each fleet
 // culled into its own (fleet, LOD) regions and drawn through its own meshes, layout and shader pair -- flat quads,
 // a lit 3D hull, a sprite, that sprite lofted solid, the radar's voxel jet, an extruded SVG hologram, a Krbn-
 // skinned hull on a line-list, glyph quads pinned to a hull, and a hull seen through ASCII cells -- on both
@@ -29,7 +29,7 @@ const viewProj = G.multiply(G.perspective(CAM.fov, 1, CAM.near, CAM.far), G.look
 const records = G.gridScene({ side: SIDE, z: -2, spacing: 1, radii: [0.34] });
 const COUNT = records.length / 4, FLEETS = F.RACES.length;
 const fleetOf = Uint32Array.from({ length: COUNT }, (_, i) => i % FLEETS);
-const AREA = ["Union", "Wedge", "Pixel", "Loft", "Holo", "Cells"];   // fleets whose hull has area at its centre; Krbn is strokes, Glyph is sparse quads, Voxel's centre is between voxels
+const AREA = ["Union", "Wedge", "Pixel", "Loft", "Holo", "Cells", "Chaos"];   // fleets whose hull has area at its centre; Krbn is strokes, Glyph is sparse quads, Voxel's centre is between voxels
 
 console.log("\n1. THE SCENE KNOWS FLEETS: regions per (fleet, LOD), the twin agrees, and the refusals are by name");
 {
@@ -117,7 +117,7 @@ console.log("\n2. THE ARCHITECTURES, ON THE CPU: hulls, skins, sprites, glyphs, 
     ok("  loading an unloadable source refuses with the reason the listing gave", refused);
     const std = F.standardFleets(nullBackend(), { userHull: box });
     const byName = Object.fromEntries(std.fleets.map((f) => [f.name, f]));
-    ok("standardFleets: nine fleets, two levels each; the Wedge, Krbn, Glyph and Cells races all built on the user's hull", std.fleets.length === 9 && std.fleets.every((f) => f.lods.length === 2) && byName.Wedge.userHull && byName.Wedge.lods[0].mesh.indices.length === 36 && byName.Krbn.topology === "line-list" && byName.Krbn.lods[0].mesh.kind === "strokes" && byName.Glyph.userHull && byName.Cells.userHull && !byName.Loft.userHull, std.fleets.map((f) => `${f.name}:${f.look}`).join(" "));
+    ok("standardFleets: ten fleets (v4315: Chaos, swk_lyapunov as a look), two levels each; the Wedge, Krbn, Glyph and Cells races all built on the user's hull", std.fleets.length === 10 && std.fleets.every((f) => f.lods.length === 2) && byName.Wedge.userHull && byName.Wedge.lods[0].mesh.indices.length === 36 && byName.Krbn.topology === "line-list" && byName.Krbn.lods[0].mesh.kind === "strokes" && byName.Glyph.userHull && byName.Cells.userHull && !byName.Loft.userHull, std.fleets.map((f) => `${f.name}:${f.look}`).join(" "));
 }
 
 console.log("\n3. ON BOTH BACKENDS: each fleet in its own architecture, its pixels where its records are, the counts the twin's");
@@ -170,7 +170,7 @@ else {
             const un = R.names.indexOf("Union"), gl = R.names.indexOf("Glyph");
             ok(`  ${b}: the Krbn race is strokes and the Glyph race sparse quads -- each fewer pixels than the Union control; a centre pick is not promised for either`, R.perFleet[k].pixels > 0 && R.perFleet[k].pixels < R.perFleet[un].pixels && R.perFleet[gl].pixels < R.perFleet[un].pixels, `Krbn ${R.perFleet[k].pixels}px (centre ${R.centre[k].hit}/${R.centre[k].tried}), Glyph ${R.perFleet[gl].pixels}px, Union ${R.perFleet[un].pixels}px`);
             let distinct = true, closest = Infinity; for (let i = 0; i < FLEETS; i++) for (let j = i + 1; j < FLEETS; j++) { const d = [0, 1, 2].reduce((s, c) => s + Math.abs(R.perFleet[i].rgb[c] - R.perFleet[j].rgb[c]), 0); closest = Math.min(closest, d); if (d < 40) distinct = false; }
-            ok(`  ${b}: the nine fleets look different (mean colour of each fleet's own lit pixels, closest pair)`, distinct, `closest pair differs by ${closest}/765; ` + R.names.map((n, i) => `${n} ${R.perFleet[i].rgb.join("/")}`).join(", "));
+            ok(`  ${b}: the fleets look different (mean colour of each fleet's own lit pixels, closest pair)`, distinct, `closest pair differs by ${closest}/765; ` + R.names.map((n, i) => `${n} ${R.perFleet[i].rgb.join("/")}`).join(", "));
         }
         const A = r.result.webgpu, B = r.result.webgl2;
         ok("WebGPU and WebGL2 agree on every region's count", A.counts.join() === B.counts.join());
@@ -202,5 +202,5 @@ console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a heading in the record (the spin is the golden angle times the id, a stand-in); the Cells race " +
     "against a real text renderer (it is graded as an impression: it draws, its pixels are its own, it looks unlike the others, and " +
     "its pick names the hull between the glyphs); a user's .glb over the network (the fetch is mocked with physics/mesh/glb.mjs's own " +
-    "writer); the EV sprite loft, which does not travel here; and how the nine look on a screen, which only a person can say.");
+    "writer); the EV sprite loft, which does not travel here; and how the ten look on a screen, which only a person can say.");
 process.exit(fails ? 1 : 0);

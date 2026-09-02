@@ -50,6 +50,7 @@ import { RAMP } from "../tools/render-qa/asciify.mjs";
 import { parseGLB } from "../physics/mesh/glb.mjs";
 import { liftStrokes, drawingBounds, hatchStrokes } from "../tools/krbn/strokeLift.js";
 import { KRBN_CAM } from "../tools/krbn/krbnCompare.js";
+import { LYAPUNOV_LOOK_WGSL, LYAPUNOV_LOOK_VERTEX_GLSL, LYAPUNOV_LOOK_FRAGMENT_GLSL, LOOK_UNIFORMS as LYAPUNOV_UNIFORMS, LOOK_KNOBS as LYAPUNOV_KNOBS } from "./lyapunovWgsl.mjs";
 
 // ---- the looks: five vertex/fragment pairs, WGSL and GLSL --------------------------------------------------------
 /**
@@ -364,6 +365,9 @@ export const LOOKS = Object.freeze({
                            uniforms: [{ name: "viewProj", type: "mat4" }, { name: "light", type: "vec4" }, { name: "holo", type: "vec4" }], topology: null, note: "the swiftShaderPass HOLOGRAPHIC rainbow over a lambert hull, with a scanline" }),
     ink: Object.freeze({ layout: LAYOUTS.flat, shaders: { wgsl: INK_WGSL, glsl: { vertex: INK_VERTEX_GLSL, fragment: INK_FRAGMENT_GLSL } }, pick: SPIN_PICK,
                           uniforms: [{ name: "viewProj", type: "mat4" }], topology: "line-list", note: "strokes on a line-list -- a Krbn drawing lifted to 3D" }),
+    // v4315 -- swk_lyapunov as a look: the hull's own coordinates are r and the seed, the shade is the exponent
+    lyapunov: Object.freeze({ layout: LAYOUTS.lit, shaders: { wgsl: LYAPUNOV_LOOK_WGSL, glsl: { vertex: LYAPUNOV_LOOK_VERTEX_GLSL, fragment: LYAPUNOV_LOOK_FRAGMENT_GLSL } }, pick: SPIN_PICK,
+                               uniforms: LYAPUNOV_UNIFORMS, topology: null, note: "the logistic map's Lyapunov exponent painted on the hull -- ours, with an exact key (ln 2 at r = 4), graded on both backends" }),
     ascii: Object.freeze({ layout: LAYOUTS.lit, shaders: { wgsl: ASCII_WGSL, glsl: { vertex: ASCII_VERTEX_GLSL, fragment: ASCII_FRAGMENT_GLSL } }, pick: SPIN_PICK,
                             uniforms: [{ name: "viewProj", type: "mat4" }, { name: "light", type: "vec4" }, { name: "cell", type: "vec4" }], topology: null, note: "an impression of an ASCII picture: screen cells, a glyph per lit shade" }),
 });
@@ -628,7 +632,7 @@ export async function loadUserModel(source, { fetchFn = (typeof fetch === "funct
 }
 
 // ---- the races -------------------------------------------------------------------------------------------------------
-/** The nine races and the honest word on each. `look` names LOOKS; the mesh source is what standardFleets() builds. */
+/** The ten races and the honest word on each. `look` names LOOKS; the mesh source is what standardFleets() builds. */
 export const RACES = Object.freeze([
     Object.freeze({ name: "Union", look: "flat", architecture: "flat quads", color: [1, 0.85, 0.35, 1], note: "the Level 11 hauler, unchanged -- the control" }),
     Object.freeze({ name: "Wedge", look: "lit", architecture: "3D hull, six flat faces", color: [0.8, 0.85, 0.95, 1], note: "the first race with a normal; a user's .glb or .obj replaces its hull" }),
@@ -639,6 +643,7 @@ export const RACES = Object.freeze([
     Object.freeze({ name: "Krbn", look: "ink", architecture: "a raised hull, krbn-skinned: strokes lifted onto its surface, on a line-list", color: [0.12, 0.09, 0.07, 1], note: "the drawing wraps the 3D model (tools/krbn/strokeLift.js); harder than it looks because a line has no area to pick or light" }),
     Object.freeze({ name: "Glyph", look: "sprite", architecture: "ASCII glyph quads pinned to the hull's surface", color: [0.55, 1, 0.6, 1], note: "tools/export/reskin.js's glyph skin, the ramp shared with the ASCII view; sparse by nature" }),
     Object.freeze({ name: "Cells", look: "ascii", architecture: "3D hull seen through screen cells", color: [0.6, 0.95, 1, 1], note: "an impression of ASCII: glyph per lit shade, in 8x8 screen cells; the pick names the hull, cells or not" }),
+    Object.freeze({ name: "Chaos", look: "lyapunov", architecture: "the SVG hull, its own bifurcation diagram", color: [1, 1, 1, 1], note: "swk_lyapunov at Level 11 (render/lyapunovWgsl.mjs): r across the hull, the seed up it, the exponent as the shade; ln 2 read back off both backends" }),
 ]);
 /** A deterministic fleet for a trader's name: the owner (before a `/`) hashed, so every ship of one owner is one race. */
 export function fleetForName(name, fleetCount = RACES.length) {
@@ -650,7 +655,7 @@ export function fleetForName(name, fleetCount = RACES.length) {
 export function fleetsForNames(names, fleetCount = RACES.length) { return Uint32Array.from(names, (n) => fleetForName(n, fleetCount)); }
 
 /**
- * The nine fleets, built on a device: meshes, layouts, pipelines, textures and bind hooks, ready for
+ * The ten fleets, built on a device: meshes, layouts, pipelines, textures and bind hooks, ready for
  * makeGpuDrivenScene({ fleets, fleetOf }). Two levels each, "near" (the architecture) and "far" (one triangle
  * or one segment in the same layout), so every fleet climbs the scene's one-threshold ladder.
  *   userHull:  an optional mesh (from loadUserModel) that replaces the hull the Wedge, Krbn, Glyph and Cells
@@ -674,6 +679,7 @@ export function standardFleets(device, { userHull = null, cell = 8, svg = DEFAUL
             case "Krbn": return { near: krbnSkin(hull(), { color: race.color }).mesh, far: farStrokeMesh(race.color) };
             case "Glyph": return { near: glyphSkinMesh(hull(), { color: race.color }), far: farMesh(race.color) };
             case "Cells": return { near: hull(), far: farMesh(race.color) };
+            case "Chaos": return { near: svgHullMesh(svg, { color: race.color }), far: farMesh(race.color) };
         }
         throw new Error("fleets: unknown race " + race.name);
     };
@@ -683,6 +689,7 @@ export function standardFleets(device, { userHull = null, cell = 8, svg = DEFAUL
             case "sprite": return race.name === "Glyph" ? (pass) => pass.texture("atlas", glyphTex, 0) : (pass) => pass.texture("atlas", spriteTex, 0);
             case "holo": return (pass, ctx) => { pass.uniform("light", light); pass.uniform("holo", [now(ctx), 40, 1.5, 0.6]); };
             case "ascii": return (pass) => { pass.uniform("light", light); pass.uniform("cell", [cell, cell, ga.ramp.length, 0]); pass.texture("glyphs", glyphTex, 0); };
+            case "lyapunov": return (pass) => { pass.uniform("light", light); pass.uniform("chaos", LYAPUNOV_KNOBS); };
             default: return null;
         }
     };

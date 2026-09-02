@@ -100,6 +100,31 @@ that the rig has not signed. Until the file exists the gate says RIG-PENDING, as
 
 - Measure: a table, not an adjective. The first honest number is the one this tree has never had.
 
+## Constructions only this infrastructure allows (added at v4315)
+
+Each of these needs several rungs at once, which is why none existed before Level 16.
+
+- **Ten thousand learners, trained on the GPU.** The brain's MLP already has a batched GPU form
+  (brain/mlp.js BatchedMLP). With the economy's step deterministic and its state a few thousand
+  integers, whole populations of policies could be evaluated in one compute dispatch -- each thread a
+  hauler in its own universe, the evolution-strategy update a reduction. Level 16's two seconds of
+  training would be frames.
+- **The journal as a time machine you can scrub.** A replay is a deterministic function of tick, so a
+  scrubber can move the whole universe backward and forward, and the pick picture names what was under
+  the pointer on any day. Level 16's journal is the whole mechanism; the slider is the work.
+- **Two universes drawn as one picture.** Lockstep hashes are integers, so two peers could each draw
+  half the fleets and composite through the identity picture, splitting a scene across machines
+  without either owning the whole state.
+- **A race that lives in the depth pyramid.** Hi-Z is a max-depth image of the previous frame. A fleet
+  whose shader reads it could hide behind whatever occluded it last frame -- a stealth race with no
+  CPU logic at all.
+- **Git time on the GPU.** With headings and arrival days in the record (item 2), the orbit pass could
+  open and close markets itself, and the cull would reject a body that has not been vendored yet with
+  no CPU decision.
+- **Physics as paint.** swk_lyapunov and the Heidler current are shaders with exact keys at v4315
+  (docs/PHYSICS-SHADER-CANDIDATES.md lists the next sixteen). Every race could wear a physical law,
+  and every law could be graded on the hull it is painted on.
+
 ## What Level 17 does NOT need
 
 - The brain as a trader (Level 16) -- a race policy is a fixed policy; learning is 16's question.
