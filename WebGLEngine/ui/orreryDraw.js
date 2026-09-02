@@ -15,6 +15,7 @@ import { repoHeightfield, BIOME_ORDER } from "../world/repoHeightfield.js";
 import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
 import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
+import { satelliteAt } from "../world/orreryFleet.mjs";   // v4325, #68 -- a satellite's position is a pure function of (seed, t)
 
 /** Licence posture is the one thing in this picture that is a JUDGEMENT, so it gets the loudest channel. */
 export const STATE_COLOUR = Object.freeze({
@@ -364,5 +365,38 @@ export function drawTerrain(ctx, field, x, y, size, opts = {}) {
 }
 
 /** Which of the three the current magnification is, given the focused body and scale. Re-exported for the page. */
+/**
+ * *** THE FLEET, AT PLANET ZOOM: EVERY ENGINE FILE THAT IMPORTS THIS BODY, IN ORBIT AROUND IT. *** (#68, v4325)
+ *
+ * Nothing is invented here. The count is world/orreryEjecta.mjs's importer measurement, the ring radius is the
+ * satellite's own axis, and the angle is a pure function of (its last commit, t) -- all from
+ * world/orreryFleet.mjs. This function only paints them.
+ *
+ * Satellites and debris are drawn differently because they are different FACTS: an importer is engine code
+ * reaching into the body, a debris rock is a licence file inside it. One population where the tree has two
+ * would be the picture deciding what is true, which world/orrery.mjs's header refuses at length.
+ *
+ * @param scale pixels per unit of a satellite's axis, so the fleet is drawn at the planet's own magnification
+ */
+export function drawFleet(ctx, fleet, x, y, scale, tDays = 0, opts = {}) {
+    if (!fleet) return { satellites: 0, debris: 0, drawn: 0 };
+    const rings = opts.rings !== false;
+    let drawn = 0;
+    for (const [list, colour, size, ring] of [[fleet.debris || [], "#8b7a52", 1.1, "rgba(139,122,82,0.18)"],
+                                              [fleet.satellites || [], "#7fe3a8", 1.9, "rgba(127,227,168,0.13)"]]) {
+        for (const sat of list) {
+            if (rings) {
+                ctx.strokeStyle = ring; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(x, y, sat.a * scale, 0, Math.PI * 2); ctx.stroke();
+            }
+            const p = satelliteAt(sat, tDays);
+            ctx.fillStyle = colour;
+            ctx.beginPath(); ctx.arc(x + p.x * scale, y + p.y * scale, size, 0, Math.PI * 2); ctx.fill();
+            drawn++;
+        }
+    }
+    return { satellites: (fleet.satellites || []).length, debris: (fleet.debris || []).length, drawn };
+}
+
 export function levelOf(body, pxPerUnit) { return levelFor(apparentPx(body, pxPerUnit)); }
 export { ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN };

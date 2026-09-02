@@ -112,11 +112,19 @@ const REPO = path.resolve(ENG, "..");
         `vendor/wasm reads as CAPTURED via a NESTED licence (depth ${wasm?.licenceDepth})`);
 
     // *** AND THE TWO THAT GENUINELY HAVE NONE. ***
-    ok(sys.unpapered.length <= UNPAPERED_BASELINE,
+    ok(sys.unpapered.length === UNPAPERED_BASELINE,
         `UNPAPERED is ${sys.unpapered.length}, at or below the baseline of ${UNPAPERED_BASELINE} -- vendoring something new without licence provenance pushes this over and the check goes red`);
-    ok(sys.unpapered.includes("box3d") && sys.unpapered.includes("htmx"),
-        `and they are named rather than counted: ${sys.unpapered.join(", ")}`);
-    ok(UNPAPERED_BASELINE > 0, "the baseline is honestly non-zero -- there is real paperwork outstanding, not a clean sheet");
+    // *** THESE TWO USED TO ASSERT THAT box3d AND htmx HAVE NO LICENCE, AND THE DEBT IS PAID. *** Backlog #61
+    // named them; both now carry a LICENSE in the tree. The claim could not be seen here until v4325 re-baked
+    // orrery.json, which had been frozen at v4189 -- so this gate has been reading a fourteen-body snapshot
+    // that predates the fix, and asserting the defect was still there. The check is INVERTED rather than
+    // deleted: a regression that re-introduced an unpapered body would go red on the line above, and this one
+    // records which two the debt was, so the history is not tidied away.
+    ok(!sys.unpapered.includes("box3d") && !sys.unpapered.includes("htmx"),
+        `#61's two are PAPERED: ${sys.bodies.filter((b) => /^(box3d|htmx)$/.test(b.name)).map((b) => b.name + " -> " + b.licence).join(", ")}`);
+    ok(UNPAPERED_BASELINE === 0 && sys.unpapered.length === 0,
+        "the baseline is zero because the tree is clean, and it is EQUALITY rather than a bound -- v4258's " +
+        "lesson, that a `<=` guard can be edited upward in silence. The next unlicensed body turns this red.");
 
     // ordering and determinism
     const again = scan(ENG, REPO, { today: "2026-08-30" });

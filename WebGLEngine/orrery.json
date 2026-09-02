@@ -6,7 +6,7 @@
    "name": "box3d",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 978055,
+   "bytes": 3767005,
    "files": [
     {
      "path": "box3d.js",
@@ -15,6 +15,62 @@
     {
      "path": "box3d.wasm",
      "bytes": 973188
+    },
+    {
+     "path": "include/box3d/base.h",
+     "bytes": 5827
+    },
+    {
+     "path": "include/box3d/box3d.h",
+     "bytes": 78982
+    },
+    {
+     "path": "include/box3d/collision.h",
+     "bytes": 26528
+    },
+    {
+     "path": "include/box3d/config.h",
+     "bytes": 1139
+    },
+    {
+     "path": "include/box3d/constants.h",
+     "bytes": 5441
+    },
+    {
+     "path": "include/box3d/id.h",
+     "bytes": 4888
+    },
+    {
+     "path": "include/box3d/math_functions.h",
+     "bytes": 32051
+    },
+    {
+     "path": "include/box3d/types.h",
+     "bytes": 90350
+    },
+    {
+     "path": "LICENSE",
+     "bytes": 1067
+    },
+    {
+     "path": "native/gate_probe",
+     "bytes": 1064472
+    },
+    {
+     "path": "native/gate_probe.c",
+     "bytes": 2481
+    },
+    {
+     "path": "native/libbox3d.a",
+     "bytes": 1451810
+    },
+    {
+     "path": "native/shim.o",
+     "bytes": 21808
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 2106
     }
    ]
   },
@@ -130,7 +186,7 @@
    "name": "htmx",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 54382,
+   "bytes": 55742,
    "files": [
     {
      "path": "htmx-ext-sse.2.2.4.min.js",
@@ -141,8 +197,12 @@
      "bytes": 51238
     },
     {
+     "path": "LICENSE",
+     "bytes": 642
+    },
+    {
      "path": "VERSIONS.txt",
-     "bytes": 291
+     "bytes": 1009
     }
    ]
   },
@@ -1195,6 +1255,34 @@
     {
      "path": "three.module.js",
      "bytes": 1272972
+    }
+   ]
+  },
+  {
+   "name": "three-webgpu",
+   "arrived": "2026-09-02",
+   "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
+   "bytes": 3214311,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1081
+    },
+    {
+     "path": "README.md",
+     "bytes": 1061
+    },
+    {
+     "path": "three.core.js",
+     "bytes": 1389353
+    },
+    {
+     "path": "three.tsl.js",
+     "bytes": 28536
+    },
+    {
+     "path": "three.webgpu.js",
+     "bytes": 1794280
     }
    ]
   },

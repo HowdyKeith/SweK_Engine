@@ -116,7 +116,12 @@ else {
     const shot1 = await pg.screenshot({ type: "png" }); await pg.waitForTimeout(400); const shot2 = await pg.screenshot({ type: "png" });
     await br.close(); srv.close();
     ok("*** the page loads and takes the WebGL2 route here, saying so in the HUD ***", /webgl2/.test(st.route) && /CPU twin/.test(st.route), st.route);
-    ok("  the clock runs and the counts are reported", st.t > 0 && /of 15/.test(st.drawn), `t=${st.t} drawn ${st.drawn}`);
+    // *** "of 15" WAS TYPED AND THE TREE GREW TO 15 BODIES PLUS THE CENTRE. *** The page prints its own
+    // source.count, so the expected figure is read from the same bake the page loads rather than written here:
+    // a sixteenth dependency must not need this line edited, and must not pass silently either.
+    const wantDrawn = "of " + (raw.bodies.length + 1);
+    ok("  the clock runs and the counts are reported", st.t > 0 && st.drawn.includes(wantDrawn),
+        `t=${st.t} drawn ${st.drawn}, expected "${wantDrawn}" (${raw.bodies.length} bodies + SweK at the centre)`);
     ok("  the picture moves", !shot1.equals(shot2));
     ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
 }
