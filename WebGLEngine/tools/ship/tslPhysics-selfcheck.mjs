@@ -39,6 +39,23 @@
 // mask calls periodic above r = 3.8 lies inside [1 + sqrt(8), 3.857] -- the period-3 window, whose edge this tree
 // owns exactly.
 //
+// v4337 -- AND AN ATOMIC ONE (section 6). render/gpuDriven.mjs's cull pass counts survivors into an indirect draw's
+// instanceCount, which every invocation may increment at once; nothing transplanted here had ever done that. A shell
+// entry may now say `atomic: true`, and the pair must agree -- three writes atomicAdd(&buf.value[i], ...) and WGSL
+// takes that pointer only into an atomic<T>, so a shell that forgot is refused by name rather than by the compiler.
+// The counter is also a WRITTEN buffer that nothing assigns to, so the role detector looks for the atomic call too.
+//
+// *** AND THE ATOMIC IS MEASURED, NOT ASSUMED. *** The same transplanted module with the atomic taken out by hand --
+// a plain read-modify-write on a plain u32 -- compiles, runs, and counts 156 to 171 where the truth is 670: 74% to
+// 77% of the increments lost to contention across sixteen workgroups, and a DIFFERENT wrong number every run. The
+// atomic version reads 670 exactly, five times. That is why this section runs at 1024 elements and not at 64: at one
+// workgroup there is nothing to lose and a plain add would have passed.
+//
+// *** AND A REGEX INSIDE THIS FILE'S BROWSER SCRIPT LOSES ITS BACKSLASHES TWICE. *** The script is a template
+// literal, so /atomicAdd\(/ arrives at RegExp as atomicAdd(s*...) and matches nothing. Two attempts at the
+// non-atomic variant replaced NOTHING, leaving an atomicAdd on a plain u32 -- caught only because the device refused
+// the module by name. The replacement is done by index and plain string now, with no pattern to escape.
+//
 // SABOTAGES, MEASURED at v4331:
 //   S  three's `enable subgroups;` and its @builtin(subgroup_size) left in the transplant -> exit=1, 6 red: the device
 //      refuses the module (12 uncaptured errors) and the storage buffer comes back zero on every element. three's own
@@ -54,6 +71,11 @@
 //      and the claim beside it says "measured as sabotage U" rather than asserting what a positional mapping would do.
 //   V  the second pass reading its OWN buffer instead of the first's (a one-word typo) -> exit=1, 1 red, refused by name
 //      before the device sees it: the graph then touches one buffer and the shell names two.
+//   MEASURED at v4337 (the atomic):
+//   W  the atomic-declaration guard removed from transplantCompute -> exit=1, 1 red: both refusals stop happening, and what
+//      would have been caught by name is left for the device's WGSL parser to reject at pipeline creation instead.
+//   X  the tally graph built without .toAtomic() and counting with a plain add -> exit=1, 1 red, refused by name before the
+//      device sees it ("the shell declares tally atomic and the pass never touches it atomically").
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -323,6 +345,78 @@ else {
     }
 }
 
+console.log("\n6. AN ATOMIC PASS (v4337): sixteen workgroups counting into one number, which is the cull pass's own shape");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const NBIG = 1024;
+    const r3 = await runInEngineOrigin({ engineRoot: ENG, args: { N: NBIG }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+        const g = P.makeLyapunovComputeTsl(T, { count: a.N, seed: 0.4 });
+        await renderer.computeAsync(g.node);
+        const t = P.makeChaosTallyTsl(T, { sweep: g.buffer, count: a.N });
+        await renderer.computeAsync(t.node);
+        const sweepEmitted = renderer._nodes.getForCompute(g.node).computeShader;
+        const tallyEmitted = renderer._nodes.getForCompute(t.node).computeShader;
+        out.threeDeclaresAtomic = /array< atomic<u32> >/.test(tallyEmitted);
+        try {
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32; const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const sweepShell = S.computeShell({ storage: [{ name: "out", element: "f32" }], uniforms: [{ name: "span", type: "vec4" }] });
+            const tallyShell = S.computeShell({ name: "chaos tally", storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "tally", element: "u32", atomic: true }], uniforms: [] });
+            const genSweep = S.transplantCompute(sweepEmitted, sweepShell);
+            const genTally = S.transplantCompute(tallyEmitted, tallyShell);
+            out.tallyWgsl = genTally.wgsl; out.reads = genTally.reads; out.writes = genTally.writes;
+            // REFUSED: the same pass into a shell that forgot the atomic, and an atomic shell for a pass that has none
+            out.refusedNoAtomic = (() => { try { S.transplantCompute(tallyEmitted, S.computeShell({ name: "chaos tally", storage: [{ name: "sweep", element: "f32", access: "read" }, { name: "tally", element: "u32" }], uniforms: [] })); return null; } catch (e) { return e.message; } })();
+            out.refusedSpurious = (() => { try { S.transplantCompute(sweepEmitted, S.computeShell({ storage: [{ name: "out", element: "f32", atomic: true }], uniforms: [{ name: "span", type: "vec4" }] })); return null; } catch (e) { return e.message; } })();
+            const sweepBuf = dev.buffer({ usage: ["storage"], size: a.N * 4 });
+            const ubuf = dev.buffer({ data: Float32Array.from(g.knobs), usage: "uniform" });
+            const groups = Math.ceil(a.N / 64);
+            const runTally = async (wgsl) => { const tb = dev.buffer({ data: new Uint32Array([0]), usage: ["storage"] });
+                const pA = dev.compute({ wgsl: genSweep.wgsl }); pA.bind("out", sweepBuf).bind("u", ubuf);
+                const pB = dev.compute({ wgsl }); pB.bind("sweep", sweepBuf).bind("tally", tb);
+                dev.frame(({ pass }) => { pass.dispatch(pA, groups); pass.dispatch(pB, groups); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+                const v = new Uint32Array(await dev.read(tb))[0]; tb.destroy(); return v; };
+            out.groups = groups;
+            out.tally = await runTally(genTally.wgsl);
+            // THE SAME MODULE WITH THE ATOMIC TAKEN OUT BY HAND: a plain read-modify-write on a plain u32. It compiles, it
+            // runs, and it is wrong -- which is the only reason the atomic declaration is worth a refusal of its own.
+            // NO REGEX HERE, AND THAT IS THE POINT. This whole script is a template literal, so a pattern written as
+            // /atomicAdd\\(/ loses its backslashes twice on the way to RegExp and matches nothing; two attempts replaced
+            // nothing at all and left an atomicAdd on a plain u32, which the device refused by name ("no matching call to
+            // atomicAdd(ptr<storage, u32, read_write>, u32)"). The call is found by index and replaced as a plain string.
+            const callAt = genTally.wgsl.indexOf("atomicAdd(");
+            const call = genTally.wgsl.slice(callAt, genTally.wgsl.indexOf(")", callAt) + 1);
+            const naive = genTally.wgsl.replace("array<atomic<u32>>", "array<u32>").replace(call, "tally.value[ 0u ] = tally.value[ 0u ] + 1u");
+            out.naiveIsPlain = naive.includes("tally.value[ 0u ] = tally.value[ 0u ] + 1u") && !/atomic/.test(naive);
+            out.naiveRuns = []; for (let i = 0; i < 5; i++) out.naiveRuns.push(await runTally(naive));
+            out.sweep = [...new Float32Array(await dev.read(sweepBuf))];
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness ran the sweep and the tally", r3.ok && r3.result && !r3.result.error && r3.result.tally != null, r3.ok ? (r3.result && r3.result.error) : (r3.reason || (r3.pageErrors || []).join("; ")));
+    if (r3.ok && r3.result && !r3.result.error) {
+        const A = r3.result;
+        const truth = A.sweep.filter((v) => v > 0).length;
+        ok(`*** ${A.groups} workgroups counted into ONE number and none of them lost an increment: the tally is ${A.tally}, and ${truth} of ${NBIG} elements of the sweep it read are positive ***`,
+            A.tally === truth && truth > 100 && A.groups > 1 && (A.errs || []).length === 0,
+            `tally ${A.tally}, truth ${truth}, ${A.groups} workgroups; device errors ${(A.errs || []).length}. At one workgroup there is no contention to lose, which is why this runs at ${NBIG}`);
+        ok("*** the atomic is declared on BOTH sides: three emitted array<atomic<u32>> and the shell says atomic, and the transplant refuses either without the other ***",
+            A.threeDeclaresAtomic && /array<atomic<u32>>/.test(A.tallyWgsl) && /does not declare it atomic/.test(A.refusedNoAtomic || "") && /never touches it atomically/.test(A.refusedSpurious || ""),
+            `refusals: ${(A.refusedNoAtomic || "none").slice(0, 60)} | ${(A.refusedSpurious || "none").slice(0, 60)}`);
+        ok(`*** and the atomic is what buys it: the SAME module with the atomic taken out counts ${A.naiveRuns.join(", ")} instead of ${truth}, a different wrong number every run ***`,
+            A.naiveIsPlain && A.naiveRuns.every((v) => v < truth) && new Set(A.naiveRuns).size > 1,
+            `atomic ${A.tally} exactly, five times; plain read-modify-write ${A.naiveRuns.join(", ")} -- ${Math.round(100 * (1 - Math.max(...A.naiveRuns) / truth))}% to ${Math.round(100 * (1 - Math.min(...A.naiveRuns) / truth))}% of the increments lost to contention. It compiles and runs, which is why the shell declares the atomic and the transplant refuses a mismatch`);
+        ok("  and the roles still hold with an atomic in the shell: the counter is a WRITTEN buffer even though nothing assigns to it", A.writes.join() === "tally" && A.reads.join() === "sweep",
+            `writes ${A.writes.join()}, reads ${A.reads.join()} -- the write is inside atomicAdd(&tally.value[0], 1u), which no assignment scan would see`);
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -332,5 +426,6 @@ else {
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the Lyapunov Loop's cost through three (448 iterations a pixel, timed by nobody); a real GPU's log() and exp() against SwiftShader's -- " +
     "which is the same question the chaotic five ask, one machine further out; a workgroup-shared or ATOMIC pass, which three can emit and this transplant has never seen (the " +
-    "fleets' own cull pass counts into an atomic<u32> and nothing here does); and an INDIRECT dispatch, where the count a pass runs at is itself in a buffer.");
+    "an INDIRECT dispatch, where the count a pass runs at is itself in a buffer, which is the last thing between this and " +
+    "regenerating a real gpuDriven pass; and workgroup-SHARED memory, which three can emit and no shell here declares.");
 process.exit(fails ? 1 : 0);

@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one), v4337 (an ATOMIC one)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -227,7 +227,15 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * touches as read_write whether the graph writes to it or not, so the shell is where read-only is stated, and the
  * transplant matches a generated buffer to a shell entry BY ROLE -- which of them the body assigns to -- rather than
  * by the order three happened to declare them in. (Measured: for a pass that reads one buffer and writes another,
- * three gave binding 0 to the one it WRITES. A positional mapping would have bound them backwards and drawn nothing.)
+ * three gave binding 0 to the one it WRITES -- so a shell that declares its INPUT first, as render/gpuDriven.mjs's
+ * cull pass does, gets them backwards under a positional mapping. Sabotage U at v4336 measured that: 2 red, six
+ * device errors from assigning a read-only binding. It went 0 red first, when the shell happened to list the written
+ * buffer first and position and role agreed -- which is why the sentence names a shell shape and not a universal.)
+ *
+ * v4337 -- an entry may also say `atomic: true`, which declares its elements as atomic<T>. An atomic buffer is one a
+ * pass WRITES even though nothing assigns to it: the write is inside atomicAdd(&buf.value[i], ...), so the role
+ * detector looks for that too. It is the shape the cull pass has -- an instanceCount every invocation may increment
+ * at once -- and the only kind of write where dropping the atomic still compiles, still runs, and quietly undercounts.
  *
  * There is NO GLSL HALF, and that is not an omission. WebGL2 has no compute stage; gfx/device.js says so by name
  * (`compute() needs { wgsl } -- a compute pipeline is WGSL-only`), and the pair contract every other transplant in
@@ -235,7 +243,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  */
 export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], uniforms = [], uniformVar = "u", workgroupSize = 64 } = {}) {
     const decls = [
-        ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${b.element || "f32"}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
+        ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${b.atomic ? `atomic<${b.element || "u32"}>` : (b.element || "f32")}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
         ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
     ];
     return { name, storage, uniforms, uniformVar, workgroupSize, prefix: decls.join("\n") };
@@ -258,11 +266,19 @@ export function transplantCompute(wgsl, shell) {
     const found = [...wgsl.matchAll(/var<storage,\s*read(?:_write)?>\s*(\w+)\s*:/g)].map((m) => m[1]);
     if (found.length !== shell.storage.length) throw new Error(`tslSource: the graph touches ${found.length} storage buffer(s) and the shell "${shell.name}" names ${shell.storage.length} (${shell.storage.map((b) => b.name).join(", ") || "none"})`);
     // v4336 -- BY ROLE, NOT BY ORDER: a generated buffer the body assigns to is a written one, the rest are read.
-    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*=`).test(wgsl));
+    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*=`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
     const readOnly = found.filter((g) => !written.includes(g));
     const wantW = shell.storage.filter((b) => b.access !== "read"), wantR = shell.storage.filter((b) => b.access === "read");
     if (written.length !== wantW.length || readOnly.length !== wantR.length) throw new Error(`tslSource: the graph writes ${written.length} buffer(s) and reads ${readOnly.length}, and the shell "${shell.name}" declares ${wantW.length} read_write and ${wantR.length} read (${shell.storage.map((b) => `${b.name}:${b.access || "read_write"}`).join(", ")})`);
     const rename = new Map([...written.map((g, i) => [g, wantW[i].name]), ...readOnly.map((g, i) => [g, wantR[i].name])]);
+    // an atomic buffer must be declared atomic on BOTH sides or the module will not compile: three writes atomicAdd(&b.value[i])
+    // and WGSL takes that pointer only into an atomic<T>. A shell that forgot is refused here, by name, not by the compiler.
+    for (const [g, name] of rename) {
+        const isAtomic = new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl);
+        const want = shell.storage.find((b) => b.name === name);
+        if (isAtomic && !want.atomic) throw new Error(`tslSource: the pass touches "${name}" atomically and the shell "${shell.name}" does not declare it atomic (atomic: true)`);
+        if (!isAtomic && want.atomic) throw new Error(`tslSource: the shell "${shell.name}" declares "${name}" atomic and the pass never touches it atomically`);
+    }
     const uniforms = uniformFields(wgsl, "wgsl");
     for (const u of uniforms) { const h = shell.uniforms.find((x) => x.name === u.name); if (!h) throw new Error(`tslSource: the compute pass's uniform "${u.name}" is not in the shell "${shell.name}"'s struct (${shell.uniforms.map((x) => x.name).join(", ") || "none"})`); if (h.type !== u.type) throw new Error(`tslSource: uniform "${u.name}" is ${u.type} in the pass and ${h.type} in the shell`); }
     const bodyAll = wgsl.slice(wgsl.indexOf(at[0]));
