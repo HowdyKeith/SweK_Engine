@@ -1,6 +1,7 @@
 {
  "built": "2026-09-03",
  "reports": [
+  "gateReport-selfcheck.json",
   "shipyard-selfcheck.json"
  ]
 }

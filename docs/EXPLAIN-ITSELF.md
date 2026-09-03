@@ -45,7 +45,7 @@ Emitting is off by default (`SWEK_GATE_REPORT=1`), because registerResidue's rul
 a stale artefact from an accidental run is worse than none, and a gate's table is not a
 pure function of the tree -- the shipyard gate's device rows need a GPU.
 
-## 3. Animate the emitted tables -- NEXT
+## 3. Animate the emitted tables -- DONE at v4399
 
 The tree already has `ui/canvasRecorder.js` and `ui/recordFloat.js` on 25 pages. A page
 that animates an emitted report, plus the recorder, is manim's **output shape** with no
@@ -55,8 +55,23 @@ out to 8.4 million while the error curves diverge -- already measured, already e
 **The reason this comes after item 2 and not before:** without emitted data an animation
 is a caption with a timeline. It has to draw the report, not a copy of it.
 
-**Measure:** whether every value the animation draws is one the report holds -- the same
-check item 2 shipped, applied to a moving picture.
+**Measured, and the prediction landed:** the argument's strongest number is the one the
+chart cannot draw. The shipyard's claim-local error is **exactly zero** at every distance
+-- the whole point of that encoding -- and a log axis has no place for a zero. Nor does
+the first distance, x = 0. **Nine of that table's twenty-one values are unplottable, 43%
+of it, seven of them the value 0**, and the plot names every one under itself rather than
+nudging a zero to 1e-16 and drawing a line that says "very small" where the measurement
+says "none".
+
+And the check that earned its keep was not membership but **coverage**: drawn plus
+named-as-undrawable must account for every value the table holds. Membership is nearly
+free when the plot reads the report directly, and it stays true when a plot draws *less*
+-- only coverage sees a number quietly disappear.
+
+The panel lives on `instruments.html` beside the tables, with the reference data-viz
+palette's dark slots validated against that page's real surface (`#0e1512`), one log y
+axis, a legend, selective endpoint labels, a hover crosshair giving the exact figure, and
+`ui/canvasRecorder.js` wired so the unfolding can leave as a clip.
 
 ## 4. Claims have the register's problem too -- OPEN
 
