@@ -91,6 +91,12 @@ TODO.md.bak
 WebGLEngine/okf/log.md
 Root Utils/email-draft.md
 
+# v4365 -- a generated img2threejs model the rig may drop here for tools/ship/img2three-selfcheck.mjs section 3.
+# The img2threejs TOOLING repo is Apache-2.0; the SHOWCASE repo that holds the generated models carries NO LICENSE
+# file and no license field in its package.json, so nothing from it is vendored or mirrored. The gate passes with
+# the file absent and says the numbers are unsigned; present, it re-derives them.
+WebGLEngine/.img2threejs/
+
 # v3923 -- per-host observed gate runtimes. gate-timings.json is the shipped REFERENCE; this is one
 # box's comparison against it and must never travel, or a fast machine would export its scale to a slow one.
 WebGLEngine/tools/ship/host-timings.local.json

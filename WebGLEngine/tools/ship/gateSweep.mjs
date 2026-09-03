@@ -283,11 +283,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "guards (1/2/2/1 by name) and restored md5-identical; one of the four is red only on a box " +
                  "whose hostScale is not 1, which is said in the log rather than left as a silent pass",
     }),
-    // v4371 -- the NINTH closing, and the first whose round also cleared a red the sweep could never have found:
+    // v4365 -- the ninth closing, and the first for a gate that reaches OUTSIDE this tree. img2three-selfcheck
+    // guards render/img2three.mjs, the bridge from a generated three.js object tree to one SweK mesh, so its
+    // third section depends on a file that is deliberately not in the mirror (.img2threejs/model.js, gitignored
+    // because img2threejs-showcase carries no licence). That section PASSES with the file absent and says the
+    // numbers are unsigned -- the BACKLOG.md shape -- so the gate is deterministic here and richer on the rig.
+    since9: Object.freeze({
+        at: "v4365", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/img2three-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, three sections. Driven RED by three sabotages of the module it " +
+                 "guards (1/3/4 by name) and restored. Its second section renders on BOTH backends at TWO cameras " +
+                 "and one of the two is where they part by a single boundary pixel, which is measured rather than " +
+                 "left at the camera where they agree",
+    }),
+    // v4366 -- the tenth closing. divineEye-selfcheck guards render/divineEye.mjs, a PORT of another project's
+    // deterministic review signals, so what it protects is fidelity to someone else's arithmetic rather than to
+    // this tree's: its first section pins their constants by value, because a port that drifts stops measuring
+    // the thing it was written to measure and starts measuring itself.
+    since10: Object.freeze({
+        at: "v4366", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/divineEye-selfcheck.mjs"]),
+        verdict: "green on this box, run singly, two sections. Driven RED by three sabotages of the module it " +
+                 "guards (1/4/1 by name) and restored -- one of the three went 0 red first and needed a new input " +
+                 "before it could bite. Both of the round's own first runs were wrong and both are logged in it",
+        redOnArrival: Object.freeze([]),
+    }),
+    // v4371 -- the ELEVENTH closing HERE and the ninth on the line that wrote it: two branches each added a
+    // ninth, and the merge renames rather than renumbers, because `at` says which round a closing belongs to
+    // and that does not move. Their note, unchanged:
+    // v4371 -- the first closing whose round also cleared a red the sweep could never have found:
     // vendor/three-webgpu went undeclared from v4319, and tools/ship/vendoredLicences-selfcheck.mjs takes 15 s,
     // which puts it outside the 3 s quick sweep. It was red on every verify for fifty rounds and reported by
     // none of them. Recorded here because it is exactly the blind spot this accounting exists to measure.
-    since9: Object.freeze({
+    since11: Object.freeze({
         at: "v4371", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carve-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -297,11 +326,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
                  "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
     }),
-    // v4372 -- the TENTH closing, for the carve's compute pass. Its round also fixed a defect in the transplant
+    // v4372 -- the TWELFTH closing, for the carve's compute pass. *** IT WAS WRITTEN AS since10 AND THAT
+    // NUMBER WAS ALREADY TAKEN: *** the other line shipped v4365 and v4366 into since9 and since10 while this
+    // one was building, and the merge left TWO since10 keys in one object literal -- where the later silently
+    // overwrites the earlier, so v4366's closing would have vanished with no error anywhere. Caught by reading
+    // the merged file rather than by anything running. That is the same hazard as a reused version number, one
+    // level down, and it is why the accounting reads `closings` as a LIST rather than by name. Its round also fixed a defect in the transplant
     // machinery every earlier closing's gate ran through (render/tslSource.mjs read `==` as an assignment), so
     // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
     // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
-    since10: Object.freeze({
+    since12: Object.freeze({
         at: "v4372", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
