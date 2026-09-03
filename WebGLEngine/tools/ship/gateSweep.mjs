@@ -664,6 +664,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "comparison survived because every consumer read a ratio or a zero. Its own first draft " +
                  "overclaimed a plateau and the claim is now about the rate, which is what is true",
     }),
+
+    // v4420 -- the thirty-fifth closing. v4220's "held-out pictures" were held-out SEEDS of one generator,
+    // and one generator over the sign flips: seven of eight off-diagonal cells in a two-row transfer matrix
+    // are BELOW uniformly random placement, the worst at -12 sd. The earlier claim is reproduced rather than
+    // contradicted -- what changes is what it was ever evidence about.
+    since36: Object.freeze({
+        at: "v4420", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/paintTransfer-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 10 checks in 17.4 s -- it TRAINS TWICE, " +
+                 "which is why. Driven RED by nine sabotages (5/3/1/1/1/1/1/3/5 by name) and restored, and " +
+                 "one went 1 RED FOR THE WRONG REASON: the check written to catch a generator that does not " +
+                 "vary was measuring the raw generators while every episode is fed the memoised wrappers. " +
+                 "Its Krbn generator had to be built twice, and the sabotage harness itself had to be fixed " +
+                 "after a timed-out run destroyed its own backup",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
