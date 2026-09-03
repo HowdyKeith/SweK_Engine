@@ -678,6 +678,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "them and 7.2x at the worst, and SIX WERE RED IN THE DARK -- two now in redCensus.RED_AT_V4407, " +
                  "two fixed by the ritual's own staleness step, two already registered. The pool fell 372 -> 234",
     }),
+    since36: Object.freeze({
+        at: "v4410", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/doomFireField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.2s, thirteen checks in five sections. It gates " +
+                 "render/doomFireField.mjs, which makes the DOOM fire's flow a PER-CELL DIRECTION FIELD rather " +
+                 "than the constant -width of v4178, and its spine is a control that costs nothing: a uniform " +
+                 "upward field reproduces render/doomFire.mjs BYTE FOR BYTE over five grid shapes and 1,000 " +
+                 "frames with stoke() and damp() interleaved, because the rule's TWO directional constants -- " +
+                 "the flow +w and the lean -1 -- are DERIVED from the field rather than re-typed beside it. " +
+                 "Four of the round's own claims were refuted by its own instruments and each is a row here: " +
+                 "quantise's comment asserted the property its code lacked, the header claimed a zero " +
+                 "direction meant nothing burns there while 154 of 1,542 off-water cells burned, the river's " +
+                 "downstream never advanced downstream, and the waterfall's 'narrow column' comment sat over " +
+                 "code making a sheet. It also pins a boundary behaviour of v4178 that v4178 could not " +
+                 "exhibit: a fuel cell with no perpendicular upstream neighbour is only ever written " +
+                 "undecayed, so the curtain's leading column reads 36 at all 20 rows.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
