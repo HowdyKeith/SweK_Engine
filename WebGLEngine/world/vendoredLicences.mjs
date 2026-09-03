@@ -79,6 +79,14 @@ export const VENDORED = Object.freeze([
     { path: "vendor/slug",      kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/taichi-js", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    { path: "vendor/three-webgpu", kind: KIND.THIRD_PARTY, spdx: "MIT",    grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://registry.npmjs.org/three/-/three-0.178.0.tgz", pin: "three@0.178.0",
+      note: "*** VENDORED AT v4319 AND UNDECLARED UNTIL v4371 -- FIFTY ROUNDS RED AND NOBODY SAW IT. *** The " +
+            "TSL build (three.webgpu.js, three.core.js, three.tsl.js) beside r160, with three's own MIT LICENSE " +
+            "copied in the same commit, so nothing was ever unpapered on disk; what was missing was the RECORD, " +
+            "which is what this list is for. The gate that says so takes 15 s and is therefore outside verify's " +
+            "3 s quick sweep, so it went red on every run and was reported by none of them -- found by a round " +
+            "that ran it by hand for an unrelated reason. A standing red nobody runs is a check nobody has." },
     { path: "vendor/wasm",      kind: KIND.FIRST_PARTY, spdx: null,        grant: GRANT.NONE,         file: null,
       note: "*** OURS, NOT SOMEBODY ELSE'S. *** sha256.wasm and graphlayout.wasm are AssemblyScript output " +
             "from sha256.ts and graphlayout.ts in the same directory. A filename census calls this unpapered; " +

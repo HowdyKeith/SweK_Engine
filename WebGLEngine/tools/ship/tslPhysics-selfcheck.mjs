@@ -144,6 +144,18 @@
 //   AL the uniform array left out of the shell's prefix -> exit=1, 1 red, and gfx/device.js is what says so: "the shader
 //      declares no storage or uniform binding named planes". The module names it, nothing declares it, and the refusal
 //      arrives by name from the device rather than from a WGSL compiler diagnostic.
+//   MEASURED at v4370 (the HMC leapfrog, against a kernel that already ships):
+//   AM the gradient DISTRIBUTED in the graph -- i00*qx - i00*mu0 for i00*(qx - mu0) -- which is the same algebra and a
+//      different rounding -> exit=1, 2 red, and the SHAPE is the argument for the whole section: 41 of 256 endpoints are
+//      still bit-exact, the worst gap is 1.192e-6, and that is 21x INSIDE hmcGpu's own 2.5e-5 floor and 42x inside its
+//      tolerance. A tolerance check passes this sabotage. "0" does not, and that is the only reason it is stated as 0.
+//   AN the pre-loop gradient dropped, so the first half-kick uses a zero gradient -> exit=1, 2 red: 0 of 256 exact and the
+//      worst relative gap 6.998e-1, four orders past the tolerance. The leapfrog's g is carried INTO the loop from before
+//      it, which is a fact about the algorithm rather than about the transplant, and the shipped kernel is what says so.
+//   AO the read/write-count agreement removed from transplantCompute -> exit=1, 1 red -- and what it costs is visible in
+//      the message: an all-read_write shell stops being refused by name and instead throws "Cannot read properties of
+//      undefined (reading 'name')" from deeper in the mapping. The guard does not prevent a broken module here; it
+//      prevents a broken module being reported as an internal crash.
 //   MEASURED at v4363 (the struct element, and the whole pass):
 //   AE the struct-layout agreement dropped, so the shell's struct is taken on trust rather than held to the graph's ->
 //      exit=1, 1 red: a field renamed in the shell stops being refused, and what it would then cost is not a compile error
@@ -195,6 +207,28 @@
 // rather than glossed -- but it is the same 40 floats: packCullUniforms lays the planes out first and the four vec4s
 // after, so the gate slices ONE packing to drive both passes instead of packing a second copy. The graph is unmoved by
 // the change: the two transplants' bodies are the same text, because planes.element(i) is one node either way.
+// v4370 -- AND A KERNEL THAT ALREADY SHIPS, HELD TO BIT FOR BIT (section 12). Every transplant before this one was
+// graded against a twin written in this tree for the purpose, or against a picture. tools/roundhouse/hmcGpu.mjs's
+// WGSL_HMC is neither: it is the batch leapfrog the swek-hmc-bench fleet job runs on real hardware, it predates this
+// arc by a thousand versions, and it carries its own CPU mirror at f32 (Math.fround after every op) and the FLOOR that
+// mirror measured. physicsTsl makeHmcLeapfrogTsl is that kernel as nodes. Measured on WebGPU: BIT-IDENTICAL to the
+// shipped kernel on all 256 endpoint values -- 0, not a tolerance -- and both inside 1.371e-6 of the f32 mirror,
+// against a floor of 2.5e-5 earned for real devices.
+//
+// *** AND THE ROUND'S OWN FIRST CLAIM ABOUT WHAT THAT IS WORTH WAS WRONG, WHICH THE GATE MEASURED RATHER THAN REVIEWED.
+// *** physicsTsl's header said writing the kick as 0.5*(eps*g) instead of (0.5*eps)*g would be algebraically identical
+// and NOT bit-identical. Run, it is bit-identical on every one of the 256: 0.5 is a power of two, that multiply is
+// exact, and re-association across it cannot lose anything. The rule is right and the example was not. So the section
+// carries a re-association that IS observable beside it -- the gradient distributed, i00*qx - i00*mu0 for
+// i00*(qx - mu0), which moves 215 of 256 endpoints -- and pins BOTH numbers instead of the rule of thumb.
+//
+// *** THE STRONGER CLAIM IS DOING WORK A TOLERANCE WOULD NOT. *** That distributed rewrite is off by 1.192e-6: 21x
+// inside hmcGpu's own floor and 42x inside the tolerance a real device is graded against. Every tolerance in this tree
+// would pass it. The bit claim is the only thing here that does not, and the section says so with the number.
+//
+// NOT CLAIMED: the kernel's full signature. L and n are uniforms in WGSL_HMC and baked constants in the graph, because
+// a TSL Loop wants a JavaScript bound -- lyapunovNodes set that precedent at v4321 with samples and warmup. This is
+// the kernel's ARITHMETIC at the fixture's own L, with the shipped pass fed the same L through its uniform.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -205,6 +239,7 @@ import { computeShell, transplantCompute } from "../../render/tslSource.mjs";
 import { lyapunovComputeWgsl } from "../../render/lyapunovWgsl.mjs";
 import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import { cullLodWgsl } from "../../render/gpuDriven.mjs";
+import { WGSL_HMC, HMC_FIXTURE, F32_FLOOR_HMC, HMC_TOL, fixtureInv, makeBatch, leapfrogF32 } from "../roundhouse/hmcGpu.mjs";
 import { keyCpu } from "../../render/heidlerWgsl.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -239,7 +274,7 @@ const k = keyCpu(PARAMS.first);
         !WGSL_TELL.test(src) && !GLSL_TELL.test(src) && WGSL_TELL.test(fleetSrc) && GLSL_TELL.test(fleetSrc),
         `physics wgsl ${WGSL_TELL.test(src)} glsl ${GLSL_TELL.test(src)}; fleet wgsl ${WGSL_TELL.test(fleetSrc)} glsl ${GLSL_TELL.test(fleetSrc)}`);
     ok("  ...and it exports no shell and no look, which is the same statement said in names", !/export function \w*(Shell|Look\w*Tsl)\b/.test(src) && /export function \w+Shell\b/.test(fleetSrc));
-    ok("  the uniforms AND the storage buffers are labelled (render/tslSource.mjs binds by the label): the two keys' ten, the compute sweep's span, the cull decision's two, and the cull PASS's four uniforms and five named buffers here; the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 24 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys, the sweep's span, the decision's eye and thresholds, the pass's eye/thresholds/info/clock and inst/extras/cmds/records/fleetOf with planes labelled on BOTH of its two bindings), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
+    ok("  the uniforms AND the storage buffers are labelled (render/tslSource.mjs binds by the label): the two keys' ten, the compute sweep's span, the cull decision's two, and the cull PASS's four uniforms and five named buffers, and the HMC leapfrog's two here; the fleet looks' eight in render/fleetTsl.mjs", (src.match(/\.label\("/g) || []).length === 26 && (fleetSrc.match(/\.label\(/g) || []).length === 8, `${(src.match(/\.label\("/g) || []).length} physics (ten keys, the sweep's span, the decision's eye and thresholds, the pass's eye/thresholds/info/clock and inst/extras/cmds/records/fleetOf with planes labelled on BOTH of its two bindings, plus the leapfrog's sinv and mu), ${(fleetSrc.match(/\.label\(/g) || []).length} fleet`);
 }
 
 const skip = webgpuSkipReason();
@@ -999,6 +1034,118 @@ else {
     }
 }
 
+console.log("\n12. THE HMC LEAPFROG (v4370): a fleet kernel that already ships, generated, and held to it BIT FOR BIT");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const N = 64, { mu, eps, L } = HMC_FIXTURE, inv = fixtureInv();
+    const batch = makeBatch(N, 77), qin = [...batch.qin], pin = [...batch.pin];
+    // the answer key is hmcGpu's OWN f32 mirror -- Math.fround after every arithmetic op, which is what WGSL f32
+    // computes -- and it is written for the shipped kernel, not for this round.
+    const cpu = []; for (let i = 0; i < N; i++) cpu.push(...leapfrogF32(qin[2 * i], qin[2 * i + 1], pin[2 * i], pin[2 * i + 1], inv, mu, eps, L));
+    const HSHELL = { name: "hmc leapfrog", workgroupSize: 64,
+        storage: [{ name: "qin", element: "f32", access: "read" }, { name: "pin", element: "f32", access: "read" },
+                  { name: "qout", element: "f32" }, { name: "pout", element: "f32" }],
+        uniforms: [{ name: "sinv", type: "vec4" }, { name: "mu", type: "vec4" }] };
+    const r9 = await runInEngineOrigin({ engineRoot: ENG, args: { N, inv, mu, eps, L, qin, pin, shipped: WGSL_HMC, shell: computeShell(HSHELL), HSHELL }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const P = await import("/render/physicsTsl.mjs"); const S = await import("/render/tslSource.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const out = {};
+        try {
+            const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+            const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
+            const g = P.makeHmcLeapfrogTsl(T, { count: a.N, inv: a.inv, mu: a.mu, eps: a.eps, L: a.L });
+            await renderer.computeAsync(g.node);
+            const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+            const gen = S.transplantCompute(emitted, a.shell);
+            out.gen = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
+            const refuse = (fn) => { try { fn(); return null; } catch (e) { return String(e.message).slice(0, 300); } };
+            const over = (o) => S.computeShell(Object.assign({}, a.HSHELL, o));
+            out.refusals = {
+                allWrite: refuse(() => S.transplantCompute(emitted, over({ storage: a.HSHELL.storage.map((s2) => ({ name: s2.name, element: "f32" })) }))),
+                threeBuffers: refuse(() => S.transplantCompute(emitted, over({ storage: a.HSHELL.storage.slice(0, 3) }))),
+            };
+            // TWO REWRITES OF THE SHIPPED KERNEL, both algebraically identical to it, run beside it to say what
+            // "bit for bit" is worth here. The patches are plain string splits -- a regex inside this template
+            // literal loses its backslashes, which this file has now paid for four times.
+            const halfAssoc = a.shipped.split("0.5 * P.eps * g.x").join("0.5 * (P.eps * g.x)").split("0.5 * P.eps * g.y").join("0.5 * (P.eps * g.y)");
+            const distributed = a.shipped.split("return vec2<f32>(P.i00 * dx + P.i01 * dy, P.i01 * dx + P.i11 * dy);")
+                .join("return vec2<f32>(P.i00 * qx - P.i00 * P.mu0 + P.i01 * qy - P.i01 * P.mu1, P.i01 * qx - P.i01 * P.mu0 + P.i11 * qy - P.i11 * P.mu1);");
+            out.patched = { halfAssoc: halfAssoc !== a.shipped, distributed: distributed !== a.shipped };
+
+            const cv = document.createElement("canvas"); cv.width = 32; cv.height = 32;
+            const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+            const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+            const qB = dev.buffer({ data: new Float32Array(a.qin), usage: ["storage"] }), pB = dev.buffer({ data: new Float32Array(a.pin), usage: ["storage"] });
+            // the shipped kernel's struct Params: six f32 then TWO u32, so it is packed through one ArrayBuffer.
+            const ab = new ArrayBuffer(32), fv = new Float32Array(ab), uv = new Uint32Array(ab);
+            fv[0] = a.inv[0]; fv[1] = a.inv[1]; fv[2] = a.inv[2]; fv[3] = a.mu[0]; fv[4] = a.mu[1]; fv[5] = a.eps; uv[6] = a.L; uv[7] = a.N;
+            const pU = dev.buffer({ data: new Uint8Array(ab), usage: "uniform" });
+            const gU = dev.buffer({ data: new Float32Array([a.inv[0], a.inv[1], a.inv[2], a.eps, a.mu[0], a.mu[1], 0, 0]), usage: "uniform" });
+            const mkOut = () => [dev.buffer({ data: new Float32Array(a.N * 2), usage: ["storage"] }), dev.buffer({ data: new Float32Array(a.N * 2), usage: ["storage"] })];
+            const [gq, gp] = mkOut(), [hq, hp] = mkOut(), [rq, rp] = mkOut(), [dq, dp] = mkOut();
+            const pipe = (wgsl, qo, po, uni, uname) => { const p2 = dev.compute({ wgsl }); p2.bind("qin", qB).bind("pin", pB).bind("qout", qo).bind("pout", po).bind(uname, uni); return p2; };
+            const pG = pipe(gen.wgsl, gq, gp, gU, "u"), pH = pipe(a.shipped, hq, hp, pU, "P");
+            const pR = pipe(halfAssoc, rq, rp, pU, "P"), pD = pipe(distributed, dq, dp, pU, "P");
+            dev.frame(({ pass }) => { pass.dispatch(pG, 1); pass.dispatch(pH, 1); pass.dispatch(pR, 1); pass.dispatch(pD, 1); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+            const rd = async (x) => [...new Float32Array(await dev.read(x))];
+            out.gq = await rd(gq); out.gp = await rd(gp); out.hq = await rd(hq); out.hp = await rd(hp);
+            out.rq = await rd(rq); out.rp = await rd(rp); out.dq = await rd(dq); out.dp = await rd(dp);
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 500); }
+        return out;
+    }` });
+    ok("the harness ran the generated pass, the shipped kernel and two rewrites of it on one device", r9.ok && r9.result && !r9.result.error && r9.result.gq,
+        r9.ok ? (r9.result && r9.result.error) : (r9.reason || (r9.pageErrors || []).join("; ")));
+    if (r9.ok && r9.result && !r9.result.error) {
+        const F = r9.result, rel = (x, y) => Math.abs(x - y) / Math.max(1, Math.abs(y));
+        let gc = 0, hc = 0, gh = 0, exact = 0, total = 0, moved = 0, halfDiff = 0, distDiff = 0, distWorst = 0;
+        for (let i = 0; i < N; i++) for (const [k, ci] of [[2 * i, 4 * i], [2 * i + 1, 4 * i + 1]]) {
+            for (const [G, H, RR, DD, C, IN] of [[F.gq, F.hq, F.rq, F.dq, cpu[ci], qin[k]], [F.gp, F.hp, F.rp, F.dp, cpu[ci + 2], pin[k]]]) {
+                gc = Math.max(gc, rel(G[k], C)); hc = Math.max(hc, rel(H[k], C)); gh = Math.max(gh, rel(G[k], H[k]));
+                total++; if (G[k] === H[k]) exact++; if (G[k] !== IN) moved++;
+                if (RR[k] !== H[k]) halfDiff++;
+                if (DD[k] !== H[k]) { distDiff++; distWorst = Math.max(distWorst, Math.abs(DD[k] - H[k])); }
+            }
+        }
+        ok(`*** the generated pass is BIT-IDENTICAL to the SHIPPED swek-hmc-bench kernel on all ${total} endpoint values -- not a tolerance, 0 ***`,
+            exact === total && gh === 0 && total === N * 4 && (F.errs || []).length === 0,
+            `${exact}/${total} exact, worst relative ${gh.toExponential(3)}, device errors ${(F.errs || []).length}`);
+        ok(`  and BOTH agree with hmcGpu's own f32 mirror to ${gc.toExponential(3)}, inside the floor it measured for real hardware (${F32_FLOOR_HMC})`,
+            gc <= F32_FLOOR_HMC && hc <= F32_FLOOR_HMC && Math.abs(gc - hc) < 1e-12,
+            `generated ${gc.toExponential(3)}, shipped ${hc.toExponential(3)}, floor ${F32_FLOOR_HMC}, tol ${HMC_TOL}`);
+        // AN AGREEMENT BETWEEN TWO PASSES THAT DID NOTHING WOULD ALSO BE PERFECT. So: every value moved off its
+        // input, and the 64 chains land in 128 distinct coordinates rather than on one attractor.
+        ok(`  and the agreement is not two passes doing nothing: all ${moved} values moved off their inputs and the ${N} chains land in ${new Set(F.gq).size} distinct q coordinates`,
+            moved === total && new Set(F.gq).size === N * 2, `${moved}/${total} moved, ${new Set(F.gq).size} distinct of ${N * 2}`);
+
+        // *** WHAT BIT-IDENTICAL IS WORTH, MEASURED IN BOTH DIRECTIONS, BECAUSE THIS ROUND'S FIRST CLAIM ABOUT IT
+        // WAS WRONG. *** physicsTsl's header said writing the kick as 0.5*(eps*g) rather than (0.5*eps)*g would be
+        // algebraically identical and not bit-identical. Run, it is bit-identical on every value: 0.5 is a power of
+        // two, so that multiply is exact and re-association across it loses nothing. The example was wrong; the rule
+        // is not, and the DISTRIBUTED gradient is what shows it.
+        ok(`*** re-associating across the 0.5 changes NOTHING (${halfDiff}/${total}), because 0.5 is a power of two -- the header's own example was wrong and this is the correction ***`,
+            F.patched.halfAssoc === true && halfDiff === 0, `${halfDiff} of ${total} differ`);
+        ok(`*** but the gradient DISTRIBUTED -- i00*qx - i00*mu0 for i00*(qx - mu0) -- moves ${distDiff} of ${total} endpoints, so bit-identity is a claim that could have failed ***`,
+            F.patched.distributed === true && distDiff > total / 2 && distWorst > 0,
+            `${distDiff}/${total} differ, worst ${distWorst.toExponential(3)}`);
+        ok(`  AND THE STRONGER CLAIM IS DOING THE WORK: that rewrite is off by ${distWorst.toExponential(3)}, which is ${(F32_FLOOR_HMC / distWorst).toFixed(0)}x INSIDE the ${F32_FLOOR_HMC} floor -- a tolerance would have passed it and "0" does not`,
+            distWorst < F32_FLOOR_HMC && distWorst < HMC_TOL,
+            `worst ${distWorst.toExponential(3)} against floor ${F32_FLOOR_HMC} and tolerance ${HMC_TOL}`);
+
+        ok("SPECIFIED OPERATIONS ONLY survives the graph: the generated module carries no transcendental, which is what makes an f32 bit claim possible at all",
+            !/\b(exp|log|log2|sin|cos|tan|sqrt|pow|inverseSqrt)\s*\(/.test(F.gen) && validateWgsl(F.gen).length === 0 && !/NodeBuffer_|object\./.test(F.gen),
+            validateWgsl(F.gen).join("; ") || "validates, and carries none of three's names");
+        ok("the shell states READ-ONLY where the shipped kernel does, and the transplant refuses a shell that does not",
+            F.reads.join() === "qin,pin" && F.writes.join() === "qout,pout" &&
+            /declares 4 read_write and 0 read/.test(F.refusals.allWrite || "") && /touches 4 storage buffer\(s\) and the shell .* names 3/.test(F.refusals.threeBuffers || ""),
+            `reads ${F.reads.join()}, writes ${F.writes.join()}; ${(F.refusals.allWrite || "NOT REFUSED").slice(0, 70)}`);
+        report("NOT CLAIMED HERE: the kernel's full SIGNATURE. L and n are uniforms in WGSL_HMC and baked constants in the " +
+            "graph, because a TSL Loop wants a JavaScript bound -- lyapunovNodes set that precedent with samples and warmup. " +
+            "So this is the kernel's ARITHMETIC at the fixture's own L, and the shipped pass was fed the same L through its " +
+            "uniform so the two are answering one question. A graph whose step count comes from a buffer is a round of its own.");
+    }
+}
+
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4321.
 //   A  the Lyapunov log's 2 dropped (log|r(1 - x)| for log|r(1 - 2x)|) -> exit=1, 9 red: the source line, and on every path and
 //      backend the exponent reads 0.000077 for ln 2 and the window and the bright end both read 0 -- the same sabotage
@@ -1013,5 +1160,5 @@ console.log("unchecked here: cullLodWgsl({ occlusion: true }), the ONE variant l
     "uniformArray as its own uniform rather than as a struct member -- the bytes are the same 40 floats, the bindings are two; whether the record SLOTS " +
     "a survivor lands in are the same in both passes, which they are not and cannot be -- an atomicAdd hands them out in whatever order the lanes " +
     "arrive, so the claim is over the sorted set and the per-region counts, and it says so; the Lyapunov Loop's cost through three, timed by nobody; " +
-    "and a real GPU's log() and exp() against SwiftShader's.");
+    "and a real GPU's log() and exp() against SwiftShader's; and, for the HMC leapfrog, a graph whose STEP COUNT comes from a uniform rather than from a JavaScript constant -- WGSL_HMC takes L and n as uniforms and a TSL Loop wants a bound, so section 12 is the kernel's arithmetic at one L and says so.");
 process.exit(fails ? 1 : 0);
