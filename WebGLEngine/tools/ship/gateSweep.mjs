@@ -737,6 +737,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "standing reds inside redCensus.UNCONFIRMED_SLOW, filed as redCensus.RED_AT_V4424, and a " +
                  "FOURTH outside it -- redCensus-selfcheck, broken by v4414 and repaired here",
     }),
+    since41: Object.freeze({
+        at: "v4425", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/budgetExile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections and 23 checks. It runs ONE cheap real gate as a " +
+                 "fixture, through the actual runQuickSweep, to demonstrate the absorbing state in both " +
+                 "directions rather than read it off the source. Driven RED by ten sabotages and restored, " +
+                 "with NO 0 REDS. The round it gates re-timed all 378 finished exiles and found TEN reds on " +
+                 "no register, every one recorded as passing; four were this session's and are repaired",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

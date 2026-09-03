@@ -69,6 +69,20 @@ export const V4279_CAP_MS = 120000;
 /** This run's cap. Chosen to be well past the v4279 cap and still let sixty-three gates finish in a session. */
 export const SERIAL_CAP_MS = 180000;
 
+// *** DELIBERATELY NOT tools/ship/gateBudget.mjs's TABLE, AND v4425 IS WHY THIS SENTENCE EXISTS. ***
+// runnerBudget-selfcheck demands that every module spawning a gate under a time limit either read the one
+// table or declare its own WITH A REASON. v4424 shipped this file doing neither, and that gate is exiled over
+// the ship-time budget, so nothing said so for a round. The reason it needs is real and was implicit: the
+// table's numbers are PER-GATE MEASUREMENTS, and every gate this module runs is one the tree had never
+// measured -- that is the entire premise. A budget derived from measurements cannot be applied to the set
+// defined by not having any. So the cap is flat, it is a decision about the SESSION rather than about the
+// gates, and a gate that exceeds it is reported as TIMEOUT rather than judged.
+export const budgetIsOwn =
+    "every gate this module runs is one with no measured budget -- that is what put it in UNCONFIRMED_SLOW -- " +
+    "so gateBudget.mjs's per-gate table has nothing to say about any of them. The flat 180s cap is a claim " +
+    "about how long one session may spend, not about how long a gate should take, and exceeding it produces " +
+    "a TIMEOUT verdict rather than a failure.";
+
 /**
  * How this was measured, including the attempt that did not work.
  *
@@ -281,7 +295,13 @@ export function runGateSerial(rel, { timeoutMs = SERIAL_CAP_MS, root = ENG } = {
         p.on("close", (code) => {
             if (done) return;
             done = true; clearTimeout(timer);
-            const lines = out.split("\n");
+            // *** AND A THIRD STYLE, FOUND AT v4425: A GATE THAT REPORTS ON stderr. ***
+            // tools/ship/wgslSpec-selfcheck.mjs writes its verdict lines to stderr and prints ZERO check lines
+            // on stdout, so a counter reading one stream saw 0 checks and called a RED a CRASH. v4424 argued
+            // the undercount below "cannot change a verdict, since an undercount can only turn a RED into a
+            // CRASH and nothing here was classified CRASH" -- SOUND FOR THAT DATA AND NOT A GENERAL LAW, and
+            // the wider run is what found the case. Both streams are counted now.
+            const lines = (out + "\n" + err).split("\n");
             // *** THE TREE HAS TWO HOUSE STYLES AND THE FIRST DRAFT OF THIS COUNTER KNEW ONE. *** Most gates
             // print "  PASS"/"  FAIL"; the roundhouse and orphan gates print "  ok  "/"  FAIL !!". The
             // measurement in MEASURED_V4424 was taken with the narrower pattern, so `checks` UNDERCOUNTS
@@ -295,6 +315,8 @@ export function runGateSerial(rel, { timeoutMs = SERIAL_CAP_MS, root = ENG } = {
                 verdict: code === 0 ? "GREEN" : (checks > 0 ? "RED" : "CRASH"),
                 ms: Date.now() - t0, checks,
                 first: (fail || err.split("\n").find((l) => l.trim()) || "").trim().slice(0, 180),
+                streams: { stdout: out.split("\n").filter((l) => /^\s{2}(PASS|FAIL|ok\s)/.test(l)).length,
+                           stderr: err.split("\n").filter((l) => /^\s{2}(PASS|FAIL|ok\s)/.test(l)).length },
             });
         });
     });

@@ -11,7 +11,7 @@ import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mj
 import { enumerateGates } from "./gateSweep.mjs";
 import {
     ENG, ABSORBING, MEASURED_V4425, STALE_FAILURES,
-    demonstrateAbsorbing, exiled, wouldRunNow, inflation, RECORD_REPAIR,
+    demonstrateAbsorbing, exiled, wouldRunNow, inflation, RECORD_REPAIR, EXILED_REGRESSIONS,
 } from "./budgetExile.mjs";
 
 let fails = 0;
@@ -102,6 +102,40 @@ console.log("\n4. *** WHAT THE EXILES ACTUALLY COST, MEASURED ONE AT A TIME ***"
         inf.every((x) => x.recorded === T[x.gate]), `${inf.length} gates compared to sweep-timings.json itself`);
     const red = Object.entries(MEASURED_V4425).filter(([, m]) => m.verdict === "RED").map(([g]) => g);
     report(red.length ? `RED among the exiles: ${red.join(", ")}` : "no red among the exiles measured here");
+}
+
+console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
+{
+    const reg = redRegister();
+    const notGreen = Object.entries(MEASURED_V4425).filter(([, m]) => m.verdict !== "GREEN").map(([g]) => g);
+    const unreg = notGreen.filter((g) => !reg.has(g));
+    report(`${notGreen.length} of the 378 exiles exit non-zero: ${notGreen.length - unreg.length} on ` +
+        `redCensus.RED_AT_V4279 and accounted for, ${unreg.length} on no register at all`);
+    // *** THE MECHANISM, NOT JUST THE COUNT. *** A gate the file records as PASSING, that now fails, went red
+    // on the far side of the door -- which is what makes the exile a hiding place rather than a backlog.
+    ok("*** every unregistered red is one the file records as having PASSED ***",
+        unreg.length > 0 && unreg.every((g) => C[g] === 0),
+        `${unreg.length} gates with a recorded exit code of 0 that exit non-zero when run`);
+    ok("  and they are named in EXILED_REGRESSIONS rather than added to a register",
+        EXILED_REGRESSIONS.every((e) => unreg.includes(e.gate)) && EXILED_REGRESSIONS.every((e) => !reg.has(e.gate)),
+        `${EXILED_REGRESSIONS.length} named -- gateSweep.SWEEP_V4297's rule: a regression is a thing to repair, ` +
+        "and registering it would make its red acceptable again");
+    ok("  the record covers every one of them, with no spare entries",
+        EXILED_REGRESSIONS.length === unreg.length,
+        `${EXILED_REGRESSIONS.length} entries against ${unreg.length} unregistered reds`);
+    const repaired = EXILED_REGRESSIONS.filter((e) => e.state === "REPAIRED HERE");
+    const owed = EXILED_REGRESSIONS.filter((e) => e.state === "OWED");
+    ok("*** four are this session's own, and this round repairs them ***",
+        repaired.length === 4 && repaired.every((e) => e.mine && e.mine !== "not attributed here"),
+        repaired.map((e) => e.gate.split("/").pop().replace(/-selfcheck\.mjs$/, "") + " (" + e.mine + ")").join(", "));
+    ok("  and what is owed says so, with attribution where the evidence gives one and not where it does not",
+        owed.length > 0 && owed.every((e) => typeof e.mine === "string" && e.fails.length > 20) &&
+        owed.some((e) => e.mine === "not attributed here"),
+        `${owed.length} owed; ${owed.filter((e) => e.mine === "not attributed here").length} left unattributed rather than guessed`);
+    ok("*** and the instrument itself was wrong once, which the wider run is what found ***",
+        /SOUND FOR THAT DATA AND NOT A GENERAL LAW/.test(EXILED_REGRESSIONS.find((e) => /wgslSpec/.test(e.gate)).note || ""),
+        "wgslSpec reports on stderr, so a counter reading stdout called a RED a CRASH -- v4424's argument that " +
+        "the undercount could not change a verdict was true of its data and is not a law");
 }
 
 console.log(`\n${fails ? "FAIL" : "ALL GREEN"} -- ${fails} failure(s)`);

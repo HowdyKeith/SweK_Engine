@@ -42,6 +42,16 @@ import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
 import * as BB from "../../render/blackbodyWgsl.mjs";
 import * as FM from "../../render/fleetMask.mjs";
+// v4425 -- the arc's own microfacet kernels. Every one was written and graded on a device between v4408 and
+// v4416 and NONE was ever put here, so census() named nine at once. The gate that says so is exiled over the
+// ship-time budget, which is why nine accumulated instead of the first being caught on arrival.
+import { COMP_WGSL } from "../../physics/render/energyCompWgsl.mjs";
+import { FRESNEL_WGSL } from "../../physics/render/fresnelWgsl.mjs";
+import { FURNACE_WGSL } from "../../physics/render/furnaceWgsl.mjs";
+import { ANISO_WGSL } from "../../physics/render/microfacetAnisoWgsl.mjs";
+import { MIS_WGSL } from "../../physics/render/misWgsl.mjs";
+import { buildSampleWgsl } from "../../physics/render/microfacetSampleWgsl.mjs";
+import { buildWgsl as buildMicrofacetWgsl } from "../../physics/render/microfacetWgsl.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -174,6 +184,32 @@ export function corpus() {
         ...(EMITTED_RACE && EMITTED_RACE.ink && EMITTED_RACE.ink.transplanted ? [
             { id: "tslSource.inkWash (generated)", from: "tools/ship/tsl-emitted-race.json", compileOnly: true, why: "the leanest shell the fleets have: p and colour, a line-list topology, a graph with one varying to read", opts: { code: EMITTED_RACE.ink.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),
+        // ---- v4425: SEVEN MICROFACET KERNELS THIS SESSION SHIPPED AND NEVER ENROLLED ------------------------
+        // Compile-only. Each already RUNS on a device in its own gate, against a reference that gate owns; what
+        // the corpus adds is the second backend's COMPILER, which is a different question from whether the
+        // numbers are right. Enrolling them to run here would need each one's Params packing duplicated, and a
+        // second copy of a packing is how two encodings drift apart.
+        { id: "energyCompWgsl.COMP_WGSL", from: "physics/render/energyCompWgsl.mjs", compileOnly: true,
+          why: "the multiple-scattering energy compensation term, v4408: reads a directional-albedo table and returns the boost",
+          opts: { code: COMP_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "microfacetSampleWgsl.buildSampleWgsl", from: "physics/render/microfacetSampleWgsl.mjs", compileOnly: true,
+          why: "the visible-normal sampler, v4410: Heitz's VNDF in the hemisphere-stretch form, built with its default plant",
+          opts: { code: buildSampleWgsl(), compileOnly: true, outCount: 0 } },
+        { id: "microfacetWgsl.buildWgsl", from: "physics/render/microfacetWgsl.mjs", compileOnly: true,
+          why: "the GGX lobe kernel the arc's device rounds are built on, with its default plant",
+          opts: { code: buildMicrofacetWgsl(), compileOnly: true, outCount: 0 } },
+        { id: "microfacetAnisoWgsl.ANISO_WGSL", from: "physics/render/microfacetAnisoWgsl.mjs", compileOnly: true,
+          why: "anisotropic GGX, v4412: two roughnesses and a tangent frame",
+          opts: { code: ANISO_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "misWgsl.MIS_WGSL", from: "physics/render/misWgsl.mjs", compileOnly: true,
+          why: "multiple importance sampling, v4413: two strategies actually combined, power and balance heuristics",
+          opts: { code: MIS_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "furnaceWgsl.FURNACE_WGSL", from: "physics/render/furnaceWgsl.mjs", compileOnly: true,
+          why: "the white furnace test on a device: the integral that must return one",
+          opts: { code: FURNACE_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "fresnelWgsl.FRESNEL_WGSL", from: "physics/render/fresnelWgsl.mjs", compileOnly: true,
+          why: "the exact Fresnel equations against Schlick, v4416: Brewster, TIR and the split directional albedo",
+          opts: { code: FRESNEL_WGSL, compileOnly: true, outCount: 0 } },
         // v4331 -- the hand-written compute twin the generated pass is graded against: the module's own lyapunov() in the
         // shell a transplant lands in. It is a FUNCTION of that shell, so the corpus builds one to compile it.
         { id: "lyapunovWgsl.lyapunovComputeWgsl", from: "render/lyapunovWgsl.mjs", compileOnly: true,
@@ -249,6 +285,11 @@ export const EXCLUDED = Object.freeze([
                     why: "reads an elements buffer and writes a records buffer -- two storage bindings, outside the one-buffer harness signature; graded against positionAt by gpuOrbits-selfcheck" }),
     Object.freeze({ id: "gpuDriven.OCC_FN_WGSL", kind: "source fragment",
                     why: "the Occ struct, the level arithmetic and hizOccluded() with no entry point -- cullLodWgsl({ occlusion: true }) is its runnable composition, graded by hiZ-selfcheck" }),
+    // v4425 -- the two of this session's nine that are NOT shaders, adjudicated by name like the six before them
+    Object.freeze({ id: "microfacetWgsl.lobeWgsl", kind: "source fragment",
+                    why: "the GGX lobe FUNCTION with no entry point -- buildWgsl is its runnable composition, and that IS in the corpus" }),
+    Object.freeze({ id: "microfacetWgsl.glslFnToWgsl", kind: "consumer, not producer",
+                    why: "a TRANSLATOR: it reads a GLSL function and rewrites it. The name matched because its output is WGSL; it has no shader of its own" }),
     Object.freeze({ id: "gpuDriven.CULL_FN_WGSL", kind: "source fragment",
                     why: "the Cull struct and cullLod() with no entry point -- cullLodWgsl and cullProbeWgsl are its runnable compositions, and the probe IS in the corpus" }),
 ]);
