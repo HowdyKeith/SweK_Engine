@@ -310,7 +310,16 @@ export function transplantCompute(wgsl, shell) {
     const found = [...wgsl.matchAll(/var<storage,\s*read(?:_write)?>\s*(\w+)\s*:/g)].map((m) => m[1]);
     if (found.length !== shell.storage.length) throw new Error(`tslSource: the graph touches ${found.length} storage buffer(s) and the shell "${shell.name}" names ${shell.storage.length} (${shell.storage.map((b) => b.name).join(", ") || "none"})`);
     // v4336 -- BY ROLE, NOT BY ORDER: a generated buffer the body assigns to is a written one, the rest are read.
-    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*=`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
+    // *** v4372 -- AND FOR THIRTY-SIX ROUNDS IT READ `==` AS AN ASSIGNMENT. *** The pattern ended in `\]\s*=`, so
+    // a body that COMPARES a storage read -- `if ( masks.value[ p ] == 0u )` -- matched on the first `=` of the
+    // `==` and the buffer was classified as WRITTEN. render/carveTsl.mjs is the first pass in this arc to test a
+    // buffer's value inline instead of binding it to a var first, and it was refused by name: "the pass writes
+    // masks and the shell declares it read". NOTHING EVER SHIPPED WRONG FROM THIS -- it refuses, loudly, rather
+    // than mis-declaring a binding -- but it is the species versionPreflight's header names: a guard that fires
+    // on legitimate work, which is the kind people learn to route around. `=(?!=)` is the whole fix, and the
+    // optional [-+*/] catches a compound assignment the old pattern also missed. `>=`, `<=` and `!=` were never
+    // at risk: their operator sits between the `]` and the `=`, where the old pattern allowed only whitespace.
+    const written = found.filter((g) => new RegExp(`\\b${g}\\.value\\[[^\\]]*\\]\\s*[-+*/]?=(?!=)`).test(wgsl) || new RegExp(`atomic\\w+\\(\\s*&${g}\\.value\\[`).test(wgsl));
     const readOnly = found.filter((g) => !written.includes(g));
     const wantW = shell.storage.filter((b) => b.access !== "read"), wantR = shell.storage.filter((b) => b.access === "read");
     // v4363 -- BY NAME WHERE THE GRAPH GIVES ONE. A TSL storage node that was .label()ed is emitted under that label

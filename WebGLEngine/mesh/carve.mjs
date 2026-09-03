@@ -85,14 +85,35 @@
  * azimuths plus one view from above.
  */
 export function project(x, y, z, n, yaw = 0, elev = 0) {
-    const c = n / 2;
-    const dx = x - c, dy = y - c, dz = z - c;
-    const cy = Math.cos(yaw), sy = Math.sin(yaw);
-    const rx = dx * cy - dz * sy;                 // horizontal, after the turntable spin
-    const rz = dx * sy + dz * cy;                 // toward the camera
-    const ce = Math.cos(elev), se = Math.sin(elev);
-    const ry = dy * ce - rz * se;                 // vertical, after the tilt
-    return { u: rx + c, v: ry + c };
+    return projectFlat(x, y, z, n, Math.cos(yaw), Math.sin(yaw), Math.cos(elev), Math.sin(elev), (v) => v);
+}
+
+/**
+ * *** THE SAME PROJECTION AT f32, AND IT IS NOT A CONVENIENCE. ***
+ *
+ * render/carveTsl.mjs runs this arithmetic on a device, where every value is IEEE binary32. Everywhere else in
+ * this tree an f32/f64 disagreement is an ulp that stays an ulp; HERE IT ENDS IN A floor(), which is
+ * discontinuous, so a voxel projecting within an ulp of a pixel boundary lands in a DIFFERENT PIXEL on the two
+ * machines -- and is then solid on one and carved on the other. No tolerance expresses that: a voxel is or is
+ * not. So the device is held to THIS, and the f32-versus-f64 gap is measured separately instead of being
+ * swallowed by a threshold nobody chose.
+ *
+ * ONE implementation with ONE knob, which is tools/roundhouse/hmcGpu.mjs's idiom (leapfrogF64Flat and
+ * leapfrogF32 are the same flat code with a rounder), so the two cannot drift apart. The four trig values are
+ * rounded FIRST because that is what the device receives: they are computed on the CPU and uploaded as f32.
+ */
+export function projectF32(x, y, z, n, yaw = 0, elev = 0) {
+    const r = Math.fround;
+    return projectFlat(x, y, z, n, r(Math.cos(yaw)), r(Math.sin(yaw)), r(Math.cos(elev)), r(Math.sin(elev)), r);
+}
+
+function projectFlat(x, y, z, n, cy, sy, ce, se, r) {
+    const c = r(n / 2);
+    const dx = r(x - c), dy = r(y - c), dz = r(z - c);
+    const rx = r(r(dx * cy) - r(dz * sy));        // horizontal, after the turntable spin
+    const rz = r(r(dx * sy) + r(dz * cy));        // toward the camera
+    const ry = r(r(dy * ce) - r(rz * se));        // vertical, after the tilt
+    return { u: r(rx + c), v: r(ry + c) };
 }
 
 /** The inverse of project() along the view ray: the world point at depth t (t measured from the grid centre). */
@@ -132,11 +153,11 @@ export function unproject(u, v, t, n, yaw = 0, elev = 0) {
  * does. It stays exported, and fillGain() is what says it earns nothing, so the next person to reach for it
  * gets a number instead of the same argument.
  */
-export function silhouetteOf(solid, n, { yaw = 0, elev = 0, fill = false } = {}) {
+export function silhouetteOf(solid, n, { yaw = 0, elev = 0, fill = false, proj = project } = {}) {
     const m = new Uint8Array(n * n);
     for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
         if (!solid(i, j, k)) continue;
-        const p = project(i + 0.5, j + 0.5, k + 0.5, n, yaw, elev);
+        const p = proj(i + 0.5, j + 0.5, k + 0.5, n, yaw, elev);
         const u = Math.floor(p.u), v = Math.floor(p.v);
         if (u >= 0 && v >= 0 && u < n && v < n) m[v * n + u] = 1;
     }
@@ -184,7 +205,7 @@ export function fillGain(solid, n, view = {}) {
  * there" ought to look like. `outside: "clear"` keeps the old behaviour reachable, because the gate measures
  * both and a policy nobody can run is a policy nobody can check.
  */
-export function carve(views, n, { outside = "keep" } = {}) {
+export function carve(views, n, { outside = "keep", proj = project } = {}) {
     const g = new Uint8Array(n * n * n).fill(1);
     const clearOutside = outside === "clear";
     for (const view of views) {
@@ -192,7 +213,7 @@ export function carve(views, n, { outside = "keep" } = {}) {
         for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
             const o = i + n * (j + n * k);
             if (!g[o]) continue;
-            const p = project(i + 0.5, j + 0.5, k + 0.5, n, yaw, elev);
+            const p = proj(i + 0.5, j + 0.5, k + 0.5, n, yaw, elev);
             const u = Math.floor(p.u), v = Math.floor(p.v);
             const off = u < 0 || v < 0 || u >= n || v >= n;
             if (off ? clearOutside : !m[v * n + u]) g[o] = 0;

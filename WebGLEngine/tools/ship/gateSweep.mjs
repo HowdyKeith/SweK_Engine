@@ -297,6 +297,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
                  "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
     }),
+    // v4372 -- the TENTH closing, for the carve's compute pass. Its round also fixed a defect in the transplant
+    // machinery every earlier closing's gate ran through (render/tslSource.mjs read `==` as an assignment), so
+    // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
+    // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
+    since10: Object.freeze({
+        at: "v4372", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, three sections and 13 checks in 18.8 s. Driven RED by four " +
+                 "sabotages (2/3/4/4 by name) and restored; two of them differ by a factor of eight in voxels " +
+                 "and the SMALLER one is the worse, because it breaks the containment bound the larger leaves " +
+                 "intact. Sections 1 and 2 need no device and stay green where WebGPU is unavailable",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

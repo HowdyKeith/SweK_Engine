@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363, the fleets variant and a uniform frustum at v4364, a SHIPPING fleet kernel held to bit for bit at v4370)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363, the fleets variant and a uniform frustum at v4364, a SHIPPING fleet kernel held to bit for bit at v4370, the silhouette carve and a defect in the transplant itself at v4372)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -227,6 +227,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    NOT CLAIMED: the kernel's full signature. L and n are uniforms in WGSL_HMC and baked constants in the graph,
    because a TSL Loop wants a JavaScript bound (lyapunovNodes set that precedent at v4321). A graph whose step count
    comes from a buffer is the next thing here, and it is unbuilt.
+   v4372 -- AND THE SILHOUETTE CARVE, WHICH IS A DIFFERENT SHAPE OF CLAIM. mesh/carve.mjs is n^3 voxel tests per
+   view in JavaScript and its own gate closed by calling itself a compute pass that had not happened yet.
+   render/carveTsl.mjs is that pass: one invocation per voxel, the views looped inside the kernel so the grid is
+   read and written once instead of once per view. *** WHAT MAKES IT HARDER THAN THE LEAPFROG IS THAT IT ENDS IN
+   A floor(). *** v4370 could claim bit-identity because its kernel is smooth arithmetic and an ulp stays an ulp;
+   here a voxel landing within an ulp of a pixel boundary floors into a DIFFERENT PIXEL at f32 than at f64, and
+   is then solid on one machine and carved on the other. No tolerance expresses that. So the twin is
+   mesh/carve.mjs's own f32 mirror (projectF32, one implementation with a rounder, hmcGpu's idiom), and the
+   device agrees with it on all 1,572,864 voxels across six fixtures -- 0 differing -- and with the f64 carve
+   too. The discontinuity is real and measured: 66 pixel flips in 17.3 million voxel/view pairs, NONE of which
+   changes a verdict, because a flip only bites where the two candidate pixels disagree in the mask and an ulp
+   from a PIXEL edge has nothing to do with proximity to a SILHOUETTE edge.
+   *** AND BUILDING IT FOUND A DEFECT IN render/tslSource.mjs THAT HAD STOOD SINCE v4336. *** The write-detector
+   asked whether the body contained `<buffer>.value[ ... ] =`, which matches the first `=` of `==`. Every earlier
+   pass in this arc bound a storage read to a var before testing it; this one compares inline, and was refused by
+   name. Nothing shipped wrong -- it refuses rather than mis-declaring a binding -- but a guard that fires on
+   legitimate work is one people route around. Also here: SPECIFIED OPERATIONS ONLY is a choice, not an accident.
+   The four trig values are computed on the CPU and arrive in a buffer, so three's cos() against a vendor's cos()
+   never enters the claim. NOT MEASURED, and it is the reason the pass exists: whether it is faster. The sandbox
+   device is SwiftShader, so a timing here would clock a CPU pretending to be a GPU.
 
 ## The count that says when step 4 matters
 
