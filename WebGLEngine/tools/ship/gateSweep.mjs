@@ -419,6 +419,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (3/3/1/1 by name), md5-identical after; sabotage B restores the actual v4162 " +
                  "defect and TWO independent detectors catch it, which is why both are there",
     }),
+    since20: Object.freeze({
+        at: "v4388", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shipyard-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, six sections, most of the time the live page. It gates " +
+                 "voxel/shipyard.mjs, Valkyrien Skies 2's indirection ported as arithmetic: a body's voxels stay " +
+                 "on the integer grid in a claim and the RAY is transformed instead of the data. THE ROUND SET " +
+                 "OUT TO CONFIRM A PRECISION ARGUMENT AND THE MEASUREMENT REFUSED IT -- in float64 the baked " +
+                 "alternative is 1.9e-12 of a voxel out after 10,000 motions, so the check asserts the argument's " +
+                 "FAILURE. It holds in float32 at distance instead: 2.0 VOXELS out at a million, and exactly zero " +
+                 "claim-local at every distance. Driven RED by three sabotages (2/3/1 by name), md5-identical " +
+                 "after. *** AND THIS CLOSING NAMES A MODULE THAT ALREADY HAS A NON-GATE IMPORTER, which is " +
+                 "v4386's finding taking effect on the very next round to add one: ray-march-demo.html casts the " +
+                 "ship's rays, so the sentence below cannot hide it ***",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
