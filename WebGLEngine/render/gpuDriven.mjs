@@ -420,6 +420,30 @@ export function quadMesh(subdiv = 1, color = [1, 1, 1, 1]) {
     return { positions, indices, color };
 }
 
+/**
+ * v4376 -- A DISC, WHICH IS WHAT orrery-gpu.html's OWN COMMENT SAYS ITS BODIES ARE. A triangle fan of `segments`
+ * around the origin, inscribed in the same [-1,1] square quadMesh spans, so it drops into a ladder in that one's
+ * place without moving a record or a threshold.
+ *
+ * *** WHY THIS EXISTS AND WHAT IT COSTS, BOTH MEASURED RATHER THAN ARGUED. *** quadMesh is a FLAT SQUARE and the
+ * default pipeline's fragment is `return v.color;` -- no discard, no distance-to-centre test -- so a body drawn
+ * from it is a square, and subdividing it changes nothing a picture can show (v4375 priced both shipped ladders
+ * and found them tells rather than approximations for exactly that reason). A disc ladder is the other kind: a
+ * 6-gon and a 32-gon have different silhouettes, the difference falls with distance, and a fidelity budget can
+ * therefore choose where to switch. It is not free -- an n-gon is n triangles where the quad is 2, so the CHEAP
+ * end of a disc ladder costs more than the cheap end of a quad one -- and being inscribed it covers pi/4 of the
+ * area, so a body swapped from quad to disc gets smaller as well as rounder. Neither is a defect; both are the
+ * price of the comment being true, and the gate states both as numbers.
+ */
+export function discMesh(segments = 16, color = [1, 1, 1, 1]) {
+    const n = Math.max(3, segments | 0);
+    const positions = new Float32Array((n + 1) * 3), indices = new Uint32Array(n * 3);
+    for (let k = 0; k < n; k++) { const a2 = (k / n) * Math.PI * 2;
+        positions[(k + 1) * 3] = Math.cos(a2); positions[(k + 1) * 3 + 1] = Math.sin(a2); positions[(k + 1) * 3 + 2] = 0; }
+    for (let k = 0; k < n; k++) { indices[k * 3] = 0; indices[k * 3 + 1] = k + 1; indices[k * 3 + 2] = ((k + 1) % n) + 1; }
+    return { positions, indices, color };
+}
+
 /** A deterministic test scene: a side x side grid in the plane z, radius cycling through `radii` by index. */
 export function gridScene({ side = 16, z = -2, spacing = 1, radii = [0.15, 0.25, 0.4] } = {}) {
     const records = new Float32Array(side * side * RECORD_FLOATS);
