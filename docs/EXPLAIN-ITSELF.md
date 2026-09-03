@@ -126,7 +126,7 @@ gate the red register already tracks. A claim naming a *green* gate that no long
 what the claim says is invisible to it. The one contradiction was found because the
 register already knew -- not because the detector is good at looking.
 
-## 5. A scanner counts a record ABOUT a thing as the thing -- DONE at v4410
+## 5. A scanner counts a record ABOUT a thing as the thing -- DONE at v4412
 
 `tools/ship/orreryFleetScan.mjs` decides which files import a vendored body by looking for
 its path. It strips **comments** -- which is why `physics/backendDivergence.mjs`, whose
@@ -147,7 +147,7 @@ baseline (box3d 21, three-webgpu 7) that the tree has grown past (28 and 11), wh
 v4399's ratchet lesson: **freeze by name, not by count.** Both readings must be re-derived
 together or the gate just moves from one wrong number to another.
 
-**Done at v4410.** `tools/ship/importPosition.mjs` asks the question positionally, and the answer is that the
+**Done at v4412.** `tools/ship/importPosition.mjs` asks the question positionally, and the answer is that the
 old rule was wrong **in both directions**: of its 138 entries **12 are records**, and it never saw **17 files**
 that reach a body through `path.join(..., "vendor", name, ...)`. The corrected population is **143**. The
 baseline is now a frozen list of *names* with the counts derived from it -- and that ratchet named this round's
@@ -176,13 +176,21 @@ deep), 13 finished and exited nonzero, and **4 of those are named by no register
 all**. Run by hand, all four are GREEN -- and three of them finish in 1.3 s, 1.9 s and
 2.2 s, comfortably **under** the budget that excludes them.
 
-## 7. The register's reader surface counts across a container -- OPEN, found v4406
+## 7. The register's reader surface went red on a STALE AUDIT, not a probe bug -- DONE at v4412
 
-`tools/ship/gateReport-selfcheck.mjs` section 7 (v4402) fails: 32 rows on screen against 27
-in the report. 27 + 5 is the size of the report's first two tables, so the probe is almost
-certainly counting rows across a container that gained a table -- a page/probe mismatch,
-not a missing register. It is over budget (6,290 ms), which is why item 6 found it rather
-than a sweep.
+`tools/ship/gateReport-selfcheck.mjs` section 7 (v4402) failed with 32 rows on screen
+against 27 in the report.
+
+**The v4408 diagnosis was wrong, and saying so is the point of writing it down.** It read
+27 + 5 as the size of the report's first two tables and concluded the probe was counting
+across a container that had gained one -- a page/probe mismatch. It was not. The register
+AUDIT was thirteen rounds stale, past `registerDrift-selfcheck`'s twelve-round cap, and the
+page was rendering a different vintage of the register than the report held. Re-freezing it
+with `tools/ship/freezeRegisterAudit.mjs` -- which is what that tool exists for -- cleared
+both gates: 27 against 27, and nine divergent entries all showing the audit's line.
+
+A plausible arithmetic coincidence (27 + 5 = 32) is not a diagnosis. Nothing had run the
+tool that owns the record.
 
 ## 8. An author-centred orrery -- OPEN, requested
 
