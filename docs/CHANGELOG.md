@@ -95,6 +95,41 @@ The lesson is not "name the page" but "let the thing name itself". That gateRepo
 ship time: at 7.8 s it is still over budget and still outside the sweep, and v4408's rotation is what will
 reach it. And that the contention factor is a constant -- it was measured on ONE machine at ONE load, and
 the honest reading is "the recorded number is not the gate's cost", not "gates cost 2.5x less".
+*** AND A SECOND DEFECT, FOUND BECAUSE THIS ROUND REFUSED TO CALL A RED A FLAKE. ***
+
+verify reported 1 NEW RED twice in a row on the same tree and NAMED A DIFFERENT GATE EACH TIME:
+sweepCoverage-selfcheck, then __rigprogress-fixture-selfcheck. Both were green run alone, green against
+origin/main's timings file, green under concurrent load, and green at origin/main in a clean worktree --
+five isolated runs, exit 0 every time. The tempting reading was "flake, ship it". That is the reasoning
+this whole round exists to refuse, so it was measured instead.
+
+FOUR GATES PLANT A TRANSIENT *-selfcheck.mjs IN THE TREE WHILE THEY RUN and delete it afterwards:
+rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy and
+__mutation-crash. Neither gateSweep.enumerateGates nor staleness.gateFiles had any notion of "transient" --
+any file ending -selfcheck.mjs under the walked tree is a gate -- so an enumeration that overlapped one of
+those runs returned the fixture AS A GATE, and the sweep ran it. rigProgress's fixture is a file whose whole
+body is `process.exit(1)`, so it lands as a NEW RED outside every register and fails the ship.
+
+MEASURED DIRECTLY, rather than by re-running the 20-minute lottery a third time. With rigProgress-selfcheck
+running in one process and a 400-iteration enumeration loop in another:
+
+    before:  max enumerateGates 1442 -- and the extra entry named:
+             tools/ship/__rigprogress-fixture-selfcheck.mjs
+    after:   fixture PROVEN on disk during the loop, max enumerateGates 1441, max gateFiles 1441,
+             transient fixtures enumerated: NONE
+
+A RACE IS THE WORST SHAPE A SHIP-TIME CHECK CAN HAVE: it fails at random, blames a different gate each time,
+and never reproduces when the accused gate is run alone. Two ships were already at risk of being talked past
+it on exactly the "it passes locally" argument.
+
+THE EXCLUSION IS `__`-PREFIXED BASENAMES, IN BOTH LISTERS, because the tree's gate COUNT flickers by one if
+they disagree. Nothing needed a fixture to be DISCOVERED: gateActivity passes its own probe path into
+gatesByDevice explicitly, and its own comment already stated the rule this repair implements -- "a gate that
+leaves a gate behind would grow the population it measures". New check in gateSweep-selfcheck.mjs PLANTS A
+REAL FILE and walks over it, rather than asking whether a name matches a regex, because a check of the
+second kind would pass over a walker that never applied the rule. Sabotage H, the exclusion removed, reads
+1 RED by name.
+
 The tree stands at 1441 gates.
 
 ## v4408 -- Once over budget, over budget forever: the sweep was evicting gates on timings it made itself

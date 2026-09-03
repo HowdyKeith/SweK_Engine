@@ -52,7 +52,9 @@ const SKIP = /node_modules|[\\/]\.git[\\/]|[\\/]vendor[\\/]|GPU_Assets|demos_cod
 //
 // So the walker lives here once and caseStudy imports it. NAME THE THING ONCE -- the law this tree has paid for
 // eight separate times, including a bridge unreachable for 35 rounds because two files declared /bench.
-const GATE_FILE = /-selfcheck\.mjs$/;
+// v4409 -- the `__` exclusion is gateSweep.enumerateGates's rule, and the two listers must agree or the
+// tree's gate COUNT flickers by one whenever a fixture-planting gate happens to be running. See that file.
+const GATE_FILE = /^(?!__)[^\\/]*-selfcheck\.mjs$/;
 
 /** Every gate file in the tree. The ONE definition of "a gate exists here". */
 export function gateFiles(dir = ENG, acc = []) {

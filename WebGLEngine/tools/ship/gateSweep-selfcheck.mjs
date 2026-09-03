@@ -464,5 +464,34 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
 //   *** AND THE FIRST RUN OF THE NEW CHECK READ 0 RED BECAUSE THE GATE WAS CRASHING. *** It used ENG, which
 //   this file does not define, so the process died before printing a single FAIL line and `grep -c FAIL`
 //   returned zero. A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED, and this one did not.
+/* ------------------------------------------------------------------------------------------------------------
+ * v4409 -- A FIXTURE IS NOT A GATE, AND enumerateGates COULD NOT TELL THE DIFFERENCE
+ *
+ * Four gates plant a transient `*-selfcheck.mjs` in the tree while they run and delete it after:
+ * rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy and
+ * __mutation-crash. The walk had no notion of "transient", so an enumeration overlapping one of those runs
+ * returned the fixture AS A GATE and the sweep ran it -- and rigProgress's is built to exit 1, so it landed
+ * as a NEW RED outside every register and failed the ship. MEASURED at v4409, with rigProgress-selfcheck
+ * running: enumerateGates returned 1442 rather than 1441, the extra being the fixture.
+ *
+ * *** IT IS A RACE, WHICH IS THE WORST SHAPE A SHIP-TIME CHECK CAN HAVE: *** it fails at random, names a
+ * different gate each time, and NEVER REPRODUCES WHEN RUN ALONE. Two consecutive verify runs on the same
+ * tree reported two different NEW reds and both gates were green in isolation.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const planted = path.join(GS.ENG, "tools", "ship", "__gatesweep-probe-selfcheck.mjs");
+    fs.writeFileSync(planted, "process.exit(1);\n");
+    let enumerated;
+    try { enumerated = GS.enumerateGates(GS.ENG); } finally { fs.unlinkSync(planted); }
+    const rel = "tools/ship/__gatesweep-probe-selfcheck.mjs";
+    ok(!enumerated.includes(rel), "*** a `__`-prefixed fixture ON DISK is NOT enumerated as a gate ***",
+       `planted ${rel} -- a file ending -selfcheck.mjs, really written, really present during the walk -- and ` +
+       `enumerateGates returned ${enumerated.length} entries ${enumerated.includes(rel) ? "INCLUDING" : "excluding"} it. ` +
+       "THE PROBE IS REAL AND NOT A STRING TEST: a check that only asked whether the name matched a regex would " +
+       "pass over a walker that never applied it");
+    ok(!fs.existsSync(planted), "...and this check does not leave a gate behind either",
+       "gateActivity's own rule: a gate that leaves a gate behind grows the population it measures");
+}
+
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

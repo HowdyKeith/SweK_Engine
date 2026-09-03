@@ -716,7 +716,19 @@ export function enumerateGates(root = ENG) {
             if (e.name.startsWith(".") && e.name !== ".claude") continue;
             const full = path.join(dir, e.name);
             if (e.isDirectory()) { if (!skip.has(e.name)) walk(full); }
-            else if (e.name.endsWith("-selfcheck.mjs")) out.push(path.relative(root, full));
+            // *** v4409 -- A FIXTURE IS NOT A GATE, AND THE SWEEP HAS BEEN RUNNING FOUR OF THEM. ***
+            // Four gates plant a transient `*-selfcheck.mjs` on disk while they run and delete it after:
+            // rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's
+            // __mutation-decoy and __mutation-crash. This walk had no notion of "transient", so an
+            // enumeration that overlapped one of those runs returned it AS A GATE and the sweep ran it --
+            // and a fixture built to exit 1 (rigProgress's is) then reports as a NEW RED outside every
+            // register. MEASURED: with rigProgress-selfcheck running, enumerateGates returned 1442 rather
+            // than 1441, the extra entry being tools/ship/__rigprogress-fixture-selfcheck.mjs. It is a
+            // race, so it fails a ship at random and never reproduces alone, which is the worst shape a
+            // ship-time check can have. gateActivity's own comment already states the rule -- "a gate that
+            // leaves a gate behind would grow the population it measures" -- and no caller needs a fixture
+            // to be DISCOVERED: gateActivity passes its own path in explicitly.
+            else if (e.name.endsWith("-selfcheck.mjs") && !e.name.startsWith("__")) out.push(path.relative(root, full));
         }
     })(root);
     return out.sort();
