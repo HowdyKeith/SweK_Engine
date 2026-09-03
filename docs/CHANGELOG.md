@@ -14,6 +14,97 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4418 -- four of Vulkan's five ray-tracing stages were already in the loop, with no names
+
+#164's other road: WebRTX's hit shaders. v4417 took the compute transplant; this is the rest of the item.
+
+FIRST, WHAT THIS IS NOT. codedhead/webrtx is not built and not vendored. ui/webrtxBrowser.js settled that at
+v4118 -- upstream publishes no dist, so there is nothing to pin, and vendoring ~3.6 MB of build artefacts
+nobody can review in a diff was refused with reasons. MEASURED AGAIN THIS ROUND rather than inherited from
+that note: cargo 1.94.1 and node 22 are on this box, `wasm-pack` is NOT, and vendor/webrtx does not exist.
+The binary road is shut here, and saying so is cheaper than discovering it halfway through.
+
+SO THIS TAKES THE STRUCTURE, WHICH IS THE PART WORTH TAKING ANYWAY. WebRTX's contribution is not a renderer,
+it is a shape: Vulkan's ray-tracing pipeline -- raygen, intersection, any-hit, closest-hit, miss -- dispatched
+through a SHADER BINDING TABLE, expressed as plain WebGPU compute. And v4118's own honest note says what it
+never reached: "NO IMAGE WAS EVER RENDERED here -- no raygen shader was compiled and no pass was dispatched.
+'The pipeline exists' is not 'it draws'."
+
+WHAT WAS MEASURED BEFORE ANYTHING WAS WRITTEN, by probing v4417's generated WGSL:
+
+    raygen        generate a camera ray          PRESENT   inlined, unnamed
+    intersection  procedural sphere hit          PRESENT   inlined, unnamed
+    closest-hit   shade and continue             PRESENT   inlined, unnamed
+    miss          environment radiance           PRESENT   inlined, unnamed
+    any-hit       alpha / transparency           ABSENT    genuinely not there
+
+    shader binding table                         ABSENT
+    geometries the shader can hold               EXACTLY ONE -- centre, radius and albedo are scalars
+
+THE MONOLITH IS NOT MISSING THE STAGES. IT IS MISSING THE SEAMS. That is a smaller and far more useful finding
+than "the tree has no ray tracing pipeline", and it is why this round is a rearrangement with a capability at
+the end rather than a rewrite.
+
+NEW physics/render/rtPipeline.mjs gives the four stages names and a binding table. The split is BIT-EXACT
+against v4417's monolith AND against the CPU tracer -- 0 of 576 pixels differing both ways -- so the seams
+cost nothing. A refactor that moved a number would be a rewrite wearing a refactor's clothes.
+
+THE CAPABILITY, because a refactor is not a round. TWO GEOMETRIES WITH TWO MATERIALS IN ONE DISPATCH, which
+v4417 has nowhere to put: its albedo is a single uniform scalar. And the oracle survives, which is what makes
+it checkable -- interreflection MULTIPLIES albedos, and a product of dyadic albedos is dyadic, so a two-sphere
+furnace stays exactly representable: 0 non-representable pixels of 576, 69 distinct values, minimum 0.132813,
+so the interreflection is real rather than dodged. Bit-exact against the CPU at three frame sizes with the
+spheres apart AND touching.
+
+AND THE ORACLE HAS A BOUNDARY, FOUND BY RUNNING RATHER THAN BY THINKING.
+
+One geometry is bit-exact BY AN ARGUMENT: a sphere is convex, every bounce escapes, the sampler never reaches
+the pixel. Two or more is bit-exact only as an OBSERVATION, because a bounce can land on a neighbour and the
+route then depends on a direction f32 and f64 disagree about.
+
+    two spheres, apart      24/16, 32/64, 48/16   ->  0, 0, 0 differing
+    two spheres, TOUCHING   24/16, 32/64, 48/16   ->  0, 0, 0 differing
+    THREE spheres           32x32 spp=64          ->  1 of 1024 differing
+
+The boundary is real and it is reached at three. The one differing pixel is diagnosable rather than
+mysterious: its delta times spp is 1.578, so ONE SAMPLE OF SIXTY-FOUR TOOK A DIFFERENT ROUTE, where a rounding
+drift would be about 1e-7. So the gate does not assert that multi-geometry agreement is perfect. It asserts
+that the values stay dyadic (0 of 1024 non-representable), that agreement stays above 99.5%, and that EVERY
+disagreement has the shape of a whole flipped sample rather than of a drifting port.
+
+AND THE FURNACE IS BLIND TO THE MATERIAL TOO, WHICH IS THE SAME FACT A THIRD TIME.
+
+The gate's first draft asserted that a mirror record and a lambertian record differ on more than 20 pixels of
+576. IT MEASURED 15. The threshold was guessed, and it was wrong for this family's own reason: IN A UNIFORM
+ENVIRONMENT EVERY BOUNCE DIRECTION RETURNS THE SAME RADIANCE, so a mirror and a diffuse produce the same
+pixel, and the 15 that differ are only the paths that happened to strike the other sphere. On a gradient sky
+the same pair differs on 70 -- 4.7 times more.
+
+    the furnace cannot see the SAMPLER          v4417 section 4
+    the furnace cannot see a broken SEEDING     v3487, pathTracer.mjs's own comment
+    the furnace cannot see the MATERIAL         here
+
+Three sites, three rounds, ONE FACT. Both numbers are kept in the gate because the GAP between them is the
+evidence, not a detail.
+
+AND THE FIRST DRAFT SILENTLY FLATTENED A MIRROR INTO A LAMBERTIAN. sceneFromSbt mapped only centre, radius and
+albedo, so a mirror record arrived at the CPU as a diffuse and the gate dutifully reported 15 pixels
+"differing" -- a GPU mirror against a CPU diffuse, a number with no meaning that looked exactly like a small
+port bug. A CONVERSION THAT DROPS A FIELD IS A SECOND DECLARATION OF THE SCENE, which is the defect this tree
+names more often than any other, committed inside the round whose whole subject is that the material is DATA.
+It refuses now, and cpuComparable() is how a caller asks first.
+
+NEW physics/render/rtPipeline-selfcheck.mjs, thirteen checks in five sections.
+
+WHAT THIS DOES NOT CLAIM. That it is WebRTX, or compatible with it: no SPIR-V, no GLSL front end, no naga, no
+Vulkan API surface. That there is a BVH: geometries are tested linearly, which is honest at four spheres and
+useless at four thousand -- the acceleration structure is the single biggest thing WebRTX has that this does
+not. That any-hit exists: it does not, and the stage list carries the row as unimplemented rather than
+dropping it. And that any of this is FASTER than v4417's monolith -- the seams are for expressiveness, and no
+timing claim is made anywhere.
+
+Five sabotages, 3/2/1/2/2 RED by name, file md5-identical after restore.
+The tree stands at 1450 gates.
 ## v4417 -- v4290 said the tracer could not be graded on a GPU, and the furnace is where it can
 
 #164 -- The path tracer on a GPU: the TSL compute transplant, or WebRTX's hit shaders.
