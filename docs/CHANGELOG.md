@@ -14,6 +14,84 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4427 -- two blobulators, and there is no shared SDF to compare
+
+#169 reads "two blobulators, ONE SDF, never compared". The first result of the comparison is that the premise
+is false: the two pages solve different equations.
+
+    blobulator.html       field = 1 - SUM over blobs of r^2 / (d^2 + 0.35),  marched at isolevel 0
+                          an inverse-square metaball -- a DENSITY, thresholded
+
+    blobulator-gpu.html   d = smin(d, length(p - c) - r, k)
+                          a smooth-minimum union of sphere SDFs -- a DISTANCE
+
+Both look like blobs. They are not the same object, so "compare the two implementations of the SDF" had no
+subject until the difference itself was measured.
+
+AND `r` IS NOT THE SAME QUANTITY ON THE TWO PAGES, WHICH IS THE PART THAT BITES.
+
+Both carry blobs as {x, y, z, r} and hand that same record to their own field. On the GPU page `r` IS the
+sphere's radius. On the CPU page it is a STRENGTH, and the surface lands where the density crosses zero:
+
+    1 - r^2 / (d^2 + 0.35) = 0    =>    d = sqrt(r^2 - 0.35)
+
+A CLOSED FORM DERIVED FROM THE FIELD EQUATION, not a fit -- checked against bisection to four decimals:
+
+    r        CPU surface     GPU surface     ratio
+    0.70       0.3742          0.7000        0.535
+    1.00       0.8064          1.0000        0.806
+    1.50       1.3786          1.5000        0.919
+    2.00       1.9106          2.0000        0.955
+
+A blob of r=1 renders 19.4% smaller on the CPU page than on the GPU one.
+
+AND THE DIVERGENCE IS CATEGORICAL RATHER THAN A TOLERANCE.
+
+Below r = sqrt(0.35) = 0.5916 the density never reaches the isolevel at all, so a blob of r=0.55 is INVISIBLE
+on blobulator.html and a solid sphere of radius 0.55 on blobulator-gpu.html. And at the waist between two unit
+blobs 2.4 apart:
+
+    metaball at x=0      -0.1173   INSIDE  -- the blobs have MERGED
+    smin SDF k=0.2       +0.1500   outside -- they are SEPARATE
+    smin SDF k=0.5       +0.0750   outside
+
+For one blob set the two pages disagree about whether the shape is even CONNECTED. The k that would reconcile
+them depends on the spacing, so no constant k makes the pages agree.
+
+AND A SECOND FINDING: fireRamp IS DUPLICATED INTO WGSL AND HAD DRIFTED.
+
+blobulator.html line 81 imports the shared ramp, with a note that v2438 removed a byte-identical copy from
+THIS page. v2438 MISSED THE WGSL COPY ON THE SIBLING PAGE, which blobulator-gpu.html still carries as its own
+`fn fireRamp`. Compared stop by stop, five of six matched exactly and one had drifted:
+
+    stop 0.85     fx/voxelize/fireRamp.js  [1.00, 0.82, 0.32]
+                  blobulator-gpu.html      [1.00, 0.85, 0.35]
+
+Widest divergence 0.0200 at heat 0.90, and exactly 0.0000 below heat 0.68. A COPY THAT IS RIGHT AT FIVE STOPS
+OF SIX IS THE KIND NOBODY NOTICES -- which is what v2438 was trying to prevent when it deduplicated the JS
+copy. The WGSL stop is corrected to the shared value. A browser page cannot import a JS module into WGSL, so
+the copy stays and the gate reads BOTH out of source and fails if they part again.
+
+AND A SABOTAGE READ ZERO RED, AND FOUND THIS ROUND COMMITTING THE DEFECT IT REPORTS.
+
+Dropping the `- k*h*(1-h)` term from the JS transcription of smin tripped NOTHING. The gate asserted the WGSL
+RAMP against its shared original and left the WGSL SMIN unchecked -- so the waist values, the connectivity
+verdict and every number in section 3 would have been measuring a function blobulator-gpu.html does not
+contain. A TRANSCRIPTION IS A SECOND DECLARATION, and this file wrote one in the very round that reports one.
+
+wgslSmin() parses the page's own text now, and drift in EITHER direction goes red: 1,089 (a, b, k) triples
+agree to 0.00e+0.
+
+NEW render/blobField.mjs and NEW render/blobField-selfcheck.mjs, nine checks in four sections.
+
+WHAT THIS DOES NOT CLAIM. That either page is wrong: a metaball and an SDF are both legitimate, and the two
+were never required to agree -- which is why this round reports a DIFFERENCE and changes neither field. That a
+k exists which reconciles them, since the measurement says the reconciling k depends on the scene. And that
+the pages were compared PIXEL by pixel: these are field values, and rendering them identically would need the
+CPU page to adopt the GPU formulation, which is a different round with a visible cost.
+
+Five sabotages, 1/3/1/1/1 RED by name, three files md5-identical after restore.
+The tree stands at 1458 gates.
 ## v4426 -- the directory outside every scanner, and what its unchecked claims turned out to be worth
 
 #170. v4412 renamed a GLSL `fireRamp` in demos_code/fitzhugh_nagumo.js to `infernoRamp`, because one name meant
