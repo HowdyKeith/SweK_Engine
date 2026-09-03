@@ -56,6 +56,12 @@ function discover() {
  */
 const RIG_ONLY = [
     {
+        id: "lodfreeze", title: "Re-freeze the LOD record on real hardware",
+        why: "TWO SHIPPED PAGES DERIVE THEIR LOD THRESHOLDS FROM A SOFTWARE RASTERISER. orrery-gpu.html and universe-gpu.html read render/lodRecord.mjs and compute metric = K / width from it; every sample in that record was drawn by SwiftShader, on both of its backends. v4378 measured the two software rasterisers against each other and they differ by 1.7% in K -- which is a LOWER BOUND on what hardware would differ by, not an estimate of it. Until a real GPU signs the record, the distance at which a planet drops a LOD is a number this sandbox chose.",
+        how: "Run `node tools/ship/freezeLod.mjs` on Galaxina with a GPU-backed browser: it rewrites render/lodRecord.mjs from what that machine actually draws, at four widths on both backends, and tools/ship/shippedLadder-selfcheck.mjs then holds the pages to it. Commit the rewritten record; nothing else needs touching.",
+        link: "/orrery-gpu.html",
+    },
+    {
         id: "wasm", title: "Rebuild box3d.wasm",
         why: "BLOCKS FIVE THINGS: the cross-arch flesh test (v2546), the paramecium's real 3D home (v2552/57), the conformance run against real box3d (v2553), the up-axis question done properly, and the brain-vs-mold race (v2557).",
         how: "The sandbox cannot: emsdk's repo answers but storage.googleapis.com returns 403. On Galaxina it should just build.",

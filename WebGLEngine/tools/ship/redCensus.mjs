@@ -120,8 +120,13 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "(confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep)" },
     { gate: "tools/ship/registerResidue-selfcheck.mjs", ms: 1321,
       fails: "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga" },
-    { gate: "tools/ship/rigJobs-selfcheck.mjs", ms: 53,
-      fails: "the page renders title, why and how for each" },
+    // v4379 -- REMOVED, FIXED RATHER THAN WIDENED. It read "the page renders title, why and how for each" and had
+    // been red since v4129, when the rig-only panel was taken off rig.html at Keith's request. The check named that
+    // page, so it went red on the removal and the line was filed here as a fact about a deleted panel. Read instead
+    // of filed, it said something else: RIG_ONLY was served on /rig/list and rendered by NO page, fifteen entries of
+    // recorded reasoning about what each chore unblocks, unreachable for 250 rounds. server.html now carries the
+    // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
+    // naming one, so the surface can move again without this going stale twice.
     { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
       fails: "!! *** only 4 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebu" },
     // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
@@ -233,6 +238,17 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/rigJobs-selfcheck.mjs", round: "v4379",
+      why: "RED SINCE v4129 AND IT WAS A MESSAGE, NOT A FACT ABOUT A DELETED PANEL. The failing line was 'the page " +
+           "renders title, why and how for each', and it named rig.html -- from which the rig-only panel was removed " +
+           "at v4129, at Keith's request. Filed here, it read as a check outliving its surface. Read instead, it said " +
+           "something else: ai-bridge/rigRunner.js RIG_ONLY was still SERVED on /rig/list and rendered by no page at " +
+           "all, fifteen entries of recorded reasoning about what each chore unblocks, unreachable for 250 rounds -- " +
+           "which is the exact failure that gate's own header exists to name. Fixed three ways: server.html carries " +
+           "the panel now (the front door, not the page he cleared), the check asks whether ANY page renders the list " +
+           "rather than naming one, and it LOADS the page against a stub bridge instead of scanning its source, " +
+           "because two sabotages of the renderer both cost 0 red against a scan. The second standing red in this " +
+           "neighbourhood to turn out to be unopened mail, after vendoredLicences at v4371." },
     { gate: "tools/ship/gateBudget-selfcheck.mjs", round: "v4329 -- pruned here; the REPAIR was v4304's",
       why: "NOT FIXED BY v4329; FOUND STALE BY IT. The failing line this census recorded is 'the recorded " +
            "slowest gate is still the slowest one anybody has SEEN', and v4304 repaired exactly that by raising " +
