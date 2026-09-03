@@ -40,7 +40,7 @@ import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mj
 import { UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
 import {
     MEASURED_V4424, PROTOCOL, DECIDED, V4279_CAP_MS, SERIAL_CAP_MS,
-    EXEMPT_AT_V4424, MEASURED_EXEMPT_AT_V4424, capRecordedAsTime,
+    EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime,
     agreementWith, scaleRatios, spearman, exemptedButMeasured, fitsUnderCap, summarise,
     stillUnmeasured, medianOf, runGateSerial,
 } from "./slowCensus.mjs";
@@ -70,9 +70,10 @@ console.log("\n2. *** THE EXEMPTION SURVIVED ITS OWN RESOLUTION ***");
 {
     const reg = redRegister();
     const both = exemptedButMeasured(reg);
-    report(`${both.length} gates the ship gate calls unmeasured have a GREEN verdict on record in this tree`);
-    ok("*** the exemption outliving its own resolution: a ceiling, so the repair passes ***",
-        both.length <= MEASURED_EXEMPT_AT_V4424, `${both.length} <= ${MEASURED_EXEMPT_AT_V4424} at v4424`);
+    // *** REPORTED, NEVER ASSERTED. *** This number rises when somebody measures more of the bucket and falls
+    // when somebody repairs the register, so a bound in either direction punishes one of the two things a
+    // later round could do about it. The monotone quantities are gated in sections 1 and 6 instead.
+    report(`*** ${both.length} GATES THE SHIP GATE CALLS UNMEASURED HAVE A GREEN VERDICT ON RECORD IN THIS TREE ***`);
     ok("  every one of them is green on every record it appears in", both.every((b) => b.verdicts.every((v) => v === "GREEN")),
         "a green-on-record gate exempted as unmeasured is the exemption outliving the reason for it");
     // *** ABOUT THE FILE, NOT ABOUT THE REGISTER. *** Phrasing this against redRegister() would make it fail
@@ -191,6 +192,11 @@ console.log("\n6. *** THEY WERE NEVER TOO SLOW FOR THE CAP THAT BUCKETED THEM **
     const still = stillUnmeasured();
     ok("*** and the round does not empty the bucket ***", still.length > 0,
         `${still.length} of ${UNCONFIRMED_SLOW.length} still have no decided verdict from any run`);
+    // *** THE RATCHET THAT POINTS THE RIGHT WAY. *** Measuring only ever shrinks this; nothing but deleting a
+    // record can grow it. Section 2's headline moves the other way under the same work, which is why it is
+    // reported rather than bounded.
+    ok("  the unmeasured third state may shrink and may not grow", still.length <= UNMEASURED_AT_V4424,
+        `${still.length} <= ${UNMEASURED_AT_V4424} at v4424`);
     ok("  every one of those is still in UNCONFIRMED_SLOW", still.every((g) => UNCONFIRMED_SLOW.includes(g)),
         "unmeasured stays a third state; rounding it off either way is how this bucket was born");
     // *** HAVING A RECORD IS NOT HAVING A VERDICT, AND THE SEVEN TIMEOUTS ARE WHERE THAT BITES. *** They are
