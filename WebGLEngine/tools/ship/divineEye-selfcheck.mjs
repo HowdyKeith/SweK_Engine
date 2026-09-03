@@ -26,10 +26,14 @@
 //
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import * as DE from "../../render/divineEye.mjs";
+import { ssim } from "../../render/perceptual.mjs";
+import { ssimWindowed } from "../../render/ssimWindowed.mjs";
+import { noComments } from "./sourceScan.mjs";
 import { surfaceMesh, volumeOf } from "../../mesh/carve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -354,6 +358,125 @@ else {
 //       base model's centre and radius held fixed (img2three unitMesh's `from`), the same deletion reads IoU exactly 1.
 //       The first reading would have been quoted as the gate WORKING, which is the more dangerous direction to be wrong in.
 
+/* ------------------------------------------------------------------------------------------------------------
+ * 7. v4386 -- THE PORT HAS A CONSUMER OUTSIDE ITS OWN GATE, AND THE PAGE MEASURES WHAT ITS TWO SIMPLIFICATIONS COST
+ *
+ * *** THIS MODULE WAS AN ORPHAN HELD OFF THE CENSUS BY THE SHIP RITUAL'S OWN SENTENCE. ***
+ * referenceKind-selfcheck counts modules with no non-gate importer that a MENTION rescues from graveyard's
+ * orphan scan. render/divineEye.mjs was on that list, and its single rescuer was tools/ship/gateSweep.mjs --
+ * the sweep-closing paragraph the ship ritual requires every round that adds a gate, reading "divineEye-selfcheck
+ * guards render/divineEye.mjs". THE RITUAL WRITES THE SENTENCE THAT HIDES THE MODULE THE ROUND JUST BUILT.
+ *
+ * The fix is the route that gate names as progress -- WIRE IT -- and the precedent is exact: render/ssimWindowed.mjs
+ * came off the unwired register at v3693 because ssim-compare.html imported it. Same page, same move.
+ *
+ * AND THE PAGE EARNS IT RATHER THAN HOSTING IT. Its subject is "what a whole-image number cannot say", and this
+ * port answers with two more numbers that cannot say it, for reasons that are MEASURED HERE rather than argued.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const pageSrc = fs.readFileSync(path.join(ENG, "ssim-compare.html"), "utf8");
+    // Stripped of comments, because this whole round is about a mention passing for a wire. A gate checking that
+    // a page imports a module must not itself be satisfied by a sentence -- including one of its own.
+    const pageCode = noComments(pageSrc);
+    ok("!! *** ssim-compare.html IMPORTS render/divineEye.mjs -- a real consumer, not a mention ***",
+        pageCode.includes("/render/divineEye.mjs") && pageCode.includes("globalSsim") && pageCode.includes("edgeOverlap"),
+        "checked against the page's CODE with comments stripped. A mention in a comment is exactly what put this " +
+        "module on the rescued list in the first place, so this check refuses to accept one. *** THE LEADING " +
+        "SLASH IS DOING REAL WORK AND IS NOT DECORATION: the page's own prose paragraph writes the module as " +
+        "render/divineEye.mjs and the IMPORT writes it as /render/divineEye.mjs, so the browser-resolvable form " +
+        "is what separates a wire from a sentence here -- measured, by removing the import and leaving the " +
+        "paragraph, which took this check red ***");
+
+    // THE TWO RELATIONSHIPS THE PAGE CLAIMS, MEASURED HERE ACROSS EVERY SIZE THE PAGE OFFERS.
+    const W = 256, H = 256;
+    const base = (x, y) => 128 + 100 * Math.sin(x / 9) * Math.cos(y / 11);
+    const synth = (f) => { const d = new Uint8ClampedArray(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = f(x, y), i = (y * W + x) * 4;
+            d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; } return { data: d, width: W, height: H }; };
+    const rows = [];
+    for (const sz of [8, 16, 32, 64]) {
+        const A = synth(base), B = synth((x, y) => (x < sz && y < sz) ? 255 - base(x, y) : base(x, y));
+        const la = DE.lumaGrid(A.data, W, H, DE.LUMA_SIZE), lb = DE.lumaGrid(B.data, W, H, DE.LUMA_SIZE);
+        const ea = DE.lumaGrid(A.data, W, H, DE.EDGE_SIZE), eb = DE.lumaGrid(B.data, W, H, DE.EDGE_SIZE);
+        const mask = DE.sobelEdges(ea, DE.EDGE_SIZE);
+        rows.push({ sz, gl: ssim(A, B), port: DE.globalSsim(la, lb), worst: ssimWindowed(A, B).min,
+                    edge: DE.edgeOverlap(ea, eb, DE.EDGE_SIZE),
+                    density: mask.reduce((t, v) => t + v, 0) / (DE.EDGE_SIZE * DE.EDGE_SIZE) });
+    }
+    for (const r of rows) console.log(`  ----  corner ${String(r.sz).padStart(2)}: ssim() ${r.gl.toFixed(5)}  port@${DE.LUMA_SIZE} ${r.port.toFixed(5)}  ` +
+        `delta ${(r.port - r.gl >= 0 ? "+" : "") + (r.port - r.gl).toFixed(5)}  worst ${r.worst.toFixed(4)}  edge ${r.edge.toFixed(5)}  density ${(r.density * 100).toFixed(1)}%`);
+
+    // *** I PREDICTED THE DOWNSAMPLE WOULD DILUTE THE DEFECT AND READ HIGHER. IT DOES NEITHER. *** A box average
+    // preserves the mean, variance and covariance that a single-window SSIM is made of, so 65,536 pixels and 4,096
+    // cells give the same answer to four decimals -- and the sign of the difference is not even consistent across
+    // the four sizes. THE SIMPLIFICATION THAT LOOKED EXPENSIVE COSTS NOTHING; the one below costs everything.
+    const worstDelta = Math.max(...rows.map((r) => Math.abs(r.port - r.gl)));
+    ok("!! *** the 64x downsample costs a global SSIM almost nothing -- the two agree to 3 decimals at every size ***",
+        worstDelta < 1e-3,
+        `largest |port - ssim()| across 8/16/32/64 is ${worstDelta.toFixed(6)}. A BOX AVERAGE PRESERVES THE MEAN, ` +
+        "VARIANCE AND COVARIANCE a single window is built from, so the grid size is nearly free here. The port " +
+        "also clamps to [0,1], which the worst window (negative at every size) shows is a real loss of range");
+
+    // *** AND THE EDGE MASK IS THE ONE THAT CANNOT SEE THE DEFECT AT ALL, FOR TWO REASONS AT ONCE. ***
+    // (1) 255-v has the same gradient MAGNITUDE as v, so inverting a region moves no Sobel response.
+    // (2) On a full-frame sinusoid the mask SATURATES -- measured 94.5% of cells are edges at threshold 0.12 --
+    // so the overlap scores ~1 against anything. It reaches EXACTLY 1.0000 on the LARGEST defect offered, which
+    // is the direction nobody would guess and the reason the density is printed beside the number on the page.
+    ok("!! *** the port's edge overlap cannot see a contrast inversion, and SATURATES on this pair ***",
+        rows.every((r) => r.edge > 0.999 && r.density > 0.9) && rows[rows.length - 1].edge === 1,
+        rows.map((r) => `${r.sz}: overlap ${r.edge.toFixed(5)} at ${(r.density * 100).toFixed(1)}% density`).join(", ") +
+        ". THE SMALLEST DEFECT AND THE BIGGEST BOTH SCORE A PERFECT 1.0000 while the two in between do not, so the " +
+        "number does not even ORDER the defects -- it is reading noise at the mask boundary. This is not a criticism " +
+        "of the port -- it is built for a " +
+        "silhouette against a background, and a full-frame sinusoid is not that -- but a number that reads 1.0 on " +
+        "a quarter of the image inverted is exactly what this page exists to show");
+
+    // THE PAGE IS LOADED, NOT SCANNED. v4379's lesson, applied here: two sabotages of a renderer both cost 0 red
+    // against a source scan, so the numbers are read out of the live DOM and compared with the ones above.
+    const probe = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 90000, script: `
+        async () => {
+            const f = document.createElement("iframe");
+            f.style.width = "1100px"; f.style.height = "900px";
+            f.src = "/ssim-compare.html";
+            document.body.appendChild(f);
+            await new Promise((r) => { f.onload = r; setTimeout(r, 20000); });
+            await new Promise((r) => setTimeout(r, 2000));
+            const d = f.contentDocument;
+            const t = d.getElementById("nums");
+            if (!t) return { rows: [], size: null };
+            const rows = Array.from(t.querySelectorAll("tr")).map((tr) => Array.from(tr.children).map((c) => c.textContent.trim()));
+            const sel = d.getElementById("size");
+            return { rows, size: sel ? sel.value : null };
+        }` });
+    if (probe.skipped) {
+        console.log("  ----  the live page read was SKIPPED: " + probe.reason + " -- the three source and numeric checks above still ran");
+    } else {
+        const live = probe.result || { rows: [], size: null };
+        const cell = (label) => { const r = (live.rows || []).find((x) => x[0] && x[0].startsWith(label)); return r ? Number(r[1]) : NaN; };
+        const shown = rows.find((r) => String(r.sz) === String(live.size));
+        ok("!! *** the page SHOWS the port's numbers, read out of the live DOM and equal to this gate's own ***",
+            !!shown && Math.abs(cell("divineEye SSIM") - shown.port) < 5e-5 && Math.abs(cell("divineEye edge overlap") - shown.edge) < 5e-5,
+            `page default size ${live.size}; DOM says SSIM ${cell("divineEye SSIM")} and edge ${cell("divineEye edge overlap")}, ` +
+            `this gate computes ${shown ? shown.port.toFixed(5) : "n/a"} and ${shown ? shown.edge.toFixed(5) : "n/a"}. ` +
+            (probe.pageErrors.length ? "PAGE ERRORS: " + probe.pageErrors.join(" | ") : "no page errors") +
+            ". A SOURCE SCAN WOULD PASS ON A PAGE THAT IMPORTED THE MODULE AND DREW NOTHING");
+        ok("...and the row the page adds is the fourth measure, not a replacement for the three it had",
+            (live.rows || []).length === 6,
+            `${(live.rows || []).length} rows including the header: measure, global ssim(), windowed MEAN, WORST WINDOW, ` +
+            "divineEye SSIM, divineEye edge overlap. The port is shown BESIDE the three, never instead of them");
+    }
+}
+
+// SABOTAGE LOG for section 7 -- applied, gate run, exit code read, restored. MEASURED at v4386.
+//   AS the two divineEye rows deleted from the page's table, THE IMPORT LEFT IN PLACE -> exit=1, 2 red: the live
+//      DOM read (SSIM NaN, edge NaN) and the row count (4, not 6). *** THE SOURCE CHECK PASSED. *** A page that
+//      imports a module and draws nothing from it satisfies a scan, which is v4379's finding reproduced exactly
+//      and the whole reason this section loads the page instead of reading it.
+//   AT the import line removed, the page's two prose paragraphs about the port left standing -> exit=1, 3 red,
+//      including the source check: the paragraph writes render/divineEye.mjs and the import writes
+//      /render/divineEye.mjs, and the leading slash is the only thing separating them. The same sabotage takes
+//      referenceKind-selfcheck's ritual check to 3 against 2, naming this module.
+//
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether a hull's verdict flips at some camera between the two measured -- section 3 shows the same 54.9%-over " +
     "tube refused obliquely and passed from the side, and where the boundary lies is a sweep this round did not run; the five soft signals and the VLM layer this port leaves out, so no verdict here is their verdict; " +

@@ -120,7 +120,15 @@ export const RED_AT_V4279 = Object.freeze([
       // about bucketing and not about the gate. The gate's own line, read for the first time since, is a RISING
       // number on a check whose text says a rise is the bad direction -- and it rose from 221 to 223 between two
       // runs inside the round that found it. The bucketing note is kept below because it is still true.
-      fails: "!! *** the prose-rescued population may only SHRINK *** 223 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE",
+      // v4386 -- READ, AND THE RISE HAD A CAUSE NOBODY HAD LOOKED FOR. Three of the modules on the rescued list
+      // were this branch's own (render/img2three.mjs, render/divineEye.mjs, mesh/carve.mjs) and all three had
+      // ONE rescuer: tools/ship/gateSweep.mjs, whose sweep closings the SHIP RITUAL requires -- one paragraph per
+      // round that adds a gate, naming the module it guards. A round that builds a module, gates it and ships it
+      // documents it into invisibility without deciding to. divineEye is wired now (ssim-compare.html imports it,
+      // the move v3693 made for render/ssimWindowed.mjs on that same page) and the population is 221; the gate
+      // gained a ratchet on the ritual class and a report of the FOURTH route (39 rescued only by a register --
+      // which, like the three routes measured before it, does not reach 181 either).
+      fails: "!! *** the prose-rescued population may only SHRINK *** 221 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE",
       note: "confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep" },
     { gate: "tools/ship/registerResidue-selfcheck.mjs", ms: 1321,
       fails: "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga" },

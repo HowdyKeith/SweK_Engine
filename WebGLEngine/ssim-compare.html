@@ -38,6 +38,13 @@
     render/ssimWindowed.mjs is SSIM as Wang et al. define it &mdash; an 11&times;11 Gaussian window slid across the
     image, producing a <b>local map</b>. This page runs both on the same pair and draws the map.
   </div>
+  <div class="hint">
+    <b>And a third opinion from outside this tree.</b> render/divineEye.mjs is a faithful port of another
+    project's render checker: it judges on a <b>64&times;64 luma downsample</b> and a <b>96&times;96 Sobel edge
+    mask</b> rather than on the pixels. Both of its numbers are shown below, on the same pair, so the cost of
+    each simplification is visible rather than argued. Neither is used to grade anything here &mdash; this page
+    picks no threshold.
+  </div>
 </header>
 <main>
 
@@ -104,6 +111,11 @@
 <script type="module">
 import { ssim } from "/render/perceptual.mjs";
 import { ssimWindowed } from "/render/ssimWindowed.mjs";
+// v4386 -- THE THIRD OPINION, AND IT IS HERE FOR A REASON BEYOND CURIOSITY. render/divineEye.mjs had no
+// consumer outside its own gate, which is exactly how render/ssimWindowed.mjs stood before v3693 wired it into
+// THIS PAGE and took it off the unwired register. The port judges on a downsample and an edge mask; showing
+// what those two simplifications cost, on a pair whose defect is known exactly, is this page's whole subject.
+import { lumaGrid, globalSsim, edgeOverlap, LUMA_SIZE, EDGE_SIZE, EDGE_THRESH, sobelEdges } from "/render/divineEye.mjs";
 
 const $ = (id) => document.getElementById(id);
 const W = 256, H = 256;
@@ -147,6 +159,13 @@ function report(a, b) {
   try { r = ssimWindowed(a, b); }
   catch (e) { $("msg").innerHTML = "<span class='bad'>" + e.message + "</span>"; return; }
   const gl = ssim(a, b);
+  // The port's two numbers, computed the way IT does: luma box-averaged to 64x64 for SSIM, to 96x96 for the
+  // Sobel mask. The edge DENSITY is reported beside the overlap because without it the overlap is unreadable --
+  // a mask where nearly every cell is an edge scores ~1 against anything.
+  const la = lumaGrid(a.data, a.width, a.height, LUMA_SIZE), lb = lumaGrid(b.data, b.width, b.height, LUMA_SIZE);
+  const ea = lumaGrid(a.data, a.width, a.height, EDGE_SIZE), eb = lumaGrid(b.data, b.width, b.height, EDGE_SIZE);
+  const pSsim = globalSsim(la, lb), pEdge = edgeOverlap(ea, eb, EDGE_SIZE);
+  const dens = sobelEdges(ea, EDGE_SIZE).reduce((t, v) => t + v, 0) / (EDGE_SIZE * EDGE_SIZE);
   paintMap($("cM"), r);
   const cls = (v) => v > 0.99 ? "warn" : (v < 0.5 ? "bad" : "");
   $("nums").innerHTML =
@@ -156,7 +175,16 @@ function report(a, b) {
     "<tr><td>windowed MEAN</td><td class='big " + cls(r.mssim) + "'>" + r.mssim.toFixed(5) + "</td>" +
       "<td>the paper's reported figure, and still an average over the image</td></tr>" +
     "<tr><td>WORST WINDOW</td><td class='big " + (r.min < 0.5 ? "bad" : "ok") + "'>" + r.min.toFixed(4) + "</td>" +
-      "<td>at (" + r.minAt.x + ", " + r.minAt.y + ") &mdash; the only one of the three that says <b>where</b></td></tr>";
+      "<td>at (" + r.minAt.x + ", " + r.minAt.y + ") &mdash; the only one of these that says <b>where</b></td></tr>" +
+    "<tr><td>divineEye SSIM @" + LUMA_SIZE + "</td><td class='big " + cls(pSsim) + "'>" + pSsim.toFixed(5) + "</td>" +
+      "<td>the port's global SSIM on a " + LUMA_SIZE + "&times;" + LUMA_SIZE + " luma downsample. <b>&Delta; vs global ssim(): " +
+      (pSsim - gl >= 0 ? "+" : "") + (pSsim - gl).toFixed(5) + "</b> &mdash; a box-average preserves the mean, variance and " +
+      "covariance a single window is made of, so the downsample costs almost nothing. It also CLAMPS to [0,1], " +
+      "so unlike the worst window it can never report a negative</td></tr>" +
+    "<tr><td>divineEye edge overlap @" + EDGE_SIZE + "</td><td class='big " + (pEdge > 0.99 ? "warn" : "") + "'>" + pEdge.toFixed(5) + "</td>" +
+      "<td>Sobel mask at threshold " + EDGE_THRESH + ", <b>" + (dens * 100).toFixed(1) + "% of cells are edges</b>. " +
+      "A saturated mask scores ~1 against anything, and inverting a region does not move it at all: " +
+      "255&minus;v has the same gradient MAGNITUDE as v. <b>This number cannot see a contrast inversion</b></td></tr>";
 }
 
 function runDemo() {
