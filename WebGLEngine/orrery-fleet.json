@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "29e1e0c7dcb8102acbb6c857e84100971e8baebb",
+ "head": "73b6a0c53afb26d777b8a09973c10073aa509b5e",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2651386,
-    "sha": "29e1e0c7dcb8102acbb6c857e84100971e8baebb"
+    "bytes": 2650490,
+    "sha": "73b6a0c53afb26d777b8a09973c10073aa509b5e"
    },
    {
     "path": "mpm3d.html",
@@ -634,8 +634,8 @@
    },
    {
     "path": "tools/ship/generatedLadder-selfcheck.mjs",
-    "bytes": 25680,
-    "sha": null
+    "bytes": 47132,
+    "sha": "73b6a0c53afb26d777b8a09973c10073aa509b5e"
    },
    {
     "path": "tools/ship/img2three-selfcheck.mjs",

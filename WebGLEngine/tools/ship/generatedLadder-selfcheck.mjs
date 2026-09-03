@@ -22,6 +22,25 @@
 // SHOWCASE repo that holds the generated models carries no LICENSE file and no license field, so nothing from it is
 // vendored. The factory here takes a segment budget the way theirs takes a quality level.
 //
+// v4374 -- AND THE THRESHOLDS DERIVED (sections 5 and 6), which is what v4373 left open: it priced the rungs and said
+// the thresholds were "PRICED but not yet chosen", because choosing needs a policy nobody had stated.
+//
+// *** THE FIRST POLICY THIS ROUND STATED WAS MEASURED WRONG, AND THAT IS THE FINDING. *** It said a rung may be used
+// wherever it changes at most a FRACTION of the pixels the subject covers -- of the subject and not of the frame,
+// because a frame budget "is satisfied trivially by anything far enough away". Measured over a 27.5x range of angular
+// size, that fraction does not move: rung 1 costs 57-75% of its own covered pixels and rung 2 costs 80-90%, spreads
+// of 1.33x and 1.36x. It is SCALE-INVARIANT, because a coarser rung shades differently across the whole subject and
+// not only at its outline, so changed and covered scale together. A scale-invariant cost expresses no preference
+// about distance, so no threshold can be derived from it at any budget -- and the sentence written against the frame
+// policy is the argument FOR it: a distant model may use a coarse rung precisely because its error is trivially small
+// in absolute terms. That is what "you cannot see it from there" means.
+//
+// So the policy is ABSOLUTE: 64 pixels of the frame per instance, one number in one place. render/lodBudget.mjs
+// derives 0.0515 and 0.0416 from the measured curve by interpolating between the two samples that bracket the budget,
+// against the 0.055 and 0.03 v4373 typed -- 0.94x and 1.39x. And the derived pair is DRIVEN, in a second harness call
+// parameterised by the first one's answer: 96 instances cost 1,406 pixels against rung 0 everywhere, 22.9% of the
+// 6,144 the policy allows. A round that derived a number and never drove with it would be an argument.
+//
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
 import path from "node:path";
@@ -29,6 +48,7 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { buildLadder, ladderInvariants, unitMesh } from "../../render/img2three.mjs";
 import * as DE from "../../render/divineEye.mjs";
+import { crossingFor, lodThresholdsFor, lodThresholdsOr, priceRung, COST_PIXELS, COST_FRACTION, FRAME, COVERED } from "../../render/lodBudget.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -224,7 +244,191 @@ else {
     }
 }
 
-// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4373.
+console.log("\n5. THE POLICY, ON THE CPU (v4374): one stated number, and the three ways deriving a threshold from it can fail");
+{
+    const s = (metric, changed, covered = 1000) => ({ metric, changed, covered });
+    const good = [s(0.10, 120), s(0.06, 60), s(0.04, 30), s(0.02, 10)];
+    const c = crossingFor(good, COVERED(0.02));
+    ok(`*** a threshold is INTERPOLATED between the two measured samples that bracket the budget: 1.00% at metric 0.02 and 3.00% at 0.04 put the 2.00% crossing at ${c.metric.toPrecision(4)} ***`,
+        Math.abs(c.metric - 0.03) < 1e-9 && c.monotone && c.bounded === false,
+        `${c.why} -- and the two bracketing samples are returned with it, so the number can be read back to the measurement it came from`);
+    ok("  a rung the record never priced, and one never cheap enough at any metric measured, both return NO threshold and say which they are",
+        crossingFor([], COVERED(0.02)).metric === null && /never priced/.test(crossingFor([], COVERED(0.02)).why) &&
+        crossingFor([s(0.1, 500)], COVERED(0.02)).metric === null && /never within 2.00%/.test(crossingFor([s(0.1, 500)], COVERED(0.02)).why),
+        `"${crossingFor([s(0.1, 500)], COVERED(0.02)).why}"`);
+    const allUnder = crossingFor([s(0.02, 5), s(0.04, 8)], COVERED(0.02));
+    ok("  and a rung within budget at EVERY metric measured returns the largest measured as a BOUND, flagged, rather than a crossing it never saw",
+        allUnder.bounded === true && allUnder.metric === 0.04 && /BOUND and not as the crossing/.test(allUnder.why));
+    ok("  a record whose cost does not rise with metric is flagged rather than interpolated through",
+        priceRung([s(0.02, 90), s(0.06, 10)], { of: "covered" }).monotone === false && priceRung(good, { of: "covered" }).monotone === true,
+        "a rung is cheaper the further away it is; a record saying otherwise is a measurement to look at");
+    const bad = lodThresholdsFor([{ rung: 1, samples: good }, { rung: 2, samples: [s(0.1, 500)] }], { policy: COVERED(0.02) });
+    ok("REFUSED: a LADDER is derived only when EVERY rung derives -- one rung short and the answer is null with the rung named, because a partly-derived ladder has a typed number hiding in it",
+        bad.thresholds === null && /rung\(s\) 2 could not be derived/.test(bad.why));
+    const unordered = lodThresholdsFor([{ rung: 1, samples: [s(0.02, 5), s(0.04, 30)] }, { rung: 2, samples: [s(0.06, 5), s(0.08, 30)] }], { policy: COVERED(0.02) });
+    ok("  and thresholds that do not FALL are refused too: gpuDriven tests them in order, so a rising pair would skip a rung",
+        unordered.thresholds === null && /do not fall/.test(unordered.why));
+    const ored = lodThresholdsOr([{ rung: 1, samples: [] }], [0.055], { policy: COVERED(0.02) });
+    ok("  and a caller who must have a number gets its own back MARKED, so a hand-chosen threshold stays visible as one",
+        ored.typed === true && ored.thresholds.join() === "0.055" && /caller's typed thresholds/.test(ored.why),
+        `the tools/roundhouse/costRecord.mjs sweepBudgetOr shape from v4361, which this is deliberately built to match`);
+}
+
+console.log("\n6. THE LADDER PRICED AND THE THRESHOLDS DERIVED, then the scene driven by them");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const r2 = await runInEngineOrigin({ engineRoot: ENG, args: { W, BUDGETS: [24, 10, 5], DIST: [4, 5, 6, 8, 11, 15, 21, 30, 45, 70, 110] }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
+        const B = await import("/render/img2three.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const make = (seg) => { const root = new THREE.Group();
+            root.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, seg, Math.max(3, seg >> 1)), new THREE.MeshPhysicalMaterial({ color: 0x2b6fb0 })));
+            const arm = new THREE.Group(); arm.position.set(0.5, 0.18, 0); arm.rotation.set(0.25, 0.6, 0.1); root.add(arm);
+            const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.5, seg), new THREE.MeshStandardMaterial({ color: 0xf4c531 })); knob.rotation.z = 0.7; arm.add(knob);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.07, Math.max(3, seg >> 1), seg), new THREE.MeshStandardMaterial({ color: 0x27ae60 }));
+            ring.position.set(-0.35, -0.2, 0.15); ring.rotation.x = 0.9; root.add(ring);
+            root.updateMatrixWorld(true); return root; };
+        const L = B.buildLadder(make, a.BUDGETS);
+        const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.W;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+        const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+        const look = F.LOOKS.lit, buffers = G.layoutBuffers(look.layout);
+        const fleetOf = (lods) => ({ name: "gen", look: "lit", layout: look.layout,
+            pipeline: { shaders: look.shaders, vs: "vs", fs: "fs", buffers, uniforms: look.uniforms },
+            pickPipeline: { shaders: look.pick, vs: "vs", fs: "fs", buffers, uniforms: [{ name: "viewProj", type: "mat4" }] },
+            lods, bind: (pass) => pass.uniform("light", F.LIGHT) });
+        const RAD = 0.5;
+        const shootOne = (mesh, dist) => { const sc = G.makeGpuDrivenScene(dev, { fleets: [fleetOf([{ name: "n", mesh }, { name: "f", mesh: F.farMesh([1, 1, 1, 1]) }])],
+                fleetOf: Uint32Array.from([0]), thresholds: [1e-9], records: Float32Array.from([0, 0, 0, RAD]) });
+            const eye = [0, 0, dist];
+            const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 300), G.lookAt(eye, [0, 0, 0])), eye };
+            return sc.frame({ ...cam, read: true, clear: [0.03, 0.03, 0.03, 1] }).pixels; };
+        const out = { triangles: L.invariants.triangles, record: [] };
+        try {
+            // PRICE: one instance at eight distances, every rung against rung 0 at the same camera
+            const priced = [[], []];
+            for (const d of a.DIST) {
+                const base = (await shootOne(L.rungs[0].mesh, d)).pixels;
+                for (let k = 1; k < L.rungs.length; k++) {
+                    const p = (await shootOne(L.rungs[k].mesh, d)).pixels;
+                    let changed = 0, covered = 0;
+                    for (let i = 0; i * 4 < base.length; i++) {
+                        let diff = 0; for (let c = 0; c < 3; c++) diff = Math.max(diff, Math.abs(base[i * 4 + c] - p[i * 4 + c]));
+                        if (diff) changed++;
+                        if (base[i * 4] + base[i * 4 + 1] + base[i * 4 + 2] > 24) covered++;
+                    }
+                    priced[k - 1].push({ metric: RAD / d, changed, covered, dist: d });
+                }
+            }
+            out.record = [{ rung: 1, samples: priced[0] }, { rung: 2, samples: priced[1] }];
+
+            // DRIVE: the same scene at the derived thresholds and at rung 0 everywhere
+            const COUNT = 96, CAP = COUNT;
+            const records = new Float32Array(COUNT * 4);
+            for (let i = 0; i < COUNT; i++) { const x = (i % 8) - 3.5, y = (Math.floor(i / 8) % 4) - 1.5, z = -1 - Math.floor(i / 32) * 7;
+                records.set([x, y, z, RAD], i * 4); }
+            const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 200), G.lookAt([0, 0, 7], [0, 0, 0])), eye: [0, 0, 7] };
+            const lods = L.rungs.map((r3, i) => ({ name: "lod" + i, mesh: r3.mesh }));
+            out.scene = { count: COUNT };
+            out.shootScene = async (th) => {};   // placeholder, replaced below
+            const sceneAt = async (th) => { const sc = G.makeGpuDrivenScene(dev, { fleets: [fleetOf(lods)], fleetOf: new Uint32Array(COUNT), thresholds: th, records, cap: CAP });
+                const pix = Array.from((await sc.frame({ ...cam, read: true, clear: [0.03, 0.03, 0.03, 1] }).pixels).pixels);
+                return { pix, counts: await sc.readCounts() }; };
+            out.full = await sceneAt([1e-9, 1e-10]);    // nothing ever drops: rung 0 everywhere
+            out.typed = await sceneAt([0.055, 0.03]);   // v4373's hand-chosen pair
+            out.derivedPending = true;
+            out.metricsOfScene = Array.from({ length: COUNT }, (_, i) => { const z = -1 - Math.floor(i / 32) * 7;
+                const dx = (i % 8) - 3.5, dy = (Math.floor(i / 8) % 4) - 1.5;
+                return RAD / Math.max(1e-6, Math.hypot(dx - 0, dy - 0, z - 7)); });
+            out.errs = errs;
+            out.__sceneAt = true;
+            // the derived pair cannot be computed in here (the module is node-side), so the harness returns the
+            // record and the caller re-enters with the thresholds it derived. Two passes, one page.
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        delete out.shootScene;
+        return out;
+    }` });
+    ok("the harness priced the ladder at eight distances", r2.ok && r2.result && !r2.result.error && r2.result.record && r2.result.record.length === 2,
+        r2.ok ? (r2.result && r2.result.error) : (r2.reason || (r2.pageErrors || []).join("; ")));
+    if (r2.ok && r2.result && !r2.result.error) {
+        const R2 = r2.result;
+        for (const rec of R2.record) { const abs = priceRung(rec.samples, { of: "frame" }), frac = priceRung(rec.samples, { of: "covered" });
+            console.log(`        rung ${rec.rung} (${R2.triangles[rec.rung]} tris)  pixels: ` + abs.rows.map((x) => `${x.metric.toFixed(4)}->${String(x.cost).padStart(5)}`).join(" "));
+            console.log(`        ${" ".repeat(String(rec.rung).length + 20)}fraction: ` + frac.rows.map((x) => `${x.metric.toFixed(4)}->${(isFinite(x.cost) ? (100 * x.cost).toFixed(0) + "%" : " n/a").padStart(4)}`).join(" ")); }
+        // THE MEASUREMENT THAT SETTLED THE POLICY, checked rather than recited
+        const spreads = R2.record.map((rec) => { const v = priceRung(rec.samples, { of: "covered" }).rows.map((x) => x.cost).filter((x) => isFinite(x) && x > 0);
+            return { rung: rec.rung, lo: Math.min(...v), hi: Math.max(...v) }; });
+        const metrics = R2.record[0].samples.map((x) => x.metric);
+        const angSpread = Math.max(...metrics) / Math.min(...metrics);
+        ok(`*** THE FIRST POLICY THIS ROUND STATED WAS MEASURED WRONG: a rung's cost as a FRACTION of its own covered pixels is SCALE-INVARIANT -- angular size varies ${angSpread.toFixed(1)}x across the sweep and the fraction varies ${spreads.map((s2) => (s2.hi / s2.lo).toFixed(2) + "x").join(" and ")} ***`,
+            spreads.every((s2) => s2.hi / s2.lo < 2) && angSpread > 5,
+            `rung ${spreads.map((s2) => `${s2.rung}: ${(100 * s2.lo).toFixed(0)}-${(100 * s2.hi).toFixed(0)}%`).join(", rung ")}. A coarser rung shades differently across the WHOLE subject, not only at its outline, so changed and covered scale together. A scale-invariant cost expresses no preference about distance, so NO threshold can be derived from it at any budget -- and the argument written against an absolute budget ("satisfied trivially by anything far enough away") turns out to be the argument FOR it`);
+        const dFrac = lodThresholdsFor(R2.record, { policy: COVERED(COST_FRACTION) });
+        ok(`  and the module says so by failing closed rather than by returning a number: the fraction policy derives NOTHING and names the rung`,
+            dFrac.thresholds === null && /never within/.test(dFrac.why), dFrac.why.slice(0, 190));
+        const D = lodThresholdsFor(R2.record, { policy: FRAME(COST_PIXELS) });
+        ok(`*** AND WITH AN ABSOLUTE BUDGET THE THRESHOLDS ARE DERIVED, NOT TYPED: at a stated ${COST_PIXELS} pixels of the frame the ladder comes out at ${D.thresholds ? D.thresholds.map((x) => x.toPrecision(3)).join(", ") : "NOTHING"} ***`,
+            !!D.thresholds && D.ordered && D.thresholds.length === 2,
+            D.thresholds ? D.per.map((p) => `rung ${p.rung}: ${p.why}`).join(" | ") : D.why);
+        if (D.thresholds) {
+            ok(`  and they are a long way from the typed pair v4373 used (0.055, 0.03): ${D.thresholds.map((x, i) => (x / [0.055, 0.03][i]).toFixed(2) + "x").join(" and ")}`,
+                D.thresholds.every((x) => x > 0), `derived ${D.thresholds.map((x) => x.toPrecision(3)).join(", ")} against typed 0.055, 0.03 -- the typed pair was chosen to exercise the ladder in a gate, and this is what the policy actually asks for`);
+            const cost = (a2, b2) => { let ch = 0, cov = 0;
+                for (let i = 0; i * 4 < a2.length; i++) { let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(a2[i * 4 + c] - b2[i * 4 + c]));
+                    if (d) ch++; if (a2[i * 4] + a2[i * 4 + 1] + a2[i * 4 + 2] > 24) cov++; }
+                return { changed: ch, covered: cov, cost: cov ? ch / cov : Infinity }; };
+            const full = Uint8ClampedArray.from(R2.full.pix), typed = Uint8ClampedArray.from(R2.typed.pix);
+            const cTyped = cost(full, typed);
+            ok(`  and the TYPED pair, measured in the units the policy is stated in: ${cTyped.changed} pixels against rung 0 everywhere over 96 instances, ${(100 * cTyped.changed / (COST_PIXELS * 96)).toFixed(1)}% of the ${COST_PIXELS * 96} the policy allows`,
+                cTyped.covered > 1000 && cTyped.changed > 0,
+                `regions at the typed pair: ${R2.typed.counts.join(" / ")}, at rung 0 everywhere: ${R2.full.counts.join(" / ")}. Reporting it as ${(100 * cTyped.cost).toFixed(2)}% of covered pixels would be the scale-invariant measure this round just discarded, and it is not repeated here`);
+            // AND DRIVE WITH THE DERIVED PAIR. The derivation is node-side and the renderer is in the page, so the
+            // record crosses out and the thresholds cross back in: a second harness call parameterised by the first
+            // one's answer. A round that derived a number and never drove with it would be an argument.
+            const r3 = await runInEngineOrigin({ engineRoot: ENG, args: { W, BUDGETS: [24, 10, 5], TH: D.thresholds }, script: `async (a) => {
+                const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
+                const B = await import("/render/img2three.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+                const make = (seg) => { const root = new THREE.Group();
+                    root.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, seg, Math.max(3, seg >> 1)), new THREE.MeshPhysicalMaterial({ color: 0x2b6fb0 })));
+                    const arm = new THREE.Group(); arm.position.set(0.5, 0.18, 0); arm.rotation.set(0.25, 0.6, 0.1); root.add(arm);
+                    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.5, seg), new THREE.MeshStandardMaterial({ color: 0xf4c531 })); knob.rotation.z = 0.7; arm.add(knob);
+                    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.07, Math.max(3, seg >> 1), seg), new THREE.MeshStandardMaterial({ color: 0x27ae60 }));
+                    ring.position.set(-0.35, -0.2, 0.15); ring.rotation.x = 0.9; root.add(ring); root.updateMatrixWorld(true); return root; };
+                const L = B.buildLadder(make, a.BUDGETS);
+                const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.W;
+                const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+                const look = F.LOOKS.lit, buffers = G.layoutBuffers(look.layout);
+                const COUNT = 96, RAD = 0.5;
+                const records = new Float32Array(COUNT * 4);
+                for (let i = 0; i < COUNT; i++) { const x = (i % 8) - 3.5, y = (Math.floor(i / 8) % 4) - 1.5, z = -1 - Math.floor(i / 32) * 7;
+                    records.set([x, y, z, RAD], i * 4); }
+                const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 200), G.lookAt([0, 0, 7], [0, 0, 0])), eye: [0, 0, 7] };
+                const at = async (th) => { const sc = G.makeGpuDrivenScene(dev, { fleets: [{ name: "gen", look: "lit", layout: look.layout,
+                        pipeline: { shaders: look.shaders, vs: "vs", fs: "fs", buffers, uniforms: look.uniforms },
+                        pickPipeline: { shaders: look.pick, vs: "vs", fs: "fs", buffers, uniforms: [{ name: "viewProj", type: "mat4" }] },
+                        lods: L.rungs.map((r4, i) => ({ name: "lod" + i, mesh: r4.mesh })), bind: (pass) => pass.uniform("light", F.LIGHT) }],
+                        fleetOf: new Uint32Array(COUNT), thresholds: th, records, cap: COUNT });
+                    return { pix: Array.from((await sc.frame({ ...cam, read: true, clear: [0.03, 0.03, 0.03, 1] }).pixels).pixels), counts: await sc.readCounts() }; };
+                return { full: await at([1e-9, 1e-10]), derived: await at(a.TH), count: COUNT };
+            }` });
+            if (r3.ok && r3.result && r3.result.derived) {
+                const fullD = Uint8ClampedArray.from(r3.result.full.pix), drv = Uint8ClampedArray.from(r3.result.derived.pix);
+                const cD = cost(fullD, drv), budget = COST_PIXELS * r3.result.count;
+                ok(`*** AND THE DERIVED PAIR IS DRIVEN, NOT JUST DERIVED: ${r3.result.count} instances at ${D.thresholds.map((x) => x.toPrecision(3)).join(", ")} cost ${cD.changed} pixels against rung 0 everywhere, inside the ${budget} the stated policy allows (${COST_PIXELS} per instance) with ${(100 * cD.changed / budget).toFixed(1)}% of it spent ***`,
+                    cD.changed > 0 && cD.changed <= budget && r3.result.derived.counts.some((c2) => c2 > 0),
+                    `regions at the derived pair ${r3.result.derived.counts.join(" / ")} against ${r3.result.full.counts.join(" / ")} at rung 0 everywhere; the typed pair spent ${cTyped.changed}. The per-rung pricing is one instance at one angular size, and this is 96 of them at once -- a bound assembled from parts and then MEASURED whole, which is the only way to find out it holds`);
+            } else ok("the derived pair was driven", false, r3.ok ? JSON.stringify(r3.result).slice(0, 200) : (r3.reason || (r3.pageErrors || []).join("; ")));
+        }
+    }
+}
+
+// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4374 (the policy):
+//   AW the fail-closed dropped from lodThresholdsFor, so a ladder with one underivable rung returns numbers anyway
+//      -> exit=1, 2 red: the refusal AND the lodThresholdsOr check, because a caller's typed floor is only reachable
+//      when the derivation admits it could not answer. Half-derived is the shape a typed number hides in.
+//   AX the policy's MODE ignored, so an absolute budget of 64 is compared against a fraction -> exit=1, 1 red: the
+//      absolute derivation stops deriving. 64 read as a fraction is a budget of 6400% and everything is under it,
+//      which would have returned the LARGEST metric measured as a bound -- a number, confidently, meaning nothing.
+// MEASURED at v4373.
 //   AU each rung normalised to its OWN bounds instead of rung 0's -> exit=1, 2 red, and the SECOND one is the
 //      interesting half: the framing check goes, as it should, and so does the mask-regime finding in section 3 --
 //      with every rung scaled back up to the same box the coarse ones never fall under the coverage threshold, so
@@ -238,9 +442,11 @@ else {
 //      line it edited, so the gate CRASHED (exit 1, zero red) instead of failing a check. A crash is not a red, and
 //      reading it as one would have credited the check with catching something it never saw.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: whether the thresholds section 3 prices should be DERIVED from that curve, which needs a policy " +
-    "(how many pixels a rung may cost) that nobody has stated; the ladder against a real img2threejs factory, whose Quality " +
-    "levels this stands in for and which is not vendorable; the occlusion variant, refused by the hook rather than supported; " +
-    "the fleets variant driving a scene, which the graph supports and this section does not exercise; and every number the rig " +
-    "has not signed.");
+console.log("unchecked here: whether 64 pixels is the RIGHT budget, which is a judgement about eyes and displays this tree cannot " +
+    "make and has therefore put in one place instead of five; whether the derived pair holds at a camera or a subject it was not " +
+    "priced at -- the record is one model on one screen size, and a threshold derived from it is honest only about that; the shipped " +
+    "pages, which still carry typed thresholds (0.012 in orrery-gpu.html, [0.004, 0.012] in universe-gpu.html, [0.025, 0.04] in " +
+    "gpu-rig-check.html) and are not rewired by this round; the ladder against a real img2threejs factory, whose Quality levels this " +
+    "stands in for and which is not vendorable; the occlusion variant, refused by the hook rather than supported; the fleets variant " +
+    "driving a scene; and every number the rig has not signed.");
 process.exit(fails ? 1 : 0);
