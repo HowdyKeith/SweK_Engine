@@ -337,6 +337,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "restored; a third attempt was MALFORMED and crashed the gate instead of failing a check, which is " +
                  "logged in it as a crash rather than counted as a catch",
     }),
+    // v4375 -- the thirteenth closing. shippedLadder-selfcheck reads two SHIPPED PAGES and prices what they draw,
+    // so what it guards is a claim about the tree's own product rather than about a module: that the LOD ladders in
+    // orrery-gpu.html and universe-gpu.html are tells and not approximations. A page edit that made one of them a
+    // real approximation should turn this red, and that is the point of it.
+    since13: Object.freeze({
+        at: "v4375", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shippedLadder-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, two sections. Driven RED by two sabotages of render/lodBudget.mjs " +
+                 "(2/2 by name) and restored. Its own first run was wrong three ways and all three are logged in it",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

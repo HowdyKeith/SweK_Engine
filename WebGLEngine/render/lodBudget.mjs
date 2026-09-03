@@ -101,3 +101,30 @@ export function lodThresholdsOr(record, typed, opts = {}) {
     if (d.thresholds) return { ...d, typed: false };
     return { ...d, thresholds: [...typed], typed: true, why: d.why + `; the caller's typed thresholds (${typed.join(", ")}) used instead` };
 }
+
+/**
+ * v4375 -- WHAT KIND OF LADDER IS THIS? A rung can differ from rung 0 in two quite different ways, and a threshold
+ * means something different for each. An APPROXIMATION rung is a coarser build of the same thing: its error is
+ * geometry, it falls with distance, and a fidelity budget can choose where to switch. A TELL rung differs on
+ * purpose so a viewer can SEE the ladder work -- a different colour per level, which this tree's shipped pages use
+ * -- and its cost is not an approximation error at all. No fidelity policy can price a tell, because nothing about
+ * it gets better as the object recedes except the number of pixels wearing the wrong colour.
+ *
+ * `shipped` and `geometry` are the same rungs priced twice: as they ship, and with one colour across every rung so
+ * only the geometry can differ. The line is the POLICY's rather than an exact zero -- measured, a subdivided flat
+ * quad rasterises its INTERIOR EDGES a few pixels differently at some sizes (5, 20 and 63 across the two shipped
+ * ladders), which is the rasteriser and not the shape. Geometry that never leaves the budget at any metric measured
+ * has no fidelity threshold to derive; a shipped cost far beyond it is a tell, and is named as one rather than
+ * handed a number that would read as a fidelity claim.
+ */
+export function ladderKind(shipped, geometry, { policy = FRAME() } = {}) {
+    const worst = (rec) => Math.max(0, ...rec.flatMap((r) => r.samples.map((x) => x.changed)));
+    const g = worst(geometry), sh = worst(shipped);
+    const budget = policy.of === "frame" ? policy.budget : Infinity;
+    if (g <= budget && sh > budget) return { kind: "tell", geometryWorst: g, shippedWorst: sh, budget,
+        why: `every rung draws the same geometry to within ${g} pixels -- inside the ${budget}-pixel budget at every metric measured -- while the ladder as shipped differs by up to ${sh}, so the visible difference is the colour and there is no fidelity to price` };
+    if (g <= budget && sh <= budget) return { kind: "identical", geometryWorst: g, shippedWorst: sh, budget,
+        why: `no rung leaves the ${budget}-pixel budget at any metric measured, coloured or not; this is one rung wearing several names` };
+    return { kind: "approximation", geometryWorst: g, shippedWorst: sh, budget,
+        why: `geometry leaves the ${budget}-pixel budget, by up to ${g} pixels, so the ladder approximates and a fidelity budget can choose where to switch` };
+}
