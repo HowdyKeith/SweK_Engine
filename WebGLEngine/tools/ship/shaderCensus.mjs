@@ -1,5 +1,5 @@
 // WebGLEngine/tools/ship/shaderCensus.mjs
-// VERSION: v2 -- v4382 (v1 was v3274)
+// VERSION: v2 -- v4383 (v1 was v3274)
 //
 // HOW MANY SHADERS EXIST IN BOTH LANGUAGES, AND HOW FAR APART HAVE THEY DRIFTED.
 //
@@ -14,12 +14,12 @@
 // identical pairs means the IR is over-engineering; twenty pairs with three disagreeing means it is overdue AND
 // three bugs were found on the way. Same move as v3262's settings census.
 //
-// ---- *** v4382 -- THE COUNT THIS FILE FEEDS IS A TRIGGER FOR AN ARCHITECTURAL DECISION, AND IT WAS MEASURED
+// ---- *** v4383 -- THE COUNT THIS FILE FEEDS IS A TRIGGER FOR AN ARCHITECTURAL DECISION, AND IT WAS MEASURED
 // ---- WITH AN INSTRUMENT THAT COUNTED THE WORD RATHER THAN THE LANGUAGE. ***
 //
 // v1 classified a file by testing its RAW SOURCE for six tokens, two of which -- the GLSL storage qualifiers
 // spelled a-t-t-r-i-b-u-t-e and v-a-r-y-i-n-g -- are also ordinary English and ordinary JavaScript. Measured
-// across this tree at v4382: FOUR of the fourteen files it called shader PAIRS carry no GLSL at all, and
+// across this tree at v4383: FOUR of the fourteen files it called shader PAIRS carry no GLSL at all, and
 // SEVENTY-TWO of the hundred and sixty-nine it called GLSL-only carry NO SHADER SOURCE OF ANY KIND. main.js and
 // brain/brain.js were in that seventy-two, on changelog prose about HTML attributes. render/bloomFused.mjs was
 // called a pair on the sentence "attribute any difference to the SAMPLING" -- the English verb.
@@ -81,7 +81,7 @@ export function shaderCensus(root) {
             const rel = path.relative(root, p);
             // *** A CHEAP GATE BEFORE THE EXPENSIVE ONE, AND IT IS NOT AN OPTIMISATION FOR ITS OWN SAKE. ***
             // prose() is the full lexer and this walk sees 2,265 files; running it on all of them put the gate
-            // over the quick sweep's 3 s budget at v4382 -- out of the sweep that runs every round and into the
+            // over the quick sweep's 3 s budget at v4383 -- out of the sweep that runs every round and into the
             // full one that runs rarely. A file whose RAW text holds no marker at all cannot hold one in its
             // code or in its comments either, since both are subsets of the raw text, so it is skipped whole.
             if (!(src.includes(GLSL_MARK) || WGSL_MARKS.some((m) => src.includes(m)) || GLSL_TELL.test(src))) continue;

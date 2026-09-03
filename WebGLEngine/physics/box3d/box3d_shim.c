@@ -697,3 +697,57 @@ void swk_contacts(float* out) {
 // The stride, published rather than duplicated on the JS side. Two declarations of a packed layout is the
 // eight-defect law waiting to happen; the reader asks the shim what the row width is.
 int swk_contact_stride(void) { return SWK_CONTACT_STRIDE; }
+
+// =============================================================================================================
+// v4382 -- *** A RAY, AND UNTIL NOW NOTHING IN THIS TREE COULD ASK THE PHYSICS WORLD WHAT ONE HITS. ***
+//
+// The shim has carried bodies, filters, three joint types, impulses, transforms, contacts and a deterministic
+// record/replay with divergence detection for hundreds of rounds. It has never carried a cast. box3d has had
+// b3World_CastRayClosest the whole time.
+//
+// The cost of that gap is not hypothetical and it is not one module: mesh/meshBVH.mjs, render/perspectiveWarp.mjs
+// and multiplayer/wadLevelHost.js each carry their own ray-versus-geometry code, and the gaze-dwell picker, the
+// FPS control path and the navmesh all ask "what is in front of me" of some OTHER representation of the world.
+// None of them can ask the one that is actually simulating it, so none of them can agree with it by construction.
+//
+// ---- THE SEGMENT CONVENTION, STATED BECAUSE IT IS THE FIRST THING A CALLER GETS WRONG --------------------------
+//
+// box3d takes an ORIGIN and a TRANSLATION, not an origin and a unit direction. The translation IS the length:
+// the cast covers origin -> origin + translation and nothing beyond it, and `fraction` is a fraction OF THAT
+// TRANSLATION rather than a distance. So a caller with a direction and a range multiplies before calling, and
+// the hit distance is fraction * |translation|. Passing a unit direction and expecting a long ray is the same
+// mistake as passing a unit direction to a segment test, and it fails quietly by hitting nothing.
+//
+// ---- WHY THIS RETURNS A BODY INDEX AND NOT A SHAPE ID ---------------------------------------------------------
+//
+// b3RayResult names the SHAPE. Every other entry point in this file speaks in the body indices swk_body_box
+// hands out, and returning a shape id here would make this the one function whose answer the rest of the shim
+// cannot use. So the shape is resolved to its body and the body to its index, by the same B3_ID_EQUALS scan the
+// contact reader uses. A body the table does not know returns -1 rather than 0, because 0 is a real body.
+#define SWK_RAY_STRIDE 9   // hit, bodyIndex, fraction, px, py, pz, nx, ny, nz
+
+int swk_ray_stride(void) { return SWK_RAY_STRIDE; }
+
+/**
+ * Closest hit along origin -> origin + translation. Writes SWK_RAY_STRIDE floats and returns the body index,
+ * or -1 for a miss. The out buffer is written on a miss too -- zeros with out[0] = 0 -- so a caller that reads
+ * the row without checking the return value sees "no hit" rather than whatever was there before.
+ */
+int swk_world_cast_ray(float ox, float oy, float oz,
+                       float tx, float ty, float tz, float* out) {
+    for (int i = 0; i < SWK_RAY_STRIDE; i++) out[i] = 0.0f;
+    b3QueryFilter filter = b3DefaultQueryFilter();
+    b3RayResult r = b3World_CastRayClosest(g_world, (b3Pos){ ox, oy, oz }, (b3Vec3){ tx, ty, tz }, filter);
+    if (!r.hit) return -1;
+    b3BodyId hitBody = b3Shape_GetBody(r.shapeId);
+    int idx = -1;
+    for (int i = 0; i < g_bodyCount; i++) {
+        if (B3_ID_EQUALS(g_bodies[i], hitBody)) { idx = i; break; }
+    }
+    out[0] = 1.0f;
+    out[1] = (float)idx;
+    out[2] = r.fraction;
+    out[3] = r.point.x;  out[4] = r.point.y;  out[5] = r.point.z;
+    out[6] = r.normal.x; out[7] = r.normal.y; out[8] = r.normal.z;
+    return idx;
+}

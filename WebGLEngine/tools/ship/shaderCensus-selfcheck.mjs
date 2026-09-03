@@ -16,7 +16,7 @@
 //
 // SAME MOVE AS v3262's SETTINGS CENSUS. Count first, especially when the thing to build is a compiler.
 //
-// ---- *** v4382 -- THE COUNT WAS THE TRIGGER FOR AN ARCHITECTURAL DECISION AND THE TRIGGER WAS MISREAD. ***
+// ---- *** v4383 -- THE COUNT WAS THE TRIGGER FOR AN ARCHITECTURAL DECISION AND THE TRIGGER WAS MISREAD. ***
 //
 // v4380's register audit found this gate saying FOURTEEN where its entry said 4, and left the judgement for a
 // round of its own: has the arithmetic inverted? It has not, and the reason is that four of the fourteen were
@@ -54,7 +54,7 @@ const { shaderCensus, pairShape } = await import(pathToFileURL(path.join(HERE, "
 const c = shaderCensus(ROOT);
 
 {
-    // v4382 -- MEASURED WITH classify(), against v1's 14 measured on raw text. It is not comparable to v3274's
+    // v4383 -- MEASURED WITH classify(), against v1's 14 measured on raw text. It is not comparable to v3274's
     // 3, which was measured with the discredited instrument; the honest v3274 figure cannot be recovered and is
     // not guessed at here. THE THRESHOLD THAT MATTERS IS THE ONE v3274 NAMED, and it is asserted separately.
     const DUAL_BASELINE = 10;
@@ -110,7 +110,7 @@ const c = shaderCensus(ROOT);
         "the raw detectors above have been quietly aligned with the real ones");
 
     ok("!! ...and a file that MENTIONS both is not a file that IMPLEMENTS both",
-        // v4382 -- THIS IS NOW A LIVE CHECK. v1 hard-coded its own filename into the census's SKIP list, so the
+        // v4383 -- THIS IS NOW A LIVE CHECK. v1 hard-coded its own filename into the census's SKIP list, so the
         // assertion could not fail and nobody learned that pairShape's split pattern -- a regex literal holding
         // all three stage attributes -- was STILL making the census a WGSL file by its own detectors. The name
         // came out of the skip list, the second self-count appeared immediately, and the markers are assembled

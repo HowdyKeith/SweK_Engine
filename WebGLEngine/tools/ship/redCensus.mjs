@@ -133,7 +133,7 @@ export const RED_AT_V4279 = Object.freeze([
     // recorded reasoning about what each chore unblocks, unreachable for 250 rounds. server.html now carries the
     // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
     // naming one, so the surface can move again without this going stale twice.
-    // v4382 -- REMOVED, AND THE COUNT IT RECORDED WAS NEVER TRUE. v4380 filed this at 14 against a line that
+    // v4383 -- REMOVED, AND THE COUNT IT RECORDED WAS NEVER TRUE. v4380 filed this at 14 against a line that
     // said 4 and left the judgement -- has the IR arithmetic inverted? -- for a round of its own. It has not:
     // FOUR OF THE FOURTEEN WERE ENGLISH PROSE. See FIXED_SINCE_V4279.
     // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
@@ -245,7 +245,7 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
-    { gate: "tools/ship/shaderCensus-selfcheck.mjs", round: "v4382",
+    { gate: "tools/ship/shaderCensus-selfcheck.mjs", round: "v4383",
       why: "FILED AT 14 AT v4380 AGAINST A LINE THAT SAID 4, AND THE JUDGEMENT IT DEFERRED CAME BACK NO. The gate " +
            "has held since v3274 that a hand-written shader pair is cheaper than an IR while few files carry both " +
            "languages, and that at TWENTY the arithmetic inverts. The count was measured by testing RAW SOURCE for " +

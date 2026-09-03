@@ -371,6 +371,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the module it guards (3/4/3/3 by name) and restored md5-identical; one of the four found a " +
                  "defect in the GATE -- typed detail strings that printed 0 beside their own FAIL",
     }),
+    // v4382 -- the 16th closing. #149's gate COMPILES AND RUNS the shim natively, so it is one of the six
+    // that spawn a process and it needs cc on the box; it skips loudly rather than failing where there is none.
+    // Run alone here, and its two shim sabotages were rebuilt before each run so what went red is the compiled
+    // physics rather than a regex over C.
+    since16: Object.freeze({
+        at: "v4382", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/box3dRay-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections against a natively built shim. Driven RED by " +
+                 "four sabotages (2/2/2/1 by name) and restored md5-identical; the first of them was the " +
+                 "round's own winding bug put back, which only one of eleven rays could see",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
