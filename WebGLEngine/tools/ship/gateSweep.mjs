@@ -695,6 +695,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "mutator returning garbage, which fitStep simply rejects. Its own arrival reddened " +
                  "krbnPaint-selfcheck by changing a list that was answering two questions",
     }),
+
+    // v4422 -- the thirty-seventh closing, and the finest-grained transfer question available: the SAME
+    // pictures, re-rendered. A scanline mask inverts the learned policy where a 13-pixel warp does not, and
+    // the mechanism is measured -- the CRT's energy sits above the Nyquist of the policy's own 4x4
+    // observation grid, so the grid goes flat. Its null control shares the code path with the real ones.
+    since38: Object.freeze({
+        at: "v4422", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/paintTransforms-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, six sections and 13 checks in 12.2 s -- one training, no " +
+                 "device. Driven RED by seven sabotages (3/1/5/5/6/1/1 by name) and restored, and ONE WENT " +
+                 "0 RED AGAINST A COMMENT THAT NAMED IT: freezing the displacement field, which the module's " +
+                 "own header calls v4420's defect one level down. Spreading the transformed generator would " +
+                 "not have caught it -- the cure is one fixed picture through six transform seeds",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
