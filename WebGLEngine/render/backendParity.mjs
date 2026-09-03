@@ -186,10 +186,16 @@ export const PARITY_BASELINE = Object.freeze({
     // has no WebGL2 half; its twin is JavaScript" -- and here the twin is physics/render/pathTracer.mjs,
     // which the module imports rather than restates so the two cannot drift. The same file is why wgslOnly
     // moves too; nothing else changed.
-    wgslBearing: 59,
+    // v4418 -- 59 -> 60, the second WGSL-only SHIPPING module in two rounds. physics/render/rtPipeline.mjs
+    // splits v4417's monolithic trace loop into Vulkan's named ray-tracing stages behind a shader binding
+    // table; like pathTracerGpu it has no WebGL2 half by construction, because a compute dispatch has none.
+    // *** THAT THIS RATCHET HAS NOW GONE RED TWO ROUNDS RUNNING IS THE RATCHET WORKING, NOT A NUISANCE: ***
+    // both times it named the arriving file rather than showing a number that moved, which is exactly what
+    // v4399's rule asked of a count baseline. The same file is why wgslOnly moves too; nothing else changed.
+    wgslBearing: 60,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 46,
+    wgslOnly: 47,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

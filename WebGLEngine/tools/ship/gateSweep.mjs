@@ -821,6 +821,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since44: Object.freeze({
         at: "v4418", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/rtPipeline-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, ~6s singly -- OVER the 3000 ms quick-sweep budget and correctly so: it " +
+                 "launches a real browser and runs eighteen GPU dispatches. #164's other road, WebRTX's hit " +
+                 "shaders, WITHOUT building or vendoring webrtx (measured again this round: cargo and node " +
+                 "are here, wasm-pack is NOT, vendor/webrtx does not exist). FOUR OF VULKAN'S FIVE RT STAGES " +
+                 "WERE ALREADY IN v4417'S LOOP, INLINED AND UNNAMED -- the monolith was missing the seams, " +
+                 "not the stages. Splitting them behind a shader binding table is bit-exact against both " +
+                 "v4417 and the CPU (0 of 576 each way), and the capability the seams buy is TWO GEOMETRIES " +
+                 "WITH TWO MATERIALS IN ONE DISPATCH, which v4417 has nowhere to put -- graded by the same " +
+                 "instrument, because a product of dyadic albedos is dyadic so interreflection stays exactly " +
+                 "representable. THE ORACLE HAS A BOUNDARY AND THE GATE ASSERTS ITS SHAPE RATHER THAN ITS " +
+                 "ABSENCE: one geometry is bit-exact by an argument, two survives everywhere tested, three " +
+                 "breaks at 1 pixel of 1024 whose delta times spp is 1.578 -- a whole flipped sample, not a " +
+                 "rounding drift. AND THE FURNACE IS BLIND TO THE MATERIAL TOO: a mirror and a diffuse differ " +
+                 "on 15 pixels under a constant sky and 70 under a gradient, the same blindness found after " +
+                 "the sampler (v4417) and the seeding scheme (v3487). Five sabotages, 3/2/1/2/2 red by name.",
+    }),
+    since45: Object.freeze({
+        at: "v4419", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/patternWidth-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~4s, four sections. v4416 closed with a claim it could " +

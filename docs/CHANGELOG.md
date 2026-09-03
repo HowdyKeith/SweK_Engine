@@ -14,9 +14,101 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
-## v4418 -- A defect species you can search for: the sixth instance, and two more inside the detector
+## v4419 -- A defect species you can search for: the sixth instance, and two more inside the detector
 
-*** SIX INSTANCES OF ONE DEFECT SPECIES, AND UNTIL NOW NOTHING HAD EVER LOOKED FOR IT. *** v4416 closed with a claim it could not check: that it could not prove there was no SIXTH narrow pattern, and that its own history was that every widening found one more. Across this session the species has been recorded in shaderCensus (v4383, counting the word not the thing), claimEvidence (v4404, a SABOTAGE clause counted as evidence), orreryFleetScan (v4412, a record ABOUT an import counted as an import), the licence scan (v4415, a false accusation against a properly licensed body) and FIVE TIMES OVER in the provenance scan (v4416). EVERY ONE WAS FOUND BY A PERSON LOOKING AT A ROW THAT SEEMED WRONG. *** THE SHAPE IS PRECISE ENOUGH TO SEARCH FOR: A PATTERN THAT NAMES A KIND OF FILE AND REJECTS A FILE IN THIS TREE PLAINLY OF THAT KIND. *** The evidence is a real filename, not a style opinion. NEW tools/ship/patternWidth.mjs reads regex literals out of the tree's modules, works out which of them CLASSIFY a kind rather than merely naming a file, and reports the documentary files of that kind each one turns away. IT IS VALIDATED AGAINST KNOWN POSITIVES, WHICH IS WHAT NONE OF THE FIVE ORIGINAL SCANNERS EVER WAS AND EXACTLY WHY EACH SHIPPED LOOKING CORRECT: three of the patterns this session actually had to widen are fed back in as fixtures and all three are caught, the licence one naming IBMPlexSerif-OFL.txt, the file v4415 falsely accused. *** AND IT FOUND THE SIXTH. *** world/orreryEjecta.mjs's isPaperFile is anchored to the FILENAME'S START, with a comment justifying that on the grounds that a false positive would zero real payload -- a fair worry, honestly argued, and it made shaders/ASHIMA-LICENSE.txt and vendor/fonts/IBMPlexSerif-OFL.txt into CODE MASS while world/orrery.mjs's isLicenceFile, in the same tree, called them licences. THE SAME FILE WAS PAPERWORK TO ONE FUNCTION AND PAYLOAD TO ANOTHER, IN THE SAME MODULE, and 4,456 bytes of licence text were drawing a planet's radius. Measured across vendor/ before changing anything: isLicenceFile matches 17 files and every one is a real licence, so the feared false positive does not exist here. The licence half is delegated now and the non-licence half kept, because PROVENANCE and README and AUTHORS are paperwork and are not licences. *** TWO DETECTORS WERE NEEDED AND THEY FOUND DIFFERENT FILES, WHICH IS THE ARGUMENT FOR BOTH: *** the near-miss test found ASHIMA-LICENSE.txt; the two-reader disagreement -- the check v4415 added after sabotaging showed a census can look healthy while a body is falsely accused -- found the OFL, which the near-miss test cannot see because "OFL" is not a kind word isPaperFile names. *** AND THE DETECTOR COMMITTED THE SPECIES TWICE WHILE BEING WRITTEN, WHICH IS THE SIXTH AND SEVENTH SIGHTINGS INSIDE THE DETECTOR FOR THE SPECIES. *** It first counted world/gpuProvenance.mjs -- a MODULE -- as a provenance record, so every licence classifier in the tree "missed" it and the census filled with noise; a file of a documentary kind is one whose extension is documentary or which is named for the kind and nothing else, which is the distinction v4412 drew for imports and v4404 for claims. And its kind matcher searched the pattern body for LITERAL words, so orreryEjecta's `LICEN[CS]E` -- which contains neither "licence" nor "license" -- did not read as naming the licence kind at all, AND THE VERY INSTANCE THAT MOTIVATED THE ROUND WAS INVISIBLE TO IT. Single-character classes are expanded now. Across 14,767 regex literals the live census is EMPTY, and the reason to believe that rather than suspect the detector is the fixture set: an empty census beside passing known positives is evidence, an empty census alone is the shape v4402 named. THREE MORE CHECKS FELL OUT, all the same species one level up and all in gates that were already careful about it. orreryFleet-selfcheck's exclusion-list check required every excluded file to contain the literal "vendor/box3d/" -- one body pinned where the property is general -- and widening it to any literal vendor path was STILL wrong, because tools/ship/provenanceRecord-selfcheck.mjs reaches vendor/keyhunt through path.join and carries no such substring at all: A CHECK THAT TESTS ONE FORM OF A DEPENDENCY THE SCAN RECOGNISES IN FIVE. It asks the scan now. orreryEjecta-selfcheck asserted that mass is unchanged FOR A BODY THAT IS ALL CODE, choosing the example by measurement after box3d stopped qualifying -- and measurement now returns NOTHING, because every vendored body carries paperwork once the OFL and the Ashima licence are counted, so the row states the invariant across all fifteen instead of an example that keeps being spent. And world/orreryFleet.mjs's COMMIT_BELT_V4329 said twelve of fifteen bodies had been touched by exactly one commit, the one that added them; v4416 wrote PROVENANCE records into six of them, WHICH IS THE FIRST TIME IN THIS REPOSITORY'S LIFE THAT A VENDORED BODY WAS TOUCHED BY A COMMIT THAT DID NOT VENDOR IT, so the count is seven and the v4329 sentence is false of this tree because of a round of ours. A NEW MOMENT GETS A NEW RECORD: COMMIT_BELT_V4418 carries the new counts and names the six that moved, the v4329 record is left exactly as it was because it is a claim about v4329 and is still true about v4329, and what survives is the conclusion -- at two commits it is still not a belt. FOUR SABOTAGES, MEASURED 3/2/1/2 BY NAME, and sabotage C is the one worth reading: dropping the documentary filter flags world/orrery.mjs's LICENCE_NAME, THE WIDEST RULE IN THE TREE, for "missing" a module called gpuProvenance.mjs -- the false-positive direction demonstrated on the one pattern that must never be flagged. UNCHECKED AND SAID PLAINLY: there may be an eighth instance. This reads REGEX LITERALS on non-comment lines and cannot see a pattern built from a string at runtime, one inside an .html page, or a classification made with indexOf and an if. It cannot tell what a pattern is APPLIED to, which is why a token test is needed at all and why one row had to be adjudicated by hand before the documentary rule retired it. It only finds misses against files that EXIST -- a pattern that will reject the next file somebody adds is invisible until they add it, the same limit v4416's five had, and the reason the census is a ratchet rather than a report. And section 4 compares exactly two classifiers, named by hand: nothing here DISCOVERS that two functions are answering the same question, which is the harder half and is where the sixth instance actually lived. The tree stands at 1450 gates.
+*** SIX INSTANCES OF ONE DEFECT SPECIES, AND UNTIL NOW NOTHING HAD EVER LOOKED FOR IT. *** v4416 closed with a claim it could not check: that it could not prove there was no SIXTH narrow pattern, and that its own history was that every widening found one more. Across this session the species has been recorded in shaderCensus (v4383, counting the word not the thing), claimEvidence (v4404, a SABOTAGE clause counted as evidence), orreryFleetScan (v4412, a record ABOUT an import counted as an import), the licence scan (v4415, a false accusation against a properly licensed body) and FIVE TIMES OVER in the provenance scan (v4416). EVERY ONE WAS FOUND BY A PERSON LOOKING AT A ROW THAT SEEMED WRONG. *** THE SHAPE IS PRECISE ENOUGH TO SEARCH FOR: A PATTERN THAT NAMES A KIND OF FILE AND REJECTS A FILE IN THIS TREE PLAINLY OF THAT KIND. *** The evidence is a real filename, not a style opinion. NEW tools/ship/patternWidth.mjs reads regex literals out of the tree's modules, works out which of them CLASSIFY a kind rather than merely naming a file, and reports the documentary files of that kind each one turns away. IT IS VALIDATED AGAINST KNOWN POSITIVES, WHICH IS WHAT NONE OF THE FIVE ORIGINAL SCANNERS EVER WAS AND EXACTLY WHY EACH SHIPPED LOOKING CORRECT: three of the patterns this session actually had to widen are fed back in as fixtures and all three are caught, the licence one naming IBMPlexSerif-OFL.txt, the file v4415 falsely accused. *** AND IT FOUND THE SIXTH. *** world/orreryEjecta.mjs's isPaperFile is anchored to the FILENAME'S START, with a comment justifying that on the grounds that a false positive would zero real payload -- a fair worry, honestly argued, and it made shaders/ASHIMA-LICENSE.txt and vendor/fonts/IBMPlexSerif-OFL.txt into CODE MASS while world/orrery.mjs's isLicenceFile, in the same tree, called them licences. THE SAME FILE WAS PAPERWORK TO ONE FUNCTION AND PAYLOAD TO ANOTHER, IN THE SAME MODULE, and 4,456 bytes of licence text were drawing a planet's radius. Measured across vendor/ before changing anything: isLicenceFile matches 17 files and every one is a real licence, so the feared false positive does not exist here. The licence half is delegated now and the non-licence half kept, because PROVENANCE and README and AUTHORS are paperwork and are not licences. *** TWO DETECTORS WERE NEEDED AND THEY FOUND DIFFERENT FILES, WHICH IS THE ARGUMENT FOR BOTH: *** the near-miss test found ASHIMA-LICENSE.txt; the two-reader disagreement -- the check v4415 added after sabotaging showed a census can look healthy while a body is falsely accused -- found the OFL, which the near-miss test cannot see because "OFL" is not a kind word isPaperFile names. *** AND THE DETECTOR COMMITTED THE SPECIES TWICE WHILE BEING WRITTEN, WHICH IS THE SIXTH AND SEVENTH SIGHTINGS INSIDE THE DETECTOR FOR THE SPECIES. *** It first counted world/gpuProvenance.mjs -- a MODULE -- as a provenance record, so every licence classifier in the tree "missed" it and the census filled with noise; a file of a documentary kind is one whose extension is documentary or which is named for the kind and nothing else, which is the distinction v4412 drew for imports and v4404 for claims. And its kind matcher searched the pattern body for LITERAL words, so orreryEjecta's `LICEN[CS]E` -- which contains neither "licence" nor "license" -- did not read as naming the licence kind at all, AND THE VERY INSTANCE THAT MOTIVATED THE ROUND WAS INVISIBLE TO IT. Single-character classes are expanded now. Across 14,767 regex literals the live census is EMPTY, and the reason to believe that rather than suspect the detector is the fixture set: an empty census beside passing known positives is evidence, an empty census alone is the shape v4402 named. THREE MORE CHECKS FELL OUT, all the same species one level up and all in gates that were already careful about it. orreryFleet-selfcheck's exclusion-list check required every excluded file to contain the literal "vendor/box3d/" -- one body pinned where the property is general -- and widening it to any literal vendor path was STILL wrong, because tools/ship/provenanceRecord-selfcheck.mjs reaches vendor/keyhunt through path.join and carries no such substring at all: A CHECK THAT TESTS ONE FORM OF A DEPENDENCY THE SCAN RECOGNISES IN FIVE. It asks the scan now. orreryEjecta-selfcheck asserted that mass is unchanged FOR A BODY THAT IS ALL CODE, choosing the example by measurement after box3d stopped qualifying -- and measurement now returns NOTHING, because every vendored body carries paperwork once the OFL and the Ashima licence are counted, so the row states the invariant across all fifteen instead of an example that keeps being spent. And world/orreryFleet.mjs's COMMIT_BELT_V4329 said twelve of fifteen bodies had been touched by exactly one commit, the one that added them; v4416 wrote PROVENANCE records into six of them, WHICH IS THE FIRST TIME IN THIS REPOSITORY'S LIFE THAT A VENDORED BODY WAS TOUCHED BY A COMMIT THAT DID NOT VENDOR IT, so the count is seven and the v4329 sentence is false of this tree because of a round of ours. A NEW MOMENT GETS A NEW RECORD: COMMIT_BELT_V4418 carries the new counts and names the six that moved, the v4329 record is left exactly as it was because it is a claim about v4329 and is still true about v4329, and what survives is the conclusion -- at two commits it is still not a belt. FOUR SABOTAGES, MEASURED 3/2/1/2 BY NAME, and sabotage C is the one worth reading: dropping the documentary filter flags world/orrery.mjs's LICENCE_NAME, THE WIDEST RULE IN THE TREE, for "missing" a module called gpuProvenance.mjs -- the false-positive direction demonstrated on the one pattern that must never be flagged. UNCHECKED AND SAID PLAINLY: there may be an eighth instance. This reads REGEX LITERALS on non-comment lines and cannot see a pattern built from a string at runtime, one inside an .html page, or a classification made with indexOf and an if. It cannot tell what a pattern is APPLIED to, which is why a token test is needed at all and why one row had to be adjudicated by hand before the documentary rule retired it. It only finds misses against files that EXIST -- a pattern that will reject the next file somebody adds is invisible until they add it, the same limit v4416's five had, and the reason the census is a ratchet rather than a report. And section 4 compares exactly two classifiers, named by hand: nothing here DISCOVERS that two functions are answering the same question, which is the harder half and is where the sixth instance actually lived. The tree stands at 1451 gates.
+
+## v4418 -- four of Vulkan's five ray-tracing stages were already in the loop, with no names
+
+#164's other road: WebRTX's hit shaders. v4417 took the compute transplant; this is the rest of the item.
+
+FIRST, WHAT THIS IS NOT. codedhead/webrtx is not built and not vendored. ui/webrtxBrowser.js settled that at
+v4118 -- upstream publishes no dist, so there is nothing to pin, and vendoring ~3.6 MB of build artefacts
+nobody can review in a diff was refused with reasons. MEASURED AGAIN THIS ROUND rather than inherited from
+that note: cargo 1.94.1 and node 22 are on this box, `wasm-pack` is NOT, and vendor/webrtx does not exist.
+The binary road is shut here, and saying so is cheaper than discovering it halfway through.
+
+SO THIS TAKES THE STRUCTURE, WHICH IS THE PART WORTH TAKING ANYWAY. WebRTX's contribution is not a renderer,
+it is a shape: Vulkan's ray-tracing pipeline -- raygen, intersection, any-hit, closest-hit, miss -- dispatched
+through a SHADER BINDING TABLE, expressed as plain WebGPU compute. And v4118's own honest note says what it
+never reached: "NO IMAGE WAS EVER RENDERED here -- no raygen shader was compiled and no pass was dispatched.
+'The pipeline exists' is not 'it draws'."
+
+WHAT WAS MEASURED BEFORE ANYTHING WAS WRITTEN, by probing v4417's generated WGSL:
+
+    raygen        generate a camera ray          PRESENT   inlined, unnamed
+    intersection  procedural sphere hit          PRESENT   inlined, unnamed
+    closest-hit   shade and continue             PRESENT   inlined, unnamed
+    miss          environment radiance           PRESENT   inlined, unnamed
+    any-hit       alpha / transparency           ABSENT    genuinely not there
+
+    shader binding table                         ABSENT
+    geometries the shader can hold               EXACTLY ONE -- centre, radius and albedo are scalars
+
+THE MONOLITH IS NOT MISSING THE STAGES. IT IS MISSING THE SEAMS. That is a smaller and far more useful finding
+than "the tree has no ray tracing pipeline", and it is why this round is a rearrangement with a capability at
+the end rather than a rewrite.
+
+NEW physics/render/rtPipeline.mjs gives the four stages names and a binding table. The split is BIT-EXACT
+against v4417's monolith AND against the CPU tracer -- 0 of 576 pixels differing both ways -- so the seams
+cost nothing. A refactor that moved a number would be a rewrite wearing a refactor's clothes.
+
+THE CAPABILITY, because a refactor is not a round. TWO GEOMETRIES WITH TWO MATERIALS IN ONE DISPATCH, which
+v4417 has nowhere to put: its albedo is a single uniform scalar. And the oracle survives, which is what makes
+it checkable -- interreflection MULTIPLIES albedos, and a product of dyadic albedos is dyadic, so a two-sphere
+furnace stays exactly representable: 0 non-representable pixels of 576, 69 distinct values, minimum 0.132813,
+so the interreflection is real rather than dodged. Bit-exact against the CPU at three frame sizes with the
+spheres apart AND touching.
+
+AND THE ORACLE HAS A BOUNDARY, FOUND BY RUNNING RATHER THAN BY THINKING.
+
+One geometry is bit-exact BY AN ARGUMENT: a sphere is convex, every bounce escapes, the sampler never reaches
+the pixel. Two or more is bit-exact only as an OBSERVATION, because a bounce can land on a neighbour and the
+route then depends on a direction f32 and f64 disagree about.
+
+    two spheres, apart      24/16, 32/64, 48/16   ->  0, 0, 0 differing
+    two spheres, TOUCHING   24/16, 32/64, 48/16   ->  0, 0, 0 differing
+    THREE spheres           32x32 spp=64          ->  1 of 1024 differing
+
+The boundary is real and it is reached at three. The one differing pixel is diagnosable rather than
+mysterious: its delta times spp is 1.578, so ONE SAMPLE OF SIXTY-FOUR TOOK A DIFFERENT ROUTE, where a rounding
+drift would be about 1e-7. So the gate does not assert that multi-geometry agreement is perfect. It asserts
+that the values stay dyadic (0 of 1024 non-representable), that agreement stays above 99.5%, and that EVERY
+disagreement has the shape of a whole flipped sample rather than of a drifting port.
+
+AND THE FURNACE IS BLIND TO THE MATERIAL TOO, WHICH IS THE SAME FACT A THIRD TIME.
+
+The gate's first draft asserted that a mirror record and a lambertian record differ on more than 20 pixels of
+576. IT MEASURED 15. The threshold was guessed, and it was wrong for this family's own reason: IN A UNIFORM
+ENVIRONMENT EVERY BOUNCE DIRECTION RETURNS THE SAME RADIANCE, so a mirror and a diffuse produce the same
+pixel, and the 15 that differ are only the paths that happened to strike the other sphere. On a gradient sky
+the same pair differs on 70 -- 4.7 times more.
+
+    the furnace cannot see the SAMPLER          v4417 section 4
+    the furnace cannot see a broken SEEDING     v3487, pathTracer.mjs's own comment
+    the furnace cannot see the MATERIAL         here
+
+Three sites, three rounds, ONE FACT. Both numbers are kept in the gate because the GAP between them is the
+evidence, not a detail.
+
+AND THE FIRST DRAFT SILENTLY FLATTENED A MIRROR INTO A LAMBERTIAN. sceneFromSbt mapped only centre, radius and
+albedo, so a mirror record arrived at the CPU as a diffuse and the gate dutifully reported 15 pixels
+"differing" -- a GPU mirror against a CPU diffuse, a number with no meaning that looked exactly like a small
+port bug. A CONVERSION THAT DROPS A FIELD IS A SECOND DECLARATION OF THE SCENE, which is the defect this tree
+names more often than any other, committed inside the round whose whole subject is that the material is DATA.
+It refuses now, and cpuComparable() is how a caller asks first.
+
+NEW physics/render/rtPipeline-selfcheck.mjs, thirteen checks in five sections.
+
+WHAT THIS DOES NOT CLAIM. That it is WebRTX, or compatible with it: no SPIR-V, no GLSL front end, no naga, no
+Vulkan API surface. That there is a BVH: geometries are tested linearly, which is honest at four spheres and
+useless at four thousand -- the acceleration structure is the single biggest thing WebRTX has that this does
+not. That any-hit exists: it does not, and the stage list carries the row as unimplemented rather than
+dropping it. And that any of this is FASTER than v4417's monolith -- the seams are for expressiveness, and no
+timing claim is made anywhere.
+
+Five sabotages, 3/2/1/2/2 RED by name, file md5-identical after restore.
+The tree stands at 1451 gates.
 ## v4417 -- v4290 said the tracer could not be graded on a GPU, and the furnace is where it can
 
 #164 -- The path tracer on a GPU: the TSL compute transplant, or WebRTX's hit shaders.
