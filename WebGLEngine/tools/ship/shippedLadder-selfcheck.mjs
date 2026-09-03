@@ -22,6 +22,24 @@
 // the last bit. That is vertex work spent on a difference no pixel can carry, and it is measured here rather than
 // argued -- across a scene, at the page's own typed threshold.
 //
+// v4376 -- AND THE BODIES ARE SQUARES (section 3). v4375 found the shipped ladders are tells and noted, in passing,
+// that orrery-gpu.html's comment calls its bodies "a finer disc up close, a coarser one far away" while quadMesh
+// builds a square. This measures it: a body covers 1,369 pixels where a disc of the same reach covers 1,060, a ratio
+// of 1.2915 against the 4/pi = 1.2732 that a square over its inscribed disc must give -- DERIVED from the two areas
+// and not asserted, with the 1.4% excess being edge coverage at this size. The default pipeline's fragment is
+// "return v.color;", with no discard and no distance-to-centre test, so there is nothing anywhere to round a corner.
+//
+// render/gpuDriven.mjs discMesh is the ladder that comment describes, and it is the OTHER KIND: priced the same way
+// with one colour across it, a 10-gon and a 5-gon against a 32-gon differ by up to 1,911 pixels, so ladderKind says
+// APPROXIMATION where it said TELL, and the 64-pixel policy derives real thresholds -- 0.0354 and 0.0286 -- where the
+// shipped quad ladder had no crossing to report at all. A 32-gon is already the disc to 0 pixels, so the fine rung is
+// not what makes a body square.
+//
+// THE PAGES ARE NOT CHANGED. Which shape a planet is belongs to whoever owns the look; what this round does is put
+// both numbers beside the choice -- a body would get rounder and SMALLER (an inscribed disc covers 0.7743 of the
+// square, measured, against pi/4 = 0.7854) and the cheap end of the ladder would cost MORE, since an n-gon is n
+// triangles where the quad is 2.
+//
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
 import fs from "node:fs";
@@ -168,7 +186,85 @@ else {
     }
 }
 
-// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4375.
+console.log("\n3. THE BODIES ARE SQUARES (v4376), and the LADDER THE COMMENT DESCRIBES, priced beside the one that ships");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const r2 = await runInEngineOrigin({ engineRoot: ENG, args: { W, DIST: [3, 4, 6, 9, 14, 22, 36, 60], SEG: [32, 10, 5] }, script: `async (a) => {
+        const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.W;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+        const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+        const RAD = 0.5, ONE = [0.7, 0.8, 0.9, 1];
+        const shoot = (mesh, dist) => { const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "only", mesh }], thresholds: [], records: Float32Array.from([0, 0, 0, RAD]) });
+            const eye = [0, 0, dist];
+            const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 300), G.lookAt(eye, [0, 0, 0])), eye };
+            return sc.frame({ ...cam, read: true, clear: [0, 0, 0, 1] }).pixels; };
+        const covered = (px) => { let c = 0; for (let i = 0; i * 4 < px.length; i++) if (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2] > 24) c++; return c; };
+        const out = {};
+        try {
+            // (1) IS A BODY A SQUARE? Cover it and compare against the two shapes it could be.
+            const D0 = 6;
+            out.shape = { quad: covered((await shoot(G.quadMesh(1, ONE), D0)).pixels),
+                          disc: covered((await shoot(G.discMesh(64, ONE), D0)).pixels),
+                          disc32: covered((await shoot(G.discMesh(32, ONE), D0)).pixels) };
+            // (2) the DISC ladder, priced the way v4375 priced the shipped one: as it would ship, and one colour
+            const COLS = [[0.62, 0.94, 0.71, 1], [0.58, 0.85, 0.66, 1], [0.55, 0.75, 0.62, 1]];
+            const shipped = [], geometry = [];
+            for (let k = 1; k < a.SEG.length; k++) { shipped.push({ rung: k, samples: [] }); geometry.push({ rung: k, samples: [] }); }
+            for (const d of a.DIST) {
+                const bS = (await shoot(G.discMesh(a.SEG[0], COLS[0]), d)).pixels, bG = (await shoot(G.discMesh(a.SEG[0], ONE), d)).pixels;
+                const count = (base, p) => { let ch = 0, cov = 0;
+                    for (let i = 0; i * 4 < base.length; i++) { let diff = 0;
+                        for (let c = 0; c < 3; c++) diff = Math.max(diff, Math.abs(base[i * 4 + c] - p[i * 4 + c]));
+                        if (diff) ch++; if (base[i * 4] + base[i * 4 + 1] + base[i * 4 + 2] > 24) cov++; }
+                    return { changed: ch, covered: cov }; };
+                for (let k = 1; k < a.SEG.length; k++) {
+                    shipped[k - 1].samples.push({ metric: RAD / d, ...count(bS, (await shoot(G.discMesh(a.SEG[k], COLS[k]), d)).pixels) });
+                    geometry[k - 1].samples.push({ metric: RAD / d, ...count(bG, (await shoot(G.discMesh(a.SEG[k], ONE), d)).pixels) });
+                }
+            }
+            out.disc = { shipped, geometry, tris: a.SEG.slice(), seg: a.SEG.slice() };
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness covered a body and priced the disc ladder", r2.ok && r2.result && !r2.result.error && r2.result.disc,
+        r2.ok ? (r2.result && r2.result.error) : (r2.reason || (r2.pageErrors || []).join("; ")));
+    if (r2.ok && r2.result && !r2.result.error) {
+        const R2 = r2.result, SH = R2.shape;
+        const ratio = SH.quad / SH.disc, PI4 = 4 / Math.PI;
+        ok(`*** A SHIPPED BODY IS A SQUARE, AND ITS PAGE'S COMMENT CALLS IT A DISC: it covers ${SH.quad} pixels where a disc of the same reach covers ${SH.disc} -- a ratio of ${ratio.toFixed(4)} against the 4/pi = ${PI4.toFixed(4)} a square-over-inscribed-disc must give ***`,
+            Math.abs(ratio - PI4) < 0.02 && SH.quad > SH.disc,
+            `derived, not asserted: a square of half-width r covers 4r^2 and the disc inscribed in it pi*r^2. The default pipeline's fragment is "return v.color;" with no discard and no distance test, so there is nothing anywhere to round a corner off`);
+        ok(`  and a 32-gon is already the disc to ${Math.abs(SH.disc32 - SH.disc)} pixels, so the ladder's fine rung is not what makes a body square`,
+            Math.abs(SH.disc32 - SH.disc) < SH.disc * 0.01, `${SH.disc32} against ${SH.disc} for a 64-gon`);
+        const K = ladderKind(R2.disc.shipped, R2.disc.geometry);
+        for (const rec of R2.disc.geometry) { const g = priceRung(rec.samples);
+            console.log(`        disc rung ${rec.rung} (${R2.disc.seg[rec.rung]}-gon, ${R2.disc.tris[rec.rung]} tris)  geometry only: ` +
+                g.rows.map((x) => `${x.metric.toFixed(4)}->${String(x.cost).padStart(4)}`).join(" ")); }
+        ok(`*** AND THE DISC LADDER IS AN APPROXIMATION WHERE THE SHIPPED ONE IS A TELL: its geometry differs by up to ${K.geometryWorst} pixels with one colour across it, against the ${K.budget}-pixel budget, so ladderKind classifies it the other way ***`,
+            K.kind === "approximation" && K.geometryWorst > K.budget,
+            `${K.why}. The same classifier, the same policy, the same page's ladder shape -- and the answer is different because the geometry now differs`);
+        const D = lodThresholdsFor(R2.disc.geometry, { policy: FRAME(COST_PIXELS) });
+        ok(`*** SO A REAL THRESHOLD IS DERIVABLE FOR IT: at ${COST_PIXELS} pixels the disc ladder comes out at ${D.thresholds ? D.thresholds.map((x) => x.toPrecision(3)).join(", ") : "NOTHING"}, where the shipped quad ladder had no crossing to report at all ***`,
+            !!D.thresholds && D.ordered && D.per.every((p) => p.bounded === false),
+            D.thresholds ? D.per.map((p) => `rung ${p.rung}: ${p.why}`).join(" | ") : D.why);
+        report(`WHAT SWAPPING WOULD COST, both numbers, so the choice is a choice: a body would get ROUNDER and SMALLER -- an ` +
+            `inscribed disc covers pi/4 = 0.785 of the square, measured here as ${(SH.disc / SH.quad).toFixed(4)} -- and the cheap end of ` +
+            `the ladder would cost MORE, since an n-gon is n triangles where the quad is 2. What it would buy is a page whose comment is ` +
+            `true and a ladder with fidelity to price. THE PAGES ARE NOT CHANGED BY THIS ROUND: which shape a planet is belongs to whoever ` +
+            `owns the look, and now it comes with numbers attached instead of a preference.`);
+    }
+}
+
+// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4376 (the disc):
+//   BA discMesh CIRCUMSCRIBING the quad instead of inscribing it (every vertex scaled by sqrt(2)) -> exit=1, 1 red:
+//      the square-over-disc ratio stops matching 4/pi, because it is no longer that pair of shapes. The check is
+//      against a closed form, so it fails on the shape rather than on a tolerance.
+//   BB every rung built at 3 segments, so the ladder stops approximating -> exit=1, 3 red: the shape claim, the
+//      classification (three triangles at every rung is a TELL again), and the derivation, which then has no
+//      crossing to report. One line, and the round's whole argument goes with it.
+// MEASURED at v4375.
 //   AY the tell/approximation distinction removed, so every ladder classifies as an approximation -> exit=1, 2 red,
 //      one per shipped page. The distinction is the whole content of this gate: without it a ladder that differs
 //      only in colour is handed a fidelity verdict, which is the reading this round exists to refuse.
