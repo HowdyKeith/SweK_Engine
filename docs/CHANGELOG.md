@@ -14,6 +14,102 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4420 -- a veto that outlived its reason by five versions, and the scene it was hiding was already built
+
+Keith: "before we switch into the webgpu avatar gauges scene which replaces the svg scene, before that we can
+swap in the full avatar, llama, gauges 3d view that we already have. then switching from that switches to the
+webgpu blob avatar scene we have fit that same size."
+
+IT WAS ALREADY BUILT AND THE DOCK COULD NOT REACH IT. face/avatarStage.js's diorama scene is the one where, in
+its own words, "the avatar + 3 gauges + llama all sit together as one group" -- three 3D gauge actors, the
+rigged figure, and the wandering pet llama, in one room. Every rigged slot in the rotation asks for
+scene=focus (one avatar, no gauges) and pet=0, so none of them has ever shown it.
+
+AND pet=1 WAS UNREACHABLE, NOT MERELY UNUSED.
+
+    avatarstage.html:  const _pet = _embed ? false : (...)
+
+?embed=1 FORCED the pet off, so the pet=0 in those mode URLs did nothing at all -- the flag was decorative.
+v3656 wrote down exactly why the veto existed: "a wandering pet is small enough to fit a 143x210 box and a
+1.8u rigged figure is not, so the only thing that ever landed in frame was the thing that wanders. AN EMBEDDED
+AVATAR IS ONE AVATAR."
+
+THAT REASON IS A BOX SIZE, AND v4414 RETIRED THE BOX. The SVG dials came out and the avatar took the whole of
+#dialsRow: host/row went from 0.263 to 1.000, and the 143x210 panel the rule was written for measures 676 px
+wide now. A room that fits one figure fits the figure and the llama. The veto outlived its reason by five
+versions -- the same shape v4413 found in a guard deleted for being inert, and v4418 found in a parity
+baseline.
+
+A VETO IS LOOSENED TO A DEFAULT ONLY AFTER COUNTING WHO RELIES ON IT, and that is a count rather than an
+opinion. Measured across the whole tree before changing anything: exactly TWO callers pass embed=1, and BOTH
+already pass pet=0 explicitly. So no shipping caller moves, and their pet=0 -- redundant while the veto stood
+-- is load-bearing again, which is the better state for a flag to be in.
+
+NEW ui/stageFlags.mjs holds the resolution as three rules: an explicit ?pet wins always (the change), an
+embedded stage otherwise defaults it off (v3656, kept), otherwise the composition decides (v1352). It lives in
+a module rather than inline BECAUSE A GATE CANNOT TEST A LINE INSIDE A PAGE'S INLINE MODULE WITHOUT EITHER
+DRIVING A BROWSER OR RESTATING THE RULE -- and a restated rule is a second declaration that drifts from the
+first, which is the defect this tree names more often than any other. avatarstage.html imports it; the gate
+imports the same function.
+
+THE ROTATION. stage3d inserted before gauges3000, and blobgpu moved to the END:
+
+    ... heerich -> stage3d -> gauges3000 -> blobgpu
+
+THAT OVERRULES A STATED PREFERENCE ON PURPOSE. v4033 asked for gauges3000 to be the last choice and this
+file's own gate asserted it for 385 versions. The later ask wins -- and THE ASSERTION MOVED RATHER THAN BEING
+DELETED. It now pins the whole three-mode tail, which is a STRONGER claim than "one named mode is last": the
+old form was satisfiable by any arrangement of everything before it, and could not have caught a stage3d
+inserted in the wrong place.
+
+Two further checks had hardcoded the eleven-mode order and went red for a reason that was not a bug. The cycle
+chain is now DERIVED from MODES instead of retyped -- and that is not circular, because nextMode walks
+allModes() rather than MODES, so asserting the two agree still catches a cycle that skips, reorders or
+dead-ends. The retyped chain was a second declaration of the list that had to be hand-edited every time the
+rotation changed.
+
+MEASURED LIVE, on a real page: the new mode loads at 676x162, embed=1 is honoured, ui/stageFlags.mjs is really
+fetched, and there are no module errors.
+
+A PIXEL DIFF WAS TRIED FIRST AND ABANDONED HONESTLY. The intended proof was to render the scene with pet=1 and
+pet=0 and count differing pixels. A WebGL canvas without preserveDrawingBuffer reads BLANK through drawImage,
+so that comparison would have returned zero for a reason that has nothing to do with the llama -- a check that
+cannot fail is worse than no check. The observable moved to the rule itself.
+
+AND THE FIRST DRAFT OF THE COUNT CHECK ACCEPTED TWO DIFFERENT NUMBERS WITH AN `||`. A ratchet satisfiable by
+either N or N+1 cannot tell "nothing changed" from "exactly one thing arrived", which is its whole job. It is
+an equality now, against a record that states the count after this round.
+
+NEW ui/stageFlags-selfcheck.mjs, sixteen checks in three sections. Section 2 RE-TAKES the caller census from
+the tree on every run rather than trusting the number measured once -- v4413's entire subject was a guard
+deleted for an inertness that later stopped being true.
+
+NOTED AND NOT FIXED. tools/ship/avatarServerViews-selfcheck.mjs is red before and after this round on "every
+framed surface the server.html switch mounts carries ?embed=1" -- krbn, ascii and heerich do not send it. It
+is a REGISTERED known red since v4279, one of the seventeen, and not a new one. The repair is not a URL edit:
+those three pages do not read `embed` at all, and sending a page a flag it ignores is exactly what
+ui/avatarSwitch-embed-selfcheck exists to forbid. Making them read it is real work and out of this round's
+scope, so it is named here rather than quietly widened into.
+
+AND I TRUNCATED main.js AND brain/brain.js TO ZERO BYTES WHILE STAMPING THE GATE COUNT INTO THEM.
+
+    io.open(p, "w").write(io.open(p).read().replace("GATECOUNT", N))
+
+Python evaluates the object whose method is called before the arguments, so `open(p, "w")` runs FIRST and
+truncates the file; the inner read then returns an empty string and writes it back. Both files went to 0 bytes
+-- 2,762,118 and 441,914 bytes gone -- from a line that reads like a one-liner substitution.
+
+IT WAS CAUGHT WITHIN THE MINUTE, AND BY SOMETHING THAT WAS NOT LOOKING FOR IT. versionPreflight refused with
+"null is not a vNNNN version, so it cannot be compared with main's" -- it could not find ENGINE_VERSION in a
+file that no longer had any content at all. A check written to compare two version numbers reported a
+destroyed file, because the first thing an empty file fails is whatever reads it first.
+
+Restored from HEAD and redone with the read completed before the open. Recorded here rather than quietly
+fixed, because the shape is worth keeping: A DESTRUCTIVE EDIT DRESSED AS A ONE-LINER, in a language whose
+evaluation order makes the destruction invisible at the call site.
+
+Four sabotages, 1/2/5/3 RED by name, three files md5-identical after restore.
+The tree stands at 1452 gates.
 ## v4419 -- A defect species you can search for: the sixth instance, and two more inside the detector
 
 *** SIX INSTANCES OF ONE DEFECT SPECIES, AND UNTIL NOW NOTHING HAD EVER LOOKED FOR IT. *** v4416 closed with a claim it could not check: that it could not prove there was no SIXTH narrow pattern, and that its own history was that every widening found one more. Across this session the species has been recorded in shaderCensus (v4383, counting the word not the thing), claimEvidence (v4404, a SABOTAGE clause counted as evidence), orreryFleetScan (v4412, a record ABOUT an import counted as an import), the licence scan (v4415, a false accusation against a properly licensed body) and FIVE TIMES OVER in the provenance scan (v4416). EVERY ONE WAS FOUND BY A PERSON LOOKING AT A ROW THAT SEEMED WRONG. *** THE SHAPE IS PRECISE ENOUGH TO SEARCH FOR: A PATTERN THAT NAMES A KIND OF FILE AND REJECTS A FILE IN THIS TREE PLAINLY OF THAT KIND. *** The evidence is a real filename, not a style opinion. NEW tools/ship/patternWidth.mjs reads regex literals out of the tree's modules, works out which of them CLASSIFY a kind rather than merely naming a file, and reports the documentary files of that kind each one turns away. IT IS VALIDATED AGAINST KNOWN POSITIVES, WHICH IS WHAT NONE OF THE FIVE ORIGINAL SCANNERS EVER WAS AND EXACTLY WHY EACH SHIPPED LOOKING CORRECT: three of the patterns this session actually had to widen are fed back in as fixtures and all three are caught, the licence one naming IBMPlexSerif-OFL.txt, the file v4415 falsely accused. *** AND IT FOUND THE SIXTH. *** world/orreryEjecta.mjs's isPaperFile is anchored to the FILENAME'S START, with a comment justifying that on the grounds that a false positive would zero real payload -- a fair worry, honestly argued, and it made shaders/ASHIMA-LICENSE.txt and vendor/fonts/IBMPlexSerif-OFL.txt into CODE MASS while world/orrery.mjs's isLicenceFile, in the same tree, called them licences. THE SAME FILE WAS PAPERWORK TO ONE FUNCTION AND PAYLOAD TO ANOTHER, IN THE SAME MODULE, and 4,456 bytes of licence text were drawing a planet's radius. Measured across vendor/ before changing anything: isLicenceFile matches 17 files and every one is a real licence, so the feared false positive does not exist here. The licence half is delegated now and the non-licence half kept, because PROVENANCE and README and AUTHORS are paperwork and are not licences. *** TWO DETECTORS WERE NEEDED AND THEY FOUND DIFFERENT FILES, WHICH IS THE ARGUMENT FOR BOTH: *** the near-miss test found ASHIMA-LICENSE.txt; the two-reader disagreement -- the check v4415 added after sabotaging showed a census can look healthy while a body is falsely accused -- found the OFL, which the near-miss test cannot see because "OFL" is not a kind word isPaperFile names. *** AND THE DETECTOR COMMITTED THE SPECIES TWICE WHILE BEING WRITTEN, WHICH IS THE SIXTH AND SEVENTH SIGHTINGS INSIDE THE DETECTOR FOR THE SPECIES. *** It first counted world/gpuProvenance.mjs -- a MODULE -- as a provenance record, so every licence classifier in the tree "missed" it and the census filled with noise; a file of a documentary kind is one whose extension is documentary or which is named for the kind and nothing else, which is the distinction v4412 drew for imports and v4404 for claims. And its kind matcher searched the pattern body for LITERAL words, so orreryEjecta's `LICEN[CS]E` -- which contains neither "licence" nor "license" -- did not read as naming the licence kind at all, AND THE VERY INSTANCE THAT MOTIVATED THE ROUND WAS INVISIBLE TO IT. Single-character classes are expanded now. Across 14,767 regex literals the live census is EMPTY, and the reason to believe that rather than suspect the detector is the fixture set: an empty census beside passing known positives is evidence, an empty census alone is the shape v4402 named. THREE MORE CHECKS FELL OUT, all the same species one level up and all in gates that were already careful about it. orreryFleet-selfcheck's exclusion-list check required every excluded file to contain the literal "vendor/box3d/" -- one body pinned where the property is general -- and widening it to any literal vendor path was STILL wrong, because tools/ship/provenanceRecord-selfcheck.mjs reaches vendor/keyhunt through path.join and carries no such substring at all: A CHECK THAT TESTS ONE FORM OF A DEPENDENCY THE SCAN RECOGNISES IN FIVE. It asks the scan now. orreryEjecta-selfcheck asserted that mass is unchanged FOR A BODY THAT IS ALL CODE, choosing the example by measurement after box3d stopped qualifying -- and measurement now returns NOTHING, because every vendored body carries paperwork once the OFL and the Ashima licence are counted, so the row states the invariant across all fifteen instead of an example that keeps being spent. And world/orreryFleet.mjs's COMMIT_BELT_V4329 said twelve of fifteen bodies had been touched by exactly one commit, the one that added them; v4416 wrote PROVENANCE records into six of them, WHICH IS THE FIRST TIME IN THIS REPOSITORY'S LIFE THAT A VENDORED BODY WAS TOUCHED BY A COMMIT THAT DID NOT VENDOR IT, so the count is seven and the v4329 sentence is false of this tree because of a round of ours. A NEW MOMENT GETS A NEW RECORD: COMMIT_BELT_V4418 carries the new counts and names the six that moved, the v4329 record is left exactly as it was because it is a claim about v4329 and is still true about v4329, and what survives is the conclusion -- at two commits it is still not a belt. FOUR SABOTAGES, MEASURED 3/2/1/2 BY NAME, and sabotage C is the one worth reading: dropping the documentary filter flags world/orrery.mjs's LICENCE_NAME, THE WIDEST RULE IN THE TREE, for "missing" a module called gpuProvenance.mjs -- the false-positive direction demonstrated on the one pattern that must never be flagged. UNCHECKED AND SAID PLAINLY: there may be an eighth instance. This reads REGEX LITERALS on non-comment lines and cannot see a pattern built from a string at runtime, one inside an .html page, or a classification made with indexOf and an if. It cannot tell what a pattern is APPLIED to, which is why a token test is needed at all and why one row had to be adjudicated by hand before the documentary rule retired it. It only finds misses against files that EXIST -- a pattern that will reject the next file somebody adds is invisible until they add it, the same limit v4416's five had, and the reason the census is a ratchet rather than a report. And section 4 compares exactly two classifiers, named by hand: nothing here DISCOVERS that two functions are answering the same question, which is the harder half and is where the sixth instance actually lived. The tree stands at 1451 gates.

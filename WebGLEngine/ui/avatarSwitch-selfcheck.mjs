@@ -57,15 +57,23 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // we did for krbn and ascii?"), inserted right after ascii and before gauges3000, which stays the frozen
     // last choice. ELEVEN surfaces now, cheapest still first, the per-frame-cost modes grouped together rather
     // than landing among the slots a stray click can hit first.
-    ok("!! eleven surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, ASCII, Heerich voxels, Gauges 3000",
-       MODES.length === 11 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,ascii,heerich,gauges3000",
-       MODES.map((m) => m.id).join(" -> ") + " — the download-cost modes sit before the tail, so a stray " +
-       "click lands on something cheap rather than starting a 12 MB download");
-    ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
-       nextMode("svg") === "rigged" && nextMode("rigged") === "stickwoman" && nextMode("stickwoman") === "robotexpressive2"
-       && nextMode("robotexpressive2") === "blob" && nextMode("blob") === "blobgpu"
-       && nextMode("blobgpu") === "thead" && nextMode("thead") === "krbn" && nextMode("krbn") === "ascii"
-       && nextMode("ascii") === "heerich" && nextMode("heerich") === "gauges3000" && nextMode("gauges3000") === "svg");
+    // *** v4419 -- TWELVE, AND blobgpu MOVED TO THE END. *** stage3d is new (the full diorama: rigged avatar,
+    // three 3D gauges, pet llama) and the WebGPU blob is now the final choice, at Keith's ask. The ORDER is
+    // typed here exactly once because the order IS the request -- see the tail check further down for why it
+    // is pinned as a sequence rather than as an endpoint.
+    const ORDER = "svg,rigged,stickwoman,robotexpressive2,blob,thead,krbn,ascii,heerich,stage3d,gauges3000,blobgpu";
+    ok("!! twelve surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, talking head, Krbn pencil, ASCII, Heerich voxels, Full stage, Gauges 3000, WebGPU Blobulator",
+       MODES.length === 12 && MODES.map((m) => m.id).join(",") === ORDER,
+       MODES.map((m) => m.id).join(" -> ") + " — the download-cost modes still sit after the cheap avatar " +
+       "slots, so a stray click lands on something cheap rather than starting a 12 MB download");
+    // *** THE CHAIN IS DERIVED FROM MODES RATHER THAN RETYPED, AND THAT IS NOT CIRCULAR. *** nextMode walks
+    // allModes(), not MODES, so this asserts the two AGREE -- it still catches a cycle that skips, reorders or
+    // dead-ends. The retyped chain it replaces was a second declaration of the list that had to be edited by
+    // hand every time the rotation changed, which is why it went red this round for a reason that was not a bug.
+    ok("!! the button cycles in declared order and WRAPS, so it cannot dead-end on the last one",
+       MODES.every((m, i) => nextMode(m.id) === MODES[(i + 1) % MODES.length].id) &&
+       nextMode(MODES[MODES.length - 1].id) === MODES[0].id,
+       MODES.map((m) => m.id + "->" + nextMode(m.id)).join(" "));
     ok("!! StickWoman is choice 3 and RobotExpressive is choice 4, as asked",
        MODES.findIndex((m) => m.id === "stickwoman") === 2 && MODES.findIndex((m) => m.id === "robotexpressive2") === 3,
        "1-indexed: " + MODES.map((m, i) => (i + 1) + ":" + m.id).join(" "));
@@ -78,10 +86,33 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // replacement, not an addition: facemuscles (~12 MB MediaPipe bundle) is gone from THIS rotation, and its
     // v3998/v3999 adjacency-to-thead invariant goes with it -- gauges3000 has no MediaPipe pairing to keep
     // adjacent to anything. face-mirror.html itself is untouched; only this switch stopped naming it.
-    ok("!! gauges3000 is the explicit LAST choice, as asked, and it is what it claims to be",
-       MODES[MODES.length - 1].id === "gauges3000" && /gauges3000\.html/.test(modeById("gauges3000").src) &&
-       /embed=1/.test(modeById("gauges3000").src),
-       modeById("gauges3000").src);
+    // *** v4419 -- THIS ASSERTION MOVED RATHER THAN BEING DELETED, AND IT GOT STRONGER DOING IT. *** For 385
+    // versions it held that gauges3000 is the LAST mode, which is what v4033 asked for. Keith, this round:
+    // "before we switch into the webgpu avatar gauges scene ... we can swap in the full avatar, llama, gauges
+    // 3d view that we already have. then switching from that switches to the webgpu blob avatar scene."
+    //
+    // That is a THREE-MODE SEQUENCE, and a sequence is a better thing to pin than a single named endpoint:
+    // "gauges3000 is last" was satisfiable by any arrangement of everything before it, and could not have
+    // caught a stage3d inserted in the wrong place. THE PREFERENCE CHANGED, SO THE CHECK ENCODES THE NEW ONE
+    // -- it is not weakened, and it is not a free hand either. If somebody appends a mode after blobgpu, this
+    // goes red and they have to come back and say what the new tail is.
+    const TAIL = ["stage3d", "gauges3000", "blobgpu"];
+    ok("!! *** the tail is stage3d -> gauges3000 -> blobgpu, in that order, as asked ***",
+       MODES.slice(-3).map((m) => m.id).join(",") === TAIL.join(","),
+       "measured tail: " + MODES.slice(-3).map((m) => m.id).join(" -> ") + ". v4033 asked for gauges3000 " +
+       "last and v4419 asked for the blob after it; THE LATER ASK WINS AND IS WRITTEN DOWN HERE. Do not " +
+       "relax this to 'contains' -- the ORDER is the request");
+    ok("!! ...and each of the three is still the page it claims to be",
+       /gauges3000\.html/.test(modeById("gauges3000").src) && /embed=1/.test(modeById("gauges3000").src) &&
+       /blobulator-gpu\.html/.test(modeById("blobgpu").src) &&
+       /avatarstage\.html/.test(modeById("stage3d").src),
+       TAIL.map((id) => modeById(id).src.split("?")[0]).join("  "));
+    // *** AND THE NEW MODE HAS TO ASK FOR THE THINGS THAT MAKE IT DIFFERENT FROM THE RIGGED SLOTS. *** Without
+    // scene=diorama it is another focus view; without pet=1 it is the same room minus the llama, which is the
+    // whole point of the ask. Both are checked as the FLAGS THEY ARE rather than as prose about them.
+    ok("!! stage3d asks for the diorama scene AND the llama -- the two flags that make it the full stage",
+       /scene=diorama/.test(modeById("stage3d").src) && /pet=1/.test(modeById("stage3d").src),
+       modeById("stage3d").src);
     // ...and the download-cost-declared principle above has to SURVIVE the swap: gauges3000 carries no `heavy`
     // (its own page falls back to Canvas2D without ever fetching anything), so it is fine trailing the two that
     // do -- the invariant that matters is that NEITHER heavy mode sits before the cheap avatar slots.
