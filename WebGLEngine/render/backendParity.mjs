@@ -160,13 +160,24 @@ export const PARITY_BASELINE = Object.freeze({
     // which no census scans -- the first shader pair in this tree that is data rather than source.
     // v4322, moved to render/fleetTsl.mjs at v4329 -- the fleet shells for the transplant carry a WGSL prefix and a GLSL
     // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
+    // v4381 -- tools/ship/brainTsl-selfcheck.mjs carries WGSL and no GLSL (+1 WGSL-bearing, +1 WGSL-only).
+    // It is a GATE rather than a shader module, and it holds the text for the reason this census is least
+    // able to see: it asserts against brain/mlp.js's kernel BY QUOTING IT -- the compute entry point with its
+    // 8x8 workgroup, and the kernel function's name -- because the claim it makes is that a GENERATED pass
+    // reproduces that hand-written one. (THIS COMMENT CANNOT SPELL EITHER MARKER OUT, and finding that out
+    // cost a red run: a census file that names a marker literally becomes its own subject, which is the same
+    // trap seven earlier gates here fell into and the eighth was v4332's. The gate's own line is one file
+    // away and can be read there.) The generated half is not here and is not anywhere a census can read: it
+    // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
+    // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
+    // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 56,
+    wgslBearing: 57,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 43,
+    wgslOnly: 44,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

@@ -360,6 +360,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (1/1 by name) and restored; its own first draft reported drift on two gates that had " +
                  "not drifted, which is logged in it",
     }),
+    // v4381 -- the FIFTEENTH closing. #148's gate drives a REAL WebGPU device, so it is one of the twenty
+    // gateAxioms's register names, and it was run alone here rather than left to the quick sweep -- a 3 s cap
+    // kills a browser gate before it reaches a device and would have vouched for nothing.
+    since15: Object.freeze({
+        at: "v4381", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/brainTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections, on a device. Driven RED by four sabotages of " +
+                 "the module it guards (3/4/3/3 by name) and restored md5-identical; one of the four found a " +
+                 "defect in the GATE -- typed detail strings that printed 0 beside their own FAIL",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -26,7 +26,7 @@
 //      to re-open the three-stage shape". It was 4 when filed, 12 at v4319 by docs/TSL-ROADMAP.md's own count,
 //      and 14 now. THIS BRANCH PUT SOME OF THEM THERE: the TSL rounds added modules authoring both languages.
 //      The register was quietly holding a counter that this session was driving toward its own stated trigger.
-//      *** ANSWERED AT v4381, AND THE COUNTER WAS THE THING THAT WAS WRONG. *** Four of the fourteen author no
+//      *** ANSWERED AT v4382, AND THE COUNTER WAS THE THING THAT WAS WRONG. *** Four of the fourteen author no
 //      GLSL: two of the census's six detector tokens were ordinary English words, so a sentence containing the
 //      verb "attribute" read as a shader. The real figure is 10 against a trigger of 20, the census delegates to
 //      render/backendParity.mjs classify() now, and the gate is green and pruned from the register. THIS DRIFT
@@ -121,7 +121,7 @@ console.log("\n4. A RED WHOSE REASON CANNOT BE READ");
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether a red SHOULD be accepted, which is a judgement and not a comparison -- this gate only " +
     "asks whether the register's description matches the gate's; whether the three findings the v4380 audit turned up are " +
-    "REPAIRED -- the third was, at v4381, and the other two are named in the header rather than folded into a count; and " +
+    "REPAIRED -- the third was, at v4382, and the other two are named in the header rather than folded into a count; and " +
     "whether a COUNT a register records is itself correct, which this gate cannot ask and which is how shaderCensus's " +
     "entry and its gate agreed for eleven hundred rounds on a number neither of them had re-derived.");
 process.exit(fails ? 1 : 0);

@@ -237,7 +237,7 @@ someone else maintains: the graph is the IR, and three's two builders are the em
 argument made concrete, and section 3 of tsl-selfcheck is its first evidence: the emitted pair equals ours.
 
 **The 12 recorded here at v4319 was not a real number, and neither was the 14 the register filed at v4380.**
-v4381 re-measured it. The census classified a file by testing its RAW SOURCE for six tokens, two of which --
+v4382 re-measured it. The census classified a file by testing its RAW SOURCE for six tokens, two of which --
 GLSL's storage qualifiers, spelled a-t-t-r-i-b-u-t-e and v-a-r-y-i-n-g -- are ordinary English words.
 render/bloomFused.mjs counted as a shader pair on the sentence "attribute any difference to the SAMPLING".
 Four of the fourteen carry no GLSL at all; seventy-two of the hundred and sixty-nine called GLSL-only carry
