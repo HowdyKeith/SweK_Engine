@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "The ship-time sweep was evicting gates on timings it manufactured itself, and never re-measuring them",
+    since: "v4407",
+    state: "open",
+    pred: "A third of this tree is run by no ship-time step, and the reason is not that those gates are slow. The quick sweep records `serialMs ?? parallelMs`, and a GREEN gate never earns a serial re-run -- so a gate that passes 8-way at 3,002 ms is FILED at 3,002 ms, crosses the 3,000 ms budget, and is excluded. The exclusion is then permanent, because the budget decision is made from that same reading and nothing ever takes another. The prediction is that most of the over-budget population is not slow at all: it was starved once, and the file could not say how long ago.",
+    why: "v4297 already established that phase-1 parallel timings are starved -- 38 of its 107 reds were starvation rather than failure, and it kept both timings for exactly that reason. The quick sweep inherited the finding for its RED verdicts and not for its TIMINGS, so the same manufactured number that v4297 refused to call a failure was quietly allowed to decide membership. And sweep-timings.json stamped one `captured` date across all 1,440 entries while rewriting only the ones it ran, so 502 readings carried a date they had not earned and nothing could tell a fresh reading from a two-hundred-round-old one.",
+    measured: "140 over-budget gates re-timed SERIALLY: 138 came back at or under the budget, median 2.85x faster than the reading that evicted them and 7.2x at the worst (labCensus 3,950 -> 546 ms). The over-budget pool fell 502 to 236 across two rotations -- and the FIRST one decayed within minutes, because the next 8-way sweep reported 60 now over budget and re-evicted the same gates on the same starved reading. quickSweep now re-runs a green gate alone whenever its parallel time crosses the budget, and the ship-time sweep stands at 1,074 gates against 937 before. SIX WERE RED IN THE DARK -- orreryEjecta, box3dFilter, staleness, caseStudy, homography, wasmSupport -- of which two were already registered, two were repaired by the ritual's own staleness step, and two are now in redCensus.RED_AT_V4407 with what is failing and why they are not this round's to fix.",
+    kill: "tools/ship/sweepCoverage-selfcheck.mjs. The four buckets must partition the tree; a cap-hitter's nonzero code must never be counted as a red; every entry in the timings file must carry its OWN capture; and a rotation must have run and returned gates. SABOTAGE: count the killed gates as reds, or stamp every entry with the run's date as the file did before v4407, and it goes red by name -- MEASURED at 3 and 1 reds. HONEST SCOPE: this does not claim the over-budget gates are green. It re-times them and reports the exit codes it saw; a genuinely slow gate stays out, and the rotation shrinks the population nobody has looked at rather than certifying it.",
+    page: "instruments.html",
+    where: "tools/ship/sweepCoverage.mjs + tools/ship/sweepRotation.mjs + tools/ship/sweepCoverage-selfcheck.mjs + tools/ship/quickSweep.mjs.",
+  },
+  {
     name: "A verdict is an exit status, and a log tail that disagrees with it is no verdict at all",
     since: "v4405",
     state: "open",

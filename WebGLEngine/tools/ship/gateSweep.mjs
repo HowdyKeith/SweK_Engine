@@ -642,6 +642,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "DIRECTION is no verdict rather than a pass -- proven against a live child that prints ALL " +
                  "GREEN and exits 1. Driven RED by three sabotages (MEASURED 1/3/1 by name)",
     }),
+    since34: Object.freeze({
+        at: "v4407", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~2s, six sections. It gates tools/ship/sweepCoverage.mjs and " +
+                 "tools/ship/sweepRotation.mjs, which answer the thing quickSweep-selfcheck's own closing line " +
+                 "said was unchecked: THE GATES OVER THE BUDGET, RUN BY NOTHING AT SHIP TIME. v4406 measured 502 " +
+                 "of 1,439. THE MECHANISM IS WORSE THAN THE GAP: sweep-timings.json stamped ONE date on all " +
+                 "1,440 entries while rewriting only the 937 it ran, the budget decision is made FROM those " +
+                 "readings, and the reading a green gate is evicted on is its PARALLEL one -- quickSweep files " +
+                 "`serialMs ?? parallelMs` and a green gate never gets a serial re-run. So the sweep closes the " +
+                 "door with a starved number of its own making and never reopens it. MEASURED BY RUNNING 140 OF " +
+                 "THEM SERIALLY: 138 came back under budget, median 2.85x faster than the reading that evicted " +
+                 "them and 7.2x at the worst, and SIX WERE RED IN THE DARK -- two now in redCensus.RED_AT_V4407, " +
+                 "two fixed by the ritual's own staleness step, two already registered. The pool fell 372 -> 234",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

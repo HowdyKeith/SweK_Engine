@@ -126,6 +126,66 @@ gate the red register already tracks. A claim naming a *green* gate that no long
 what the claim says is invisible to it. The one contradiction was found because the
 register already knew -- not because the detector is good at looking.
 
+## 5. A scanner counts a record ABOUT a thing as the thing -- OPEN, found v4406
+
+`tools/ship/orreryFleetScan.mjs` decides which files import a vendored body by looking for
+its path. It strips **comments** -- which is why `physics/backendDivergence.mjs`, whose
+header discusses box3d and imports nothing, correctly dropped out at v4406 -- but it does
+not strip **string literals**. So `tools/ship/gateSweep.mjs` became a box3d importer,
+because a sweep closing's `verdict:` string quotes `"/vendor/box3d/box3d.js"` at line 565
+while explaining that `box3dLoader` imports it.
+
+**Fifth sighting of the shader census's defect, in a fifth scanner:** a detector that
+counts the *word* rather than the *thing*. v4383 found it in `shaderCensus`; v4404 found it
+in `claimEvidence`, where a `SABOTAGE:` clause names files on purpose that should not
+resolve.
+
+The honest fix is a **positional** test -- a path counts only in an `import` / `require` /
+`fetch` / `new URL(` position -- and that test moves counts across all 138 satellites, so
+it is a round of its own rather than a line. `world/orreryEjecta.mjs` also holds a frozen
+baseline (box3d 21, three-webgpu 7) that the tree has grown past (28 and 11), which is
+v4399's ratchet lesson: **freeze by name, not by count.** Both readings must be re-derived
+together or the gate just moves from one wrong number to another.
+
+## 6. A third of the tree is run by no ship-time step, and the exclusion is a ONE-WAY DOOR -- v4407
+
+**502 of 1,439 gates are over the quick sweep's 3,000 ms budget.** The quick sweep (v4303)
+is honest about being quick, and the full two-phase sweep covers the rest -- but the full
+sweep runs when somebody decides to run it, and `orreryFleet-selfcheck` spent eight rounds
+red inside that gap before v4406 looked.
+
+**The worse half is the mechanism.** `tools/ship/sweep-timings.json` stamps ONE `captured`
+date on all 1,440 entries, and the run rewrites only the ones it ran -- so 502 readings
+carry a date they did not earn. And the budget decision is made *from* those readings, so a
+gate that got faster is never re-measured and therefore never re-included. **Once over
+budget, never re-timed, therefore over budget forever.**
+
+Measured at v4406: of the over-budget population, **130 hit the 20 s cap** (a killed
+process's exit code is not a verdict -- v4392's rule, sitting in a data file 130 entries
+deep), 13 finished and exited nonzero, and **4 of those are named by no register list at
+all**. Run by hand, all four are GREEN -- and three of them finish in 1.3 s, 1.9 s and
+2.2 s, comfortably **under** the budget that excludes them.
+
+## 7. The register's reader surface counts across a container -- OPEN, found v4406
+
+`tools/ship/gateReport-selfcheck.mjs` section 7 (v4402) fails: 32 rows on screen against 27
+in the report. 27 + 5 is the size of the report's first two tables, so the probe is almost
+certainly counting rows across a container that gained a table -- a page/probe mismatch,
+not a missing register. It is over budget (6,290 ms), which is why item 6 found it rather
+than a sweep.
+
+## 8. An author-centred orrery -- OPEN, requested
+
+The orrery draws this tree at the centre with its dependencies around it. Keith asked for
+the inversion: **the author as the sun**, a GitHub universe centred on a person rather than
+a repository.
+
+**The opening measurement is already taken and it is the whole problem:** `orrery.json`'s
+15 bodies carry `[name, arrived, sha, bytes]` plus `files`, and **no owner, url or repo
+field on any of them.** The orrery records *what this tree took* and nothing about *who
+from*. An author-centred view needs exactly the field the bake has never collected, so the
+first round is a provenance bake, not a renderer.
+
 ## What is deliberately NOT being taken
 
 **The manim skill itself.** `npx skills add adithya-s-k/manim_skill` is a cheap

@@ -357,6 +357,35 @@ export const FIXED_SINCE_V4279 = Object.freeze([
  *
  * Confirming them serially is roughly three hours (measured: 20 of the 64 done, all green so far), which is a round of its own and is recorded here as the next step rather than guessed at now.
  */
+/*
+ * v4407 -- *** WHAT THE FIRST ROTATION FOUND WHEN THE DOOR WAS OPENED. ***
+ *
+ * A NEW LIST AND NOT AN APPEND TO RED_AT_V4279, for the reason MOMENTS states below in its own words: a record
+ * whose fields are snapshots of different instants has to say which instant. These gates were not red at v4279;
+ * nobody knows when they went red, because until v4407 nothing at ship time ran them. They spent that time in
+ * the over-budget population -- 502 of 1,439 gates -- which the quick sweep skips and which the file's single
+ * `captured` date presented as freshly measured.
+ *
+ * THEY ARE NOT REGISTERED TO EXCUSE THEM. Two are open items in docs/EXPLAIN-ITSELF.md with the work named, and
+ * every entry says what is actually failing so the next round can pick one up. Registering a red the round did
+ * not cause is what the register is for; widening it to hide one the round DID cause is the thing forbidden.
+ */
+export const RED_AT_V4407 = Object.freeze([
+    { gate: "tools/ship/orreryEjecta-selfcheck.mjs", ms: 874,
+      fails: "three-webgpu 11 importers recorded 7; box3d 28 recorded 21",
+      why: "docs/EXPLAIN-ITSELF.md item 5. A FROZEN COUNT THE TREE GREW PAST -- v4399's ratchet lesson -- and " +
+           "the two readings are not even measured by the same rule: the baseline strips comments, the fleet " +
+           "scan does not strip STRING LITERALS, so tools/ship/gateSweep.mjs counts as a box3d importer because " +
+           "a sweep closing quotes the vendor path while explaining that box3dLoader imports it. Raising the " +
+           "baseline would move the gate from one wrong number to another; both readings must be re-derived " +
+           "under one rule, which is a round of its own." },
+    { gate: "tools/ship/box3dFilter-selfcheck.mjs", ms: 93,
+      fails: "*** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST *** 74 declared, 18 missing",
+      why: "TWO BUILD SCRIPTS DISAGREE ABOUT THE EXPORT SET, and nothing at ship time has ever said so. Not " +
+           "this round's and not this round's to fix -- it is a WASM build question that needs the rig. Named " +
+           "here with its reading so the next round can start from a number rather than a rumour." },
+]);
+
 export const UNCONFIRMED_SLOW = Object.freeze([
     "fluid/flip3d-selfcheck.mjs",
     "physics/astroparticle/jeans-selfcheck.mjs",

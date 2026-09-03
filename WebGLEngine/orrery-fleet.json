@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "25943e1c63fca698497c75050ca4658db86dc43d",
+ "head": "d0dd6f7ef7ea93fc9346c48560913a96e427f16c",
  "bodies": {
   "box3d": [
    {
@@ -61,7 +61,7 @@
    },
    {
     "path": "predictions.html",
-    "bytes": 610946,
+    "bytes": 614034,
     "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
    },
    {
@@ -131,7 +131,7 @@
    },
    {
     "path": "tools/ship/gateSweep.mjs",
-    "bytes": 65610,
+    "bytes": 67077,
     "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
    },
    {
@@ -172,7 +172,7 @@
   "gifenc": [
    {
     "path": "predictions.html",
-    "bytes": 610946,
+    "bytes": 614034,
     "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
    },
    {
@@ -267,7 +267,7 @@
    },
    {
     "path": "predictions.html",
-    "bytes": 610946,
+    "bytes": 614034,
     "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
    },
    {
@@ -477,7 +477,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 2694065,
+    "bytes": 2700423,
     "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
    },
    {
