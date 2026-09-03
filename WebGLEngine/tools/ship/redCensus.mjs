@@ -117,7 +117,13 @@ export const RED_AT_V4279 = Object.freeze([
     // as exonerated. Found only because the control in section 3 re-runs a sample rather than trusting the
     // set difference -- which is the entire argument for having that control.
     { gate: "tools/ship/referenceKind-selfcheck.mjs", ms: 73680,
-      fails: "(confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep)" },
+      // v4380 -- THIS ENTRY NEVER RECORDED A FAILING LINE. What stood here was an annotation about the SWEEP
+      // ("confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep"), which is a fact
+      // about bucketing and not about the gate. The gate's own line, read for the first time since, is a RISING
+      // number on a check whose text says a rise is the bad direction -- and it rose from 221 to 223 between two
+      // runs inside the round that found it. The bucketing note is kept below because it is still true.
+      fails: "!! *** the prose-rescued population may only SHRINK *** 223 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE",
+      note: "confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep" },
     { gate: "tools/ship/registerResidue-selfcheck.mjs", ms: 1321,
       fails: "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga" },
     // v4379 -- REMOVED, FIXED RATHER THAN WIDENED. It read "the page renders title, why and how for each" and had
@@ -128,7 +134,13 @@ export const RED_AT_V4279 = Object.freeze([
     // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
     // naming one, so the surface can move again without this going stale twice.
     { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
-      fails: "!! *** only 4 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebu" },
+      // v4380 -- 4 WHEN FILED, 14 NOW, AND THE NUMBER IS THE POINT. This gate has held since v3274 that a
+      // hand-written pair is cheaper than an IR "while few files carry both languages -- if this count climbs
+      // toward twenty the arithmetic inverts, and THAT is when to re-open the three-stage shape: parse, lower,
+      // emit per target". docs/TSL-ROADMAP.md records 12 at v4319. It is 14 now, and THIS BRANCH PUT SOME OF THEM
+      // THERE: the TSL rounds added modules authoring both languages. The register was holding a counter that the
+      // session was driving toward the tree's own stated trigger, under a line that said 4.
+      fails: "!! *** only 14 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebula.js, render/blackbodyWgsl.mjs, render/bloomFuse" },
     // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
     { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
       fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },

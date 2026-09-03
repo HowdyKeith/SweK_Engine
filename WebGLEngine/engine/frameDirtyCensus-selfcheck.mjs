@@ -19,7 +19,12 @@ import { readFileSync } from "node:fs";
 import { codeOnly } from "../tools/ship/sourceScan.mjs";
 
 let pass = 0, fail = 0;
-const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
+// v4380 -- THIS PRINTED ITS FAIL LINE TO STDERR, ALONE AMONG THE 29 GATES IN THE RED REGISTER. It still exited 1,
+// so the sweep saw the red -- but every consumer in this tree scrapes STDOUT for "  FAIL  ", so the REASON was
+// invisible: the red register recorded this gate's line only because somebody once read it by hand. A red whose
+// reason cannot be read is most of the way to a red nobody opens, which is what tools/ship/registerDrift-selfcheck.mjs
+// exists to catch. The verdict is unchanged; only the stream is.
+const ok = (c, m) => { if (c) pass++; else { fail++; console.log("  FAIL  " + m); } };
 const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8");
 
 // 1) THE EXTRACTION IS MECHANICAL, so it cannot go stale the way a maintained list would.

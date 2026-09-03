@@ -348,6 +348,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         verdict: "green on this box, run singly, two sections. Driven RED by two sabotages of render/lodBudget.mjs " +
                  "(2/2 by name) and restored. Its own first run was wrong three ways and all three are logged in it",
     }),
+    // v4380 -- the fourteenth closing, and the first gate whose subject is the RED REGISTER itself. registerDrift
+    // compares what the census says each standing red fails on against what that gate actually prints, which is the
+    // question that would have caught vendoredLicences (52 rounds) and rigJobs (250) before somebody stumbled on
+    // them. It reads a frozen audit rather than running 29 gates, so it stays inside the quick sweep.
+    since14: Object.freeze({
+        at: "v4380", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/registerDrift-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections over all 29 standing reds. Driven RED by two " +
+                 "sabotages (1/1 by name) and restored; its own first draft reported drift on two gates that had " +
+                 "not drifted, which is logged in it",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
