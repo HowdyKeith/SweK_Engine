@@ -10,7 +10,7 @@
 // a green gate imply otherwise.
 
 import { magAt, muPoint, muPointF32, sampleTable, cellMag, cellOffset, referenceCell, lensEq } from "./magmapKernel.mjs";
-import { magmapEmulated, adjudicate, gradedPeak, F32_FLOOR, MAGMAP_TOL, WGSL } from "./magmapGpu.mjs";
+import { magmapEmulated, adjudicate, gradedPeak, F32_FLOOR, MEASURED_F32_WORST, MAGMAP_TOL, WGSL } from "./magmapGpu.mjs";
 import { isGpuSourced, unwrapGpu, armGpuTripwire, disarmGpuTripwire } from "./gpuProvenance.mjs";
 import { buildLens } from "./lensBind.mjs";
 
@@ -96,9 +96,24 @@ const N = 9, SPAN = 1.0, RHO = 0.1, CFG = { n: N, span: SPAN, rho: RHO };
         worstK === centre,
         "worst f32 error " + worst.toExponential(3) + " at cell " + worstK + " (centre is " + centre + "); " +
         "this is why the peak is adjudicated on the CPU rather than read from the proposal");
-    ok("the emulated f32 floor still sits where the tolerance was calibrated",
-        worst > 0 && worst <= F32_FLOOR * 2,
-        "measured " + worst.toExponential(3) + " vs recorded floor " + F32_FLOOR.toExponential(3));
+    // *** v4385 -- THIS MEASURED THE FLOOR ONE ROUNDING SHORT OF THE KERNEL, and then allowed `worst <=
+    // F32_FLOOR * 2` on top of it. *** cellMag() above returns a DOUBLE; the shipped kernel writes
+    // `out : array<f32>`, so a real run rounds once more on the store. Measured through the store the worst is
+    // 4.4196e-6, not the 4.3846e-6 this loop produced -- and a device agrees with the store, at 4.420e-6. The
+    // check and the constant were both computed the same wrong way, so they agreed with each other, and the 2x
+    // slack (which magmapGpu's header explicitly promised was not there) covered the rest.
+    const storeWorst = (() => { let w = 0;
+        const emu = magmapEmulated({ n: N, span: SPAN, rho: RHO }).value;    // Float32Array: the kernel's own buffer
+        for (let k = 0; k < N * N; k++) { const ref = referenceCell(k, { n: N, span: SPAN, rho: RHO, table });
+            w = Math.max(w, Math.abs(emu[k] - ref) / ref); }
+        return w; })();
+    ok("*** the f32 floor is measured THROUGH THE STORE, as the kernel writes it, and is strictly under the recorded floor ***",
+        storeWorst > 0 && storeWorst < F32_FLOOR,
+        "through the store " + storeWorst.toExponential(4) + " vs floor " + F32_FLOOR.toExponential(3) +
+        "; the same grid measured WITHOUT the store rounds to " + worst.toExponential(4) + ", which is what the old constant was");
+    ok("  ...and it reproduces the recorded measurement to the digit, which the old one no longer did",
+        Math.abs(storeWorst - MEASURED_F32_WORST) / MEASURED_F32_WORST < 1e-3,
+        "a constant nobody re-derives is a constant that drifts, and this one drifted by a rounding step nobody had modelled");
     ok("!! proposeAndVerify's DEFAULT tol would reject a correct kernel",
         worst > 1e-6,
         "which is why MAGMAP_TOL is set to " + MAGMAP_TOL.toExponential(0) + " here, before the first failure, " +

@@ -32,12 +32,33 @@ import { sampleTable, cellMag, cellOffset, referenceCell, muPoint } from "./magm
 import { variantWgsl, SHARED_CAP } from "./magmapVariants.mjs";
 
 /**
- * MEASURED f32 FLOOR: 4.385e-6 worst relative error over a 9x9 grid at rho=0.1 with the 48x48 quadrature,
- * against the f64 reference. The fma-contracted variant differs from the uncontracted one by at most 6.3e-8,
- * so vendor contraction is NOT the dominant term -- plain f32 rounding is, and a second card should not move
- * this materially. Margin of ~2x for grids and rho not swept here.
+ * f32 FLOOR, HEADROOM OVER THE MEASURED WORST -- AND THE OLD NUMBER WAS MEASURED ONE ROUNDING SHORT OF THE KERNEL.
+ *
+ * IT USED TO READ: "MEASURED f32 FLOOR: 4.385e-6 worst relative error over a 9x9 grid at rho=0.1 with the 48x48
+ * quadrature, against the f64 reference." That number is exactly what magmapKernel's cellMag() returns -- and
+ * cellMag RETURNS A DOUBLE. *** THE SHIPPED KERNEL WRITES `out : array<f32>`, so the result is rounded to f32 ONE
+ * MORE TIME on the store, and 4.385e-6 was measured without it. *** magmapEmulated(), which stores into a
+ * Float32Array and therefore models the kernel's own output buffer, gives 4.4196e-6 at n = 9, 21 and 33 alike.
+ *
+ * A DEVICE SETTLES WHICH MODEL IS RIGHT, AND IT IS NOT THE RECORDED ONE: run headlessly at v4385, the shipped
+ * wg128-shared kernel measures 4.420e-6 against the f64 reference -- the Float32Array emulator's number, not
+ * cellMag's. The floor was below what a correct kernel actually produces.
+ *
+ * IT WENT UNNOTICED FOR TWO REASONS, AND THE SECOND IS THE ONE WORTH FIXING. magmap-selfcheck re-measured the
+ * floor with cellMag too, so the check and the constant shared the same one-rounding-short model and agreed with
+ * each other; and it asserted `worst <= F32_FLOOR * 2` while this file's header promised "the selfcheck fails if
+ * the measured floor ever moves above it". A 2x slack with no stated reason will hide a 0.8% disagreement
+ * forever. The check now measures through the STORE, and is strict; the slack lives in this constant, where it
+ * is visible, which is the shape hmcGpu.mjs uses for F32_FLOOR_HMC.
+ *
+ * The fma sentence was wrong too -- it said the contracted variant differs by "at most 6.3e-8" and it is
+ * 2.578e-7, four times that. *** THE CONCLUSION IT SUPPORTED IS RIGHT AND IS NOW MEASURED ON A DEVICE RATHER
+ * THAN ARGUED FROM AN EMULATOR: *** contraction is not the dominant term. The device sits 7.634e-7 from the
+ * uncontracted emulator and 7.634e-7 from the contracted one -- the SAME distance from both, so whatever
+ * separates a device from the model, it is not fma. See tools/roundhouse/magmapDevice-selfcheck.mjs.
  */
-export const F32_FLOOR = 4.385e-6;
+export const MEASURED_F32_WORST = 4.4196e-6;   // through the f32 STORE, as the kernel does; re-measured every run
+export const F32_FLOOR = 4.5e-6;               // headroom over it, stated here rather than hidden in a check
 export const MAGMAP_TOL = 1e-5;
 
 export const WGSL = /* wgsl */ `

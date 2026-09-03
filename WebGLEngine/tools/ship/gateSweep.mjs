@@ -427,6 +427,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Driven RED by two sabotages (1/2 by name) and restored -- and the first attempt at the first " +
                  "one went 0 red because the sabotage itself was wrong, which is logged in the gate",
     }),
+    // v4385 -- the TWENTIETH closing, and the fourth round running for a kernel nothing had ever given a device.
+    // This one also corrected a CONSTANT that two gates agreed on because both computed it the same wrong way,
+    // so tools/roundhouse's magmap family (magmap, magmapAndroid, magmapVariants, magmapDefault, magmapEvidence,
+    // magmapFastPath, magmapBenchVerdict, magmapTaichi, androidPeer, iosPeer, fmaAssumption) was run to
+    // completion beside it -- eleven gates read F32_FLOOR.
+    since20: Object.freeze({
+        at: "v4385", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/magmapDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, two sections and 9 checks in 1.2 s. Driven RED by three " +
+                 "sabotages (2/3/1 by name, and the first also reddens magmap-selfcheck) and restored; the first " +
+                 "is the constant the tree actually shipped, which now costs a red in two gates instead of none",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
