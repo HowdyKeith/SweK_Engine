@@ -20,6 +20,7 @@
 // licenceExists, redistributable and a `why` that says what was taken -- judgements made one source at a
 // time, and inventing them to clear a number would be worse than owing it. The number is a ratchet instead.
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { REACHED_SOURCES, UNREGISTERED_CITED_BASELINE } from "../../world/reachedLicences.mjs";
@@ -27,7 +28,7 @@ import { REACHED_SOURCES, UNREGISTERED_CITED_BASELINE } from "../../world/reache
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
-const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
  * Every `owner/repo (LICENCE)` in the first 6 KB of a module -- the header, where this tree states provenance.

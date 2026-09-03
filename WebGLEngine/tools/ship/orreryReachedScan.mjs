@@ -33,6 +33,7 @@
 // model name as a literal at all, so it cannot be its own subject.
 "use strict";
 
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -198,7 +199,7 @@ export function reachedDrift(engineRoot, repoRoot) {
 }
 
 if (process.argv[2] === "--write") {
-    const engineRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+    const engineRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
     const repoRoot = path.resolve(engineRoot, "..");
     const payload = reachedPayload(engineRoot, repoRoot);
     fs.writeFileSync(path.join(engineRoot, REACHED_BAKE), JSON.stringify(payload, null, 1) + "\n");

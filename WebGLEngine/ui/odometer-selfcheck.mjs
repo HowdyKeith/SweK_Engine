@@ -13,6 +13,7 @@
 //
 // Run: node ui/odometer-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { alignValues, rollFor, blurAt, blurAtOriginal, cubicInOut, digitAt, delaysFor,
          totalDuration, planRoll, DIGITS, ROTATIONS, DEFAULTS } from "./odometerModel.mjs";
 import { readFileSync } from "node:fs";
@@ -115,7 +116,7 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
 
 // 7) THE SVG HALF: what it must and must not do, read from source.
 {
-    const src = readFileSync(new URL("./odometer.js", import.meta.url).pathname, "utf8");
+    const src = readFileSync(fileURLToPath(new URL("./odometer.js", import.meta.url)), "utf8");
     const code = codeOnly(src);
     const nc = noComments(src);
 
@@ -140,14 +141,14 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
         "the roll applies its FINAL time exactly on completion -- stopping at dt >= total would leave the last computed frame, a fraction of a digit high, permanently");
 
     // no Math.random anywhere: an odometer is deterministic
-    ok(!/Math\.random/.test(code) && !/Math\.random/.test(codeOnly(readFileSync(new URL("./odometerModel.mjs", import.meta.url).pathname, "utf8"))),
+    ok(!/Math\.random/.test(code) && !/Math\.random/.test(codeOnly(readFileSync(fileURLToPath(new URL("./odometerModel.mjs", import.meta.url)), "utf8"))),
         "nothing here is random -- the same two values always roll the same way");
 }
 
 // 8) *** WHERE IT MAY NOT BE USED, AND THE MODULE SAYS SO. *** A three-second roll cannot serve a per-frame
 //    readout: the next value arrives long before the roll ends, so the digits blur permanently.
 {
-    const modelSrc = readFileSync(new URL("./odometerModel.mjs", import.meta.url).pathname, "utf8");
+    const modelSrc = readFileSync(fileURLToPath(new URL("./odometerModel.mjs", import.meta.url)), "utf8");
     ok(/per-frame/.test(modelSrc) && /SystemPerfMonitor/.test(modelSrc),
         "the model names the case it must NOT be used for -- the per-frame FPS/CPU/MEM gauges -- rather than leaving it to be discovered");
     // *** AND IT CITES WHERE THE RULE CAME FROM, WHICH IS NOT THIS MODULE. *** ui/morphDigits.js settled it at
@@ -165,8 +166,8 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
 //    would both write to it, the later would win, and the loss would be invisible -- the same class of bug
 //    as a draw-in overwriting a dashed edge's stroke-dasharray at v4180.
 {
-    const odoSrc = readFileSync(new URL("./odometer.js", import.meta.url).pathname, "utf8");
-    const morphSrc = readFileSync(new URL("./morphDigits.js", import.meta.url).pathname, "utf8");
+    const odoSrc = readFileSync(fileURLToPath(new URL("./odometer.js", import.meta.url)), "utf8");
+    const morphSrc = readFileSync(fileURLToPath(new URL("./morphDigits.js", import.meta.url)), "utf8");
     const sel = (src) => (noComments(src).match(/querySelectorAll\("\[([a-z-]+)\]"\)/g) || []);
     const odoSel = sel(odoSrc), morphSel = sel(morphSrc);
     ok(odoSel.length === 1 && morphSel.length === 1, "each initialiser claims exactly one attribute");
@@ -180,7 +181,7 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
     let both = 0;
     for (const p of pages) {
         let html = "";
-        try { html = readFileSync(new URL("../" + p, import.meta.url).pathname, "utf8"); } catch { continue; }
+        try { html = readFileSync(fileURLToPath(new URL("../" + p, import.meta.url)), "utf8"); } catch { continue; }
         // an element carrying both attributes would appear as the two names inside one tag
         for (const tag of html.match(/<[^>]+>/g) || []) {
             if (/data-morph-stat/.test(tag) && /data-odometer/.test(tag)) both++;

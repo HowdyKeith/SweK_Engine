@@ -9,11 +9,13 @@
 // in pixels, and that none of them travels inward.
 "use strict";
 
+import { gateReport } from "../tools/ship/gateReport.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as D from "./shipDebris.mjs";
 import { SOURCES, census, MEASURED_AT_V4412 } from "../render/fireColour.mjs";
+const REPORT = gateReport("ev/shipDebris-selfcheck.mjs");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const viewRaw = fs.readFileSync(path.join(HERE, "flightView.js"), "utf8");
@@ -80,6 +82,11 @@ const say = (m) => console.log("  ----  " + m);
     for (let f = 1; f <= 81; f++) { d = D.stepDebris(d, 1 / 60); if (f % 20 === 0) at[f] = D.reach(d).slice(); }
     for (const f of Object.keys(at))
         say(`  frame ${String(f).padStart(2)}: reach px ${at[f].map((v) => v.toFixed(1)).join(" ")}`);
+    // v4423 -- the same table, emitted rather than only printed. gateReport-selfcheck's rule since v4399: a
+    // gate that argues in NUMBERS and emits nothing writes its evidence to a terminal that closes.
+    REPORT.table("how far each fragment gets from where the ship died", ["frame", "reach px, per piece"],
+        Object.keys(at).map((f) => [f, at[f].map((v) => v.toFixed(1)).join("  ")]),
+        "The hull never leaving was the defect; a number in pixels is the only thing that answers it.");
 
     const final = at[80];
     ok("!! *** every fragment is somewhere else than where the ship died ***",
@@ -126,4 +133,5 @@ const say = (m) => console.log("  ----  " + m);
 }
 
 console.log("shipDebris-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+REPORT.write();
 process.exit(fails ? 1 : 0);

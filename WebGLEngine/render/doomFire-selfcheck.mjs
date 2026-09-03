@@ -14,6 +14,7 @@
 //
 // Run: node render/doomFire-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { DoomFire, PALETTE, MAX_INTENSITY, mulberry32 } from "./doomFire.mjs";
 import { readFileSync } from "node:fs";
 import { codeOnly } from "../tools/ship/sourceScan.mjs";
@@ -81,7 +82,7 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
 //    It is the leftward lean, and the wrap is why a wisp shows up on the far side. Pinned so that clamping
 //    it -- the obvious fix -- goes red.
 {
-    const code = codeOnly(readFileSync(new URL("./doomFire.mjs", import.meta.url).pathname, "utf8"));
+    const code = codeOnly(readFileSync(fileURLToPath(new URL("./doomFire.mjs", import.meta.url)), "utf8"));
     ok(/const dst = i - decay;/.test(code), "the write target is current - decay, the original's expression");
     // Scoped to step() and to shapes that would actually clamp a COLUMN. The first version tested /clamp/i
     // over the whole file and matched Uint8ClampedArray in toRGBA -- a check that went red on a type name.
@@ -110,7 +111,7 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
 // 5) *** ARTIFACT 2: SINGLE-BUFFERED, COLUMN-MAJOR, ORDER-DEPENDENT. *** Double-buffering is the obvious
 //    tidy-up and changes the result.
 {
-    const code = codeOnly(readFileSync(new URL("./doomFire.mjs", import.meta.url).pathname, "utf8"));
+    const code = codeOnly(readFileSync(fileURLToPath(new URL("./doomFire.mjs", import.meta.url)), "utf8"));
     ok(/for \(let column = 0; column < w; column\+\+\)/.test(code) && /for \(let row = 0; row < h; row\+\+\)/.test(code),
         "the loops are COLUMN-major, matching the original");
     const stepBody = code.slice(code.indexOf("step()"), code.indexOf("at(x, y)"));

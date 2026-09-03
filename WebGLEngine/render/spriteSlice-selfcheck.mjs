@@ -14,6 +14,7 @@
 //
 // Run: node render/spriteSlice-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { detectKey, borderFill, unmix, components, mergeBoxes, readingOrder, sliceSheet, toSheetMeta, SLICE_DEFAULTS } from "./spriteSlice.mjs";
 import { validateSheet, importSheet } from "../tools/ship/spriteSheetImport.mjs";
 import { readFileSync } from "node:fs";
@@ -267,7 +268,7 @@ const rgbAt   = (im, x, y) => { const i = (y * im.width + x) * 4; return [im.dat
 //     textures/sprites/effects/torch_sheet.png, 128x48, four flame frames. Every other section builds its
 //     own input, which means every other section can be right about a world that does not exist.
 {
-    const img = decodePng(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url).pathname);
+    const img = decodePng(fileURLToPath(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url)));
     ok(img.width === 128 && img.height === 48, "the real torch sheet decodes to 128x48");
 
     const k = detectKey(img);
@@ -296,7 +297,7 @@ const rgbAt   = (im, x, y) => { const i = (y * im.width + x) * 4; return [im.dat
     ok(frames[3].h === 44 && frames[0].h === 42, "the fourth flame is 44px to the others' 42px, and it starts 2px higher");
 
     // determinism on the real asset too
-    const again = sliceSheet(decodePng(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url).pathname));
+    const again = sliceSheet(decodePng(fileURLToPath(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url))));
     ok(JSON.stringify(again.frames) === JSON.stringify(frames), "and the real sheet slices identically on a second run");
 }
 
@@ -306,7 +307,7 @@ const rgbAt   = (im, x, y) => { const i = (y * im.width + x) * 4; return [im.dat
 //     that same standard rather than a private, laxer path -- otherwise the undeclared half would be the
 //     one place an out-of-bounds rect could get through.
 {
-    const img = decodePng(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url).pathname);
+    const img = decodePng(fileURLToPath(new URL("../textures/sprites/effects/torch_sheet.png", import.meta.url)));
     const { frames, matted } = sliceSheet(img);
     const meta = toSheetMeta(matted, frames, "torch");
     ok(meta.sheet.w === 128 && meta.sheet.h === 48, "the emitted metadata carries the sheet size");

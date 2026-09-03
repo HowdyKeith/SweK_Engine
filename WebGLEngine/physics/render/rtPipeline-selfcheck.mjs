@@ -13,9 +13,12 @@
 // three. The gate asserts the SHAPE of the breakage, not its absence.
 "use strict";
 
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
 import * as R from "./rtPipeline.mjs";
 import { traceWgsl, traceUniforms } from "./pathTracerGpu.mjs";
+const REPORT = gateReport("physics/render/rtPipeline-selfcheck.mjs");
+const REPORT_ROWS = [];
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -110,6 +113,8 @@ const rec = R.sbtRecord;
             const view = V(w);
             const r = cmp(await gpu(sbt, { view, spp }), R.renderSbtCpu(sbt, { spp, view }));
             say(`  two spheres ${name.padEnd(9)} ${w}x${w} spp=${String(spp).padStart(2)} -> ${r.bad} of ${r.n} differ`);
+            // v4423 -- emitted, not only printed: gateReport-selfcheck's rule since v4399.
+            REPORT_ROWS.push([name, `${w}x${w}`, String(spp), `${r.bad} of ${r.n}`]);
             worst = Math.max(worst, r.bad);
         }
     ok("!! *** TWO geometries with TWO albedos are BIT-EXACT against the CPU ***",
@@ -212,4 +217,7 @@ const rec = R.sbtRecord;
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+REPORT.table("two spheres: CPU against the pipeline, per resolution and sample count", ["scene", "size", "spp", "pixels differing"], REPORT_ROWS,
+    "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read.");
+REPORT.write();
 process.exit(fails ? 1 : 0);

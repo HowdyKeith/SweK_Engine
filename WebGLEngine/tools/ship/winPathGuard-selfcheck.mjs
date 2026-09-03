@@ -19,6 +19,7 @@
 // The slash-stripping helper form `new URL(rel, import.meta.url).pathname` (report.js, brain.js _localPath)
 // is SAFE and is not flagged -- it has a rel argument and strips the leading slash itself. This gate greps the
 // tree for the two unsafe forms so they cannot come back. The sabotage below reintroduces one and this fails.
+import { noComments } from "./sourceScan.mjs";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -46,9 +47,22 @@ const RE_ENDSWITH_ARGV    = /import\.meta\.url\.endsWith\([^;]*process\.argv\[1\
 const RE_ANCHORED_BASE    = /import\.meta\.url\.endsWith\(\s*"\/"\s*\+\s*process\.argv\[1\]\.split\(/;
 const RE_NODE_SPECIFIER   = /from\s+"node:|require\("node:/;
 // Line-wise, like v3126's stripper: a non-greedy /* */ span once ate 965,179 characters of server.js.
-const stripComments = (src) => src.split("\n")
-    .filter((L) => { const t = L.trim(); return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")); })
-    .join("\n");
+// v4423 -- *** A SECOND, WEAKER COPY OF A RULE THE TREE ALREADY HAS RIGHT. ***
+// This was a line filter: it dropped lines that BEGIN with //, and a TRAILING comment on a code line survived
+// it untouched. main.js's and brain/brain.js's version notes are exactly that shape --
+// `const ENGINE_VERSION = "v4423";   // <the round note>` -- so the moment this round's note quoted the idiom
+// in prose, the gate reported main.js and brain.js as offenders. THE HEADER OF THIS VERY FILE EXPLAINS THAT
+// TRAP: "the sentence describing the bug is not the bug", written at v3936 after the same thing happened.
+// tools/ship/sourceScan.mjs's codeOnly() has handled trailing comments, and string bodies, since it was
+// written; measured on main.js, the fragment survives the local stripper and does not survive codeOnly. One
+// owner, imported -- which is v4420's finding about isDocumentary, in a third place.
+//
+// *** AND codeOnly() IS THE WRONG ONE, WHICH COST A DETOUR WORTH RECORDING. *** It blanks STRING BODIES as
+// well as comments, and this gate's guards live in strings and regex literals: RE_ANCHORED_BASE looks for the
+// leading "/" that makes an endsWith a basename comparison, and RE_DRIVE_STRIP for the /^\/[A-Za-z]:/ test.
+// Blank those and every correctly-guarded file reads as unguarded -- 22 hits became 14 NEW false ones. Two
+// strippers, two questions: noComments() for "what does this file SAY", codeOnly() for "what does it DO".
+const stripComments = (src) => noComments(src);
 const SKIP = new Set(["node_modules", ".git", "vendor", "rt", "__pycache__"]);
 
 function walk(dir, hits) {
@@ -115,13 +129,18 @@ let baseGuards = 0;
     } };
     count(ROOT);
 }
+// v4423 -- *** THIS LINE SHOWED SIX OF TWENTY-TWO, AND THE OTHER SIXTEEN WERE REACHABLE ONLY BY EDITING THE
+// GATE. *** It read hits.slice(0, 6), so 144 rounds of readers saw six filenames and no way to know what else
+// was there. A list nobody can see is a list nobody acts on -- v4379's finding about RIG_ONLY -- and it is the
+// best available explanation for why this red stood as long as it did. Every hit is printed now, one per line.
+// The cost is a long failure message on a red run, which is the run where a long message is worth having.
 ok("!! no source file uses the Windows-fragile path idioms", hits.length === 0,
    hits.length === 0
      ? "the tree is clean: no `new URL(import.meta.url).pathname`, no `file://${process.argv[1]}` guard, and " +
        "no slash-only or unanchored basename guard -- fileURLToPath and pathToFileURL are used instead, so " +
        "paths and main-module detection survive Windows. The " + baseGuards + " file(s) that DO compare " +
        "basenames each earned it: no `node:` specifier, because a browser page imports them."
-     : hits.length + " offending occurrence(s): " + hits.slice(0, 6).join(" ; "));
+     : hits.length + " offending occurrence(s), ALL of them:\n           " + hits.join("\n           "));
 
 console.log(fails ? "\nwinPathGuard-selfcheck: " + fails + " FAILED" : "\nwinPathGuard-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

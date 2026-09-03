@@ -10,6 +10,7 @@
 // bytes that DID enter had no register at all. #61 filed it as "box3d and htmx", and the census says the
 // shape is bigger and stranger than two names.
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { VENDORED, KIND, GRANT, needsGrant, unpapered, spdxSet, naiveUnpapered } from "../../world/vendoredLicences.mjs";
@@ -18,7 +19,7 @@ import { REACHED_SOURCES } from "../../world/reachedLicences.mjs";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
-const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 console.log("vendoredLicences-selfcheck -- what came IN, as against what was only read\n");
 

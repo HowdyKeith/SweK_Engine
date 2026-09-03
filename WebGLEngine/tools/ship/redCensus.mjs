@@ -157,8 +157,6 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "...and an errored check is counted as its own thing, not silently dropped" },
     { gate: "tools/ship/wasmSupport-selfcheck.mjs", ms: 2968,
       fails: "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 89 mention it" },
-    { gate: "tools/ship/winPathGuard-selfcheck.mjs", ms: 672,
-      fails: "!! no source file uses the Windows-fragile path idioms 17 offending occurrence(s): engine/frameDirtyCensus-sel" },
     { gate: "tools/ship/wiringClaims-selfcheck.mjs", ms: 1731,
       fails: "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name *** a sentence that says 'A is unwired whil" },]);
 
@@ -251,6 +249,18 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/winPathGuard-selfcheck.mjs", round: "v4423",
+      why: "RED SINCE v4279 AND REPAIRED BY DOING THE WORK, which is what a register entry is for and what none " +
+           "of this session's other twenty-six have had. 28 occurrences of `new URL(<x>).pathname` across 16 " +
+           "files, all replaced with fileURLToPath, which is the idiom this gate's own header names and which " +
+           "the gate file itself has used since it was written. THE FIX IS NOT A WIDENING: no pattern was " +
+           "relaxed, no file exempted, and the gate's assertion is the one it always made. v4404 found a " +
+           "SETTLED claim resting on this red -- 'the selfchecks and the server survive Windows path semantics' " +
+           "-- and marked it broken with the measurement; the claim is re-stated here with the gate actually " +
+           "passing, which is the only honest way a broken prediction comes back. AND 16 OF THE 22 HITS HAD " +
+           "BEEN INVISIBLE: the report showed hits.slice(0, 6), so a reader saw six files and the other ten " +
+           "were reachable only by editing the gate. A list nobody can see is a list nobody acts on, which is " +
+           "v4379's finding and is the best available explanation for 144 rounds of standing still." },
     { gate: "tools/ship/mutationTable-selfcheck.mjs", round: "v4386",
       why: "RED FROM v4279 TO v4385 OVER A MUTATION THAT HAD BEEN MUTATING NOTHING SINCE v4162 -- 223 versions " +
            "dead, 106 of them with this gate naming it. tools/mutate/mutate.mjs's table looks for each " +

@@ -21,6 +21,7 @@
 //   2. No tracked file carries a conflict marker. That is the artifact that actually escaped, and it is
 //      cheap, absolute, and needs no list.
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -118,7 +119,7 @@ export function runProcess(cmd, argv, opts = {}) {
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]).endsWith("shipVerdict.mjs");
 if (isMain) {
-    const eng = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+    const eng = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const root = path.resolve(eng, "..");
     const pass = process.argv.slice(2);
     const verify = await runProcess(process.execPath, [path.join(eng, "tools", "ship", "verify.mjs"), ...pass],

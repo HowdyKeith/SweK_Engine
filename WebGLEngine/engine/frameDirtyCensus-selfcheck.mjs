@@ -13,6 +13,7 @@
 //
 // Run: node engine/frameDirtyCensus-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { tickersIn, census, report, coveredIn, VERDICTS, ANIMATES, REACTIVE, INERT, UNEXAMINED, UNEXAMINED_BASELINE, UNGUARDED_BASELINE, STILL_UNGUARDED_REASON } from "./frameDirtyCensus.mjs";
 import { FrameDirty } from "./frameDirty.js";
 import { readFileSync } from "node:fs";
@@ -25,7 +26,7 @@ let pass = 0, fail = 0;
 // reason cannot be read is most of the way to a red nobody opens, which is what tools/ship/registerDrift-selfcheck.mjs
 // exists to catch. The verdict is unchanged; only the stream is.
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log("  FAIL  " + m); } };
-const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8");
+const MAIN = readFileSync(fileURLToPath(new URL("../main.js", import.meta.url)), "utf8");
 
 // 1) THE EXTRACTION IS MECHANICAL, so it cannot go stale the way a maintained list would.
 {
@@ -60,7 +61,7 @@ const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8
     ok(Object.isFrozen(VERDICTS), "the table is frozen");
 
     // the verdicts must be about the picture, not about cost
-    const src = readFileSync(new URL("./frameDirtyCensus.mjs", import.meta.url).pathname, "utf8");
+    const src = readFileSync(fileURLToPath(new URL("./frameDirtyCensus.mjs", import.meta.url)), "utf8");
     const reasons = names.map((n) => VERDICTS[n].why).join(" ");
     ok(!/\bcheap\b|\bfast\b|microsecond/i.test(reasons),
         "*** no reason argues from COST -- the question is whether it can move pixels, and a cheap tick can animate while a costly one changes nothing ***");
@@ -70,7 +71,7 @@ const MAIN = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8
 
 // 3) *** THE COST COMMENTS IN main.js ARE NOT EVIDENCE, AND THE CENSUS SAYS SO. ***
 {
-    const src = readFileSync(new URL("./frameDirtyCensus.mjs", import.meta.url).pathname, "utf8");
+    const src = readFileSync(fileURLToPath(new URL("./frameDirtyCensus.mjs", import.meta.url)), "utf8");
     ok(/CAN THIS MOVE PIXELS/.test(src), "the module states the question it is answering");
     ok(/not "IS THIS EXPENSIVE"|NOT "IS THIS EXPENSIVE/i.test(src), "and the question it is NOT answering");
 

@@ -72,11 +72,12 @@
 // None of the three is rare enough to hand-wave, and all three make the census SMALLER, never larger: an
 // undercount is the safe direction for a claim of the form "these sites cannot be falsified."
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { codeOnly, noComments } from "../ship/sourceScan.mjs";
 
-const ENG = path.resolve(new URL("../..", import.meta.url).pathname);
+const ENG = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SKIP = new Set(["node_modules", ".git", ".claude", "vendor", "dist", "build"]);
 
 /** Question one: what a ZERO MUTATION of the outer literal does, decided by the CALLEE's operator. */

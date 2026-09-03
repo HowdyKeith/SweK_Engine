@@ -14,6 +14,7 @@
 //
 // Run: node ui/svgPath-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { parsePath, flattenPath, pathLength, subpathLengths, isSupported, DEFAULT_TOLERANCE } from "./svgPath.mjs";
 import { measureElement, primeDraw, setProgress, drawElement, clearDraw } from "./svgDraw.js";
 import { readFileSync } from "node:fs";
@@ -188,7 +189,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 // 10) THE WIRING. ui/brainTrail.js draws its edges as CUBIC BEZIERS, which is the shape that could not be
 //     dash-animated before this -- so it is the consumer, not a demo page.
 {
-    const src = readFileSync(new URL("./brainTrail.js", import.meta.url).pathname, "utf8");
+    const src = readFileSync(fileURLToPath(new URL("./brainTrail.js", import.meta.url)), "utf8");
     const code = codeOnly(src);        // strings AND comments blanked -- for code shapes
     const nc   = noComments(src);      // comments stripped, strings KEPT -- an import PATH is a string literal
     // Which instrument to read with, again: codeOnly blanks "./svgDraw.js" to "", so an import-path check

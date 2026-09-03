@@ -13,6 +13,7 @@
 //
 // Run: node render/badTv-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { offsetAt, sampleAt, fract, maxTear, DEFAULTS, COARSE_FREQ, FINE_FREQ, COARSE_GAIN, FINE_GAIN, COMPOSE_ORDER } from "./badTvModel.mjs";
 import { FRAGMENT_SHADER, VERTEX_SHADER, makeBadTvPass } from "./badTvPass.js";
 import { snoise2, snoise3, SNOISE2_FALLOFF, SNOISE2_SCALE, SNOISE3_FALLOFF, SNOISE3_SCALE } from "../shaders/ashimaNoise.mjs";
@@ -21,7 +22,7 @@ import { codeOnly, noComments } from "../tools/ship/sourceScan.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
-const src = (p) => readFileSync(new URL(p, import.meta.url).pathname, "utf8");
+const src = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
 
 // 1) THE CPU snoise2 IS FAITHFUL, by the same properties used for snoise3 at v4177 -- the ones a
 //    mis-translation fails.

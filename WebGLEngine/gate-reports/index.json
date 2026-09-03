@@ -5,9 +5,12 @@
   "claimEvidence-selfcheck.json",
   "frontDoor-selfcheck.json",
   "gateReport-selfcheck.json",
+  "pathTracerGpu-selfcheck.json",
   "registerDrift-selfcheck.json",
   "rigidCouple-selfcheck.json",
   "rigidFloat-selfcheck.json",
+  "rtPipeline-selfcheck.json",
+  "shipDebris-selfcheck.json",
   "shipyard-selfcheck.json"
  ]
 }

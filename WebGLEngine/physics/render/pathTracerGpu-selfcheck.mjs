@@ -13,8 +13,10 @@
 // instead of waiting to be caught by it.
 "use strict";
 
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
 import * as G from "./pathTracerGpu.mjs";
+const REPORT = gateReport("physics/render/pathTracerGpu-selfcheck.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -147,6 +149,13 @@ const cmp = (a, b) => {
     say(`  furnace   PLANT  differ ${String(fPlant.bad).padStart(3)}/${fPlant.n}  max|d| ${fPlant.mx.toExponential(3)}`);
     say(`  gradient  clean  differ ${String(gClean.bad).padStart(3)}/${gClean.n}  max|d| ${gClean.mx.toExponential(3)}`);
     say(`  gradient  PLANT  differ ${String(gPlant.bad).padStart(3)}/${gPlant.n}  max|d| ${gPlant.mx.toExponential(3)}`);
+    // v4423 -- emitted, not only printed: gateReport-selfcheck's rule since v4399.
+    REPORT.table("CPU against GPU, clean and with a planted fault", ["scene", "run", "pixels differing", "max |delta|"],
+        [["furnace", "clean", `${fClean.bad}/${fClean.n}`, fClean.mx.toExponential(3)],
+         ["furnace", "PLANT", `${fPlant.bad}/${fPlant.n}`, fPlant.mx.toExponential(3)],
+         ["gradient", "clean", `${gClean.bad}/${gClean.n}`, gClean.mx.toExponential(3)],
+         ["gradient", "PLANT", `${gPlant.bad}/${gPlant.n}`, gPlant.mx.toExponential(3)]],
+        "A planted fault must move the differing-pixel count; a clean run must not.");
 
     ok("!! *** the furnace CERTIFIES a broken cosine sampler, bit-exactly ***",
         fPlant.bad === 0 && fPlant.mx === 0,
@@ -170,4 +179,5 @@ const cmp = (a, b) => {
 }
 
 console.log("pathTracerGpu-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+REPORT.write();
 process.exit(fails ? 1 : 0);

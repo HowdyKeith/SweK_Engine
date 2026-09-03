@@ -14,6 +14,7 @@
 //
 // Run: node engine/xrSession-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { mat4Multiply, mat4Identity, cameraForView, viewportFor, describeSupport,
          XRSessionManager, XR_IDLE, XR_REQUESTING, XR_ACTIVE } from "./xrSession.mjs";
 import { readFileSync } from "node:fs";
@@ -86,7 +87,7 @@ const S = (s) => { const m = mat4Identity(); m[0] = m[5] = m[10] = s; return m; 
     const right = { getViewport: () => ({ x: 960, y: 0, width: 960, height: 1080 }) };
     ok(viewportFor(right, {}).join(",") === "960,0,960,1080", "including a non-zero x, which is how the right eye is placed");
     ok(viewportFor({}, {}) === null && viewportFor(null, {}) === null, "and a layer that cannot answer returns null rather than a bogus rect");
-    const code = codeOnly(readFileSync(new URL("./xrSession.mjs", import.meta.url).pathname, "utf8"));
+    const code = codeOnly(readFileSync(fileURLToPath(new URL("./xrSession.mjs", import.meta.url)), "utf8"));
     ok(!/height - v\.y|- v\.height/.test(code), "no y-flip anywhere in the module");
 }
 
@@ -192,7 +193,7 @@ const S = (s) => { const m = mat4Identity(); m[0] = m[5] = m[10] = s; return m; 
 
 // 8) THE MODULE STAYS PURE -- no WebXR at module scope, no GL, so it loads anywhere and the gate can drive it.
 {
-    const code = codeOnly(readFileSync(new URL("./xrSession.mjs", import.meta.url).pathname, "utf8"));
+    const code = codeOnly(readFileSync(fileURLToPath(new URL("./xrSession.mjs", import.meta.url)), "utf8"));
     ok(!/^\s*navigator\.xr/m.test(code), "navigator.xr is never touched at module scope");
     ok(!/gl\.|WebGL|createTexture/.test(code), "and there is no GL in it at all -- the rendering stays in the caller");
     ok(/requestSession: opts\.requestSession|this\._request = opts\.requestSession/.test(code),
@@ -202,7 +203,7 @@ const S = (s) => { const m = mat4Identity(); m[0] = m[5] = m[10] = s; return m; 
 // 9) *** THE WIRING IN main.js. Three of these four failures are silent, and the first one is the entire
 //    point of the round: a loop scheduled from the window never gives a headset a frame. ***
 {
-    const raw = readFileSync(new URL("../main.js", import.meta.url).pathname, "utf8");
+    const raw = readFileSync(fileURLToPath(new URL("../main.js", import.meta.url)), "utf8");
     const code = codeOnly(raw);
 
     ok(/import\s*\{[^}]*XRSessionManager[^}]*\}\s*from/.test(code), "main.js imports the manager");
