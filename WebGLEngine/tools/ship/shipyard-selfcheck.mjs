@@ -235,13 +235,15 @@ const F32 = [];
                 return purple;
             };
             const on = shot();
-            const note = (d.getElementById("ship-note").textContent || "").slice(0, 400);
+            const noteEl = d.getElementById("ship-note");
+            const note = (noteEl.textContent || "").slice(0, 1200);
+            const enc = noteEl.dataset.enc || "";
             const box = d.getElementById("ship");
             box.checked = false; box.onchange();
             await new Promise((r) => setTimeout(r, 800));
             const off = shot();
             const noteOff = (d.getElementById("ship-note").textContent || "").slice(0, 200);
-            return { on, off, note, noteOff };
+            return { on, off, note, noteOff, enc };
         }` });
     if (probe.skipped) {
         say("the live page read was SKIPPED: " + probe.reason + " -- the five sections above still ran");
@@ -256,9 +258,146 @@ const F32 = [];
         ok("...and the page reports the claim-local error as zero, from the module rather than from a caption",
            /claim-local/i.test(r.note || "") && /\b0\b/.test(r.note || ""),
            `readout: ${JSON.stringify((r.note || "").slice(0, 220))}`);
+        // v4390 -- AND THE ALTERNATIVE IS ON THE PAGE, not only in this gate. A finding that lives in a check
+        // nobody runs is the shape this tree keeps finding in its own register.
+        // *** THIS CHECK'S FIRST DRAFT TESTED FOR THE WORDS AND A SABOTAGE COST 0 RED. *** Deleting the three
+        // rival rows left the sentence "Camera-relative is the standard answer and it is not the fix" standing,
+        // so /camera-relative/ still matched. A CHECK FOR A WORD IS SATISFIED BY THE PROSE THAT EXPLAINS IT --
+        // the same defect v4383 found in the shader census, on this session's own gate, three rounds later.
+        // The page publishes the three numbers as data now and this recomputes them from the module.
+        const shown = (r.enc || "").split(",").map(Number);
+        const eyeP = [28 + 30.25, 22 + 15.5, 28 - 42.75];
+        const poseP = (() => { const a = 35 * Math.PI / 180, sn = Math.sin(a / 2);
+            return SY.pose({ id: 7, position: [28, 22, 28], quaternion: [0.2 * sn, sn, 0.1 * sn, Math.cos(a / 2)] }); })();
+        const SW = 8, SH = 6;
+        const hull = (x, y, z) => !(x > 0 && x < SW - 1 && y > 0 && y < SH - 1 && z > 0 && z < SW - 1);
+        const f0 = Math.fround;
+        const spun = SY.pose({ id: 7, position: [0, 0, 0], quaternion: poseP.quaternion });
+        const tS = [f0(poseP.position[0] - eyeP[0]), f0(poseP.position[1] - eyeP[1]), f0(poseP.position[2] - eyeP[2])];
+        let mine = [0, 0, 0];
+        for (let z = 0; z < SW; z++) for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+            if (!hull(x, y, z)) continue;
+            const cc = [x + 0.5, y + 0.5, z + 0.5], w = SY.localToWorld(cc, poseP);
+            const truth = [w[0] - eyeP[0], w[1] - eyeP[1], w[2] - eyeP[2]];
+            const b = SY.eyeRelative(w, eyeP);
+            const rr = SY.localToWorld([f0(cc[0]), f0(cc[1]), f0(cc[2])], spun);
+            const cN = [f0(f0(rr[0]) + tS[0]), f0(f0(rr[1]) + tS[1]), f0(f0(rr[2]) + tS[2])];
+            const dN = [0, 1, 2].map((i) => SY.splitDifference(w[i], eyeP[i]));
+            for (let i = 0; i < 3; i++) {
+                mine[0] = Math.max(mine[0], Math.abs(b[i] - truth[i]));
+                mine[1] = Math.max(mine[1], Math.abs(cN[i] - truth[i]));
+                mine[2] = Math.max(mine[2], Math.abs(dN[i] - truth[i]));
+            }
+        }
+        ok("!! *** the page publishes the three rival numbers as DATA, and they are this gate's own ***",
+           shown.length === 3 && shown.every((v, i) => Number.isFinite(v) && Math.abs(v - mine[i]) <= 1e-12),
+           `page ${JSON.stringify(r.enc)} against ${mine.map((v) => v.toExponential(6)).join(",")}. A reader meets ` +
+           "the alternative where the claim is made, and the numbers are the module's rather than a caption's");
     }
 }
 
+/* ------------------------------------------------------------------------------------------------------------
+ * 7. v4390 -- THE ALTERNATIVE v4388 NAMED AND DID NOT MEASURE: IS CAMERA-RELATIVE THE BETTER FIX?
+ *
+ * *** IT IS NOT A FIX AT ALL FOR THIS CASE, AND THE FACTOR IS 2.2. *** "Render relative to eye" is the standard
+ * answer to large-world float32 jitter, and it addresses the wrong half: it removes the CANCELLATION in the
+ * matrix multiply and cannot touch the QUANTISATION already in the stored coordinate. For a body stored at
+ * world distance D the stored coordinate is the whole error.
+ *
+ * Four encodings, one body, one camera near it, the view transform accumulated in float32 the way a vertex
+ * shader does, measured against the f64 answer:
+ *   A world-absolute vertex through a view matrix with the translation baked in
+ *   B camera-relative: world vertex, eye differenced in f64, rotation only
+ *   C the shipyard: claim-local vertex, pose translation (body - eye) differenced in f64
+ *   D double-single: world coordinate carried as a high/low f32 pair, differenced against a split eye
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const f = Math.fround, f3 = (v) => [f(v[0]), f(v[1]), f(v[2])];
+    const rotM = (q) => { const [x, y, z, w] = q; return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]; };
+    // Accumulated in float32 at every step, which is what makes this a measurement of the PIPELINE and not of
+    // the algebra: doing the same sum in f64 and rounding once at the end reports a different, kinder number.
+    const applyF32 = (R, t, v) => [0, 1, 2].map((r) => { let a = f(t[r]);
+        for (let c = 0; c < 3; c++) a = f(a + f(R[r][c] * v[c])); return a; });
+    const cq = (() => { const q = [0.1, 0.2, 0.05, 0.97], n = Math.hypot(...q); return q.map((v) => v / n); })();
+    const ROWS = [];
+    for (const D of [1e3, 1e4, 1e5, 1e6, 4e6, 8.4e6]) {
+        const a = 0.7, sn = Math.sin(a / 2);
+        const po = SY.pose({ id: 0, position: [D, 40, D * 0.5], quaternion: [0.2 * sn, sn, 0.1 * sn, Math.cos(a / 2)] });
+        const eye = [D + 30.25, 55.5, D * 0.5 - 42.75];
+        const Rv = rotM(cq), Rv32 = Rv.map((r) => f3(r)), Rb32 = rotM(po.quaternion).map((r) => f3(r));
+        const tA = f3([0, 1, 2].map((r) => -(Rv[r][0] * eye[0] + Rv[r][1] * eye[1] + Rv[r][2] * eye[2])));
+        const tC = f3([po.position[0] - eye[0], po.position[1] - eye[1], po.position[2] - eye[2]]);
+        const Z = [0, 0, 0];
+        let eA = 0, eB = 0, eC = 0, eD = 0;
+        for (const c of CENTRES) {
+            const truth = SY.localToWorld(c, po);
+            const rel = [truth[0] - eye[0], truth[1] - eye[1], truth[2] - eye[2]];
+            const view = [0, 1, 2].map((r) => Rv[r][0] * rel[0] + Rv[r][1] * rel[1] + Rv[r][2] * rel[2]);
+            const m = (o) => Math.max(...[0, 1, 2].map((i) => Math.abs(o[i] - view[i])));
+            eA = Math.max(eA, m(applyF32(Rv32, tA, f3(truth))));
+            eB = Math.max(eB, m(applyF32(Rv32, Z, SY.eyeRelative(truth, eye))));
+            eC = Math.max(eC, m(applyF32(Rv32, Z, applyF32(Rb32, tC, f3(c)))));
+            eD = Math.max(eD, m(applyF32(Rv32, Z, [0, 1, 2].map((i) => SY.splitDifference(truth[i], eye[i])))));
+        }
+        // NAMED dist AND ds, NOT D TWICE: the first draft wrote { D, ..., D: eD } and the double-single error
+        // silently overwrote the distance, so the table printed 4.59e-6 in the world-x column. A key collision
+        // in an object literal is not an error in JavaScript, and the assertions still passed on the values.
+        ROWS.push({ dist: D, sp: SY.f32Spacing(D), A: eA, B: eB, C: eC, ds: eD });
+    }
+    for (const r of ROWS) say(`world x ${String(r.dist).padStart(9)}  f32 spacing ${String(r.sp).padStart(20)}  ` +
+        `A ${r.A.toExponential(2)}  B ${r.B.toExponential(2)}  C ${r.C.toExponential(2)}  D ${r.ds.toExponential(2)}`);
+
+    // *** THE PREDICTION WRITTEN BEFORE THIS RAN SAID B WOULD IMPROVE ON A BY ORDERS OF MAGNITUDE. IT DOES NOT.
+    // It improves it by a factor between 2 and 3 at every distance, because the two errors are not the same
+    // size: the cancellation RTE removes is a fraction of the quantisation it cannot. ***
+    const ratio = ROWS.map((r) => r.A / r.B);
+    ok("!! *** camera-relative is NOT the fix for a far body: it buys a factor of about two, not a fix ***",
+       ratio.every((x) => x > 1.5 && x < 4),
+       `A/B is ${ratio.map((x) => x.toFixed(2)).join(", ")} across 1e3 to 8.4e6 -- a constant small factor, not ` +
+       "orders of magnitude. RENDER-RELATIVE-TO-EYE REMOVES THE CANCELLATION IN THE MATRIX MULTIPLY AND CANNOT " +
+       "TOUCH THE QUANTISATION ALREADY IN THE STORED COORDINATE, which for a body at distance is the whole error");
+
+    ok("!! ...and B plateaus at half the float32 spacing, which is the stored coordinate and nothing else",
+       ROWS.every((r) => r.B / r.sp > 0.3 && r.B / r.sp < 0.9),
+       ROWS.map((r) => `${r.dist}: B/spacing ${(r.B / r.sp).toFixed(2)}`).join(", ") +
+       ". A ROUNDING ERROR YOU CANNOT ARGUE WITH: the vertex buffer holds a world coordinate and the nearest " +
+       "representable one is up to half a spacing away before any arithmetic happens");
+
+    const flatC = Math.max(...ROWS.map((r) => r.C)) / Math.min(...ROWS.map((r) => r.C));
+    ok("!! *** both real fixes change the STORAGE, and both are flat in distance ***",
+       flatC < 1.05 && ROWS.every((r) => r.C < 1e-4 && r.ds < 1e-4 && r.C / r.ds < 2),
+       `the shipyard is ${ROWS[0].C.toExponential(2)} at every distance from 1e3 to 8.4e6 (ratio ${flatC.toFixed(3)}), ` +
+       `double-single ${ROWS[0].ds.toExponential(2)}. FOUR ORDERS BELOW B AT A MILLION. The two agree to within ` +
+       "1.4x, so the choice between them is COST and not accuracy: the shipyard needs a per-body origin and a " +
+       "pose, which a moving body already has; double-single needs twice the attribute bytes and no pose, which " +
+       "is what STATIC far terrain can use and the shipyard cannot help with at all");
+
+    // *** AND THIS CORRECTS HOW v4388's RESULT SHOULD BE READ, WHICH IS THE ROUND'S OWN ERROR TO OWN. ***
+    // Section 4 measured the shipyard's STORED error as exactly zero and the note said so. The RENDERED error is
+    // not zero -- the rotation and the f32 accumulation cost 6e-6 of a voxel -- and a reader who took "exact"
+    // to mean "exact through the pipeline" would have been wrong by that much.
+    ok("...and the shipyard's RENDERED error is small but NOT zero, unlike its stored error",
+       ROWS.every((r) => r.C > 0),
+       `${ROWS[0].C.toExponential(2)} of a voxel, flat in distance. v4388 measured the STORED coordinate as ` +
+       "exactly zero and that stands; the pipeline adds a rotation and three float32 accumulations on top, and " +
+       "those are not free. THE TWO NUMBERS ARE DIFFERENT CLAIMS and the earlier note did not distinguish them");
+}
+
+// SABOTAGE LOG for section 7 -- applied, gate run, exit code read, restored, md5 checked. MEASURED at v4390.
+//   AX splitDouble returning a zero low word, so double-single collapses to plain float32 -> exit=1, 1 red:
+//      "both real fixes change the STORAGE" goes red because D stops being flat and follows the spacing.
+//   AY eyeRelative differencing in float32 instead of float64, so camera-relative becomes world-absolute ->
+//      exit=1, 1 red: A/B collapses to 1 and the factor-of-two claim fails.
+//   AZ the page's three rival rows deleted -> *** 0 RED, AND THAT IS THE FINDING. *** The check tested for the
+//      WORD "camera-relative", and the sentence explaining that camera-relative is not the fix still contained
+//      it. A CHECK FOR A WORD IS SATISFIED BY THE PROSE THAT EXPLAINS IT -- v4383's shader census defect, on
+//      this session's own gate, three rounds after writing it up. The page publishes the three numbers as a
+//      data attribute now and the check recomputes them from the module; re-sabotaged by having the page
+//      compute camera-relative itself instead of calling SY.eyeRelative -> exit=1, 1 red, naming both figures.
+//
 // SABOTAGE LOG -- applied, gate run, exit code read, restored, md5 checked. MEASURED at v4388.
 //   AU the ray DIRECTION passed through worldToLocal instead of being rotated alone, so it picks up the body's
 //      translation -> exit=1, 2 red: every one of the six aimed rays lands on the wrong voxel, and the page

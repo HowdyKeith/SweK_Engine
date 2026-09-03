@@ -459,7 +459,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "1. Driven RED by four sabotages (2/4/1/1 by name), three files md5-identical after",
     }),
     since23: Object.freeze({
-        at: "v4391", swept: 1, green: 1, red: 0,
+        at: "v4392", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/lockstepConstants-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, five sections. It writes the checks v4390 said were missing, " +
