@@ -632,6 +632,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "any number of seeds, and an exponent check that compared three numbers to each other and " +
                  "never to zero. The round's own premise was wrong and the gate says so where the number is",
     }),
+
+    // v4418 -- the thirty-third closing, and the one that connects two halves that were each already gated
+    // and had no caller in common. The painter is 2D; Krbn's projection and back-projection are the exact,
+    // settled bridge to a surface. Wiring them splits the painter's single distance into "on the object" and
+    // "the empty space around it" -- a third to a half of what it reports -- and shows that telling the same
+    // search which pixels are the object buys 16% to 34% at no cost.
+    since34: Object.freeze({
+        at: "v4418", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/krbnPaint-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 14 checks in 1.7 s -- no device, no model. " +
+                 "Driven RED by nine sabotages (4/4/2/1/1/1/1/1/1 by name) and restored; ONE OF THEM DRIVES A " +
+                 "SECOND GATE RED TOO, which is what makes its 'a second independent caller holds this " +
+                 "invariant' claim a measurement rather than a sentence. One went 0 RED FIRST: a promise of a " +
+                 "CLOSED boundary that lived in a comment and nowhere else",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
