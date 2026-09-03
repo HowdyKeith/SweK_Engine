@@ -1027,6 +1027,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "upside-down fire would have shipped green. Section 6 exists because of them. Eleven " +
                  "sabotages, all RED by name, three files md5-identical.",
     }),
+    // v4431 -- the fifty-fourth closing. #69's gate, driven through sixteen sabotages; THREE read ZERO RED on
+    // their first pass and all three named the same hole, which is why the entry records the shape and not
+    // just the colour.
+    since54: Object.freeze({
+        at: "v4431", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/explosionRecipe-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, arithmetic and three source reads, no browser. #69 asked whether the " +
+                 "space explosions are a recipe or a port, and the answer is that the recipe CANNOT express " +
+                 "the port, categorically rather than approximately. Gap 1: the recipe's only velocity term " +
+                 "is gravity, and speed under it is sqrt(v0^2 + (g t)^2) -- non-decreasing for every g, over " +
+                 "96,200 (g, t) pairs with 0 violations -- while the port's drag only decreases; the best-fit " +
+                 "gravity against the port's speed curve is EXACTLY 0, the identity, leaving 64.0% of the " +
+                 "launch speed unexplained. A best fit that picks 'do nothing' says the family is wrong. " +
+                 "Gap 2: colour and sprite are constants in the recipe and curves in the port (1.000,0.600," +
+                 "0.250 to 0.007,0.004,0.002; 8 px to 35.8 px; a fireball 26 to 150 with its own life). " +
+                 "Gap 3: shatter's comment that the pieces 'cannot all leave in one direction by luck' is " +
+                 "EXACTLY TRUE against a bound nobody had derived -- 0 of 20,000 seeds exceed 2*(TAU/7) and " +
+                 "the worst sits 0.0029 under it -- while an independent draw, the recipe's family, breaks it " +
+                 "80.1% of the time. AND ONE NEGATIVE RESULT MADE THE PORT POSSIBLE: the port's per-frame " +
+                 "drag agrees with dv/dt = -drag*v to 0.4% at 60 fps and spreads 2.4% over a sixteenfold " +
+                 "frame-rate range, so drag is expressible as a number. novaBurst is added to the book with " +
+                 "every field an expression over ev/shipDebris.mjs at the scale spellbook.html states in its " +
+                 "own draw (16 px/unit -- at which the port's 3.2 px debris is EXACTLY quake's 0.2 particle). " +
+                 "The six pre-existing spells are byte-identical, 30 hashes of 30. AND THREE SABOTAGES READ " +
+                 "ZERO RED, all the same hole: the gate checked the BOOK against novaFromPort and never " +
+                 "novaFromPort against the PORT -- a two-link chain with one link checked. The third round " +
+                 "running whose zero-red found an unchecked link in a transcription chain (v4427's WGSL " +
+                 "smin, v4429's heatAt). The repair perturbs the port and requires every derived field to " +
+                 "follow, which a correct literal cannot do. Sixteen sabotages, all RED by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

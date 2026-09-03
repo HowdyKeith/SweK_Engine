@@ -65,6 +65,7 @@ const S = (id) => document.getElementById(id);
 const player = new SfxPlayer();
 const cv = S("stage"), ctx = cv.getContext("2d");
 let energy = ENERGY_POOL, live = [], t0 = 0, casting = null, castSeed = 1;
+let flash = null;   // v4430 -- the ported spell's fireball: a SECOND population, which six spells have none of
 
 S("units").innerHTML = `unit prices &mdash; particle <span class="num">${COST_UNITS.particle.us}</span>&micro;s ` +
     `(${COST_UNITS.particle.measuredBy}), fractured voxel <span class="num">${COST_UNITS.fractureVoxel.us}</span>&micro;s ` +
@@ -108,6 +109,7 @@ async function cast(name) {
     for (const tr of tb.children) tr.classList.toggle("cast", tr.id === "row-" + name);
     castSeed++;
     live = burstFor(name, castSeed, { x: 0, y: 0, z: 0 });
+    flash = SPELLS[name].burst.flash || null;   // v4430 -- ev/shipDebris.mjs's fireball, if this spell has one
     t0 = performance.now();
     casting = name;
     const snd = soundFor(name);
@@ -131,16 +133,43 @@ function frame() {
     const age = (performance.now() - t0) / 1000;
     const cx = cv.width / 2, cy = cv.height * 0.62, scale = 16;
     let alive = 0;
+    // v4430 -- *** THE FLASH, DRAWN FIRST SO THE DEBRIS SITS IN FRONT OF IT. *** ev/shipDebris.mjs's fireball
+    // is a SECOND POPULATION with its own life and its own size curve, and the recipe had no way to say so
+    // until this round. Six of the seven spells have no flash and this block does nothing for them.
+    if (flash && age < flash.life) {
+        const k = age / flash.life;
+        const rad = Math.max(1, (flash.sizeFrom + k * (flash.sizeTo - flash.sizeFrom)) * scale * 0.5);
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+        g.addColorStop(0, `rgba(255,236,196,${(0.85 * (1 - k)).toFixed(3)})`);
+        g.addColorStop(0.45, `rgba(255,150,60,${(0.45 * (1 - k)).toFixed(3)})`);
+        g.addColorStop(1, "rgba(255,90,20,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+        alive++;
+    }
     for (const p of live) {
         if (age > p.ttl) continue;
         alive++;
-        const x = cx + (p.x + p.vx * age) * scale;
-        const y = cy - (p.y + p.vy * age + 0.5 * p.gravity * age * age) * scale;
-        const a = p.a * (1 - age / p.ttl);
-        ctx.fillStyle = `rgba(${p.r * 255 | 0},${p.g * 255 | 0},${p.b * 255 | 0},${a.toFixed(3)})`;
-        ctx.fillRect(x, y, Math.max(1, p.size * scale), Math.max(1, p.size * scale));
+        // *** DRAG IS INTEGRATED IN CLOSED FORM, NOT STEPPED. *** v4430 measured that the port's per-frame
+        // multiply and dv/dt = -drag*v agree to 0.4% at 60 fps, and spread 2.4% over a sixteenfold frame-rate
+        // range -- so the analytic displacement v0*(1 - e^(-d*t))/d is a faithful statement of what ev/ does
+        // AND does not inherit its frame rate. d = 0 gives the limit v0*t, which is what the other six get.
+        const d = p.drag || 0;
+        const disp = d > 0 ? (1 - Math.exp(-d * age)) / d : age;
+        // gravity and drag are summed independently, which is exact here only because NO SPELL CARRIES BOTH:
+        // the ported one has gravity 0 (there is none in space and none in the port) and the other six have
+        // drag 0. Stated rather than left as an assumption somebody has to rediscover.
+        const x = cx + (p.x + p.vx * disp) * scale;
+        const y = cy - (p.y + p.vy * disp + 0.5 * p.gravity * age * age) * scale;
+        const k = age / p.ttl;
+        const a = p.a * (1 - k);
+        // the two curves the recipe could not hold before v4430: the colour couples to the remaining life and
+        // the sprite grows. `fade` absent and `grow` absent leave both terms at 1, so the six are unchanged.
+        const f = p.fade ? (1 - k) : 1;
+        const sz = p.size * (1 + ((p.grow || 1) - 1) * k);
+        ctx.fillStyle = `rgba(${p.r * f * 255 | 0},${p.g * f * 255 | 0},${p.b * f * 255 | 0},${a.toFixed(3)})`;
+        ctx.fillRect(x, y, Math.max(1, sz * scale), Math.max(1, sz * scale));
     }
-    if (!alive && casting) { casting = null; live = []; }
+    if (!alive && casting) { casting = null; live = []; flash = null; }
 }
 requestAnimationFrame(frame);
 window.spellbook = { cast, get energy() { return energy; }, refill: () => { energy = ENERGY_POOL; S("energy").textContent = energy; S("energybar").style.width = "100%"; } };

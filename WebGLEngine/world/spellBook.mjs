@@ -24,8 +24,19 @@
 "use strict";
 
 import { PRESETS as SFX } from "../audio/sfxModel.mjs";
+import { novaFromPort, TAU } from "./explosionRecipe.mjs";   // v4430 -- #69: the space explosion, DERIVED from ev/shipDebris.mjs
 
 export const ELEMENTS = Object.freeze(["arcane", "fire", "ice", "acid", "kinetic"]);
+
+/**
+ * Pixels per world unit at the cast site.
+ *
+ * *** A TRANSCRIPTION, AND THEREFORE A SECOND DECLARATION THE GATE MUST CHECK. *** spellbook.html draws
+ * every particle at `p.size * scale` with scale = 16. A browser module cannot read the page that imports
+ * it, so the number lives here and explosionRecipe.pxPerUnit() parses it back out of the page; the gate
+ * holds the two equal. v4427 shipped a round whose entire finding was an unchecked transcription drifting.
+ */
+export const PX_PER_UNIT = 16;
 
 /**
  * *** THE BOOK. NOTE WHAT IS NOT HERE: A COST. ***
@@ -64,6 +75,28 @@ export const SPELLS = Object.freeze({
     // expensive thing in the book because it is the only spell that runs BOTH of the two most expensive
     // systems in the engine -- a full fracture of a large grid and a sustained ray-march -- and its price
     // falls straight out of that rather than being chosen to feel dramatic.
+    // *** v4430 -- #69: THE SPACE EXPLOSION, AND NOT ONE NUMBER OF IT IS TYPED HERE. ***
+    //
+    // Every field comes from ev/shipDebris.mjs's own DEFAULTS and FIREBALL, converted at the scale
+    // spellbook.html states in its own draw call (16 px per world unit). The book already refuses a typed
+    // COST because it would drift from the work; a PORTED spell must refuse typed NUMBERS for the same
+    // reason -- change DEFAULTS.speed in ev/ and this spell changes with it.
+    //
+    // *** IT IS THE CHEAPEST SPELL IN THE BOOK, AND THAT IS THE COST MODEL WORKING RATHER THAN FAILING. ***
+    // A hull breaks into seven pieces, so a space explosion is seven particles and one flash, and eight
+    // particles is what eight particles cost. A spell that looked expensive here would mean somebody had
+    // typed a number.
+    //
+    // WHAT IT IS NOT: three-dimensional. The port is a top-down 2D view and its headings are angles in a
+    // plane, so the ported burst is planar too. Inventing a third dimension the port never had would be
+    // making the effect up rather than porting it -- see `stratify` in burstFor.
+    novaBurst: {
+        element: "fire", sound: "explosion", radius: 4.0, damage: 12,
+        burst: novaFromPort(PX_PER_UNIT),
+        // quake and cataclysm already share "explosion"; without an override this would render their bytes.
+        soundOver: { lowPass: 0.34, frequency: { start: 140, slide: -150, min: 30 },
+                     volume: { attack: 0.005, sustain: 0.10, punch: 0.7, decay: 0.62 } },
+    },
     cataclysm: {
         element: "kinetic", sound: "explosion", radius: 16.0, damage: 40,
         burst: { count: 2400, speed: 26, ttl: 2.40, size: 0.34, colour: [1.0, 0.86, 0.55], gravity: -4 },
@@ -108,6 +141,32 @@ export function burstFor(name, seed = 1, origin = { x: 0, y: 0, z: 0 }) {
     const b = s.burst;
     const r = rng(seed);
     const out = [];
+
+    // *** v4430 -- THE PORTED PATH, AND IT IS A SEPARATE BRANCH SO THE OTHER SIX SPELLS ARE UNTOUCHED. ***
+    // Every spell that existed before this round lacks `stratify`, so it takes the loop below, draws the same
+    // four randoms in the same order, and its burst is BYTE-IDENTICAL to v4192's. The gate holds it to that
+    // rather than to "looks the same" -- the same control v4410 used when it generalised the DOOM fire.
+    //
+    // The port is PLANAR: shatter picks an angle, not a direction on a sphere. Stratified headings in the
+    // x/y plane are what it does, so that is what this does, rather than inventing a sphere it never had.
+    if (b.stratify) {
+        for (let i = 0; i < b.count; i++) {
+            const a = (i / b.count) * TAU + (r() - 0.5) * (TAU / b.count);
+            const sp = b.speed * (1 + (r() * 2 - 1) * (b.spread ?? 0));
+            out.push({
+                x: origin.x, y: origin.y, z: origin.z,
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: 0,
+                ttl: b.ttl, size: b.size,
+                r: b.colour[0], g: b.colour[1], b: b.colour[2], a: 0.9,
+                gravity: b.gravity,
+                // the three the recipe could not express before this round, carried per particle so the cast
+                // site integrates them rather than re-deriving them from the book
+                drag: b.drag ?? 0, fade: !!b.fade, grow: b.grow ?? 1,
+            });
+        }
+        return out;
+    }
+
     for (let i = 0; i < b.count; i++) {
         // an even-ish sphere of directions: acos keeps the poles from bunching, which a naive
         // (random, random, random) direction does visibly on a burst this large
@@ -143,7 +202,9 @@ export function workOf(name) {
     if (!s) throw new Error(`spellBook: no spell "${name}"`);
     const g = s.fracture ? s.fracture.grid : 0;
     return {
-        particles: s.burst.count,
+        // v4430 -- a flash is one more sprite drawn for its own life, so it is one more particle of work.
+        // Leaving it out would be the book quietly under-pricing the only spell that has one.
+        particles: s.burst.count + (s.burst.flash ? 1 : 0),
         fractureVoxels: g * g * g,          // the flood fill visits the whole grid, not just the carve
         raymarchFrames: s.raymarch ? s.raymarch.frames : 0,
     };
