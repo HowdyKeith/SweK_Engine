@@ -334,7 +334,15 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
     // v4329 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
     // closing, and reading only since2 meant the next one had to edit this arithmetic as well as the record.
-    const closings = [SS.since2, SS.since3, SS.since4, SS.since5, SS.since6, SS.since7, SS.since8, SS.since9, SS.since10, SS.since11, SS.since12, SS.since13].filter(Boolean);
+    // *** v4380 -- AND THE LIST OF CLOSINGS IS NOW READ OFF THE RECORD RATHER THAN TYPED OUT. *** v4329
+    // replaced a named PAIR with a list so a round could append an entry instead of editing this arithmetic.
+    // It half-worked: the arithmetic stopped changing and the LIST kept growing by hand, twelve entries by
+    // v4375, and a round that added since14 and forgot this line would have under-counted the sweep and gone
+    // red somewhere else entirely. The keys are in the frozen record; sorting them NUMERICALLY matters,
+    // because "since10" sorts before "since2" as a string and the sum would be over a different set.
+    const closings = Object.keys(SS).filter((k) => /^since\d+$/.test(k))
+        .sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)))
+        .map((k) => SS[k]).filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
     const closed = closings.reduce((n, c) => n + (c.swept || 0), 0);
     const uncovered = surplus - SS.swept - closed;
