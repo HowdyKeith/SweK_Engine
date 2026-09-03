@@ -883,6 +883,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since47: Object.freeze({
         at: "v4421", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["ev/shipDebris-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, well under the quick-sweep budget -- ballistics as arithmetic and a " +
+                 "comment-stripped read of flightView, no browser. #167: a ship's death was ONE additive " +
+                 "point sprite and `grep -n debris ev/flightView.js` returned nothing. AND ITS COLOUR WAS THE " +
+                 "FIFTH FIRE v4412'S CENSUS COULD NOT SEE: SOURCES is a table of {file, symbol, sample} and " +
+                 "walks NAMED RAMP FUNCTIONS, while this colour was three expressions inside an argument " +
+                 "list -- no symbol, so no row was possible. Measured across the twelve additive-blending " +
+                 "files: flightView has 3 inline colour writes, avatarStage 1, the other ten none, so the " +
+                 "population is small and named rather than guessed. THE FIX WAS A NAME: explosionSample IS " +
+                 "the expression the draw call computed, extracted bit-identically at 201 sample points, so " +
+                 "the picture did not move and the census gained a row. The hull leaves now -- 7 " +
+                 "deterministic fragments inheriting the ship's velocity, reach 17.3 to 44.3 px over 80 " +
+                 "frames, monotone, none inward. AND SABOTAGE D COST ZERO RED: the check tested for " +
+                 "explosionSample(f) against RAW SOURCE and MY OWN COMMENT contained that string, so prose " +
+                 "about the code satisfied a check about the code -- commentFalsePass's own species, inside " +
+                 "a gate asserting a rewrite had happened. Comments are stripped before any idiom is " +
+                 "asserted now. Five sabotages, 1/3/1/1/2 red by name.",
+    }),
+    since48: Object.freeze({
+        at: "v4422", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/predicatePairs-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~8s, four sections. v4419 named the half nothing did -- " +

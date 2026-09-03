@@ -50,6 +50,7 @@
 import { PALETTE } from "./doomFire.mjs";
 import { blackbodyRamp } from "../fx/voxelize/fireRamp.js";
 import { H_PLANCK, K_BOLTZ, C_LIGHT } from "../physics/thermal/blackbody.mjs";
+import { explosionSample } from "../ev/shipDebris.mjs";   // v4421 -- the fifth fire
 
 /** Planck spectral radiance at one wavelength and temperature. Constants come from the thermal module. */
 export function planckRadiance(lambdaM, T) {
@@ -131,6 +132,10 @@ export const infernoSample = (t) => {
 
 export const rampSample = (h) => blackbodyRamp(h).slice();
 
+// v4421 -- explosionSample is IMPORTED at the top of this file (one binding, not two); it is re-exported
+// here so a consumer of the census can sample the fifth source without reaching past this module.
+export { explosionSample };
+
 /**
  * The census. `claims` is what the source calls itself; `blackbodyCandidate` says whether monotonicity is a
  * property it is FAIR to hold it to. A palette that never claimed to be physics is not failing when it isn't.
@@ -144,6 +149,21 @@ export const SOURCES = Object.freeze([
         claims: "the fire-profile texture's three channel ramps", blackbodyCandidate: true, sample: meshSample }),
     Object.freeze({ key: "inferno", file: "demos_code/fitzhugh_nagumo.js", symbol: "infernoRamp", steps: 200,
         claims: "an Inferno-style perceptual colormap, black to purple to white", blackbodyCandidate: false, sample: infernoSample }),
+    // *** v4421 -- THE FIFTH FIRE, AND IT WAS INVISIBLE TO THIS FILE BY CONSTRUCTION FOR NINE VERSIONS. ***
+    // ev/flightView.js draws a ship's death as one additive sprite whose colour is three EXPRESSIONS inside
+    // an argument list -- `arr.set([e.x, e.y, f, 0.6 * f, 0.25 * f, ...])`. It is a fire, it answers "what
+    // colour at heat h", and it has no symbol and no function, so SOURCES -- a table of {file, symbol,
+    // sample} -- could never have held it. A CENSUS THAT ENUMERATES NAMED FUNCTIONS CANNOT SEE A COLOUR TYPED
+    // INTO A DRAW CALL, which is v4413's substring rule and v4418's furnace blindness at a third site.
+    //
+    // The repair was to give it a name rather than to build a scanner for inline colours: ev/shipDebris.mjs's
+    // explosionSample IS the expression the draw call already computed, extracted, so the picture did not
+    // move and the census gained a row. blackbodyCandidate is FALSE and says so -- it is an artistic orange
+    // that never claimed to be physics, and holding it to monotonicity would be grading it against a claim it
+    // does not make.
+    Object.freeze({ key: "explosion", file: "ev/shipDebris.mjs", symbol: "explosionSample", steps: 200,
+        claims: "the EV ship-death fireball -- a fixed orange scaled by the fade, extracted from the draw call",
+        blackbodyCandidate: false, sample: explosionSample }),
 ]);
 
 /** Every source measured, in one pass, so a caller and a gate cannot disagree about the numbers. */
@@ -154,9 +174,13 @@ export function census() {
 
 /** What v4412 measured, so a later round reads a number rather than re-deriving one and calling it the same. */
 export const MEASURED_AT_V4412 = Object.freeze({
-    sources: 4,
+    // v4421 -- FIVE. ev/shipDebris.mjs's explosionSample joined, and it is the row this table could not have
+    // held before: the colour lived as three expressions inside a draw call, with no symbol to name.
+    sources: 5,
     drops: Object.freeze({ doom: Object.freeze([5, 0, 0]), ramp: Object.freeze([0, 0, 0]),
-                           mesh: Object.freeze([0, 0, 0]), inferno: Object.freeze([0, 0, 40]) }),
+                           mesh: Object.freeze([0, 0, 0]), inferno: Object.freeze([0, 0, 40]),
+                           // Linear in h with fixed coefficients, so no channel can fall. Measured, not assumed.
+                           explosion: Object.freeze([0, 0, 0]) }),
     // The two that shared the name `fireRamp`, and where they part company hardest. *** THE FIRST DRAFT OF
     // THIS RECORD TYPED gap 0.30 IN BLUE, read off the sample table by eye. widestDisagreement() says the
     // widest single-channel gap is 0.3255 IN RED at the same heat -- the blue gap is the one that carries the
