@@ -192,7 +192,7 @@ both gates: 27 against 27, and nine divergent entries all showing the audit's li
 A plausible arithmetic coincidence (27 + 5 = 32) is not a diagnosis. Nothing had run the
 tool that owns the record.
 
-## 8. An author-centred orrery -- MEASURED and SURFACED at v4414
+## 8. An author-centred orrery -- MEASURED and SURFACED at v4415, provenance recorded at v4416
 
 The orrery draws this tree at the centre with its dependencies around it. Keith asked for
 the inversion: **the author as the sun**, a GitHub universe centred on a person rather than
@@ -224,10 +224,21 @@ be named, never dropped and never given a placeholder.
 **PAPERED IS NOT ATTRIBUTED.** `world/orrery.mjs` has answered "may these bytes ship?" since v4185. It has
 never answered whose they are, and htmx is the proof that the two questions are different.
 
-**And this is still not the GitHub universe that was asked for.** Only **3 of 15** bodies record *where* they
-came from -- two `PROVENANCE.md` files and one README. The tree knows who wrote twelve of its dependencies and
-not where any of those twelve came from, so there is nothing yet to centre a repository graph on. That gap is
-the next round of this item, not a footnote to this one.
+**The "only 3 of 15" figure was mostly a reading error, corrected at v4416.** The scan carried five separate
+too-narrow patterns -- the record must be `.md`, the URL must be `http`, the file must be *called*
+`PROVENANCE`, the host must be `github.com`, and my own fix for the third capped path depth and lost
+`vendor/wasm`. The true figure was **5**, and after six records written from evidence in the tree it is **11
+of 15**. Four are frozen by name as genuinely unrecorded: `fonts`, `grass`, `krbn`, and `keyhunt` (whose
+record deliberately carries no URL, because none exists anywhere in the tree).
+
+**Provenance is attested, not derived, and that is measured.** The commonest GitHub URL inside `vendor/three`
+is `KhronosGroup/glTF` at **59 hits against `mrdoob/three.js` at 9** -- the glTF loader cites the
+specification it implements. A scraper picking the most frequent URL files three.js under KhronosGroup, wrong
+by six to one, on the largest body in the tree.
+
+**Still not the GitHub universe.** Four bodies have no owner/repo, three because the tree genuinely does not
+know. That is a fact about the tree, not a gap in the scan, and closing it needs something outside these
+bytes.
 
 ## What is deliberately NOT being taken
 

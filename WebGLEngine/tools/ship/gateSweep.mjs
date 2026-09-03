@@ -774,6 +774,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "until a second independent reader was added -- the first draft falsely accused vendor/fonts " +
                  "of having no licence, reproducing a bug orrery.mjs had already been fixed for three times",
     }),
+    since42: Object.freeze({
+        at: "v4416", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/provenanceRecord-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~2s, four sections. docs/EXPLAIN-ITSELF.md item 8's next " +
+                 "step, and mostly a correction of the round that named it. v4415 measured 'only 3 of 15 " +
+                 "bodies record where they came from'; the true figure was 5, and it is 11 now. THE SCAN " +
+                 "CARRIED FIVE SEPARATE TOO-NARROW PATTERNS AND EACH WAS FOUND ONLY BY WIDENING THE ONE " +
+                 "BEFORE: the record must be .md (missed gifenc and slug), the URL must be http (missed " +
+                 "gifenc's git://), the file must be called PROVENANCE (missed htmx/VERSIONS.txt, a full " +
+                 "record), the host must be github.com (missed raw.githubusercontent.com), and my own fix " +
+                 "for the third capped depth at 2 and LOST vendor/wasm, which the rule it replaced had " +
+                 "found -- a widening that narrows is a narrowing. v4415 wrote a paragraph about replacing " +
+                 "its own licence regex with orrery.mjs's isLicenceFile TWO LINES ABOVE the first of them. " +
+                 "The rule is structural now rather than a list of guessed filenames. SIX RECORDS WRITTEN " +
+                 "from evidence in the tree, four bodies frozen BY NAME as genuinely unrecorded. AND THE " +
+                 "SCRAPE IS PROVED WRONG WHERE IT MATTERS MOST: the commonest GitHub URL inside vendor/three " +
+                 "is KhronosGroup/glTF at 59 against mrdoob/three.js at 9, because the glTF loader cites the " +
+                 "specification it implements. Driven RED by four sabotages (MEASURED 6/3/3/3 by name)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

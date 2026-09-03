@@ -64,12 +64,19 @@ export function holderFrom(text) {
 }
 
 /** An upstream URL, from a PROVENANCE.md or a README that records one. The strongest evidence there is. */
-const URL_RE = /https?:\/\/[^\s)>\]"']+/g;
+// git://, git+https:// and ssh git@host:owner/repo are all real ways a provenance file records an upstream,
+// and the first draft accepted only https. vendor/gifenc/PROVENANCE.txt reads git://github.com/mattdesl/gifenc.git
+// and was read as having no upstream at all -- the THIRD narrow pattern in this one function, after the licence
+// filename and the provenance-file extension. The species is "I matched the shape I happened to picture".
+const URL_RE = /(?:git\+)?(?:https?|git|ssh):\/\/[^\s)>\]"']+|git@[\w.-]+:[\w.-]+\/[\w.-]+/g;
 export function upstreamFrom(text) {
     const hits = String(text || "").match(URL_RE) || [];
-    const gh = hits.find((u) => /github\.com\/[^/]+\/[^/]+/.test(u));
+    // raw.githubusercontent.com/<owner>/<repo>/<ref>/<path> is a GitHub URL and `github\.com` does not match it.
+    // vendor/htmx/VERSIONS.txt records its licence source that way, so htmx read as having an upstream with no
+    // owner. FIFTH narrow pattern in this one function; each was found by widening the one before.
+    const gh = hits.find((u) => /(?:^|\/\/|@)(?:raw\.githubusercontent\.com|github\.com)[/:][^/]+\/[^/]+/.test(u));
     if (!gh) return hits.length ? { url: hits[0], owner: null, repo: null } : null;
-    const m = /github\.com\/([^/#?]+)\/([^/#?.]+)/.exec(gh);
+    const m = /(?:raw\.githubusercontent\.com|github\.com)[/:]([^/#?]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/.exec(gh);
     return { url: gh, owner: m ? m[1] : null, repo: m ? m[2] : null };
 }
 
@@ -86,7 +93,24 @@ export function attributionFor(name, paths, read) {
     // anywhere in the filename. Writing a second copy of a scan the tree had already fixed reproduced the bug
     // it was fixed for. One rule, imported.
     const licences = (paths || []).filter((p) => isLicenceFile(p.split("/").pop()));
-    const provs = (paths || []).filter((p) => /(^|\/)(provenance|readme)\.md$/i.test(p));
+// *** FOUR NARROW PATTERNS IN ONE FUNCTION, EACH FOUND BY WIDENING THE ONE BEFORE. ***
+    // v4415 replaced its own licence regex with orrery.mjs's isLicenceFile after falsely accusing vendor/fonts,
+    // wrote a paragraph about it, and left `provenance|readme\.md$` standing two lines down -- so PROVENANCE.txt
+    // in gifenc and slug did not count. Widening the extension found those; widening the URL scheme found
+    // gifenc's `git://` upstream; and then vendor/htmx/VERSIONS.txt turned out to be a full provenance record
+    // -- npm source, version, verified date, and the tagged licence URL -- missed because it is not called
+    // PROVENANCE. EVERY WIDENING FOUND ANOTHER ONE, which is the signal that guessing filenames was the wrong
+    // method rather than the wrong guess. So the rule is now structural: a body's own RECORDS are the shallow
+    // text files that are not the licence and not shipped code, and all of them are read.
+    const SHIPPED = /\.(js|mjs|cjs|ts|wasm|json|map|css|html|ttf|woff2?|png|jpe?g|glb|bin|h|c|cpp|a|so|dll)$/i;
+    const provs = (paths || []).filter((p) => {
+        const base = p.split("/").pop();
+        // depth 3, not 2: the first cut here LOST vendor/wasm, whose record is
+        // quickjs/quickjs-emscripten-core/README.md three levels down and which the OLD rule had found. A
+        // widening that narrows somewhere else is still a narrowing, and only re-reading the whole table
+        // caught it -- the count went up and one row went blank in the same edit.
+        return p.split("/").length <= 3 && !SHIPPED.test(base) && !isLicenceFile(base);
+    });
     // EVERY licence is read, not the first that parses: vendor/wasm holds three, and a body whose licences
     // name different holders is a fact a view must be able to show rather than a tie the scanner breaks alone.
     let holder = null, from = null, unread = 0;

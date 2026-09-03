@@ -31,7 +31,7 @@ export function build(root = ENG) {
               "whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
         built: new Date().toISOString().slice(0, 10),
         bodies: c.rows.map((r) => ({ name: r.name, kind: r.kind, who: r.who, line: r.line,
-                                     licenceFile: r.licenceFile, licences: r.licences,
+                                     licenceFile: r.licenceFile, licences: r.licences, upstreamFile: r.upstreamFile,
                                      alsoHolders: r.alsoHolders, upstream: r.upstream, bytes: sizeOf(r.name) })),
         systems: s.systems,
         unattributed: s.unattributed.map((r) => ({ name: r.name, kind: r.kind, licenceFile: r.licenceFile })),

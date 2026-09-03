@@ -1,0 +1,14 @@
+gpu-keyhunt -- REFERENCE ONLY, NOT VENDORED CODE
+author: tongriyaotxt -- see ATTRIBUTION.txt beside this file
+licence: MIT
+
+Recorded at v4416.
+
+*** NO CODE FROM THE UPSTREAM PROJECT IS IN THIS TREE. *** ATTRIBUTION.txt states it directly: the
+technique -- windowed scalar multiplication in Jacobian coordinates, Montgomery batch inversion,
+and the key -> k*G -> HASH160 -> address pipeline -- is referenced by physics/crypto/secp256k1.mjs,
+which is BigInt on the CPU where the upstream is Python on the GPU. The key search is not ported.
+
+NOT ESTABLISHED HERE: a repository URL. ATTRIBUTION.txt names the project and its author and no
+URL, and no URL appears anywhere in this directory. This file does not construct one from the
+name, which is the difference between a record and a guess.

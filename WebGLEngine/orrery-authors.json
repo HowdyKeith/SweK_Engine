@@ -9,6 +9,7 @@
    "line": "Copyright (c) 2026 Erin Catto",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
    "alsoHolders": [],
    "upstream": {
     "url": "https://github.com/erincatto/box3d",
@@ -24,9 +25,14 @@
    "line": "Copyright (c) 2026 Mr.doob",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
-   "bytes": 257428
+   "upstream": {
+    "url": "https://github.com/mrdoob/three.js",
+    "owner": "mrdoob",
+    "repo": "three.js"
+   },
+   "bytes": 258392
   },
   {
    "name": "fonts",
@@ -35,6 +41,7 @@
    "line": "Copyright © 2017 IBM Corp. with Reserved Font Name \"Plex\"",
    "licenceFile": "IBMPlexSerif-OFL.txt",
    "licences": 1,
+   "upstreamFile": null,
    "alsoHolders": [],
    "upstream": null,
    "bytes": 164836
@@ -46,8 +53,13 @@
    "line": "Copyright (c) 2017 Matt DesLauriers",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
+   "upstream": {
+    "url": "git://github.com/mattdesl/gifenc.git",
+    "owner": "mattdesl",
+    "repo": "gifenc"
+   },
    "bytes": 10453
   },
   {
@@ -57,6 +69,7 @@
    "line": "Copyright (c) 2026 boona13",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": null,
    "alsoHolders": [],
    "upstream": null,
    "bytes": 1064
@@ -68,9 +81,14 @@
    "line": "Copyright (c) 2025 meodai",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
-   "bytes": 119007
+   "upstream": {
+    "url": "https://github.com/meodai/heerich",
+    "owner": "meodai",
+    "repo": "heerich"
+   },
+   "bytes": 119532
   },
   {
    "name": "htmx",
@@ -79,8 +97,13 @@
    "line": null,
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "VERSIONS.txt",
    "alsoHolders": [],
-   "upstream": null,
+   "upstream": {
+    "url": "https://raw.githubusercontent.com/bigskysoftware/htmx/v2.0.10/LICENSE",
+    "owner": "bigskysoftware",
+    "repo": "htmx"
+   },
    "bytes": 55742
   },
   {
@@ -90,9 +113,14 @@
    "line": "Copyright (c) 2022-2024 Jorrit Rouwe",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
-   "bytes": 3223645
+   "upstream": {
+    "url": "https://github.com/jrouwe/JoltPhysics.js",
+    "owner": "jrouwe",
+    "repo": "JoltPhysics.js"
+   },
+   "bytes": 3224554
   },
   {
    "name": "keyhunt",
@@ -101,9 +129,10 @@
    "line": null,
    "licenceFile": "ATTRIBUTION.txt",
    "licences": 1,
+   "upstreamFile": null,
    "alsoHolders": [],
    "upstream": null,
-   "bytes": 338
+   "bytes": 1127
   },
   {
    "name": "krbn",
@@ -112,6 +141,7 @@
    "line": "Copyright (c) 2026 Krbn contributors",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": null,
    "alsoHolders": [],
    "upstream": null,
    "bytes": 940443
@@ -123,8 +153,13 @@
    "line": "Copyright (c) 2017 Eric Lengyel",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
+   "upstream": {
+    "url": "https://github.com/EricLengyel/Slug",
+    "owner": "EricLengyel",
+    "repo": "Slug"
+   },
    "bytes": 3821
   },
   {
@@ -134,11 +169,12 @@
    "line": "Copyright (c) [2024] [Dunfan Lu]",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
    "alsoHolders": [],
    "upstream": {
     "url": "https://github.com/AmesingFlank/taichi.js",
     "owner": "AmesingFlank",
-    "repo": "taichi"
+    "repo": "taichi.js"
    },
    "bytes": 3638669
   },
@@ -149,9 +185,14 @@
    "line": "Copyright © 2010-2023 three.js authors",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
-   "upstream": null,
-   "bytes": 1550472
+   "upstream": {
+    "url": "https://github.com/mrdoob/three.js",
+    "owner": "mrdoob",
+    "repo": "three.js"
+   },
+   "bytes": 1551374
   },
   {
    "name": "three-webgpu",
@@ -160,13 +201,14 @@
    "line": "Copyright © 2010-2025 three.js authors",
    "licenceFile": "LICENSE",
    "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
    "alsoHolders": [],
    "upstream": {
-    "url": "https://registry.npmjs.org/three/-/three-0.178.0.tgz",
-    "owner": null,
-    "repo": null
+    "url": "https://github.com/mrdoob/three.js",
+    "owner": "mrdoob",
+    "repo": "three.js"
    },
-   "bytes": 3214311
+   "bytes": 3215271
   },
   {
    "name": "wasm",
@@ -175,6 +217,7 @@
    "line": "Copyright (c) 2017-2021 Fabrice Bellard",
    "licenceFile": "quickjs/quickjs-wasmfile-release-sync/LICENSE",
    "licences": 3,
+   "upstreamFile": "quickjs/quickjs-emscripten-core/README.md",
    "alsoHolders": [],
    "upstream": {
     "url": "https://github.com/justjakel/quickjs-emscripten",
@@ -192,7 +235,7 @@
     "three",
     "three-webgpu"
    ],
-   "bytes": 4764783
+   "bytes": 4766645
   },
   {
    "author": "Dunfan Lu",
@@ -208,7 +251,7 @@
    "bodies": [
     "jolt"
    ],
-   "bytes": 3223645
+   "bytes": 3224554
   },
   {
    "author": "Erin Catto",
@@ -240,7 +283,7 @@
    "bodies": [
     "draco"
    ],
-   "bytes": 257428
+   "bytes": 258392
   },
   {
    "author": "IBM Corp",
@@ -256,7 +299,7 @@
    "bodies": [
     "heerich"
    ],
-   "bytes": 119007
+   "bytes": 119532
   },
   {
    "author": "Matt DesLauriers",
@@ -301,7 +344,7 @@
   "authors": 12,
   "covered": 13,
   "missing": 2,
-  "withUpstream": 3,
+  "withUpstream": 11,
   "person": 9,
   "collective": 4,
   "disclaimed": 1,

@@ -62,7 +62,7 @@
    "name": "draco",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 257428,
+   "bytes": 258392,
    "files": [
     {
      "path": "DRACOLoader.js",
@@ -71,6 +71,10 @@
     {
      "path": "LICENSE",
      "bytes": 1064
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 964
     }
    ]
   },
@@ -126,7 +130,7 @@
    "name": "heerich",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 119007,
+   "bytes": 119532,
    "files": [
     {
      "path": "bsp.js",
@@ -155,6 +159,10 @@
     {
      "path": "points.js",
      "bytes": 1321
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 525
     },
     {
      "path": "shapes.js",
@@ -194,7 +202,7 @@
    "name": "jolt",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 3223645,
+   "bytes": 3224554,
    "files": [
     {
      "path": "jolt-physics.wasm-compat.d.ts",
@@ -207,6 +215,10 @@
     {
      "path": "LICENSE",
      "bytes": 1074
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 909
     }
    ]
   },
@@ -214,11 +226,15 @@
    "name": "keyhunt",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 338,
+   "bytes": 1127,
    "files": [
     {
      "path": "ATTRIBUTION.txt",
      "bytes": 338
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 789
     }
    ]
   },
@@ -1202,7 +1218,7 @@
    "name": "three",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 1550472,
+   "bytes": 1551374,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
@@ -1237,6 +1253,10 @@
      "bytes": 1081
     },
     {
+     "path": "PROVENANCE.txt",
+     "bytes": 902
+    },
+    {
      "path": "three.module.js",
      "bytes": 1272972
     }
@@ -1246,11 +1266,15 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3214311,
+   "bytes": 3215271,
    "files": [
     {
      "path": "LICENSE",
      "bytes": 1081
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 960
     },
     {
      "path": "README.md",
