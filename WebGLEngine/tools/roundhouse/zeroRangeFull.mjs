@@ -1,22 +1,50 @@
 // FILE: tools/roundhouse/zeroRangeFull.mjs -- v4426
 //
-// *** A PREDICTION MADE AT v2912, SETTLED AT v4426. ***
+// *** THE SWEEP HAS HAD NO POSITIVE CONTROL SINCE v3313, AND THIS ROUND JUST MADE SIXTEEN CLAIMS WITH IT. ***
 //
-// tools/roundhouse/zeroRangeSweep.mjs carries a real pre-registration, written before any sweep ran:
+// tools/roundhouse/zeroRangeSweep.mjs carries a pre-registration written before any sweep ran:
 //
 //   A -- POSITIVE CONTROL. The sweep must find optics.airy.airyRingErrFrac = 0. "If the sweep misses a zero
 //        known to be present, it is not measuring what it claims and nothing else it reports counts."
-//   B -- THE BET. It finds at least one FURTHER unregistered exact zero, somewhere other than optics.airy.
-//        "If B fails, the airy case was a genuine one-off and the census's default-only frame is cheaper
-//        than I think."
+//   B -- THE BET. At least one FURTHER unregistered exact zero, somewhere other than optics.airy.
 //
-// B WAS NEVER TESTED, and the reason is a sentence in that file's own header: "The full sweep is seven values
-// per knob across 642 knobs and did not finish in twenty minutes. A gate nobody can afford to run is a gate
-// that gets skipped, so this one sweeps four device/modes chosen to include the known case."
+// *** A DOES NOT HOLD, AND THE TREE HAS KNOWN EXACTLY WHY SINCE v3314. *** The zero was not lost, it was CURED:
+// v2931 adopted firstMinimumRefined in place of the raw grid estimator and moved the grading to the exact
+// j(1,1)/pi instead of the rounded 1.22, which destroyed the coincidence on purpose. zeroRangeSweep-selfcheck
+// asserts its ABSENCE and states the cost in its own words -- "the sweep now has NO DEMONSTRATED DETECTION
+// POWER for exact zeros ... UNPROVEN until a replacement control is planted".
 //
-// FOUR OF FOUR HUNDRED AND EIGHTY-FOUR. The scoped gate covers optics.airy, optics.slit, splat.integral and
-// kepler.kepler3. The lab is 128 devices and 484 device/modes. So the positive control has been re-confirmed
-// every round for fifteen hundred rounds, and the actual bet has been sitting unresolved beside it.
+// NO REPLACEMENT WAS EVER PLANTED. That sentence has stood for eleven hundred versions, and this round drove
+// the uncontrolled instrument across 78 devices and came back with SIXTEEN unregistered exact zeros. Sixteen
+// positive results from a detector with no demonstrated ability to find a positive is the finding, and it is
+// worth more than any of the sixteen.
+//
+// *** CONFIRMED INDEPENDENTLY AND WIDER THAN THE GATE CHECKS. *** The gate looks at optics.airy and optics.slit.
+// A sweep of ALL FIVE optics modes -- airy, slit, edge, converge, radiusconfusion, 175 builds and 140
+// error-field readings -- finds not one exact zero anywhere. The control is gone from the whole device, not
+// just from the mode that used to carry it.
+//
+// ---- *** AND THE OBVIOUS REPLACEMENT IS CONFOUNDED BY THE SAMPLE THAT ESTABLISHED IT *** ----------------------
+//
+// The natural candidate is the hit B already rests on: splat.integral.isoRollDeviation, which the gate reports
+// as exactly 0 "at dyadic sigma" with a mechanism it believes it established from five dyadic values
+// (0.125, 0.25, 0.5, 1, 2) against three non-dyadic ones (0.1, 0.3, 0.7). MEASURED ACROSS EIGHTEEN VALUES, THE
+// DYADIC STORY IS NOT WHAT IS HAPPENING:
+//
+//     0.05 0.1 0.2 0.3 0.4      2.8e-15 .. 4.5e-13     non-zero
+//     0.125 0.25 0.5            EXACTLY 0              dyadic, below 1
+//     0.6 0.7 0.8 0.9           1.8e-12 .. 3.6e-12     non-zero
+//     1 1.05 1.1 1.2 1.3 1.5 2 3    EXACTLY 0          EVERY value at or above 1, dyadic or not
+//
+// Tested as rules rather than described: "dyadic" fits the gate's own EIGHT points and FAILS on twenty.
+// "sigma >= 1" fails on both. "sigma >= 1 OR dyadic" fits all twenty. SO THE RECORDED MECHANISM IS NOT WRONG,
+// IT IS INCOMPLETE -- it is one of two disjuncts, and the second operates only above 1 where all three of the
+// gate's non-dyadic probes (0.1, 0.3, 0.7) never went. A sample drawn entirely below the boundary cannot see
+// that a boundary is there.
+//
+// *** SO THIS ROUND DOES NOT PLANT A REPLACEMENT CONTROL. *** A control whose mechanism is not understood is
+// not a control; it is a second unexplained zero standing where the explanation should be. Naming the candidate
+// and the confound is what makes planting one a round somebody can actually do.
 //
 // ---- *** THE COST THAT WAS MEASURED ONCE AND BECAME A STANDING FACT *** ---------------------------------------
 //
@@ -1978,6 +2006,38 @@ export const MEASURED_V4426 = Object.freeze({
      "errors": []
     });
 // ==== /MEASURED_V4426 ====
+
+/**
+ * *** THE CANDIDATE REPLACEMENT CONTROL, AND THE MEASUREMENT THAT DISQUALIFIES THE STATED MECHANISM. ***
+ * Eighteen values of sigma through splat.integral. Recorded rather than summarised, because the whole point is
+ * that a smaller sample agreed with the wrong explanation.
+ */
+export const SPLAT_ISOROLL = Object.freeze({
+    field: "splat.integral.isoRollDeviation",
+    gateProbes: Object.freeze({ dyadic: [0.125, 0.25, 0.5, 1, 2], nonDyadic: [0.1, 0.3, 0.7] }),
+    measured: Object.freeze([
+        { sigma: 0.05, zero: false }, { sigma: 0.1, zero: false }, { sigma: 0.2, zero: false },
+        { sigma: 0.3, zero: false }, { sigma: 0.4, zero: false }, { sigma: 0.5, zero: true },
+        { sigma: 0.6, zero: false }, { sigma: 0.7, zero: false }, { sigma: 0.8, zero: false },
+        { sigma: 0.9, zero: false }, { sigma: 1, zero: true }, { sigma: 1.05, zero: true },
+        { sigma: 1.1, zero: true }, { sigma: 1.2, zero: true }, { sigma: 1.3, zero: true },
+        { sigma: 1.5, zero: true }, { sigma: 2, zero: true }, { sigma: 3, zero: true },
+        { sigma: 0.125, zero: true }, { sigma: 0.25, zero: true },
+    ]),
+    // Rules, testable against the rows above rather than asserted about them.
+    rules: Object.freeze({
+        dyadic: "fits the gate's 8 probes, FAILS on 20",
+        atLeastOne: "fits neither sample",
+        either: "sigma >= 1 OR dyadic -- fits all 20",
+    }),
+    confound: "the recorded mechanism is not wrong, it is INCOMPLETE. 'Dyadic' is true on every point the gate " +
+              "chose and false on twenty: 1.05, 1.1, 1.2, 1.3 and 1.5 are not dyadic and are exactly zero. A " +
+              "second rule operates at or above sigma = 1, and all three of the gate's non-dyadic probes are " +
+              "below it. A sample drawn entirely on one side of a boundary cannot show that the boundary exists.",
+});
+
+/** Is a proposed mechanism consistent with the measurement, or does another rule fit the same points? */
+export function mechanismFits(rows, rule) { return rows.every((r) => rule(r.sigma) === r.zero); }
 
 /** Verdict on the two pre-registered predictions, from a merged sweep result. */
 export function settle(found, { airy = "optics.airy.airyRingErrFrac" } = {}) {
