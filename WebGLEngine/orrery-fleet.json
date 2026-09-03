@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4ce1bf1f737285fe29cfc5222d6f93906ea31f96",
+ "head": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c",
  "bodies": {
   "box3d": [
    {
@@ -185,7 +185,7 @@
    {
     "path": "tools/ship/orrery-selfcheck.mjs",
     "bytes": 13270,
-    "sha": "fe96784e8ff7c55884c0e83388db67aa7a2bdc55"
+    "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    }
   ],
   "heerich": [
@@ -213,7 +213,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 838081,
+    "bytes": 840633,
     "sha": "4343629ad08e6b9541de2526f7aa7df676b0d11b"
    },
    {
@@ -489,8 +489,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2735623,
-    "sha": "8a12609eca010195ec1cf9d1fc4ef3fa1ba4743c"
+    "bytes": 2741191,
+    "sha": "aefc87ad6bbf6fedaf1dc91461ae0580c33b773c"
    },
    {
     "path": "mpm3d.html",
@@ -534,7 +534,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 838081,
+    "bytes": 840633,
     "sha": "4343629ad08e6b9541de2526f7aa7df676b0d11b"
    },
    {

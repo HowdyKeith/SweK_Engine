@@ -745,6 +745,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since40: Object.freeze({
         at: "v4414", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/avatarDock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box; it drives a real browser twice so it is a SLOW gate by design, and what " +
+                 "it checks is a LAYOUT -- a layout claim with no browser behind it is a claim about source " +
+                 "text. Eight checks: three on the sizing rule against a fake host, five on a live " +
+                 "server.html measured at TWO widths, because the defect it repairs was a typed constant and " +
+                 "a typed constant is right at exactly one width by luck. It closed its own named gap in " +
+                 "draft: it first reported the staged-panel contract UNCHECKED because it reached for " +
+                 "gi.show(), which is called showInfo()/showGauges(). *** AND ITS ORDINAL IS 40 BECAUSE 39 " +
+                 "WAS TAKEN WHILE THIS ROUND WAS BEING BUILT -- the collision gateSweep-selfcheck warns " +
+                 "about, arriving in the round that added the warning's own next entry.",
+    }),
+    since41: Object.freeze({
+        at: "v4415", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/orreryAuthor-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~6s, five sections including a live browser render. " +
