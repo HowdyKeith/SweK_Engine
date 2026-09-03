@@ -153,6 +153,24 @@ export const directionalAlbedo = (alpha, cosO, o = {}) => furnaceIntegral(alpha,
 /**
  * Sample a half-vector from the NDF. Inverting the GGX cdf gives cos(theta_h) in closed form, so this is
  * arithmetic and a square root -- no rejection loop, no table.
+ *
+ * *** v4409 -- THIS DENOMINATOR IS THE CANCELLATION v3494 REMOVED FROM D, AND IT IS STILL HERE. ***
+ *
+ *     shipped, below       u1 * (a2 - 1) + 1        a DIFFERENCE OF NUMBERS NEAR 1
+ *     algebraically same   (1 - u1) + u1 * a2       a SUM OF POSITIVES
+ *
+ * The same shape, in this same file, missed because v3494 was looking at D. At binary32 it is worth 3.28e-3
+ * in cos_h at alpha 0.001, u1 0.999999, against 1.4e-8 for the rewrite -- five orders, exactly as in D.
+ *
+ * *** AND IT IS LEFT ALONE ON PURPOSE, BECAUSE THE MEASUREMENT SAYS SO. *** Through the estimator the rewrite
+ * moves the answer by 1.2e-8 at worst and by EXACTLY ZERO at alpha >= 0.25: the corrupted samples live where
+ * u1 -> 1, they are a vanishing fraction of any uniform or stratified draw, and bounceWeight is smooth there.
+ * A latent hazard named with a number is worth more than a fix nobody could justify from a measurement.
+ *
+ * WHAT WOULD CHANGE THAT: a consumer that samples u1 NON-uniformly and clusters it near 1 -- an adaptive
+ * scheme, or a low-discrepancy sequence whose first dimension bunches -- would meet the 3.28e-3 directly.
+ * physics/render/microfacetSampleWgsl.mjs keeps the rewrite one bit away (REPAIR.stableCdf) for that day, and
+ * physics/render/microfacetSampleWgsl-selfcheck.mjs section 5 holds both forms side by side.
  */
 export function sampleHalfVector(u1, u2, alpha) {
     const a2 = alpha * alpha;
@@ -200,5 +218,12 @@ export function bsdfEval(cosO, cosI, cosH, alpha, { F = 1, ...o } = {}) {
  * The balance heuristic. v3472 proved these weights sum to 1 for the cone/cosine pair; THIS IS A DIFFERENT PAIR
  * (cone against the NDF) and the property has to hold again -- it is p_i/(p_L+p_B) summed over i, so it is one
  * BY CONSTRUCTION, and that is the only reason combining two estimators does not double-count.
+ *
+ * *** v4409 -- "ONE BY CONSTRUCTION" IS ALGEBRA. IN FLOATING POINT IT IS ONE TO WITHIN A BIT. *** Measured over
+ * 4096 pairs: 10.8% do not sum to exactly 1 at f64 and 12.6% do not on a device, worst departure 1.0 ULP.
+ * The rate is the SAME at both precisions, so this is not a precision question and porting it changes nothing
+ * -- the sum rounds two quotients and adds them, and that misses by a bit wherever it runs. No weight leaves
+ * [0, 1], which is the part that would actually break an estimator, and one ULP is far beneath any renderer's
+ * sampling noise. The sentence above is not wrong; it is a statement about the reals.
  */
 export const misWeight = (pThis, pOther) => (pThis + pOther > 0 ? pThis / (pThis + pOther) : 0);

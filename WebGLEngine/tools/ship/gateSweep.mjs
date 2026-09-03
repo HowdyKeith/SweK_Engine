@@ -492,6 +492,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "(19/4/3/6 by name) and restored; two more went 0 red and are recorded as unreachable branches " +
                  "with the clearance measured, five and six orders",
     }),
+
+    // v4409 -- the twenty-fourth closing, and the first gate in this arc whose kernel COMPOSES another gate's
+    // shader instead of translating or copying one. It ports microfacet.mjs's sampling half, holds it to three
+    // analytic keys (an algebraic identity with no statistics, the zero-variance mirror limit, and a measured
+    // blindness to D), and finds that v4408's quadrature is 49% wrong at the roughness where this estimator is
+    // exact -- so the two rounds together say which instrument to believe where.
+    since25: Object.freeze({
+        at: "v4409", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/microfacetSampleWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 28 checks in 2.1 s -- inside the quick " +
+                 "sweep's 3 s budget, as v4408 is. Driven RED by five sabotages (6/5/2/3 by name, one of them " +
+                 "caught by a single key and by nothing else) and restored; a sixth went 0 red and earned a " +
+                 "section proving the blindness is the FIXTURE's and measuring what would move it",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

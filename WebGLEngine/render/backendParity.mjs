@@ -169,13 +169,17 @@ export const PARITY_BASELINE = Object.freeze({
     // GLSL at call time -- the file ships the kernel around the lobe, and the census counts text it authors.
     // Note what does NOT move: microfacetShader.js is already counted as GLSL-bearing, and generating WGSL from
     // it does not make it a `both` file, because the WGSL is never written down there.
+    // v4409 -- physics/render/microfacetSampleWgsl.mjs joins it: WGSL-only, +1 wgslBearing and +1 wgslOnly. Its
+    // LOBE is composed from microfacetWgsl.mjs rather than written here, but everything below the lobe is this
+    // file's own WGSL text -- the sampling half has no shipped GLSL to translate -- so it is shader-bearing on
+    // the same test the previous two passed: the census counts text a file AUTHORS, not text it imports.
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 58,
+    wgslBearing: 59,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 45,
+    wgslOnly: 46,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

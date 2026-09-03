@@ -170,14 +170,23 @@ export function plantedGlsl({ textbook = false, noPi = false } = {}) {
 }
 
 /** The kernel around the lobe. The three lobe functions are spliced in from the shipped GLSL, never retyped. */
-export function buildWgsl(plant = {}) {
+/**
+ * The lobe itself: the three functions translated out of the shipped GLSL, plus the masking helpers built on
+ * them. Exported SEPARATELY from the kernels so a second module can compose the same lobe without a second
+ * translation -- physics/render/microfacetSampleWgsl.mjs does, and a lobe copied for it could have drifted.
+ */
+export function lobeWgsl(plant = {}) {
     const src = plantedGlsl(plant);
     const fns = ["ggxD", "ggxLambda", "ggxG2"].map((n) => {
         const f = glslFnToWgsl(src, n);
-        if (!f) throw new Error("buildWgsl: " + n + " is not in the shipped shader");
+        if (!f) throw new Error("lobeWgsl: " + n + " is not in the shipped shader");
         return f;
     });
-    return WGSL_HEAD + "\n\n" + fns.join("\n\n") + "\n" + WGSL_TAIL;
+    return fns.join("\n\n") + "\n" + LOBE_HELPERS;
+}
+
+export function buildWgsl(plant = {}) {
+    return WGSL_HEAD + "\n\n" + lobeWgsl(plant) + "\n" + WGSL_TAIL;
 }
 
 const WGSL_HEAD = /* wgsl */ `
@@ -201,7 +210,7 @@ struct Params {
 
 const PI : f32 = 3.141592653589793;`;
 
-const WGSL_TAIL = /* wgsl */ `
+const LOBE_HELPERS = /* wgsl */ `
 // Abramowitz-Stegun 7.1.26, needed only by the beckmann plant. microfacet.mjs's erf(), constant for constant.
 fn erfA(x0 : f32) -> f32 {
   let s = sign(x0);
@@ -231,6 +240,9 @@ fn g2(cosO : f32, cosI : f32, a : f32) -> f32 {
   return select(hc, sep, (P.faults & 2u) != 0u);
 }
 
+`;
+
+const WGSL_TAIL = /* wgsl */ `
 // ndfIntegral: one lane per stripe of the theta grid, striding by laneCount. The host adds the partials in
 // f64 and applies the 2 PI, exactly as microfacet.mjs's last line does.
 fn ndfPartial(lane : u32) -> f32 {
