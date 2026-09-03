@@ -14,6 +14,68 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4423 -- the fires compared on spread, and the two rules are not two takes on one idea
+
+#171, which is what was left of #163. v4412 compared six fires on COLOUR and closed with the limit written
+down: "that the six fires were compared AS FIRES -- the spread rules are still uncompared, which is what is
+left of the item."
+
+The axis is not pixels either. It is the two questions every spread rule answers whether or not its author
+wrote them down: DOES THE FIRE CONSUME WHAT IT BURNS, and WHAT DOES ITS FRONT DO?
+
+                         render/doomFire.mjs                world/fireSystem.js
+    fuel model           NONE. The source row is held       GRASS -> ASH. Finite, and consumed.
+                         lit and never changes.
+    front                SETTLES at ~39 rows, and that      TRAVELS at 1 cell per step until the
+                         height belongs to the decay        fuel runs out.
+                         rate, not to the grid.
+    goes out by itself   NEVER, while lit.                  ALWAYS. 40 of 40 cells to ash at t = 5.9 s.
+    after extinguish()   dark in 48 steps, by decay         n/a -- it had already gone out
+
+ONE IS A STEADY-STATE INTENSITY FIELD WITH A STATIONARY FRONT. THE OTHER IS A TRAVELLING FRONT THAT EATS ITS
+SUBSTRATE. They cannot be swapped: a wildfire drawn with doomFire's rule would never stop, and a thruster plume
+drawn with fireSystem's rule would consume the engine. The tree has been calling both "fire", which is true,
+and is exactly why the comparison had to be made on something other than the name.
+
+AND THE FIRST MEASUREMENT OF THE PLATEAU WAS THE GRID CEILING.
+
+On an 8x40 grid the flame height read 34-40 rows and looked like a clean steady state. IT WAS THE TOP OF THE
+ARRAY. Only running it taller separates "the rule settles here" from "the array ended":
+
+    grid height   settled flame height (mean of steps 601-1200)   ceiling-limited
+       40                   37.8  (min 33, max 40)                     YES
+      100                   38.6  (min 32, max 46)                     no
+      200                   38.8  (min 33, max 47)                     no
+      400                   39.1  (min 32, max 49)                     no
+
+The height CONVERGES as the container grows, so ~39 rows is a property of the decay rate. A measurement taken
+at one size and called a plateau would have been a claim about the container -- the same species as v4418's
+threshold tuned on one frame size, two rounds earlier. THE GATE ASSERTS THAT THE 40-ROW CASE IS
+CEILING-LIMITED, so the trap stays visible instead of being tidied away once the taller runs look clean.
+
+NEW render/fireSpread.mjs, and NEW render/fireSpread-selfcheck.mjs -- WHICH IS THE FIRST GATE
+world/fireSystem.js HAS EVER HAD. v4412 recorded that the voxel wildfire carried no gate of its own. The reason
+it stayed that way is that it needs a WORLD, and nobody had stubbed one: ninety-nine lines of spread rule sat
+ungraded behind a dependency on voxel chunks. lineWorld is that stub. It answers exactly the three methods
+FireSystem calls -- getChunk, voxelAt, setVoxel -- and the gate asserts it contains NO fire logic of its own,
+because a harness that decided anything about fire would be a second implementation of the rule under test,
+which is how a harness starts agreeing with itself.
+
+Twelve checks in four sections.
+
+Also corrected before shipping: decayToDarkSteps was recorded as a bare 46 and is HEIGHT-TAGGED now (46 at
+height 40, 48 at height 200). An untagged number there is the ceiling trap wearing a different hat, in the same
+file that exists to name it.
+
+WHAT THIS DOES NOT CLAIM. That either rule is right: they answer different questions, and which one a scene
+wants is the point. That the front speeds are comparable in absolute terms -- one is cells per update and the
+other rows per frame, with no shared clock between them, so the comparison is CATEGORICAL and says so. And
+that all six fires were measured on this axis: doomFireField and shipExhaust are FieldFire and inherit
+doomFire's answer by construction, fireMesh is a ray-marched volume with no spread rule at all, and saying that
+is cheaper than pretending six numbers exist.
+
+Four sabotages, 1/1/4/1 RED by name, three files md5-identical after restore.
+The tree stands at 1455 gates.
 ## v4422 -- Discovering that two functions answer the same question, and the widest rule in the tree was wrong
 
 *** DISCOVERING THAT TWO FUNCTIONS ANSWER THE SAME QUESTION, WHICH IS THE HALF v4419 SAID NOTHING DID AND WHERE v4418'S OWN FINDING LIVED. *** v4418 found the session's sixth defect by comparing world/orrery.mjs's isLicenceFile with world/orreryEjecta.mjs's isPaperFile. THAT COMPARISON WAS WRITTEN BY HAND, because a person happened to know both existed, and v4419 closed by saying so. THE SIGNATURE TURNS OUT TO BE MECHANICAL AND TO NEED NO SEMANTICS: run every predicate over one corpus and compare the SETS they accept. Identical is a duplicate. CONTAINMENT is a designed hierarchy -- every licence is paperwork, and more besides. CROSSING, where each accepts something the other rejects, is TWO FUNCTIONS ANSWERING ONE QUESTION AND DISAGREEING ABOUT IT, which is exactly the shape the sixth instance had. The measure is the OVERLAP COEFFICIENT and not Jaccard or raw agreement: containment scores 1.00 under overlap and 0.27 under Jaccard, which punishes a hierarchy for being one, while raw agreement puts these two predicates at 99% by both saying NO to almost every filename in the tree. THE KNOWN CASE IS THE FIXTURE, IN BOTH OF ITS STATES: fed isPaperFile exactly as it stood before v4418, the census reads CROSSING at 50% and names ASHIMA-LICENSE.txt and IBMPlexSerif-OFL.txt -- the two files v4418 found by hand -- and fed the same pair today it reads CONTAINMENT at 100%. A repair to this defect has a visible signature in the measure. *** AND IT FOUND A DEFECT IN THE WIDEST, MOST-TRUSTED RULE IN THE TREE. *** v4263 widened world/orrery.mjs's LICENCE_NAME three times to stop isLicenceFile falsely accusing properly licensed dependencies, and its header records each widening; every one was right. NOBODY EVER ASKED THE OTHER DIRECTION. Measured here, TWO OF THE SIX FILES IT MATCHED IN THIS TREE ARE .mjs MODULES -- brain/rl/attribution.mjs and its own gate -- because the rule looks for the word anywhere in a name and "attribution" is a perfectly good name for code about attribution. A LICENCE IS A DOCUMENT, and requiring that costs the rule nothing: all seventeen licences under vendor/ are documentary and stay matched, measured before the change and after. The documentary rule moved to world/orrery.mjs where the licence question lives, and tools/ship/patternWidth.mjs imports it rather than keeping the second copy that would be free to drift. *** THE DETECTOR NARROWED ITSELF FOUR TIMES BEFORE IT COULD SEE ITS OWN MOTIVATING CASE, AND EVERY ONE WAS FOUND BY ASKING WHY THE KNOWN PAIR WAS NOT IN THE OUTPUT RATHER THAN BY READING THE OUTPUT. *** The function-body cap was 700 characters and isPaperFile's comment is longer than that, so the function this whole file exists to compare was never extracted. Comments were scanned for calls, so prose ABOUT a call read as a call -- v4412's finding in a fourth place. The probe corpus was the first 400 basenames, and the first 400 hold no licence, so isLicenceFile looked like a function that never returns true and was dropped: A SAMPLE THAT MISSES THE POSITIVE CLASS ANSWERS A DIFFERENT QUESTION. And raw agreement was the measure, under which two unrelated predicates read as a crossing pair. That is v4418's finding for the third round running -- the detector is built around the shape its author pictured, and the motivating case is not that shape. CALLING A FUNCTION TO FIND OUT WHAT IT IS IS A HAZARD AND THE FIRST DRAFT PROVED IT: calling every unary export ran render/passFootprint.mjs's perturbFootprint, which reached for a GPU and threw. Two layers guard it now -- the module must be QUIET, with no top-level statement beyond a declaration, and the body must call nothing but string and regex work or another predicate, decided from the SOURCE before anything is imported. THE TWO GATES NOW CHECK EACH OTHER TWO ROUNDS APART: v4418's census flagged this round's frozen fixture as a narrow pattern, which it is, on purpose -- adjudicated by name rather than widened, because widening it would destroy the known positive. And a row asserting the two copies cannot drift was written as a check on the SPELLING OF AN IMPORT LINE and went red the moment the re-export had to become an import plus an export; it compares the function objects now, which is the only test a lookalike cannot pass. ALSO CAUGHT BY READING THE EXIT CODE: `export { x } from "y"` gives no LOCAL binding, so patternWidth crashed with ZERO FAIL LINES PRINTED -- v4392's rule for the sixth time this session. UNCHECKED AND SAID PLAINLY: this compares FIVE predicates, out of roughly three thousand exported functions, because one has to be exported from a quiet module, take one argument, be provably free of anything but string work, and return a boolean over the corpus. THAT IS A SMALL SAFE CORNER AND NOT A SURVEY. The corpus is filenames, so two predicates about anything else are compared over the wrong population or not at all. A crossing is not proof of a defect -- the one standing pair is two genuinely different questions that overlap, and saying which is a judgement, made once and recorded by name. And it cannot see the case that started all of this: a classification written inline as an `if`, never named and never exported, is invisible to every part of it. *** AND I INFERRED A DIRECTORY FROM A BASENAME, WHICH IS THE SPECIES IN THE PROSE. *** The detector reported `attribution.mjs` and I wrote `world/attribution.mjs` into the claim, the note, the closing and two code comments without resolving it: the file is brain/rl/attribution.mjs. claimEvidence-selfcheck caught it as a NEW dangling citation and the ship stopped, which is the gate v4404 built for exactly this doing its job on the round about detectors matching the shape their author pictured. The tree stands at 1454 gates.

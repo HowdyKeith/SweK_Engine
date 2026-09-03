@@ -921,6 +921,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "400 names holding no licence, and raw agreement as the measure. Driven RED by four " +
                  "sabotages (MEASURED 3/1/2/1 by name)",
     }),
+    since49: Object.freeze({
+        at: "v4423", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/fireSpread-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, well under the quick-sweep budget -- two automata stepped as arithmetic " +
+                 "against a stub world, no browser. #171, what was left of #163: v4412 compared the fires on " +
+                 "COLOUR and wrote down that the spread rules were still uncompared. THE AXIS IS whether a " +
+                 "fire consumes what it burns and what its front does. MEASURED: world/fireSystem.js travels " +
+                 "1 cell per step, chars 40 of 40 cells to ASH and GOES OUT BY ITSELF at t=5.9s; " +
+                 "render/doomFire.mjs held lit has a source row summing 288 at step 0 and 288 at step 1200 -- " +
+                 "IT CONSUMES NOTHING and never goes out, and extinguishing ends it in 48 steps by DECAY. One " +
+                 "is a steady-state intensity field, the other a travelling front that eats its substrate, " +
+                 "and they cannot be swapped. AND THE FIRST READING OF THE PLATEAU WAS THE GRID CEILING: 34-40 " +
+                 "rows on 8x40 looked like a steady state and was the top of the array; run taller the mean " +
+                 "goes 38.6 / 38.8 / 39.1 at heights 100 / 200 / 400 and CONVERGES, so ~39 rows belongs to " +
+                 "the decay rate. The gate asserts the 40-row case IS ceiling-limited so the trap stays " +
+                 "visible. THIS IS ALSO THE FIRST GATE world/fireSystem.js HAS EVER HAD -- it needed a world " +
+                 "and nobody had stubbed one; lineWorld is that stub, checked to contain no fire logic of its " +
+                 "own so the harness cannot agree with itself. Four sabotages, 1/1/4/1 red by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
