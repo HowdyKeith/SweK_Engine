@@ -235,6 +235,36 @@ console.log("\n8. THE ANGULAR PATH IS OPTIONAL, AND ITS ABSENCE IS HANDLED RATHE
            "gain the method halfway through a frame and receive torque for only some of its bodies");
 }
 
+console.log("\n8b. THE KEY tools/ship/coverageTriage.mjs IMAGINED, AND WHY THIS DESIGN CANNOT HAVE IT");
+{
+    // *** THE TRIAGE HAS CARRIED THIS MODULE AS A CANDIDATE ON A KEY THAT IS STRUCTURALLY UNAVAILABLE: ***
+    // "Momentum exchange across the coupling COULD be an exact key (what one side loses the other gains),
+    // which would be a real gate rather than a smoke test." Both halves of that are wrong, and v4415 checked
+    // rather than argued. THIS GATE IS NOT A SMOKE TEST -- the eight sections above hold the nudge to an exact
+    // formula at three scales, pin the torque's scale^2 exponent, and assert the ORDER of the exchange. And
+    // the momentum key cannot exist here, because THE COUPLING IS DELIBERATELY ONE-WAY: this module's own
+    // header says "box3d OWNS the body motion... and the fluid just supplies external forces". The fluid is
+    // never told to give up what the body receives, so there is no ledger with two sides to balance.
+    const w = mockWorld(), f = mockFluid();
+    const c = createFluidBox3D(w, f, { scale: 1 });
+    const rec = c.addBox([0, 0, 0], [0.5, 0.5, 0.5], 1);
+    const before = w.readVelocities().slice(rec.idx * 3, rec.idx * 3 + 3);
+    const dt = 0.02;
+    c.step(dt);
+    const after = w.readVelocities().slice(rec.idx * 3, rec.idx * 3 + 3);
+    const gained = [0, 1, 2].map((i) => rec.mass * (after[i] - before[i]));
+    const impulse = [0, 1, 2].map((i) => f.forceScale * dt * [F[0], F[1], F[2]][i]);
+    ok("*** the body GAINS exactly the impulse the fluid stamped -- which is the only half of a ledger there is ***",
+        gained.every((g, i) => Math.abs(g - impulse[i]) < 1e-12),
+        `momentum gained ${gained.map((g) => g.toFixed(6)).join(", ")} against force * dt ${impulse.map((g) => g.toFixed(6)).join(", ")}. That is the transfer being EXACT; it is not conservation, because nothing subtracts it from the fluid`);
+    ok("!! ...and the fluid's own force is UNCHANGED by the transfer, so no momentum left it",
+        f.bodies[0]._fx === F[0] && f.bodies[0]._fy === F[1] && f.bodies[0]._fz === F[2],
+        `the stamped force is still ${F.join(", ")} after the step. A conserving coupler would have to remove the impulse from the fluid's own momentum; a STAGGERED co-simulation like this one does not, and that is a property of the design rather than a defect in it`);
+    ok("!! *** so \"what one side loses the other gains\" is not a key this module can be held to, and the triage entry is corrected rather than left standing ***",
+        typeof f.externalBodies === "boolean" && f.externalBodies === true,
+        `externalBodies is true: the fluid does not integrate the bodies at all, so it has no body momentum to lose. The exact key that DOES exist here is the transfer formula, and sections 5 and 6 already hold it. A candidate key that cannot be written is worth recording as such -- otherwise it stays on a list forever, which is what happened for the ${"~1,100"} rounds since v3853`);
+}
+
 console.log("\n9. THE REAL FLIP3D: a light box RISES AGAINST GRAVITY and a heavy one does not");
 {
     const run = (density) => {

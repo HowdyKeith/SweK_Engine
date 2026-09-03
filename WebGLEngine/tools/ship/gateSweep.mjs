@@ -583,6 +583,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "0 RED FIRST: a check comparing a list against its own length, and a fixture whose planted " +
                  "leak collided with a name already present. Both were this gate's defects, not properties",
     }),
+
+    // v4415 -- the thirtieth closing, and the last two CANDIDATE keys on the coverage triage. One was real and
+    // the module's own header named a sharper version of it; the other was already gated, and the key the
+    // triage imagined is structurally unavailable because that coupling is deliberately one-way. Both entries
+    // are corrected rather than left standing, which is the point of a list somebody reads.
+    since31: Object.freeze({
+        at: "v4415", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/voxel/fracture-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections and 14 checks in 0.08 s -- cheaper than v4414's, " +
+                 "and no device. Driven RED by five sabotages (2/2/1/3/3 by name) and restored; the 1 went 0 " +
+                 "RED FIRST because every fixture was a box and a box's products of inertia are zero, so an " +
+                 "L was added with an independent two-box reference. Its FIXTURE also had to be built twice: " +
+                 "the sphere carves it started with never detached anything",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
