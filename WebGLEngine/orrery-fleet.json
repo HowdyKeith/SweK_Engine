@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4fc39105f153411d63e5e91f9f52c2c38651b255",
+ "head": "73b6a0c53afb26d777b8a09973c10073aa509b5e",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2650641,
-    "sha": "5d9dd7e01bcc09060ea9d35600efb44c41d5f5ef"
+    "bytes": 2650490,
+    "sha": "73b6a0c53afb26d777b8a09973c10073aa509b5e"
    },
    {
     "path": "mpm3d.html",
@@ -630,7 +630,12 @@
    {
     "path": "tools/ship/divineEye-selfcheck.mjs",
     "bytes": 39627,
-    "sha": "5d9dd7e01bcc09060ea9d35600efb44c41d5f5ef"
+    "sha": "29e1e0c7dcb8102acbb6c857e84100971e8baebb"
+   },
+   {
+    "path": "tools/ship/generatedLadder-selfcheck.mjs",
+    "bytes": 47132,
+    "sha": "73b6a0c53afb26d777b8a09973c10073aa509b5e"
    },
    {
     "path": "tools/ship/img2three-selfcheck.mjs",

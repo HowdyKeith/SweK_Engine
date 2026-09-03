@@ -602,7 +602,18 @@ const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]
  * whose vertex stage moves the hull passes `pickPipeline` (and `pickBind`) so the identity picture moves it too --
  * the fleets gate found the default pick drawing unspun hulls under spun ones, and named the wrong pixels.
  */
-export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null, headings = null, clock = null }) {
+export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, fleets = null, fleetOf = null, time = null, headings = null, clock = null, cull = null }) {
+    // v4373 -- `cull` lets a caller BRING THE COMPUTE PASS THAT DECIDES WHAT DRAWS, the way `pipeline`/`bind` let
+    // one bring the render shaders. { wgsl, entryPoint, bind(pipe, buffers), write(u) }: the scene creates and owns
+    // every buffer, hands them to bind() once, and calls write() each frame with the SAME packed uniforms
+    // packCullUniforms produces -- so a pass with a different binding shape (a generated one, whose frustum is its
+    // own uniform rather than a member of struct Cull) can be driven without gpuDriven knowing anything about it.
+    // WebGPU only, and refused by name elsewhere: the WebGL2 route runs the CPU twin and there is no pass to swap.
+    // Refused with occlusion too, because the two-phase path builds a second cull this hook does not describe.
+    if (cull && (typeof cull.wgsl !== "string" || typeof cull.bind !== "function" || typeof cull.write !== "function"))
+        throw new Error("gpuDriven: cull must be { wgsl, entryPoint?, bind(pipe, buffers), write(u) } -- the scene owns the buffers and the uniforms, and the caller owns the binding shape");
+    if (cull && occlusion) throw new Error("gpuDriven: a custom cull and occlusion together are refused -- the two-phase path builds a SECOND cull pass from cullLodWgsl and this hook describes one");
+    if (cull && device.backend !== "webgpu") throw new Error(`gpuDriven: a custom cull needs a compute stage and this device is ${device.backend}; the webgl2 route culls on the CPU (cullLodCpu) and has no pass to replace`);
     // Level 12 -- `records` may be a Float32Array (static instances) or a SOURCE produced elsewhere each frame:
     //   { count, buffer }   a gfx/device.js buffer another compute pass writes (WebGPU: the cull reads it directly)
     //   { count, cpu }      a function returning the Float32Array for this frame (the twin route, any backend)
@@ -662,14 +673,19 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
     if (extrasNow.length < count * EXTRA_FLOATS) throw new Error(`gpuDriven: headings must carry ${EXTRA_FLOATS} floats per record (${count * EXTRA_FLOATS}), got ${extrasNow.length}`);
     let extraBuf = null;
     if (gpuPath) {
-        cullPipe = device.compute({ wgsl: cullLodWgsl({ occlusion: occ, fleets: hasFleets }), entryPoint: "main" });
+        cullPipe = device.compute({ wgsl: cull ? cull.wgsl : cullLodWgsl({ occlusion: occ, fleets: hasFleets }), entryPoint: (cull && cull.entryPoint) || "main" });
         ubuf = device.buffer({ size: CULL_UNIFORM_BYTES, usage: "uniform" });
         inBuf = (src.buffer && src.buffer.gpu) ? src.buffer : device.buffer({ data: src.static || src.cpu(), usage: "storage" });
         cmdBuf = device.buffer({ data: template, usage: "indirect" });
         outBuf = device.buffer({ size: regionCount * regionBytes, usage: ["storage", "vertex"] });
-        cullPipe.bind("cull", ubuf).bind("inst", inBuf).bind("cmds", cmdBuf).bind("records", outBuf);
-        if (hasFleets) { fleetBuf = device.buffer({ data: fleetOfU32, usage: "storage" }); cullPipe.bind("fleetOf", fleetBuf); }
-        extraBuf = device.buffer({ data: extrasNow, usage: "storage" }); cullPipe.bind("extras", extraBuf);
+        if (hasFleets) fleetBuf = device.buffer({ data: fleetOfU32, usage: "storage" });
+        extraBuf = device.buffer({ data: extrasNow, usage: "storage" });
+        if (cull) cull.bind(cullPipe, { inst: inBuf, cmds: cmdBuf, records: outBuf, extras: extraBuf, fleetOf: fleetBuf, cullUniform: ubuf });
+        else {
+            cullPipe.bind("cull", ubuf).bind("inst", inBuf).bind("cmds", cmdBuf).bind("records", outBuf);
+            if (hasFleets) cullPipe.bind("fleetOf", fleetBuf);
+            cullPipe.bind("extras", extraBuf);
+        }
         if (occ) {
             occBuf = device.buffer({ size: OCC_UNIFORM_FLOATS * 4, usage: "uniform" });
             rejBuf = device.buffer({ size: count * 4, usage: "storage" });
@@ -743,7 +759,7 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
         lastCam = ctx;
         let twin = null, occU = null;
         if (!extraSrc.static) { extrasNow = extraSrc.cpu(); if (gpuPath) extraBuf.write(extrasNow); }
-        if (gpuPath) { ubuf.write(u); cmdBuf.write(template);
+        if (gpuPath) { if (cull) cull.write(u); else ubuf.write(u); cmdBuf.write(template);
             if (occ) { const en = pyramidReady && hizLayoutNow; occU = packOccUniforms({ view, proj, w: en ? hizDims[0] : 0, h: en ? hizDims[1] : 0, levels: en ? hizLayoutNow.levels.length : 0, enabled: !!en });
                 if (!hizBuf) { ensureHiz(1, 1); pyramidReady = false; }   // a binding must exist before the first dispatch
                 occBuf.write(occU); cullPipe.bind("occ", occBuf); } }

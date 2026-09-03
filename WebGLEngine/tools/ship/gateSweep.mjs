@@ -326,7 +326,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
                  "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
     }),
-    // v4373 -- the TWELFTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
+    // v4373 -- the twelfth closing, and the first for a gate that drives render/gpuDriven.mjs with a compute pass
+    // gpuDriven does not contain: the new `cull` hook means a scene's decision can come from outside the module,
+    // so this gate is what stands between that hook and a caller binding it wrongly in silence.
+    since12: Object.freeze({
+        at: "v4373", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/generatedLadder-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections. Driven RED by two sabotages (2/2 by name) and " +
+                 "restored; a third attempt was MALFORMED and crashed the gate instead of failing a check, which is " +
+                 "logged in it as a crash rather than counted as a catch",
+    }),
+    // v4380 -- the THIRTEENTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
     // FORWARD at the merge; a closing's `at` names the round it belongs to, so it moves with the round). *** IT WAS WRITTEN AS since10 AND THAT
     // NUMBER WAS ALREADY TAKEN: *** the other line shipped v4365 and v4366 into since9 and since10 while this
     // one was building, and the merge left TWO since10 keys in one object literal -- where the later silently
@@ -336,8 +347,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // machinery every earlier closing's gate ran through (render/tslSource.mjs read `==` as an assignment), so
     // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
     // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
-    since12: Object.freeze({
-        at: "v4373", swept: 1, green: 1, red: 0,
+    since13: Object.freeze({
+        at: "v4380", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, three sections and 13 checks in 18.8 s. Driven RED by four " +
@@ -345,12 +356,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and the SMALLER one is the worse, because it breaks the containment bound the larger leaves " +
                  "intact. Sections 1 and 2 need no device and stay green where WebGPU is unavailable",
     }),
-    // v4374 -- the THIRTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
+    // v4381 -- the FOURTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
     // because main's v4372 landed mid-build and had already done three of them, better; what survived is the one
-    // parameter that round did not vary. Numbered THIRTEEN and not fourteen because an earlier draft's since13
-    // went into a stash that was dropped at the merge -- the number was never spent, so it is still free.
-    since13: Object.freeze({
-        at: "v4374", swept: 1, green: 1, red: 0,
+    // parameter that round did not vary. It has been numbered three times -- since13 in a draft that went into a
+    // dropped stash, since13 again after that, and since14 here once main's own since12 landed. The number is
+    // bookkeeping and moves freely; the `at` is the round and does not.
+    since14: Object.freeze({
+        at: "v4381", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveJudged-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, four sections and 10 checks in 22 s. Driven RED by three " +

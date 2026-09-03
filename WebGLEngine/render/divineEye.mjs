@@ -95,11 +95,16 @@ export function largestComponent(mask, size) {
 /** The 224-grid mask their loader hands the IoU: NEAREST-NEIGHBOUR resampling, then the largest blob. */
 export function maskGrid(px, width, height, size = MASK_GRID_SIZE) {
     const full = buildForegroundMask(width, height, px);
+    // v4373 -- `fellBack` is the regime their own loader warns about: below 0.035 coverage the mask is REPLACED by
+    // "every pixel with alpha", so on an opaque render it becomes the whole frame and the silhouette IoU is
+    // identically 1 no matter what is in the picture. It is a warning in their code, not a failure, so it is
+    // surfaced here as a value a caller can check rather than a string a caller might not read.
     const resized = new Uint8Array(size * size);
     for (let y = 0; y < size; y++) { const sy = Math.min(height - 1, Math.trunc(y * height / size));
         for (let x = 0; x < size; x++) { const sx = Math.min(width - 1, Math.trunc(x * width / size)); resized[y * size + x] = full.mask[sy * width + sx]; } }
     const lc = largestComponent(resized, size);
-    return { grid: lc.mask, discarded: lc.discarded, coverage: full.coverage, warnings: full.warnings };
+    return { grid: lc.mask, discarded: lc.discarded, coverage: full.coverage, warnings: full.warnings,
+             fellBack: full.warnings.some((w) => /foreground mask is tiny/.test(w)) };
 }
 
 export function silhouetteIou(a, b) {
@@ -176,7 +181,8 @@ export function compare(refPx, renPx, width, height) {
     if (prop.scaleDelta > SCALE_HARD_MAX) hardFailures.push(`scale delta ${prop.scaleDelta.toFixed(3)} exceeds threshold ${SCALE_HARD_MAX}`);
     return { iou, ...prop, ssim: globalSsim(la, lb), edgeOverlap: edgeOverlap(ea, eb, EDGE_SIZE),
              hardFailures, passesHardGates: hardFailures.length === 0,
-             refCoverage: rm.coverage, renCoverage: dm.coverage, refDiscarded: rm.discarded, renDiscarded: dm.discarded };
+             refCoverage: rm.coverage, renCoverage: dm.coverage, refDiscarded: rm.discarded, renDiscarded: dm.discarded,
+             refFellBack: rm.fellBack, renFellBack: dm.fellBack, maskWarnings: [...rm.warnings, ...dm.warnings] };
 }
 
 /** The exact comparison this tree makes, beside it: differing pixels and the worst channel difference. */

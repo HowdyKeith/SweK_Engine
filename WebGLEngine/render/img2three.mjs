@@ -149,3 +149,46 @@ export function unitMesh(flat, radius = 1, from = flat) {
     return { ...flat, positions, centre: [0, 0, 0], radius,
              bounds: { min: flat.bounds.min.map((q, k) => (q - from.centre[k]) * s), max: flat.bounds.max.map((q, k) => (q - from.centre[k]) * s) } };
 }
+
+// ---- v4373: THE LADDER ----------------------------------------------------------------------------------------
+/**
+ * A GENERATED MODEL'S LOD LADDER, GENERATED. A mesh file has one resolution and a coarser level must be DECIMATED
+ * out of it -- an approximation of an approximation, and every simplifier's own error on top. A model that exists
+ * as CODE has a property no download has: call its factory again with a smaller budget and the coarse level is
+ * built by the same construction as the fine one. img2threejs's own mesh codec already carries this idea (a
+ * Quality type with named levels and a ?quality= override); nothing consumed it.
+ *
+ * `make(budget)` returns a three.js object tree. Every rung is flattened and then framed by RUNG 0 -- not by its
+ * own bounds -- because a coarser rung is a different solid and normalising each to itself would rescale them
+ * apart, which is the mistake v4366 made and measured.
+ *
+ * The invariants are returned as numbers rather than asserted here, so a caller (and a gate) can say which one
+ * failed and by how much. TRIANGLES must fall strictly: two budgets that build the same mesh are one rung wearing
+ * two names. And a coarser rung must NOT GROW: an inscribed polygon has fewer segments and less extent, so a rung
+ * that reaches outside rung 0's bounds is a factory whose budget does something other than coarsen.
+ */
+export function buildLadder(make, budgets, { radius = 1, tol = 1e-5 } = {}) {
+    if (!Array.isArray(budgets) || budgets.length < 2) throw new Error("img2three: a ladder needs at least two budgets; one rung is a model, not a ladder");
+    const flats = budgets.map((b) => { const root = make(b);
+        if (root && typeof root.updateMatrixWorld === "function") root.updateMatrixWorld(true);
+        return flattenThreeTree(root); });
+    const base = flats[0];
+    const rungs = flats.map((f, i) => ({ budget: budgets[i], mesh: unitMesh(f, radius, base), raw: f,
+        triangles: f.triangles, vertices: f.vertices, meshes: f.meshes, materials: f.materials, bounds: f.bounds }));
+    return { rungs, base, invariants: ladderInvariants(rungs, tol) };
+}
+
+/** The three facts a generated ladder must carry, each as a number and a verdict rather than a throw. */
+export function ladderInvariants(rungs, tol = 1e-5) {
+    const tris = rungs.map((r) => r.triangles);
+    let decreasing = true; for (let i = 1; i < tris.length; i++) if (!(tris[i] < tris[i - 1])) decreasing = false;
+    const b0 = rungs[0].bounds;
+    let worstOutside = 0;
+    for (const r of rungs) for (const k of [0, 1, 2]) {
+        worstOutside = Math.max(worstOutside, b0.min[k] - r.bounds.min[k], r.bounds.max[k] - b0.max[k]);
+    }
+    const fams = rungs.map((r) => Object.keys(r.materials).sort().join(","));
+    const sameMaterials = fams.every((f) => f === fams[0]);
+    return { triangles: tris, decreasing, worstOutside, contained: worstOutside <= tol, sameMaterials, families: fams[0],
+             ratio: tris.map((t) => t / tris[0]) };
+}
