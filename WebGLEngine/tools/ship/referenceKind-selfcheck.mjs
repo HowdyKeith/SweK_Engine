@@ -229,6 +229,54 @@ const rescued = [];
     // *** v3223 CLOSED ONE INSTANCE AND NOT THE CLASS, AND THIS IS THE EVIDENCE. ***
     const registers = ["tools/ship/reportingTools.mjs", "tools/ship/graveyard-selfcheck.mjs"];
     const byRegister = registers.map((r) => [r, rescued.filter((x) => x.by.includes(r)).length]);
+    // ------------------------------------------------------------------------------------------------------
+    // v4386 -- THE FOURTH ROUTE, AND THE ONE THE SHIP RITUAL DRIVES ITSELF.
+    //
+    // Three routes to the changelog-vs-load distinction were measured and refused in an earlier round and are
+    // reported at the foot of this file: comment stripping (only 31 of 191 were comment-only), runtime directory
+    // enumeration (92 of its 128 hits were tools/ walked BY GATES AUDITING IT), and demos_code (10 modules, the
+    // one earned case, too small). *** THE REGISTER ROUTE WAS NEVER AMONG THEM, THOUGH v3223's LAW HAS BEEN ON
+    // THE BOOKS SINCE: A REGISTER OF ORPHANS IS NOT A CONSUMER OF THEM. *** Measured here: it does not close the
+    // gap either. FOUR routes now, none of which reaches the ceiling, and that is itself the answer -- 222 is a
+    // real diffuse population, not one hidden class waiting to be subtracted.
+    const isRegister = (m) => /-selfcheck\.mjs$/.test(m) ||
+        ["tools/ship/reportingTools.mjs", "tools/ship/orphanTriage.mjs", "tools/ship/orphanDisposition.mjs",
+         "tools/ship/unwiredRegister.mjs"].includes(m);
+    const registerOnly = rescued.filter((r) => r.by.every(isRegister));
+    say(`${registerOnly.length} of them are rescued ONLY by a register -- the fourth route, and it does not reach ${RESCUED_CEILING} either`);
+
+    // *** AND ONE RESCUER IS THE SHIP RITUAL ITSELF, WHICH IS WHY THIS IS A CHECK AND NOT A REPORT. ***
+    // tools/ship/gateSweep.mjs carries the sweep CLOSINGS: one paragraph per round that adds a gate, required by
+    // the ship skill, reading "X-selfcheck guards render/X.mjs". A round that builds a module, gates it, and
+    // follows the ritual therefore writes the sentence that hides its own new module from the orphan census.
+    // NOBODY CHOSE THIS. It is the header's "documenting a module is the single commonest way to hide it" with
+    // the documentation MANDATED -- and it is the same shape as this file's own first run, where the gate about
+    // prose rescuing modules rescued one with its own prose.
+    //
+    // MEASURED AT v4386: three modules were in this position, all three from the branch that found it --
+    // render/img2three.mjs, render/divineEye.mjs and mesh/carve.mjs. divineEye is WIRED as of this round
+    // (ssim-compare.html imports it, the same move v3693 made for render/ssimWindowed.mjs on the same page), so
+    // the number is two. THE RATCHET IS ON THE COUNT, NOT ON THE NAMES: the point is that the next round to leave
+    // a gate-only module behind is told so by its own ship run, rather than 900 rounds later by a census.
+    //
+    // *** AND THE FIRST DRAFT OF THIS CHECK WAS DEFEATED BY A SENTENCE, WHICH IS THE FOURTH TIME IN THIS THREAD
+    // THE DEFECT HAS LANDED ON THE FILE STUDYING IT. *** It asked for the closing to be the module's ONLY rescuer
+    // (`by.length === 1`). Sabotaging the wiring -- import removed from ssim-compare.html, the page's two prose
+    // paragraphs about the port left in place -- put divineEye straight back on the rescued list and the check
+    // STAYED GREEN, because the page now MENTIONED it: two rescuers, not one. A check about modules hidden by a
+    // sentence, hidden from its own subject by a sentence. The property is not "the closing is the only rescuer",
+    // it is "THE CLOSING IS ONE OF THEM" -- the ritual is holding the module off the census either way.
+    const RITUAL_CEILING = 2;
+    const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
+    ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
+       ritual.length <= RITUAL_CEILING,
+       `${ritual.length} against ${RITUAL_CEILING}: ${ritual.map((r) => r.f).join(", ") || "(none)"}. THE CLOSING IS ` +
+       "WRITTEN BY THE RITUAL, one per round that adds a gate, and it names the module it guards -- so a round that " +
+       "builds a module, gates it and ships it has documented the module into invisibility without deciding to. " +
+       "The two standing are render/img2three.mjs (a three.js-object-tree flattener whose only caller today is its " +
+       "own gate; no page builds a three tree to flatten) and mesh/carve.mjs. Falling is progress by the three " +
+       "routes this file has always named -- wire it, delete it, or teach the census to resolve.");
+
     ok("!! *** a REGISTER still rescues modules, and one of them is the census gate itself ***",
        byRegister.every(([, n]) => n > 0),
        byRegister.map(([r, n]) => `${r} rescues ${n}`).join("; ") + `. v3223 excluded tools/ship/unwiredRegister.mjs BY NAME for exactly this reason -- "A REGISTER OF ORPHANS IS NOT A CONSUMER OF THEM" -- and stopped at one file. THE GATE'S OWN HEADER AND LISTS NAME THE MODULES IT IS JUDGING, so it suppresses its own findings.`);
@@ -308,5 +356,19 @@ const rescued = [];
        "a first attempt moved the actionable count 22 -> 97 -> 228 depending on which routes the resolver knew about (import specifiers, then worker targets, then the directory exemption). *** A NUMBER THAT MOVES THAT FAR UNDER ITS OWN AUTHOR IS NOT YET A MEASUREMENT, and rewriting a SHARED scan on one is the v3202 sweep shape that deleted 61 live modules. *** The exposure is frozen here instead, and the rewrite is a round with a fixture rather than a guess.");
 }
 
+// SABOTAGE LOG for the v4386 ritual check -- applied, gate run, exit code read, restored.
+//   AT the divineEye import removed from ssim-compare.html, the page's prose about the port left standing ->
+//      exit=1 and the ritual check reads 3 against 2, naming render/divineEye.mjs. *** ITS FIRST DRAFT DID NOT
+//      BITE ON THIS AT ALL: written as `by.length === 1 && by[0] === gateSweep`, it stayed GREEN because the
+//      leftover paragraph made the page a second rescuer. A check about modules hidden by a sentence, hidden
+//      from its own subject by a sentence -- caught by sabotaging it, not by reading it, and the property is
+//      now "the closing is ONE OF the rescuers" rather than "the only one". ***
+//
+// WHAT THE v4386 ROUND DID NOT DO, SAID PLAINLY: it did not lower 221. Wiring divineEye moved it by one, which
+// is one module genuinely reachable and not a dent in the ratchet. render/img2three.mjs and mesh/carve.mjs are
+// still gate-only and still named above; no page builds a three.js object tree to flatten, and inventing one to
+// move a number would be the opposite of what the wire route means. The ceiling stays at 181 and the gate stays
+// red on the register with its own line, because raising it to 221 would be the ratchet catching up to wherever
+// the number landed -- which this file's own v3195 note calls a ratchet holding nothing.
 console.log(fails ? "\nreferenceKind-selfcheck: " + fails + " FAILED" : "\nreferenceKind-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
