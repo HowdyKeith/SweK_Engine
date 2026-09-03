@@ -43,6 +43,7 @@
 // and any gate that scans files rather than reading git's index will be compared across that gap. It is fixed
 // at its cause (the walk skips .claude now) rather than by moving a baseline.
 "use strict";
+import { REGISTER_AUDIT } from "./register-audit.mjs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,104 +76,77 @@ export const METHOD = Object.freeze({
  * than sampling: the whole list costs about 68 seconds. A census that only spot-checks is a census that can
  * be wrong about the entries it skipped, and this tree has enough of those already.
  */
-export const RED_AT_V4279 = Object.freeze([
-    { gate: "engine/frameDirtyCensus-selfcheck.mjs", ms: 775,
-      fails: "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it *" },
-    { gate: "tools/roundhouse/swekWebviewApk-selfcheck.mjs", ms: 914,
-      fails: "...and a failed load offers the prompt, since that is when the address is usually wrong" },
-    { gate: "tools/ship/avatarServerViews-selfcheck.mjs", ms: 6352,
-      fails: "!! every framed surface the server.html switch mounts carries ?embed=1 rigged, stickwoman, robotexpressive2, b" },
-    { gate: "tools/ship/bfcache-selfcheck.mjs", ms: 993,
-      fails: "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted camera-effects.html" },
-    { gate: "tools/ship/boundaryLint-selfcheck.mjs", ms: 5714,
-      fails: "!! no response body is read without consulting .ok see above" },
-    { gate: "tools/ship/canvasFill-selfcheck.mjs", ms: 4908,
-      fails: "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effe" },
-    { gate: "tools/ship/definitionGates-selfcheck.mjs", ms: 226,
-      fails: "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 18: physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/me" },
-    { gate: "tools/ship/gateReach-selfcheck.mjs", ms: 9808,
-      fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
-    { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
-      fails: "!! it is the only homography in the tree" },
-    { gate: "tools/ship/pagePlacement-selfcheck.mjs", ms: 88,
-      fails: "!! ...and the silent bucket is the large one, which is the finding 188 silent against 235 placed. pageSections says of UNPLACED: \"an unplaced page and" },
-    { gate: "tools/ship/pagePlacements-selfcheck.mjs", ms: 106,
-      fails: "...and the packing rule has ONE implementation, on the server side the browser renders what it is handed. A se" },
-    { gate: "tools/ship/pageReflow-selfcheck.mjs", ms: 87,
-      fails: "!! *** nothing reads layout after a DOM write inside a loop *** ui/crtToggle.js:58 getBoundingClientRect, ui/d" },
-    { gate: "tools/ship/pageSectionsReport-selfcheck.mjs", ms: 1483,
-      fails: "!! and no alarm span is drawn at all when nothing is actually wrong \u2014 1 already linked in another part of t" },
-    { gate: "tools/ship/pairlaneBridge-selfcheck.mjs", ms: 90,
-      fails: "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched *** renaming the i" },
-    { gate: "tools/ship/proseAudit-selfcheck.mjs", ms: 2001,
-      fails: "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit) 44 so" },
-    // *** THIS ENTRY IS THE ONE THE FIRST DRAFT GOT WRONG, AND IT EXPOSED A HOLE IN THE METHOD. ***
-    // The parallel sweep TIMED IT OUT at 120s and the census then filed it under RECORDED_BUT_GREEN, on the
-    // strength of it appearing in gate-timings.json's stale list and not in the confirmed-red list. It runs
-    // in 73.7s on an idle box and EXITS 1. It was never green; it was starved, mis-bucketed, and then read
-    // as exonerated. Found only because the control in section 3 re-runs a sample rather than trusting the
-    // set difference -- which is the entire argument for having that control.
-    { gate: "tools/ship/referenceKind-selfcheck.mjs", ms: 73680,
-      // v4380 -- THIS ENTRY NEVER RECORDED A FAILING LINE. What stood here was an annotation about the SWEEP
-      // ("confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep"), which is a fact
-      // about bucketing and not about the gate. The gate's own line, read for the first time since, is a RISING
-      // number on a check whose text says a rise is the bad direction -- and it rose from 221 to 223 between two
-      // runs inside the round that found it. The bucketing note is kept below because it is still true.
-      // v4386 -- READ, AND THE RISE HAD A CAUSE NOBODY HAD LOOKED FOR. Three of the modules on the rescued list
-      // were this branch's own (render/img2three.mjs, render/divineEye.mjs, mesh/carve.mjs) and all three had
-      // ONE rescuer: tools/ship/gateSweep.mjs, whose sweep closings the SHIP RITUAL requires -- one paragraph per
-      // round that adds a gate, naming the module it guards. A round that builds a module, gates it and ships it
-      // documents it into invisibility without deciding to. divineEye is wired now (ssim-compare.html imports it,
-      // the move v3693 made for render/ssimWindowed.mjs on that same page) and the population is 221; the gate
-      // gained a ratchet on the ritual class and a report of the FOURTH route (39 rescued only by a register --
-      // which, like the three routes measured before it, does not reach 181 either).
-      fails: "!! *** the prose-rescued population may only SHRINK *** 234 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling" },
-    { gate: "tools/ship/registerResidue-selfcheck.mjs", ms: 1321,
-      fails: "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga" },
-    // v4379 -- REMOVED, FIXED RATHER THAN WIDENED. It read "the page renders title, why and how for each" and had
-    // been red since v4129, when the rig-only panel was taken off rig.html at Keith's request. The check named that
-    // page, so it went red on the removal and the line was filed here as a fact about a deleted panel. Read instead
-    // of filed, it said something else: RIG_ONLY was served on /rig/list and rendered by NO page, fifteen entries of
-    // recorded reasoning about what each chore unblocks, unreachable for 250 rounds. server.html now carries the
-    // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
-    // naming one, so the surface can move again without this going stale twice.
-    // v4383 -- REMOVED, AND THE COUNT IT RECORDED WAS NEVER TRUE. v4380 filed this at 14 against a line that
-    // said 4 and left the judgement -- has the IR arithmetic inverted? -- for a round of its own. It has not:
-    // FOUR OF THE FOURTEEN WERE ENGLISH PROSE. See FIXED_SINCE_V4279.
-    // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
-    { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
-      fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },
-    { gate: "tools/ship/statedRuntime-selfcheck.mjs", ms: 129,
-      fails: "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/commentFalsePas" },
-    { gate: "tools/ship/sunshineHost-selfcheck.mjs", ms: 101,
-      fails: "every route the bridge lists is reachable through its own handler" },
-    { gate: "tools/ship/supersededFlag-selfcheck.mjs", ms: 69,
-      fails: "...and an UNINVITED launch still refuses, which was always correct two launchers that both start a server take" },
-    { gate: "tools/ship/unattendedHold-selfcheck.mjs", ms: 54,
-      fails: "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict it must still decline to f" },
-    { gate: "tools/ship/updatePause-selfcheck.mjs", ms: 284,
-      fails: "...and an errored check is counted as its own thing, not silently dropped" },
-    { gate: "tools/ship/wasmSupport-selfcheck.mjs", ms: 2968,
-      fails: "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 99 mention it" },
-    { gate: "tools/ship/wiringClaims-selfcheck.mjs", ms: 1731,
-      fails: "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name *** a sentence that says 'A is unwired whil" },]);
-
-/**
- * The thirteen gate-timings.json listed as failing that are GREEN now.
+/*
+ * v4430 -- *** THE AUDIT IS THE SOURCE NOW, AND THIS LIST IS THE ONLY THING THE AUDIT CANNOT KNOW. ***
  *
- * *** THESE ARE NOT A BACKLOG. THEY ARE THE REGISTER'S OWN FALSE ACCUSATIONS, *** kept visible because
- * deleting them silently would repeat the mistake that produced them. Each was fixed by some round that did
- * not know it was listed, which is exactly what happens when a register is written once and never read.
+ * docs/EXPLAIN-ITSELF.md item 1, and the step three rounds declined. This array used to carry a QUOTED FAILING
+ * LINE and a MILLISECOND COUNT per entry -- a projection of a gate run, frozen at the moment somebody typed it.
+ * v4380 found shaderCensus filed at 4 saying 14; v4383 found the 14 was itself false; v4386 found
+ * referenceKind's line describing sweep BUCKETING rather than the gate; v4426 found budgetEvidence saying 67
+ * when the answer was 3, a 22x drift, and had to retype EIGHT lines from the audit to make the register true.
+ * One shape, five sightings: THE STORED PROJECTION WENT STALE BECAUSE THE CANONICAL THING WAS ELSEWHERE.
+ *
+ * MEASURED BEFORE INVERTING: of the 25 entries, 24 had a line the audit could re-derive -- 7 matching exactly,
+ * 16 a whitespace truncation of one, 1 drifted -- and exactly ONE could not, tools/ship/shaderRefs-selfcheck.mjs,
+ * whose 379-second run the audit's cap ends before it prints. So all but one of these fields was a hand-typed
+ * copy of something the tree already had, and the one is not a stale reading, it is an UNVERIFIED one, which
+ * is a different fact and now says so in its own field rather than by looking like the other twenty-four.
+ *
+ * WHAT REMAINS CANONICAL HERE IS THE NAME LIST: which gates were red at v4279 is a claim about a MOMENT, and no
+ * later run can establish it. The reading -- what the gate says, and how long it takes -- belongs to the run,
+ * and the run is tools/ship/register-audit.mjs. Re-freeze that and this register updates itself; there is
+ * nothing left to retype and nothing left to drift.
+ *
+ * `ms` and `fails` are still on every entry, so every reader keeps working. They are GETTERS over the audit.
  */
-export const RECORDED_BUT_GREEN = Object.freeze([
-    "ai-bridge/tools/lab-scene-run-selfcheck.mjs", "tools/roundhouse/strictConfig-selfcheck.mjs",
-    "tools/roundhouse/twoF-selfcheck.mjs", "tools/ship/hookupState-selfcheck.mjs",
-    "tools/ship/moduleHistory-selfcheck.mjs", "tools/ship/physicsReach-selfcheck.mjs",
-    "tools/ship/registryOrphans-selfcheck.mjs",
-    "tools/ship/rootLayout-selfcheck.mjs", "tools/ship/singleSource-selfcheck.mjs",
-    "tools/ship/timingCoverage-selfcheck.mjs", "tools/ship/updateIntegrity-selfcheck.mjs",
-    "ui/stageInfo-selfcheck.mjs",
+const RED_AT_V4279_GATES = Object.freeze([
+    "engine/frameDirtyCensus-selfcheck.mjs",
+    "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
+    "tools/ship/avatarServerViews-selfcheck.mjs",
+    "tools/ship/bfcache-selfcheck.mjs",
+    "tools/ship/boundaryLint-selfcheck.mjs",
+    "tools/ship/canvasFill-selfcheck.mjs",
+    "tools/ship/definitionGates-selfcheck.mjs",
+    "tools/ship/gateReach-selfcheck.mjs",
+    "tools/ship/homography-selfcheck.mjs",
+    "tools/ship/pagePlacement-selfcheck.mjs",
+    "tools/ship/pagePlacements-selfcheck.mjs",
+    "tools/ship/pageReflow-selfcheck.mjs",
+    "tools/ship/pageSectionsReport-selfcheck.mjs",
+    "tools/ship/pairlaneBridge-selfcheck.mjs",
+    "tools/ship/proseAudit-selfcheck.mjs",
+    "tools/ship/referenceKind-selfcheck.mjs",
+    "tools/ship/registerResidue-selfcheck.mjs",
+    "tools/ship/shaderRefs-selfcheck.mjs",
+    "tools/ship/statedRuntime-selfcheck.mjs",
+    "tools/ship/sunshineHost-selfcheck.mjs",
+    "tools/ship/supersededFlag-selfcheck.mjs",
+    "tools/ship/unattendedHold-selfcheck.mjs",
+    "tools/ship/updatePause-selfcheck.mjs",
+    "tools/ship/wasmSupport-selfcheck.mjs",
+    "tools/ship/wiringClaims-selfcheck.mjs",
 ]);
+
+// What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
+export const UNVERIFIED_LINE = Object.freeze({
+    "tools/ship/shaderRefs-selfcheck.mjs":
+        "379,838 ms: the audit's cap ends the run before it prints a failing line. NOT a stale reading -- an " +
+        "absent one. Measuring it needs a cap raised past six minutes, which is a decision about the audit.",
+});
+
+const auditRow = (gate) => ((REGISTER_AUDIT && REGISTER_AUDIT.rows) || []).find((r) => r.gate === gate) || null;
+
+export const RED_AT_V4279 = Object.freeze(RED_AT_V4279_GATES.map((gate) => Object.freeze({
+    gate,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() {
+        const r = auditRow(gate);
+        if (r && r.first) return r.first;
+        return UNVERIFIED_LINE[gate] || null;
+    },
+    /** true when the line above is the audit's own; false when it is the admission from UNVERIFIED_LINE. */
+    get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
 
 /** Fixed at v4279, with who broke them -- the two that were this session's doing, and the one that was not. */
 export const FIXED_AT_V4279 = Object.freeze([
@@ -387,13 +361,26 @@ export const FIXED_SINCE_V4279 = Object.freeze([
  * every entry says what is actually failing so the next round can pick one up. Registering a red the round did
  * not cause is what the register is for; widening it to hide one the round DID cause is the thing forbidden.
  */
-export const RED_AT_V4408 = Object.freeze([
-    { gate: "tools/ship/box3dFilter-selfcheck.mjs", ms: 93,
-      fails: "*** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST *** 74 declared, 18 missing",
-      why: "TWO BUILD SCRIPTS DISAGREE ABOUT THE EXPORT SET, and nothing at ship time has ever said so. Not " +
-           "this round's and not this round's to fix -- it is a WASM build question that needs the rig. Named " +
-           "here with its reading so the next round can start from a number rather than a rumour." },
+// v4430 -- the same inversion as RED_AT_V4279 above: the NAMES are the claim, the reading comes from the run.
+// This list held the file's last typed `fails:` literal, with no recorded run behind it at all.
+export const RED_AT_V4408_GATES = Object.freeze([
+    "tools/ship/box3dFilter-selfcheck.mjs",
 ]);
+
+const WHY_V4408 = Object.freeze({
+    "tools/ship/box3dFilter-selfcheck.mjs":
+        "TWO BUILD SCRIPTS DISAGREE ABOUT THE EXPORT SET, and nothing at ship time has ever said so. Not " +
+               "this round's and not this round's to fix -- it is a WASM build question that needs the rig. Named " +
+               "here with its reading so the next round can start from a number rather than a rumour.",
+});
+
+export const RED_AT_V4408 = Object.freeze(RED_AT_V4408_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4408[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
 
 // *** ONE OF THE TWO IS ALREADY GONE, AND THE REPAIR BELONGS TO ITS OWN MOMENT. ***
 // FIXED_SINCE_V4279 is the record of what the v4279 REGISTER held; orreryEjecta-selfcheck was never in it, so

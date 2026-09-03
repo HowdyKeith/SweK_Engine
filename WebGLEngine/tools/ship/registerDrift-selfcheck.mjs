@@ -42,9 +42,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RED_AT_V4279 } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, UNVERIFIED_LINE } from "./redCensus.mjs";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
 import { divergence, renderFor, auditAge } from "./registerRender.mjs";
+import { noComments } from "./sourceScan.mjs";
 import { gateReport } from "./gateReport.mjs";
 
 const REPORT = gateReport("tools/ship/registerDrift-selfcheck.mjs");
@@ -64,9 +65,12 @@ const byGate = new Map(REGISTER_AUDIT.rows.map((r) => [r.gate, r]));
 
 console.log("\n1. EVERY REGISTER ENTRY WAS ACTUALLY RUN, and the audit is not older than the register");
 {
-    const missing = RED_AT_V4279.filter((e) => !byGate.has(e.gate));
-    const extra = REGISTER_AUDIT.rows.filter((r) => !RED_AT_V4279.some((e) => e.gate === r.gate));
-    ok(`!! *** every one of the ${RED_AT_V4279.length} standing reds appears in the audit, and the audit carries nothing the register does not ***`,
+    // v4430 -- BOTH registers. The audit is the source of the failing line for RED_AT_V4279 and RED_AT_V4408
+    // alike now, so it runs both, and a check that knew about one would report the other's row as an intruder.
+    const REGISTERED = [...RED_AT_V4279, ...RED_AT_V4408];
+    const missing = REGISTERED.filter((e) => !byGate.has(e.gate));
+    const extra = REGISTER_AUDIT.rows.filter((r) => !REGISTERED.some((e) => e.gate === r.gate));
+    ok(`!! *** every one of the ${REGISTERED.length} standing reds appears in the audit, and the audit carries nothing the register does not ***`,
         missing.length === 0 && extra.length === 0,
         missing.length ? `never run: ${missing.map((e) => e.gate).join(", ")}`
                        : extra.length ? `audited but not registered: ${extra.map((r) => r.gate).join(", ")}`
@@ -99,7 +103,13 @@ console.log("\n3. THE MESSAGE THE REGISTER RECORDS IS THE MESSAGE THE GATE GIVES
         console.log(`          register: ${d.rec.slice(0, 120) || "(nothing recorded)"}`);
         console.log(`          gate now: ${d.now.slice(0, 160) || "(no FAIL line on either stream)"}${d.nLines > 1 ? `   [${d.nLines} failing lines]` : ""}`);
     }
-    ok(`!! *** every entry's recorded failing line is still the line the gate gives: ${rows.length - drifted.length} of ${rows.length} agree ***`,
+    // v4430 -- *** THIS ROW CANNOT FAIL ANY MORE, AND SAYING SO IS THE POINT. *** redCensus.mjs no longer
+    // STORES a failing line: `fails` is a getter over the audit, so "the filed line equals the audit's line" is
+    // true by construction. The check is kept because it still catches ONE thing -- an entry whose gate the
+    // audit has no row for at all, which is neither derived nor admitted -- and it is renamed to say that.
+    // Leaving it worded as a comparison would be an assertion that cannot fail, which this session has now
+    // found four times.
+    ok(`!! *** every entry's line comes from a run: ${rows.length - drifted.length} of ${rows.length} ***`,
         drifted.length === 0,
         drifted.length ? `${drifted.length} DRIFTED -- an entry describing a red the gate no longer gives is a red nobody has read since it was filed, which is how vendoredLicences went 52 rounds and rigJobs went 250`
                        : "so no entry is describing a red that has moved on without it");
@@ -143,7 +153,45 @@ console.log("\n5. v4400 -- THE REGISTER KEEPS A RENDERING WHERE IT SHOULD KEEP T
     // The claim worth holding is the one the measurement actually made -- NOT ONE ENTRY NAMES SOMETHING ITS
     // GATE NO LONGER SAYS. Every divergence in this register is a live check quoting a stale reading, which is
     // a different and much better problem than a register full of deleted checks.
-    ok("!! ...and NOT ONE entry names a check the gate no longer has: every divergence is a stale READING",
+    // *** REPLACED AT v4429, BECAUSE THE OLD ROW WAS ABOUT A DRIFT THAT NO LONGER EXISTS. *** `moved` and
+    // `drifted` are both structurally zero once the line is derived. What is still real, and is what the
+    // inversion has to be held to, is that NOTHING IS INVENTED: every entry is either derived from a recorded
+    // run or named in UNVERIFIED_LINE with the reason the audit could not supply it. A gate added to the
+    // register without re-freezing the audit is neither, and lands here.
+    const invented = RED_AT_V4279.filter((e) => !e.derived && !UNVERIFIED_LINE[e.gate]);
+    ok("!! *** every entry is DERIVED from a run or ADMITTED as unverified -- nothing is typed in between ***",
+       invented.length === 0,
+       invented.length ? "NEITHER: " + invented.map((e) => e.gate).join(", ") + " -- re-freeze the audit, or " +
+           "name it in UNVERIFIED_LINE with why the run cannot supply a line"
+           : `${RED_AT_V4279.filter((e) => e.derived).length} derived, ${Object.keys(UNVERIFIED_LINE).length} admitted, 0 typed`);
+    // *** AND A SABOTAGE THAT COST ZERO RED PUT THIS ROW HERE. *** Making the getter return a plausible
+    // sentence for the unadmitted entry -- inventing exactly the kind of reading this round exists to stop --
+    // left every row above green: `derived` was still false and the key was still in the map, so "derived or
+    // admitted" passed while the LINE was fabricated. The admission has to BE what comes back, not merely
+    // exist beside it.
+    const fabricated = RED_AT_V4279.concat(RED_AT_V4408)
+        .filter((e) => !e.derived && e.fails !== (UNVERIFIED_LINE[e.gate] || null));
+    ok("!! *** an entry with no run returns ITS ADMISSION, not a sentence that reads like a reading ***",
+       fabricated.length === 0,
+       fabricated.length ? "FABRICATED: " + fabricated.map((e) => e.gate).join(", ") +
+           " -- the getter answered with something that is neither a run nor the recorded reason"
+           : "the one unverified entry returns its own admission verbatim");
+    ok("!! ...and the admitted set may only SHRINK",
+       Object.keys(UNVERIFIED_LINE).every((g) => RED_AT_V4279.some((e) => e.gate === g)) &&
+       Object.keys(UNVERIFIED_LINE).length <= 1,
+       Object.keys(UNVERIFIED_LINE).join(", ") + " -- an entry that gains a captured run leaves this map, and " +
+       "the map is not a place to put a reading somebody could not be bothered to take");
+    // *** AND THE STRUCTURAL GUARANTEE ITSELF, WHICH IS THE ONLY THING THAT MAKES THE ROWS ABOVE HONEST. ***
+    // If a typed `fails:` string comes back into redCensus.mjs, every claim on this page about derivation is
+    // false and every row above still passes. This is the row that would not.
+    const censusSrc = fs.readFileSync(path.join(ENG, "tools", "ship", "redCensus.mjs"), "utf8");
+    const typed = (noComments(censusSrc).match(/\bfails:\s*["'`]/g) || []).length;
+    ok("!! *** redCensus.mjs stores NO typed failing line -- the inversion, asserted rather than assumed ***",
+       typed === 0,
+       typed ? typed + " typed `fails:` literal(s) are back in the register. THE FIELD IS DERIVED; a stored one " +
+               "cannot be kept honest and five rounds of this session are the evidence"
+             : "0 typed literals; `fails` is a getter over tools/ship/register-audit.mjs");
+    ok("...and the old row is kept only as history",
        (d.counts.moved || 0) === 0,
        `${d.counts.moved || 0} moved, ${d.counts.drifted || 0} drifted. THE REGISTER IS NOT WRONG ABOUT WHAT IS ` +
        "FAILING, IT IS WRONG ABOUT HOW MUCH -- and that is why the fix is to render the reading from the audit " +

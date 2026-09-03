@@ -12,7 +12,7 @@ this engine's own device-versus-shell split, and what v4388 to v4393 measured.
 
 This file is the roadmap for that thread. Each item names what it would measure.
 
-## 1. The register keeps a rendering where it should keep the source -- MEASURED v4401, SURFACED v4402
+## 1. The register keeps a rendering where it should keep the source -- MEASURED v4401, SURFACED v4402, INVERTED v4430
 
 `tools/ship/redCensus.mjs` stores a **quoted failing line**: a projection of a gate run,
 frozen at the moment somebody typed it. Three rounds in a row found it stale, each in a
@@ -49,12 +49,26 @@ the most consequential list it keeps. v4402 gives it one: `registerDrift` emits 
 register through v4395's mechanism with **the audit's line beside the filed one**, and
 `instruments.html` renders it. The nine divergences stop being a count and become a column.
 
-**Shipped:** `tools/ship/registerRender.mjs` derives the display line from the audit and
-classifies each entry into five outcomes rather than "matches / differs". `fails:` is
-*not* deleted -- it is the historical claim, and the distance between it and the run is
-the number this measured. What remains open is narrower now: `redCensus.mjs` still *stores* the typed line, and a
-reader who opens that file rather than the page still meets it. Making the module itself
-generated is a change to a file two branches edit every round, and this round declined it.
+**Shipped at v4402:** `tools/ship/registerRender.mjs` derives the display line from the audit
+and classifies each entry into five outcomes rather than "matches / differs".
+
+**Inverted at v4430, and the measurement is what made it obvious.** Of the 25 entries, **24
+had a line the audit could re-derive** -- 7 matching exactly, 16 a whitespace truncation of
+one, 1 drifted -- and exactly **one could not**: `shaderRefs-selfcheck.mjs`, whose 379-second
+run the audit's cap ends before it prints. All but one of the field was a hand-typed copy of
+something the tree already had.
+
+`fails` and `ms` are **getters over `register-audit.mjs`** now. What stays canonical in
+`redCensus.mjs` is the **name list** -- which gates were red at v4279 is a claim about a
+moment, and no later run can establish it; the reading belongs to the run. `RED_AT_V4408` was
+inverted the same way, since it held the file's last typed literal, and the audit runs both
+registers now.
+
+The one entry the audit cannot supply sits in `UNVERIFIED_LINE` with its reason, because an
+absent reading and a stale one are different facts. And the inversion is **asserted rather
+than assumed**: `registerDrift` fails if a typed `fails:` literal returns to the file, and
+fails if a non-derived entry answers with anything but its own admission -- a row that exists
+only because sabotaging for it cost zero red the first time.
 
 ## 2. Gates emit verdicts, not explanations -- DONE at v4395
 
