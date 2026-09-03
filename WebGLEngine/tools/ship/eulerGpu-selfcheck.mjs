@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/eulerGpu-selfcheck.mjs -- v4383
+// WebGLEngine/tools/ship/eulerGpu-selfcheck.mjs -- v4403
 //
 // *** simulation/euler/eulerShader.js HAD NEVER RUN, AND THE TREE SAID SO IN TWO PLACES. ***
 //

@@ -96,7 +96,7 @@ const N = 9, SPAN = 1.0, RHO = 0.1, CFG = { n: N, span: SPAN, rho: RHO };
         worstK === centre,
         "worst f32 error " + worst.toExponential(3) + " at cell " + worstK + " (centre is " + centre + "); " +
         "this is why the peak is adjudicated on the CPU rather than read from the proposal");
-    // *** v4385 -- THIS MEASURED THE FLOOR ONE ROUNDING SHORT OF THE KERNEL, and then allowed `worst <=
+    // *** v4405 -- THIS MEASURED THE FLOOR ONE ROUNDING SHORT OF THE KERNEL, and then allowed `worst <=
     // F32_FLOOR * 2` on top of it. *** cellMag() above returns a DOUBLE; the shipped kernel writes
     // `out : array<f32>`, so a real run rounds once more on the store. Measured through the store the worst is
     // 4.4196e-6, not the 4.3846e-6 this loop produced -- and a device agrees with the store, at 4.420e-6. The

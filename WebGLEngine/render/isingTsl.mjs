@@ -1,4 +1,4 @@
-// WebGLEngine/render/isingTsl.mjs -- v4382
+// WebGLEngine/render/isingTsl.mjs -- v4402
 //
 // THE ISING CHECKERBOARD AS A TSL COMPUTE PASS: THE FIRST TRANSPLANT IN THIS ARC WITH NO FLOAT IN IT AT ALL.
 //
@@ -6,7 +6,7 @@
 //
 // v4370 transplanted tools/roundhouse/hmcGpu.mjs's leapfrog and got BIT-IDENTICAL results because that kernel is
 // SMOOTH f32 arithmetic: an ulp of disagreement stays an ulp, so the claim survives a rounding difference.
-// v4380 transplanted the silhouette carve, which ends in a floor() -- DISCONTINUOUS, so an ulp can flip a voxel,
+// v4400 transplanted the silhouette carve, which ends in a floor() -- DISCONTINUOUS, so an ulp can flip a voxel,
 // and the twin had to become an f32 mirror with the discontinuity measured separately (66 flips in 17.3 million
 // pairs, none of which propagated).
 //
@@ -25,7 +25,7 @@
 //   So there is no vendor exp() in play and no float rounding anywhere on the accept path.
 //
 // Which means the claim here is not "bit-identical, which is a nice surprise" (v4370) or "exact against an f32
-// mirror, with the discontinuity measured beside it" (v4380). IT IS THE KERNEL'S OWN CONTRACT: every spin, or
+// mirror, with the discontinuity measured beside it" (v4400). IT IS THE KERNEL'S OWN CONTRACT: every spin, or
 // the round is wrong. There is no tolerance to fall back to and adjudicateSpins() has tol: 0 written into it.
 //
 // ---- WHAT THIS COST THE SHELL, AND IT WAS REFUSED BY NAME FIRST --------------------------------------------------
@@ -33,7 +33,7 @@
 // render/tslSource.mjs's uniform vocabulary was FLOAT-ONLY in its vectors: f32, vec2/3/4<f32>, mat4x4<f32>, plus
 // i32 and u32 as scalars. This pass carries its seed and key in a vec4<u32> and the transplant refused it by name
 // -- "uniform cfg has type vec4<u32>, which the device's uniform list does not carry". That is the guard doing
-// its job; the vocabulary is what had to grow, and ivec2/3/4 and uvec2/3/4 are in it at v4382.
+// its job; the vocabulary is what had to grow, and ivec2/3/4 and uvec2/3/4 are in it at v4402.
 //
 // Gated in tools/ship/tslIsing-selfcheck.mjs.
 "use strict";

@@ -25,7 +25,7 @@ export const TRI_VS_WGSL = `struct VSOut { @builtin(position) pos: vec4f, @locat
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   var o: VSOut; o.pos = vec4f(p[vi], 0.0, 1.0); o.uv = vec2f((p[vi].x + 1.0) * 0.5, 1.0 - (p[vi].y + 1.0) * 0.5); return o;
 }`;
-// *** v4382 -- THE VOCABULARY WAS FLOAT-ONLY, AND A PURE-INTEGER KERNEL CANNOT BE TRANSPLANTED THROUGH IT. ***
+// *** v4402 -- THE VOCABULARY WAS FLOAT-ONLY, AND A PURE-INTEGER KERNEL CANNOT BE TRANSPLANTED THROUGH IT. ***
 // Every uniform in this arc had been a float or a float vector, so nothing noticed that i32 and u32 were here as
 // SCALARS while their vectors were not. tools/roundhouse/isingGpu.mjs's Philox pass carries its seed and key in a
 // vec4<u32> and was refused by name -- "uniform cfg has type vec4<u32>, which the device's uniform list does not

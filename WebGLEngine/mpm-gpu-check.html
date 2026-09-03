@@ -131,7 +131,7 @@ async function gpuRun(dev, { block = {}, walls = null, mode = 1, steps = 60 } = 
     { binding: 2, resource: { buffer: bufAcc } }, { binding: 3, resource: { buffer: bufGv } },
     { binding: 4, resource: { buffer: bufFlags } },
   ];
-  // *** v4386 -- AN EXPLICIT LAYOUT, AND WITHOUT IT THIS PAGE HAD NEVER RUN A SINGLE STEP. ***
+  // *** v4406 -- AN EXPLICIT LAYOUT, AND WITHOUT IT THIS PAGE HAD NEVER RUN A SINGLE STEP. ***
   // With layout:"auto" WebGPU derives each entry point's bind group layout from the bindings THAT ENTRY POINT
   // USES, and `clear` never touches binding 1 (the particles). So createBindGroup with all five entries was
   // INVALID for it -- "binding index 1 not present in the bind group layout" -- and an invalid bind group means

@@ -348,7 +348,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         verdict: "green on this box, run singly, two sections. Driven RED by two sabotages of render/lodBudget.mjs " +
                  "(2/2 by name) and restored. Its own first run was wrong three ways and all three are logged in it",
     }),
-    // v4380 -- the FOURTEENTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
+    // v4380 -- the fourteenth closing, and the first gate whose subject is the RED REGISTER itself. registerDrift
+    // compares what the census says each standing red fails on against what that gate actually prints, which is the
+    // question that would have caught vendoredLicences (52 rounds) and rigJobs (250) before somebody stumbled on
+    // them. It reads a frozen audit rather than running 29 gates, so it stays inside the quick sweep.
+    since14: Object.freeze({
+        at: "v4380", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/registerDrift-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections over all 29 standing reds. Driven RED by two " +
+                 "sabotages (1/1 by name) and restored; its own first draft reported drift on two gates that had " +
+                 "not drifted, which is logged in it",
+    }),
+
+    // v4400 -- the FOURTEENTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
     // FORWARD at the merge; a closing's `at` names the round it belongs to, so it moves with the round). *** IT WAS WRITTEN AS since10 AND THAT
     // NUMBER WAS ALREADY TAKEN: *** the other line shipped v4365 and v4366 into since9 and since10 while this
     // one was building, and the merge left TWO since10 keys in one object literal -- where the later silently
@@ -358,8 +371,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // machinery every earlier closing's gate ran through (render/tslSource.mjs read `==` as an assignment), so
     // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
     // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
-    since14: Object.freeze({
-        at: "v4380", swept: 1, green: 1, red: 0,
+    since15: Object.freeze({
+        at: "v4400", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, three sections and 13 checks in 18.8 s. Driven RED by four " +
@@ -367,25 +380,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and the SMALLER one is the worse, because it breaks the containment bound the larger leaves " +
                  "intact. Sections 1 and 2 need no device and stay green where WebGPU is unavailable",
     }),
-    // v4381 -- the FIFTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
+    // v4401 -- the FIFTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
     // because main's v4372 landed mid-build and had already done three of them, better; what survived is the one
     // parameter that round did not vary. It has been numbered three times -- since13 in a draft that went into a
-    // dropped stash, then since13, then since14, and since15 here once main's own since13 landed. The number is
+    // dropped stash, then since13, then since15, and since16 here once main's own since13 landed. The number is
     // bookkeeping and moves freely; the `at` is the round and does not.
-    since15: Object.freeze({
-        at: "v4381", swept: 1, green: 1, red: 0,
+    since16: Object.freeze({
+        at: "v4401", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveJudged-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, four sections and 10 checks in 22 s. Driven RED by three " +
                  "sabotages (3/3/1 by name) and restored -- and the 1-red one is the thesis rather than a weak " +
                  "check: making the hulls worse does not move a verdict that depends on the grid",
     }),
-    // v4382 -- the SIXTEENTH closing, for the arc's first PURE-INTEGER transplant. Its round also widened
+    // v4402 -- the SIXTEENTH closing, for the arc's first PURE-INTEGER transplant. Its round also widened
     // render/tslSource.mjs's uniform vocabulary (ivec/uvec), which every earlier closing's gate runs through, so
     // tslPhysics, tslRace, tslRig and carveGpu were re-run to completion beside this one rather than left to the
     // quick sweep's cap -- machinery that changed is what a 3 s cap cannot vouch for.
-    since16: Object.freeze({
-        at: "v4382", swept: 1, green: 1, red: 0,
+    since17: Object.freeze({
+        at: "v4402", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/tslIsing-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, four sections and 8 checks in 0.9 s -- fast because node-webgpu " +
@@ -393,58 +406,58 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "name) and restored; the first is the round's own argument, a completely wrong RNG that moves " +
                  "13% of the spins and leaves the physics looking healthy",
     }),
-    // v4383 -- the SEVENTEENTH closing, and the first for a module the triage had written off. Its round moved
+    // v4403 -- the SEVENTEENTH closing, and the first for a module the triage had written off. Its round moved
     // simulation/euler/eulerShader.js from HARDWARE to GATEABLE by running it, so tools/ship/coverageTriage.mjs
     // changed too and coverageTriage-selfcheck was run beside this one.
-    since17: Object.freeze({
-        at: "v4383", swept: 1, green: 1, red: 0,
+    since18: Object.freeze({
+        at: "v4403", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/eulerGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, four sections and 8 checks in 20 s. Driven RED by three " +
                  "sabotages (1/2/1 by name) and restored; the FIRST is the round's argument -- a broken HLLC " +
                  "wave speed that the page's own 2% tolerance would have passed on both of its rows",
     }),
-    // v4384 -- the EIGHTEENTH closing, and the second in two rounds for a kernel the tree had never run. This one
+    // v4404 -- the EIGHTEENTH closing, and the second in two rounds for a kernel the tree had never run. This one
     // did not merely go ungated: it did not COMPILE. Its round also changed gfx/device.js (multi-entry-point
     // binding sets), so every gate that builds a compute pipeline -- tslPhysics, tslRace, tslRig, tslIsing,
     // carveGpu, eulerGpu and the four device* gates -- was run to completion beside this one.
-    since18: Object.freeze({
-        at: "v4384", swept: 1, green: 1, red: 0,
+    since19: Object.freeze({
+        at: "v4404", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/lbmGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, four sections and 8 checks in 7.8 s. Driven RED by three " +
                  "sabotages (2/3/1 by name) and restored; the first is a RE-ENACTMENT of the state the shader " +
                  "actually shipped in, since `macro` is a WGSL reserved keyword and the module never compiled",
     }),
-    // v4384 -- the NINETEENTH closing, and it is in the same round as the eighteenth because the round produced
+    // v4404 -- the NINETEENTH closing, and it is in the same round as the eighteenth because the round produced
     // two gates: one for a kernel that never compiled, and one for the merge hazard that shipped a conflicted
     // file into a commit WHILE that kernel was being fixed.
-    since19: Object.freeze({
-        at: "v4384", swept: 1, green: 1, red: 0,
+    since20: Object.freeze({
+        at: "v4404", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/conflictMarkers-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, two sections and 6 checks, scanning 5,427 tracked text files. " +
                  "Driven RED by two sabotages (1/2 by name) and restored -- and the first attempt at the first " +
                  "one went 0 red because the sabotage itself was wrong, which is logged in the gate",
     }),
-    // v4385 -- the TWENTIETH closing, and the fourth round running for a kernel nothing had ever given a device.
+    // v4405 -- the TWENTIETH closing, and the fourth round running for a kernel nothing had ever given a device.
     // This one also corrected a CONSTANT that two gates agreed on because both computed it the same wrong way,
     // so tools/roundhouse's magmap family (magmap, magmapAndroid, magmapVariants, magmapDefault, magmapEvidence,
     // magmapFastPath, magmapBenchVerdict, magmapTaichi, androidPeer, iosPeer, fmaAssumption) was run to
     // completion beside it -- eleven gates read F32_FLOOR.
-    since20: Object.freeze({
-        at: "v4385", swept: 1, green: 1, red: 0,
+    since21: Object.freeze({
+        at: "v4405", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/roundhouse/magmapDevice-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, two sections and 9 checks in 1.2 s. Driven RED by three " +
                  "sabotages (2/3/1 by name, and the first also reddens magmap-selfcheck) and restored; the first " +
                  "is the constant the tree actually shipped, which now costs a red in two gates instead of none",
     }),
-    // v4386 -- the TWENTY-FIRST closing, and the fifth round running for a kernel nothing had ever given a
+    // v4406 -- the TWENTY-FIRST closing, and the fifth round running for a kernel nothing had ever given a
     // device. This one found the CHECK PAGE itself broken, so mpm-gpu-check.html changed too and the MPM family
     // (gpuKernel, gpuKernelInterp and the step/transfer/plasticity gates behind them) was run beside it.
-    since21: Object.freeze({
-        at: "v4386", swept: 1, green: 1, red: 0,
+    since22: Object.freeze({
+        at: "v4406", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/mpm/mpmDevice-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, three sections and 10 checks in 0.8 s. Driven RED by three " +
@@ -452,16 +465,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "third leaves the determinism row GREEN while destroying the scatter, which is that row's " +
                  "declared limit arriving as a measurement",
     }),
-    // v4387 -- the TWENTY-SECOND closing, and the first in six rounds that did NOT find a kernel broken: this
+    // v4407 -- the TWENTY-SECOND closing, and the first in six rounds that did NOT find a kernel broken: this
     // one is graded against six analytic constants rather than against another renderer, so there was no
     // comparison to be wrong about. Its round touched no shipped module, only added two files.
-    since22: Object.freeze({
-        at: "v4387", swept: 1, green: 1, red: 0,
+    since23: Object.freeze({
+        at: "v4407", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/furnaceWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, three sections and 8 checks in 6.3 s. Driven RED by three " +
                  "sabotages (2/3/2 by name) and restored -- and a FOURTH went 0 red, which the gate keeps as a " +
                  "property: the furnace key is azimuthally blind, so no tangent frame can move it",
+    }),
+
+    // v4408 -- the twenty-third closing, and the first gate whose WGSL is GENERATED from a shipped GLSL file
+    // rather than written beside it. It scores v3494's Math.fround prediction on a device (right, to four
+    // figures), finds where a fround model cannot follow (WGSL bounds sin and cos by 2^-11 ABSOLUTE, and the
+    // NDF identity then reads 0.837 at roughness 0.02), and pins the cause by handing the same kernel the
+    // host's trig. Two of its six sabotages went 0 red and earned a section that MEASURES the two guards this
+    // quadrature never reaches, rather than letting dead branches look covered.
+    since24: Object.freeze({
+        at: "v4408", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/microfacetWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, six sections and 26 checks in 1.4 s -- inside the quick sweep's " +
+                 "3 s budget, which no other device gate in this arc is. Driven RED by four sabotages " +
+                 "(19/4/3/6 by name) and restored; two more went 0 red and are recorded as unreachable branches " +
+                 "with the clearance measured, five and six orders",
     }),
 });
 

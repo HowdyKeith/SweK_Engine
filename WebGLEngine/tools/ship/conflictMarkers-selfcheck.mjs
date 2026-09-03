@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/conflictMarkers-selfcheck.mjs -- v4384
+// WebGLEngine/tools/ship/conflictMarkers-selfcheck.mjs -- v4404
 //
 // *** NO TRACKED FILE CARRIES AN UNRESOLVED MERGE CONFLICT. THIS EXISTS BECAUSE THE LESSON WAS WRITTEN DOWN
 // TWICE AND REPEATED ANYWAY. ***
@@ -8,8 +8,8 @@
 // intact. Both times the cause was identical: `git add -A` STAGES A CONFLICTED FILE, marks it resolved, and then
 // `git diff --diff-filter=U` reports nothing. The conflict list was taken after the staging command that hid it.
 //
-//   v4381's own commit message says it: "a conflict list taken after `git add -A` is not a conflict list."
-//   v4384 did it again, three rounds later, to docs/CHANGELOG.md.
+//   v4401's own commit message says it: "a conflict list taken after `git add -A` is not a conflict list."
+//   v4404 did it again, three rounds later, to docs/CHANGELOG.md.
 //
 // THE FIRST TIME, tools/check.mjs CAUGHT IT -- brain/brain.js is JavaScript and conflict markers are a
 // SyntaxError, so verify refused the ship. THE SECOND TIME NOTHING DID: a Markdown file with markers in it parses
@@ -88,7 +88,7 @@ console.log("\n2. *** AND NOW THE TREE: no tracked file carries an unresolved me
 
 // SABOTAGE LOG -- applied, gate run, exit code read, restored.
 //   A  a conflict block written into docs/CHANGELOG.md (the exact file it was missed in) -> exit=1, 1 red, naming
-//      the file and its marker counts. A re-enactment of what actually got committed at v4384.
+//      the file and its marker counts. A re-enactment of what actually got committed at v4404.
 //      *** AND THE FIRST ATTEMPT AT THIS SABOTAGE WENT 0 RED, WHICH WAS A FINDING ABOUT THE SABOTAGE. *** It
 //      spliced the block in at byte offset 200, which landed mid-line, so the opening marker was not at the start
 //      of a line and the reader was right to ignore it. A sabotage that goes 0 red is a finding either way; here

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/roundhouse/magmapDevice-selfcheck.mjs -- v4385
+// WebGLEngine/tools/roundhouse/magmapDevice-selfcheck.mjs -- v4405
 //
 // *** "THE CARD IS GRADED BY magmapGpu.js IN A BROWSER, AGAINST THIS SAME REFERENCE, AND ONLY THAT COUNTS AS THE
 // KERNEL HAVING BEEN RUN." *** magmapKernel.mjs wrote that at v2903 about its own f32 emulator, to keep the
 // emulator from ever being reported as a card. It was the right rule and it had one consequence nobody chased:
-// magmapGpu() and magmapRun() take a `device`, and until v4385 the ONLY callers that passed one were two HTML
+// magmapGpu() and magmapRun() take a `device`, and until v4405 the ONLY callers that passed one were two HTML
 // pages. No gate had ever given the first kernel a device. This one does, through node-webgpu.
 //
 // ---- WHAT A DEVICE SETTLED THAT AN EMULATOR COULD NOT -----------------------------------------------------------
@@ -19,7 +19,7 @@
 // with cellMag as well, so the constant and its guard agreed with each other; and it asserted
 // `worst <= F32_FLOOR * 2` while magmapGpu.mjs's header promised "the selfcheck fails if the measured floor ever
 // moves above it". Two models of the same thing, both one rounding short, with a 2x slack on top. Both are fixed
-// at v4385: the floor carries visible headroom (4.5e-6) over a measurement taken THROUGH the store, and the
+// at v4405: the floor carries visible headroom (4.5e-6) over a measurement taken THROUGH the store, and the
 // check is strict.
 //
 // ---- AND THE ARCHITECTURE IT WAS BUILT TO JUSTIFY IS CONFIRMED, ON HARDWARE, FOR THE FIRST TIME ------------------
@@ -139,7 +139,7 @@ else {
 }
 
 // SABOTAGE LOG -- applied to tools/roundhouse/magmapGpu.mjs, gates run, exit codes read, restored.
-//   A  F32_FLOOR put back to the pre-v4385 4.385e-6 -> exit=1, 2 red HERE and 1 red in magmap-selfcheck. This is
+//   A  F32_FLOOR put back to the pre-v4405 4.385e-6 -> exit=1, 2 red HERE and 1 red in magmap-selfcheck. This is
 //      the state the tree shipped in, and the point is that it now costs something in BOTH places: the device's
 //      measured 4.420e-6 is over it, and so is the store-rounded emulator's 4.4196e-6. Before this round neither
 //      gate could say so -- one measured without the store and the other allowed 2x on top.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/tslIsing-selfcheck.mjs -- v4382
+// WebGLEngine/tools/ship/tslIsing-selfcheck.mjs -- v4402
 //
 // GRADES render/isingTsl.mjs: the Ising checkerboard as a TSL compute pass, at ZERO TOLERANCE.
 //
@@ -7,10 +7,10 @@
 //
 //   v4370  hmcGpu's leapfrog: SMOOTH f32 arithmetic, so an ulp stays an ulp. Bit-identical was a strong finding
 //          and the round would still have stood at 1e-6.
-//   v4380  the silhouette carve: ends in a floor(), which is DISCONTINUOUS, so an ulp can flip a voxel. The twin
+//   v4400  the silhouette carve: ends in a floor(), which is DISCONTINUOUS, so an ulp can flip a voxel. The twin
 //          became an f32 mirror and the discontinuity was measured separately -- 66 flips in 17.3 million pairs,
 //          none of which propagated.
-//   v4382  the Ising sweep: NO FLOATING POINT ANYWHERE. tools/roundhouse/isingGpu.mjs states the contract in its
+//   v4402  the Ising sweep: NO FLOATING POINT ANYWHERE. tools/roundhouse/isingGpu.mjs states the contract in its
 //          own header -- "INTEGER ARITHMETIC END TO END, so the CPU mirror and the device must agree BIT-EXACTLY
 //          on every spin, every sweep" -- and adjudicateSpins() carries tol: 0. There is nothing to fall back to.
 //
@@ -27,7 +27,7 @@
 // render/tslSource.mjs's uniform vocabulary was float-only in its VECTORS -- f32, vec2/3/4<f32>, mat4x4<f32>,
 // with i32 and u32 present only as scalars. This pass carries sweep, parity, seed and key in a vec4<u32> and the
 // transplant refused it: "uniform cfg has type vec4<u32>, which the device's uniform list does not carry". The
-// guard was right and the vocabulary was short; ivec2/3/4 and uvec2/3/4 are in it at v4382, which is the same
+// guard was right and the vocabulary was short; ivec2/3/4 and uvec2/3/4 are in it at v4402, which is the same
 // shape of shell growth as the struct element at v4363 and the uniform arrays at v4364.
 //
 // SABOTAGES: see the log at the foot of this file.
@@ -167,7 +167,7 @@ else {
             F.noFloat === true && validateWgsl(F.wgsl).length === 0 && !/NodeBuffer_|object\./.test(F.wgsl),
             `${validateWgsl(F.wgsl).join("; ") || "validates"}; reads ${F.reads.join()}, writes ${F.writes.join()}`);
         report("THIS IS WHY THE CLAIM IS A CONTRACT RATHER THAN A RESULT. v4370 could have stood at 1e-6 and chose to " +
-               "say 0; v4380 had to measure a discontinuity beside its exactness. Here there is no float to round, so " +
+               "say 0; v4400 had to measure a discontinuity beside its exactness. Here there is no float to round, so " +
                "there is no weaker claim available: every spin, or the round is wrong. The kernel was DESIGNED that " +
                "way at v3283 and the transplant either preserves it or does not.");
     }

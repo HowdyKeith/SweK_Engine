@@ -15,7 +15,7 @@
 // TRUE. The test now exists, in simulation/lbm/shaderConstants-selfcheck.mjs, and it does what this sentence
 // always said it did.
 //
-// v4384 CORRECTION, AND IT IS THE SECOND OF THE SAME SPECIES IN THIS FILE. The line below used to end "The WGSL
+// v4404 CORRECTION, AND IT IS THE SECOND OF THE SAME SPECIES IN THIS FILE. The line below used to end "The WGSL
 // is correct-by-construction and unrun here." IT DID NOT COMPILE. `macro` is a RESERVED KEYWORD in WGSL, so the
 // binding on line 37 made the whole module a parse error -- "13:48 error: 'macro' is a reserved keyword" -- and
 // every one of the 48,124 dispatches a first run attempted was rejected before it began. The buffer is `moments`

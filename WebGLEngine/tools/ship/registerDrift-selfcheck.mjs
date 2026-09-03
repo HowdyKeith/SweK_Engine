@@ -1,0 +1,121 @@
+// THE RED REGISTER, HELD TO WHAT ITS GATES ACTUALLY SAY (v4380).
+//
+// *** TWICE IN ONE SESSION A STANDING RED TURNED OUT TO BE UNOPENED MAIL. *** vendoredLicences was red from v4319
+// to v4371 because vendor/three-webgpu was undeclared, and nobody ran it because it takes 15 s and the quick sweep
+// caps at 3. rigJobs was red from v4129 to v4379 on a line naming a page whose panel had been deliberately removed
+// -- filed as a fact about a deleted panel, when what it actually said was that fifteen entries of recorded
+// reasoning had been unreachable for 250 rounds. Both were in the register, both were accurate, and neither was
+// read. A register is supposed to be a list of reds somebody has ACCEPTED; these were reds nobody had opened.
+//
+// So this gate asks the one question that would have caught both: DOES EACH ENTRY STILL SAY WHAT IT SAYS IT SAYS?
+// tools/ship/register-audit.mjs is the observed side, frozen by tools/ship/freezeRegisterAudit.mjs, which runs
+// every gate in the census and writes down its exit code and its first failing line. This compares the two.
+//
+// *** THE AUDIT FOUND THREE THINGS AND EACH IS A DIFFERENT KIND. ***
+//   1. engine/frameDirtyCensus-selfcheck.mjs prints its FAIL line to STDERR, alone among the 29. It still exits 1,
+//      so the sweep sees the red -- but the MESSAGE is invisible to anything reading stdout, which is what every
+//      consumer in this tree does. A red whose reason cannot be read is most of the way to a red nobody opens.
+//   2. referenceKind's entry never recorded a failing line at all: its `fails` is the annotation "(confirmed red
+//      serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep)", which is about the SWEEP and not
+//      about the gate. What the gate actually says is that a prose-rescued population may only shrink and stands
+//      at 221 against a ceiling of 181 -- a RISING number, on a check whose own words are "A RISE MEANS A NEW
+//      ORPHAN IS BEING HIDDEN BY A SENTENCE". A live, worsening signal filed under a note about bucketing.
+//   3. shaderCensus recorded "only 4 files author a shader in BOTH languages" and now says FOURTEEN. That number
+//      is not decoration: the gate has held since v3274 that a hand-written pair is cheaper than an IR "while few
+//      files carry both languages -- if this count climbs toward twenty the arithmetic inverts, and THAT is when
+//      to re-open the three-stage shape". It was 4 when filed, 12 at v4319 by docs/TSL-ROADMAP.md's own count,
+//      and 14 now. THIS BRANCH PUT SOME OF THEM THERE: the TSL rounds added modules authoring both languages.
+//      The register was quietly holding a counter that this session was driving toward its own stated trigger.
+//
+// WHAT THIS GATE DOES NOT DO: repair any of them, or judge whether a red should be accepted. It checks that the
+// register's description of a red is the red's own description of itself, which is the difference between a list
+// somebody keeps and a list somebody reads.
+//
+// SABOTAGES: see the log at the foot of this file.
+"use strict";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { RED_AT_V4279 } from "./redCensus.mjs";
+import { REGISTER_AUDIT } from "./register-audit.mjs";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+let fails = 0;
+const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
+const report = (s) => console.log(`  ----  ${s}`);
+const norm = (s) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+const byGate = new Map(REGISTER_AUDIT.rows.map((r) => [r.gate, r]));
+
+console.log("\n1. EVERY REGISTER ENTRY WAS ACTUALLY RUN, and the audit is not older than the register");
+{
+    const missing = RED_AT_V4279.filter((e) => !byGate.has(e.gate));
+    const extra = REGISTER_AUDIT.rows.filter((r) => !RED_AT_V4279.some((e) => e.gate === r.gate));
+    ok(`!! *** every one of the ${RED_AT_V4279.length} standing reds appears in the audit, and the audit carries nothing the register does not ***`,
+        missing.length === 0 && extra.length === 0,
+        missing.length ? `never run: ${missing.map((e) => e.gate).join(", ")}`
+                       : extra.length ? `audited but not registered: ${extra.map((r) => r.gate).join(", ")}`
+                       : `${REGISTER_AUDIT.rows.length} rows, frozen at ${REGISTER_AUDIT.at} -- adding a register entry without re-freezing fails HERE rather than going unnoticed`);
+}
+
+console.log("\n2. NOTHING IN THE REGISTER IS SECRETLY GREEN");
+{
+    const green = REGISTER_AUDIT.rows.filter((r) => r.exit === 0);
+    ok("!! *** no gate in the register passes: a red that has been repaired and left on the list is a check nobody is getting the benefit of ***",
+        green.length === 0, green.length ? green.map((r) => r.gate).join(", ") : `all ${REGISTER_AUDIT.rows.length} still fail, so the register is not carrying a repaired gate as an excuse`);
+    const timedOut = REGISTER_AUDIT.rows.filter((r) => r.exit === "timeout");
+    ok(`  and a gate too slow to finish inside the audit's cap is recorded as TIMEOUT rather than as a verdict`,
+        timedOut.every((r) => !r.first), timedOut.length ? `${timedOut.map((r) => r.gate.replace("tools/ship/", "")).join(", ")} at ${REGISTER_AUDIT.capMs} ms -- a bound, not a measurement` : "none timed out");
+}
+
+console.log("\n3. THE MESSAGE THE REGISTER RECORDS IS THE MESSAGE THE GATE GIVES");
+{
+    // AMONG the gate's failing lines, not just its FIRST. A gate with several reds is ordinary, and asking only
+    // about the first reported drift on two gates that had not drifted at all -- the recorded line was still there,
+    // with another one printed above it. The register names ONE line; the question is whether the gate still says it.
+    const rows = RED_AT_V4279.map((e) => { const a = byGate.get(e.gate) || {};
+        const rec = norm(e.fails), all = (a.all || []).map(norm);
+        const head = rec.slice(0, 45);
+        const matches = !!rec && all.some((n) => n.startsWith(head) || rec.startsWith(n.slice(0, 45)));
+        return { gate: e.gate, rec, now: all.join(" | "), matches, exit: a.exit, nLines: all.length }; });
+    const drifted = rows.filter((r) => r.exit !== "timeout" && !r.matches);
+    for (const d of drifted) {
+        console.log(`        ${d.gate.replace("tools/ship/", "")}`);
+        console.log(`          register: ${d.rec.slice(0, 120) || "(nothing recorded)"}`);
+        console.log(`          gate now: ${d.now.slice(0, 160) || "(no FAIL line on either stream)"}${d.nLines > 1 ? `   [${d.nLines} failing lines]` : ""}`);
+    }
+    ok(`!! *** every entry's recorded failing line is still the line the gate gives: ${rows.length - drifted.length} of ${rows.length} agree ***`,
+        drifted.length === 0,
+        drifted.length ? `${drifted.length} DRIFTED -- an entry describing a red the gate no longer gives is a red nobody has read since it was filed, which is how vendoredLicences went 52 rounds and rigJobs went 250`
+                       : "so no entry is describing a red that has moved on without it");
+}
+
+console.log("\n4. A RED WHOSE REASON CANNOT BE READ");
+{
+    const stderrOnly = REGISTER_AUDIT.rows.filter((r) => r.onStderr);
+    ok(`!! *** every gate prints its FAIL line where the tree reads it: ${REGISTER_AUDIT.rows.length - stderrOnly.length} of ${REGISTER_AUDIT.rows.length} on stdout ***`,
+        stderrOnly.length === 0,
+        stderrOnly.length ? `${stderrOnly.map((r) => r.gate).join(", ")} prints to STDERR. It still exits 1, so the sweep sees the red -- but every consumer in this tree scrapes stdout, so the REASON is invisible. That is most of the way to a red nobody opens, which is the failure this whole gate exists for`
+                          : "so a red's reason reaches every consumer that scrapes a verdict");
+    const noLine = REGISTER_AUDIT.rows.filter((r) => r.exit !== "timeout" && r.count === 0);
+    ok("  and a gate that fails without printing any FAIL line at all is named, because an exit code with no sentence is a red nobody can act on",
+        noLine.length === 0, noLine.length ? noLine.map((r) => r.gate).join(", ") : "every failing gate says something");
+}
+
+// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4380.
+//   BJ the shaderCensus entry put back to the stale count of 4 -> exit=1, 1 red, naming the gate and printing both
+//      lines: what the register says and what the gate says. That is the whole mechanism in one failure.
+//   BK the FAIL line moved back to stderr in engine/frameDirtyCensus-selfcheck.mjs, with the audit RE-FROZEN so the
+//      change is observed rather than assumed -> exit=1, 1 red. Re-freezing is part of the sabotage: a check that
+//      read the source instead of a run would have caught this one for the wrong reason.
+//
+// AND THIS GATE'S FIRST DRAFT REPORTED DRIFT ON TWO GATES THAT HAD NOT DRIFTED. It compared the register's line
+// against the gate's FIRST failing line, and a gate with several reds is ordinary -- boundaryLint and
+// pagePlacements each print another line above the one recorded, so both read as drifted when the recorded line was
+// still there. The audit now freezes EVERY failing line and the comparison asks whether the recorded one is among
+// them: 4 drifted became 2, and the two that remain are real.
+console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
+console.log("unchecked here: whether a red SHOULD be accepted, which is a judgement and not a comparison -- this gate only " +
+    "asks whether the register's description matches the gate's; whether the three findings the v4380 audit turned up are " +
+    "REPAIRED, which they are not, and each is named in the header rather than folded into a count; and whether shaderCensus's " +
+    "climb from 4 to 14 has passed the point where this tree's own recorded reasoning says the hand-written-pair argument " +
+    "inverts -- that is a decision about the engine's shape and belongs to a round of its own, not to a drift check.");
+process.exit(fails ? 1 : 0);

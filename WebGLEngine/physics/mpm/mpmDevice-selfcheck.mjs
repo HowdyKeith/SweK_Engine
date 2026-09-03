@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/physics/mpm/mpmDevice-selfcheck.mjs -- v4386
+// WebGLEngine/physics/mpm/mpmDevice-selfcheck.mjs -- v4406
 //
 // *** "CORRECT ON AN INTERPRETER, UNTRIED ON A GPU." *** physics/mpm/gpuKernel.mjs says that of itself, and
 // names precisely what an interpreter cannot establish: "It does not prove the shader COMPILES on real

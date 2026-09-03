@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/lbmGpu-selfcheck.mjs -- v4384
+// WebGLEngine/tools/ship/lbmGpu-selfcheck.mjs -- v4404
 //
 // *** simulation/lbm/lbmShader.js SAID IT WAS "CORRECT-BY-CONSTRUCTION AND UNRUN". IT DID NOT COMPILE. ***
 //

@@ -30,6 +30,35 @@
 // WHAT THIS FILE CANNOT ANSWER: whether a real driver agrees. highp is a MINIMUM guarantee and a vendor may
 // carry more, may fold expressions differently, or may not honour highp in a fragment shader at all. THE
 // SANDBOX MODELS binary32; THE GPU IS THE AUTHORITY, and the page reads the numbers back to ask it.
+//
+// ================================================================================================
+// v4408 -- ASKED. THE ARITHMETIC PREDICTION IS RIGHT TO FOUR FIGURES AND ONE SENTENCE ABOVE IS TOO NARROW.
+// ================================================================================================
+//
+// physics/render/microfacetWgsl.mjs translates the three functions below into WGSL from THIS TEXT -- no second
+// copy -- and physics/render/microfacetWgsl-selfcheck.mjs runs them on a device. Two answers came back.
+//
+// *** THE MODEL WAS RIGHT ABOUT THE ARITHMETIC. *** At roughness 0.001 and cos 1 the device returns 2.604e-2
+// for the textbook denominator and 1.333e-7 for the rewrite -- the same two numbers Math.fround predicted, to
+// four significant figures, and the two forms agree with the model to a last-bit difference over a 20-cell
+// (roughness, cos) grid. The finding this round shipped is confirmed on silicon.
+//
+// *** AND "THE REWRITE HOLDS AT 1e-7 THROUGHOUT" IS A ROUGHNESS SWEEP AT cos = 1. *** The gate's rows are
+// D32(kind, 1, a): seven roughnesses, ONE cosine -- and cos = 1 is the single point where (1 - c2) has nothing
+// to cancel, because 1 - 1*1 is exactly 0 in every precision. Every PIXEL of the shader below is a different
+// (roughness, cos) pair, so the axis that was not swept is the one the shader spans. Along it the rewrite is
+// 9.9e-5 out at cos = 0.9999 -- three orders worse than the number that sentence quotes, in the model and on
+// the device alike. (1 - c2) IS ITSELF A DIFFERENCE OF NUMBERS NEAR 1: v3494 removed the cancellation in
+// (a^2 - 1) and this is the half that stayed. Nothing here is wrong; the claim is narrower than it reads.
+//
+// *** THE LARGER BILL IS PAID BY A CONSUMER THIS FILE CANNOT SEE. *** A fragment shader writing one lobe value
+// per pixel cannot take an integral, so microfacet.mjs's first key -- INT D(m)(n.m)dm = 1 -- stayed on the CPU.
+// A compute pass can take it, and on a device that builds the grid with the BUILT-IN sin and cos it reads 0.837
+// at roughness 0.02. WGSL bounds sin and cos by an ABSOLUTE error of 2^-11 inside [-PI, PI], so a conformant
+// device may return a cos that is four decimals correct, and (1.0 - c2) then reads twenty-eight times too
+// large near the pole. Handing the same kernel the same grid's sine and cosine from the host drops the residual
+// from 1.63e-1 to 2.50e-5 and lands it on the f32 mirror. THE ARITHMETIC HERE IS FINE; THE DANGER IS FEEDING IT
+// A COSINE THE HARDWARE COMPUTED.
 "use strict";
 
 export const VERT_SRC = `#version 300 es

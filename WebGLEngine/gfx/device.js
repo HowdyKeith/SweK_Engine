@@ -335,7 +335,7 @@ async function webgpuBackend(canvas, opts = {}) {
         p._bg = gpu.createBindGroup({ layout: p.pipe.getBindGroupLayout(0), entries }); p._bgGen = p._gen;
         return p._bg;
     };
-    // *** v4384 -- A MODULE MAY HAVE MORE THAN ONE ENTRY POINT, AND UNTIL NOW THIS ASSUMED IT DID NOT. ***
+    // *** v4404 -- A MODULE MAY HAVE MORE THAN ONE ENTRY POINT, AND UNTIL NOW THIS ASSUMED IT DID NOT. ***
     // WebGPU's layout:"auto" builds a bind group layout from what the CHOSEN entry point actually uses, not from
     // what the module declares. simulation/lbm/lbmShader.js is the first module here with two -- collideStream
     // touches all five bindings and stream touches three -- and both halves of the mismatch are errors: binding

@@ -40,7 +40,7 @@ import { variantWgsl, SHARED_CAP } from "./magmapVariants.mjs";
  * MORE TIME on the store, and 4.385e-6 was measured without it. *** magmapEmulated(), which stores into a
  * Float32Array and therefore models the kernel's own output buffer, gives 4.4196e-6 at n = 9, 21 and 33 alike.
  *
- * A DEVICE SETTLES WHICH MODEL IS RIGHT, AND IT IS NOT THE RECORDED ONE: run headlessly at v4385, the shipped
+ * A DEVICE SETTLES WHICH MODEL IS RIGHT, AND IT IS NOT THE RECORDED ONE: run headlessly at v4405, the shipped
  * wg128-shared kernel measures 4.420e-6 against the f64 reference -- the Float32Array emulator's number, not
  * cellMag's. The floor was below what a correct kernel actually produces.
  *

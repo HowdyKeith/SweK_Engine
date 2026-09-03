@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/physics/render/furnaceWgsl-selfcheck.mjs -- v4387
+// WebGLEngine/physics/render/furnaceWgsl-selfcheck.mjs -- v4407
 //
 // *** THE FIRST PIECE OF THE PATH TRACER TO CROSS TO A DEVICE, AND IT IS GRADED AGAINST SIX CONSTANTS RATHER
 // THAN AGAINST THE CPU. ***
@@ -14,10 +14,10 @@
 // ---- THE FOURTH CLAIM SHAPE IN THIS ARC ------------------------------------------------------------------------
 //
 //   v4370  smooth f32 arithmetic         -> bit-identical, and the claim would have survived at 1e-6
-//   v4380  a decision ending in floor()  -> exact set equality against an f32 mirror
-//   v4382  integer end to end            -> zero tolerance, because the kernel's own contract says so
-//   v4385  a quadrature with sqrt in it  -> a measured f32 floor, earned before the first failure
-//   v4387  a MONTE CARLO ESTIMATOR       -> NO comparison with the CPU at all. Six analytic constants.
+//   v4400  a decision ending in floor()  -> exact set equality against an f32 mirror
+//   v4402  integer end to end            -> zero tolerance, because the kernel's own contract says so
+//   v4405  a quadrature with sqrt in it  -> a measured f32 floor, earned before the first failure
+//   v4407  a MONTE CARLO ESTIMATOR       -> NO comparison with the CPU at all. Six analytic constants.
 //
 // physics/render/furnace.mjs's key has no free parameters: a white furnace returns the albedo, and each named
 // fault returns the albedo times a constant -- EXPECTED = { clean: 1, noPdf: 1/(2 PI), noCosine: 2,

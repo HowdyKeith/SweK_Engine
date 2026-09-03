@@ -1,4 +1,4 @@
-// WebGLEngine/physics/render/furnaceWgsl.mjs -- v4387
+// WebGLEngine/physics/render/furnaceWgsl.mjs -- v4407
 //
 // *** THE FURNACE ON A DEVICE, HELD TO ITS ANALYTIC KEY RATHER THAN TO THE CPU. ***
 //
@@ -15,9 +15,9 @@
 //
 // Every device round before this one compared a GPU against a CPU and had to say what agreement meant:
 //   v4370  smooth f32 arithmetic         -> bit-identical, and the claim would have survived at 1e-6
-//   v4380  a decision ending in floor()  -> exact set equality against an f32 mirror, discontinuity measured
-//   v4382  integer end to end            -> zero tolerance, because the kernel's own contract says so
-//   v4385  a quadrature with sqrt in it  -> a measured f32 floor, earned before the first failure
+//   v4400  a decision ending in floor()  -> exact set equality against an f32 mirror, discontinuity measured
+//   v4402  integer end to end            -> zero tolerance, because the kernel's own contract says so
+//   v4405  a quadrature with sqrt in it  -> a measured f32 floor, earned before the first failure
 //
 // *** THIS ONE CANNOT DO ANY OF THAT, AND DOES NOT NEED TO. *** physics/render/furnace.mjs's estimator is a
 // Monte Carlo integral whose answer is known exactly: a white furnace returns the albedo, and each named fault
