@@ -14,6 +14,76 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4390 -- The mutation operator chosen by the constant's role, and what survives after it
+
+v4389 ran the mechanical scanner for the first time and found seven survivors, five of which were about the
+OPERATOR rather than the tree: integer tick counts and a JSON indent, nudged by three percent and filed as
+constants nothing is checking. It recorded that judgement as a hand annotation called `plausible` and said so.
+tools/mutate/operators.mjs is that annotation becoming a function.
+
+THREE ROLES, each with the operator its kind of number deserves:
+
+  SCALE    non-integer, or in multiplicative context. Keeps the relative nudge -- the case scan.mjs's single
+           operator was always right about.
+  COUNT    an integer default, a tick offset, a table size. Set to ZERO and stepped by ONE, because a 3% nudge
+           is not a defect anyone could ship and those two are. Checked if EITHER lands.
+  FORMAT   an argument to a named formatting call. NO MUTANT, reported SKIPPED -- a different and honest answer
+           to "is this number checked": it is not a number anyone should check.
+
+AND ARITHMETIC BEATS DEFAULT, WHICH IS LOAD-BEARING. `const dt = opts.dt || 1 / 30` is both a default and a
+division. Read as a default it would be set to 0 -- a zero timestep, caught instantly by everything, telling
+you nothing whatever about the 1/30.
+
+THE CONTROL IS A CONSTANT WHOSE ANSWER WAS KNOWN BEFORE THE RUN. tools/mutate/mutate.mjs's hand-picked table
+sets box3dLockstepNet's redundancy to 0 and has been CAUGHT every time the suite has run. If the role operator
+had not caught it, the classifier would be wrong in the one case with an independent answer. It caught it,
+after ONE gate.
+
+RE-SWEPT, PER CONSTANT, over the same eleven in the same three files:
+
+    3% only     4 checked, 7 survivors
+    by role     6 checked, 4 survivors, 1 correctly skipped
+
+maxCatchup and redundancy are caught the moment they are set to zero. The JSON indent is skipped.
+
+AND ALL FOUR REMAINING SURVIVORS ARE THE SAME SHAPE, WHICH IS THE ROUND'S REAL FINDING.
+
+v4389 found the lockstep timestep survives because the gates that reach it are DIFFERENTIAL: they build two
+peers and compare them, so a constant both peers share moves both sides of the equality and cancels. That was
+not one curiosity. inputDelay SET TO ZERO survives -- lockstep schedules inputs ahead by that many ticks, and at
+zero both peers misbehave identically. So does the history-window offset. So does shipHalf.
+
+SO THE RULE IS SHARPER THAN "A DIFFERENTIAL GATE IS BLIND TO A SHARED CONSTANT": IT SEES ONE ONLY WHEN
+SOMETHING BREAKS THE SYMMETRY.
+
+Both catches came from the same gate -- physics/box3d-lockstep-loss-selfcheck.mjs, the cheapest in the set, and
+the one that injects PACKET LOSS. Redundancy governs what survives a lossy channel and maxCatchup whether a
+peer can ever catch up, so under loss the two peers stop being symmetric and diverge for real. dt, inputDelay,
+shipHalf and the window offset have nothing that breaks their symmetry, and pass. That is a statement about how
+to WRITE the missing check, not merely about which numbers lack one.
+
+THE CLASSIFIER SHIPPED A BUG IN ITS FIRST DRAFT AND THE FIX IS A SECTION. It read the role off `context`, which
+findConstants TRIMS and TRUNCATES for printing, while `col` indexes the untrimmed line. So `1 / 30` read as a
+bare integer and JSON.stringify's indent was not seen to be inside its own call. scan.mjs now carries `code`
+beside `context` -- the same family as v4389's length-preserving string stripper: a column is only meaningful
+against the text it was measured on.
+
+AND THE CLASSIFIER IS A SYNTACTIC GUESS THAT IS ALREADY KNOWN WRONG. shipHalf reads as a COUNT and is really a
+physical half-extent. The role is wrong; the operator it chose -- a body of half-extent 0 -- is still a better
+question than 30 -> 30.9, and the record says where it is wrong rather than smoothing it over. FORMAT is the one
+role that must not be wrong, because it makes a constant vanish from the experiment entirely, which is why it
+is a named list of eight calls rather than a rule.
+
+Four sabotages, 2/4/1/1 red by name, three files md5-identical after. B is the instructive one: with default
+beating arithmetic, every SCALE collapses into COUNT and dt would be caught FOR THE WRONG REASON -- which is
+worse than surviving, because it reports coverage that does not exist.
+
+UNCHECKED: the four survivors are still unguarded. This round sharpens the question and fixes nothing in the
+lockstep pair -- dt, inputDelay, shipHalf and the window offset can all be changed and every gate still passes.
+The three wide files from v4389 are still unswept for the same reason as before: 100-plus gate sets holding
+gates past the 120 s cap.
+
+The tree stands at 1428 gates.
 ## v4389 -- The mechanical mutation scanner runs, and what it finds first is itself
 
 tools/mutate/scan.mjs exists because a hand-picked mutation set "measures the AUTHOR'S IMAGINATION, not the

@@ -77,7 +77,14 @@ function findConstants(src) {
             if (val === 0 || val === 1) continue;              // identity/flag noise
             const before = code.slice(Math.max(0, m.index - 1), m.index);
             if (before === "[") continue;                      // an index, not a quantity
-            out.push({ line: li + 1, col: m.index, text: m[1], value: val, context: code.trim().slice(0, 68) });
+            // *** v4390 -- `code` IS CARRIED BESIDE `context` AND THE DIFFERENCE MATTERS. *** context is
+            // TRIMMED and TRUNCATED for printing; col is an index into the untrimmed line. A reader who slices
+            // context at col gets the wrong characters, and tools/mutate/operators.mjs did exactly that on its
+            // first run: `1 / 30` read as a bare integer because the leading spaces were gone, and
+            // JSON.stringify's indent was not seen to be inside the call. Same family as the length-preserving
+            // string stripper above -- a column is only meaningful against the text it was measured on.
+            out.push({ line: li + 1, col: m.index, text: m[1], value: val,
+                       code, context: code.trim().slice(0, 68) });
         }
     }
     return out;

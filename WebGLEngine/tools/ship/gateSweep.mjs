@@ -446,6 +446,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the default is unexercised. Driven RED by four sabotages (2/2/3/1 by name), three files " +
                  "md5-identical after",
     }),
+    since22: Object.freeze({
+        at: "v4390", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/operators-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, eight sections. The mutation operator is now chosen by the " +
+                 "constant's ROLE, and the same eleven constants re-swept go from 4 checked / 7 survivors to " +
+                 "6 checked / 4 survivors / 1 correctly skipped. The CONTROL had a known answer beforehand: " +
+                 "mutate.mjs sets redundancy to 0 by hand and is caught, and the role operator chose zero on " +
+                 "its own and was caught too. The classifier shipped a bug in its first draft (it read the " +
+                 "role off the TRIMMED excerpt while col indexes the untrimmed line) and that fix is section " +
+                 "1. Driven RED by four sabotages (2/4/1/1 by name), three files md5-identical after",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

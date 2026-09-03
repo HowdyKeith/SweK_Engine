@@ -38,7 +38,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL, fileURLToPath } from "node:url";
-import { mutationsFor } from "./scan.mjs";
+import { mutationsFor, findConstants } from "./scan.mjs";
+import { mutantsFor, roleOf, roleCensus } from "./operators.mjs";
 import { affectedGates, buildGraph } from "../ship/affected.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -107,6 +108,37 @@ export function costProfile(file, graph = null) {
     };
 }
 
+/**
+ * *** THE MUTANTS, CHOSEN BY ROLE. *** scan.mjs's mutationsFor() applies one operator to every literal; this
+ * asks tools/mutate/operators.mjs what KIND of number each is first, and a COUNT gets two mutants where a
+ * SCALE gets one. A FORMAT constant gets none and is returned as SKIPPED -- never as survived, because an
+ * untested constant and an unguarded one are different findings.
+ *
+ * The row shape stays scan.mjs's, plus `role` and `kind`, so the sweep and its record read the same either way.
+ */
+export function roleMutationsFor(file, opts = {}) {
+    const src = fs.readFileSync(file, "utf8");
+    const lines = src.split("\n");
+    const out = [];
+    for (const c of findConstants(src)) {
+        const ms = mutantsFor(c, opts);
+        if (!ms.length) {
+            out.push({ file, line: c.line, was: c.text, now: null, context: c.context,
+                       role: roleOf(c), kind: "skip", mutated: null });
+            continue;
+        }
+        for (const m of ms) {
+            const line = lines[c.line - 1];
+            const newLine = line.slice(0, c.col) + m.now + line.slice(c.col + c.text.length);
+            if (newLine === line) continue;
+            out.push({ file, line: c.line, was: c.text, now: m.now, context: c.context, role: m.role,
+                       kind: m.kind,
+                       mutated: [...lines.slice(0, c.line - 1), newLine, ...lines.slice(c.line)].join("\n") });
+        }
+    }
+    return out;
+}
+
 /** One gate, as a yes/no. A gate that cannot run is NOT a pass -- it is reported as its own state. */
 export function runGate(gate, timeout = 120000) {
     try {
@@ -148,15 +180,21 @@ export function alreadyRed(gate, file, original) {
  * stayed green -- which is scan.mjs's whole point: "a constant whose value can be changed without any gate
  * noticing is a constant nothing is checking".
  */
-export function sweepFile(file, { graph = null, onResult = null, costs = null } = {}) {
+export function sweepFile(file, opts = {}) {
+    const { graph = null, onResult = null, costs = null } = opts;
     recoverStranded();
     const full = path.join(ENG, file);
     const original = fs.readFileSync(full, "utf8");
     const order = gatesFor(file, graph, costs);
     const dropped = [];
-    const muts = mutationsFor(full);
+    const muts = (opts.byRole === false) ? mutationsFor(full) : roleMutationsFor(full);
     const results = [];
     for (const m of muts) {
+        if (m.mutated === null) {          // FORMAT: not a quantity, so not an experiment
+            const row = { file, line: m.line, was: m.was, now: null, context: m.context, state: "SKIPPED",
+                          by: null, gatesRun: 0, role: m.role, kind: m.kind };
+            results.push(row); if (onResult) onResult(row); continue;
+        }
         let state = "SURVIVED", by = null, ran = 0;
         try {
             fs.writeFileSync(MARKER, JSON.stringify({ file, original, line: m.line }));
@@ -182,7 +220,8 @@ export function sweepFile(file, { graph = null, onResult = null, costs = null } 
             }
             try { fs.unlinkSync(MARKER); } catch {}
         }
-        const row = { file, line: m.line, was: m.was, now: m.now, context: m.context, state, by, gatesRun: ran };
+        const row = { file, line: m.line, was: m.was, now: m.now, context: m.context, state, by,
+                      gatesRun: ran, role: m.role, kind: m.kind };
         results.push(row);
         if (onResult) onResult(row);
     }
@@ -195,6 +234,7 @@ export function tallySweep(results) {
         caught: results.filter((r) => r.state === "CAUGHT").length,
         survived: results.filter((r) => r.state === "SURVIVED").length,
         unmeasured: results.filter((r) => r.state === "UNMEASURED").length,
+        skipped: results.filter((r) => r.state === "SKIPPED").length,
         total: results.length,
     };
 }
@@ -216,14 +256,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(f + ": " + p.gates + " gate(s) reach it, cheapest " + p.cheapestMs + " ms, dearest " +
                     p.dearestMs + " ms, whole set " + (p.totalMs / 1000).toFixed(1) + " s");
         const r = sweepFile(f, { graph, costs, onResult: (row) =>
-            console.log("   " + row.state.padEnd(10) + String(row.gatesRun).padStart(3) + " gate(s)  line " +
+            console.log("   " + row.state.padEnd(10) + String(row.gatesRun).padStart(3) + " gate  " +
+                        (row.role || "").padEnd(6) + (row.kind || "").padEnd(9) + "line " +
                         String(row.line).padStart(4) + "  " + row.was + " -> " + row.now + "   " + row.context) });
         if (r.dropped.length) console.log("   dropped as already red: " + r.dropped.map((d) => d.gate).join(", "));
         all.push(...r.results);
     }
     const t = tallySweep(all);
     console.log("\n[mechanical] " + t.caught + "/" + t.total + " caught, " + t.survived + " SURVIVED" +
-                (t.unmeasured ? ", " + t.unmeasured + " unmeasured" : ""));
+                (t.unmeasured ? ", " + t.unmeasured + " unmeasured" : "") +
+                (t.skipped ? ", " + t.skipped + " skipped (format)" : ""));
     if (t.survived) {
         console.log("\n   A SURVIVING CONSTANT IS A NUMBER NOTHING IS CHECKING. Candidates, to be confirmed");
         console.log("   against a full verify before they are believed:");

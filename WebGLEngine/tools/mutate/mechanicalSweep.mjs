@@ -126,3 +126,113 @@ export function tally(rows) {
 
 /** The survivors worth arguing about: those whose operator was a plausible defect for that kind of number. */
 export const plausibleSurvivors = (rows) => rows.filter((r) => r.state === "SURVIVED" && r.plausible);
+
+// ================================================================================================================
+// *** v4390 -- THE SAME THREE FILES, SWEPT AGAIN WITH THE OPERATOR CHOSEN BY ROLE. ***
+//
+// The comparison is the point, so both records live here. tools/mutate/operators.mjs asks what KIND of number
+// each constant is before choosing how to break it: a SCALE keeps the relative nudge, a COUNT is set to zero
+// and stepped by one, a FORMAT argument is not mutated at all.
+//
+// PER CONSTANT -- which is the unit that matters, since a COUNT now gets two attempts and is checked if either
+// lands -- over the eleven constants in these three files:
+//
+//     3% only        4 checked, 7 survivors
+//     by role        6 checked, 4 survivors, 1 correctly skipped
+//
+// THREE OF THE SEVEN SURVIVORS WERE FALSE. maxCatchup and redundancy are CAUGHT the moment they are set to 0;
+// the JSON indent is SKIPPED, which is a different and honest answer to "is this number checked" -- it is not a
+// number anyone should check.
+//
+// *** AND redundancy IS THE CONTROL, BECAUSE THE ANSWER WAS KNOWN BEFORE THE RUN. *** mutate.mjs's hand-picked
+// table sets that same constant to 0 and has been CAUGHT every time the suite has run. If the role operator had
+// not caught it, the classifier would have been wrong in the one case with an independent answer. It caught it,
+// after ONE gate.
+//
+// ---- AND THE FOUR THAT SURVIVE ARE ALL THE SAME SHAPE, WHICH IS THE ROUND'S REAL FINDING --------------------
+//
+// v4389 found that box3dLockstepNet's dt survives because the gates that reach it are DIFFERENTIAL: they build
+// two peers and compare them, and a constant both peers share moves both sides of the equality. Sweeping by
+// role shows that was not one curiosity. inputDelay set to ZERO survives. So does the history-window offset.
+// All four survivors are shared constants in a peer-versus-peer comparison.
+//
+// *** SO THE RULE IS SHARPER THAN "DIFFERENTIAL GATES ARE BLIND": a differential gate sees a shared constant
+// only when something BREAKS THE SYMMETRY. *** Both catches here came from the same gate --
+// physics/box3d-lockstep-loss-selfcheck.mjs, the cheapest in the set -- and it is the one that injects PACKET
+// LOSS. Redundancy governs what survives a lossy channel and maxCatchup governs whether a peer can ever catch
+// up, so under loss the two peers stop being symmetric and diverge for real. dt, inputDelay, shipHalf and the
+// window offset have nothing to break their symmetry, and pass.
+// ================================================================================================================
+
+export const SWEEP_BY_ROLE = Object.freeze({
+    version: "v4389",
+    commit: "770deb9",
+    files: Object.freeze(["physics/box3dLockstep.js", "physics/box3dLockstepNet.js", "brain/blobPolicyStore.js"]),
+    /** One row per CONSTANT, carrying every mutant it was given. `before` is v4389's 3%-only verdict. */
+    constants: Object.freeze([
+        { file: "physics/box3dLockstep.js", line: 21, was: "30", role: "count", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "SURVIVED" },
+                                  { kind: "offByOne", now: "31", state: "SURVIVED" }]),
+          note: "shipHalf -- MISCLASSIFIED as a count; it is a physical half-extent. Still unchecked either way" },
+        { file: "physics/box3dLockstep.js", line: 71, was: "30", role: "scale", before: "CAUGHT",
+          mutants: Object.freeze([{ kind: "nudge", now: "30.9", state: "CAUGHT" }]),
+          note: "tryStep's dt default; caught by lockstepDt-selfcheck, which compares it against an ABSOLUTE" },
+        { file: "physics/box3dLockstepNet.js", line: 18, was: "3", role: "count", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "SURVIVED" },
+                                  { kind: "offByOne", now: "4", state: "SURVIVED" }]),
+          note: "inputDelay set to ZERO survives -- a new finding, and the same differential blindness as dt" },
+        { file: "physics/box3dLockstepNet.js", line: 19, was: "30", role: "scale", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "nudge", now: "30.9", state: "SURVIVED" }]),
+          note: "THE LOCKSTEP TIMESTEP; v4389 confirmed this one against the full 934-gate verify" },
+        { file: "physics/box3dLockstepNet.js", line: 20, was: "16", role: "count", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "CAUGHT" },
+                                  { kind: "offByOne", now: "17", state: "SURVIVED" }]),
+          note: "maxCatchup -- a FALSE survivor under 3%; caught at zero by the packet-loss gate" },
+        { file: "physics/box3dLockstepNet.js", line: 38, was: "4", role: "count", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "CAUGHT" },
+                                  { kind: "offByOne", now: "5", state: "SURVIVED" }]),
+          note: "THE CONTROL: mutate.mjs sets this to 0 by hand and is caught, so the answer was known first" },
+        { file: "physics/box3dLockstepNet.js", line: 110, was: "2", role: "count", before: "SURVIVED",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "SURVIVED" },
+                                  { kind: "offByOne", now: "3", state: "SURVIVED" }]),
+          note: "the history-window offset -- shared by both peers, so the comparison cannot see it" },
+        { file: "brain/blobPolicyStore.js", line: 26, was: "5", role: "count", before: "CAUGHT",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "CAUGHT" },
+                                  { kind: "offByOne", now: "6", state: "CAUGHT" }]), note: "SHAPE.heat" },
+        { file: "brain/blobPolicyStore.js", line: 26, was: "5", role: "count", before: "CAUGHT",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "CAUGHT" },
+                                  { kind: "offByOne", now: "6", state: "CAUGHT" }]), note: "SHAPE.vent" },
+        { file: "brain/blobPolicyStore.js", line: 26, was: "2", role: "count", before: "CAUGHT",
+          mutants: Object.freeze([{ kind: "zero", now: "0", state: "CAUGHT" },
+                                  { kind: "offByOne", now: "3", state: "CAUGHT" }]), note: "SHAPE.bias" },
+        { file: "brain/blobPolicyStore.js", line: 51, was: "2", role: "format", before: "SURVIVED",
+          mutants: Object.freeze([]),
+          note: "JSON.stringify's indent -- not mutated at all now, which is the honest answer" },
+    ]),
+    caughtBy: Object.freeze({ "physics/box3dLockstepNet.js": "physics/box3d-lockstep-loss-selfcheck.mjs",
+                              "physics/box3dLockstep.js": "physics/lockstepDt-selfcheck.mjs",
+                              "brain/blobPolicyStore.js": "brain/blob-policy-selfcheck.mjs" }),
+});
+
+/**
+ * A constant is CHECKED if any mutant it was given was caught; SKIPPED if it was given none; otherwise it
+ * SURVIVES. Derived, so the before/after comparison cannot be typed.
+ */
+export function verdictOf(c) {
+    if (!c.mutants.length) return "SKIPPED";
+    return c.mutants.some((m) => m.state === "CAUGHT") ? "CHECKED" : "SURVIVED";
+}
+
+/** The before/after, per constant. The only place the comparison is computed. */
+export function operatorComparison(constants = SWEEP_BY_ROLE.constants) {
+    const after = constants.map(verdictOf);
+    return {
+        total: constants.length,
+        beforeChecked: constants.filter((c) => c.before === "CAUGHT").length,
+        beforeSurvived: constants.filter((c) => c.before === "SURVIVED").length,
+        afterChecked: after.filter((v) => v === "CHECKED").length,
+        afterSurvived: after.filter((v) => v === "SURVIVED").length,
+        afterSkipped: after.filter((v) => v === "SKIPPED").length,
+        rescued: constants.filter((c, i) => c.before === "SURVIVED" && after[i] !== "SURVIVED"),
+    };
+}
