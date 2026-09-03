@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/brainTsl-selfcheck.mjs -- v4380
+// WebGLEngine/tools/ship/brainTsl-selfcheck.mjs -- v4381
 //
 // GRADES render/brainTsl.mjs against brain/mlp.js -- the GPU Brain's own MLP kernel, expressed as a TSL
 // compute graph and transplanted through render/tslSource.mjs.

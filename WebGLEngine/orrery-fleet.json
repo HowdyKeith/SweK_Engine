@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "4343629ad08e6b9541de2526f7aa7df676b0d11b",
+ "head": "f572f670e4dac99511f3b38f3b937f9c563e0a6b",
  "bodies": {
   "box3d": [
    {
@@ -443,7 +443,7 @@
    {
     "path": "main.js",
     "bytes": 2650089,
-    "sha": "4343629ad08e6b9541de2526f7aa7df676b0d11b"
+    "sha": "f572f670e4dac99511f3b38f3b937f9c563e0a6b"
    },
    {
     "path": "mpm3d.html",
@@ -630,7 +630,7 @@
    {
     "path": "tools/ship/brainTsl-page.js",
     "bytes": 3256,
-    "sha": null
+    "sha": "f572f670e4dac99511f3b38f3b937f9c563e0a6b"
    },
    {
     "path": "tools/ship/divineEye-selfcheck.mjs",

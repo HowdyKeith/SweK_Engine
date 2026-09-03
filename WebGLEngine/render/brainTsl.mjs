@@ -1,4 +1,4 @@
-// FILE: render/brainTsl.mjs -- v4380
+// FILE: render/brainTsl.mjs -- v4381
 //
 // *** THE GPU BRAIN'S MLP LAYER AS A TSL COMPUTE GRAPH, AGAINST THE KERNEL THAT ALREADY RUNS IT. ***
 //

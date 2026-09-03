@@ -160,7 +160,7 @@ export const PARITY_BASELINE = Object.freeze({
     // which no census scans -- the first shader pair in this tree that is data rather than source.
     // v4322, moved to render/fleetTsl.mjs at v4329 -- the fleet shells for the transplant carry a WGSL prefix and a GLSL
     // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
-    // v4380 -- tools/ship/brainTsl-selfcheck.mjs carries WGSL and no GLSL (+1 WGSL-bearing, +1 WGSL-only).
+    // v4381 -- tools/ship/brainTsl-selfcheck.mjs carries WGSL and no GLSL (+1 WGSL-bearing, +1 WGSL-only).
     // It is a GATE rather than a shader module, and it holds the text for the reason this census is least
     // able to see: it asserts against brain/mlp.js's kernel BY QUOTING IT -- the compute entry point with its
     // 8x8 workgroup, and the kernel function's name -- because the claim it makes is that a GENERATED pass
