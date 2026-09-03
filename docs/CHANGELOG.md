@@ -14,6 +14,80 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4412 -- five things turn heat into a colour, two of them shared a name, and nothing had compared any of them
+
+The backlog filed this as "three fires and no gate has ever compared their rules". *** THE CENSUS CORRECTED
+THE COUNT BEFORE IT CORRECTED ANYTHING ELSE. *** There are SIX fires: render/doomFire.mjs (cellular),
+render/doomFireField.mjs (field-driven), render/shipExhaust.mjs (the plume), physics/fire/fireMesh.js
+(ray-marched volumetric), world/fireSystem.js (voxel wildfire, spread and char to ash), and the ramps.
+
+And the axis on which those are ACTUALLY comparable is not their pixels -- a cellular automaton, a ray-marched
+volume and a voxel spread rule share no pixel -- but the one question every one of them answers:
+
+    WHAT COLOUR IS FIRE AT HEAT h?
+
+*** THE PHYSICAL CONDITION, COMPUTED RATHER THAN ASSERTED. *** Planck's law is monotonically increasing in T
+at EVERY fixed wavelength: heat a body and it radiates more at 700 nm, more at 550 nm and more at 450 nm, all
+at once. NEW render/fireColour.mjs verifies that from H_PLANCK, K_BOLTZ and C_LIGHT out of
+physics/thermal/blackbody.mjs, over 800-6000 K -- because a check resting on an unverified premise is a check
+resting on nothing, and this tree has caught itself doing that before. So a ramp claiming to be a blackbody
+cannot have a channel that FALLS as heat rises.
+
+    source                                     channel drops (R G B)   verdict
+    render/doomFire.mjs PALETTE (37 stops)          5   0   0          an ARTISTIC hue rotation
+    fx/voxelize/fireRamp.js blackbodyRamp           0   0   0          monotone: the name is EARNED
+    physics/fire/fireMesh.js channel ramps          0   0   0          monotone
+    demos_code/fitzhugh_nagumo.js GLSL ramp         0   0  40          an INFERNO COLORMAP
+
+*** THE ONE CALLED blackbody EARNS ITS NAME, WHICH IS WORTH SAYING BECAUSE THE ROUND BEGAN BY SUSPECTING IT
+WOULD NOT. *** And the 1993 DOOM palette has five red drops: it climbs from red to yellow by LOWERING RED
+while raising green. That is a hue rotation, an artistic choice and a good one, and it is not a blackbody --
+nothing in the tree had ever said so.
+
+*** THE NAMING TRAP, AND IT IS v4144'S SPECIES EXACTLY: TWO FUNCTIONS CALLED fireRamp. *** One is
+fx/voxelize/fireRamp.js's six-stop blackbody approximation, whose blue channel is zero until the fire is
+nearly white. The other is a GLSL Inferno-style perceptual colormap running black -> PURPLE -> red -> orange
+-> yellow -> white, whose blue channel rises to 0.30 at a fifth of full heat and then falls away. At h = 0.2:
+
+    JS  blackbodyRamp   [0.51, 0.04, 0.00]      dark red
+    GLSL fireRamp       [0.18, 0.05, 0.30]      purple
+
+THEY DO NOT DIFFER IN SHADE. THEY DISAGREE ABOUT WHETHER COOL FIRE IS RED OR PURPLE, and a cool blackbody is
+never purple -- there is almost no green or blue in its spectrum at 1000 K, which is why fire is red before
+it is yellow. The widest single-channel gap between them is 0.3255, in RED, at that same h = 0.2.
+
+The repair is the RENAME: demos_code/fitzhugh_nagumo.js's function is now `infernoRamp`. The ramp was never
+wrong, its name was, and a colormap called fireRamp beside a fireRamp.js that means something else is a trap
+laid for whoever reaches for the wrong one.
+
+*** AND THE COLLISION SURVIVED BECAUSE OF WHERE IT LIVED. *** demos_code/ is excluded by staleness.mjs's SKIP
+regex, so gateFiles() has never seen it and no gate in 4,412 versions has read a line of it. A DIRECTORY THE
+SCANNERS SKIP IS A DIRECTORY WHERE A NAME CAN MEAN TWO THINGS FOR EVER. That is reported here rather than
+repaired by widening the scan: widening it is a round of its own, with its own count to argue about.
+
+FIVE SABOTAGES, MEASURED 4/1/1/1/2 RED BY NAME, three files md5-identical after restore: A channelDrops stops
+counting drops; B the ramp named blackbody stops being held to monotonicity; C the JS restatement of the
+shader's stops drifts by one; D the rename is reverted; E fireRamp's red dips mid-ramp.
+
+*** TWO OF THE FIVE MISFIRED ON THE FIRST ATTEMPT, AND BOTH WERE MY AIM RATHER THAN THE GATE. *** B's search
+string carried leading whitespace that did not match the source, so it was a no-op that read zero red. And E
+lowered a ramp stop from 1.0 to 0.9 at a position where the sequence 0.55 -> 0.9 -> 1.0 IS STILL MONOTONE, so
+it created no drop for the check to find -- a sabotage aimed at the right file and the wrong property, which
+is v4403's sabotage E again. Re-aimed, they read 1 and 2.
+
+The record in MEASURED_AT_V4412 also had to be corrected against its own instrument: its first draft typed
+the collision's gap as 0.30 in BLUE, read off a sample table by eye, where widestDisagreement() measures
+0.3255 in RED. The blue gap is the one that carries the argument and the red gap is the one that is largest,
+and those are two different questions; both are now recorded and both are measured.
+
+WHAT THIS DOES NOT CLAIM. That any ramp here IS the colour of a blackbody at some temperature: that needs CIE
+colour matching this tree does not have, and inventing the matching functions to fill the gap would be
+exactly the "reference value I made up" that blackbody.mjs's own header refuses. MONOTONICITY IS A NECESSARY
+CONDITION AND NOT A SUFFICIENT ONE -- passing it does not make a ramp right, failing it makes a ramp
+not-a-blackbody. That the DOOM palette or the Inferno colormap should change: both are good at what they are.
+And that the six fires were compared AS FIRES -- the spread rules are still uncompared, which is what is left
+of the item.
+The tree stands at 1444 gates.
 ## v4411 -- every ship had a thruster state and not one of them showed it
 
 *** THE BOOLEAN NOBODY DREW. *** ev/flightView.js has carried `thrust` per entity since the flight model
