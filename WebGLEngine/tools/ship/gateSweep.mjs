@@ -283,6 +283,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "guards (1/2/2/1 by name) and restored md5-identical; one of the four is red only on a box " +
                  "whose hostScale is not 1, which is said in the log rather than left as a silent pass",
     }),
+    // v4371 -- the NINTH closing, and the first whose round also cleared a red the sweep could never have found:
+    // vendor/three-webgpu went undeclared from v4319, and tools/ship/vendoredLicences-selfcheck.mjs takes 15 s,
+    // which puts it outside the 3 s quick sweep. It was red on every verify for fifty rounds and reported by
+    // none of them. Recorded here because it is exactly the blind spot this accounting exists to measure.
+    since9: Object.freeze({
+        at: "v4371", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/carve-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, nine sections and 19 checks in 5.1 s. Driven RED by four " +
+                 "sabotages of mesh/carve.mjs (1/6/1/6 by name) and restored; one of the four went 0 red first " +
+                 "and turned out to be the FIX rather than the sabotage -- the module's out-of-frame policy was " +
+                 "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
+                 "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
