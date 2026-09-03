@@ -1,4 +1,5 @@
 "use strict";
+import { LOD_RECORD } from "./lodRecord.mjs";
 /**
  * LOD THRESHOLDS DERIVED FROM A MEASUREMENT, NOT TYPED.
  *
@@ -127,4 +128,70 @@ export function ladderKind(shipped, geometry, { policy = FRAME() } = {}) {
         why: `no rung leaves the ${budget}-pixel budget at any metric measured, coloured or not; this is one rung wearing several names` };
     return { kind: "approximation", geometryWorst: g, shippedWorst: sh, budget,
         why: `geometry leaves the ${budget}-pixel budget, by up to ${g} pixels, so the ladder approximates and a fidelity budget can choose where to switch` };
+}
+
+/**
+ * v4377 -- THE COST A RECORD PREDICTS AT ONE ANGULAR SIZE, interpolated between the samples that bracket it. The
+ * inverse of crossingFor, and the way a derived threshold can be CHECKED rather than trusted: feed the threshold
+ * back in and the cost it implies must be inside the budget it was derived from. Outside the sampled range it
+ * returns null, because a record cannot answer for a metric it never measured.
+ */
+export function costAtMetric(samples, metric, { of = "frame" } = {}) {
+    const { rows } = priceRung(samples, { of });
+    if (!rows.length || metric < rows[0].metric || metric > rows[rows.length - 1].metric) return null;
+    for (let i = 1; i < rows.length; i++) {
+        if (metric <= rows[i].metric) { const lo = rows[i - 1], hi = rows[i];
+            const span = hi.metric - lo.metric;
+            return span > 0 ? lo.cost + ((metric - lo.metric) / span) * (hi.cost - lo.cost) : lo.cost; }
+    }
+    return rows[rows.length - 1].cost;
+}
+
+/**
+ * v4377 -- THE DISC LADDER'S THRESHOLDS AT A GIVEN FRAME WIDTH, derived from the frozen record rather than typed.
+ *
+ * *** WHY A THRESHOLD CANNOT BE ONE CONSTANT, MEASURED RATHER THAN REASONED. *** A rung's cost in PIXELS is an area
+ * on the screen, so it grows with the square of the frame width, and a budget stated in pixels is therefore met at a
+ * different angular size on a different canvas. Derived at three widths from the same record, the crossings are
+ * 0.0625 / 0.0354 / 0.0151 for rung 1 at 128, 256 and 512 -- and metric x width is 8.00 / 9.06 / 7.72, constant to
+ * about a tenth over a fourfold change of resolution. So the shape of the law is metric = K / width, and K is what
+ * this derives.
+ *
+ * IT TAKES THE SMALLEST K, not the mean. The policy is a CEILING -- at most `budget` pixels -- so the threshold that
+ * honours it at every width measured is the most conservative one, and a mean would exceed the budget at whichever
+ * resolution came in below it. A caller at a width outside the record's range is extrapolating and is told so.
+ *
+ * *** v4378 -- AND K DEPENDS ON THE RASTERISER, WHICH v4377 SHIPPED WITHOUT MEASURING. *** A rung's cost is pixels
+ * a rasteriser drew, and gfx/device.js has two. Measured on the same box, the same ladder and the same widths, K is
+ * 7.72 / 6.54 under WebGPU and 7.59 / 6.43 under WebGL2 -- 1.7% apart -- and v4377 froze the WebGPU record and
+ * shipped its number to pages that run on either, on a box where the orrery in fact runs WebGL2. Name the `backend`
+ * and the record answers for that one; leave it null and it answers with the conservative K across every rasteriser
+ * it has, which is never above budget on any of them. A backend the record never priced is REFUSED rather than
+ * guessed, because a rasteriser nobody measured is exactly what this correction is about.
+ */
+export function discLadderThresholds(width, { policy = FRAME(), record = LOD_RECORD, backend = null } = {}) {
+    const all = record.backends || ["webgpu"];
+    const use = backend == null ? all : (all.includes(backend) ? [backend] : null);
+    if (!use) return { thresholds: null, k: null, backends: all,
+        why: `the frozen record was measured on ${all.join(" and ")} and this device is ${backend}; a threshold is what a RASTERISER costs, so it is not answered for one nobody priced` };
+    const rows = [];
+    for (const b of use) { const byW = record.byBackend[b]; if (!byW) continue;
+        for (const w of record.widths) { if (!byW[w]) continue;
+            const d = lodThresholdsFor(byW[w], { policy });
+            if (!d.thresholds) return { thresholds: null, k: null, backends: use,
+                why: `the frozen record does not derive on ${b} at width ${w}: ${d.why}` };
+            rows.push({ b, w, th: d.thresholds }); } }
+    if (!rows.length) return { thresholds: null, k: null, backends: use, why: "the frozen record carries nothing for the requested backend(s)" };
+    const rungs = rows[0].th.length;
+    const k = Array.from({ length: rungs }, (_, i) => Math.min(...rows.map((x) => x.th[i] * x.w)));
+    const widths = [...new Set(rows.map((x) => x.w))].sort((a, b2) => a - b2);
+    const lo = Math.min(...widths), hi = Math.max(...widths);
+    const extrapolating = width < lo || width > hi;
+    return { thresholds: k.map((kk) => kk / width), k, widths, width, backends: use, extrapolating,
+             spread: Array.from({ length: rungs }, (_, i) => { const v = rows.map((x) => x.th[i] * x.w);
+                 return Math.max(...v) / Math.min(...v); }),
+             why: `metric = K / width with K = ${k.map((x) => x.toFixed(2)).join(", ")}, the smallest of ${rows.length} (backend, width) pairs`
+                  + ` on ${use.join(" and ")} at widths ${widths.join(", ")}`
+                  + (backend == null ? "; NO BACKEND NAMED, so the conservative K across every rasteriser in the record is used" : "")
+                  + (extrapolating ? `; width ${width} is OUTSIDE that range and this is an extrapolation` : "") };
 }

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7488d97f83e66ee2604289e8bcbc174b920123df",
+ "head": "aca0a087217a36316fd6bc43fb819b9a548a4f0d",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2649451,
-    "sha": "7488d97f83e66ee2604289e8bcbc174b920123df"
+    "bytes": 2649144,
+    "sha": "aca0a087217a36316fd6bc43fb819b9a548a4f0d"
    },
    {
     "path": "mpm3d.html",
@@ -624,8 +624,8 @@
   "three-webgpu": [
    {
     "path": "orrery-gpu.html",
-    "bytes": 35176,
-    "sha": "2776e510f13e8369eb45229a2b508a8beab0b696"
+    "bytes": 36684,
+    "sha": "aca0a087217a36316fd6bc43fb819b9a548a4f0d"
    },
    {
     "path": "tools/ship/divineEye-selfcheck.mjs",

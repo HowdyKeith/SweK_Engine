@@ -40,12 +40,53 @@
 // square, measured, against pi/4 = 0.7854) and the cheap end of the ladder would cost MORE, since an n-gon is n
 // triangles where the quad is 2.
 //
+// v4377 -- AND THE SWAP IS DONE (section 4). Both pages draw DISCS, and neither carries a typed threshold: each
+// calls render/lodBudget.mjs discLadderThresholds with its own canvas width.
+//
+// *** A THRESHOLD CANNOT BE ONE CONSTANT, AND THAT IS MEASURED RATHER THAN REASONED. *** A rung's cost in PIXELS is
+// an area on the screen, so it grows with the square of the frame width and a pixel budget is met at a different
+// angular size on a different canvas. Derived from one record at four widths, the crossings for rung 1 are 0.0625,
+// 0.0354, 0.0151 and 0.0075 at 128, 256, 512 and 1024 -- and metric x width is 8.00, 9.06, 7.72 and 7.75, constant
+// to a fifth across an eightfold change of resolution. So the law is metric = K / width, and K is derived, not typed.
+//
+// K IS THE SMALLEST OF THE MEASURED WIDTHS AND NOT THE MEAN, because the policy is a CEILING. That choice went
+// unchecked until a sabotage swapped it for the mean and cost nothing; section 4 now feeds every derived threshold
+// back into the record and demands the cost stay inside the budget, and the mean then reads 80.9 px against 64.
+//
+// AND THE RECORD HAD TO GROW TWICE, both times because the gate asked it a question it could not answer: it stopped
+// at 512 while the orrery's canvas is 640, which made the shipped page an EXTRAPOLATION; and at 1024 its distance
+// sweep did not reach far enough for rung 2 to come inside 64 pixels, so the derivation failed closed and refused
+// the whole ladder -- the fail-closed path working on real data rather than on a fixture.
+//
+// v4378 -- AND THE RASTERISER v4377 NEVER ASKED ABOUT. The threshold two shipped pages run on was derived from a
+// record frozen on WebGPU. gfx/device.js has TWO rasterisers, and on this box the orrery runs WEBGL2 -- so v4377
+// shipped one rasteriser's number to a page drawing with another, and could not have told you what that cost,
+// because only one had been measured.
+//
+// MEASURED, same ladder, same widths, same box: K is 7.72 / 6.54 under WebGPU and 7.59 / 6.43 under WebGL2, 1.6%
+// and 1.8% apart. Fed back into the WebGL2 record, the WebGPU threshold costs up to 66.6 pixels against the
+// 64-pixel budget it was derived from -- 4.1% over. Small, and the point is that it was UNKNOWN.
+//
+// render/lodRecord.mjs now carries both, render/lodBudget.mjs discLadderThresholds takes the `backend` and answers
+// for that one, and a backend the record never priced is REFUSED rather than served a plausible number. With no
+// backend named it answers with the conservative K across every rasteriser it has. Both pages pass device.backend,
+// and this gate checks the page derived for the rasteriser its own route line says it got.
+//
+// BOTH RASTERISERS HERE ARE SwiftShader'S. This measures the difference between two SOFTWARE backends, which is a
+// LOWER bound on what a real GPU would differ by, not an estimate of it -- and every number the rig has not signed
+// is still unsigned.
+//
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import http from "node:http";
+import { createRequire } from "node:module";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { discLadderThresholds, costAtMetric, COST_PIXELS as BUDGET } from "../../render/lodBudget.mjs";
+import { LOD_RECORD } from "../../render/lodRecord.mjs";
 import { lodThresholdsFor, ladderKind, priceRung, FRAME, COST_PIXELS } from "../../render/lodBudget.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -63,9 +104,14 @@ console.log("\n1. WHAT THE PAGES ACTUALLY DECLARE, read out of the pages rather 
     const lodLine = (src) => (src.split("\n").find((l) => l.startsWith("const lods = ")) || "");
     const thLine = (src) => (src.match(/thresholds: \[[^\]]*\]/) || [""])[0];
     const oL = lodLine(orrery), uL = lodLine(universe);
-    ok("both shipped ladders are built from quadMesh(subdiv, colour) and nothing else -- no second mesh source, no per-rung shape",
-        /quadMesh\(/.test(oL) && /quadMesh\(/.test(uL) && !/Mesh\(/.test(oL.replace(/quadMesh\(/g, "")) && !/Mesh\(/.test(uL.replace(/quadMesh\(/g, "")),
-        `orrery: ${thLine(orrery)}; universe: ${thLine(universe)}`);
+    // v4377 -- THIS SECTION USED TO ASSERT quadMesh AND WENT STALE THE MOMENT THIS GATE'S OWN ROUND SWAPPED THE
+    // PAGES. It now reads what they are: discs, from one mesh source, with the ladder ordered by gpuDriven rather
+    // than by the array. The quad ladder it used to describe is still measured, in section 2, as the kind of thing
+    // it was -- the measurement did not stop being true when the pages stopped being it.
+    ok("both shipped ladders are built from discMesh(segments, colour) and nothing else -- no second mesh source, no per-rung shape",
+        /discMesh\(/.test(oL) && /discMesh\(/.test(uL) && !/quadMesh\(/.test(oL) && !/quadMesh\(/.test(uL) &&
+        !/Mesh\(/.test(oL.replace(/discMesh\(/g, "")) && !/Mesh\(/.test(uL.replace(/discMesh\(/g, "")),
+        `orrery: ${oL.trim().slice(0, 60)}...; universe: ${uL.trim().slice(0, 60)}...`);
     const colours = (l) => [...l.matchAll(/\[([\d.,\s]+)\]/g)].map((m) => m[1].trim());
     ok(`  and every rung was given a DIFFERENT colour on purpose: orrery ${colours(oL).length} rungs, universe ${colours(uL).length}, no two alike`,
         new Set(colours(oL)).size === colours(oL).length && new Set(colours(uL)).size === colours(uL).length && colours(uL).length === 3,
@@ -73,12 +119,12 @@ console.log("\n1. WHAT THE PAGES ACTUALLY DECLARE, read out of the pages rather 
     ok("  and neither page brings its own render pipeline, so both draw with gpuDriven's default flat look: `p` and `color`, no normal and no vertex displacement",
         !/makeGpuDrivenScene\(device, \{ lods[^}]*pipeline:/.test(orrery) && !/makeGpuDrivenScene\(device, \{ lods[^}]*pipeline:/.test(universe),
         "which is why subdividing a flat quad can change nothing: there is no stage that reads the extra vertices");
-    ok("  the comment beside the orrery's ladder calls it a finer DISC, and quadMesh builds a square -- the prose describes an approximation the code does not build",
-        /a finer disc up close, a coarser one far away/.test(orrery) && /positions\[o \+ 2\] = 0;/.test(fs.readFileSync(path.join(ENG, "render/gpuDriven.mjs"), "utf8")),
-        "quadMesh writes z = 0 for every vertex; a subdivided flat quad is the same flat quad");
+    ok("*** and the comment and the code now AGREE: the orrery's ladder has said \"a finer disc up close\" since the line was written, and as of v4377 that is what it builds ***",
+        /a finer disc up close, a coarser one far away/.test(orrery) && /G\.discMesh\(32/.test(orrery) && /G\.discMesh\(5/.test(orrery),
+        "v4376 measured the disagreement -- 1369 covered pixels against an inscribed disc's 1060, a ratio of 1.2915 against 4/pi = 1.2732 -- and this round closed it in the direction of the prose rather than by editing the prose");
 }
 
-console.log("\n2. PRICED TWICE: as they ship, and with ONE colour across the ladder so only geometry can differ");
+console.log("\n2. THE QUAD LADDER THAT SHIPPED UNTIL v4377, PRICED TWICE: as it shipped, and with ONE colour across it so only geometry can differ");
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, DIST: [3, 4, 6, 9, 14, 22, 36, 60] }, script: `async (a) => {
@@ -154,7 +200,7 @@ else {
         }
         for (const [name, L] of Object.entries(R.ladders)) {
             const K = ladderKind(L.shipped, L.geometry);
-            ok(`*** ${name}-gpu.html's ladder is a TELL, not an approximation: with ONE COLOUR across it the worst rung differs by ${K.geometryWorst} pixels at any distance measured, inside the ${K.budget}-pixel budget; as shipped it differs by up to ${K.shippedWorst} ***`,
+            ok(`*** ${name}-gpu.html's QUAD ladder was a TELL, not an approximation: with ONE COLOUR across it the worst rung differs by ${K.geometryWorst} pixels at any distance measured, inside the ${K.budget}-pixel budget; as it shipped it differed by up to ${K.shippedWorst} ***`,
                 K.kind === "tell" && K.geometryWorst <= K.budget && K.shippedWorst > 20 * Math.max(1, K.geometryWorst),
                 `${K.why}. The residue is the rasteriser rather than the shape: a subdivided flat quad splits its interior into triangles whose shared edges land a few pixels differently at some sizes, and ${K.geometryWorst} of them is what that costs`);
             const D = lodThresholdsFor(L.geometry, { policy: FRAME(COST_PIXELS) });
@@ -257,7 +303,111 @@ else {
     }
 }
 
-// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4376 (the disc):
+console.log("\n4. THE SWAP, IN THE PAGES (v4377) AND THE RASTERISER IT WAS DERIVED ON (v4378)");
+{
+    const orrery = fs.readFileSync(path.join(ENG, "orrery-gpu.html"), "utf8");
+    const universe = fs.readFileSync(path.join(ENG, "universe-gpu.html"), "utf8");
+    ok("*** both pages draw DISCS now, and neither carries a typed threshold any more: each derives from render/lodRecord.mjs through discLadderThresholds ***",
+        /G\.discMesh\(/.test(orrery) && /G\.discMesh\(/.test(universe) && !/G\.quadMesh\(/.test(orrery.split("const lods")[1].split("\n")[0]) &&
+        /discLadderThresholds\(cv\.width/.test(orrery) && /discLadderThresholds\(cv\.width/.test(universe) &&
+        !/thresholds: \[0\.012\]/.test(orrery) && !/thresholds: \[0\.004, 0\.012\]/.test(universe),
+        "the typed 0.012 and [0.004, 0.012] are gone; what replaced them is a call, and the number it returns depends on the canvas");
+    const D = discLadderThresholds(256);
+    ok(`  and the derivation is a LAW rather than a constant: metric = K / width with K = ${D.k.map((x) => x.toFixed(2)).join(", ")}, the SMALLEST of the ${D.widths.length} widths in the record (${D.widths.join(", ")}), spread ${D.spread.map((x) => x.toFixed(2) + "x").join(" and ")}`,
+        D.thresholds && D.k.length === 2 && D.spread.every((x) => x < 1.5) && !D.extrapolating,
+        `${D.why}. The smallest and not the mean: the policy is a CEILING, so the threshold that honours it at every width measured is the conservative one, and a mean would exceed the budget at whichever resolution came in below it`);
+    // *** v4378 -- K DEPENDS ON THE RASTERISER, AND v4377 SHIPPED WITHOUT MEASURING THAT. ***
+    const gpu = discLadderThresholds(256, { backend: "webgpu" }), gl = discLadderThresholds(256, { backend: "webgl2" });
+    const gap = gpu.k.map((x, i) => x / gl.k[i]);
+    ok(`*** K IS A PROPERTY OF THE RASTERISER, NOT ONLY OF THE LADDER: the same ladder at the same widths gives K = ${gpu.k.map((x) => x.toFixed(2)).join(", ")} under WebGPU and ${gl.k.map((x) => x.toFixed(2)).join(", ")} under WebGL2, ${gap.map((x) => ((x - 1) * 100).toFixed(1) + "%").join(" and ")} apart ***`,
+        gap.every((x) => x > 1) && gap.every((x) => x < 1.1) && gpu.backends.join() === "webgpu" && gl.backends.join() === "webgl2",
+        `v4377 froze the WebGPU record and shipped its number to pages that run on EITHER -- and on this box the orrery runs WebGL2, so the threshold it shipped was the wrong rasteriser's. Both are in the record now and the pages name the backend they got`);
+    // what that mismatch actually cost, in the units the policy is stated in
+    const glRec = LOD_RECORD.byBackend.webgl2;
+    const overspend = LOD_RECORD.widths.map((w) => { const wrong = discLadderThresholds(w, { backend: "webgpu" }).thresholds;
+        return glRec[w].map((rec, i) => costAtMetric(rec.samples, wrong[i])).filter((c) => c != null); }).flat();
+    const worstOver = Math.max(...overspend);
+    ok(`  and the mismatch is priced rather than waved at: the WebGPU threshold used on the WebGL2 rasteriser costs up to ${worstOver.toFixed(1)} pixels against the ${BUDGET}-pixel budget it was derived from -- ${(100 * (worstOver / BUDGET - 1)).toFixed(1)}% over`,
+        worstOver > BUDGET && worstOver < BUDGET * 1.2,
+        `a small overspend, and the point is that it was UNKNOWN: nothing in v4377 could have told you the number, because only one rasteriser had been asked`);
+    ok(`  a backend the record never priced is REFUSED rather than guessed`,
+        discLadderThresholds(256, { backend: "metal" }).thresholds === null && /not answered for one nobody priced/.test(discLadderThresholds(256, { backend: "metal" }).why),
+        discLadderThresholds(256, { backend: "metal" }).why.slice(0, 120));
+    // *** AND THE CONSERVATIVE CHOICE IS CHECKED, NOT TRUSTED. *** Taking K as the smallest of the measured widths
+    // rather than their mean cost NOTHING when it was first sabotaged -- nothing verified what the choice was for.
+    // This feeds each derived threshold back into the record at its own width and demands the cost it implies be
+    // inside the budget. A mean K exceeds it at whichever width came in lowest, which is the whole point of the min.
+    const kept = [];
+    for (const b of LOD_RECORD.backends) for (const w of LOD_RECORD.widths) { const th = discLadderThresholds(w).thresholds;
+        LOD_RECORD.byBackend[b][w].forEach((rec, i) => { const c = costAtMetric(rec.samples, th[i]);
+            if (c != null) kept.push({ b, w, rung: rec.rung, metric: th[i], cost: c }); }); }
+    const over = kept.filter((x) => x.cost > COST_PIXELS + 1e-6);
+    ok(`*** the derived threshold is fed BACK into the record on EVERY backend, width and rung, and the cost it implies is inside the ${COST_PIXELS}-pixel budget in all ${kept.length} cases (worst ${Math.max(...kept.map((x) => x.cost)).toFixed(1)} px) ***`,
+        kept.length === LOD_RECORD.backends.length * LOD_RECORD.widths.length * 2 && over.length === 0,
+        over.length ? over.map((x) => `${x.b} w=${x.w} rung ${x.rung}: ${x.cost.toFixed(1)} px`).join(", ")
+                    : `this is what taking the SMALLEST K buys, and it went unchecked until a sabotage that swapped it for the mean cost 0 red`);
+    ok(`  a width outside the measured range is served but FLAGGED as an extrapolation rather than answered silently`,
+        discLadderThresholds(1920).extrapolating === true && /OUTSIDE that range/.test(discLadderThresholds(1920).why) && discLadderThresholds(256).extrapolating === false,
+        `at 1920 the pair would be ${discLadderThresholds(1920).thresholds.map((x) => x.toPrecision(3)).join(", ")}`);
+    ok(`  the frozen record says what it is and what it is not: ${LOD_RECORD.backends.length} backends x ${LOD_RECORD.widths.length} widths x ${LOD_RECORD.distances.length} distances x ${LOD_RECORD.segments.length - 1} rungs, at v${LOD_RECORD.at.slice(1)}, rewritable by tools/ship/freezeLod.mjs`,
+        LOD_RECORD.backends.length === 2 && LOD_RECORD.widths.length === 4 && LOD_RECORD.segments[0] === 32 && fs.existsSync(path.join(ENG, "tools/ship/freezeLod.mjs")),
+        `segments ${LOD_RECORD.segments.join("/")}, radius ${LOD_RECORD.radius}; both rasterisers are SwiftShader's here, so this measures the DIFFERENCE between two software backends and not a rig's GPU`);
+}
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    // AND THE PAGES ARE LOADED, because a page that parses is not a page that runs
+    const pw = resolvePlaywright(createRequire(import.meta.url));
+    const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json", ".wgsl": "text/plain" };
+    const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]);
+        const f = path.join(ENG, u === "/" ? "orrery-gpu.html" : u);
+        if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
+        s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
+    await new Promise((res) => srv.listen(0, "127.0.0.1", res));
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const load = async (url) => { const pg = await br.newPage({ viewport: { width: 640, height: 480 } });
+        const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+        await pg.goto(url, { waitUntil: "load" }); await pg.waitForTimeout(6000);
+        const st = await pg.evaluate(() => ({ route: (document.getElementById("route") || {}).textContent || "",
+            used: (window.__lodTh && window.__lodTh.used) || null, backends: (window.__lodTh && window.__lodTh.backends) || null,
+            width: (document.getElementById("stage") || {}).width || null }));
+        return { errs, ...st }; };
+    const port = srv.address().port;
+    const o = await load(`http://127.0.0.1:${port}/?history=0`);
+    const u = await load(`http://127.0.0.1:${port}/universe-gpu.html`);
+    await br.close(); srv.close();
+    ok("*** both swapped pages LOAD and throw nothing -- a page that parses is not a page that runs, and this round changed what they draw ***",
+        o.errs.length === 0 && u.errs.length === 0 && /webgpu|webgl2/.test(o.route),
+        `orrery: ${o.route.slice(0, 70) || "(no route line)"}; errors ${o.errs.slice(0, 1).join(" | ") || "none"} / ${u.errs.slice(0, 1).join(" | ") || "none"}`);
+    if (o.used && o.width) {
+        const ran = (o.backends || [])[0] || null;
+        ok(`*** and the page derived for the rasteriser it ACTUALLY GOT: it reports "${ran}", and the route line says ${/webgl2/.test(o.route) ? "webgl2" : "webgpu"} ***`,
+            !!ran && new RegExp(ran).test(o.route) && (o.backends || []).length === 1,
+            `v4377 would have used the WebGPU record here whatever the page ran on; this asks the record for the one in front of it, and refuses a backend nobody priced`);
+        const want = discLadderThresholds(o.width, { backend: ran });
+        ok(`*** and the threshold the ORRERY ACTUALLY RAN is the one the record derives for its own canvas: ${o.used.map((x) => x.toPrecision(4)).join(", ")} at width ${o.width}, interpolated and not extrapolated ***`,
+            o.used.length === 1 && Math.abs(o.used[0] - want.thresholds[1]) < 1e-12 && want.extrapolating === false,
+            `derived for width ${o.width}: ${want.thresholds.map((x) => x.toPrecision(4)).join(", ")}; a two-rung ladder switches on the COARSE rung's. The record covers ${want.widths.join(", ")}, and 640 sits inside it -- it did NOT on the first freeze, which stopped at 512 and made the shipped page an extrapolation`);
+    } else ok("the orrery reported the threshold it ran", false, JSON.stringify({ used: o.used, width: o.width }).slice(0, 160));
+}
+
+// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4378 (the rasteriser):
+//   BE the named backend ignored, so every caller gets the conservative pair across both -> exit=1, 4 red. The
+//      THRESHOLD it returns is still safe -- the conservative K is by construction inside the budget everywhere --
+//      and four checks still go, because what breaks is not the number but the ANSWER TO A DIFFERENT QUESTION: the
+//      page stops being able to say which rasteriser its threshold came from. A safe wrong answer is still wrong.
+//   BF a backend nobody priced served the conservative pair instead of being refused -> exit=1, 1 red. The refusal
+//      is the whole content of v4378: a threshold is what a rasteriser costs, and answering for one never measured
+//      is the exact mistake v4377 made by not asking.
+// MEASURED at v4377 (the swap):
+//   BC K taken as the MEAN of the measured widths instead of the SMALLEST -> exit=0, 0 RED FIRST, the fifth sabotage
+//      this session to find a check nobody had written. The conservative choice is load-bearing -- a mean K exceeds
+//      the budget at whichever width came in lowest -- and nothing verified it. Section 4 now feeds each derived
+//      threshold BACK into the record at its own width and demands the cost inside the budget; re-run, the mean K
+//      reads 80.9 px at width 128 against a 64-pixel ceiling, and the sabotage costs 1 red.
+//   BD the orrery deriving at a fixed 256 instead of its own canvas width -> exit=1, 2 red: the page stops asking
+//      the record about the canvas it has, and the threshold it runs stops matching the one the record derives for
+//      it. A resolution-scaled law typed back into a constant is the thing this round replaced.
+// MEASURED at v4376 (the disc):
 //   BA discMesh CIRCUMSCRIBING the quad instead of inscribing it (every vertex scaled by sqrt(2)) -> exit=1, 1 red:
 //      the square-over-disc ratio stops matching 4/pi, because it is no longer that pair of shapes. The check is
 //      against a closed form, so it fails on the shape rather than on a tolerance.
@@ -283,7 +433,8 @@ else {
 //       the module was restored from the last commit rather than retyped. Recorded because the tree's own habit is
 //       that a mistake made while building the check belongs beside the check.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: gpu-rig-check.html's [0.025, 0.04], whose ladder is quadMesh too but whose page is a rig probe rather " +
+console.log("unchecked here: what K is on a rig's real GPU -- the two rasterisers measured here are both SwiftShader's, so their " +
+    "1.7% gap is a lower bound on rasteriser sensitivity and not an estimate of one; gpu-rig-check.html's [0.025, 0.04], whose ladder is quadMesh too but whose page is a rig probe rather " +
     "than a scene; whether the tell should be a debug TOGGLE rather than the shipped default, which is a product decision and not " +
     "this gate's to make; what the tell costs on a real rig rather than on SwiftShader, where a triangle is nearly free and the " +
     "vertex saving measured here is a count and not a time; and every number the rig has not signed.");

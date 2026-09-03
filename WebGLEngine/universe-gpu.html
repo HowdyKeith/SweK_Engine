@@ -35,6 +35,7 @@
 import { universeRecords, slimUniverse } from "./world/universeBodies.mjs";
 import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
+import { discLadderThresholds } from "./render/lodBudget.mjs";
 import { makeUniverseEconomy } from "./world/universeEconomy.mjs";
 import { makeHaulSource } from "./render/gpuHaul.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel } from "./render/fleets.mjs";
@@ -52,8 +53,18 @@ let device = null;
 try { device = await requestDevice(cv, {}); } catch (e) { say("requestDevice threw: " + e.message, true); throw e; }
 if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is available on this origin -- nothing can be drawn (WebGPU needs https or localhost)", true); throw new Error("no device"); }
 
-const lods = [{ name: "far", mesh: G.quadMesh(1, [0.35, 0.5, 0.8, 1]) }, { name: "mid", mesh: G.quadMesh(2, [0.55, 0.7, 0.95, 1]) }, { name: "near", mesh: G.quadMesh(5, [0.85, 0.92, 1, 1]) }];
-const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.004, 0.012], records: U.records, occlusion: "twoPhase" });
+// v4377 -- DISCS, and thresholds DERIVED rather than typed. quadMesh builds a flat square and the default
+// pipeline has no discard, so these systems were squares; render/gpuDriven.mjs discMesh is the shape, and
+// render/lodBudget.mjs derives where to switch from the frozen pricing in render/lodRecord.mjs at a budget of
+// 64 changed pixels per instance. A pixel budget is an AREA, so the threshold scales as K / width. The typed
+// [0.004, 0.012] is what this replaces.
+const lods = [{ name: "far", mesh: G.discMesh(5, [0.35, 0.5, 0.8, 1]) }, { name: "mid", mesh: G.discMesh(10, [0.55, 0.7, 0.95, 1]) }, { name: "near", mesh: G.discMesh(32, [0.85, 0.92, 1, 1]) }];
+// v4378 -- AND THE BACKEND IS NAMED. A rung's cost is pixels a RASTERISER drew, and gfx/device.js has two:
+// measured on one box, K is 7.72/6.54 under WebGPU and 7.59/6.43 under WebGL2. v4377 derived from the WebGPU
+// record and ran this page on WebGL2, which is the mismatch this line closes.
+const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
+window.__lodTh = { ...lodTh, used: lodTh.thresholds };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: lodTh.thresholds, records: U.records, occlusion: "twoPhase" });
 // v4300 -- LIFE: 300 haulers trading between the 694 systems (world/universeEconomy.mjs). The systems stand still, so
 // each flight is a function of time and render/gpuHaul.mjs evaluates it on the GPU; the CPU only trades.
 const economy = makeUniverseEconomy(slimUniverse(raw), { haulers: 300, seed: 11 });

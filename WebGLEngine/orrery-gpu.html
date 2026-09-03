@@ -71,6 +71,7 @@ import { buildOrrery } from "./world/orrery.mjs";
 import { extentOf, slowestPeriod, positionAt } from "./world/orreryView.mjs";
 import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
+import { discLadderThresholds } from "./render/lodBudget.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
@@ -101,12 +102,25 @@ try { device = await requestDevice(cv, {}); } catch (e) { say("requestDevice thr
 if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is available on this origin -- nothing can be drawn (WebGPU needs https or localhost)", true); throw new Error("no device"); }
 
 // LODs: a finer disc up close, a coarser one far away; the ORDER is derived from the meshes, not typed here.
-const lods = [{ name: "far", mesh: G.quadMesh(1, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: G.quadMesh(6, [0.62, 0.94, 0.71, 1]) }];
+// v4377 -- AND THEY ARE DISCS NOW, WHICH THIS COMMENT HAS CLAIMED SINCE THE LINE WAS WRITTEN. quadMesh builds a
+// SQUARE, and the default pipeline's fragment is `return v.color;` with no discard, so the bodies were square:
+// measured at v4376 as 1369 covered pixels against an inscribed disc's 1060, a ratio of 1.2915 against the
+// 4/pi = 1.2732 that pair must give. A body is now rounder and, being inscribed, 0.7743 of its old area.
+const lods = [{ name: "far", mesh: G.discMesh(5, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: G.discMesh(32, [0.62, 0.94, 0.71, 1]) }];
 const source = makeOrbitSource(device, system);
 // v4318 -- GIT TIME ON THE GPU: every body record carries its market's opening day in extra.z and the cull is handed the
 // sim day; a body not yet vendored on day t is not drawn, not picked, not counted -- decided in the cull, not by the page.
 const bodyExtras = G.defaultExtras(source.count);
-const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [0.012], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null) });
+// v4377 -- THE THRESHOLD IS DERIVED, NOT TYPED. render/lodBudget.mjs prices the disc ladder out of the frozen
+// record in render/lodRecord.mjs at a stated budget of 64 changed pixels per instance, and a pixel budget is an
+// AREA, so the angular size that meets it depends on the canvas: metric = K / width, K measured at three widths.
+// The two-rung ladder here switches on the coarse rung's K. The old typed 0.012 is what this replaces.
+// v4378 -- AND THE BACKEND IS NAMED. A rung's cost is pixels a RASTERISER drew, and gfx/device.js has two:
+// measured on one box, K is 7.72/6.54 under WebGPU and 7.59/6.43 under WebGL2. v4377 derived from the WebGPU
+// record and ran this page on WebGL2, which is the mismatch this line closes.
+const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
+window.__lodTh = { ...lodTh, used: [lodTh.thresholds[1]] };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [lodTh.thresholds[1]], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null) });
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
 
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.
