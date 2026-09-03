@@ -384,7 +384,7 @@ export function linearMomentum(cloth, proxy) {
     return p;
 }
 
-export const ADDED_AT_V4402 = Object.freeze([
+export const ADDED_AT_V4403 = Object.freeze([
     "boxMassProperties", "qRotate", "qRotateInv", "makeRigidProxy", "worldInvInertiaApply",
     "generalizedInvMass", "boxFace", "faceConstraint", "closestOnBox", "rigidContacts", "solveRigidContacts", "ledgerResidual",
     "qIntegrate", "rigidClothSubstep", "rigidReaction", "linearMomentum",

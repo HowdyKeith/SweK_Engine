@@ -73,7 +73,7 @@ function cloth(W = 6, H = 6, muscleRow = -1) {
     const fOpt = { dt: 0.016, iterations: 6, gravity: [0, -6, 0], fluidRadius: 0.09, contactRadius: 0.26 };
     for (let k = 0; k < 30; k++) { fluidC.substep(fReg.fluid, fReg.mesh, fReg.cons, fReg.batches, fOpt); fluidMeshSubstep(fDir.fluid, fDir.mesh, fDir.cons, fDir.batches, fOpt); }
     const fluidOK = hp(fReg.mesh.pos) === hp(fDir.mesh.pos) && hp(fReg.fluid.pos) === hp(fDir.fluid.pos);
-    // rigid (driver "rigid", v4402: a particle set and ONE BODY, so the proxy has to be compared too -- a
+    // rigid (driver "rigid", v4403: a particle set and ONE BODY, so the proxy has to be compared too -- a
     // delegation check that only hashed the cloth would pass on a registry that dropped the body's half)
     const rigidMk = () => {
         const W = 9, H = 9, SP = 0.07, NN = W * H;

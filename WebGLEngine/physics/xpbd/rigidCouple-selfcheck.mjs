@@ -1,4 +1,4 @@
-// WebGLEngine/physics/xpbd/rigidCouple-selfcheck.mjs -- v4402
+// WebGLEngine/physics/xpbd/rigidCouple-selfcheck.mjs -- v4403
 //
 // *** FOUR SOLVERS IN THIS TREE AND UNTIL THIS ROUND NONE OF THEM TOUCHED. ***
 //
@@ -477,7 +477,7 @@ console.log("\n8. THE REGISTRY IS STILL THE UI'S ONLY SOURCE OF TRUTH");
     }
 }
 
-// ---- v4402 SABOTAGES, grep-CONFIRMED APPLIED BEFORE READING, RESTORED md5-IDENTICAL -------------------------
+// ---- v4403 SABOTAGES, grep-CONFIRMED APPLIED BEFORE READING, RESTORED md5-IDENTICAL -------------------------
 //
 // The subject files, before and after all six -- md5-identical:
 //    physics/xpbd/rigidCouple.js   d7dc2efb24419901f360634a23381ab7

@@ -579,7 +579,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "passed vacuously by naming a route that had just failed",
     }),
     since30: Object.freeze({
-        at: "v4402", swept: 1, green: 1, red: 0,
+        at: "v4403", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/xpbd/rigidCouple-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in 1.7s including a browser probe, eight sections. THE FIRST " +

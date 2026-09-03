@@ -88,7 +88,7 @@ import { COUPLINGS, couplingById } from "./physics/xpbd/couplingRegistry.js";
 const W = 26, H = 18, SP = 0.28;      // mesh grid
 const cvs = document.getElementById("stage"), ctx = cvs.getContext("2d");
 let cons, batches, state, field, N, fluid = null, proxy = null;
-// v4402 -- the rigid coupling needs SUBSTEPS, not iterations, and that is a measurement rather than a taste:
+// v4403 -- the rigid coupling needs SUBSTEPS, not iterations, and that is a measurement rather than a taste:
 // one substep of six iterations lets this box through the rope (Macklin 2019, Small Steps in Physics
 // Simulation). The slider is labelled Substeps for that reason and the loop below honours it.
 const RIGID_HE = [0.42, 0.30, 0.30], RIGID_RHO = 6;

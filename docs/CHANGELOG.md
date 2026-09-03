@@ -14,7 +14,7 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
-## v4402 -- the fifth coupling, and the first that leaves XPBD: a sheet that holds a rigid body up
+## v4403 -- the fifth coupling, and the first that leaves XPBD: a sheet that holds a rigid body up
 
 FOUR SOLVERS IN THIS TREE AND UNTIL THIS ROUND NONE OF THEM TOUCHED.
 
