@@ -1,0 +1,312 @@
+{
+ "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
+ "built": "2026-09-03",
+ "bodies": [
+  {
+   "name": "box3d",
+   "kind": "person",
+   "who": "Erin Catto",
+   "line": "Copyright (c) 2026 Erin Catto",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/erincatto/box3d",
+    "owner": "erincatto",
+    "repo": "box3d"
+   },
+   "bytes": 1226434
+  },
+  {
+   "name": "draco",
+   "kind": "person",
+   "who": "Mr.doob",
+   "line": "Copyright (c) 2026 Mr.doob",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 257428
+  },
+  {
+   "name": "fonts",
+   "kind": "collective",
+   "who": "IBM Corp",
+   "line": "Copyright © 2017 IBM Corp. with Reserved Font Name \"Plex\"",
+   "licenceFile": "IBMPlexSerif-OFL.txt",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 164836
+  },
+  {
+   "name": "gifenc",
+   "kind": "person",
+   "who": "Matt DesLauriers",
+   "line": "Copyright (c) 2017 Matt DesLauriers",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 10453
+  },
+  {
+   "name": "grass",
+   "kind": "person",
+   "who": "boona13",
+   "line": "Copyright (c) 2026 boona13",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 1064
+  },
+  {
+   "name": "heerich",
+   "kind": "person",
+   "who": "meodai",
+   "line": "Copyright (c) 2025 meodai",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 119007
+  },
+  {
+   "name": "htmx",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 55742
+  },
+  {
+   "name": "jolt",
+   "kind": "person",
+   "who": "Jorrit Rouwe",
+   "line": "Copyright (c) 2022-2024 Jorrit Rouwe",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 3223645
+  },
+  {
+   "name": "keyhunt",
+   "kind": "prose",
+   "who": null,
+   "line": null,
+   "licenceFile": "ATTRIBUTION.txt",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 338
+  },
+  {
+   "name": "krbn",
+   "kind": "collective",
+   "who": "Krbn contributors",
+   "line": "Copyright (c) 2026 Krbn contributors",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 940443
+  },
+  {
+   "name": "slug",
+   "kind": "person",
+   "who": "Eric Lengyel",
+   "line": "Copyright (c) 2017 Eric Lengyel",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 3821
+  },
+  {
+   "name": "taichi-js",
+   "kind": "person",
+   "who": "Dunfan Lu",
+   "line": "Copyright (c) [2024] [Dunfan Lu]",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/AmesingFlank/taichi.js",
+    "owner": "AmesingFlank",
+    "repo": "taichi"
+   },
+   "bytes": 3638669
+  },
+  {
+   "name": "three",
+   "kind": "collective",
+   "who": "three.js authors",
+   "line": "Copyright © 2010-2023 three.js authors",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": null,
+   "bytes": 1550472
+  },
+  {
+   "name": "three-webgpu",
+   "kind": "collective",
+   "who": "three.js authors",
+   "line": "Copyright © 2010-2025 three.js authors",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://registry.npmjs.org/three/-/three-0.178.0.tgz",
+    "owner": null,
+    "repo": null
+   },
+   "bytes": 3214311
+  },
+  {
+   "name": "wasm",
+   "kind": "person",
+   "who": "Fabrice Bellard",
+   "line": "Copyright (c) 2017-2021 Fabrice Bellard",
+   "licenceFile": "quickjs/quickjs-wasmfile-release-sync/LICENSE",
+   "licences": 3,
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/justjakel/quickjs-emscripten",
+    "owner": "justjakel",
+    "repo": "quickjs-emscripten"
+   },
+   "bytes": 810948
+  }
+ ],
+ "systems": [
+  {
+   "author": "three.js authors",
+   "kind": "collective",
+   "bodies": [
+    "three",
+    "three-webgpu"
+   ],
+   "bytes": 4764783
+  },
+  {
+   "author": "Dunfan Lu",
+   "kind": "person",
+   "bodies": [
+    "taichi-js"
+   ],
+   "bytes": 3638669
+  },
+  {
+   "author": "Jorrit Rouwe",
+   "kind": "person",
+   "bodies": [
+    "jolt"
+   ],
+   "bytes": 3223645
+  },
+  {
+   "author": "Erin Catto",
+   "kind": "person",
+   "bodies": [
+    "box3d"
+   ],
+   "bytes": 1226434
+  },
+  {
+   "author": "Krbn contributors",
+   "kind": "collective",
+   "bodies": [
+    "krbn"
+   ],
+   "bytes": 940443
+  },
+  {
+   "author": "Fabrice Bellard",
+   "kind": "person",
+   "bodies": [
+    "wasm"
+   ],
+   "bytes": 810948
+  },
+  {
+   "author": "Mr.doob",
+   "kind": "person",
+   "bodies": [
+    "draco"
+   ],
+   "bytes": 257428
+  },
+  {
+   "author": "IBM Corp",
+   "kind": "collective",
+   "bodies": [
+    "fonts"
+   ],
+   "bytes": 164836
+  },
+  {
+   "author": "meodai",
+   "kind": "person",
+   "bodies": [
+    "heerich"
+   ],
+   "bytes": 119007
+  },
+  {
+   "author": "Matt DesLauriers",
+   "kind": "person",
+   "bodies": [
+    "gifenc"
+   ],
+   "bytes": 10453
+  },
+  {
+   "author": "Eric Lengyel",
+   "kind": "person",
+   "bodies": [
+    "slug"
+   ],
+   "bytes": 3821
+  },
+  {
+   "author": "boona13",
+   "kind": "person",
+   "bodies": [
+    "grass"
+   ],
+   "bytes": 1064
+  }
+ ],
+ "unattributed": [
+  {
+   "name": "htmx",
+   "kind": "disclaimed",
+   "licenceFile": "LICENSE"
+  },
+  {
+   "name": "keyhunt",
+   "kind": "prose",
+   "licenceFile": "ATTRIBUTION.txt"
+  }
+ ],
+ "counts": {
+  "bodies": 15,
+  "attributed": 13,
+  "authors": 12,
+  "covered": 13,
+  "missing": 2,
+  "withUpstream": 3,
+  "person": 9,
+  "collective": 4,
+  "disclaimed": 1,
+  "prose": 1,
+  "none": 0,
+  "unread": 0
+ }
+}

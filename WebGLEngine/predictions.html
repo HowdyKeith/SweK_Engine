@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "The orrery knew whether a dependency was papered and never whose it was",
+    since: "v4414",
+    state: "open",
+    pred: "world/orrery.mjs has split every vendored body into CAPTURED and UNPAPERED since v4185 -- may these bytes ship? -- and v4263 spent three findings making that search wide enough to be fair. It has never asked WHOSE they are. The prediction is that the author is recoverable from bytes already in the tree for most bodies, that it is NOT recoverable for some, and that the difference is the interesting part rather than an edge case to round away.",
+    why: "Keith asked for the inversion: the author as the sun, a universe centred on a person rather than on this repository. orrery.json's fifteen bodies carry [name, arrived, sha, bytes] and files, and NO owner, url or repo field on any of them -- so the first round of an author-centred view is a provenance bake, not a renderer. The evidence that exists is the copyright line in each licence, plus an upstream URL where a PROVENANCE.md records one.",
+    measured: "Six kinds across 15 bodies: 9 person, 4 collective, 1 disclaimed, 1 prose, 0 none, 0 unread -- giving 12 authors covering 13 bodies, with 2 carried as unattributed rather than dropped or guessed. PAPERED IS NOT ATTRIBUTED: htmx ships 0BSD, whose text says THE AUTHOR and names nobody, so the body is properly licensed and its author is still unknown. And ONLY 3 OF 15 record where they came from -- two PROVENANCE.md files and one README -- so this tree knows who wrote twelve of its dependencies and not where any of those twelve came from.",
+    kill: "tools/ship/orreryAuthor-selfcheck.mjs. The six kinds must partition the bodies, covered + unattributed must equal the total, the bake must equal a fresh scan, and the live page must draw the unattributed with the reason each cannot be named. SABOTAGE: make the collective test match nothing and three.js authors reads as a person; turn the disclaimed test off and htmx gains an author called The Author -- MEASURED at 1 and 2 reds. HONEST SCOPE: this does not claim the copyright line is TRUE, only that it is what the bytes assert. vendor/draco holds three.js's DRACOLoader.js and is attributed to Mr.doob, which is correct about the bytes and misleading about the name. And it is not the GitHub universe that was asked for -- twelve bodies have no upstream recorded anywhere, so there is nothing to centre a repository graph on.",
+    page: "orrery.html",
+    where: "world/orreryAuthor.mjs + tools/ship/orreryAuthorScan.mjs + tools/ship/orreryAuthor-selfcheck.mjs + orrery-authors.json + orrery.html.",
+  },
+  {
     name: "A guard deleted for being inert stayed deleted while the tree grew the case it existed for",
     since: "v4410",
     state: "open",

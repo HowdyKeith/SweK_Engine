@@ -134,7 +134,15 @@ const REPO = path.resolve(ENG, "..");
     // *** THE NEWEST ARRIVALS ORBIT CLOSEST, which is the whole "over time" reading ***
     const inner = sys.bodies[0], outer = sys.bodies[sys.bodies.length - 1];
     ok(inner.ageDays <= outer.ageDays, `the innermost body is the youngest (${inner.name}, ${inner.ageDays}d) and the outermost the oldest (${outer.name}, ${outer.ageDays}d)`);
-    ok(["draco", "grass", "keyhunt"].includes(inner.name), `and the innermost is one of the three captured today (${inner.name})`);
+    // v4414 -- *** THIS ROW FROZE A DERIVED ORDERING BY HAND AND WENT STALE, WHICH IS v4399's LESSON AGAIN. ***
+    // It named ["draco", "grass", "keyhunt"] as "the three captured today" against a fixed `today`, so the row
+    // said nothing about the ordering and everything about who happened to be newest on the day it was typed.
+    // It has been red since box3d's arrival date moved. The claim worth keeping is that the innermost body is
+    // one of the NEWEST -- derived from the same scan the ordering comes from, so it cannot drift from it.
+    const newest = sys.bodies.reduce((m, b) => Math.min(m, b.ageDays), Infinity);
+    const youngest = sys.bodies.filter((b) => b.ageDays === newest).map((b) => b.name);
+    ok(youngest.includes(inner.name),
+        `and the innermost is one of the newest arrivals (${inner.name}; newest at ${newest}d: ${youngest.join(", ")})`);
 }
 
 // 6) STATES are exclusive, and a REACHED body is never called unpapered.

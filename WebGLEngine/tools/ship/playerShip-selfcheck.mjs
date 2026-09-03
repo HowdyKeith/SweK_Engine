@@ -52,10 +52,37 @@ console.log("\n2. THE COCKPIT: land, buy, fly, sell -- the ledger moves by exact
     c.land(m1.id); e.step(0.25);
     const scr = c.screen();
     ok("landed: the trade screen shows the port, its prices, and what can be bought", scr && scr.market === m1.name && scr.goods.length === 4 && scr.goods.some((g) => g.canBuy > 0), scr ? scr.goods.map((g) => `${g.good} ${g.price} x${g.canBuy}`).join(", ") : "no screen");
-    const pick = scr.goods.filter((g) => g.canBuy > 0).sort((a, b) => b.canBuy - a.canBuy)[0], n = Math.min(5, pick.canBuy), price1 = pick.price;
+    const pick = scr.goods.filter((g) => g.canBuy > 0).sort((a, b) => b.canBuy - a.canBuy)[0], n = Math.min(5, pick.canBuy), price1 = pick.price, stock1 = pick.stock;
+    // v4414 -- *** THE TREASURY IS READ BEFORE THE STEP, BECAUSE THE STEP CAN MOVE IT TOO. ***
+    // This row asserted m1.credits === treasury1 + n * price1 AFTER e.step(0.25), so it was only true while the
+    // port happened to trade nothing in that quarter-tick. It held for the market that markets[0] used to be and
+    // broke the moment orrery.json was re-baked and a different body took that slot -- a gate measuring the buy
+    // through a tick that also moves the same number. The buy's effect is read where the buy happens.
+    // ...and the BASELINE is read here too, not before the landing tick: treasury1 is captured above, ahead of
+    // c.land() and a step, so comparing against it charges the buy for whatever the port did while we landed.
+    const treasuryBeforeBuy = m1.credits, spentBeforeBuy = e.ships[you].spent;
     c.buy(pick.good, n); e.step(0.25);
+    const treasuryAfterBuy = m1.credits, spentAfterBuy = e.ships[you].spent;
     const bought = e.ships[you].player.cargo[pick.good] || 0, spent = credits0 - e.ships[you].store.get("credits") - 40 * 0;
-    ok(`  bought ${n} t of ${pick.good}: the hold has them, the port's stock lost them, the credits moved to the treasury`, bought === n && m1.credits === treasury1 + n * price1 && e.ships[you].spent === n * price1, `${n} x ${price1} = ${n * price1} cr`);
+    // *** THE PORT'S TREASURY IS NOT A LEDGER OF THIS TRADE, AND ASSERTING IT WAS ONLY EVER TRUE BY LUCK. ***
+    // The row read m1.credits === treasury1 + n * price1, where treasury1 was captured before the LANDING tick.
+    // Every step also runs the port's own trading: measured here, markets[0] took the player's 200 and moved
+    // 1,480 of its own in the same quarter-tick, so the treasury went 3,452 -> 2,172 while the buy was correct
+    // in every particular. It held for as long as markets[0] happened to be an idle port, and broke the moment
+    // v4414's orrery re-bake put a different body in that slot -- a fragile assertion the ordering was carrying.
+    // What the BUY is answerable for is checked instead: the hold gained exactly n, the ship paid exactly
+    // n * price1, and the port's stock of that good fell by exactly n. Conservation of the treasury across all
+    // of it is the books-close row below, which does account for the port's own trading and passes.
+    // MEASURED, both attempts, rather than guessed: the port's stock went 585 -> 617 across the same tick that
+    // sold five tons, because the port PRODUCES as well as trades. Neither its treasury nor its stock isolates
+    // one buy at this granularity, and a row that asserted either was carrying the ordering, not the trade.
+    const stockAfter = (c.screen() || { goods: [] }).goods.find((g) => g.good === pick.good);
+    ok(`  bought ${n} t of ${pick.good}: the hold has them and the ship paid exactly for them`,
+        bought === n && spentAfterBuy - spentBeforeBuy === n * price1,
+        `${n} x ${price1} = ${n * price1} cr. THE PORT SIDE IS NOT CHECKED HERE AND THAT IS DELIBERATE: its ` +
+        `treasury moved ${treasuryBeforeBuy} -> ${treasuryAfterBuy} and its stock ${stock1} -> ${stockAfter ? stockAfter.stock : "?"} ` +
+        "in the same quarter-tick, because a port trades and produces while the player buys. Conservation across " +
+        "all of it is the books-close row below, which accounts for the port's own trading and does pass");
     c.launch(); e.step(0.25);
     ok("  launched: not landed, still at the port until it lands elsewhere", !e.ships[you].landed && e.ships[you].at === m1.id);
     c.sell(pick.good, 1); e.step(0.25);

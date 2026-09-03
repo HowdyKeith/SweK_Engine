@@ -743,6 +743,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "as pure paperwork are reached by real gates. FOUR SABOTAGES LANDED AND THREE MORE COST ZERO " +
                  "RED, which rewrote a section: a two-line fixture has too few quotes to break",
     }),
+    since40: Object.freeze({
+        at: "v4414", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orreryAuthor-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~6s, five sections including a live browser render. " +
+                 "docs/EXPLAIN-ITSELF.md item 8, the inversion Keith asked for: the author as the sun. THE " +
+                 "OPENING MEASUREMENT IS THAT THE FIELD DID NOT EXIST -- orrery.json's fifteen bodies carry " +
+                 "name, date, sha, bytes and files, and no owner, url or repo on any of them; world/orrery.mjs " +
+                 "has split them CAPTURED vs UNPAPERED since v4185 and never asked WHOSE they are. PAPERED IS " +
+                 "NOT ATTRIBUTED: htmx ships 0BSD, whose text says THE AUTHOR and names nobody. SIX KINDS -- " +
+                 "9 person, 4 collective, 1 disclaimed, 1 prose, 0 none, 0 unread -- giving 12 authors over 13 " +
+                 "bodies with 2 carried as unattributed rather than dropped or guessed. ONLY 3 OF 15 RECORD " +
+                 "WHERE THEY CAME FROM, so this is the field a GitHub universe needs and not that universe. " +
+                 "Driven RED by four sabotages (MEASURED 1/2/2/1 by name), one of which cost only ONE red " +
+                 "until a second independent reader was added -- the first draft falsely accused vendor/fonts " +
+                 "of having no licence, reproducing a bug orrery.mjs had already been fixed for three times",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

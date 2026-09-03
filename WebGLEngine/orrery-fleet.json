@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8a12609eca010195ec1cf9d1fc4ef3fa1ba4743c",
+ "head": "4ce1bf1f737285fe29cfc5222d6f93906ea31f96",
  "bodies": {
   "box3d": [
    {
@@ -184,7 +184,7 @@
    },
    {
     "path": "tools/ship/orrery-selfcheck.mjs",
-    "bytes": 12517,
+    "bytes": 13270,
     "sha": "fe96784e8ff7c55884c0e83388db67aa7a2bdc55"
    }
   ],
@@ -489,7 +489,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 2730081,
+    "bytes": 2735623,
     "sha": "8a12609eca010195ec1cf9d1fc4ef3fa1ba4743c"
    },
    {

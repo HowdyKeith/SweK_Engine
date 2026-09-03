@@ -4,9 +4,9 @@
  "bodies": [
   {
    "name": "box3d",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 10250339,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 1226434,
    "files": [
     {
      "path": "box3d.js",
@@ -53,70 +53,6 @@
      "bytes": 1067
     },
     {
-     "path": "native/gate_probe",
-     "bytes": 1073976
-    },
-    {
-     "path": "native/gate_probe.c",
-     "bytes": 2481
-    },
-    {
-     "path": "native/joint_probe",
-     "bytes": 1074112
-    },
-    {
-     "path": "native/joint_probe.c",
-     "bytes": 3397
-    },
-    {
-     "path": "native/libbox3d.a",
-     "bytes": 1451810
-    },
-    {
-     "path": "native/ray_probe",
-     "bytes": 1073960
-    },
-    {
-     "path": "native/ray_probe.c",
-     "bytes": 2024
-    },
-    {
-     "path": "native/ray_short",
-     "bytes": 1073920
-    },
-    {
-     "path": "native/ray_short.c",
-     "bytes": 583
-    },
-    {
-     "path": "native/sensor_gate",
-     "bytes": 1074032
-    },
-    {
-     "path": "native/sensor_gate.c",
-     "bytes": 3510
-    },
-    {
-     "path": "native/sensor_probe",
-     "bytes": 1073680
-    },
-    {
-     "path": "native/sensor_probe.c",
-     "bytes": 4654
-    },
-    {
-     "path": "native/shim.o",
-     "bytes": 35432
-    },
-    {
-     "path": "native/wheel_gate",
-     "bytes": 1073984
-    },
-    {
-     "path": "native/wheel_gate.c",
-     "bytes": 2350
-    },
-    {
      "path": "PROVENANCE.md",
      "bytes": 2106
     }
@@ -124,8 +60,8 @@
   },
   {
    "name": "draco",
-   "arrived": "2026-08-30",
-   "sha": "7985f885e6a11a92c2e43c70cba25b76779262fd",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 257428,
    "files": [
     {
@@ -140,8 +76,8 @@
   },
   {
    "name": "fonts",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 164836,
    "files": [
     {
@@ -156,8 +92,8 @@
   },
   {
    "name": "gifenc",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 10453,
    "files": [
     {
@@ -176,8 +112,8 @@
   },
   {
    "name": "grass",
-   "arrived": "2026-08-30",
-   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 1064,
    "files": [
     {
@@ -188,8 +124,8 @@
   },
   {
    "name": "heerich",
-   "arrived": "2026-08-28",
-   "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 119007,
    "files": [
     {
@@ -232,8 +168,8 @@
   },
   {
    "name": "htmx",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 55742,
    "files": [
     {
@@ -256,8 +192,8 @@
   },
   {
    "name": "jolt",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 3223645,
    "files": [
     {
@@ -276,8 +212,8 @@
   },
   {
    "name": "keyhunt",
-   "arrived": "2026-08-30",
-   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 338,
    "files": [
     {
@@ -288,8 +224,8 @@
   },
   {
    "name": "krbn",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 940443,
    "files": [
     {
@@ -1228,8 +1164,8 @@
   },
   {
    "name": "slug",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 3821,
    "files": [
     {
@@ -1244,8 +1180,8 @@
   },
   {
    "name": "taichi-js",
-   "arrived": "2026-08-23",
-   "sha": "e6d46a775e89e71ac5d41f5318b925b2a05c4649",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 3638669,
    "files": [
     {
@@ -1264,8 +1200,8 @@
   },
   {
    "name": "three",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 1550472,
    "files": [
     {
@@ -1336,8 +1272,8 @@
   },
   {
    "name": "wasm",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 810948,
    "files": [
     {

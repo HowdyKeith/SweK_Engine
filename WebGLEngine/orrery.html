@@ -59,10 +59,18 @@
   <div><i style="background:#6b7d8c"></i>reached, unread &mdash; nobody has opened the licence</div>
   <div><i style="border:1.5px dashed #ffcc66;background:none"></i>undated &mdash; inner orbit is a default</div>
   <div style="margin-top:8px"><button id="surf" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:11px">surface: file tree (measured)</button></div>
+  <div style="margin-top:8px"><button id="authbtn" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit">author view</button></div>
   <div style="margin-top:8px"><button id="fxbtn" style="background:transparent;border:1px solid var(--line);color:var(--amber);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:12px">&#9680; signal: off</button> <span id="fxwhy" style="font-size:11px;opacity:.7"></span></div>
 </div>
 
 <div class="card" id="ratchet"><h2>ratchet</h2><p id="rtext">reading&hellip;</p></div>
+
+<!-- v4414 -- THE INVERSION: the author as the sun. The orrery has drawn THIS REPOSITORY at the centre since
+     v4185, with every vendored body an acquisition of ours. Turned round, each author is a system of their own
+     and what this tree took from them are its planets. The two bodies nobody can name are drawn as a separate
+     region and counted in the heading, because a universe that quietly omits what it cannot attribute is a
+     universe lying about its own coverage. -->
+<div class="card" id="authors" style="display:none;max-height:52vh;overflow:auto"><h2 id="ahead">authors</h2><div id="alist"></div></div>
 
 <div class="card" id="info"><h2 id="iname"></h2><dl id="idl"></dl></div>
 
@@ -122,6 +130,46 @@ if (!raw) {
     system = buildOrrery(raw.bodies);
     const fleetRaw = await fetch("./orrery-fleet.json").then((r) => r.json()).catch(() => null);
     if (fleetRaw) fleets = fleetsFor(system, fleetRaw.bodies);
+    // v4414 -- the author view. Its data is BAKED (tools/ship/orreryAuthorScan.mjs) rather than parsed here,
+    // for the same reason the orrery itself is: a page that re-derives a record beside the tool that owns it is
+    // two rules that can disagree, and this tree has spent four rounds on exactly that shape.
+    const authRaw = await fetch("./orrery-authors.json").then((r) => r.json()).catch(() => null);
+    if (authRaw) {
+        const esc = (t) => String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const c = authRaw.counts || {};
+        document.getElementById("ahead").textContent =
+            c.authors + " authors, " + c.covered + " of " + c.bodies + " bodies";
+        const mb = (n) => (n / 1048576).toFixed(n < 1048576 ? 2 : 1) + " MB";
+        let html = "";
+        for (const sys of authRaw.systems || []) {
+            const kind = sys.kind === "collective" ? " &middot; a group, not a person" : "";
+            html += '<div style="margin:6px 0;padding:6px 0;border-top:1px solid var(--line)">' +
+                '<b>' + esc(sys.author) + '</b><span style="opacity:.6">' + kind + '</span><br>' +
+                '<span style="opacity:.8">' + esc(sys.bodies.join(", ")) + '</span> &middot; ' + mb(sys.bytes) + '</div>';
+        }
+        // NOT a footnote. The bodies with no nameable author get the same treatment as the rest, with the
+        // reason each one cannot be named, because "unattributed" is a finding and not a gap in the picture.
+        const un = authRaw.unattributed || [];
+        const WHY = { disclaimed: "its licence names no holder", prose: "credited in prose, no copyright line",
+                      none: "no licence file in the tree", unread: "a licence is present and unparsed" };
+        html += '<div style="margin:10px 0 0;padding:8px 0 0;border-top:1px solid var(--amber)">' +
+            '<b style="color:var(--amber)">' + un.length + ' unattributed</b> &mdash; drawn, not dropped<br>' +
+            un.map((u) => '<span style="opacity:.85">' + esc(u.name) + '</span> <span style="opacity:.6">&mdash; ' +
+                esc(WHY[u.kind] || u.kind) + '</span>').join("<br>") + '</div>';
+        html += '<div style="margin-top:8px;opacity:.6">' + (c.withUpstream || 0) + ' of ' + c.bodies +
+            ' record an upstream owner. The rest are attributed by copyright line alone &mdash; this tree knows ' +
+            'WHO wrote them and not WHERE they came from.</div>';
+        document.getElementById("alist").innerHTML = html;
+        const card = document.getElementById("authors"), btn = document.getElementById("authbtn");
+        btn.onclick = () => {
+            const on = card.style.display === "none";
+            card.style.display = on ? "" : "none";
+            btn.textContent = on ? "hide authors" : "author view";
+        };
+    } else {
+        document.getElementById("authbtn").textContent = "no author bake";
+        document.getElementById("authbtn").disabled = true;
+    }
     const reachedRaw = await fetch("./orrery-reached.json").then((r) => r.json()).catch(() => null);
     const visited = reachedRaw ? (reachedRaw.visited || []).map((v) => v.name) : [];
     const far = extentOf(system);

@@ -192,7 +192,7 @@ both gates: 27 against 27, and nine divergent entries all showing the audit's li
 A plausible arithmetic coincidence (27 + 5 = 32) is not a diagnosis. Nothing had run the
 tool that owns the record.
 
-## 8. An author-centred orrery -- OPEN, requested
+## 8. An author-centred orrery -- MEASURED and SURFACED at v4414
 
 The orrery draws this tree at the centre with its dependencies around it. Keith asked for
 the inversion: **the author as the sun**, a GitHub universe centred on a person rather than
@@ -203,6 +203,31 @@ a repository.
 field on any of them.** The orrery records *what this tree took* and nothing about *who
 from*. An author-centred view needs exactly the field the bake has never collected, so the
 first round is a provenance bake, not a renderer.
+
+
+**Done, in the only order that works: the bake before the renderer.** `world/orreryAuthor.mjs` reads the
+copyright line out of each body's licence, in **six kinds**, because "we know who wrote this" must not cover
+the cases where we plainly do not:
+
+| kind | n | what it means |
+|---|---|---|
+| person | 9 | a copyright line naming an individual |
+| collective | 4 | `three.js authors`, `Krbn contributors`, `IBM Corp` -- a real attribution, and not a person |
+| disclaimed | 1 | htmx ships 0BSD, whose text says THE AUTHOR and names nobody |
+| prose | 1 | keyhunt's ATTRIBUTION.txt credits a project and says NO CODE WAS COPIED |
+| none | 0 | no licence file at all |
+| unread | 0 | a licence is present and could not be parsed |
+
+**12 authors covering 13 bodies; 2 carried as unattributed** -- drawn on the page with the reason each cannot
+be named, never dropped and never given a placeholder.
+
+**PAPERED IS NOT ATTRIBUTED.** `world/orrery.mjs` has answered "may these bytes ship?" since v4185. It has
+never answered whose they are, and htmx is the proof that the two questions are different.
+
+**And this is still not the GitHub universe that was asked for.** Only **3 of 15** bodies record *where* they
+came from -- two `PROVENANCE.md` files and one README. The tree knows who wrote twelve of its dependencies and
+not where any of those twelve came from, so there is nothing yet to centre a repository graph on. That gap is
+the next round of this item, not a footnote to this one.
 
 ## What is deliberately NOT being taken
 
