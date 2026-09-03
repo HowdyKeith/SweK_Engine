@@ -19,11 +19,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { JSDOM } from "jsdom";
+// *** A MISSING DEV DEPENDENCY MUST SKIP RATHER THAN THROW, AND THIS IMPORT THREW. *** Repaired at v4435.
+// tools/ship/placementRender-selfcheck.mjs states the tree's convention in its own header -- jsdom is not
+// vendored, it is `npm i jsdom --no-save`, and a static import makes the shipped tree CRASH WITH A STACK
+// TRACE instead of saying what is missing, which reads as a broken gate rather than an absent tool. This
+// gate imported it statically and so exited 1 with ZERO FAIL LINES on any box without it. A SKIP NAMES WHAT
+// IS MISSING; A CRASH DOES NOT -- and per v4402, a skip must SAY SO rather than pass quietly.
+let JSDOM = null;
+try { ({ JSDOM } = await import("jsdom")); } catch { /* named below, not swallowed */ }
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+
+if (!JSDOM) {
+    console.log("  SKIP  jsdom is not installed, so ui/pageFxOverlay.js cannot be mounted here.");
+    console.log("        Install it with:  npm install jsdom --no-save");
+    console.log("        *** THIS IS A SKIP AND NOT A PASS. Nothing below ran, and the listener-leak check");
+    console.log("        this gate exists for is UNANSWERED on this box rather than answered green. ***");
+    console.log("\npageFxOverlay-selfcheck: SKIPPED -- jsdom absent, 0 checks run");
+    process.exit(0);
+}
 const say = (m) => console.log("  ----  " + m);
 
 /* ---------------------------------------------------------------------------------------------------------

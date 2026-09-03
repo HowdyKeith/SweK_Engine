@@ -283,19 +283,43 @@ setting may return more energy than it receives.
 those modules rather than beside them", because a second declaration of a graded thing means
 the keys grade a different renderer than the one that ships.
 
-## 10. A two-level BVH for instancing -- OPEN, not taken
+## 10. Two-level the BVH the tree already has -- CORRECTED at v4435, still OPEN
 
-The renderer has **no BVH at all**: `grep -li bvh` over `physics/`, `render/` and `world/`
-finds mesh CSG and a spatial-agreement gate, nothing in the tracer. GLSL-PathTracer's
-two-level BVH is what makes instancing affordable there.
+**This item was written wrong at v4432 and the correction is the more useful half.** It said the renderer has
+**no BVH at all**, citing `grep -li bvh` over `physics/`, `render/` and `world/`, which "finds mesh CSG and a
+spatial-agreement gate". Graded at v4435 by `tools/ship/absenceScope.mjs`: the tree holds **twelve** files of
+real BVH code and the claim named **two**. It failed three separate ways, and only one of them is the one
+anybody expects:
 
-**Deliberately after item 9, and the reason is that it is harder to grade honestly.** A BVH is
-a *speed* structure: it must change no pixel, so its correctness key is easy (same image, fewer
-intersections) and its *value* key is the hard one. v4390 spent a whole round finding that
-camera-relative arithmetic bought 2.2x where the intuition said more, and a speed structure
-shipped without that measurement is a claim nobody checked. The round needs a
-before-and-after intersection count on a scene big enough for the answer to mean something,
-and that scene does not exist in the tree yet either.
+1. **Out of scope.** `mesh/meshBVH.mjs` (v4221) is a **binned-SAH ray-triangle BVH** taken from
+   gkjohnson/three-mesh-bvh, with stackless-ish traversal, near-child-first ordering, best-t pruning, and a
+   green gate. It lives in top-level `mesh/`, and the three directories searched were `physics/`, `render/`
+   and `world/`. The grep was correct. **The scope was the claim, and nothing in the claim said how wide it
+   was.**
+2. **In scope, and summarised away.** `physics/sph/bvhNeighbours.mjs` (v3805) is a Morton BVH. It *was* in the
+   searched directories; the prose summary of the grep's output dropped it.
+3. **A denial counted as a presence.** `physics/render/rtPipeline.mjs` matched because its comment says
+   *"Linear over the geometries. NO BVH"*. A file that matched **because it asserts the absence** is evidence
+   *for* the claim. So are `main.js` and `brain/brain.js`, which carry item 10's own text. This is item 5's
+   defect -- a record *about* a thing counted as the thing -- in the one place nobody thought to look.
+
+**The narrow claim survives: the tracer has no BVH, and `rtPipeline.mjs` says so itself.** What did not survive
+is the sentence supporting it, and it was hiding the two facts that change what this item should DO.
+
+**So the item shrinks, and its hard part is already solved.** It is not "build a BVH" -- the tree ships one,
+with SAH, graded. It is: **make `mesh/meshBVH.mjs` two-level (a TLAS over instance transforms with a shared
+BLAS) and point `physics/render/rtPipeline.mjs`'s linear-over-geometries loop at it.**
+
+And the value key, which v4432 called the hard part and claimed the tree had no way to measure: **the tree has
+measured exactly this once already, and got a negative answer.** `physics/sph/neighbourBakeoff-selfcheck.mjs`
+put the Morton BVH against `spatialGrid.js` on identical particle sets, **asserted identical neighbour lists
+before believing any timing**, counted the rebuild, and reported machine-independent check counts rather than
+milliseconds. Verdict: *"spatialGrid wins on per-step SPH (~cells vs ~130 nodes/query, N vs 2N-1+sort
+rebuild)."* That is the instrument this item needs and the shape its answer should take -- including the
+possibility that the answer is again **no**.
+
+**Still open, and still after item 9,** because the scene big enough to make the measurement mean something
+does not exist in the tree yet. That part of v4432 was right.
 
 ## What is deliberately NOT being taken
 

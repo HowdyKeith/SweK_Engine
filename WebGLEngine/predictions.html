@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "An absence claim is only as wide as where it looked, and nothing in the claim says how wide that was",
+    since: "v4435",
+    state: "open",
+    pred: "docs/EXPLAIN-ITSELF.md item 10, written at v4432, said the tree has NO BVH and cited a grep over three directories. The prediction here is the general one the correction implies: that absence claims in this tree fail on SCOPE rather than on search, that the failure is invisible from inside the claim, and that a third failure mode exists nobody names -- a file matching BECAUSE IT ASSERTS THE ABSENCE, counted as evidence against the very claim it supports.",
+    why: "Every previous sighting of this session's recurring defect was a detector matching the shape its author pictured in CODE. This is the same defect in a CLAIM, where there is no gate to catch it, and where the author and the reader are the same person.",
+    measured: "ALL THREE MODES FIRED ON ONE CLAIM. The tree holds twelve files of real BVH code where item 10 named two. Out of scope: mesh/meshBVH.mjs, a binned-SAH ray-triangle BVH with a green gate since v4221, in a directory the grep never searched. In scope and summarised away: physics/sph/bvhNeighbours.mjs. Denial counted as presence: physics/render/rtPipeline.mjs, whose comment reads 'Linear over the geometries. NO BVH' -- plus main.js and brain/brain.js, which carry item 10's own text. AND THE DETECTOR WRITTEN TO FIND THIS COMMITTED IT ON THE FIRST TRY: \\bbvh\\b cannot see MeshBVH, because a regex word boundary is a rule about punctuation and a programmer's word includes the camel hump.",
+    kill: "tools/ship/absenceScope-selfcheck.mjs. The three failure modes are asserted BY NAME against a fresh grade, so a file arriving or leaving moves the lists rather than a count. SABOTAGE: revert tokenMatch to \\b and 10 rows go red; run the denial pass before codeOnly and 2 do; widen `exclude` to swallow the out-of-scope list and 6 do -- MEASURED 10/2/0-then-1/6 by name. THE ZERO IS RECORDED AS A FINDING: dropping the path check cost nothing, because once tokenMatch understood humps the path check rescued 0 of 14 files. Unfalsifiable rather than wrong, and now graded against a fixture tree. HONEST SCOPE: ONE claim is wired in, item 10's. The other nine items make absence claims and none is graded, because each needs a term chosen by a person and a wrong term produces a confident wrong answer -- which is the defect this file is about, so building a term-guesser would be committing it a third time in one round.",
+    page: "instruments.html",
+  },
+  {
     name: "A principled BSDF is a composition, and the composition creates eight per cent of the light it returns",
     since: "v4432",
     state: "open",

@@ -147,11 +147,20 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
         sourceExts.length === 0,
         `BUILT_EXT is ${[...U.BUILT_EXT].join(" ")}; LANGUAGE_BIOME classifies none of them, which is what ` +
         '"build artifact" has to mean. Adding "js" cost zero red once the ordering was fixed');
+    // *** THIS ROW WAS RED FROM THE MOMENT IT WAS WRITTEN AND IS repaired at v4435. *** It required
+    // vendor/box3d to hold MORE THAN TEN .c/.h files and its own message asserted fifteen. The tree holds
+    // EIGHT, and `git ls-tree` says it held eight at the commit that shipped this gate and twenty commits
+    // before that -- so nothing went missing and the number was never measured. A THRESHOLD AND A MESSAGE
+    // THAT DISAGREE WITH THE TREE ARE TWO HAND-TYPED RENDERINGS OF SOMETHING THE GATE CAN COUNT, which is
+    // docs/EXPLAIN-ITSELF.md item 1's defect. The count is derived now, and the assertion states what the
+    // row actually needs: jolt vendors NONE of its upstream language and box3d vendors SOME.
+    const joltCpp = fs.readdirSync(path.join(ENG, "vendor", "jolt")).filter((f) => /\.(cpp|h|hpp|cc)$/.test(f)).length;
+    const box3dC = walk(path.join(ENG, "vendor", "box3d")).filter((f) => /\.(c|h)$/.test(f)).length;
     ok("...and the two output mechanisms are genuinely different, not one rule written twice",
-        fs.readdirSync(path.join(ENG, "vendor", "jolt")).filter((f) => /\.(cpp|h|hpp|cc)$/.test(f)).length === 0 &&
-        walk(path.join(ENG, "vendor", "box3d")).filter((f) => /\.(c|h)$/.test(f)).length > 10,
-        "vendor/jolt has no C++ at all while vendor/box3d has 15 .c/.h files -- so 'the source is absent' " +
-        "explains jolt and NOT box3d, and 'the dominant extension is an artifact' explains box3d and NOT jolt");
+        joltCpp === 0 && box3dC > 0,
+        `vendor/jolt has ${joltCpp} C++ files while vendor/box3d has ${box3dC} .c/.h files -- so 'the source ` +
+        "is absent' explains jolt and NOT box3d, and 'the dominant extension is an artifact' explains box3d " +
+        "and NOT jolt");
     ok("!! *** and NO disagreement is unexplained -- each has a named mechanism ***",
         tally.unexplained === U.MEASURED_AT_V4432.languageUnexplained && tally.unexplained === 0,
         `${tally.built} have a BUILD ARTIFACT as their dominant extension (a 1.45 MB .a, 511 KB of .wasm), ` +

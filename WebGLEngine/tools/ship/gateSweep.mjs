@@ -1144,6 +1144,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "rather than failing it by name, which is not a red anybody can read; it fails by name now. " +
                  "Eleven sabotages, all RED by name, two files md5-identical.",
     }),
+    // v4435 -- the fifty-eighth closing. The gate that grades an absence claim, and the claim it grades is
+    // mine from two rounds ago. Four sabotages; the one that read ZERO RED found a check that could not fail.
+    since58: Object.freeze({
+        at: "v4435", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/absenceScope-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, six sections. docs/EXPLAIN-ITSELF.md item 10 said at v4432 " +
+                 "that the tree has NO BVH, citing a grep over physics/, render/ and world/. THE TREE HOLDS " +
+                 "TWELVE FILES OF REAL BVH CODE AND THE CLAIM NAMED TWO, and it failed three separate ways: " +
+                 "mesh/meshBVH.mjs -- a binned-SAH ray-triangle BVH with a green gate since v4221 -- sits in " +
+                 "a directory the grep never searched; physics/sph/bvhNeighbours.mjs WAS searched and got " +
+                 "summarised away; and physics/render/rtPipeline.mjs matched only because it SAYS 'NO BVH', " +
+                 "a denial counted as a presence, which is item 5's defect in the last place anybody would " +
+                 "look for it. The narrow claim survives (the tracer really has no BVH) and the sentence " +
+                 "supporting it does not. *** AND THE ROUND'S OWN DETECTOR COMMITTED THE ROUND'S OWN DEFECT " +
+                 "ON THE FIRST TRY: *** `\\bbvh\\b` missed mesh/meshBVH.mjs, because its code carries the " +
+                 "term in exactly one identifier -- MeshBVH -- and there is no word boundary between Mesh " +
+                 "and BVH. A regex word boundary is a rule about punctuation and a programmer's word " +
+                 "includes the camel hump. tokenMatch grades humps instead. Item 10 is rewritten: not " +
+                 "'build a BVH' but 'two-level the SAH BVH the tree already ships and point rtPipeline at " +
+                 "it', and its stated hard part -- the value key -- ALREADY HAS ITS INSTRUMENT, since " +
+                 "neighbourBakeoff-selfcheck measured a BVH against a grid once and concluded the GRID " +
+                 "wins. Four sabotages, MEASURED 10/2/0-then-1/6 by name. THE ZERO IS THE INTERESTING ONE: " +
+                 "dropping the path check cost nothing, because once tokenMatch understood humps the path " +
+                 "check rescued 0 of 14 files -- unfalsifiable rather than wrong -- so it is now graded " +
+                 "against a fixture tree and the sabotage costs one row.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
