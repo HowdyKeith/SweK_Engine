@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A principled BSDF is a composition, and the composition creates eight per cent of the light it returns",
+    since: "v4432",
+    state: "open",
+    pred: "physics/render/ held every PIECE of a Disney-style BSDF -- GGX in microfacet.mjs, Fresnel, the multi-scatter table in energyCompensation.mjs, Oren-Nayar in roughDiffuse.mjs -- and no composed model at all. docs/EXPLAIN-ITSELF.md item 9 predicted in writing that the interesting question would not be the lobes but the SEAMS: whether the composition still conserves energy or whether the lobes double-count where they meet. It also predicted the falsifier would be the boundary, since a composed model must agree with the pieces at their limits.",
+    why: "Read from knightcrawler25/GLSL-PathTracer (MIT, C++/OpenGL), which ships the model. Most implementations of it are never run against a white furnace, and this tree already had the furnace machinery and a directional albedo per lobe -- so the question was askable here in a way it usually is not.",
+    measured: "IT CREATES ENERGY. On a white surface at metallic 0, roughness 1, cosO 0.15, Disney's weighting returns a directional albedo of 1.0796 -- eight per cent more light than arrived -- because the diffuse lobe is scaled only by (1 - metallic), so Schlick's grazing term rides on top of a full-albedo diffuse. That is Disney's stated trade for artist-controllability, not a porting error, so both weightings ship: coupling the diffuse by (1 - F(cosO))(1 - F(cosI)) conserves at 0.99813 across 60 parameter combinations. And the boundary held exactly: at its diffuse limit the composed model IS roughDiffuse to 9.6e-15.",
+    kill: "physics/render/principled-selfcheck.mjs. The diffuse limit must equal roughDiffuse to 1e-12; the coupled model must conserve and be reciprocal; the uncoupled one must be non-conserving within a stated RANGE, so a change either way is a red rather than a silence. SABOTAGE: make the coupling one-sided and the coupled-reciprocity row goes red; give metals a diffuse lobe and the furnace row does; drop the specular denominator and three rows do -- MEASURED 1/1/1/3 by name. HONEST SCOPE: this is not Disney's model in full -- no sheen, no clearcoat, no anisotropy, no transmission, no subsurface. The specular lobe is SINGLE-SCATTER GGX, so a white metal at roughness 1 returns 0.379 and the tree's own energyCompensation table is not wired in, which makes every furnace number here a ceiling rather than an answer. And nothing checks the sampler: sample() exists and its pdf is untested, which is why every number comes from quadrature.",
+    page: "instruments.html",
+    where: "physics/render/principled.mjs + physics/render/principled-selfcheck.mjs + physics/render/microfacet.mjs + physics/render/roughDiffuse.mjs.",
+  },
+  {
     name: "Two functions answering the same question can be discovered rather than hand-named, and the widest rule in the tree was wrong",
     since: "v4420",
     state: "open",

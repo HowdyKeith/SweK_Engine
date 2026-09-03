@@ -1058,6 +1058,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "smin, v4429's heatAt). The repair perturbs the port and requires every derived field to " +
                  "follow, which a correct literal cannot do. Sixteen sabotages, all RED by name.",
     }),
+    // v4432 -- the fifty-fifth closing. The Disney BSDF gate, driven RED by four sabotages; one of them
+    // found a real defect in my own work, which is why the entry names the reciprocity row.
+    since55: Object.freeze({
+        at: "v4432", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/principled-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~4s, four sections. docs/EXPLAIN-ITSELF.md item 9, from " +
+                 "reading knightcrawler25/GLSL-PathTracer (MIT, C++/OpenGL, Disney BSDF). The tree had every " +
+                 "PIECE of a principled model -- GGX, Fresnel, the multi-scatter table, Oren-Nayar -- and no " +
+                 "composition at all. *** ITEM 9 PREDICTED THE LOBES WOULD DOUBLE-COUNT AT THE SEAMS AND THE " +
+                 "FURNACE SAYS BY HOW MUCH: 1.0796, EIGHT PER CENT MORE LIGHT THAN ARRIVED *** at metallic 0, " +
+                 "roughness 1, cosO 0.15, because Disney scales the diffuse lobe only by (1 - metallic) and " +
+                 "Schlick's grazing term rides on top. That is Disney's stated trade, not a porting error, so " +
+                 "BOTH weightings ship and each is held to what it is: the coupled one conserves at 0.99813. " +
+                 "The composed model IS roughDiffuse at its diffuse limit to 9.6e-15, which is the rule " +
+                 "pathTracer.mjs states -- assembled FROM the graded modules, not beside them -- made " +
+                 "falsifiable. THREE INSTRUMENT FINDINGS: `specular: 0` does not remove the specular lobe " +
+                 "(Schlick keeps its grazing term at F0 = 0); albedoSplit isolated a lobe by zeroing " +
+                 "baseColour, which also zeroes a metal's F0; and the mirror limit reads ZERO at roughness " +
+                 "0.001 because a near-delta lobe steps through a fixed grid -- the collapse MOVES from " +
+                 "roughness 0.15 to 0.05 when N goes 192 to 768, and a limit that moves when you refine the " +
+                 "instrument is the instrument. Driven RED by four sabotages (MEASURED 1/1/1/3 by name), one " +
+                 "of which found that my own coupled weighting was NOT RECIPROCAL and put a row in to say so",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

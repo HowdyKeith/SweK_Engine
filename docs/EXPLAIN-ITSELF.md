@@ -254,6 +254,49 @@ by six to one, on the largest body in the tree.
 know. That is a fact about the tree, not a gap in the scan, and closing it needs something outside these
 bytes.
 
+## 9. A composed principled BSDF, graded by the furnace -- v4432
+
+From reading `knightcrawler25/GLSL-PathTracer` (MIT, C++/OpenGL, GLSL fragment-shader path
+tracer; Disney BSDF, MIS with stochastic alpha testing, two-level BVH, GLTF/GLB, analytic
+lights, IBL, tile rendering, OpenImageDenoise, homogeneous volumes).
+
+**A different thread from items 1-8** -- this is rendering, not self-explanation -- but it is
+put here because this is the plan being worked, and it is here rather than in
+`docs/PHYSICS-SHADER-CANDIDATES.md` because the *grading* is the point, which is that file's
+subject in a different domain.
+
+`physics/render/` already holds the **pieces**: `microfacet.mjs` (GGX `D`, Smith `Lambda`,
+`G1`, `G2`, `ndfIntegral`, `furnaceIntegral`, `directionalAlbedo`, `sampleHalfVector`),
+`fresnel.mjs`, `energyCompensation.mjs` (the multi-scatter table), `roughDiffuse.mjs`
+(Oren-Nayar with its own directional albedo). What it has **no** composed principled BSDF --
+`grep -i disney` over the tree returns one comment about a sphere radius.
+
+**Why it is worth a round rather than a copy:** a principled BSDF is a *composition of lobes*,
+and the honest question is whether the composition still conserves energy or whether the lobes
+double-count at the seams. This tree can ask that -- it already has the white-furnace machinery
+and a directional albedo per lobe. Most implementations of this model are never run against
+one. The falsifier is the boundary: at `metallic=0, roughness=1` the composed thing must agree
+with `roughDiffuse`; at `metallic=1, roughness->0` with mirror Fresnel; and no parameter
+setting may return more energy than it receives.
+
+**Compose, do not re-implement** -- `pathTracer.mjs`'s own rule: "deliberately assembled FROM
+those modules rather than beside them", because a second declaration of a graded thing means
+the keys grade a different renderer than the one that ships.
+
+## 10. A two-level BVH for instancing -- OPEN, not taken
+
+The renderer has **no BVH at all**: `grep -li bvh` over `physics/`, `render/` and `world/`
+finds mesh CSG and a spatial-agreement gate, nothing in the tracer. GLSL-PathTracer's
+two-level BVH is what makes instancing affordable there.
+
+**Deliberately after item 9, and the reason is that it is harder to grade honestly.** A BVH is
+a *speed* structure: it must change no pixel, so its correctness key is easy (same image, fewer
+intersections) and its *value* key is the hard one. v4390 spent a whole round finding that
+camera-relative arithmetic bought 2.2x where the intuition said more, and a speed structure
+shipped without that measurement is a claim nobody checked. The round needs a
+before-and-after intersection count on a scene big enough for the answer to mean something,
+and that scene does not exist in the tree yet either.
+
 ## What is deliberately NOT being taken
 
 **The manim skill itself.** `npx skills add adithya-s-k/manim_skill` is a cheap
