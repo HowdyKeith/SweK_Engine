@@ -148,6 +148,14 @@ export const PENDING_REBUILD = [
     "swk_body_get_filter",
     "swk_joint_set_collide_connected",
     "swk_joint_get_collide_connected",
+    // v4382 -- AND THE NEXT ONE AGAIN, with the same split #125's note recorded for the filter. The raycast
+    // (swk_world_cast_ray plus swk_ray_stride, which publishes the row width so the reader is not typed) is
+    // BUILT AND MEASURED: build-box3d-native.sh needs only cc and cmake, so tools/ship/box3dRay-selfcheck.mjs
+    // compiles a probe against the real library and compares eleven rays against the mesh BVH. What it is NOT
+    // is packaged: getting it into vendor/box3d/box3d.wasm needs emsdk, which this sandbox has not got, so the
+    // browser path degrades on has() until somebody runs build-box3d-wasm.sh on a rig that has it.
+    "swk_world_cast_ray",
+    "swk_ray_stride",
 ];
 
 
