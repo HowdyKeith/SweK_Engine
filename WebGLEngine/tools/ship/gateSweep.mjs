@@ -393,6 +393,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "name) and restored; the first is the round's own argument, a completely wrong RNG that moves " +
                  "13% of the spins and leaves the physics looking healthy",
     }),
+    // v4383 -- the SEVENTEENTH closing, and the first for a module the triage had written off. Its round moved
+    // simulation/euler/eulerShader.js from HARDWARE to GATEABLE by running it, so tools/ship/coverageTriage.mjs
+    // changed too and coverageTriage-selfcheck was run beside this one.
+    since17: Object.freeze({
+        at: "v4383", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/eulerGpu-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections and 8 checks in 20 s. Driven RED by three " +
+                 "sabotages (1/2/1 by name) and restored; the FIRST is the round's argument -- a broken HLLC " +
+                 "wave speed that the page's own 2% tolerance would have passed on both of its rows",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
