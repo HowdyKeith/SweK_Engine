@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "180ef515efb78909ff53333a3e4cac850db99629",
+ "head": "0d6344749164c7ae62fea99f48ad0ca7d8d328fa",
  "bodies": {
   "box3d": [
    {
@@ -489,8 +489,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2795322,
-    "sha": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d"
+    "bytes": 2798785,
+    "sha": "0d6344749164c7ae62fea99f48ad0ca7d8d328fa"
    },
    {
     "path": "mpm3d.html",
