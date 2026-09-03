@@ -247,11 +247,11 @@
     ],
     [
      "read at",
-     "v4402"
+     "v4404"
     ],
     [
      "rounds between",
-     3
+     5
     ]
    ],
    "note": "The freezer wrote this version as a string literal until v4400, so the audit claimed v4380 for twenty rounds including a re-freeze taken at v4399."

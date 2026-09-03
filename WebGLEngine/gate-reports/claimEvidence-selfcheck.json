@@ -1,0 +1,172 @@
+{
+ "gate": "tools/ship/claimEvidence-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "what each claim's evidence is worth",
+   "columns": [
+    "outcome",
+    "claims"
+   ],
+   "rows": [
+    [
+     "names a gate that exists",
+     182
+    ],
+    [
+     "names no runnable falsifier",
+     52
+    ],
+    [
+     "names a file that is gone",
+     7
+    ],
+    [
+     "settled with its own gate RED",
+     0
+    ]
+   ],
+   "note": "kill: and where: are sentences. Nothing resolved the path or ran the gate until v4404, and the one contradicted claim had been asserting the opposite of its own killer for as long as that gate was red."
+  },
+  {
+   "title": "the claims settled without a falsifier anybody can run",
+   "columns": [
+    "claim",
+    "since"
+   ],
+   "rows": [
+    [
+     "The rig verification is clickable now -- master, fleet, and the full gate suite run from a button in server.html",
+     "v2751"
+    ],
+    [
+     "SweK's routes are exposed as ChatGPT App widgets, so a fleet can be checked and driven from a chat",
+     "v2748"
+    ],
+    [
+     "The live-mind and a single gauge are extracted into their own mini-panels, so the dashboard can tile just the part you want",
+     "v2747"
+    ],
+    [
+     "The page index is a dashboard-assembler, not a link list -- check pages and watch them live side by side",
+     "v2746"
+    ],
+    [
+     "SweK exports its ground truth in the estimator's own format, so a method like Trace Anything can be scored against it",
+     "v2742"
+    ],
+    [
+     "The ground-truth scene renders to actual depth frames, and the z-buffer gives point-vs-point self-occlusion for free",
+     "v2741"
+    ],
+    [
+     "The ground-truth scene now has occlusion -- tracks vanish behind solids and return, and the grade knows which points were seen",
+     "v2740"
+    ],
+    [
+     "The other live brain pages got the same swap-away guard, and the audit named which pages actually needed it",
+     "v2738"
+    ],
+    [
+     "brain-maze's render and poll loops go quiet when the page is swapped away, instead of throwing every frame",
+     "v2737"
+    ],
+    [
+     "The brain on the robot's head gets a glass dome with lights that flash and cast a glow over it",
+     "v2736"
+    ],
+    [
+     "The GPU brain is a visible brain on the robot's head -- a whirlpool that swirls while it solves",
+     "v2734"
+    ],
+    [
+     "Device gate is multi-runtime and honours forceEngine -- no more false 'no WebGL2'",
+     "v2728"
+    ],
+    [
+     "Krbn-compare left pane renders in real WebGL2, with a verified canvas-2D fallback",
+     "v2726"
+    ],
+    [
+     "Physics Lab contrasts -- A/B pairs where the difference is the lesson, gated to actually differ",
+     "v2692"
+    ],
+    [
+     "Physics Lab presets -- curated starter scenes as foundations, gated so none can rot",
+     "v2689"
+    ],
+    [
+     "Physics Lab -- a 3D showcase whose scenes are gated so the demo cannot rot",
+     "v2682"
+    ],
+    [
+     "The one failure mode here is the one that looks like success",
+     "v2581"
+    ],
+    [
+     "Every time I removed an assumption, the number got smaller",
+     "v2577"
+    ],
+    [
+     "The caves cost 78% of the merge",
+     "v2576"
+    ],
+    [
+     "The creature's control loop erases the world",
+     "v2566"
+    ],
+    [
+     "The instrument was the limit, not the subject",
+     "v2565"
+    ],
+    [
+     "The solver cannot blow up, so it lies instead",
+     "v2563"
+    ],
+    [
+     "A measurement is not a fact about a shape until you say what measured it",
+     "v2562"
+    ],
+    [
+     "The blob dies of uniform heat, not of heat",
+     "v2558"
+    ],
+    [
+     "Sound is vibration because the blob does not push back",
+     "v2554"
+    ],
+    [
+     "The paramecium loses to the mold, and that is the biology",
+     "v2552"
+    ],
+    [
+     "The isosurface papers optimise 10% of the flesh frame",
+     "v2550"
+    ],
+    [
+     "You cannot measure substance by counting words",
+     "v2548"
+    ],
+    [
+     "Splatting would not boil where our marcher does",
+     "v2532, tested v2533"
+    ],
+    [
+     "Krbn's hand-drawn lines do not boil between frames",
+     "their claim, tested v2530"
+    ],
+    [
+     "Krbn's SVG is byte-identical across runs",
+     "their claim, tested at v2521"
+    ],
+    [
+     "The engine's blobulator page works",
+     "assumed since v2438, settled v2505"
+    ]
+   ],
+   "note": "Mostly UI and wiring, where a gate is hard rather than neglected. Frozen by name: the list may shrink and nothing new may join it."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

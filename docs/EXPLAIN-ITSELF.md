@@ -101,10 +101,30 @@ palette's dark slots validated against that page's real surface (`#0e1512`), one
 axis, a legend, selective endpoint labels, a hover crosshair giving the exact figure, and
 `ui/canvasRecorder.js` wired so the unfolding can leave as a clip.
 
-## 4. Claims have the register's problem too -- OPEN
+## 4. Claims have the register's problem too -- MEASURED at v4404
 
-241 claims, stored as prose plus a settled/open/broken flag. The canonical thing is the
-measurement that settles one. Same inversion as item 1, bigger surface.
+241 claims, stored as prose plus a settled/open/broken flag. Each carries `kill:` -- the
+condition that would kill it -- and `where:` -- the files it rests on. **Both are
+sentences.** Nothing resolved the path, nothing ran the gate, and nothing had ever asked
+whether a claim's own stated killer was firing.
+
+**One was.** *"The selfchecks and the server survive Windows path semantics"* was marked
+**settled**; its kill named `tools/ship/winPathGuard-selfcheck.mjs`; its measured read
+*"it is, so every straggler was caught"*. That gate reports **twenty offending
+occurrences** and has been in the red register as long as the register has existed. The
+claim is marked **broken** at v4404 with the measurement -- what this tree does with a
+falsified prediction, and what its other nine broken entries are for.
+
+Measured across 241: **182 gated** (the falsifier is runnable), **52 prose** (no runnable
+falsifier -- 32 of them settled), **7 dangling** (evidence names a file that is gone),
+**1 contradicted**, now 0. `tools/ship/claimEvidence.mjs` classifies into those four and
+excludes each field's `SABOTAGE:` clause, which names files *on purpose* that should not
+resolve -- counting those reported three references never meant to exist.
+
+**The limit, stated in the gate itself:** this can only see a claim whose falsifier is a
+gate the red register already tracks. A claim naming a *green* gate that no longer tests
+what the claim says is invisible to it. The one contradiction was found because the
+register already knew -- not because the detector is good at looking.
 
 ## What is deliberately NOT being taken
 

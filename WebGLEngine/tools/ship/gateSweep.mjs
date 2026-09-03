@@ -578,6 +578,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotage A found two defects in the new gate: it THREW instead of reporting, and one check " +
                  "passed vacuously by naming a route that had just failed",
     }),
+    since30: Object.freeze({
+        at: "v4404", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/claimEvidence-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~1s, four checks. It gates tools/ship/claimEvidence.mjs, which " +
+                 "asks what each of predictions.html's 241 claims rests on: kill: and where: are SENTENCES, and " +
+                 "nothing had ever resolved the path or run the gate. ONE SETTLED CLAIM WAS RESTING ON A RED " +
+                 "GATE -- 'the selfchecks and the server survive Windows path semantics', whose own killer " +
+                 "reports twenty offending occurrences -- and it is marked BROKEN with the measurement rather " +
+                 "than exempted. 182 gated, 52 prose, 7 dangling, 0 contradicted. Driven RED by three sabotages " +
+                 "(1/1/1 by name). The dangling list was frozen TWICE: the first counted a citation of this very " +
+                 "gate, written one command before the file existed",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
