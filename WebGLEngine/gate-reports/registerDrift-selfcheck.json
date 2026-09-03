@@ -1,0 +1,60 @@
+{
+ "gate": "tools/ship/registerDrift-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "the register against the runs it should render from",
+   "columns": [
+    "how the quoted line stands to the run",
+    "entries"
+   ],
+   "rows": [
+    [
+     "matches a run exactly",
+     5
+    ],
+    [
+     "a truncation of one",
+     12
+    ],
+    [
+     "a stale READING of a live check",
+     9
+    ],
+    [
+     "names something the gate no longer says",
+     0
+    ],
+    [
+     "no line captured (the audit's cap)",
+     1
+    ]
+   ],
+   "note": "Section 3 compares the first 45 characters and is green: that reaches the end of an assertion's NAME and stops before its READING. The register is not describing deleted checks; it is quoting stale numbers, and the fix is to stop storing the reading rather than to retype it."
+  },
+  {
+   "title": "how old the source is",
+   "columns": [
+    "field",
+    "value"
+   ],
+   "rows": [
+    [
+     "audit frozen at",
+     "v4399"
+    ],
+    [
+     "read at",
+     "v4401"
+    ],
+    [
+     "rounds between",
+     2
+    ]
+   ],
+   "note": "The freezer wrote this version as a string literal until v4400, so the audit claimed v4380 for twenty rounds including a re-freeze taken at v4399."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -12,7 +12,7 @@ this engine's own device-versus-shell split, and what v4388 to v4393 measured.
 
 This file is the roadmap for that thread. Each item names what it would measure.
 
-## 1. The register keeps a rendering where it should keep the source -- OPEN
+## 1. The register keeps a rendering where it should keep the source -- MEASURED at v4400
 
 `tools/ship/redCensus.mjs` stores a **quoted failing line**: a projection of a gate run,
 frozen at the moment somebody typed it. Three rounds in a row found it stale, each in a
@@ -25,8 +25,27 @@ was elsewhere.**
 canonical -- the audit becomes the record, `fails:` becomes derived, and `registerDrift`
 stops being a comparison and becomes a projection.
 
-**Measure first:** how many of the register's lines are re-derivable from the audit today
-versus hand-typed, and whether the drift count goes to zero rather than down.
+**Measured.** Of 27 entries: **5** match a recorded line exactly, **12** are a
+whitespace-normalised truncation of one -- a rendering by definition -- and **10** are
+backed by no run at all. Those ten split cleanly: **9 quote a stale READING of a live
+check**, 1 cannot be checked because the audit's 120 s cap cut the gate off before it
+printed, and **zero name a check the gate no longer has**. So the register is not wrong
+about *what* is failing; it is wrong about *how much*.
+
+**And the check that existed to catch this was green throughout**, because it compares the
+first 45 characters -- which reaches the end of an assertion's *name* and stops before its
+*reading*. The two claims are now two checks.
+
+**The source could not say when it was taken.** `freezeRegisterAudit.mjs` wrote
+`at: "v4380"` as a string literal, so every re-freeze for twenty rounds produced a file
+claiming v4380 -- including one taken at v4399 while measuring exactly this. It reads
+`main.js` now, and the audit's age in rounds is a gated number.
+
+**Shipped:** `tools/ship/registerRender.mjs` derives the display line from the audit and
+classifies each entry into five outcomes rather than "matches / differs". `fails:` is
+*not* deleted -- it is the historical claim, and the distance between it and the run is
+the number this measured. What remains open is the last step: making the register's
+display read from `renderFor()` at the point of use rather than from the stored string.
 
 ## 2. Gates emit verdicts, not explanations -- DONE at v4395
 

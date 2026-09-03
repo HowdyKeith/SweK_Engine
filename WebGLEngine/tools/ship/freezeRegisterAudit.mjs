@@ -13,6 +13,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RED_AT_V4279 } from "./redCensus.mjs";
 
+// *** v4400 -- THE VERSION WAS A STRING LITERAL AND THE AUDIT LIED ABOUT ITS OWN AGE FOR TWENTY ROUNDS. ***
+// This tool wrote `at: "v4380"` as text, so every re-freeze since has produced a file claiming to have been
+// taken at v4380 -- including one taken at v4399 while measuring exactly this species of defect. THE CANONICAL
+// SOURCE THE REGISTER SHOULD RENDER FROM COULD NOT SAY WHEN IT WAS TAKEN, because the round that wrote the
+// freezer typed the number instead of reading it. It is read from main.js now, which is where the tree keeps it.
+function ENGINE_VERSION() {
+    const src = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    const m = src.match(/const ENGINE_VERSION = "(v\d+)"/);
+    if (!m) throw new Error("freezeRegisterAudit: main.js has no ENGINE_VERSION to read");
+    return m[1];
+}
+
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || 120000);
 
@@ -44,7 +56,7 @@ const body = `"use strict";
  * where there is none), and whether the gate printed them to STDERR -- which one of them does, invisibly to anything
  * reading stdout. Rewritten by tools/ship/freezeRegisterAudit.mjs.
  */
-export const REGISTER_AUDIT = Object.freeze(${JSON.stringify({ at: "v4380", capMs: CAP_MS, rows }, null, 1)});
+export const REGISTER_AUDIT = Object.freeze(${JSON.stringify({ at: ENGINE_VERSION(), capMs: CAP_MS, rows }, null, 1)});
 `;
 fs.writeFileSync(path.join(ENG, "tools/ship/register-audit.mjs"), body);
 console.log(`\nfrozen: ${rows.length} rows, ${rows.filter((r) => r.exit === 0).length} now green, ${rows.filter((r) => r.onStderr).length} printing FAIL to stderr`);
