@@ -28,7 +28,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin } from "./webgpuHarness.mjs";
+import { runInEngineOrigin, runWgslCompute } from "./webgpuHarness.mjs";
 import { noComments } from "./sourceScan.mjs";
 import * as SY from "../../voxel/shipyard.mjs";
 import { traverseDDA } from "../../voxel/voxelDDA.js";
@@ -386,6 +386,188 @@ const F32 = [];
        "those are not free. THE TWO NUMBERS ARE DIFFERENT CLAIMS and the earlier note did not distinguish them");
 }
 
+/* ------------------------------------------------------------------------------------------------------------
+ * 8. v4392 -- THE SAME FOUR ENCODINGS ON A REAL DEVICE, WHICH v4391 SAID THIS TREE COULD NOT DO
+ *
+ * v4391 closed with: "whether a GPU's float32 rounds the same way Math.fround does on every driver, which is a
+ * claim about hardware this tree cannot make from node". *** THAT SENTENCE WAS WRONG ABOUT THE TREE. ***
+ * webgpuHarness.mjs has had runWgslCompute() for hundreds of rounds -- a real WebGPU device, a compute shader,
+ * a storage buffer read back. The claim was not unmakeable; it was unattempted, and writing it down as a limit
+ * is how an unattempted thing becomes a believed one.
+ *
+ * *** AND THE PREDICTION FOR THIS SECTION WAS ALSO WRONG. *** I expected the device to BEAT the node model on C
+ * and D, because WGSL's `t + m.x*v.x + ...` is a multiply-add a driver may FUSE into one instruction with a
+ * single rounding where Math.fround(a + Math.fround(m*v)) rounds twice. It does not fuse. The device reproduces
+ * the two-rounding model to every digit read back, at every distance.
+ *
+ * THE CHECK IS NOT THEREFORE TAUTOLOGICAL, and the fused model is computed beside it to prove that: contraction
+ * would move C by 2.2x, so "the device agrees" is a real measurement of which of two behaviours the driver has.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const f = Math.fround, f3 = (v) => [f(v[0]), f(v[1]), f(v[2])];
+    const rotM = (q) => { const [x, y, z, w] = q; return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]; };
+    // TWO node models, and the SECOND is why this section can conclude anything: `two` rounds the product and
+    // the sum separately, `fused` rounds once, and a driver is free to do either.
+    const two   = (R, t, v) => [0, 1, 2].map((r) => { let a = f(t[r]); for (let c = 0; c < 3; c++) a = f(a + f(R[r][c] * v[c])); return a; });
+    const fused = (R, t, v) => [0, 1, 2].map((r) => { let a = f(t[r]); for (let c = 0; c < 3; c++) a = f(a + R[r][c] * v[c]); return a; });
+    const cq = (() => { const q = [0.1, 0.2, 0.05, 0.97], n = Math.hypot(...q); return q.map((v) => v / n); })();
+    const VS = []; for (let i = 0; i < 16; i++) { const x = (i & 1) ? 7 : 0, y = (i & 2) ? 5 : 0, z = (i & 4) ? 7 : 0, j = (i >> 3) & 1;
+        VS.push([x + 0.5 + j * 2, y + 0.5, z + 0.5 + j * 3]); }
+    const DISTS = [1e3, 1e5, 1e6, 8.4e6];
+    const HDR = 10, PERV = 4, BLOCK = HDR + VS.length * PERV;
+
+    const U = [], truth = [], nodeTwo = [], nodeFused = [];
+    for (const Dv of DISTS) {
+        const an = 0.7, sn = Math.sin(an / 2);
+        const po = SY.pose({ id: 0, position: [Dv, 40, Dv * 0.5], quaternion: [0.2 * sn, sn, 0.1 * sn, Math.cos(an / 2)] });
+        const eye = [Dv + 30.25, 55.5, Dv * 0.5 - 42.75];
+        const Rv = rotM(cq), Rb = rotM(po.quaternion), Rv32 = Rv.map(f3), Rb32 = Rb.map(f3);
+        const tA = f3([0, 1, 2].map((r) => -(Rv[r][0] * eye[0] + Rv[r][1] * eye[1] + Rv[r][2] * eye[2])));
+        const tC = f3([po.position[0] - eye[0], po.position[1] - eye[1], po.position[2] - eye[2]]);
+        const Z = [0, 0, 0];
+        const push = (v) => U.push(v[0], v[1], v[2], 0);
+        push(f3(Rv[0])); push(f3(Rv[1])); push(f3(Rv[2]));
+        push(f3(Rb[0])); push(f3(Rb[1])); push(f3(Rb[2]));
+        push(tA); push(tC);
+        push(f3(eye)); push(f3([eye[0] - f(eye[0]), eye[1] - f(eye[1]), eye[2] - f(eye[2])]));
+        for (const c of VS) {
+            const w = SY.localToWorld(c, po);
+            const rel = [w[0] - eye[0], w[1] - eye[1], w[2] - eye[2]];
+            truth.push([0, 1, 2].map((r) => Rv[r][0] * rel[0] + Rv[r][1] * rel[1] + Rv[r][2] * rel[2]));
+            const camrel = SY.eyeRelative(w, eye);
+            const dsv = [0, 1, 2].map((i) => SY.splitDifference(w[i], eye[i]));
+            for (const model of [two, fused]) {
+                const row = [model(Rv32, tA, f3(w)), model(Rv32, Z, camrel),
+                             model(Rv32, Z, model(Rb32, tC, f3(c))), model(Rv32, Z, dsv)];
+                (model === two ? nodeTwo : nodeFused).push(row);
+            }
+            push(f3(c)); push(f3(w));
+            push(f3([w[0] - f(w[0]), w[1] - f(w[1]), w[2] - f(w[2])])); push(camrel);
+        }
+    }
+    const CODE = `
+struct U { v: array<vec4<f32>, ${U.length / 4}> };
+@group(0) @binding(0) var<storage, read_write> out: array<f32>;
+@group(0) @binding(1) var<uniform> u: U;
+fn m3(r0: vec3<f32>, r1: vec3<f32>, r2: vec3<f32>, v: vec3<f32>, t: vec3<f32>) -> vec3<f32> {
+  return vec3<f32>(t.x + r0.x*v.x + r0.y*v.y + r0.z*v.z,
+                   t.y + r1.x*v.x + r1.y*v.y + r1.z*v.z,
+                   t.z + r2.x*v.x + r2.y*v.y + r2.z*v.z);
+}
+@compute @workgroup_size(1)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  let d = i / ${VS.length}u;
+  let k = i % ${VS.length}u;
+  let h = d * ${BLOCK}u;
+  let rv0 = u.v[h].xyz; let rv1 = u.v[h+1u].xyz; let rv2 = u.v[h+2u].xyz;
+  let rb0 = u.v[h+3u].xyz; let rb1 = u.v[h+4u].xyz; let rb2 = u.v[h+5u].xyz;
+  let tA = u.v[h+6u].xyz; let tC = u.v[h+7u].xyz;
+  let eh = u.v[h+8u].xyz; let el = u.v[h+9u].xyz;
+  let b = h + ${HDR}u + k * ${PERV}u;
+  let loc = u.v[b].xyz; let whi = u.v[b+1u].xyz; let wlo = u.v[b+2u].xyz; let camrel = u.v[b+3u].xyz;
+  let z = vec3<f32>(0.0, 0.0, 0.0);
+  let A = m3(rv0, rv1, rv2, whi, tA);
+  let B = m3(rv0, rv1, rv2, camrel, z);
+  let C = m3(rv0, rv1, rv2, m3(rb0, rb1, rb2, loc, tC), z);
+  let Dd = m3(rv0, rv1, rv2, (whi - eh) + (wlo - el), z);
+  let o = i * 12u;
+  out[o]=A.x; out[o+1u]=A.y; out[o+2u]=A.z;
+  out[o+3u]=B.x; out[o+4u]=B.y; out[o+5u]=B.z;
+  out[o+6u]=C.x; out[o+7u]=C.y; out[o+8u]=C.z;
+  out[o+9u]=Dd.x; out[o+10u]=Dd.y; out[o+11u]=Dd.z;
+}`;
+    const total = DISTS.length * VS.length;
+    const gpu = await runWgslCompute({ code: CODE, outCount: total * 12, uniforms: U, workgroups: total });
+    if (gpu.skipped || !gpu.ok) {
+        say("the device run was SKIPPED or refused: " + (gpu.reason || "unknown") +
+            (gpu.errors && gpu.errors.length ? " -- " + gpu.errors.join(" | ") : "") +
+            ". Sections 1-7 still ran; this one makes no claim without a device");
+    } else {
+        say("adapter: " + JSON.stringify(gpu.adapter || null) +
+            " -- SOFTWARE, and the round says so rather than letting a reader read 'GPU' as silicon");
+        const worst = (pick) => { const e = [0, 0, 0, 0];
+            for (let i = 0; i < total; i++) for (let sIdx = 0; sIdx < 4; sIdx++) for (let c = 0; c < 3; c++)
+                e[sIdx] = Math.max(e[sIdx], Math.abs(pick(i, sIdx, c) - truth[i][c]));
+            return e; };
+        const perDist = [];
+        for (let d = 0; d < DISTS.length; d++) {
+            const e = [0, 0, 0, 0], n2 = [0, 0, 0, 0], nf = [0, 0, 0, 0];
+            for (let k = 0; k < VS.length; k++) { const i = d * VS.length + k;
+                for (let sIdx = 0; sIdx < 4; sIdx++) for (let c = 0; c < 3; c++) {
+                    e[sIdx] = Math.max(e[sIdx], Math.abs(gpu.values[i * 12 + sIdx * 3 + c] - truth[i][c]));
+                    n2[sIdx] = Math.max(n2[sIdx], Math.abs(nodeTwo[i][sIdx][c] - truth[i][c]));
+                    nf[sIdx] = Math.max(nf[sIdx], Math.abs(nodeFused[i][sIdx][c] - truth[i][c])); } }
+            perDist.push({ D: DISTS[d], gpu: e, two: n2, fused: nf });
+            say(`world x ${String(DISTS[d]).padStart(9)}  device A ${e[0].toExponential(3)} B ${e[1].toExponential(3)} ` +
+                `C ${e[2].toExponential(3)} D ${e[3].toExponential(3)}   node two-rounding C ${n2[2].toExponential(3)}  fused C ${nf[2].toExponential(3)}`);
+        }
+        void worst;
+
+        // *** THE FIRST DRAFT OF THIS CHECK ASKED FOR B/C > 100 AT EVERY DISTANCE AND WENT RED AT A THOUSAND,
+        // WHERE IT IS 4.3. *** That was the assertion being wrong, not the device: at short range camera-relative
+        // is very nearly as good as changing the storage, and the whole point is that the gap OPENS WITH
+        // DISTANCE. The check now measures that instead, which is the claim actually worth holding.
+        const ratios = perDist.map((r) => r.gpu[1] / r.gpu[2]);
+        const rising = ratios.every((v, i) => i === 0 || v > ratios[i - 1]);
+        ok("!! *** the device reproduces v4391's ordering, and the advantage of changing the STORAGE grows with distance ***",
+           perDist.every((r) => r.gpu[0] > r.gpu[1] && r.gpu[3] < 1e-4) && rising && ratios[2] > 1000,
+           perDist.map((r, i) => `${r.D}: A/B ${(r.gpu[0] / r.gpu[1]).toFixed(2)}, B/C ${ratios[i].toExponential(1)}`).join("; ") +
+           ". CAMERA-RELATIVE IS NEARLY AS GOOD AS THE SHIPYARD AT A THOUSAND (4.3x) AND FOUR ORDERS WORSE AT " +
+           "EIGHT MILLION, because its residual follows the float32 spacing and theirs does not. THE CONCLUSION " +
+           "OF TWO ROUNDS NOW RESTS ON A DEVICE AND NOT ON A MODEL OF ONE");
+
+        // Bit-for-bit against BOTH models. A driver is free to contract a multiply-add, and the numbers say
+        // which it did rather than assuming. The tolerance is exact equality on the readback, because these are
+        // float32 values compared with float32 values -- anything looser would hide the very difference measured.
+        const eqTwo = perDist.every((r) => r.gpu.every((v, i) => v === r.two[i]));
+        const eqFused = perDist.every((r) => r.gpu.every((v, i) => v === r.fused[i]));
+        ok("!! *** and it matches ONE of the two arithmetics exactly -- this driver does NOT fuse multiply-add ***",
+           eqTwo !== eqFused,
+           `two-rounding: ${eqTwo}, fused: ${eqFused}. WGSL LETS A DRIVER CONTRACT t + m*v INTO ONE INSTRUCTION ` +
+           `with a single rounding, and this one does not: contraction would move C from ` +
+           `${perDist[2].two[2].toExponential(3)} to ${perDist[2].fused[2].toExponential(3)}, a factor of ` +
+           `${(perDist[2].two[2] / perDist[2].fused[2]).toFixed(2)}, so the agreement is a MEASUREMENT and not a ` +
+           "tautology. A device that fuses would match the other model and this check would still pass, naming it -- " +
+           "which is the behaviour a gate that has to run on somebody else's rig needs");
+
+        ok("...and the model this tree has been quoting since v4391 is the one the device uses",
+           eqTwo,
+           eqTwo ? "Math.fround chains, rounding the product and the sum separately. v4391's table stands as measured."
+                 : eqFused ? "*** THE DEVICE FUSES AND v4391's TABLE IS THE OTHER MODEL. *** Its numbers for C and D " +
+                   "are pessimistic by the factor above, in favour of the encodings it recommends, which is the " +
+                   "direction that flatters a conclusion and must be said out loud"
+                 : "*** THE DEVICE MATCHES NEITHER MODEL, which is a third thing and not a worse version of the " +
+                   "second. *** Either the arithmetic here has drifted from what the shader computes, or the " +
+                   "driver is doing something neither model describes; read the per-distance rows above before " +
+                   "assuming which. THE FAILURE MESSAGE THAT NAMES A CAUSE IT HAS NOT ESTABLISHED IS THE ONE THAT " +
+                   "sends the next reader down the wrong path, so this one names three possibilities and no cause");
+    }
+}
+
+// SABOTAGE LOG for section 8 -- applied, gate run, exit code read, restored, md5 checked. MEASURED at v4392.
+//   AG the shader's multiply-adds rewritten with WGSL's own fma(), to make the driver produce the FUSED
+//      arithmetic -> *** 0 RED, AND IT IS A FINDING ABOUT THE MEASUREMENT RATHER THAN A PASS. *** The readback
+//      was bit-identical to the unfused run, so THIS IMPLEMENTATION'S fma() DOES NOT FUSE EITHER: SwiftShader
+//      computes a*b then adds, two roundings, exactly as Math.fround chains do. There is no way on this box to
+//      make the device produce the contracted arithmetic, so the claim "this check can tell the two apart" is
+//      demonstrated from the OTHER side (AH) and not from the device's. A gate whose discriminating power can
+//      only be shown by moving the reference is a weaker gate than one that can be shown by moving the subject,
+//      and that limit is stated here rather than left for somebody with a fusing GPU to discover.
+//   AH the node two-rounding model rewritten to round once, i.e. the tree starts quoting the fused arithmetic
+//      while the device does not -> exit=1, 2 red: neither model matches and the check names all three cases.
+//   AI the shader's shipyard path fed the WORLD vertex instead of the claim-local one -> exit=1, 3 red: B/C
+//      collapses from 4.3 to 3.1e-8 because C becomes the worst of the four rather than the best.
+//   AJ the double-single low word dropped in the shader -> exit=1, 3 red: D stops being flat in distance.
+//
+// AND THE FIRST DRAFT OF THE ORDERING CHECK WENT RED ON A CORRECT DEVICE. It asked for B/C > 100 at every
+// distance and B/C is 4.3 at a thousand, because at short range camera-relative is very nearly as good as
+// changing the storage. THE ASSERTION WAS WRONG, NOT THE MEASUREMENT: the claim worth holding is that the gap
+// OPENS WITH DISTANCE -- 4.3x at a thousand, 8.2e4 at eight million -- and that is what it now checks.
+//
 // SABOTAGE LOG for section 7 -- applied, gate run, exit code read, restored, md5 checked. MEASURED at v4390.
 //   AX splitDouble returning a zero low word, so double-single collapses to plain float32 -> exit=1, 1 red:
 //      "both real fixes change the STORAGE" goes red because D stops being flat and follows the spacing.

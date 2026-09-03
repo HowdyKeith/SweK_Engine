@@ -174,10 +174,15 @@ export const PARITY_BASELINE = Object.freeze({
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 57,
+    // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
+    // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
+    // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
+    // an exclusion for "gates do not count" would have hidden every probe this tree has written, which is most of
+    // the WGSL it owns. The same file is why wgslOnly moves too; nothing else changed.
+    wgslBearing: 58,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 44,
+    wgslOnly: 45,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
