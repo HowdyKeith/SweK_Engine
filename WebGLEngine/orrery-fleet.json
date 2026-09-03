@@ -1,12 +1,17 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "2963ba5c38c7e2e7bf46e18cf561cd975f84d747",
+ "head": "09b7c581fcea5fc419934ea83464fa0edecd416a",
  "bodies": {
   "box3d": [
    {
     "path": "box3d-info.html",
     "bytes": 32827,
+    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "physics/backendDivergence.mjs",
+    "bytes": 10089,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    },
    {
@@ -457,7 +462,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 2652777,
+    "bytes": 2652339,
     "sha": "2963ba5c38c7e2e7bf46e18cf561cd975f84d747"
    },
    {

@@ -14,6 +14,74 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4397 -- the same experiments on Jolt: which of v4396's findings are about physics and which are about box3d
+
+v4396's footer named a question it structurally could not answer: are the aliasing bands and the 34 m/s hole
+properties of DISCRETE-TIMESTEP PHYSICS, or properties of box3d? One engine cannot say. This runs the same
+experiments on Jolt and separates them, and physics/backendDivergence.mjs is the record -- derived from the
+measurement, never listed beside it.
+
+SHARED: THERE IS NO TUNNELLING THRESHOLD IN EITHER ENGINE. Jolt is non-monotonic too -- 52 m/s passes through
+the wall while 100 m/s is stopped, the same shape box3d showed at 13 and 90. So v4396's correction generalises:
+a bisection for a threshold returns a property of its own bracket on either engine, and whether a body passes
+through is a question of phase.
+
+BOX3D'S ALONE: THE HOLE. With continuous collision enabled, box3d still passes a body through at exactly
+34 m/s. Jolt's LinearCast stops all 96 sampled speeds. So "continuous collision is necessary and not
+sufficient" is a statement about box3d, and v4396 was right to ship a counterexample rather than a law. The
+hole reproduces in the SHIPPED wasm and not only the native build, so the two builds agree where both can be
+asked.
+
+BOTH ENGINES SILENTLY CAP LINEAR SPEED, AND THE CAPS ARE 100 m/s APART. box3d 400, Jolt 500. Both measured and
+neither quotable: box3d's default is assigned in its own .c, and Jolt's PhysicsSettings in this build does not
+expose the field at all. physics/esBox3d.js:50 clamps a ship to its hull's `speed` and hands that to whichever
+backend the router picked, so ev/tools/es-arena.mjs's Fighter at 430 flies at 400 or at 430 depending on a
+decision nothing surfaces. That is v2468's damping finding in a second place -- found the same way, and the
+engine still has not chosen.
+
+AND THE SENSOR APIS ARE SHAPED DIFFERENTLY, IN THE DANGEROUS DIRECTION. box3d has a dedicated buffer holding
+sensor overlaps and nothing else. Jolt routes them through the ORDINARY ContactListener, so a portable reader
+must call Body.IsSensor() or it reports every solid collision as a trigger. Measured on a sensor above a solid
+floor: two contact events, one of each. The asymmetry runs the other way for creation -- Jolt's
+Body.SetIsSensor lets a body become a sensor afterwards, which is the setter box3d lacks and the reason
+v4396's shim needed a second creation entry point.
+
+AND JOLT NEEDED NO REBUILD. box3d's half of this took C, a native build, and a PENDING_REBUILD entry still
+outstanding for the browser. Jolt is a vendored wasm with JS bindings whose sensors, CCD and cap are all
+reachable from a page today. Worth stating rather than enjoying quietly.
+
+Five sabotages, 4/1/2/3/1 RED by name, both files md5-identical. B is v2468's mistake reproduced on demand:
+dropping the damping match reads 25/96 with an onset at 45 m/s against the matched 19/96 at 52, so an
+unmatched comparison reports a difference between two damping settings as a difference between two solvers.
+The first Jolt scan of this round really did read 25/96 before the match was made.
+
+UNCHECKED: box3d with CCD OFF is not re-measured here -- it needs swk_world_enable_continuous, which is in the
+shim and not in the shipped wasm, so its 64/96 is carried in the record labelled with its source rather than
+mixed in with rows this run produced. Everything is a box against a box at one thickness, one timestep and one
+substep count, so the profile is a slice and not a surface. And the sensor comparison is about DELIVERY, not
+agreement: nothing here asks whether the two engines report the same overlap at the same step, which is what a
+lockstep peer swapping backends would need.
+
+*** AND THE ROUND NEARLY DESTROYED AN EXISTING MODULE TO FIND ITS BEST RESULT. ***
+
+This was first written to physics/backendDivergence.mjs -- a file that has existed since v3845 doing the OTHER
+half of this comparison, hash trajectories rather than capability limits. `cat >` overwrote it,
+render/perceptual-selfcheck went red inside one verify, and the module is now backendLimits.mjs. The tree caught
+the clobber in a single sweep; it happened because a file was written without asking whether the name was taken.
+
+Reading the module it nearly replaced turned up the finding worth the most. physics/backend-qa-check.mjs -- the
+tree's own cross-backend divergence harness -- imports ./box3d/box3dLoader.js (the BROWSER loader) in Node,
+calls createWorld without init(), and catches the resulting "box3d: call init() first" to print "(box3d WASM
+absent -> Jolt baseline only)". The wasm is not absent: physics/box3d/box3dNode.mjs loads the same artifact
+headless with 45 swk_ functions, and every physics gate in the tree uses it. So the envelope that harness exists
+to record -- how far box3d and Jolt drift apart on one scene -- has never been recorded, and its own header at
+line 87 warns about precisely this shape: "a control that cannot fail". A catch block turning a usage error into
+a capability claim.
+
+Reported with the mechanism named, filed, and deliberately NOT fixed here: the repair is about a line, but it
+makes that gate start comparing two engines against a baseline recorded from one, which is its own round.
+
+The tree stands at 1433 gates.
 ## v4396 -- box3d sensors and CCD: #150's last two names, and a third nobody went looking for
 
 v4385 shipped joint motors and limits and left sensors/triggers and CCD open. This is those: fourteen new

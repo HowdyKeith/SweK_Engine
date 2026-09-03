@@ -524,6 +524,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "three files md5-identical after, and sabotage D caught a check that required its own " +
                  "finding to stay broken",
     }),
+    since27: Object.freeze({
+        at: "v4397", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/backendLimits-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.9s, six sections, BOTH ENGINES re-measured in the run. It " +
+                 "answers the question v4396's footer said it could not: the aliasing non-monotonicity is " +
+                 "SHARED (Jolt passes at 52 and stops at 100, the same inversion box3d showed at 13 and 90) " +
+                 "while the 34 m/s CCD hole is BOX3D'S ALONE (Jolt's LinearCast stops all 96). Both engines " +
+                 "silently cap linear speed and the caps are 100 m/s apart -- 400 and 500, both measured and " +
+                 "neither quotable -- so es-arena's Fighter at 430 flies at two speeds depending on the " +
+                 "router, which is v2468's damping finding in a second place. Jolt routes sensor overlaps " +
+                 "through the ORDINARY contact listener, so a portable reader must call Body.IsSensor() or it " +
+                 "reports the floor as a trigger. Driven RED by five sabotages (4/1/2/3/1 by name), both files " +
+                 "md5-identical after, and B reproduces v2468's mistake on demand: dropping the damping match " +
+                 "reads 25/96 onset 45 against the matched 19/96 onset 52",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
