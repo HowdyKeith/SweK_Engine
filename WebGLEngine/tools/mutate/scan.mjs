@@ -32,13 +32,43 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
+/**
+ * Blank the CONTENTS of string literals, keeping the quotes and the length so every column index still points
+ * where it did. Length-preserving on purpose: findConstants reports a column that mutationsFor slices the real
+ * line at, so a stripper that shortened the text would move every constant after the first string.
+ *
+ * Template literals are blanked too. A ${} expression inside one is code, and blanking it means a real
+ * constant there is MISSED -- which is the safe direction: a missed mutation is an untested constant, while a
+ * mutated string is a false accusation, and this file's output is read as a list of accusations.
+ */
+function stripStrings(code) {
+    let out = "", quote = null;
+    for (let i = 0; i < code.length; i++) {
+        const c = code[i];
+        if (quote) {
+            if (c === "\\") { out += "  "; i++; continue; }
+            if (c === quote) { quote = null; out += c; continue; }
+            out += " ";
+        } else if (c === '"' || c === "'" || c === "`") {
+            quote = c; out += c;
+        } else out += c;
+    }
+    return out;
+}
+
 // Find numeric literals that are plausibly PHYSICS rather than plumbing.
 function findConstants(src) {
     const out = [];
     const lines = src.split("\n");
     for (let li = 0; li < lines.length; li++) {
         const line = lines[li];
-        const code = line.split("//")[0];                      // comments are not code
+        // *** v4388 -- STRIPPING ONLY "//" WAS NOT ENOUGH, AND RUNNING THE SCANNER FOR THE FIRST TIME PROVED IT.
+        // The header above says "anything in a comment: not code", and that was the whole guard. It misses
+        // STRING LITERALS. physics/box3dLockstepNet.js:71 carries the prose "...collisions amplify that
+        // ~90,000x", and the scanner dutifully perturbed 90 to 92.7, ran four gates, and reported a SURVIVING
+        // CONSTANT -- a number in a sentence, filed as a quantity nothing is checking. A survivor list is only
+        // worth reading if its entries are candidates; one prose number in ten empties it of authority.
+        const code = stripStrings(line.split("//")[0]);
         if (!code.trim()) continue;
         const re = /(?<![\w.$])(\d+\.\d+|\d+)(?![\w.])/g;
         let m;

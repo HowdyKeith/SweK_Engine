@@ -419,6 +419,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (3/3/1/1 by name), md5-identical after; sabotage B restores the actual v4162 " +
                  "defect and TWO independent detectors catch it, which is why both are there",
     }),
+    since20: Object.freeze({
+        at: "v4388", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/mechanical-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, eight sections. The round RAN the mechanical scanner for the " +
+                 "first time: 19 constants over 5 files, 6/7/6 caught/survived/unmeasured, and two survivors " +
+                 "confirmed against the FULL 934-gate verify. Two claims were corrected by measuring -- the " +
+                 "gate set had to be ordered cheapest-first (a name-ordered draft burned 27 minutes without a " +
+                 "verdict) and the lockstep timestep survives because the gates are DIFFERENTIAL, not because " +
+                 "the default is unexercised. Driven RED by four sabotages (2/2/3/1 by name), three files " +
+                 "md5-identical after",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

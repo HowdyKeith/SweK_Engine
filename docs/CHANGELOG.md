@@ -14,6 +14,83 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4388 -- The mechanical mutation scanner runs, and what it finds first is itself
+
+tools/mutate/scan.mjs exists because a hand-picked mutation set "measures the AUTHOR'S IMAGINATION, not the
+gate" -- so it walks the source and perturbs every numeric literal mechanically. It enumerates and prints. It
+has never applied one. v4387 filed that as #151; tools/mutate/mechanical.mjs is the runner.
+
+THE GAP FIRST, BECAUSE IT IS THE MOTIVATION. scan.mjs finds 105 numeric constants in the eight files the
+hand-picked ten touch. Ten of a hundred and five: THE SUITE THAT SCORES 10/10 EXAMINES 9.5% OF THE NUMBERS IN
+ITS OWN TARGET FILES, and that ratio appears nowhere in the 10/10.
+
+WHAT MAKES A MECHANICAL SWEEP AFFORDABLE is that a mutation to one file cannot be seen by a gate that does not
+reach it. tools/ship/affected.mjs has known the import graph since v3041 and nothing in the mutation directory
+had ever asked it. brain/blobPolicyStore.js is reached by ONE gate of 1425; physics/box3dLockstep.js by four.
+That is not an approximation -- it is the same answer computed without the 1421 gates that could not possibly
+have noticed.
+
+AND THE ORDER WITHIN THAT SET IS WHAT MAKES IT USABLE, WHICH THE FIRST DRAFT LEARNT EXPENSIVELY. Sorted by
+name, a three-constant file burned 27 MINUTES without producing a single verdict, because its 98-gate set holds
+several multi-minute gates. A mutation is CAUGHT at the FIRST red, so which gate is first decides everything.
+The set is now ordered cheapest-first from tools/ship/sweep-timings.json -- a 164x spread between 123 ms and
+20165 ms -- and poly6's 315 was caught after ONE gate of 107. A gate with no recorded time sorts LAST, because
+unmeasured is not cheap.
+
+The control moved for the same reason. Running all 98 gates up front to check they are green costs the whole
+set -- 794 s -- before a single mutation is tried. It is paid LAZILY instead: only a gate that actually goes
+red is asked whether it was red already. Two were, and are named rather than skipped (statedRuntime,
+proseAudit).
+
+THE FIRST SWEEP: 19 constants across 5 files -- 6 CAUGHT, 7 SURVIVED, 6 UNMEASURED.
+
+Beside the hand-picked 10/10 that looks damning, and read carelessly it would be. IT IS MOSTLY A FINDING ABOUT
+THE OPERATOR. A single relative 3% perturbation is a PHYSICS mutation: meaningful for a kernel normalising
+constant, meaningless for an integer tick count or a JSON indent. Five of the seven survivors are exactly that.
+
+AND THE redundancy LINE SETTLES IT, BECAUSE BOTH SUITES MUTATE IT. The hand-picked entry sets that constant to
+0 and is CAUGHT; the mechanical operator sets it to 4.12 and it SURVIVES. Same line, same file, opposite
+verdicts. So the difference is not gate coverage at all -- it is whether the mutation is a plausible defect for
+that KIND of number. One operator applied to every literal manufactures survivors, and a survivor list nobody
+can trust is worth about what a comment is.
+
+BUT TWO SURVIVORS ARE REAL, AND WERE PUT ON TRIAL. Each was re-applied and graded by the FULL verify -- 934
+gates, not the four that reach the file -- and both came back ALL GREEN:
+
+    physics/box3dLockstepNet.js:19   const dt = opts.dt || 1 / 30      ->  1 / 30.9
+    physics/box3dLockstep.js:21      shipHalf: opts.shipHalf || 30     ->  30.9
+
+A three-percent change to the LOCKSTEP TIMESTEP passes every gate in the tree.
+
+AND THE REASON IS NOT THE OBVIOUS ONE. The first theory was "the default is never exercised", and reading the
+callers killed it: all four createLockstepNet calls in the two gates that reach the file leave dt at its
+default. Those gates build TWO PEERS and compare them to each other -- which is what lockstep is for -- so a
+change to a constant they SHARE moves both sides of the equality and cancels. A DIFFERENTIAL CANNOT SEE A
+SHARED CONSTANT, the same family as a twin built from the same shell. By contrast physics/lockstepDt-selfcheck
+compares the default against an explicit 1/30, an absolute rather than a difference, which is exactly why
+box3dLockstep.js's own dt default WAS caught.
+
+RUNNING THE SCANNER ALSO EXPOSED A DEFECT IN IT. Its header says comments are excluded; it stripped "//" and
+not STRING LITERALS. So it perturbed the 90 in the prose "...collisions amplify that ~90,000x", ran four gates,
+and filed a number in a sentence as a constant nothing is checking. A survivor list is only worth reading if
+its entries are candidates. Fixed with a length-preserving stripper -- length-preserving because findConstants
+reports a column that mutationsFor slices the real line at. 105 constants where there were 106: exactly the one
+prose number, and nothing else.
+
+Four sabotages, 2/2/3/1 red by name, all three files md5-identical after. C is the instructive one: folding
+UNMEASURED into SURVIVED does not merely overstate the survivor count, it silently un-covers the trial that was
+supposed to back it -- "2 tried, all 7 plausible survivors".
+
+UNCHECKED: the sweep is not re-run by the gate. Forty minutes against milliseconds, so what is checked is that
+the record is CURRENT and internally honest, never that it is right. Three of the eight files are unswept --
+sph.js (52 constants), blobPhantom.js (27), fdtd1d.js (7) -- because their gate sets are 100-plus wide and hold
+gates past the 120 s cap, which is what the six UNMEASURED rows are.
+
+THE STANDING LIMIT: the sweep is affordable exactly where the dependency graph is NARROW, and narrow means few
+gates care -- which is where a survivor matters least. Nineteen constants is not a mutation score for SweK. It
+is a measurement of five files, and of the operator that measured them.
+
+The tree stands at 1426 gates.
 ## v4387 -- The mutation suite's score was prose, and it had been false for 223 versions
 
 tools/mutate/scan.mjs opened by stating a perfect score for the ten mutations as a bare literal in a comment.
