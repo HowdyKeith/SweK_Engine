@@ -962,6 +962,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "one session. Comments are stripped now; 20 hot effects unregistered, not 29. Five " +
                  "sabotages, 3/3/1/4/1 red by name.",
     }),
+    since51: Object.freeze({
+        at: "v4426", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/demosReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, a directory walk plus SHA-256 known-answer tests, no browser. #170: " +
+                 "demos_code/ is 56 files and 19,110 lines and is excluded from BOTH staleness.mjs and " +
+                 "buildKnowledgeIndex, so a gate living there would exist, pass by hand and NEVER RUN ON A " +
+                 "SHIP -- the exact defect staleness.mjs's own header records for the old vendor pattern. " +
+                 "FIRST THING CHECKED: it has not happened, ZERO gates inside, so the exclusion costs " +
+                 "COVERAGE and not correctness, and the check makes that a standing fact rather than luck. " +
+                 "242 function names there, 7 colliding with exported symbols, AND EVERY COLLISION WITH AN " +
+                 "ORACLE AGREES: the demo's hand-rolled SHA-256 passes 3 of 3 FIPS 180-4 vectors and matches " +
+                 "node crypto on 200 of 200 random inputs, and mat4Identity is the same matrix in a different " +
+                 "container. Its header's claim of 'real double-SHA-256' was TRUE and had never been checked " +
+                 "in 4,412 versions. v4412's fireRamp was a trap because two colour ramps shared a name and " +
+                 "differed; these share a STANDARD, which has a known answer to test against. Names are read " +
+                 "from code and not prose by default -- v4424's lesson applied on arrival, 245 raw vs 242 " +
+                 "stripped. Four sabotages, 2/2/1/1 red by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

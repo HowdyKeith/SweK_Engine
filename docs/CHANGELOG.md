@@ -14,6 +14,70 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4426 -- the directory outside every scanner, and what its unchecked claims turned out to be worth
+
+#170. v4412 renamed a GLSL `fireRamp` in demos_code/fitzhugh_nagumo.js to `infernoRamp`, because one name meant
+two different colour ramps and nothing had noticed for 4,412 versions. Its closing note said why, and named the
+successor: demos_code is outside staleness.mjs's walk, "and widening that scan is its own round".
+
+THE EXCLUSION IS REAL AND IT IS IN TWO PLACES:
+
+    tools/ship/staleness.mjs:40          SKIP = /node_modules|...|GPU_Assets|demos_code/
+    tools/ship/buildKnowledgeIndex.mjs   SKIP = /node_modules|...|GPU_Assets|demos_code/
+
+staleness.mjs's gateFiles() is what countGateFiles(), the knowledge index and the affected-file filter all
+read. A GATE LIVING IN demos_code WOULD EXIST, PASS WHEN RUN BY HAND, AND NEVER RUN ON A SHIP -- which is
+precisely the defect that file's own header records for the old `[\\/]vendor` pattern, where exactly one real
+gate was hidden for hundreds of rounds.
+
+THE FIRST THING TO CHECK IS WHETHER THAT HAS ALREADY HAPPENED. IT HAS NOT: zero gates inside demos_code.
+
+The vendor defect bit because a gate WAS there. Here none is, so the exclusion has been costing COVERAGE
+rather than correctness -- and saying that plainly is worth more than implying a disaster. What the new check
+does is turn it from today's luck into a standing fact: planting one file in there goes red by name.
+
+WHAT THE EXCLUSION HAS BEEN HIDING, MEASURED RATHER THAN FEARED:
+
+    function names defined in demos_code/                      242
+    of those, names ALSO exported from the scanned tree           7
+
+        sha256          demos_code/bitcoin_miner.js    vs  tools/roundhouse/updatePolicy.mjs
+        mat4Identity    demos_code/texture_studio.js   vs  engine/xrSession.mjs
+        buildPlane, initGL, setMode, render, frame     -- generic names, unrelated jobs
+
+AND EVERY COLLISION THAT HAS AN ORACLE AGREES.
+
+After v4412 this round expected to find more traps and found none, which is a result rather than a
+disappointment.
+
+    sha256        demos_code hand-rolls SHA-256; updatePolicy.mjs calls node's crypto. The hand-rolled one
+                  passes 3 of 3 FIPS 180-4 known-answer vectors and hashes 200 of 200 random inputs
+                  IDENTICALLY to node. The file's own header claims "real double-SHA-256" and "byte-identical
+                  hashes" -- BOTH TRUE, AND NEVER ONCE CHECKED IN 4,412 VERSIONS, because the directory it
+                  lives in is outside every scanner.
+
+    mat4Identity  one returns a Float32Array through an out-param, the other a plain Array. The sixteen
+                  values are the same matrix.
+
+THE DIFFERENCE FROM v4412 IS WORTH NAMING. That collision was between two COLOUR RAMPS, where one name implied
+one curve and the curves differed -- catchable only by reading both. These are between two implementations of
+a STANDARD, and a standard has a known answer, which is why these could be caught by RUNNING. A trap and a
+duplicate look identical in a name census and are told apart by whether an oracle exists.
+
+NEW tools/ship/demosReach.mjs and NEW tools/ship/demosReach-selfcheck.mjs -- THE FIRST GATE THAT LOOKS INSIDE
+demos_code. Eight checks in four sections.
+
+It reads names from CODE and not from prose by default, which is v4424's lesson applied on arrival rather than
+after a red sweep: the raw count is 245 and the comment-stripped count is 242.
+
+WHAT THIS DOES NOT CLAIM. That the scanners should now walk demos_code: widening gateFiles() would make 56
+demo files eligible to be gates, which is a different decision with a different cost, so THE EXCLUSION STAYS
+and is watched instead. That all 7 collisions are benign -- only two have oracles, and the other five are
+generic names doing unrelated jobs, listed rather than cleared. And that demos_code is now covered: one gate
+over 19,110 lines is a beginning, and the five untested collisions are named rather than waved at.
+
+Four sabotages, 2/2/1/1 RED by name, two files md5-identical after restore.
+The tree stands at 1457 gates.
 ## v4425 -- A standing red from v4279 is green, and sixteen of its twenty-two hits had been invisible
 
 *** A STANDING RED FROM v4279 IS GREEN, BY DOING THE WORK, WHICH IS WHAT A REGISTER ENTRY IS FOR AND WHAT NONE OF THIS SESSION'S OTHER TWENTY-SIX HAVE HAD. *** Seven rounds of this session built instruments for one defect species and every one of them ended by naming more debt. This round spends a round paying some. tools/ship/winPathGuard-selfcheck.mjs has been red since v4279 -- one hundred and forty-four rounds -- over Windows-fragile path idioms, and v4404 found a SETTLED CLAIM RESTING ON IT: "the selfchecks and the server survive Windows path semantics", whose own `kill:` named this gate and whose `measured:` read "it is, so every straggler was caught". That claim was marked BROKEN at v4404 with the measurement, which is what this tree does with a falsified prediction. IT IS SETTLED AGAIN NOW, AND WHAT MAKES IT SETTLED IS THE GATE AND NOT THE SENTENCE. TWENTY-EIGHT OCCURRENCES ACROSS SIXTEEN FILES, all of them `new URL(<x>).pathname`, replaced with fileURLToPath -- the idiom this gate's own header names and which the gate file itself has used since it was written. `new URL(import.meta.url).pathname` returns a leading slash before the drive letter on Windows, so `/C:/Users/...` reaches readFileSync and nothing opens; the sixteen files include four render gates, two engine gates, two ui gates, a shaders gate, and tools/ship/shipVerdict.mjs, WHICH IS MINE FROM v4406 -- written six rounds into a session about detectors, with the idiom the tree has a gate against. THE FIX IS NOT A WIDENING: no pattern was relaxed, no file exempted, and the gate asserts exactly what it always asserted. Every one of the sixteen was re-run: thirteen green, and the three that are not -- frameDirtyCensus, box3dFilter and domScope -- were already in the register or the slow bucket before this round touched them, which is the check that separates "I fixed it" from "I broke something else". *** AND SIXTEEN OF THE TWENTY-TWO HITS HAD BEEN INVISIBLE THE WHOLE TIME. *** The failure line read `hits.slice(0, 6)`, so a reader saw six filenames and had no way to learn what the other sixteen were except by editing the gate. A LIST NOBODY CAN SEE IS A LIST NOBODY ACTS ON -- v4379's finding about RIG_ONLY, and the best available explanation for a hundred and forty-four rounds of standing still. Every hit is printed now, one per line; the cost is a long message on a red run, which is the run where a long message is worth having. The entry is REMOVED from redCensus.RED_AT_V4279 and recorded in FIXED_SINCE_V4279 with the round that did it, because a census that is only appended to becomes a list of grievances -- this file's own words about the register it replaced. The register stands at twenty-six. *** AND RE-STATING THE CLAIM TRIPPED THE GATE v4404 BUILT FOR EXACTLY THIS, IN A WAY WORTH RECORDING. *** claimEvidence-selfcheck went red the moment the claim went back to settled: its `measured:` prose named engine/frameDirtyCensus-selfcheck.mjs as an EXAMPLE OF AN OFFENDING FILE, and tools/ship/claimEvidence.mjs reads every path in that field as a CITATION -- so a settled claim appeared to rest on a gate that is still red. That is the session's own species one more time, in the checker: a path spelled in prose counted as a reference to it, exactly as a record about an import was counted as an import at v4412. The prose names those two files by ROLE now rather than by path, and the reason is written where the sentence is. THREE MORE GATES WERE MADE TO EMIT rather than filed. gateReport-selfcheck's v4399 ratchet -- no gate written since may argue in numbers and emit nothing -- went red on three arrivals from the other branch: ev/shipDebris-selfcheck.mjs, physics/render/pathTracerGpu-selfcheck.mjs and physics/render/rtPipeline-selfcheck.mjs, each printing a table of numbers to a terminal that closes. Adding them to the frozen silent list would have been WIDENING A RATCHET, which this tree forbids, so each got the one line the check's own message says it needs: the fragment-reach table, the CPU-against-GPU furnace and gradient rows, and the two-sphere sweep are emitted now and readable on instruments.html. UNCHECKED AND SAID PLAINLY: this fixes an IDIOM, not Windows. Nothing here ran on Windows, no rig was involved, and the claim it restores is still a claim about what the code says rather than about what a Windows box does -- which is what the gate has always been, and the honest reading of "survive Windows path semantics" is "does not use the two idioms known to break there". The replacement is mechanical and was verified by re-running the sixteen files, not by reading them: a transform that parses balanced parentheses rather than a regex, because `new URL("./x.mjs", import.meta.url).pathname` has a comma and a nested call in it and a regex over that is the thing this session has spent seven rounds finding. *** AND THE ROUND'S OWN NOTE TURNED THE GATE RED, WHICH FOUND A SECOND, WEAKER COPY OF A RULE THE TREE ALREADY HAS RIGHT. *** This note quotes the idiom in prose, and verify came back DO NOT SHIP with main.js and brain/brain.js named as offenders. The gate's own header explains that trap -- 'the sentence describing the bug is not the bug', written at v3936 after the same thing happened -- and it strips comments for exactly that reason. Its stripper was a LINE FILTER: it dropped lines that BEGIN with //, and a TRAILING comment on a code line survived untouched, which is the precise shape of every version note this tree writes. tools/ship/sourceScan.mjs has handled trailing comments since it was written; one owner, imported. AND THE OBVIOUS IMPORT WAS THE WRONG ONE, which cost a detour worth recording: codeOnly() blanks STRING BODIES as well as comments, and this gate's guards live in strings and regex literals -- the leading slash that makes an endsWith a basename comparison, the /^\/[A-Za-z]:/ drive test. Blanking those turned 22 real hits into 14 BRAND NEW FALSE ONES, every correctly-guarded file reading as unguarded. TWO STRIPPERS, TWO QUESTIONS: noComments() for what a file SAYS, codeOnly() for what it DOES -- which is written down in orreryFleet-selfcheck and which I walked into anyway, one command after fixing the same species elsewhere. Twenty-six reds still stand, several of them for as long as this one did. The tree stands at 1456 gates.
