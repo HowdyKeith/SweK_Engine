@@ -14,6 +14,94 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4410 -- the DOOM fire's "up" was a constant, and that is the only reason it could not run down a river
+
+*** TWO DIRECTIONAL CONSTANTS, NOT ONE. *** render/doomFire.mjs (v4178, ported from
+filipedeschamps/doom-fire-algorithm, MIT) expresses its whole rule as 1D index arithmetic on a rectangle:
+
+    const below = i + w;                       // where the heat is DRAWN FROM
+    const decay = Math.floor(rng() * 3);
+    const dst   = i - decay;                   // where it is WRITTEN: leaned LEFT by decay
+
+`+w` is the FLOW and `-1` is the LEAN. A generalisation that replaced only the first produces fire that flows
+sideways and still leans left, which is not a rotated fire, it is a broken one. Both now come from ONE
+per-cell direction field:
+
+    back(d) = -(dx + w*dy)          the neighbour OPPOSITE the flow
+    perp(d) =  dy + w*(-dx)         the flow turned 90 degrees
+
+For the original's d = (0,-1) those evaluate to exactly `+w` and `-1`. THE TWO CONSTANTS, DERIVED.
+
+*** SO THE CONTROL IS FREE AND TOTAL. *** NEW render/doomFireField.mjs, run with a uniform upward field,
+reproduces v4178 BYTE FOR BYTE, FRAME FOR FRAME: five grid shapes (60x40, 37x23, 8x5, 120x80, 1x2), 200
+frames each, stoke() every 7 frames and damp() every 11 -- 0 differing cells in 1,000 frames. rng() is called
+at the same point and the same number of times, after the bounds test on the source cell, so a cell with no
+source consumes no randomness in either implementation. That is what makes the control exact rather than
+close.
+
+*** RIVERS, WATERFALLS, AND LAVA THAT CATCHES. *** riverField follows a wandering channel and the fire runs
+downstream inside its banks; waterfallField runs horizontally along the top, turns at the lip, and pours down
+a three-cell curtain; lavaField spreads radially from a vent under a downhill bias. One field holding two
+regimes -- horizontal above the lip, vertical over it -- is what a scalar "wind" knob cannot express, and is
+the whole reason the direction is per cell.
+
+*** THE INLET IS DERIVED FROM THE FLOW, NOT TYPED. *** upstreamSource() returns every fuel cell whose
+upstream neighbour is off-grid or non-fuel. For the upward field that is EXACTLY v4178's bottom row: its
+hand-picked source recovered as a consequence of its rule rather than as a second fact about it.
+
+*** THIS ROUND'S OWN INSTRUMENTS REFUTED FOUR OF ITS CLAIMS, AND THERE IS A CHECK FOR EACH. ***
+
+  1. quantise's comment said it "keeps a shallow diagonal diagonal instead of collapsing it to the dominant
+     axis". IT DID THE OPPOSITE. Normalising by the larger component and rounding sends (2.4, 1) -- 22.6
+     degrees off horizontal -- to [1, 0], the downstream component rounded away entirely, and the river's
+     fire never left its source row. It snaps the ANGLE now: (2.4, 1) -> [1, 1].
+  2. The header said a zero direction means "nothing burns here" while 154 of 1,542 off-water cells burned.
+     A live cell's LEAN lands on a diagonal neighbour and that neighbour is off the water at every bend. The
+     write refuses non-fuel destinations now; the count is 0 of 984.
+  3. riverField's downstream never advanced downstream. The default path wanders a quarter of the width over
+     a quarter period -- a channel genuinely steeper than 45 degrees, whose tangent quantises to pure
+     horizontal. The tangent is clamped to one cell per row: downstream that never advances downstream is
+     not downstream.
+  4. waterfallField's comment read "the fall itself, a narrow column" beside code making EVERY cell left of
+     the lip into falling water, so the whole left half of the grid burned.
+
+*** A BOUNDARY BEHAVIOUR OF v4178 THAT v4178 COULD NOT EXHIBIT. *** The decay is applied to the value
+WRITTEN, and the write lands on the PERPENDICULAR neighbour -- so only a decay of 0 writes a cell to itself,
+and it writes it undecayed. A fuel cell whose perpendicular upstream neighbour is not fuel therefore never
+receives a decayed value at all and conducts its inlet intensity forever. MEASURED: the waterfall curtain's
+leading column reads exactly 36 at every one of 20 rows, and across the grid 48 of the 51 such cells sit at
+MAX_INTENSITY.
+
+THIS IS OLD BEHAVIOUR WITH NOWHERE TO APPEAR. v4178's fuel region is the entire rectangle, so its only such
+cells are one screen edge, where the effect is a 9% warm bias -- measured on the original 40x20 after 300
+frames: mean intensity 25.7 at the right edge against 23.6 at the left, the right being the edge with no
+perpendicular upstream neighbour because the lean is leftward. Give the same rule an interior boundary and it
+draws a hard bright line. Reported rather than smoothed: smoothing it would be changing the ported rule to
+suit a picture.
+
+*** AND WHAT THE KRBN LIFT CAN AND CANNOT DO, SETTLED. *** tools/krbn/strokeLift.js liftStrokes(strokes,
+mesh, cam) ray-casts 2D points onto a mesh and drapes them as 3D polylines. It is a FORWARD MAP ONLY -- point
+to surface position, with no inverse and no adjacency. So it can PAINT this fire onto geometry and it cannot
+make the fire TRAVERSE geometry: traversal needs a neighbour topology, and a direction field is that
+topology. The lift and this module answer two different questions, and the one worth being clear about is
+which.
+
+SIX SABOTAGES, MEASURED 4/2/1/1/2/2 RED BY NAME, file md5-identical after restore: A the lean dropped from
+the derivation; B quantise reverted to the component-normalising draft; C the lean allowed to cross a bank;
+D the river tangent unclamped; E the curtain back to a sheet; F the inlet typed as the bottom row.
+
+*** SABOTAGE D READ ZERO RED THE FIRST TIME, AND THAT IS THE MOST USEFUL THING HERE. *** The travel check
+counted how many rows held fire while lighting the FULL derived inlet -- and that inlet spans many rows by
+construction, so "fire reaches 24 of 24 rows" was satisfied by the injection and travel was never measured at
+all. Travel is a distance FROM the inlet: lit only at the row-0 inlet cells, the clamped river reaches row 13
+of 23 from 23 inlet cells, and the unclamped one reaches row 0 from 1.
+
+WHAT THIS DOES NOT CLAIM. That the fire looks right: a gate cannot judge a picture, and these checks hold
+direction, confinement, travel and the derived inlet, none of which is beauty. That a direction field is a
+fluid solver -- it is an advection direction per cell and nothing solves for it, so a river's course here is
+drawn, not simulated. And that any of this reaches a scene: nothing in the tree renders it yet, which is
+#162 and is deliberately not done here.
+The tree stands at 1442 gates.
 ## v4409 -- a check identified its subject by SHAPE, and a round two versions later gave it a bigger one
 
 *** THE SELECTOR THAT KEPT MATCHING AFTER ITS SUBJECT WAS REPLACED. *** tools/ship/gateReport-selfcheck.mjs
