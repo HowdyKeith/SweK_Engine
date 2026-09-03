@@ -488,6 +488,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "named voxelizePage at all. Driven RED by four sabotages (1/3/2/1 by name), five subject " +
                  "files md5-identical after",
     }),
+    since25: Object.freeze({
+        at: "v4395", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/gateReport-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections. It gates tools/ship/gateReport.mjs, the answer to " +
+                 "the census that opened the round: 1429 gates, 67 print a table of numbers, ZERO wrote anything " +
+                 "a second reader could open -- and artefactWriters, the register that exists to answer that, " +
+                 "could not see one of them because its walk skips -selfcheck.mjs by construction, so its zero " +
+                 "read clean. Driven RED by four sabotages (2/3/3/1 by name), md5-identical after; the first " +
+                 "left a stale artefact behind within one run of turning the dry-run rule off, which is the rule " +
+                 "demonstrating itself. Two of its own drafts were wrong and both are logged in the gate: " +
+                 "reports() returned index.json as a report (a register counting its own listing), and the " +
+                 "value check looked in rendered text the page had rounded -- THE PAGE WAS THE THING THAT NEEDED " +
+                 "FIXING, and every cell now carries its exact value in a title",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

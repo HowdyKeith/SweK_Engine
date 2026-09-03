@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "1f2b05c27e9f8374588b9953c572a4d147c4de28",
+ "head": "4fb9d3afb7107d45ea21cf63ff77e52188ccd5d5",
  "catalogue": 150,
  "coverage": {
   "total": 150,
