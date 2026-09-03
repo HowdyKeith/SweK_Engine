@@ -1157,6 +1157,10 @@ window.addEventListener("load", function () {
              pageSections.mjs like every other drawer; the TEST LINKS above them are hand-written because they are
              QUERY VARIANTS of a page rather than pages -- ?tsl=1 and ?webgl=1 are the whole point of clicking, and
              the mover files pages, not URLs. Each one says what it should show and what it is worth looking for. -->
+        <!-- v4379 -- A PANEL WITHOUT A TAB IS THE FAILURE THIS ROUND EXISTS TO FIX, WEARING A DIFFERENT HAT: the
+             gpanels are hidden until a gtab opens them, so a rig-only panel with no button would be exactly as
+             unreachable as the list was before it had a panel at all. -->
+        <button class="gtab" data-tab="rigonly"><span class="gtabTog">&#9656;</span><span>&#128296; Only at the rig</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rendertsl"><span class="gtabTog">&#9656;</span><span>&#128302; Render TSL</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
@@ -1685,6 +1689,20 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#129513; Renders</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="renders" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- v4379 -- THE RIG-ONLY LIST GETS A SURFACE AGAIN, ON A DIFFERENT PAGE FROM THE ONE KEITH CLEARED.
+             v4129 removed the "Only a human at the rig can do these" panel from rig.html at his request, kept
+             RIG_ONLY in ai-bridge/rigRunner.js on the grounds that fourteen items of recorded reasoning are
+             "expensive to write and impossible to reconstruct", and forwarded the reader to "that file's own
+             note for where it surfaces now". THAT NOTE DOES NOT SAY, BECAUSE IT SURFACED NOWHERE: measured at
+             v4379, the list had fifteen entries and zero renderers, served on /rig/list and read by no page for
+             two hundred and fifty rounds. tools/ship/rigJobs-selfcheck.mjs was RED about it the whole time --
+             "the page renders title, why and how for each" -- and the red register absorbed the line instead of
+             anyone reading it. This is the front door, not rig.html; the panel he asked to lose stays lost. -->
+        <div class="gpanel" data-panel="rigonly" hidden>
+          <div class="gpanelHdr">&#128296; Only at the rig</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Work this sandbox CANNOT do -- it needs Keith's hardware, a real GPU, a toolchain that answers, or a repo push. Each says what it UNBLOCKS rather than only what it is, because "rebuild the wasm" is a chore and "rebuild the wasm, it blocks five things" is a decision. Served from ai-bridge/rigRunner.js RIG_ONLY via /rig/list; the bridge must be running for this to fill.</div>
+          <div id="rigOnlyList" style="font-size:11px;color:var(--dim);">checking&hellip;</div>
         </div>
         <div class="gpanel" data-panel="rendertsl" hidden>
           <div class="gpanelHdr">&#128302; Render TSL</div>
@@ -8956,6 +8974,28 @@ import { mountHostingControls } from "./ui/hostingControls.js";
             mountHostingControls(slot, { sections: ["permanent", "tailscale", "netbird"], compact: true });
         } catch (e) { console.warn("hosting controls:", e); }
     });
+})();
+</script>
+<script>
+// v4379 -- RENDER THE RIG-ONLY LIST. /rig/list has served it since v4129 and no page has read it since; this is
+// the reader. Kept deliberately dumb: title, what it unblocks, how, and the link if it has one. It fails QUIET
+// when the bridge is not running, because the front door is opened far more often without it than with it.
+(function () {
+  var el = document.getElementById("rigOnlyList");
+  if (!el) return;
+  var esc = function (x) { return String(x == null ? "" : x).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); };
+  fetch("/rig/list").then(function (r) { return r.json(); }).then(function (data) {
+    var jobs = (data && data.rigOnly) || [];
+    if (!jobs.length) { el.textContent = "the bridge served no rig-only jobs"; return; }
+    el.innerHTML = jobs.map(function (r) {
+      return '<div style="margin:7px 0;padding:6px 8px;border:1px solid #24405a;border-radius:6px">'
+        + '<div style="color:#cfe9d8;font-weight:600">' + esc(r.title) + '</div>'
+        + '<div style="margin:3px 0"><b>Unblocks:</b> ' + esc(r.why) + '</div>'
+        + '<div style="margin:3px 0"><b>How:</b> ' + esc(r.how) + '</div>'
+        + (r.link ? '<a href="' + esc(r.link) + '" target="_blank" rel="noopener" style="color:#8fd0ff">' + esc(r.link) + '</a>' : '')
+        + '</div>';
+    }).join("");
+  }).catch(function () { el.textContent = "the bridge is not running (/rig/list did not answer), so this list is unread -- start ai-bridge and reload"; });
 })();
 </script>
 </body>
