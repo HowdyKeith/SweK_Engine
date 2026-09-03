@@ -76,7 +76,10 @@ async function openPageFx(img, initial) {
     try { const rec = await import("./canvasRecorder.js"); if (rec.installRecorder && !window.swekRecord) rec.installRecorder(); } catch (e) {}
     let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
     function resize() { W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR); cv.width = W; cv.height = H; }
-    resize(); addEventListener("resize", resize);
+    // v4434 -- the handler is stashed on `host` AT REGISTRATION, not on the last line of openPageFx.
+    // Assigning it at the end means anything that throws in between leaves the listener registered with
+    // nothing holding a reference to remove it by.
+    resize(); host._resize = resize; addEventListener("resize", resize);
     const state = { vg: null, t: 0, filter: initial || lastFilter(), ry: 0, rx: -0.12, target: { x: 1.1, y: 0 }, rainT: 0, phys: null, physBackend: "cpu", backendName: "cpu" };
     async function build() { const d = src.getContext("2d").getImageData(0, 0, src.width, src.height).data; state.vg = voxelizePage(d, src.width, src.height, { cell: 6 }); state.t = 0; state.phys = null; await FILTERS[state.filter].init(state.vg, state); refreshBar(); }
     function mkBtn(txt, on, hot) { const b = document.createElement("button"); b.textContent = txt; b.style.cssText = "background:rgba(10,16,28,.85);color:" + (hot || "#59d1ff") + ";border:1px solid #1c2942;border-radius:8px;padding:9px 13px;font:600 12px ui-monospace,monospace;letter-spacing:.04em;cursor:pointer;"; b.onclick = on; return b; }
@@ -92,15 +95,22 @@ async function openPageFx(img, initial) {
     await build();
     let drag = false, lx = 0, ly = 0;
     cv.addEventListener("pointerdown", e => { if (e.shiftKey) { drag = true; lx = e.clientX; ly = e.clientY; } else if (state.filter === "shatter" && state.phys) { const mx = (e.clientX / innerWidth - .5) * 1.6, my = (e.clientY / innerHeight - .5) * 1.6; state.phys.impact({ x: mx, y: my, z: 0 }, 1.6); } });
-    addEventListener("pointerup", () => drag = false);
+    // v4434 -- *** THIS LEAKED ONE WINDOW LISTENER PER OPEN, MEASURED AT EXACTLY ONE PER CYCLE OVER FIVE. ***
+    // It was an anonymous arrow, so closePageFx had nothing to pass to removeEventListener, and each
+    // orphan closes over the same scope as `state` -- retaining the whole voxel grid (2,120 voxels of 8
+    // numbers for a 240x320 page, ~136 KB) and, in shatter, a live physics backend.
+    host._pointerup = () => { drag = false; };
+    addEventListener("pointerup", host._pointerup);
     cv.addEventListener("pointermove", e => { if (drag) { state.ry += (e.clientX - lx) * .008; state.rx += (e.clientY - ly) * .008; lx = e.clientX; ly = e.clientY; } else { state.target.x = (e.clientX / innerWidth - .5) * 2.2; state.target.y = (e.clientY / innerHeight - .5) * 2.2; } });
     let R = null; const args = () => ({ W, H, ry: state.ry, rx: state.rx, dist: state.filter === "shatter" ? 3.0 : 2.4 });
     try { R = initVoxelGL(cv, () => state.vg, args); } catch (e) { R = null; } if (!R) R = initVoxelCanvas(cv, () => state.vg, args);
     host._raf = 1; let last = performance.now();
     (function loop() { if (!host) return; host._raf = requestAnimationFrame(loop); const now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now; state.t += dt; try { FILTERS[state.filter].update(state.vg, state.t, dt, state); R.draw(); } catch (e) {} })();
-    host._resize = resize;
 }
-function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); removeEventListener("resize", host._resize); host.remove(); host = null; }
+function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); removeEventListener("resize", host._resize); removeEventListener("pointerup", host._pointerup); host.remove(); host = null; }
 
 if (typeof window !== "undefined") window.swekPageFx = { open: openPageFx, close: closePageFx, shatterTo: shatterTransition };
-export { openPageFx, closePageFx, shatterTransition };
+// v4434 -- FILTERS is exported so a gate can DRIVE each entry rather than read the table and hope. It was
+// module-private and the first draft of the gate could only count the keys, which says nothing about
+// whether an entry does anything.
+export { openPageFx, closePageFx, shatterTransition, FILTERS };

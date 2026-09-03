@@ -1116,6 +1116,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "was held against the tree's own legend. Fifteen sabotages, all RED by name, six files " +
                  "md5-identical.",
     }),
+    // v4434 -- the fifty-seventh closing. The FIRST gate ui/pageFxOverlay.js has ever had, and the first thing
+    // driving it produced was a listener leak. Three instruments measured themselves before one measured it.
+    since57: Object.freeze({
+        at: "v4434", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pageFxOverlay-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, jsdom and the real voxel module, no browser. ui/pageFxOverlay.js was " +
+                 "named as ungated at v4424 and stayed ungated for ten rounds. Driven for the first time, it " +
+                 "LEAKED ONE WINDOW LISTENER PER OPEN: `pointerup` was registered as an anonymous arrow, so " +
+                 "closePageFx had nothing to pass to removeEventListener, and the count read 1, 2, 3, 5 over " +
+                 "cumulative loads of 1, 2, 3, 5 -- exactly one per cycle, unbounded. Each orphan closes over " +
+                 "the same scope as `state`, retaining the whole voxel grid (2,120 voxels of 8 numbers for a " +
+                 "240x320 page, about 136 KB) and, under shatter, a live physics backend. A SECOND leak was " +
+                 "latent on the throw path: host._resize was assigned on openPageFx's LAST line, so anything " +
+                 "throwing before it left the resize listener up with nothing holding a reference to remove " +
+                 "it by. Both handlers are stashed at registration now and both removed on close; measured 0 " +
+                 "of every type after 5 cycles and after a throwing open. *** THREE INSTRUMENTS MEASURED " +
+                 "THEMSELVES BEFORE ONE MEASURED THE OVERLAY: *** counting calls to removeEventListener (a " +
+                 "no-op call still counts), dispatching probes through a wrapped addEventListener (the probe " +
+                 "could not remove its own wrapper, so the reading counted leaked probes), and injecting " +
+                 "window's globals BEFORE wrapping (the overlay calls the BARE global, so every reading was " +
+                 "0). AND TWO SABOTAGES READ ZERO RED: giving plasma ripple's exact body passed, because " +
+                 "ripple calls Math.random and two identical filters still differ by noise -- and passed " +
+                 "AGAIN after the random was pinned, because one shared stream let plasma continue where " +
+                 "ripple left off. The seed restarts per filter now. Un-exporting FILTERS crashed the gate " +
+                 "rather than failing it by name, which is not a red anybody can read; it fails by name now. " +
+                 "Eleven sabotages, all RED by name, two files md5-identical.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
