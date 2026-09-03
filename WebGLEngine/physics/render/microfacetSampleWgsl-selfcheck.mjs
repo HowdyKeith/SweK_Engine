@@ -342,7 +342,7 @@ async function run() {
                 if (out.compileErrors.length) return out;
                 const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: m, entryPoint: "sample" } });
                 for (const j of a.jobs) {
-                    const uni = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+                    const uni = dev.createBuffer({ size: j.pack.length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
                     dev.queue.writeBuffer(uni, 0, new Uint8Array(j.pack));
                     const bytes = j.out * 4;
                     const pb = dev.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });

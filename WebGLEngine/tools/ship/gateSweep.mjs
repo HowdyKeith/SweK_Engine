@@ -507,6 +507,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "caught by a single key and by nothing else) and restored; a sixth went 0 red and earned a " +
                  "section proving the blindness is the FIXTURE's and measuring what would move it",
     }),
+
+    // v4410 -- the twenty-fifth closing, for the sampler a modern tracer actually uses. It is the first gate in
+    // this arc to carry a capability the tree did not have rather than to port one it did, and it repays two
+    // earlier rounds: it reaches the frame error v4409's section 7 proved that fixture could not see, and it
+    // finds that v4409's stratified sample pattern -- chosen to keep an unportable RNG out of the comparison --
+    // does not converge for a sampler that maps its two numbers onto a disk.
+    since26: Object.freeze({
+        at: "v4410", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/microfacetVndf-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 30 checks in 3.7 s. Driven RED by five " +
+                 "sabotages (8/5/1/4/1 by name) and restored; none went 0 red, and the 4 went 2 RED FIRST and " +
+                 "widened the gate -- the shipped CPU sampler had been resting on one section, which the " +
+                 "sabotage is what found",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

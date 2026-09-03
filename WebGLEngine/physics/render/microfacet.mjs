@@ -214,6 +214,78 @@ export function bsdfEval(cosO, cosI, cosH, alpha, { F = 1, ...o } = {}) {
     return D(cosH, alpha, o) * G2(cosO, cosI, alpha, o) * F / (4 * cosO * cosI);
 }
 
+/* ---------------------------------------------------------------------------------------------------------
+ * v4410 -- THE VISIBLE-NORMAL SAMPLER, WHICH IS WHAT A MODERN TRACER ACTUALLY USES
+ *
+ * *** sampleHalfVector ABOVE DRAWS FROM D. THAT IS THE WRONG DISTRIBUTION AND HAS BEEN SINCE 2014. *** It
+ * samples microfacets by how MANY there are, not by how many the viewer can SEE, so at grazing angles it keeps
+ * proposing facets that face away from wo -- 444 of 4096 at roughness 0.25 and cos_o 0.3, 1432 of 4096 at
+ * roughness 1 -- and every one of them is a sample whose weight is zero. Heitz's sampler draws from
+ *
+ *     D_visible(wh) = G1(wo) max(0, wo.wh) D(wh) / cos_o
+ *
+ * which is a normalised distribution over the hemisphere at EVERY view angle, and it proposes a backfacing
+ * facet exactly never.
+ *
+ * *** AND THE WEIGHT COLLAPSES FURTHER THAN v4409's DID: f cos_i / pdf = G2 / G1(wo). *** No D, no |wo.wh|, no
+ * cos_h -- the entire lobe cancels and what is left is the masking-shadowing ratio. That is the reason to do
+ * it, and it is an algebraic identity with no free parameter, so it can be checked pointwise.
+ * ------------------------------------------------------------------------------------------------------- */
+
+/**
+ * Heitz 2018 (JCGT 7:4), "Sampling the GGX Distribution of Visible Normals", listing 3, isotropic.
+ *
+ * *** WRITTEN IN THE PAPER'S OWN Z-UP FRAME SO IT CAN BE READ AGAINST THE PAPER LINE FOR LINE, with ONE named
+ * swap at each end. *** This file is y-up (sampleHalfVector's own comment says so). A transcription that
+ * silently reorders axes is unreadable against its source and is exactly the class of error v4409's section 7
+ * found this arc could not see; here the swap is a single involution and the gate proves it is one.
+ *
+ * `noWarp` and `noDegenerate` are the listing's two traps, as options rather than as a second copy:
+ *   noWarp        drops the section-4.2 reparameterisation. STILL PROPOSES NO BACKFACING FACET -- so the cheap
+ *                 structural check passes -- while the distribution is wrong by up to 35%.
+ *   noDegenerate  drops the lensq == 0 special case. Returns NaN when wo is along the normal, which is not an
+ *                 exotic direction: it is the centre of every flat surface facing the camera.
+ */
+export function sampleVisibleNormal(wo, alpha, u1, u2, { noWarp = false, noDegenerate = false } = {}) {
+    const Ve = [wo[0], wo[2], wo[1]];                       // y-up -> the paper's z-up. Named swap, one of two.
+    const V0 = [alpha * Ve[0], alpha * Ve[1], Ve[2]];       // 3.2: stretch into the hemisphere configuration
+    const vl = Math.hypot(V0[0], V0[1], V0[2]), Vh = [V0[0] / vl, V0[1] / vl, V0[2] / vl];
+    const lensq = Vh[0] * Vh[0] + Vh[1] * Vh[1];            // 4.1: an orthonormal basis about Vh
+    const T1 = (lensq > 0 || noDegenerate)
+        ? [-Vh[1] / Math.sqrt(lensq), Vh[0] / Math.sqrt(lensq), 0] : [1, 0, 0];
+    const T2 = [Vh[1] * T1[2] - Vh[2] * T1[1], Vh[2] * T1[0] - Vh[0] * T1[2], Vh[0] * T1[1] - Vh[1] * T1[0]];
+    const r = Math.sqrt(u1), phi = 2 * Math.PI * u2;        // 4.2: a uniform disk, then warped to the
+    const t1 = r * Math.cos(phi);                           //      PROJECTED AREA of the hemisphere
+    let t2 = r * Math.sin(phi);
+    const s = 0.5 * (1 + Vh[2]);
+    if (!noWarp) t2 = (1 - s) * Math.sqrt(Math.max(0, 1 - t1 * t1)) + s * t2;
+    const k = Math.sqrt(Math.max(0, 1 - t1 * t1 - t2 * t2));                          // 4.3: reproject up
+    const Nh = [t1 * T1[0] + t2 * T2[0] + k * Vh[0], t1 * T1[1] + t2 * T2[1] + k * Vh[1],
+                t1 * T1[2] + t2 * T2[2] + k * Vh[2]];
+    const Ne = [alpha * Nh[0], alpha * Nh[1], Math.max(0, Nh[2])];                     // 3.4: unstretch
+    const nl = Math.hypot(Ne[0], Ne[1], Ne[2]);
+    return [Ne[0] / nl, Ne[2] / nl, Ne[1] / nl];            // z-up -> y-up. The second half of the same swap.
+}
+
+/**
+ * The pdf of the SAMPLED DIRECTION under visible-normal sampling. The half-vector pdf is D_visible; the
+ * 1/(4|wo.wh|) is the reflection's Jacobian, and it cancels the max(0, wo.wh) inside D_visible outright --
+ * which is why this depends on cos_h and cos_o and NOT on the dot product that sampleDirPdf needs.
+ */
+export const visibleNormalDirPdf = (cosO, cosH, alpha, o = {}) => G1(cosO, alpha, o) * D(cosH, alpha, o) / (4 * cosO);
+
+/**
+ * f cos_i / pdf under visible-normal sampling, cancelled analytically: F G2 / G1(wo).
+ *
+ * *** COMPARE bounceWeight ABOVE, WHICH STILL CARRIES |wo.wh| / (cos_o cos_h). *** Sampling the visible
+ * normals removes those too. A wrong D is invisible here for the same reason it is invisible there, and more
+ * so: nothing about the lobe survives into the weight at all.
+ */
+export function visibleBounceWeight(cosO, cosI, alpha, { F = 1, ...o } = {}) {
+    if (cosI <= 0 || cosO <= 0) return 0;
+    return F * G2(cosO, cosI, alpha, o) / G1(cosO, alpha, o);
+}
+
 /**
  * The balance heuristic. v3472 proved these weights sum to 1 for the cone/cosine pair; THIS IS A DIFFERENT PAIR
  * (cone against the NDF) and the property has to hold again -- it is p_i/(p_L+p_B) summed over i, so it is one
