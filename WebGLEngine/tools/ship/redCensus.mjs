@@ -329,6 +329,43 @@ export const FIXED_SINCE_V4279 = Object.freeze([
            "by touching the ratchet." },
 ]);
 
+// ================================================================================================
+// v4424 -- THE HOLE IS CLOSED, AND IT HAD THREE REDS IN IT
+// ================================================================================================
+//
+// *** THE BUCKET BELOW WAS NOT ONLY HIDING SUCCESSES. *** All sixty-three were run one at a time at a 180 s
+// cap (tools/ship/slowCensus.mjs holds the protocol and every verdict): 39 GREEN, 21 still unfinished, and
+// THREE RED. They had been red and exempt from the ship gate for a hundred and forty-five rounds, because
+// quickSweep.redRegister() waves the whole bucket through on the grounds that nobody measured it.
+//
+// *** AND THE FIRST FORTY-THREE MEASURED WERE ALL GREEN, WHICH IS WHY THIS IS FILED AS A RED SET AND NOT AS
+// A REASSURANCE. *** Partway through, the honest summary of the evidence was "zero red -- the bucket has been
+// hiding successes, not failures". Finishing the measurement refuted it. That is the same shape as
+// referenceKind at v4279, one bucket later: an unmeasured gate is not a green one, however many of its
+// neighbours turn out green.
+export const RED_AT_V4424 = Object.freeze([
+    { gate: "tools/ship/doorKinds-selfcheck.mjs", ms: 150960, failed: 2, of: 20,
+      fails: "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed -- UNEXPLAINED: " +
+             "tools/ship/verifyLicenceTexts.mjs, tools/ship/wgslDeviceLimits.mjs; and !! NO PROSE DOOR " +
+             "STANDS UNEXPLAINED -- orreryBake.mjs",
+      why: "a partition over gate-only modules with three members in no part. Not a timing failure: it exits " +
+           "1 in 151 s alone on an idle box, and would have exited 1 at any cap that let it finish." },
+    { gate: "tools/ship/graveyard-selfcheck.mjs", ms: 75400, failed: 1, of: 11,
+      fails: "!! ORPHANED UTILITIES HAVE NOT INCREASED -- 145 now vs 93 recorded. These export functions and " +
+             "NOTHING calls them -- wire it, or delete it.",
+      why: "*** A RATCHET THIS SESSION HAS BEEN BREAKING WHILE SHIPPING ALL GREEN OVER IT. *** The baseline " +
+           "of 93 was set at v4153; the count is 145. Twenty-seven of those 145 were first committed in " +
+           "September, SIXTEEN of them on the day of v4408-v4424 -- fresnelWgsl, polyBrush, paintGenerators, " +
+           "paintTransforms, paintFields and the five microfacet WGSL modules among them. Every one is a " +
+           "module imported only by its own gate. The instrument that would have said so was in this bucket." },
+    { gate: "tools/ship/orphanDisposition-selfcheck.mjs", ms: 80100, failed: 2, of: 24,
+      fails: "!! 'imported by a gate named for something else' holds for EVERY member -- 24 of 26; " +
+             "!! ...so it discriminates NOTHING and is not used as a signal",
+      why: "the gate's own section 4 is titled 'A QUESTION WHOSE ANSWER IS STRUCTURALLY GUARANTEED, DRIVEN' " +
+           "and it is now 24 of 26 rather than 26 of 26 -- the guarantee has two exceptions and the gate " +
+           "says so. Filed, not repaired: which way that check should read is the owning round's call." },
+]);
+
 /**
  * *** THE HOLE THIS CENSUS DOES NOT CLOSE, NAMED RATHER THAN OMITTED. ***
  *
@@ -677,7 +714,17 @@ export const RECHECK_V4313 = Object.freeze({
                       "instruments-selfcheck went green-to-red in this very round, found at v4314 by a sweep " +
                       "with actual coverage. The zero this record used to carry would have been read as its " +
                       "denial",
-    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.filter((e) => !/^v43(1[4-9]|[2-9])/.test(e.round)).map((e) => e.gate)),
+    // *** AND THE FILTER THAT FIXED IT KNEW ONLY FOUR-DIGIT ROUNDS BEGINNING v43, SO IT BROKE AGAIN AT
+    // v4414. *** `!/^v43(1[4-9]|[2-9])/` excludes v4314 through v4399 and matches NOTHING in v44xx, so when
+    // v4414 pruned shaderCensus into FIXED_SINCE_V4279 that entry walked straight into a record of v4313 --
+    // the identical defect, one numbering era later, and the check below (nowGreen against the length of the
+    // list it names) is what caught it. Ten rounds late, because this gate re-runs the whole red set and is
+    // skipped by the ship-time budget every time. Written as a NUMBER now: a round is in this record if its
+    // version is at or before the one the record is about, whatever digits that takes.
+    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.filter((e) => {
+        const m = /^v(\d+)/.exec(e.round);
+        return !m || Number(m[1]) <= 4313;      // no version at all means "before the census", e.g. a raw sha
+    }).map((e) => e.gate)),
     causes: "one stale generated file (launch-index.json, 507 against 523) accounted for TWO of the three; the " +
             "third had been green since commit 9695918 and nobody pruned the entry",
     lesson: "a census entry is not a cause. Two of these three were one artefact read by two gates, so the red " +

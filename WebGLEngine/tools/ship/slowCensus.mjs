@@ -1,6 +1,7 @@
 // FILE: tools/ship/slowCensus.mjs -- v4424
 //
-// *** SIXTY-THREE GATES ARE EXEMPT FROM THE SHIP GATE ON THE GROUNDS THAT NOBODY HAS MEASURED THEM. ***
+// *** SIXTY-THREE GATES WERE EXEMPT FROM THE SHIP GATE ON THE GROUNDS THAT NOBODY HAD MEASURED THEM, AND
+// THREE OF THEM WERE RED. ***
 //
 // tools/ship/quickSweep.mjs decides whether a round may ship by asking one question: is any gate red that is
 // not already on the register? The register is built in redRegister(), and its third line is
@@ -29,12 +30,26 @@
 // verdict on a timing-sensitive gate is not a verdict, and none of these sixty-three is cheap enough to be
 // insensitive. Everything below is ONE GATE AT A TIME on an idle box.
 //
-// ---- *** WHAT THE RE-MEASUREMENT ACTUALLY FOUND *** ----------------------------------------------------------
+// ---- *** WHAT THE RE-MEASUREMENT ACTUALLY FOUND: THREE REDS *** ----------------------------------------------
 //
-// Zero red. Zero crashes. Every verdict that could be compared against v4279 agreed with it: no gate recorded
-// green came back red, and every gate that ran past this run's cap was one v4279 had also recorded above it.
-// The bucket has been hiding successes, not failures -- which does not make the exemption safe, because a
-// register that cannot tell the two apart is exactly what let referenceKind sit in it while exiting 1.
+// All sixty-three, one at a time: 39 GREEN, 21 still unfinished at 180 s, THREE RED, no crashes. The three
+// have been red and exempt for a hundred and forty-five rounds -- doorKinds, graveyard and orphanDisposition,
+// each exiting 1 in 75 to 151 seconds alone on an idle box. Not one of them is a timing failure.
+//
+// *** AND THE FIRST FORTY-THREE MEASURED WERE ALL GREEN, WHICH IS THE POINT. *** Partway through, the honest
+// summary of the evidence in hand was "zero red -- the bucket has been hiding successes, not failures". It
+// was written down, and finishing the measurement refuted it. An unmeasured gate is not a green one however
+// many of its neighbours turn out green; that is what referenceKind demonstrated at v4279 and what the last
+// twenty gates demonstrated again here.
+//
+// *** ONE OF THE THREE IS A RATCHET THIS SESSION HAS BEEN BREAKING WHILE SHIPPING ALL GREEN OVER IT. ***
+// graveyard-selfcheck counts modules that export functions nothing calls: baseline 93 at v4153, now 145.
+// Sixteen of the 145 were first committed on the day that shipped v4408 through v4424, five of them from this
+// very arc. Every one of those rounds reported ALL GREEN truthfully, because the instrument that would have
+// said otherwise was in the bucket. See ORPHAN_RATCHET below.
+//
+// Everything comparable with the v4279 record agreed with it: no gate recorded green came back red, and every
+// gate that ran past this run's cap was one v4279 had also recorded above it.
 //
 // *** THE RUNTIMES ARE REPRODUCIBLE IN THE THING THAT MATTERS AND NOT IN THE THING THAT DOES NOT. *** All
 // sixteen re-measured greens came back FASTER than v4279 recorded, median ratio 0.883 -- and a uniform shift
@@ -45,7 +60,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
+import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424 } from "./redCensus.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -125,6 +140,26 @@ export const MEASURED_V4424 = Object.freeze({
     "tools/roundhouse/plantedCoverage-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180101, checks: 0 },
     "tools/roundhouse/rayleighOnset-selfcheck.mjs": { verdict: "GREEN", ms: 79898, checks: 7 },
     "tools/roundhouse/responseCensus-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180081, checks: 0 },
+    "tools/roundhouse/sensitivity-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180084, checks: 0 },
+    "tools/roundhouse/stabilityBind-selfcheck.mjs": { verdict: "GREEN", ms: 61528, checks: 7 },
+    "tools/roundhouse/thermalScaling-selfcheck.mjs": { verdict: "GREEN", ms: 57505, checks: 7 },
+    "tools/roundhouse/twoFBind-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180053, checks: 0 },
+    "tools/roundhouse/valueMatch-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180053, checks: 0 },
+    "tools/roundhouse/zeroRangeSweep-selfcheck.mjs": { verdict: "GREEN", ms: 51894, checks: 9 },
+    "tools/ship/ddaPrecisionReport-selfcheck.mjs": { verdict: "GREEN", ms: 97207, checks: 19 },
+    "tools/ship/deterministicRaf-selfcheck.mjs": { verdict: "GREEN", ms: 47189, checks: 10 },
+    "tools/ship/domScope-selfcheck.mjs": { verdict: "GREEN", ms: 97958, checks: 18 },
+    "tools/ship/doorKinds-selfcheck.mjs": { verdict: "RED", ms: 150994, checks: 20 },
+    "tools/ship/driveEnv-selfcheck.mjs": { verdict: "GREEN", ms: 46665, checks: 37 },
+    "tools/ship/floors-selfcheck.mjs": { verdict: "GREEN", ms: 35391, checks: 42 },
+    "tools/ship/gateSelection-selfcheck.mjs": { verdict: "GREEN", ms: 60286, checks: 32 },
+    "tools/ship/graveyard-selfcheck.mjs": { verdict: "RED", ms: 75388, checks: 11 },
+    "tools/ship/labDevices-selfcheck.mjs": { verdict: "GREEN", ms: 118558, checks: 232 },
+    "tools/ship/loopSearch-selfcheck.mjs": { verdict: "GREEN", ms: 47685, checks: 9 },
+    "tools/ship/moduleRefs-selfcheck.mjs": { verdict: "GREEN", ms: 75330, checks: 11 },
+    "tools/ship/orphanDisposition-selfcheck.mjs": { verdict: "RED", ms: 80070, checks: 2 },
+    "tools/ship/orphanTriage-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180033, checks: 0 },
+    "tools/ship/toolFrontDoor-selfcheck.mjs": { verdict: "TIMEOUT", ms: 180077, checks: 0 },
 });
 // ==== /MEASURED_V4424 ====
 
@@ -135,8 +170,8 @@ export const MEASURED_V4424 = Object.freeze({
  * day somebody repairs it -- which turns a repair into a chore and is how a finding becomes a fixture. These
  * two are recorded as ceilings instead: fewer is a fix and passes, more is a regression and does not.
  */
-export const EXEMPT_AT_V4424 = 63;          // gates the register waves through for being unmeasured
-export const UNMEASURED_AT_V4424 = 999;     // ...of which this many still have no verdict from any run
+export const EXEMPT_AT_V4424 = 60;          // gates the register waves through for being unmeasured
+export const UNMEASURED_AT_V4424 = 18;      // ...of which this many still have no verdict from any run
 
 // *** AND THE NUMBER IN BETWEEN IS NOT RATCHETABLE IN EITHER DIRECTION, WHICH IS WORTH SAYING OUT LOUD. ***
 // "gates exempted as unmeasured that this tree has measured green" -- the headline of section 2 -- GOES UP
@@ -247,7 +282,13 @@ export function runGateSerial(rel, { timeoutMs = SERIAL_CAP_MS, root = ENG } = {
             if (done) return;
             done = true; clearTimeout(timer);
             const lines = out.split("\n");
-            const checks = lines.filter((l) => /^\s{2}(PASS|FAIL)/.test(l)).length;
+            // *** THE TREE HAS TWO HOUSE STYLES AND THE FIRST DRAFT OF THIS COUNTER KNEW ONE. *** Most gates
+            // print "  PASS"/"  FAIL"; the roundhouse and orphan gates print "  ok  "/"  FAIL !!". The
+            // measurement in MEASURED_V4424 was taken with the narrower pattern, so `checks` UNDERCOUNTS
+            // those gates -- orphanDisposition reads 2 where it ran 24. It changes no verdict and cannot:
+            // `checks` is used only to tell a RED from a CRASH, and an undercount can only turn a RED into a
+            // CRASH, never the reverse. Nothing in the sixty-three was classified CRASH.
+            const checks = lines.filter((l) => /^\s{2}(PASS|FAIL|ok\s)/.test(l)).length;
             const fail = lines.find((l) => /^\s{2}FAIL/.test(l)) || "";
             res({
                 gate: rel,
@@ -286,6 +327,78 @@ export function capRecordedAsTime(timings, measured = MEASURED_V4424) {
     }
     return out;
 }
+
+/**
+ * *** WHAT THE EXEMPTION WAS ACTUALLY HIDING. ***
+ *
+ * Three of the sixty-three exit 1. Two are about the tree's own bookkeeping over gate-only modules, and one
+ * of those is a RATCHET THIS SESSION HAS BEEN BREAKING: graveyard-selfcheck counts modules that export
+ * functions nothing calls, its baseline is 93 from v4153, and the count is 145. Twenty-seven of the 145 were
+ * first committed in September and SIXTEEN of them on the day that shipped v4408 through v4424 -- including
+ * five modules from this very arc. Every round of it reported ALL GREEN, truthfully, because the instrument
+ * that would have said otherwise was in the bucket this round is measuring.
+ */
+export const ORPHAN_RATCHET = Object.freeze({
+    gate: "tools/ship/graveyard-selfcheck.mjs",
+    baseline: 93, baselineRound: "v4153", now: 145,
+    firstCommittedInSeptember: 27,
+    firstCommittedOnTheDayOfV4408toV4424: 16,
+    fromThisArc: Object.freeze([
+        "physics/render/fresnelWgsl.mjs",   // v4416
+        "fx/paintGenerators.mjs",           // v4420
+        "fx/polyBrush.mjs",                 // v4421
+        "fx/paintTransforms.mjs",           // v4422
+        "fx/paintFields.mjs",               // v4423
+    ]),
+    note: "a module imported only by its own gate. Named, not repaired: wiring or deleting 145 modules is " +
+          "not a measuring round's work, and moving the baseline to 145 would be the repair this tree calls " +
+          "a grievance list.",
+});
+
+/** The reds this round found, joined to the census entries that now carry them. */
+export function redsFound(measured = MEASURED_V4424, register = RED_AT_V4424) {
+    const red = Object.entries(measured).filter(([, m]) => m.verdict === "RED").map(([g]) => g);
+    return { gates: red, filed: red.filter((g) => register.some((e) => e.gate === g)) };
+}
+
+/**
+ * *** AND THE BUCKET IS THE NAMED PART OF A MUCH LARGER UNNAMED ONE. ***
+ *
+ * The 63 at least have a list. selectGates() skips EVERY gate over the ship-time budget, and most of those
+ * are on no register at all -- not red, not green, not even filed as unmeasured. This counts them from the
+ * same three inputs quickSweep uses, so it cannot drift from what actually ships.
+ */
+export function budgetSkip(all, timings, register, budgetMs = 3000, codes = {}) {
+    const run = [], skipped = [];
+    for (const g of all) ((timings[g] != null && timings[g] > budgetMs) ? skipped : run).push(g);
+    return {
+        enumerated: all.length, run: run.length, skipped: skipped.length,
+        skippedUnregistered: skipped.filter((g) => !register.has(g)).length,
+        skippedAtCap: skipped.filter((g) => codes[g] === 124).length,
+    };
+}
+
+/**
+ * *** A FOURTH RED, OUTSIDE THE BUCKET, CAUSED BY ONE OF THIS SESSION'S OWN ROUNDS. ***
+ *
+ * redCensus-selfcheck.mjs is not in UNCONFIRMED_SLOW and is on no register. It is simply over the budget --
+ * it re-runs the whole red set, ten minutes -- so no round has executed it since it was written. This round
+ * ran it because it is this round's own dependency, NOT by sampling: one gate outside the bucket was run for
+ * an unrelated reason and it was red, which is an anecdote about the 437 and not a rate.
+ *
+ * Its failing check is the one that exists to catch exactly this: "each recheck's own count must equal the
+ * length of the list it names". RECHECK_V4313.nowGreenGates filtered FIXED_SINCE_V4279 with
+ * `!/^v43(1[4-9]|[2-9])/` -- a regex meaning "at or before v4313" that knows only four-digit rounds
+ * beginning v43. v4414 pruned shaderCensus into that list and it walked straight into a record of v4313.
+ * FIXED, not filed: the filter compares version NUMBERS now.
+ */
+export const RED_OUTSIDE_THE_BUCKET = Object.freeze({
+    gate: "tools/ship/redCensus-selfcheck.mjs",
+    onRegister: false, inBucket: false, recordedMs: 20021, recordedCode: 124,
+    brokenBy: "v4414", foundAt: "v4424", roundsUnnoticed: 10,
+    fails: "v4313 names exactly as many now-green gates as it counts -- nowGreen 3 against 4 named",
+    fix: "the round filter reads the version as a number instead of matching v43 with a regex",
+});
 
 /** Every gate in the bucket that still has no decided verdict from any run. */
 export function stillUnmeasured(records = [SLOW_PARTIAL, MEASURED_V4424]) {

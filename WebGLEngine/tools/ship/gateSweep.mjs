@@ -725,6 +725,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "world unit made a +/-20 camera invisible -- and seedSpread caught it, the third generator " +
                  "in three rounds that check has caught",
     }),
+    since40: Object.freeze({
+        at: "v4424", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/slowCensus-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, ten sections and 58 checks, pure -- it runs no gate at gate " +
+                 "time, only reads the frozen verdicts of the 63 it ran once. Driven RED by twenty-three " +
+                 "sabotages and restored, with TWO EARNED 0 REDS: ranking both arrays descending inside " +
+                 "spearman is the same statistic, and REMOVING the exemption from redRegister passes because " +
+                 "a ratchet that fails on its own repair is a broken ratchet. The round it gates found THREE " +
+                 "standing reds inside redCensus.UNCONFIRMED_SLOW, filed as redCensus.RED_AT_V4424, and a " +
+                 "FOURTH outside it -- redCensus-selfcheck, broken by v4414 and repaired here",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

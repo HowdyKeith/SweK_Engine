@@ -36,11 +36,15 @@
 //
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { ENG } from "./slowCensus.mjs";
 import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mjs";
-import { UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
+import { enumerateGates } from "./gateSweep.mjs";
+import { UNCONFIRMED_SLOW, SLOW_PARTIAL, RED_AT_V4424, RECHECK_V4313, RECHECK_V4314, FIXED_SINCE_V4279 } from "./redCensus.mjs";
 import {
     MEASURED_V4424, PROTOCOL, DECIDED, V4279_CAP_MS, SERIAL_CAP_MS,
-    EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime,
+    EXEMPT_AT_V4424, UNMEASURED_AT_V4424, capRecordedAsTime, redsFound, ORPHAN_RATCHET, budgetSkip, RED_OUTSIDE_THE_BUCKET,
     agreementWith, scaleRatios, spearman, exemptedButMeasured, fitsUnderCap, summarise,
     stillUnmeasured, medianOf, runGateSerial,
 } from "./slowCensus.mjs";
@@ -49,12 +53,13 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 
-console.log("\n1. *** THE SHIP GATE EXEMPTS SIXTY-THREE GATES BECAUSE NOBODY MEASURED THEM ***");
+console.log("\n1. *** THE SHIP GATE EXEMPTED SIXTY-THREE GATES BECAUSE NOBODY MEASURED THEM ***");
 {
     const reg = redRegister();
     const exempt = [...reg].filter(([, why]) => why === "redCensus.UNCONFIRMED_SLOW").map(([g]) => g);
     report(`${exempt.length} of the ${reg.size} gates on quickSweep's register are there for being UNMEASURED, ` +
-        `not for any recorded failure -- ${(100 * exempt.length / reg.size).toFixed(0)}% of the register`);
+        `not for any recorded failure -- ${(100 * exempt.length / reg.size).toFixed(0)}% of the register. It was ` +
+        `${exempt.length + RED_AT_V4424.length} before this round measured three of them red and filed them as red.`);
     // *** A CEILING, NOT AN EQUALITY. *** Asserting "63 are exempt" would go red the day somebody fixes it.
     ok("*** gates waved past the ship gate for absence of evidence: a ceiling that a repair passes ***",
         exempt.length <= EXEMPT_AT_V4424, `${exempt.length} <= ${EXEMPT_AT_V4424} at v4424`);
@@ -111,10 +116,19 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     const by = summarise(MEASURED_V4424);
     report(`${Object.keys(MEASURED_V4424).length} of ${UNCONFIRMED_SLOW.length} run serially at a ${SERIAL_CAP_MS / 1000}s cap: ` +
         Object.entries(by).map(([k, v]) => `${v} ${k}`).join(", "));
-    ok("*** zero red ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "RED"),
-        "the bucket has been hiding successes, not failures");
+    // *** THE CLAIM THIS ROUND WROTE DOWN AT FORTY-THREE GATES AND THEN REFUTED AT SIXTY-THREE. ***
+    const r = redsFound();
+    ok("*** THREE RED, and the first forty-three measured were all green ***", r.gates.length === 3,
+        r.gates.map((x) => x.replace(/-selfcheck\.mjs$/, "").replace(/^tools\/ship\//, "")).join(", ") +
+        " -- red and exempt from the ship gate for 145 rounds");
+    ok("  every one of them is FILED, with its failure, not left in the bucket it came out of",
+        r.filed.length === r.gates.length && RED_AT_V4424.every((e) => e.fails.length > 40 && e.why.length > 60),
+        `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with the check that fails and why`);
+    ok("  none of them is a timing failure", RED_AT_V4424.every((e) => e.ms < SERIAL_CAP_MS && e.ms > 60000),
+        "75s to 151s alone on an idle box, exit 1 -- they would fail at any cap that let them finish");
     ok("*** zero crash ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "CRASH"),
-        "a non-zero exit with no checks printed is a crash and would be counted separately");
+        "a non-zero exit with no checks printed is a crash and would be counted separately -- which also " +
+        "means the check counter's undercount on the second house style changed no verdict here");
     const a = agreementWith(SLOW_PARTIAL, MEASURED_V4424);
     ok("*** nothing contradicts the v4279 serial record ***", a.contradict.length === 0,
         `${a.agree.length} agreements, ${a.consistentTimeouts.length} timeouts consistent with a slower record, ` +
@@ -125,6 +139,24 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
         ok(`  ${t.gate.replace(/-selfcheck\.mjs$/, "")} ran past ${SERIAL_CAP_MS / 1000}s and v4279 recorded ${(t.wasMs / 1000).toFixed(0)}s`,
             !(DECIDED.includes(t.was) && t.wasMs <= SERIAL_CAP_MS), `was ${t.was}`);
     }
+}
+
+console.log("\n3b. *** ONE OF THE THREE IS A RATCHET THIS SESSION HAS BEEN BREAKING ***");
+{
+    const O = ORPHAN_RATCHET;
+    report(`${O.gate.replace(/-selfcheck\.mjs$/, "")}: modules that export functions nothing calls. ` +
+        `Baseline ${O.baseline} at ${O.baselineRound}; now ${O.now}.`);
+    ok("*** and this arc's own rounds are in the overrun ***",
+        O.fromThisArc.length > 0 && O.now > O.baseline,
+        `${O.fromThisArc.length} of them shipped in v4416-v4423: ` + O.fromThisArc.join(", "));
+    ok("  every one of those files is really in the tree, gate-only, and named here rather than inferred",
+        O.fromThisArc.every((f) => fs.existsSync(path.join(ENG, f))),
+        "a claim about my own debt that named a file the tree does not have would be worse than no claim");
+    ok("*** and the baseline is NOT moved ***", O.baseline === 93 && /grievance list/.test(O.note),
+        "raising 93 to 145 would turn a ratchet into a record of having given up");
+    report("Every round from v4408 to v4424 reported ALL GREEN, truthfully -- verify.mjs runs a different " +
+        "and much smaller set, and this gate was in the bucket. THE EXEMPTION IS WHAT MADE THE ALL GREEN " +
+        "TRUE AND USELESS AT THE SAME TIME.");
 }
 
 console.log("\n4. *** THE COMPARATOR CAN DISAGREE, WHICH IS THE ONLY REASON ITS AGREEMENT MEANS ANYTHING ***");
@@ -234,7 +266,8 @@ console.log("\n7. *** EXEMPT TWICE OVER, AND THE SECOND LAYER RECORDS A CAP AS A
     const codes = prior.codes || {};
     ok("  and the recorded exit code is 124 -- gave up -- in the field a reader takes for what the gate returned",
         cap.every((c) => codes[c.gate] === 124),
-        `${cap.filter((c) => codes[c.gate] === 124).length} of ${cap.length} recorded as exit 124; every one exits 0 when allowed to finish`);
+        `${cap.filter((c) => codes[c.gate] === 124).length} of ${cap.length} recorded as exit 124 -- allowed to finish, ` +
+        `${cap.length - redsFound().gates.length} exit 0 and ${redsFound().gates.length} exit 1, and 124 is neither`);
     const u = cap.map((c) => c.understatedBy).sort((a, b) => a - b);
     ok("*** so the file understates these gates by a factor it cannot know ***", u[0] > 1.5,
         `understated ${u[0].toFixed(2)}x to ${u[u.length - 1].toFixed(2)}x, median ${medianOf(u).toFixed(2)}x`);
@@ -246,6 +279,49 @@ console.log("\n7. *** EXEMPT TWICE OVER, AND THE SECOND LAYER RECORDS A CAP AS A
     ok("  a budget raised past the cap would run all of them and read 20s where the truth is up to 3 minutes",
         raised.run.length === UNCONFIRMED_SLOW.length,
         `at a 25000ms budget all ${raised.run.length} become eligible, on a number that means "at least 20s"`);
+}
+
+console.log("\n7b. *** THE BUCKET IS THE NAMED PART OF A MUCH LARGER UNNAMED ONE ***");
+{
+    const prior = readTimings();
+    const b = budgetSkip(enumerateGates(ENG), prior.timings || {}, redRegister(), DEFAULTS.budgetMs, prior.codes || {});
+    report(`the ship gate runs ${b.run} of ${b.enumerated} gates; ${b.skipped} are skipped over the ` +
+        `${DEFAULTS.budgetMs}ms budget, and ${b.skippedUnregistered} of those are on NO register at all -- ` +
+        `not red, not green, not even filed as unmeasured. ${b.skippedAtCap} carry a recorded exit code of 124.`);
+    ok("*** the 63 are the part that at least has a list ***", b.skippedUnregistered > UNCONFIRMED_SLOW.length,
+        `${b.skippedUnregistered} skipped-and-unregistered against ${UNCONFIRMED_SLOW.length} named in the bucket`);
+    ok("  and the arithmetic is the sweep's own, not a second count of the tree",
+        b.run + b.skipped === b.enumerated, `${b.run} + ${b.skipped} = ${b.enumerated}`);
+    // *** "SKIPPED" AND "SKIPPED AND UNACCOUNTED FOR" ARE TWO NUMBERS AND ONLY THE SECOND IS THE FINDING. ***
+    // Reporting the first under the second's name would still clear a floor and still be wrong, so the
+    // difference is checked against the register directly.
+    const regd = redRegister();
+    const skippedOnRegister = enumerateGates(ENG)
+        .filter((x) => (prior.timings || {})[x] > DEFAULTS.budgetMs && regd.has(x)).length;
+    ok("  the unregistered count is the skipped count MINUS the ones the register accounts for",
+        b.skippedUnregistered === b.skipped - skippedOnRegister && skippedOnRegister > 0,
+        `${b.skipped} skipped - ${skippedOnRegister} on the register = ${b.skippedUnregistered}`);
+    const R = RED_OUTSIDE_THE_BUCKET;
+    ok("*** and one gate outside the bucket, run for an unrelated reason, was RED ***",
+        !R.onRegister && !R.inBucket && R.recordedCode === 124,
+        `${R.gate.replace(/-selfcheck\.mjs$/, "")} -- on no register, over the budget, broken by ${R.brokenBy} ` +
+        `and unnoticed for ${R.roundsUnnoticed} rounds`);
+    ok("  it was broken by one of this session's OWN rounds, and it is FIXED rather than filed",
+        /^v44/.test(R.brokenBy) && /number/.test(R.fix),
+        "a regex meaning 'at or before v4313' that knew only rounds beginning v43; it reads the version as a number now");
+    // *** THE REPAIR ITSELF, ASSERTED RATHER THAN DESCRIBED. *** The gate that catches this takes ten minutes;
+    // the property it checks costs nothing, so it is checked here too and a round need not wait to find out.
+    for (const K of [RECHECK_V4313, RECHECK_V4314]) {
+        ok(`  ${K.at}'s record names exactly as many now-green gates as it counts`,
+            K.nowGreen === K.nowGreenGates.length, `${K.nowGreen} against ${K.nowGreenGates.length}`);
+    }
+    const later = FIXED_SINCE_V4279.filter((e) => { const m = /^v(\d+)/.exec(e.round); return m && Number(m[1]) > 4313; });
+    ok("  and a repair from a LATER round stays out of an earlier round's record",
+        later.length > 0 && later.every((e) => !RECHECK_V4313.nowGreenGates.includes(e.gate)),
+        `${later.length} entries stamped after v4313, including ${later.map((e) => e.round).join(", ")}`);
+    report("THIS IS AN ANECDOTE ABOUT THE 437 AND NOT A RATE. The gate was run because it is this round's own " +
+        "dependency, not because anything sampled the skipped set. What the 437 hold is unknown, and saying " +
+        "so is the whole habit this round is about.");
 }
 
 console.log("\n8. *** THE PROTOCOL RECORDS THE ATTEMPT THAT DID NOT WORK ***");

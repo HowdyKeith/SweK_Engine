@@ -17,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
 import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
-import { RED_AT_V4279, UNCONFIRMED_SLOW } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4424, UNCONFIRMED_SLOW } from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -47,8 +47,14 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
        "the v4297 unmeasured and slow-bucket gates are known too", `${SWEEP_V4297.unmeasured.length} + ${SWEEP_V4297.fromSlowBucket.length}`);
     ok(SWEEP_V4297.regressions.every((g) => !reg.has(g)),
        "*** the six v4297 regressions are NOT in the register: their red is the thing to repair, not to accept ***", SWEEP_V4297.regressions.map((g) => g.split("/").pop()).join(", "));
-    ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...UNCONFIRMED_SLOW, ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
+    ok(reg.size === new Set([...RED_AT_V4279.map((e) => e.gate), ...RED_AT_V4424.map((e) => e.gate), ...UNCONFIRMED_SLOW,
+                             ...SWEEP_V4297.fromSlowBucket, ...SWEEP_V4297.unmeasured]).size,
        "and the register's size is the union of those lists, nothing typed", `${reg.size} gates`);
+    // *** v4424: A MEASURED RED OUTRANKS "NOBODY LOOKED", AND THE REASON STRING HAS TO SHOW IT. *** All three
+    // are also in UNCONFIRMED_SLOW, so the register's SIZE cannot tell whether the reason was upgraded.
+    ok(RED_AT_V4424.every((e) => reg.get(e.gate) === "redCensus.RED_AT_V4424" && UNCONFIRMED_SLOW.includes(e.gate)),
+       "*** the three measured at v4424 are credited to their FAILURE, not to the bucket they came out of ***",
+       `${RED_AT_V4424.length} gates, each still listed in UNCONFIRMED_SLOW and each reading RED_AT_V4424`);
     const repaired = Object.keys(REGRESSIONS_REPAIRED.gates).sort();
     ok(JSON.stringify(repaired) === JSON.stringify([...SWEEP_V4297.regressions].sort()) && repaired.every((g) => /v43\d\d/.test(REGRESSIONS_REPAIRED.gates[g])),
        "*** and every one of the six is recorded as REPAIRED, with the round that did it ***", `${repaired.length} of ${SWEEP_V4297.regressions.length}`);
