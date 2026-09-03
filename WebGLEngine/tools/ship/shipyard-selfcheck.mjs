@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, runWgslCompute } from "./webgpuHarness.mjs";
 import { noComments } from "./sourceScan.mjs";
+import { gateReport } from "./gateReport.mjs";
 import * as SY from "../../voxel/shipyard.mjs";
 import { traverseDDA } from "../../voxel/voxelDDA.js";
 
@@ -37,6 +38,11 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+// v4394 -- THE THREE TABLES BELOW ARE THIS GATE'S ARGUMENT AND THEY EXISTED ONLY IN SCROLLBACK.
+// gateReport collects them as NUMBERS, not as rendered text, so a page shows the module's figures
+// rather than a caption of them. It changes no verdict and prints nothing extra.
+const REPORT = gateReport("tools/ship/shipyard-selfcheck.mjs");
+let ROWS_C_AT_MILLION = NaN, ROWS_B_AT_MILLION = NaN;
 
 // One body, built once, used by every section: an 8 x 8 x 8 cube of solid voxels in claim-local space.
 const N = 8;
@@ -155,6 +161,11 @@ const F32 = [];
     }
     for (const r of F32) say(`world x ${String(r.D).padStart(9)}  f32 spacing ${String(r.spacing).padStart(22)}  ` +
         `world-baked error ${r.bake.toExponential(3)} voxels   claim-local error ${r.local}`);
+    REPORT.table("stored float32 error after 2,000 rigid motions",
+        ["world x", "f32 spacing", "world-baked (voxels)", "claim-local (voxels)"],
+        F32.map((r) => [r.D, r.spacing, r.bake, r.local]),
+        "It is not the motions, it is the ADDRESS: float32 spacing grows with the coordinate and a stored " +
+        "world position pays it on every voxel. Claim-local is exact because 0..8192 is exact.");
 
     ok("!! *** stored world-baked in float32, a body a million voxels out is wrong by WHOLE VOXELS ***",
        F32.find((r) => r.D === 1e6).bake > 1 && F32.find((r) => r.D === 1e4).bake < 0.1,
@@ -349,6 +360,11 @@ const F32 = [];
     }
     for (const r of ROWS) say(`world x ${String(r.dist).padStart(9)}  f32 spacing ${String(r.sp).padStart(20)}  ` +
         `A ${r.A.toExponential(2)}  B ${r.B.toExponential(2)}  C ${r.C.toExponential(2)}  D ${r.ds.toExponential(2)}`);
+    REPORT.table("four float32 encodings, worst vertex in eye-relative space (node)",
+        ["world x", "f32 spacing", "A world-absolute", "B camera-relative", "C shipyard", "D double-single"],
+        ROWS.map((r) => [r.dist, r.sp, r.A, r.B, r.C, r.ds]),
+        "Camera-relative removes the cancellation in the multiply and cannot touch the quantisation already " +
+        "in the stored coordinate: it buys about 2.2x. Both real fixes change the STORAGE.");
 
     // *** THE PREDICTION WRITTEN BEFORE THIS RAN SAID B WOULD IMPROVE ON A BY ORDERS OF MAGNITUDE. IT DOES NOT.
     // It improves it by a factor between 2 and 3 at every distance, because the two errors are not the same
@@ -366,6 +382,8 @@ const F32 = [];
        ". A ROUNDING ERROR YOU CANNOT ARGUE WITH: the vertex buffer holds a world coordinate and the nearest " +
        "representable one is up to half a spacing away before any arithmetic happens");
 
+    ROWS_C_AT_MILLION = ROWS.find((r) => r.dist === 1e6).C;
+    ROWS_B_AT_MILLION = ROWS.find((r) => r.dist === 1e6).B;
     const flatC = Math.max(...ROWS.map((r) => r.C)) / Math.min(...ROWS.map((r) => r.C));
     ok("!! *** both real fixes change the STORAGE, and both are flat in distance ***",
        flatC < 1.05 && ROWS.every((r) => r.C < 1e-4 && r.ds < 1e-4 && r.C / r.ds < 2),
@@ -483,6 +501,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     const total = DISTS.length * VS.length;
     const gpu = await runWgslCompute({ code: CODE, outCount: total * 12, uniforms: U, workgroups: total });
     if (gpu.skipped || !gpu.ok) {
+        REPORT.skip("the device table", "no WebGPU device on this box: " + (gpu.reason || "unknown"));
         say("the device run was SKIPPED or refused: " + (gpu.reason || "unknown") +
             (gpu.errors && gpu.errors.length ? " -- " + gpu.errors.join(" | ") : "") +
             ". Sections 1-7 still ran; this one makes no claim without a device");
@@ -506,6 +525,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 `C ${e[2].toExponential(3)} D ${e[3].toExponential(3)}   node two-rounding C ${n2[2].toExponential(3)}  fused C ${nf[2].toExponential(3)}`);
         }
         void worst;
+        REPORT.table("the same four encodings on a real device",
+            ["world x", "device A", "device B", "device C", "device D", "node two-rounding C", "node fused C"],
+            perDist.map((r) => [r.D, r.gpu[0], r.gpu[1], r.gpu[2], r.gpu[3], r.two[2], r.fused[2]]),
+            "adapter " + JSON.stringify(gpu.adapter || null) + " -- SOFTWARE. The device reproduces the " +
+            "two-rounding model exactly; contraction would move C to the last column.");
 
         // *** THE FIRST DRAFT OF THIS CHECK ASKED FOR B/C > 100 AT EVERY DISTANCE AND WENT RED AT A THOUSAND,
         // WHERE IT IS 4.3. *** That was the assertion being wrong, not the device: at short range camera-relative
@@ -596,6 +620,34 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 // frame in node and counting, moved to y = 22, and the live DOM now reports 529 ship pixels, the same number.
 // A SOURCE CHECK WOULD HAVE CALLED THE OFF-SCREEN VERSION A WORKING PAGE.
 //
+/* ------------------------------------------------------------------------------------------------------------
+ * 9. v4394 -- THE ARGUMENT LEAVES THE TERMINAL, AND IT IS THE SAME OBJECT THE CHECKS RAN ON
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const doc = REPORT.build();
+    const out = REPORT.write();
+    const rowCount = doc.tables.reduce((n, t) => n + t.rows.length, 0);
+    ok("!! *** this gate's three tables exist somewhere a second reader can open ***",
+        doc.tables.length >= 2 && rowCount >= 10 &&
+        doc.tables.every((t) => t.rows.every((r) => r.length === t.columns.length)),
+        `${doc.tables.length} tables, ${rowCount} rows, ${doc.skipped.length} skipped section(s) named. ` +
+        (out.written ? `written to ${out.file}` : `NOT written -- ${out.why}, which is the default: an emitter ` +
+        "that fires on sight leaves a stale artefact behind every accidental run") +
+        ". 67 of this tree's 1429 gates print a table like these and NONE of them survived the terminal");
+
+    // *** THE MANIM RULE, APPLIED TO THIS GATE'S OWN REPORT. *** The point of generating an explanation from the
+    // same objects as the argument is that it cannot drift. So the report is checked against the values the
+    // CHECKS above ran on, not against a copy: if somebody edits a table for the page, this goes red.
+    const enc = doc.tables.find((t) => t.title.startsWith("four float32 encodings"));
+    const million = enc && enc.rows.find((r) => r[0] === 1e6);
+    ok("...and the numbers in it are the ones the checks asserted on, not a second copy",
+        !!million && million[4] === ROWS_C_AT_MILLION && million[3] === ROWS_B_AT_MILLION,
+        million ? `report says C ${million[4].toExponential(3)} and B ${million[3].toExponential(3)} at a million; ` +
+        `the checks ran on ${ROWS_C_AT_MILLION.toExponential(3)} and ${ROWS_B_AT_MILLION.toExponential(3)}. ` +
+        "A CAPTION CAN BE WRONG ABOUT A NUMBER; A NUMBER RENDERED FROM THE NUMBER CANNOT BE, and that is the " +
+        "whole of what this tree takes from manim" : "the encodings table is missing from the report");
+}
+
 console.log();
 console.log("  ----  WHAT THIS DOES NOT CLAIM. That the shipyard is worth building into this engine's world: it is");
 console.log("  ----  one page and one module, and nothing streams, collides or persists through it. That a body's");

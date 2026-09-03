@@ -346,6 +346,24 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
         .sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)))
         .map((k) => SS[k]).filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
+    // *** v4394 -- A DUPLICATE CLOSING KEY IS INVISIBLE AT RUNTIME, AND THIS ROUND WROTE ONE. ***
+    // The convention picks the next ordinal by hand, and two branches shipping in parallel both reach for
+    // sinceN+1: v4394's closing was written as since21 while origin/main already had one, and in a JavaScript
+    // object literal the later key SILENTLY WINS. The other branch's closing vanished, its swept count with it,
+    // and the surplus arithmetic went one short with no hint of why. The source is the only place a duplicate
+    // is visible, so this reads it -- the same move as every other check in this tree that has to see a
+    // declaration rather than a value.
+    const keyLines = fs.readFileSync(path.join(GS.ENG, "tools", "ship", "gateSweep.mjs"), "utf8")
+        .split("\n").map((l) => (l.match(/^\s{4}(since\d+): Object\.freeze\(/) || [])[1]).filter(Boolean);
+    const dupes = keyLines.filter((k, i) => keyLines.indexOf(k) !== i);
+    ok(dupes.length === 0,
+       "!! *** no two closings share an ordinal, which a runtime read cannot see ***",
+       dupes.length ? `DUPLICATE: ${[...new Set(dupes)].join(", ")} -- the later declaration wins silently and ` +
+       "the earlier round's swept count disappears from the surplus arithmetic" :
+       `${keyLines.length} closings, ${new Set(keyLines).size} distinct ordinals. THE NUMBER IS PICKED BY HAND ` +
+       "and two branches shipping in parallel both reach for the next one; this is the only place the collision " +
+       "is visible, because Object.freeze sees one key and the reader sees two");
+
     const closed = closings.reduce((n, c) => n + (c.swept || 0), 0);
     const uncovered = surplus - SS.swept - closed;
     ok(uncovered <= 0,
@@ -439,5 +457,12 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(Object.isFrozen(S) && Object.isFrozen(S.regressions),
        "the record is frozen", "a gate's own record is not a place a run gets to write");
 }
+// v4394 SABOTAGE -- BE the new closing's ordinal duplicated onto an existing one -> exit=1, 2 red: the
+//   duplicate check names it, and the surplus arithmetic goes one short, which is exactly what happened for
+//   real. v4394's closing was first written as since21 while origin/main already had one; the later key won
+//   silently, the other branch's swept count vanished, and the only symptom was 1 STILL UNSWEPT.
+//   *** AND THE FIRST RUN OF THE NEW CHECK READ 0 RED BECAUSE THE GATE WAS CRASHING. *** It used ENG, which
+//   this file does not define, so the process died before printing a single FAIL line and `grep -c FAIL`
+//   returned zero. A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED, and this one did not.
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

@@ -52,6 +52,15 @@
     searchable nowhere. Five times this session something was proposed or rebuilt that the tree already had. The
     same filter searches these; type <code>hydrostatic</code> or <code>broad</code> and see.</div>
   <div id="kn" style="max-height:520px;overflow:auto"></div>
+
+  <h1 style="margin-top:26px">What the gates measured</h1>
+  <div class="sub">A gate's verdict is a word; its ARGUMENT is a table of numbers, and 67 of this tree's gates
+    print one that has never survived the terminal it was written to. The tables below are those numbers, read
+    from the gate's own report rather than retyped &mdash; the discipline this tree takes from 3Blue1Brown's
+    manim, which is not animation but that <b>the explanation is generated from the same objects as the
+    argument</b>, so it cannot drift from it. Emitting is off by default: run a gate with
+    <code>SWEK_GATE_REPORT=1</code> and its table appears here.</div>
+  <div id="gr" style="max-height:640px;overflow:auto"></div>
 </div>
 
 <script type="module">
@@ -103,7 +112,7 @@ function renderSuite() {
     " ungated (verified but too slow to run every ship, listed so the gap stays visible)</td></tr>";
 }
 
-$("q").addEventListener("input", (e) => { q = e.target.value; render(); renderSuite(); renderKnowledge(); });
+$("q").addEventListener("input", (e) => { q = e.target.value; render(); renderSuite(); renderKnowledge(); renderReports(null, REPORTS); });
 render();
 suiteChecks().then((s) => { SUITE = s; renderSuite(); }).catch(() => {});
 
@@ -128,6 +137,46 @@ function renderKnowledge() {
                               : '<div class="dim" style="padding-top:6px">' + g.length + " gates, " + c.length + " claims" +
                                 (g.length === 40 || c.length === 40 ? " (capped at 40 each)" : "") + "</div>");
 }
+// v4394 -- THE GATE REPORTS. The index is written by tools/ship/gateReport.mjs from what is actually on disk,
+// because a browser cannot list a directory and a hand-typed list of report names would be a second declaration
+// of which gates emit -- drifting from the first the moment somebody adds one.
+function renderReports(idx, docs) {
+  const ql = q.trim().toLowerCase();
+  const shown = docs.filter((d) => !ql || JSON.stringify(d).toLowerCase().includes(ql));
+  if (!shown.length) {
+    $("gr").innerHTML = '<div class="dim">' + (docs.length ? "no report matches that filter" :
+      "no gate reports on disk yet &mdash; a gate emits one when run with SWEK_GATE_REPORT=1") + "</div>";
+    return;
+  }
+  const num = (v) => typeof v === "number"
+    ? (v !== 0 && (Math.abs(v) < 1e-3 || Math.abs(v) >= 1e7) ? v.toExponential(3) : String(v))
+    : String(v == null ? "" : v);
+  $("gr").innerHTML = shown.map((d) =>
+    '<div style="margin-bottom:18px"><div style="color:#9fe8c0">' + d.gate + '</div>' +
+    '<div class="dim" style="font-size:11px">measured ' + d.at + "</div>" +
+    (d.skipped || []).map((s) => '<div class="dim" style="color:#e6c877;font-size:11px">not measured: ' +
+        s.what + " &mdash; " + s.why + "</div>").join("") +
+    (d.tables || []).map((t) =>
+      '<div style="margin-top:8px;color:#cfe9d8">' + t.title + "</div>" +
+      '<table style="border-collapse:collapse;font-size:11px"><tr>' +
+      t.columns.map((c) => '<th style="text-align:right;padding:2px 10px 2px 0;color:#6f8a7c;font-weight:normal">' +
+        c + "</th>").join("") + "</tr>" +
+      // THE CELL IS FORMATTED FOR WIDTH AND THE TITLE CARRIES THE EXACT VALUE. A table of 17-digit floats is
+      // unreadable, and a table that has thrown them away is a rounding of the argument rather than the
+      // argument -- so hover gives back what the report holds, to the digit.
+      t.rows.map((r) => "<tr>" + r.map((v) => '<td title="' + String(v == null ? "" : v) +
+        '" style="text-align:right;padding:2px 10px 2px 0;' +
+        'border-bottom:1px solid #1a2a22">' + num(v) + "</td>").join("") + "</tr>").join("") + "</table>" +
+      (t.note ? '<div class="dim" style="font-size:11px;max-width:760px">' + t.note + "</div>" : "")
+    ).join("") + "</div>").join("");
+}
+let REPORTS = [];
+fetch("./gate-reports/index.json").then((r) => r.json())
+  .then((idx) => Promise.all((idx.reports || []).map((f) => fetch("./gate-reports/" + f).then((r) => r.json())))
+    .then((docs) => { REPORTS = docs; renderReports(idx, docs); }))
+  .catch(() => { $("gr").innerHTML = '<div class="dim">no gate reports on disk yet &mdash; a gate emits one ' +
+      'when run with SWEK_GATE_REPORT=1</div>'; });
+
 fetch("./knowledge-index.json").then((r) => r.json()).then((k) => { KN = k; renderKnowledge(); }).catch(() => {
   $("kn").innerHTML = '<div class="dim">knowledge-index.json not built &mdash; run node tools/ship/buildKnowledgeIndex.mjs</div>';
 });
