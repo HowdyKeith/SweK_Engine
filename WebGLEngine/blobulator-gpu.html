@@ -246,10 +246,17 @@ fn calcN(p: vec3f) -> vec3f {
     mapScene(p + e.yxy) - mapScene(p - e.yxy),
     mapScene(p + e.yyx) - mapScene(p - e.yyx)));
 }
+// *** v4427 -- A TRANSCRIPTION OF fx/voxelize/fireRamp.js's blackbodyRamp, AND IT HAD DRIFTED. ***
+// v2438 removed a byte-identical JS copy of this ramp from blobulator.html and made that page import the
+// shared one. IT MISSED THIS WGSL COPY on the sibling page. Compared stop by stop at v4427, five of six
+// matched and c4 read (1.0, 0.85, 0.35) against the shared (1.0, 0.82, 0.32) -- 0.03 on two channels,
+// widest divergence 0.0200 at heat 0.90 and exactly 0.0000 below heat 0.68. A COPY THAT IS RIGHT AT FIVE
+// STOPS OF SIX IS THE KIND NOBODY NOTICES. A browser page cannot import a JS module into WGSL, so the copy
+// stays and render/blobField-selfcheck.mjs now reads BOTH out of source and fails if they part again.
 fn fireRamp(hh: f32) -> vec3f {
   let x = clamp(hh, 0.0, 1.0);
   let c0 = vec3f(0.06, 0.0, 0.0); let c1 = vec3f(0.55, 0.04, 0.0); let c2 = vec3f(1.0, 0.22, 0.0);
-  let c3 = vec3f(1.0, 0.55, 0.08); let c4 = vec3f(1.0, 0.85, 0.35); let c5 = vec3f(1.0, 1.0, 0.86);
+  let c3 = vec3f(1.0, 0.55, 0.08); let c4 = vec3f(1.0, 0.82, 0.32);   // v4427 -- was (1.0, 0.85, 0.35); the shared fx/voxelize/fireRamp.js stop is 0.82/0.32 let c5 = vec3f(1.0, 1.0, 0.86);
   if (x < 0.22) { return mix(c0, c1, x / 0.22); }
   if (x < 0.45) { return mix(c1, c2, (x - 0.22) / 0.23); }
   if (x < 0.68) { return mix(c2, c3, (x - 0.45) / 0.23); }

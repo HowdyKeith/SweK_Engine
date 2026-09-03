@@ -981,6 +981,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "from code and not prose by default -- v4424's lesson applied on arrival, 245 raw vs 242 " +
                  "stripped. Four sabotages, 2/2/1/1 red by name.",
     }),
+    since52: Object.freeze({
+        at: "v4427", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/blobField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, field arithmetic and two source reads, no browser. #169 asked to compare " +
+                 "two blobulators' ONE SDF and THERE IS NO SHARED SDF: blobulator.html thresholds a DENSITY " +
+                 "(1 - SUM r^2/(d^2+0.35), marched at 0) and blobulator-gpu.html marches a DISTANCE " +
+                 "(smin of sphere SDFs). AND r IS NOT THE SAME QUANTITY -- the CPU surface is sqrt(r^2-0.35), " +
+                 "a closed form matched to bisection at four decimals, so a blob of r=1 renders 19.4% " +
+                 "smaller, and below r=0.5916 it is INVISIBLE on one page and solid on the other. At the " +
+                 "waist of two unit blobs the pages disagree about whether the shape is CONNECTED. SECOND " +
+                 "FINDING: v2438 deduplicated fireRamp on blobulator.html and MISSED the WGSL copy next " +
+                 "door, which had drifted at one stop of six -- c4 (1.0,0.85,0.35) against the shared " +
+                 "(1.0,0.82,0.32), widest divergence 0.0200 at heat 0.90 and 0.0000 below 0.68. Corrected, " +
+                 "and both are read from source now. AND A SABOTAGE READ ZERO RED: dropping smin's " +
+                 "-k*h*(1-h) term tripped nothing, because the gate checked the WGSL ramp and left the WGSL " +
+                 "SMIN unchecked -- a transcription is a second declaration, committed inside the round " +
+                 "reporting one. Drift in either direction goes red now. Five sabotages, 1/3/1/1/1 by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
