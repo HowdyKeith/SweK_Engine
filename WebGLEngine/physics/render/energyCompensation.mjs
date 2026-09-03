@@ -35,6 +35,7 @@
 // closure); it is stated here BEFORE the measurement rather than discovered afterwards. ***
 "use strict";
 import { directionalAlbedo } from "./microfacet.mjs";
+import { trustworthy } from "./albedoEstimator.mjs";
 
 /**
  * The directional-albedo table and its cosine-weighted average.
@@ -43,9 +44,23 @@ import { directionalAlbedo } from "./microfacet.mjs";
  * a renderer ships this as a texture, and the gate proves the closure residual is SECOND ORDER in it, so "the
  * table is coarse" and "the construction is wrong" are told apart by the ORDER rather than by the size.
  */
-export function buildTable(alpha, { K = 24, N = 220, M = 220, plant = {} } = {}) {
+// *** THE ROWS OF THIS TABLE NEAREST GRAZING WERE WRONG BY A QUARTER AT alpha 0.05, WHICH IS AN ALPHA THE
+// TREE'S OWN GATES BUILD AT. *** Measured at v4438: the first mu row is (0 + 0.5)/K = 0.0208, THE MOST OBLIQUE
+// ANGLE THERE IS, so this table starts in exactly the regime a marched grid cannot integrate -- a narrow lobe
+// at a grazing view falls between grid lines. `trustworthy` picks the sampler there and the grid everywhere
+// else, by the rule in albedoEstimator.mjs rather than by a number chosen at this call site. The `plant` path
+// keeps the grid, because a plant is a deliberate corruption of THE GRID and swapping the estimator under it
+// would quietly disarm every gate that plants one.
+export function buildTable(alpha, { K = 24, N = 220, M = 220, plant = {}, estimator = null } = {}) {
     const mu = [], E = [];
-    for (let i = 0; i < K; i++) { const m = (i + 0.5) / K; mu.push(m); E.push(directionalAlbedo(alpha, m, { N, M, plant })); }
+    const planted = plant && Object.keys(plant).length > 0;
+    for (let i = 0; i < K; i++) {
+        const m = (i + 0.5) / K;
+        mu.push(m);
+        E.push(planted || estimator === "grid"
+            ? directionalAlbedo(alpha, m, { N, M, plant })
+            : trustworthy(alpha, m, { N, M, force: estimator }).value);
+    }
     // E_avg = 2 INT E(mu) mu dmu, the cosine-weighted average over the hemisphere.
     const Eavg = 2 * E.reduce((s, e, i) => s + e * mu[i], 0) / K;
     return { alpha, K, mu, E, Eavg };

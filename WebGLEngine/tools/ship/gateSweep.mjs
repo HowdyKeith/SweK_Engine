@@ -1244,6 +1244,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "three of those, after a hand-picked 'half a per cent' went red on ordinary noise. Four " +
                  "sabotages, MEASURED 6/3/3/4 by name, none zero.",
     }),
+    // v4438 -- the sixty-first closing. The loose end v4437 wrote down and did not act on: the tree's baked
+    // energy table was a quarter wrong at an alpha its own gates build at.
+    since61: Object.freeze({
+        at: "v4438", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/albedoEstimator-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 24 checks in six sections. v4437 ended with a sentence saying every " +
+                 "furnace number at low roughness and grazing angles should be re-checked, AND THEN DID NOT " +
+                 "CHECK THEM -- leaving the tree standing on an instrument already known to be broken. This " +
+                 "is that check, and it is worse than the round predicting it guessed. " +
+                 "physics/render/energyCompensation.mjs BAKES A TABLE other modules consume, its first mu row " +
+                 "is (0 + 0.5)/K = 0.0208 -- THE MOST OBLIQUE ANGLE THERE IS -- and at alpha 0.05, which is " +
+                 "ALPHAS[0] in its own gate, the grid reads 0.705 where the truth is 0.927. TWENTY-FOUR PER " +
+                 "CENT WRONG AND SHIPPED; msDirect-selfcheck's coarser N=120 is forty. *** AND THE FIX IS NOT " +
+                 "A BIGGER GRID, WHICH THE TIMING SETTLES RATHER THAN TASTE. *** Converging the worst cell " +
+                 "needs N > 4800 and 3456 ms for ONE POINT, against a three-second sweep budget for a whole " +
+                 "gate. THE TREE ALREADY OWNED THE RIGHT ESTIMATOR AND WAS USING IT ONLY TO CHECK THE WRONG " +
+                 "ONE: sampleHalfVector draws from the GGX lobe and bounceWeight cancels the pdf " +
+                 "analytically, and together they read 0.8925 at n=60k, 0.8921 at n=2M -- FLAT -- in 18 ms, " +
+                 "while the grid climbs 0.686, 0.845, 0.889 and is still moving. A HUNDRED TIMES CHEAPER AND " +
+                 "RIGHT: a sampler cannot miss the lobe it is drawing from. buildTable now routes by a RULE " +
+                 "(narrow lobe AND oblique view, both halves asserted) rather than by whatever N somebody " +
+                 "typed. THE REPAIR MOVES ONLY THE GRAZING ROWS -- 20 of 24 rows unchanged, alpha 0.8 " +
+                 "bit-identical -- and the grid path is kept reachable, because energyCompensation-selfcheck's " +
+                 "CONVERGENCE-ORDER STUDY genuinely needs a deterministic integrand and now says " +
+                 "estimator: 'grid' OUT LOUD. The default and the study want different things and both are " +
+                 "right. TWO FINDINGS AGAINST MY OWN WORK: the record conflated the alphas THE RULE FLAGS " +
+                 "{0.05, 0.2} with the ones MATERIALLY wrong {0.05}, and a conservative rule flagging more " +
+                 "than it must is the rule working, not a mismatch to tune away. And SABOTAGE D READ ZERO " +
+                 "RED -- the third zero in four rounds and the sharpest: the row asserted a planted table " +
+                 "DIFFERS from the grid table, and with plants routed through the sampler it still differed, " +
+                 "because the ESTIMATOR had changed rather than the plant being applied. A check satisfiable " +
+                 "by the wrong cause would have left every planting gate in the tree passing for free. " +
+                 "Repaired by asserting the mechanism: a planted table must BE the grid with the plant " +
+                 "applied, row for row. Four sabotages, MEASURED 4/4/1/0-then-1 by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

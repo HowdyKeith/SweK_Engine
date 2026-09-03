@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A marched grid was the wrong instrument for a narrow lobe, and the tree had the right one all along",
+    since: "v4438",
+    state: "open",
+    pred: "v4437 found principled.directionalAlbedo's default grid wrong by 3x for a tight lobe at an oblique angle, and predicted in its honest scope that the same defect would reach other furnace numbers in the tree. The prediction under test is that one, and the sharper one behind it: that the failure is not carelessness about N but a MISMATCH OF INSTRUMENT TO INTEGRAND, and therefore that refining the grid would not be an affordable fix.",
+    why: "Because a note saying 'this should be re-checked' costs nothing to write and leaves the tree standing on an instrument known to be broken. The round that wrote it is the round that should have acted on it.",
+    measured: "WORSE THAN PREDICTED, AND THE AFFORDABILITY CLAIM HELD. energyCompensation.buildTable bakes a table other modules consume; its first mu row is 0.0208, the most oblique angle there is, and at alpha 0.05 -- ALPHAS[0] in its own gate -- it reads 0.705 against a true 0.927. TWENTY-FOUR PER CENT, SHIPPED. msDirect-selfcheck's N=120 is forty. Converging the worst cell needs N > 4800 and 3456 ms for ONE POINT against a three-second whole-gate budget, so a bigger grid was never available. The sampler the tree has had since v3495 -- sampleHalfVector plus bounceWeight -- reads flat at 0.8925 (n=60k) and 0.8921 (n=2M) in 18 ms, while the grid climbs 0.686, 0.845, 0.889 and is still moving. A sampler cannot miss the lobe it draws from.",
+    kill: "physics/render/albedoEstimator-selfcheck.mjs. The routing rule is asserted as a PRODUCT with both halves shown harmless alone; the repair is asserted to move ONLY the grazing rows (20 of 24 unchanged, alpha 0.8 bit-identical); and the plant path is asserted BY MECHANISM rather than symptom. SABOTAGE: flip the rule to OR and 4 rows go red, divide by surviving draws and 4 do, make buildTable ignore the estimator and 1 does -- MEASURED 4/4/1/0-then-1 by name. THE ZERO IS THE THIRD IN FOUR ROUNDS AND THE SHARPEST: routing plants through the sampler left the symptom intact, so the row passed for the wrong cause and would have disarmed every planting gate in the tree. HONEST SCOPE: the grid is not bad, it is DETERMINISTIC, and the convergence-order study genuinely needs that -- it now pins estimator 'grid' out loud. The thresholds are generous rather than tuned. And only directionalAlbedo's consumers were audited; no other integrator in the tree was.",
+    page: "instruments.html",
+  },
+  {
     name: "GPU against CPU is not two independent paths when both run the same sampler",
     since: "v4437",
     state: "open",

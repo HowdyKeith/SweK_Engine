@@ -53,7 +53,14 @@ const TABLES = ALPHAS.map((a) => buildTable(a));
     // and it is the cell that set section 1's number. REFINING WHERE IT ALREADY LOOKS GOOD WOULD BE MEASURING
     // THE FIXTURE (v3417).
     const Ks = [8, 16, 32, 64, 128];
-    const errs = Ks.map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K }), 0.2) - 1));
+    // *** THE ORDER STUDY PINS THE GRID ESTIMATOR, AND THAT IS A REQUIREMENT IT ALWAYS HAD. *** v4438 made
+    // buildTable pick the SAMPLER at grazing, because the grid is wrong by a quarter there. A sampler is the
+    // right default and the wrong integrand for THIS section: a convergence order is measured by watching one
+    // error fall while everything under it holds still, and Monte Carlo noise does not fall with K. It would
+    // put a floor under the sweep -- which is the very failure the rows below already diagnose for the fixed
+    // quadrature error. So the study says `estimator: "grid"` OUT LOUD rather than inheriting whatever the
+    // default happens to be, and what it measures is the TABLE'S interpolation order, which is what it claims.
+    const errs = Ks.map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, estimator: "grid" }), 0.2) - 1));
     const ratios = errs.slice(1).map((v, i) => errs[i] / v);
     say(`table refinement at the WORST cell (alpha 0.05, cos_o 0.2), K = ${Ks.join("/")}: ${errs.map((v) => v.toExponential(2)).join(" -> ")}  ratios ${ratios.map((r) => r.toFixed(2)).join(", ")}`);
 
@@ -68,7 +75,7 @@ const TABLES = ALPHAS.map((a) => buildTable(a));
     // *** AND THE FLOOR IS PROVEN BY LIFTING IT RATHER THAN ASSERTED. If the top of the sweep is really the
     // quadrature underneath, then a finer quadrature must give K = 128 its order back -- and it does. Without
     // this the paragraph above would be a plausible story rather than a measurement.
-    const fine = [32, 64, 128].map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, N: 440, M: 440 }), 0.2, { N: 800 }) - 1));
+    const fine = [32, 64, 128].map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, N: 440, M: 440, estimator: "grid" }), 0.2, { N: 800 }) - 1));
     const fineRatios = fine.slice(1).map((v, i) => fine[i] / v);
     say(`  same three K with the quadrature DOUBLED: ${fine.map((v) => v.toExponential(2)).join(" -> ")}  ratios ${fineRatios.map((r) => r.toFixed(2)).join(", ")}`);
     ok("!! *** AND LIFTING THE FLOOR GIVES K = 128 ITS ORDER BACK, WHICH IS WHAT MAKES THAT A MEASUREMENT AND NOT A STORY ***",
