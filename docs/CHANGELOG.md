@@ -14,6 +14,82 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4400 -- one line that does not resolve in Node, three findings downstream of it, and the cross-backend envelope recorded at last
+
+physics/box3d/box3dLoader.js loads its artifact with `import("/vendor/box3d/box3d.js")` -- a BROWSER-ABSOLUTE
+URL. In Node that is a path from the filesystem root, so it cannot resolve, and the catch reported the failure
+as "Box3D WASM not built yet -- run build-box3d-wasm-clang.sh". Both halves were false: vendor/box3d/box3d.js
+(5 KB) and box3d.wasm (950 KB) are committed and present, and physics/box3d/box3dNode.mjs has been loading
+that same wasm headless for hundreds of versions -- 45 swk_ functions, under every physics gate in the tree.
+
+WHAT ONE LINE COST:
+
+1. THE FACADE. selectBackend() catches a non-ready box3d and falls through to Jolt, so in Node EVERY caller
+   got Jolt -- including `prefer: "box3d"`, silently, while the comment beside the order said "auto: try the
+   lighter engine first".
+
+2. THE CROSS-BACKEND ENVELOPE. physics/backend-qa-check.mjs printed "(box3d WASM absent -> Jolt baseline only)"
+   and recorded a two-engine divergence envelope holding one engine. It also called createWorld WITHOUT init(),
+   so it would have failed even with the loader fixed, and its own header had warned about becoming "a control
+   that cannot fail".
+
+3. THE CAPABILITY TABLE -- a separate defect, found by pulling the same thread. CAPS said box3d had no
+   constraints and JOLT_ONLY listed them, so a caller needing constraints was routed to Jolt, whose portable
+   joint interface answers -1 to every joint call, while box3d -- joints since v2515, motors and limits since
+   v4385, a wheel joint since v4398 -- was excluded.
+
+*** AND THE FIRST FIX WAS WRONG IN A WAY THIS TREE'S OWN GUARD CAUGHT INSIDE ONE VERIFY. ***
+
+Making box3dLoader.init() fall back to box3dNode.mjs works and is wrong. box3dNode imports node:fs at the top
+level, and tools/ship/browserNodeGuard-selfcheck.mjs walks the import graph from every .html page: it went RED
+with "1 offender(s): physics/box3d/box3dNode.mjs (reached from backend-physics-check.html)". physics/backend.js
+is browser-reachable too (blob-herd.html, blob-avatar.html), so the fallback could not live there either.
+
+The guard was not in the way; it was the design constraint stated out loud. Making the specifier opaque to the
+scanner would have defeated it rather than satisfied it -- the same move as adding an exclusion instead of a
+fix. So the direction is INVERTED: box3dLoader offers an adopt() seam and imports nothing new, and a new
+Node-only module, physics/backendNode.mjs, which no page reaches, does the reaching.
+
+ALL THREE FIXED ON EVIDENCE. box3d now loads in Node, drops a box that lands at y=0.4999 against a derived
+0.5000, and the router sends auto and prefer:"box3d" to box3d and need:['constraints'] to box3d.
+
+The capability field had to be GIVEN A MEANING before it could be checked. `constraints` now means the PORTABLE
+joint interface -- the thing a caller reading the table goes on to call -- so box3d's row went true and JOLT'S
+WENT FALSE, and the gate asserts caps.constraints equals what each backend's own world reports, on both, by
+loading them. Jolt's constraints are still reachable through createRagdoll and raw(); that is what
+ragdolls:true is for. `ragdolls` and `vehicles` stay Jolt-only, and the note now says that is a limit of THIS
+FACADE and not of box3d.
+
+AND THE FIRST CROSS-BACKEND NUMBERS THIS TREE HAS EVER HAD:
+
+    box3d determinism   identical trajectory, renderDiff 0
+    Jolt | box3d        drift 3.718u   visual 6.0%   IoU 0.588   SSIM 0.6849   edge 0.2219   pHash 14 bits
+
+180 ticks, one identical scene. That is the measured reason mixed-backend lockstep is refused, rather than the
+asserted one. v3337 designed this moment -- the baseline's own note said "the first rig run where box3d loads
+will go RED and name this command" -- and it did, on the run that fixed the loader.
+
+v4229 fixed one branch of the loader's misreporting and called it "the third instance of the same defect".
+This is the fourth, by a road explainWasmFailure cannot see: it asks whether WebAssembly is usable, and here
+WebAssembly was fine and the PATH was not.
+
+Five sabotages, 6/2/1/1/1 RED by name, four files md5-identical. Sabotage A found two defects in the new gate
+itself: it THREW instead of reporting, dying in section 1 and never reaching sections 2 to 5, so a reader got
+one stack trace where six named failures belonged; and its "it says HOW" check passed VACUOUSLY, reading an
+undefined route as "via the browser path" and naming a path that had just failed.
+
+NOT EDITED: tools/ship/doorKinds.mjs still records this harness as owing "a rig where box3d's WASM builds",
+which is now the stale record. It is named in the gate and left, because a register describing work owed is not
+something to quietly rewrite while fixing the work.
+
+UNCHECKED: whether the envelope holds anywhere else. It was recorded in this container; the bands are
+multiplicative and generous by construction, but no second machine has been near it. The BROWSER path is also
+untouched and untested from here -- the absolute-URL import is still the only path the loader itself takes, and
+what this round added is an adopt() seam beside it that only a Node caller reaches, so a browser that cannot
+resolve that URL now gets a truer message and no new route. And the facade's ragdoll asymmetry is reported,
+not repaired.
+
+The tree stands at 1435 gates.
 ## v4398 -- box3d's wheel joint, and the jitter claim physics/vehicle.mjs has been arguing unmeasured since v4217
 
 v4217 built a RAYCAST vehicle -- one rigid chassis, wheels as downward rays, forces applied to the single body

@@ -317,12 +317,21 @@ console.log("\n7. *** THE TREE ALREADY HAD A CROSS-BACKEND HARNESS, AND IT HAS O
     // reason it happened is that a new file was written without asking whether the name was taken.
     //
     // And reading the module it nearly replaced turned up something worth more than the near-miss.
+    // *** THIS CHECK USED TO ASSERT THE DEFECT, AND v4400 FIXED THE DEFECT, SO IT WENT RED. ***
+    //
+    // v4397 wrote it as "backend-qa-check reaches for the BROWSER loader and calls the failure `WASM absent`"
+    // -- true at the time, and a check that fails the moment its subject is repaired. v4398's sabotage D
+    // caught the same shape in a check of mine one round later and the lesson was already written down:
+    // assert the INVARIANT, keep the defect count as a census beside it, and let zero be a passing answer.
+    // This is that fix applied backwards to the round that needed it first.
     const qa = fs.readFileSync(path.join(ENG, "physics/backend-qa-check.mjs"), "utf8");
-    const reachesForBrowserLoader = /import\("\.\/box3d\/box3dLoader\.js"\)/.test(qa);
-    const callsItWasmAbsent = /box3d WASM absent/.test(qa);
-    ok("physics/backend-qa-check.mjs reaches for the BROWSER loader and calls the failure `WASM absent`",
-       reachesForBrowserLoader && callsItWasmAbsent,
-       "one try/catch around box3dLoader.createWorld, and the catch prints a capability claim");
+    ok("the harness reports THE LOADER'S OWN WORDS rather than a capability claim of its own",
+       /The loader said: /.test(qa) && !/box3d WASM absent/.test(qa),
+       "v4400 replaced the guess with st.reason or the thrown message, whichever actually happened");
+    ok("...and it asks something that can answer before it uses the answer",
+       /adoptBox3dInNode\(\)/.test(qa),
+       "it called createWorld first, so box3dLoader threw `call init() first` -- a USAGE error read as a " +
+       "missing artifact");
 
     // The wasm is not absent. This gate drove it in section 2. What box3dLoader actually says is different.
     let loaderErr = null;

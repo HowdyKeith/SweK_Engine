@@ -557,6 +557,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "b3MakeBoxHull, then the settled car was ASLEEP and reported full motor torque at zero speed. " +
                  "Driven RED by five sabotages (4/3/2/2/2 by name), four files md5-identical after",
     }),
+    since29: Object.freeze({
+        at: "v4400", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/backendRouting-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.27s, five sections, both engines LOADED in the run. One " +
+                 "line was behind three findings: box3dLoader imports \"/vendor/box3d/box3d.js\", a " +
+                 "browser-absolute URL that cannot resolve in Node, and reported it as \"WASM not built " +
+                 "yet\" -- while the artifact was committed and box3dNode had been loading it for hundreds " +
+                 "of versions. So the facade gave Node callers Jolt even for prefer:box3d, backend-qa-check " +
+                 "recorded a two-engine envelope holding one engine, and CAPS routed constraint-needers to " +
+                 "the backend whose portable joint interface refuses them. All three fixed; the cross-backend " +
+                 "envelope is recorded for the first time (drift 3.718u, IoU 0.588, box3d deterministic), " +
+                 "which v3337 had designed the UNMEASURED failure to force. Driven RED by five sabotages " +
+                 "(6/2/1/1/1 by name), four files md5-identical after, and sabotage A found two defects in " +
+                 "the new gate: it THREW instead of reporting, and one check passed vacuously by naming a " +
+                 "route that had just failed",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

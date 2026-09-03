@@ -139,8 +139,29 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const BASE = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "tools", "render-qa", "backend-baseline.json");
     const jolt = await createJoltBackend();
     const backends = [{ name: "Jolt", make: () => jolt.createWorld({ gravity: [0, -9.8, 0] }) }];
-    try { const mod = await import("./box3d/box3dLoader.js"); const w = mod.box3d.createWorld({ gravity: [0, -9.8, 0] }); w.destroy && w.destroy(); backends.push({ name: "box3d", make: () => mod.box3d.createWorld({ gravity: [0, -9.8, 0] }) }); }
-    catch { console.log("(box3d WASM absent -> Jolt baseline only; on a rig run with box3d built + --update to record the cross envelope)"); }
+    // *** v4400 -- THIS BLOCK NEVER LOADED box3d, AND SAID SO IN THE WRONG WORDS FOR AS LONG AS IT EXISTED. ***
+    // It called createWorld WITHOUT init(), so box3dLoader threw "box3d: call init() first" -- a USAGE error --
+    // and the catch printed it as the artifact being absent. So the cross-backend envelope this file exists to
+    // record has only ever held ONE backend, and its own header at line 87 warns about exactly that shape:
+    // "a run where box3d finally loads would go GREEN while measuring nothing -- a control that cannot fail".
+    // The reason is now taken from the loader's own status rather than assumed from the fact that something
+    // failed.
+    try {
+        // v4400 -- through the NODE DOOR. box3dLoader's own init() uses a browser-absolute URL that cannot
+        // resolve here, and it must stay that way: it is browser-reachable, so it cannot import a Node module
+        // (browserNodeGuard walks the graph from every page and says so). backendNode.mjs is the Node-only
+        // module that loads the wasm by a module-relative path and hands it to the shared loader.
+        const mod = await import("./box3d/box3dLoader.js");
+        const { adoptBox3dInNode } = await import("./backendNode.mjs");
+        const st = await adoptBox3dInNode();
+        if (!st || !st.ready) throw new Error(st && st.reason ? st.reason : "box3d reported not ready");
+        const w = mod.box3d.createWorld({ gravity: [0, -9.8, 0] });
+        w.destroy && w.destroy();
+        backends.push({ name: "box3d", make: () => mod.box3d.createWorld({ gravity: [0, -9.8, 0] }) });
+    } catch (e) {
+        console.log("(box3d unavailable -> Jolt baseline only. The loader said: " +
+                    String(e.message || e).slice(0, 160) + ")");
+    }
 
     const metrics = captureMetrics(backends, { ticks: 180 });
     if (UPDATE) {
