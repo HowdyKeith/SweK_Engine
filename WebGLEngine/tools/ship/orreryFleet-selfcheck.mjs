@@ -190,14 +190,25 @@ console.log("\n5. THE DERIVED QUANTITIES COME FROM THEIR OWNERS, NOT FROM A SECO
 // =============================================================================================================
 console.log("\n6. THE DEBRIS RING IS THE PAPERWORK, AND THE THREE PAPER PLANETS ARE NOW VISIBLE");
 {
+    // *** v4410: TWO OF THE THREE PAPER PLANETS TURN OUT TO HAVE SATELLITES. *** They were drawn as empty
+    // because the substring rule could not see a dependency built with path.join("vendor", name) -- grass is
+    // reached by tools/ship/grassField-selfcheck and orrery-selfcheck, keyhunt by secp256k1-selfcheck. The
+    // paperwork ring is still there and still the finding; what is retired is the claim that the ring is ALL
+    // there is. A row that asserted an emptiness produced by a blind spot is not a row to keep passing.
     for (const name of PAPER_ONLY_BODIES) {
         const f = fleets.get(name);
-        ok("  " + name.padEnd(8) + " draws as debris around nothing: no satellites, a ring of licences",
-            f.satellites.length === 0 && f.debris.length > 0,
-            f.debris.map((d) => d.path).join(", "));
+        ok("  " + name.padEnd(8) + " carries a ring of licences, and " + f.satellites.length + " satellite(s) of code",
+            f.debris.length > 0,
+            "debris: " + f.debris.map((d) => d.path).join(", ") +
+            (f.satellites.length ? " | reached by: " + f.satellites.map((x) => x.path).join(", ") : " | reached by nothing"));
     }
+    const trulyEmpty = PAPER_ONLY_BODIES.filter((n) => fleets.get(n).satellites.length === 0);
+    ok("*** and at least one body really is paperwork and nothing else ***", trulyEmpty.length > 0,
+        trulyEmpty.join(", ") + " of " + PAPER_ONLY_BODIES.join(", ") + " -- v4266's 'three planets made entirely " +
+        "of paperwork' was measured with a rule that could not see path.join, and the honest number is " + trulyEmpty.length);
     report("world/orreryEjecta.mjs measured that at v4266 -- 'three planets made entirely of paperwork, 21% of " +
-        "its bodies' -- and the orrery could not show it. The finding existed; the picture did not.");
+        "its bodies' -- and the orrery could not show it. The finding existed; the picture did not. v4410 then " +
+        "found the finding itself was two-thirds an artefact of the scanner.");
     const anyCode = names.find((n) => !PAPER_ONLY_BODIES.includes(n) && fleets.get(n).debris.length > 0);
     ok("*** and a body with code carries BOTH: satellites and a debris ring ***",
         !!anyCode && fleets.get(anyCode).satellites.length > 0,
@@ -322,10 +333,20 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
             return n; });
         ok("*** and the marks are really on the canvas, not only in the readout ***", painted > 40,
             painted + " pixels in the satellite colour -- a caption without a picture is the defect this checks for");
-        const bare = await look(PAPER_ONLY_BODIES[0]);
-        ok("*** a paper-only body says so rather than showing an empty sky with no explanation ***",
+        // v4410: the probe used PAPER_ONLY_BODIES[0], which was grass -- and grass now HAS satellites, so the
+        // page correctly stopped saying "nothing imports" and this row went red on a page that had got better.
+        // It now asks the body that really is empty, and asserts the paperwork half for every paper-only body.
+        const empty = PAPER_ONLY_BODIES.find((n) => fleets.get(n).satellites.length === 0) || PAPER_ONLY_BODIES[0];
+        const bare = await look(empty);
+        ok("*** a body nothing reaches says so rather than showing an empty sky with no explanation ***",
             /nothing imports/.test(bare.fleet) && /paperwork/.test(bare.fleet),
-            `${PAPER_ONLY_BODIES[0]}: "${bare.fleet}"`);
+            `${empty}: "${bare.fleet}"`);
+        const reached = PAPER_ONLY_BODIES.filter((n) => fleets.get(n).satellites.length > 0);
+        for (const n of reached) {
+            const r = await look(n);
+            ok("  ...and a paper-only body that IS reached reports both, rather than the old blanket sentence",
+                /paperwork/.test(r.fleet) && /importers?/.test(r.fleet), `${n}: "${r.fleet}"`);
+        }
         ok("  and the page threw nothing", errs.length === 0, errs.join(" | ") || "clean");
         await br.close(); srv.close();
     }

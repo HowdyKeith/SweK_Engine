@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A guard deleted for being inert stayed deleted while the tree grew the case it existed for",
+    since: "v4410",
+    state: "open",
+    pred: "world/orreryEjecta.mjs decided which files depend on a vendored body by asking whether the source CONTAINS `vendor/<name>/`. Its first draft also required the hit to sit inside a quoted specifier; all 32 matching files satisfied that anyway, so the guard was deleted under the rule that a guard whose removal changes no count is an assertion that cannot fail. THE RULE IS RIGHT AND IT COST THIS ANYWAY, because inertness is a property of the tree ON THE DAY IT IS MEASURED. The prediction is that asking POSITIONALLY -- is the quoted string the path, or a sentence containing one -- corrects the record in both directions, and that the deleted guard would not have helped either way.",
+    why: "At v4406 tools/ship/gateSweep.mjs was filed as a box3d importer because a sweep closing's `verdict:` string quotes the vendor path while EXPLAINING that box3dLoader imports it. That mention IS quoted, so v4329's guard would have passed it. A record about an import satisfies every test that asks whether the path is in a string; only a test that asks whether the string IS the path can tell them apart.",
+    measured: "Of the old rule's 138 entries, 12 are records rather than dependencies -- and it never saw 17 files that reach a body through path.join(..., 'vendor', name, ...), which contains no matching substring at all. The corrected population is 143, so the record was wrong in BOTH directions. Five kinds partition it: 79 import, 11 load, 27 path, 9 joined, 12 record. Two of the three bodies the orrery drew as pure paperwork turn out to be reached by real gates. The baseline is now a frozen LIST OF NAMES with the counts derived, and that ratchet named this round's own new gate joining box3d's fleet within the hour.",
+    kill: "tools/ship/importPosition-selfcheck.mjs. Any fixture landing on the wrong kind kills it, so does a derived count disagreeing with the frozen name list, so does gateSweep.mjs reappearing in box3d's fleet. SABOTAGE: drop the specifier test, leaving v4329's guard exactly as it was, and three rows go red BY NAME including the one that shipped. HONEST SCOPE: this is a POSITIONAL rule over text, not a parse. A specifier assembled at runtime is as invisible to it as it was to the substring rule, and an importmap that renames a bare specifier in one file while fifty others use the bare name counts one dependant, not fifty.",
+    page: "orrery.html",
+    where: "tools/ship/importPosition.mjs + tools/ship/importPosition-selfcheck.mjs + world/orreryEjecta.mjs + tools/ship/orreryFleetScan.mjs.",
+  },
+  {
     name: "The ship-time sweep was evicting gates on timings it manufactured itself, and never re-measuring them",
     since: "v4407",
     state: "open",

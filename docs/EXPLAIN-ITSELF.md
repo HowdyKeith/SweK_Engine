@@ -126,7 +126,7 @@ gate the red register already tracks. A claim naming a *green* gate that no long
 what the claim says is invisible to it. The one contradiction was found because the
 register already knew -- not because the detector is good at looking.
 
-## 5. A scanner counts a record ABOUT a thing as the thing -- OPEN, found v4406
+## 5. A scanner counts a record ABOUT a thing as the thing -- DONE at v4410
 
 `tools/ship/orreryFleetScan.mjs` decides which files import a vendored body by looking for
 its path. It strips **comments** -- which is why `physics/backendDivergence.mjs`, whose
@@ -146,6 +146,16 @@ it is a round of its own rather than a line. `world/orreryEjecta.mjs` also holds
 baseline (box3d 21, three-webgpu 7) that the tree has grown past (28 and 11), which is
 v4399's ratchet lesson: **freeze by name, not by count.** Both readings must be re-derived
 together or the gate just moves from one wrong number to another.
+
+**Done at v4410.** `tools/ship/importPosition.mjs` asks the question positionally, and the answer is that the
+old rule was wrong **in both directions**: of its 138 entries **12 are records**, and it never saw **17 files**
+that reach a body through `path.join(..., "vendor", name, ...)`. The corrected population is **143**. The
+baseline is now a frozen list of *names* with the counts derived from it -- and that ratchet named this round's
+own new gate joining box3d's fleet within the hour, which is the scanner counting the scanner for the third
+recorded time. Two of the three bodies the orrery drew as pure paperwork turn out to be reached by real gates.
+
+**And v4329's deleted guard would not have caught it.** The offending mention *is* quoted. The question is not
+whether the path sits in a string; it is whether the string **is** the path.
 
 ## 6. A third of the tree is run by no ship-time step, and the exclusion is a ONE-WAY DOOR -- v4407
 

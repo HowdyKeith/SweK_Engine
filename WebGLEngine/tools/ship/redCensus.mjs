@@ -370,20 +370,29 @@ export const FIXED_SINCE_V4279 = Object.freeze([
  * every entry says what is actually failing so the next round can pick one up. Registering a red the round did
  * not cause is what the register is for; widening it to hide one the round DID cause is the thing forbidden.
  */
-export const RED_AT_V4407 = Object.freeze([
-    { gate: "tools/ship/orreryEjecta-selfcheck.mjs", ms: 874,
-      fails: "three-webgpu 11 importers recorded 7; box3d 28 recorded 21",
-      why: "docs/EXPLAIN-ITSELF.md item 5. A FROZEN COUNT THE TREE GREW PAST -- v4399's ratchet lesson -- and " +
-           "the two readings are not even measured by the same rule: the baseline strips comments, the fleet " +
-           "scan does not strip STRING LITERALS, so tools/ship/gateSweep.mjs counts as a box3d importer because " +
-           "a sweep closing quotes the vendor path while explaining that box3dLoader imports it. Raising the " +
-           "baseline would move the gate from one wrong number to another; both readings must be re-derived " +
-           "under one rule, which is a round of its own." },
+export const RED_AT_V4408 = Object.freeze([
     { gate: "tools/ship/box3dFilter-selfcheck.mjs", ms: 93,
       fails: "*** EVERY swk_* IN THE SHIM IS IN build-box3d-wasm.sh's HARDCODED EXPORT LIST *** 74 declared, 18 missing",
       why: "TWO BUILD SCRIPTS DISAGREE ABOUT THE EXPORT SET, and nothing at ship time has ever said so. Not " +
            "this round's and not this round's to fix -- it is a WASM build question that needs the rig. Named " +
            "here with its reading so the next round can start from a number rather than a rumour." },
+]);
+
+// *** ONE OF THE TWO IS ALREADY GONE, AND THE REPAIR BELONGS TO ITS OWN MOMENT. ***
+// FIXED_SINCE_V4279 is the record of what the v4279 REGISTER held; orreryEjecta-selfcheck was never in it, so
+// filing the repair there inflated registerAtSweep() by one and took three arithmetic rows in
+// gateSweep-selfcheck red within the minute. A list is a claim about an instant, and a repair to a different
+// instant needs a different list -- which is the same rule RED_AT_V4408 was created under one round ago.
+export const FIXED_SINCE_V4408 = Object.freeze([
+    { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
+      why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +
+           "against a frozen count and the count had drifted -- but the two readings were not even taken by " +
+           "the same rule, so raising the baseline would have moved the gate from one wrong number to another. " +
+           "tools/ship/importPosition.mjs asks the question POSITIONALLY: is the quoted string the path, or a " +
+           "sentence containing one? The old substring rule was wrong in BOTH directions -- 12 of its 138 " +
+           "entries are records, and it never saw 17 files that reach a body through path.join. The baseline " +
+           "is now a FROZEN LIST OF NAMES with the counts derived from it, so the next arrival is reported by " +
+           "name; that ratchet caught this round's own new gate joining box3d's fleet within the hour." },
 ]);
 
 export const UNCONFIRMED_SLOW = Object.freeze([

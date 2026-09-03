@@ -678,6 +678,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "them and 7.2x at the worst, and SIX WERE RED IN THE DARK -- two now in redCensus.RED_AT_V4407, " +
                  "two fixed by the ritual's own staleness step, two already registered. The pool fell 372 -> 234",
     }),
+    since36: Object.freeze({
+        at: "v4410", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/importPosition-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~3s, five sections. docs/EXPLAIN-ITSELF.md item 5. It gates " +
+                 "tools/ship/importPosition.mjs, which asks POSITIONALLY whether a vendor path is a dependency: " +
+                 "not is it quoted, but IS THE QUOTED STRING THE PATH. world/orreryEjecta.mjs's own header " +
+                 "records deleting that guard at v4329 because it was measured INERT -- true then, and " +
+                 "inertness is a property of the tree on the day it is measured. THE OLD RULE IS WRONG IN BOTH " +
+                 "DIRECTIONS: of 138 entries 12 are records, and it never saw 17 files reaching a body through " +
+                 "path.join, so the population is 143. The baseline is now a FROZEN LIST OF NAMES with counts " +
+                 "derived, and that ratchet caught this round's own gate joining box3d's fleet within the hour " +
+                 "-- the scanner counting the scanner, third instance. It clears orreryEjecta-selfcheck from " +
+                 "the register by RE-DERIVING rather than raising a number, and retires an orrery claim that " +
+                 "was true only because the old rule could not see path.join: two of the three planets drawn " +
+                 "as pure paperwork are reached by real gates. FOUR SABOTAGES LANDED AND THREE MORE COST ZERO " +
+                 "RED, which rewrote a section: a two-line fixture has too few quotes to break",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
