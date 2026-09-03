@@ -121,7 +121,15 @@ const CENSUS = PW.census(SRCS, BASES);
     // unadjudicated near-miss, and the reason to believe that number rather than suspect the detector is
     // SECTION 1: three patterns this session really did have to widen are fed back in and all three are caught.
     // An empty census beside a passing fixture set is evidence; an empty census alone is the shape v4402 named.
-    const ADJUDICATED = Object.freeze({});
+    const ADJUDICATED = Object.freeze({
+        // v4420 -- A FROZEN FIXTURE OF THE DEFECT, ON PURPOSE. tools/ship/predicatePairs-selfcheck.mjs carries
+        // isPaperFile exactly as it stood before v4418 widened it, as the known positive its own method is
+        // validated against. This census correctly reports it as rejecting ASHIMA-LICENSE.txt, because it does.
+        // Widening it would destroy the fixture; the row is adjudicated instead, and the two gates checking each
+        // other two rounds apart is the census working rather than a collision.
+        "tools/ship/predicatePairs-selfcheck.mjs": "a deliberately narrow pattern, frozen as the KNOWN POSITIVE " +
+            "that validates predicatePairs' method. It is a fixture of the defect, not an instance of it.",
+    });
     const rows = CENSUS.rows;
     const surprise = rows.filter((r) => !(r.path in ADJUDICATED));
     ok("!! *** every near-miss in the tree has a verdict recorded against it ***", surprise.length === 0,

@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "Two functions answering the same question can be discovered rather than hand-named, and the widest rule in the tree was wrong",
+    since: "v4420",
+    state: "open",
+    pred: "v4418 found the session's sixth defect by comparing isLicenceFile with isPaperFile -- a comparison a person wrote because a person happened to know both existed. v4419 closed by saying nothing DISCOVERS that two functions answer the same question. The prediction is that the signature is mechanical and needs no semantics: run every predicate over one corpus and compare the sets they accept. Identical is a duplicate; CONTAINMENT is a designed hierarchy; CROSSING -- each accepting what the other rejects -- is two functions answering one question and disagreeing about it.",
+    why: "v4418's fix turned exactly that pair from crossing into containment, so a repair to this defect has a visible signature in the measure and the known case can serve as a fixture. The measure has to be the OVERLAP COEFFICIENT rather than Jaccard or raw agreement: containment scores 1.0 under overlap and 0.35 under Jaccard, and two predicates that reject almost everything agree 99% of the time about nothing.",
+    measured: "The pre-v4418 pair reads as CROSSING at 50% overlap and names ASHIMA-LICENSE.txt and IBMPlexSerif-OFL.txt -- the two files v4418 found by hand -- while the same pair after the fix reads as containment at 100%. It then found a defect in the widest, most-trusted rule in the tree: v4263 widened isLicenceFile three times to stop false accusations against properly licensed dependencies, every widening was right, and NOBODY ASKED THE OTHER DIRECTION. Two of the six files it matched were .mjs MODULES, brain/rl/attribution.mjs and its own gate. A licence is a document; requiring that costs the rule nothing, and all 17 vendored licences stay matched.",
+    kill: "tools/ship/predicatePairs-selfcheck.mjs. Any crossing pair without a recorded verdict fails it, so does any file isLicenceFile accepts that is not documentary. SABOTAGE: revert the documentary constraint and 3 rows go red naming attribution.mjs; replace the overlap coefficient with raw agreement and two unrelated predicates read as a crossing pair -- MEASURED 3 and 1. HONEST SCOPE: it finds FIVE predicates it can safely evaluate out of roughly three thousand exported functions, because one must be exported from a quiet module, take one argument, be provably free of anything but string work, and return a boolean. That is a small safe corner, not a survey. A crossing is not proof of a defect -- one standing pair is two genuinely different questions that overlap. And a classification written inline as an `if`, never named and never exported, is invisible to all of it.",
+    page: "instruments.html",
+    where: "tools/ship/predicatePairs.mjs + tools/ship/predicatePairs-selfcheck.mjs + world/orrery.mjs.",
+  },
+  {
     name: "A defect species can be searched for, and searching found the sixth instance nobody had looked for",
     since: "v4418",
     state: "open",

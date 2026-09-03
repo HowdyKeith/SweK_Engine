@@ -858,6 +858,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the round was invisible to it. Sixth and seventh sightings, inside the detector for the " +
                  "species. Driven RED by four sabotages (MEASURED 3/2/1/2 by name)",
     }),
+    since46: Object.freeze({
+        at: "v4420", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/predicatePairs-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~8s, four sections. v4419 named the half nothing did -- " +
+                 "that nothing DISCOVERS two functions answering the same question -- and it is where v4418's " +
+                 "own finding lived, since that pair was compared BY HAND. The signature is mechanical: run " +
+                 "every predicate over one corpus and compare the sets. identical is a duplicate, CONTAINMENT " +
+                 "is a designed hierarchy, CROSSING is two functions answering one question and disagreeing. " +
+                 "v4418's fix turned that pair from crossing to containment, which is the fixture. IT THEN " +
+                 "FOUND A DEFECT IN THE WIDEST RULE IN THE TREE: v4263 widened isLicenceFile three times to " +
+                 "stop false accusations and nobody asked the other direction -- TWO OF THE SIX FILES IT " +
+                 "MATCHED WERE .mjs MODULES, brain/rl/attribution.mjs and its gate. A licence is a DOCUMENT, and " +
+                 "the constraint costs nothing: all 17 vendored licences stay matched. AND THE DETECTOR " +
+                 "NARROWED ITSELF FOUR TIMES before it could see its own motivating case -- a 700-character " +
+                 "body cap shorter than isPaperFile's comment, comments scanned for calls, a probe corpus of " +
+                 "400 names holding no licence, and raw agreement as the measure. Driven RED by four " +
+                 "sabotages (MEASURED 3/1/2/1 by name)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

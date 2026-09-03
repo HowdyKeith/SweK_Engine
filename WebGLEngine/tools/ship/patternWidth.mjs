@@ -34,8 +34,11 @@ const IDENT = /[A-Za-z0-9_]/;
 // and every licence classifier "missed" it. A file of a documentary kind is one whose extension is documentary,
 // or which is named for the kind and nothing else. A .mjs called gpuProvenance is code that talks about
 // provenance, which is the exact distinction v4412 drew for imports and v4404 for claims.
-const DOCUMENTARY = /(^[^.]+$)|\.(txt|md|rst|adoc|text|1st)$/i;
-export const isDocumentary = (base) => DOCUMENTARY.test(String(base || ""));
+// v4420: the rule MOVED to world/orrery.mjs, where the licence question lives, and is re-exported here so
+// the two cannot drift. A second copy of a classification is the defect this file exists to find.
+import { isDocumentary } from "../../world/orrery.mjs";
+export { isDocumentary };   // a re-export alone gives no LOCAL binding, and nearMisses uses it -- the gate crashed
+                            // with 0 FAIL lines printed, which is v4392's rule for the sixth time this session
 
 /**
  * Which kinds this pattern CLASSIFIES, as opposed to merely mentioning inside a longer name.
