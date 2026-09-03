@@ -79,6 +79,7 @@
 import { attachGestures as _swekGestures } from "./ui/touchGestures.js";
 import { computeSkinColors, applySkinMaterial } from "./fx/avatar/skinsThree.js";
 import { blackbodyRamp as fireRamp } from "./fx/voxelize/fireRamp.js";   // v2438 -- the shared temperature ramp; this page carried a byte-identical copy
+import { BlobFire } from "./render/blobFire.mjs";   // v4429 -- the fire the ramp is finally being handed a temperature FROM
 import { SKIN_NAMES } from "./fx/avatar/skins.js";
 import * as THREE from "/vendor/three/three.module.js";
 import { marchScalarField } from "/simulation/MarchingCubes.js";
@@ -195,6 +196,7 @@ function newRiverBall(LX, LY, LZ, anywhere) {
 
 // build + march the river field, then paint fire vertex colours
 let riverDims = { LX: 1, LY: 1, LZ: 1, cs: 1 };
+let blobFire = null;   // v4429 -- render/blobFire.mjs; rebuilt only when the channel is resized
 function riverGeom(res, t, dt) {
   const LX = Math.max(28, Math.round(res * 1.7));   // long (flow)
   const LY = Math.max(20, Math.round(res * 1.35));  // tall  (balloons rise)
@@ -236,6 +238,15 @@ function riverGeom(res, t, dt) {
       }
     }
   }
+  // v4429 -- *** THE FIRE, LIT BY THESE BLOBS, ON THE SAME FIELD COORDINATES THE MARCH USES. *** The source
+  // is the density at the channel's centre z slice, so a ball drifting off-centre fades out of the fire the
+  // way metaballField's own dz^2 term says it should, rather than being clipped in or out.
+  if (!blobFire || blobFire.w !== LX || blobFire.h !== LY) {
+    blobFire = new BlobFire({ w: LX, h: LY, rect: { x0: 0, x1: LX - 1, y0: 0, y1: LY - 1, z: LZ / 2 } });
+  }
+  blobFire.setBlobs(cx.map((_, k) => ({ x: cx[k], y: cy[k], z: cz[k], r: Math.sqrt(cr2[k]) })));
+  blobFire.step();
+
   const m = marchScalarField(field, LX, LY, LZ, 0, { origin: [-(LX * cs) / 2, 0, -(LZ * cs) / 2], cellSize: cs });
   return m;
 }
@@ -245,14 +256,17 @@ const _c = [0, 0, 0], _up = new THREE.Vector3(0, 1, 0);
 function paintFire(g, positions, normals, t) {
   const n = positions.length / 3;
   const colors = new Float32Array(positions.length);
-  const LY = riverDims.LY, cs = riverDims.cs, worldH = LY * cs;
+  const LX = riverDims.LX, cs = riverDims.cs;
   for (let i = 0; i < n; i++) {
     const px = positions[i * 3], py = positions[i * 3 + 1];
     const nx = normals[i * 3], ny = normals[i * 3 + 1], nz = normals[i * 3 + 2];
-    // heat: hot at the base, cooling as it rises; flicker along the length
-    const hgt = py / worldH;                                  // 0 at bed, 1 at top
-    let heat = 1.0 - hgt * 1.05;
-    heat += 0.10 * Math.sin(px * 0.35 + t * 7.0) + 0.06 * Math.sin(px * 0.9 - t * 11.0);
+    // v4429 -- *** THE HEAT IS READ FROM A FIRE THE BLOBS LIT, NOT COMPUTED FROM THE VERTEX'S HEIGHT. ***
+    // What stood here was `heat = 1 - py/worldH*1.05` plus two sines of (px, t): a positional gradient with
+    // no blob in scope and no memory of the previous frame, so the colour did not depend on the thing being
+    // coloured and nothing could cool. render/blobFire.mjs's header carries the measurement -- the same
+    // 0.582477 for clustered blobs, distant blobs and no blobs at all. The march's origin is
+    // [-(LX*cs)/2, 0, ...] with cell size cs, so world maps back to field coordinates by this line.
+    const heat = blobFire ? blobFire.heatAt(px / cs + LX / 2, py / cs) : 0;
     fireRamp(heat, _c);
     // cheap fake shading so the form still reads (light from above-front)
     const shade = 0.62 + 0.38 * Math.max(0, nx * 0.3 + ny * 0.85 + nz * 0.2);

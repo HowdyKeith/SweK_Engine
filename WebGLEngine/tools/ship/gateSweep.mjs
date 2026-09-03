@@ -1000,6 +1000,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "SMIN unchecked -- a transcription is a second declaration, committed inside the round " +
                  "reporting one. Drift in either direction goes red now. Five sabotages, 1/3/1/1/1 by name.",
     }),
+    // v4429 -- the fifty-third closing. #168's gate, driven through eleven sabotages before it shipped; three
+    // of the eleven read ZERO RED on the first pass and each one named a real gap, which is why the entry
+    // below records the sabotage count rather than only the colour.
+    since53: Object.freeze({
+        at: "v4429", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/blobFire-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, field arithmetic and two source reads, no browser. #168 said the " +
+                 "blobulator paints heat with the blackbody ramp and has no fire; measured, what it handed " +
+                 "the ramp was heat = 1 - py/worldH*1.05 plus two sines of (px, t) -- no blob in scope and " +
+                 "no memory, the same 0.582477 for clustered blobs, distant blobs and none at all. THE ROUND " +
+                 "THEN CORRECTED ITS OWN SELECTION CRITERION: it chose doomFire's rule over fireSystem's on " +
+                 "v4423's measurement that doomFire consumes nothing, and an interior source went out in ten " +
+                 "frames -- 218 cells at MAX at step 0, total 0 by step 60. The persistence belongs to the " +
+                 "BOTTOM ROW, whose back index i+w is off-grid so step() never writes it; an interior cell's " +
+                 "is on-grid and the cold cell below overwrites it. Maintained, it settles: 19458 at step 60 " +
+                 "and 19605 at 1200. SECOND FINDING: the unclamped write wraps -- 50 cells of heat right of " +
+                 "a source no transport can carry heat rightward from -- and the gutter that stops it is " +
+                 "MAX_DECAY wide, DERIVED, where a guessed 1 still leaves 47. THIRD: v4410 made the flow a " +
+                 "field and left the LEAN welded to it; |perp| over the eight directions is 1, 63, 64 or 65 " +
+                 "and never 0, so no field can make this fire rise straight -- the plume shears 0.95 columns " +
+                 "per row, which is E[decay] = 1. AND THREE SABOTAGES READ ZERO RED: transposing heatAt's " +
+                 "bilinear weights, flipping worldToCell's y, and clamping out-of-rect reads instead of " +
+                 "returning 0. heatAt IS THE PIPE THE PAGE DRAWS THROUGH and nothing graded it; an " +
+                 "upside-down fire would have shipped green. Section 6 exists because of them. Eleven " +
+                 "sabotages, all RED by name, three files md5-identical.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
