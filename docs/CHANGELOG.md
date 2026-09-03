@@ -14,6 +14,77 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4383 -- A song, lathed: the first reference the silhouette judge did not make itself
+
+render/silhouette.mjs was built at v3337 as a HARD gate -- a veto a soft average cannot wash out -- with its
+thresholds deliberately left null because nobody in this tree had measured one. v4255 built mesh/lathe.mjs and
+stated the problem in its own header: revolving a profile makes an object whose front view IS the profile
+mirrored, "so the front-view IoU against the source image is high almost by construction, and is close to
+worthless as evidence". Those two statements have stood unreconciled for a hundred and thirty rounds.
+
+The missing piece was never a better rasteriser. It was a reference from somewhere else, and
+world/songHeightfield.mjs (v4280) has been sitting on one: an STFT column is magnitude against frequency, which
+is a radius as a function of height, which is a lathe profile. mesh/songLathe.mjs revolves it.
+
+A spectrum is worth lathing not because it is prettier than a photograph but because IT HAS AN ANSWER KEY.
+Two references, neither made by the geometry pipeline:
+
+  * THE CLOSED FORM. A rectangular-windowed sum of bin-centred sines has |X[k]| = A*N/2 at each tone's bin and
+    zero everywhere else. Arithmetic. No transform runs to produce it.
+  * A NAIVE O(N^2) DFT, sharing no line with physics/fft.js's radix-2 -- no twiddle table, no bit reversal, no
+    butterfly. It needs no closed form, so it reaches sweeps and chords that have none.
+
+Measured on a three-tone chord at N = 256: max |fft - analytic| = 3.176e-13, max |fft - naiveDFT| = 4.943e-13,
+and the two lathed silhouettes agree at IoU 1.000000 -- the same pixels, not merely close. render/silhouette.mjs's
+own hard-gate combiner ACCEPTS at a limit of exactly 1, which is the first threshold this tree has earned rather
+than refused.
+
+THE CONTROL IS IN THE GATE BECAUSE IT LOOKS MOST LIKE PROOF AND CARRIES THE LEAST. A solid of revolution has the
+same silhouette from every azimuth -- true of any lathe whatsoever. Reverse the spectrum so every tone is at the
+wrong frequency and rotational invariance still reads 1.000000, while the IoU against the closed form collapses
+to 0.419142.
+
+AND WRITING THAT CONTROL FOUND A DEFECT IN v4255. A companion check claimed mesh/lathe.mjs's asymmetry() would be
+blind for the same reason, and it CAME BACK RED at 0.590698 on a solid that is symmetric by construction.
+silhouetteMask rasterises at pixel CENTRES; asymmetry mirrored pixel INDICES. Two functions in one file, one
+pixel apart, never crossed because v4255's fixtures are index-space predicates that happen to be index-symmetric.
+About centres the same mask reads 0.000000. Fixed with an explicit convention rather than a silent switch, since
+the index convention is genuinely right for profileFromMask's axis. That number is the one lathe.mjs's own header
+calls THE ONLY ONE THAT TESTS THE ASSUMPTION.
+
+THE CROSSING PUTS A NUMBER ON A SENTENCE songHeightfield COULD ONLY WRITE IN WORDS. Its header says a tone moved
+half a bin is smeared across the spectrum by the rectangular window; a smear has no size until something measures
+it. Lathed, the IoU against the closed form runs 1.000000, 0.882668, 0.733083, 0.598592 at offsets 0, 0.1, 0.25
+and 0.5 -- monotone, so it is the window and not an accident. Forty percent of the silhouette is the window's fault.
+
+Two more closed forms, because a number nobody can predict is not evidence:
+
+  * VOLUME against a frustum stack whose constant is (n/2)sin(2pi/n) AND NOT pi. At 64 facets the polygon form
+    agrees to 1.88e-8 -- Float32Array storage noise, which is what lathe() returns positions in -- while pi is out
+    by 1.61e-3. A tolerance 85000x looser, wide enough to swallow a real fault.
+  * THE READBACK, which is lossy and whose loss has a closed form. Rasterising the solid and reading its profile
+    back recovers the HALF-CELL INTERPOLANT rather than the profile, because a pixel row samples the frustum at
+    its own midpoint: 50.794% error against the profile against 0.794% against the interpolant. A 64-fold gap
+    between unexplained loss and understood loss, and what the geometry loses hardest is the isolated pure tone --
+    exactly the signal the closed forms are about.
+
+Every bin gets a ring and the quiet ones get a floor radius, because carrying lathe.mjs's habit of dropping empty
+rows across would RENUMBER THE FREQUENCY AXIS: 3 of 128 bins clear 1e-6 on the chord, so bin 70 would come out at
+row 2 and the object would stop encoding frequency while still looking like a plausible vase.
+
+Four sabotages, 2/10/3/2 red by name, mesh/songLathe.mjs md5-identical after. A is the instructive one:
+self-normalising the column by its own peak leaves section 4 reading 1.000000, because scaling both paths by their
+own maxima cancels exactly. A reference independent of the TRANSFORM is not independent of a global SCALE, and only
+the scalloping curve and the sweep readback catch it.
+
+UNCHECKED: a real song, which has no answer key at all -- section 4 would have nothing to say about a recording and
+only the naive DFT would remain, grading the FFT and not the music. Also unwired: no page consumes
+mesh/songLathe.mjs, so the sculptor's only consumer is still a judge. What changed is that the judge is no longer
+marking its own homework. And the loudness axis is untouched -- radius is linear in magnitude rather than in dB, so
+a quiet harmonic beside a loud fundamental is a stem beside a bowl, which is honest arithmetic and probably the
+wrong picture.
+
+The tree stands at 1423 gates.
 ## v4382 -- the physics world can finally be asked what a ray hits
 
 *** THE PHYSICS WORLD CAN FINALLY BE ASKED WHAT A RAY HITS, AND A SECOND IMPLEMENTATION SAYS IT IS RIGHT. *** physics/box3d/box3d_shim.c has carried bodies, filters, three joint types, impulses, transforms, contacts and a deterministic record/replay with divergence detection for hundreds of rounds, and never a cast -- while the vendored box3d has had b3World_CastRayClosest the whole time. swk_world_cast_ray adds it: origin plus translation, closest hit, returning a BODY INDEX like every other entry point rather than the b3ShapeId the library hands back, resolved through the same B3_ID_EQUALS scan the contact reader uses, with -1 for a miss because 0 is a real body. *** AND THE ROUND'S OWN PREMISE WAS WRONG, WHICH COUNTING FIXED. *** It was filed as "several modules roll their own ray intersection"; a loose grep found five files and three were gates or comment matches. Counted properly, comments stripped, there is exactly ONE ray implementation in this tree -- mesh/meshBVH.mjs -- with three consumers, and multiplayer/wadLevelHost.js's castRay() DELEGATES to it. That is a better finding than the one it replaced and it sharpens what the round is worth: the tree had one ray, and box3d's cast is the SECOND it has ever had, which is exactly what makes each able to check the other. Eleven rays on all six axes plus an oblique one, four boxes of deliberately unequal shape, the same solids as hulls in box3d and as twelve triangles each in the BVH: agreement on the body, the distance and the face EVERY TIME, worst distance gap 2.400e-7 and worst normal gap exactly 0 -- box3d in f32 over hulls, the BVH in f64 over triangles, neither written to agree with the other, and one shared miss so that "agrees" is not agreement about nothing. *** THE WINDING TABLE HAD A FACE BACKWARDS AND ONLY ONE RAY IN NINE COULD SEE IT. *** boxTriangles' +y face was wound inward. Seven of the first probe rays travelled along x or z and every one agreed with box3d on body, distance AND normal; the eighth pointed down, hit the slab's top, and the winding gave (0,-1,0) against box3d's (0,+1,0) -- a gap of 2.0 on a unit vector, not a rounding question. The hit point and the distance were right in that case too, which is why nothing else noticed. So the gate no longer takes a ray set on trust: it checks that all twelve triangles of a box face away from its centre, on a box with three unequal half-extents so a cube's symmetry cannot hide a swap. A ray set is a sample; that is the property. *** AND THE SEGMENT CONVENTION FAILS SILENTLY, WHICH IS MEASURED ON THE DEVICE RATHER THAN WARNED ABOUT. *** box3d covers origin -> origin + TRANSLATION and reports a fraction OF THAT TRANSLATION; mesh/meshBVH.mjs covers origin -> origin + dir * maxT and reports a distance. A caller handing box3d a unit direction gets a cast one unit long. Run: the same ray hits body 0 at fraction 0.45 with a translation of 20 and returns -1 with a translation of 1 -- no error, no complaint, only an absence. translationFor() and distanceOf() write the conversion once, and translationFor deliberately does NOT normalise, because a direction of length 2 with a range of 3 means three lots of that vector. The row layout is the shim's: SWK_RAY_STRIDE is published through swk_ray_stride() as swk_contact_stride() set the precedent, rayCast.mjs names the fields, and the gate compares the two rather than letting a packed layout be declared twice. Four sabotages, 2/2/2/1 red by name, the two shim ones REBUILT natively before running so what went red is compiled physics. Sabotage C is the instructive one: a hard-wired body index still agreed on 4 of 11 rays, because a third of them genuinely hit body 0. UNCHECKED: the WASM packaging -- build-box3d-native.sh needs only cc and cmake so the physics is built and measured here, but getting this into vendor/box3d/box3d.wasm needs emsdk and stays rig work, exactly as #125's note said of the filter. Also unchecked and now named: shape casts, sensors, and joint motors, which box3d has and this shim still does not. The tree stands at 1422 gates.

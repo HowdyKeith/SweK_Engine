@@ -383,6 +383,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "four sabotages (2/2/2/1 by name) and restored md5-identical; the first of them was the " +
                  "round's own winding bug put back, which only one of eleven rays could see",
     }),
+    since17: Object.freeze({
+        at: "v4383", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/songLathe-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, nine sections. TWO of them were written as claims and came " +
+                 "back RED before they came back green: mesh/lathe.mjs's asymmetry() reporting 0.590698 on a " +
+                 "solid symmetric by construction (a real defect, fixed there), and an end-to-end IoU of " +
+                 "0.433447 that was a wrong frequency in this gate's own fixture. Driven RED by four " +
+                 "sabotages (2/10/3/2 by name) and restored md5-identical",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
