@@ -471,6 +471,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "it was written to fix. Driven RED by four sabotages (4/1/2/1 by name), three files " +
                  "md5-identical after",
     }),
+    since24: Object.freeze({
+        at: "v4394", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/mutate/shadowedDefaults-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 6s, seven sections. It censuses the pattern v4392 proved " +
+                 "for one pair -- a default written into an object literal and defaulted AGAIN by the " +
+                 "imported callee -- and finds 18 edges tree-wide, against 25,657 if you pair by option name " +
+                 "with no import edge. TWO of the round's own conclusions were refuted, neither by reading: " +
+                 "executing the third row showed a `||` FORWARDER never emits a zero, so the caller's zero " +
+                 "dies at the NEAR end and there are two questions here answered by two operators in two " +
+                 "files; and the tree's own mechanicalSweep record shows the ERASED zero mutant CAUGHT on the " +
+                 "exact row the draft called uncatchable, because v4392 wrote a SOURCE check where no " +
+                 "behavioural one could work. The fix generalises that one hand-written pair to a frozen list " +
+                 "of all five ERASED edges; four of the five had nothing before, and no gate in the tree " +
+                 "named voxelizePage at all. Driven RED by four sabotages (1/3/2/1 by name), five subject " +
+                 "files md5-identical after",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

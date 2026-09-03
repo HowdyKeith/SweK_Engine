@@ -14,6 +14,67 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4394 -- shadowed defaults: a default written twice along one call edge, and the second one decides
+
+v4392 found by accident that physics/box3dLockstep.js writes `shipHalf: opts.shipHalf || 30` and hands it to
+physics/esBox3d.js, which writes `const half = opts.shipHalf || 30`. Set the outer one to 0 and it becomes
+falsy, the inner supplies 30, and the world sees no change: the mutation is not missed by a gate, it is erased
+before it reaches one. That round said so in its own footer and added that the finding "generalises further
+than it is checked ... proved here for exactly one pair rather than censusing the tree for others."
+
+This is the census. tools/mutate/shadowedDefaults.mjs finds every default written into an object literal that
+is passed to a function imported from another module which defaults the same key again. Grouping by option NAME
+alone gives 25,657 candidate pairs and nearly all are coincidence -- x, width, steps and timeoutMs are
+defaulted in dozens of modules that never call one another. Requiring the callee to be an IMPORTED BINDING
+takes it to 18, and 18 rows can be read by hand.
+
+The first draft of the scanner censused ZERO, including the pair v4392 had already proved. It used
+sourceScan.codeOnly() throughout, which blanks string bodies, and an import specifier IS a string: every edge
+in the tree became `from ""`. noComments() for the graph, codeOnly() for the idiom. Same lesson as v4386,
+reached from the other side.
+
+*** THE ROUND WAS WRONG TWICE, AND NEITHER ERROR WAS CAUGHT BY READING. ***
+
+The draft said a caller passing an explicit 0 gets the CALLEE's number. Executing it said 32, not 256: a `||`
+FORWARDER never emits a zero, so it swallows the caller's zero at the near end and the callee is never
+consulted. Two questions, two operators, two files. Q1 -- what a zero MUTATION of the outer literal does, with
+the option absent -- is decided by the CALLEE: ERASED when it repeats the same number (byte-identical world),
+REDIRECTED when it uses a different one (the world moves, but the mutation that ran is V to W, not V to 0, so
+the sweep's label is wrong), HONOURED under `??`. Q2 -- where a caller's runtime zero dies -- is decided by the
+FORWARDER, and the answer is the forwarder at 16 of 18. 18 edges: 6 ERASED, 7 REDIRECTED, 2 HONOURED, 2
+AMBIGUOUS, 1 UNRESOLVED.
+
+Then the draft wrote that an ERASED zero mutant "cannot be caught by any gate, present or future" --
+and tools/mutate/mechanicalSweep.mjs, a record already in this tree, shows box3dLockstep.js:21's zero mutant
+CAUGHT, on the exact row that sentence was about. No BEHAVIOURAL gate can catch it, which stands. v4392 wrote a
+SOURCE check that greps both files and asserts the literals agree, and that catches it without the world moving
+at all. So the useful reading of an ERASED row is not "the sweep must stop counting it" but "this edge needs an
+agreement check", and the census says which edges those are.
+
+That is the fix shipped: v4392's one hand-written pair generalised to a frozen list of all five ERASED edges,
+asserted still ERASED and still agreeing on every run. Four of the five had nothing before -- 1,430 gates in
+the tree and not one names voxelizePage, so ui/physicsMontage.js's two `cell` sites were undefended by
+anything at all.
+
+Blind spots counted rather than waved at: 212 consuming defaults resolve to a named ALL_CAPS constant and are
+invisible to a literal scanner; 2 rows are AMBIGUOUS because the callee module defaults one key more than once
+and a module-level scan cannot say which function was called; 1 row is UNRESOLVED because `?? 6 * 60 * 1000` is
+not the number 6. All three UNDERCOUNT, which is the safe direction for a claim that a site cannot be falsified.
+
+Four sabotages, 1/3/2/1 RED by name, five subject files md5-identical. The one that matters is setting
+physicsMontage's `|| 6` to `|| 0` and watching the tree go red on a mutation it previously could not see.
+Sabotage C changes one character -- `?? 3` to `|| 3` in brain/fleet/fleetTracker.js -- and CREATES an erasure
+where there was none; the check that catches it is the one asserting the frozen list still covers every ERASED
+row, which is a different guarantee from any of the five specific ones.
+
+UNCHECKED: which FUNCTION holds the consuming default -- the scan is module-level, so a module defaulting a key
+once is paired confidently and one defaulting it twice is not paired at all, with no middle setting. The seven
+REDIRECTED rows are reported and not fixed, and so are the sixteen `||` forwarders whose callers cannot pass a
+zero: whether each wants `??` is sixteen separate judgements about what zero MEANS for that option, and several
+almost certainly want to keep rejecting it. And the census sees only defaults reached through a NAMED IMPORT --
+a method on an object, a callback, or a dynamic import is outside it entirely.
+
+The tree stands at 1430 gates.
 ## v4393 -- the tree said it could not make a claim it had the instrument for
 
 *** v4391 SAID THIS TREE COULD NOT MAKE A CLAIM IT HAD THE INSTRUMENT FOR, AND WRITING A LIMIT DOWN IS HOW AN UNATTEMPTED THING BECOMES A BELIEVED ONE. *** Its closing line was "whether a GPU's float32 rounds the same way Math.fround does on every driver, which is a claim about hardware this tree cannot make from node". tools/ship/webgpuHarness.mjs has had runWgslCompute() for hundreds of rounds: a real WebGPU device, a compute shader, a storage buffer read back. The claim was not unmakeable, it was unattempted. So the four encodings of the last two rounds -- world-absolute, camera-relative, the shipyard's claim-local vertex, and a double-single high/low pair -- are computed IN WGSL ON A DEVICE at four distances, read back, and compared against the float64 truth and against BOTH of the two arithmetics a driver is allowed to have. *** THE DEVICE REPRODUCES v4391's TABLE TO EVERY DIGIT, AND THE PREDICTION WRITTEN FOR THIS ROUND WAS THAT IT WOULD NOT. *** I expected the device to BEAT the node model on the two storage fixes, because WGSL's `t + m.x*v.x + ...` is a multiply-add a driver may CONTRACT into one instruction with a single rounding where Math.fround(a + Math.fround(m*v)) rounds twice, and I guessed 1.3x to 2x. It does not contract: A, B, C and D come back bit-identical to the two-rounding model at 1e3, 1e5, 1e6 and 8.4e6. The fused model is computed beside it precisely so that agreement means something -- contraction would move the shipyard's figure from 6.42e-6 to 2.87e-6, a factor of 2.24 -- so the check reports WHICH of two behaviours the driver has rather than asserting a tautology, and a device that fuses would pass it while naming the other model, which is what a gate that has to run on somebody else's rig needs. THE ADAPTER IS SwiftShader, google/swiftshader, A SOFTWARE IMPLEMENTATION, and the round says so rather than letting a reader take "GPU" for silicon: what is established is that a real WebGPU implementation agrees, not that every driver does. *** AND THE SABOTAGE THAT SHOULD HAVE PROVEN THE CHECK'S DISCRIMINATING POWER COST 0 RED, WHICH IS THE ROUND'S SECOND FINDING. *** Rewriting the shader's multiply-adds with WGSL's own fma() -- the operation whose entire purpose is a single rounding -- produced a BIT-IDENTICAL readback. SwiftShader's fma() does not fuse either; it multiplies and then adds. So there is no way on this box to make the device produce the contracted arithmetic, and the claim "this check can tell the two apart" is demonstrated only from the OTHER side, by moving the node reference until neither model matches (2 red, and the failure text now names all three cases rather than asserting a cause it has not established). A GATE WHOSE DISCRIMINATING POWER CAN ONLY BE SHOWN BY MOVING THE REFERENCE IS WEAKER THAN ONE THAT CAN BE SHOWN BY MOVING THE SUBJECT, and that limit is written into the gate rather than left for somebody with a fusing GPU to find. THE ORDERING CHECK'S FIRST DRAFT ALSO WENT RED ON A CORRECT DEVICE: it asked for camera-relative to be a hundred times worse than the shipyard at every distance, and at a thousand it is 4.3 times worse, because at short range changing the storage barely helps. THE ASSERTION WAS WRONG, NOT THE MEASUREMENT -- the claim worth holding is that the gap OPENS WITH DISTANCE, 4.3x at a thousand and 8.2e4 at eight million, and the residual of camera-relative tracks the float32 spacing while the other two do not. Two further sabotages bite: the shader's shipyard path fed the world vertex instead of the claim-local one (3 red, the ratio collapsing from 4.3 to 3.1e-8 as C becomes the worst of the four rather than the best), and the double-single low word dropped (3 red, D stops being flat in distance). UNCHECKED AND SAID PLAINLY: silicon, which this container does not have and which is exactly where contraction is most likely, so the fused branch of the check has never been exercised by a device; whether the same holds through a PROJECTION matrix, still the item v4391 named and this round did not take; and whether a WebGL2 GLSL path rounds as the WGSL one does, which is a second backend this tree has and this section did not ask. *** AND THE QUICK SWEEP CAUGHT A NEW RED THIS ROUND WAS CAUSING, WHICH IS THE ONE THING IT IS FOR. *** backendParity-selfcheck went red on wgslBearing 58 against a recorded 57: section 8's compute shader makes tools/ship/shipyard-selfcheck.mjs a WGSL-BEARING FILE, and it is a GATE rather than a shipping module. The baseline is raised by one with the reason named and the file NOT exempted -- a rule that gates do not count would hide every probe this tree has written, which is most of the WGSL it owns. *** AND THIS ROUND WAS NUMBERED v4392 UNTIL IT TRIED TO LAND, THE FOURTH SUPERSEDE OF THE SESSION. *** claude/orrery-seeded-by-git-log reached main first with its own v4392, so this one moves forward rather than reusing the number; its round is merged here and its gate takes the tree to 1429. The tree stands at 1429 gates.
