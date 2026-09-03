@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "The symmetric error to assuming absence is assuming presence, and two of three integrators came back clean",
+    since: "v4439",
+    state: "open",
+    pred: "v4438 named three integrators it had not audited and predicted the grid defect might reach them. The prediction under test is the harder one behind it: that the mechanism is specifically A NARROW LOBE FALLING BETWEEN GRID LINES, and therefore that a grid on a BROAD lobe would be fine on the very same N -- so finding a defect nearby is not evidence for one in a similar-looking file.",
+    why: "This session has assumed absence and been wrong three times in three rounds. The symmetric failure is to assume presence because a defect was found next door, and it is the one a round auditing its own neighbours is most likely to make.",
+    measured: "TWO OF THREE CLEAN, AND THE MECHANISM PREDICTED WHICH. roughDiffuse builds its table on the SAME N=96, M=48 grid that failed for GGX and is clean to 0.036% over 16 cells -- Oren-Nayar has no narrow lobe. ndfIntegral at N=4000 is clean to 3.21e-5. furnaceIntegral at its OWN N=500 default is still 50% wrong at alpha 0.02 / cosO 0.0208 and 6.9% at alpha 0.05: v4438 repaired one CALLER, not the integrator. And nothing in the tree breaks only because no caller goes below cosO 0.2, which is luck rather than a design.",
+    kill: "physics/render/albedoEstimator-selfcheck.mjs sections 7-9. The caller set is FROZEN so a new caller forces review; the sampler noise is measured ON THIS INTEGRAND (8 seeds, relative sd 8.4e-3) rather than carried over from v4437. SABOTAGE: put the routing back inside microfacet.directionalAlbedo and 11 rows go red HERE AND renderBsdf-selfcheck goes red too -- that was this round's FIRST DESIGN, rejected by a gate from v3490 whose value is that its two estimators are independent; the guard would have made the quadrature side into the sampler and a passing version would have been WORTHLESS. Divide by surviving draws, 5 red. Key the caller scan on the call instead of the import, 1 red -- MEASURED 11/5/1 by name. HONEST SCOPE: nothing outside physics/render/ was audited. The frozen list is a tripwire, not a proof -- it cannot see a caller computing its angles at runtime. The guard is still OPT-IN, so a caller who marches the grid at grazing still gets a silently wrong number, and renderBsdf just demonstrated that making it opt-out is not free.",
+    page: "instruments.html",
+  },
+  {
     name: "A marched grid was the wrong instrument for a narrow lobe, and the tree had the right one all along",
     since: "v4438",
     state: "open",

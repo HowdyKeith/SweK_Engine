@@ -113,6 +113,54 @@ export function ndfIntegral(alpha, { N = 4000, plant = {} } = {}) {
  * The integrand is symmetric about the plane containing wo and the normal, so phi runs over [0, pi] and the
  * result is doubled -- an exact halving of the cost, not an approximation.
  */
+// ---- *** THE GRID'S DOMAIN OF VALIDITY, AND IT WAS ACCIDENTAL SAFETY UNTIL v4439. *** -------------------
+//
+// v4437 found this integrator's default grid wrong by 3x for a narrow lobe at a grazing view; v4438 found the
+// baked energy table a quarter wrong at an alpha its own gates build at, and repaired THAT CALLER. v4439
+// audited the rest and the result is worth stating exactly, because two of three came back clean:
+//
+//   roughDiffuse's table (N=96)      CLEAN -- worst 0.036%. Oren-Nayar has no narrow lobe; the grid is the
+//                                    right instrument there, and finding a defect nearby is not evidence for
+//                                    one here.
+//   ndfIntegral (N=4000)             CLEAN -- 3.2e-5 at alpha 0.02, 5.1e-4 at an extreme 0.005.
+//   furnaceIntegral (N=500, M=500)   STILL WRONG: 50% at alpha 0.02 / cosO 0.0208, 6.9% at alpha 0.05.
+//
+// *** AND NOTHING WAS BREAKING ONLY BECAUSE NO CALLER GOES BELOW cosO 0.2. *** Every gate's shallowest angle
+// is 0.2, where N=500 is fine. That is luck, not a design, and the next caller to ask for a grazing angle
+// would have got a silently wrong number. So the guard moves INTO the integrator: it routes to the sampler in
+// the domain where marching a grid cannot work, and every caller gets it rather than the one that was patched.
+//
+// The sampler needs no import -- sampleHalfVector and bounceWeight are in this file, which is exactly why
+// they belong in one file. A plant KEEPS THE GRID: a plant is a deliberate corruption of the grid, and routing
+// one through the sampler would silently disarm every gate that plants one (v4438 learned that from a
+// sabotage that read zero red).
+export const GRID_NARROW_ALPHA = 0.3;
+export const GRID_OBLIQUE_COS = 0.35;
+export const gridUnsafeFor = (alpha, cosO) => alpha < GRID_NARROW_ALPHA && cosO < GRID_OBLIQUE_COS;
+
+/** The albedo by drawing from the lobe. Deterministic seed, and escaped draws counted rather than dropped. */
+export function sampledFurnace(alpha, cosO, { n = 60000, seed = 1 } = {}) {
+    let a = seed | 0;
+    const rand = () => {
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const sinO = Math.sqrt(Math.max(0, 1 - cosO * cosO));
+    const wo = [sinO, cosO, 0];
+    let sum = 0, escaped = 0;
+    for (let k = 0; k < n; k++) {
+        const h = sampleHalfVector(rand(), rand(), alpha);
+        const dot = wo[0] * h[0] + wo[1] * h[1] + wo[2] * h[2];
+        if (dot <= 0) { escaped++; continue; }
+        const cosI = 2 * dot * h[1] - wo[1];
+        if (cosI <= 0) { escaped++; continue; }
+        sum += bounceWeight(cosO, cosI, h[1], dot, alpha);
+    }
+    return { value: sum / n, n, escaped };
+}
+
 export function furnaceIntegral(alpha, cosO, { strong = false, N = 500, M = 500, plant = {}, noJacobian = false } = {}) {
     const so = Math.sqrt(Math.max(0, 1 - cosO * cosO)), wo = [so, 0, cosO];
     const thMax = strong ? Math.PI / 2 : Math.PI;
@@ -138,6 +186,17 @@ export function furnaceIntegral(alpha, cosO, { strong = false, N = 500, M = 500,
 }
 
 /** Directional albedo: how much of the arriving light a white, non-absorbing GGX surface actually sends back. */
+// *** THE GUARD IS DELIBERATELY *NOT* HERE, AND A GATE THAT ALREADY EXISTED IS THE REASON. ***
+// v4439 first put the routing INSIDE this function so every caller would get the right number without asking.
+// It went red on physics/render/renderBsdf-selfcheck.mjs, whose headline row reads: "PATH SAMPLING AND
+// MIDPOINT QUADRATURE AGREE ON THE DIRECTIONAL ALBEDO TO BETTER THAN 0.3% -- THE TWO ROUTES SHARE ONLY THE
+// DEFINITIONS OF D AND G2." *** THAT GATE'S ENTIRE VALUE IS THAT THE TWO ESTIMATORS ARE INDEPENDENT, AND THE
+// GUARD WOULD HAVE MADE THE QUADRATURE SIDE INTO THE SAMPLER -- comparing the sampler to itself. *** A version
+// that PASSED would have been worthless, which is the defect this session keeps finding, nearly built into
+// the fix for it. So directionalAlbedo stays exactly what it says it is: a marched grid, deterministic, and
+// independent of the sampler. The routing lives in physics/render/albedoEstimator.mjs where a caller CHOOSES
+// it, and physics/render/albedoEstimator-selfcheck.mjs asserts that no caller in this tree marches the grid
+// inside the domain where it cannot work -- which makes the safety explicit instead of accidental.
 export const directionalAlbedo = (alpha, cosO, o = {}) => furnaceIntegral(alpha, cosO, { ...o, strong: true });
 
 /* ---------------------------------------------------------------------------------------------------------

@@ -17,6 +17,16 @@
 //     v4420's ratchet, and it would have left every planting gate in the tree passing for free. Repaired by
 //     asserting the MECHANISM: a planted table must BE the grid with the plant applied, row for row.
 //
+//  --- v4439 added three more, on the mechanisms this round built ---
+//  E. Put the routing back INSIDE microfacet.directionalAlbedo   -> 11 RED here, AND renderBsdf goes red too
+//     *** THAT IS THE DESIGN THIS ROUND TRIED FIRST AND AN EXISTING GATE REJECTED. ***
+//     physics/render/renderBsdf-selfcheck.mjs's headline reads "PATH SAMPLING AND MIDPOINT QUADRATURE AGREE
+//     ... THE TWO ROUTES SHARE ONLY THE DEFINITIONS OF D AND G2". Routing the grid to the sampler makes that
+//     comparison the sampler against itself -- and a version that PASSED would have been worthless. The
+//     sabotage is kept because it is the argument for where the guard lives.
+//  F. sampledFurnace divides by surviving draws instead of drawn  -> 5 RED
+//  G. Key the caller scan on the CALL again instead of the IMPORT -> 1 RED
+//
 // ---- *** WHAT THIS DOES NOT CLAIM *** ---------------------------------------------------------------------
 //
 // That the grid is bad. It is DETERMINISTIC and the sampler is not, and section 4 shows that mattering: the
@@ -28,9 +38,14 @@
 // nothing else.
 
 import {
-    rng, sampledAlbedo, gridError, gridIsUnsafe, trustworthy, NARROW_ALPHA, OBLIQUE_COS, RISK_AT_V4438,
+    sampledAlbedo, gridError, gridIsUnsafe, trustworthy, NARROW_ALPHA, OBLIQUE_COS, RISK_AT_V4438,
 } from "./albedoEstimator.mjs";
-import { directionalAlbedo } from "./microfacet.mjs";
+import { directionalAlbedo, ndfIntegral } from "./microfacet.mjs";
+import { directionalAlbedo as rdAlbedo } from "./roughDiffuse.mjs";
+import { sourceFiles, ENG } from "../../tools/ship/absenceScope.mjs";
+import { codeOnly } from "../../tools/ship/sourceScan.mjs";
+import fs from "node:fs";
+import path from "node:path";
 import { buildTable } from "./energyCompensation.mjs";
 
 let fails = 0;
@@ -135,7 +150,12 @@ ok("sampledAlbedo reports escaped draws rather than hiding them", typeof s.escap
 ok("...and divides by the draws MADE, not the draws that survived",
    Math.abs(s.value - trustworthy(0.05, mu0, { n: 20000, seed: 8 }).value) < 1e-12,
    "dividing by survivors turns a sampler that rejects most draws into one that looks unbiased -- v4437's own first probe");
-ok("rng is deterministic", (() => { const a = rng(2), b = rng(2); for (let i = 0; i < 40; i++) if (a() !== b()) return false; return true; })());
+// Determinism is asserted on the ESTIMATOR rather than on the generator inside it -- what a caller relies on
+// is that the same seed gives the same albedo, not that some private function repeats.
+ok("the same seed gives the same albedo, bit for bit",
+   sampledAlbedo(0.05, mu0, { n: 5000, seed: 12 }).value === sampledAlbedo(0.05, mu0, { n: 5000, seed: 12 }).value);
+ok("...and a different seed does not, so the seed is actually reaching the draws",
+   sampledAlbedo(0.05, mu0, { n: 5000, seed: 12 }).value !== sampledAlbedo(0.05, mu0, { n: 5000, seed: 13 }).value);
 
 // ---- 6. THE RECORD --------------------------------------------------------------------------------------
 console.log("\n6. the record is re-derived, not remembered");
@@ -147,6 +167,84 @@ ok("...and the worst case's grid value",
    Math.abs(directionalAlbedo(0.02, mu0, { N: 220, M: 220 }) - RISK_AT_V4438.worst.grid220) < 1e-4);
 ok("the sampled reference in the record agrees with a fresh estimate",
    Math.abs(sampledAlbedo(0.02, mu0, { n: 400000, seed: 3 }).value - RISK_AT_V4438.worst.sampled) / RISK_AT_V4438.worst.sampled < 0.01);
+
+// ---- 7. THE REST OF THE AUDIT, AND TWO OF THREE CAME BACK CLEAN -----------------------------------------
+console.log("\n7. the audit v4438 deferred -- and a negative result is a result");
+
+// *** FINDING A DEFECT NEARBY IS NOT EVIDENCE FOR ONE HERE. *** roughDiffuse builds a table on the SAME
+// N=96, M=48 grid v4437 convicted. Oren-Nayar has no narrow lobe, so the mechanism does not reach it -- and
+// that is MEASURED rather than reasoned, because the symmetric error to assuming absence is assuming presence.
+let rdWorst = 0;
+for (const sigma of [0, 0.2, 0.5, 1.0]) {
+    for (const cosO of [mu0, 0.1, 0.5, 0.95]) {
+        const coarse = rdAlbedo(cosO, sigma, { N: 96, M: 48 });
+        const fine = rdAlbedo(cosO, sigma, { N: 1536, M: 768 });
+        rdWorst = Math.max(rdWorst, Math.abs(coarse - fine) / fine);
+    }
+}
+say(`roughDiffuse at its own N=96 grid: worst error ${(rdWorst * 100).toFixed(3)}% over 16 (sigma, cosO) cells`);
+ok("!! roughDiffuse's table is CLEAN on the very grid that failed for GGX", rdWorst < 0.001,
+   "three orders of magnitude better -- the defect is about NARROW LOBES and Oren-Nayar has none");
+
+let ndfWorst = 0;
+for (const a of [0.02, 0.05, 0.2, 0.6, 1.0]) ndfWorst = Math.max(ndfWorst, Math.abs(ndfIntegral(a) - 1));
+say(`ndfIntegral at its N=4000 default: worst |value - 1| = ${ndfWorst.toExponential(2)}`);
+ok("ndfIntegral is clean at every alpha the tree uses", ndfWorst < 1e-4);
+
+const fiErr = gridError(0.02, mu0, { N: 500, M: 500, n: 200000, seed: 21 });
+ok("!! furnaceIntegral is STILL wrong at its OWN default grid, which v4438 did not touch", fiErr.rel > 0.3,
+   `N=500 reads ${fiErr.grid.toFixed(6)} against ${fiErr.sampled.toFixed(6)} -- ${(fiErr.rel * 100).toFixed(0)}%`);
+
+// ---- 8. THE SAFETY IS ACCIDENTAL, SO IT IS MADE EXPLICIT -------------------------------------------------
+console.log("\n8. nothing breaks only because no caller goes below cosO 0.2");
+
+// *** THE SCAN KEYS ON THE IMPORT, NOT THE CALL, AND THE FIRST VERSION DID NOT. *** Matching
+// `directionalAlbedo(` over physics/ returned TEN files, including roughDiffuse.mjs and principled.mjs --
+// both of which DEFINE A FUNCTION OF THAT NAME and call their own. The detector matched the shape its author
+// pictured, inside the file written to make a safety explicit. What makes a file a caller of THIS grid is
+// that it imports it from microfacet.mjs, which is a mechanism rather than a spelling.
+const CALLERS = Object.freeze([
+    "physics/render/albedoEstimator-selfcheck.mjs", "physics/render/albedoEstimator.mjs",
+    "physics/render/energyCompensation.mjs", "physics/render/microfacet-selfcheck.mjs",
+    "physics/render/renderBsdf-selfcheck.mjs",
+]);
+const importsFromMicrofacet = (src) =>
+    /import\s*\{[^}]*\b(directionalAlbedo|furnaceIntegral)\b[^}]*\}\s*from\s*["'][^"']*microfacet\.mjs["']/.test(src);
+const found = sourceFiles(ENG, { dirs: ["physics"] })
+    .filter((f) => f !== "physics/render/microfacet.mjs")
+    .filter((f) => {
+        const src = fs.readFileSync(path.join(ENG, f), "utf8");
+        return importsFromMicrofacet(src) && /directionalAlbedo\s*\(|furnaceIntegral\s*\(/.test(codeOnly(src));
+    });
+say(`callers of the marched grid under physics/: ${found.length}`);
+ok("!! the caller set is FROZEN, so a new one forces this list to be reviewed",
+   JSON.stringify(found) === JSON.stringify([...CALLERS].sort()),
+   "this cannot know a caller's runtime alpha and cosO -- it can only make a NEW caller visible, which is " +
+   "the difference between accidental safety and checked safety");
+ok("...and the shallowest angle any gate grid uses is 0.2, where N=500 is sound",
+   gridError(0.05, 0.2, { N: 500, M: 500, n: 120000, seed: 22 }).rel < 0.01 &&
+   gridError(0.2, 0.2, { N: 500, M: 500, n: 120000, seed: 22 }).rel < 0.01,
+   "which is WHY nothing is broken, stated rather than left to luck");
+
+// ---- 9. THE SAMPLER'S OWN NOISE, ON THIS INTEGRAND ------------------------------------------------------
+console.log("\n9. the number v4438 refused to carry over from v4437");
+
+// *** v4438 DECLINED TO REUSE v4437's NOISE FIGURE because it was measured on a different estimator and a
+// different integrand. This is the measurement it owed. ***
+const seeds = [];
+for (let sd = 1; sd <= 8; sd++) seeds.push(sampledAlbedo(0.05, mu0, { n: 60000, seed: sd }).value);
+const mean = seeds.reduce((a, b) => a + b, 0) / seeds.length;
+const sd8 = Math.sqrt(seeds.reduce((a, b) => a + (b - mean) ** 2, 0) / (seeds.length - 1));
+say(`8 seeds at n=60k, alpha 0.05, mu ${mu0.toFixed(4)}: mean ${mean.toFixed(6)}, relative sd ${(sd8 / mean).toExponential(2)}`);
+ok("the sampled estimator's noise is well under the bias it replaces", sd8 / mean < 0.01,
+   `${((sd8 / mean) * 100).toFixed(2)}% noise against the grid's 24% bias at this cell`);
+ok("...and it falls with the sample count, which says it is noise and not a second bias", (() => {
+    const wide = [];
+    for (let sd = 1; sd <= 8; sd++) wide.push(sampledAlbedo(0.05, mu0, { n: 240000, seed: sd }).value);
+    const m4 = wide.reduce((a, b) => a + b, 0) / wide.length;
+    const s4 = Math.sqrt(wide.reduce((a, b) => a + (b - m4) ** 2, 0) / (wide.length - 1));
+    return s4 < sd8 * 0.75;
+})(), "quadrupling the samples should roughly halve the spread");
 
 console.log(`\nalbedoEstimator-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

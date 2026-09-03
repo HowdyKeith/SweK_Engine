@@ -42,42 +42,21 @@
 // NARROW AND THE VIEW IS OBLIQUE, the sampler does not, and `trustworthy()` picks between them by a rule
 // rather than by whichever one somebody typed at the call site.
 
-import { sampleHalfVector, bounceWeight, directionalAlbedo } from "./microfacet.mjs";
+import { sampledFurnace, directionalAlbedo } from "./microfacet.mjs";
+
 
 "use strict";
 
-/** Deterministic RNG, so a gate reporting a sampled number reports the same one every run. */
-export function rng(seed = 1) {
-    let a = seed | 0;
-    return () => {
-        a = (a + 0x6D2B79F5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
-
-/**
- * The directional albedo, estimated by drawing from the GGX lobe itself.
- * Reports `escaped` -- draws whose reflected direction went below the horizon -- rather than hiding them,
- * because a sampler that rejects most of its draws is a different animal from one that rejects none, and
- * dividing by the survivors would turn that difference into silence (v4402, and v4437's own first probe).
- */
-export function sampledAlbedo(alpha, cosO, { n = 60000, seed = 1 } = {}) {
-    const r = rng(seed);
-    const sinO = Math.sqrt(Math.max(0, 1 - cosO * cosO));
-    const wo = [sinO, cosO, 0];
-    let sum = 0, escaped = 0;
-    for (let k = 0; k < n; k++) {
-        const h = sampleHalfVector(r(), r(), alpha);
-        const dot = wo[0] * h[0] + wo[1] * h[1] + wo[2] * h[2];
-        if (dot <= 0) { escaped++; continue; }
-        const cosI = 2 * dot * h[1] - wo[1];
-        if (cosI <= 0) { escaped++; continue; }
-        sum += bounceWeight(cosO, cosI, h[1], dot, alpha);
-    }
-    return { value: sum / n, n, escaped };
-}
+// The sampler itself lives in microfacet.mjs beside sampleHalfVector and bounceWeight, because those two are
+// what it is made of and a second copy here would be a second declaration of one estimator. What lives HERE is
+// the RULE for when to reach for it, which is a policy rather than a piece of arithmetic.
+// *** `export { x } from "y"` GIVES NO LOCAL BINDING, AND THIS FILE PROVED IT AGAIN. *** The first version
+// re-exported sampledFurnace with that form; trustworthy() below then threw ReferenceError on every call, and
+// physics/render/renderBsdf-selfcheck.mjs reported ZERO FAIL LINES WHILE EXITING 1 -- a crash, not a failed
+// assertion. The tree has a written rule for exactly that ("a count of failures is not a verdict unless the
+// process finished") and this is its seventh sighting. Import, then export, so the name exists here too.
+export { sampledFurnace };
+export const sampledAlbedo = sampledFurnace;
 
 /** How wrong a given grid is at a given cell, measured against the sampler rather than against a finer grid. */
 export function gridError(alpha, cosO, { N = 220, M = 220, n = 60000, seed = 1 } = {}) {
