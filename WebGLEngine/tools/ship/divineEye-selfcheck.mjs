@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import * as DE from "../../render/divineEye.mjs";
+import { surfaceMesh, volumeOf } from "../../mesh/carve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -82,6 +83,14 @@ console.log("\n1. THE PORT, ON THE CPU: their constants, their arithmetic, and t
         Math.abs(DE.proportionDelta([0, 0, 100, 100], [0, 0, 110, 110]).scaleDelta - 0.21) < 1e-9,
         `so a LINEAR scale trips the 0.08 ceiling at sqrt(1.08) = ${Math.sqrt(1.08).toFixed(4)}, which section 2 measures rather than assumes`);
     const flat = new Float64Array(64 * 64).fill(0.5);
+    // v4372 -- what the surface mesher's interior-face cull actually buys, because SABOTAGING IT COST 0 RED and
+    // that is the honest answer rather than a missing check: a face between two solid voxels is behind a closed
+    // opaque surface, so removing the cull changes no pixel of any picture in this gate. Its value is SIZE.
+    const cube8 = (i, j, k) => i > 1 && i < 6 && j > 1 && j < 6 && k > 1 && k < 6;
+    const culled = surfaceMesh(cube8, 8).faces, all6 = volumeOf(cube8, 8) * 6;
+    ok(`the surface mesher's interior-face cull is a SIZE win and not a correctness one, which a 0-red sabotage said and this counts: ${culled} faces against ${all6} for every face of every voxel, ${(100 * (1 - culled / all6)).toFixed(1)}% dropped`,
+        culled === 96 && all6 === 384 && culled < all6,
+        "a 4x4x4 cube has 64 voxels and 96 exposed faces; emitting all 384 draws the same picture, because the extra 288 are between two solid voxels and behind a closed opaque surface. Measured, not argued: removing the cull cost 0 red, and it is logged as such");
     ok("  and the SSIM is their single-window one over the whole grid: two identical flats read 1, and a constant offset reads below it",
         Math.abs(DE.globalSsim(flat, flat) - 1) < 1e-12 && DE.globalSsim(flat, new Float64Array(64 * 64).fill(0.6)) < 1,
         `identical ${DE.globalSsim(flat, flat).toFixed(6)}, offset ${DE.globalSsim(flat, new Float64Array(64 * 64).fill(0.6)).toFixed(6)}`);
@@ -216,7 +225,115 @@ else {
     }
 }
 
-// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4366.
+console.log("\n3. THE SCULPTOR AND THE JUDGE IN ONE ROOM (v4372): what the hard gates say about a hull whose volume error is KNOWN");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    // v4371 built mesh/carve.mjs and measured its hulls by REPROJECTION -- a hull against the silhouettes it was
+    // carved from, which is 1.000000 by construction and was never at risk. v4366 measured the judge on a model
+    // against a modified model. Neither asked the question img2threejs's pipeline actually asks: RENDER the
+    // reconstruction and the reference from one camera and score the pictures. That needs both rounds and the
+    // v4365 bridge, and it is the only place the volume error and the hard gates can be put side by side.
+    //
+    // WRITTEN DOWN BEFORE THE RUN, so the measurement can contradict it: volume error should NOT predict the
+    // verdict. A visual hull's excess sits wherever no view could see, and whether that is INSIDE the outline or
+    // outside it is what the silhouette gates read. So the tube -- 90% over because sixteen azimuths cannot reach
+    // its bore -- should score near 1 with the gates passing, and the cube over-carved from three azimuths at 0,
+    // 60 and 120 should be caught, at a QUARTER of the tube's volume error.
+    const r3 = await runInEngineOrigin({ engineRoot: ENG, args: { W, N: 32 }, script: `async (a) => {
+        const C = await import("/mesh/carve.mjs"); const G = await import("/render/gpuDriven.mjs");
+        const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const n = a.N, c = n / 2, R = n * 0.3, H = n * 0.35, r0 = n * 0.16;
+        // the fixture solids, as tools/ship/carve-selfcheck.mjs defines them
+        const S = {
+            cube: (i, j, k) => Math.abs(i + 0.5 - c) < R && Math.abs(j + 0.5 - c) < H && Math.abs(k + 0.5 - c) < R,
+            tube: (i, j, k) => { const x = i + 0.5 - c, y = j + 0.5 - c, z = k + 0.5 - c, r2 = x * x + z * z;
+                return Math.abs(y) < H && r2 < R * R && r2 > r0 * r0; },
+        };
+        const views = (solid, yaws, tops = 0) => [
+            ...yaws.map((yaw) => ({ m: C.silhouetteOf(solid, n, { yaw }), yaw })),
+            ...(tops ? [{ m: C.silhouetteOf(solid, n, { yaw: 0, elev: Math.PI / 2 }), yaw: 0, elev: Math.PI / 2 }] : []),
+        ];
+        const cases = [
+            { name: "tube / 16 azimuths", solid: S.tube, v: views(S.tube, C.turntable(16)) },
+            { name: "tube / 2 + a top view", solid: S.tube, v: views(S.tube, [0, Math.PI / 2], 1) },
+            { name: "cube / 2 at 0 and 90", solid: S.cube, v: views(S.cube, [0, Math.PI / 2]) },
+            { name: "cube / 3 at 0, 60, 120", solid: S.cube, v: views(S.cube, C.turntable(3)) },
+        ];
+        const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.W;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+        const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+        const look = F.LOOKS.lit, buffers = G.layoutBuffers(look.layout);
+        const CAMS = { oblique: [2.4, 1.7, 2.8], side: [0, 0.35, 3.4] };
+        const shoot = (mesh, eye) => {
+            const fleet = { name: "v", look: "lit", layout: look.layout,
+                pipeline: { shaders: look.shaders, vs: "vs", fs: "fs", buffers, uniforms: look.uniforms },
+                pickPipeline: { shaders: look.pick, vs: "vs", fs: "fs", buffers, uniforms: [{ name: "viewProj", type: "mat4" }] },
+                lods: [{ name: "near", mesh }, { name: "far", mesh: F.farMesh([1, 1, 1, 1]) }],
+                bind: (pass) => pass.uniform("light", F.LIGHT) };
+            const sc = G.makeGpuDrivenScene(dev, { fleets: [fleet], fleetOf: Uint32Array.from([0]), thresholds: [0.0001], records: Float32Array.from([0, 0, 0, 1]) });
+            const cam = { viewProj: G.multiply(G.perspective(Math.PI / 3, 1, 0.1, 100), G.lookAt(eye, [0, 0, 0])), eye };
+            return sc.frame({ ...cam, read: true, clear: [0.03, 0.03, 0.03, 1] }).pixels;
+        };
+        const out = { cases: [] };
+        try {
+            for (const cse of cases) {
+                const hull = C.carve(cse.v, n);
+                const trueVol = C.volumeOf(cse.solid, n), hullVol = C.volumeOf(hull, n);
+                const solidMesh = C.surfaceMesh(cse.solid, n), hullMesh = C.surfaceMesh(hull, n);
+                const rec = { name: cse.name, trueVol, hullVol, overPct: 100 * (hullVol - trueVol) / trueVol,
+                              contains: C.contains(hull, (() => { const g = new Uint8Array(n * n * n);
+                                  for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (cse.solid(i, j, k)) g[i + n * (j + n * k)] = 1; return g; })()),
+                              faces: { solid: solidMesh.faces, hull: hullMesh.faces }, pics: {} };
+                for (const [cam, eye] of Object.entries(CAMS))
+                    rec.pics[cam] = { ref: Array.from((await shoot(solidMesh, eye)).pixels), ren: Array.from((await shoot(hullMesh, eye)).pixels) };
+                out.cases.push(rec);
+            }
+            out.errs = errs;
+        } catch (e) { out.error = String(e && e.message || e).slice(0, 400); }
+        return out;
+    }` });
+    ok("the harness carved four hulls and rendered each beside its own solid", r3.ok && r3.result && !r3.result.error && r3.result.cases && r3.result.cases.length === 4,
+        r3.ok ? (r3.result && r3.result.error) : (r3.reason || (r3.pageErrors || []).join("; ")));
+    if (r3.ok && r3.result && !r3.result.error) {
+        const rows = r3.result.cases.map((c) => { const o = { name: c.name, overPct: c.overPct, contains: c.contains, faces: c.faces };
+            for (const cam of ["oblique", "side"]) { const ref = Uint8ClampedArray.from(c.pics[cam].ref), ren = Uint8ClampedArray.from(c.pics[cam].ren);
+                o[cam] = { ...DE.exactDifference(ref, ren), ...DE.compare(ref, ren, W, W) }; }
+            return o; });
+        for (const o of rows) console.log(`        ${o.name.padEnd(22)} ${o.overPct >= 0 ? "+" : ""}${o.overPct.toFixed(1).padStart(5)}% volume | oblique ${String(o.oblique.differing).padStart(5)} px IoU ${o.oblique.iou.toFixed(4)} scale ${o.oblique.scaleDelta.toFixed(4)} ${o.oblique.passesHardGates ? "PASSES    " : "hard-gated"} | side ${String(o.side.differing).padStart(5)} px IoU ${o.side.iou.toFixed(4)} scale ${o.side.scaleDelta.toFixed(4)} ${o.side.passesHardGates ? "PASSES" : "hard-gated"}`);
+        ok("every hull CONTAINS its solid, which is the one thing a carve has that a fit does not -- checked here too rather than taken from the other gate",
+            rows.every((o) => o.contains), rows.map((o) => `${o.name}: ${o.contains}`).join("; "));
+        const tube16 = rows[0], tubeTop = rows[1], cube2 = rows[2], cube3 = rows[3];
+        // *** THE PREDICTION WRITTEN ABOVE WAS WRONG, AND WHAT REPLACED IT IS SHARPER. *** It said the tube's 
+        // excess is interior so the gates would pass it. They pass it from ONE camera and refuse it from another:
+        // the filled bore is hidden behind the wall from the side, and from an oblique angle it is sky the true tube
+        // shows through its top rim, so it becomes an outline event. The verdict is a property of the CAMERA.
+        ok(`*** THE SAME HULL, THE SAME ${tube16.overPct.toFixed(1)}% VOLUME ERROR, IS REFUSED FROM ONE CAMERA AND PASSES FROM ANOTHER: oblique IoU ${tube16.oblique.iou.toFixed(4)} scale ${tube16.oblique.scaleDelta.toFixed(4)} (${tube16.oblique.hardFailures.join("; ")}), side IoU ${tube16.side.iou.toFixed(4)} scale ${tube16.side.scaleDelta.toFixed(4)} and both gates pass ***`,
+            !tube16.oblique.passesHardGates && tube16.side.passesHardGates && tube16.side.differing > 200,
+            `and the camera that PASSES it is the one nearest the views it was carved from -- ${tube16.side.differing} pixels differ there and the gates read none of them. THIS ROUND PREDICTED THE OPPOSITE and wrote it down first: that the filled bore was interior and would pass everywhere. From the side it is hidden behind the wall; obliquely it is sky the true tube shows through its rim, and an interior error becomes an outline event by moving the camera`);
+        ok(`  and volume error does not order the verdicts either: the cube at ${cube3.overPct.toFixed(1)}% -- little more than half the tube's -- is refused from BOTH cameras`,
+            !cube3.passesHardGates === false || (!cube3.oblique.passesHardGates && !cube3.side.passesHardGates),
+            `cube ${cube3.oblique.differing} px oblique / ${cube3.side.differing} px side, both refused; tube ${tube16.overPct.toFixed(1)}% over and readable from one camera of two. What the gates read is where the error lands in the OUTLINE, and a visual hull puts its error wherever no view could see -- which is not a fixed place`);
+        ok(`  and the two EXACT hulls score as exact: the tube from two azimuths plus a top view (${tubeTop.overPct.toFixed(1)}%) and the cube from two at 0 and 90 (${cube2.overPct.toFixed(1)}%) differ from their solids by ${tubeTop.oblique.differing} and ${cube2.oblique.differing} pixels`,
+            Math.abs(tubeTop.overPct) < 0.5 && Math.abs(cube2.overPct) < 0.5 && tubeTop.oblique.differing === 0 && cube2.oblique.differing === 0 && tubeTop.oblique.iou === 1 && cube2.oblique.iou === 1,
+            `an exact reconstruction renders to the same picture, to the pixel -- so the ${tube16.oblique.differing} pixels the 16-azimuth tube moves are real and the gates are declining to read them, not failing to be given them`);
+        report("WHAT THIS SETTLES BETWEEN THE TWO ROUNDS THAT DISAGREED IN APPEARANCE. v4371 reported reprojection IoU 1.000000 on hulls " +
+            "spanning 0% to 90% volume error and said the number was never at risk; v4366 measured the same judge catching a 3% LINEAR enlargement. " +
+            "Both hold, and this is why: a scale change moves the outline and is read, while a visual hull's error is interior by construction -- it is " +
+            "exactly the material no silhouette could see. The gates are not weak about volume; they are silhouette statistics being asked a volume " +
+            "question. And the pictures here are RENDERS from a camera no view carved from, not reprojections, so the 1.000000 is not by construction.");
+    }
+}
+
+// SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4372.
+//   AS the surface mesher's interior-face cull removed, so every face of every voxel is emitted -> exit=0, 0 RED, and
+//      that is the CORRECT answer rather than a hole in the gate: a face between two solid voxels sits behind a closed
+//      opaque surface and the depth test never lets it show. The cull is a size optimisation. Section 1 now COUNTS what
+//      it buys (96 faces against 384 on a 4x4x4 cube, 75.0% dropped) instead of a check pretending to guard a picture.
+//      Fourth 0-red sabotage this session; the other three were unreachable checks, and this one is a true statement.
+//   AT the hull framed 0.02 differently from the solid it is compared with -> exit=1, 1 red: the two EXACT hulls stop
+//      rendering to 0 differing pixels. That is v4366's own lesson wired in as a check -- a comparison where one side
+//      is re-framed measures the framing, and it read as the gate WORKING the first time it happened.
+// MEASURED at v4366.
 //   AP the luma grid widened from their 64 to the render's own size -> exit=1, 1 red: the constants check, by name. It is
 //      one red because the round's claims are about the two HARD gates, which are mask statistics and do not read the luma
 //      grid at all -- the soft signals move and change nothing that can fail a build. That is their contract, seen from
@@ -238,7 +355,8 @@ else {
 //       The first reading would have been quoted as the gate WORKING, which is the more dangerous direction to be wrong in.
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the five soft signals and the VLM layer this port leaves out, so no verdict here is their verdict; " +
+console.log("unchecked here: whether a hull's verdict flips at some camera between the two measured -- section 3 shows the same 54.9%-over " +
+    "tube refused obliquely and passed from the side, and where the boundary lies is a sweep this round did not run; the five soft signals and the VLM layer this port leaves out, so no verdict here is their verdict; " +
     "whether these numbers hold against a PHOTOGRAPH rather than a second render, which is the case their gate actually runs and " +
     "cannot be measured in this tree without a reference photo and a licence to keep it; their microscope path " +
     "(grimoire/review/divine_eye_microscope.md), which is what they say answers feature-scale fidelity and which this round does not " +

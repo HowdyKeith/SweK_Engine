@@ -214,6 +214,46 @@ export function turntable(count) {
     return Array.from({ length: count }, (_, i) => (i * Math.PI) / count);
 }
 
+/**
+ * v4372 -- THE SURFACE OF AN OCCUPANCY GRID, so a carved hull can be RENDERED and not only reprojected.
+ *
+ * One quad per exposed voxel face, in the shape render/gpuDriven.mjs packMeshes eats. Voxel space (0..n) maps to
+ * (-1..1) on every axis for BOTH the hull and the solid it was carved from, so the two are framed identically by
+ * construction rather than by a normalisation that could move one and not the other. (v4366 learned that the hard
+ * way: normalising each variant to its own bounds re-framed the model and made a deletion look like a catch.)
+ *
+ * Flat normals, one per face, because a voxel surface has no smooth normal and inventing one would put shading
+ * differences into a comparison that is about geometry.
+ */
+export function surfaceMesh(gridOrFn, n, { color = [0.75, 0.78, 0.82, 1] } = {}) {
+    const at = typeof gridOrFn === "function"
+        ? (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= n || j >= n || k >= n ? 0 : (gridOrFn(i, j, k) ? 1 : 0))
+        : (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= n || j >= n || k >= n ? 0 : gridOrFn[i + n * (j + n * k)]);
+    const P = [], NR = [], IX = [];
+    const FACES = [
+        { d: [1, 0, 0], c: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]] },
+        { d: [-1, 0, 0], c: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]] },
+        { d: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]] },
+        { d: [0, -1, 0], c: [[1, 0, 0], [1, 0, 1], [0, 0, 1], [0, 0, 0]] },
+        { d: [0, 0, 1], c: [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]] },
+        { d: [0, 0, -1], c: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]] },
+    ];
+    const to = (q) => (q / n) * 2 - 1;
+    for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        if (!at(i, j, k)) continue;
+        for (const f of FACES) {
+            if (at(i + f.d[0], j + f.d[1], k + f.d[2])) continue;   // interior face: never seen, never emitted
+            const base = P.length / 3;
+            for (const c of f.c) { P.push(to(i + c[0]), to(j + c[1]), to(k + c[2])); NR.push(f.d[0], f.d[1], f.d[2]); }
+            IX.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+    }
+    const positions = Float32Array.from(P), normals = Float32Array.from(NR), indices = Uint32Array.from(IX);
+    const colors = new Float32Array((positions.length / 3) * 4);
+    for (let v = 0; v * 4 < colors.length; v++) colors.set(color, v * 4);
+    return { positions, normals, colors, indices, color, kind: "hull", triangles: indices.length / 3, faces: indices.length / 6 };
+}
+
 /** Does grid A contain grid B everywhere? The containment fact, checkable rather than assumed. */
 export function contains(a, b) {
     for (let i = 0; i < b.length; i++) if (b[i] && !a[i]) return false;
