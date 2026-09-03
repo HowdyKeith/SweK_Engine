@@ -57,7 +57,7 @@ const say = (m) => console.log("  ----  " + m);
  * ------------------------------------------------------------------------------------------------------ */
 const rows = census();
 {
-    ok("*** four sources measured, and each carries what it CLAIMS beside what it MEASURES ***",
+    ok("*** five sources measured, and each carries what it CLAIMS beside what it MEASURES ***",
        rows.length === MEASURED_AT_V4412.sources && rows.every((r) => typeof r.claims === "string" && r.claims.length > 20),
        `${rows.length} sources: ${rows.map((r) => r.key).join(", ")}. A census that recorded only the numbers ` +
        "would make the DOOM palette look like a failure, when a palette that never claimed to be physics is " +

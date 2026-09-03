@@ -22,6 +22,7 @@ import { makeRng, spawnSeed, ownsNpc, packNpcs, mergeRemoteNpcs, ghostAt,       
     validateDamage, noteAccepted, damageEvent, applyDamageEvent,                                     // v2171 -- the damage wire
     makeDeadBoard, noteDead, deadPack, MAX_NPCS_PER_PACKET } from "./esAuthority.js";   // v2172 -- kill credit
 import { ShipExhaust } from "../render/shipExhaust.mjs";   // v4411 -- the DOOM fire as a thruster plume
+import { shatter, stepDebris, FIREBALL, fireballSize, fadeAt, explosionSample } from "./shipDebris.mjs";   // v4421 -- the hull leaves
 import { intentGhostAt } from "./npcGhost.js";   // v2252 -- curved (flight-model) ghost extrapolation, falls back to ghostAt
 import { recordGrudges, clearGrudges, decayGrudges } from "./evData.js";
 
@@ -226,6 +227,8 @@ function FlightView(canvas, opts = {}) {
     let running = false, raf = null, lastT = 0, landTarget = null;
     let shots = [], fc = new FireControl([]), speedScale = 1;
     let enemies = [], explosions = [], hp = { shield: 100, armor: 100, maxShield: 100, maxArmor: 100, shieldRech: 0 };
+    // v4421 -- the pieces of every hull that has died this session, and a seed so a kill is reproducible.
+    let debris = [], debrisSeed = 1;
 
     // v2266/v2316 -- fly the player + owned NPCs on the box3d substrate so ships COLLIDE, on the deterministic
     // WASM once it's ready and the JS planarFallbackWorld until then. box3d owns position/velocity/collision;
@@ -301,7 +304,7 @@ function FlightView(canvas, opts = {}) {
         net = opts.net || null; callsign = opts.callsign || "Pilot"; shipNameStr = opts.shipName || ""; lastNet = 0;
         shipClassId = (ps && ps.id != null) ? ps.id : null;
         // hostile wing
-        explosions = [];
+        explosions = []; debris = [];
         enemies = [];
         inDmg = []; deadBoard = makeDeadBoard();   // v2171 -- a new system: no corpses to announce, no hits in flight
         // Engine-agnostic spawn hook: the host supplies the ship mix (used by the ES path to drop ambient
@@ -408,11 +411,27 @@ function FlightView(canvas, opts = {}) {
             entryOpts.onCalloutBubbles(cbs);
         }
         // shots (team-colored) + explosions, additive
-        const extra = shots.length + explosions.length;
+        const extra = shots.length + explosions.length + debris.length;
         if (extra) {
             const arr = new Float32Array(extra * 8); let o = 0;
             for (const s of shots) { const en = s.team === "enemy"; const beam = s.kind === "beam"; const g = en ? (beam ? 0.55 : 0.32) : (beam ? 0.98 : 0.55); const b = en ? (beam ? 0.55 : 0.32) : (beam ? 0.98 : 0.55); const sz = beam ? 9 : (s.kind === "homing" ? 7 : 6); arr.set([s.x, s.y, 1.0, g, b, 4, 0, sz], o); o += 8; }
-            for (const e of explosions) { const f = Math.max(0, 1 - e.t / e.life), sz = (e.big ? 16 : 8) + (e.t / e.life) * (e.big ? 70 : 28); arr.set([e.x, e.y, f, 0.6 * f, 0.25 * f, 4, 0, sz], o); o += 8; }
+            // v4421 -- THE COLOUR COMES FROM A NAMED RAMP NOW. explosionSample(f) IS the expression this
+            // line used to compute inline (r = f, g = 0.6f, b = 0.25f), so the picture is unchanged -- but a
+            // colour with a symbol is one render/fireColour.mjs's census can hold, and a colour typed into an
+            // argument list is not. That blindness is why this was the tree's fifth and unseen fire.
+            for (const e of explosions) {
+                const f = fadeAt(e.t, e.life);
+                const sz = e.fireball ? fireballSize(e.t) : (e.big ? 16 : 8) + (e.t / e.life) * (e.big ? 70 : 28);
+                const [r, g, b] = explosionSample(f);
+                arr.set([e.x, e.y, r, g, b, 4, 0, sz], o); o += 8;
+            }
+            // The fragments use the same ramp at a cooler heat, so the wreck reads as the same fire cooling
+            // rather than as a second unrelated effect.
+            for (const p of debris) {
+                const f = fadeAt(p.t, p.life);
+                const [r, g, b] = explosionSample(f * 0.85);
+                arr.set([p.x, p.y, r, g, b, 4, 0, p.size], o); o += 8;
+            }
             gl.useProgram(pProg); gl.uniform1f(pl.u_scale, camScale); gl.uniform2f(pl.u_res, W, H);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
             gl.uniform2f(pl.u_center, st.x, st.y); gl.uniform1f(pl.u_zoom, Math.max(0.8, Math.min(5, camScale * 0.6)));
@@ -663,7 +682,16 @@ function FlightView(canvas, opts = {}) {
                 shots = keep;
             }
         }
-        for (const k of killed) { explosions.push({ x: k.x, y: k.y, t: 0, life: 0.55, big: true }); if (entryOpts.onSound) entryOpts.onSound("explosion"); if (entryOpts.onKill) entryOpts.onKill(k); }
+        for (const k of killed) {
+            explosions.push({ x: k.x, y: k.y, t: 0, life: 0.55, big: true });
+            // v4421 -- A FIREBALL AND A HULL THAT LEAVES. The original flash is kept and a second, larger,
+            // longer-lived sprite goes behind it; the fragments carry the ship's own velocity so the wreck
+            // belongs to the ship that died rather than to the point it died at.
+            explosions.push({ x: k.x, y: k.y, t: 0, life: FIREBALL.life, big: true, fireball: true });
+            debris = debris.concat(shatter(k, { seed: (debrisSeed = (debrisSeed * 1664525 + 1013904223) >>> 0) }));
+            if (entryOpts.onSound) entryOpts.onSound("explosion");
+            if (entryOpts.onKill) entryOpts.onKill(k);
+        }
         // v2167 -- tactics reward. Attribution is deliberately conservative: we only credit a decision
         // we can actually tie to an outcome, and we never invent a sample without its counterfactual.
         //   a hostile died                  -> its OWN last decision was bad          (-1)
@@ -693,6 +721,7 @@ function FlightView(canvas, opts = {}) {
         if (killed.length || enemies.some((e) => e.dead)) enemies = enemies.filter((e) => !e.dead);
         rechargeShield(hp, dt);
         explosions = explosions.filter((x) => (x.t += dt) < x.life);
+        debris = stepDebris(debris, dt);   // v4421
         const near = nearestLandable(spobs, st.x, st.y, LAND_RANGE); landTarget = near ? near.spob : null;
         render();
         if (entryOpts.onHud) entryOpts.onHud({ speed: speedOf(st), maxSpeed: stats.speed, heading: st.heading, physics: EVBOX.mode(),

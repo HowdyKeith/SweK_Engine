@@ -14,6 +14,81 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4421 -- a ship's death was one dot, and its colour was the one fire no census could see
+
+#167. MEASURED FIRST, in ev/flightView.js at HEAD. A kill pushed exactly this:
+
+    explosions.push({ x: k.x, y: k.y, t: 0, life: 0.55, big: true });
+
+and the draw was one additive quad growing 16 -> 86 px over 0.55 s:
+
+    arr.set([e.x, e.y, f, 0.6 * f, 0.25 * f, 4, 0, sz], o);
+
+`grep -n debris ev/flightView.js` returned NOTHING. There was no fragment of any kind in the whole flight
+view, so "the ship blew up" and "a dot got bigger and faded" were the same event.
+
+AND THE COLOUR IS A FIFTH FIRE THAT v4412'S CENSUS IS STRUCTURALLY BLIND TO.
+
+render/fireColour.mjs was built to answer "what colour is fire at heat h?" across every fire in the tree, and
+its SOURCES table is four entries of {file, symbol, sample} -- IT WALKS NAMED RAMP FUNCTIONS. The three numbers
+above are not a ramp and have no symbol: they are expressions inside an argument list, written straight into a
+vertex buffer. A CENSUS THAT ENUMERATES NAMED FUNCTIONS CANNOT SEE A COLOUR TYPED INTO A DRAW CALL. That is
+v4413's substring rule which could not see a path built by path.join, and v4418's furnace which could not see
+the material, at a third site.
+
+MEASURED RATHER THAN ASSERTED, across the twelve files in the tree that blend additively:
+
+    file                       named-ramp refs   inline-colour buffer writes
+    star_gas.html                     4                 0
+    face/avatarStage.js               0                 1
+    ev/flightView.js                  0                 3
+    the other nine                    0                 0
+
+So the population is SMALL and it is named rather than guessed at: flightView is the only file that writes
+more than one, and the only fire in the tree with no ramp to sample was this one.
+
+THE FIX WAS A NAME, NOT A SCANNER FOR INLINE COLOURS. NEW ev/shipDebris.mjs exports explosionSample, which IS
+the expression the draw call already computed -- r = h, g = 0.6h, b = 0.25h -- extracted rather than invented.
+BIT-IDENTICAL at 201 sample points, so the picture did not move, and the census gained a fifth row. Its
+blackbodyCandidate is FALSE and says so: a fixed orange scaled by a fade is an artistic tint, and holding it to
+monotonicity it never claimed would be how a census turns into a scoreboard.
+
+AND THE HULL LEAVES NOW. shatter() breaks a hull into seven deterministic fragments -- evenly spaced headings
+with a jitter so a seed cannot fire the whole hull one way, per-piece spin, drag, and THE SHIP'S OWN VELOCITY
+INHERITED. That last one is not a detail: a ship dying at speed whose debris fell straight down would read as
+the explosion happening to a different, stationary object.
+
+    frame 20: reach px 20.9 12.2 14.8 18.8 14.1  9.3  8.2
+    frame 40: reach px 33.0 19.2 23.5 29.7 22.3 14.7 12.9
+    frame 60: reach px 40.1 23.4 28.5 36.1 27.0 17.8 15.7
+    frame 80: reach px 44.3 25.8 31.5 39.8 29.8 19.7 17.3
+
+Monotone per piece, none travelling inward. A fireball (0.9 s, 26 -> 150 px) goes behind the original 0.55 s
+flash, which is KEPT -- this round adds rather than replacing something that already read correctly.
+
+AND SABOTAGE D COST ZERO RED, WHICH REWROTE A CHECK.
+
+Reverting the draw call to the old inline triple tripped nothing. The check tested `/explosionSample\(f\)/`
+against RAW SOURCE -- and the COMMENT I had written directly above that line contains the string
+"explosionSample(f) IS the expression this line used to compute inline". THE CHECK WAS SATISFIED BY PROSE
+ABOUT THE CODE INSTEAD OF BY THE CODE.
+
+That is exactly the species tools/ship/commentFalsePass-selfcheck.mjs exists to catch, and this tree has
+caught it twice before in other files -- committed here inside a gate written to assert that a rewrite had
+happened. Comments are stripped before any code idiom is asserted now, and the re-aimed sabotage goes red by
+name. A SABOTAGE THAT COSTS ZERO RED IS A FINDING AND NOT A PASS, which is v4413's rule arriving again.
+
+NEW ev/shipDebris-selfcheck.mjs, fifteen checks in four sections.
+
+WHAT THIS DOES NOT CLAIM. That the debris is a rigid-body simulation: it is ballistic with drag and spin, no
+collisions and no mass properties. box3d exists and this deliberately does not reach for it, because a 2D
+flight view that spawns rigid bodies on every kill is a different and much larger round. That the hull
+fragments along its real geometry: the ship is drawn as a sprite or a triangle here, so the pieces are derived
+from its heading and size rather than cut from a mesh. And that the explosion ramp is physically right --
+which is precisely what blackbodyCandidate: false records.
+
+Five sabotages, 1/3/1/1/2 RED by name, three files md5-identical after restore.
+The tree stands at 1453 gates.
 ## v4420 -- a veto that outlived its reason by five versions, and the scene it was hiding was already built
 
 Keith: "before we switch into the webgpu avatar gauges scene which replaces the svg scene, before that we can
