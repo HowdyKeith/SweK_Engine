@@ -434,9 +434,30 @@ window.addEventListener("load", function () {
         <!-- v3912 -- align-items was center, which is why the preview box floated 26px below the drawer top instead
              of aligning with it. stretch top-justifies it AND lets it reach the bottom; flex:1 passes the
              stretched height on rather than collapsing to content. -->
-        <div id="dialsRow" style="display:flex;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:0;">
-          <div id="dials" title="Live SVG dials — same gauge settings as the 3D gauges. No avatar, no render." style="display:flex;gap:14px;align-items:flex-start;min-width:360px;min-height:230px;"></div>
-          <span id="dialsRobot" style="display:inline-flex;align-items:flex-end;align-self:stretch;flex:none;overflow:visible;" title="SweK — turns red on errors"></span>
+        <!-- v4413 -- THE min-height MOVES FROM #dials TO THE ROW, and it is the SAME 230 rather than a new
+             number. It was #dials that held `min-height:230px`, so the dials were what propped this row
+             open; retiring them measured the row at 100 px tall where it had been 184, and an avatar that
+             gained the whole width while losing half its height is not "filling the space". The constant
+             now sits on the element it was actually sizing. -->
+        <div id="dialsRow" style="display:flex;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:230px;">
+          <!-- v4413 -- THE SVG DIALS ARE OUT OF THE LAYOUT AND THE AVATAR SCENE TAKES THE WHOLE ROW.
+               Keith, on the screenshot: "this avatar view should actually not show the svg gauges, but
+               instead extend the avatar and the new gauges in that same scene, to fill the entire space
+               also to the left." MEASURED at v4412: #dialsRow was 676 px wide, #dials took 288 of it and
+               #dialsRobot 178 -- the avatar had TWENTY-SIX PER CENT of the row.
+               #dials is kept in the DOM and hidden rather than deleted: ui/gaugeInfoPanel.js's hideWith
+               list (v3671) and show("info") both reach for it by id and treat it as #dialsRobot's SIBLING,
+               so removing the element would break the staged-panel path that hides the avatar with it. -->
+          <!-- *** AND THE RETIREMENT IS STRUCTURAL, NOT AN INLINE display:none. *** The first draft set
+               style="display:none" on #dials itself and MEASURED IT 285 px WIDE ANYWAY: gaugeInfoPanel's
+               show() writes `dialsEl.style.display = infoUp ? "none" : ""`, and the empty string clears the
+               INLINE style -- which is where the none was -- so the div reverted to a visible block the
+               first time the gauges tab was shown. A wrapper the panel does not know about cannot be
+               cleared by it. #dials keeps its id and its box for every path that reaches for it. -->
+          <div id="dialsRetired" style="display:none;">
+            <div id="dials" title="Live SVG dials — retired from this row at v4413; the avatar scene has the space. Still built and still driven, so every path that reads it still reads it." style="display:flex;gap:14px;align-items:flex-start;min-height:230px;"></div>
+          </div>
+          <span id="dialsRobot" style="display:inline-flex;align-items:stretch;align-self:stretch;flex:1 1 auto;min-width:0;overflow:visible;" title="SweK — turns red on errors"></span>
         </div>
               <div id="swekChat" style="border-top:1px solid var(--line);margin-top:4px;padding-top:7px;">
           <div style="color:var(--go);font-weight:bold;font-size:11px;margin-bottom:4px;">&#128172; SweK chat <span style="color:var(--dim);font-weight:normal;">&mdash; the target box's avatar speaks it</span></div>
@@ -6164,7 +6185,13 @@ try{
   if(h){
     try{
       const {mountAvatarSwitch,headProbe,setExtraModes}=await import("/ui/avatarSwitch.js");
-      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,width:223,height:210,probe:headProbe});   // v3770 -- +30px wide (was 193; v3743 -- +30px wide, was 163). frameFromBox re-derives frame= from this box, so the rigged figure reframes to the wider aspect automatically.
+      // v4413 -- SIZED FROM THE HOST, NOT FROM A NUMBER. The old call asked for 223x210 and MEASURED
+      // 178x184 on the page, with the SVG surface coming out 178x168: a scene built at one size and
+      // displayed at another, which is #83 at its real site. sizeFromHost makes the box the authority and a
+      // ResizeObserver keeps it so, because a panel opening or a window resizing moves the box and a scene
+      // measured once at mount is a typed constant that arrived late. The 223x210 that was here is gone
+      // rather than kept as a fallback: a fallback nobody can reach is a number nobody re-derives.
+      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,sizeFromHost:true,minSize:120,probe:headProbe});
       window._avatarSwitch=sw;
       // v3557 -- THE FAVOURITES STAR, under the mode switch. It owns NO favourites list of its own: it reads and
       // writes ui/kpopFavorites.js, the store the sandbox avatar cycle already uses, so a favourite set here

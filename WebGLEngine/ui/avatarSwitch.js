@@ -135,8 +135,27 @@ const STORE_KEY = "swek.serverAvatarMode";
  * `probe` answers "is this mode's asset actually there" and defaults to a HEAD request. It is injectable so the
  * gate can drive the missing-asset path without a network.
  */
-export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, probe = null, store = null } = {}) {
+export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, probe = null, store = null,
+                                    sizeFromHost = false, minSize = 96, onResize = null } = {}) {
     if (!host) return null;
+
+    // *** v4413 -- THE SIZE CAN COME FROM THE BOX INSTEAD OF FROM A TYPED NUMBER. ***
+    //
+    // v3657's comment says the aspect is "MEASURED from the box this switch is about to create, so changing
+    // width/height above cannot leave a stale constant behind" -- and that is true of the box it CREATES and
+    // says nothing about the box it SITS IN. MEASURED at v4412 on server.html: the caller asked for 223x210,
+    // the host rendered at 178x184, and the SVG surface came out 178x168. A SCENE BUILT AT ONE SIZE AND
+    // DISPLAYED AT ANOTHER, which is #83 ("the compact scene does not span its own canvas") at its real site.
+    //
+    // sizeFromHost makes the host the authority. minSize is a floor and not a default: a host measured at
+    // zero is a host that has not been laid out yet, and building a 0x0 surface would be believing it.
+    const measure = () => {
+        if (!sizeFromHost) return { w: width, h: height };
+        const b = host.getBoundingClientRect();
+        return { w: Math.max(minSize, Math.round(b.width)), h: Math.max(minSize, Math.round(b.height)) };
+    };
+    let box = measure();
+    width = box.w; height = box.h;
     const mem = store || (() => { try { return window.localStorage; } catch { return null; } })();
     const readMode = () => { try { return (mem && mem.getItem(STORE_KEY)) || "svg"; } catch { return "svg"; } };
     const writeMode = (id) => { try { mem && mem.setItem(STORE_KEY, id); } catch {} };
@@ -268,7 +287,48 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
     host.appendChild(note);
     set(readMode(), { announce: false });
 
-    return { el: btn, set, get current() { return current; }, next: () => set(nextMode(current)), teardown, MODES };
+    /* ---- v4413 -- AND THE BOX MOVES, SO THE SCENE HAS TO FOLLOW IT ------------------------------------
+     * Measuring once at mount is only half the repair: a panel that opens, a window that resizes or a
+     * sibling that is hidden all change the host, and a scene sized at mount is then wrong for the rest of
+     * the session -- which is the SAME defect as a typed constant, arriving later.
+     *
+     * *** AN IFRAME IS RESIZED IN PLACE AND RELOADED ONLY WHEN ITS ASPECT MOVES. *** f.width/f.height cost
+     * nothing; the ?frame= aspect is baked into the URL, so changing it means a reload, and reloading a
+     * live avatar on every pixel of a drag would be a worse defect than the one being fixed. The threshold
+     * is on the ASPECT because that is what the URL carries -- resizing at constant aspect needs no reload
+     * at all. The SVG surface is rebuilt outright: it is procedural and cheap.
+     */
+    const ASPECT_EPS = 0.04;                 // ~4% of aspect, well under what the stage's own clamp resolves
+    let ro = null;
+    if (sizeFromHost && typeof ResizeObserver !== "undefined") {
+        let pending = 0;
+        ro = new ResizeObserver(() => {
+            if (pending) return;
+            pending = requestAnimationFrame(() => {
+                pending = 0;
+                const b = measure();
+                if (b.w === width && b.h === height) return;
+                const oldAspect = width / height;
+                width = b.w; height = b.h;
+                if (!surface) return;
+                if (surface.tagName === "IFRAME") {
+                    surface.width = width; surface.height = height;
+                    const mode = modeById(current);
+                    if (mode && mode.frameFromBox && Math.abs(width / height - oldAspect) > ASPECT_EPS) build(mode);
+                } else {
+                    const mode = modeById(current);
+                    if (mode) build(mode);
+                }
+                if (onResize) { try { onResize({ width, height }); } catch {} }
+            });
+        });
+        try { ro.observe(host); } catch { ro = null; }
+    }
+    const stopObserving = () => { if (ro) { try { ro.disconnect(); } catch {} ro = null; } };
+
+    return { el: btn, set, get current() { return current; }, next: () => set(nextMode(current)),
+             teardown: () => { stopObserving(); teardown(); }, MODES,
+             get size() { return { width, height }; }, remeasure: () => { const b = measure(); width = b.w; height = b.h; return { width, height }; } };
 }
 
 /**
