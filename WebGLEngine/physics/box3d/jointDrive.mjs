@@ -57,8 +57,11 @@ export const LIMIT_FIELDS = Object.freeze(["limitEnabled", "lower", "upper", "mo
  * Upstream owns its own enum and may renumber it; this is a contract between box3d_shim.c and this file, and
  * the gate asserts the two agree rather than assuming a shared header keeps them in step.
  */
-export const KIND = Object.freeze({ UNKNOWN: 0, REVOLUTE: 1, SPHERICAL: 2, WELD: 3 });
-export const KIND_NAME = Object.freeze(["unknown", "revolute", "spherical", "weld"]);
+// v4398 -- WHEEL APPENDED AT 4. These numbers are a wire format between this file and box3d_shim.c's
+// SWK_JOINT_* defines, so a new kind goes on the END: renumbering to keep any kind of order would
+// reinterpret every joint index a caller already holds.
+export const KIND = Object.freeze({ UNKNOWN: 0, REVOLUTE: 1, SPHERICAL: 2, WELD: 3, WHEEL: 4 });
+export const KIND_NAME = Object.freeze(["unknown", "revolute", "spherical", "weld", "wheel"]);
 
 export const DEG = 180 / Math.PI;
 export const RAD = Math.PI / 180;

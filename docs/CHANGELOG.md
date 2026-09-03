@@ -14,6 +14,77 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4398 -- box3d's wheel joint, and the jitter claim physics/vehicle.mjs has been arguing unmeasured since v4217
+
+v4217 built a RAYCAST vehicle -- one rigid chassis, wheels as downward rays, forces applied to the single body
+-- and justified it in its own header:
+
+    "The intuitive model is five rigid bodies: a chassis and four wheels, joined by constraints. *** IT IS ALSO
+     WHY TOY CAR PHYSICS JITTERS. *** A constraint solver has to reconcile the wheel's contact with the ground
+     AND its joint to the chassis every step, at a mass ratio of maybe 50:1, and small errors in each feed the
+     other."
+
+box3d has had 36 b3WheelJoint_ functions the whole time and not one had ever been called from this tree.
+tools/ship/vehicle-selfcheck.mjs has 56 checks, every one about the raycast force arithmetic, and the word
+jitter appears in none of them. The rejected alternative sat unbound and the rejection was an argument nothing
+had ever tested.
+
+THE MECHANISM IS REAL, AND IT SCALES WITH EXACTLY THE TWO THINGS THE CLAIM NAMES.
+
+At rest the chassis is dead still at every mass ratio from 1:1 to 500:1 -- sd 0.000e+00, identical to a plain
+box with no joints at all. That is the EASY case: a settled strut has nothing to reconcile, and a control with
+no joints is what makes that visible rather than convenient.
+
+Driving, with ground contact and the chassis joint both live every step:
+
+    mass ratio      10        50       200      1000
+    jitter (sd)  1.5e-06   4.6e-06  1.4e-04   9.2e-03
+
+3.79 orders of magnitude. And at a fixed 50:1, dropping box3d from four substeps to one takes it from 6.0e-06
+to 7.2e-03 -- three orders more. Mass ratio and solver budget: the mechanism stated exactly.
+
+AND THE DEGREE IS WHERE THE CLAIM STOPS BEING A REASON. At the 50:1 v4217 itself names, with box3d's four
+substeps, the effect is 4.6 MICRONS on a 0.65 m ride height -- seven parts per million. Detectable, and not a
+wobble anybody would see. v4217 identified a real coupling and was right about what drives it; the conclusion
+drawn from it -- constrained wheels are unusable, so rays are the answer -- does not follow from the SIZE of
+the effect in this engine at this substep count. box3d's soft-constraint solver with substepping is
+specifically good at the thing the claim is about. Neither file is wrong. The argument was never checked, and
+now it has a number.
+
+*** THE RIG HAD TO BE FIXED THREE TIMES, AND EVERY FAILURE READ AS A PHYSICS RESULT. ***
+
+1. The first measurements were taken at 5 Hz with the strut resting on its 0.25 m LIMIT STOP. A body on a rigid
+   stop is the easiest case a solver can have, so "no jitter" measured the stop. The tell was the rigid-strut
+   row agreeing with the spring row to three decimals; the honest regime was FOUND by disabling the limit and
+   comparing ride heights, not assumed from the frequency.
+
+2. The car travelled EXACTLY 0.00 m at every mass ratio, because the wheels were 0.35-CUBES. Every body
+   constructor in box3d_shim.c called b3MakeBoxHull and nothing in this tree had ever needed to roll, so
+   swk_body_sphere is added this round -- b3CreateSphereShape had been there all along.
+
+3. Still 0.00 m with real spheres, because the vehicle had settled for ten seconds and box3d had put it to
+   SLEEP. The readback lied convincingly: spinTorque saturated at the full 300 N-m while spinSpeed sat at
+   exactly 0.0000. Full torque, no motion, no error. swk_wheel_spin now wakes the bodies.
+
+None of the three threw, and the only tell in cases 2 and 3 was the distance being exactly 0.00 rather than
+small. The gate now checks that the car MOVES before it checks anything about how it moves.
+
+Also fixed: tools/ship/jointDrive-selfcheck.mjs's historical claim that "the joint API before this round was
+exactly seven functions" was maintained by SUBTRACTING ADDED_AT_V4385 from the present function list -- so the
+eighth entry point broke a sentence about v4384. A historical count maintained by subtraction needs every later
+addition subtracted, or it quietly stops being historical and becomes a count of the present.
+
+Five sabotages, 4/3/2/2/2 RED by name, four files md5-identical. Sabotage E makes this round's own first
+mistake permanent -- declaring the bottomed-out regime fine -- and B and A are the two 0.00 m failures
+restored, both caught by the same precondition check.
+
+UNCHECKED: the two vehicles head to head. vehicle.mjs produces FORCES and owns no body, so putting it on a
+box3d chassis through swk_world_cast_ray is a real integration and a round of its own; until it exists, "which
+model jitters less" has one side measured. Steering is bound and exercised by nothing, because a steering
+claim needs a path and there is no track in this tree. And the constrained model is not tested on rough ground
+at speed, which is where the coupling has the most to feed on.
+
+The tree stands at 1434 gates.
 ## v4397 -- the same experiments on Jolt: which of v4396's findings are about physics and which are about box3d
 
 v4396's footer named a question it structurally could not answer: are the aliasing bands and the 34 m/s hole

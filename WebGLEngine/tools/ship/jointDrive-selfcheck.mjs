@@ -15,6 +15,7 @@
 // what is graded is compiled physics and not a model of it.
 "use strict";
 import * as JD from "../../physics/box3d/jointDrive.mjs";
+import * as WJ from "../../physics/wheelJoint.mjs";
 import { PENDING_REBUILD } from "../../physics/box3d/box3dNode.mjs";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -114,9 +115,13 @@ console.log("1. THE GAP: SEVEN JOINT ENTRY POINTS AND NOT ONE OF THEM COULD READ
     const shim = readFileSync(path.join(ENG, "physics/box3d/box3d_shim.c"), "utf8");
     const code = shim.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
     const jointFns = [...code.matchAll(/^(?:int|void|float)\s+(swk_joint_[a-z0-9_]+)/gm)].map((m) => m[1]);
-    const added = new Set(JD.ADDED_AT_V4385);
+    // *** A HISTORICAL COUNT MAINTAINED BY SUBTRACTION NEEDS EVERY LATER ADDITION SUBTRACTED TOO, OR IT
+    // QUIETLY STOPS BEING HISTORICAL AND BECOMES A COUNT OF THE PRESENT. *** This read `current minus
+    // ADDED_AT_V4385` and was exactly right until v4398 added swk_joint_wheel, at which point it failed while
+    // claiming to describe v4384. Every round that adds a joint entry point belongs in this list.
+    const added = new Set([...JD.ADDED_AT_V4385, ...WJ.ADDED_AT_V4398]);
     const before = jointFns.filter((n) => !added.has(n)).sort();
-    ok("the joint API before this round was exactly seven functions, none of them a readback",
+    ok("the joint API before v4385 was exactly seven functions, none of them a readback",
        before.length === 7 && !before.some((n) => /state|angle|limits|kind|motor/.test(n)),
        before.join(", "));
 

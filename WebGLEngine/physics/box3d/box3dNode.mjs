@@ -41,6 +41,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ADDED_AT_V4385 as JOINT_DRIVE_ADDED } from "./jointDrive.mjs";
 import { ADDED_AT_V4395 as SENSOR_CCD_ADDED } from "./sensorTrigger.mjs";
+import { ADDED_AT_V4398 as WHEEL_ADDED } from "../wheelJoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VENDOR_DIR = join(HERE, "..", "..", "vendor", "box3d");
@@ -172,6 +173,11 @@ export const PENDING_REBUILD = [
     // and ev/tools/es-arena.mjs's Fighter asks for 430, and 400 is what the world gives it today, in the wasm,
     // with no rebuild involved. What is pending is only the ability to SEE or MOVE the cap from the browser.
     ...SENSOR_CCD_ADDED,
+    // v4398 -- the WHEEL JOINT and, beside it, the first ROUND SHAPE this shim has ever been able to make.
+    // swk_body_sphere is not a wheel-joint function and is in this list for a wheel-joint reason: every body
+    // constructor here called b3MakeBoxHull, so the rig's wheels were cubes and the car travelled exactly
+    // 0.00 m. A vehicle needs something that rolls before any claim about wheels can be measured at all.
+    ...WHEEL_ADDED,
 ];
 
 

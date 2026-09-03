@@ -540,6 +540,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "md5-identical after, and B reproduces v2468's mistake on demand: dropping the damping match " +
                  "reads 25/96 onset 45 against the matched 19/96 onset 52",
     }),
+    since28: Object.freeze({
+        at: "v4398", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/wheelJoint-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.24s, seven sections, the last of which RE-MEASURES the " +
+                 "record natively in its own run rather than grading a receipt. It binds box3d's wheel joint " +
+                 "-- 36 functions, never once called from this tree -- and tests the claim physics/vehicle.mjs " +
+                 "has used to justify its whole design since v4217: that constrained wheels are why toy car " +
+                 "physics jitters at a 50:1 mass ratio. THE ANSWER IS YES IN KIND AND NO IN DEGREE. The " +
+                 "mechanism is real and scales with both things the claim names -- 1.5e-06 at 10:1 to 9.2e-03 " +
+                 "at 1000:1, 3.79 orders, and three more orders from four substeps down to one -- while at the " +
+                 "50:1 the claim itself names it is 4.6 MICRONS on a 0.65 m ride height. The rig had to be " +
+                 "fixed THREE times and every failure read as a physics result: the strut was resting on its " +
+                 "limit stop, then the wheels were CUBES because every constructor in the shim called " +
+                 "b3MakeBoxHull, then the settled car was ASLEEP and reported full motor torque at zero speed. " +
+                 "Driven RED by five sabotages (4/3/2/2/2 by name), four files md5-identical after",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

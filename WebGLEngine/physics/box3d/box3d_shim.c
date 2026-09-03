@@ -783,11 +783,16 @@ int swk_world_cast_ray(float ox, float oy, float oz,
 
 // What kind of joint an index holds, so a caller reading a row knows which fields mean anything.
 // *** THIS IS NOT b3JointType. *** box3d numbers its own enum and that numbering is upstream's to change;
-// these three constants are this shim's contract with jointDrive.mjs and are asserted equal in the gate.
+// these constants are this shim's contract with jointDrive.mjs and are asserted equal in the gate.
+//
+// v4398 -- WHEEL is APPENDED at 4 and the three before it do not move. A kind constant is a wire format
+// between this file and jointDrive.mjs's KIND, so renumbering to keep the list alphabetical or tidy would
+// silently reinterpret every joint a caller already holds.
 #define SWK_JOINT_UNKNOWN   0
 #define SWK_JOINT_REVOLUTE  1
 #define SWK_JOINT_SPHERICAL 2
 #define SWK_JOINT_WELD      3
+#define SWK_JOINT_WHEEL     4
 
 int swk_joint_state_stride(void)  { return SWK_JOINT_STATE_STRIDE; }
 int swk_joint_limits_stride(void) { return SWK_JOINT_LIMITS_STRIDE; }
@@ -799,6 +804,7 @@ static int swk__joint_kind(int idx) {
         case b3_revoluteJoint:  return SWK_JOINT_REVOLUTE;
         case b3_sphericalJoint: return SWK_JOINT_SPHERICAL;
         case b3_weldJoint:      return SWK_JOINT_WELD;
+        case b3_wheelJoint:     return SWK_JOINT_WHEEL;
         default:                return SWK_JOINT_UNKNOWN;
     }
 }
@@ -1024,3 +1030,146 @@ int swk_body_is_bullet(int idx) {
 
 void  swk_world_set_max_linear_speed(float v) { b3World_SetMaximumLinearSpeed(g_world, v); }
 float swk_world_max_linear_speed(void)        { return b3World_GetMaximumLinearSpeed(g_world); }
+
+// ==============================================================================================================
+// v4398 -- THE WHEEL JOINT, WHICH IS THE DESIGN physics/vehicle.mjs ARGUES AGAINST.
+//
+// box3d exposes 36 b3WheelJoint_ functions -- suspension spring and limits, a spin motor with torque readback,
+// steering with its own spring and limits -- and not one of them has ever been called from this tree. That is
+// not an oversight. v4217 built physics/vehicle.mjs as a RAYCAST vehicle and its header says why in as many
+// words: "A constraint solver has to reconcile the wheel's contact with the ground AND its joint to the
+// chassis every step, at a mass ratio of maybe 50:1, and small errors in each feed the other" -- that is why,
+// it says, toy car physics jitters.
+//
+// *** SO THE WHEEL JOINT IS NOT A DUPLICATE OF vehicle.mjs. IT IS THE ALTERNATIVE vehicle.mjs REJECTED, AND
+// THE TREE HAS NEVER TESTED THE REJECTION. *** 56 checks in tools/ship/vehicle-selfcheck.mjs and every one of
+// them is about the raycast force arithmetic; not one asks whether the constrained version actually jitters.
+// Binding this is what makes the claim measurable, and the answer is worth having either way.
+//
+// ---- THE FRAMES, WHICH ARE NOT THE OBVIOUS ONES ---------------------------------------------------------------
+//
+// box3d's header: "The wheel rotates around the local z-axis in frame B. The wheel translates along the local
+// x-axis in frame A. The wheel can optionally steer along the x-axis in frame A." So the SUSPENSION axis and
+// the STEERING axis are the same axis -- frame A's local x -- and the SPIN axis is frame B's local z. For a car
+// on flat ground that means frame A's x points UP and frame B's z points sideways, which is not what anybody
+// guesses from the words "wheel axis". Two axes in, and the quats are built the same way swk_joint_revolute
+// builds its one.
+// ==============================================================================================================
+
+#define SWK_WHEEL_STATE_STRIDE 5   /* spinSpeed, spinTorque, steeringAngle, steeringTorque, linearSeparation */
+
+int swk_wheel_state_stride(void) { return SWK_WHEEL_STATE_STRIDE; }
+
+/**
+ * A wheel: body a is the CHASSIS, body b is the WHEEL, per box3d's own convention.
+ *
+ * susAxis is the suspension AND steering axis (frame A's local x, so "up" for a car); spinAxis is the roll axis
+ * (frame B's local z, so "sideways"). hertz <= 0 leaves the spring disabled, which is a rigid strut. The
+ * suspension limits are in metres of travel and are enabled only when lo < hi, the same convention
+ * swk_joint_revolute uses for its angles.
+ */
+int swk_joint_wheel(int a, int b, float wx, float wy, float wz,
+                    float sux, float suy, float suz, float spx, float spy, float spz,
+                    float hertz, float damping, float loTravel, float hiTravel) {
+    if (!swk__valid_pair(a, b)) return -1;
+    b3Vec3 world = { wx, wy, wz };
+    b3Vec3 sus = b3Normalize((b3Vec3){ sux, suy, suz });
+    b3Vec3 spin = b3Normalize((b3Vec3){ spx, spy, spz });
+
+    b3WheelJointDef def = b3DefaultWheelJointDef();
+    def.base.bodyIdA = g_bodies[a];
+    def.base.bodyIdB = g_bodies[b];
+    def.base.localFrameA.p = b3Body_GetLocalPoint(g_bodies[a], world);
+    def.base.localFrameA.q = b3ComputeQuatBetweenUnitVectors(b3Vec3_axisX, sus);
+    def.base.localFrameB.p = b3Body_GetLocalPoint(g_bodies[b], world);
+    def.base.localFrameB.q = b3ComputeQuatBetweenUnitVectors(b3Vec3_axisZ, spin);
+    if (hertz > 0.0f) {
+        def.enableSuspensionSpring = true;
+        def.suspensionHertz = hertz;
+        def.suspensionDampingRatio = damping;
+    }
+    if (loTravel < hiTravel) {
+        def.enableSuspensionLimit = true;
+        def.lowerSuspensionLimit = loTravel;
+        def.upperSuspensionLimit = hiTravel;
+    }
+    return swk__push_joint(b3CreateWheelJoint(g_world, &def));
+}
+
+/**
+ * Drive: a target spin speed in rad/s and a torque budget. enable 0 lets the wheel freewheel.
+ *
+ * *** IT WAKES THE BODIES, AND WITHOUT THAT LINE IT SILENTLY DOES NOTHING. *** A vehicle that has been standing
+ * still is ASLEEP -- box3d puts a settled body to sleep and a sleeping body ignores its constraints' motors.
+ * The first draft omitted the wake, and the diagnosis took a while because the readback LIED convincingly:
+ * swk_wheel_state reported spinTorque saturated at the full 300 N-m while spinSpeed sat at exactly 0.0000 and
+ * the car travelled 0.00 m. Full torque, no motion, no error -- which reads like a physics result and is a
+ * sleeping body. Anything that changes what a joint should DO has to wake what it is attached to.
+ */
+int swk_wheel_spin(int idx, int enable, float radPerSec, float maxTorque) {
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    b3WheelJoint_EnableSpinMotor(g_joints[idx], enable ? true : false);
+    b3WheelJoint_SetSpinMotorSpeed(g_joints[idx], radPerSec);
+    b3WheelJoint_SetMaxSpinTorque(g_joints[idx], maxTorque);
+    b3Joint_WakeBodies(g_joints[idx]);
+    return 1;
+}
+
+/** Steer: a target angle in DEGREES at the shim boundary, radians inside, like every other joint here. */
+int swk_wheel_steer(int idx, int enable, float targetDeg, float maxTorque) {
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    b3WheelJoint_EnableSteering(g_joints[idx], enable ? true : false);
+    b3WheelJoint_SetTargetSteeringAngle(g_joints[idx], B3_DEG_TO_RAD * targetDeg);
+    b3WheelJoint_SetMaxSteeringTorque(g_joints[idx], maxTorque);
+    b3Joint_WakeBodies(g_joints[idx]);   // same reason as swk_wheel_spin: a sleeping wheel does not steer
+    return 1;
+}
+
+/**
+ * Readback. b3WheelJoint_ has no suspension-TRAVEL getter of its own -- the four Get*SuspensionLimit calls
+ * return the configured limits, not where the strut is -- so the fifth field is the generic
+ * b3Joint_GetLinearSeparation, which is the constraint's own linear error. It is a proxy and it is labelled as
+ * one rather than being called ride height.
+ */
+int swk_wheel_state(int idx, float* out) {
+    for (int i = 0; i < SWK_WHEEL_STATE_STRIDE; i++) out[i] = 0.0f;
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    out[0] = b3WheelJoint_GetSpinSpeed(g_joints[idx]);
+    out[1] = b3WheelJoint_GetSpinTorque(g_joints[idx]);
+    out[2] = b3WheelJoint_GetSteeringAngle(g_joints[idx]);
+    out[3] = b3WheelJoint_GetSteeringTorque(g_joints[idx]);
+    out[4] = b3Joint_GetLinearSeparation(g_joints[idx]);
+    return 1;
+}
+
+// ---- A ROUND BODY, BECAUSE UNTIL NOW THIS SHIM COULD ONLY MAKE BOXES ------------------------------------------
+//
+// *** EVERY BODY CONSTRUCTOR IN THIS FILE CALLED b3MakeBoxHull, AND NOBODY NOTICED BECAUSE NOTHING HAD EVER
+// NEEDED TO ROLL. *** swk_body_box, swk_body_ship and swk_body_sensor: three constructors, one shape. box3d has
+// had b3CreateSphereShape all along.
+//
+// It surfaced in the worst possible way. The v4398 wheel-joint rig built its wheels out of 0.35-cubes, drove
+// them at 10 and 40 rad/s, and the car travelled EXACTLY 0.00 m at every mass ratio. Not slowly -- zero. A cube
+// on a suspension strut does not roll, it corners and locks, and the reading looked like a physics result for
+// one round of measurements before the number 0.00 repeated once too often to be a car.
+//
+// So the driving half of the wheel joint was not measurable at all, and that was a property of this file rather
+// than of box3d or of the claim under test.
+int swk_body_sphere(int type, float x, float y, float z, float radius, float density) {
+    if (g_bodyCount >= MAX_BODIES) return -1;
+    b3BodyDef bd = b3DefaultBodyDef();
+    bd.linearDamping = 0.05f;
+    bd.angularDamping = 0.05f;
+    bd.type = (type == 2) ? b3_kinematicBody : (type == 1) ? b3_dynamicBody : b3_staticBody;
+    bd.position = (b3Pos){ x, y, z };
+    b3BodyId body = b3CreateBody(g_world, &bd);
+    b3ShapeDef sd = b3DefaultShapeDef();
+    sd.density = density;
+    b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, radius };
+    b3CreateSphereShape(body, &sd, &sphere);
+    g_bodies[g_bodyCount] = body;
+    return g_bodyCount++;
+}
