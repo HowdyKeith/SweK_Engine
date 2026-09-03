@@ -569,10 +569,14 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "recorded a two-engine envelope holding one engine, and CAPS routed constraint-needers to " +
                  "the backend whose portable joint interface refuses them. All three fixed; the cross-backend " +
                  "envelope is recorded for the first time (drift 3.718u, IoU 0.588, box3d deterministic), " +
-                 "which v3337 had designed the UNMEASURED failure to force. Driven RED by five sabotages " +
-                 "(6/2/1/1/1 by name), four files md5-identical after, and sabotage A found two defects in " +
-                 "the new gate: it THREW instead of reporting, and one check passed vacuously by naming a " +
-                 "route that had just failed",
+                 "which v3337 had designed the UNMEASURED failure to force. AND THE OTHER BRANCH'S v4399 " +
+                 "ARRIVALS RATCHET WENT RED ON THIS GATE BY PATH AT THE MERGE, one round after they installed " +
+                 "it, so it emits three tables now -- and wiring it found instruments.html building report " +
+                 "cell titles by raw concatenation, where the first value holding a double quote closed the " +
+                 "attribute (153 values, 4 missing, exactly the four routing requests with quotes). Driven " +
+                 "RED by seven sabotages (6/2/1/1/1 then 1/6 by name), six files md5-identical after, and " +
+                 "sabotage A found two defects in the new gate: it THREW instead of reporting, and one check " +
+                 "passed vacuously by naming a route that had just failed",
     }),
 });
 

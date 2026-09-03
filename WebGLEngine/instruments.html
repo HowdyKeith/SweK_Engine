@@ -15,6 +15,15 @@
   input[type=text]{flex:1;min-width:180px;background:#0a100d;color:#cfe9d8;border:1px solid #24382e;padding:4px 8px;font:inherit}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
   .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;display:flex;flex-direction:column}
+  /* v4397 -- the reference data-viz palette's DARK categorical slots 1-5, validated by the skill's own script
+     against THIS page's surface (#0e1512) rather than the reference's #1a1a19: all six checks pass, worst
+     adjacent CVD dE 8.4. Roles, not raw hex, so a light variant would swap in one place. */
+  .viz{--surface:#0e1512;--ink:#cfe9d8;--ink2:#9fb8ab;--ink3:#6f8a7c;--grid:#1a2a22;
+       --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181}
+  .viz canvas{width:100%;max-width:820px;height:auto;display:block;background:var(--surface)}
+  .viz .lg{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 2px;color:var(--ink2);font-size:11px}
+  .viz .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .viz .rd{font-variant-numeric:tabular-nums;color:var(--ink2);font-size:11px;min-height:1.6em}
   .card h2{font-size:14px;margin:0 0 2px}
   .card h2 a{color:#9fe8c0;text-decoration:none;border-bottom:1px dotted #3a5a4a}
   .card h2 a:hover{color:#b6f0cf}
@@ -61,10 +70,32 @@
     argument</b>, so it cannot drift from it. Emitting is off by default: run a gate with
     <code>SWEK_GATE_REPORT=1</code> and its table appears here.</div>
   <div id="gr" style="max-height:640px;overflow:auto"></div>
+
+  <h1 style="margin-top:26px">...and the same numbers, unfolding</h1>
+  <div class="sub">The tables above are the argument; this is the argument <b>told</b>. The playhead walks the
+    measured distances and each series is drawn as far as it has been reached &mdash; manim's output shape, from
+    <code>ui/canvasRecorder.js</code> rather than from Python. Every point is a value the report holds; hover for
+    the exact figure. <b>Two values in the report cannot be drawn at all</b> and the plot says which rather than
+    quietly dropping them.</div>
+  <div class="viz" id="viz">
+    <div class="lg" id="vlg"></div>
+    <canvas id="vcv" width="820" height="380"></canvas>
+    <div class="rd" id="vrd"></div>
+    <div class="row" style="margin-top:6px">
+      <select id="vsel"></select>
+      <button id="vplay">play</button>
+      <button id="vrec">record 10s</button>
+      <span class="dim" id="vskip" style="font-size:11px"></span>
+    </div>
+  </div>
 </div>
 
 <script type="module">
 import { INSTRUMENTS, AREAS, suiteChecks } from "./physics/instruments.mjs";
+// v4397 -- the recorder, so the unfolding can leave the page as a clip. manim's output shape with
+// no Python and no FFmpeg: this tree has had canvas capture since v2270.
+import { installRecorder } from "./ui/canvasRecorder.js";
+installRecorder();
 
 const $ = (id) => document.getElementById(id);
 let area = "", q = "";
@@ -151,29 +182,206 @@ function renderReports(idx, docs) {
   const num = (v) => typeof v === "number"
     ? (v !== 0 && (Math.abs(v) < 1e-3 || Math.abs(v) >= 1e7) ? v.toExponential(3) : String(v))
     : String(v == null ? "" : v);
+  // *** v4400 -- EVERY REPORT STRING IS ESCAPED, BECAUSE THE FIRST CELL WITH A QUOTE IN IT BROKE THE ROW. ***
+  // The titles here are built by concatenation, so a value containing a double quote CLOSED THE ATTRIBUTE and
+  // the rest of the cell became stray markup. physics/backendRouting-selfcheck.mjs emits five routing requests
+  // as JSON -- {"prefer":"box3d"} and three more -- and the "every value reaches the DOM to the digit" check
+  // read exactly 4 of 153 missing: the four with quotes, not the one that is bare {}. The check was right and
+  // the page was wrong, the same way round as when it rounded 0.0000045892996283214416 away.
+  const esc = (v) => String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   $("gr").innerHTML = shown.map((d) =>
-    '<div style="margin-bottom:18px"><div style="color:#9fe8c0">' + d.gate + '</div>' +
-    '<div class="dim" style="font-size:11px">measured ' + d.at + "</div>" +
+    '<div style="margin-bottom:18px"><div style="color:#9fe8c0">' + esc(d.gate) + '</div>' +
+    '<div class="dim" style="font-size:11px">measured ' + esc(d.at) + "</div>" +
     (d.skipped || []).map((s) => '<div class="dim" style="color:#e6c877;font-size:11px">not measured: ' +
-        s.what + " &mdash; " + s.why + "</div>").join("") +
+        esc(s.what) + " &mdash; " + esc(s.why) + "</div>").join("") +
     (d.tables || []).map((t) =>
-      '<div style="margin-top:8px;color:#cfe9d8">' + t.title + "</div>" +
+      '<div style="margin-top:8px;color:#cfe9d8">' + esc(t.title) + "</div>" +
       '<table style="border-collapse:collapse;font-size:11px"><tr>' +
       t.columns.map((c) => '<th style="text-align:right;padding:2px 10px 2px 0;color:#6f8a7c;font-weight:normal">' +
-        c + "</th>").join("") + "</tr>" +
+        esc(c) + "</th>").join("") + "</tr>" +
       // THE CELL IS FORMATTED FOR WIDTH AND THE TITLE CARRIES THE EXACT VALUE. A table of 17-digit floats is
       // unreadable, and a table that has thrown them away is a rounding of the argument rather than the
       // argument -- so hover gives back what the report holds, to the digit.
-      t.rows.map((r) => "<tr>" + r.map((v) => '<td title="' + String(v == null ? "" : v) +
+      t.rows.map((r) => "<tr>" + r.map((v) => '<td title="' + esc(v) +
         '" style="text-align:right;padding:2px 10px 2px 0;' +
-        'border-bottom:1px solid #1a2a22">' + num(v) + "</td>").join("") + "</tr>").join("") + "</table>" +
-      (t.note ? '<div class="dim" style="font-size:11px;max-width:760px">' + t.note + "</div>" : "")
+        'border-bottom:1px solid #1a2a22">' + esc(num(v)) + "</td>").join("") + "</tr>").join("") + "</table>" +
+      (t.note ? '<div class="dim" style="font-size:11px;max-width:760px">' + esc(t.note) + "</div>" : "")
     ).join("") + "</div>").join("");
 }
+/* ---------------------------------------------------------------------------------------------------------
+ * v4397 -- ITEM 3 OF docs/EXPLAIN-ITSELF.md: THE SAME NUMBERS, UNFOLDING.
+ *
+ * The plot draws from the SAME array the tables above draw from, so there is no second copy to drift. What it
+ * cannot draw it NAMES: a log axis has no place for a zero, and this report holds two of them -- the first
+ * distance (x = 0) and the claim-local error, which is exactly 0 at every distance and is the entire point of
+ * that encoding. *** THE ARGUMENT'S STRONGEST NUMBER IS THE ONE THE CHART CANNOT PLOT. *** Fudging it to 1e-16
+ * would draw a line that says "very small" where the measurement says "none", so it is dropped, counted, and
+ * printed under the plot instead.
+ * ------------------------------------------------------------------------------------------------------- */
+const VZ = { doc: null, ti: 0, head: 0, playing: false, pts: [], dropped: [], hover: null };
+const SERIES_TOKENS = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+const vcss = (n) => getComputedStyle(document.getElementById("viz")).getPropertyValue(n).trim();
+
+/** Every table with a numeric first column and at least one numeric series after it. */
+function plottable(docs) {
+  const out = [];
+  for (const d of docs) for (const t of (d.tables || [])) {
+    const numericCol = (c) => t.rows.length && t.rows.every((r) => typeof r[c] === "number" && Number.isFinite(r[c]));
+    if (!numericCol(0)) continue;
+    const series = t.columns.map((_, c) => c).filter((c) => c > 0 && numericCol(c));
+    if (series.length) out.push({ gate: d.gate, title: t.title, columns: t.columns, rows: t.rows, series });
+  }
+  return out;
+}
+
+function vzPrepare() {
+  const p = VZ.doc;
+  VZ.pts = []; VZ.dropped = [];
+  if (!p) return;
+  for (const r of p.rows) for (const c of p.series) {
+    const x = r[0], y = r[c];
+    // BOTH axes are log, and BOTH have a zero in this report, from different rows. Named, not nudged.
+    if (!(x > 0)) VZ.dropped.push({ col: p.columns[c], x, y, why: "x = " + x + " has no place on a log distance axis" });
+    else if (!(y > 0)) VZ.dropped.push({ col: p.columns[c], x, y, why: "the value is exactly " + y + " -- not small, NONE" });
+    else VZ.pts.push({ x, y, c });
+  }
+}
+
+function vzDraw() {
+  const cv = document.getElementById("vcv"), g = cv.getContext("2d"), p = VZ.doc;
+  const W = cv.width, H = cv.height, L = 78, R = 168, T = 26, B = 44;   // R leaves room for direct labels
+  g.fillStyle = vcss("--surface"); g.fillRect(0, 0, W, H);
+  if (!p) { g.fillStyle = vcss("--ink3"); g.font = "13px ui-monospace, monospace";
+            g.fillText("no emitted report has a plottable table", L, H / 2); return; }
+  const xs = VZ.pts.map((q) => q.x), ys = VZ.pts.map((q) => q.y);
+  if (!xs.length) { g.fillStyle = vcss("--ink3"); g.font = "13px ui-monospace, monospace";
+                    g.fillText("every value in this table is unplottable -- see below", L, H / 2); return; }
+  const lg = Math.log10;
+  const x0 = lg(Math.min(...xs)), x1 = lg(Math.max(...xs));
+  const y0 = Math.floor(lg(Math.min(...ys))), y1 = Math.ceil(lg(Math.max(...ys)));
+  const px = (x) => L + (x1 === x0 ? 0.5 : (lg(x) - x0) / (x1 - x0)) * (W - L - R);
+  const py = (y) => H - B - (y1 === y0 ? 0.5 : (lg(y) - y0) / (y1 - y0)) * (H - T - B);
+
+  // RECESSIVE, SOLID grid -- dashed rules read as data (anti-patterns).
+  g.strokeStyle = vcss("--grid"); g.lineWidth = 1; g.fillStyle = vcss("--ink3");
+  g.font = "10px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "middle";
+  for (let e = y0; e <= y1; e++) {
+    const yy = Math.round(py(10 ** e)) + 0.5;
+    g.beginPath(); g.moveTo(L, yy); g.lineTo(W - R, yy); g.stroke();
+    g.fillText("1e" + e, L - 8, yy);
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  const uniq = [...new Set(xs)].sort((a, b) => a - b);
+  for (const xv of uniq) {
+    const xx = Math.round(px(xv)) + 0.5;
+    g.strokeStyle = vcss("--grid"); g.beginPath(); g.moveTo(xx, T); g.lineTo(xx, H - B); g.stroke();
+    g.fillStyle = vcss("--ink3"); g.fillText(xv >= 1e6 ? (xv / 1e6) + "M" : xv >= 1e3 ? (xv / 1e3) + "k" : String(xv), xx, H - B + 7);
+  }
+  g.textAlign = "left"; g.fillStyle = vcss("--ink2"); g.font = "11px ui-monospace, monospace";
+  g.fillText(p.title, L, 8);
+  g.save(); g.translate(14, (H - B + T) / 2); g.rotate(-Math.PI / 2);
+  g.textAlign = "center"; g.fillStyle = vcss("--ink3"); g.font = "10px ui-monospace, monospace";
+  g.fillText("error, voxels (log)", 0, 0); g.restore();
+
+  // THE PLAYHEAD REVEALS THE MEASURED POINTS IN ORDER. Points as points, segments between them, and nothing
+  // smoothed: there are seven measured distances and pretending to a curve would be drawing data that is not there.
+  const reached = uniq.slice(0, VZ.head);
+  const drawn = [];
+  for (const c of p.series) {
+    const line = VZ.pts.filter((q) => q.c === c && reached.includes(q.x)).sort((a, b) => a.x - b.x);
+    if (!line.length) continue;
+    const col = vcss(SERIES_TOKENS[p.series.indexOf(c) % SERIES_TOKENS.length]);
+    g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = "round";
+    g.beginPath(); line.forEach((q, i) => (i ? g.lineTo(px(q.x), py(q.y)) : g.moveTo(px(q.x), py(q.y)))); g.stroke();
+    for (const q of line) {
+      g.fillStyle = vcss("--surface"); g.beginPath(); g.arc(px(q.x), py(q.y), 5.5, 0, 7); g.fill();  // 2px surface ring
+      g.fillStyle = col; g.beginPath(); g.arc(px(q.x), py(q.y), 4, 0, 7); g.fill();
+      drawn.push(q.y);
+    }
+    // SELECTIVE direct label: the endpoint reached, never a number on every point.
+    const last = line[line.length - 1];
+    g.fillStyle = vcss("--ink2"); g.font = "10px ui-monospace, monospace"; g.textAlign = "left";
+    g.fillText(p.columns[c], px(last.x) + 9, py(last.y));
+  }
+  if (VZ.head > 0 && VZ.head <= uniq.length) {
+    const hx = Math.round(px(uniq[VZ.head - 1])) + 0.5;
+    g.strokeStyle = vcss("--ink3"); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(hx, T); g.lineTo(hx, H - B); g.stroke();
+  }
+  if (VZ.hover) {
+    g.strokeStyle = vcss("--ink2"); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(px(VZ.hover.x), T); g.lineTo(px(VZ.hover.x), H - B); g.stroke();
+    g.beginPath(); g.arc(px(VZ.hover.x), py(VZ.hover.y), 7, 0, 7); g.stroke();
+  }
+  // The exact values drawn this frame, for the gate: the plot is held to the report it drew from.
+  cv.dataset.plotted = drawn.map((v) => String(v)).join(",");
+  cv.dataset.head = String(VZ.head);
+  // AND WHAT IT COULD NOT DRAW, as data. Membership -- "everything drawn is in the report" -- is nearly free
+  // when the plot reads the report directly. COVERAGE is the check that earns its keep: drawn plus dropped must
+  // account for every value the table holds, or the plot is losing numbers silently.
+  cv.dataset.dropped = VZ.dropped.map((d) => String(d.y)).join(",");
+  cv.dataset.held = VZ.doc.rows.reduce((n, r) => n + VZ.doc.series.length, 0) + "";
+}
+
+function vzLegend() {
+  const p = VZ.doc;
+  document.getElementById("vlg").innerHTML = !p ? "" : p.series.map((c, i) =>
+    '<span><i class="sw" style="background:var(' + SERIES_TOKENS[i % SERIES_TOKENS.length] + ')"></i>' +
+    p.columns[c] + "</span>").join("");
+  document.getElementById("vskip").textContent = !p ? "" :
+    VZ.dropped.length ? VZ.dropped.length + " value(s) not drawn: " +
+      VZ.dropped.map((d) => d.col + " at x=" + d.x + " (" + d.why + ")").join("; ")
+    : "every value in this table is drawn";
+}
+
+function vzSelect(list) {
+  const sel = document.getElementById("vsel");
+  sel.innerHTML = list.map((t, i) => '<option value="' + i + '">' + t.title + "</option>").join("");
+  VZ.doc = list[VZ.ti] || null; vzPrepare();
+  VZ.head = [...new Set(VZ.pts.map((q) => q.x))].length;
+  vzLegend(); vzDraw();
+}
+function vzInit(docs) {
+  const list = plottable(docs);
+  vzSelect(list);
+  const cv = document.getElementById("vcv");
+  document.getElementById("vsel").onchange = (e) => { VZ.ti = Number(e.target.value); vzSelect(list); };
+  document.getElementById("vplay").onclick = () => {
+    if (VZ.playing) return;
+    const n = [...new Set(VZ.pts.map((q) => q.x))].length;
+    VZ.playing = true; VZ.head = 0;
+    const step = () => { VZ.head++; vzDraw();
+      if (VZ.head < n) setTimeout(step, 520); else VZ.playing = false; };
+    step();
+  };
+  document.getElementById("vrec").onclick = () => {
+    if (window.swekRecord) { window.swekRecord.start(10, cv); document.getElementById("vplay").click(); }
+    else document.getElementById("vrd").textContent = "no recorder on this page";
+  };
+  cv.onmousemove = (e) => {
+    const b = cv.getBoundingClientRect(), sx = cv.width / b.width, sy = cv.height / b.height;
+    const mx = (e.clientX - b.left) * sx, my = (e.clientY - b.top) * sy;
+    const xs = VZ.pts.map((q) => q.x), ys = VZ.pts.map((q) => q.y), lg = Math.log10;
+    const x0 = lg(Math.min(...xs)), x1 = lg(Math.max(...xs));
+    const y0 = Math.floor(lg(Math.min(...ys))), y1 = Math.ceil(lg(Math.max(...ys)));
+    const PX = (x) => 78 + (x1 === x0 ? 0.5 : (lg(x) - x0) / (x1 - x0)) * (cv.width - 78 - 168);
+    const PY = (y) => cv.height - 44 - (y1 === y0 ? 0.5 : (lg(y) - y0) / (y1 - y0)) * (cv.height - 26 - 44);
+    let best = null, bd = 1e9;
+    for (const q of VZ.pts) { const d = Math.hypot(PX(q.x) - mx, PY(q.y) - my); if (d < bd) { bd = d; best = q; } }
+    VZ.hover = bd < 26 ? best : null;
+    document.getElementById("vrd").textContent = VZ.hover
+      ? VZ.doc.columns[VZ.hover.c] + " at world x " + VZ.hover.x + " = " + VZ.hover.y
+      : "hover a point for the exact value the report holds";
+    vzDraw();
+  };
+  cv.onmouseleave = () => { VZ.hover = null; document.getElementById("vrd").textContent = ""; vzDraw(); };
+}
+
 let REPORTS = [];
 fetch("./gate-reports/index.json").then((r) => r.json())
   .then((idx) => Promise.all((idx.reports || []).map((f) => fetch("./gate-reports/" + f).then((r) => r.json())))
-    .then((docs) => { REPORTS = docs; renderReports(idx, docs); }))
+    .then((docs) => { REPORTS = docs; renderReports(idx, docs); vzInit(docs); }))
   .catch(() => { $("gr").innerHTML = '<div class="dim">no gate reports on disk yet &mdash; a gate emits one ' +
       'when run with SWEK_GATE_REPORT=1</div>'; });
 

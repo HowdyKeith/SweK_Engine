@@ -1,0 +1,46 @@
+{
+ "gate": "tools/ship/gateReport-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "the population that argues in numbers",
+   "columns": [
+    "population",
+    "count"
+   ],
+   "rows": [
+    [
+     "gate files",
+     1434
+    ],
+    [
+     "argue in numbers",
+     70
+    ],
+    [
+     "emit a report",
+     2
+    ],
+    [
+     "argue and do not",
+     69
+    ],
+    [
+     "frozen at v4399",
+     69
+    ],
+    [
+     "arrived since",
+     0
+    ],
+    [
+     "visible to artefactWriters",
+     0
+    ]
+   ],
+   "note": "artefactWriters' walk skips -selfcheck.mjs by construction, so its zero was a fact about the walk rather than a finding about gates. The exclusion stays; the blindness is counted."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

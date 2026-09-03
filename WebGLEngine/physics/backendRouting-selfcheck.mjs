@@ -31,11 +31,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectBackend, box3dStatus } from "./backendNode.mjs";
 import { box3d, Box3DLoader } from "./box3d/box3dLoader.js";
+import { gateReport } from "../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
+
+// *** AND THE TABLES BELOW LEAVE THE TERMINAL, BECAUSE v4399's RATCHET SAID SO AND WAS RIGHT. ***
+// tools/ship/gateReport-selfcheck.mjs went RED on this file the moment the two branches met: "no gate written
+// SINCE may argue in numbers and emit nothing -- ARRIVALS: physics/backendRouting-selfcheck.mjs". That is the
+// arrivals ratchet from the other branch's v4399 doing exactly what its author built it to do, one round after
+// installing it, on a gate written in ignorance of it. Both tables are emitted from the SAME objects the checks
+// above assert on, which is the whole discipline: a caption can be wrong about a number, a number rendered
+// from the number cannot be. Nothing is written unless SWEK_GATE_REPORT=1.
+const GR = gateReport("physics/backendRouting-selfcheck.mjs");
 
 // =============================================================================================================
 console.log("1. *** box3d LOADS IN NODE, WHICH IT COULD NOT DO BEFORE THIS ROUND ***");
@@ -117,6 +127,14 @@ console.log("\n2. THE ROUTER NOW ROUTES WHERE ITS OWN COMMENTS SAY IT DOES");
         console.log(`        ${JSON.stringify(r.opts).padEnd(26)} -> ${r.name.padEnd(6)}` +
                     `  caps.constraints ${String(r.caps.constraints).padEnd(5)}  supportsJoints() ${r.joints}`);
     }
+    // The first column is TEXT on purpose: these are five REQUESTS, not five points on an axis, and the plot
+    // in instruments.html names a non-numeric table rather than drawing a line through categories.
+    GR.table("which backend each request reaches, and what that engine's own world says",
+             ["request", "backend", "caps.constraints", "world.supportsJoints()"],
+             rows.map((r) => [JSON.stringify(r.opts), r.name, String(r.caps.constraints), String(r.joints)]),
+             "before this round every one of these five said jolt in Node, because box3dLoader's " +
+             "browser-absolute import could not resolve and selectBackend fell through");
+
     const auto = rows.find((r) => Object.keys(r.opts).length === 0);
     ok("*** auto prefers the LIGHTER engine, which is what the comment beside the order has always said ***",
        auto.name === "box3d", "before this round auto returned jolt in Node, silently, because box3d never loaded");
@@ -174,6 +192,30 @@ console.log("\n4. *** THE CROSS-BACKEND ENVELOPE, RECORDED AT LAST -- AND box3d 
                 p.visualEnvelope.map((v) => (v * 100).toFixed(1) + "%").join(" .. "));
     console.log(`        IoU       ${p.perceptual.measured.iou}      SSIM ${p.perceptual.measured.ssim}` +
                 `   edge ${p.perceptual.measured.edgeOverlap}   pHash ${p.perceptual.measured.phashBits} bits`);
+    // TWO tables, because the metrics do not all have the same SHAPE of bound: six are bracketed both ways and
+    // pHash carries a ceiling only. One table with an empty cell where a lower bound is not recorded would be
+    // a blank pretending to be a measurement.
+    GR.table("Jolt against box3d after 180 ticks on one identical scene: the two-sided bands",
+             ["metric", "measured", "envelope lo", "envelope hi"],
+             [["drift (units)", p.measured.maxDrift, p.driftEnvelope[0], p.driftEnvelope[1]],
+              ["visual (fraction of pixels)", p.measured.visual, p.visualEnvelope[0], p.visualEnvelope[1]],
+              ["silhouette IoU", p.perceptual.measured.iou,
+               p.perceptual.iouEnvelope[0], p.perceptual.iouEnvelope[1]],
+              ["silhouette scale delta", p.perceptual.measured.scaleDelta,
+               p.perceptual.scaleEnvelope[0], p.perceptual.scaleEnvelope[1]],
+              ["SSIM", p.perceptual.measured.ssim,
+               p.perceptual.ssimEnvelope[0], p.perceptual.ssimEnvelope[1]],
+              ["edge overlap", p.perceptual.measured.edgeOverlap,
+               p.perceptual.edgeEnvelope[0], p.perceptual.edgeEnvelope[1]]],
+             "the first cross-backend numbers this tree has ever held. Read the columns, not a curve: these " +
+             "are six different metrics, so the row order is not an axis. Bounded BOTH ways on purpose -- " +
+             "v3337's rule is that two different solvers agreeing perfectly is a finding, not a success");
+    GR.table("...and the one metric bounded on one side only",
+             ["metric", "measured", "ceiling"],
+             [["pHash (bits differing)", p.perceptual.measured.phashBits, p.perceptual.phashCeiling]],
+             "a perceptual hash distance has no meaningful floor between two DIFFERENT solvers, so only the " +
+             "ceiling is recorded");
+
     ok("the two solvers DIVERGE, which is the expected answer and the reason mixed-backend lockstep is refused",
        p.measured.maxDrift > 0.5 && p.perceptual.measured.iou < 0.95,
        `${p.measured.maxDrift}u apart after 180 ticks on an identical scene`);
@@ -240,12 +282,51 @@ console.log("\n5. WHAT THE HARNESS SAYS WHEN IT CANNOT LOAD A BACKEND, WHICH IS 
 //   E  the harness stops going through the Node door. -> 1 RED. The original bug, and the reason the envelope
 //      held one backend for as long as the file existed.
 //
+//
+// ---- AND TWO MORE AT THE MERGE, BECAUSE THE OTHER BRANCH'S v4399 RATCHET FIRED ON THIS GATE ---------------
+//
+// tools/ship/gateReport-selfcheck.mjs arrived from main with an arrivals ratchet on the named set of gates
+// that print tables and emit nothing, and it went RED on THIS FILE by path the moment the branches met. That
+// is somebody else's check catching a gate written in ignorance of it, one round after they installed it. So
+// this gate emits, and wiring it found a defect in THEIR page:
+//
+//   F  the report table's title attribute goes back to raw interpolation, as it was before this round
+//      -> 1 RED: "EVERY value in every report reaches the DOM to the digit -- 153 values, 4 MISSING".
+//      Exactly the four routing requests containing a double quote -- {"prefer":"box3d"} and three more --
+//      and not the fifth, which is a bare {}. A quote CLOSED the attribute. The check was right and
+//      instruments.html was wrong, the same way round as when the page rounded a 17-digit float away.
+//      instruments.html restored 6755dc5b60f9a4d722d5692dc09bc1e1.
+//   G  gate-reports/backendRouting-selfcheck.json removed from disk, as if this gate still argued in numbers
+//      and emitted nothing -> 6 RED, the arrivals ratchet FIRST and by path: "ARRIVALS:
+//      physics/backendRouting-selfcheck.mjs". The other five are the page checks reading a stale index, which
+//      is the same finding from five angles rather than five findings.
+//
+// THE DETECTOR IS BEHAVIOURAL, WHICH IS WHY G IS THE HONEST SABOTAGE: emits is read from the reports ON DISK,
+// not from a call to gateReport() in the source, so deleting the GR calls while leaving the artefact would
+// have proved nothing. That is the same choice v3609 forced on artefactWriters.
+//
+// *** THE TABLES LEAVE THE TERMINAL, AND WHAT WAS NOT MEASURED LEAVES WITH THEM. ***
+GR.skip("the same envelope on any other machine",
+        "recorded in this container against the vendored clang wasm and the vendored Jolt. The bands are " +
+        "multiplicative and generous by construction, but no second box has been near them");
+GR.skip("the BROWSER path of box3dLoader",
+        "the absolute-URL import is still the only path the loader itself takes, and nothing here runs a page");
+GR.note("Every number in both tables is read from the object the checks above assert on -- the routing rows " +
+        "from the worlds actually created, the envelope from tools/render-qa/backend-baseline.json.");
+{
+    const w = GR.write();
+    console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +
+                ` -- ${w.doc.tables.length} tables, ` +
+                `${w.doc.tables.reduce((n, t) => n + t.rows.length * t.columns.length, 0)} cells`);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER THE ENVELOPE HOLDS ANYWHERE ELSE. It was recorded in this container and " +
     "the bands are wide by design, but no second machine has been near it, so 'the two solvers stay this far " +
     "apart' is one sample dressed as a floor. Also unchecked: the BROWSER path. box3dLoader's absolute-URL " +
-    "import is still first and still untested from here -- this round added a Node fallback behind it and did " +
-    "not touch what a page does, so if that URL is also wrong in a browser this gate would not know. And the " +
+    "import is still the only path the loader itself takes and is still untested from here -- what this round " +
+    "added beside it is an adopt() seam that only a Node caller reaches, so a page's behaviour is unchanged " +
+    "and if that URL is also wrong in a browser this gate would not know. And the " +
     "facade's ragdoll asymmetry is reported, not repaired: physics/ragdollFromSkeleton.mjs derives a ragdoll " +
     "box3d can step, and selectBackend still has no box3d factory to hand a caller who asks for one.");
 process.exit(fails ? 1 : 0);

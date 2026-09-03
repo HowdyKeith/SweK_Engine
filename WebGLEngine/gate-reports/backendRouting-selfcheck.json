@@ -1,0 +1,125 @@
+{
+ "gate": "physics/backendRouting-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "which backend each request reaches, and what that engine's own world says",
+   "columns": [
+    "request",
+    "backend",
+    "caps.constraints",
+    "world.supportsJoints()"
+   ],
+   "rows": [
+    [
+     "{}",
+     "box3d",
+     "true",
+     "true"
+    ],
+    [
+     "{\"prefer\":\"box3d\"}",
+     "box3d",
+     "true",
+     "true"
+    ],
+    [
+     "{\"prefer\":\"jolt\"}",
+     "jolt",
+     "false",
+     "false"
+    ],
+    [
+     "{\"need\":[\"constraints\"]}",
+     "box3d",
+     "true",
+     "true"
+    ],
+    [
+     "{\"need\":[\"ragdolls\"]}",
+     "jolt",
+     "false",
+     "false"
+    ]
+   ],
+   "note": "before this round every one of these five said jolt in Node, because box3dLoader's browser-absolute import could not resolve and selectBackend fell through"
+  },
+  {
+   "title": "Jolt against box3d after 180 ticks on one identical scene: the two-sided bands",
+   "columns": [
+    "metric",
+    "measured",
+    "envelope lo",
+    "envelope hi"
+   ],
+   "rows": [
+    [
+     "drift (units)",
+     3.718,
+     1.2309050530727035,
+     7.577262632681759
+    ],
+    [
+     "visual (fraction of pixels)",
+     0.0596,
+     0.02385416666666667,
+     0.13734375
+    ],
+    [
+     "silhouette IoU",
+     0.588,
+     0.44103623649078194,
+     0.676255562619199
+    ],
+    [
+     "silhouette scale delta",
+     0.0668,
+     0.03341483292583537,
+     0.15365933170334148
+    ],
+    [
+     "SSIM",
+     0.6849,
+     0.49368355202696934,
+     0.8761392533782821
+    ],
+    [
+     "edge overlap",
+     0.2219,
+     0.15535714285714283,
+     0.2863265306122449
+    ]
+   ],
+   "note": "the first cross-backend numbers this tree has ever held. Read the columns, not a curve: these are six different metrics, so the row order is not an axis. Bounded BOTH ways on purpose -- v3337's rule is that two different solvers agreeing perfectly is a finding, not a success"
+  },
+  {
+   "title": "...and the one metric bounded on one side only",
+   "columns": [
+    "metric",
+    "measured",
+    "ceiling"
+   ],
+   "rows": [
+    [
+     "pHash (bits differing)",
+     14,
+     25
+    ]
+   ],
+   "note": "a perceptual hash distance has no meaningful floor between two DIFFERENT solvers, so only the ceiling is recorded"
+  }
+ ],
+ "notes": [
+  "Every number in both tables is read from the object the checks above assert on -- the routing rows from the worlds actually created, the envelope from tools/render-qa/backend-baseline.json."
+ ],
+ "skipped": [
+  {
+   "what": "the same envelope on any other machine",
+   "why": "recorded in this container against the vendored clang wasm and the vendored Jolt. The bands are multiplicative and generous by construction, but no second box has been near them"
+  },
+  {
+   "what": "the BROWSER path of box3dLoader",
+   "why": "the absolute-URL import is still the only path the loader itself takes, and nothing here runs a page"
+  }
+ ]
+}
