@@ -393,6 +393,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "0.433447 that was a wrong frequency in this gate's own fixture. Driven RED by four " +
                  "sabotages (2/10/3/2 by name) and restored md5-identical",
     }),
+    since18: Object.freeze({
+        at: "v4385", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/jointDrive-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections against a natively rebuilt shim. TWO checks " +
+                 "were written as claims and came back RED first: a clean below/above split on the torque cap " +
+                 "(the measurement made it three -- a cap of exactly m*g*d holds MARGINALLY, 62x the sag of one " +
+                 "6% larger), and a fixed-size limit overshoot (it is SIGNED -- the knee stops 0.0153 deg SHORT " +
+                 "while three tighter stops overshoot). Also swept tools/ship/box3dFilter-selfcheck.mjs, which " +
+                 "was RED AT HEAD -- v4382 shipped a raycast that never reached build-box3d-wasm.sh's hand-typed " +
+                 "export list -- and is green now. Driven RED by five sabotages (3/5/1/1/3 by name), both files " +
+                 "md5-identical after, the three shim ones rebuilt natively so what went red is compiled physics",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

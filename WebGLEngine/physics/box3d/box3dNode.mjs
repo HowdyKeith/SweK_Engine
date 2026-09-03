@@ -39,6 +39,7 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { ADDED_AT_V4385 as JOINT_DRIVE_ADDED } from "./jointDrive.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VENDOR_DIR = join(HERE, "..", "..", "vendor", "box3d");
@@ -156,6 +157,12 @@ export const PENDING_REBUILD = [
     // browser path degrades on has() until somebody runs build-box3d-wasm.sh on a rig that has it.
     "swk_world_cast_ray",
     "swk_ray_stride",
+    // v4385 -- the joint READBACKS and the DRIVE, same split again: built and measured natively, not packaged.
+    // These six are the half of the joint API that was missing for four hundred rounds -- the shim could set a
+    // limit and never read one back, so physics/ragdollFromSkeleton.mjs's derived knee angle of [-145, 0] was
+    // written into the solver and unobservable. The names come from physics/box3d/jointDrive.mjs's
+    // ADDED_AT_V4385 rather than being typed here twice; the gate asserts the two lists are the same.
+    ...JOINT_DRIVE_ADDED,
 ];
 
 

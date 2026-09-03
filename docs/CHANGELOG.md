@@ -14,6 +14,88 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4385 -- The joint limit was write-only for four hundred rounds
+
+swk_joint_revolute has taken loDeg and hiDeg since v2515 and swk_joint_spherical has taken coneDeg just as
+long. Seven swk_joint_* entry points existed before this round -- create three kinds, destroy, count, toggle
+collide-connected -- and NOT ONE OF THEM COULD READ AN ANGLE BACK.
+
+So physics/ragdollFromSkeleton.mjs derives a knee bound of [-145, 0] degrees from a bone name, hands it to the
+solver, and it becomes unobservable. tools/ship/ragdollStep-selfcheck.mjs has been saying the consequence about
+itself: "a rig that settles symmetrically can still have its knees bending the wrong way -- the limits are
+checked as VALUES by v4245 and never as BEHAVIOUR". A value written and never read is not a setting, it is a
+hope.
+
+swk_joint_state, swk_joint_limits and swk_joint_kind are the reading half, with their row widths published
+through swk_joint_state_stride and swk_joint_limits_stride the way swk_contact_stride and swk_ray_stride
+already publish theirs. swk_joint_motor is the drive a limit implies: a joint that can only be stopped is a
+ragdoll, and one that can also be pushed is a rig. It also closes v3568's dangling promise -- that round found
+a comment pointing at a swk_joint_motor_set that was defined nowhere, and wrote "when there is one, this is
+where it goes".
+
+WHAT MAKES A MOTOR GRADEABLE RATHER THAN "THE RAGDOLL LOOKS BETTER" is that holding a limb level is a statics
+problem with a closed form. torque = m*g*d*cos(theta), and box3d lands on it over five independent
+(mass, gravity, lever) triples:
+
+  predicted   800.0000   784.8000   200.0000   1800.0000   1600.0000
+  measured    800.0000   784.8000   200.0000   1800.0001   1600.0000
+
+worst relative error 6.78e-08, which is float32 storage and nothing else.
+
+AND THE SAME FORM IS THE THRESHOLD, which is what maxTorque means. The arm needs 800 N m to hold level: a cap
+of 700 sags 49.76 degrees, 750 sags 34.75, 850 holds within 0.007. The number separating a limb that resists
+from a limb that hangs is not a feel, it is computed before the simulation runs.
+
+THE CHECK FOR THAT WAS WRITTEN AS A CLEAN BINARY AND THE MEASUREMENT SPLIT IT IN THREE. A cap of EXACTLY m*g*d
+holds, but MARGINALLY: 0.4531 degrees of sag, sixty-two times the 0.0073 of a cap six percent larger. A motor
+given exactly what the statics demand has nothing spare for the solver's own slack, so the threshold is a knee
+in the curve rather than a cliff. The cosine half is checked on the WEAK-cap family and not the level case,
+because at level cos = 1 and a dropped cosine is invisible there -- with a cap of 700 the arm settles at
+49.7583 degrees and the motor then reports 516.80, which is 800*cos(49.7583) = 516.81 and NOT the cap it
+slipped past on the way down.
+
+AND THE OBSERVABLE HAD TO BE THE EXTREME, NOT THE FINAL VALUE, WHICH NEARLY SHIPPED A COINCIDENCE. The first
+probe read the angle after five seconds. A free hinge gave -30.331; the same hinge limited to [-30, 0] gave
+-30.010. Two numbers a fifth of a degree apart, reading as "the limit did nothing" -- and wrong in both
+directions, because the free hinge was still SWINGING and -30.331 was a pendulum passing through. Run to rest
+it reaches -176.560 while the limited one stops at -30.017. A limit does not say where a joint ends up, it says
+where it never goes, so every check reads a running extreme. The knee this tree actually derives is held 31.575
+degrees short of where it would otherwise swing.
+
+AND THE EXCURSION PAST A SOFT STOP IS SIGNED, WHICH THE SECOND CLAIM GOT WRONG. Written as "a fixed overshoot
+whatever the bound", it went red: [-1,0], [-10,0] and [-30,0] overshoot by +0.0121, +0.0155 and +0.0166
+degrees, and [-145,0] UNDERSHOOTS by -0.0153. Not noise and not a second mechanism -- at -145 the arm has swung
+past vertical and arrives at the stop almost weightless, so it never leans on it hard enough to push through.
+How far a soft constraint yields depends on how hard something pushes, and a one-sided check would have passed
+the knee for the wrong reason.
+
+Two controls, because a number that only ever agrees is not evidence:
+
+  * A CONE OF ZERO reaches 176.560 degrees -- the same extreme the free HINGE found, from a different joint
+    type through a different code path.
+  * A MOTOR ENABLED WITH A ZERO CAP is the free joint to the digit: min -176.560 and final -47.602 both ways.
+    That is what isolates the torque as the cause rather than the enable flag or the extra constraint row.
+
+Five sabotages, 3/5/1/1/3 red by name, box3d_shim.c and jointDrive.mjs md5-identical after, the three shim ones
+REBUILT NATIVELY so what went red is compiled physics. Sabotage D is the instructive one: dropping the cosine
+from holdTorque goes red on exactly ONE check, because five of the six torque comparisons are at level where
+cos = 1. Sabotage E also caught a DETAIL STRING asserting "float32 storage and nothing else" while printing
+7.00e+0 beside its own FAIL -- a detail decorating a failure with the conclusion it had just disproved -- and
+that is fixed.
+
+AND box3dFilter-selfcheck WAS RED AT HEAD AND IS GREEN NOW. It counts the shim's swk_* names against
+build-box3d-wasm.sh's hand-typed EXPORTED_FUNCTIONS list, and found 2 missing before this round began: v4382's
+swk_world_cast_ray and swk_ray_stride shipped without ever reaching it. All eight are listed now. A
+hand-maintained list is a ratchet only if something counts it.
+
+UNCHECKED: a ragdoll. Every joint above is one arm on one anchor, so what is graded is that box3d honours a
+limit and a motor, not that eleven derived bones do anything sensible together -- the JOINT_TABLE is still
+applied by nothing outside a gate. Also unchecked: the TWIST limit, which the spherical joint has and
+swk_joint_spherical still does not pass, so a shoulder here can cone correctly and rotate the forearm freely
+inside it. SENSORS and CCD are deliberately left on #150: both are real box3d capabilities with NO consumer in
+this tree, and #133's rule is find the consumer before taking the solver. The limit had one waiting since v4245.
+
+The tree stands at 1424 gates.
 ## v4384 -- A song, lathed: the first reference the silhouette judge did not make itself
 
 render/silhouette.mjs was built at v3337 as a HARD gate -- a veto a soft average cannot wash out -- with its

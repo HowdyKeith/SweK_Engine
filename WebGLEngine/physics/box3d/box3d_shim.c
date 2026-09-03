@@ -464,6 +464,12 @@ int swk_player_transforms(float* out) {
 // v3568 -- THIS COMMENT USED TO SAY "see swk_joint_motor_set below" AND NO SUCH FUNCTION IS DEFINED IN THIS FILE,
 // or anywhere. A reader following the pointer found nothing, which is worse than silence because it reads like a
 // capability the shim has. There is no motor binding yet; when there is, this is where it goes.
+//
+// *** v4385 -- THERE IS ONE NOW, AND IT IS CALLED swk_joint_motor, IN THE JOINT STATE BLOCK AT THE END OF THIS
+// FILE. *** v3568 left a promise rather than a pointer and this closes it. The name deliberately is NOT
+// swk_joint_motor_set: box3dNode.mjs's documentedButMissing() still lists that string as a name the shim
+// mentions and never defines, and inventing a function to satisfy a report would be shipping code to silence a
+// measurement. The dangling name stays reported until this comment stops containing it.
 // =============================================================================
 
 // (the joint table is declared with the other globals at the top of the file -- v3568)
@@ -750,4 +756,137 @@ int swk_world_cast_ray(float ox, float oy, float oz,
     out[3] = r.point.x;  out[4] = r.point.y;  out[5] = r.point.z;
     out[6] = r.normal.x; out[7] = r.normal.y; out[8] = r.normal.z;
     return idx;
+}
+
+// ============================================================================================================
+// JOINT STATE AND JOINT DRIVE -- v4385.
+//
+// *** THE LIMIT HAS BEEN WRITE-ONLY SINCE v2515. *** swk_joint_revolute has taken loDeg and hiDeg from the
+// day it was written and swk_joint_spherical has taken coneDeg just as long, and NOT ONE FUNCTION IN THIS FILE
+// HAS EVER READ A JOINT ANGLE BACK. Seven swk_joint_* entry points before this block, and every one of them
+// either creates, destroys, counts, or toggles collide-connected. So physics/ragdollFromSkeleton.mjs derives
+// a knee limit of [-145, 0] degrees from a bone name, hands it to box3d, and nothing anywhere can say whether
+// the knee ever reached it -- which is exactly what tools/ship/ragdollStep-selfcheck.mjs's own footer says of
+// itself: "the limits are checked as values by v4245 and never as behaviour".
+//
+// A value you write and never read is not a setting, it is a hope. These are the readbacks that turn it into
+// a measurement, plus the DRIVE that a limit implies the need for: a joint that can only be stopped is a
+// ragdoll, and a joint that can also be pushed is a rig.
+//
+// LAYOUTS ARE PUBLISHED, NOT TYPED TWICE. swk_joint_state_stride() and swk_joint_limits_stride() do for these
+// rows what swk_contact_stride() and swk_ray_stride() already do for theirs, so physics/box3d/jointDrive.mjs
+// names the fields and the gate compares the two counts rather than trusting that they agree.
+// ============================================================================================================
+
+#define SWK_JOINT_STATE_STRIDE  4   // kind, angle, twist, motorTorque
+#define SWK_JOINT_LIMITS_STRIDE 4   // limitEnabled, lower, upper, motorEnabled
+
+// What kind of joint an index holds, so a caller reading a row knows which fields mean anything.
+// *** THIS IS NOT b3JointType. *** box3d numbers its own enum and that numbering is upstream's to change;
+// these three constants are this shim's contract with jointDrive.mjs and are asserted equal in the gate.
+#define SWK_JOINT_UNKNOWN   0
+#define SWK_JOINT_REVOLUTE  1
+#define SWK_JOINT_SPHERICAL 2
+#define SWK_JOINT_WELD      3
+
+int swk_joint_state_stride(void)  { return SWK_JOINT_STATE_STRIDE; }
+int swk_joint_limits_stride(void) { return SWK_JOINT_LIMITS_STRIDE; }
+
+static int swk__joint_kind(int idx) {
+    if (idx < 0 || idx >= g_jointCount) return SWK_JOINT_UNKNOWN;
+    if (B3_IS_NULL(g_joints[idx])) return SWK_JOINT_UNKNOWN;
+    switch (b3Joint_GetType(g_joints[idx])) {
+        case b3_revoluteJoint:  return SWK_JOINT_REVOLUTE;
+        case b3_sphericalJoint: return SWK_JOINT_SPHERICAL;
+        case b3_weldJoint:      return SWK_JOINT_WELD;
+        default:                return SWK_JOINT_UNKNOWN;
+    }
+}
+
+int swk_joint_kind(int idx) { return swk__joint_kind(idx); }
+
+/*
+ * The live angles, in RADIANS. Fields: kind, angle, twist, motorTorque.
+ *
+ * *** THE TWO ANGLE FIELDS MEAN DIFFERENT THINGS FOR THE TWO JOINT KINDS, AND COLLAPSING THEM WOULD BE A LIE.
+ * A revolute has ONE angle about its axis and no twist. A spherical has a CONE angle -- how far the bone has
+ * swung away from its rest direction, always non-negative -- and separately a TWIST about that direction,
+ * which is signed. Writing the cone angle into a field called "angle" and leaving twist at zero would let a
+ * caller average the two kinds together, which is meaningless. `kind` is field 0 so the reader has to look.
+ *
+ * Returns the kind, or SWK_JOINT_UNKNOWN with the row zeroed.
+ */
+int swk_joint_state(int idx, float* out) {
+    for (int i = 0; i < SWK_JOINT_STATE_STRIDE; i++) out[i] = 0.0f;
+    int kind = swk__joint_kind(idx);
+    out[0] = (float)kind;
+    if (kind == SWK_JOINT_REVOLUTE) {
+        out[1] = b3RevoluteJoint_GetAngle(g_joints[idx]);
+        out[3] = b3RevoluteJoint_GetMotorTorque(g_joints[idx]);
+    } else if (kind == SWK_JOINT_SPHERICAL) {
+        out[1] = b3SphericalJoint_GetConeAngle(g_joints[idx]);
+        out[2] = b3SphericalJoint_GetTwistAngle(g_joints[idx]);
+        b3Vec3 t = b3SphericalJoint_GetMotorTorque(g_joints[idx]);
+        out[3] = b3Length(t);
+    }
+    return kind;
+}
+
+/*
+ * What the joint was actually CONFIGURED with, read back out of the solver rather than remembered here.
+ * Fields: limitEnabled, lower, upper, motorEnabled -- radians, and for a spherical the "lower/upper" pair is
+ * the cone half-angle in BOTH slots, because a cone has one number and duplicating it is honester than
+ * leaving a field that a reader would have to know to ignore.
+ *
+ * *** READING THIS BACK IS THE POINT, NOT A CONVENIENCE. *** swk_joint_revolute silently drops the limit when
+ * loDeg >= hiDeg, and swk_joint_spherical silently drops the cone when coneDeg <= 0. Both are documented and
+ * neither was observable: a caller who passed its degrees the wrong way round got a free joint and no
+ * complaint. Now the caller can ask.
+ */
+int swk_joint_limits(int idx, float* out) {
+    for (int i = 0; i < SWK_JOINT_LIMITS_STRIDE; i++) out[i] = 0.0f;
+    int kind = swk__joint_kind(idx);
+    if (kind == SWK_JOINT_REVOLUTE) {
+        out[0] = b3RevoluteJoint_IsLimitEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+        out[1] = b3RevoluteJoint_GetLowerLimit(g_joints[idx]);
+        out[2] = b3RevoluteJoint_GetUpperLimit(g_joints[idx]);
+        out[3] = b3RevoluteJoint_IsMotorEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+    } else if (kind == SWK_JOINT_SPHERICAL) {
+        out[0] = b3SphericalJoint_IsConeLimitEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+        const float cone = b3SphericalJoint_GetConeLimit(g_joints[idx]);
+        out[1] = cone; out[2] = cone;
+        out[3] = b3SphericalJoint_IsMotorEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+    }
+    return kind;
+}
+
+/*
+ * THE DRIVE. A motor is what makes a rig resist instead of hanging.
+ *
+ * speed is RADIANS PER SECOND about the joint's own axis; maxTorque caps what the solver may spend reaching
+ * it, and is the field that separates "a limb that holds its pose" from "a limb that cannot be pushed off it".
+ * A motor with an unbounded torque is not a muscle, it is a weld with extra steps.
+ *
+ * *** DETERMINISM: THE COMMENT ABOVE THE JOINT BLOCK HAS WARNED ABOUT THIS SINCE v2515 AND IT IS STILL TRUE.
+ * Joints are solved inside box3d and cost lockstep nothing. A motor whose target is set per tick by gameplay
+ * is an INPUT, and an input has to travel the same path every other input travels or the replay diverges.
+ * This function is the actuator, not the policy; nothing here decides when to call it.
+ */
+int swk_joint_motor(int idx, int enable, float speed, float maxTorque) {
+    int kind = swk__joint_kind(idx);
+    if (kind == SWK_JOINT_REVOLUTE) {
+        b3RevoluteJoint_EnableMotor(g_joints[idx], enable ? true : false);
+        b3RevoluteJoint_SetMotorSpeed(g_joints[idx], speed);
+        b3RevoluteJoint_SetMaxMotorTorque(g_joints[idx], maxTorque);
+        return kind;
+    }
+    if (kind == SWK_JOINT_SPHERICAL) {
+        // A spherical motor takes a VECTOR velocity. The axis a spherical joint was built around is its
+        // frame's z, so a scalar "speed" here means "about your own axis" and is written as such.
+        b3SphericalJoint_EnableMotor(g_joints[idx], enable ? true : false);
+        b3SphericalJoint_SetMotorVelocity(g_joints[idx], (b3Vec3){ 0.0f, 0.0f, speed });
+        b3SphericalJoint_SetMaxMotorTorque(g_joints[idx], maxTorque);
+        return kind;
+    }
+    return SWK_JOINT_UNKNOWN;       // a weld has nothing to drive, and saying so beats doing nothing quietly
 }
