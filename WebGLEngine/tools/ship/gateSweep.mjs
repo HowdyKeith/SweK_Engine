@@ -326,7 +326,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
                  "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
     }),
-    // v4372 -- the TWELFTH closing, for the carve's compute pass. *** IT WAS WRITTEN AS since10 AND THAT
+    // v4373 -- the TWELFTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
+    // FORWARD at the merge; a closing's `at` names the round it belongs to, so it moves with the round). *** IT WAS WRITTEN AS since10 AND THAT
     // NUMBER WAS ALREADY TAKEN: *** the other line shipped v4365 and v4366 into since9 and since10 while this
     // one was building, and the merge left TWO since10 keys in one object literal -- where the later silently
     // overwrites the earlier, so v4366's closing would have vanished with no error anywhere. Caught by reading
@@ -336,13 +337,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
     // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
     since12: Object.freeze({
-        at: "v4372", swept: 1, green: 1, red: 0,
+        at: "v4373", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, three sections and 13 checks in 18.8 s. Driven RED by four " +
                  "sabotages (2/3/4/4 by name) and restored; two of them differ by a factor of eight in voxels " +
                  "and the SMALLER one is the worse, because it breaks the containment bound the larger leaves " +
                  "intact. Sections 1 and 2 need no device and stay green where WebGPU is unavailable",
+    }),
+    // v4374 -- the THIRTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
+    // because main's v4372 landed mid-build and had already done three of them, better; what survived is the one
+    // parameter that round did not vary. Numbered THIRTEEN and not fourteen because an earlier draft's since13
+    // went into a stash that was dropped at the merge -- the number was never spent, so it is still free.
+    since13: Object.freeze({
+        at: "v4374", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/carveJudged-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections and 10 checks in 22 s. Driven RED by three " +
+                 "sabotages (3/3/1 by name) and restored -- and the 1-red one is the thesis rather than a weak " +
+                 "check: making the hulls worse does not move a verdict that depends on the grid",
     }),
 });
 
