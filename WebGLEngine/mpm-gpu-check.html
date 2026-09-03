@@ -131,10 +131,26 @@ async function gpuRun(dev, { block = {}, walls = null, mode = 1, steps = 60 } = 
     { binding: 2, resource: { buffer: bufAcc } }, { binding: 3, resource: { buffer: bufGv } },
     { binding: 4, resource: { buffer: bufFlags } },
   ];
+  // *** v4386 -- AN EXPLICIT LAYOUT, AND WITHOUT IT THIS PAGE HAD NEVER RUN A SINGLE STEP. ***
+  // With layout:"auto" WebGPU derives each entry point's bind group layout from the bindings THAT ENTRY POINT
+  // USES, and `clear` never touches binding 1 (the particles). So createBindGroup with all five entries was
+  // INVALID for it -- "binding index 1 not present in the bind group layout" -- and an invalid bind group means
+  // every dispatch in every stage was silently dropped. The symptom was not an error: the particles came back
+  // exactly where they started, the centre of mass read its rest value to nine decimals, two runs were of
+  // course bit-identical, and nothing ever saturated. A page that does nothing passes three of its own rows.
+  // One declared layout is valid for all four stages, so they share it and share one bind group.
+  const bgl = dev.createBindGroupLayout({ entries: [
+    { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
+    { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+    { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+    { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+    { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } } ] });
+  const pipeLayout = dev.createPipelineLayout({ bindGroupLayouts: [bgl] });
+  const sharedBind = dev.createBindGroup({ layout: bgl, entries });
   const pipes = {}, binds = {};
   for (const stage of ["clear", "p2g", "grid", "g2p"]) {
-    pipes[stage] = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: stage } });
-    binds[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries });
+    pipes[stage] = dev.createComputePipeline({ layout: pipeLayout, compute: { module: mod, entryPoint: stage } });
+    binds[stage] = sharedBind;
   }
 
   const wg = (x) => Math.ceil(x / 64);

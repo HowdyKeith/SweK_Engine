@@ -440,6 +440,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (2/3/1 by name, and the first also reddens magmap-selfcheck) and restored; the first " +
                  "is the constant the tree actually shipped, which now costs a red in two gates instead of none",
     }),
+    // v4386 -- the TWENTY-FIRST closing, and the fifth round running for a kernel nothing had ever given a
+    // device. This one found the CHECK PAGE itself broken, so mpm-gpu-check.html changed too and the MPM family
+    // (gpuKernel, gpuKernelInterp and the step/transfer/plasticity gates behind them) was run beside it.
+    since21: Object.freeze({
+        at: "v4386", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/mpm/mpmDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, three sections and 10 checks in 0.8 s. Driven RED by three " +
+                 "sabotages (1/3/3 by name) and restored; the first is the state the tree shipped in, and the " +
+                 "third leaves the determinism row GREEN while destroying the scatter, which is that row's " +
+                 "declared limit arriving as a measurement",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
