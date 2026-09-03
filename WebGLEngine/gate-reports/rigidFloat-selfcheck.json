@@ -1,0 +1,165 @@
+{
+ "gate": "physics/sph/rigidFloat-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "hull quadrature against an exact hydrostatic field",
+   "columns": [
+    "particle spacing (m)",
+    "hull span (spacings)",
+    "summed area / hull area",
+    "F_up (N)",
+    "rho*g*V (N)",
+    "ratio"
+   ],
+   "rows": [
+    [
+     0.05,
+     3.0000000000000004,
+     0.9999999999999968,
+     3.5319714911844375,
+     3.531600000000001,
+     1.0001051906174077
+    ],
+    [
+     0.033,
+     5,
+     0.9999999999999981,
+     9.808991770309037,
+     9.81,
+     0.9998972242924604
+    ],
+    [
+     0.025,
+     6.000000000000001,
+     0.9999999999999949,
+     21.186054684006624,
+     21.189600000000006,
+     0.9998326860349709
+    ],
+    [
+     0.02,
+     8,
+     0.9999999999999989,
+     50.22227703956204,
+     50.2272,
+     0.9999019861661019
+    ],
+    [
+     "band estimator, d=0.033",
+     5,
+     1.0777777777777802,
+     -31.882500000000014,
+     9.81,
+     -3.2500000000000013
+    ]
+   ],
+   "note": "no solver in this table: every particle is GIVEN p = rho*g*(level-y)"
+  },
+  {
+   "title": "the settled pool's pressure down its centre column",
+   "columns": [
+    "depth below surface (m)",
+    "p (Pa)"
+   ],
+   "rows": [
+    [
+     0.04342578808690119,
+     0
+    ],
+    [
+     0.08685157617380238,
+     0
+    ],
+    [
+     0.13027736426070355,
+     0
+    ],
+    [
+     0.17370315234760475,
+     0
+    ],
+    [
+     0.21712894043450592,
+     49.04948681913294
+    ],
+    [
+     0.2605547285214071,
+     402.4863513303155
+    ],
+    [
+     0.30398051660830827,
+     1004.3310202563855
+    ],
+    [
+     0.3474063046952095,
+     2008.0143861912354
+    ],
+    [
+     0.3908320927821107,
+     2957.797698617904
+    ]
+   ],
+   "note": "least squares dp/d(depth) = 7778.2 Pa/m against rho0*g = 1179.3 Pa/m"
+  },
+  {
+   "title": "the same quadrature against the LIVE settled pool",
+   "columns": [
+    "box footprint x height (m)",
+    "centre y (m)",
+    "local rho",
+    "F_up (N)",
+    "rho_local*g*V (N)",
+    "ratio"
+   ],
+   "rows": [
+    [
+     "0.120 x 0.080",
+     0.15199025830415414,
+     113.43600862380995,
+     16.695263403312683,
+     1.2819539457787108,
+     13.023294212937817
+    ],
+    [
+     "0.120 x 0.080",
+     0.21712894043450592,
+     108.5092337972884,
+     7.247729261045697,
+     1.2262758722512117,
+     5.9103578770902745
+    ],
+    [
+     "0.120 x 0.080",
+     0.2822676225648577,
+     84.50118594064546,
+     0.28965871045846,
+     0.9549580424575471,
+     0.3033208764994896
+    ],
+    [
+     "0.080 x 0.060",
+     0.21712894043450592,
+     107.04528049893165,
+     2.036160462952365,
+     0.40324385345069547,
+     5.0494519520340955
+    ]
+   ],
+   "note": "the integrator is unchanged from the table in section 3; only the field is different"
+  }
+ ],
+ "notes": [
+  "Every number in these tables is read from the same objects the checks above assert on."
+ ],
+ "skipped": [
+  {
+   "what": "a box that floats at the Archimedes draft",
+   "why": "refused, not deferred: the pressure gradient this fluid delivers is 6.6x too steep in the bottom half and zero in the top 44%, so there is no depth at which the lift is rho*g*V. Section 6 is the evidence"
+  },
+  {
+   "what": "torque, heel and righting moment",
+   "why": "the quadrature returns a torque and nothing here checks it. A floating body's stability is a second round and it needs a fluid whose gradient is right first"
+  }
+ ]
+}

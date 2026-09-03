@@ -14,6 +14,107 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4405 -- #160 ships as a refusal, and the cause is a quantity nobody had measured
+
+#160 was filed to come AFTER #159 on purpose, so the fluid would not be the second consumer of an unproven
+bridge. v4403 proved the bridge -- generalized inverse mass, a bit-exact impulse ledger, a sheet that holds a
+3.8 kg box up. This round takes it to physics/sph/, which had never touched a rigid body either: poolFixture's
+boundaries are analytic box walls, sph.js's own third line says it "is NOT a rigid-body engine", and so
+buoyancy was unrepresentable in an engine that has a fluid solver and two rigid-body solvers.
+
+The answer comes in two halves and only one of them is a success.
+
+WHAT IS ESTABLISHED: THE HULL INTEGRAL.
+
+Quadrature over a submerged box's six faces, against an EXACT hydrostatic field given to the particles by
+hand, returns rho*g*V:
+
+    particle spacing   hull span      summed area / hull        F_up (N)    rho*g*V (N)    ratio
+    0.050 m            3 spacings     1.000000000000            3.53197      3.53160       1.0001
+    0.033 m            5 spacings     1.000000000000            9.80899      9.81000       0.9999
+    0.025 m            6 spacings     1.000000000000           21.18605     21.18960       0.9998
+    0.020 m            8 spacings     1.000000000000           50.22228     50.22720       0.9999
+
+Worst deviation 0.017% over a 2.5x range of resolution. The summed quadrature area equals the hull area
+IDENTICALLY -- res x res midpoints per face at weight faceArea/res^2 sum to the face area by construction --
+which is an invariant to assert rather than a number that happens to land near 1. The integrator is right.
+
+WHAT IS REFUSED: BUOYANCY IN THIS FLUID, AND NOT FOR WANT OF AN INTEGRAL.
+
+The same integral against the live settled pool -- physicsSuite's own gated fluid, its numbers, 2000 steps --
+reads 5x to 13x rho*g*V. The reason is measurable and it is not the integral:
+
+    depth below surface     p (SPH interpolant, centre column)
+    0.0434                        0.0
+    0.0869                        0.0
+    0.1303                        0.0
+    0.1737                        0.0
+    0.2171                       49.0
+    0.2606                      402.5
+    0.3040                     1004.3
+    0.3474                     2008.0
+    0.3908                     2957.8
+
+    least squares dp/d(depth)     7778.2 Pa/m
+    rho0 * g, as required          1179.3 Pa/m
+    ratio                             6.60
+
+THE TOP 44% OF THE COLUMN CARRIES EXACTLY ZERO PRESSURE. clampPressure zeroes anything under rest density and
+this column's upper half sits under it, so all the pressure is crowded into the bottom. A hull down there feels
+6.6x too much lift; a hull at 65% of the way up feels 0.303x, which is not a smaller error but the OPPOSITE
+error from the same cause.
+
+SO THE ONE GATED FLUID CHECK MEASURES THE QUANTITY BUOYANCY DOES NOT DEPEND ON.
+
+physicsSuite's "a settled fluid presses with exactly its own weight" reads the MEAN floor pressure against
+M*g/area and gets it right to 15.5%, honestly argued against its own 25% tolerance. It is a good check of the
+thing it checks. But buoyancy is a DIFFERENCE between two face pressures, so it depends on the GRADIENT, and
+the gradient had never been read -- because nothing had ever asked for it. rigidFloat.pressureGradient() is
+the reader this round adds, and the number it returns is the first of its kind in the tree.
+
+hydrostatic.mjs says the same thing from a third direction, and has since v2881: its best row, "ideal,
+restDensity = the actual packing", RETAINS 0.632 of a still column's height -- a column standing at 1.58x the
+density it was given. Three independent readings of one fluid, and the load-bearing one was the one missing.
+
+AND THE FIRST TWO INTEGRALS WERE BOTH WRONG, IN A WAY ONE DIAGNOSTIC CAUGHT.
+
+Both summed over PARTICLES in a band around the hull, each carrying its own (m/rho)^(2/3) of area. The
+diagnostic that named it is the ratio of the summed area to the hull's actual area: it came out between 0.28x
+and 3.4x depending on how the lattice happened to meet the faces, and the force landed with the WRONG SIGN at
+three resolutions out of four (-2.94x, -0.35x, -2.52x of rho*g*V). A band of particles is not a surface and its
+area is an accident of alignment. The first draft also included every particle INSIDE the box, which is where
+half of that came from.
+
+The band estimator is KEPT, as this round's negative control, with its reading PINNED at 1.0778x the hull area
+and -3.2500x rho*g*V. Deleting it would delete the reason quadrature exists, and prose is not a measurement.
+
+Six sabotages, 3/3/1/2/0/1 RED by name, one file md5-identical after. TWO OF THEM REWROTE CHECKS:
+
+Sabotage F showed the band check had asserted the band was wrong by MORE than a threshold -- so two mutations
+that made it wronger still both read ZERO RED. A check written in the direction of the defect cannot see the
+defect grow, which is v4398's lesson in a new shape. It pins the measured values now.
+
+Sabotage E is recorded as UNREACHABLE rather than undetected. It removes the band's "a fluid pushes, it does
+not pull" guard, which defends against p <= 0 -- and every fixture in this gate runs clampPressure:true, which
+already forbids that. Manufacturing a negative-pressure fixture to catch it would be testing a state the
+engine's own configuration prevents. The honest record is that the guard is exercised by nothing here, and why.
+
+Sabotage A is worth a line for what it broke: the quadrature weight becoming faceArea/res instead of
+faceArea/res^2 took out three checks at once, including the area invariant, which is what that invariant is for.
+
+THE REFUSAL IS WRITTEN TO EXPIRE. The checks assert the MEASURED state -- 6.6x, 44% pressureless, 15.5% on the
+mean -- so a round that fixes the gradient turns this gate RED and makes it say the refusal is stale, rather
+than leaving a stale refusal standing over a tree that has moved past it.
+
+UNCHECKED AND SAID PLAINLY: whether the fluid CAN be fixed. This round measures the gradient and refuses
+buoyancy on it; it does not go looking for a stiffness, a viscosity or an equation of state that would make the
+gradient right, because tuning a solver until a number matches is the one move this tree does not make without
+an argument of its own. Also unchecked: torque, heel and any righting moment -- the quadrature returns a torque
+and nothing here reads it; any shape but a box and any body but one; and the reaction the fluid takes back from
+the hull, which is shared over the wetted particles in proportion to nothing but their number and is called
+crude in the module rather than dressed up.
+
+The tree stands at 1437 gates.
 ## v4403 -- the fifth coupling, and the first that leaves XPBD: a sheet that holds a rigid body up
 
 FOUR SOLVERS IN THIS TREE AND UNTIL THIS ROUND NONE OF THEM TOUCHED.

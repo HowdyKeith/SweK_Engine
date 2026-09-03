@@ -597,6 +597,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "ZERO RED at first because every scene caught the body before the bug could show, so the gate " +
                  "could not see the exact defect the round exists to have fixed",
     }),
+    since31: Object.freeze({
+        at: "v4405", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/sph/rigidFloat-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 8.4s, six sections. #160 SHIPS AS A REFUSAL WITH A CAUSE. " +
+                 "The SPH-to-rigid coupling is built on v4403's seam -- the formula IMPORTED across from " +
+                 "physics/xpbd/ rather than copied -- and its ledger is bit-exact. The hull integral is " +
+                 "verified against an EXACT hydrostatic field and returns rho*g*V to 0.017% over a 2.5x range " +
+                 "of resolution, with the summed quadrature area equal to the hull area IDENTICALLY. Against " +
+                 "the live fluid it reads 5x to 13x, and the cause is measured: dp/d(depth) is 7778 Pa/m " +
+                 "against the 1179 Pa/m hydrostatics requires (6.6x), and the top 44% of the column carries " +
+                 "NO pressure because clampPressure zeroes everything under rest density. SO THE ONE GATED " +
+                 "FLUID CHECK MEASURES THE QUANTITY BUOYANCY DOES NOT DEPEND ON: physicsSuite reads the MEAN " +
+                 "floor pressure and gets it right to 15.5%, while buoyancy needs the GRADIENT, which nothing " +
+                 "had ever asked for. Driven RED by six sabotages (3/3/1/2/0/1 by name), one file " +
+                 "md5-identical after; sabotage E is recorded as UNREACHABLE rather than undetected, and " +
+                 "sabotage F rewrote a check that had asserted a defect existed instead of pinning its value",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

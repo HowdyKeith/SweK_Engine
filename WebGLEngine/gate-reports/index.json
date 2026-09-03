@@ -5,6 +5,7 @@
   "gateReport-selfcheck.json",
   "registerDrift-selfcheck.json",
   "rigidCouple-selfcheck.json",
+  "rigidFloat-selfcheck.json",
   "shipyard-selfcheck.json"
  ]
 }
