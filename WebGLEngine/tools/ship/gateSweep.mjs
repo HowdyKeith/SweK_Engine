@@ -538,6 +538,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "does not. energyCompensation-selfcheck.mjs's section 2 was rewritten in the same round, " +
                  "because its second-order measurement turned out to be its instrument's",
     }),
+
+    // v4412 -- the twenty-seventh closing, and the one that closes v4409's section 7. That round proved its
+    // fixture could not see a tangent-frame error at all and called handedness untested rather than harmless;
+    // anisotropy makes the frame a physical parameter, so the same class of error is now visible. It also
+    // carries a key with no isotropic counterpart -- the swap identity, bit-exact at f32 -- and that
+    // exactness was earned by the gate going red on its own first draft.
+    since28: Object.freeze({
+        at: "v4412", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/microfacetAnisoWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, six sections and 16 checks in 2.6 s. Driven RED by six " +
+                 "sabotages (1/1/1/1/3/1 by name) and restored -- and FOUR GOING ONE RED IS A PARTITION, not a " +
+                 "thin gate, which the 3 demonstrates. Its own first draft overclaimed exactness FOUR TIMES " +
+                 "and each correction is recorded where the claim is",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

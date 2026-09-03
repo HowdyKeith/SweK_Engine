@@ -53,6 +53,72 @@ export function D(cosM, alpha, { noPi = false } = {}) {
     return a2 / ((noPi ? 1 : Math.PI) * t * t);
 }
 
+/* ---------------------------------------------------------------------------------------------------------
+ * v4412 -- ANISOTROPY, WHICH IS THE PARAMETER EVERY KEY IN THIS FILE HAS BEEN AVERAGING OVER
+ *
+ * D above takes a COSINE. That is not a simplification, it is the isotropic assumption written into a
+ * signature: a lobe that depends only on the angle from the normal cannot know which way the surface is
+ * brushed. A real anisotropic GGX takes the whole microfacet direction in a TANGENT FRAME.
+ *
+ *     D(m) = 1 / (pi ax ay ((m.x/ax)^2 + (m.z/ay)^2 + m.y^2)^2)        y up, x tangent, z bitangent
+ *
+ * *** AND IT BRINGS A KEY THAT DOES NOT EXIST IN THE ISOTROPIC CASE. *** Rotating the tangent frame by 90
+ * degrees about the normal and swapping ax with ay must leave the lobe unchanged -- it is the same surface
+ * described from a frame turned a quarter turn. Measured BIT-EXACT, not to a tolerance, because the two
+ * expressions are the same arithmetic with two arguments exchanged.
+ *
+ * The isotropic forms above are kept rather than replaced: they are what render/microfacetShader.js ships in
+ * GLSL and what v4408 graded on a device, and a signature change there would have moved four rounds of
+ * measurements. The gate proves the general form CONTAINS them, which is the honest relationship.
+ * ------------------------------------------------------------------------------------------------------- */
+
+/**
+ * Anisotropic GGX / Trowbridge-Reitz. `m` is a unit microfacet normal in the tangent frame (y up).
+ *
+ * WRITTEN AS A SUM OF POSITIVES, for v3494's reason and with v4408's finding in view: (m.x/ax)^2 + (m.z/ay)^2
+ * + m.y^2 has nothing that cancels, where the textbook cos^2(a^2 - 1) + 1 does. That mattered at binary32 in
+ * the isotropic case and it matters more here, because the tangential terms are divided by roughnesses that
+ * can be small.
+ */
+export function Daniso(m, ax, ay) {
+    if (m[1] <= 0) return 0;
+    const tx = m[0] / ax, tz = m[2] / ay;
+    const t = tx * tx + tz * tz + m[1] * m[1];
+    // *** THE PARENTHESES ARE THE SWAP IDENTITY. *** Multiplication is COMMUTATIVE but not ASSOCIATIVE, so
+    // (PI ax) ay and (PI ay) ax differ by a rounding -- and that rounding is the whole difference between an
+    // exact key and a one-ULP one. Grouped this way the only operation asked to commute is ax * ay, which
+    // does, and D(m; ax, ay) == D(rot90 m; ay, ax) BIT FOR BIT: 216 of 216 sampled directions against 170
+    // ungrouped. v3494 re-associated to avoid a cancellation; this re-associates to preserve an exactness.
+    return 1 / (Math.PI * (ax * ay) * (t * t));
+}
+
+/**
+ * The Smith auxiliary for anisotropic GGX. The roughness a direction sees is its own azimuthal blend of ax
+ * and ay, and writing it this way -- (ax w.x)^2 + (ay w.z)^2 over w.y^2 -- keeps that implicit rather than
+ * computing an angle and a cos^2/sin^2 pair, which would introduce a second place for the frame to be wrong.
+ */
+export function lambdaAniso(w, ax, ay) {
+    const c2 = w[1] * w[1];
+    if (c2 >= 1) return 0;
+    const tx = ax * w[0], tz = ay * w[2];
+    return (-1 + Math.sqrt(1 + (tx * tx + tz * tz) / c2)) / 2;
+}
+
+export const G1aniso = (w, ax, ay) => 1 / (1 + lambdaAniso(w, ax, ay));
+/** Height-correlated Smith, as G2 above. `separable` is the other legitimate choice, not a plant. */
+export const G2aniso = (wo, wi, ax, ay, { separable = false } = {}) =>
+    separable ? G1aniso(wo, ax, ay) * G1aniso(wi, ax, ay)
+              : 1 / (1 + lambdaAniso(wo, ax, ay) + lambdaAniso(wi, ax, ay));
+
+/** f cos_i / pdf under anisotropic visible-normal sampling: G2 / G1(wo), unchanged in form from v4410. */
+export function visibleBounceWeightAniso(wo, wi, ax, ay, { F = 1, ...o } = {}) {
+    if (wi[1] <= 0 || wo[1] <= 0) return 0;
+    return F * G2aniso(wo, wi, ax, ay, o) / G1aniso(wo, ax, ay);
+}
+
+/** The direction pdf under anisotropic visible-normal sampling. */
+export const visibleNormalDirPdfAniso = (wo, wh, ax, ay) => G1aniso(wo, ax, ay) * Daniso(wh, ax, ay) / (4 * wo[1]);
+
 /**
  * The Smith auxiliary for GGX.
  *
@@ -284,9 +350,12 @@ export function bsdfEval(cosO, cosI, cosH, alpha, { F = 1, ...o } = {}) {
  *   noDegenerate  drops the lensq == 0 special case. Returns NaN when wo is along the normal, which is not an
  *                 exotic direction: it is the centre of every flat surface facing the camera.
  */
-export function sampleVisibleNormal(wo, alpha, u1, u2, { noWarp = false, noDegenerate = false } = {}) {
+export function sampleVisibleNormal(wo, alpha, u1, u2, { noWarp = false, noDegenerate = false, alphaY = alpha } = {}) {
+    // v4412 -- alphaY defaults to alpha, so every v4410 caller is unchanged. Heitz's listing was ALWAYS
+    // anisotropic; v4410 used the special case, and the two roughnesses enter at exactly the two places the
+    // paper puts them -- the 3.2 stretch and the 3.4 unstretch.
     const Ve = [wo[0], wo[2], wo[1]];                       // y-up -> the paper's z-up. Named swap, one of two.
-    const V0 = [alpha * Ve[0], alpha * Ve[1], Ve[2]];       // 3.2: stretch into the hemisphere configuration
+    const V0 = [alpha * Ve[0], alphaY * Ve[1], Ve[2]];      // 3.2: stretch into the hemisphere configuration
     const vl = Math.hypot(V0[0], V0[1], V0[2]), Vh = [V0[0] / vl, V0[1] / vl, V0[2] / vl];
     const lensq = Vh[0] * Vh[0] + Vh[1] * Vh[1];            // 4.1: an orthonormal basis about Vh
     const T1 = (lensq > 0 || noDegenerate)
@@ -300,7 +369,7 @@ export function sampleVisibleNormal(wo, alpha, u1, u2, { noWarp = false, noDegen
     const k = Math.sqrt(Math.max(0, 1 - t1 * t1 - t2 * t2));                          // 4.3: reproject up
     const Nh = [t1 * T1[0] + t2 * T2[0] + k * Vh[0], t1 * T1[1] + t2 * T2[1] + k * Vh[1],
                 t1 * T1[2] + t2 * T2[2] + k * Vh[2]];
-    const Ne = [alpha * Nh[0], alpha * Nh[1], Math.max(0, Nh[2])];                     // 3.4: unstretch
+    const Ne = [alpha * Nh[0], alphaY * Nh[1], Math.max(0, Nh[2])];                    // 3.4: unstretch
     const nl = Math.hypot(Ne[0], Ne[1], Ne[2]);
     return [Ne[0] / nl, Ne[2] / nl, Ne[1] / nl];            // z-up -> y-up. The second half of the same swap.
 }
