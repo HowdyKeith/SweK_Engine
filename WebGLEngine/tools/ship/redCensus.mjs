@@ -133,14 +133,14 @@ export const RED_AT_V4279 = Object.freeze([
     // recorded reasoning about what each chore unblocks, unreachable for 250 rounds. server.html now carries the
     // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
     // naming one, so the surface can move again without this going stale twice.
-    { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
-      // v4380 -- 4 WHEN FILED, 14 NOW, AND THE NUMBER IS THE POINT. This gate has held since v3274 that a
-      // hand-written pair is cheaper than an IR "while few files carry both languages -- if this count climbs
-      // toward twenty the arithmetic inverts, and THAT is when to re-open the three-stage shape: parse, lower,
-      // emit per target". docs/TSL-ROADMAP.md records 12 at v4319. It is 14 now, and THIS BRANCH PUT SOME OF THEM
-      // THERE: the TSL rounds added modules authoring both languages. The register was holding a counter that the
-      // session was driving toward the tree's own stated trigger, under a line that said 4.
-      fails: "!! *** only 14 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebula.js, render/blackbodyWgsl.mjs, render/bloomFuse" },
+    // v4414 -- REPAIRED AND REMOVED. tools/ship/shaderCensus-selfcheck.mjs was red from the round its
+    // dual-language count passed 3 until v4414, and the red was TRUE about a number that did not bear on the
+    // claim it served. The gate asserted "few files author a shader in BOTH languages" as a proxy for "few
+    // shader pairs an IR would replace"; of the 14 it counted, five duplicate a computation, two share only an
+    // entry-point name, and seven share nothing -- and the seven include render/tslSource.mjs, which is in the
+    // population BECAUSE IT EMITS GLSL, so building the IR raised the count the trigger read. The instrument
+    // was replaced rather than the threshold widened, the co-occurrence count is still reported, and
+    // tools/ship/shaderPairs-selfcheck.mjs carries the evidence and the verdict v4380 deferred.
     // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
     { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
       fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },
@@ -250,6 +250,21 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/shaderCensus-selfcheck.mjs", round: "v4414",
+      why: "RED FROM THE ROUND ITS COUNT PASSED 3, AND THE RED WAS TRUE ABOUT A NUMBER THAT DID NOT BEAR ON THE " +
+           "CLAIM IT SERVED. The gate asserted 'few files author a shader in BOTH languages' as a proxy for 'few " +
+           "shader pairs an IR would replace'. Those are different questions: of the 14 files it counted, FIVE " +
+           "duplicate a computation, two share only an entry-point name, and SEVEN share nothing at all -- " +
+           "render/bloomFused.mjs exists precisely because WebGPU can fuse what WebGL2 cannot, so its two halves " +
+           "are different algorithms and no IR could emit both from one source. WORSE, THE POPULATION INCLUDED " +
+           "THE MACHINERY THAT WOULD BE THE IR: render/tslSource.mjs carries eleven GLSL markers BECAUSE IT " +
+           "EMITS GLSL, so building the IR RAISED the count the trigger read, and a trigger that fires harder " +
+           "the more the problem is solved is not one anybody can act on. v4380 watched it climb from 4 to 14 " +
+           "and correctly refused to draw the conclusion. THE INSTRUMENT IS REPLACED, NOT THE THRESHOLD " +
+           "WIDENED: the co-occurrence count is still reported and the DUPLICATION count is gated, against a " +
+           "measured baseline of 5. tools/ship/shaderPairs-selfcheck.mjs carries the evidence and the verdict -- " +
+           "including that the three-stage shape v3274 said to re-open WAS re-opened, at v4319-v4320, and has " +
+           "shipped ten rounds through render/tslSource.mjs since." },
     { gate: "tools/ship/rigJobs-selfcheck.mjs", round: "v4379",
       why: "RED SINCE v4129 AND IT WAS A MESSAGE, NOT A FACT ABOUT A DELETED PANEL. The failing line was 'the page " +
            "renders title, why and how for each', and it named rig.html -- from which the rig-only panel was removed " +

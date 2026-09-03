@@ -34,6 +34,7 @@
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { RED_AT_V4279 } from "./redCensus.mjs";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
@@ -64,6 +65,44 @@ console.log("\n2. NOTHING IN THE REGISTER IS SECRETLY GREEN");
     const timedOut = REGISTER_AUDIT.rows.filter((r) => r.exit === "timeout");
     ok(`  and a gate too slow to finish inside the audit's cap is recorded as TIMEOUT rather than as a verdict`,
         timedOut.every((r) => !r.first), timedOut.length ? `${timedOut.map((r) => r.gate.replace("tools/ship/", "")).join(", ")} at ${REGISTER_AUDIT.capMs} ms -- a bound, not a measurement` : "none timed out");
+}
+
+console.log("\n2b. THE FREEZE IS A CLAIM ABOUT THE PAST, SO A BOUNDED SAMPLE OF IT IS RE-RUN LIVE");
+{
+    // *** v4414 -- SECTION 2 READS THE FREEZE, SO A GATE REPAIRED AFTER THE FREEZE IS INVISIBLE TO IT. ***
+    // Section 1 catches a register entry ADDED without re-freezing; the opposite case -- a red REPAIRED and
+    // the audit not re-taken -- passed silently until v4414 repaired shaderCensus and this gate said nothing.
+    // Re-taking all 28 costs minutes, so a DETERMINISTIC CHEAPEST-FIRST SAMPLE is re-run instead, under a
+    // stated budget, and the coverage is reported rather than implied.
+    const BUDGET_MS = 1200;
+    const byCost = REGISTER_AUDIT.rows.filter((r) => typeof r.ms === "number").sort((a, b) => a.ms - b.ms);
+    const sample = [];
+    let cum = 0;
+    for (const r of byCost) { if (cum + r.ms > BUDGET_MS) break; sample.push(r); cum += r.ms; }
+    // *** AND EACH RE-RUN HAS TO PROVE IT RAN. *** The first draft of this block referenced an undefined ROOT
+    // (the root here is called ENG); the ReferenceError was thrown inside the try, caught, read as exit 1, and
+    // matched every frozen red -- so the check reported "10 of 28 re-run" in 47 ms while running nothing at
+    // all. That is v4406's shape exactly, written in a round about instruments that measure the wrong thing,
+    // so the gate's own OUTPUT is now the evidence rather than its exit code.
+    const live = sample.map((r) => {
+        let exit = 0, out = "";
+        try { out = execFileSync(process.execPath, [r.gate], { cwd: ENG, encoding: "utf8", timeout: 20000, stdio: "pipe" }); }
+        catch (e) { exit = typeof e.status === "number" ? e.status : -1; out = String((e && e.stdout) || ""); }
+        return { gate: r.gate, frozen: r.exit, now: exit, said: /\bFAIL\b/.test(out) };
+    });
+    const moved = live.filter((r) => (r.frozen === 0) !== (r.now === 0));
+    const silent = live.filter((r) => !r.said);
+    ok(`!! *** a cheapest-first sample of the register is re-run LIVE, so a repaired red cannot hide behind the freeze ***`,
+        moved.length === 0,
+        moved.length ? `${moved.map((r) => `${r.gate} frozen exit ${r.frozen}, now ${r.now}`).join("; ")} -- re-run tools/ship/freezeRegisterAudit.mjs`
+                     : `${live.length} of ${REGISTER_AUDIT.rows.length} gates re-run in a ${BUDGET_MS} ms budget (${cum} ms recorded), all still failing. THE OTHER ${REGISTER_AUDIT.rows.length - live.length} ARE TAKEN ON THE FREEZE'S WORD. *** AND THIS SAMPLE WOULD NOT HAVE CAUGHT v4414's OWN REPAIR: *** shaderCensus cost 279 ms, and the ten cheapest stop at ${sample[sample.length - 1].ms} ms. Raising the budget until it reached that one case would be fitting the instrument to the answer, which is the error the round that added this block is ABOUT. It is a bounded sample and the bound is the number above`);
+    ok("  ...and every gate in the sample PRINTED a FAIL line, which is what says it ran at all",
+        silent.length === 0 && live.every((r) => r.now >= 0),
+        silent.length ? `${silent.map((r) => r.gate).join(", ")} produced no FAIL line -- a re-run reporting agreement without running is worth less than no check`
+                      : `${live.length} gates, all printing. An exit code alone cannot tell "the gate failed" from "the runner failed", which is how this block passed in 47 ms on its first draft`);
+    ok("  and the freeze stamps the version it was taken at, read from the tree rather than typed",
+        /^v\d+$/.test(String(REGISTER_AUDIT.at)),
+        `frozen at ${REGISTER_AUDIT.at}. Until v4414 that string was a literal and said v4380 however long ago the freeze was actually taken -- a staleness marker that could not go stale, in the file whose job is to make staleness visible`);
 }
 
 console.log("\n3. THE MESSAGE THE REGISTER RECORDS IS THE MESSAGE THE GATE GIVES");

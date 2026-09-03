@@ -14,6 +14,9 @@ import { fileURLToPath } from "node:url";
 import { RED_AT_V4279 } from "./redCensus.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+// v4414 -- the stamp is read from the tree rather than typed, because a freeze that says v4380 while the
+// tree is at v4414 is exactly the staleness the freeze is supposed to make visible.
+const AT = (fs.readFileSync(path.join(ROOT, "main.js"), "utf8").match(/const ENGINE_VERSION = "(v\d+)"/) || [,"unknown"])[1];
 const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || 120000);
 
 /** Run one gate and read its verdict. BOTH STREAMS: one gate of 29 prints its FAIL line to stderr (v4380). */
@@ -44,7 +47,7 @@ const body = `"use strict";
  * where there is none), and whether the gate printed them to STDERR -- which one of them does, invisibly to anything
  * reading stdout. Rewritten by tools/ship/freezeRegisterAudit.mjs.
  */
-export const REGISTER_AUDIT = Object.freeze(${JSON.stringify({ at: "v4380", capMs: CAP_MS, rows }, null, 1)});
+export const REGISTER_AUDIT = Object.freeze(${JSON.stringify({ at: AT, capMs: CAP_MS, rows }, null, 1)});
 `;
 fs.writeFileSync(path.join(ENG, "tools/ship/register-audit.mjs"), body);
 console.log(`\nfrozen: ${rows.length} rows, ${rows.filter((r) => r.exit === 0).length} now green, ${rows.filter((r) => r.onStderr).length} printing FAIL to stderr`);

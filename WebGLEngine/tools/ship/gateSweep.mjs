@@ -568,6 +568,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "device pdf check. Three of its thresholds were set from measurement after a first draft " +
                  "overshot, including one where a strategy returns exactly zero rather than a finite variance",
     }),
+
+    // v4414 -- the twenty-ninth closing, and the first in this arc whose subject is a DECISION rather than a
+    // measurement. It settles the IR question v3274 posed and v4380 deferred, by finding that the trigger
+    // counted co-occurrence where the decision needed duplication -- and that the population included the
+    // emitter that would BE the IR, so building it raised the number the trigger read. A ~200-round standing
+    // red is repaired by replacing the instrument, and shaderCensus leaves the register.
+    since30: Object.freeze({
+        at: "v4414", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shaderPairs-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections and 13 checks in 0.5 s -- the cheapest gate this " +
+                 "arc has added. Driven RED by five sabotages (1/1/1/1/1 by name) and restored, and TWO WENT " +
+                 "0 RED FIRST: a check comparing a list against its own length, and a fixture whose planted " +
+                 "leak collided with a name already present. Both were this gate's defects, not properties",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

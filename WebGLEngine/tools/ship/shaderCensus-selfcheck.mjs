@@ -30,13 +30,39 @@ const { shaderCensus, pairShape } = await import(pathToFileURL(path.join(HERE, "
 const c = shaderCensus(ROOT);
 
 {
-    const DUAL_BASELINE = 3;   // v3274 -- MEASURED. If this GROWS, the IR argument gets stronger; read the note below.
-    ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",
-        c.both.length <= DUAL_BASELINE,
-        c.both.join(", ") + " -- against " + c.wgslOnly.length + " WGSL-only and " + c.glslOnly.length +
-        " GLSL-only, which never needed translating. AN IR FOR THREE CONSUMERS WOULD BE A THIRD THING TO " +
-        "MAINTAIN BESIDE THE TWO IT REPLACED. If this count climbs toward twenty the arithmetic inverts, and " +
-        "THAT is when to re-open llvm-tutorial-book's three-stage shape: parse, lower to an IR, emit per target");
+    // ==========================================================================================================
+    // *** v4414 -- THIS ASSERTION WAS RED FOR ~200 ROUNDS AND IT WAS MEASURING THE WRONG POPULATION. ***
+    //
+    // It gated `both.length <= 3` -- files whose TEXT contains markers of both languages -- as a proxy for
+    // "how many shader pairs would an IR replace". Those are different questions, and
+    // tools/ship/shaderPairs-selfcheck.mjs measures the gap: of the 14 files counted here, FIVE duplicate a
+    // computation, two share only an entry-point name, and SEVEN share nothing at all.
+    //
+    // WORSE, THE POPULATION INCLUDES THE MACHINERY THAT WOULD BE THE IR. render/tslSource.mjs holds eleven
+    // GLSL markers because it EMITS GLSL, so BUILDING THE IR RAISES THIS COUNT. A trigger that fires harder
+    // the more the problem is solved cannot be the thing anyone acts on, and this one never fired for that
+    // reason: v4380 watched it climb from 4 to 14 and correctly refused to draw the conclusion.
+    //
+    // SO THE INSTRUMENT IS REPLACED, NOT THE THRESHOLD WIDENED. The co-occurrence count is still REPORTED --
+    // it was never wrong about what it measured -- and what is GATED is the count that bears on the decision.
+    // ==========================================================================================================
+    const { classifyPairs } = await import(pathToFileURL(path.join(HERE, "shaderPairs.mjs")).href);
+    const pairs = classifyPairs(ROOT);
+    const DUPLICATION_BASELINE = 5;   // v4414 -- MEASURED, in the units the claim is actually about.
+    ok("!! *** only " + pairs.duplication.length + " files DUPLICATE a computation across the two languages ***",
+        pairs.duplication.length <= DUPLICATION_BASELINE,
+        pairs.duplication.map((r) => r.file).join(", ") + " -- against " + c.both.length +
+        " that merely CO-OCCUR (" + pairs.disjoint.length + " of those share no function name at all, and two " +
+        "of them are the author-once machinery itself). AN IR FOR FIVE CONSUMERS WOULD STILL BE A THIRD THING " +
+        "TO MAINTAIN BESIDE THE TWO IT REPLACED. If THIS count climbs toward twenty the arithmetic inverts -- " +
+        "and note that the three-stage shape v3274 pointed at was re-opened anyway, at v4319-v4320, and has " +
+        "shipped ten rounds through render/tslSource.mjs since");
+
+    ok("  ...and the co-occurrence count is still reported, because it was never wrong about what it measured",
+        c.both.length >= pairs.duplication.length,
+        c.both.length + " files carry text in both languages, against " + c.wgslOnly.length + " WGSL-only and " +
+        c.glslOnly.length + " GLSL-only. THE NUMBER IS TRUE AND IT IS NOT THE DECISION'S NUMBER, which is the " +
+        "whole finding of v4414 -- see tools/ship/shaderPairs-selfcheck.mjs");
 
     ok("!! ...and a file that MENTIONS both is not a file that IMPLEMENTS both",
         // AND THE ASSERTION HIT THE SAME WALL: I searched the census's source for its own SKIP pattern, but the
