@@ -147,12 +147,12 @@ const STILL = trackFrames(Array(K).fill(FRAMES[0]), { budget: BUDGET, seed: SEED
     const a = spansOf(made, W, H), b = spansOf(ell, W, H);
     report(`spansOf({ kind: "doomFire", x, y, rx, ry }) -> ${a.length} rows, ${areaOf(a)} pixels; the same fields as an ellipse -> ${b.length} rows, ${areaOf(b)} pixels`);
     ok("!! *** A KIND THAT IS NOT IN KINDS NOW COVERS NOTHING, WHERE IT USED TO BE AN ELLIPSE ***",
-       a.length === 0 && b.length > 0 && KINDS.length === 4 && !KINDS.includes("doomFire"),
+       a.length === 0 && b.length > 0 && !KINDS.includes("doomFire") && KINDS.includes("ellipse"),
        `*** MEASURED BEFORE THE FIX: 16 rows and 208 pixels, BIT-IDENTICAL to the ellipse -- not "plausible", THE SAME SPANS. *** pointsOf() returns null for anything it does not recognise and spansOf() read that as "so it must be the ellipse", so a fifth primitive added to KINDS by name alone did not look like it worked, IT WAS ROUND. Returning no spans is the refusal that costs nothing: fitStep already treats an empty coverage as a rejected candidate, so no caller changes.`);
 
     ok("...and KINDS is now load-bearing rather than decorative -- it is what the refusal consults",
-       KINDS.every((k) => spansOf({ kind: k, x: 20, y: 20, w: 10, h: 10, rx: 8, ry: 8, angle: 0.3, x1: 5, y1: 5, x2: 25, y2: 8, x3: 12, y3: 30 }, W, H).length > 0),
-       `all four of ${KINDS.join(", ")} still rasterise. A FROZEN LIST NOTHING READS IS A COMMENT; this is the first thing in the module that consults it at run time.`);
+       KINDS.every((k) => spansOf({ kind: k, x: 20, y: 20, w: 10, h: 10, rx: 8, ry: 8, angle: 0.3, x1: 5, y1: 5, x2: 25, y2: 8, x3: 12, y3: 30, points: [[5, 5], [30, 8], [12, 30]] }, W, H).length > 0),
+       `every one of ${KINDS.join(", ")} still rasterises. A FROZEN LIST NOTHING READS IS A COMMENT; this is the first thing in the module that consults it at run time. *** THE FIRST DRAFT ALSO ASSERTED KINDS.length === 4 AND v4421 BROKE IT BY ADDING A FIFTH. *** A count is not a contract: what this check needs is that the list does not contain the invented kind and does contain the real ones, which is a property, and the length was an arrangement that happened to hold.`);
 }
 
 /* ------------------------------------------------------------------------------------------------------------

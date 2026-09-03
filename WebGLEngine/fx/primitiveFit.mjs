@@ -29,7 +29,27 @@
 
 import { dims } from "../render/perceptual.mjs";
 
-export const KINDS = Object.freeze(["triangle", "rect", "rotatedRect", "ellipse"]);
+// v4421 -- `polygon` joins them: an arbitrary closed outline, carried on the shape as `points`. It is the
+// first added kind that costs this module nothing structurally -- a polygon is a filled region with ONE free
+// colour, so optimalColour applies unchanged, and its coverage is spans, so differenceChange does too.
+// randomShape does NOT produce one: a polygon needs an outline from somewhere (a glyph, an SVG path), so it
+// is a kind a CALLER supplies rather than one the search invents. See fx/polyBrush.mjs.
+export const KINDS = Object.freeze(["triangle", "rect", "rotatedRect", "ellipse", "polygon"]);
+
+/**
+ * *** AND THE LIST THE SEARCH DRAWS FROM IS NOT THE LIST spansOf CAN RASTERISE. ONE FROZEN ARRAY WAS DOING
+ * BOTH JOBS AND ADDING A KIND IS WHAT REVEALED IT. ***
+ *
+ * randomShape() cannot invent a polygon -- an outline has to come from somewhere -- and it returns an ELLIPSE
+ * for any kind it does not know. So the moment "polygon" joined KINDS, fitStep's default proposer began
+ * drawing ellipses two times in five instead of one in four, which shifted the rng stream and moved numbers
+ * in a gate about something else entirely. krbnPaint-selfcheck going red on a rank-overlap check is what
+ * caught it; nothing threw and nothing looked wrong.
+ *
+ * KINDS answers "can this be rasterised". SEARCH_KINDS answers "can the search invent one". They were the
+ * same set for four kinds and they are not the same question.
+ */
+export const SEARCH_KINDS = Object.freeze(["triangle", "rect", "rotatedRect", "ellipse"]);
 export const DEFAULTS = Object.freeze({ alpha: 0.5, candidates: 60, mutations: 30, patience: 10 });
 
 /** A deterministic RNG, so every measurement in the gate is repeatable. */
@@ -64,6 +84,7 @@ export function cloneImage(img) { const { data, w, h } = dims(img); return { dat
 
 /** The corner points of a shape, as a convex polygon. Ellipses have no polygon and return null. */
 export function pointsOf(s) {
+    if (s.kind === "polygon") return s.points && s.points.length >= 3 ? s.points : null;
     if (s.kind === "triangle") return [[s.x1, s.y1], [s.x2, s.y2], [s.x3, s.y3]];
     if (s.kind === "rect") return [[s.x, s.y], [s.x + s.w, s.y], [s.x + s.w, s.y + s.h], [s.x, s.y + s.h]];
     if (s.kind === "rotatedRect") {
@@ -88,20 +109,31 @@ export function spansOf(shape, w, h) {
         let minY = Infinity, maxY = -Infinity;
         for (const p of pts) { if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]; }
         const y0 = Math.max(0, Math.floor(minY)), y1 = Math.min(h - 1, Math.ceil(maxY));
+        // *** v4421 -- THIS USED TO TAKE THE MIN AND MAX CROSSING AND FILL BETWEEN THEM, WHICH IS A CONVEX
+        // RULE THAT NOTHING SAID WAS ONE. *** For a triangle or a rectangle it is exactly right: a convex
+        // shape meets any horizontal line exactly twice, so min-and-max IS the pair. For a CONCAVE outline it
+        // fills the notches -- it draws the shape's row-wise convex hull, and a five-pointed star comes out
+        // 18.2% too big, silently.
+        //
+        // Pairing every crossing instead is SVG's `fill-rule: evenodd`. THE CHANGE IS SAFE BECAUSE THE THREE
+        // EXISTING POLYGON KINDS ARE CONVEX: with two crossings the pairing is the min and the max, and the
+        // gate measures the two rules BIT-IDENTICAL over 3000 random triangles, rects and rotatedRects rather
+        // than arguing it. SVG's other rule, `nonzero`, is deliberately NOT implemented -- see fx/polyBrush.mjs.
         for (let y = y0; y <= y1; y++) {
             const cy = y + 0.5;
-            let lo = Infinity, hi = -Infinity;
+            const xs = [];
             for (let i = 0; i < pts.length; i++) {
                 const a = pts[i], b = pts[(i + 1) % pts.length];
                 if ((a[1] <= cy && b[1] > cy) || (b[1] <= cy && a[1] > cy)) {
                     const t = (cy - a[1]) / (b[1] - a[1]);
-                    const x = a[0] + t * (b[0] - a[0]);
-                    if (x < lo) lo = x; if (x > hi) hi = x;
+                    xs.push(a[0] + t * (b[0] - a[0]));
                 }
             }
-            if (lo > hi) continue;
-            const x0 = Math.max(0, Math.round(lo)), x1 = Math.min(w, Math.round(hi));
-            if (x1 > x0) spans.push([y, x0, x1]);
+            xs.sort((p, q) => p - q);
+            for (let k = 0; k + 1 < xs.length; k += 2) {
+                const x0 = Math.max(0, Math.round(xs[k])), x1 = Math.min(w, Math.round(xs[k + 1]));
+                if (x1 > x0) spans.push([y, x0, x1]);
+            }
         }
         return spans;
     }
@@ -258,7 +290,13 @@ export function fitStep(target, current, opts = {}) {
     const o = { ...DEFAULTS, ...opts };
     const t = dims(target);
     const rng = o.rng || mulberry32(1);
-    const kinds = o.kinds || KINDS;
+    const kinds = o.kinds || SEARCH_KINDS;
+    // v4421 -- *** THE SEARCH TAKES ITS PROPOSER AND ITS MUTATOR AS ARGUMENTS, so a new primitive is a caller
+    // rather than a case in a switch. *** randomShape cannot invent a polygon: an outline has to come from
+    // somewhere (a glyph, an SVG path), and mutateShape jitters every numeric field, which turns a `points`
+    // array into NaN. Both defaults are exactly what this function did before, so nothing that existed moves.
+    const propose = o.propose || ((w, h, r) => randomShape(kinds[(r() * kinds.length) | 0], w, h, r));
+    const mutate = o.mutate || ((sh, w, h, r) => mutateShape(sh, w, h, r));
     const score = (shape) => {
         const spans = spansOf(shape, t.w, t.h);
         if (!spans.length) return null;
@@ -269,14 +307,14 @@ export function fitStep(target, current, opts = {}) {
 
     let best = null;
     for (let i = 0; i < o.candidates; i++) {
-        const cand = score(randomShape(kinds[(rng() * kinds.length) | 0], t.w, t.h, rng));
+        const cand = score(propose(t.w, t.h, rng));
         if (cand && (!best || cand.delta < best.delta)) best = cand;
     }
     if (!best) return null;
 
     let fails = 0;
     for (let i = 0; i < o.mutations && fails < o.patience; i++) {
-        const cand = score(mutateShape(best.shape, t.w, t.h, rng));
+        const cand = score(mutate(best.shape, t.w, t.h, rng));
         if (cand && cand.delta < best.delta) { best = cand; fails = 0; } else fails++;
     }
     return best;
@@ -305,4 +343,4 @@ export function fit(target, opts = {}) {
     return { canvas, shapes, trace, distance: distanceOf(diff, pixels), difference: diff };
 }
 
-export default { KINDS, DEFAULTS, fit, fitStep, optimalColour, differenceChange, difference, distanceOf, spansOf };
+export default { KINDS, SEARCH_KINDS, DEFAULTS, fit, fitStep, optimalColour, differenceChange, difference, distanceOf, spansOf };

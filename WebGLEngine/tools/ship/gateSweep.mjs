@@ -680,6 +680,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Its Krbn generator had to be built twice, and the sabotage harness itself had to be fixed " +
                  "after a timed-out run destroyed its own backup",
     }),
+
+    // v4421 -- the thirty-sixth closing, and the first ADDED PRIMITIVE since the fitter was built. Its fill
+    // rule turned out to be a convex assumption nothing had stated; its arrival silently changed the search
+    // distribution for every existing caller, which an unrelated gate caught; and the brush loses to a
+    // rectangle on a picture made entirely of glyphs, with both obvious excuses ruled out by measurement.
+    since37: Object.freeze({
+        at: "v4421", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/polyBrush-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 17 checks in 4.0 s -- no device, no model. " +
+                 "Driven RED by eight sabotages (5/2/2/1/1/1/3/1 by name) and restored, and TWO WENT 0 RED " +
+                 "FIRST: the half-open crossing rule, which only 4 of 651 vertices ever exercise, and a " +
+                 "mutator returning garbage, which fitStep simply rejects. Its own arrival reddened " +
+                 "krbnPaint-selfcheck by changing a list that was answering two questions",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
