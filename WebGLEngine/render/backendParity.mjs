@@ -179,10 +179,17 @@ export const PARITY_BASELINE = Object.freeze({
     // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
     // an exclusion for "gates do not count" would have hidden every probe this tree has written, which is most of
     // the WGSL it owns. The same file is why wgslOnly moves too; nothing else changed.
-    wgslBearing: 58,
+    // v4416 -- 58 -> 59, and this one is a SHIPPING MODULE that carries WGSL and no GLSL on purpose.
+    // physics/render/pathTracerGpu.mjs puts the path tracer's Lambertian transport loop on a compute shader;
+    // there is no WebGL2 half and there is not going to be one, because the thing it needs is a compute
+    // dispatch. That is the same shape render/gpuOrbits.mjs was recorded under at Level 12 -- "a compute pass
+    // has no WebGL2 half; its twin is JavaScript" -- and here the twin is physics/render/pathTracer.mjs,
+    // which the module imports rather than restates so the two cannot drift. The same file is why wgslOnly
+    // moves too; nothing else changed.
+    wgslBearing: 59,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 45,
+    wgslOnly: 46,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

@@ -774,6 +774,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "until a second independent reader was added -- the first draft falsely accused vendor/fonts " +
                  "of having no licence, reproducing a bug orrery.mjs had already been fixed for three times",
     }),
+    since42: Object.freeze({
+        at: "v4416", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/pathTracerGpu-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, ~3.6s singly -- OVER the 3000 ms quick-sweep budget and correctly so: " +
+                 "it launches a real browser and runs eleven GPU dispatches. #164, the path tracer on a GPU. " +
+                 "v4290 REFUSED THE TRANSPLANT WITH A REASON AND THE REASON IS FALSE ON THE FURNACE: with a " +
+                 "dyadic albedo and a power-of-two spp the f64 render is EXACTLY REPRESENTABLE IN f32, so " +
+                 "the comparison is bit-exact rather than tolerance-bound -- 11,072 pixels over seven " +
+                 "configurations, zero differing. BOTH PRECONDITIONS ARE MEASURED NECESSARY (a non-dyadic " +
+                 "albedo costs 163 non-exact pixels of 576, a non-power-of-two spp costs 26 to 39). AND THE " +
+                 "CONVEXITY ARGUMENT IS A THEOREM ABOUT REALS THAT f32 BREAKS: the first run differed on 152 " +
+                 "pixels, 120 of them INTERIOR, reading rho mixed with rho^2 because an eps chosen for f64 " +
+                 "sits below the f32 noise floor and the bounce re-hit its own surface. Two repairs were " +
+                 "wrong first -- a tuned absolute eps that failed at the next frame size, and a 'relative' " +
+                 "eps that was a NO-OP because length(P - centre) is exactly the radius at every bounce " +
+                 "origin -- before the origin was moved off the surface, which is insensitive to eps over " +
+                 "three decades. SECTION 4 IS A CHECK ON THE OTHER CHECKS: it plants a broken cosine sampler " +
+                 "and measures that the furnace CERTIFIES IT bit-exactly, because what makes the comparison " +
+                 "decidable is what makes it blind; the gradient sky catches the same plant at 18,660x the " +
+                 "clean f32 floor. Four sabotages, 2/2/1/1 red by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -14,6 +14,92 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4416 -- v4290 said the tracer could not be graded on a GPU, and the furnace is where it can
+
+#164 -- The path tracer on a GPU: the TSL compute transplant, or WebRTX's hit shaders.
+
+v4290 refused to port the tracer and gave a reason. pathTracerWgsl.mjs states it plainly: "The tracer runs in
+f64. A GPU runs in f32. Those are different renderers, so 'did the port work' has no answer until somebody
+says what agreement was supposed to look like." So it ported the two DECIDABLE pieces -- the generator and a
+coverage kernel -- and left the transport alone.
+
+THE REASON IS TRUE IN GENERAL AND FALSE ON THE ONE SCENE THE TRACER WAS BUILT TO BE TESTED ON.
+
+A sphere is convex, so a cosine-weighted bounce escapes to a constant sky, and a camera ray on the furnace is
+worth exactly rho or exactly 1. A pixel is the mean of spp of those -- and with a DYADIC albedo and a
+POWER-OF-TWO spp that mean is a dyadic rational needing fewer than 24 mantissa bits. NOTHING ROUNDS, so the
+f64 render is exactly representable in f32 and the comparison is bit-exact rather than tolerance-bound.
+
+BOTH PRECONDITIONS MEASURED NECESSARY RATHER THAN ASSUMED, of 576 pixels:
+
+    albedo dyadic     0.5 .25 .75 1      not-exact pixels 0 0 0 0
+    albedo NOT dyadic 0.3 0.1 1/3        not-exact pixels 163 163 159
+    spp power of two  1 4 16 64          not-exact pixels 0 0 0 0
+    spp NOT a power   3 5 10             not-exact pixels 26 36 39
+
+NEW physics/render/pathTracerGpu.mjs puts the Lambertian transport loop on a real GPU. BIT-IDENTICAL to the
+CPU across 11,072 pixels in seven configurations -- the claim v4290 said could not be made.
+
+AND THE CONVEXITY ARGUMENT IS A THEOREM ABOUT REAL NUMBERS THAT f32 BREAKS. The first run differed on 152 of
+576 pixels and 120 OF THOSE WERE INTERIOR -- not the silhouette, where a jitter difference could plausibly
+move a sample across an edge, but the middle of the disc where the derivation said the answer was exactly rho.
+The values were below rho and dyadic: 0.421875 is (11 x 0.5 + 5 x 0.25) / 16, five of sixteen samples bouncing
+TWICE. The bounce ray was re-hitting the surface it had just left, because occlusion.mjs's eps = 1e-6 was
+chosen against f64 and sits BELOW THE f32 NOISE FLOOR at these magnitudes. The theorem holds; its precondition
+-- that the origin lies exactly on the surface -- is what f32 breaks.
+
+TWO REPAIRS WERE WRONG BEFORE THE THIRD WAS RIGHT, AND BOTH WRONG ONES ARE KEPT IN THE FILE.
+
+  1. A BIGGER ABSOLUTE eps. Swept 1e-6 -> 152 differ, 1e-5 -> 12, 2.5e-5 -> 0 at 24x24. It looked settled and
+     it was not: at 32x32 two interior pixels came back reading 0.49609375, which is 0.5 - 0.25/64, ONE sample
+     in sixty-four self-hitting again. A THRESHOLD TUNED ON ONE FRAME SIZE IS TUNED ON NOTHING, and it fails
+     silently at the next size rather than loudly at this one.
+
+  2. A "RELATIVE" eps SCALED BY length(P - centre). Worse than wrong: a NO-OP that looks principled. At a
+     bounce origin P is ON the sphere, so that length is EXACTLY THE RADIUS every time. It scaled by a
+     constant and returned differ-counts byte-identical to the absolute sweep, which is the only reason it was
+     caught. A CORRECTION THAT CHANGES NO NUMBER IS NOT A CORRECTION.
+
+  3. MOVE THE ORIGIN OFF THE SURFACE: o = P + N * eps. From a point strictly outside a convex sphere, a
+     direction in the hemisphere about the outward normal has no positive-t intersection with it at all -- the
+     self-hit becomes geometrically impossible instead of being filtered after the fact.
+
+THE SIGNATURE OF THE STRUCTURAL FIX IS THAT THE TUNING PARAMETER STOPPED MATTERING: eps of 1e-5, 1e-4 and
+1e-3 all give ZERO differing pixels. A threshold has exactly one good value; this has three decades of them,
+and that is what tells the two kinds of repair apart.
+
+AND WHAT MAKES THE COMPARISON POSSIBLE IS EXACTLY WHAT MAKES IT WEAK. THIS IS THE FINDING, AND IT SHIPS AS A
+CHECK RATHER THAN AS A CAVEAT.
+
+Read the derivation again and notice what is missing: THE SAMPLER. A camera ray's value depends only on
+whether it hits the sphere, because every bounce escapes to the same constant sky no matter which way it
+points. The furnace is bit-exact BECAUSE it is insensitive to the sampling, and it is a weak test FOR THE SAME
+REASON. Those are not two facts. They are one fact stated twice.
+
+So the gate PLANTS A BROKEN COSINE SAMPLER -- a fixed direction instead of a cosine-weighted one -- and
+measures what each scene does with it:
+
+    furnace   clean   0 of 576 differ    max|d| 0.000e+0
+    furnace   PLANT   0 of 576 differ    max|d| 0.000e+0        certifies it, bit-exactly
+    gradient  clean   576 of 576 differ  max|d| 3.917e-6        f32 noise
+    gradient  PLANT   576 of 576 differ  max|d| 7.310e-2        18,660x the clean floor
+
+pathTracer.mjs's own v3487 comment said the same thing from the other side: "A SUITE THAT GRADED ONLY THE
+FURNACE WOULD CERTIFY A BROKEN SEEDING SCHEME." The tolerance separating the two gradient rows is not typed --
+it is the clean run's own measured f32 floor, and the separation is reported so nobody has to trust a number
+somebody picked.
+
+NEW physics/render/pathTracerGpu-selfcheck.mjs, eleven checks in four sections. Section 4 is a check on the
+other checks.
+
+WHAT THIS DOES NOT CLAIM. That the whole tracer is on the GPU: NEE, microfacets, Fresnel, energy compensation,
+Russian roulette and stratification all stay on the CPU and are named here as absent rather than discovered
+missing later. That bit-exactness reaches past the furnace: the gradient run differs on all 576 pixels and the
+file says so with a number rather than hoping nobody asks. And that f32 is enough for a shipping renderer --
+that question is not asked here.
+
+Four sabotages, 2/2/1/1 RED by name, file md5-identical after restore.
+The tree stands at 1448 gates.
 ## v4415 -- Papered is not attributed: the orrery knew whether a dependency had a licence and never whose it was
 
 *** PAPERED IS NOT ATTRIBUTED, AND THIS ORRERY HAS ONLY EVER KNOWN THE FIRST. *** docs/EXPLAIN-ITSELF.md item 8, the inversion Keith asked for: the author as the sun, a universe centred on a person rather than on this repository. THE MEASUREMENT THAT OPENS IT IS THAT THE FIELD DID NOT EXIST. orrery.json's fifteen bodies carry [name, arrived, sha, bytes] and files, and NO owner, url or repo on any of them -- the orrery records what this tree TOOK and nothing about who from. world/orrery.mjs has split every body into CAPTURED and UNPAPERED since v4185, and v4263 spent three findings making that licence search wide enough to be fair; it answers "may these bytes ship?" and has never asked whose they are. SO THE FIRST ROUND OF AN AUTHOR-CENTRED VIEW IS A PROVENANCE BAKE, NOT A RENDERER. NEW world/orreryAuthor.mjs reads the copyright line out of each licence in SIX KINDS, because "we know who wrote this" must not cover the cases where we plainly do not: person (9), collective (4 -- "three.js authors" and "Krbn contributors" and "IBM Corp" are REAL attributions and NOT people, and a view that drew one as a person would be inventing somebody), disclaimed (1 -- htmx ships 0BSD, whose text says THE AUTHOR and names nobody, so the body is properly papered and its author is still unknown, which IS the finding), prose (1 -- keyhunt's ATTRIBUTION.txt credits a project and says in as many words that NO CODE WAS COPIED), none (0), and unread (0, kept separate from `none` because an absence read as a skip is an absence read as a pass). TWELVE AUTHORS COVERING THIRTEEN BODIES, TWO UNATTRIBUTED -- and the two are DRAWN on the page with the reason each cannot be named, never dropped and never given a placeholder, because a universe that quietly omits what it cannot attribute is a universe lying about its own coverage. *** AND ONLY THREE OF FIFTEEN RECORD WHERE THEY CAME FROM. *** Two PROVENANCE.md files and one README carry an upstream URL; the other twelve are attributed by copyright line alone. THIS TREE KNOWS WHO WROTE TWELVE OF ITS DEPENDENCIES AND NOT WHERE ANY OF THOSE TWELVE CAME FROM, so this is the field a GitHub universe needs and emphatically not that universe -- said in the gate rather than implied by a screenshot. *** THE FIRST DRAFT FALSELY ACCUSED A PROPERLY LICENSED DEPENDENCY, WHICH IS THE EXACT HARM THE FILE BESIDE IT WAS FIXED FOR THREE TIMES. *** It filtered licence paths with a regex of its own that matched the licence word only at the start of a path segment, so vendor/fonts/IBMPlexSerif-OFL.txt did not count and `fonts` was reported as having NO PAPERWORK AT ALL. world/orrery.mjs's header records that same false accusation happening THREE TIMES IN ONE SESSION before it widened LICENCE_NAME to match the word anywhere in a filename. A SECOND COPY OF A SCAN THE TREE HAD ALREADY FIXED REPRODUCED THE BUG IT WAS FIXED FOR; isLicenceFile is imported now. AND SABOTAGING FOR IT COST ONLY ONE RED, which is why the gate gained a row: `none: 1` is a perfectly valid bucket and the partition still sums, so the census goes on looking healthy while a licensed body is accused. The new row asks a SECOND, INDEPENDENT READER -- orrery.mjs's own CAPTURED decision -- and the sabotage now costs two reds naming `fonts`. In the round itself I found it by LOOKING at the row and asking why, not by a gate. *** AND THE WHOLE RANKING WAS BUILT ON BYTES THAT ARE NOT IN THE REPOSITORY. *** orreryView-selfcheck was red on a stale orrery.json, and the re-bake was refused by the shrink guard over sixteen entries under vendor/box3d/native -- probe binaries, a .c file and libbox3d.a. THEY ARE NOT TRACKED IN GIT AT ALL: local build output from a box that had run the native build script, baked into the record as if they shipped. box3d was carried at 10,250,339 bytes and is 1,226,434 -- EIGHT TIMES ITS REAL SIZE -- and the author view's first draft therefore put Erin Catto at the top of the universe on 10.3MB. Re-baked, he is FOURTH at 1.17MB behind three.js authors, Dunfan Lu and Jorrit Rouwe. A view sized by a number nobody had re-derived ordered its whole subject wrongly, and the finding is the bake reading a WORKING TREE where the question is about a REPOSITORY. Also repaired: tools/ship/orrery-selfcheck.mjs asserted the innermost body is one of ["draco","grass","keyhunt"] -- a DERIVED ORDERING FROZEN BY HAND against a fixed today, red since box3d's arrival date moved, saying nothing about the ordering and everything about who was newest on the day it was typed. It now derives the newest set from the same scan, which is v4399's rule for the third round running. FOUR SABOTAGES, ALL LOGGED, MEASURED 1/2/2/1 BY NAME, and the gate's last section is a LIVE BROWSER RENDER: the button opens, the biggest systems are on screen by name, and the unattributed bodies are drawn with why. UNCHECKED AND SAID PLAINLY: this does not claim the copyright line is TRUE -- it is what the vendored bytes assert, and a licence copied wrong upstream is copied wrong here. It does not claim the author is the author of the NAMED thing: vendor/draco holds three.js's DRACOLoader.js and its licence names Mr.doob, which is correct about the bytes and misleading about the name. A body with three licence files gets one holder and the others reported beside it. And two writers on orrery.json remain two writers -- the other branch's rig has the native build and this one does not, so the sixteen phantom entries can come back by merge exactly as v4408's rotation did. *** AND THE RE-BAKE TOOK A TRADE GATE RED, WHICH IS THE SAME FRAGILITY ONE SUBSYSTEM OVER. *** tools/ship/playerShip-selfcheck.mjs asserted that a port's treasury after a buy equals its treasury before the LANDING TICK plus the price paid. Every step also runs the port's own trading and production, so the row was only ever true while markets[0] happened to be an idle port -- and re-baking orrery.json put a different body in that slot. MEASURED, BOTH WAYS, RATHER THAN GUESSED: the treasury moved 3,452 -> 2,172 while the player's 200 came in, and the port's STOCK went 585 -> 617 across the same quarter-tick that sold five tons. Neither isolates one buy. The row now asserts what the buy is answerable for -- the hold gained exactly n and the ship paid exactly n * price -- and says in its own detail why the port side is not checked there, with the books-close row below carrying conservation across the whole tick. THREE ASSERTIONS FROZEN AGAINST A DERIVED ORDERING IN ONE ROUND, in three different files, all of them true when typed. The tree stands at 1447 gates.
