@@ -236,3 +236,58 @@ export function operatorComparison(constants = SWEEP_BY_ROLE.constants) {
         rescued: constants.filter((c, i) => c.before === "SURVIVED" && after[i] !== "SURVIVED"),
     };
 }
+
+// ================================================================================================================
+// *** v4391 -- THE SAME TWO LOCKSTEP FILES, SWEPT AFTER THE MISSING CHECKS WERE WRITTEN. ***
+//
+// physics/lockstepConstants-selfcheck.mjs gives each of v4390's four survivors the check its actual blindness
+// needs. Re-sweeping is the only honest way to say whether that worked, and it is what caught the two places
+// where the FIRST DRAFT of that gate reproduced the very defect it was written to fix.
+//
+//     before (v4390)   3/12 caught, 9 survived
+//     after  (v4391)   9/12 caught, 3 survived
+//
+// *** THE "BEFORE" NUMBER HAD TO BE TAKEN FROM THE RIGHT RUN, AND THE FIRST ONE QUOTED WAS CONTAMINATED. ***
+// An intermediate sweep read 6/12 and was nearly written down. It was taken while lockstepConstants-selfcheck
+// already existed on disk in a half-built state, so three of its six catches were the new gate's, not the old
+// tree's. The honest baseline is the sweep from BEFORE the gate file existed at all: 3 of 12. A before/after
+// is only a measurement if the "before" was measured before.
+//
+// ALL FOUR OF v4390'S NAMED SURVIVORS ARE NOW CAUGHT. The three that remain are every COUNT's off-by-one --
+// maxCatchup 16 -> 17, redundancy 4 -> 5, the history offset 2 -> 3 -- and each of those is a LEGITIMATE
+// WIDENING of a margin or a budget. That is the correct end state rather than a remaining hole: a margin
+// should be checkable in direction (zero is a defect) and not in value (larger is somebody's judgement).
+// ================================================================================================================
+
+export const SWEEP_AFTER_FIX = Object.freeze({
+    version: "v4390",
+    commit: "b5eeda9",
+    files: Object.freeze(["physics/box3dLockstepNet.js", "physics/box3dLockstep.js"]),
+    rows: Object.freeze([
+        { file: "physics/box3dLockstepNet.js", line: 18, was: "3", kind: "zero", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 18, was: "3", kind: "offByOne", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 19, was: "30", kind: "nudge", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 20, was: "16", kind: "zero", before: "CAUGHT", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 20, was: "16", kind: "offByOne", before: "SURVIVED", state: "SURVIVED" },
+        { file: "physics/box3dLockstepNet.js", line: 38, was: "4", kind: "zero", before: "CAUGHT", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 38, was: "4", kind: "offByOne", before: "SURVIVED", state: "SURVIVED" },
+        { file: "physics/box3dLockstepNet.js", line: 110, was: "2", kind: "zero", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstepNet.js", line: 110, was: "2", kind: "offByOne", before: "SURVIVED", state: "SURVIVED" },
+        { file: "physics/box3dLockstep.js", line: 21, was: "30", kind: "zero", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstep.js", line: 21, was: "30", kind: "offByOne", before: "SURVIVED", state: "CAUGHT" },
+        { file: "physics/box3dLockstep.js", line: 71, was: "30", kind: "nudge", before: "CAUGHT", state: "CAUGHT" },
+    ]),
+    note: "every remaining survivor is an off-by-one that WIDENS a margin, which is legitimate",
+});
+
+/** What the round moved, derived from the rows. No count is carried beside them. */
+export function fixComparison(rows = SWEEP_AFTER_FIX.rows) {
+    const caught = (v) => v === "CAUGHT";
+    return {
+        total: rows.length,
+        before: rows.filter((r) => caught(r.before)).length,
+        after: rows.filter((r) => caught(r.state)).length,
+        newlyCaught: rows.filter((r) => !caught(r.before) && caught(r.state)),
+        stillSurviving: rows.filter((r) => !caught(r.state)),
+    };
+}

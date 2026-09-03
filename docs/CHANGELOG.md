@@ -14,6 +14,74 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4391 -- The four lockstep constants get their checks, and two of them were not the shape v4390 said
+
+v4390 named four constants nothing in the tree checked and said all four were one shape: shared constants
+inside a DIFFERENTIAL gate, two peers compared to each other so a constant they both hold moves both sides of
+the equality. Building the fixes refuted that for half of them, and the corrections are worth more than the
+checks.
+
+shipHalf WAS NEVER A COVERAGE FINDING AT ALL.
+
+    box3dLockstep.js:21   createESBox3D(opts.world, { shipHalf: opts.shipHalf || 30 })
+    esBox3d.js:19         const half = opts.shipHalf || 30;
+
+The same default is written twice. Set the outer one to 0 and it becomes falsy, so the inner `|| 30` supplies
+30 anyway and the world sees no change. The mutation is not missed by the gates -- it is ERASED before it
+reaches one. A no-op mutation: the same species as the find-string that mutated nothing for 223 versions at
+v4387, arriving by a different road. What the code deserves is not a behaviour check but the observation that
+nothing makes the two copies agree, so the gate asserts that they do.
+
+AND THE HISTORY OFFSET IS A MARGIN, CHECKABLE IN DIRECTION AND NOT IN VALUE. The prune keeps two ticks more
+history than the resend loop needs. Zero removes the margin and is a defect; 2 -> 3 widens it and is somebody's
+judgement. So the gate asserts the margin is POSITIVE and nothing more. The first draft of that section said
+the constant "gets NO new check" -- while the check shipped beside that sentence catches it. The prose was
+wrong, not the check, and re-running the mechanical sweep is what said so.
+
+Only dt and inputDelay were really differential blindness, and each gets the pattern that fits:
+
+  * dt, ASYMMETRIC: two peers at 1/30 and 1/31 must diverge, and they part company at step 0. The gates could
+    not see a constant both peers share, so give them different ones and assert they must disagree.
+  * inputDelay, ABSOLUTE: box3dLockstepNet already exports lead(), with a comment saying it "should hover near
+    inputDelay". THE OBSERVABLE WAS ALREADY THERE AND NOTHING EVER READ IT.
+
+THAT ONE CORRECTED ITSELF TWICE. The first draft asserted lead() at a snapshot and read 0 at every delay.
+Measuring the whole run explains it: the lead OSCILLATES between inputDelay + 1 and 0 -- it is inputDelay + 1
+right after pump() and falls to 0 once the peer's inputs arrive and the session catches up. A snapshot samples
+a phase, not a property. The PEAK is phase-independent and holds at three different latencies.
+
+AND THEN THE GATE REPRODUCED THE EXACT BLINDNESS IT WAS WRITTEN TO FIX. Every case in sections 1 and 2 passed
+the constant EXPLICITLY, so the module's own DEFAULT was never under test -- and re-sweeping showed inputDelay
+and dt STILL SURVIVING against the new gate. That is precisely the defect v4389 diagnosed in
+physics/lockstepDt-selfcheck.mjs. Fixed with default-against-explicit, which is the pattern lockstepDt has been
+using all along and which this round praised before copying.
+
+MEASURED, before and after, on the same twelve mutants:
+
+    before (v4390)   3/12 caught, 9 survived
+    after  (v4391)   9/12 caught, 3 survived
+
+All four named survivors are now caught. The three that remain are every COUNT's off-by-one -- maxCatchup
+16 -> 17, redundancy 4 -> 5, the history offset 2 -> 3 -- and each is a legitimate WIDENING of a margin or a
+budget. That is the correct end state, not a residue.
+
+THE BEFORE NUMBER NEEDED CARE TOO. An intermediate sweep read 6/12 and was nearly written down; it was taken
+while the new gate already sat half-built on disk, so three of its six catches were the new gate's rather than
+the old tree's. The honest baseline is the sweep from before the gate file existed at all. A before/after is
+only a measurement if the before was measured before.
+
+Four sabotages, 4/1/2/1 red by name, three files md5-identical after. B is the one worth having: making the
+asymmetric dt check compare peer A against ITSELF goes red while its printed detail still reads "the hash
+sequences part company" -- the detail is fine and the verdict is what moved, which is exactly how an asymmetric
+check quietly becomes a tautology.
+
+UNCHECKED: the lossless transport only. physics/box3d-lockstep-loss-selfcheck.mjs owns the lossy channel and
+this does not duplicate it, so whether the lead invariant holds under LOSS -- where a stalled peer keeps
+generating input and the lead grows -- is asserted nowhere. And the shipHalf finding generalises further than
+it is checked: a `|| default` chain erases any outer constant that can be falsified, proved here for exactly
+one pair rather than censused across the tree.
+
+The tree stands at 1429 gates.
 ## v4390 -- The mutation operator chosen by the constant's role, and what survives after it
 
 v4389 ran the mechanical scanner for the first time and found seven survivors, five of which were about the

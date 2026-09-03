@@ -458,6 +458,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "role off the TRIMMED excerpt while col indexes the untrimmed line) and that fix is section " +
                  "1. Driven RED by four sabotages (2/4/1/1 by name), three files md5-identical after",
     }),
+    since23: Object.freeze({
+        at: "v4391", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/lockstepConstants-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections. It writes the checks v4390 said were missing, " +
+                 "and MEASURES the effect by re-sweeping the same twelve mutants: 3/12 caught -> 9/12, all " +
+                 "four named survivors now caught. THREE claims of v4390's and this round's own were " +
+                 "corrected by measuring -- shipHalf was a no-op mutation absorbed by a duplicated default, " +
+                 "the history offset needs a direction check rather than none, and the gate's first draft " +
+                 "passed both constants EXPLICITLY so the defaults went untested, which is the very blindness " +
+                 "it was written to fix. Driven RED by four sabotages (4/1/2/1 by name), three files " +
+                 "md5-identical after",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
