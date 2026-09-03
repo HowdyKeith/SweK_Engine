@@ -64,6 +64,21 @@ console.log("\n2. *** WHO IS IN THERE ***");
     ok("*** the exiled set is exactly the gates whose RECORDED time is over budget ***",
         sel.skipped.every((g) => T[g] > DEFAULTS.budgetMs) && sel.run.every((g) => T[g] == null || T[g] <= DEFAULTS.budgetMs),
         "no other property of a gate takes part in the decision -- not its register entry, not its exit code");
+    // *** THE REPAIR MAKES THE FINDING VISIBLE IN THE FILE ITSELF. *** A row with no observation stamp is a
+    // row no sweep has been able to refresh since the field existed -- and every one of them is an exile. The
+    // containment is the assertable direction: a gate released from exile gets stamped on its next run, so
+    // equality would fail on the repair while this stays true.
+    const O = prior.observed || {};
+    const unstamped = Object.keys(T).filter((g) => !O[g]);
+    if (unstamped.length) {
+        report(`${unstamped.length} of ${Object.keys(T).length} rows carry no observation stamp; ` +
+            `${Object.keys(T).length - unstamped.length} were refreshed by the last sweep`);
+        ok("*** every row no sweep can refresh is an exiled one ***",
+            unstamped.every((g) => sel.skipped.includes(g)),
+            "containment, not equality: a gate released from exile is stamped on its next run");
+    } else {
+        report("every row carries an observation stamp -- either no exile remains, or the file predates none of them");
+    }
     const atCap = sel.skipped.filter((g) => C[g] === 124);
     ok("  and a gate killed at the sweep's cap is exiled on the CAP, not on a time it ever took",
         atCap.length > 0 && atCap.every((g) => T[g] >= 20000 && T[g] < 21000),
