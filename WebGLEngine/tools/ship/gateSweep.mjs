@@ -337,7 +337,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "restored; a third attempt was MALFORMED and crashed the gate instead of failing a check, which is " +
                  "logged in it as a crash rather than counted as a catch",
     }),
-    // v4380 -- the THIRTEENTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
+    // v4375 -- the thirteenth closing. shippedLadder-selfcheck reads two SHIPPED PAGES and prices what they draw,
+    // so what it guards is a claim about the tree's own product rather than about a module: that the LOD ladders in
+    // orrery-gpu.html and universe-gpu.html are tells and not approximations. A page edit that made one of them a
+    // real approximation should turn this red, and that is the point of it.
+    since13: Object.freeze({
+        at: "v4375", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shippedLadder-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, two sections. Driven RED by two sabotages of render/lodBudget.mjs " +
+                 "(2/2 by name) and restored. Its own first run was wrong three ways and all three are logged in it",
+    }),
+    // v4380 -- the FOURTEENTH closing, for the carve's compute pass (the round shipped as v4372 and renumbered
     // FORWARD at the merge; a closing's `at` names the round it belongs to, so it moves with the round). *** IT WAS WRITTEN AS since10 AND THAT
     // NUMBER WAS ALREADY TAKEN: *** the other line shipped v4365 and v4366 into since9 and since10 while this
     // one was building, and the merge left TWO since10 keys in one object literal -- where the later silently
@@ -347,7 +358,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // machinery every earlier closing's gate ran through (render/tslSource.mjs read `==` as an assignment), so
     // tslPhysics, tslRace and tslRig were re-run to completion beside this one rather than left to the quick
     // sweep's cap -- machinery that changed is exactly what a 3 s cap cannot vouch for.
-    since13: Object.freeze({
+    since14: Object.freeze({
         at: "v4380", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -356,12 +367,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and the SMALLER one is the worse, because it breaks the containment bound the larger leaves " +
                  "intact. Sections 1 and 2 need no device and stay green where WebGPU is unavailable",
     }),
-    // v4381 -- the FOURTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
+    // v4381 -- the FIFTEENTH closing. Its round began as a four-section gate and shipped as a two-section one,
     // because main's v4372 landed mid-build and had already done three of them, better; what survived is the one
     // parameter that round did not vary. It has been numbered three times -- since13 in a draft that went into a
-    // dropped stash, since13 again after that, and since14 here once main's own since12 landed. The number is
+    // dropped stash, then since13, then since14, and since15 here once main's own since13 landed. The number is
     // bookkeeping and moves freely; the `at` is the round and does not.
-    since14: Object.freeze({
+    since15: Object.freeze({
         at: "v4381", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveJudged-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
