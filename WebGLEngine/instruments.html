@@ -179,9 +179,15 @@ function renderReports(idx, docs) {
       "no gate reports on disk yet &mdash; a gate emits one when run with SWEK_GATE_REPORT=1") + "</div>";
     return;
   }
+  // v4402 -- TEXT CELLS ARE CAPPED AND THE TITLE STILL CARRIES THE WHOLE VALUE. Measured with the register's
+  // 27 standing reds: two 110-character sentences per row wrapped to a median row height of 58px and a table
+  // 1459px tall inside a 640px panel -- a wall rather than something a person can scan down. Capping makes
+  // every row one line, and the rule v4397 already established (the cell formats, the title gives it back
+  // whole) does the rest. THE CHECK THAT READS TITLES IS UNAFFECTED, which is why that rule was worth having.
+  const CELL = 54;
   const num = (v) => typeof v === "number"
     ? (v !== 0 && (Math.abs(v) < 1e-3 || Math.abs(v) >= 1e7) ? v.toExponential(3) : String(v))
-    : String(v == null ? "" : v);
+    : (() => { const t = String(v == null ? "" : v); return t.length > CELL ? t.slice(0, CELL - 1) + "\u2026" : t; })();
   // *** v4400 -- EVERY REPORT STRING IS ESCAPED, BECAUSE THE FIRST CELL WITH A QUOTE IN IT BROKE THE ROW. ***
   // The titles here are built by concatenation, so a value containing a double quote CLOSED THE ATTRIBUTE and
   // the rest of the cell became stray markup. physics/backendRouting-selfcheck.mjs emits five routing requests

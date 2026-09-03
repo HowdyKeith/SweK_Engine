@@ -3,6 +3,208 @@
  "at": "2026-09-03",
  "tables": [
   {
+   "title": "the standing reds, with the line the run gives beside the line the register files",
+   "columns": [
+    "gate",
+    "ms",
+    "how it stands",
+    "the run's line",
+    "the register's line"
+   ],
+   "rows": [
+    [
+     "engine/frameDirtyCensus",
+     775,
+     "truncation",
+     "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it",
+     "*** every covers list belongs to an addSource call -- none has drifted onto a constructor that would ignore it *"
+    ],
+    [
+     "tools/roundhouse/swekWebviewApk",
+     914,
+     "exact",
+     "...and a failed load offers the prompt, since that is when the address is usually wrong",
+     "...and a failed load offers the prompt, since that is when the address is usually wrong"
+    ],
+    [
+     "avatarServerViews",
+     6352,
+     "truncation",
+     "!! every framed surface the server.html switch mounts carries ?embed=1 rigged, stickwoman, robotexpressive2, b",
+     "!! every framed surface the server.html switch mounts carries ?embed=1 rigged, stickwoman, robotexpressive2, b"
+    ],
+    [
+     "bfcache",
+     993,
+     "exact",
+     "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted camera-effects.html",
+     "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted camera-effects.html"
+    ],
+    [
+     "boundaryLint",
+     5714,
+     "drifted",
+     "!! no response body is read without consulting .ok see above",
+     "!! no NEW reported boundary tell has appeared 89 sites against a baseline of 88; NEW (1): ai-bridge/vbaArchive"
+    ],
+    [
+     "budgetEvidence",
+     80,
+     "drifted",
+     "!! *** every gate carries evidence about its own runtime, or admits that it does not finish *** 3 with none --",
+     "!! *** every gate carries evidence about its own runtime, or admits that it does not finish *** 67 with none -"
+    ],
+    [
+     "canvasFill",
+     4908,
+     "drifted",
+     "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: gpu-rig-check.html#stage, tools/ship/a",
+     "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: tools/ship/atmosphereHarness.html#c, t"
+    ],
+    [
+     "definitionGates",
+     226,
+     "drifted",
+     "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 8: physics/crypto/sec",
+     "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 6: physics/crypto/sec"
+    ],
+    [
+     "gateReach",
+     9808,
+     "truncation",
+     "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce",
+     "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce"
+    ],
+    [
+     "homography",
+     1444,
+     "exact",
+     "!! it is the only homography in the tree",
+     "!! it is the only homography in the tree"
+    ],
+    [
+     "pagePlacement",
+     88,
+     "drifted",
+     "!! ...and the silent bucket is the large one, which is the finding 188 silent against 235 placed. pageSections",
+     "!! ...and the silent bucket is the large one, which is the finding 210 silent against 211 placed. pageSections"
+    ],
+    [
+     "pagePlacements",
+     106,
+     "truncation",
+     "!! a page can be listed in TWO topics at once *** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Ke",
+     "...and the packing rule has ONE implementation, on the server side the browser renders what it is handed. A se"
+    ],
+    [
+     "pageReflow",
+     87,
+     "truncation",
+     "!! *** nothing reads layout after a DOM write inside a loop *** ui/crtToggle.js:58 getBoundingClientRect, ui/d",
+     "!! *** nothing reads layout after a DOM write inside a loop *** ui/crtToggle.js:58 getBoundingClientRect, ui/d"
+    ],
+    [
+     "pageSectionsReport",
+     1483,
+     "truncation",
+     "!! and no alarm span is drawn at all when nothing is actually wrong — 1 already linked in another part of the ",
+     "!! and no alarm span is drawn at all when nothing is actually wrong — 1 already linked in another part of t"
+    ],
+    [
+     "pairlaneBridge",
+     90,
+     "truncation",
+     "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched *** renaming the i",
+     "!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched *** renaming the i"
+    ],
+    [
+     "proseAudit",
+     2001,
+     "truncation",
+     "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit) 44 so",
+     "the audit actually resolved most of its subjects (an audit that cannot see its subjects is not an audit) 44 so"
+    ],
+    [
+     "referenceKind",
+     73680,
+     "drifted",
+     "!! *** the prose-rescued population may only SHRINK *** 224 against a ceiling of 181. A RISE MEANS A NEW ORPHA",
+     "!! *** the prose-rescued population may only SHRINK *** 221 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE"
+    ],
+    [
+     "registerResidue",
+     1321,
+     "truncation",
+     "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga",
+     "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga"
+    ],
+    [
+     "shaderRefs",
+     379838,
+     "uncaptured",
+     "(the audit captured no failing line: exit timeout after 120140 ms, past the capture cap)",
+     "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha"
+    ],
+    [
+     "statedRuntime",
+     129,
+     "drifted",
+     "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/reconQualityBind-s",
+     "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/assumptions-selfch"
+    ],
+    [
+     "sunshineHost",
+     101,
+     "exact",
+     "every route the bridge lists is reachable through its own handler",
+     "every route the bridge lists is reachable through its own handler"
+    ],
+    [
+     "supersededFlag",
+     69,
+     "truncation",
+     "...and an UNINVITED launch still refuses, which was always correct two launchers that both start a server take",
+     "...and an UNINVITED launch still refuses, which was always correct two launchers that both start a server take"
+    ],
+    [
+     "unattendedHold",
+     54,
+     "truncation",
+     "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict it must still decline to f",
+     "!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict it must still decline to f"
+    ],
+    [
+     "updatePause",
+     284,
+     "exact",
+     "...and an errored check is counted as its own thing, not silently dropped",
+     "...and an errored check is counted as its own thing, not silently dropped"
+    ],
+    [
+     "wasmSupport",
+     2968,
+     "drifted",
+     "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 95 mention it",
+     "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 89 mention it"
+    ],
+    [
+     "winPathGuard",
+     672,
+     "drifted",
+     "!! no source file uses the Windows-fragile path idioms 20 offending occurrence(s): engine/frameDirtyCensus-sel",
+     "!! no source file uses the Windows-fragile path idioms 17 offending occurrence(s): engine/frameDirtyCensus-sel"
+    ],
+    [
+     "wiringClaims",
+     1731,
+     "truncation",
+     "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name *** a sentence that says 'A is unwired whil",
+     "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name *** a sentence that says 'A is unwired whil"
+    ]
+   ],
+   "note": "DERIVED, not retyped: the fourth column comes from register-audit.mjs, the fifth is what somebody typed when the entry was filed. Where they differ the check above says which species of difference it is. Nothing here changes a verdict -- redCensus is still the register and this is its first page."
+  },
+  {
    "title": "the register against the runs it should render from",
    "columns": [
     "how the quoted line stands to the run",
@@ -45,11 +247,11 @@
     ],
     [
      "read at",
-     "v4401"
+     "v4402"
     ],
     [
      "rounds between",
-     2
+     3
     ]
    ],
    "note": "The freezer wrote this version as a string literal until v4400, so the audit claimed v4380 for twenty rounds including a re-freeze taken at v4399."

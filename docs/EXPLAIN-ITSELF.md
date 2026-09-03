@@ -12,7 +12,7 @@ this engine's own device-versus-shell split, and what v4388 to v4393 measured.
 
 This file is the roadmap for that thread. Each item names what it would measure.
 
-## 1. The register keeps a rendering where it should keep the source -- MEASURED at v4400
+## 1. The register keeps a rendering where it should keep the source -- MEASURED v4401, SURFACED v4402
 
 `tools/ship/redCensus.mjs` stores a **quoted failing line**: a projection of a gate run,
 frozen at the moment somebody typed it. Three rounds in a row found it stale, each in a
@@ -41,11 +41,20 @@ first 45 characters -- which reaches the end of an assertion's *name* and stops 
 claiming v4380 -- including one taken at v4399 while measuring exactly this. It reads
 `main.js` now, and the audit's age in rounds is a gated number.
 
+**And there was no point of use to render at.** `fails:` is read by four files, all gates
+or the freezer, two of which only assert it is a string longer than ten characters. **Zero
+HTML files mention the register.** The tree's own debt list -- 27 standing reds -- was
+reachable only by reading a `.mjs` or running a gate, which is v4379's RIG_ONLY finding on
+the most consequential list it keeps. v4402 gives it one: `registerDrift` emits the
+register through v4395's mechanism with **the audit's line beside the filed one**, and
+`instruments.html` renders it. The nine divergences stop being a count and become a column.
+
 **Shipped:** `tools/ship/registerRender.mjs` derives the display line from the audit and
 classifies each entry into five outcomes rather than "matches / differs". `fails:` is
 *not* deleted -- it is the historical claim, and the distance between it and the run is
-the number this measured. What remains open is the last step: making the register's
-display read from `renderFor()` at the point of use rather than from the stored string.
+the number this measured. What remains open is narrower now: `redCensus.mjs` still *stores* the typed line, and a
+reader who opens that file rather than the page still meets it. Making the module itself
+generated is a change to a file two branches edit every round, and this round declined it.
 
 ## 2. Gates emit verdicts, not explanations -- DONE at v4395
 
