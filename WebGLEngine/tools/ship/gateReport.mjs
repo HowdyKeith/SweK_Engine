@@ -43,6 +43,34 @@ export const REPORT_DIR = "gate-reports";
 export const enabled = () => process.env.SWEK_GATE_REPORT === "1";
 
 /**
+ * *** v4408 -- HOW A RENDERED TABLE IS IDENTIFIED, AND WHY THE NAMES LIVE HERE. ***
+ *
+ * A report is a gate plus its tables, and this module is what says so; the attributes a page stamps on a
+ * rendered table are therefore part of that shape and not the page's private business. They exist because
+ * gateReport-selfcheck selected the register's table by SHAPE -- "the first table in #gr with over 20 rows"
+ * -- and v4404 added tools/ship/claimEvidence-selfcheck.mjs, whose 32-row table sorts ahead of
+ * registerDrift's 27 in index.json. The selector kept matching, silently, on somebody else's table, and
+ * three checks went red over a subject nobody had touched.
+ *
+ * *** A SHAPE IS NOT AN IDENTITY. *** A selector written as a shape keeps matching after its subject is
+ * replaced, which is the failure that gives no error and no diff -- and the reason it went unrepaired for
+ * four versions is the other half of the same round: gateReport-selfcheck costs 7.8 s against quickSweep's
+ * 3 s budget, so v4404 through v4407 all shipped ALL GREEN over the gate v4404 broke.
+ *
+ * instruments.html declares these strings a second time -- a browser page cannot import a Node module -- so
+ * the second declaration is CHECKED rather than trusted: tools/ship/gateReport-selfcheck.mjs holds that the
+ * page's markup uses exactly these names, which is the tree's standing answer to a constant that must live
+ * in two places.
+ */
+export const TABLE_ATTR = Object.freeze({ gate: "data-gate", title: "data-report-table" });
+
+/** The CSS selector that finds one report table by identity rather than by how big it happens to be. */
+export function tableSelector(gate, title = null) {
+    const q = (v) => String(v).replace(/["\\]/g, "\\$&");
+    return `table[${TABLE_ATTR.gate}="${q(gate)}"]` + (title == null ? "" : `[${TABLE_ATTR.title}="${q(title)}"]`);
+}
+
+/**
  * Collect a gate's measured tables and, when asked, write them where a page can read them.
  *
  * `columns` is the header row; `rows` are arrays of the same length. NUMBERS STAY NUMBERS -- a report that

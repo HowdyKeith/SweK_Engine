@@ -31,7 +31,7 @@ import { gateFiles } from "./staleness.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as AW from "./artefactWriters.mjs";
-import { gateReport, reports, arguesInNumbers, REPORT_DIR, enabled } from "./gateReport.mjs";
+import { gateReport, reports, arguesInNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector } from "./gateReport.mjs";
 
 const SELF_REPORT = gateReport("tools/ship/gateReport-selfcheck.mjs");
 let probeResult = null;
@@ -395,6 +395,7 @@ const onDisk = reports();
 
     const probe = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 120000, script: `
         async () => {
+            const REG_SELECTOR = ${JSON.stringify(tableSelector("tools/ship/registerDrift-selfcheck.mjs"))};
             const f = document.createElement("iframe");
             f.style.width = "1200px"; f.style.height = "1400px";
             f.src = "/instruments.html";
@@ -419,9 +420,27 @@ const onDisk = reports();
             }
             // v4402 -- THE REGISTER'S OWN ROWS, out of the live DOM. Cells are capped for width and their
             // titles carry the value whole, so the title is what a check must read.
-            const reg = Array.from(d.querySelectorAll("#gr table")).find((t) => t.rows.length > 20);
-            out.register = !reg ? null : Array.from(reg.rows).slice(1).map((tr) =>
+            //
+            // *** v4408 -- BY IDENTITY, NOT BY SHAPE. *** The line below used to read
+            //   Array.from(d.querySelectorAll("#gr table")).find((t) => t.rows.length > 20)
+            // and that selector was correct for exactly two versions. v4404 added claimEvidence-selfcheck,
+            // whose "the claims settled without a falsifier anybody can run" table holds 32 rows and whose
+            // report sorts ahead of registerDrift's in index.json, so .find() -- the FIRST match -- began
+            // returning somebody else's table. Nothing threw; three checks below simply started grading the
+            // wrong subject. BOTH selectors are read here so the gate can SHOW the disagreement rather than
+            // merely be repaired by it.
+            const cellsOf = (t) => !t ? null : Array.from(t.rows).slice(1).map((tr) =>
                 Array.from(tr.cells).map((c) => ({ shown: c.textContent || "", full: c.getAttribute("title") || "" })));
+            const regTable = d.querySelector(REG_SELECTOR);
+            out.register = cellsOf(regTable);
+            out.registerGate = regTable ? regTable.getAttribute("data-gate") : null;
+            const byShape = Array.from(d.querySelectorAll("#gr table")).find((t) => t.rows.length > 20);
+            out.byShape = !byShape ? null : { rows: byShape.rows.length - 1,
+                gate: byShape.getAttribute("data-gate"), title: byShape.getAttribute("data-report-table") };
+            // Every table the page rendered, with the identity it carries. An UNSTAMPED table is one a shape
+            // selector could take next, so the gate counts them rather than trusting the markup.
+            out.stamped = Array.from(d.querySelectorAll("#gr table")).map((t) => ({
+                rows: t.rows.length - 1, gate: t.getAttribute("data-gate"), title: t.getAttribute("data-report-table") }));
             return out;
         }` });
     probeResult = probe.skipped ? null : (probe.result || null);
@@ -511,6 +530,11 @@ const onDisk = reports();
            "reason this section exists");
     } else {
         const reg = probeResult.register;
+        const regSelector = tableSelector("tools/ship/registerDrift-selfcheck.mjs");
+        // RAW source, not noComments(): that stripper is a JavaScript stripper, and handed instruments.html
+        // it returns 428 bytes of 18,692. The attribute names live inside a JS string inside an HTML file,
+        // which is exactly the shape it destroys.
+        const src = fs.readFileSync(path.join(ENG, "instruments.html"), "utf8");
         const audit = onDisk.find((d) => d.gate === "tools/ship/registerDrift-selfcheck.mjs");
         const table = audit && (audit.tables || []).find((t) => t.title.startsWith("the standing reds"));
         say(`the register panel shows ${reg.length} row(s); the report holds ${table ? table.rows.length : 0}`);
@@ -548,7 +572,65 @@ const onDisk = reports();
            "of 58px and a table 1459px tall inside a 640px panel -- a wall, not something to scan. After: 632px " +
            "and every row one line. A GATE CANNOT SAY WHETHER A TABLE READS WELL and this one does not try; it " +
            "holds the property that made it unreadable");
+
     }
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 7b. v4408 -- THE FOUR CHECKS THAT WOULD HAVE CAUGHT v4404 THE DAY IT LANDED, AND WHY THEY LIVE OUT HERE
+ *
+ * They were written inside the else-branch above, and SABOTAGE A -- the page stops stamping data-gate -- read
+ * exactly ONE RED: the register was not found by its selector, section 7 took its "not on it" branch, and the
+ * four checks that would have said WHY never ran. That is v4399's sabotage A a third time: one failure line
+ * where four named ones belong, and the one line blames the register for a defect in the markup. A DIAGNOSIS
+ * MUST NOT BE NESTED INSIDE THE SYMPTOM IT DIAGNOSES.
+ * --------------------------------------------------------------------------------------------------------- */
+if (probeResult) {
+    const reg = probeResult.register || [];
+    const regSelector = tableSelector("tools/ship/registerDrift-selfcheck.mjs");
+    // RAW source, not noComments(): that stripper is a JavaScript stripper, and handed instruments.html it
+    // returns 428 bytes of 18,692. The attribute names live inside a JS string inside an HTML file, which is
+    // exactly the shape it destroys.
+    const src = fs.readFileSync(path.join(ENG, "instruments.html"), "utf8");
+
+    ok("!! *** the table the register checks read NAMES ITSELF as registerDrift's ***",
+       probeResult.registerGate === "tools/ship/registerDrift-selfcheck.mjs",
+       `the table matched by ${JSON.stringify(regSelector)} carries data-gate=` +
+       `${JSON.stringify(probeResult.registerGate)}. THE THREE CHECKS ABOVE ARE ONLY ABOUT THE REGISTER ` +
+       "IF THIS ONE HOLDS; without it they grade whatever the selector happened to return, which for four " +
+       "versions was somebody else's 32-row table");
+
+    // The old selector's answer is REPORTED, never asserted: a check that required it to keep returning
+    // the wrong table would need claimEvidence to stay bigger than the register forever, which is a check
+    // that depends on its own finding staying broken. What is asserted is that nothing reads it.
+    const bs = probeResult.byShape;
+    say(`the SHAPE selector -- the first #gr table with over 20 rows -- returns ` +
+        (bs ? `${bs.rows} rows from ${bs.gate} (${JSON.stringify(String(bs.title).slice(0, 46))})` : "nothing") +
+        `; the identity selector returns ${reg.length} rows from ${probeResult.registerGate}`);
+
+    const stamped = probeResult.stamped || [];
+    const bare = stamped.filter((t) => !t.gate || !t.title);
+    ok("!! *** EVERY table the page renders carries an identity, so no selector need guess ***",
+       stamped.length > 0 && bare.length === 0,
+       `${stamped.length} table(s) rendered, ${bare.length} with no ${TABLE_ATTR.gate}/${TABLE_ATTR.title}. ` +
+       "AN UNSTAMPED TABLE IS THE NEXT ONE A SHAPE SELECTOR TAKES -- the defect this section repairs was not " +
+       "that one selector was wrong, it was that a table could not say what it was");
+
+    const ids = stamped.map((t) => t.gate + "\u0000" + t.title);
+    ok("!! ...and no two of them share one, which is what makes an identity an identity",
+       ids.length === new Set(ids).size,
+       `${ids.length} table(s), ${new Set(ids).size} distinct (gate, title) pair(s)` +
+       (ids.length === new Set(ids).size ? "" : ": " + ids.filter((v, i) => ids.indexOf(v) !== i).join("; ")));
+
+    // instruments.html cannot import a Node module, so TABLE_ATTR is declared twice on purpose. The
+    // second declaration is CHECKED rather than trusted -- v4394's own rule about the report index,
+    // applied to the attribute names that index's tables now carry.
+    ok("!! *** and the page's second declaration of the attribute names matches this module's ***",
+       src.includes(`<table ${TABLE_ATTR.gate}="`) && src.includes(`" ${TABLE_ATTR.title}="`),
+       `instruments.html must stamp ${TABLE_ATTR.gate} and ${TABLE_ATTR.title} verbatim -- ` +
+       `${TABLE_ATTR.gate}: ${src.includes(`<table ${TABLE_ATTR.gate}="`)}, ` +
+       `${TABLE_ATTR.title}: ${src.includes(`" ${TABLE_ATTR.title}="`)}. A BROWSER PAGE CANNOT IMPORT ` +
+       "gateReport.mjs, so the name lives in two places; this is the check that keeps the two the same");
 }
 
 console.log();

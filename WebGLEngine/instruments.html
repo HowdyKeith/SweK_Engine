@@ -203,7 +203,13 @@ function renderReports(idx, docs) {
         esc(s.what) + " &mdash; " + esc(s.why) + "</div>").join("") +
     (d.tables || []).map((t) =>
       '<div style="margin-top:8px;color:#cfe9d8">' + esc(t.title) + "</div>" +
-      '<table style="border-collapse:collapse;font-size:11px"><tr>' +
+      // *** v4408 -- THE TABLE CARRIES ITS OWN IDENTITY, BECAUSE A CHECK WAS SELECTING ONE BY SHAPE. ***
+      // gateReport-selfcheck read "the first table in #gr with over 20 rows" and graded it as the red
+      // register. It was, until v4404 added claimEvidence-selfcheck, whose 32-row table sorts ahead of
+      // registerDrift's 27 in index.json and took its place. Three checks went red at once over a subject
+      // nobody had moved. data-gate and data-report-table are what a check should have been reading.
+      '<table data-gate="' + esc(d.gate) + '" data-report-table="' + esc(t.title) +
+      '" style="border-collapse:collapse;font-size:11px"><tr>' +
       t.columns.map((c) => '<th style="text-align:right;padding:2px 10px 2px 0;color:#6f8a7c;font-weight:normal">' +
         esc(c) + "</th>").join("") + "</tr>" +
       // THE CELL IS FORMATTED FOR WIDTH AND THE TITLE CARRIES THE EXACT VALUE. A table of 17-digit floats is

@@ -6,7 +6,7 @@
    "name": "box3d",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 3767005,
+   "bytes": 10250339,
    "files": [
     {
      "path": "box3d.js",
@@ -54,19 +54,67 @@
     },
     {
      "path": "native/gate_probe",
-     "bytes": 1064472
+     "bytes": 1073976
     },
     {
      "path": "native/gate_probe.c",
      "bytes": 2481
     },
     {
+     "path": "native/joint_probe",
+     "bytes": 1074112
+    },
+    {
+     "path": "native/joint_probe.c",
+     "bytes": 3397
+    },
+    {
      "path": "native/libbox3d.a",
      "bytes": 1451810
     },
     {
+     "path": "native/ray_probe",
+     "bytes": 1073960
+    },
+    {
+     "path": "native/ray_probe.c",
+     "bytes": 2024
+    },
+    {
+     "path": "native/ray_short",
+     "bytes": 1073920
+    },
+    {
+     "path": "native/ray_short.c",
+     "bytes": 583
+    },
+    {
+     "path": "native/sensor_gate",
+     "bytes": 1074032
+    },
+    {
+     "path": "native/sensor_gate.c",
+     "bytes": 3510
+    },
+    {
+     "path": "native/sensor_probe",
+     "bytes": 1073680
+    },
+    {
+     "path": "native/sensor_probe.c",
+     "bytes": 4654
+    },
+    {
      "path": "native/shim.o",
-     "bytes": 21808
+     "bytes": 35432
+    },
+    {
+     "path": "native/wheel_gate",
+     "bytes": 1073984
+    },
+    {
+     "path": "native/wheel_gate.c",
+     "bytes": 2350
     },
     {
      "path": "PROVENANCE.md",

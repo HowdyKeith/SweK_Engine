@@ -14,6 +14,89 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4409 -- a check identified its subject by SHAPE, and a round two versions later gave it a bigger one
+
+*** THE SELECTOR THAT KEPT MATCHING AFTER ITS SUBJECT WAS REPLACED. *** tools/ship/gateReport-selfcheck.mjs
+read the red register out of the live instruments.html panel as "the first table in #gr with over 20 rows":
+
+    Array.from(d.querySelectorAll("#gr table")).find((t) => t.rows.length > 20)
+
+That was correct for exactly two versions. v4404 added tools/ship/claimEvidence-selfcheck.mjs, whose table
+"the claims settled without a falsifier anybody can run" holds 32 rows and whose report sorts ahead of
+registerDrift-selfcheck.json's 27 in gate-reports/index.json. `.find()` takes the FIRST match, so the
+selector began returning somebody else's table. NOTHING THREW AND NOTHING DIFFED. Three checks simply started
+grading the wrong subject and reported, at origin/main, exactly this:
+
+    FAIL  the standing reds are RENDERED BY A PAGE     32 entries on screen against 27 in the report
+    FAIL  ...and for every DIVERGENT entry the line shown is the RUN'S    9 entries: not on screen
+    FAIL  ...and no cell is shown at full length       0 over the cap, 20 truncated (the check wants > 20)
+
+No edit was made to gateReport-selfcheck.mjs, to instruments.html, or to registerDrift-selfcheck.mjs. A gate
+went red because an unrelated round added a report.
+
+*** A SHAPE IS NOT AN IDENTITY. *** tools/ship/gateReport.mjs -- the module that defines what a report IS --
+now owns TABLE_ATTR (data-gate, data-report-table) and tableSelector(gate, title). instruments.html stamps
+both on every table it draws, and the probe selects by identity. All three checks went green with NO CHANGE
+TO WHAT THEY ASSERT, which is the evidence that the assertions were right and the subject was wrong.
+
+*** THE OLD SELECTOR IS STILL READ, AND REPORTED RATHER THAN ASSERTED. *** The gate prints both answers side
+by side -- shape: 32 rows from claimEvidence-selfcheck; identity: 27 rows from registerDrift-selfcheck. It is
+a `say` and not an `ok` on purpose: a check that REQUIRED the shape selector to keep returning the wrong
+table would need claimEvidence to stay bigger than the register forever, which is a check that depends on its
+own finding staying broken.
+
+*** WHY IT STOOD FOR FOUR VERSIONS, WHICH IS #134 AGAIN. *** gateReport-selfcheck costs 7.8 s against
+quickSweep's 3,000 ms budget, so it is skipped by every ship. v4404 broke it; v4404, v4405, v4406 and v4407
+all shipped ALL GREEN over it.
+
+*** AND THE SYSTEMIC HALF WAS SHIPPED FIRST BY SOMEBODY ELSE, SO THIS ROUND DELETED ITS OWN VERSION OF IT. ***
+This session measured the same defect independently -- 503 of 1,441 gates sealed out of every ship, 130 of
+them carrying a 20,000 ms "time" that is only the SIGKILL timer firing -- and built tools/ship/sweepCensus.mjs
+with a parole rotor and a gate of 17 checks. A concurrent session shipped v4408 (sweepCoverage.mjs,
+sweepRotation.mjs) with the same finding and a better repair: quickSweep now re-runs a green gate ALONE before
+filing it over budget. THE CENSUS AND THE ROTOR WERE BUILT, MEASURED, SABOTAGED AND THEN DELETED rather than
+shipped beside them, because a second census is the same defect this round is about -- a rival declaration of
+one fact. What that work established, and what stands as measurement:
+
+    of 40 gates recorded 3,002-3,252 ms, 40 of 40 run UNDER the 3,000 ms budget alone
+    tools/ship/downloadScan-selfcheck.mjs is recorded at 3,047 ms and costs 518 ms -- 5.9x
+    the 130 killed entries span 455 ms around a 20,000 ms cap; the 373 measured ones span 16,907 ms
+    ONE POPULATION IS A DISTRIBUTION AND THE OTHER IS A CONSTANT, and the constant is a timer
+
+*** THE ROUND ALSO REFUTED ITS OWN FILING, TWICE. *** #161 was filed on "six gates read red out of the
+timings file and are in no register". Running them showed FIVE OF THE SIX GREEN: the file's exit codes age
+exactly as its timings do, because a sealed gate never runs and nothing refreshes either number. A SEALED
+GATE'S VERDICT IS NOT A VERDICT, IT IS A DATE. And #161 asked whether the register should hold 32 or the page
+should render 27. Neither: the register holds 27, the page renders both, and the CHECK grabbed the wrong one.
+
+*** FOUR NEW CHECKS, AND THEY LIVE OUTSIDE THE BRANCH THEY DIAGNOSE. *** Every rendered table must carry an
+identity; no two may share one; the table the register checks read must NAME ITSELF as registerDrift's; and
+instruments.html's second declaration of the attribute names must match gateReport.mjs's, since a browser
+page cannot import a Node module. SABOTAGE A -- the page stops stamping data-gate -- first read ONE red,
+because the four were nested inside section 7's "the register is not on the page" branch and never ran. That
+is v4399's sabotage A a third time: one line, blaming the register, for a defect in the markup. A DIAGNOSIS
+MUST NOT BE NESTED INSIDE THE SYMPTOM IT DIAGNOSES. Moved into their own block, the same sabotage reads 4.
+
+*** ALSO REPAIRED, AND FOUND BY RUNNING A GATE THE CAP HAD SEALED OUT. *** tools/ship/orrerySeed-selfcheck.mjs
+was 2 RED over a stale orrery.json and appears in no red register. The timings file recorded it as "killed at
+20,000 ms"; run alone it finishes in 12.3 s and fails. `node tools/ship/orreryBake.mjs --write` and it is 57
+passed, 0 failed.
+
+SEVEN SABOTAGES, MEASURED 4/1/4/1/2/1/1 RED BY NAME, every file md5-identical after restore: A the page stops
+stamping data-gate; B every table stamped with one identity; C whySealed stops reading the exit code; D a
+SIGKILLed run reports Date.now() - t0, which is the cap; E the parole cursor never advances; F the
+never-measured gates go to the back of the queue; G an untimed gate falls out of the partition. C through G
+were aimed at the census this round then deleted, and are logged because they are what established that the
+deleted work was correct before the decision not to ship it.
+
+WHAT THIS DOES NOT CLAIM. That the shape selector was a careless choice: it was written to avoid naming a
+page, which is v4379's rule after a check that named rig.html stayed red for 250 rounds over a moved panel.
+The lesson is not "name the page" but "let the thing name itself". That gateReport-selfcheck now runs at
+ship time: at 7.8 s it is still over budget and still outside the sweep, and v4408's rotation is what will
+reach it. And that the contention factor is a constant -- it was measured on ONE machine at ONE load, and
+the honest reading is "the recorded number is not the gate's cost", not "gates cost 2.5x less".
+The tree stands at 1441 gates.
+
 ## v4408 -- Once over budget, over budget forever: the sweep was evicting gates on timings it made itself
 
 *** THE SHIP-TIME SWEEP HAS BEEN EVICTING GATES ON TIMINGS IT MANUFACTURED ITSELF, AND THEN NEVER RE-MEASURING THEM. *** docs/EXPLAIN-ITSELF.md item 6, and the sharpest defect this session has found. v4406 measured that 502 of 1,439 gates sit over the quick sweep's 3,000 ms budget and are run by NO ship-time step; that was the visible half. THE MECHANISM IS THREE FINDINGS DEEP. First, tools/ship/sweep-timings.json stamped ONE `captured` date across all 1,440 entries while the run rewrote only the 937 it ran, so 502 readings carried a date they had not earned -- v4401's defect at a new site, A STORED PROJECTION WHOSE PROVENANCE IS A SINGLE FROZEN FIELD. Second, the budget decision is made FROM those readings, so a gate that got faster is never re-measured and therefore never re-included: once over budget, over budget forever. *** THIRD AND WORST: THE READING A GREEN GATE IS EVICTED ON IS ITS PARALLEL ONE. *** quickSweep records `serialMs ?? parallelMs` and a green gate never earns a serial re-run, so a gate that passes 8-way at 3,002 ms is filed at 3,002 ms and excluded -- while v4297 had ALREADY established that phase-1 parallel timings are starved, keeping both timings for exactly that reason and finding 38 of its 107 reds were starvation rather than failure. The finding was inherited for the sweep's RED VERDICTS and not for its TIMINGS, so the same manufactured number v4297 refused to call a failure was quietly allowed to decide membership. MEASURED BY RUNNING 140 OF THEM SERIALLY, WHICH IS THE ONLY WAY TO KNOW: 138 came back at or under the budget, median 2.85x faster than the reading that evicted them and 7.2x at the worst -- labCensus 3,950 -> 546 ms, wgslLayout 3,919 -> 549. *** AND THE FIRST ROTATION DECAYED IMMEDIATELY, WHICH IS THIS ROUND'S OWN MISTAKE AND THE MOST USEFUL THING IN IT. *** It returned 138 gates, and the very next 8-way verify reported SIXTY NOW OVER BUDGET -- the parallel run re-evicting the same gates on the same starved reading. A DOOR THAT REOPENS ONCE IS NOT OPEN. So quickSweep now re-runs a GREEN gate alone whenever its parallel time crosses the budget, before filing it: v4297's two-phase rule for reds, applied to costs. With that in place a second rotation returned 58 of 60, and the ship-time sweep stands at 1,074 gates against 937 before, with the over-budget pool at 236. NEW tools/ship/sweepCoverage.mjs partitions the tree into FOUR buckets and not two, for v4401's reason that one bucket for several species sends different work to the same place: under (1,074 after this round, 937 before), over (236, the rotation's population), KILLED (130 that hit the 20 s cap, whose exit codes ARE NOT VERDICTS -- v4392's rule sitting in a data file 130 entries deep), and never (no reading at all, which is a new gate and not a skip). NEW tools/ship/sweepRotation.mjs re-times a slice stalest-first under a wall-clock budget, SERIALLY on purpose because the budget is a serial number and a rotation that re-timed under load would evict healthy gates on the same manufactured reading it exists to undo. quickSweep now writes PER-ENTRY provenance: an entry the run did not observe keeps its own older stamp, and one that has never earned a stamp reads "unknown" rather than borrowing the file's date, because an unknown age is a finding and not a default. *** SIX GATES WERE RED IN THE DARK AND ARE NAMED. *** Opening the door surfaced orreryEjecta, box3dFilter, staleness, caseStudy, homography and wasmSupport. Two were already registered; two (staleness, caseStudy) were repaired by the ritual's own `staleness.mjs --fix` step and are green; two are now in NEW redCensus.RED_AT_V4408 -- A NEW LIST AND NOT AN APPEND, because RED_AT_V4279 is stamped with an instant these gates were not part of and nobody knows when they went red. Registering a red the round did not cause is what the register is for; widening it to hide one the round DID cause is the thing forbidden, and the distinction is written into the list's own comment. orreryEjecta is item 5 -- a frozen count the tree grew past, whose two readings are not even measured by the same rule -- and box3dFilter is two build scripts disagreeing about 18 WASM exports, which needs the rig. *** A SECOND MISTAKE OF THIS ROUND, ALSO FOUND BY RUNNING: THE ROTATION'S LEDGER LIVED IN sweep-timings.json AND THE NEXT SWEEP DELETED IT. *** quickSweep builds a fresh object each write and does not know about fields it did not put there, so a record with two writers lost one silently. The rotation now keeps its own file, tools/ship/sweep-rotation.json, with the reading that had evicted each gate beside the fresh one. FIVE SABOTAGES, ALL LOGGED, MEASURED 3/1/1/2/4 BY NAME; sabotage C reproduced the exact pre-v4408 stamping and cost one red, and sabotage A -- counting the cap-hitters as failures -- would have reported a catastrophically red tree from a file that only says these did not finish; sabotage E removed the budget confirmation and took four rows with it. *** AND THREE ROWS OF THE FIRST DRAFT WOULD HAVE PASSED VACUOUSLY, CAUGHT BY READING THE OUTPUT RATHER THAN THE EXIT CODE. *** An `.every()` over an empty map is true; an `undefined <= undefined` comparison is false for the wrong reason; and `rotated.length === 0 || returned.length > 0` reads PASS in precisely the state the round exists to end. That is v4401's lesson for the second time, in the round about readings nobody re-takes. UNCHECKED AND SAID PLAINLY: this does NOT claim the over-budget gates are green -- it re-times them and reports the exit codes it saw, a genuinely slow gate stays out on purpose, and the rotation shrinks the population nobody has looked at rather than certifying it. It does not argue that 3,000 ms is the right budget; nothing here does, and the case for changing it would need the distribution this file now makes readable. And 234 gates are still in the pool, so quickSweep-selfcheck's closing line still stands for what is left -- it is rewritten to say so rather than deleted. Items 5, 7 and 8 are added to docs/EXPLAIN-ITSELF.md and not taken: the scanner that counts a record about an import as an import, the register panel's probe counting across a container, and the author-centred orrery, whose opening measurement is that orrery.json's fifteen bodies carry no owner field at all. The tree stands at 1441 gates.
