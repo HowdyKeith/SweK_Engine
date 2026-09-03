@@ -1,7 +1,18 @@
 // tools/mutate/scan.mjs -- stop choosing the mutations.
 //
-// mutate.mjs runs ten mutations and catches all ten. That number is worth exactly as much as its weakest
-// assumption, which is me: I hand-picked those ten, and nine were things I had just built or just fixed. A
+// v4386 -- THIS PARAGRAPH USED TO OPEN BY STATING A PERFECT SCORE FOR THE TEN AS A BARE LITERAL, AND THAT
+// SENTENCE WAS FALSE FROM v4162 TO v4385. One of the ten looked for a find-string v4162 had reformatted away,
+// so it mutated nothing: nine experiments and one abstention, reported as ten results. The number now lives in
+// tools/mutate/mutationScore.mjs, where tools/ship/mutationScore-selfcheck.mjs can check it is still about this
+// tree. A number in a comment cannot be checked by anything.
+//
+// The old sentence is DESCRIBED above rather than QUOTED, and that is not squeamishness. Quoting it verbatim
+// put the literal back into this file, and the gate that greps for it went red on the very correction that
+// removed it -- a file naming its own subject becomes its own subject. Reworded rather than excluded, because
+// an exclusion would have left the next real occurrence unfindable too.
+//
+// The score is worth exactly as much as its weakest assumption, which is me: I hand-picked those ten, and nine
+// were things I had just built or just fixed. A
 // hand-picked mutation set measures the AUTHOR'S IMAGINATION, not the gate. It is the same trap as every control
 // in this engine that was designed to pass -- I chose the ways in which the code might be wrong, so I could only
 // discover the wrongness I had already thought of.

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9424b71715b6b1886b6c3726bdd6cc605d83ffac",
+ "head": "24588e1c1e864388c7910e64aefe599629228f42",
  "bodies": {
   "box3d": [
    {
@@ -112,7 +112,7 @@
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
     "bytes": 24652,
-    "sha": null
+    "sha": "24588e1c1e864388c7910e64aefe599629228f42"
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
@@ -452,8 +452,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2650633,
-    "sha": "8f20a9c26be0ef99b9687f426579d26e6b57d78a"
+    "bytes": 2650162,
+    "sha": "24588e1c1e864388c7910e64aefe599629228f42"
    },
    {
     "path": "mpm3d.html",

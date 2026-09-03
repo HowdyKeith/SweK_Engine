@@ -14,6 +14,90 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4386 -- The mutation suite's score was prose, and it had been false for 223 versions
+
+tools/mutate/scan.mjs opened by stating a perfect score for the ten mutations as a bare literal in a comment.
+
+v4162 rewrote physics/sph/sph.js's shadow amplitude from Math.pow(o.h, 3) to (h * h * h). Same arithmetic,
+different text, and that commit explains why -- pow and multiplication need not agree bit-for-bit. Nothing
+wrong with the change. But a mutation's find-string is a COPY OF SOURCE TEXT rather than a reference to it, so
+from that day the mutation applied NOTHING: nine experiments and one abstention, reported as ten results.
+
+AND THE GATE BUILT FOR EXACTLY THIS ROT CAUGHT IT, BY NAME, AND THEN STOOD RED FROM v4279 TO v4385.
+tools/ship/mutationTable-selfcheck.mjs (v2884) exists to check that every find-string is still present, and its
+own header already records a PREVIOUS occurrence of the same rot -- Math.pow(h, 6) becoming _p6(h) in
+kernels.js. So the harness was honest (mutate.mjs has a STALE branch that excludes a dead mutation from the
+score), the gate was right, and the only thing that failed for 106 versions was that nothing read it.
+
+THEN THE SUITE WAS ACTUALLY RUN, WHICH NOBODY HAD DONE. Eleven full verifies, about fourteen minutes:
+
+  10/10 CAUGHT
+
+and the restored mutation was caught on its FIRST REAL RUN. So no hole in the net was ever hidden -- the
+fluid-shadow behaviour was guarded the whole time. What was broken was the MEASUREMENT of it. That is a smaller
+finding than a surviving mutation and a more insidious one, because a suite reporting a perfect score is
+exactly the one nobody re-examines.
+
+THE FIX IS A RECORD THAT CAN DETECT ITS OWN ROT. tools/mutate/mutationScore.mjs carries the ten states, a
+tableFingerprint over every mutation's name, file, find, replace and breaks, and the COMMIT the run was taken
+at. Two rots, two detectors:
+
+  * THE TABLE CHANGED -- edit any mutation and the fingerprint moves, and the gate refuses the record by name
+    rather than reporting a score measured on a table that no longer exists.
+  * THE CODE UNDER TEST CHANGED -- tools/ship/mutationScore-selfcheck.mjs asks git whether any of the eight
+    target files has moved since that commit, and names the ones that have. THAT IS THE CHECK THAT WOULD HAVE
+    FIRED AT v4162.
+
+What it deliberately does NOT do is fail on age. A score N versions old is not wrong, it is older; failing on a
+version count would force every round either to re-run fourteen minutes or to edit a number, and this tree
+already knows what an editable threshold is worth. The trigger is a change to a file the score is ABOUT.
+
+No count is stored beside the states either -- tally() derives caught/survived/stale/total, because a total
+typed next to the rows it totals is the same defect one size smaller.
+
+AND THE ROUND'S FIRST HYPOTHESIS WAS WRONG TWICE OVER, WHICH IS THE MORE USEFUL RESULT. The guess was that
+redCensus's red register held gates somebody had since fixed, padding every green verify with a false
+denominator. All 28 entries of RED_AT_V4279 were re-run serially -- 597 seconds of wall clock -- and 28 of 28
+are genuinely red. The register is accurate and the debt is real.
+
+Then the second correction, and it is the one worth having: THE TREE HAD ALREADY SOLVED THIS.
+tools/ship/register-audit.mjs freezes an observed run of every register entry, freezeRegisterAudit.mjs produces
+it, and registerDrift-selfcheck.mjs compares the two ON EVERY SHIP -- so a register carrying a repaired gate
+could never have gone unnoticed, and the audit had been re-frozen as recently as v4380. The hand re-run
+corroborated a mechanism already in place; it did not discover one. The guess was that a record had rotted, and
+the answer was that this particular record has a keeper. (The run did show shaderRefs-selfcheck taking 426
+seconds, so the ship sweep's 3000 ms cap can never see it -- which is why the audit exists.)
+
+One entry leaves the register: mutationTable-selfcheck is pruned to FIXED_SINCE_V4279 with its cause, using the
+term the census added at v4318 precisely so that pruning is how the arithmetic balances rather than what breaks
+it.
+
+TWO STALE PROSE CLAIMS WERE ALSO CORRECTED:
+
+  * the gate's failure line said a dead mutation "WOULD REPORT A PHANTOM SURVIVOR", which mutate.mjs's STALE
+    branch already prevents -- a gate about stale records carrying a stale claim about staleness;
+  * scan.mjs's sentence now points at the record instead of asserting a number.
+
+AND THE CORRECTION TRIPPED THE SELF-COUNTING TRAP. Quoting the false claim verbatim in the note that retracted
+it put the literal straight back into the file, and the gate that greps for it went red on the very edit that
+removed it. Reworded rather than excluded -- an exclusion would have left the next real occurrence unfindable
+too.
+
+Four sabotages, 3/3/1/1 red by name, both files md5-identical after. B is the instructive one: it restores the
+actual v4162 defect, and BOTH the find-string check and the table fingerprint catch it. Two independent
+detectors for one rot is why both are there.
+
+UNCHECKED: the score is not RE-MEASURED by the gate. The gate costs milliseconds and the run costs fourteen
+minutes, so what is checked is that the record is CURRENT, never that it is right. A record whose targets have
+not moved is a record nobody has invalidated -- weaker than a fresh run, and much stronger than a comment.
+
+AND NOW NAMED: tools/mutate/scan.mjs, the MECHANICAL scanner built because "a hand-picked mutation set measures
+the AUTHOR'S IMAGINATION, not the gate", is imported by nothing, invoked by no rig job, and records nothing.
+The better measurement has been sitting unrun beside the weaker one, which is the same shape as the defect this
+round fixed. Also: the ten mutations touch eight files. This is a score for SPH, tomography, FDTD, lockstep and
+the policy store, and for nothing else.
+
+The tree stands at 1425 gates.
 ## v4385 -- The joint limit was write-only for four hundred rounds
 
 swk_joint_revolute has taken loDeg and hiDeg since v2515 and swk_joint_spherical has taken coneDeg just as

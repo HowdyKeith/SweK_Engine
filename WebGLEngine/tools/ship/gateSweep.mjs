@@ -406,6 +406,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "export list -- and is green now. Driven RED by five sabotages (3/5/1/1/3 by name), both files " +
                  "md5-identical after, the three shim ones rebuilt natively so what went red is compiled physics",
     }),
+    since19: Object.freeze({
+        at: "v4386", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/mutationScore-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections. This round also re-ran every entry in " +
+                 "redCensus's RED_AT_V4279 -- all 28, serially, 597 s -- to test whether the register held " +
+                 "gates somebody had since fixed. It did not: 28 of 28 genuinely red. And the check ITSELF " +
+                 "was redundant, which is the finding: registerDrift-selfcheck already compares the register " +
+                 "against a frozen audit on every ship, and the audit was last re-frozen at v4380. One of them is red no longer: " +
+                 "mutationTable-selfcheck is pruned to FIXED_SINCE_V4279 with its cause. Driven RED by four " +
+                 "sabotages (3/3/1/1 by name), md5-identical after; sabotage B restores the actual v4162 " +
+                 "defect and TWO independent detectors catch it, which is why both are there",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

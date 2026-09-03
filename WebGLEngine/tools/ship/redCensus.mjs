@@ -96,8 +96,6 @@ export const RED_AT_V4279 = Object.freeze([
       fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
     { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
       fails: "!! it is the only homography in the tree" },
-    { gate: "tools/ship/mutationTable-selfcheck.mjs", ms: 58,
-      fails: "!! EVERY MUTATION'S FIND-STRING IS STILL PRESENT STALE, MUTATES NOTHING, WOULD REPORT A PHANTOM SURVIVOR: the" },
     { gate: "tools/ship/pagePlacement-selfcheck.mjs", ms: 88,
       fails: "!! ...and the silent bucket is the large one, which is the finding 210 silent against 211 placed. pageSections" },
     { gate: "tools/ship/pagePlacements-selfcheck.mjs", ms: 106,
@@ -245,6 +243,20 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/mutationTable-selfcheck.mjs", round: "v4386",
+      why: "RED FROM v4279 TO v4385 OVER A MUTATION THAT HAD BEEN MUTATING NOTHING SINCE v4162 -- 223 versions " +
+           "dead, 106 of them with this gate naming it. tools/mutate/mutate.mjs's table looks for each " +
+           "mutation's find-string VERBATIM, and v4162 rewrote physics/sph/sph.js's shadow amplitude from " +
+           "Math.pow(o.h, 3) to (h * h * h): same arithmetic, different text, so the mutation applied nothing. " +
+           "The harness was honest about it -- a STALE branch excludes a dead mutation from the score -- and " +
+           "the gate was right; what failed is that nothing read either. Meanwhile tools/mutate/scan.mjs " +
+           "opened by stating a perfect score for the ten as a bare literal: nine experiments and one " +
+           "abstention, reported as ten results. Fixed at the cause (the find-string), then MEASURED -- the " +
+           "full suite was run and scores 10/10, the restored mutation CAUGHT on its first real run, so no " +
+           "hole in the net was ever hidden and only the measurement of it was broken. The number now lives " +
+           "in tools/mutate/mutationScore.mjs with a table fingerprint and the commit it was taken at, and " +
+           "tools/ship/mutationScore-selfcheck.mjs asks git whether any file the score is ABOUT has moved " +
+           "since. That is the check that would have fired at v4162." },
     { gate: "tools/ship/shaderCensus-selfcheck.mjs", round: "v4383",
       why: "FILED AT 14 AT v4380 AGAINST A LINE THAT SAID 4, AND THE JUDGEMENT IT DEFERRED CAME BACK NO. The gate " +
            "has held since v3274 that a hand-written shader pair is cheaper than an IR while few files carry both " +
