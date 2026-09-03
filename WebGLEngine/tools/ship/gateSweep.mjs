@@ -384,7 +384,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "round's own winding bug put back, which only one of eleven rays could see",
     }),
     since17: Object.freeze({
-        at: "v4383", swept: 1, green: 1, red: 0,
+        at: "v4384", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/songLathe-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly, nine sections. TWO of them were written as claims and came " +
