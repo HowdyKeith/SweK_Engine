@@ -553,6 +553,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "thin gate, which the 3 demonstrates. Its own first draft overclaimed exactness FOUR TIMES " +
                  "and each correction is recorded where the claim is",
     }),
+
+    // v4413 -- the twenty-eighth closing. It uses the balance-heuristic weights v4409 computed and left idle,
+    // and its most useful result came from a sabotage that went 0 red: MIS is unbiased for ANY partition of
+    // unity, so a wrong pdf inside the heuristic cannot move the mean and every mean-based check is blind to
+    // it by construction. The gate now compares the two routes to the pdf directly, on the device as well as
+    // on the CPU, because the WGSL is a separate transcription.
+    since29: Object.freeze({
+        at: "v4413", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/misWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections and 15 checks in 4.1 s. Driven RED by four " +
+                 "sabotages (3/1/2/4 by name) and restored -- and the 1 WENT 0 RED FIRST, which bought the " +
+                 "device pdf check. Three of its thresholds were set from measurement after a first draft " +
+                 "overshot, including one where a strategy returns exactly zero rather than a finite variance",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
