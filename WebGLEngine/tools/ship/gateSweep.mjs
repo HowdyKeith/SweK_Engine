@@ -579,19 +579,6 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "passed vacuously by naming a route that had just failed",
     }),
     since30: Object.freeze({
-<<<<<<< HEAD
-        at: "v4404", swept: 1, green: 1, red: 0,
-        added: Object.freeze(["tools/ship/claimEvidence-selfcheck.mjs"]),
-        redOnArrival: Object.freeze([]),
-        verdict: "green on this box, run singly in ~1s, four checks. It gates tools/ship/claimEvidence.mjs, which " +
-                 "asks what each of predictions.html's 241 claims rests on: kill: and where: are SENTENCES, and " +
-                 "nothing had ever resolved the path or run the gate. ONE SETTLED CLAIM WAS RESTING ON A RED " +
-                 "GATE -- 'the selfchecks and the server survive Windows path semantics', whose own killer " +
-                 "reports twenty offending occurrences -- and it is marked BROKEN with the measurement rather " +
-                 "than exempted. 182 gated, 52 prose, 7 dangling, 0 contradicted. Driven RED by three sabotages " +
-                 "(1/1/1 by name). The dangling list was frozen TWICE: the first counted a citation of this very " +
-                 "gate, written one command before the file existed",
-=======
         at: "v4403", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/xpbd/rigidCouple-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -609,7 +596,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "by six sabotages (1/3/1/1/2/2 by name), two files md5-identical after -- and sabotage C read " +
                  "ZERO RED at first because every scene caught the body before the bug could show, so the gate " +
                  "could not see the exact defect the round exists to have fixed",
->>>>>>> origin/main
+    }),
+    since31: Object.freeze({
+        at: "v4404", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/claimEvidence-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~1s, four checks. It gates tools/ship/claimEvidence.mjs, which " +
+                 "asks what each of predictions.html's 241 claims rests on: kill: and where: are SENTENCES, and " +
+                 "nothing had ever resolved the path or run the gate. ONE SETTLED CLAIM WAS RESTING ON A RED " +
+                 "GATE -- 'the selfchecks and the server survive Windows path semantics', whose own killer " +
+                 "reports twenty offending occurrences -- and it is marked BROKEN with the measurement rather " +
+                 "than exempted. 182 gated, 52 prose, 7 dangling, 0 contradicted. Driven RED by three sabotages " +
+                 "(1/1/1 by name). The dangling list was frozen TWICE: the first counted a citation of this very " +
+                 "gate, written one command before the file existed",
+    }),
+    since32: Object.freeze({
+        at: "v4405", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shipVerdict-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~2s, five sections. It gates tools/ship/shipVerdict.mjs, the " +
+                 "repair for the worst mistake of the session: v4404 was committed, pushed and fast-forwarded " +
+                 "onto main WITH THREE CONFLICT MARKERS IN IT, past a verify that had printed DO NOT SHIP and " +
+                 "exited 1, because the git steps were chained behind a read of the log tail rather than of the " +
+                 "exit status. Two conditions, held apart: no tracked file carries a conflict marker (5,505 read " +
+                 "in full, no allowance list, and the ref checked as well as the tree because a clean tree is " +
+                 "not evidence about what shipped), and a (status, tail) pair that DISAGREES IN EITHER " +
+                 "DIRECTION is no verdict rather than a pass -- proven against a live child that prints ALL " +
+                 "GREEN and exits 1. Driven RED by three sabotages (MEASURED 1/3/1 by name)",
     }),
 });
 
