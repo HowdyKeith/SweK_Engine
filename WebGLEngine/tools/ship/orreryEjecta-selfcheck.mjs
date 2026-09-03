@@ -59,10 +59,19 @@ console.log("1. *** THE PAPERWORK PLANETS: 3 of 14 bodies contain no code at all
     // with no licence provenance"; both have since gained a LICENSE, so box3d now carries paperwork and its
     // mass is correctly LESS than its bytes. The example is chosen by measurement now -- the first body with no
     // paper file at all -- so the check states the property rather than a body that happened to have it.
+    // *** AND AT v4418 THERE IS NO ALL-CODE BODY LEFT, WHICH IS THE COMMENT ABOVE HAPPENING A SECOND TIME. ***
+    // That comment records box3d ceasing to be the example when it gained a LICENSE, and says the example is
+    // chosen by measurement now. Measurement returns NOTHING: v4418 delegated isPaperFile's licence half to
+    // world/orrery.mjs's isLicenceFile after finding the same file was paperwork to one function and payload to
+    // another, and IBMPlexSerif-OFL.txt and ASHIMA-LICENSE.txt came across with it. Every vendored body carries
+    // paperwork. So the row states the INVARIANT rather than an example that keeps being spent: mass is bytes
+    // minus paper, for every body, and it is checked on all fifteen instead of on whichever one still fits.
     const allCode = BODIES.filter((b) => !(b.files || []).some((f) => E.isPaperFile(f.path)));
-    ok("  and mass is unchanged for a body that is all code",
-        allCode.length > 0 && allCode.every((b) => E.massOf(b) === b.bytes),
-        allCode.map((b) => b.name).join(", ") + " carry no paperwork to discount");
+    const paperBytes = (b) => (b.files || []).filter((f) => E.isPaperFile(f.path)).reduce((a, f) => a + f.bytes, 0);
+    ok("!! *** mass is bytes MINUS paperwork, for every body, not for a chosen example ***",
+        BODIES.every((b) => E.massOf(b) === b.bytes - paperBytes(b)),
+        BODIES.filter((b) => E.massOf(b) !== b.bytes - paperBytes(b)).map((b) => b.name).join(", ") ||
+        `${BODIES.length} bodies reconcile; ${allCode.length} carry no paperwork at all, against 1 before v4418`);
     ok("  ...and #61's two now DO carry paperwork, which is why neither is the example any more",
         ["box3d", "htmx"].every((n) => { const b = BODIES.find((x) => x.name === n);
             return b && (b.files || []).some((f) => E.isPaperFile(f.path)) && E.massOf(b) < b.bytes; }),

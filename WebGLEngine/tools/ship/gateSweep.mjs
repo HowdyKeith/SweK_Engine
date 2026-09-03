@@ -819,6 +819,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "silently wins and one round's swept count vanishes from the surplus arithmetic. The round " +
                  "renumbered from v4416 to v4417 for the same collision, one level up.",
     }),
+    since44: Object.freeze({
+        at: "v4418", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/patternWidth-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~4s, four sections. v4416 closed with a claim it could " +
+                 "not check -- that it could not prove there was no SIXTH narrow pattern -- and this is the " +
+                 "detector for the species, VALIDATED AGAINST v4416's OWN FIVE, which is what none of the " +
+                 "five original scanners ever was. The shape: a pattern that NAMES A KIND of file and rejects " +
+                 "a file in this tree plainly of that kind. IT FOUND THE SIXTH -- world/orreryEjecta.mjs's " +
+                 "isPaperFile, anchored at the filename start, made shaders/ASHIMA-LICENSE.txt and " +
+                 "vendor/fonts/IBMPlexSerif-OFL.txt into CODE MASS while world/orrery.mjs's isLicenceFile, " +
+                 "in the same tree, called them licences: THE SAME FILE PAPERWORK TO ONE FUNCTION AND PAYLOAD " +
+                 "TO ANOTHER, and 4,456 bytes of licence drawing a planet's radius. AND THE DETECTOR " +
+                 "COMMITTED THE SPECIES TWICE WHILE BEING WRITTEN: it counted world/gpuProvenance.mjs, a " +
+                 "MODULE, as a provenance record; and its kind matcher searched for literal words, so " +
+                 "LICEN[CS]E did not read as naming the licence kind and the very instance that motivated " +
+                 "the round was invisible to it. Sixth and seventh sightings, inside the detector for the " +
+                 "species. Driven RED by four sabotages (MEASURED 3/2/1/2 by name)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

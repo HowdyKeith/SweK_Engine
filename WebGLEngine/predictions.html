@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A defect species can be searched for, and searching found the sixth instance nobody had looked for",
+    since: "v4418",
+    state: "open",
+    pred: "Six instances of one defect -- a detector matching the shape somebody happened to picture -- were recorded across this session, in shaderCensus, claimEvidence, orreryFleetScan, the licence scan and five times in the provenance scan. EVERY ONE WAS FOUND BY A PERSON LOOKING AT A ROW THAT SEEMED WRONG; nothing looked for them. The prediction is that the shape is precise enough to search for -- a pattern that NAMES A KIND of file and rejects a file in this tree plainly of that kind -- and that searching finds instances hand-reading has not.",
+    why: "v4416 closed with a claim it could not check: it could not prove there was no sixth narrow pattern, and its own history was that every widening found one more. A detector for this must be validated against KNOWN POSITIVES, which none of the five original scanners ever was -- that is precisely why each of them shipped looking correct.",
+    measured: "It finds the sixth: world/orreryEjecta.mjs's isPaperFile, anchored at the filename's start, rejected shaders/ASHIMA-LICENSE.txt and vendor/fonts/IBMPlexSerif-OFL.txt while world/orrery.mjs's isLicenceFile, in the same tree, called them licences -- the same file paperwork to one function and payload to another, with 4,456 bytes of licence text drawing a planet's radius. Two detectors were needed and they found DIFFERENT files: the near-miss test found ASHIMA-LICENSE.txt, the two-reader disagreement found the OFL. Across 14,767 regex literals in the tree the live census is now empty, and the reason to believe that rather than suspect the detector is that three patterns this session really did have to widen are fed back in as fixtures and all three are caught.",
+    kill: "tools/ship/patternWidth-selfcheck.mjs. Any pattern in the tree that names a kind and rejects a documentary file of that kind fails it unless adjudicated by name; so does any file that is a licence to orrery.mjs and payload to orreryEjecta.mjs. SABOTAGE: revert isPaperFile to the anchored list and 3 rows go red naming both files; drop character-class expansion and the fixture row goes red because LICEN[CS]E stops reading as the licence kind -- MEASURED 3 and 2. HONEST SCOPE: it reads REGEX LITERALS on non-comment lines and cannot see a pattern built at runtime, one in an .html page, or a classification made with indexOf and an if. It only finds misses against files that EXIST, so a pattern that will reject the next file somebody adds is invisible until they add it.",
+    page: "instruments.html",
+    where: "tools/ship/patternWidth.mjs + tools/ship/patternWidth-selfcheck.mjs + world/orreryEjecta.mjs.",
+  },
+  {
     name: "Fixing one instance of a defect species is not fixing the species, even when the instance is two lines away",
     since: "v4416",
     state: "open",

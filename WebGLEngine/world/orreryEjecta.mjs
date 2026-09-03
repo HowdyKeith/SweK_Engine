@@ -55,6 +55,7 @@
 // ===================================================================
 "use strict";
 import * as IP from "../tools/ship/importPosition.mjs";
+import { isLicenceFile } from "./orrery.mjs";
 
 /** What a body is made of. A planet with no code is a filed licence, not a captured dependency. */
 export const SUBSTANCE = Object.freeze({ CODE: "CODE", PAPER_ONLY: "PAPER_ONLY" });
@@ -68,7 +69,14 @@ export const SUBSTANCE = Object.freeze({ CODE: "CODE", PAPER_ONLY: "PAPER_ONLY" 
  */
 export function isPaperFile(p) {
     const base = String(p || "").split("/").pop();
-    return /^(LICEN[CS]E|COPYING|NOTICE|ATTRIBUTION|PROVENANCE|README|AUTHORS|PATENTS)/i.test(base);
+    // v4418 -- *** THE LICENCE HALF IS DELEGATED, BECAUSE THE SAME FILE WAS PAPERWORK TO ONE FUNCTION AND
+    // PAYLOAD TO ANOTHER IN THIS MODULE. *** The comment above justified anchoring at the filename's start on
+    // the grounds that a false positive here zeroes real payload -- a fair worry, and it made
+    // IBMPlexSerif-OFL.txt and shaders/ASHIMA-LICENSE.txt into CODE MASS while world/orrery.mjs's
+    // isLicenceFile, in the same tree, called them licences. Measured across vendor/: isLicenceFile matches 17
+    // files and every one of them is a real licence, so the feared false positive does not exist here. What is
+    // kept is the non-licence half -- PROVENANCE and README and AUTHORS are paperwork and are not licences.
+    return isLicenceFile(base) || /^(PROVENANCE|README|AUTHORS|PATENTS|VERSIONS)/i.test(base);
 }
 
 /**
