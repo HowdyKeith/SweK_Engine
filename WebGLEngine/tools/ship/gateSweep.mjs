@@ -452,6 +452,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "third leaves the determinism row GREEN while destroying the scatter, which is that row's " +
                  "declared limit arriving as a measurement",
     }),
+    // v4387 -- the TWENTY-SECOND closing, and the first in six rounds that did NOT find a kernel broken: this
+    // one is graded against six analytic constants rather than against another renderer, so there was no
+    // comparison to be wrong about. Its round touched no shipped module, only added two files.
+    since22: Object.freeze({
+        at: "v4387", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/furnaceWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, three sections and 8 checks in 6.3 s. Driven RED by three " +
+                 "sabotages (2/3/2 by name) and restored -- and a FOURTH went 0 red, which the gate keeps as a " +
+                 "property: the furnace key is azimuthally blind, so no tangent frame can move it",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

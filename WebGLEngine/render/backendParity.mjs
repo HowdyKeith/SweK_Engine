@@ -160,13 +160,17 @@ export const PARITY_BASELINE = Object.freeze({
     // which no census scans -- the first shader pair in this tree that is data rather than source.
     // v4322, moved to render/fleetTsl.mjs at v4329 -- the fleet shells for the transplant carry a WGSL prefix and a GLSL
     // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
+    // v4387 -- physics/render/furnaceWgsl.mjs joins the census: WGSL-only, +1 wgslBearing and +1 wgslOnly. It is
+    // a genuine shader-bearing MODULE (the furnace estimator as a compute kernel), not a gate carrying a fixture,
+    // so the baseline moves rather than the shader hiding. That is the opposite call from tools/ship's carve and
+    // roles fixtures, which went into JSON at v4372 and v4384 precisely because a GATE is not a shader module.
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 56,
+    wgslBearing: 57,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 43,
+    wgslOnly: 44,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
