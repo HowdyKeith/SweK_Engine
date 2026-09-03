@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "Fixing one instance of a defect species is not fixing the species, even when the instance is two lines away",
+    since: "v4416",
+    state: "open",
+    pred: "v4415 replaced its own narrow licence-filename regex with world/orrery.mjs's isLicenceFile after falsely accusing vendor/fonts of having no paperwork, and wrote a paragraph about why. TWO LINES BELOW IT, in the same function, in the same round, a provenance-file filter required the .md extension. The prediction is that a defect species is not closed by fixing an instance, that the remaining instances are usually adjacent, and that each widening will find another record the tree had already written down.",
+    why: "The species is 'I matched the shape I happened to picture'. It has now been recorded in shaderCensus (v4383, counting the word not the thing), claimEvidence (v4404, a SABOTAGE clause counted as evidence), orreryFleetScan (v4412, a record ABOUT an import counted as an import), the licence scan (v4415), and five times inside one function here. Every instance looks like a one-line oversight and none of them was found by reading -- all were found by looking at a row that seemed wrong and asking why.",
+    measured: "FIVE narrow patterns in one function, each found only by widening the one before: the record must be .md (missed gifenc/PROVENANCE.txt and slug/PROVENANCE.txt); the URL must be http (missed git://github.com/mattdesl/gifenc.git); the file must be called PROVENANCE (missed htmx/VERSIONS.txt, a full record with npm source, version and verified date); the host must be github.com (missed raw.githubusercontent.com/bigskysoftware/htmx); and my own fix for the third capped path depth at 2 and LOST vendor/wasm, which the rule it replaced had found. v4415's published figure of 3 of 15 was really 5, and is 11 after six records were written from evidence in the tree.",
+    kill: "tools/ship/provenanceRecord-selfcheck.mjs. Restoring any one of the five patterns takes down both the fixture row naming it and the population count. SABOTAGE: put back the .md requirement and 6 rows go red; the http-only URL, the github.com-only host, and the depth cap cost 3 each -- MEASURED 6/3/3/3 by name. HONEST SCOPE: this cannot prove there is no SIXTH narrow pattern in the same function, and the round's own history is that every widening found one more. It does not check the recorded upstreams are correct, only that they are attested with evidence rather than scraped.",
+    page: "orrery.html",
+    where: "world/orreryAuthor.mjs + tools/ship/provenanceRecord-selfcheck.mjs + vendor/*/PROVENANCE.txt.",
+  },
+  {
     name: "The orrery knew whether a dependency was papered and never whose it was",
     since: "v4414",
     state: "open",

@@ -1,0 +1,19 @@
+three.js -- vendored
+https://github.com/mrdoob/three.js
+author: three.js authors (a collective, not a person -- see LICENSE)
+
+Recorded at v4416.
+
+EVIDENCE:
+  - LICENSE reads "Copyright (c) 2010-2023 three.js authors".
+  - three.module.js is the upstream's own ES module build.
+  - github.com/mrdoob/three.js appears 9 times in this directory.
+
+*** AND THE MOST FREQUENT URL HERE IS THE WRONG ONE. *** github.com/KhronosGroup/glTF appears 58
+times -- six times as often -- because the glTF loader cites the specification it implements. A
+scraper picking the commonest URL would file three.js under KhronosGroup. That is why this record
+exists as an attestation with its reasoning, and not as a scan.
+
+NOT ESTABLISHED HERE: the version. vendor/three-webgpu/README.md records an npm registry URL for
+the three package; this directory carries no version marker of its own and this file does not
+guess one.

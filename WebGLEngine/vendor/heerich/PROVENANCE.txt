@@ -1,0 +1,13 @@
+heerich -- vendored
+https://github.com/meodai/heerich
+author: meodai
+
+Recorded at v4416.
+
+EVIDENCE:
+  - LICENSE reads "Copyright (c) 2025 meodai".
+  - docs/CHANGELOG.md's round that brought it in records it as "Vendored: vendor/heerich, MIT,
+    meodai/heerich" -- an owner/repo pair written by the round that did the vendoring.
+
+This is the only body whose upstream was recovered from THIS TREE'S OWN CHANGELOG rather than from
+bytes inside the directory. The changelog was searched for all fifteen and gave up exactly one.

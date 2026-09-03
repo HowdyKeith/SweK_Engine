@@ -53,6 +53,10 @@ export const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[
 export const NOT_IMPORTERS = Object.freeze([
     "tools/ship/orreryEjecta-selfcheck.mjs",
     "tools/ship/importPosition-selfcheck.mjs",
+    // v4416: FOURTH instance. This gate names vendor/keyhunt and vendor/three while measuring what a URL scrape
+    // would conclude, so it joined keyhunt's fleet the moment it existed. The name-frozen ratchet said WHICH
+    // file within the minute, which is the whole reason v4412 made the baseline a list instead of a count.
+    "tools/ship/provenanceRecord-selfcheck.mjs",
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */

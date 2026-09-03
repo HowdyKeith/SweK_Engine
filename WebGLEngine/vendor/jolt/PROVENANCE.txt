@@ -1,0 +1,17 @@
+JoltPhysics.js -- vendored
+https://github.com/jrouwe/JoltPhysics.js
+author: Jorrit Rouwe
+
+Recorded at v4416. Before this file, vendor/jolt/ held the wasm-compat build and its LICENSE and
+nothing that said where they came from.
+
+EVIDENCE, stated rather than asserted:
+  - LICENSE beside this file reads "Copyright (c) Jorrit Rouwe", and Jorrit Rouwe is JoltPhysics'
+    author.
+  - github.com/jrouwe/JoltPhysics.js is the ONLY GitHub URL anywhere in this directory. Not the
+    most frequent -- the only one. (For contrast, the same scan over vendor/three returns 58 hits
+    for KhronosGroup/glTF against 9 for mrdoob/three.js, which is why frequency is not the test.)
+
+NOT ESTABLISHED HERE: the exact upstream tag or commit. The build predates this record and nothing
+in the directory pins one, so this file does not invent one. A round that rebuilds the artifact
+should write the tag in here at that point.

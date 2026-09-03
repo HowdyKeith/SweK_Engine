@@ -1,0 +1,17 @@
+three.js (WebGPU build) -- vendored
+https://github.com/mrdoob/three.js
+author: three.js authors (a collective, not a person -- see LICENSE)
+
+Recorded at v4416. Arrived 2026-09-02 and was invisible to the orrery's ejecta baseline until
+v4329, which is its own recorded finding.
+
+EVIDENCE:
+  - LICENSE reads "Copyright (c) 2010-2023 three.js authors" -- the same grant as vendor/three.
+  - README.md beside this file records the npm registry URL the artifact was fetched from.
+  - github.com/mrdoob/three.js appears 8 times in this directory, against 3 for
+    selfshadow/ltc_code, which is a technique reference inside the area-light shader and not a
+    source of these bytes.
+
+NOTE: this is the same upstream project as vendor/three, vendored twice as two different builds.
+The orrery draws them as two bodies and attributes both to "three.js authors", which is correct
+about the grant and worth knowing when reading the author view: one author, two planets.
