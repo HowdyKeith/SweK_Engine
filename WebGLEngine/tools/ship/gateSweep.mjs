@@ -616,6 +616,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the side that is supposed to be empty, which cannot tell empty from broken. It also " +
                  "corrects a sentence in fresnel-selfcheck.mjs by measurement",
     }),
+
+    // v4417 -- the thirty-second closing, and the first in this arc whose headline is a NULL. Keith asked what
+    // would happen if the AI scene composer made a scene and the learned painter painted it; the round found
+    // that the painter's shape budget cannot see the composition's declared prop count at all, and proved the
+    // null with a control rather than reporting an absence of signal. It also found that the painter's target
+    // has always been inside its own model class, and that this turns out not to be what governs it.
+    since33: Object.freeze({
+        at: "v4417", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/paintFloor-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 18 checks in 3.1 s -- no device, no model, " +
+                 "no network. Driven RED by eight sabotages (6/1/5/1/4/1/2/2 by name) and restored, and TWO " +
+                 "WENT 0 RED FIRST: a boundary convention that five seeds of bit-identity could not reach at " +
+                 "any number of seeds, and an exponent check that compared three numbers to each other and " +
+                 "never to zero. The round's own premise was wrong and the gate says so where the number is",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
