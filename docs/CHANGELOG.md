@@ -17,9 +17,174 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 ## v4404 -- a claim names its own falsifier in prose, and nothing had ever pulled the trigger
 
 *** A CLAIM NAMES ITS OWN FALSIFIER IN PROSE, AND NOTHING HAD EVER PULLED THE TRIGGER -- SO ONE OF THEM HAD BEEN ASSERTING THE OPPOSITE OF ITS OWN KILLER FOR AS LONG AS THAT KILLER HAS BEEN RED. *** docs/EXPLAIN-ITSELF.md item 4, and the red register's defect one level over. predictions.html holds 241 claims -- 204 settled, 28 open, 9 broken -- and each carries `kill:`, the condition that would kill it, and `where:`, the files it rests on. BOTH ARE SENTENCES. Nothing resolved a path, nothing ran a gate, and nothing had ever asked whether a claim's stated killer was currently firing. ONE WAS. "The selfchecks and the server survive Windows path semantics" was marked SETTLED; its kill reads "tools/ship/winPathGuard-selfcheck.mjs. SABOTAGE: reintroduce either idiom in any file and the grep finds it and the gate fails"; its measured reads "it is, so every straggler was caught". RUN NOW, THAT GATE REPORTS TWENTY OFFENDING OCCURRENCES -- engine/frameDirtyCensus-selfcheck.mjs and engine/xrSession among them -- and it has sat in redCensus.RED_AT_V4279 for as long as that register has existed. The claim's own stated kill condition was met twenty times over while the claim read settled. IT IS MARKED BROKEN AT v4404 WITH THE MEASUREMENT, which is what this tree does with a falsified prediction and what its other nine broken entries are for -- not exempted, not re-scoped. NEW tools/ship/claimEvidence.mjs asks what each claim's evidence is actually worth, in FOUR outcomes rather than two because v4401 established that one bucket for several species sends different work to the same place: CONTRADICTED (settled, own gate red -- read it and re-state it), DANGLING (names a file that is gone -- repoint or delete), PROSE (no runnable falsifier -- write a gate or admit there is none), GATED (nothing to do). MEASURED across 241: 182 gated, 52 prose of which 32 are SETTLED, 7 dangling, and 1 contradicted which is now 0. *** AND THE FIRST DRAFT OF THE DETECTOR COUNTED A SABOTAGE CLAUSE AS EVIDENCE, WHICH IS THE SHADER CENSUS'S DEFECT AGAIN. *** A `kill:` usually ends "SABOTAGE: <how to break it>", and that sentence names files ON PURPOSE that should not resolve -- one claim names brain/nonexistent-brain.js, which IS the sabotage it describes. Reading paths out of it reported dangling references for files the claim intends not to exist: ten flagged, three of them the detector's own fault, found by looking at the ten instead of trusting the ten. Excluding each field's sabotage clause takes it to seven, against the four-to-six I predicted in writing -- outside my range, and said so. NEW GATE tools/ship/claimEvidence-selfcheck.mjs holds three things: CONTRADICTED MUST BE ZERO with no ceiling and no frozen list, because the answer to finding one is to read it and change its state rather than to file it; the dangling set frozen BY NAME and may only shrink; and no NEW claim may be settled without naming a gate that could kill it, which puts the cost of settling on prose on the round that writes it. THE TWO POPULATIONS ARE FROZEN BY NAME AND NOT BY COUNT, which is v4399's lesson: a count drifts with the tree and cannot say which entry moved. Three sabotages, all logged (1/1/1 by name): the falsified claim put back to settled, the sabotage-clause exclusion removed, and one name taken off the frozen prose list so an existing claim reads as an arrival. *** TWO OF THIS ROUND'S OWN MISTAKES, BOTH CAUGHT BY RUNNING RATHER THAN READING. *** The dangling list was frozen twice: the first freeze counted the Windows claim, because the measured note this round wrote into it CITED THE NEW GATE ONE COMMAND BEFORE THE FILE EXISTED -- a citation that resolves a moment later is still dangling while it does not -- so the list is taken after the gate exists and the ratchet has no slack, which is v3195's rule. And repairing the comment that says so broke a template literal, the gate stopped compiling, and `grep -c FAIL` returned ZERO: A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED, v4392's finding hit for the third time in this session, in the round about claims that assert what nobody checked. UNCHECKED AND SAID PLAINLY, IN THE GATE ITSELF: that the other 203 settled claims are true. This can only see a claim whose falsifier is a gate the red register already tracks; a claim naming a GREEN gate that no longer tests what the claim says is invisible to it, and so is one whose prose describes a gate that exists but checks something else. THE ONE CONTRADICTION WAS FOUND BECAUSE THE REGISTER ALREADY KNEW, not because the detector is good at looking. Also unchecked: whether the 32 prose-settled claims deserve gates -- they are mostly UI and wiring, where a gate is genuinely hard rather than neglected, and saying that is not the same as excusing it. The tree stands at 1436 gates.
+
+## v4403 -- the fifth coupling, and the first that leaves XPBD: a sheet that holds a rigid body up
+
+FOUR SOLVERS IN THIS TREE AND UNTIL THIS ROUND NONE OF THEM TOUCHED.
+
+physics/xpbd/ is 77 modules and 38 gates and it collided against a PLANE -- frictionalContact.js's
+floorN/floorD -- and against other particles, and against nothing else. physics/sph/'s boundaries are analytic
+box walls, and sph.js's own third line says it "is NOT a rigid-body engine". box3d and Jolt collided their own
+bodies. couplingRegistry.js held four couplings and its only TWO-WAY one, fluidMeshSubstep, is fluid-to-mesh
+with BOTH SIDES INSIDE XPBD. physics/mechanics/reposeOps.mjs is the one file that names both solvers, and it
+puts them side by side as a DIFFERENTIAL on the critical-angle question -- a comparison, not a contact.
+
+So a soft body could not rest on a rigid one, cloth could not hold a body up, and buoyancy was unrepresentable.
+
+THE ONE PIECE OF PHYSICS THAT HAD TO BE WRITTEN IS ONE FORMULA.
+
+Between two particles a correction splits by inverse mass. Against a rigid body it splits by the GENERALIZED
+inverse mass at the contact point (Muller/Macklin, Detailed Rigid Body Simulation with XPBD, 2020, eq. 2):
+
+    w = 1/m + (r x n)^T I^-1 (r x n)
+
+That second term is why a shove at a corner costs less than one through the centre: the body can rotate away
+instead of translating. And it IS the entire content of the "XPBD rigid bodies" extension for this tree, because
+XPBD state here is {pos, vel, invMass} -- no orientation, no angular velocity and no inertia anywhere in xpbd/.
+It lives inside the coupling rather than in its own round because the coupling is the only thing that needs it.
+
+    on a 0.4 x 0.3 x 0.24 box at density 300 (8.640 kg)
+
+    1/m alone                    1.157407e-1
+    w at the top face CENTRE     1.157407e-1     r x n = 0, so the term is a bit-identical zero
+    w at a top CORNER            4.734643e-1     4.0907x
+
+The face-centre row is EXACT, not close: the cross product of parallel vectors is exact arithmetic.
+
+THE MASS PROPERTIES ARE DERIVED AND THEN PROBED, BECAUSE box3d EXPORTS NEITHER.
+
+None of the 45 built swk_* functions returns a mass, an inertia or an angular velocity -- swk_velocities is
+linear only. So both come from the solid-box formula. A formula agreeing with itself is not evidence, so the
+real body is interrogated: a known impulse, the velocity read BEFORE stepping (ApplyLinearImpulseToCenter
+changes it immediately), and m = J/dv.
+
+    mass                         3.80160022 measured   3.8016 derived     relative 5.7e-8   (one ulp of f32)
+    omega after L = 0.006        0.21032810 measured    0.21026249         relative 3.1e-4
+
+The angular impulse is small on purpose and the first draft's was not. L = 2 predicts 70 rad/s, which is 67
+degrees in one 1/60 step; reading omega back as 2*atan2(qz,qw)/dt then measured 46.96 against 70.09 and looked
+like a 33% error in the INERTIA. It was the small-angle extraction failing. A probe has to stay inside the
+regime its readback is valid in, or it measures the probe.
+
+WHAT IS EXACT IS KEPT APART FROM WHAT IS ONLY SMALL, AND CONFLATING THEM WOULD HAVE BEEN THE EASY LIE.
+
+tools/roundhouse/conservation.mjs reports EXACT separately from small because "a quantity that never changes a
+bit is conserved by CONSTRUCTION, and calling that conserved to 1e-16 understates it and invites somebody to
+loosen the tolerance later". This coupling has one of each.
+
+  THE IMPULSE LEDGER IS BIT-IDENTICALLY ZERO. Every contact adds +s*n to the particle side and -s*n to the
+  body side; IEEE negation is exact and round-to-nearest is sign-symmetric, so sum(-x) is the exact negation of
+  sum(x) and the two sides cancel to a bit-identical zero for any number of contacts in any order. There is no
+  tolerance here and therefore nothing to loosen.
+
+  TOTAL MOMENTUM ONLY REACHES THE ROUNDING FLOOR, 4.8e-14 relative. Recovering m_i * (w_i * s) needs
+  m_i * w_i == 1, which floating point does not promise. Claiming exactness there would be claiming a property
+  the arithmetic does not have.
+
+THE ONE-WAY CONTROL IS THE POINT, BECAUSE "IT LOOKS RIGHT" IS NOT A MEASUREMENT.
+
+fluid.js said it first: "Two-way coupling is therefore not bolted on; it is momentum. Drop the mesh half of the
+correction and the mesh is a wall the fluid slides off; drop the fluid half and the fluid tunnels straight
+through. Only both halves is a coupling." So every experiment runs TWICE, differing in one boolean.
+
+    free impact, zero gravity, 0.72 kg sheet at 2 m/s into a free 4.32 kg box, 300 frames
+
+    two-way    p_x 1.440000000 -> 1.440000000     relative drift 4.842e-14    ledger exact
+    one-way    p_x 1.440000000 -> -0.275508398    relative drift 1.191e+0     ledger not exact
+
+The one-way run does not merely leak momentum, it REVERSES it -- 2.46e13 times the two-way run's error. And the
+two-way body picks up |v| 0.184 and |w| 0.192 from a deliberately off-centre aim, where the one-way body's
+velocity and spin are both exactly zero: it never feels a thing.
+
+    the hammock: a 3.8 kg box lowered into an 11x11 sheet pinned all round, 240 frames
+
+    two-way, 4 substeps x 2 iterations    box y after 4 s   +0.0321    |v| 0.033    holding 921/960 substeps
+    one-way, 4 substeps x 2 iterations    box y after 4 s  -79.9703    |v| 40.00    holding  30/960 substeps
+    two-way, 1 substep  x 6 iterations    box y after 4 s  -78.40      through the sheet
+
+A free fall from 0.113 m for four seconds reaches -79.89. So the sheet HOLDS the box, permanently rather than
+for the handful of substeps an impact lasts -- and one substep of six iterations loses it where four substeps
+of two hold it, which is Macklin's Small Steps in Physics Simulation reproduced in the one place it decides
+whether the scene works at all.
+
+AND THE SAME THING WORKS WITH box3d OWNING THE BODY.
+
+The module imports no physics engine. The proxy is a plain object the caller fills, the same choice reposeOps
+made for the same reason: a file with no engine import can be gated from anywhere and cannot smuggle node:fs
+into a page. So the gate closes the loop through the real solver -- pose out through swk_transforms, reaction in
+through swk_body_impulse and swk_body_ang_impulse, box3d integrating:
+
+    two-way    box3d body y after 3 s   +0.0160    |v|  0.31    holding 642/720 substeps
+    one-way    box3d body y after 3 s  -42.7338    |v| 27.86    holding  28/720 substeps
+
+A box3d body in free fall from 0.113 m for three seconds reaches about -44.89. An XPBD sheet is holding up a
+body a WASM rigid-body engine is integrating, and the only things crossing the seam are a pose and an impulse.
+
+THE REGISTRY IS STILL THE UI'S ONLY SOURCE OF TRUTH, so COUPLINGS gains a fifth entry with a driver of its own.
+"body" would have been a lie -- that driver means two particle systems, and the second system here has an
+orientation and a lever arm. couple.html learns to drive it and builds its picker, sliders, tag and hint from
+the registry as it does for the other four: a rope pinned at both ends with a rigid box resting in it, the box
+drawn as its four rotated corners. Its slider says Substeps rather than Iterations because that is what decides
+whether the rope holds the box, and the hint says so out loud.
+
+AND THE FIRST TWO DRAFTS WERE BOTH WRONG IN WAYS THAT LOOKED LIKE TUNNELLING.
+
+The first solved the contacts ONCE, after all the cloth iterations. A box lowered onto a pinned sheet fell
+straight through: the contact pushed the nearest particles out of the way and, with no cloth iteration left to
+run, that displacement never propagated along the sheet to the pins. The sheet could not carry a load because
+the load arrived after the sheet had finished solving. Measured: 5 of 600 substeps in contact, the box at -498
+after ten seconds against a free fall of -499.9 -- slowed by a rounding error's worth and nothing else.
+
+The second recomputed the contact NORMAL every iteration. Once the box had descended past the particles they
+were closest to its BOTTOM face, so the solver pushed them out downward -- the shortest way out of a box is
+through the far side once you are more than halfway across it. Measured mid-fall: 10 contacts found, 5
+projections applied, the box accelerating at a clean -g the whole way. The normal has to be fixed at DISCOVERY
+and held for the substep, which is what a contact is; recomputing it is a nearest-surface query wearing a
+contact's name.
+
+Six sabotages, 1/3/1/1/2/2 RED by name, two files md5-identical after.
+
+SABOTAGE C READ ZERO RED AT FIRST, and that is the finding about this gate rather than about the module.
+Re-choosing the face every iteration -- the second draft's actual bug, the one the round exists to have fixed
+-- went undetected by every scene in the file, because all of them catch the body before it ever descends past
+a particle's midplane. A CHECK MUST NOT NEED ITS OWN FINDING TO STAY HIDDEN. The property is tested directly
+now, on the one configuration where the two rules disagree: a particle already deep inside the box past the
+halfway point with the contact recorded against the top face. Held, it comes back out the way it went in.
+Re-chosen, it goes out the bottom. Same sabotage, 1 RED by name.
+
+Sabotage A is worth reporting for what it did NOT break: with the angular term deleted the hammock still
+catches the box, because a sheet landing flat on a face has little lever arm to exploit. The term is earned by
+its own check and not by the scene, which is the honest reading rather than the flattering one. And sabotage E
+was aimed wrong the first time -- it changed the inertia's x component where the probe reads the z one, so it
+read 1 RED for a reason that had nothing to do with the check being weak.
+
+TWO SMALLER FINDINGS ABOUT THE TOOLS, both caught by checks going red for the wrong reason:
+
+sourceScan.noComments is a JAVASCRIPT stripper, and handed couple.html it returns 428 bytes out of 18,692 --
+97.7% of the file gone, the module body with it, so every regex against it answers false. A source check
+written that way goes red on a page that is perfectly correct. The page check reads raw and the behavioural
+probe is what actually settles it.
+
+And runInEngineOrigin compiles its script with new Function("return (" + src + ")"), so the script must BE a
+function expression. A bare statement list is a SyntaxError, and the result comes back ok:false with every
+field undefined -- which reads as "the page drew nothing" rather than as "the harness never ran the script".
+
+UNCHECKED, AND ALL THREE ARE LIMITS RATHER THAN TUNINGS. FRICTION AND RESTITUTION: the coupled contact is
+frictionless and perfectly inelastic along the normal, so a box set down on a tilted sheet slides where a real
+one would grip, and nothing bounces. frictionalContact.js has Coulomb friction against a plane and fluid.js has
+it across two particle sets; neither is wired to this face constraint yet. TUNNELLING: contacts are found once
+per substep against the predicted positions, so a body crossing more than the contact radius in one substep
+passes through -- a box dropped from 0.35 m arrived at 2.3 m/s, 0.038 m per substep against a 0.02 m radius,
+and went through. box3d's own CCD cannot help, because the contact test is on THIS side of the seam. EDGES AND
+CORNERS are approximated by their dominant face, which is what makes a box the only shape here; swk_body_sphere
+is in the shim and not in the built wasm.
+
+The tree stands at 1436 gates.
+
 ## v4402 -- the tree's own debt list is rendered by no page
 
 *** THE TREE'S OWN DEBT LIST IS RENDERED BY NO PAGE, AND THAT IS WHY v4401's LAST STEP HAD NOWHERE TO LAND. *** v4401 closed by naming what it had not done -- render the register's line from the audit "at the point of use rather than from the stored string" -- and looking for that point of use found none. MEASURED: redCensus's `fails:` is read by exactly four files, all of them gates or the freezer, and TWO OF THOSE ONLY ASSERT `typeof === "string" && length > 10`, which checks that the field EXISTS rather than that it is true. ZERO HTML FILES mention redCensus, RED_AT_V4279 or a register artefact. THE 27 STANDING REDS -- the thing three rounds of this session found stale, the list every ship reconciles against -- WERE REACHABLE ONLY BY READING A .mjs OR RUNNING A GATE. That is v4379's finding about RIG_ONLY, "a record nobody can reach is a record nobody has", on the most consequential list this tree keeps, and it is the same shape as v4395's gates whose arguments died in a terminal. So this round gives it one, using both mechanisms this thread built: registerDrift-selfcheck emits the register through v4395's gateReport with THE AUDIT'S LINE BESIDE THE FILED ONE, and instruments.html renders it. The nine divergences stop being a count and become a column a person can look down. *** AND THE INVERSION IS CHECKED WHERE IT CAN ONLY BE CHECKED: for every entry whose two lines DIFFER, the line on screen must be the run's. *** Those two strings are identical for the eighteen entries that agree and different for exactly the nine that do not, so a page quietly rendering the stored copy fails on those nine and could not fail anywhere else -- feeding the filed line into the report takes it red naming boundaryLint. THE FIRST PREDICTION LANDED AND COST A REAL FIX. I wrote that the generic renderer would draw the table without modification but would handle 27 rows of long sentences badly. MEASURED: two 110-character sentences per row wrapped to a MEDIAN ROW HEIGHT OF 58 PIXELS and a table 1459px tall inside a 640px panel -- a wall rather than something to scan. Text cells are capped at 54 characters now and the rule v4397 already established carries the rest: the cell formats for width, the title gives the value back whole, and the check that reads titles is unaffected, which is why that rule was worth having. After: 632px, every row one line, 52 cells truncated with their value entire one hover away. A GATE CANNOT SAY WHETHER A TABLE READS WELL and this one does not try -- it holds the property that made it unreadable. *** THE THIRD SABOTAGE COST 0 RED AND THAT IS THE ROUND'S SECOND FINDING. *** Dropping the register table from the report altogether failed nothing: the section's guard read "if the probe returned no register, say so", so a missing register took the SKIP branch and ran no check at all. AN ABSENCE READ AS A SKIP IS AN ABSENCE READ AS A PASS -- the same species as v4392's gate that crashed before printing a FAIL line and handed back a failure count of zero. The skip branch now covers only "no browser ran"; a page that LOADED without the register is a failure, and the same sabotage takes it red. Three sabotages in total, all logged in the gate (1/1/1 by name). UNCHECKED AND SAID PLAINLY: redCensus.mjs still STORES the typed line, so a reader who opens the module rather than the page still meets it -- making the module itself generated is a change to a file two branches edit every round and this round declined it rather than starting a merge war; whether 27 rows of two similar sentences reads as insight or as noise, which is a judgement no gate can make and which the person looking at it will settle; and whether the nine stale readings should be re-taken by hand now, which is exactly the chore this whole thread exists to stop anyone having to do. The tree stands at 1435 gates.
+
 ## v4401 -- the register stores a rendering, and the check that exists to catch that reads 45 characters
 
 *** THE RED REGISTER STORES A RENDERING OF A LINE, THE CHECK THAT EXISTS TO CATCH THAT COMPARES ONLY THE FIRST FORTY-FIVE CHARACTERS, AND NINE ENTRIES QUOTE A NUMBER NO RUN NOW PRODUCES. *** Item 1 of docs/EXPLAIN-ITSELF.md, the one three rounds of this session kept finding by hand: redCensus.mjs keeps a typed `fails:` string per standing red -- a projection of a run, frozen when somebody typed it -- while tools/ship/register-audit.mjs holds the runs. v4380 filed shaderCensus at 4 where the gate said 14; v4383 found the 14 itself false; v4386 found referenceKind's line describing sweep bucketing rather than the gate. One shape, three symptoms, and the shipyard's lesson one level up: KEEP THE THING WHERE IT IS EXACT AND PROJECT IT FOR VIEWING. MEASURED BEFORE ANYTHING WAS BUILT, against the audit as it stood: of 27 entries 4 matched a recorded line exactly, 17 were a whitespace-normalised TRUNCATION of one, and 5 matched nothing -- and re-taking the audit at HEAD moved that to 5 exact, 12 truncations and TEN backed by no run, which is inside the eight-to-fourteen I predicted in writing. *** AND THE TEN SPLIT CLEANLY IN A WAY THAT CHANGES WHAT THE FIX IS: NINE QUOTE A STALE READING OF A LIVE CHECK, ONE CANNOT BE CHECKED AT ALL BECAUSE THE AUDIT'S 120-SECOND CAP CUTS shaderRefs OFF AT 380 SECONDS BEFORE IT PRINTS, AND ZERO NAME A CHECK THE GATE NO LONGER HAS. *** The register is not wrong about WHAT is failing; it is wrong about HOW MUCH -- so the answer is not to prune entries or retype nine numbers, it is to stop storing the reading. THE CHECK THAT EXISTS TO CATCH THIS WAS GREEN THROUGHOUT, and the reason is the whole finding: section 3 of registerDrift-selfcheck compares the first 45 characters, which reaches the end of an assertion's NAME and stops before its READING, so an entry whose count went stale sails through the gate written to notice. The two claims are different and both worth holding, so they are two checks now rather than one loosened one. *** AND THE SOURCE THE REGISTER SHOULD RENDER FROM COULD NOT SAY WHEN IT WAS TAKEN. *** freezeRegisterAudit.mjs wrote `at: "v4380"` AS A STRING LITERAL, so every re-freeze for twenty rounds produced a file claiming v4380 -- including one taken at v4399 in the middle of measuring exactly this species. It reads main.js now, the audit's age in rounds is a gated number with a ceiling of twelve, and the sabotage that rolls it back reproduces the state this round found the tree in. NEW tools/ship/registerRender.mjs derives the line a reader should see from the audit and classifies each entry into FIVE outcomes rather than "matches or differs", because one bucket for three species is the defect the file is about. *** IT DOES NOT DELETE `fails:`, AND THAT IS A DECISION: that string is the HISTORICAL CLAIM, and deleting it destroys the only record of the drift this round measured. THE TYPED LINE ADDS NOTHING ELSE -- asked directly which of its words appear in no recorded line of its gate, four entries answer with a FILENAME CUT IN HALF by the 110-column clip, which is not information but a broken rendering. *** THREE OF THIS ROUND'S OWN CHECKS WERE VACUOUS ON THEIR FIRST DRAFT, IN THE ROUND ABOUT A REGISTER THAT COULD NOT BE WRONG. *** registerDrift's ok() is (name, condition, detail); gateSweep-selfcheck's is (condition, name, detail); the arguments went in the other file's order, so the CONDITION printed as the name -- "PASS true" -- and the NAME, a non-empty string, served as the condition. Three checks that could not fail, caught by READING THE OUTPUT rather than the exit code, which was zero throughout. A FOURTH DEFECT WAS FOUND THE SAME WAY: the classifier's first draft compared the text up to the first run of two spaces, which a gate's output has and the register's collapsed copy does not, so it normalised one side and not the other and reported three entries that had merely counted differently as naming something the gate no longer says. The shared-prefix test does not depend on either side's spacing. Three sabotages, all logged (1/1/1 by name), and THE THIRD COST 0 RED THE FIRST TIME: reverting the classifier changed no verdict, because the unbacked TOTAL is identical whichever species an entry lands in -- the split was decoration until the claim the measurement actually made was asserted, and the same sabotage now takes it red at 9 moved against 0 drifted. The gate emits its two tables through v4395's mechanism, so the register's own numbers leave the terminal and v4399's plot can take them. UNCHECKED AND SAID PLAINLY: the last step of the inversion, which is making the register's display READ from renderFor() at the point of use rather than from the stored string -- this round proves it can and does not yet do it; whether the 120-second capture cap should rise, which would cost the audit ten minutes per freeze to derive one more entry; and whether nine stale readings should be re-taken by hand now, which is the chore this whole thread exists to stop anyone having to do. *** AND THE SEVENTH SUPERSEDE OF THE SESSION CARRIES THE BEST NEWS IN IT: THE OTHER BRANCH HIT THIS SESSION'S OWN RATCHET AND PAID IT. *** claude/orrery-seeded-by-git-log reached main first with a v4400 whose title reads 'the arrivals ratchet from main's v4399 fired on this round's own gate' -- v4399 shipped a check that no NEW gate may print a table of numbers and emit nothing, and the next round anybody wrote tripped it and WIRED THE GATE rather than raising a ceiling. A ratchet on arrivals puts the cost on the round that writes the gate, and it just collected from a round this session did not write. Their work is merged here and takes the tree to 1435. The tree stands at 1435 gates.
