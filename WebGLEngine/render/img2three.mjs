@@ -137,11 +137,15 @@ export function flattenThreeTree(root, { includeInvisible = false, fallbackColor
  * The instance record a flattened model needs to draw at the origin at unit size through the fleets' own pipelines:
  * gpuDriven's shaders place a hull at rec.xyz + p * rec.w, so the model is recentred and rescaled HERE rather than
  * by a matrix the shell does not have. Returns a new mesh; the input is not touched.
+ *
+ * v4366 -- `from` normalises this model AS ANOTHER WAS normalised, taking that one's centre and radius instead of
+ * its own. Without it, comparing two variants of a model is comparing two framings as well: add one detached part
+ * and the bounds grow, so every vertex of every other part moves and the difference being measured is drowned.
  */
-export function unitMesh(flat, radius = 1) {
-    const s = radius / flat.radius, positions = new Float32Array(flat.positions.length);
+export function unitMesh(flat, radius = 1, from = flat) {
+    const s = radius / from.radius, positions = new Float32Array(flat.positions.length);
     for (let v = 0; v * 3 < positions.length; v++) for (let k = 0; k < 3; k++)
-        positions[v * 3 + k] = (flat.positions[v * 3 + k] - flat.centre[k]) * s;
+        positions[v * 3 + k] = (flat.positions[v * 3 + k] - from.centre[k]) * s;
     return { ...flat, positions, centre: [0, 0, 0], radius,
-             bounds: { min: flat.bounds.min.map((q, k) => (q - flat.centre[k]) * s), max: flat.bounds.max.map((q, k) => (q - flat.centre[k]) * s) } };
+             bounds: { min: flat.bounds.min.map((q, k) => (q - from.centre[k]) * s), max: flat.bounds.max.map((q, k) => (q - from.centre[k]) * s) } };
 }

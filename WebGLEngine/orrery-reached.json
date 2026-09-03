@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "45fd1cc6c3b62467e9d1f71799467a2ade0b67a2",
+ "head": "2a88a2a03645797205cf424a39e2617772981d59",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -33,7 +33,7 @@
   },
   {
    "name": "Box",
-   "hits": 31
+   "hits": 32
   },
   {
    "name": "Cameras",

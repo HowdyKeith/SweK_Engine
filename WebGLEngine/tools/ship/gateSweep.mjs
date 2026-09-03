@@ -297,6 +297,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and one of the two is where they part by a single boundary pixel, which is measured rather than " +
                  "left at the camera where they agree",
     }),
+    // v4366 -- the tenth closing. divineEye-selfcheck guards render/divineEye.mjs, a PORT of another project's
+    // deterministic review signals, so what it protects is fidelity to someone else's arithmetic rather than to
+    // this tree's: its first section pins their constants by value, because a port that drifts stops measuring
+    // the thing it was written to measure and starts measuring itself.
+    since10: Object.freeze({
+        at: "v4366", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/divineEye-selfcheck.mjs"]),
+        verdict: "green on this box, run singly, two sections. Driven RED by three sabotages of the module it " +
+                 "guards (1/4/1 by name) and restored -- one of the three went 0 red first and needed a new input " +
+                 "before it could bite. Both of the round's own first runs were wrong and both are logged in it",
+        redOnArrival: Object.freeze([]),
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
