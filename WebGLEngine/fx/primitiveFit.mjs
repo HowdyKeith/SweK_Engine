@@ -105,6 +105,15 @@ export function spansOf(shape, w, h) {
         }
         return spans;
     }
+    // v4419 -- *** AN UNKNOWN KIND COVERS NOTHING, RATHER THAN QUIETLY BECOMING AN ELLIPSE. ***
+    // pointsOf() returns null for anything it does not recognise, and this function used to read that as
+    // "so it must be the ellipse". MEASURED: { kind: "doomFire", x, y, rx, ry } returned spans BIT-IDENTICAL
+    // to an ellipse with the same fields -- not merely plausible, the same 16 rows and the same 208 pixels.
+    // So a fifth primitive added to KINDS by name alone does not look like it works, IT IS AN ELLIPSE, and
+    // the first thing anybody would notice is that their new brush is round.
+    // Returning no spans is the refusal that costs nothing: fitStep already treats an empty coverage as a
+    // rejected candidate, so no caller changes and KINDS becomes load-bearing instead of decorative.
+    if (!KINDS.includes(shape.kind)) return spans;
     // ellipse, analytically: x = cx +/- rx*sqrt(1 - ((y-cy)/ry)^2)
     const y0 = Math.max(0, Math.floor(shape.y - shape.ry)), y1 = Math.min(h - 1, Math.ceil(shape.y + shape.ry));
     for (let y = y0; y <= y1; y++) {

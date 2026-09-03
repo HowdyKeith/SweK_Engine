@@ -648,6 +648,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "invariant' claim a measurement rather than a sentence. One went 0 RED FIRST: a promise of a " +
                  "CLOSED boundary that lived in a comment and nowhere else",
     }),
+
+    // v4419 -- the thirty-fourth closing, and the first fixture in this arc that MOVES. Its strongest piece is
+    // a control rather than a result: on a still target, warm-starting and refitting are the same computation
+    // to the last bit, so on a moving one the whole gap between them is the motion. It also corrects v4418's
+    // "a fourth generator lands in the same band" with a fifth that does not, one round later.
+    since35: Object.freeze({
+        at: "v4419", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/firePaint-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 14 checks in 6.7 s -- no device, no model. " +
+                 "Driven RED by nine sabotages (2/0/5/5/3/1/1/1/1 by name) and restored. ONE 0 IS EARNED and " +
+                 "measured so: the discard rule it removes never fires in 250 fitStep calls and is gated in " +
+                 "primitiveFit-selfcheck anyway. The other 0 bought a check -- a channel-blind pixel " +
+                 "comparison survived because every consumer read a ratio or a zero. Its own first draft " +
+                 "overclaimed a plateau and the claim is now about the rate, which is what is true",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
