@@ -20,6 +20,7 @@ import { thermalModulate, modulatedSubstep } from "./modulate.js";
 import { muscleModulate, markRowFibers } from "./muscle.js";
 import { plasticSubstep } from "./plastic.js";
 import { fluidMeshSubstep } from "./fluid.js";
+import { rigidClothSubstep, makeRigidProxy } from "./rigidCouple.js";
 import { COUPLINGS, couplingById, couplingIds } from "./couplingRegistry.js";
 
 let fails = 0;
@@ -72,8 +73,31 @@ function cloth(W = 6, H = 6, muscleRow = -1) {
     const fOpt = { dt: 0.016, iterations: 6, gravity: [0, -6, 0], fluidRadius: 0.09, contactRadius: 0.26 };
     for (let k = 0; k < 30; k++) { fluidC.substep(fReg.fluid, fReg.mesh, fReg.cons, fReg.batches, fOpt); fluidMeshSubstep(fDir.fluid, fDir.mesh, fDir.cons, fDir.batches, fOpt); }
     const fluidOK = hp(fReg.mesh.pos) === hp(fDir.mesh.pos) && hp(fReg.fluid.pos) === hp(fDir.fluid.pos);
-    ok("!! every registry coupling equals its verified module called directly, byte-for-byte", thermalOK && muscleOK && plasticOK && fluidOK,
-       "thermal, muscle, plasticity, and the two-body fluid coupling each run identically whether invoked through the registry or through the module -- the registry delegates, it holds no physics of its own.");
+    // rigid (driver "rigid", v4402: a particle set and ONE BODY, so the proxy has to be compared too -- a
+    // delegation check that only hashed the cloth would pass on a registry that dropped the body's half)
+    const rigidMk = () => {
+        const W = 9, H = 9, SP = 0.07, NN = W * H;
+        const built = buildClothConstraints(W, H, SP);
+        const rp = new Float64Array(3 * NN), rv = new Float64Array(3 * NN), ri = new Float64Array(NN);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = y * W + x;
+            rp[3 * i] = (x - (W - 1) / 2) * SP; rp[3 * i + 1] = 0; rp[3 * i + 2] = (y - (H - 1) / 2) * SP;
+            ri[i] = (x === 0 || x === W - 1 || y === 0 || y === H - 1) ? 0 : 1 / 0.03;
+        }
+        return { cloth: { pos: rp, vel: rv, invMass: ri }, cons: built.cons, batches: colorConstraints(built.cons),
+                 proxy: makeRigidProxy({ halfExtents: [0.12, 0.09, 0.11], density: 400, pos: [0, 0.113, 0] }) };
+    };
+    const rReg = rigidMk(), rDir = rigidMk(); const rigidC = couplingById("rigid");
+    const rOpt = { dt: 0.016 / 4, iterations: 2, gravity: [0, -10, 0], radius: 0.02 };
+    for (let k = 0; k < 60; k++) {
+        rigidC.substep(rReg.cloth, rReg.cons, rReg.batches, rReg.proxy, rOpt);
+        rigidClothSubstep(rDir.cloth, rDir.cons, rDir.batches, rDir.proxy, rOpt);
+    }
+    const rigidOK = hp(rReg.cloth.pos) === hp(rDir.cloth.pos) &&
+                    JSON.stringify(rReg.proxy.pos) === JSON.stringify(rDir.proxy.pos) &&
+                    JSON.stringify(rReg.proxy.quat) === JSON.stringify(rDir.proxy.quat);
+    ok("!! every registry coupling equals its verified module called directly, byte-for-byte", thermalOK && muscleOK && plasticOK && fluidOK && rigidOK,
+       "thermal, muscle, plasticity, the two-body fluid coupling and the rigid coupling each run identically whether invoked through the registry or through the module -- the registry delegates, it holds no physics of its own. For the rigid one BOTH SIDES are hashed, cloth and body pose, because a registry that quietly dropped the body's half would leave the cloth identical.");
 }
 
 // ---- 2. METADATA VALID: ranges ordered and defaults inside them ---------------------------------------------
@@ -91,7 +115,7 @@ function cloth(W = 6, H = 6, muscleRow = -1) {
 // ---- 3. COVERAGE: the registry lists exactly the fingerprinted couplings ------------------------------------
 {
     const ids = couplingIds().slice().sort().join(",");
-    const expected = ["fluid", "muscle", "plastic", "thermal"].join(",");
+    const expected = ["fluid", "muscle", "plastic", "rigid", "thermal"].join(",");
     ok("!! the registry covers exactly the fingerprinted couplings", ids === expected,
        "registry ids [" + couplingIds().join(", ") + "] match the couplings that own fingerprint subsystems -- nothing paintable is missing and nothing phantom is listed.");
 }
@@ -101,8 +125,8 @@ function cloth(W = 6, H = 6, muscleRow = -1) {
     let consistent = true;
     for (const c of COUPLINGS) {
         if (c.driver === "field" && !c.fieldName) consistent = false;
-        if ((c.driver === "strain" || c.driver === "body") && c.fieldName !== null) consistent = false;
-        if (c.driver !== "field" && c.driver !== "strain" && c.driver !== "body") consistent = false;
+        if ((c.driver === "strain" || c.driver === "body" || c.driver === "rigid") && c.fieldName !== null) consistent = false;
+        if (c.driver !== "field" && c.driver !== "strain" && c.driver !== "body" && c.driver !== "rigid") consistent = false;
     }
     ok("!! field-driven couplings name a paint field and strain-driven ones name none", consistent,
        "thermal and muscle declare the scalar the brush paints (temperature, activation); plasticity declares none because it reads stress from the motion -- the UI knows when to show the brush.");

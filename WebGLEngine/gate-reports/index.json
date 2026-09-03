@@ -3,6 +3,7 @@
  "reports": [
   "backendRouting-selfcheck.json",
   "gateReport-selfcheck.json",
+  "rigidCouple-selfcheck.json",
   "shipyard-selfcheck.json"
  ]
 }

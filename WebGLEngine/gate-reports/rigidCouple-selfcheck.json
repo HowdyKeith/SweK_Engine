@@ -1,0 +1,152 @@
+{
+ "gate": "physics/xpbd/rigidCouple-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "box3d's own mass properties against the solid-box formula",
+   "columns": [
+    "quantity",
+    "measured from box3d",
+    "derived formula",
+    "relative difference"
+   ],
+   "rows": [
+    [
+     "mass (kg)",
+     3.8016002181093875,
+     3.8015999999999996,
+     5.7373050264076586e-8
+    ],
+    [
+     "omega after L=2 about z (rad/s)",
+     0.21032810235491384,
+     0.21026249169463163,
+     0.00031204167587578664
+    ]
+   ],
+   "note": "neither is readable through the 45 built exports, so both are derived and then probed"
+  },
+  {
+   "title": "generalized inverse mass on a 0.4 x 0.3 x 0.24 box at density 300",
+   "columns": [
+    "contact point",
+    "w",
+    "w / (1/m)"
+   ],
+   "rows": [
+    [
+     "top face centre",
+     0.11574074074074073,
+     1
+    ],
+    [
+     "top corner",
+     0.473464317976513,
+     4.090731707317073
+    ]
+   ],
+   "note": "the box masses 8.64 kg, so 1/m is 1.157407e-1"
+  },
+  {
+   "title": "free impact, zero gravity: a 0.72 kg sheet at 2 m/s into a free 4.32 kg box, 300 frames",
+   "columns": [
+    "run",
+    "p_x at start",
+    "p_x at end",
+    "relative drift",
+    "ledger bit-exact zero"
+   ],
+   "rows": [
+    [
+     "two-way",
+     1.439999999999994,
+     1.4399999999999693,
+     4.8418059685041755e-14,
+     "true"
+    ],
+    [
+     "one-way",
+     1.439999999999994,
+     -0.2755083977083846,
+     1.1913252761863997,
+     "false"
+    ]
+   ],
+   "note": "p_x is conserved in this scene because there is no gravity, so it is the judge"
+  },
+  {
+   "title": "the hammock: a 3.8 kg box lowered into an 11x11 sheet pinned all round, 240 frames",
+   "columns": [
+    "run",
+    "box y after 4 s",
+    "body speed",
+    "substeps holding",
+    "substeps total"
+   ],
+   "rows": [
+    [
+     "two-way, 4 substeps x 2 iterations",
+     0.032130853841024806,
+     0.03247766620421178,
+     921,
+     960
+    ],
+    [
+     "one-way, 4 substeps x 2 iterations",
+     -79.97033333321421,
+     39.999999999813554,
+     30,
+     960
+    ],
+    [
+     "two-way, 1 substep x 6 iterations",
+     -78.40156263213832,
+     39.53264478743521,
+     9,
+     240
+    ]
+   ],
+   "note": "a free fall from 0.113 m for 4 s reaches -79.89 m"
+  },
+  {
+   "title": "box3d integrating the body, XPBD projecting the sheet, 180 frames x 4 substeps",
+   "columns": [
+    "run",
+    "box3d body y after 3 s",
+    "body speed",
+    "substeps holding",
+    "substeps total"
+   ],
+   "rows": [
+    [
+     "two-way",
+     0.01600772514939308,
+     0.308327550455309,
+     642,
+     720
+    ],
+    [
+     "one-way",
+     -42.73384475708008,
+     27.858047485351562,
+     28,
+     720
+    ]
+   ],
+   "note": "a box3d body in free fall from 0.113 m for 3 s reaches about -44.89 m"
+  }
+ ],
+ "notes": [
+  "Every number in these tables is read from the same objects the checks above assert on -- the mass from the probed body, the envelope from the runs themselves."
+ ],
+ "skipped": [
+  {
+   "what": "friction and restitution at the coupled contact",
+   "why": "the constraint here is frictionless and perfectly inelastic in the normal direction. frictionalContact.js has Coulomb friction against a plane and fluid.js has it across two particle sets; neither is wired to this face constraint yet"
+  },
+  {
+   "what": "any shape but a box, and any body but one",
+   "why": "swk_body_sphere exists in the shim and NOT in the built wasm (box3dNode's PENDING_REBUILD), and the proxy carries a single set of half-extents"
+  }
+ ]
+}

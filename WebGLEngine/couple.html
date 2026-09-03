@@ -82,11 +82,16 @@ import { buildClothConstraints } from "./physics/xpbd/clothMesh.js";
 import { colorConstraints } from "./physics/xpbd/xpbd.js";
 import { markRowFibers } from "./physics/xpbd/muscle.js";
 import { fluidMeshSubstep } from "./physics/xpbd/fluid.js";
+import { makeRigidProxy, qRotate } from "./physics/xpbd/rigidCouple.js";
 import { COUPLINGS, couplingById } from "./physics/xpbd/couplingRegistry.js";
 
 const W = 26, H = 18, SP = 0.28;      // mesh grid
 const cvs = document.getElementById("stage"), ctx = cvs.getContext("2d");
-let cons, batches, state, field, N, fluid = null;
+let cons, batches, state, field, N, fluid = null, proxy = null;
+// v4402 -- the rigid coupling needs SUBSTEPS, not iterations, and that is a measurement rather than a taste:
+// one substep of six iterations lets this box through the rope (Macklin 2019, Small Steps in Physics
+// Simulation). The slider is labelled Substeps for that reason and the loop below honours it.
+const RIGID_HE = [0.42, 0.30, 0.30], RIGID_RHO = 6;
 let coupling = COUPLINGS[0];
 let params = {};                       // live parameter values
 let playing = false, erase = false;
@@ -99,7 +104,19 @@ function spawnFluid(nSide, cx, cy) {
 }
 
 function buildMesh() {
-    fluid = null;
+    fluid = null; proxy = null;
+    if (coupling.driver === "rigid") {
+        // A rope pinned at both ends with a rigid box resting in it -- the hammock, in the x-y plane the rest
+        // of this page draws in. The box is the ONLY thing on this page that is not a particle.
+        const RW = 22; const built = buildClothConstraints(RW, 1, SP, { structural: 0.0006, shear: 0, bending: 0.02 });
+        cons = built.cons; batches = colorConstraints(cons); N = RW;
+        const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N);
+        for (let x = 0; x < RW; x++) { pos[3 * x] = x * SP; pos[3 * x + 1] = 0; pos[3 * x + 2] = 0; invMass[x] = (x === 0 || x === RW - 1) ? 0 : 1; }
+        state = { pos, vel, invMass };
+        field = new Float64Array(N);
+        proxy = makeRigidProxy({ halfExtents: RIGID_HE, density: RIGID_RHO, pos: [(RW - 1) * SP / 2, 0.42, 0] });
+        return;
+    }
     if (coupling.driver === "body") {
         // a catenary rope (single row) pinned at both ends, with a fluid blob to pour in -- all in the x-y plane
         const RW = 22; const built = buildClothConstraints(RW, 1, SP, { structural: 0.0006, shear: 0, bending: 0.02 });
@@ -127,6 +144,7 @@ function fit() {
     const pad = 40;
     let gx0 = 0, gx1 = (W - 1) * SP, gy0 = -(H - 1) * SP, gy1 = 0;
     if (coupling.driver === "body") { gx0 = 0; gx1 = (N - 1) * SP; gy0 = -1.4; gy1 = 1.9; }
+    if (coupling.driver === "rigid") { gx0 = 0; gx1 = (N - 1) * SP; gy0 = -2.0; gy1 = 1.3; }
     const gw = gx1 - gx0, gh = gy1 - gy0;
     const s = Math.min((cvs.width - 2 * pad) / gw, (cvs.height - 2 * pad) / gh);
     const ox = pad + (cvs.width - 2 * pad - gw * s) / 2 - gx0 * s, oy = pad + gy1 * s;
@@ -153,6 +171,18 @@ function render() {
         ctx.fillStyle = state.invMass[i] === 0 ? "#ff3322" : fieldColor(field[i]);
         ctx.beginPath(); ctx.arc(sx, sy, state.invMass[i] === 0 ? 4 : 3, 0, 7); ctx.fill();
     }
+    if (proxy) {                                          // the rigid body: its four x-y corners, rotated
+        const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+            const w = qRotate(proxy.quat, [sx * proxy.halfExtents[0], sy * proxy.halfExtents[1], 0]);
+            return toScreen(proxy.pos[0] + w[0], proxy.pos[1] + w[1], f);
+        });
+        ctx.strokeStyle = "rgba(160,235,200,.95)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(c[0][0], c[0][1]);
+        for (let k = 1; k < 4; k++) ctx.lineTo(c[k][0], c[k][1]);
+        ctx.closePath(); ctx.stroke();
+        const [cx, cy] = toScreen(proxy.pos[0], proxy.pos[1], f);
+        ctx.fillStyle = "rgba(160,235,200,.95)"; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 7); ctx.fill();
+    }
     if (fluid) {                                          // fluid particles (two-body coupling)
         for (let i = 0; i < fluid.nF; i++) {
             const [sx, sy] = toScreen(fluid.pos[3 * i], fluid.pos[3 * i + 1], f);
@@ -177,13 +207,15 @@ function selectCoupling(id) {
         row.append(pr.label + " ", inp, val); box.appendChild(row);
     }
     const kt = document.getElementById("kindTag"); kt.textContent = coupling.kind; kt.className = "tag " + (coupling.kind === "permanent" ? "perm" : coupling.kind === "selective" ? "sel" : "temp");
-    const dt = document.getElementById("driverTag"); dt.textContent = coupling.driver === "field" ? "paint: " + coupling.fieldName : (coupling.driver === "body" ? "two-body fluid" : "auto (stress)");
+    const dt = document.getElementById("driverTag"); dt.textContent = coupling.driver === "field" ? "paint: " + coupling.fieldName : (coupling.driver === "body" ? "two-body fluid" : coupling.driver === "rigid" ? "cloth + rigid body" : "auto (stress)");
     document.getElementById("brushBlock").style.display = coupling.driver === "field" ? "" : "none";
     document.getElementById("couplingHint").textContent = coupling.driver === "field"
         ? "Paint the " + coupling.fieldName + " field onto the mesh, then Play."
+        : coupling.driver === "rigid" ? "A rigid box rests in a rope. Press Play -- the rope holds the box up and the box's weight sags the rope, both move (two-way). Drop Substeps to 1 and the box falls through."
         : coupling.driver === "body" ? "A fluid blob sits above a hammock. Press Play -- its weight caves the mesh, the mesh holds it up, both move (two-way)."
         : "Plasticity reads stress from the motion -- just raise gravity and Play to dent it. No painting.";
-    document.getElementById("paintHint").textContent = coupling.driver === "field" ? "" : (coupling.driver === "body" ? "Two coupled bodies -- fluid (blue) and mesh (amber). Reset to re-drop the fluid." : "This coupling has no paint field; deformation is driven by load.");
+    document.getElementById("paintHint").textContent = coupling.driver === "field" ? "" : (coupling.driver === "body" ? "Two coupled bodies -- fluid (blue) and mesh (amber). Reset to re-drop the fluid."
+          : coupling.driver === "rigid" ? "A rope (amber) and one rigid body (green). Reset to re-drop the box." : "This coupling has no paint field; deformation is driven by load.");
     buildMesh(); render();
 }
 sel.onchange = () => selectCoupling(sel.value);
@@ -221,7 +253,13 @@ playBtn.onclick = () => { playing = !playing; playBtn.classList.toggle("on", pla
 let frame = 0;
 function stepSim() {
     const opts = { dt: 0.016, iterations: parseInt(iters.value), gravity: [0, -parseFloat(grav.value), 0], ...params };
-    if (coupling.driver === "body") {
+    if (coupling.driver === "rigid") {
+        // SUBSTEPS, honoured. The slider's value is how many times the substep runs per frame at dt/n each --
+        // which is the thing that decides whether the rope holds the box or the box goes through it.
+        const n = Math.max(1, Math.round(params.substeps ?? 4));
+        const sub = { ...opts, dt: opts.dt / n, iterations: 2 };
+        for (let k = 0; k < n; k++) coupling.substep(state, cons, batches, proxy, sub);
+    } else if (coupling.driver === "body") {
         coupling.substep(fluid, state, cons, batches, opts);   // two-body: fluid + mesh both advance
     } else {
         coupling.substep(state, cons, batches, field, opts);   // the gated substep -- registry delegates to the verified module
@@ -230,6 +268,7 @@ function stepSim() {
     let extra = "";
     if (coupling.id === "plastic") { let y = 0; for (const c of cons) if (c.restOrig !== undefined && Math.abs(c.rest0 - c.restOrig) > 1e-9) y++; extra = `  |  yielded ${y}`; }
     if (coupling.driver === "body") extra = `  |  fluid ${fluid.nF}`;
+    if (coupling.driver === "rigid") extra = `  |  body y ${proxy.pos[1].toFixed(3)}  |v| ${Math.hypot(proxy.vel[0], proxy.vel[1], proxy.vel[2]).toFixed(3)}`;
     document.getElementById("status").textContent = `coupling: ${coupling.id}  |  frame ${frame}  |  nodes ${N}  |  constraints ${cons.length}` + extra;
 }
 function loop() { if (playing) { stepSim(); render(); } requestAnimationFrame(loop); }

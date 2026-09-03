@@ -14,6 +14,168 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4402 -- the fifth coupling, and the first that leaves XPBD: a sheet that holds a rigid body up
+
+FOUR SOLVERS IN THIS TREE AND UNTIL THIS ROUND NONE OF THEM TOUCHED.
+
+physics/xpbd/ is 77 modules and 38 gates and it collided against a PLANE -- frictionalContact.js's
+floorN/floorD -- and against other particles, and against nothing else. physics/sph/'s boundaries are analytic
+box walls, and sph.js's own third line says it "is NOT a rigid-body engine". box3d and Jolt collided their own
+bodies. couplingRegistry.js held four couplings and its only TWO-WAY one, fluidMeshSubstep, is fluid-to-mesh
+with BOTH SIDES INSIDE XPBD. physics/mechanics/reposeOps.mjs is the one file that names both solvers, and it
+puts them side by side as a DIFFERENTIAL on the critical-angle question -- a comparison, not a contact.
+
+So a soft body could not rest on a rigid one, cloth could not hold a body up, and buoyancy was unrepresentable.
+
+THE ONE PIECE OF PHYSICS THAT HAD TO BE WRITTEN IS ONE FORMULA.
+
+Between two particles a correction splits by inverse mass. Against a rigid body it splits by the GENERALIZED
+inverse mass at the contact point (Muller/Macklin, Detailed Rigid Body Simulation with XPBD, 2020, eq. 2):
+
+    w = 1/m + (r x n)^T I^-1 (r x n)
+
+That second term is why a shove at a corner costs less than one through the centre: the body can rotate away
+instead of translating. And it IS the entire content of the "XPBD rigid bodies" extension for this tree, because
+XPBD state here is {pos, vel, invMass} -- no orientation, no angular velocity and no inertia anywhere in xpbd/.
+It lives inside the coupling rather than in its own round because the coupling is the only thing that needs it.
+
+    on a 0.4 x 0.3 x 0.24 box at density 300 (8.640 kg)
+
+    1/m alone                    1.157407e-1
+    w at the top face CENTRE     1.157407e-1     r x n = 0, so the term is a bit-identical zero
+    w at a top CORNER            4.734643e-1     4.0907x
+
+The face-centre row is EXACT, not close: the cross product of parallel vectors is exact arithmetic.
+
+THE MASS PROPERTIES ARE DERIVED AND THEN PROBED, BECAUSE box3d EXPORTS NEITHER.
+
+None of the 45 built swk_* functions returns a mass, an inertia or an angular velocity -- swk_velocities is
+linear only. So both come from the solid-box formula. A formula agreeing with itself is not evidence, so the
+real body is interrogated: a known impulse, the velocity read BEFORE stepping (ApplyLinearImpulseToCenter
+changes it immediately), and m = J/dv.
+
+    mass                         3.80160022 measured   3.8016 derived     relative 5.7e-8   (one ulp of f32)
+    omega after L = 0.006        0.21032810 measured    0.21026249         relative 3.1e-4
+
+The angular impulse is small on purpose and the first draft's was not. L = 2 predicts 70 rad/s, which is 67
+degrees in one 1/60 step; reading omega back as 2*atan2(qz,qw)/dt then measured 46.96 against 70.09 and looked
+like a 33% error in the INERTIA. It was the small-angle extraction failing. A probe has to stay inside the
+regime its readback is valid in, or it measures the probe.
+
+WHAT IS EXACT IS KEPT APART FROM WHAT IS ONLY SMALL, AND CONFLATING THEM WOULD HAVE BEEN THE EASY LIE.
+
+tools/roundhouse/conservation.mjs reports EXACT separately from small because "a quantity that never changes a
+bit is conserved by CONSTRUCTION, and calling that conserved to 1e-16 understates it and invites somebody to
+loosen the tolerance later". This coupling has one of each.
+
+  THE IMPULSE LEDGER IS BIT-IDENTICALLY ZERO. Every contact adds +s*n to the particle side and -s*n to the
+  body side; IEEE negation is exact and round-to-nearest is sign-symmetric, so sum(-x) is the exact negation of
+  sum(x) and the two sides cancel to a bit-identical zero for any number of contacts in any order. There is no
+  tolerance here and therefore nothing to loosen.
+
+  TOTAL MOMENTUM ONLY REACHES THE ROUNDING FLOOR, 4.8e-14 relative. Recovering m_i * (w_i * s) needs
+  m_i * w_i == 1, which floating point does not promise. Claiming exactness there would be claiming a property
+  the arithmetic does not have.
+
+THE ONE-WAY CONTROL IS THE POINT, BECAUSE "IT LOOKS RIGHT" IS NOT A MEASUREMENT.
+
+fluid.js said it first: "Two-way coupling is therefore not bolted on; it is momentum. Drop the mesh half of the
+correction and the mesh is a wall the fluid slides off; drop the fluid half and the fluid tunnels straight
+through. Only both halves is a coupling." So every experiment runs TWICE, differing in one boolean.
+
+    free impact, zero gravity, 0.72 kg sheet at 2 m/s into a free 4.32 kg box, 300 frames
+
+    two-way    p_x 1.440000000 -> 1.440000000     relative drift 4.842e-14    ledger exact
+    one-way    p_x 1.440000000 -> -0.275508398    relative drift 1.191e+0     ledger not exact
+
+The one-way run does not merely leak momentum, it REVERSES it -- 2.46e13 times the two-way run's error. And the
+two-way body picks up |v| 0.184 and |w| 0.192 from a deliberately off-centre aim, where the one-way body's
+velocity and spin are both exactly zero: it never feels a thing.
+
+    the hammock: a 3.8 kg box lowered into an 11x11 sheet pinned all round, 240 frames
+
+    two-way, 4 substeps x 2 iterations    box y after 4 s   +0.0321    |v| 0.033    holding 921/960 substeps
+    one-way, 4 substeps x 2 iterations    box y after 4 s  -79.9703    |v| 40.00    holding  30/960 substeps
+    two-way, 1 substep  x 6 iterations    box y after 4 s  -78.40      through the sheet
+
+A free fall from 0.113 m for four seconds reaches -79.89. So the sheet HOLDS the box, permanently rather than
+for the handful of substeps an impact lasts -- and one substep of six iterations loses it where four substeps
+of two hold it, which is Macklin's Small Steps in Physics Simulation reproduced in the one place it decides
+whether the scene works at all.
+
+AND THE SAME THING WORKS WITH box3d OWNING THE BODY.
+
+The module imports no physics engine. The proxy is a plain object the caller fills, the same choice reposeOps
+made for the same reason: a file with no engine import can be gated from anywhere and cannot smuggle node:fs
+into a page. So the gate closes the loop through the real solver -- pose out through swk_transforms, reaction in
+through swk_body_impulse and swk_body_ang_impulse, box3d integrating:
+
+    two-way    box3d body y after 3 s   +0.0160    |v|  0.31    holding 642/720 substeps
+    one-way    box3d body y after 3 s  -42.7338    |v| 27.86    holding  28/720 substeps
+
+A box3d body in free fall from 0.113 m for three seconds reaches about -44.89. An XPBD sheet is holding up a
+body a WASM rigid-body engine is integrating, and the only things crossing the seam are a pose and an impulse.
+
+THE REGISTRY IS STILL THE UI'S ONLY SOURCE OF TRUTH, so COUPLINGS gains a fifth entry with a driver of its own.
+"body" would have been a lie -- that driver means two particle systems, and the second system here has an
+orientation and a lever arm. couple.html learns to drive it and builds its picker, sliders, tag and hint from
+the registry as it does for the other four: a rope pinned at both ends with a rigid box resting in it, the box
+drawn as its four rotated corners. Its slider says Substeps rather than Iterations because that is what decides
+whether the rope holds the box, and the hint says so out loud.
+
+AND THE FIRST TWO DRAFTS WERE BOTH WRONG IN WAYS THAT LOOKED LIKE TUNNELLING.
+
+The first solved the contacts ONCE, after all the cloth iterations. A box lowered onto a pinned sheet fell
+straight through: the contact pushed the nearest particles out of the way and, with no cloth iteration left to
+run, that displacement never propagated along the sheet to the pins. The sheet could not carry a load because
+the load arrived after the sheet had finished solving. Measured: 5 of 600 substeps in contact, the box at -498
+after ten seconds against a free fall of -499.9 -- slowed by a rounding error's worth and nothing else.
+
+The second recomputed the contact NORMAL every iteration. Once the box had descended past the particles they
+were closest to its BOTTOM face, so the solver pushed them out downward -- the shortest way out of a box is
+through the far side once you are more than halfway across it. Measured mid-fall: 10 contacts found, 5
+projections applied, the box accelerating at a clean -g the whole way. The normal has to be fixed at DISCOVERY
+and held for the substep, which is what a contact is; recomputing it is a nearest-surface query wearing a
+contact's name.
+
+Six sabotages, 1/3/1/1/2/2 RED by name, two files md5-identical after.
+
+SABOTAGE C READ ZERO RED AT FIRST, and that is the finding about this gate rather than about the module.
+Re-choosing the face every iteration -- the second draft's actual bug, the one the round exists to have fixed
+-- went undetected by every scene in the file, because all of them catch the body before it ever descends past
+a particle's midplane. A CHECK MUST NOT NEED ITS OWN FINDING TO STAY HIDDEN. The property is tested directly
+now, on the one configuration where the two rules disagree: a particle already deep inside the box past the
+halfway point with the contact recorded against the top face. Held, it comes back out the way it went in.
+Re-chosen, it goes out the bottom. Same sabotage, 1 RED by name.
+
+Sabotage A is worth reporting for what it did NOT break: with the angular term deleted the hammock still
+catches the box, because a sheet landing flat on a face has little lever arm to exploit. The term is earned by
+its own check and not by the scene, which is the honest reading rather than the flattering one. And sabotage E
+was aimed wrong the first time -- it changed the inertia's x component where the probe reads the z one, so it
+read 1 RED for a reason that had nothing to do with the check being weak.
+
+TWO SMALLER FINDINGS ABOUT THE TOOLS, both caught by checks going red for the wrong reason:
+
+sourceScan.noComments is a JAVASCRIPT stripper, and handed couple.html it returns 428 bytes out of 18,692 --
+97.7% of the file gone, the module body with it, so every regex against it answers false. A source check
+written that way goes red on a page that is perfectly correct. The page check reads raw and the behavioural
+probe is what actually settles it.
+
+And runInEngineOrigin compiles its script with new Function("return (" + src + ")"), so the script must BE a
+function expression. A bare statement list is a SyntaxError, and the result comes back ok:false with every
+field undefined -- which reads as "the page drew nothing" rather than as "the harness never ran the script".
+
+UNCHECKED, AND ALL THREE ARE LIMITS RATHER THAN TUNINGS. FRICTION AND RESTITUTION: the coupled contact is
+frictionless and perfectly inelastic along the normal, so a box set down on a tilted sheet slides where a real
+one would grip, and nothing bounces. frictionalContact.js has Coulomb friction against a plane and fluid.js has
+it across two particle sets; neither is wired to this face constraint yet. TUNNELLING: contacts are found once
+per substep against the predicted positions, so a body crossing more than the contact radius in one substep
+passes through -- a box dropped from 0.35 m arrived at 2.3 m/s, 0.038 m per substep against a 0.02 m radius,
+and went through. box3d's own CCD cannot help, because the contact test is on THIS side of the seam. EDGES AND
+CORNERS are approximated by their dominant face, which is what makes a box the only shape here; swk_body_sphere
+is in the shim and not in the built wasm.
+
+The tree stands at 1436 gates.
 ## v4400 -- one line that does not resolve in Node, three findings downstream of it, and the cross-backend envelope recorded at last
 
 physics/box3d/box3dLoader.js loads its artifact with `import("/vendor/box3d/box3d.js")` -- a BROWSER-ABSOLUTE

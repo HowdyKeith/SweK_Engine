@@ -578,6 +578,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotage A found two defects in the new gate: it THREW instead of reporting, and one check " +
                  "passed vacuously by naming a route that had just failed",
     }),
+    since30: Object.freeze({
+        at: "v4402", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/xpbd/rigidCouple-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 1.7s including a browser probe, eight sections. THE FIRST " +
+                 "COUPLING THAT LEAVES XPBD: four solvers in this tree and until this round none of them " +
+                 "touched -- xpbd collided against a plane and particles, sph against analytic box walls, " +
+                 "box3d and Jolt against their own bodies, and the registry's only two-way coupling had both " +
+                 "sides inside xpbd. One formula had to be written, the generalized inverse mass " +
+                 "w = 1/m + (r x n)^T I^-1 (r x n), exactly 1/m at a face centre and 4.0907x at a corner. " +
+                 "Mass and inertia are derived from the box and PROBED against box3d, which exports neither: " +
+                 "3.80160022 kg against 3.8016 (5.7e-8) and omega to 3.1e-4. The ledger is bit-identically " +
+                 "zero and momentum only reaches 4.8e-14, reported apart on purpose. An 11x11 pinned sheet " +
+                 "holds a 3.8 kg box at y=+0.032 after 4 s against a free fall of -79.89, and does it again " +
+                 "with box3d integrating the body through swk_body_impulse. One-way, p_x reverses. Driven RED " +
+                 "by six sabotages (1/3/1/1/2/2 by name), two files md5-identical after -- and sabotage C read " +
+                 "ZERO RED at first because every scene caught the body before the bug could show, so the gate " +
+                 "could not see the exact defect the round exists to have fixed",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
