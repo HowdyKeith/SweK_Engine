@@ -93,7 +93,13 @@ out vec4 outColor;
 uniform sampler2D uState;
 uniform float uOverlayBrightness;
 
-vec3 fireRamp(float t) {
+// v4412 -- RENAMED FROM fireRamp. fx/voxelize/fireRamp.js exports blackbodyRamp, a six-stop temperature
+// ramp whose blue channel is zero until the fire is nearly white. This one runs black -> PURPLE -> red
+// and its blue channel RISES to 0.30 at a fifth of full heat and then falls. At h = 0.2 they read
+// [0.51, 0.04, 0.00] and [0.18, 0.05, 0.30]: they do not differ in shade, they disagree about whether
+// cool fire is red or purple, and a cool blackbody is never purple. Two functions called fireRamp, one
+// of them not a fire ramp at all. render/fireColour.mjs measures both.
+vec3 infernoRamp(float t) {
     t = clamp(t, 0.0, 1.0);
     // Inferno-ish: black → purple → red → orange → yellow → white
     vec3 c0 = vec3(0.0, 0.0, 0.0);
@@ -113,7 +119,7 @@ void main() {
     vec2 c = texture(uState, vUV).rg;
     // Remap u from ~[-2..+2] into [0..1]
     float uM = clamp((c.r + 1.5) / 3.0, 0.0, 1.0);
-    vec3 col = fireRamp(uM);
+    vec3 col = infernoRamp(uM);
     // Tint cool when v is high (refractory) so the wave tail reads
     // distinct from the leading edge
     float vN = clamp((c.g + 0.5) / 2.0, 0.0, 1.0);

@@ -713,6 +713,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since38: Object.freeze({
         at: "v4412", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/fireColour-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in under a second, thirteen checks in four sections. It gates " +
+                 "render/fireColour.mjs, the census of everything in this tree that turns heat into a colour, " +
+                 "and its first section COMPUTES the premise every other row rests on -- Planck's law " +
+                 "monotone in T at 700/550/450 nm, from the constants in physics/thermal/blackbody.mjs -- " +
+                 "because a check resting on an unverified premise is a check resting on nothing. It found a " +
+                 "naming trap of v4144's species: two functions called fireRamp, one a blackbody " +
+                 "approximation and one an Inferno colormap that is PURPLE where the other is dark red, " +
+                 "living in demos_code/ which staleness.mjs's SKIP regex has excluded from gateFiles() for " +
+                 "4,412 versions.",
+    }),
+    since39: Object.freeze({
+        at: "v4413", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/importPosition-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~3s, five sections. docs/EXPLAIN-ITSELF.md item 5. It gates " +
