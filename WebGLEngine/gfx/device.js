@@ -335,8 +335,17 @@ async function webgpuBackend(canvas, opts = {}) {
         p._bg = gpu.createBindGroup({ layout: p.pipe.getBindGroupLayout(0), entries }); p._bgGen = p._gen;
         return p._bg;
     };
-    const classify = (wgsl) => {
-        const all = parseBindings(wgsl).filter((b) => b.group === 0);
+    // *** v4384 -- A MODULE MAY HAVE MORE THAN ONE ENTRY POINT, AND UNTIL NOW THIS ASSUMED IT DID NOT. ***
+    // WebGPU's layout:"auto" builds a bind group layout from what the CHOSEN entry point actually uses, not from
+    // what the module declares. simulation/lbm/lbmShader.js is the first module here with two -- collideStream
+    // touches all five bindings and stream touches three -- and both halves of the mismatch are errors: binding
+    // the extra two to `stream` is rejected by the device ("binding index 2 not present in the bind group
+    // layout") and NOT binding them is refused by the loop below ("nothing was bound to it"). There was no way
+    // to be right. `uses` lets a caller name the subset one entry point needs; omitted, every declared binding is
+    // required exactly as before, so nothing that already worked changes.
+    const classify = (wgsl, uses) => {
+        const keep = Array.isArray(uses) ? new Set(uses) : null;
+        const all = parseBindings(wgsl).filter((b) => b.group === 0).filter((b) => !keep || keep.has(b.name));
         return { texBindings: all.filter((b) => /^texture_/.test(b.type)), samplerBindings: all.filter((b) => /^sampler/.test(b.type)),
                  storageBindings: all.filter((b) => b.addressSpace === "storage"), uniformBindings: all.filter((b) => b.addressSpace === "uniform"), all };
     };
@@ -416,7 +425,7 @@ async function webgpuBackend(canvas, opts = {}) {
             const mod = gpu.createShaderModule({ code: d.wgsl });
             const compiled = _watchCompile(mod, "compute pipeline");
             const pipe = gpu.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: d.entryPoint || "main" } });
-            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
+            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl, d.uses), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
             compiled.then((e) => { c.error = e; });
             c.bind = (n, buf, o) => { bindByName(c, n, buf, o); return c; };
             // Level 12 -- a compute pass may read a texture (the Hi-Z build reads the frame's depth). Same rule as

@@ -15,7 +15,17 @@
 // TRUE. The test now exists, in simulation/lbm/shaderConstants-selfcheck.mjs, and it does what this sentence
 // always said it did.
 //
-// RIG-ONLY for execution: this sandbox has no GPU and no WebGPU. The WGSL is correct-by-construction and unrun here.
+// v4384 CORRECTION, AND IT IS THE SECOND OF THE SAME SPECIES IN THIS FILE. The line below used to end "The WGSL
+// is correct-by-construction and unrun here." IT DID NOT COMPILE. `macro` is a RESERVED KEYWORD in WGSL, so the
+// binding on line 37 made the whole module a parse error -- "13:48 error: 'macro' is a reserved keyword" -- and
+// every one of the 48,124 dispatches a first run attempted was rejected before it began. The buffer is `moments`
+// now, which is what it holds: density and momentum are the moments of the distribution.
+//
+// "Correct-by-construction" was doing the same work "the test below pulls the constants back out" did at v2977:
+// standing in for a check that had never run. The constants gate DID exist and DID pass, because it reads the
+// text; nothing had ever handed the text to a compiler. tools/ship/lbmGpu-selfcheck.mjs now does.
+//
+// RIG-ONLY for TIMING: the sandbox device is SwiftShader, so what runs here is checked and not timed.
 "use strict";
 import { E, W, OPP, CS2, Q } from "./lbm2d.js";
 
@@ -34,7 +44,7 @@ struct Params { nx: u32, ny: u32, tau: f32, gx: f32, gy: f32, _pad: vec3<f32> };
 @group(0) @binding(0) var<storage, read>       fIn:   array<f32>;
 @group(0) @binding(1) var<storage, read_write> fOut:  array<f32>;
 @group(0) @binding(2) var<storage, read>       solid: array<u32>;
-@group(0) @binding(3) var<storage, read_write> macro: array<vec4<f32>>;   // rho, ux, uy, curl
+@group(0) @binding(3) var<storage, read_write> moments: array<vec4<f32>>;   // rho, ux, uy, curl
 @group(0) @binding(4) var<uniform>             P:     Params;
 
 fn eq(i: u32, rho: f32, u: vec2<f32>) -> f32 {
@@ -56,7 +66,7 @@ fn collideStream(@builtin(global_invocation_id) gid: vec3<u32>) {
     let g = vec2<f32>(P.gx, P.gy);
     let u = select(vec2<f32>(0.0, 0.0), m / rho + g * 0.5, rho > 0.0);   // the half-force correction, same as the CPU
     let cf = 1.0 - 1.0 / (2.0 * P.tau);
-    macro[k] = vec4<f32>(rho, u.x, u.y, 0.0);
+    moments[k] = vec4<f32>(rho, u.x, u.y, 0.0);
     for (var i: u32 = 0u; i < Q; i = i + 1u) {
         let eu = dot(E[i], u);
         let Fi = W[i] * cf * rho * (3.0 * dot(E[i] - u, g) + 9.0 * eu * dot(E[i], g));   // Guo forcing

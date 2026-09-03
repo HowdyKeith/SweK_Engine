@@ -404,6 +404,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (1/2/1 by name) and restored; the FIRST is the round's argument -- a broken HLLC " +
                  "wave speed that the page's own 2% tolerance would have passed on both of its rows",
     }),
+    // v4384 -- the EIGHTEENTH closing, and the second in two rounds for a kernel the tree had never run. This one
+    // did not merely go ungated: it did not COMPILE. Its round also changed gfx/device.js (multi-entry-point
+    // binding sets), so every gate that builds a compute pipeline -- tslPhysics, tslRace, tslRig, tslIsing,
+    // carveGpu, eulerGpu and the four device* gates -- was run to completion beside this one.
+    since18: Object.freeze({
+        at: "v4384", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/lbmGpu-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections and 8 checks in 7.8 s. Driven RED by three " +
+                 "sabotages (2/3/1 by name) and restored; the first is a RE-ENACTMENT of the state the shader " +
+                 "actually shipped in, since `macro` is a WGSL reserved keyword and the module never compiled",
+    }),
+    // v4384 -- the NINETEENTH closing, and it is in the same round as the eighteenth because the round produced
+    // two gates: one for a kernel that never compiled, and one for the merge hazard that shipped a conflicted
+    // file into a commit WHILE that kernel was being fixed.
+    since19: Object.freeze({
+        at: "v4384", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/conflictMarkers-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, two sections and 6 checks, scanning 5,427 tracked text files. " +
+                 "Driven RED by two sabotages (1/2 by name) and restored -- and the first attempt at the first " +
+                 "one went 0 red because the sabotage itself was wrong, which is logged in the gate",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
