@@ -71,6 +71,81 @@ export function decodeHeidler(px, i) { return ((px[i] + px[i + 1] / 255) / 255) 
 // v4329 -- the looks and shells that USE these functions moved to render/fleetTsl.mjs: a shell is a fleet's
 // vertex stage, not a physics function, and this module was holding three of them and five looks besides.
 
+// ---- v4370: HMC's leapfrog as a COMPUTE pass, against a kernel that already ships -----------------------------------
+/**
+ * THE HMC LEAPFROG AS A TSL COMPUTE PASS. One invocation per chain, L kick-drift-kick steps over the Gaussian
+ * potential U = 0.5 (q-mu)^T Sinv (q-mu), which is tools/roundhouse/hmcGpu.mjs's WGSL_HMC written as nodes.
+ *
+ * *** THE TWIN IS SHIPPED CODE, WHICH IS THE WHOLE POINT. *** v4326 made this argument for the fleets' sprite look
+ * and it applies harder here: WGSL_HMC is not a fixture written for this round, it is the kernel the swek-hmc-bench
+ * fleet job runs on real hardware, and tools/roundhouse/hmcGpu.mjs carries a CPU mirror of it at f32 (leapfrogF32,
+ * Math.fround at every step) and at f64. So a generated pass has TWO independent things to agree with, one of them
+ * a number rather than a picture, and neither written to make this round look good.
+ *
+ * SPECIFIED OPERATIONS ONLY: + - * /. The kernel's header says so and it is what makes the claim sharp -- no
+ * transcendentals, so every value is IEEE f32 add/mul and Math.fround reproduces the device exactly. A pixel claim
+ * cannot be made this way; 8 bits a channel hides a difference under 1/255, as v4325 measured. Here a single ULP
+ * shows.
+ *
+ * THE ORDER OF OPERATIONS IS THE ARITHMETIC, AND THE FIRST VERSION OF THIS PARAGRAPH GOT ITS OWN EXAMPLE WRONG.
+ * It said that writing the kick as 0.5*(eps*g.x) instead of (0.5*eps)*g.x is algebraically identical and NOT
+ * bit-identical. MEASURED, IT IS BIT-IDENTICAL ON ALL 256 VALUES -- 0.5 is a power of two, so scaling by it is
+ * exact in IEEE and re-association across that multiply cannot lose anything. The claim was true of re-association
+ * in general and false of the one instance chosen to illustrate it. A re-association that IS observable, measured
+ * beside it: the gradient distributed, i00*qx - i00*mu0 for i00*(qx - mu0), moves 215 of 256 endpoints. So the
+ * nodes below are built to the kernel's association because SOME of it is load-bearing and no reading tells you
+ * which -- and the gate pins both numbers rather than the rule of thumb.
+ *
+ * WHAT IS DELIBERATELY NOT THE SAME: L and n are baked constants here where the kernel takes them as uniforms.
+ * lyapunovNodes set that precedent (samples and warmup are JS numbers), and a TSL Loop wants a JS bound. So this
+ * pass is the kernel's ARITHMETIC at a fixed step count rather than the kernel's full signature; the gate says so
+ * and compares at the fixture's own L.
+ */
+export function makeHmcLeapfrogTsl(TSL, { count = 64, inv = null, mu = [1, -1], eps = 0.18, L = 24 } = {}) {
+    const { Fn, float, vec4, uniform, instanceIndex, instancedArray, Loop } = TSL;
+    for (const n of ["Fn", "float", "vec4", "uniform", "instancedArray", "Loop"])
+        if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (!inv || inv.length !== 3) throw new Error("physicsTsl: makeHmcLeapfrogTsl needs inv = [i00, i01, i11]");
+    if (!(L > 0)) throw new Error("physicsTsl: makeHmcLeapfrogTsl needs a positive step count L");
+
+    // The kernel's own packing: array<f32> with q and p interleaved two per chain, so the buffers a device binds
+    // here are the buffers it binds there rather than a tidier shape chosen for the graph's convenience.
+    const qin = instancedArray(count * 2, "float");
+    const pin = instancedArray(count * 2, "float");
+    const qout = instancedArray(count * 2, "float");
+    const pout = instancedArray(count * 2, "float");
+    const uniforms = {
+        sinv: uniform(vec4(inv[0], inv[1], inv[2], eps)).label("sinv"),   // i00 i01 i11 eps
+        mu: uniform(vec4(mu[0], mu[1], 0, 0)).label("mu"),
+    };
+
+    const node = Fn(() => {
+        const i2 = instanceIndex.mul(2);
+        const qx = qin.element(i2).toVar(), qy = qin.element(i2.add(1)).toVar();
+        const px = pin.element(i2).toVar(), py = pin.element(i2.add(1)).toVar();
+        const gx = float(0).toVar(), gy = float(0).toVar();
+        // gradU(q) = Sinv (q - mu), associated as the kernel writes it: i00*dx + i01*dy.
+        const grad = () => {
+            const dx = qx.sub(uniforms.mu.x), dy = qy.sub(uniforms.mu.y);
+            gx.assign(uniforms.sinv.x.mul(dx).add(uniforms.sinv.y.mul(dy)));
+            gy.assign(uniforms.sinv.y.mul(dx).add(uniforms.sinv.z.mul(dy)));
+        };
+        grad();
+        Loop({ start: 0, end: L }, () => {
+            const half = float(0.5).mul(uniforms.sinv.w);          // (0.5 * eps), once, as the kernel groups it
+            px.subAssign(half.mul(gx)); py.subAssign(half.mul(gy)); // half kick
+            qx.addAssign(uniforms.sinv.w.mul(px));                  // full drift
+            qy.addAssign(uniforms.sinv.w.mul(py));
+            grad();
+            px.subAssign(half.mul(gx)); py.subAssign(half.mul(gy)); // half kick
+        });
+        qout.element(i2).assign(qx); qout.element(i2.add(1)).assign(qy);
+        pout.element(i2).assign(px); pout.element(i2.add(1)).assign(py);
+    })().compute(count);
+
+    return { node, qin, pin, qout, pout, uniforms, count, L, eps, inv, mu };
+}
+
 // ---- v4331: the exponent as a COMPUTE pass ---------------------------------------------------------------------------
 /**
  * THE LYAPUNOV EXPONENT AS A TSL COMPUTE PASS: invocation i sweeps r across [rLo, rHi] and writes the exponent into a

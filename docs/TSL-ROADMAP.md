@@ -1,4 +1,4 @@
-# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363, the fleets variant and a uniform frustum at v4364)
+# TSL and SweK -- the roadmap (written at v4319; step 4 built at v4320, step 5 at v4321, a race painted and the rig page at v4322, linear sampling and the page's generated race at v4323, the vertex stage at v4324, a second shell and a second race at v4325, a texture across the shell boundary at v4326, a sampler at v4327, the ink layout at v4328, the module split and the front-door drawer at v4329, the compute stage at v4331, a pass that reads a buffer at v4336, an atomic one at v4337, workgroup-shared memory at v4338, an indirect dispatch at v4339/v4351, the cull's own decision at v4361, the struct element and the whole pass at v4363, the fleets variant and a uniform frustum at v4364, a SHIPPING fleet kernel held to bit for bit at v4370)
 
 TSL is three.js's node shading language: a shader written as JavaScript nodes that three's node builders
 compile to WGSL on its WebGPU backend and to GLSL on its WebGL2 backend. SweK's own answer to "one shader,
@@ -210,6 +210,23 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    function; a graph inlines it and reads the buffer directly. What it does need is a mat4x4 uniform, two while-loops
    whose bounds are computed, and a nested tile loop -- none of which any graph here has emitted. It is the one
    variant left.
+   v4370 -- AND A KERNEL THAT ALREADY SHIPS, HELD TO BIT FOR BIT. Everything above is graded against a twin written
+   in this tree for the arc, or against a picture whose 8 bits a channel hide a difference under 1/255.
+   tools/roundhouse/hmcGpu.mjs's WGSL_HMC is neither: it is the batch leapfrog the swek-hmc-bench fleet job runs on
+   real hardware, it predates this arc by a thousand versions, and it carries its own f32 CPU mirror (Math.fround
+   after every op) and the FLOOR that mirror measured. physicsTsl makeHmcLeapfrogTsl is that kernel as nodes -- one
+   invocation per chain, L kick-drift-kick steps over a Gaussian potential, specified operations only (+ - * /), so
+   there is no transcendental for two compilers to round differently. Measured on WebGPU against the shipped text:
+   BIT-IDENTICAL on all 256 endpoint values, with both passes inside 1.371e-6 of the mirror against a 2.5e-5 floor.
+   *** AND THE FIRST STATEMENT OF WHAT THAT IS WORTH WAS WRONG. *** The module's header said writing the half-kick
+   as 0.5*(eps*g) rather than (0.5*eps)*g would be algebraically identical and not bit-identical. It is bit-identical
+   on every value: 0.5 is a power of two, so that multiply is exact. The rule holds; the example did not. A
+   re-association that IS observable is pinned beside it -- the gradient distributed, i00*qx - i00*mu0 for
+   i00*(qx - mu0) -- which moves 215 of 256 endpoints by at most 1.192e-6. That is 21x INSIDE the floor and 42x
+   inside the device tolerance, so every tolerance in this tree passes it and only the bit claim does not.
+   NOT CLAIMED: the kernel's full signature. L and n are uniforms in WGSL_HMC and baked constants in the graph,
+   because a TSL Loop wants a JavaScript bound (lyapunovNodes set that precedent at v4321). A graph whose step count
+   comes from a buffer is the next thing here, and it is unbuilt.
 
 ## The count that says when step 4 matters
 
