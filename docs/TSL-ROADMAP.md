@@ -232,10 +232,23 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an
 IR while few files carry both languages ("if this count climbs toward twenty the arithmetic inverts, and
-THAT is when to re-open the three-stage shape: parse, lower, emit per target"). The count is 12 at v4319
-(3 when the line was written) and the gate is red on it, on the record. TSL is a three-stage shape someone
-else maintains: the graph is the IR, and three's two builders are the emitters. Step 4 is that argument
-made concrete, and section 3 of tsl-selfcheck is its first evidence: the emitted pair equals ours.
+THAT is when to re-open the three-stage shape: parse, lower, emit per target"). TSL is a three-stage shape
+someone else maintains: the graph is the IR, and three's two builders are the emitters. Step 4 is that
+argument made concrete, and section 3 of tsl-selfcheck is its first evidence: the emitted pair equals ours.
+
+**The 12 recorded here at v4319 was not a real number, and neither was the 14 the register filed at v4380.**
+v4381 re-measured it. The census classified a file by testing its RAW SOURCE for six tokens, two of which --
+GLSL's storage qualifiers, spelled a-t-t-r-i-b-u-t-e and v-a-r-y-i-n-g -- are ordinary English words.
+render/bloomFused.mjs counted as a shader pair on the sentence "attribute any difference to the SAMPLING".
+Four of the fourteen carry no GLSL at all; seventy-two of the hundred and sixty-nine called GLSL-only carry
+no shader source of any kind, main.js and brain/brain.js among them; and two real GLSL passes were missing
+because three.js prepends their version directive. The census delegates to render/backendParity.mjs
+classify() now, which has read this tree's shader languages correctly since v4269.
+
+The honest figures are **10 both, 23 WGSL-only, 99 GLSL-only**, and the gate is green. Three to ten in
+eleven hundred rounds is a real climb; the trigger is twenty and it has not fired. So the compiler stays
+unbuilt -- and step 4 is the reason that costs nothing: the three-stage shape got re-opened without this
+tree maintaining an IR, an emitter or a parser.
 
 ## What TSL gives that the tree does not have today
 

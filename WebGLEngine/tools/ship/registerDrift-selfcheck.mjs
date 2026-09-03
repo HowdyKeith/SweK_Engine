@@ -26,6 +26,12 @@
 //      to re-open the three-stage shape". It was 4 when filed, 12 at v4319 by docs/TSL-ROADMAP.md's own count,
 //      and 14 now. THIS BRANCH PUT SOME OF THEM THERE: the TSL rounds added modules authoring both languages.
 //      The register was quietly holding a counter that this session was driving toward its own stated trigger.
+//      *** ANSWERED AT v4381, AND THE COUNTER WAS THE THING THAT WAS WRONG. *** Four of the fourteen author no
+//      GLSL: two of the census's six detector tokens were ordinary English words, so a sentence containing the
+//      verb "attribute" read as a shader. The real figure is 10 against a trigger of 20, the census delegates to
+//      render/backendParity.mjs classify() now, and the gate is green and pruned from the register. THIS DRIFT
+//      CHECK FOUND IT BY ASKING ONLY WHETHER TWO SENTENCES MATCHED -- it could not have known which of the two
+//      was wrong, and the answer was neither the register's 4 nor the gate's 14.
 //
 // WHAT THIS GATE DOES NOT DO: repair any of them, or judge whether a red should be accepted. It checks that the
 // register's description of a red is the red's own description of itself, which is the difference between a list
@@ -115,7 +121,7 @@ console.log("\n4. A RED WHOSE REASON CANNOT BE READ");
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether a red SHOULD be accepted, which is a judgement and not a comparison -- this gate only " +
     "asks whether the register's description matches the gate's; whether the three findings the v4380 audit turned up are " +
-    "REPAIRED, which they are not, and each is named in the header rather than folded into a count; and whether shaderCensus's " +
-    "climb from 4 to 14 has passed the point where this tree's own recorded reasoning says the hand-written-pair argument " +
-    "inverts -- that is a decision about the engine's shape and belongs to a round of its own, not to a drift check.");
+    "REPAIRED -- the third was, at v4381, and the other two are named in the header rather than folded into a count; and " +
+    "whether a COUNT a register records is itself correct, which this gate cannot ask and which is how shaderCensus's " +
+    "entry and its gate agreed for eleven hundred rounds on a number neither of them had re-derived.");
 process.exit(fails ? 1 : 0);

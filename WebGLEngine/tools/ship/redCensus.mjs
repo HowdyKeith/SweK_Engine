@@ -133,14 +133,9 @@ export const RED_AT_V4279 = Object.freeze([
     // recorded reasoning about what each chore unblocks, unreachable for 250 rounds. server.html now carries the
     // panel (a different page from the one he cleared) and the check asks whether ANY page renders it rather than
     // naming one, so the surface can move again without this going stale twice.
-    { gate: "tools/ship/shaderCensus-selfcheck.mjs", ms: 279,
-      // v4380 -- 4 WHEN FILED, 14 NOW, AND THE NUMBER IS THE POINT. This gate has held since v3274 that a
-      // hand-written pair is cheaper than an IR "while few files carry both languages -- if this count climbs
-      // toward twenty the arithmetic inverts, and THAT is when to re-open the three-stage shape: parse, lower,
-      // emit per target". docs/TSL-ROADMAP.md records 12 at v4319. It is 14 now, and THIS BRANCH PUT SOME OF THEM
-      // THERE: the TSL rounds added modules authoring both languages. The register was holding a counter that the
-      // session was driving toward the tree's own stated trigger, under a line that said 4.
-      fails: "!! *** only 14 files author a shader in BOTH languages *** fx/nebula/nebulaShaders.js, fx/wormhole/wormholeNebula.js, render/blackbodyWgsl.mjs, render/bloomFuse" },
+    // v4381 -- REMOVED, AND THE COUNT IT RECORDED WAS NEVER TRUE. v4380 filed this at 14 against a line that
+    // said 4 and left the judgement -- has the IR arithmetic inverted? -- for a round of its own. It has not:
+    // FOUR OF THE FOURTEEN WERE ENGLISH PROSE. See FIXED_SINCE_V4279.
     // v4318 -- RECOVERED FROM THE TIMEOUT BUCKET, the second gate to make that journey after referenceKind.
     { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
       fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },
@@ -250,6 +245,19 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/shaderCensus-selfcheck.mjs", round: "v4381",
+      why: "FILED AT 14 AT v4380 AGAINST A LINE THAT SAID 4, AND THE JUDGEMENT IT DEFERRED CAME BACK NO. The gate " +
+           "has held since v3274 that a hand-written shader pair is cheaper than an IR while few files carry both " +
+           "languages, and that at TWENTY the arithmetic inverts. The count was measured by testing RAW SOURCE for " +
+           "six tokens, two of which -- GLSL's storage qualifiers -- are ordinary English: render/bloomFused.mjs " +
+           "was a shader pair on the sentence 'attribute any difference to the SAMPLING'. Four of the fourteen " +
+           "carry no GLSL, seventy-two of the hundred and sixty-nine called GLSL-only carry no shader at all " +
+           "(main.js and brain/brain.js among them), and TWO REAL GLSL PASSES WERE MISSING because three.js " +
+           "prepends their version directive. The census now delegates to render/backendParity.mjs classify(), " +
+           "which has read this tree's shader languages correctly since v4269 one directory over. 10 both, 23 " +
+           "WGSL-only, 99 GLSL-only; the trigger is twenty and has not fired. Third standing red in this " +
+           "neighbourhood to turn out to be unopened mail, after vendoredLicences at v4371 and rigJobs at v4379 " +
+           "-- and the first whose recorded LINE was the defect rather than its symptom." },
     { gate: "tools/ship/rigJobs-selfcheck.mjs", round: "v4379",
       why: "RED SINCE v4129 AND IT WAS A MESSAGE, NOT A FACT ABOUT A DELETED PANEL. The failing line was 'the page " +
            "renders title, why and how for each', and it named rig.html -- from which the rig-only panel was removed " +
