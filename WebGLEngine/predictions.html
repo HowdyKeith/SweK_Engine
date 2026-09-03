@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "GPU against CPU is not two independent paths when both run the same sampler",
+    since: "v4437",
+    state: "open",
+    pred: "docs/EXPLAIN-ITSELF.md item 11 asked for a WGSL raygen pass so the render stack could check quadrature against Monte Carlo, on the stated premise that the tracer had never rendered an image. The prediction under test is the one the item got RIGHT even though its premise was false: that two estimators of the same integral, sharing no code, would find something neither could find alone.",
+    why: "v4432 and v4436 each shipped an honest note saying the sampler was unchecked. Neither said it was BROKEN, because neither had run it -- and an unexercised code path is always free to return anything.",
+    measured: "THE PREMISE WAS FALSE AND THE PREDICTION HELD FOUR TIMES OVER. The tree has graded WGSL against a real device since v4290 and a bit-exact GPU transport port since v4415 -- and v4415's own gate already records that its comparison 'CERTIFIES a broken cosine sampler, bit-exactly', because a shared sampler bug agrees perfectly and is perfectly wrong. The second estimator then convicted: principled.sample() returned NaN on every specular draw for five rounds (it read h.cosTheta from a function returning a three-vector with y up); the pdf was the chosen lobe's rather than the mixture's, worth 2x on a dielectric and INVISIBLE on a metal; the tree's own quadrature reads 0.334246 at its default grid where the converged value is 0.991341, for a tight lobe at an oblique angle; and this record's own hand-copied number was from the wrong grid rung.",
+    kill: "physics/render/samplerCheck-selfcheck.mjs. 27 configurations must agree within THREE MEASURED standard deviations of the estimator's own seed-to-seed noise -- a bound derived rather than picked, after a hand-chosen 'half a per cent' went red on 1.35 sd of ordinary noise. The grid rule is asserted as a PRODUCT, so neither half can be dropped. SABOTAGE: restore the NaN read and 6 rows go red, return the chosen lobe's pdf and 3 do, use the small-angle reflection stand-in and 3 do, divide by surviving samples instead of drawn ones and 4 do -- MEASURED 6/3/3/4 by name, none zero. HONEST SCOPE: variance is not measured, only bias -- an unbiased estimator can still need a hundred times the samples and nothing here would notice. The quadrature is CHARACTERISED, not fixed. And pathTracerGpu.mjs has its own sampler which this round did not touch, which is exactly the independence that made the CPU bug invisible to it.",
+    page: "instruments.html",
+  },
+  {
     name: "A dielectric has laws where a BSDF has limits, and two of the four predictions about it came back backwards",
     since: "v4436",
     state: "open",

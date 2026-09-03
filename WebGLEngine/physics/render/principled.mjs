@@ -136,30 +136,68 @@ export function albedoSplit(params, cosO, opts = {}) {
 /**
  * Sample an incoming direction. Chooses a lobe by its share of the reflectance, then samples that lobe --
  * GGX through microfacet.sampleHalfVector, cosine-weighted for the diffuse.
- * Returns { cosI, cosM, phi, pdf, lobe }.
+ * Returns { cosI, cosM, phi, pdf, lobe }, where `phi` is the AZIMUTH OF wi RELATIVE TO wo, which is what
+ * evaluate() wants as cosPhiDiff and not the half-vector's own azimuth.
+ *
+ * *** THIS FUNCTION RETURNED NaN ON EVERY SPECULAR SAMPLE FROM v4432 UNTIL v4437, AND NOTHING NOTICED
+ * BECAUSE NOTHING CALLED IT. *** The first version read:
+ *
+ *     const h = sampleHalfVector(u1, u2, alpha);
+ *     const cosM = h.cosTheta !== undefined ? h.cosTheta : Math.cos(h.theta);
+ *
+ * microfacet.sampleHalfVector returns a THREE-VECTOR with Y UP -- [sinH cos(phi), cosH, sinH sin(phi)] --
+ * so `h.cosTheta` is undefined, the ternary falls through, `h.theta` is ALSO undefined, and Math.cos of
+ * undefined is NaN. Both the SHAPE and the AXIS were wrong. *** THE TERNARY IS THE TELL: it guards between
+ * two GUESSED shapes and neither of them is the real one, and a guess with a fallback is still a guess. ***
+ * v4432 shipped this with an honest note saying the sampler was ungraded -- and "ungraded" was carrying
+ * "returns NaN", which is what an unexercised code path is always free to do.
  */
 export function sample(params, cosO, u1, u2, u3) {
     const m = Math.min(1, Math.max(0, params.metallic || 0));
     const alpha = alphaOf(params.roughness ?? 0.5);
     const pSpec = m + (1 - m) * 0.5;                  // metals are specular-only; dielectrics split evenly
-    const thetaO = Math.acos(Math.min(1, Math.max(-1, cosO)));
+    const sinO = Math.sqrt(Math.max(0, 1 - cosO * cosO));
+    const wo = [sinO, cosO, 0];                        // the frame is Y-UP, matching furnace.mjs and the sampler
+
+    // *** THE PDF IS THE MIXTURE'S, NOT THE CHOSEN LOBE'S, AND THAT WAS A SECOND DEFECT WORTH 2x. ***
+    // evaluate() returns the WHOLE BSDF, so the estimator f*cos/pdf must divide by the density that actually
+    // produced the direction: pSpec*pdfSpec + (1 - pSpec)*pdfDiff, both evaluated AT THE SAMPLED DIRECTION.
+    // Returning only the chosen lobe's term halves the denominator whenever both lobes can reach a direction,
+    // and the Monte Carlo estimate came back at 1.9917x the quadrature for a dielectric. A METAL HIDES IT
+    // ENTIRELY, because pSpec is 1 there and the mixture IS the one lobe -- so the check that would have
+    // caught this had to be run on a dielectric, and the obvious material to test a specular sampler on is
+    // a metal.
+    const mixturePdf = (cosI, cosM, dotOH) => {
+        const pdfSpec = dotOH > 0 ? (D(cosM, alpha) * cosM) / (4 * dotOH) : 0;
+        const pdfDiff = cosI > 0 ? cosI / Math.PI : 0;
+        return { pdf: pSpec * pdfSpec + (1 - pSpec) * pdfDiff, pdfSpec, pdfDiff };
+    };
+
     if (u3 < pSpec) {
-        const h = sampleHalfVector(u1, u2, alpha);     // { cosTheta/theta, phi } per microfacet.mjs
-        const cosM = h.cosTheta !== undefined ? h.cosTheta : Math.cos(h.theta);
-        const phi = h.phi !== undefined ? h.phi : 2 * Math.PI * u2;
-        // reflect wo about the half vector, in the shading frame
-        const dot = Math.cos(thetaO) * cosM;           // wo . h for h tilted in wo's plane, small-angle honest form
-        const cosI = Math.min(1, Math.max(0, 2 * dot * cosM - cosO));
-        const pdfH = D(cosM, alpha) * cosM;
-        const pdf = pSpec * (pdfH / (4 * Math.max(1e-9, Math.abs(dot))));
-        return { cosI, cosM, phi, pdf, lobe: "specular" };
+        const h = sampleHalfVector(u1, u2, alpha);     // [x, y, z] with y up -- a vector, not an angle pair
+        const cosM = h[1];
+        const dot = wo[0] * h[0] + wo[1] * h[1] + wo[2] * h[2];
+        if (dot <= 0) return { cosI: 0, cosM, phi: 0, pdf: 0, lobe: "specular" };
+        // Reflect wo about h. The full vector reflection, not a small-angle stand-in for it.
+        const wi = [2 * dot * h[0] - wo[0], 2 * dot * h[1] - wo[1], 2 * dot * h[2] - wo[2]];
+        const cosI = wi[1];
+        if (cosI <= 0) return { cosI: 0, cosM, phi: 0, pdf: 0, lobe: "specular" };
+        const phi = Math.atan2(wi[2], wi[0]) - Math.atan2(wo[2], wo[0]);
+        const { pdf, pdfSpec, pdfDiff } = mixturePdf(cosI, cosM, dot);
+        return { cosI, cosM, phi, pdf, pdfSpec, pdfDiff, lobe: "specular" };
     }
-    const cosI = Math.sqrt(Math.max(0, 1 - u1));       // cosine-weighted
+
+    // Cosine-weighted diffuse, then the SAME half-vector arithmetic so the mixture pdf can be formed here too.
+    const cosI = Math.sqrt(Math.max(0, 1 - u1));
     const phi = 2 * Math.PI * u2;
-    const sinI = Math.sqrt(Math.max(0, 1 - cosI * cosI)), sinO = Math.sin(thetaO);
-    const hz = cosO + cosI, hx = sinO + sinI * Math.cos(phi), hy = sinI * Math.sin(phi);
+    const sinI = Math.sqrt(Math.max(0, 1 - cosI * cosI));
+    const wi = [sinI * Math.cos(phi), cosI, sinI * Math.sin(phi)];
+    const hx = wo[0] + wi[0], hy = wo[1] + wi[1], hz = wo[2] + wi[2];
     const len = Math.hypot(hx, hy, hz);
-    return { cosI, cosM: len > 0 ? hz / len : 1, phi, pdf: (1 - pSpec) * (cosI / Math.PI), lobe: "diffuse" };
+    const cosM = len > 0 ? hy / len : 1;
+    const dot = len > 0 ? (wo[0] * hx + wo[1] * hy + wo[2] * hz) / len : 0;
+    const { pdf, pdfSpec, pdfDiff } = mixturePdf(cosI, cosM, dot);
+    return { cosI, cosM, phi, pdf, pdfSpec, pdfDiff, lobe: "diffuse" };
 }
 
 /** The two limits the composed model must agree with, named so the gate reads as the argument it is. */

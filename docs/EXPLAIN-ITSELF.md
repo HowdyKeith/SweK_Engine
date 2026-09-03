@@ -321,26 +321,47 @@ possibility that the answer is again **no**.
 **Still open, and still after item 9,** because the scene big enough to make the measurement mean something
 does not exist in the tree yet. That part of v4432 was right.
 
-## 11. A WGSL raygen pass, so the render stack finally produces an image -- OPEN
+## 11. The second estimator -- DONE at v4437, and the item as written was wrong
 
-**The tracer has never rendered anything, and it says so itself.** `physics/render/rtPipeline.mjs` quotes
-v4118's own note: *"NO IMAGE WAS EVER RENDERED here -- no raygen shader was compiled and no pass was"* run.
-Measured at v4436: **zero `.wgsl` files in the tree carry a raygen or trace entry point.** From the other end,
-item 9's honest scope says the same thing -- every furnace number comes from quadrature, and `sample()`'s pdf
-is untested.
+**This item was wrong, and it is the third absence claim of mine in three rounds to be wrong.** It said the
+tracer had never rendered an image and asked for a WGSL raygen pass. Measured:
 
-**Read from `camcimahir/webgpu-ray-tracer`, and NO code taken.** It is the first repository in this whole
-sequence that passes the toolchain test -- WGSL and JavaScript, no framework, running on the GPU in a browser,
-where GLSL-PathTracer, tinsel, sandbox and warp all failed on C++/CUDA. And it is the first blocked on the
-*licence* instead: **the repository declares none**, so the default is all rights reserved. Readable, not
-copyable. On the model it is well behind this tree anyway -- Lambertian, Phong, mirror, refraction, glossy,
-point lights and hard shadows, no BVH, no importance sampling. What it supplies is an **existence proof** of
-the shape, not an implementation.
+* `physics/render/pathTracerWgsl.mjs` (v4290) generates WGSL compute kernels and grades them **against a real
+  WebGPU device** -- the LCG, the camera, and the primary ray, with 2304 coverage pixels agreeing.
+* `physics/render/pathTracerGpu.mjs` (v4415) ported the **transport**, and agrees with the CPU **bit for bit**
+  on 576 furnace pixels, after finding three real bugs doing it.
 
-**The deliverable is the measurement, not the picture.** A GPU Monte Carlo estimate checked against the CPU
-quadrature, on the BSDF that is already graded. Two independent paths to one number is a real falsifier, which
-"does it look right" is not -- and it is the only way to answer the sampler question item 9 left open. It also
-makes item 10's BVH worth having, since a linear-over-geometries loop is where the cost first becomes visible.
+So the premise was false. What made it *feel* true is that the honest-scope notes of v4432 and v4436 both say
+the sampler is unchecked -- and I read "the sampler is unchecked" as "there is no GPU path", when the tree had
+a GPU path and it could not have helped.
+
+**And v4415 had already written down why.** Its gate carries a row reading *"the furnace CERTIFIES a broken
+cosine sampler, bit-exactly"*, with a note saying the pass is the point and is not good news. **GPU-versus-CPU
+is not two independent paths when both run the same sampler.** A shared sampler bug agrees perfectly and is
+perfectly wrong. What was missing was never a device: it was an estimator that shares no code with the one it
+checks.
+
+**What that second estimator found, immediately:**
+
+1. **`principled.sample()` returned NaN on every specular draw, from v4432 to v4437.** It read `h.cosTheta`
+   from a function that returns a three-vector with **y** up, fell through to `Math.cos(h.theta)`, and
+   `h.theta` was undefined too. The ternary guarding two guessed shapes was the tell. Five rounds of
+   "ungraded" were carrying "broken".
+2. **The pdf was the chosen lobe's, not the mixture's** -- worth exactly 2x on a dielectric, and **invisible
+   on a metal**, where `pSpec` is 1 and the mixture *is* the one lobe. The obvious material on which to test
+   a specular sampler is the one that hides the bug.
+3. **The tree's own quadrature is wrong by half at its default grid**, for a tight lobe at an oblique angle:
+   `directionalAlbedo` defaults to N=96, M=48 and reads **0.334246** where the converged value is
+   **0.991341**. The Monte Carlo had it right from fifty thousand samples. `GRID_FAILS_AT_V4437` records
+   where not to believe the instrument, and the rule is a *product* -- a tight lobe alone is fine, an oblique
+   angle alone is fine.
+
+**v4432's headline survives, checked rather than assumed:** 1.0796 holds from N=96 to N=2048 because roughness
+1 is a broad lobe. The claim was not taken where the instrument fails.
+
+**What is still open, and is what item 11 should have said:** the GPU port has its own sampler, and this round
+did not touch it. `pathTracerGpu.mjs` should get the same second-estimator treatment -- which is now a
+different and much smaller item than "render an image".
 
 ## 12. Affine texture warping and vertex wobble -- OPEN, and only half of it is gradeable
 

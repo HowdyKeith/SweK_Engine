@@ -1210,6 +1210,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "unreachable behind Math.abs, a real postcondition nothing asserted, which is v4435's path " +
                  "check one round later in a different file.",
     }),
+    // v4437 -- the sixtieth closing. A second estimator for the composed BSDF, and it convicted the sampler,
+    // the pdf, the tree's own quadrature and the plan item that asked for it -- four for one.
+    since60: Object.freeze({
+        at: "v4437", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/samplerCheck-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 19 checks in five sections. *** ITEM 11 WAS WRONG AND IT IS THE THIRD " +
+                 "ABSENCE CLAIM OF MINE IN THREE ROUNDS TO BE WRONG. *** It said the tracer had never " +
+                 "rendered an image and asked for a WGSL raygen pass; pathTracerWgsl.mjs has graded WGSL " +
+                 "against a real device since v4290 and pathTracerGpu.mjs ported the TRANSPORT at v4415, " +
+                 "agreeing with the CPU BIT FOR BIT on 576 furnace pixels. AND v4415 HAD ALREADY WRITTEN " +
+                 "DOWN WHY THAT COULD NOT HELP: its gate carries a row reading 'the furnace CERTIFIES a " +
+                 "broken cosine sampler, bit-exactly'. GPU-versus-CPU is not two independent paths when " +
+                 "both run the SAME sampler. What was missing was never a device -- it was an estimator " +
+                 "sharing no code with the one it checks. *** AND IT CONVICTED FOUR THINGS ON ITS FIRST " +
+                 "OUTING. *** ONE: principled.sample() returned NaN on EVERY specular draw from v4432 to " +
+                 "v4437, reading h.cosTheta from a function that returns a three-vector with Y up, falling " +
+                 "through to Math.cos(h.theta) which is undefined too -- a ternary guarding two GUESSED " +
+                 "shapes, and five rounds of 'ungraded' carrying 'broken'. TWO: the pdf was the CHOSEN " +
+                 "lobe's rather than the MIXTURE's, worth exactly 2x on a dielectric and INVISIBLE ON A " +
+                 "METAL where pSpec is 1 -- the obvious material to test a specular sampler on is the one " +
+                 "that hides the bug. THREE: the tree's own quadrature is wrong BY HALF at its default " +
+                 "grid for a tight lobe at an oblique angle -- directionalAlbedo defaults to N=96 M=48 and " +
+                 "reads 0.334246 where the converged value is 0.991341, and the Monte Carlo had it right " +
+                 "from fifty thousand samples. The rule is a PRODUCT and both halves are asserted: a tight " +
+                 "lobe alone reads correctly, an oblique angle alone reads correctly. FOUR: the record's " +
+                 "own atDefaultGrid was hand-copied from the N=128 rung rather than the default, and the " +
+                 "row that re-derives it from the tree caught that within the hour. v4432's headline 1.0796 " +
+                 "SURVIVES, checked rather than assumed -- it holds N=96 to N=2048 because roughness 1 is a " +
+                 "broad lobe, and the second estimator confirms it independently. The Monte Carlo bound is " +
+                 "MEASURED rather than picked: eight seeds give a relative sd of 5.04e-3 and the bound is " +
+                 "three of those, after a hand-picked 'half a per cent' went red on ordinary noise. Four " +
+                 "sabotages, MEASURED 6/3/3/4 by name, none zero.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
