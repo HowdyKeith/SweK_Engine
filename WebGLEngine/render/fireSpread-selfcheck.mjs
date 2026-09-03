@@ -12,9 +12,11 @@
 // it asserts the 40-row case IS ceiling-limited so the trap stays visible instead of being tidied away.
 "use strict";
 
+import { gateReport } from "../tools/ship/gateReport.mjs";
 import * as F from "./fireSpread.mjs";
 import { FireSystem } from "../world/fireSystem.js";
 import { VOXEL } from "../world/voxelFormat.js";
+const REPORT = gateReport("render/fireSpread-selfcheck.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -28,6 +30,11 @@ const say = (m) => console.log("  ----  " + m);
         if (r.front[s - 1] !== undefined)
             say(`  t=${(s * r.dt).toFixed(1)}s  front x=${r.front[s - 1]}  active=${r.active[s - 1]}`);
     say(`  went out at step ${r.wentOutAt} (t=${(r.wentOutAt * r.dt).toFixed(1)}s), ash ${r.ash}, fuel left ${r.fuelLeft}`);
+    // v4426 -- emitted, not only printed: gateReport-selfcheck's rule since v4399, a gate that argues in
+    // numbers and emits nothing writes its evidence to a terminal that closes.
+    REPORT.table("a fire eating a finite substrate", ["step", "t (s)", "front x", "active cells"],
+        r.front.map((x, i) => [String(i + 1), ((i + 1) * r.dt).toFixed(1), String(x), String(r.active[i])]).slice(0, 24),
+        `Went out at step ${r.wentOutAt}, ash ${r.ash}, fuel left ${r.fuelLeft}. The going-out is the item: a fire on a finite substrate must stop.`);
 
     ok("!! *** it CONSUMES its fuel -- every cell is ash ***", r.consumesFuel && r.ash === r.n && r.fuelLeft === 0,
         `${r.ash} of ${r.n} ash, ${r.fuelLeft} fuel remaining`);
@@ -100,4 +107,5 @@ const say = (m) => console.log("  ----  " + m);
 }
 
 console.log("fireSpread-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
+REPORT.write();
 process.exit(fails ? 1 : 0);

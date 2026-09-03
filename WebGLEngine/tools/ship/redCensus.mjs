@@ -85,19 +85,17 @@ export const RED_AT_V4279 = Object.freeze([
     { gate: "tools/ship/bfcache-selfcheck.mjs", ms: 993,
       fails: "!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted camera-effects.html" },
     { gate: "tools/ship/boundaryLint-selfcheck.mjs", ms: 5714,
-      fails: "!! no NEW reported boundary tell has appeared 89 sites against a baseline of 88; NEW (1): ai-bridge/vbaArchive" },
-    { gate: "tools/ship/budgetEvidence-selfcheck.mjs", ms: 80,
-      fails: "!! *** every gate carries evidence about its own runtime, or admits that it does not finish *** 67 with none -" },
+      fails: "!! no response body is read without consulting .ok see above" },
     { gate: "tools/ship/canvasFill-selfcheck.mjs", ms: 4908,
-      fails: "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: tools/ship/atmosphereHarness.html#c, t" },
+      fails: "!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS POSTAGE STAMPS: gpu-rig-check.html#stage, tools/ship/atmosphereHarness.html#c, tools/ship/effe" },
     { gate: "tools/ship/definitionGates-selfcheck.mjs", ms: 226,
-      fails: "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 6: physics/crypto/sec" },
+      fails: "!! no NEW exported symbol under physics/ has appeared without its gate naming it GREW to 18: physics/crypto/secp256k1.mjs:pointDouble, physics/mesh/me" },
     { gate: "tools/ship/gateReach-selfcheck.mjs", ms: 9808,
       fails: "!! the default population is ACCOUNTED FOR -- it may grow, but not silently expected 472 (from the recorded ce" },
     { gate: "tools/ship/homography-selfcheck.mjs", ms: 1444,
       fails: "!! it is the only homography in the tree" },
     { gate: "tools/ship/pagePlacement-selfcheck.mjs", ms: 88,
-      fails: "!! ...and the silent bucket is the large one, which is the finding 210 silent against 211 placed. pageSections" },
+      fails: "!! ...and the silent bucket is the large one, which is the finding 188 silent against 235 placed. pageSections says of UNPLACED: \"an unplaced page and" },
     { gate: "tools/ship/pagePlacements-selfcheck.mjs", ms: 106,
       fails: "...and the packing rule has ONE implementation, on the server side the browser renders what it is handed. A se" },
     { gate: "tools/ship/pageReflow-selfcheck.mjs", ms: 87,
@@ -128,8 +126,7 @@ export const RED_AT_V4279 = Object.freeze([
       // the move v3693 made for render/ssimWindowed.mjs on that same page) and the population is 221; the gate
       // gained a ratchet on the ritual class and a report of the FOURTH route (39 rescued only by a register --
       // which, like the three routes measured before it, does not reach 181 either).
-      fails: "!! *** the prose-rescued population may only SHRINK *** 221 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE",
-      note: "confirmed red serially at 73.7s -- mis-bucketed as a timeout by the parallel sweep" },
+      fails: "!! *** the prose-rescued population may only SHRINK *** 234 against a ceiling of 181. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling" },
     { gate: "tools/ship/registerResidue-selfcheck.mjs", ms: 1321,
       fails: "!! *** the residue may only SHRINK -- a page linked but neither placed nor excused fails on arrival *** 45 aga" },
     // v4379 -- REMOVED, FIXED RATHER THAN WIDENED. It read "the page renders title, why and how for each" and had
@@ -146,7 +143,7 @@ export const RED_AT_V4279 = Object.freeze([
     { gate: "tools/ship/shaderRefs-selfcheck.mjs", ms: 379838,
       fails: "!! the hand-spelled corpus filters are COUNTED, not swept 16 callers still spell /\\.(js|mjs|html)$/ by ha" },
     { gate: "tools/ship/statedRuntime-selfcheck.mjs", ms: 129,
-      fails: "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/assumptions-selfch" },
+      fails: "!! *** no NEW header has drifted from what its gate actually does *** NEW: tools/roundhouse/reconQualityBind-selfcheck.mjs, tools/ship/commentFalsePas" },
     { gate: "tools/ship/sunshineHost-selfcheck.mjs", ms: 101,
       fails: "every route the bridge lists is reachable through its own handler" },
     { gate: "tools/ship/supersededFlag-selfcheck.mjs", ms: 69,
@@ -156,7 +153,7 @@ export const RED_AT_V4279 = Object.freeze([
     { gate: "tools/ship/updatePause-selfcheck.mjs", ms: 284,
       fails: "...and an errored check is counted as its own thing, not silently dropped" },
     { gate: "tools/ship/wasmSupport-selfcheck.mjs", ms: 2968,
-      fails: "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 89 mention it" },
+      fails: "!! 82 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one 99 mention it" },
     { gate: "tools/ship/wiringClaims-selfcheck.mjs", ms: 1731,
       fails: "!! *** every remaining hit is a CONTRAST LINE, adjudicated by name *** a sentence that says 'A is unwired whil" },]);
 
@@ -249,6 +246,16 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/budgetEvidence-selfcheck.mjs", round: "v4426",
+      why: "RED SINCE v4279, ASKING FOR THREE MEASUREMENTS NOBODY HAD TAKEN. Its own register line said SIXTY-" +
+           "SEVEN gates carried no evidence about their own runtime; run today the figure was THREE, so the " +
+           "stored reading had drifted by 22x while the entry sat there -- and the gate that watches for that " +
+           "reported it as `drifted` and PASSED, because a count is not a verdict. tools/roundhouse/" +
+           "modeDistinct, tools/ship/divineEye and tools/ship/traderPolicy were timed with date +%s%N around a " +
+           "real run: 379,689 ms, 68,395 ms and 38,648 ms, ALL THREE EXIT 0. None was slow because it was " +
+           "broken; they were slow, therefore never swept, and never swept is why they had no evidence -- the " +
+           "population was a property of the RECORD, which is the finding budgetEvidence exists to make and " +
+           "which it was making about itself for 147 rounds." },
     { gate: "tools/ship/winPathGuard-selfcheck.mjs", round: "v4423",
       why: "RED SINCE v4279 AND REPAIRED BY DOING THE WORK, which is what a register entry is for and what none " +
            "of this session's other twenty-six have had. 28 occurrences of `new URL(<x>).pathname` across 16 " +

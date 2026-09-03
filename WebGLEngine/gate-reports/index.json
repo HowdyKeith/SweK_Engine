@@ -3,6 +3,7 @@
  "reports": [
   "backendRouting-selfcheck.json",
   "claimEvidence-selfcheck.json",
+  "fireSpread-selfcheck.json",
   "frontDoor-selfcheck.json",
   "gateReport-selfcheck.json",
   "pathTracerGpu-selfcheck.json",

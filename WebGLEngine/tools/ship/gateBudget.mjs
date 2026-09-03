@@ -137,6 +137,16 @@ export const MEASURED = {
     // shape yet; at the 1.63x ratio it would run ~690 s, inside the 847 s this basis buys, and the
     // gate-timings.json cross-check below will raise the basis again the day the rig records more.
     "tools/roundhouse/knobLiveness-selfcheck.mjs":   423693,
+
+    // v4426 -- *** THE LAST THREE GATES IN THE TREE WITH NO EVIDENCE ABOUT THEIR OWN RUNTIME. ***
+    // tools/ship/budgetEvidence-selfcheck.mjs has been red since v4279 asking for exactly this, and its
+    // register line said SIXTY-SEVEN gates had none. The true figure, run today, is THREE -- the line had
+    // drifted 22x and nothing forced it to move, which is this round's other half. All three were timed with
+    // `date +%s%N` around a real run, to completion, and ALL THREE EXIT 0: none of them was slow because it
+    // was broken, they were slow and therefore never swept, and never swept is why they had no evidence.
+    "tools/roundhouse/modeDistinct-selfcheck.mjs":   379689,   // exit 0, MEASURED v4426
+    "tools/ship/divineEye-selfcheck.mjs":             68395,   // exit 0, MEASURED v4426
+    "tools/ship/traderPolicy-selfcheck.mjs":         38648,   // exit 0, MEASURED v4426
     // *** v4304 -- #15's REMAINDER. *** budgetEvidence-selfcheck named thirteen gates with no runtime evidence:
     // eleven the ship-time quick sweep kills at its 20 s cap every run (a 124 is not evidence) and the two new
     // this round. All thirteen were stopwatch-timed serially to EXIT 0 in this sandbox. Twelve are under
