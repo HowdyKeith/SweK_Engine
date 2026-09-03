@@ -52,9 +52,9 @@ export function redRegister() {
     return reg;
 }
 
-/** Read a timings file: { captured, timings: { gate: ms }, codes: { gate: exitCode } }. Missing file -> empty. */
+/** Read a timings file: { captured, timings: {gate:ms}, codes: {gate:exitCode}, observed: {gate:iso|null} }. Missing -> empty. */
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
-    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {} }; }
+    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
 }
 
 /**
@@ -130,7 +130,18 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const falseReds = rows.filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial").length;   // red under -P, green alone
     // the timings file, rewritten with what was just seen (serial time where there was one)
     const timings = { ...(prior.timings || {}) }, codes = { ...(prior.codes || {}) };
-    for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; }
+    // *** v4425 -- AND WHEN EACH ENTRY WAS OBSERVED, BECAUSE MOST OF THEM WERE NOT OBSERVED BY THIS RUN. ***
+    // Only gates that RAN get their time and code rewritten; every other entry is carried forward from
+    // whenever it was last seen, which can be many rounds ago. The file's note said "OBSERVED at the last
+    // quickSweep run" and that was true of the entries this run touched and false of the rest -- and the
+    // false ones are exactly the exiled gates, whose recorded time is the only reason they were not run.
+    // A stamp per entry makes the staleness legible instead of leaving it to be inferred from a whole-file
+    // timestamp that belongs to the run and not to the row. `null` means "recorded before this field
+    // existed", which is a fact and not a gap to be filled in with a guess.
+    const observed = { ...(prior.observed || {}) };
+    for (const g of Object.keys(timings)) if (!(g in observed)) observed[g] = null;
+    const stamp = new Date().toISOString();
+    for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; observed[r.gate] = stamp; }
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
     const out = {
         at: new Date().toISOString(), budgetMs, workers, capMs, ms: Date.now() - t00,
@@ -139,9 +150,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     };
     if (write) {
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
-            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
-                  "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is.",
-            captured: out.at, budgetMs, capMs, timings, codes,
+            note: "ms per gate (serial where a serial re-run happened), exit code, and the ISO time each row was OBSERVED. " +
+                  "A row is rewritten only when its gate RAN, so `captured` dates the RUN and `observed` dates the ROW -- a gate " +
+                  "over the budget is skipped and keeps whatever it last had, which is why the two are different fields. " +
+                  "Used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is.",
+            captured: out.at, budgetMs, capMs, timings, codes, observed,
         }, null, 1) + "\n");
     }
     return out;
