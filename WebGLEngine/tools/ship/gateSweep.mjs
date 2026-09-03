@@ -283,6 +283,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "guards (1/2/2/1 by name) and restored md5-identical; one of the four is red only on a box " +
                  "whose hostScale is not 1, which is said in the log rather than left as a silent pass",
     }),
+    // v4365 -- the ninth closing, and the first for a gate that reaches OUTSIDE this tree. img2three-selfcheck
+    // guards render/img2three.mjs, the bridge from a generated three.js object tree to one SweK mesh, so its
+    // third section depends on a file that is deliberately not in the mirror (.img2threejs/model.js, gitignored
+    // because img2threejs-showcase carries no licence). That section PASSES with the file absent and says the
+    // numbers are unsigned -- the BACKLOG.md shape -- so the gate is deterministic here and richer on the rig.
+    since9: Object.freeze({
+        at: "v4365", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/img2three-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, three sections. Driven RED by three sabotages of the module it " +
+                 "guards (1/3/4 by name) and restored. Its second section renders on BOTH backends at TWO cameras " +
+                 "and one of the two is where they part by a single boundary pixel, which is measured rather than " +
+                 "left at the camera where they agree",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
