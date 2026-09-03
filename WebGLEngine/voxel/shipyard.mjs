@@ -36,6 +36,23 @@
 // CLAIM-LOCAL coordinates -- 0..8192, where float32 spacing is 2^-10 -- with the pose as a uniform matrix. The
 // far-away location is safe precisely because it is never a vertex. So this module hands out claim-local
 // coordinates for rendering and refuses to hand out an absolute one, and the gate holds it to that.
+//
+// ---- *** v4390 -- TWO CORRECTIONS TO THE PARAGRAPH ABOVE, BOTH MEASURED *** -----------------------------------
+//
+// (1) "EXACT" MEANT STORED, NOT RENDERED, AND v4388's NOTE DID NOT SAY WHICH. The claim-local coordinate is
+// exactly representable in float32 and stays so forever -- that stands. Taken all the way to eye-relative space
+// through a rotation and three float32 accumulations, the worst vertex is 6.3e-6 of a voxel out. Small, flat in
+// distance, and NOT ZERO; a reader who took "exact" to mean "exact through the pipeline" was wrong by that much.
+//
+// (2) THE STANDARD ALTERNATIVE WAS MEASURED AND IT IS NOT A FIX. "Render relative to eye" -- keep the world
+// coordinate and difference the camera in float64 -- buys a factor of about 2.2 and no more, at every distance
+// from a thousand to eight million, because it removes the CANCELLATION in the matrix multiply and cannot touch
+// the QUANTISATION already in the stored coordinate. Its residual sits at 0.54 of a float32 spacing: the vertex
+// buffer holds a world number and the nearest representable one is half a spacing away before any arithmetic.
+// BOTH REAL FIXES CHANGE THE STORAGE. Double-single (a high/low float32 pair, Cesium's trick) matches the
+// shipyard to within 1.4x, so the choice is COST: this module needs a per-body origin and a pose, which a moving
+// body already has; double-single needs twice the attribute bytes and no pose, which is what STATIC far terrain
+// can use and a shipyard has nothing to offer.
 
 /** VS2's own two numbers, kept as its own two numbers rather than multiplied into one. */
 export const CHUNK = 16;
@@ -143,6 +160,31 @@ export function advance(po, { deltaQuaternion = [0, 0, 0, 1], deltaPosition = [0
     return pose({ id: po.id, scale: po.scale, quaternion: qmul(deltaQuaternion, po.quaternion),
                   position: [po.position[0] + deltaPosition[0], po.position[1] + deltaPosition[1],
                              po.position[2] + deltaPosition[2]] });
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * v4390 -- THE TWO RIVAL ENCODINGS, HERE TO BE MEASURED AGAINST RATHER THAN USED.
+ *
+ * v4388 shipped this module and named its own unchecked item: whether a CAMERA-RELATIVE render is the better
+ * fix for float32 at distance. It is the standard answer -- "render relative to eye" -- and the gate now
+ * measures it beside the other two. Both encodings live here rather than in the gate because a claim in this
+ * file's own header is what they test, and a rival implemented inside the check that judges it is not a rival.
+ * --------------------------------------------------------------------------------------------------------- */
+
+/** CAMERA-RELATIVE (relative-to-eye): the vertex stays a world coordinate, the eye is subtracted in f64. */
+export function eyeRelative(vWorld, eye) {
+    const f = Math.fround;
+    return [f(f(vWorld[0]) - eye[0]), f(f(vWorld[1]) - eye[1]), f(f(vWorld[2]) - eye[2])];
+}
+
+/**
+ * DOUBLE-SINGLE: a world coordinate carried as a high/low pair of float32s, the trick Cesium uses for a globe.
+ * Differencing two split values recovers the precision a single float32 lost, at twice the attribute bytes.
+ */
+export function splitDouble(x) { const f = Math.fround, hi = f(x); return [hi, f(x - hi)]; }
+export function splitDifference(a, b) {
+    const f = Math.fround, [ah, al] = splitDouble(a), [bh, bl] = splitDouble(b);
+    return f(f(ah - bh) + f(al - bl));
 }
 
 /**

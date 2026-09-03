@@ -146,18 +146,44 @@ function render(w, h) {
     if (pose) {
         const d = Math.abs(pose.position[0]);
         const f = Math.fround;
-        let bakeErr = 0, localErr = 0;
+        let bakeErr = 0, localErr = 0, rel = 0, shy = 0, dsg = 0;
+        // A camera thirty voxels off the body, which is where one actually sits. The comparison is between
+        // ENCODINGS and not between distances, so the eye moves with the ship.
+        const eye = [pose.position[0] + 30.25, pose.position[1] + 15.5, pose.position[2] - 42.75];
+        const tShip = [f(pose.position[0] - eye[0]), f(pose.position[1] - eye[1]), f(pose.position[2] - eye[2])];
+        const spun = SHIP.pose({ id: pose.id, position: [0, 0, 0], quaternion: pose.quaternion });
         for (const cc of shipCentres) {
             const wpt = SHIP.localToWorld(cc, pose);
             for (let i = 0; i < 3; i++) bakeErr = Math.max(bakeErr, Math.abs(f(wpt[i]) - wpt[i]));
             for (let i = 0; i < 3; i++) localErr = Math.max(localErr, Math.abs(f(cc[i]) - cc[i]));
+            const truth = [wpt[0] - eye[0], wpt[1] - eye[1], wpt[2] - eye[2]];
+            const b = SHIP.eyeRelative(wpt, eye);
+            const r = SHIP.localToWorld([f(cc[0]), f(cc[1]), f(cc[2])], spun);
+            const c = [f(f(r[0]) + tShip[0]), f(f(r[1]) + tShip[1]), f(f(r[2]) + tShip[2])];
+            const d = [0, 1, 2].map((i) => SHIP.splitDifference(wpt[i], eye[i]));
+            for (let i = 0; i < 3; i++) {
+                rel = Math.max(rel, Math.abs(b[i] - truth[i]));
+                shy = Math.max(shy, Math.abs(c[i] - truth[i]));
+                dsg = Math.max(dsg, Math.abs(d[i] - truth[i]));
+            }
         }
+        // The three numbers are published as DATA as well as prose, because a gate that checks for the WORD
+        // "camera-relative" is satisfied by the sentence explaining it -- measured, by deleting the rows and
+        // watching the check stay green.
+        $("ship-note").dataset.enc = [rel, shy, dsg].map((v) => v.toExponential(6)).join(",");
         $("ship-note").innerHTML =
             `<b>ship at world x = ${d.toLocaleString()}</b> &mdash; float32 spacing there is ${SHIP.f32Spacing(d || 1)}.<br>` +
             `stored WORLD-baked, the worst voxel centre is off by <b>${bakeErr.toExponential(2)}</b> of a voxel.<br>` +
             `stored CLAIM-LOCAL, it is off by <b>${localErr}</b> &mdash; every integer and half-integer in 0..8192 ` +
             `is exact in float32, and nothing ever rewrites them.<br>` +
-            `The claim address itself is never a vertex: the mesh goes to the GPU local, with the pose as a uniform.`;
+            `The claim address itself is never a vertex: the mesh goes to the GPU local, with the pose as a uniform.` +
+            `<br><br><b>and the alternative, measured rather than assumed (v4390)</b> &mdash; the same body's worst ` +
+            `vertex, taken all the way to eye-relative space in float32:<br>` +
+            `camera-relative (world vertex, eye differenced in f64): <b>${rel.toExponential(2)}</b><br>` +
+            `shipyard (claim-local vertex, pose translation differenced): <b>${shy.toExponential(2)}</b><br>` +
+            `double-single (world vertex as a high/low f32 pair): <b>${dsg.toExponential(2)}</b><br>` +
+            `Camera-relative is the standard answer and it is <b>not the fix</b>: it removes the cancellation in ` +
+            `the multiply and cannot touch the quantisation already in the stored coordinate.`;
     } else {
         $("ship-note").textContent = "shipyard off -- the block is gone, because it is not in the world grid any more.";
     }
