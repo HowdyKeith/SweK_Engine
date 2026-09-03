@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7df2f4bcd533b4cdb3ae41edd9fe12c7229c67ca",
+ "head": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11",
  "bodies": {
   "box3d": [
    {
@@ -132,7 +132,7 @@
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
     "bytes": 15954,
-    "sha": "04d2bf0687bfcb8c50f1dd7847497d09f7799c68"
+    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
@@ -246,7 +246,7 @@
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
     "bytes": 15954,
-    "sha": "04d2bf0687bfcb8c50f1dd7847497d09f7799c68"
+    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    }
   ],
   "keyhunt": [
@@ -302,7 +302,7 @@
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
     "bytes": 15954,
-    "sha": "04d2bf0687bfcb8c50f1dd7847497d09f7799c68"
+    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    }
   ],
   "taichi-js": [
@@ -505,8 +505,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2841547,
-    "sha": "7df2f4bcd533b4cdb3ae41edd9fe12c7229c67ca"
+    "bytes": 2847702,
+    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "mpm3d.html",
@@ -760,7 +760,7 @@
    {
     "path": "tools/ship/orreryUniverse-selfcheck.mjs",
     "bytes": 15954,
-    "sha": "04d2bf0687bfcb8c50f1dd7847497d09f7799c68"
+    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "wasm-bench.html",

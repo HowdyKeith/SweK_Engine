@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A dielectric has laws where a BSDF has limits, and two of the four predictions about it came back backwards",
+    since: "v4436",
+    state: "open",
+    pred: "docs/EXPLAIN-ITSELF.md item 9 shipped at v4432 naming five gaps, of which transmission is the fourth. The prediction was that transmission would be MORE gradeable than the opaque model rather than less -- because a dielectric interface has answers that are exact rather than converged (Snell, R + T = 1, the critical angle, and the eta-squared law the BTDF obeys INSTEAD of reciprocity) where v4432 could measure a furnace number and assert almost nothing. The header also predicted the rough dielectric would LOSE energy the way single-scatter GGX does, and that it would transmit zero past the critical angle.",
+    why: "Read from mmacklin/tinsel (Zlib), which extends Disney's BRDF to specular transmission -- design only, no code, since a C++/CUDA host does not fit a browser. The maths is Walter et al. 2007, a paper rather than a repository, which needs no licence at all.",
+    measured: "THE GRADEABILITY PREDICTION HELD AND BOTH ENERGY PREDICTIONS DID NOT. Exact: Snell to 1e-12 relative, R + T = 1 to 1e-14 across 164 samples, exactly zero transmission past critical on the smooth interface by branch, and f(i->o)/etaO^2 == f(o->i)/etaI^2 to 4.7e-16 while plain reciprocity fails by exactly 2.25x ON A CORRECT LOBE. Backwards: the rough dielectric CREATES energy, worst 1.28276 at alpha 1 cos 0.25 -- more than triple v4432's opaque 1.0796 -- and the reflection half is cleared rather than blamed, agreeing with microfacet.mjs's graded albedo to 1.6e-6. And the rough lobe leaks past the critical angle BY DESIGN, 3.1e-6 at alpha 0.001 rising monotonically to 0.435 at alpha 0.8, because a tilted facet presents a local incidence inside it.",
+    kill: "physics/render/transmission-selfcheck.mjs. The four exact laws are asserted at machine precision, so a tolerance cannot absorb a wrong one; the energy excess is held to a RANGE (1.2 to 1.4) so a change either way is a red rather than a silence; and the past-critical leak is asserted as MONOTONE IN ROUGHNESS rather than as a number. SABOTAGE: swap nAbove/nBelow and 5 rows go red, drop the etaO^2 and 4 do, use Schlick where exact Fresnel belongs and 10 do -- MEASURED 5/4/10/0-then-1 by name. THE ZERO IS RECORDED: the half-vector flip was unreachable behind Math.abs and is now asserted as a postcondition. HONEST SCOPE: WHY the single-scatter BTDF gains rather than loses is not derived. Every number is quadrature -- nothing here checks the sampler, which is item 11's whole reason for existing. One interface, one index, grey: no dispersion, no nesting, no colour.",
+    page: "instruments.html",
+  },
+  {
     name: "An absence claim is only as wide as where it looked, and nothing in the claim says how wide that was",
     since: "v4435",
     state: "open",

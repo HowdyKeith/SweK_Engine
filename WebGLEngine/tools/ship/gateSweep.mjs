@@ -1171,6 +1171,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "check rescued 0 of 14 files -- unfalsifiable rather than wrong -- so it is now graded " +
                  "against a fixture tree and the sabotage costs one row.",
     }),
+    // v4436 -- the fifty-ninth closing. Specular transmission, and most of the file is EXACT rather than
+    // measured. Four sabotages; the zero found unfalsifiable code for the second round running.
+    since59: Object.freeze({
+        at: "v4436", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/transmission-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 27 checks in five sections. docs/EXPLAIN-ITSELF.md item 9's next round, " +
+                 "closing the fourth of the five gaps v4432 named in writing. Design read from " +
+                 "mmacklin/tinsel (Zlib) and NO code taken; the maths is Walter et al. 2007, a paper rather " +
+                 "than a repository. *** WHAT MAKES THIS GRADEABLE WHERE v4432 WAS ONLY MEASURABLE IS THAT A " +
+                 "DIELECTRIC HAS LAWS RATHER THAN LIMITS. *** Snell holds to 1e-12 relative; R + T = 1 " +
+                 "across 164 samples to 1e-14; the smooth interface transmits EXACTLY zero past the " +
+                 "critical angle by branch; and the non-reciprocity is itself exact -- " +
+                 "f(i->o)/etaO^2 == f(o->i)/etaI^2 to 4.7e-16, while PLAIN reciprocity fails by exactly " +
+                 "2.25x ON A CORRECT LOBE, so a row copied from the reflection side would red the right " +
+                 "answer. *** THE FIRST DRAFT PARAMETERISED BY ROLE AND THAT WAS THE BUG. *** n1/n2 name " +
+                 "the incident and transmitted media, and A ROLE FLIPS WITH THE DIRECTION OF TRANSPORT " +
+                 "while a SIDE DOES NOT: the energy integral came back a converged 0.477 against Fresnel's " +
+                 "0.95, a deficit of almost exactly 1.5^2 -- the eta-squared factor from the file's own " +
+                 "header, arriving as a bug in the file describing it. nAbove/nBelow cannot be swapped by " +
+                 "accident. AND REFINING THE INSTRUMENT IS WHAT SORTED IT: the total held at 0.47700 from " +
+                 "N=128 to N=1024, and a wrong number that does not move is the MODEL where one that moves " +
+                 "is the GRID -- the same rule that said the opposite about v4432's mirror limit. *** TWO " +
+                 "PREDICTIONS IN THE HEADER CAME BACK BACKWARDS. *** It predicted the rough dielectric " +
+                 "would LOSE energy like single-scatter GGX; it GAINS, worst 1.28276 at alpha 1 cos 0.25, " +
+                 "more than triple v4432's opaque 1.0796 -- and the reflection half is CLEARED rather than " +
+                 "argued, agreeing with microfacet.mjs's graded directionalAlbedo to 1.6e-6 including the " +
+                 "0.37889 v4432 reported. It also predicted the rough lobe would transmit zero past the " +
+                 "critical angle; it does not and should not, because a tilted facet can present a local " +
+                 "incidence inside it -- leakage runs 3.1e-6 at alpha 0.001 to 0.435 at alpha 0.8, monotone, " +
+                 "so the falsifier is the monotonicity and not a zero. AND THE SWEEP FOUND A NaN IN A GATED " +
+                 "MODULE: physics/render/fresnel.mjs returned T = NaN at EXACTLY grazing incidence, because " +
+                 "the projected-solid-angle ratio is Infinity times zero there. Its own gate tests cos 1e-3, " +
+                 "1e-5 and 1e-7 -- APPROACHING A BOUNDARY IS NOT EVALUATING IT -- and a NaN in T propagates " +
+                 "silently through every R + T downstream. Repaired as a branch beside the TIR branch. Four " +
+                 "sabotages, MEASURED 5/4/10/0-then-1 by name; the zero found the half-vector flip " +
+                 "unreachable behind Math.abs, a real postcondition nothing asserted, which is v4435's path " +
+                 "check one round later in a different file.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

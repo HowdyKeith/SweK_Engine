@@ -321,6 +321,51 @@ possibility that the answer is again **no**.
 **Still open, and still after item 9,** because the scene big enough to make the measurement mean something
 does not exist in the tree yet. That part of v4432 was right.
 
+## 11. A WGSL raygen pass, so the render stack finally produces an image -- OPEN
+
+**The tracer has never rendered anything, and it says so itself.** `physics/render/rtPipeline.mjs` quotes
+v4118's own note: *"NO IMAGE WAS EVER RENDERED here -- no raygen shader was compiled and no pass was"* run.
+Measured at v4436: **zero `.wgsl` files in the tree carry a raygen or trace entry point.** From the other end,
+item 9's honest scope says the same thing -- every furnace number comes from quadrature, and `sample()`'s pdf
+is untested.
+
+**Read from `camcimahir/webgpu-ray-tracer`, and NO code taken.** It is the first repository in this whole
+sequence that passes the toolchain test -- WGSL and JavaScript, no framework, running on the GPU in a browser,
+where GLSL-PathTracer, tinsel, sandbox and warp all failed on C++/CUDA. And it is the first blocked on the
+*licence* instead: **the repository declares none**, so the default is all rights reserved. Readable, not
+copyable. On the model it is well behind this tree anyway -- Lambertian, Phong, mirror, refraction, glossy,
+point lights and hard shadows, no BVH, no importance sampling. What it supplies is an **existence proof** of
+the shape, not an implementation.
+
+**The deliverable is the measurement, not the picture.** A GPU Monte Carlo estimate checked against the CPU
+quadrature, on the BSDF that is already graded. Two independent paths to one number is a real falsifier, which
+"does it look right" is not -- and it is the only way to answer the sampler question item 9 left open. It also
+makes item 10's BVH worth having, since a linear-over-geometries loop is where the cost first becomes visible.
+
+## 12. Affine texture warping and vertex wobble -- OPEN, and only half of it is gradeable
+
+From `DaveFace/UnrealRetroShaders` (MIT). **Nothing is portable at the file level**: it is UE4.27 Blueprint
+materials in binary `.uasset`, and the author states UE5 is unsupported because the rendering systems it relies
+on changed. The techniques are portable and are not the author's to license anyway -- they are 1994 console
+constraints.
+
+Measured at v4436 with `tools/ship/absenceScope.mjs`: **Bayer dithering is already here** (`fx/dither.js`, with
+a gate). YUV colour space and posterise are **0 files**. Affine texture warping is **0 in the tree's own code**
+-- the nineteen `affine` hits are transforms (MPM grid solve, secp256k1 curve points, drift estimation), the
+only affine-*texture* code is in `vendor/`, and `render/perspectiveWarp.mjs` is a homography, which is the
+deliberate opposite.
+
+**The split that matters is which half has a right answer.** This tree grades things that can be wrong, and
+"does it look like a PS1" cannot be. But two of the three can:
+
+* **Affine warping is exactly "interpolate UV without dividing by w"** -- checkable against the
+  perspective-correct result, with a closed-form error that is zero at the vertices and maximal at the
+  triangle's centre, growing with the depth ratio across it.
+* **Vertex wobble is quantisation to a fixed-point lattice** -- checkable as snap-to-grid at a stated
+  precision, where a wrong implementation looks right on screen.
+
+YUV quantisation is the aesthetic-only third and ships as a knob rather than a claim, if at all.
+
 ## What is deliberately NOT being taken
 
 **The manim skill itself.** `npx skills add adithya-s-k/manim_skill` is a cheap
