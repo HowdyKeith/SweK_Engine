@@ -1058,6 +1058,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "smin, v4429's heatAt). The repair perturbs the port and requires every derived field to " +
                  "follow, which a correct literal cannot do. Sixteen sabotages, all RED by name.",
     }),
+    // v4432 -- the fifty-fifth closing. #139's gate. Two sabotages read ZERO RED and both were found by
+    // hunting for them deliberately after the first thirteen all went red -- which is the only reason the
+    // round has a corroboration check at all.
+    since55: Object.freeze({
+        at: "v4432", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orreryUniverse-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, JSON and directory reads, no network and no browser. #139 asked for " +
+                 "country, default language and contributor count as orrery axes. MEASURED BY CALLING THEM: " +
+                 "search endpoints are not repo-scoped and per-repo endpoints are, so default language is " +
+                 "reachable (search_repositories returns it) while contributor count is refused (both routes " +
+                 "are per-repo; list_commits AND list_repository_collaborators on mrdoob/three.js returned " +
+                 "the identical refusal) and country is refused (search_users returns five keys and none is " +
+                 "a location). Both refusals are recorded WITH the local proxy that would have been a " +
+                 "different quantity wearing the right name. *** AND THE FIRST TIME ANYTHING ASKED GITHUB " +
+                 "ABOUT THESE OWNERS, ONE WAS NOT THERE: *** justjakel/quickjs-emscripten does not exist, " +
+                 "justjake/quickjs-emscripten has 1,702 stars, and the tree attributed 810,948 vendored " +
+                 "bytes to the first. The file the scanner reads names the owner 42 times -- 41 right, 1 " +
+                 "wrong -- and the wrong one is line 5, the identity line, THE ONLY LINE ANYTHING READ. " +
+                 "upstreamFrom() took the FIRST GitHub URL; it now votes on the owner of the repo that URL " +
+                 "names and reports the vote. Its header records four earlier widenings; this defect was not " +
+                 "narrowness at all. SECOND FINDING: GitHub's language against the tree's own LANGUAGE_BIOME " +
+                 "gives 6 agree, 2 built, 2 transpiled, 1 paperwork, 0 UNEXPLAINED -- and the three " +
+                 "mechanisms are genuinely distinct, since box3d and wasm DO vendor their source (7 .c + 8 " +
+                 ".h, 7 .ts) under a 1.45 MB .a and 511 KB of .wasm, while jolt and taichi-js vendor NOT ONE " +
+                 "file of their upstream language. taichi-js was invisible until the absence test was moved " +
+                 "BEFORE the biome test, because TypeScript and JavaScript are one biome and a bundled .js " +
+                 "therefore agreed with a TypeScript upstream. ZERO RED TWICE: flipping three.js's stored " +
+                 "language to TypeScript passed everything (the gate has no network, and both map to " +
+                 "forest) until agreement was required to be corroborated by the vendored bytes; and adding " +
+                 "'js' to the build-artifact set went inert the moment the ordering was fixed, until the set " +
+                 "was held against the tree's own legend. Fifteen sabotages, all RED by name, six files " +
+                 "md5-identical.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

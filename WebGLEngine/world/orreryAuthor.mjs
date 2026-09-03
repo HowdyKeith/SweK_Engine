@@ -69,15 +69,62 @@ export function holderFrom(text) {
 // and was read as having no upstream at all -- the THIRD narrow pattern in this one function, after the licence
 // filename and the provenance-file extension. The species is "I matched the shape I happened to picture".
 const URL_RE = /(?:git\+)?(?:https?|git|ssh):\/\/[^\s)>\]"']+|git@[\w.-]+:[\w.-]+\/[\w.-]+/g;
+const GH_URL = /(?:^|\/\/|@)(?:raw\.githubusercontent\.com|github\.com)[/:][^/]+\/[^/]+/;
+const GH_PARTS = /(?:raw\.githubusercontent\.com|github\.com)[/:]([^/#?]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/;
+
+/**
+ * *** v4432 -- THE SIXTH DEFECT IN THIS FUNCTION, AND IT IS NOT NARROWNESS. *** The header above records four
+ * widenings, each because a pattern matched a shape somebody happened to picture. This one is different: the
+ * pattern was FINE and the SELECTION was wrong. It took `hits.find(...)` -- the FIRST GitHub URL in the file --
+ * and the first is not more authoritative than the rest.
+ *
+ * MEASURED: vendor/wasm/quickjs/quickjs-emscripten-core/README.md contains THIRTY GitHub URLs for its own
+ * project. Line 5 says `justjakel`; lines 72 to 332 say `justjake`, twenty-nine times. The scanner took line
+ * 5, so orrery-authors.json attributed 810,948 vendored bytes to github.com/justjakel -- AN ACCOUNT THAT DOES
+ * NOT EXIST. GitHub's user search returns "the listed users cannot be searched either because the users do
+ * not exist" for justjakel and a real profile for justjake, whose quickjs-emscripten has 1,702 stars. Three
+ * SIBLING packages vendored from the same upstream release spell it correctly on their equivalent line.
+ *
+ * Nothing caught it for as long as it has been there because nothing had ever asked GitHub whether the owner
+ * exists -- which is #139's question, asked once.
+ *
+ * So: the majority (owner, repo) among ALL the GitHub URLs in the file wins, and the vote is reported so a
+ * disagreement is visible rather than silently resolved. This does not touch the vendored text; whether the
+ * stray L is upstream's or arrived here cannot be told from inside this tree, and guessing would be editing
+ * somebody else's README on a hunch.
+ */
 export function upstreamFrom(text) {
     const hits = String(text || "").match(URL_RE) || [];
-    // raw.githubusercontent.com/<owner>/<repo>/<ref>/<path> is a GitHub URL and `github\.com` does not match it.
-    // vendor/htmx/VERSIONS.txt records its licence source that way, so htmx read as having an upstream with no
-    // owner. FIFTH narrow pattern in this one function; each was found by widening the one before.
-    const gh = hits.find((u) => /(?:^|\/\/|@)(?:raw\.githubusercontent\.com|github\.com)[/:][^/]+\/[^/]+/.test(u));
-    if (!gh) return hits.length ? { url: hits[0], owner: null, repo: null } : null;
-    const m = /(?:raw\.githubusercontent\.com|github\.com)[/:]([^/#?]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/.exec(gh);
-    return { url: gh, owner: m ? m[1] : null, repo: m ? m[2] : null };
+    const ghs = hits.filter((u) => GH_URL.test(u));
+    if (!ghs.length) return hits.length ? { url: hits[0], owner: null, repo: null } : null;
+    const parts = ghs.map((u) => ({ u, m: GH_PARTS.exec(u) })).filter((x) => x.m)
+                     .map((x) => ({ url: x.u, owner: x.m[1], repo: x.m[2] }));
+    if (!parts.length) return { url: ghs[0], owner: null, repo: null };
+
+    // *** THE VOTE IS OVER THE OWNER OF ONE REPO NAME, NOT OVER WHICH REPO THE FILE IS ABOUT. ***
+    // A README legitimately links other projects -- this one names justjake/quickjs-emscripten 41 times,
+    // bellard/quickjs 34 and quickjs-ng/quickjs 8 -- so a plain majority over (owner, repo) would let a
+    // heavily-cited DEPENDENCY outvote the package itself. Which repo the file is about is still decided the
+    // way it always was, by the first GitHub URL in the file; only the SPELLING OF ITS OWNER is put to a vote.
+    // That is the defect that was actually found, and a fix wider than the defect is a second guess.
+    const first = parts[0];
+    const sameRepo = parts.filter((p2) => p2.repo === first.repo);
+    const byOwner = new Map();
+    for (const p2 of sameRepo) byOwner.set(p2.owner, (byOwner.get(p2.owner) || 0) + 1);
+    const ranked = [...byOwner.entries()].sort((a, b) => b[1] - a[1]);
+    const owner = ranked[0][0];
+    // *** AND WHEN THE VOTE AGREES WITH THE FIRST URL, THE RECORD IS LEFT EXACTLY AS IT WAS. *** Synthesising
+    // a canonical repo root for every body looked tidier and silently threw information away: htmx's record
+    // pointed at the LICENSE blob at tag v2.0.10 and gifenc's at a git:// clone URL, both of which say more
+    // about where the bytes came from than a repo root does. A fix should move the record it was written for
+    // and nothing else, so a canonical URL is built ONLY when the vote overrode the first URL's owner.
+    const out = owner === first.owner
+        ? { url: first.url, owner, repo: first.repo }
+        : { url: "https://github.com/" + owner + "/" + first.repo, owner, repo: first.repo };
+    if (ranked.length > 1) {
+        out.contested = ranked.map(([o, n]) => ({ owner: o, repo: first.repo, count: n }));
+    }
+    return out;
 }
 
 /**

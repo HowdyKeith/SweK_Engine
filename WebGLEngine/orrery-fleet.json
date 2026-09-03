@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "85f316a117b8f2068a2a03a96206debb87d94980",
+ "head": "dae30e71bfb09c23236cff0cfaf50796570496b9",
  "bodies": {
   "box3d": [
    {
@@ -130,6 +130,11 @@
     "sha": "36f01db7295733b140e5661f1ea3e64acfe4a6ba"
    },
    {
+    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
+    "bytes": 15150,
+    "sha": null
+   },
+   {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
     "bytes": 17897,
     "sha": "b9ea45a342c9052ae236cf1b08adcfedf49799f1"
@@ -237,6 +242,11 @@
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
+    "bytes": 15150,
+    "sha": null
    }
   ],
   "keyhunt": [
@@ -288,7 +298,13 @@
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    }
   ],
-  "slug": [],
+  "slug": [
+   {
+    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
+    "bytes": 15150,
+    "sha": null
+   }
+  ],
   "taichi-js": [
    {
     "path": "tools/roundhouse/androidPeer-selfcheck.mjs",
@@ -489,8 +505,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2819253,
-    "sha": "85f316a117b8f2068a2a03a96206debb87d94980"
+    "bytes": 2825537,
+    "sha": "dae30e71bfb09c23236cff0cfaf50796570496b9"
    },
    {
     "path": "mpm3d.html",
@@ -740,6 +756,11 @@
     "path": "ai-bridge/wasmSandbox.js",
     "bytes": 3356,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
+    "bytes": 15150,
+    "sha": null
    },
    {
     "path": "wasm-bench.html",

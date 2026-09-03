@@ -220,9 +220,21 @@
    "upstreamFile": "quickjs/quickjs-emscripten-core/README.md",
    "alsoHolders": [],
    "upstream": {
-    "url": "https://github.com/justjakel/quickjs-emscripten",
-    "owner": "justjakel",
-    "repo": "quickjs-emscripten"
+    "url": "https://github.com/justjake/quickjs-emscripten",
+    "owner": "justjake",
+    "repo": "quickjs-emscripten",
+    "contested": [
+     {
+      "owner": "justjake",
+      "repo": "quickjs-emscripten",
+      "count": 41
+     },
+     {
+      "owner": "justjakel",
+      "repo": "quickjs-emscripten",
+      "count": 1
+     }
+    ]
    },
    "bytes": 810948
   }
