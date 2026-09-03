@@ -8,7 +8,7 @@
 import { ZERO_RANGE_REGISTRATION } from "./zeroRangeSweep.mjs";
 import { EXACT_OK } from "./exactZeroRegister.mjs";
 import { SCOPE, PARALLEL_IS_LEGITIMATE, MEASURED_V4426, settle, vacuousDevices, coverage,
-         costConcentration, RESOLUTION_MS } from "./zeroRangeFull.mjs";
+         costConcentration, RESOLUTION_MS, NONTERMINATING } from "./zeroRangeFull.mjs";
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -94,9 +94,26 @@ console.log("\n4. *** WHAT THE RUN REACHED, AND WHAT IT BUILT NOTHING FOR ***");
     const cc = costConcentration(perDevice);
     report(`the most expensive device is ${cc.top ? cc.top.name : "-"} at ${(cc.top ? cc.top.ms / 60000 : 0).toFixed(1)} ` +
         `minutes; the other ${cc.n - 1} together take ${(cc.rest / 60000).toFixed(1)}`);
-    ok("*** the full sweep was never expensive -- it has one expensive member ***", cc.share > 0.5,
-        `${(100 * cc.share).toFixed(0)}% of the total is a single device. "Scope it to four device/modes" was ` +
-        "the wrong remedy for that; finding out WHICH device was the right one");
+    ok("*** the full sweep was never expensive -- its cost lives in a handful of devices ***",
+        cc.devicesHoldingHalf <= cc.n / 10 && cc.medianMs < 10000,
+        `${cc.devicesHoldingHalf} of ${cc.n} devices hold half the total; the median device takes ` +
+        `${(cc.medianMs / 1000).toFixed(1)}s. "Scope it to four device/modes" was the wrong remedy for that`);
+    report(`AND THIS ROUND GOT IT WRONG ONCE, ON ITS OWN DATA: at 20 devices the top was bell at 89% and that ` +
+        `was committed; at ${cc.n} it is ${cc.top ? cc.top.name : "-"} at ${(100 * cc.share).toFixed(0)}% and ` +
+        "bell is third. The share is REPORTED for that reason and the gated properties are the ones that do " +
+        "not move with the sample. corroborationCensus.mjs's own words, quoted here one round earlier: a rate " +
+        "measured on a sample I selected is not a rate.");
+    // *** THREE STATES, NOT TWO, AND EACH HAS A DIFFERENT REMEDY. ***
+    const N = NONTERMINATING;
+    ok("*** a device that does not FINISH is kept apart from a device that is merely expensive ***",
+        N.stoppedAfterMs > (cc.top ? cc.top.ms : 0) && !(N.device in perDevice),
+        `${N.device} ran ${(N.stoppedAfterMs / 3600000).toFixed(1)}h without terminating, against ` +
+        `${(cc.top ? cc.top.ms / 60000 : 0).toFixed(1)} minutes for the most expensive device that DID finish. ` +
+        "The ratio is not the point -- producing no verdict is");
+    ok("  and it is named, not counted", typeof N.device === "string" && N.completedBefore.length > 0,
+        "'the sweep has a device that hangs' is a bug report; 'one of them did not finish' is a shrug");
+    ok("  it contributes no row, because it produced no verdict", !Object.keys(perDevice).includes(N.device),
+        "more time will not produce one either, which is what makes this a different state from slow");
     const vac = vacuousDevices(perDevice);
     ok("*** and a device the sweep BUILDS NOTHING for is counted separately, not as a clean result ***",
         vac.length > 0 && vac.every((n) => perDevice[n].zeros === 0),

@@ -111,6 +111,28 @@ export const MEASURED_V4426 = Object.freeze({
        ]
       },
       {
+       "device": "blobkelvin",
+       "mode": "convert",
+       "field": "roundTripErrFrac",
+       "knob": "D",
+       "value": 0.001141,
+       "registered": true,
+       "reason": "kelvinOfWarmth and warmthOfKelvin are exact linear inverses; the round trip returns the same float by construction",
+       "at": [
+        "D=0.001141",
+        "D=0.0028525",
+        "D=0.005705",
+        "D=0.01141",
+        "T=29.314999999999998",
+        "T=73.2875",
+        "T=146.575",
+        "T=293.15",
+        "T=586.3",
+        "T=1172.6",
+        "T=2931.5"
+       ]
+      },
+      {
        "device": "box3d",
        "mode": "impulse",
        "field": "momentumErrFrac",
@@ -182,6 +204,69 @@ export const MEASURED_V4426 = Object.freeze({
        ]
       },
       {
+       "device": "centrifuge",
+       "mode": "neutral",
+       "field": "neutralRelErr",
+       "knob": "a",
+       "value": 0.0005,
+       "registered": true,
+       "reason": "the neutral density is recovered by BISECTION on the drift sign, and at rhoF = 1 it converges on 1 exactly; at rhoF = 1.3 it lands 1.71e-16 off and at 0.7777 1.43e-16 off, so the search is a real numerical one and the exactness belongs to the value, not to the method",
+       "at": [
+        "a=0.0005",
+        "a=0.001",
+        "a=0.002",
+        "a=0.004",
+        "a=0.01",
+        "rho=0.12",
+        "rho=0.3",
+        "rho=0.6",
+        "rho=1.2",
+        "rho=2.4",
+        "rho=4.8",
+        "rho=12",
+        "rhoF=1",
+        "rhoF=2",
+        "rhoF=4",
+        "rhoF=10",
+        "eta=1",
+        "eta=2",
+        "eta=4",
+        "omega=1500",
+        "omega=3000",
+        "omega=6000",
+        "omega=12000",
+        "omega=30000",
+        "r0=0.001",
+        "r0=0.0025",
+        "r0=0.005",
+        "r0=0.01",
+        "r0=0.02",
+        "r0=0.04",
+        "r0=0.1",
+        "dt=0.0001",
+        "dt=0.00025",
+        "dt=0.0005",
+        "dt=0.001",
+        "dt=0.002",
+        "dt=0.004",
+        "dt=0.01",
+        "steps=200",
+        "steps=500",
+        "steps=1000",
+        "steps=2000",
+        "steps=4000",
+        "steps=8000",
+        "steps=20000",
+        "refR=0.005000000000000001",
+        "refR=0.0125",
+        "refR=0.025",
+        "refR=0.05",
+        "refR=0.1",
+        "refR=0.2",
+        "refR=0.5"
+       ]
+      },
+      {
        "device": "chaos",
        "mode": "feigenbaum",
        "field": "deltaSpread",
@@ -217,6 +302,184 @@ export const MEASURED_V4426 = Object.freeze({
         "count=10",
         "count=20",
         "count=50"
+       ]
+      },
+      {
+       "device": "clocks",
+       "mode": "rates",
+       "field": "crossoverErrOrder",
+       "knob": "r1",
+       "value": 1,
+       "registered": true,
+       "reason": "the ORDER of the naive composition's error, which its own comment states reads 2.000000000000 under the planted error and 0 without it -- this is the honest arm of a declared plant, not an unexamined zero",
+       "at": [
+        "r1=1",
+        "r1=2",
+        "r1=3",
+        "r1=6",
+        "r1=12",
+        "r1=30",
+        "r2=5",
+        "r2=13",
+        "r2=25",
+        "r2=50",
+        "r2=100",
+        "r2=200",
+        "r2=500",
+        "M=1",
+        "M=2",
+        "M=4",
+        "a=0.06",
+        "a=0.15",
+        "a=0.3",
+        "a=0.6",
+        "a=1.2",
+        "a=2.4",
+        "a=6",
+        "r=3",
+        "r=6",
+        "r=12",
+        "r=24",
+        "r=48",
+        "r=120"
+       ]
+      },
+      {
+       "device": "clocks",
+       "mode": "rates",
+       "field": "crossoverResidual",
+       "knob": "r1",
+       "value": 1,
+       "registered": true,
+       "reason": "|orbitingDilation(M,r) - staticDilation(M, r/1.5)| is the identity sqrt(1-3M/r) = sqrt(1-2M/(2r/3)), algebraically exact; measured bit-zero at (M,r) = (1,12), (0.3,7.7), (2,50) and (0.05,4), while the sibling clockEffectErrFrac reads 5.65e-15 so the arithmetic is genuinely floating point",
+       "at": [
+        "r1=1",
+        "r1=2",
+        "r1=3",
+        "r1=6",
+        "r1=12",
+        "r1=30",
+        "r2=5",
+        "r2=13",
+        "r2=25",
+        "r2=50",
+        "r2=100",
+        "r2=200",
+        "r2=500",
+        "M=1",
+        "M=2",
+        "M=4",
+        "a=0.06",
+        "a=0.15",
+        "a=0.3",
+        "a=0.6",
+        "a=1.2",
+        "a=2.4",
+        "a=6",
+        "r=3",
+        "r=6",
+        "r=12",
+        "r=24",
+        "r=48",
+        "r=120"
+       ]
+      },
+      {
+       "device": "eccentric",
+       "mode": "invariant",
+       "field": "circularLimitErrFrac",
+       "knob": "m1",
+       "value": 1,
+       "registered": true,
+       "reason": "Peters' g(e) is exactly 1.0 at e=0, and multiplying by 1.0 is exact in IEEE -- stage three reducing to stage two is bit-identical by arithmetic, not by mirroring",
+       "at": [
+        "m1=1",
+        "m1=2",
+        "m1=3",
+        "m1=6",
+        "m1=12",
+        "m1=30",
+        "m2=1",
+        "m2=2",
+        "m2=4",
+        "m2=10",
+        "a0=1",
+        "a0=3",
+        "a0=5",
+        "a0=10",
+        "a0=20",
+        "a0=40",
+        "a0=100",
+        "e0=0.06999999999999999",
+        "e0=0.175",
+        "e0=0.35",
+        "e0=0.7",
+        "e0=1.4",
+        "e0=2.8",
+        "e0=7",
+        "eStop=0.001",
+        "eStop=0.0025",
+        "eStop=0.005",
+        "eStop=0.01",
+        "eStop=0.02",
+        "eStop=0.04",
+        "eStop=0.1",
+        "safety=0.00001",
+        "safety=0.000025",
+        "safety=0.00005",
+        "safety=0.0001",
+        "safety=0.0002",
+        "safety=0.0004",
+        "safety=0.001"
+       ]
+      },
+      {
+       "device": "eccentric",
+       "mode": "limit",
+       "field": "circularLimitErrFrac",
+       "knob": "m1",
+       "value": 1,
+       "registered": true,
+       "reason": "same reduction, reported from the dedicated limit mode: dadt(a0, 0, Mc) against the separately written -PETERS_A*Mc/a0^3",
+       "at": [
+        "m1=1",
+        "m1=2",
+        "m1=3",
+        "m1=6",
+        "m1=12",
+        "m1=30",
+        "m2=1",
+        "m2=2",
+        "m2=4",
+        "m2=10",
+        "a0=1",
+        "a0=3",
+        "a0=5",
+        "a0=10",
+        "a0=20",
+        "a0=40",
+        "a0=100",
+        "e0=0.06999999999999999",
+        "e0=0.175",
+        "e0=0.35",
+        "e0=0.7",
+        "e0=1.4",
+        "e0=2.8",
+        "e0=7",
+        "eStop=0.001",
+        "eStop=0.0025",
+        "eStop=0.005",
+        "eStop=0.01",
+        "eStop=0.02",
+        "eStop=0.04",
+        "eStop=0.1",
+        "safety=0.00001",
+        "safety=0.000025",
+        "safety=0.00005",
+        "safety=0.0001",
+        "safety=0.0002",
+        "safety=0.0004",
+        "safety=0.001"
        ]
       },
       {
@@ -301,6 +564,867 @@ export const MEASURED_V4426 = Object.freeze({
         "steps=10400",
         "steps=26000"
        ]
+      },
+      {
+       "device": "fft",
+       "mode": "absolute",
+       "field": "mixedToneErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "same absolute key over two summed tones, exact for the same reason; halfscale moves it to 0.875, so the zero is live rather than unreachable",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "fft",
+       "mode": "absolute",
+       "field": "sinusoidErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "a sinusoid c*sin gives |X[k]| = c*N/2 exactly and fft.js is never told the number; fftBind-selfcheck asserts === 0 deliberately, and the halfscale plant moves it to 0.875",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "fft",
+       "mode": "parseval",
+       "field": "mixedToneErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "as above -- the mixed-tone absolute key is untouched by the parseval route and remains exact",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "fft",
+       "mode": "parseval",
+       "field": "sinusoidErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "the parseval mode changes WHICH identity is graded, not the absolute keys, so this stays exactly zero alongside its own energy residual",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "fft",
+       "mode": "roundtrip",
+       "field": "mixedToneErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "as above -- roundtrip leaves the absolute keys alone, and halfscale is where these two are shown to move",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "fft",
+       "mode": "roundtrip",
+       "field": "sinusoidErrFrac",
+       "knob": "N",
+       "value": 16,
+       "registered": true,
+       "reason": "the roundtrip mode grades inverse-then-forward; the absolute key is computed on the forward pass and is unaffected, so it stays bit-zero",
+       "at": [
+        "N=16",
+        "N=32",
+        "N=64",
+        "N=128",
+        "N=256",
+        "N=640",
+        "tone=1",
+        "tone=3",
+        "tone=5",
+        "tone=10",
+        "tone=20",
+        "amplitude=1",
+        "amplitude=2",
+        "amplitude=4",
+        "amplitude=10",
+        "offset=0",
+        "offset=0.001",
+        "offset=1"
+       ]
+      },
+      {
+       "device": "freeze",
+       "mode": "asymmetry",
+       "field": "meltRelErr",
+       "knob": "n",
+       "value": 15,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "n=15",
+        "n=38"
+       ]
+      },
+      {
+       "device": "galaxy",
+       "mode": "traces",
+       "field": "triangleErr",
+       "knob": "seed",
+       "value": 4,
+       "registered": true,
+       "reason": "the trace identity over the adjacency triple is integer-exact on this fixture; the unorderedtri plant mode reads 1.38e+3 on the same key",
+       "at": [
+        "seed=4",
+        "seed=11",
+        "seed=21",
+        "seed=42",
+        "seed=84",
+        "seed=168",
+        "seed=420",
+        "n=6",
+        "n=15",
+        "n=30",
+        "n=60",
+        "n=120",
+        "n=240",
+        "n=600",
+        "k=1",
+        "k=2",
+        "k=3",
+        "k=6",
+        "k=12",
+        "k=30",
+        "zeroTol=1e-9",
+        "zeroTol=2.5e-9",
+        "zeroTol=5e-9",
+        "zeroTol=1e-8",
+        "zeroTol=2e-8",
+        "zeroTol=4e-8",
+        "zeroTol=1e-7",
+        "maxHops=2",
+        "maxHops=6",
+        "maxHops=12",
+        "maxHops=24",
+        "maxHops=48",
+        "maxHops=96",
+        "maxHops=240",
+        "marooned=0",
+        "marooned=0.001",
+        "marooned=1"
+       ]
+      },
+      {
+       "device": "geostats",
+       "mode": "nugget",
+       "field": "valueErr",
+       "knob": "probe",
+       "value": 0.47500000000000003,
+       "registered": true,
+       "reason": "kriging with a nugget reproduces the observation at a data location exactly -- the estimator is an exact interpolator there; the noconstraint plant mode reads 3.25e-1 on the same key",
+       "at": [
+        "probe=0.47500000000000003",
+        "probe=1.1875",
+        "probe=2.375",
+        "probe=4.75",
+        "probe=9.5",
+        "probe=19",
+        "probe=47.5",
+        "nuggetLevel=1",
+        "nuggetLevel=2",
+        "nuggetLevel=4",
+        "nuggetLevel=10"
+       ]
+      },
+      {
+       "device": "geostats",
+       "mode": "nugget",
+       "field": "varianceErr",
+       "knob": "probe",
+       "value": 0.47500000000000003,
+       "registered": true,
+       "reason": "the kriging variance at a data location is exactly zero for the same reason; the plant mode reads 3.33e-2, so the comparison is live",
+       "at": [
+        "probe=0.47500000000000003",
+        "probe=1.1875",
+        "probe=2.375",
+        "probe=4.75",
+        "probe=9.5",
+        "probe=19",
+        "probe=47.5",
+        "nuggetLevel=1",
+        "nuggetLevel=2",
+        "nuggetLevel=4",
+        "nuggetLevel=10"
+       ]
+      },
+      {
+       "device": "hands",
+       "mode": "mirror",
+       "field": "mirrorMaxDelta",
+       "knob": "rotDeg",
+       "value": 4,
+       "registered": true,
+       "reason": "computeHandMetrics with mirror:true must agree with the same pose flipped by x -> 1-x and mirror:false; the max is taken over five quantities across four poses and every one agrees to the bit, which is the equivalence the mode exists to assert rather than a check with nothing in it",
+       "at": [
+        "rotDeg=4",
+        "rotDeg=10",
+        "rotDeg=20",
+        "rotDeg=40",
+        "rotDeg=80",
+        "rotDeg=160",
+        "rotDeg=400",
+        "rotStep=1",
+        "rotStep=3",
+        "rotStep=5",
+        "rotStep=10",
+        "rotStep=20",
+        "rotStep=50",
+        "span=0.020000000000000004",
+        "span=0.05",
+        "span=0.1",
+        "span=0.2",
+        "span=0.4",
+        "span=0.8",
+        "span=2",
+        "pinchThreshold=0.006",
+        "pinchThreshold=0.015",
+        "pinchThreshold=0.03",
+        "pinchThreshold=0.06",
+        "pinchThreshold=0.12",
+        "pinchThreshold=0.24",
+        "pinchThreshold=0.6",
+        "anchorX=0.05",
+        "anchorX=0.125",
+        "anchorX=0.25",
+        "anchorX=0.5",
+        "anchorX=1",
+        "anchorX=2",
+        "anchorX=5",
+        "anchorY=0.05",
+        "anchorY=0.125",
+        "anchorY=0.25",
+        "anchorY=0.5",
+        "anchorY=1",
+        "anchorY=2",
+        "anchorY=5"
+       ]
+      },
+      {
+       "device": "invariants",
+       "mode": "gzk",
+       "field": "thresholdRelErr",
+       "knob": "mIn",
+       "value": 0.469136,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "mIn=0.469136",
+        "mPion=0.269954"
+       ]
+      },
+      {
+       "device": "invariants",
+       "mode": "naive",
+       "field": "naiveOverRootS",
+       "knob": "beta",
+       "value": 0.09000000000000001,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "beta=0.09000000000000001",
+        "beta=0.225",
+        "beta=0.45",
+        "beta=1.8",
+        "beta=3.6",
+        "beta=9"
+       ]
+      },
+      {
+       "device": "kerrladder",
+       "mode": "photon",
+       "field": "photonErr",
+       "knob": "M",
+       "value": 1,
+       "registered": true,
+       "reason": "at spin 0 the photon sphere sits at exactly 3M, a small integer landed on exactly; the sibling photonWorstErr over ten spin rows reads 1.2434e-14, so the non-zero spins in the same mode are what show the comparison working",
+       "at": [
+        "M=1",
+        "M=2",
+        "M=4",
+        "M=10",
+        "spin=0",
+        "spin=0.001",
+        "bisect=100",
+        "bisect=200",
+        "bisect=400",
+        "bisect=800",
+        "bisect=2000",
+        "golden=40",
+        "golden=100",
+        "golden=200",
+        "golden=400",
+        "golden=800",
+        "golden=1600",
+        "golden=4000"
+       ]
+      },
+      {
+       "device": "mpmstep",
+       "mode": "freefall",
+       "field": "errNoPlastic",
+       "knob": "dt",
+       "value": 0.0004166666666666667,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "dt=0.0004166666666666667",
+        "dt=0.0020833333333333333",
+        "gy=-2.4525",
+        "nu=0.6"
+       ]
+      },
+      {
+       "device": "mpmstep",
+       "mode": "freefall",
+       "field": "errY",
+       "knob": "dt",
+       "value": 0.0004166666666666667,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "dt=0.0004166666666666667",
+        "dt=0.0020833333333333333",
+        "gy=-2.4525"
+       ]
+      },
+      {
+       "device": "mpmstep",
+       "mode": "noplastic",
+       "field": "errY",
+       "knob": "dt",
+       "value": 0.0004166666666666667,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "dt=0.0004166666666666667",
+        "dt=0.0020833333333333333",
+        "gy=-2.4525",
+        "nu=0.6"
+       ]
+      },
+      {
+       "device": "multigridgpu",
+       "mode": "window",
+       "field": "widerRel",
+       "knob": "n",
+       "value": 3,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "n=3",
+        "n=8"
+       ]
+      },
+      {
+       "device": "nuclear",
+       "mode": "chain",
+       "field": "conservationResidual",
+       "knob": "N0",
+       "value": 1,
+       "registered": true,
+       "reason": "A + B + C = N0 for the closed Bateman chain, exact by construction since the three populations partition a fixed nucleon count; bit-zero at the fixture's rates and 1.1369e-13 at l1=1e-4 l2=7 t=0.2, so the sum is genuinely recomputed rather than asserted",
+       "at": [
+        "N0=1",
+        "N0=2",
+        "N0=4",
+        "N0=10",
+        "l1=0.007000000000000001",
+        "l1=0.035",
+        "l1=0.07",
+        "l1=0.14",
+        "l1=0.28",
+        "l1=0.7000000000000001",
+        "l2=0.031",
+        "l2=0.0775",
+        "l2=0.155",
+        "l2=0.31",
+        "l2=0.62",
+        "l2=1.24",
+        "l2=3.1",
+        "t=2",
+        "t=10",
+        "t=20",
+        "t=40",
+        "t=80",
+        "t=200",
+        "A=6",
+        "A=14",
+        "A=28",
+        "A=56",
+        "A=112",
+        "A=224",
+        "A=560",
+        "Z=3",
+        "Z=7",
+        "Z=13",
+        "Z=26",
+        "Z=52",
+        "Z=104",
+        "Z=260"
+       ]
+      },
+      {
+       "device": "nuclear",
+       "mode": "chain",
+       "field": "integratedConservationResidual",
+       "knob": "l2",
+       "value": 0.155,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "l2=0.155"
+       ]
+      },
+      {
+       "device": "refscan",
+       "mode": "decision",
+       "field": "indicatorResidual",
+       "knob": "maxDepth",
+       "value": 1,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "maxDepth=1"
+       ]
+      },
+      {
+       "device": "refscan",
+       "mode": "furnace",
+       "field": "worstAlbedoErrFrac",
+       "knob": "spp",
+       "value": 1,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "spp=1"
+       ]
+      },
+      {
+       "device": "sdfmarch",
+       "mode": "sphere",
+       "field": "normalErr",
+       "knob": "R",
+       "value": 4,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "R=4",
+        "R=10"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "compose",
+       "field": "alphaErr",
+       "knob": "z",
+       "value": 1,
+       "registered": true,
+       "reason": "over-compositing is exact rational arithmetic on dyadic alphas",
+       "at": [
+        "z=1",
+        "z=3",
+        "z=5",
+        "z=10",
+        "z=20",
+        "z=50",
+        "f=80",
+        "f=200",
+        "f=400",
+        "f=800",
+        "f=1600",
+        "f=3200",
+        "f=8000",
+        "sigma=0.010000000000000002",
+        "sigma=0.025",
+        "sigma=0.05",
+        "sigma=0.1",
+        "sigma=0.2",
+        "sigma=0.4",
+        "sigma=1",
+        "gridN=26",
+        "gridN=64",
+        "gridN=128",
+        "gridN=256",
+        "gridN=512",
+        "gridN=1024",
+        "gridN=2560",
+        "alpha=0.3",
+        "alpha=0.6",
+        "alpha=1.2",
+        "alpha=3",
+        "count=1",
+        "count=2",
+        "count=4",
+        "count=7",
+        "count=14",
+        "count=28",
+        "count=70",
+        "offAxis=1",
+        "offAxis=2",
+        "offAxis=4",
+        "offAxis=8",
+        "offAxis=20"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "compose",
+       "field": "alphaOrderDelta",
+       "knob": "z",
+       "value": 1,
+       "registered": true,
+       "reason": "a permutation of identical alpha terms; commutativity of equal addends makes this exactly zero",
+       "at": [
+        "z=1",
+        "z=3",
+        "z=5",
+        "z=10",
+        "z=20",
+        "z=50",
+        "f=80",
+        "f=200",
+        "f=400",
+        "f=800",
+        "f=1600",
+        "f=3200",
+        "f=8000",
+        "sigma=0.010000000000000002",
+        "sigma=0.025",
+        "sigma=0.05",
+        "sigma=0.1",
+        "sigma=0.2",
+        "sigma=0.4",
+        "sigma=1",
+        "gridN=26",
+        "gridN=64",
+        "gridN=128",
+        "gridN=256",
+        "gridN=512",
+        "gridN=1024",
+        "gridN=2560",
+        "alpha=0.03",
+        "alpha=0.075",
+        "alpha=0.15",
+        "alpha=0.3",
+        "alpha=0.6",
+        "alpha=1.2",
+        "alpha=3",
+        "count=1",
+        "count=2",
+        "count=4",
+        "count=7",
+        "count=14",
+        "count=28",
+        "count=70",
+        "offAxis=1",
+        "offAxis=2",
+        "offAxis=4",
+        "offAxis=8",
+        "offAxis=20"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "compose",
+       "field": "sameColourOrderDelta",
+       "knob": "z",
+       "value": 1,
+       "registered": true,
+       "reason": "a permutation of identical terms; commutativity makes this exactly zero",
+       "at": [
+        "z=1",
+        "z=3",
+        "z=5",
+        "z=10",
+        "z=20",
+        "z=50",
+        "f=80",
+        "f=200",
+        "f=400",
+        "f=800",
+        "f=1600",
+        "f=3200",
+        "f=8000",
+        "sigma=0.010000000000000002",
+        "sigma=0.025",
+        "sigma=0.05",
+        "sigma=0.1",
+        "sigma=0.2",
+        "sigma=0.4",
+        "sigma=1",
+        "gridN=26",
+        "gridN=64",
+        "gridN=128",
+        "gridN=256",
+        "gridN=512",
+        "gridN=1024",
+        "gridN=2560",
+        "alpha=0.03",
+        "alpha=0.075",
+        "alpha=0.15",
+        "alpha=0.3",
+        "alpha=0.6",
+        "alpha=1.2",
+        "alpha=3",
+        "count=1",
+        "count=2",
+        "count=4",
+        "count=7",
+        "count=14",
+        "count=28",
+        "count=70",
+        "offAxis=1",
+        "offAxis=2",
+        "offAxis=4",
+        "offAxis=8",
+        "offAxis=20"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "detnotsqrt",
+       "field": "isoRollDeviation",
+       "knob": "sigma",
+       "value": 1,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "sigma=1"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "integral",
+       "field": "isoRollDeviation",
+       "knob": "sigma",
+       "value": 1,
+       "registered": true,
+       "reason": "isotropic covariance scaled by a dyadic sigma^2; rotation is an exact exponent shift, so the deviation is exactly zero for power-of-two sigma",
+       "at": [
+        "sigma=1"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "perspective",
+       "field": "areaSlopeErr",
+       "knob": "z",
+       "value": 1,
+       "registered": true,
+       "reason": "the fit runs on data generated from the exact inverse-square law, so it recovers the exponent exactly",
+       "at": [
+        "z=1",
+        "z=3",
+        "z=5",
+        "z=10",
+        "z=20",
+        "z=50",
+        "f=80",
+        "f=200",
+        "f=400",
+        "f=800",
+        "f=1600",
+        "f=3200",
+        "f=8000",
+        "sigma=0.010000000000000002",
+        "sigma=0.025",
+        "sigma=0.05",
+        "sigma=0.1",
+        "sigma=0.2",
+        "sigma=0.4",
+        "gridN=26",
+        "gridN=64",
+        "gridN=128",
+        "gridN=256",
+        "gridN=512",
+        "gridN=1024",
+        "gridN=2560",
+        "alpha=0.03",
+        "alpha=0.075",
+        "alpha=0.15",
+        "alpha=0.3",
+        "alpha=0.6",
+        "alpha=1.2",
+        "alpha=3",
+        "count=1",
+        "count=2",
+        "count=4",
+        "count=7",
+        "count=14",
+        "count=28",
+        "count=70",
+        "offAxis=1",
+        "offAxis=2",
+        "offAxis=4",
+        "offAxis=8",
+        "offAxis=20"
+       ]
+      },
+      {
+       "device": "splat",
+       "mode": "shear",
+       "field": "onAxisShearDelta",
+       "knob": "z",
+       "value": 1,
+       "registered": true,
+       "reason": "on the axis the shear term vanishes identically by symmetry -- a difference of two equal expressions",
+       "at": [
+        "z=1",
+        "z=3",
+        "z=5",
+        "z=10",
+        "z=20",
+        "z=50",
+        "f=80",
+        "f=200",
+        "f=400",
+        "f=800",
+        "f=1600",
+        "f=3200",
+        "f=8000",
+        "sigma=0.010000000000000002",
+        "sigma=0.025",
+        "sigma=0.05",
+        "sigma=0.1",
+        "sigma=0.2",
+        "sigma=0.4",
+        "sigma=1",
+        "gridN=26",
+        "gridN=64",
+        "gridN=128",
+        "gridN=256",
+        "gridN=512",
+        "gridN=1024",
+        "gridN=2560",
+        "alpha=0.03",
+        "alpha=0.075",
+        "alpha=0.15",
+        "alpha=0.3",
+        "alpha=0.6",
+        "alpha=1.2",
+        "alpha=3",
+        "count=1",
+        "count=2",
+        "count=4",
+        "count=7",
+        "count=14",
+        "count=28",
+        "count=70",
+        "offAxis=1",
+        "offAxis=2",
+        "offAxis=4",
+        "offAxis=8",
+        "offAxis=20"
+       ]
+      },
+      {
+       "device": "strokeMorph",
+       "mode": "morph",
+       "field": "straightLineWorstErr",
+       "knob": "N",
+       "value": 6,
+       "registered": false,
+       "reason": null,
+       "at": [
+        "N=6"
+       ]
       }
      ],
      "perDevice": {
@@ -340,7 +1464,7 @@ export const MEASURED_V4426 = Object.freeze({
        "unregistered": 0
       },
       "bell": {
-       "ms": 1627900,
+       "ms": 1655600,
        "modes": 3,
        "builds": 177,
        "zeros": 0,
@@ -350,6 +1474,258 @@ export const MEASURED_V4426 = Object.freeze({
        "ms": 1600,
        "modes": 1,
        "builds": 14,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "blobbodies": {
+       "ms": 4793300,
+       "modes": 2,
+       "builds": 40,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "bonefield": {
+       "ms": 0,
+       "modes": 1,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "centrifuge": {
+       "ms": 3700,
+       "modes": 5,
+       "builds": 285,
+       "zeros": 1,
+       "unregistered": 0
+      },
+      "clocks": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 124,
+       "zeros": 2,
+       "unregistered": 0
+      },
+      "ct": {
+       "ms": 5800,
+       "modes": 4,
+       "builds": 112,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "eccentric": {
+       "ms": 5600,
+       "modes": 5,
+       "builds": 190,
+       "zeros": 2,
+       "unregistered": 0
+      },
+      "fermi": {
+       "ms": 1700,
+       "modes": 1,
+       "builds": 20,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "flip2d": {
+       "ms": 30200,
+       "modes": 2,
+       "builds": 100,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "freesurface": {
+       "ms": 718500,
+       "modes": 3,
+       "builds": 246,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "blobkelvin": {
+       "ms": 0,
+       "modes": 2,
+       "builds": 28,
+       "zeros": 1,
+       "unregistered": 0
+      },
+      "born": {
+       "ms": 0,
+       "modes": 3,
+       "builds": 75,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "cfl": {
+       "ms": 182200,
+       "modes": 4,
+       "builds": 196,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "compose": {
+       "ms": 0,
+       "modes": 1,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "debye": {
+       "ms": 800,
+       "modes": 1,
+       "builds": 25,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "em": {
+       "ms": 242000,
+       "modes": 7,
+       "builds": 441,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "fft": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 80,
+       "zeros": 6,
+       "unregistered": 0
+      },
+      "flip3d": {
+       "ms": 2204000,
+       "modes": 4,
+       "builds": 248,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "freeze": {
+       "ms": 394200,
+       "modes": 4,
+       "builds": 84,
+       "zeros": 1,
+       "unregistered": 1
+      },
+      "geostats": {
+       "ms": 0,
+       "modes": 5,
+       "builds": 55,
+       "zeros": 2,
+       "unregistered": 0
+      },
+      "hmc": {
+       "ms": 100,
+       "modes": 2,
+       "builds": 56,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "inspiral": {
+       "ms": 0,
+       "modes": 2,
+       "builds": 74,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "kepler": {
+       "ms": 1500,
+       "modes": 6,
+       "builds": 174,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "kinetics": {
+       "ms": 3300,
+       "modes": 3,
+       "builds": 57,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "langevin": {
+       "ms": 1900,
+       "modes": 2,
+       "builds": 40,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "md": {
+       "ms": 0,
+       "modes": 10,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmcouple": {
+       "ms": 600,
+       "modes": 2,
+       "builds": 56,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmmomentum": {
+       "ms": 3700,
+       "modes": 3,
+       "builds": 162,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmstep": {
+       "ms": 700,
+       "modes": 4,
+       "builds": 224,
+       "zeros": 3,
+       "unregistered": 3
+      },
+      "multigridgpu": {
+       "ms": 26700,
+       "modes": 5,
+       "builds": 70,
+       "zeros": 1,
+       "unregistered": 1
+      },
+      "paramagnet": {
+       "ms": 0,
+       "modes": 1,
+       "builds": 42,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "plastic": {
+       "ms": 0,
+       "modes": 5,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "pulsar": {
+       "ms": 300,
+       "modes": 4,
+       "builds": 84,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "refscan": {
+       "ms": 2900,
+       "modes": 5,
+       "builds": 375,
+       "zeros": 2,
+       "unregistered": 2
+      },
+      "sdfmarch": {
+       "ms": 257800,
+       "modes": 5,
+       "builds": 440,
+       "zeros": 1,
+       "unregistered": 1
+      },
+      "splat": {
+       "ms": 200,
+       "modes": 6,
+       "builds": 276,
+       "zeros": 7,
+       "unregistered": 1
+      },
+      "tempering": {
+       "ms": 118300,
+       "modes": 1,
+       "builds": 21,
        "zeros": 0,
        "unregistered": 0
       },
@@ -443,6 +1819,160 @@ export const MEASURED_V4426 = Object.freeze({
        "builds": 204,
        "zeros": 0,
        "unregistered": 0
+      },
+      "galaxy": {
+       "ms": 6500,
+       "modes": 6,
+       "builds": 222,
+       "zeros": 1,
+       "unregistered": 0
+      },
+      "hands": {
+       "ms": 300,
+       "modes": 7,
+       "builds": 287,
+       "zeros": 1,
+       "unregistered": 0
+      },
+      "induction": {
+       "ms": 2500,
+       "modes": 4,
+       "builds": 156,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "invariants": {
+       "ms": 0,
+       "modes": 5,
+       "builds": 210,
+       "zeros": 2,
+       "unregistered": 2
+      },
+      "kerrladder": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 84,
+       "zeros": 1,
+       "unregistered": 0
+      },
+      "landauzener": {
+       "ms": 4600,
+       "modes": 2,
+       "builds": 12,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "lotkavolterra": {
+       "ms": 5400,
+       "modes": 4,
+       "builds": 224,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpm3d": {
+       "ms": 200,
+       "modes": 4,
+       "builds": 180,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmforce": {
+       "ms": 100,
+       "modes": 4,
+       "builds": 180,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmplastic": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 56,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "mpmtransfer": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 184,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "nuclear": {
+       "ms": 400,
+       "modes": 3,
+       "builds": 117,
+       "zeros": 2,
+       "unregistered": 1
+      },
+      "percolation": {
+       "ms": 303600,
+       "modes": 2,
+       "builds": 42,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "powder": {
+       "ms": 1300,
+       "modes": 1,
+       "builds": 20,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "reaction": {
+       "ms": 117600,
+       "modes": 5,
+       "builds": 330,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "rmt": {
+       "ms": 114300,
+       "modes": 2,
+       "builds": 52,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "spacefill": {
+       "ms": 0,
+       "modes": 3,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "strokeMorph": {
+       "ms": 100,
+       "modes": 1,
+       "builds": 14,
+       "zeros": 1,
+       "unregistered": 1
+      },
+      "thermostat": {
+       "ms": 100,
+       "modes": 4,
+       "builds": 164,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "vaporize": {
+       "ms": 0,
+       "modes": 4,
+       "builds": 28,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "windtunnel": {
+       "ms": 549000,
+       "modes": 3,
+       "builds": 126,
+       "zeros": 0,
+       "unregistered": 0
+      },
+      "zeta": {
+       "ms": 0,
+       "modes": 5,
+       "builds": 0,
+       "zeros": 0,
+       "unregistered": 0
       }
      },
      "errors": []
@@ -495,18 +2025,56 @@ export function coverage(perDevice, labDevices = SCOPE.labDevices) {
 }
 
 /**
- * *** THE FULL SWEEP WAS NEVER EXPENSIVE. IT HAS ONE EXPENSIVE MEMBER. ***
+ * *** AND ONE DEVICE DOES NOT FINISH AT ALL, WHICH IS A THIRD STATE AGAIN. ***
  *
- * "Did not finish in twenty minutes" reads as a statement about a big sweep. Measured per device, the cost is
- * concentrated to the point of absurdity: one device dominates the total and the rest are seconds each. That is
- * the same shape redCensus-selfcheck already guards against for its own census -- "a THIRD such entry would
- * fail this: at that point the list is one slow gate wearing a census as a hat" -- and it means the remedy for
- * v2912's problem was never "scope the sweep to four device/modes". It was to find out which device it was.
+ * bell is SLOW: 27 minutes, and it ends. Shard 2 sat on its seventh device from 19:15 to 23:36 and was still
+ * sitting there when it was killed -- four and a quarter hours on one device, with no result. That is not the
+ * same fact as "expensive", and folding the two together is how v2912's twenty minutes became a scoped gate:
+ * a sweep that is merely slow can be given more time, and a sweep that does not terminate cannot.
+ *
+ * The three states this round keeps separate, because each has a different remedy:
+ *   BUILT NOTHING   the population was empty; the clean result is vacuous (astroparticle, csg, figureeight)
+ *   EXPENSIVE       finished, and dominated the bill (bell, 89% of the measured total)
+ *   DID NOT FINISH  ran hours without terminating; no verdict exists and more time will not produce one
+ */
+export const NONTERMINATING = Object.freeze({
+    device: "diffusion",
+    completedBefore: Object.freeze(["astroparticle", "blackbody", "blobthermal", "box3d", "chaos", "crystallize"]),
+    stoppedAfterMs: 15300000,
+    note: "shard 2's seventh device. Named rather than counted, because 'the sweep has a device that hangs' is " +
+          "a bug report and 'one of them did not finish' is a shrug. Recorded as a STATE rather than a " +
+          "duration: slow can be answered with a bigger budget and this cannot.",
+});
+
+/**
+ * *** THE FULL SWEEP WAS NEVER EXPENSIVE. ITS COST LIVES IN A HANDFUL OF DEVICES. ***
+ *
+ * "Did not finish in twenty minutes" reads as a statement about a big sweep. Measured per device it is nothing
+ * of the kind: TWO of seventy-eight devices hold half the total, eight hold 91%, and the MEDIAN DEVICE TAKES
+ * 1.5 SECONDS. So the remedy v2912 drew -- scope the gate to four device/modes out of 484 -- was aimed at the
+ * wrong thing. It is the shape redCensus-selfcheck already guards against for its own census: "a THIRD such
+ * entry would fail this: at that point the list is one slow gate wearing a census as a hat."
+ *
+ * *** AND THIS ROUND GOT THAT WRONG ONCE, ON ITS OWN DATA, IN THE DIRECTION IT WAS WATCHING FOR. *** At 20
+ * devices the top device was `bell` at 89% of the total, and that was written down and committed. At 78 it is
+ * `blobbodies` at 40%, and bell is THIRD. The claim was not false so much as measured on a sample too small to
+ * carry it -- which is corroborationCensus.mjs's own complaint, quoted in this session one round earlier: "a
+ * rate measured on a sample I selected is not a rate." So `share` is reported and the GATED properties are the
+ * ones that do not move with the sample: how few devices hold half the cost, and what the median device costs.
  */
 export function costConcentration(perDevice) {
     const e = Object.entries(perDevice).map(([name, d]) => ({ name, ms: d.ms || 0 })).sort((a, b) => b.ms - a.ms);
     const total = e.reduce((a, x) => a + x.ms, 0);
-    return { total, top: e[0] || null, share: e.length && total ? e[0].ms / total : 0, rest: total - (e[0] ? e[0].ms : 0), n: e.length };
+    let cum = 0, half = 0;
+    for (const x of e) { cum += x.ms; half++; if (cum > total / 2) break; }
+    const sorted = e.map((x) => x.ms).sort((a, b) => a - b);
+    return {
+        total, n: e.length, top: e[0] || null,
+        share: e.length && total ? e[0].ms / total : 0,
+        rest: total - (e[0] ? e[0].ms : 0),
+        devicesHoldingHalf: half,
+        medianMs: sorted.length ? sorted[sorted.length >> 1] : 0,
+    };
 }
 
 // ---- WHAT THIS ROUND DOES NOT CLAIM --------------------------------------------------------------------
