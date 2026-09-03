@@ -696,6 +696,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "exhibit: a fuel cell with no perpendicular upstream neighbour is only ever written " +
                  "undecayed, so the curtain's leading column reads 36 at all 20 rows.",
     }),
+    since37: Object.freeze({
+        at: "v4411", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/shipExhaust-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.3s, twelve checks in six sections. It gates " +
+                 "render/shipExhaust.mjs -- v4178's DOOM fire on v4410's direction field, hung off every EV " +
+                 "ship's stern -- and its last section is the REACH, which is what #162 was filed for: the " +
+                 "automaton's only consumer in three hundred versions was doom-fire.html, a standalone 2D " +
+                 "canvas demo. The reach rows ask more than whether an import string is present: the " +
+                 "specifier must RESOLVE through the tree's own resolver, the plume must be pushed from the " +
+                 "same `thrust` the flight model consumed for both player and NPC, and a plume must be " +
+                 "dropped when its ship goes. v4165's rule, that an import is not a consumer. Written into " +
+                 "the ledger IN the round, after v4410 shipped a gate without an entry and gateSweep-" +
+                 "selfcheck went red on the surplus by exactly one.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

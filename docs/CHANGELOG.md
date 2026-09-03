@@ -14,6 +14,82 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4411 -- every ship had a thruster state and not one of them showed it
+
+*** THE BOOLEAN NOBODY DREW. *** ev/flightView.js has carried `thrust` per entity since the flight model
+existed -- the player's from the keyboard (`keys.thrust`), every AI's from stepAI -- and the flight model
+consumes it to accelerate. The draw path never read it. A ship under full burn and a ship coasting were the
+same textured quad. `grep -rn "exhaust\|thruster"` over the whole tree returned nothing but prose about
+browser connection pools and ray-march budgets.
+
+AND THE DOOM FIRE HAD ONE CONSUMER IN THREE HUNDRED VERSIONS: doom-fire.html, a standalone 2D canvas demo
+linked from server.html. Gated since v4178, generalised at v4410, and in no scene.
+
+*** NEW render/shipExhaust.mjs: v4178's AUTOMATON ON v4410's DIRECTION FIELD, HUNG OFF EVERY STERN. *** The
+control is free for the third round running: a ship flying STRAIGHT has zero heading delta in every row, so
+the plume's field is uniformly (0, +1) and the plume is EXACTLY FieldFire on straightField -- three seeds,
+200 frames each, 0 differing cells.
+
+*** AND WHAT NEEDS A FIELD RATHER THAN A ROTATED SPRITE IS THE BEND. *** A straight plume is a rotated
+sprite: bake one fire, draw the quad at the ship's heading, done. What a rotated sprite cannot do is bend.
+Exhaust is emitted and then left behind -- A PARCEL KEEPS THE HEADING IT WAS EMITTED WITH -- so a ship that
+turns while burning drags a curved trail, and the curve is a record of where the ship has been. That is a
+different direction in every row, which one texture rotated by one angle has no way to hold.
+
+    row 15 of a 24-cell plume, after 200 frames:
+      straight              11.8
+      turning +2 deg/frame   8.0
+      turning -2 deg/frame  15.4      -- a spread of 7.4 cells, the two turns bending opposite ways
+
+*** THE FIRST DRAFT POINTED EACH ROW ALONG ITS PARCEL'S HEADING, AND THAT IS A DIFFERENT QUANTITY FROM THE
+DIRECTION HEAT TRAVELS. *** At 3 degrees per frame over 32 rows the oldest row is 96 degrees off, so its
+`back` pointed SIDEWAYS: the row read from its neighbour instead of from the nozzle, the plume stopped being
+connected to the engine at all, and turning left and turning right both put the tail in the same place --
+12.0 and 12.7 against a straight 7.9. That is noise, not a bend. Heat always enters at the nozzle and travels
+DOWN THE ROWS; what a turn bends is the plume's COURSE. So the field is v4410's river with the channel's
+centre line derived from the heading history rather than drawn, tangent clamped to one cell per row for the
+reason v4410 established.
+
+*** CUTTING THRUST EXTINGUISHES THE NOZZLE, AND MERELY NOT LIGHTING IT IS NOT CUTTING IT. *** The nozzle
+row's upstream neighbour is off-grid, so step() skips it and it KEEPS ITS VALUE FOR EVER. Measured on the
+first draft: thrust cut after 120 frames, still burning 500 frames later -- while this module's own header
+claimed the plume "rises, cools and burns out on its own". v4178 has the same shape and names it: extinguish()
+is a separate call from not calling light(). It is out in 45 frames now, and dims rather than vanishing (heat
+9940 -> 7752 three frames after the cut), which is the whole reason the automaton was worth porting.
+
+*** WIRED, NOT MERELY IMPORTED -- v4165's RULE. *** The plume is pushed from the SAME `thrust` the flight
+model just consumed, for the player and for every NPC, so a frame in which the engine fired and the flame did
+not is not representable. Plumes are dropped by rebuilding the live set each frame rather than on a death
+event, because a death event that is ever missed leaves a plume burning for the session. The quad is drawn
+UNDER the hull and blended ADDITIVELY, because an alpha blend over the starfield punches a dark rectangle
+wherever the plume is cool, and alpha carries the fire's own intensity rather than a flat 255 -- measured
+59 fully opaque, 296 partial, 413 fully clear across a 24x32 plume, where a flat alpha makes all three one
+number and the quad shows as a rectangle.
+
+*** AND A CORRECTION WHERE IT LIVES: ev/flightModel3d.js's angleDiffDeg STATES ITS RANGE AS "(-180, 180]"
+AND RETURNS -180 FOR A HALF TURN *** -- the one value that range excludes. angleDiffDeg(0, 180) and
+angleDiffDeg(180, 0) are both -180. The value is not wrong (at half a turn the two ways round are the same
+length, so the sign is a convention) but the comment named the wrong endpoint. Found by copying that
+expression deliberately, so a plume and the flight model can never disagree about which way a ship turned,
+and then testing it.
+
+SIX SABOTAGES, MEASURED 1/1/1/2/2/1 RED BY NAME, both files md5-identical after restore: A parcelDirection's
+sign flipped; B thrust-off merely stops lighting; C alpha goes flat; D the centre line stops recording the
+turn; E the import extension wrong (reads fine in source, 404s in a browser); F NPCs stop feeding their
+plumes.
+
+*** THIS GATE'S OWN FIRST DRAFT HAD THREE ROWS WRONG, and one of them is a repeat offence. *** resolveSpec
+was called with its arguments reversed (it takes fromFile first, not the specifier). The half-turn was
+asserted at +180 on the strength of angleDiffDeg's inaccurate comment rather than on what it returns. And the
+NPC wiring check used `[^)]*` to cross an argument list CONTAINING PARENTHESES -- `(e.id | 0) * 2654435761`
+-- which is v4407's detectBackends mistake made a second time, and fixed the same way, with `[^;]*`.
+
+WHAT THIS DOES NOT CLAIM. That the plume looks right on a GPU: these checks run the automaton and read its
+cells, and the quad, the additive blend and the stern offset are judged by a person. That the bend is
+aerodynamically true -- a parcel here keeps its emission heading and nothing diffuses or slows it, which
+makes this a record of the ship's path and not a plume model. And that every ship burns: a ship with no
+thrust input never lights, which is the point, so an empty sky is a correct empty sky.
+The tree stands at 1443 gates.
 ## v4410 -- the DOOM fire's "up" was a constant, and that is the only reason it could not run down a river
 
 *** TWO DIRECTIONAL CONSTANTS, NOT ONE. *** render/doomFire.mjs (v4178, ported from

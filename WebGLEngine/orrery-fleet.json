@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "229edf8326c639675bac8af54d95983564b52657",
+ "head": "3db4a58bc40d03584b881121c83fd8f4eebf86d8",
  "bodies": {
   "box3d": [
    {
@@ -131,8 +131,8 @@
    },
    {
     "path": "tools/ship/gateSweep.mjs",
-    "bytes": 70127,
-    "sha": "6e791a9e93e416e486d10f13eeaa13824e18dc8b"
+    "bytes": 72979,
+    "sha": "ac5da9c4f52343ff7523f315deab646e8efeb350"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
@@ -477,8 +477,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2715370,
-    "sha": "6e791a9e93e416e486d10f13eeaa13824e18dc8b"
+    "bytes": 2718965,
+    "sha": "71d2e55bf982ce73078b0eeb346d00c609c4a621"
    },
    {
     "path": "mpm3d.html",
