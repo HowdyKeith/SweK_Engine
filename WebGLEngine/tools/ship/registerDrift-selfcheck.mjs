@@ -174,6 +174,26 @@ console.log("\n5. v4400 -- THE REGISTER KEEPS A RENDERING WHERE IT SHOULD KEEP T
        "ADDS NOTHING: asked which of its words appear in no recorded line of that gate, four entries answer " +
        "with a FILENAME CUT IN HALF by the 110-column clip, which is not information but a broken rendering");
 
+    // *** AND THE REGISTER ITSELF, ENTRY BY ENTRY, BECAUSE NO PAGE IN THIS TREE HAS EVER SHOWN IT. ***
+    // Measured while looking for v4401's "point of use": `fails:` is read by four files, all of them gates or
+    // the freezer, and TWO of those only assert that it is a string longer than ten characters -- that the
+    // field EXISTS, not that it is true. Zero HTML files mention redCensus, RED_AT_V4279 or a register
+    // artefact. THE TREE'S OWN DEBT LIST IS REACHABLE ONLY BY READING A .mjs OR RUNNING A GATE, which is
+    // v4379's finding about RIG_ONLY -- "a record nobody can reach is a record nobody has" -- on the most
+    // consequential list it has.
+    //
+    // So the line each entry SHOWS is the one derived from the audit, and the one it FILES is beside it. The
+    // nine divergences stop being a count and become a column a person can look down.
+    REPORT.table("the standing reds, with the line the run gives beside the line the register files",
+        ["gate", "ms", "how it stands", "the run's line", "the register's line"],
+        RED_AT_V4279.map((e) => { const r = d.rows.find((x) => x.gate === e.gate) || {};
+            const rendered = renderFor(e.gate, REGISTER_AUDIT);
+            return [e.gate.replace("tools/ship/", "").replace("-selfcheck.mjs", ""), e.ms, r.kind || "?",
+                    rendered.line || ("(" + (rendered.why || "no line") + ")"), (e.fails || "").trim()]; }),
+        "DERIVED, not retyped: the fourth column comes from register-audit.mjs, the fifth is what somebody " +
+        "typed when the entry was filed. Where they differ the check above says which species of difference " +
+        "it is. Nothing here changes a verdict -- redCensus is still the register and this is its first page.");
+
     REPORT.table("the register against the runs it should render from",
         ["how the quoted line stands to the run", "entries"],
         [["matches a run exactly", d.counts.exact || 0],

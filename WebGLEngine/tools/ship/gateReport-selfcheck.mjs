@@ -34,6 +34,7 @@ import * as AW from "./artefactWriters.mjs";
 import { gateReport, reports, arguesInNumbers, REPORT_DIR, enabled } from "./gateReport.mjs";
 
 const SELF_REPORT = gateReport("tools/ship/gateReport-selfcheck.mjs");
+let probeResult = null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -313,6 +314,18 @@ const onDisk = reports();
     }
 }
 
+// SABOTAGE LOG for section 7 -- applied, gate run, exit code read, restored. MEASURED at v4402.
+//   BM the report's register table fed the FILED line where the run's belongs -> exit=1, 1 red naming
+//      boundaryLint. The two strings differ for exactly the nine divergent entries, so a page that had quietly
+//      gone on rendering the stored copy fails here and could not fail anywhere else.
+//   BN the page's text-cell cap removed -> exit=1, 1 red: 52 cells over the cap and 0 truncated. That is the
+//      state measured before the cap -- a table 1459px tall inside a 640px panel.
+//   BO the register table dropped from the report altogether -> *** 0 RED THE FIRST TIME. *** probeResult
+//      .register came back null, the section SAID SO and ran no check at all: an absence read as a skip is an
+//      absence read as a pass, which is v4392's crashing gate returning a failure count of zero. The skip
+//      branch now covers only "no browser"; a page that loaded without the register is a FAILURE, and the same
+//      sabotage takes it red.
+//
 // SABOTAGE LOG for section 6 and the frozen ratchets -- MEASURED at v4399.
 //   BF the plot nudging an exact zero to 1e-16 instead of naming it -> exit=1, 1 red: the undrawable count
 //      falls from 9 to 3 and the zeros vanish into a line that says "very small" where the report says "none".
@@ -404,8 +417,14 @@ const onDisk = reports();
                     dropped: (cv.dataset.dropped || "").split(",").filter(Boolean),
                     held: Number(cv.dataset.held || 0) });
             }
+            // v4402 -- THE REGISTER'S OWN ROWS, out of the live DOM. Cells are capped for width and their
+            // titles carry the value whole, so the title is what a check must read.
+            const reg = Array.from(d.querySelectorAll("#gr table")).find((t) => t.rows.length > 20);
+            out.register = !reg ? null : Array.from(reg.rows).slice(1).map((tr) =>
+                Array.from(tr.cells).map((c) => ({ shown: c.textContent || "", full: c.getAttribute("title") || "" })));
             return out;
         }` });
+    probeResult = probe.skipped ? null : (probe.result || null);
     if (probe.skipped) {
         say("the live plot read was SKIPPED: " + probe.reason + " -- the checks above still ran");
     } else {
@@ -455,6 +474,72 @@ const onDisk = reports();
            "for it. A NUDGE TO 1e-16 WOULD DRAW A LINE SAYING 'VERY SMALL' WHERE THE MEASUREMENT SAYS 'NONE', " +
            "which is the caption problem with a chart on top of it" : "no table reported an undrawable value, " +
            "which cannot be right while the shipyard report holds a column of exact zeros");
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 7. v4402 -- THE RED REGISTER HAS A READER SURFACE, AND UNTIL NOW IT HAD NONE
+ *
+ * v4401 named its own last step -- render the register's line from the audit "at the point of use" -- and there
+ * was no point of use to render at. MEASURED: `fails:` is read by four files, all gates or the freezer, and two
+ * of those only assert `typeof === "string" && length > 10`, which checks the field EXISTS rather than that it
+ * is true. ZERO HTML FILES mention redCensus, RED_AT_V4279 or a register artefact. *** THE TREE'S OWN DEBT LIST
+ * -- 27 STANDING REDS, THE THING THREE ROUNDS OF THIS SESSION FOUND STALE -- WAS REACHABLE ONLY BY READING A
+ * .mjs OR RUNNING A GATE. *** That is v4379's finding about RIG_ONLY, "a record nobody can reach is a record
+ * nobody has", on the most consequential list this tree keeps.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    // *** THE SKIP BRANCH ONLY COVERS "NO BROWSER", AND ITS FIRST DRAFT COVERED "NO REGISTER" TOO. ***
+    // Dropping the register table from the report cost ZERO RED: probeResult.register came back null, the
+    // section said so and ran no check at all. AN ABSENCE READ AS A SKIP IS AN ABSENCE READ AS A PASS -- the
+    // same species as v4392's gate that crashed before printing a FAIL line and returned a count of zero. If
+    // the page loaded, a missing register is a FAILURE and not a reason to stand down.
+    if (!probeResult) {
+        say("the register panel could not be read: the live page check above was skipped, so no browser ran");
+    } else if (!probeResult.register) {
+        ok("!! *** the standing reds are RENDERED BY A PAGE, not merely declared in a module ***", false,
+           "THE PAGE LOADED AND THE REGISTER IS NOT ON IT. Either registerDrift stopped emitting its table or " +
+           "the panel stopped drawing it; both are the record becoming unreachable again, which is the whole " +
+           "reason this section exists");
+    } else {
+        const reg = probeResult.register;
+        const audit = onDisk.find((d) => d.gate === "tools/ship/registerDrift-selfcheck.mjs");
+        const table = audit && (audit.tables || []).find((t) => t.title.startsWith("the standing reds"));
+        say(`the register panel shows ${reg.length} row(s); the report holds ${table ? table.rows.length : 0}`);
+
+        ok("!! *** the standing reds are RENDERED BY A PAGE, not merely declared in a module ***",
+           !!table && reg.length === table.rows.length && reg.length > 20,
+           `${reg.length} entries on screen against ${table ? table.rows.length : 0} in the report. THE CHECK ` +
+           "ASKS WHETHER ANY PAGE RENDERS THEM rather than naming one, which is the shape v4379 arrived at after " +
+           "a check that named rig.html stayed red for 250 rounds over a panel somebody had moved");
+
+        // *** THE INVERSION, CHECKED WHERE IT MATTERS: the line on screen is the AUDIT'S, not the typed one. ***
+        // For a divergent entry those two strings differ, so this cannot pass by accident.
+        const divergent = table.rows.filter((r) => r[2] === "drifted" || r[2] === "moved");
+        const bad = [];
+        for (const row of divergent) {
+            const onScreen = reg.find((cells) => cells[0].full === row[0] || cells[0].shown === row[0]);
+            if (!onScreen) { bad.push(row[0] + ": not on screen"); continue; }
+            if (onScreen[3].full !== String(row[3])) bad.push(row[0] + ": shows a line the audit did not give");
+            if (onScreen[3].full === String(row[4])) bad.push(row[0] + ": shows the FILED line where the run's should be");
+        }
+        ok("!! ...and for every DIVERGENT entry the line shown is the RUN'S, not the one somebody typed",
+           divergent.length > 0 && bad.length === 0,
+           bad.length ? bad.join("; ") : `${divergent.length} entries whose two lines differ, and every one shows ` +
+           "the audit's. THE TWO STRINGS ARE DIFFERENT FOR EXACTLY THESE ROWS, so a page that had quietly kept " +
+           "rendering the stored copy would fail here and could not fail anywhere else");
+
+        // Structural, not aesthetic: a gate cannot judge whether a table READS well, but it can hold the
+        // property that made it unreadable -- 110-character sentences wrapping every row to four lines.
+        const overlong = reg.flat().filter((c) => c.shown.length > 56);
+        const truncated = reg.flat().filter((c) => c.full.length > c.shown.length);
+        ok("!! ...and no cell is shown at full length while its title carries the whole value",
+           overlong.length === 0 && truncated.length > 20,
+           `${overlong.length} cell(s) over the cap, ${truncated.length} truncated with the value whole in the ` +
+           "title. MEASURED BEFORE THE CAP: two 110-character sentences per row wrapped to a median row height " +
+           "of 58px and a table 1459px tall inside a 640px panel -- a wall, not something to scan. After: 632px " +
+           "and every row one line. A GATE CANNOT SAY WHETHER A TABLE READS WELL and this one does not try; it " +
+           "holds the property that made it unreadable");
     }
 }
 
