@@ -890,3 +890,137 @@ int swk_joint_motor(int idx, int enable, float speed, float maxTorque) {
     }
     return SWK_JOINT_UNKNOWN;       // a weld has nothing to drive, and saying so beats doing nothing quietly
 }
+
+// ==============================================================================================================
+// v4395 -- SENSORS AND CONTINUOUS COLLISION. The last two names on #150 after v4385 shipped motors and limits.
+//
+// *** A SENSOR IS NOT A FLAG YOU CAN SET LATER. *** b3Shape_IsSensor is a GETTER and there is no setter: the
+// isSensor field lives on b3ShapeDef and is read once, at b3CreateHullShape. So this is a second CREATION entry
+// point rather than a set-it-afterwards flag, and the shape of the API is dictated by the library rather than
+// chosen. Adding an eighth parameter to swk_body_box would have been the other option and would have changed
+// the signature every existing caller and every existing gate uses.
+//
+// The obvious name for that flag is deliberately NOT written above, and this paragraph is why. The first draft
+// explained the absence BY NAMING IT, and box3dNode.documentedButMissing -- which greps this file for swk_
+// names it can find no definition of -- went from two to three on the strength of a sentence saying the
+// function does not exist. A file that names its own subject becomes its own subject; v4387 hit the same trap
+// from the other side and the fix is the same, reword rather than add an exclusion.
+//
+// *** AND SENSOR EVENTS ARE OFF BY DEFAULT ON BOTH ENDS. *** The header says so twice, in two places, because
+// it catches everybody: "Enable sensor events for this shape. This applies to sensors AND NON-SENSORS. False by
+// default, EVEN FOR SENSORS." A sensor with events disabled is a hole in the world that reports nothing, and a
+// visitor with events disabled walks through a live sensor silently. swk_body_sensor enables them on the sensor
+// it creates; the VISITOR is the caller's job and swk_body_enable_sensor_events is how.
+// ==============================================================================================================
+
+#define SWK_SENSOR_STRIDE 2   /* sensorBodyIndex, visitorBodyIndex */
+
+int swk_sensor_stride(void) { return SWK_SENSOR_STRIDE; }
+
+// Shape -> body -> index, the same scan swk_world_cast_ray and the contact reader use. A shape whose body the
+// table does not know yields -1, which is a real answer here: an END event can name a shape that has already
+// been destroyed, and the header warns about exactly that.
+static int swk__index_of_shape(b3ShapeId s) {
+    b3BodyId b = b3Shape_GetBody(s);
+    for (int i = 0; i < g_bodyCount; i++) if (B3_ID_EQUALS(g_bodies[i], b)) return i;
+    return -1;
+}
+
+/**
+ * A sensor body: overlaps are reported, nothing is pushed. Density is fixed at 0 rather than taken as a
+ * parameter -- the header notes sensors still contribute to body mass at non-zero density, and a trigger volume
+ * that changes the mass of the thing it is attached to is a trap nobody would look for.
+ *
+ * type follows swk_body_box: 0 static, 1 dynamic, 2 kinematic. A static sensor is the ordinary trigger volume.
+ */
+int swk_body_sensor(int type, float x, float y, float z, float hx, float hy, float hz) {
+    if (g_bodyCount >= MAX_BODIES) return -1;
+    b3BodyDef bd = b3DefaultBodyDef();
+    bd.linearDamping = 0.05f;
+    bd.angularDamping = 0.05f;
+    bd.type = (type == 2) ? b3_kinematicBody : (type == 1) ? b3_dynamicBody : b3_staticBody;
+    bd.position = (b3Pos){ x, y, z };
+    b3BodyId body = b3CreateBody(g_world, &bd);
+    b3ShapeDef sd = b3DefaultShapeDef();
+    sd.density = 0.0f;
+    sd.isSensor = true;
+    sd.enableSensorEvents = true;   // see the header block: false by default EVEN FOR SENSORS
+    b3BoxHull hull = b3MakeBoxHull(hx, hy, hz);
+    b3CreateHullShape(body, &sd, &hull.base);
+    g_bodies[g_bodyCount] = body;
+    return g_bodyCount++;
+}
+
+/** Is this body's first shape a sensor? Reads the library rather than a flag this file kept. */
+int swk_body_is_sensor(int idx) {
+    if (idx < 0 || idx >= g_bodyCount) return 0;
+    b3ShapeId shapes[8];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, 8);
+    return (n > 0 && b3Shape_IsSensor(shapes[0])) ? 1 : 0;
+}
+
+/** Turn sensor events on or off for every shape on a body. A VISITOR needs this or it is never reported. */
+void swk_body_enable_sensor_events(int idx, int flag) {
+    if (idx < 0 || idx >= g_bodyCount) return;
+    b3ShapeId shapes[8];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, 8);
+    for (int i = 0; i < n; i++) b3Shape_EnableSensorEvents(shapes[i], flag ? true : false);
+}
+
+int swk_sensor_begin_count(void) { return b3World_GetSensorEvents(g_world).beginCount; }
+int swk_sensor_end_count(void)   { return b3World_GetSensorEvents(g_world).endCount; }
+
+// Packed int rows, the same idiom as swk_contacts: the caller sizes from the count and reads a flat Int32Array.
+// The events are TRANSIENT -- the header says do not store a reference -- so they are copied out here and the
+// buffer belongs to the caller.
+void swk_sensor_begin(int* out) {
+    b3SensorEvents ev = b3World_GetSensorEvents(g_world);
+    for (int i = 0; i < ev.beginCount; i++) {
+        out[i * SWK_SENSOR_STRIDE + 0] = swk__index_of_shape(ev.beginEvents[i].sensorShapeId);
+        out[i * SWK_SENSOR_STRIDE + 1] = swk__index_of_shape(ev.beginEvents[i].visitorShapeId);
+    }
+}
+
+void swk_sensor_end(int* out) {
+    b3SensorEvents ev = b3World_GetSensorEvents(g_world);
+    for (int i = 0; i < ev.endCount; i++) {
+        out[i * SWK_SENSOR_STRIDE + 0] = swk__index_of_shape(ev.endEvents[i].sensorShapeId);
+        out[i * SWK_SENSOR_STRIDE + 1] = swk__index_of_shape(ev.endEvents[i].visitorShapeId);
+    }
+}
+
+// ---- CONTINUOUS COLLISION -------------------------------------------------------------------------------------
+//
+// Two independent switches, and calling either one "CCD" would hide the difference. b3World_EnableContinuous is
+// DYNAMIC-VERSUS-STATIC and defaults ON; b3Body_SetBullet is DYNAMIC-VERSUS-DYNAMIC for one body and defaults
+// off. Measured, and this is stronger than anything the vendored header says: the bullet flag is a second gate
+// BEHIND the world switch, not an alternative to it. With the world switch off, setting bullet changes nothing
+// against either kind of wall.
+
+void swk_world_enable_continuous(int flag) { b3World_EnableContinuous(g_world, flag ? true : false); }
+int  swk_world_continuous_enabled(void)    { return b3World_IsContinuousEnabled(g_world) ? 1 : 0; }
+
+void swk_body_set_bullet(int idx, int flag) {
+    if (idx < 0 || idx >= g_bodyCount) return;
+    b3Body_SetBullet(g_bodies[idx], flag ? true : false);
+}
+
+int swk_body_is_bullet(int idx) {
+    if (idx < 0 || idx >= g_bodyCount) return 0;
+    return b3Body_IsBullet(g_bodies[idx]) ? 1 : 0;
+}
+
+// ---- THE SPEED CAP, WHICH swk_body_set_velocity HAS ALWAYS BEEN SUBJECT TO AND NEVER MENTIONED ---------------
+//
+// *** FOUND BY MEASURING CONTINUOUS COLLISION, NOT BY LOOKING FOR IT. *** A tunnelling sweep read the same
+// final position for 640 m/s and for 1280 m/s, to the last decimal, which no physics does. b3WorldDef carries
+// a maximumLinearSpeed and b3DefaultWorldDef sets it; the vendored headers declare the FIELD and the two
+// accessors and nowhere state the DEFAULT, because it is assigned in box3d's own .c, which is not vendored
+// here. So the number is a measurement rather than a quotation: swk_body_set_velocity accepts any speed, reads
+// back unchanged before the step, and is silently 400 m/s after it.
+//
+// Exposing the accessors is the point. A shim with a velocity setter and no way to see or move the cap that
+// overrides it is half an API, and the half it is missing is the one that explains the surprise.
+
+void  swk_world_set_max_linear_speed(float v) { b3World_SetMaximumLinearSpeed(g_world, v); }
+float swk_world_max_linear_speed(void)        { return b3World_GetMaximumLinearSpeed(g_world); }

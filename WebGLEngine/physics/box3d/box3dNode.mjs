@@ -40,6 +40,7 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ADDED_AT_V4385 as JOINT_DRIVE_ADDED } from "./jointDrive.mjs";
+import { ADDED_AT_V4395 as SENSOR_CCD_ADDED } from "./sensorTrigger.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VENDOR_DIR = join(HERE, "..", "..", "vendor", "box3d");
@@ -163,6 +164,14 @@ export const PENDING_REBUILD = [
     // written into the solver and unobservable. The names come from physics/box3d/jointDrive.mjs's
     // ADDED_AT_V4385 rather than being typed here twice; the gate asserts the two lists are the same.
     ...JOINT_DRIVE_ADDED,
+    // v4395 -- sensors, continuous collision, and the speed cap: the same split a fourth time, and this one
+    // brought back something the browser path needs more than the functions. swk_world_max_linear_speed
+    // MEASURES a default the vendored headers never state -- 400 m/s -- and the artifact that ships ALREADY
+    // ENFORCES IT, because it is box3d's own default and not something this round added. So unlike the twelve
+    // names beside it, that finding is not pending anything: physics/esBox3d.js hands box3d a ship's top speed
+    // and ev/tools/es-arena.mjs's Fighter asks for 430, and 400 is what the world gives it today, in the wasm,
+    // with no rebuild involved. What is pending is only the ability to SEE or MOVE the cap from the browser.
+    ...SENSOR_CCD_ADDED,
 ];
 
 

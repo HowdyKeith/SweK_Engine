@@ -488,6 +488,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "named voxelizePage at all. Driven RED by four sabotages (1/3/2/1 by name), five subject " +
                  "files md5-identical after",
     }),
+    since25: Object.freeze({
+        at: "v4395", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/box3d/sensorsCcd-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.3s, five sections, all of it compiled and RUN against " +
+                 "the real box3d rather than asserted. Sensors: a body falls through one and ends at the SAME " +
+                 "six decimals as through empty space, while a solid box in the same place stops it -- and " +
+                 "with the VISITOR's sensor events off, a live sensor reports nothing at all. CCD: eight " +
+                 "combinations, one predicate reproducing all of them, and the measured fact that the bullet " +
+                 "flag is a second gate BEHIND the world switch rather than an alternative to it. THREE of " +
+                 "the round's own conclusions were refuted by measurement: two bisections of one experiment " +
+                 "disagreed (22.58 vs 30.08), which proved the predicate non-monotonic; a dense scan showed " +
+                 "pass-through ALTERNATES IN BANDS, so there is no threshold and the quantity is a rate " +
+                 "(64/96 without continuous, 1/96 with); and that one is a HOLE at 34 m/s where continuous is " +
+                 "on and the body goes through anyway, which makes the rule necessary and not sufficient. " +
+                 "Plus the finding nobody went looking for: b3WorldDef.maximumLinearSpeed defaults to 400 m/s, " +
+                 "the vendored headers state it nowhere, and the SHIPPED wasm already enforces it on " +
+                 "ev/tools/es-arena.mjs's Fighter at 430. Driven RED by five sabotages (2/4/4/2/2 by name), " +
+                 "three files md5-identical after, and sabotage D caught a check that required its own " +
+                 "finding to stay broken",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

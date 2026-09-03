@@ -14,6 +14,63 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4395 -- box3d sensors and CCD: #150's last two names, and a third nobody went looking for
+
+v4385 shipped joint motors and limits and left sensors/triggers and CCD open. This is those: fourteen new
+functions in box3d_shim.c, built and RUN natively against the real library, because build-box3d-native.sh
+needs only cc and cmake. Packaging to wasm still needs emsdk, so the names go on PENDING_REBUILD -- the same
+split for the fourth round running.
+
+SENSORS. A sensor reports one begin and one end as a body passes through it and names the sensor and visitor
+by body index. The property that makes it a sensor is a number: the falling box ends at y = -70.005989, the
+SAME six decimals as with no sensor at all, against 0.399930 for a solid box in the same place. And the trap
+the vendored header warns about twice is measured rather than quoted -- enableSensorEvents is false by default
+EVEN FOR SENSORS and must be on at both ends, and the same fall with the visitor's events off reports begins
+0, ends 0. A live sensor, a body going through it, and nothing at all.
+
+CCD IS TWO SWITCHES AND THE TABLE IS STRONGER THAN THE HEADER. Across all eight combinations at 500 m/s, the
+bullet flag does nothing against a static wall, and nothing against a dynamic one either unless the world
+switch is also on. It is a second gate BEHIND b3World_EnableContinuous, not an alternative to it, and no
+sentence in the vendored header says so. One predicate reproduces all eight rows.
+
+*** THEN THE ROUND WAS WRONG THREE TIMES IN ONE SECTION. ***
+
+Two bisections of the same tunnelling experiment, differing only in their upper bracket, returned 22.58 m/s
+and 30.08 m/s. A bisection cannot disagree with itself on a monotonic predicate. A dense scan says why: with
+the world switch off, pass-through ALTERNATES IN BANDS -- stopped at 20, through at 21, stopped at 22, through
+at 23-24 -- and 90 m/s stops while 13 m/s goes through. It is aliasing, not a threshold. So the quantity worth
+reporting is a RATE: 64 of 96 sampled speeds pass through with the switch off, 1 of 96 with it on.
+
+That ONE is the third correction. At 34 m/s the body goes clean through with continuous ENABLED, while 33, 35
+and 36 all bounce. The rule is NECESSARY AND NOT SUFFICIENT, and the gate ships the counterexample rather than
+a caveat.
+
+*** AND THE THING NOBODY WENT LOOKING FOR. ***
+
+Two runs at 640 and 1280 m/s landed on the same six decimals, which no physics does. It is
+b3WorldDef.maximumLinearSpeed, whose default the vendored headers state NOWHERE because it is assigned in
+box3d's own .c: measured through the getter, 400 m/s exactly, and raising it to 5000 lets the same 2000 m/s
+request through. swk_body_set_velocity accepts any speed and reads back unchanged until the world steps.
+
+IT IS ALREADY IN THE ARTIFACT THAT SHIPS. This is box3d's own default and nothing this round added.
+physics/esBox3d.js:50 clamps a ship to its hull's `speed` and hands that straight to box3d, and
+ev/tools/es-arena.mjs's Fighter has speed 430, so it has always been flying at 400 in the browser. The
+engine's own clamp, overridden by a library clamp it did not know existed. The gate drives the SHIPPED wasm,
+not the native build, to show it.
+
+Five sabotages, 2/4/4/2/2 RED by name, three subject files md5-identical. Sabotage D caught a gate of mine
+that required its own finding to stay broken: the hull check first asserted that a hull EXCEEDS the cap, which
+would go red the day somebody fixed it. It was rebuilt around the predictor, with a control that brings the
+Fighter to 390 and confirms the gate stays ALL GREEN with the census reporting zero.
+
+Also recorded and not bundled: box3dNode's documentedButMissing reports a truncated `swk_joint_` match that
+predates this round, which its own header's "the only name still outstanding" does not mention.
+
+UNCHECKED: trigger semantics above the event -- fire-once, occupancy sets, ordering when two sensors overlap
+one body in a step. Sensor events under LOCKSTEP, where two peers must agree on the event ORDER and not just
+the set. And CCD measured against a BOX only; box3d's continuous sweep is shape-dependent.
+
+The tree stands at 1431 gates.
 ## v4394 -- shadowed defaults: a default written twice along one call edge, and the second one decides
 
 v4392 found by accident that physics/box3dLockstep.js writes `shipHalf: opts.shipHalf || 30` and hands it to
