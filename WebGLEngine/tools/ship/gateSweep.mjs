@@ -380,6 +380,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages (3/3/1 by name) and restored -- and the 1-red one is the thesis rather than a weak " +
                  "check: making the hulls worse does not move a verdict that depends on the grid",
     }),
+    // v4382 -- the SIXTEENTH closing, for the arc's first PURE-INTEGER transplant. Its round also widened
+    // render/tslSource.mjs's uniform vocabulary (ivec/uvec), which every earlier closing's gate runs through, so
+    // tslPhysics, tslRace, tslRig and carveGpu were re-run to completion beside this one rather than left to the
+    // quick sweep's cap -- machinery that changed is what a 3 s cap cannot vouch for.
+    since16: Object.freeze({
+        at: "v4382", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/tslIsing-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections and 8 checks in 0.9 s -- fast because node-webgpu " +
+                 "serves it in-process rather than through a browser. Driven RED by three sabotages (4/3/3 by " +
+                 "name) and restored; the first is the round's own argument, a completely wrong RNG that moves " +
+                 "13% of the spins and leaves the physics looking healthy",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -25,8 +25,20 @@ export const TRI_VS_WGSL = `struct VSOut { @builtin(position) pos: vec4f, @locat
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   var o: VSOut; o.pos = vec4f(p[vi], 0.0, 1.0); o.uv = vec2f((p[vi].x + 1.0) * 0.5, 1.0 - (p[vi].y + 1.0) * 0.5); return o;
 }`;
-const WGSL_TYPES = { "f32": "f32", "vec2<f32>": "vec2", "vec3<f32>": "vec3", "vec4<f32>": "vec4", "mat4x4<f32>": "mat4", "i32": "i32", "u32": "u32" };
-const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "vec4", "mat4": "mat4", "int": "i32", "uint": "u32" };
+// *** v4382 -- THE VOCABULARY WAS FLOAT-ONLY, AND A PURE-INTEGER KERNEL CANNOT BE TRANSPLANTED THROUGH IT. ***
+// Every uniform in this arc had been a float or a float vector, so nothing noticed that i32 and u32 were here as
+// SCALARS while their vectors were not. tools/roundhouse/isingGpu.mjs's Philox pass carries its seed and key in a
+// vec4<u32> and was refused by name -- "uniform cfg has type vec4<u32>, which the device's uniform list does not
+// carry" -- which is the guard working, and then the vocabulary is what has to grow. The reverse lookup below maps
+// the short name back to the WGSL type, so the short names must stay distinct; ivec/uvec are three's own names for
+// these and are what its GLSL builder emits.
+const WGSL_TYPES = { "f32": "f32", "vec2<f32>": "vec2", "vec3<f32>": "vec3", "vec4<f32>": "vec4", "mat4x4<f32>": "mat4",
+                     "i32": "i32", "u32": "u32",
+                     "vec2<i32>": "ivec2", "vec3<i32>": "ivec3", "vec4<i32>": "ivec4",
+                     "vec2<u32>": "uvec2", "vec3<u32>": "uvec3", "vec4<u32>": "uvec4" };
+const GLSL_TYPES = { "float": "f32", "vec2": "vec2", "vec3": "vec3", "vec4": "vec4", "mat4": "mat4", "int": "i32", "uint": "u32",
+                     "ivec2": "ivec2", "ivec3": "ivec3", "ivec4": "ivec4",
+                     "uvec2": "uvec2", "uvec3": "uvec3", "uvec4": "uvec4" };
 // v4325 -- the names a shell has for what three calls positionLocal, normalLocal, position and normal. A shell that
 // carries no normal (the sprite layout has p, color, uv and nothing else) simply leaves those out, and a displacement
 // that reads one is refused BY NAME rather than renamed into a variable the shell's vertex stage never declared.
