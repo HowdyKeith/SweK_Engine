@@ -173,13 +173,26 @@ export const PARITY_BASELINE = Object.freeze({
     // LOBE is composed from microfacetWgsl.mjs rather than written here, but everything below the lobe is this
     // file's own WGSL text -- the sampling half has no shipped GLSL to translate -- so it is shader-bearing on
     // the same test the previous two passed: the census counts text a file AUTHORS, not text it imports.
+    //
+    // *** AND THEN THE NUMBERS MOVED THREE TIMES WITH NOTHING WRITTEN HERE, WHICH v4416 FOUND BY ADDING THE
+    // FOURTH. *** The run of entries above stops at v4409 and reads like a complete history. It is not one:
+    // v4411, v4412 and v4413 each took wgslBearing and wgslOnly up by one and left the reason in their commit
+    // messages instead. Recovered from the history and written down, because a record that looks complete and
+    // is not is worse than one that admits a gap:
+    //   v4411 -- physics/render/energyCompWgsl.mjs, WGSL-only: the compensation table built on the device.
+    //   v4412 -- physics/render/microfacetAnisoWgsl.mjs, WGSL-only: the anisotropic lobe and its swap identity.
+    //   v4413 -- physics/render/misWgsl.mjs, WGSL-only: two estimators and the balance heuristic in one kernel.
+    //   v4416 -- physics/render/fresnelWgsl.mjs, WGSL-only: the exact Fresnel equations, Schlick, and a GGX
+    //            lobe carrying one of them. Same call as the four before it -- a shader-bearing MODULE, so
+    //            the baseline moves rather than the shader hiding in a gate fixture. (v4410 correctly moved
+    //            NOTHING: it extended microfacetSampleWgsl.mjs rather than adding a file.)
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 62,
+    wgslBearing: 63,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 49,
+    wgslOnly: 50,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

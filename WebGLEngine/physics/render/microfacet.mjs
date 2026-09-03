@@ -234,6 +234,34 @@ export function directionalAlbedoSampled(alpha, cosO, { samples = 4096, ...o } =
     return s / samples;
 }
 
+/**
+ * v4416 -- THE SAME ESTIMATOR WITH A REAL FRESNEL TERM, AND THE TRANSMITTED SHARE ACCUMULATED ALONGSIDE IT.
+ *
+ * `Fof` is called with dot(wo, wh) -- the angle AT THE MICROFACET, which is what Fresnel is a function of and
+ * is NOT the angle to the macroscopic normal. Passing cos_o there is a real and popular bug; it is invisible
+ * at normal incidence and at every roughness below about 0.1, because the two angles coincide in the limit.
+ *
+ * *** THE COMPLEMENT IS THE POINT. *** Under visible-normal sampling the reflected estimator is F * G2/G1(wo),
+ * so (1 - F) * G2/G1(wo) is the light that went THROUGH the interface rather than being lost, and the two sum
+ * to the F = 1 albedo sample for sample. That is what makes a Fresnel deficit DISTINGUISHABLE from a masking
+ * deficit: fresnel-selfcheck.mjs's "R + T = 1 is worthless if T is defined as 1 - R", lifted from one
+ * interface to a whole lobe. With Fof = null this returns exactly directionalAlbedoSampled with T = 0.
+ */
+export function directionalAlbedoSplit(alpha, cosO, Fof = null, { samples = 4096, ...o } = {}) {
+    const so = Math.sqrt(Math.max(0, 1 - cosO * cosO)), wo = [so, cosO, 0];
+    let R = 0, T = 0, one = 0;
+    for (let i = 0; i < samples; i++) {
+        const wh = sampleVisibleNormal(wo, alpha, (i + 0.5) / samples, vanDerCorput16(i) / 65536, o);
+        const d = wo[0] * wh[0] + wo[1] * wh[1] + wo[2] * wh[2];
+        const cosI = 2 * d * wh[1] - wo[1];
+        if (cosI <= 0) continue;
+        const w = visibleBounceWeight(cosO, cosI, alpha, o);
+        const F = Fof ? Fof(Math.min(1, Math.max(0, d))) : 1;
+        R += F * w; T += (1 - F) * w; one += w;
+    }
+    return { E: R / samples, T: T / samples, one: one / samples };
+}
+
 /** Bit reversal of the low sixteen bits. Integer throughout, so it is exact wherever it runs. */
 export function vanDerCorput16(i) {
     let b = i & 0xffff;

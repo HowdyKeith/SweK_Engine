@@ -598,6 +598,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "L was added with an independent two-box reference. Its FIXTURE also had to be built twice: " +
                  "the sphere carves it started with never detached anything",
     }),
+
+    // v4416 -- the thirty-first closing, and the one that closes the F = 1 six rounds of this arc named as
+    // unchecked. Its headline is a COLLISION rather than a discrepancy: a model failure and correct physics
+    // made to return the same furnace number bit for bit, so that the thing which separates them has to be
+    // found somewhere other than in a tolerance. It also corrects its own first draft, which borrowed a
+    // sentence about one interface for a lobe where it does not hold -- and a 0-red sabotage now keeps that
+    // correction from drifting back.
+    since32: Object.freeze({
+        at: "v4416", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/fresnelWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 25 checks in 3.3 s. Driven RED by nine " +
+                 "sabotages (0/2/2/7/2/1/3/2/1 by name) and restored -- THE 0 IS DELIBERATE AND IS THE ONE " +
+                 "WORTH READING, because the quantity it changes is the same quantity by linearity and no " +
+                 "check may claim otherwise. One of the 2s went 1 RED FIRST: the collision check read only " +
+                 "the side that is supposed to be empty, which cannot tell empty from broken. It also " +
+                 "corrects a sentence in fresnel-selfcheck.mjs by measurement",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

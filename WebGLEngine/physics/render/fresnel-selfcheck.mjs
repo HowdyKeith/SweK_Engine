@@ -54,7 +54,9 @@ const PAIRS = [[1, 1.33], [1, 1.5], [1, 2.4], [1.5, 1]];   // air/water, air/gla
     const unpol = fresnel(found, n1, n2).R, Rs = fresnel(found, n1, n2).Rs;
     ok("...and the UNPOLARISED reflectance is NOT zero there -- it is exactly half the s term",
        Math.abs(unpol - Rs / 2) < 1e-15 && unpol > 0.07,
-       `${unpol.toFixed(6)} against R_s/2 = ${(Rs / 2).toFixed(6)}. A renderer that works in unpolarised light sees a MINIMUM at Brewster, never a zero, so a check on the unpolarised number could not find this angle at all. THE KEY LIVES IN A QUANTITY THE RENDERER DOES NOT DISPLAY.`);
+       `${unpol.toFixed(6)} against R_s/2 = ${(Rs / 2).toFixed(6)}. A check on the unpolarised number could not find this angle at all. THE KEY LIVES IN A QUANTITY THE RENDERER DOES NOT DISPLAY.
+
+       *** v4416 CORRECTS THIS LINE. *** It used to say a renderer working in unpolarised light "sees a MINIMUM at Brewster, never a zero". IT SEES NOTHING AT ALL: (R_s + R_p)/2 is STRICTLY MONOTONE in cos for every index pair this file tests, and its least value over the whole range is F0, at NORMAL INCIDENCE -- R_s climbs faster than R_p falls, everywhere. So Brewster leaves no feature in the unpolarised curve to blur, and the stronger claim is the true one. The check itself was right and unchanged; the sentence explaining it understated the case. fresnelWgsl-selfcheck.mjs section 2 measures the monotonicity, and its section 4 runs a minimum-hunt for Brewster on a device in exactly this quantity -- which walks to the end of its bracket and reports F0, because that is where the minimum is.`);
 
     ok("and the bisection REFUSES rather than returning a midpoint when there is no sign change",
        brewsterByBisection(1, 1) === null,
