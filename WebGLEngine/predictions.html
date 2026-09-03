@@ -70,6 +70,17 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A verdict is an exit status, and a log tail that disagrees with it is no verdict at all",
+    since: "v4405",
+    state: "open",
+    pred: "The gates in this tree grade the tree. NOTHING graded the hand between the gate and the push, and that is where the worst mistake of the session happened: v4404 was committed, pushed and fast-forwarded onto main with three conflict markers still in main.js, brain/brain.js and tools/ship/gateSweep.mjs, past a verify that had printed DO NOT SHIP and exited 1. The prediction is that making the ritual's LAST LINE be generated from the exit status -- rather than a line to be read past, beside an earlier run's ALL GREEN in the same scrollback -- removes the failure rather than merely warning about it, and that the conflict-marker scan catches the next one that gets past it anyway.",
+    why: "The failure was not carelessness that more care fixes. It was a decision procedure that consumed TEXT where the truth was a STATUS, in a log where both an ALL GREEN and a DO NOT SHIP were present. The same defect has now been recorded three times inside gates (v4392, v4404 twice) as `a count of failures is not a verdict unless the process finished`; this is the first sighting of it at the ritual's own level, where nothing had ever looked.",
+    measured: "tools/ship/shipVerdict.mjs runs verify, reads its exit status, scans all 5,505 tracked files for anchored conflict markers, and prints one SHIP / DO NOT SHIP line derived from both. All five (status, tail) pairs are graded, including the two that DISAGREE in either direction and the one with no status at all -- and the disagreeing pairs are NO VERDICT rather than a pass. The tail-says-green-exit-says-1 case is proven against a live child process, not a fixture string.",
+    kill: "tools/ship/shipVerdict-selfcheck.mjs. Any tracked file carrying a conflict marker at line start kills it, here or on origin/main; so does any (status, tail) pair that resolves to SHIP without both agreeing. SABOTAGE: drop the ^ anchor from MARKER_RE, or make verdict() trust the tail over the status, and it goes red by name -- MEASURED at 1 and 3 reds respectively. HONEST SCOPE: nothing in a repository can stop a person from typing git push, and this cannot see a conflict resolved WRONGLY -- markers gone, semantics broken. It makes the unverified push leave a mark the next run finds.",
+    page: "instruments.html",
+    where: "tools/ship/shipVerdict.mjs + tools/ship/shipVerdict-selfcheck.mjs + .claude/skills/ship/SKILL.md step 4.",
+  },
+  {
     name: "The Endless Sky calendar is exact to the day, because approximately right is a save file that disagrees with itself",
     since: "v2864",
     state: "settled",

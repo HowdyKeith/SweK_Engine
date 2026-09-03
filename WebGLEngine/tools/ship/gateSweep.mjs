@@ -629,6 +629,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotage F rewrote a check that had asserted a defect existed instead of pinning its value",
     }),
     since33: Object.freeze({
+        at: "v4406", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shipVerdict-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in ~2s, five sections. It gates tools/ship/shipVerdict.mjs, the " +
+                 "repair for the worst mistake of the session: v4404 was committed, pushed and fast-forwarded " +
+                 "onto main WITH THREE CONFLICT MARKERS IN IT, past a verify that had printed DO NOT SHIP and " +
+                 "exited 1, because the git steps were chained behind a read of the log tail rather than of the " +
+                 "exit status. Two conditions, held apart: no tracked file carries a conflict marker (5,505 read " +
+                 "in full, no allowance list, and the ref checked as well as the tree because a clean tree is " +
+                 "not evidence about what shipped), and a (status, tail) pair that DISAGREES IN EITHER " +
+                 "DIRECTION is no verdict rather than a pass -- proven against a live child that prints ALL " +
+                 "GREEN and exits 1. Driven RED by three sabotages (MEASURED 1/3/1 by name)",
+    }),
+    since34: Object.freeze({
         at: "v4407", swept: 1, green: 1, red: 0,
         added: Object.freeze(["gfx/frontDoor-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),

@@ -69,9 +69,16 @@ two is sensitive to what.
 
 ## 4. Verify
 
-    node tools/ship/verify.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"
+    node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"; echo "exit=$?"
 
-Must end `[verify] ALL GREEN`. The PASS count is environment-conditional (SwiftShader, Playwright, WASM
+`shipVerdict.mjs` (v4405) runs verify, reads its EXIT STATUS, scans every tracked file for conflict markers,
+and prints one last line -- `[ship] SHIP` or `[ship] DO NOT SHIP -- <reason>` -- that is GENERATED FROM the
+exit status rather than restated beside it. Ship only on `SHIP`, and never chain the git steps behind a grep
+of the log: v4404 was pushed with three conflict markers in it because the chain read a tail that said ALL
+GREEN from an earlier run while verify itself had exited 1. A tail that disagrees with the exit status in
+EITHER direction is NO VERDICT -- not a pass. If you run verify directly instead, read `$?` and nothing else.
+
+The PASS count is environment-conditional (SwiftShader, Playwright, WASM
 availability) and is NOT a number to assert or compare between boxes.
 
 Since v4303 verify runs the QUICK SWEEP (`tools/ship/quickSweep.mjs`): every gate under the budget in
