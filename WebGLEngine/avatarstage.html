@@ -84,6 +84,7 @@
 <script type="module">
   import { mountStage } from "./face/avatarStage.js";
   import avatarRegistry from "./ui/avatarRegistry.js";   // v1016 clean-house: rename + missing-file memory
+  import { resolvePet } from "./ui/stageFlags.mjs";   // v4419 -- one declaration of the pet rule
 
   const qs = new URLSearchParams(location.search);
   let _chosenAvatar = null;   // v1009 — a live setAvatar persists across re-mounts
@@ -331,10 +332,23 @@
       // v3656 -- ?embed=1 -> the flag the CSS above keys on, and the pet forced OFF. The panel showed the pet and
       // not the avatar: a wandering pet is small enough to fit a 143x210 box and a 1.8u rigged figure is not, so
       // the only thing that ever landed in frame was the thing that wanders. AN EMBEDDED AVATAR IS ONE AVATAR.
+      //
+      // *** v4419 -- THAT REASON WAS A BOX SIZE, AND THE BOX IS GONE. *** v4414 retired server.html's SVG dials
+      // and gave the avatar the whole of #dialsRow: host/row went from 0.263 to 1.000, and the 143x210 panel
+      // this rule was written for measures 676 px wide now. A ROOM THAT FITS ONE FIGURE FITS THE FIGURE AND THE
+      // LLAMA. So `embed` no longer FORCES the pet off -- it still DEFAULTS it off, and an explicit ?pet=1 is
+      // now honoured, which is the difference between a default and a veto.
+      //
+      // MEASURED BEFORE CHANGING IT, because a default that nobody overrides is safe to loosen and a veto that
+      // somebody relies on is not: the whole tree has exactly TWO callers passing embed=1, and BOTH already
+      // pass pet=0 explicitly. So no existing caller moves, and their pet=0 -- redundant under the veto -- is
+      // load-bearing again, which is the better state for it to be in.
       const _embed = qs.get("embed") === "1";
       if (_embed) { try { document.documentElement.setAttribute("data-embed", "1"); } catch (e) {} }
-      const _pet = _embed ? false
-                 : ((qs.get("pet") !== null) ? (qs.get("pet") !== "0") : (_comp.pet !== undefined ? !!_comp.pet : true));   // v1352
+      // v4419 -- the three-rule resolution lives in ui/stageFlags.mjs so the gate can test THE RULE rather
+      // than a restatement of it. Explicit ?pet wins; an embedded stage otherwise defaults it off (v3656);
+      // otherwise the composition decides (v1352).
+      const _pet = resolvePet(qs.get("pet"), _embed, _comp.pet);
       // v993 — mountScene lets the panel re-mount with a different scene so it
       // can drift into a screensaver when idle, then snap back. Avatar scenes
       // reuse url/url2/gauges; ambient fidget scenes need none.

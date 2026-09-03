@@ -52,8 +52,6 @@ export const MODES = [
       src: "/blob-avatar.html?embed=1" },
     // v3556 -- the two heavy ones, added last on purpose. Each carries a `heavy` note so the button can say what
     // it is about to cost BEFORE the click, rather than after the download starts.
-    { id: "blobgpu", label: "\u26a1", title: "Blobulator GPU — WebGPU raymarched SDF (needs a WebGPU browser)", kind: "frame",
-      src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",
       src: "/thead.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
     // v4046 -- Keith: "so can we have a krbn avatar switch to on server.html?" The same rigged GLB the "rigged"
@@ -107,8 +105,34 @@ export const MODES = [
     // MediaPipe blendshape face, ~12 MB on first use) is REMOVED from this rotation rather than kept alongside --
     // "swap out ... swap in" was the request, not "add"; face-mirror.html itself is untouched and still reachable
     // elsewhere (the universal viewer, direct URL), only this switch's rotation drops it.
+    // *** v4419 -- Keith: "before we switch into the webgpu avatar gauges scene which replaces the svg scene,
+    // before that we can swap in the full avatar, llama, gauges 3d view that we already have." ***
+    //
+    // IT WAS ALREADY BUILT AND THE DOCK COULD NOT REACH IT. face/avatarStage.js's diorama scene is the one
+    // where, in its own words, "the avatar + 3 gauges + llama all sit together as one group" -- three 3D gauge
+    // actors, the rigged figure, and the wandering pet llama, in one room. Every rigged slot above asks for
+    // scene=focus (one avatar, no gauges) and pet=0, so none of them has ever shown it.
+    //
+    // *** AND pet=0 IN THOSE URLs WAS REDUNDANT UNTIL THIS ROUND. *** avatarstage.html forced the pet off for
+    // ANY ?embed=1 caller, so the flag did nothing; v4419 turned that veto back into a default because the
+    // reason for it -- "a 143x210 box" -- was retired at v4414 when this dock became the full 676 px row.
+    // See the block above _pet in avatarstage.html: the two existing embed callers both pass pet=0, so
+    // loosening the veto moves nothing that already ships and makes their flag load-bearing again.
+    { id: "stage3d", label: "\ud83e\udd99", title: "Full stage \u2014 the rigged avatar, three 3D gauges and the pet llama in one room", kind: "frame",
+      src: "/avatarstage.html?voice=M1&glb=RobotExpressive&scene=diorama&camdock=1&embed=1&pet=1&saver=0",
+      frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
     { id: "gauges3000", label: "\ud83c\udf00", title: "Gauges 3000 \u2014 WebGPU energy-core avatar ringed by an LCARS gauge cluster (Canvas2D fallback)", kind: "frame",
       src: "/gauges3000.html?embed=1" },
+    // *** v4419 -- AND THE WEBGPU BLOB IS THE LAST CHOICE NOW, WHICH OVERRULES A STATED PREFERENCE ON PURPOSE.
+    // *** v4033 asked for gauges3000 to be final and this file's gate asserted it for 385 versions. Keith,
+    // this round: "then switching from that switches to the webgpu blob avatar scene we have fit that same
+    // size." So the order is stage3d -> gauges3000 -> blobgpu, and the ASSERTION MOVED RATHER THAN BEING
+    // DELETED -- ui/avatarSwitch-selfcheck.mjs now pins the whole three-mode tail, which is a stronger claim
+    // than "one named mode is last" and encodes the sequence that was actually asked for.
+    //
+    // It keeps its `heavy` note: a WebGPU context is a real cost and the button still says so before the click.
+    { id: "blobgpu", label: "\u26a1", title: "Blobulator GPU \u2014 WebGPU raymarched SDF (needs a WebGPU browser)", kind: "frame",
+      src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
 
 ];
 

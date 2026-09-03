@@ -860,6 +860,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since46: Object.freeze({
         at: "v4420", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["ui/stageFlags-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, well under the quick-sweep budget -- it tests a RULE as arithmetic and " +
+                 "walks the tree for a caller census, with no browser. Keith asked for the full avatar, llama " +
+                 "and 3D gauges view before the WebGPU gauges scene. IT WAS ALREADY BUILT AND THE DOCK COULD " +
+                 "NOT REACH IT: face/avatarStage.js's diorama scene puts 'the avatar + 3 gauges + llama all " +
+                 "sit together as one group', and every rigged slot asks for scene=focus and pet=0. AND pet=1 " +
+                 "WAS UNREACHABLE RATHER THAN UNUSED -- avatarstage.html forced the pet off for any embed=1 " +
+                 "caller, so the flag did nothing. v3656's stated reason was 'a 143x210 box', and v4414 " +
+                 "retired that box (host/row 0.263 -> 1.000, 676 px). The veto outlived its reason by five " +
+                 "versions. Loosened to a DEFAULT only after counting who relied on it: exactly two embed " +
+                 "callers, both already passing pet=0, so nothing that ships moved. The rule moved to NEW " +
+                 "ui/stageFlags.mjs because a gate cannot test a line inside a page's inline module without " +
+                 "restating it, and a restated rule is a second declaration. Rotation: stage3d before " +
+                 "gauges3000, blobgpu last -- which overrules v4033's stated preference on purpose, and the " +
+                 "ASSERTION MOVED RATHER THAN BEING DELETED, now pinning the whole three-mode tail (stronger " +
+                 "than 'one named mode is last', which could not have caught a mode inserted in the wrong " +
+                 "place). The first draft of the census check accepted N or N+1 with an ||; a ratchet " +
+                 "satisfiable by two numbers cannot do its job, and it is an equality now. Four sabotages, " +
+                 "1/2/5/3 red by name.",
+    }),
+    since47: Object.freeze({
+        at: "v4421", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/predicatePairs-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~8s, four sections. v4419 named the half nothing did -- " +
