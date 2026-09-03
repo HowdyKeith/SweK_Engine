@@ -1,4 +1,5 @@
 "use strict";
+import { LOD_RECORD } from "./lodRecord.mjs";
 /**
  * LOD THRESHOLDS DERIVED FROM A MEASUREMENT, NOT TYPED.
  *
@@ -127,4 +128,52 @@ export function ladderKind(shipped, geometry, { policy = FRAME() } = {}) {
         why: `no rung leaves the ${budget}-pixel budget at any metric measured, coloured or not; this is one rung wearing several names` };
     return { kind: "approximation", geometryWorst: g, shippedWorst: sh, budget,
         why: `geometry leaves the ${budget}-pixel budget, by up to ${g} pixels, so the ladder approximates and a fidelity budget can choose where to switch` };
+}
+
+/**
+ * v4377 -- THE COST A RECORD PREDICTS AT ONE ANGULAR SIZE, interpolated between the samples that bracket it. The
+ * inverse of crossingFor, and the way a derived threshold can be CHECKED rather than trusted: feed the threshold
+ * back in and the cost it implies must be inside the budget it was derived from. Outside the sampled range it
+ * returns null, because a record cannot answer for a metric it never measured.
+ */
+export function costAtMetric(samples, metric, { of = "frame" } = {}) {
+    const { rows } = priceRung(samples, { of });
+    if (!rows.length || metric < rows[0].metric || metric > rows[rows.length - 1].metric) return null;
+    for (let i = 1; i < rows.length; i++) {
+        if (metric <= rows[i].metric) { const lo = rows[i - 1], hi = rows[i];
+            const span = hi.metric - lo.metric;
+            return span > 0 ? lo.cost + ((metric - lo.metric) / span) * (hi.cost - lo.cost) : lo.cost; }
+    }
+    return rows[rows.length - 1].cost;
+}
+
+/**
+ * v4377 -- THE DISC LADDER'S THRESHOLDS AT A GIVEN FRAME WIDTH, derived from the frozen record rather than typed.
+ *
+ * *** WHY A THRESHOLD CANNOT BE ONE CONSTANT, MEASURED RATHER THAN REASONED. *** A rung's cost in PIXELS is an area
+ * on the screen, so it grows with the square of the frame width, and a budget stated in pixels is therefore met at a
+ * different angular size on a different canvas. Derived at three widths from the same record, the crossings are
+ * 0.0625 / 0.0354 / 0.0151 for rung 1 at 128, 256 and 512 -- and metric x width is 8.00 / 9.06 / 7.72, constant to
+ * about a tenth over a fourfold change of resolution. So the shape of the law is metric = K / width, and K is what
+ * this derives.
+ *
+ * IT TAKES THE SMALLEST K, not the mean. The policy is a CEILING -- at most `budget` pixels -- so the threshold that
+ * honours it at every width measured is the most conservative one, and a mean would exceed the budget at whichever
+ * resolution came in below it. A caller at a width far outside 128..512 is extrapolating and is told so.
+ */
+export function discLadderThresholds(width, { policy = FRAME(), record = LOD_RECORD } = {}) {
+    const widths = record.widths.filter((w) => record.byWidth[w]);
+    const perWidth = widths.map((w) => ({ w, d: lodThresholdsFor(record.byWidth[w], { policy }) }));
+    const failed = perWidth.filter((x) => !x.d.thresholds);
+    if (failed.length) return { thresholds: null, k: null, widths,
+        why: `the frozen record does not derive at width(s) ${failed.map((x) => x.w).join(", ")}: ${failed[0].d.why}` };
+    const rungs = perWidth[0].d.thresholds.length;
+    const k = Array.from({ length: rungs }, (_, i) => Math.min(...perWidth.map((x) => x.d.thresholds[i] * x.w)));
+    const lo = Math.min(...widths), hi = Math.max(...widths);
+    const extrapolating = width < lo || width > hi;
+    return { thresholds: k.map((kk) => kk / width), k, widths, width, extrapolating,
+             spread: Array.from({ length: rungs }, (_, i) => { const v = perWidth.map((x) => x.d.thresholds[i] * x.w);
+                 return Math.max(...v) / Math.min(...v); }),
+             why: `metric = K / width with K = ${k.map((x) => x.toFixed(2)).join(", ")}, the smallest of ${widths.length} widths measured (${widths.join(", ")})`
+                  + (extrapolating ? `; width ${width} is OUTSIDE that range and this is an extrapolation` : "") };
 }

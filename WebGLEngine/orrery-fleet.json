@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7488d97f83e66ee2604289e8bcbc174b920123df",
+ "head": "3bfa4e78ddfa9e82816d01144b04232340ecb4ad",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2649451,
-    "sha": "7488d97f83e66ee2604289e8bcbc174b920123df"
+    "bytes": 2650116,
+    "sha": "3bfa4e78ddfa9e82816d01144b04232340ecb4ad"
    },
    {
     "path": "mpm3d.html",
@@ -624,7 +624,7 @@
   "three-webgpu": [
    {
     "path": "orrery-gpu.html",
-    "bytes": 35176,
+    "bytes": 36358,
     "sha": "2776e510f13e8369eb45229a2b508a8beab0b696"
    },
    {
