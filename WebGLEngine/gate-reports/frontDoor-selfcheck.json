@@ -1,0 +1,103 @@
+{
+ "gate": "gfx/frontDoor-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "the WebGPU/TSL population and whether the front door reaches it",
+   "columns": [
+    "module",
+    "reached from main.js"
+   ],
+   "rows": [
+    [
+     "gfx/device.js",
+     "yes"
+    ],
+    [
+     "render/tslSource.mjs",
+     "no"
+    ],
+    [
+     "render/badTvTsl.mjs",
+     "no"
+    ],
+    [
+     "render/badTvDevicePass.mjs",
+     "no"
+    ],
+    [
+     "render/blackbodyTsl.mjs",
+     "no"
+    ],
+    [
+     "render/fleetTsl.mjs",
+     "no"
+    ],
+    [
+     "render/physicsTsl.mjs",
+     "no"
+    ],
+    [
+     "render/brainTsl.mjs",
+     "no"
+    ],
+    [
+     "ui/orreryPost.mjs",
+     "no"
+    ],
+    [
+     "ui/webrtxBrowser.js",
+     "no"
+    ]
+   ],
+   "note": "695 modules reached in total, walked with tools/ship/moduleRefs.mjs"
+  },
+  {
+   "title": "one server, two origins, in a real browser",
+   "columns": [
+    "origin",
+    "isSecureContext",
+    "webgpu state",
+    "backend the door opened",
+    "step that stopped webgpu"
+   ],
+   "rows": [
+    [
+     "loopback + --enable-unsafe-webgpu",
+     "true",
+     "present",
+     "webgpu",
+     "null"
+    ],
+    [
+     "LAN 192.0.2.2",
+     "false",
+     "withheld",
+     "webgl2",
+     "null"
+    ],
+    [
+     "loopback 127.0.0.1",
+     "true",
+     "no-device",
+     "webgl2",
+     "adapter"
+    ]
+   ],
+   "note": "the adapter here is swiftshader, so this says which BACKEND answered and never how fast"
+  }
+ ],
+ "notes": [
+  "The reach numbers are walked with the tree's own resolver at run time, not read from a record."
+ ],
+ "skipped": [
+  {
+   "what": "the TSL chain from the front door",
+   "why": "nine of the ten named modules are still outside the reach and the gate says the number. Routing render/tslSource.mjs and an effect through the door is its own round; this one opens the device"
+  },
+  {
+   "what": "any timing",
+   "why": "the adapter reachable here is google/swiftshader, a software rasteriser. Every number in these tables is a backend name or a boolean, never a rate"
+  }
+ ]
+}

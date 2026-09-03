@@ -14,6 +14,95 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4407 -- the front door reached no WebGPU and no TSL, and advertised WebGPU anyway
+
+Walked forward from main.js with the tree's own resolver -- tools/ship/moduleRefs.mjs's specifiers() and
+resolveSpec() -- the front door reached 692 modules and NOT ONE of these:
+
+    gfx/device.js            538 lines, requestDevice / detectBackends / webgl2Backend / webgpuBackend,
+                             39 mentions of compute and storage
+    render/tslSource.mjs     v4320-v4338: a TSL graph compiled by three's node builders to BOTH WGSL and
+                             GLSL, transplanted into device.js's own shell, held to the hand-written
+                             pipeline's picture BYTE FOR BYTE ON BOTH BACKENDS. Compute passes (v4331),
+                             buffers read as well as written (v4336), atomics (v4337), workgroup-shared
+                             memory (v4338)
+    six TSL modules          blackbodyTsl, fleetTsl, physicsTsl, brainTsl, badTvTsl, badTvDevicePass
+    ui/orreryPost.mjs        the device post chain
+    ui/webrtxBrowser.js      Vulkan's ray tracing pipeline as pure WebGPU compute
+
+All of it lives on tsl-rig.html, tsl-probe.html, orrery-gpu.html and webrtx.html, pages main.js never reaches.
+And main.js carried one line that printed "this browser HAS WebGPU -- run ... to compare against it" and then
+offered nothing that used it.
+
+A LAZILY-IMPORTED DOOR CLOSES ONE OF TEN, AND SAYS ONE RATHER THAN IMPLYING TEN.
+
+gfx/frontDoor.mjs is imported the way main.js imports 123 other things, so the cost is zero for a session that
+never asks and the reach is still real: moduleRefs counts a dynamic import as a route, and the graph now runs
+main.js -> gfx/frontDoor.mjs -> gfx/device.js where it stopped at main.js before. 692 -> 695.
+
+The ratchet is on the DIFFERENCE between the frozen population and what this round closed, computed in the gate
+rather than read from a third list -- a count typed beside the rows it totals is the defect this tree has spent
+hundreds of rounds pulling back out of itself. Nine are still outside and the gate names all nine.
+
+The default render path is UNTOUCHED, on purpose, and the next paragraph is why.
+
+AND THE REASON IT IS A DOOR AND NOT A REROUTE IS A DISTINCTION detectBackends() CANNOT MAKE.
+
+It reads `!!navigator.gpu` and nothing else. An undefined navigator.gpu therefore means "this browser has none"
+and "this URL may not have it" AT THE SAME TIME, and requestDevice() falls through to webgl2 without saying
+which happened. Those have different fixes: one is a machine to replace, the other an address to change. SweK's
+primary origin is http://<lan-ip>:8787, neither https nor loopback.
+
+THREE REASONS A WEBGPU DEVICE DOES NOT ARRIVE, MEASURED ON ONE MACHINE IN ONE RUN:
+
+    origin                              isSecureContext   state       backend   step that stopped it
+    LAN 192.0.2.2                       false             withheld    webgl2    (never asked -- no API)
+    loopback 127.0.0.1                  true              no-device   webgl2    adapter
+    loopback + --enable-unsafe-webgpu   true              present     webgpu    --
+
+The same server, the same browser, the same GPU. detectBackends() reports webgpu:false for the first two and
+cannot tell them apart, and the third differs from the second BY A COMMAND-LINE ARGUMENT -- which is what
+tools/ship/webgpuHarness.mjs's LAUNCH_ARGS carries, and why a compute dispatch there returns real numbers.
+So "no adapter" is a statement about the LAUNCH, not only about the address.
+
+THE FOURTH STATE EXISTS BECAUSE THE GATE CAUGHT THE DOOR LYING.
+
+The door shipped with three states -- present, withheld, absent -- and on loopback, a secure origin with
+navigator.gpu defined and the state reading PRESENT, gfx/device.js still handed back webgl2 while open()
+reported `why: null`, "nothing to explain", over a downgrade sitting in plain view. PRESENT is a fact about the
+API; ANSWERED is a fact about the pipeline. webgpuBackend() returns null at FOUR separate points and tells
+nobody which, so the door now diagnoses them in order and names the first that fails.
+
+And then I wrote "the canvas context" into the module header as the cause, and THE MEASUREMENT SAID "adapter":
+navigator.gpu exists and requestAdapter() returns null. The header was corrected to match the reading. That is
+the third time in this round that a check corrected my prose rather than the other way round.
+
+Six sabotages, 1/4/2/5/2/10 RED by name, two files md5-identical after.
+
+AND SABOTAGE F TOOK THREE ATTEMPTS, BECAUSE IT FOUND TWO DEFECTS IN THE GATE BEFORE THE ONE IT WAS AIMED AT.
+
+The first attempt read 6 RED and the browser-purity check was not among them. THAT CHECK COULD NOT FAIL: it
+scanned moduleRefs.specifiers() output for a spec matching /^node:/, and specifiers() NEVER EMITS ONE. Measured
+directly -- given `import fs from "node:fs"; import x from "./y.js";` it yields exactly [{spec:"./y.js"}]. It
+reports RESOLVABLE specifiers, which is the right job for a reference graph and the wrong tool for this
+question. It reads the source text now.
+
+The second attempt still did not fire it, because THE GATE THREW BEFORE REACHING THE SECTION. With the door
+unloadable every live browser read came back null and a template literal dereferenced `.state` on it, so the
+run died at section 5b and section 6 -- whose whole subject is that node: import -- never ran at all. One stack
+trace where seven named failures belonged. v4399's sabotage A taught this tree exactly that, and it is written
+down again here because a gate that dies is a gate that reports one thing.
+
+The third attempt reads 10 RED, the purity check among them by name.
+
+UNCHECKED, AND SAID PLAINLY: WHETHER ANYTHING IS DRAWN. This round opens the device from the front door and
+reports honestly which backend answered; it renders nothing new. Rerouting the front door's render path before
+saying out loud that the shipping origin has no WebGPU would make the LAN worse in order to improve the
+localhost. Also unchecked: the nine remaining modules, named rather than counted; and whether a real GPU
+behaves as swiftshader does, which nothing in this container can ask -- the adapter reachable here is
+google/swiftshader, so every reading above is a backend name or a boolean and never a rate.
+
+The tree stands at 1439 gates.
 ## v4405 -- #160 ships as a refusal, and the cause is a quantity nobody had measured
 
 #160 was filed to come AFTER #159 on purpose, so the fluid would not be the second consumer of an unproven
