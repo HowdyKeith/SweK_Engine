@@ -326,6 +326,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backwards and no fixture reached the branch. The round ALSO cleared vendoredLicences-selfcheck, " +
                  "red since v4319, but that gate is not counted here: it was not ADDED, it was found",
     }),
+    // v4373 -- the twelfth closing, and the first for a gate that drives render/gpuDriven.mjs with a compute pass
+    // gpuDriven does not contain: the new `cull` hook means a scene's decision can come from outside the module,
+    // so this gate is what stands between that hook and a caller binding it wrongly in silence.
+    since12: Object.freeze({
+        at: "v4373", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/generatedLadder-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections. Driven RED by two sabotages (2/2 by name) and " +
+                 "restored; a third attempt was MALFORMED and crashed the gate instead of failing a check, which is " +
+                 "logged in it as a crash rather than counted as a catch",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
