@@ -137,8 +137,46 @@ export function furnaceIntegral(alpha, cosO, { strong = false, N = 500, M = 500,
     return s * 2;
 }
 
-/** Directional albedo: how much of the arriving light a white, non-absorbing GGX surface actually sends back. */
+/**
+ * Directional albedo BY QUADRATURE: how much of the arriving light a white, non-absorbing GGX surface sends back.
+ *
+ * *** v4411 -- THIS IS THE INSTRUMENT THAT CANNOT RESOLVE A NARROW LOBE, AND ITS CALLERS MUST KNOW. *** v4409
+ * measured it: a 500x500 grid reads 0.512 at roughness 0.001 where the answer is 0.999999, and a 220x220 grid
+ * -- which is what buildTable used to ask for -- reads 0.145. The failure is confined to alpha below about
+ * 0.01 and is TOTAL there. Use directionalAlbedoSampled below unless you have a reason not to.
+ */
 export const directionalAlbedo = (alpha, cosO, o = {}) => furnaceIntegral(alpha, cosO, { ...o, strong: true });
+
+/**
+ * v4411 -- Directional albedo BY VISIBLE-NORMAL SAMPLING, which is grid-free and therefore has no lobe it
+ * cannot resolve. Same quantity, 3.4e-5 at every roughness from 0.0005 to 1, and 4096 evaluations against the
+ * quadrature's 48,400.
+ *
+ * The sample points are a Hammersley set from a SIXTEEN-BIT van der Corput inverse -- v4410's construction and
+ * for its reason: 2^16 is under 2^24, so f32() of the integer is exact on any conformant device, and 65536 is
+ * a power of two, so a port of this reproduces the CPU's sample set rather than approximating it.
+ */
+export function directionalAlbedoSampled(alpha, cosO, { samples = 4096, ...o } = {}) {
+    const so = Math.sqrt(Math.max(0, 1 - cosO * cosO)), wo = [so, cosO, 0];
+    let s = 0;
+    for (let i = 0; i < samples; i++) {
+        const wh = sampleVisibleNormal(wo, alpha, (i + 0.5) / samples, vanDerCorput16(i) / 65536, o);
+        const d = wo[0] * wh[0] + wo[1] * wh[1] + wo[2] * wh[2];
+        const cosI = 2 * d * wh[1] - wo[1];
+        if (cosI > 0) s += visibleBounceWeight(cosO, cosI, alpha, o);
+    }
+    return s / samples;
+}
+
+/** Bit reversal of the low sixteen bits. Integer throughout, so it is exact wherever it runs. */
+export function vanDerCorput16(i) {
+    let b = i & 0xffff;
+    b = ((b & 0x00ff) << 8) | ((b & 0xff00) >>> 8);
+    b = ((b & 0x0f0f) << 4) | ((b & 0xf0f0) >>> 4);
+    b = ((b & 0x3333) << 2) | ((b & 0xcccc) >>> 2);
+    b = ((b & 0x5555) << 1) | ((b & 0xaaaa) >>> 1);
+    return b & 0xffff;
+}
 
 /* ---------------------------------------------------------------------------------------------------------
  * v3493 -- SAMPLING, WHICH IS THE HALF A RENDERER NEEDS AND AN INTEGRAL DOES NOT

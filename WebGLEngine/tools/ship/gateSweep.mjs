@@ -522,6 +522,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "widened the gate -- the shipped CPU sampler had been resting on one section, which the " +
                  "sabotage is what found",
     }),
+
+    // v4411 -- the twenty-sixth closing, and the first in this arc whose subject is a gate that was already
+    // green. energyCompensation-selfcheck.mjs has closed E + INT f_ms cos dw = 1 since v3492 and could not see
+    // that the E it was handed was 85% wrong, because the closure is algebra in whatever table it gets. This
+    // gate reads the TABLE against something external, ports the lobe, and finds the device's whole f32
+    // residual is its sin and cos -- the third round in a row to land there.
+    since27: Object.freeze({
+        at: "v4411", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/energyCompWgsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections and 19 checks in 6.8 s. Driven RED by five " +
+                 "sabotages (6/4/1/6/2 by name) and restored -- and the 6 went 1 RED FIRST, which built the " +
+                 "check that now catches it: a real integral moves when its grid is refined and a closed form " +
+                 "does not. energyCompensation-selfcheck.mjs's section 2 was rewritten in the same round, " +
+                 "because its second-order measurement turned out to be its instrument's",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
