@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "50f155ddb940f6aca9531e1009fa75b02544be95",
+ "head": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d",
  "bodies": {
   "box3d": [
    {
@@ -112,7 +112,7 @@
    {
     "path": "tools/ship/box3dFilter-selfcheck.mjs",
     "bytes": 19606,
-    "sha": "b9ea45a342c9052ae236cf1b08adcfedf49799f1"
+    "sha": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d"
    },
    {
     "path": "tools/ship/box3dRay-selfcheck.mjs",
@@ -224,7 +224,7 @@
    {
     "path": "tools/ship/vendoredLicences-selfcheck.mjs",
     "bytes": 14055,
-    "sha": "08647fdb98c3d91565b04a2eabc8c1be023468c6"
+    "sha": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d"
    }
   ],
   "jolt": [
@@ -489,8 +489,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2780915,
-    "sha": "848a2db4e5eec403a17272abc0db60498cf37c1c"
+    "bytes": 2790675,
+    "sha": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d"
    },
    {
     "path": "mpm3d.html",
