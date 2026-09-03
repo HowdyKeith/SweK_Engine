@@ -59,7 +59,10 @@ if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is av
 // 64 changed pixels per instance. A pixel budget is an AREA, so the threshold scales as K / width. The typed
 // [0.004, 0.012] is what this replaces.
 const lods = [{ name: "far", mesh: G.discMesh(5, [0.35, 0.5, 0.8, 1]) }, { name: "mid", mesh: G.discMesh(10, [0.55, 0.7, 0.95, 1]) }, { name: "near", mesh: G.discMesh(32, [0.85, 0.92, 1, 1]) }];
-const lodTh = discLadderThresholds(cv.width || 256);
+// v4378 -- AND THE BACKEND IS NAMED. A rung's cost is pixels a RASTERISER drew, and gfx/device.js has two:
+// measured on one box, K is 7.72/6.54 under WebGPU and 7.59/6.43 under WebGL2. v4377 derived from the WebGPU
+// record and ran this page on WebGL2, which is the mismatch this line closes.
+const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
 window.__lodTh = { ...lodTh, used: lodTh.thresholds };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
 const scene = G.makeGpuDrivenScene(device, { lods, thresholds: lodTh.thresholds, records: U.records, occlusion: "twoPhase" });
 // v4300 -- LIFE: 300 haulers trading between the 694 systems (world/universeEconomy.mjs). The systems stand still, so

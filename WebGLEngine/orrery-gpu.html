@@ -115,7 +115,10 @@ const bodyExtras = G.defaultExtras(source.count);
 // record in render/lodRecord.mjs at a stated budget of 64 changed pixels per instance, and a pixel budget is an
 // AREA, so the angular size that meets it depends on the canvas: metric = K / width, K measured at three widths.
 // The two-rung ladder here switches on the coarse rung's K. The old typed 0.012 is what this replaces.
-const lodTh = discLadderThresholds(cv.width || 256);
+// v4378 -- AND THE BACKEND IS NAMED. A rung's cost is pixels a RASTERISER drew, and gfx/device.js has two:
+// measured on one box, K is 7.72/6.54 under WebGPU and 7.59/6.43 under WebGL2. v4377 derived from the WebGPU
+// record and ran this page on WebGL2, which is the mismatch this line closes.
+const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
 window.__lodTh = { ...lodTh, used: [lodTh.thresholds[1]] };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
 const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [lodTh.thresholds[1]], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null) });
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
