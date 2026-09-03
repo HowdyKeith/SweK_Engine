@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/sweepCoverage.mjs
 //
-// v4407 -- *** ONCE OVER BUDGET, NEVER RE-TIMED, THEREFORE OVER BUDGET FOREVER. ***
+// v4408 -- *** ONCE OVER BUDGET, NEVER RE-TIMED, THEREFORE OVER BUDGET FOREVER. ***
 //
 // The quick sweep (v4303) runs every gate under 3,000 ms at ship time and skips the rest. It is honest about
 // being quick and the full two-phase sweep covers the remainder -- but the full sweep runs when somebody
@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const BUDGET_MS = 3000;
 export const CAP_MS = 20000;
-export const UNKNOWN_AT = "unknown -- before v4407";
+export const UNKNOWN_AT = "unknown -- before v4408";
 
 export function classify(ms, { budgetMs = BUDGET_MS, capMs = CAP_MS } = {}) {
     if (ms === null || ms === undefined) return "never";

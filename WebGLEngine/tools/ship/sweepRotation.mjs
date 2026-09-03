@@ -2,7 +2,7 @@
 //
 // Run: node tools/ship/sweepRotation.mjs [--budget-s 180] [--slots 24] [--write]
 //
-// v4407 -- THE DOOR SWINGS BOTH WAYS. The quick sweep excludes a gate that measured over 3,000 ms and then
+// v4408 -- THE DOOR SWINGS BOTH WAYS. The quick sweep excludes a gate that measured over 3,000 ms and then
 // never measures it again, so the exclusion is permanent and rests on a reading whose age the file could not
 // state. This runs a SLICE of the over-budget population, stalest first, under a wall-clock budget, and
 // rewrites those entries with a per-entry `at`. Over enough rounds every over-budget gate is re-timed, and the

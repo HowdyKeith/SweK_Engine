@@ -47,7 +47,7 @@ sec("2. THE REGISTER IS BUILT FROM THE RECORDS IT NAMES, AND THE SIX REGRESSIONS
        "the v4297 unmeasured and slow-bucket gates are known too", `${SWEEP_V4297.unmeasured.length} + ${SWEEP_V4297.fromSlowBucket.length}`);
     ok(SWEEP_V4297.regressions.every((g) => !reg.has(g)),
        "*** the six v4297 regressions are NOT in the register: their red is the thing to repair, not to accept ***", SWEEP_V4297.regressions.map((g) => g.split("/").pop()).join(", "));
-    // v4407 -- a FIFTH list joined the register (RED_AT_V4407, the reds the first rotation surfaced), and this
+    // v4408 -- a FIFTH list joined the register (RED_AT_V4407, the reds the first rotation surfaced), and this
     // row went red the moment it did. That is the check working: a register that knows one shape reports
     // everything else as absent, and the union is derived here precisely so a new list cannot arrive unnoticed.
     ok(RED_AT_V4407.every((e) => reg.get(e.gate) === "redCensus.RED_AT_V4407"),
@@ -132,7 +132,7 @@ sec("5. verify.mjs RUNS IT, AND FAILS ON NEW REDS ONLY");
 //      -> exit=1, three lines: section 3, and section 4's hang test. A timeout alone is not a verdict --
 //      v4297's UNMEASURED bucket exists so that "did not finish" is never folded into "failed".
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4407 answered the older " +
+console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +
     "ship time -- by re-timing the population a slice at a time: 138 of the first 140 came back UNDER budget, " +
     "because the reading that evicted them was the STARVED PARALLEL one. The pool is 234 and shrinking. Until it " +

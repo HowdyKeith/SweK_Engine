@@ -3,6 +3,7 @@
  "reports": [
   "backendRouting-selfcheck.json",
   "claimEvidence-selfcheck.json",
+  "frontDoor-selfcheck.json",
   "gateReport-selfcheck.json",
   "registerDrift-selfcheck.json",
   "rigidCouple-selfcheck.json",

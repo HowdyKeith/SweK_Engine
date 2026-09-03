@@ -2,7 +2,7 @@
 //
 // Run: node tools/ship/sweepCoverage-selfcheck.mjs   (~2s -- MEASURED)
 //
-// v4407 -- *** THE SHIP-TIME SWEEP EVICTS GATES ON TIMINGS IT MANUFACTURED ITSELF, AND NEVER RE-MEASURES THEM. ***
+// v4408 -- *** THE SHIP-TIME SWEEP EVICTS GATES ON TIMINGS IT MANUFACTURED ITSELF, AND NEVER RE-MEASURES THEM. ***
 //
 // v4406 measured that 502 of 1,439 gates are over the quick sweep's 3,000 ms budget and so are run by no
 // ship-time step at all. The gap was the visible half. THE MECHANISM IS WORSE, and it is three findings deep:
@@ -28,7 +28,7 @@
 //      would have reported a catastrophically red tree from a file that only says "these did not finish".
 //   B. roundsToCover returned 0 instead of Infinity for an empty slice -> the "covers the pool in 0 rounds"
 //      row went red BY NAME. A division that returns 0 reads as FULL COVERAGE: absence-as-a-pass, in arithmetic.
-//   C. stamped EVERY entry with the run's date, which is exactly the pre-v4407 behaviour -> section 5's last
+//   C. stamped EVERY entry with the run's date, which is exactly the pre-v4408 behaviour -> section 5's last
 //      row went red. The other two rows in that section stayed green, which is the point of having three.
 //   D. made rotation() return an empty slice -> two rows red, including the stalest-first ordering.
 //
@@ -91,7 +91,7 @@ console.log("\n3. the file can now say WHICH entries the last run observed");
 {
     const p = SC.provenance(FILE);
     ok("!! *** every entry carries its OWN capture, not the file's ***", p.withoutAt === 0,
-        `${p.withAt} of ${p.entries} entries stamped individually, ${p.withoutAt} without. BEFORE v4407 THE ANSWER WAS ZERO: ` +
+        `${p.withAt} of ${p.entries} entries stamped individually, ${p.withoutAt} without. BEFORE v4408 THE ANSWER WAS ZERO: ` +
         "one `captured` field covered 1,440 readings of which the run had taken 937");
     // *** AN .every() OVER AN EMPTY MAP IS TRUE. *** The first draft of this row read PASS against a file with no
     // `at` at all -- v4401's vacuous check, and the third row in this gate that would have. The population is
@@ -157,7 +157,7 @@ console.log("\n5. the eviction reading is the PARALLEL one, and that is provable
 
 console.log("\n5b. a green gate that crosses the budget in parallel is CONFIRMED ALONE before it is filed");
 {
-    // *** THE ROTATION DECAYS WITHOUT THIS, AND THE FIRST RUN PROVED IT. *** v4407's rotation returned 138 gates
+    // *** THE ROTATION DECAYS WITHOUT THIS, AND THE FIRST RUN PROVED IT. *** v4408's rotation returned 138 gates
     // to the sweep; the very next 8-way run reported "60 now over budget" and would have evicted them again on
     // the same starved reading. A door that reopens once is not open. quickSweep now re-runs a GREEN gate alone
     // whenever its parallel time crosses the budget, which is v4297's two-phase rule for reds applied to costs.

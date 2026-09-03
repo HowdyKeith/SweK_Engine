@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d0dd6f7ef7ea93fc9346c48560913a96e427f16c",
+ "head": "51382521c529c41f014b5e60af2b7b86740a3673",
  "bodies": {
   "box3d": [
    {
@@ -62,7 +62,7 @@
    {
     "path": "predictions.html",
     "bytes": 614034,
-    "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
+    "sha": "51382521c529c41f014b5e60af2b7b86740a3673"
    },
    {
     "path": "servicesdash.html",
@@ -131,8 +131,8 @@
    },
    {
     "path": "tools/ship/gateSweep.mjs",
-    "bytes": 67077,
-    "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
+    "bytes": 68867,
+    "sha": "51382521c529c41f014b5e60af2b7b86740a3673"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
@@ -173,7 +173,7 @@
    {
     "path": "predictions.html",
     "bytes": 614034,
-    "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
+    "sha": "51382521c529c41f014b5e60af2b7b86740a3673"
    },
    {
     "path": "render/gifRecorder-selfcheck.mjs",
@@ -268,7 +268,7 @@
    {
     "path": "predictions.html",
     "bytes": 614034,
-    "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
+    "sha": "51382521c529c41f014b5e60af2b7b86740a3673"
    },
    {
     "path": "render/holoGif-selfcheck.mjs",
@@ -477,8 +477,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2700423,
-    "sha": "25b94b02a46e2734df9d8a9c260b769170673d88"
+    "bytes": 2706613,
+    "sha": "51382521c529c41f014b5e60af2b7b86740a3673"
    },
    {
     "path": "mpm3d.html",

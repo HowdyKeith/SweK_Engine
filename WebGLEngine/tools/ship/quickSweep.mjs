@@ -41,7 +41,7 @@ export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000
 export function redRegister() {
     const reg = new Map();
     for (const e of RED_AT_V4279) reg.set(e.gate, "redCensus.RED_AT_V4279");
-    for (const e of RED_AT_V4407) reg.set(e.gate, "redCensus.RED_AT_V4407");   // v4407: reds the first rotation surfaced
+    for (const e of RED_AT_V4407) reg.set(e.gate, "redCensus.RED_AT_V4407");   // v4408: reds the first rotation surfaced
     for (const g of UNCONFIRMED_SLOW) if (!reg.has(g)) reg.set(g, "redCensus.UNCONFIRMED_SLOW");
     for (const g of SWEEP_V4297.fromSlowBucket) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.fromSlowBucket");
     for (const g of SWEEP_V4297.unmeasured) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.unmeasured");
@@ -118,7 +118,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         const p1 = phase1.get(rel);
         const parallel = { code: p1.code, ms: p1.ms, timedOut: p1.timedOut };
         if (p1.code === 0) {
-            // v4407 -- *** A GREEN GATE'S PARALLEL TIME IS NOT ITS COST, AND THIS IS WHERE THE DOOR USED TO SHUT. ***
+            // v4408 -- *** A GREEN GATE'S PARALLEL TIME IS NOT ITS COST, AND THIS IS WHERE THE DOOR USED TO SHUT. ***
             // The recorded timing decides membership next run, and until now a green gate never earned a serial
             // reading -- so one that passed 8-way at 3,002 ms was filed at 3,002 ms and evicted forever. v4297
             // already refused to call a starved parallel run a FAILURE; it is no better as a COST. The first
@@ -141,7 +141,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const green = rows.filter((r) => r.verdict === VERDICT.GREEN).length;
     const falseReds = rows.filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial").length;   // red under -P, green alone
     // the timings file, rewritten with what was just seen (serial time where there was one)
-    // v4407 -- *** PER-ENTRY PROVENANCE. *** This file used to stamp ONE `captured` date on all 1,440 entries
+    // v4408 -- *** PER-ENTRY PROVENANCE. *** This file used to stamp ONE `captured` date on all 1,440 entries
     // while rewriting only the ones it ran, so 502 readings carried a date they did not earn -- and the budget
     // decision is made FROM those readings, which made the exclusion a one-way door. `at` records, per entry,
     // the capture that actually observed it. Entries this run did not touch KEEP their old stamp, and an entry
@@ -157,7 +157,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
         green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
-        // v4407: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
+        // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
         budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,
         budgetRescued: rows.filter((r) => r.from === "budget-confirm" && r.serialMs <= budgetMs).length,
@@ -166,7 +166,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
                   "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. " +
-                  "`at` is PER ENTRY (v4407): the capture that actually observed that gate. `captured` is this run's stamp and " +
+                  "`at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and " +
                   "applies ONLY to entries whose `at` equals it -- the rest were not run and say so.",
             captured: out.at, budgetMs, capMs, timings, codes, at,
         }, null, 1) + "\n");

@@ -358,11 +358,11 @@ export const FIXED_SINCE_V4279 = Object.freeze([
  * Confirming them serially is roughly three hours (measured: 20 of the 64 done, all green so far), which is a round of its own and is recorded here as the next step rather than guessed at now.
  */
 /*
- * v4407 -- *** WHAT THE FIRST ROTATION FOUND WHEN THE DOOR WAS OPENED. ***
+ * v4408 -- *** WHAT THE FIRST ROTATION FOUND WHEN THE DOOR WAS OPENED. ***
  *
  * A NEW LIST AND NOT AN APPEND TO RED_AT_V4279, for the reason MOMENTS states below in its own words: a record
  * whose fields are snapshots of different instants has to say which instant. These gates were not red at v4279;
- * nobody knows when they went red, because until v4407 nothing at ship time ran them. They spent that time in
+ * nobody knows when they went red, because until v4408 nothing at ship time ran them. They spent that time in
  * the over-budget population -- 502 of 1,439 gates -- which the quick sweep skips and which the file's single
  * `captured` date presented as freshly measured.
  *

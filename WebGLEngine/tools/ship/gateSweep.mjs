@@ -644,6 +644,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since34: Object.freeze({
         at: "v4407", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["gfx/frontDoor-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 3.5s including three browser launches, six sections. THE " +
+                 "FRONT DOOR REACHED NO WEBGPU AND NO TSL AND ADVERTISED WEBGPU ANYWAY: walked forward from " +
+                 "main.js with the tree's own resolver, 692 modules reached and NOT ONE of gfx/device.js, " +
+                 "render/tslSource.mjs, the six TSL modules, ui/orreryPost.mjs or ui/webrtxBrowser.js -- while " +
+                 "main.js printed 'this browser HAS WebGPU' and offered nothing using it. A lazily-imported " +
+                 "door closes ONE of the ten (692 -> 695) and the ratchet is on the DIFFERENCE, so the nine " +
+                 "still outside are named rather than implied. AND THE MEASUREMENT FOUND THREE REASONS A " +
+                 "WEBGPU DEVICE DOES NOT ARRIVE ON ONE MACHINE, none of which detectBackends() can name: the " +
+                 "LAN address WITHHOLDS navigator.gpu; loopback on a plain launch has the API and " +
+                 "requestAdapter() returns NULL; loopback with --enable-unsafe-webgpu gets an adapter and the " +
+                 "webgpu backend. Driven RED by six sabotages (1/4/2/5/2/10 by name), two files md5-identical " +
+                 "after -- and F took three attempts because it found two defects in the gate first: a purity " +
+                 "check that COULD NOT FAIL (it scanned specifiers() output for node: specs, which " +
+                 "specifiers() never emits) and a gate that THREW on a null live read before reaching the " +
+                 "section that check lived in",
+    }),
+    since35: Object.freeze({
+        at: "v4408", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~2s, six sections. It gates tools/ship/sweepCoverage.mjs and " +
