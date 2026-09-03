@@ -680,6 +680,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     since36: Object.freeze({
         at: "v4410", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/doomFireField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.2s, thirteen checks in five sections. It gates " +
+                 "render/doomFireField.mjs, which makes the DOOM fire's flow a PER-CELL DIRECTION FIELD rather " +
+                 "than the constant -width of v4178, and its spine is a control that costs nothing: a uniform " +
+                 "upward field reproduces render/doomFire.mjs BYTE FOR BYTE over five grid shapes and 1,000 " +
+                 "frames with stoke() and damp() interleaved, because the rule's TWO directional constants -- " +
+                 "the flow +w and the lean -1 -- are DERIVED from the field rather than re-typed beside it. " +
+                 "Four of the round's own claims were refuted by its own instruments and each is a row here: " +
+                 "quantise's comment asserted the property its code lacked, the header claimed a zero " +
+                 "direction meant nothing burns there while 154 of 1,542 off-water cells burned, the river's " +
+                 "downstream never advanced downstream, and the waterfall's 'narrow column' comment sat over " +
+                 "code making a sheet. It also pins a boundary behaviour of v4178 that v4178 could not " +
+                 "exhibit: a fuel cell with no perpendicular upstream neighbour is only ever written " +
+                 "undecayed, so the curtain's leading column reads 36 at all 20 rows.",
+    }),
+    since37: Object.freeze({
+        at: "v4411", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/shipExhaust-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly in 0.3s, twelve checks in six sections. It gates " +
+                 "render/shipExhaust.mjs -- v4178's DOOM fire on v4410's direction field, hung off every EV " +
+                 "ship's stern -- and its last section is the REACH, which is what #162 was filed for: the " +
+                 "automaton's only consumer in three hundred versions was doom-fire.html, a standalone 2D " +
+                 "canvas demo. The reach rows ask more than whether an import string is present: the " +
+                 "specifier must RESOLVE through the tree's own resolver, the plume must be pushed from the " +
+                 "same `thrust` the flight model consumed for both player and NPC, and a plume must be " +
+                 "dropped when its ship goes. v4165's rule, that an import is not a consumer. Written into " +
+                 "the ledger IN the round, after v4410 shipped a gate without an entry and gateSweep-" +
+                 "selfcheck went red on the surplus by exactly one.",
+    }),
+    since38: Object.freeze({
+        at: "v4412", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/importPosition-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         verdict: "green on this box, run singly in ~3s, five sections. docs/EXPLAIN-ITSELF.md item 5. It gates " +

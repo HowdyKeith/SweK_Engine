@@ -14,9 +14,174 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
-## v4410 -- A guard deleted for being inert, and the tree that grew the case it existed for
+## v4412 -- A guard deleted for being inert, and the tree that grew the case it existed for
 
-*** A GUARD WAS DELETED BECAUSE IT WAS MEASURED INERT. THE MEASUREMENT WAS TRUE. THE TREE THEN GREW THE CASE THE GUARD EXISTED FOR. *** docs/EXPLAIN-ITSELF.md item 5, and the whole story was already written down in the file that has it wrong. world/orreryEjecta.mjs decides which files depend on a vendored body by asking whether the comment-stripped source CONTAINS `vendor/<name>/`. Its own header records that the first draft ALSO required the hit to sit inside a quoted specifier, that all 32 matching files satisfied that test anyway, and that the guard was therefore removed under the rule that "a guard whose removal changes no count is not caution, it is an assertion that cannot fail". THE RULE IS RIGHT. What it does not carry is that INERTNESS IS A PROPERTY OF THE TREE ON THE DAY IT IS MEASURED, and eighty rounds later tools/ship/gateSweep.mjs was filed as a box3d importer because a sweep closing's `verdict:` string quotes "/vendor/box3d/box3d.js" while EXPLAINING that box3dLoader imports it. *** AND THE DELETED GUARD WOULD NOT HAVE CAUGHT IT EITHER: THAT MENTION IS QUOTED. *** The question is not whether the path sits in a string. It is whether the string IS the path. NEW tools/ship/importPosition.mjs asks it positionally, in FIVE kinds because collapsing them sends different work to one place: import (the module graph), load (fetch, Worker, script src, an importmap value), path (a specifier the tool reads, stats or weighs -- tools/ship/artifactWeight.mjs lists the artifact to weigh it), joined (reached through path.join, invisible to any substring rule), and record (the path inside a sentence, the only kind that is not a dependency). *** THE OLD RULE IS WRONG IN BOTH DIRECTIONS, WHICH IS THE MEASUREMENT WORTH KEEPING. *** Of its 138 entries, 12 are records; and it NEVER SAW 17 FILES that reach a body through path.join(..., "vendor", "box3d", ...), whose only literal hit is a log line saying the artifact is absent. The corrected population is 143: 79 import, 11 load, 27 path, 9 joined. *** THE FIFTH KIND EXISTS ONLY BECAUSE I LOOKED AT WHAT THE FOURTH CAUGHT. *** The first census called 21 files record-only and NINE OF THEM DEPEND ON THE BODY. Filtering the 21 would have deleted nine real dependants to remove twelve false ones -- which is item 5's own written warning that this fix could trade one wrong count for another, met by reading the list instead of the number. EJECTA_BASELINE was a map of NUMBERS and is now a FROZEN LIST OF NAMES with the counts derived from it, because v4399's rule is that a count ratchet drifts with the tree and cannot say which entry moved; the file's own inline comments show two rounds spent working out by hand which file had arrived, and twice the answer was that a scanner had counted a sentence. THE NEW RATCHET PROVED ITSELF WITHIN THE HOUR BY CATCHING THIS ROUND: the new gate holds ten vendor-path fixtures, joined box3d's fleet at 26 -> 27, and the ratchet named the arriving FILE instead of showing a number that moved. THE SCANNER COUNTING THE SCANNER IS THIS RECORD'S OLDEST MISTAKE AND THAT IS ITS THIRD INSTANCE; the exclusion list had a second copy in a second walker, which is why the gate's own walker had never heard of it, and there is one list now. tools/ship/orreryEjecta-selfcheck.mjs IS CLEARED FROM THE REGISTER BY RE-DERIVING RATHER THAN BY RAISING A NUMBER, which was the whole reason v4408 registered it instead of patching it. *** AND A CLAIM THE ORRERY HAS MADE SINCE v4266 IS RETIRED RATHER THAN REPAIRED. *** It asserted that the bodies nothing imports are exactly the bodies made of paperwork, and under the substring rule both sets were {grass, keyhunt, slug} so it passed. Those are two different properties, and the positional rule separates them: grass is reached by tools/ship/grassField-selfcheck and orrery-selfcheck, keyhunt by physics/crypto/secp256k1-selfcheck, through joins no substring search could see. ONLY SLUG IS UNREACHED. The surviving half -- there is no vendored CODE in this tree that nothing reaches -- is kept and stated; the half that was an artefact of a blind spot is gone, and the page's live probe now asks the body that really is empty. *** THREE SABOTAGES COST ZERO RED AND THAT REWROTE A SECTION. *** Reverting the string finder to a whole-file scan, to the first enclosing pair, and to a pair allowed to span lines all left the gate green, because a two-line fixture has too few quotes to go wrong. A sabotage that goes 0 red is a finding and not a pass, so that row now runs against main.js -- 6,600 lines, the file the bug was actually found on -- and the first mutation then costs a red by name; the other two still cost nothing and it says so rather than claiming four clean sabotages. THE FIRST DRAFT OF MY OWN DETECTOR COMMITTED THIS ROUND'S SUBJECT: it paired quotes from byte 0, so one unbalanced apostrophe offset everything after it, and it reported 0 imports across the entire tree while filing main.js -- which does `import("./vendor/three/...")` twice -- as a record. It answered confidently and was measuring something else. Two more of my own: FIXED_SINCE_V4279 is a claim about the v4279 register and filing this repair there inflated registerAtSweep() by one, taking three arithmetic rows red within the minute (a repair to a different instant needs a different list, which is the rule RED_AT_V4408 was created under one round ago); and the sweep closing was inserted into the wrong frozen object entirely, which the sweep arithmetic caught by naming one unswept gate. UNCHECKED AND SAID PLAINLY: this is a POSITIONAL RULE OVER TEXT, NOT A PARSE. A specifier assembled at runtime is as invisible to it as it was to the substring rule. It does not read a bundler config or a symlink, and an importmap that renames a bare specifier to a vendored path in ONE file while fifty others import the bare name counts one dependant and not fifty. The `joined` detector matches a literal "vendor" beside a literal body name, so a path built from a VARIABLE body name -- what a generic vendor walker does -- is attributed to no body, which is right for a walker and wrong the day somebody writes a specific dependency that way. *** AND v4408'S ROTATION WAS ERASED BY A MERGE, WHICH IS A FINDING ABOUT THE RECORD AND NOT ABOUT THE ROUND. *** tools/ship/sweep-timings.json is a GENERATED file that two branches both write, and the other branch's v4409 shipped timings taken before v4408's rotation ran -- so merging it restored 374 gates to the over-budget pool that serial re-timing had rescued. The budget-confirm fix means no NEW eviction happens on a starved reading, but it cannot un-take a reading that arrives by merge. A second rotation returned 146 OF 150 and put the pool back to 228, and its three reds are all already registered. The durable fix is that a generated file with two writers is a record with no owner, which is the same shape that deleted the rotation's own ledger one round ago and was fixed there by giving it its own file; here the two writers are two BRANCHES, and that is not a thing a .gitignore or a filename can settle. Item 5 is closed; items 7 and 8 stay open, and 8 is the author-centred orrery whose opening measurement is that orrery.json's fifteen bodies carry no owner field at all. The tree stands at 1442 gates.
+*** A GUARD WAS DELETED BECAUSE IT WAS MEASURED INERT. THE MEASUREMENT WAS TRUE. THE TREE THEN GREW THE CASE THE GUARD EXISTED FOR. *** docs/EXPLAIN-ITSELF.md item 5, and the whole story was already written down in the file that has it wrong. world/orreryEjecta.mjs decides which files depend on a vendored body by asking whether the comment-stripped source CONTAINS `vendor/<name>/`. Its own header records that the first draft ALSO required the hit to sit inside a quoted specifier, that all 32 matching files satisfied that test anyway, and that the guard was therefore removed under the rule that "a guard whose removal changes no count is not caution, it is an assertion that cannot fail". THE RULE IS RIGHT. What it does not carry is that INERTNESS IS A PROPERTY OF THE TREE ON THE DAY IT IS MEASURED, and eighty rounds later tools/ship/gateSweep.mjs was filed as a box3d importer because a sweep closing's `verdict:` string quotes "/vendor/box3d/box3d.js" while EXPLAINING that box3dLoader imports it. *** AND THE DELETED GUARD WOULD NOT HAVE CAUGHT IT EITHER: THAT MENTION IS QUOTED. *** The question is not whether the path sits in a string. It is whether the string IS the path. NEW tools/ship/importPosition.mjs asks it positionally, in FIVE kinds because collapsing them sends different work to one place: import (the module graph), load (fetch, Worker, script src, an importmap value), path (a specifier the tool reads, stats or weighs -- tools/ship/artifactWeight.mjs lists the artifact to weigh it), joined (reached through path.join, invisible to any substring rule), and record (the path inside a sentence, the only kind that is not a dependency). *** THE OLD RULE IS WRONG IN BOTH DIRECTIONS, WHICH IS THE MEASUREMENT WORTH KEEPING. *** Of its 138 entries, 12 are records; and it NEVER SAW 17 FILES that reach a body through path.join(..., "vendor", "box3d", ...), whose only literal hit is a log line saying the artifact is absent. The corrected population is 143: 79 import, 11 load, 27 path, 9 joined. *** THE FIFTH KIND EXISTS ONLY BECAUSE I LOOKED AT WHAT THE FOURTH CAUGHT. *** The first census called 21 files record-only and NINE OF THEM DEPEND ON THE BODY. Filtering the 21 would have deleted nine real dependants to remove twelve false ones -- which is item 5's own written warning that this fix could trade one wrong count for another, met by reading the list instead of the number. EJECTA_BASELINE was a map of NUMBERS and is now a FROZEN LIST OF NAMES with the counts derived from it, because v4399's rule is that a count ratchet drifts with the tree and cannot say which entry moved; the file's own inline comments show two rounds spent working out by hand which file had arrived, and twice the answer was that a scanner had counted a sentence. THE NEW RATCHET PROVED ITSELF WITHIN THE HOUR BY CATCHING THIS ROUND: the new gate holds ten vendor-path fixtures, joined box3d's fleet at 26 -> 27, and the ratchet named the arriving FILE instead of showing a number that moved. THE SCANNER COUNTING THE SCANNER IS THIS RECORD'S OLDEST MISTAKE AND THAT IS ITS THIRD INSTANCE; the exclusion list had a second copy in a second walker, which is why the gate's own walker had never heard of it, and there is one list now. tools/ship/orreryEjecta-selfcheck.mjs IS CLEARED FROM THE REGISTER BY RE-DERIVING RATHER THAN BY RAISING A NUMBER, which was the whole reason v4408 registered it instead of patching it. *** AND A CLAIM THE ORRERY HAS MADE SINCE v4266 IS RETIRED RATHER THAN REPAIRED. *** It asserted that the bodies nothing imports are exactly the bodies made of paperwork, and under the substring rule both sets were {grass, keyhunt, slug} so it passed. Those are two different properties, and the positional rule separates them: grass is reached by tools/ship/grassField-selfcheck and orrery-selfcheck, keyhunt by physics/crypto/secp256k1-selfcheck, through joins no substring search could see. ONLY SLUG IS UNREACHED. The surviving half -- there is no vendored CODE in this tree that nothing reaches -- is kept and stated; the half that was an artefact of a blind spot is gone, and the page's live probe now asks the body that really is empty. *** THREE SABOTAGES COST ZERO RED AND THAT REWROTE A SECTION. *** Reverting the string finder to a whole-file scan, to the first enclosing pair, and to a pair allowed to span lines all left the gate green, because a two-line fixture has too few quotes to go wrong. A sabotage that goes 0 red is a finding and not a pass, so that row now runs against main.js -- 6,600 lines, the file the bug was actually found on -- and the first mutation then costs a red by name; the other two still cost nothing and it says so rather than claiming four clean sabotages. THE FIRST DRAFT OF MY OWN DETECTOR COMMITTED THIS ROUND'S SUBJECT: it paired quotes from byte 0, so one unbalanced apostrophe offset everything after it, and it reported 0 imports across the entire tree while filing main.js -- which does `import("./vendor/three/...")` twice -- as a record. It answered confidently and was measuring something else. Two more of my own: FIXED_SINCE_V4279 is a claim about the v4279 register and filing this repair there inflated registerAtSweep() by one, taking three arithmetic rows red within the minute (a repair to a different instant needs a different list, which is the rule RED_AT_V4408 was created under one round ago); and the sweep closing was inserted into the wrong frozen object entirely, which the sweep arithmetic caught by naming one unswept gate. UNCHECKED AND SAID PLAINLY: this is a POSITIONAL RULE OVER TEXT, NOT A PARSE. A specifier assembled at runtime is as invisible to it as it was to the substring rule. It does not read a bundler config or a symlink, and an importmap that renames a bare specifier to a vendored path in ONE file while fifty others import the bare name counts one dependant and not fifty. The `joined` detector matches a literal "vendor" beside a literal body name, so a path built from a VARIABLE body name -- what a generic vendor walker does -- is attributed to no body, which is right for a walker and wrong the day somebody writes a specific dependency that way. *** AND v4408'S ROTATION WAS ERASED BY A MERGE, WHICH IS A FINDING ABOUT THE RECORD AND NOT ABOUT THE ROUND. *** tools/ship/sweep-timings.json is a GENERATED file that two branches both write, and the other branch's v4409 shipped timings taken before v4408's rotation ran -- so merging it restored 374 gates to the over-budget pool that serial re-timing had rescued. The budget-confirm fix means no NEW eviction happens on a starved reading, but it cannot un-take a reading that arrives by merge. A second rotation returned 146 OF 150 and put the pool back to 228, and its three reds are all already registered. The durable fix is that a generated file with two writers is a record with no owner, which is the same shape that deleted the rotation's own ledger one round ago and was fixed there by giving it its own file; here the two writers are two BRANCHES, and that is not a thing a .gitignore or a filename can settle. Item 5 is closed; items 7 and 8 stay open, and 8 is the author-centred orrery whose opening measurement is that orrery.json's fifteen bodies carry no owner field at all. The tree stands at 1444 gates.
+
+## v4411 -- every ship had a thruster state and not one of them showed it
+
+*** THE BOOLEAN NOBODY DREW. *** ev/flightView.js has carried `thrust` per entity since the flight model
+existed -- the player's from the keyboard (`keys.thrust`), every AI's from stepAI -- and the flight model
+consumes it to accelerate. The draw path never read it. A ship under full burn and a ship coasting were the
+same textured quad. `grep -rn "exhaust\|thruster"` over the whole tree returned nothing but prose about
+browser connection pools and ray-march budgets.
+
+AND THE DOOM FIRE HAD ONE CONSUMER IN THREE HUNDRED VERSIONS: doom-fire.html, a standalone 2D canvas demo
+linked from server.html. Gated since v4178, generalised at v4410, and in no scene.
+
+*** NEW render/shipExhaust.mjs: v4178's AUTOMATON ON v4410's DIRECTION FIELD, HUNG OFF EVERY STERN. *** The
+control is free for the third round running: a ship flying STRAIGHT has zero heading delta in every row, so
+the plume's field is uniformly (0, +1) and the plume is EXACTLY FieldFire on straightField -- three seeds,
+200 frames each, 0 differing cells.
+
+*** AND WHAT NEEDS A FIELD RATHER THAN A ROTATED SPRITE IS THE BEND. *** A straight plume is a rotated
+sprite: bake one fire, draw the quad at the ship's heading, done. What a rotated sprite cannot do is bend.
+Exhaust is emitted and then left behind -- A PARCEL KEEPS THE HEADING IT WAS EMITTED WITH -- so a ship that
+turns while burning drags a curved trail, and the curve is a record of where the ship has been. That is a
+different direction in every row, which one texture rotated by one angle has no way to hold.
+
+    row 15 of a 24-cell plume, after 200 frames:
+      straight              11.8
+      turning +2 deg/frame   8.0
+      turning -2 deg/frame  15.4      -- a spread of 7.4 cells, the two turns bending opposite ways
+
+*** THE FIRST DRAFT POINTED EACH ROW ALONG ITS PARCEL'S HEADING, AND THAT IS A DIFFERENT QUANTITY FROM THE
+DIRECTION HEAT TRAVELS. *** At 3 degrees per frame over 32 rows the oldest row is 96 degrees off, so its
+`back` pointed SIDEWAYS: the row read from its neighbour instead of from the nozzle, the plume stopped being
+connected to the engine at all, and turning left and turning right both put the tail in the same place --
+12.0 and 12.7 against a straight 7.9. That is noise, not a bend. Heat always enters at the nozzle and travels
+DOWN THE ROWS; what a turn bends is the plume's COURSE. So the field is v4410's river with the channel's
+centre line derived from the heading history rather than drawn, tangent clamped to one cell per row for the
+reason v4410 established.
+
+*** CUTTING THRUST EXTINGUISHES THE NOZZLE, AND MERELY NOT LIGHTING IT IS NOT CUTTING IT. *** The nozzle
+row's upstream neighbour is off-grid, so step() skips it and it KEEPS ITS VALUE FOR EVER. Measured on the
+first draft: thrust cut after 120 frames, still burning 500 frames later -- while this module's own header
+claimed the plume "rises, cools and burns out on its own". v4178 has the same shape and names it: extinguish()
+is a separate call from not calling light(). It is out in 45 frames now, and dims rather than vanishing (heat
+9940 -> 7752 three frames after the cut), which is the whole reason the automaton was worth porting.
+
+*** WIRED, NOT MERELY IMPORTED -- v4165's RULE. *** The plume is pushed from the SAME `thrust` the flight
+model just consumed, for the player and for every NPC, so a frame in which the engine fired and the flame did
+not is not representable. Plumes are dropped by rebuilding the live set each frame rather than on a death
+event, because a death event that is ever missed leaves a plume burning for the session. The quad is drawn
+UNDER the hull and blended ADDITIVELY, because an alpha blend over the starfield punches a dark rectangle
+wherever the plume is cool, and alpha carries the fire's own intensity rather than a flat 255 -- measured
+59 fully opaque, 296 partial, 413 fully clear across a 24x32 plume, where a flat alpha makes all three one
+number and the quad shows as a rectangle.
+
+*** AND A CORRECTION WHERE IT LIVES: ev/flightModel3d.js's angleDiffDeg STATES ITS RANGE AS "(-180, 180]"
+AND RETURNS -180 FOR A HALF TURN *** -- the one value that range excludes. angleDiffDeg(0, 180) and
+angleDiffDeg(180, 0) are both -180. The value is not wrong (at half a turn the two ways round are the same
+length, so the sign is a convention) but the comment named the wrong endpoint. Found by copying that
+expression deliberately, so a plume and the flight model can never disagree about which way a ship turned,
+and then testing it.
+
+SIX SABOTAGES, MEASURED 1/1/1/2/2/1 RED BY NAME, both files md5-identical after restore: A parcelDirection's
+sign flipped; B thrust-off merely stops lighting; C alpha goes flat; D the centre line stops recording the
+turn; E the import extension wrong (reads fine in source, 404s in a browser); F NPCs stop feeding their
+plumes.
+
+*** THIS GATE'S OWN FIRST DRAFT HAD THREE ROWS WRONG, and one of them is a repeat offence. *** resolveSpec
+was called with its arguments reversed (it takes fromFile first, not the specifier). The half-turn was
+asserted at +180 on the strength of angleDiffDeg's inaccurate comment rather than on what it returns. And the
+NPC wiring check used `[^)]*` to cross an argument list CONTAINING PARENTHESES -- `(e.id | 0) * 2654435761`
+-- which is v4407's detectBackends mistake made a second time, and fixed the same way, with `[^;]*`.
+
+WHAT THIS DOES NOT CLAIM. That the plume looks right on a GPU: these checks run the automaton and read its
+cells, and the quad, the additive blend and the stern offset are judged by a person. That the bend is
+aerodynamically true -- a parcel here keeps its emission heading and nothing diffuses or slows it, which
+makes this a record of the ship's path and not a plume model. And that every ship burns: a ship with no
+thrust input never lights, which is the point, so an empty sky is a correct empty sky.
+The tree stands at 1443 gates.
+## v4410 -- the DOOM fire's "up" was a constant, and that is the only reason it could not run down a river
+
+*** TWO DIRECTIONAL CONSTANTS, NOT ONE. *** render/doomFire.mjs (v4178, ported from
+filipedeschamps/doom-fire-algorithm, MIT) expresses its whole rule as 1D index arithmetic on a rectangle:
+
+    const below = i + w;                       // where the heat is DRAWN FROM
+    const decay = Math.floor(rng() * 3);
+    const dst   = i - decay;                   // where it is WRITTEN: leaned LEFT by decay
+
+`+w` is the FLOW and `-1` is the LEAN. A generalisation that replaced only the first produces fire that flows
+sideways and still leans left, which is not a rotated fire, it is a broken one. Both now come from ONE
+per-cell direction field:
+
+    back(d) = -(dx + w*dy)          the neighbour OPPOSITE the flow
+    perp(d) =  dy + w*(-dx)         the flow turned 90 degrees
+
+For the original's d = (0,-1) those evaluate to exactly `+w` and `-1`. THE TWO CONSTANTS, DERIVED.
+
+*** SO THE CONTROL IS FREE AND TOTAL. *** NEW render/doomFireField.mjs, run with a uniform upward field,
+reproduces v4178 BYTE FOR BYTE, FRAME FOR FRAME: five grid shapes (60x40, 37x23, 8x5, 120x80, 1x2), 200
+frames each, stoke() every 7 frames and damp() every 11 -- 0 differing cells in 1,000 frames. rng() is called
+at the same point and the same number of times, after the bounds test on the source cell, so a cell with no
+source consumes no randomness in either implementation. That is what makes the control exact rather than
+close.
+
+*** RIVERS, WATERFALLS, AND LAVA THAT CATCHES. *** riverField follows a wandering channel and the fire runs
+downstream inside its banks; waterfallField runs horizontally along the top, turns at the lip, and pours down
+a three-cell curtain; lavaField spreads radially from a vent under a downhill bias. One field holding two
+regimes -- horizontal above the lip, vertical over it -- is what a scalar "wind" knob cannot express, and is
+the whole reason the direction is per cell.
+
+*** THE INLET IS DERIVED FROM THE FLOW, NOT TYPED. *** upstreamSource() returns every fuel cell whose
+upstream neighbour is off-grid or non-fuel. For the upward field that is EXACTLY v4178's bottom row: its
+hand-picked source recovered as a consequence of its rule rather than as a second fact about it.
+
+*** THIS ROUND'S OWN INSTRUMENTS REFUTED FOUR OF ITS CLAIMS, AND THERE IS A CHECK FOR EACH. ***
+
+  1. quantise's comment said it "keeps a shallow diagonal diagonal instead of collapsing it to the dominant
+     axis". IT DID THE OPPOSITE. Normalising by the larger component and rounding sends (2.4, 1) -- 22.6
+     degrees off horizontal -- to [1, 0], the downstream component rounded away entirely, and the river's
+     fire never left its source row. It snaps the ANGLE now: (2.4, 1) -> [1, 1].
+  2. The header said a zero direction means "nothing burns here" while 154 of 1,542 off-water cells burned.
+     A live cell's LEAN lands on a diagonal neighbour and that neighbour is off the water at every bend. The
+     write refuses non-fuel destinations now; the count is 0 of 984.
+  3. riverField's downstream never advanced downstream. The default path wanders a quarter of the width over
+     a quarter period -- a channel genuinely steeper than 45 degrees, whose tangent quantises to pure
+     horizontal. The tangent is clamped to one cell per row: downstream that never advances downstream is
+     not downstream.
+  4. waterfallField's comment read "the fall itself, a narrow column" beside code making EVERY cell left of
+     the lip into falling water, so the whole left half of the grid burned.
+
+*** A BOUNDARY BEHAVIOUR OF v4178 THAT v4178 COULD NOT EXHIBIT. *** The decay is applied to the value
+WRITTEN, and the write lands on the PERPENDICULAR neighbour -- so only a decay of 0 writes a cell to itself,
+and it writes it undecayed. A fuel cell whose perpendicular upstream neighbour is not fuel therefore never
+receives a decayed value at all and conducts its inlet intensity forever. MEASURED: the waterfall curtain's
+leading column reads exactly 36 at every one of 20 rows, and across the grid 48 of the 51 such cells sit at
+MAX_INTENSITY.
+
+THIS IS OLD BEHAVIOUR WITH NOWHERE TO APPEAR. v4178's fuel region is the entire rectangle, so its only such
+cells are one screen edge, where the effect is a 9% warm bias -- measured on the original 40x20 after 300
+frames: mean intensity 25.7 at the right edge against 23.6 at the left, the right being the edge with no
+perpendicular upstream neighbour because the lean is leftward. Give the same rule an interior boundary and it
+draws a hard bright line. Reported rather than smoothed: smoothing it would be changing the ported rule to
+suit a picture.
+
+*** AND WHAT THE KRBN LIFT CAN AND CANNOT DO, SETTLED. *** tools/krbn/strokeLift.js liftStrokes(strokes,
+mesh, cam) ray-casts 2D points onto a mesh and drapes them as 3D polylines. It is a FORWARD MAP ONLY -- point
+to surface position, with no inverse and no adjacency. So it can PAINT this fire onto geometry and it cannot
+make the fire TRAVERSE geometry: traversal needs a neighbour topology, and a direction field is that
+topology. The lift and this module answer two different questions, and the one worth being clear about is
+which.
+
+SIX SABOTAGES, MEASURED 4/2/1/1/2/2 RED BY NAME, file md5-identical after restore: A the lean dropped from
+the derivation; B quantise reverted to the component-normalising draft; C the lean allowed to cross a bank;
+D the river tangent unclamped; E the curtain back to a sheet; F the inlet typed as the bottom row.
+
+*** SABOTAGE D READ ZERO RED THE FIRST TIME, AND THAT IS THE MOST USEFUL THING HERE. *** The travel check
+counted how many rows held fire while lighting the FULL derived inlet -- and that inlet spans many rows by
+construction, so "fire reaches 24 of 24 rows" was satisfied by the injection and travel was never measured at
+all. Travel is a distance FROM the inlet: lit only at the row-0 inlet cells, the clamped river reaches row 13
+of 23 from 23 inlet cells, and the unclamped one reaches row 0 from 1.
+
+WHAT THIS DOES NOT CLAIM. That the fire looks right: a gate cannot judge a picture, and these checks hold
+direction, confinement, travel and the derived inlet, none of which is beauty. That a direction field is a
+fluid solver -- it is an advection direction per cell and nothing solves for it, so a river's course here is
+drawn, not simulated. And that any of this reaches a scene: nothing in the tree renders it yet, which is
+#162 and is deliberately not done here.
+The tree stands at 1444 gates.
 ## v4409 -- a check identified its subject by SHAPE, and a round two versions later gave it a bigger one
 
 *** THE SELECTOR THAT KEPT MATCHING AFTER ITS SUBJECT WAS REPLACED. *** tools/ship/gateReport-selfcheck.mjs

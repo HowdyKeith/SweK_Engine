@@ -52,7 +52,10 @@ export function stepFlight3d(state, input, stats, dt) {
     };
 }
 
-// Signed shortest angle a->b in degrees, in (-180, 180].
+// Signed shortest angle a->b in degrees, in [-180, 180). v4411: this said "(-180, 180]" -- the wrong
+// endpoint. A half-turn returns -180, not +180: angleDiffDeg(0, 180) and angleDiffDeg(180, 0) are BOTH
+// -180. The value is not wrong (at half a turn the two ways round are the same length, so the sign is a
+// convention) but the stated range excluded the one value the function actually returns there.
 export function angleDiffDeg(a, b) { let d = ((b - a) % 360 + 540) % 360 - 180; return d; }
 
 // The yaw a ship at (x,y) must hold to face (tx,ty) in the ES plane. headingVector = (sin, -cos), so the heading

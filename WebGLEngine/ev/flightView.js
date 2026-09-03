@@ -21,6 +21,7 @@ import { DEFAULT_W, decide as tacticsDecide, applyBrainWeights } from "./esTacti
 import { makeRng, spawnSeed, ownsNpc, packNpcs, mergeRemoteNpcs, ghostAt,                            // v2168/v2169 -- co-op authority
     validateDamage, noteAccepted, damageEvent, applyDamageEvent,                                     // v2171 -- the damage wire
     makeDeadBoard, noteDead, deadPack, MAX_NPCS_PER_PACKET } from "./esAuthority.js";   // v2172 -- kill credit
+import { ShipExhaust } from "../render/shipExhaust.mjs";   // v4411 -- the DOOM fire as a thruster plume
 import { intentGhostAt } from "./npcGhost.js";   // v2252 -- curved (flight-model) ghost extrapolation, falls back to ghostAt
 import { recordGrudges, clearGrudges, decayGrudges } from "./evData.js";
 
@@ -356,6 +357,9 @@ function FlightView(canvas, opts = {}) {
             // sprite ships first (textured, blended)
             if (sprited.length) {
                 gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                // v4411 -- plumes first: the hull is drawn over the nozzle, not the other way round.
+                for (const e of sprited) { const p = worldToScreen(view, W, H, e.x, e.y);
+                    drawPlume(p.sx, p.sy, e.heading, 11 * eff, exhausts.get("e" + e.id)); }
                 for (const e of sprited) { const p = worldToScreen(view, W, H, e.x, e.y); drawSpriteQuad(p.sx, p.sy, e.heading, eScale, e.dead ? 0.35 : 1, shipSprites.get(e.cls.id)); }
             }
             // triangle ships (grouped by team color)
@@ -417,6 +421,13 @@ function FlightView(canvas, opts = {}) {
         }
         // ship marker at screen center, pointing along heading. Stage 3: draw the
         // textured sprite if one is loaded; otherwise the vector triangle.
+        {
+            // v4411 -- the player's plume, drawn under the hull in BOTH branches so a pilot without loaded
+            // ship art still sees the engine burn. It is the same DOOM fire the AI ships carry.
+            const eff = dpr * renderScale;
+            gl.enable(gl.BLEND);
+            drawPlume(W / 2, H / 2, st.heading, 13 * eff, exhausts.get("player"));
+        }
         if (sprite) {
             gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             const eff = dpr * renderScale;   // keep on-screen size constant under supersampling
@@ -437,6 +448,9 @@ function FlightView(canvas, opts = {}) {
         const input = { turn: (keys.left ? -1 : 0) + (keys.right ? 1 : 0), thrust: !!keys.thrust };
         const _bxLocal = [st]; for (const e of enemies) if (!e._foreign && !e.dead) _bxLocal.push(e); EVBOX.reconcile(_bxLocal);
         if (EVBOX.on) EVBOX.drive(st, input, dt); else st = stepFlight(st, input, stats, dt);
+        // v4411 -- the plume is advanced from the SAME input the flight model just consumed, so a frame in
+        // which the engine fired and the flame did not is not representable.
+        plumeFor("player", 0x5EED).push(st.heading, input.thrust);
         // broadcast presence (throttled)
         if (net && t - lastNet > 100) {
             // v2169 -- ride the npcs we own on the presence packet we already send at 10Hz. packNpcs
@@ -568,10 +582,15 @@ function FlightView(canvas, opts = {}) {
             if (!engaging && target && Math.hypot(target.x - e.x, target.y - e.y) < 60) ai = { turn: 0, thrust: false, firing: false };   // settle into the wing slot
             if (EVBOX.on) { EVBOX.drive(e, { turn: ai.turn, thrust: ai.thrust }, dt); }
             else { const ns = stepFlight(e, { turn: ai.turn, thrust: ai.thrust }, e.stats, dt); e.x = ns.x; e.y = ns.y; e.vx = ns.vx; e.vy = ns.vy; e.heading = ns.heading; }
+            plumeFor("e" + e.id, (e.id | 0) * 2654435761 % 65536).push(e.heading, ai.thrust && !e.dead);
             if (engaging && target && ai.firing) for (const sh of e.fc.tick(dt, ai.firing, e, speedScale, target)) { sh.team = team; shots.push(sh); }
             if (team === "ally") { const line = escortCallout(e, engaging, t); if (line) { e._callout = { line, until: t + 3000 }; if (entryOpts.onCallout) entryOpts.onCallout(line, e); } }
             rechargeShield(e, dt);
         }
+        // v4411 -- a plume per ship is state, and state keyed by a spawned entity leaks when the entity goes.
+        // Rebuilt from the live set each frame rather than deleted on a death event, because a death event
+        // that is ever missed leaves a plume burning for the rest of the session.
+        { const live = new Set(["player"]); for (const e of enemies) if (!e.dead) live.add("e" + e.id); dropPlumes(live); }
         if (EVBOX.on) EVBOX.settle(dt);   // v2266 -- one shared box3d step: local ships collide, positions synced back
         // homing shots steer toward the nearest opposing target: player + live enemies, tagged by team
         const homingTargets = [{ x: st.x, y: st.y, team: "player" }];
@@ -772,6 +791,62 @@ function FlightView(canvas, opts = {}) {
         if (a) shipSprites.set(classId, a); return !!a;
     }
     function clearShipSprites() { shipSprites.clear(); }
+
+    // ---- v4411 -- THRUSTER PLUMES ------------------------------------------------------------------
+    // Every ship here has carried a live `thrust` boolean since the flight model existed and the draw path
+    // has never read it: a ship under full burn and a ship coasting were the same textured quad. The plume
+    // is render/shipExhaust.mjs -- v4178's DOOM fire on v4410's direction field, whose course bends to
+    // record where the ship has been. ONE texture is reused for every plume: the upload is 24x32 RGBA, and
+    // a texture per ship would be a GL object per NPC in a brawl.
+    const exhausts = new Map();
+    let plumeTex = null, plumeBuf = null;
+    function plumeFor(key, seed) {
+        let e = exhausts.get(key);
+        if (!e) { e = new ShipExhaust({ width: 24, height: 32, seed: (seed | 0) || 0x5EED }); exhausts.set(key, e); }
+        return e;
+    }
+    function dropPlumes(live) { for (const k of exhausts.keys()) if (!live.has(k)) exhausts.delete(k); }
+
+    // A quad rotated to the ship's heading, hung off its stern. shipTriangle's convention is the authority:
+    // heading 0 points UP the screen, so forward is (sin a, -cos a) and aft is its negation.
+    function drawPlume(cx, cy, headingDeg, px, ex) {
+        if (!ex || !ex.isBurning()) return false;
+        if (!plumeTex) {
+            plumeTex = gl.createTexture(); plumeBuf = gl.createBuffer();
+            gl.bindTexture(gl.TEXTURE_2D, plumeTex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        }
+        gl.bindTexture(gl.TEXTURE_2D, plumeTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, ex.width, ex.height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array(ex.rgba().buffer));
+        const a = headingDeg * Math.PI / 180;
+        const fx = Math.sin(a), fy = -Math.cos(a);          // forward
+        const rx = -fy, ry = fx;                            // across the plume
+        const halfW = px * 0.55, len = px * 2.6, off = px * 0.45;   // stern offset, so it starts at the hull
+        const P = (u, v) => {
+            const across = (u - 0.5) * 2 * halfW, back = off + v * len;
+            return [cx + rx * across - fx * back, cy + ry * across - fy * back];
+        };
+        const a0 = P(0, 0), b0 = P(1, 0), a1 = P(0, 1), b1 = P(1, 1);
+        const q = new Float32Array([
+            a0[0], a0[1], 0, 0,  b0[0], b0[1], 1, 0,  a1[0], a1[1], 0, 1,
+            b0[0], b0[1], 1, 0,  b1[0], b1[1], 1, 1,  a1[0], a1[1], 0, 1,
+        ]);
+        // ADDITIVE: a flame adds light to what is behind it, and an alpha blend over the starfield would
+        // punch a dark rectangle wherever the plume is cool.
+        gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.useProgram(tProg); gl.uniform2f(tl.u_res, dims.W, dims.H); gl.uniform1f(tl.u_alpha, 1);
+        gl.activeTexture(gl.TEXTURE0); gl.uniform1i(tl.u_tex, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, plumeBuf); gl.bufferData(gl.ARRAY_BUFFER, q, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(tl.a_screen); gl.vertexAttribPointer(tl.a_screen, 2, gl.FLOAT, false, 16, 0);
+        gl.enableVertexAttribArray(tl.a_uv); gl.vertexAttribPointer(tl.a_uv, 2, gl.FLOAT, false, 16, 8);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        return true;
+    }
 
     // Draw a textured ship sprite centered at (cx,cy) screen px, oriented by heading.
     // Uses `atlas` if given, else the player sprite. Picks the rotation frame from
