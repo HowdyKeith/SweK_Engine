@@ -14,6 +14,88 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4424 -- I said the population was small; that was a claim about draw sites, not about colours
+
+Keith: "we also have fireworks, and plasma, and lightning."
+
+v4421 had just added the fifth entry to v4412's fire-colour census, after finding a colour typed straight into
+a draw call rather than written as a named ramp. It then asked how many more there were, and answered with
+this detector:
+
+    files that call gl.blendFunc(..., gl.ONE)      -- twelve in the tree
+
+and concluded, in ev/shipDebris.mjs's own header: "the population is SMALL and it is named rather than guessed
+at".
+
+THAT SENTENCE IS TRUE OF DRAW SITES AND FALSE OF COLOURS, AND THE DIFFERENCE IS A WHOLE MECHANISM. An effect
+that hands a colour to a SHARED PARTICLE SYSTEM never calls blendFunc at all. All three effects Keith named
+are exactly that shape:
+
+    world/fireworkShell.mjs     blendFunc calls: 0
+    world/kaijuAttackFx.js      blendFunc calls: 0    8 distinct inline colour literals, six impact styles
+    ui/pageFxOverlay.js         blendFunc calls: 0    and NO GATE OF ANY KIND
+
+RE-TAKEN WITH A DETECTOR THAT LOOKS FOR COLOURS RATHER THAN FOR DRAWING:
+
+    KIND                                                        files
+    A  a NAMED ramp function, which fireColour can hold             5   (its whole SOURCES table)
+    B  a literal colour inside an additive DRAW call               13   (v4421's detector)
+    C  a literal colour named for something else to draw           75
+
+    files in BOTH B and C                                           0
+    of C, files that also talk about HOT effects                   20
+
+ZERO OVERLAP. The two mechanisms do not share a single file, which is why one detector reported the other's
+population as absent rather than as small. That is v4413's substring rule which could not see a path built by
+path.join, a third time -- and the third round running in which the instrument's REACH, rather than its
+arithmetic, was the thing that was wrong.
+
+NEW render/colourReach.mjs makes the reach itself measurable rather than assumed. Three KINDS as predicates
+over source, so every number is re-derivable; and HOT_UNREGISTERED, a FROZEN LIST OF NAMES of the 29 hot
+effects that name a literal colour and are not in the census.
+
+IT DOES NOT REGISTER 75 FILES. A colour literal is not a fire: 54 of the 75 are weather, water, biome tints,
+chess pieces and UI. Registering them all would turn a census with a question into a list with none.
+
+AND MY OWN HEADLINE NUMBERS DISAGREED WITH MY OWN CODE. The first draft of that header said 12 and 87 --
+measured with grep from a terminal. census() says 13 and 75, because it excludes gates and vendor and the
+ad-hoc greps did not. A CENSUS WHOSE HEADLINE NUMBERS COME FROM A DIFFERENT READER THAN ITS CODE IS TWO
+CENSUSES, and the round whose whole subject is a detector's reach is the worst possible place to keep one.
+Every number in that file is produced by its own KINDS now.
+
+AND THE FROZEN LIST WAS PASTED FROM A TERMINAL `head -16` WHEN THE RAW COUNT WAS 29. A list truncated by a
+pager is not a measurement: it would have ratcheted thirteen real files into invisibility, inside the file
+built to stop exactly that. The gate now asserts that the frozen length EQUALS the measured length, so a
+screenful can never stand in for a census again.
+
+v4421's sentence is CORRECTED IN PLACE AND LEFT STANDING rather than silently rewritten. A measurement that
+was right about the wrong question is worth more visible than erased.
+
+NEW render/colourReach-selfcheck.mjs, nine checks in four sections.
+
+WHAT THIS DOES NOT CLAIM. That the 29 should all be registered: most of them want a ramp only if somebody asks
+them a colour question, and the list is a REACH MEASUREMENT rather than a to-do. That the hot predicate is
+anything but crude -- it reads words and not behaviour, so it counts a file that merely mentions fire and
+misses one that draws a flame without naming it, and it says so in the file. And that fireworks, plasma or
+lightning were FIXED here: they were the prompt, they are now named and counted, and ui/pageFxOverlay.js still
+has no gate.
+
+AND WRITING THIS ROUND CHANGED THE CENSUS'S OWN ANSWER -- commentFalsePass, a third time in one session.
+
+The first draft read RAW SOURCE and measured 13 draw sites. Then the version comment, the sweep-ledger entry
+and the module header were written, and every one of them QUOTES the string `gl.blendFunc(..., gl.ONE)` while
+explaining the detector. The census counted prose ABOUT the detector as instances OF it: 17 draw sites instead
+of 13, with main.js and ev/shipDebris.mjs landing in the "both kinds" overlap that the entire finding rests on
+being EMPTY. The verify sweep caught it; running the gate standalone before the comments existed had not.
+
+A CENSUS THAT READS PROSE MEASURES ITS OWN CHANGELOG. Comments are stripped before any predicate runs now, and
+the corrected figures are 13 draw sites, 75 literal-colour files, ZERO overlap and 20 hot effects unregistered
+-- nine of the earlier 29 were hot only in their comments, which makes the list more precise as well as
+smaller. The gate asserts that a file mentioning the pattern ONLY in a comment is not counted, so describing a
+detector can never again enrol the describer.
+
+Five sabotages, 3/3/1/4/1 RED by name, two files md5-identical after restore.
+The tree stands at 1456 gates.
 ## v4423 -- the fires compared on spread, and the two rules are not two takes on one idea
 
 #171, which is what was left of #163. v4412 compared six fires on COLOUR and closed with the limit written

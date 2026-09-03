@@ -34,6 +34,17 @@
 // So the population is SMALL and it is named rather than guessed at: flightView is the only file that writes
 // more than one, and the only fire in the tree with no ramp to sample is this one.
 //
+// *** v4424 -- THAT SENTENCE IS TRUE OF DRAW SITES AND FALSE OF COLOURS, AND THE DIFFERENCE IS A WHOLE
+// MECHANISM. *** The table above was built by asking which files call gl.blendFunc(..., gl.ONE) -- files that
+// own their draw call. An effect that hands a colour to a SHARED PARTICLE SYSTEM never calls blendFunc at
+// all, and there are 77 of those, sharing ZERO files with the twelve counted here. Keith asked about
+// fireworks, plasma and lightning: world/fireworkShell.mjs, world/kaijuAttackFx.js and ui/pageFxOverlay.js
+// have 0 blendFunc calls between them and were invisible to the detector that pronounced the population
+// small. render/colourReach.mjs re-takes the count with a detector that looks for COLOURS rather than for
+// DRAWING, and ratchets the 29 hot effects the census still does not reach. The reading above is kept
+// unedited, because a measurement that was right about the wrong question is worth more standing than
+// silently corrected.
+//
 // *** THE FIX IS TO GIVE IT A NAME, NOT TO BUILD A SCANNER FOR INLINE COLOURS. *** explosionSample below is
 // the SAME function the draw call already computed -- r = h, g = 0.6h, b = 0.25h -- extracted rather than
 // invented, so the port is bit-identical at every h and the picture does not move. Once it has a symbol the

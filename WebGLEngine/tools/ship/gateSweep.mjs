@@ -941,6 +941,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and nobody had stubbed one; lineWorld is that stub, checked to contain no fire logic of its " +
                  "own so the harness cannot agree with itself. Four sabotages, 1/1/4/1 red by name.",
     }),
+    since50: Object.freeze({
+        at: "v4424", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/colourReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, a tree walk and three predicates, no browser. Keith named fireworks, " +
+                 "plasma and lightning, and ALL THREE ARE INVISIBLE TO THE DETECTOR v4421 USED TO DECLARE THE " +
+                 "POPULATION SMALL: that detector looked for gl.blendFunc(gl.ONE) -- files that own their " +
+                 "draw call -- and an effect handing a colour to a shared particle system never calls it. " +
+                 "Re-taken: 5 named ramps, 13 draw-site files, 75 literal-colour files, ZERO IN BOTH. The two " +
+                 "mechanisms share no file at all, which is why one reported the other as absent rather than " +
+                 "as small -- v4413's substring rule a third time, and the third round running where the " +
+                 "instrument's REACH was what was wrong. HOT_UNREGISTERED freezes the 29 hot effects the " +
+                 "census does not reach, as NAMES rather than a count. Two of my own errors are recorded: the " +
+                 "header's headline numbers came from shell greps (12/87) and disagreed with the module's own " +
+                 "predicates (13/75), and the frozen list was pasted from a terminal head -16. AND WRITING THE " +
+                 "ROUND CHANGED THE CENSUS'S ANSWER: the version comment, this ledger entry and the module " +
+                 "header all QUOTE the blendFunc pattern, so a raw reader counted 17 draw sites and put two " +
+                 "files into the overlap the finding rests on being empty. commentFalsePass a third time in " +
+                 "one session. Comments are stripped now; 20 hot effects unregistered, not 29. Five " +
+                 "sabotages, 3/3/1/4/1 red by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
