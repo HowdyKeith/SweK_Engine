@@ -710,6 +710,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "own header calls v4420's defect one level down. Spreading the transformed generator would " +
                  "not have caught it -- the cure is one fixed picture through six transform seeds",
     }),
+
+    // v4423 -- the thirty-eighth closing, and the one that corrects two earlier rounds with their own
+    // instruments. Eleven transfer columns show v4420's "worse than random on everything else" was drawn from
+    // four, and the tempting reading of v4422's mechanism as a variable that ORDERS targets does not survive
+    // (r = 0.34). It also adds the first target that is not a picture: a scalar radiance field.
+    since39: Object.freeze({
+        at: "v4423", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/paintFields-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seven sections and 15 checks in 13.2 s -- one training, no " +
+                 "device. Driven RED by eight sabotages (2/3/1/2/1/1/1/1 by name) and restored, with NO 0 " +
+                 "REDS. Its nebula generator had to be built twice -- a flight-view parallax of 0.00035 per " +
+                 "world unit made a +/-20 camera invisible -- and seedSpread caught it, the third generator " +
+                 "in three rounds that check has caught",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
