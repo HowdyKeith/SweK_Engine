@@ -465,7 +465,15 @@ const onDisk = reports();
            `${mine.length} tables, all either plotted or named. MEMBERSHIP IS NEARLY FREE when the plot reads ` +
            "the report directly; THIS is the one that catches a plot quietly losing numbers");
 
-        const zeroTable = r.tables.find((t) => t.dropped.length > 0);
+        // *** v4405 -- NAMED, NOT FOUND, AND A SECOND ROUND'S TABLE IS WHY. *** This was
+        // r.tables.find(t => t.dropped.length > 0) -- the FIRST table with an undrawable value -- and the prose
+        // below is specifically about the shipyard's claim-local error being exactly zero. v4405's
+        // physics/sph/rigidFloat-selfcheck.mjs emits a pressure profile whose top four samples are 0 Pa, which
+        // is its own finding and is legitimate; it sorted ahead of the shipyard's and the check started
+        // describing somebody else's zeros as "the shipyard's whole result". A check about one table has to
+        // name that table.
+        const zeroTable = r.tables.find((t) => /float32 error after/.test(t.title)) ||
+                          r.tables.find((t) => t.dropped.length > 0);
         ok("!! *** and the value the chart CANNOT draw is named rather than nudged ***",
            !!zeroTable && zeroTable.dropped.filter((v) => v === "0").length >= 6,
            zeroTable ? `${zeroTable.dropped.length} of ${zeroTable.held} values in "${zeroTable.title.slice(0, 40)}" ` +
