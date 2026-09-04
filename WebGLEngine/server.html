@@ -6197,7 +6197,15 @@ try{
       // ResizeObserver keeps it so, because a panel opening or a window resizing moves the box and a scene
       // measured once at mount is a typed constant that arrived late. The 223x210 that was here is gone
       // rather than kept as a fallback: a fallback nobody can reach is a number nobody re-derives.
-      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,sizeFromHost:true,minSize:120,probe:headProbe});
+      // v4451 -- A CEILING TO GO WITH v4413'S FLOOR. Measured on this page at four window widths, the surface
+      // ran 341 / 621 / 749 / 1005 px while the robot drawn inside it stayed 100 px at all four: the figure is
+      // HEIGHT-bound (viewBox 60x88 letterboxed into a 147 px-tall box) so every pixel of width past ~100 was
+      // empty. 420 is the cap and it is a judgement stated as one: it is about 2.3x the row's own 184 px
+      // rendered height, which leaves room for a scene twice the robot's width -- the gauges v4413 was asked to
+      // make space for -- and refuses the runaway beyond it. Below 420 nothing changes, so the panel still
+      // tracks its box on an ordinary laptop; the two numbers are the floor and the ceiling of the same box and
+      // are passed together for that reason.
+      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,sizeFromHost:true,minSize:120,maxSize:420,probe:headProbe});
       window._avatarSwitch=sw;
       // v3557 -- THE FAVOURITES STAR, under the mode switch. It owns NO favourites list of its own: it reads and
       // writes ui/kpopFavorites.js, the store the sandbox avatar cycle already uses, so a favourite set here

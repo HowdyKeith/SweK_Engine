@@ -327,7 +327,11 @@ async function publishVersion({ repo, tag, name, body, assetPath, draft, prerele
 
 // v1129 — one click: auto-tag from the running engine version, build the Gmail-safe
 // engine zip, and publish it as a release asset. The whole "cut a new version" flow.
-async function publishEngineBuild({ repo, notes, draft, prerelease } = {}) {
+// v4451 -- wrapped for the same reason: this one packs a ~30 MB zip and uploads it, and an update restart
+// inside the upload leaves a release whose asset never finished arriving -- which the installer would then
+// scan for and not find.
+async function publishEngineBuild(a) { return _tracked("an engine release", () => _publishEngineBuildInner(a || {})); }
+async function _publishEngineBuildInner({ repo, notes, draft, prerelease } = {}) {
     const c = loadCfg();
     repo = repo || c.engineRepo || c.defaultRepo;
     if (!effTok()) return { ok: false, error: "a personal access token (repo scope) is required" };
@@ -386,7 +390,9 @@ function _run(cmd, args, opts) {
     });
 }
 
-async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
+// v4451 -- wrapped so the updater can see it; the body is unchanged and is now _cloneEngineSourceInner.
+async function cloneEngineSource(a) { return _tracked("a source clone", () => _cloneEngineSourceInner(a || {})); }
+async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     const c = loadCfg();
     repo = (repo || c.engineRepo || c.defaultRepo || "").trim();
     if (!repo) return { ok: false, error: "no repo (set engineRepo in Account, or pass repo)" };
@@ -1053,4 +1059,29 @@ async function ledgerCheck() {
     catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 }
 
-module.exports = { ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+// =====================================================================================
+// v4451 -- IN-FLIGHT STATE FOR THE LONG GITHUB OPERATIONS, BECAUSE THE UPDATER COULD NOT SEE THEM.
+//
+// Keith: "we need to make sure that the running swek does not start an auto update that kills the github
+// tasks." server.js has deferred auto-updates during a live test run since v3075, but _testRunActive() asks
+// render QA, the gate suite and the rig runner -- and NOTHING in this file, which is where the two longest
+// GitHub operations live: cloneEngineSource walks several hundred megabytes over the network, and
+// publishEngineBuild packs a ~30 MB zip and uploads it. An update restart landing inside either leaves a
+// half-written clone directory or, worse, a release whose asset never finished going up.
+//
+// A COUNTER RATHER THAN A BOOLEAN, AND THE SHAPE IS THE ONE updatePause-selfcheck ALREADY BLESSES for
+// gatesBridge: incremented before the work, decremented in a finally so no throw can strand it, and floored
+// at zero because "a stuck-negative counter would report idle forever, which is the failure mode that matters
+// here". A boolean would be wrong the moment two operations overlap -- which they can, since nothing in this
+// file serialises them.
+let _ghBusy = 0, _ghWhat = "";
+async function _tracked(what, fn) {
+    _ghBusy++; _ghWhat = what;
+    try { return await fn(); }
+    finally { _ghBusy = Math.max(0, _ghBusy - 1); if (!_ghBusy) _ghWhat = ""; }
+}
+/** Is a long GitHub operation in flight? Read by server.js's update deferral. */
+function busy() { return _ghBusy > 0; }
+function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
+
+module.exports = { busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

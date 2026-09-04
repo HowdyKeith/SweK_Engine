@@ -39,6 +39,20 @@
 //         v4435 family -- a check that cannot fail on the thing it is about. ledgerRefresh takes an
 //         injectable fetchRaw and writeFile now, section 2 CALLS it three times (clean / vanished / dry) and
 //         asks what it did, and the same sabotage is exit=1 with the refusal line red by name.
+//
+// ---- v4451: SECTION 4, THE ONE-PRESS 3->6 RUNNER ---------------------------------------------------------
+// Keith: "can we have a button that does 3, 4, 5, and also then 6?" v3964 split 3 from 4 deliberately, and
+// the reason is worth restating before a press is removed: "A SUBTLY BROKEN TREE BOOTS FINE AND PACKAGES
+// FINE... so Publish is a SECOND press, and it is disabled until the verdict is green." What that protected
+// is NEVER PUBLISH A RED TREE, and that is kept exactly -- the runner reads the verdict and stops. What it
+// gives up is a human reading the log before the upload, said out loud rather than traded away quietly.
+// The stub varies ONE thing, the verify verdict, so any difference in behaviour is attributable to it.
+//   5. `if (!j3.verified)` -> `if (false && !j3.verified)` -- publish on a red verify
+//      -> exit=1, 2 red: the endpoint list shows start, publish, refresh and check all called where only
+//         start should have been. This is the sabotage the whole section exists for.
+//   6. moved step 5 (record the ledger) ABOVE step 4 (publish)
+//      -> exit=1, 1 red by name: recording before the release exists writes the OLD answer and reads as
+//         success, so the section asserts the ORDER of the four calls and not merely that all four happened.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -161,12 +175,27 @@ if (skipWhy) {
 } else {
     const b = await chromium.launch({ executablePath: HEADLESS_SHELL });
     const page = await b.newPage();
+    let verifyRed = false;
+    let hits = [];
     await page.route("**/*", (route) => {
         const u = new URL(route.request().url());
         if (u.pathname.startsWith("/github/") || u.pathname.startsWith("/source-chain/")) {
-            if (u.pathname === "/github/config") return route.fulfill({ status: 200, contentType: "application/json",
-                body: JSON.stringify({ ok: true, owner: "HowdyKeith", engineRepo: "HowdyKeith/SweK_Engine", hasToken: true, engineVersion: "v4450" }) });
-            return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, releases: [] }) });
+            hits.push(u.pathname);
+            const J = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+            if (u.pathname === "/github/config") return J({ ok: true, owner: "HowdyKeith", engineRepo: "HowdyKeith/SweK_Engine", hasToken: true, engineVersion: "v4450" });
+            // *** THE VERIFY VERDICT IS WHAT THE STUB VARIES, BECAUSE IT IS THE ONLY THING THE RUNNER DECIDES
+            // ON. *** verifyRed is flipped between the two drives below; everything else answers the same, so
+            // any difference in what the runner does is attributable to the verdict and nothing else.
+            if (u.pathname === "/source-chain/start") return J(verifyRed
+                ? { ok: true, verified: false, verifyExit: 1, version: "v4450", path: "/tmp/clone" }
+                : { ok: true, verified: true, verifyExit: 0, version: "v4450", path: "/tmp/clone" });
+            if (u.pathname === "/source-chain/publish") return J({ ok: true, tag: "v4450", release: { tag: "v4450", url: "https://example.invalid/r" } });
+            if (u.pathname === "/source-chain/status") return J({ ok: true, canPublish: !verifyRed, clone: { path: "/tmp/clone", version: "v4450" } });
+            if (u.pathname === "/source-chain/log") return J({ ok: true, log: "" });
+            if (u.pathname === "/github/ledger/refresh") return J({ ok: true, wrote: "releases.json", repo: "o/r", count: 26, added: ["v4450"] });
+            if (u.pathname === "/github/ledger/check") return J({ ok: true, tree: "v4450", latestTag: "v4450", behind: 0,
+                releaseCount: 26, shippedCount: 262, floor: 4449, owed: [], refreshedAt: "now", fleetRunsWhatIsBuilt: true });
+            return J({ ok: true, releases: [] });
         }
         const p = path.join(ROOT, decodeURIComponent(u.pathname));
         if (fs.existsSync(p) && fs.statSync(p).isFile()) {
@@ -241,6 +270,52 @@ if (skipWhy) {
            seen.cardOverflow <= 0, `card scrollWidth - clientWidth = ${seen.cardOverflow} px (root ${seen.rootW} px). ` +
            "v4102: a hardcoded 440 demanded ~38px more than the card's content area at every zoom. The cap moved " +
            "to 640 and the CARD moved with it, so the rule that fixed it -- width:100% -- still does the work");
+    }
+
+    /* -----------------------------------------------------------------------------------------------------
+     * 4. THE ONE-PRESS RUNNER. Keith asked for 3->6 on one button; v3964 split 3 from 4 on purpose. The
+     *    guarantee it split them FOR -- never publish a red tree -- is the thing driven here, both ways.
+     * -------------------------------------------------------------------------------------------------- */
+    console.log("\n4. THE 3->6 RUNNER STOPS WHERE v3964 SAID IT MUST");
+    const runBtn = await page.$("#ghManagerDlg button:has-text('Run 3')");
+    ok("!! *** the one-press runner exists ***", !!runBtn && await runBtn.isEnabled().catch(() => false),
+       "steps 3, 4, 5 and 6 behind one press; 1 and 2 stay with the person");
+    if (runBtn) {
+        const out = () => page.evaluate(() => {
+            const r = document.getElementById("ghPanelRoot");
+            const boxes = [...r.querySelectorAll("div")].filter((d) => /ui-monospace/.test(d.style.font || ""));
+            return boxes.length ? boxes[boxes.length - 1].textContent : "";
+        });
+        // ---- RED: the case the split existed for ----------------------------------------------------
+        verifyRed = true; hits = [];
+        await runBtn.click();
+        await page.waitForTimeout(1600);
+        const red = await out();
+        ok("!! *** on a RED verify it STOPS AT 3 AND PUBLISHES NOTHING ***",
+           /STOPPED AT STEP 3/.test(red) && /Nothing was published/.test(red) && !hits.includes("/source-chain/publish"),
+           `endpoints called: ${hits.filter((h) => !/config|status|log/.test(h)).join(", ") || "(none)"}. ` +
+           "v3964: 'A SUBTLY BROKEN TREE BOOTS FINE AND PACKAGES FINE... so Publish is a SECOND press.' The " +
+           "press is gone and the PREDICATE is not -- and /source-chain/publish refuses on canPublish() too, " +
+           "so a bug in this button still cannot publish a tree the backend thinks is red");
+        ok("...and it says which step it stopped at rather than just failing",
+           /VERIFY IS RED/.test(red) && /exit 1/.test(red),
+           "a runner that reports 'failed' has made four steps into one opaque one");
+        // ---- GREEN: all four run, in order ----------------------------------------------------------
+        verifyRed = false; hits = [];
+        await runBtn.click();
+        await page.waitForTimeout(2600);
+        const green = await out();
+        const ordered = ["/source-chain/start", "/source-chain/publish", "/github/ledger/refresh", "/github/ledger/check"];
+        const seenOrder = hits.filter((h) => ordered.includes(h));
+        ok("!! *** on a GREEN verify all four steps run, in order ***",
+           JSON.stringify(seenOrder) === JSON.stringify(ordered),
+           `called: [${seenOrder.join(", ")}]. ORDER IS ASSERTED, NOT JUST PRESENCE: recording the ledger before ` +
+           "the release exists would write the old answer and read as success");
+        ok("...and the last line is GENERATED from the check, not restated beside it",
+           /6\/6/.test(green) && /THE FLEET RUNS WHAT IS BUILT/.test(green),
+           "v4404 shipped with conflict markers because a chain read a tail that said ALL GREEN while the run " +
+           "itself had exited 1. This prints what /github/ledger/check answered, not a summary of what the " +
+           "runner believes it did");
     }
     await b.close();
 }

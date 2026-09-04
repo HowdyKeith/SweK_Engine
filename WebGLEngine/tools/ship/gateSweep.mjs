@@ -1647,6 +1647,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "1, because STEP() is still called so the medallion still renders. Corrected in the header " +
                  "rather than quietly fixed.",
     }),
+    // v4451 -- the seventy-third closing. A gate that could not load, and the budget that hid it.
+    since73: Object.freeze({
+        at: "v4451", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/importHealth-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/updatePause-selfcheck.mjs (23 checks -> 31, the GitHub work the deferral could not see)",
+            "tools/ship/redCensus-selfcheck.mjs (revived: dead at import since v4430, then 3 real reds fixed)",
+        ]),
+        verdict: "green on this box, ~200 ms, no browser, 9,410 named bindings across 1,478 gates. Keith asked " +
+                 "that an auto-update not restart the server during the GitHub chain; _testRunActive() had " +
+                 "deferred updates since v3075 and named THREE runners, so the clone, the verify, the pack and " +
+                 "the upload were invisible to it -- and sourceChainBridge set R.phase all through start() and " +
+                 "NEVER IN publish(), so the blind window was exactly the one holding the action this tree " +
+                 "calls hardest to take back. *** THE REPAIR OF ITS GATE THEN EXPOSED A GATE THAT HAD BEEN DEAD " +
+                 "AT IMPORT FOR TWENTY-ONE ROUNDS: *** v4430 deleted RECORDED_BUT_GREEN from redCensus.mjs " +
+                 "(rightly -- a frozen copy of a derivable set) and left its one importer naming it, so " +
+                 "redCensus-selfcheck threw before its first check while this very session repaired entries on " +
+                 "the register it guards. IT WENT UNSEEN BECAUSE IT IS BUDGETED AT 140,941 ms and the quick " +
+                 "sweep runs everything under 3,000 -- THE NUMBER THAT DESCRIBES A GATE IS WHAT HIDES IT, and " +
+                 "fifty-one gates sit above that cap. Reviving it surfaced three reds, all one family: a " +
+                 "regex over round strings that stopped excluding anything at v44xx, an equality between a " +
+                 "typed measurement and a getter whose audit caps below it, and a claim about v4279 measured " +
+                 "against a register that repairs shrink -- so the claim went false BECAUSE THE WORK THE " +
+                 "CENSUS ASKS FOR WAS DONE. It also found winPathGuard red again after its v4423 repair: one " +
+                 "new gate reintroduced `new URL(import.meta.url).pathname`, which yields '/C:/...' on the " +
+                 "box this engine is developed on. This gate asks the load question STATICALLY, which is what " +
+                 "makes it cheap enough to ask of all 1,478 rather than only the 51. Five sabotages, MEASURED " +
+                 "1/1/1/0-then-1/2 by name. *** THE ZERO WAS ITS OWN UNREACHED BRANCH: *** nothing in this " +
+                 "tree imports from a module that re-exports, so the `export * from` guard never ran and its " +
+                 "own report line said so while I read past it; closed with temp-directory fixtures rather " +
+                 "than planted files, because a gate that leaves a gate behind grows its own population. AND " +
+                 "THE GATE WAS WRONG TWICE BEFORE IT WAS RIGHT, both times accusing correct code: 36 false " +
+                 "reds from reading one name out of `export const A = 1, B = 2;` and none out of CommonJS, " +
+                 "then ~110 more from anchoring a declaration on a semicolon at end of line in a tree that " +
+                 "writes `export const MU0 = 1.25e-6;   // CODATA`. Running one of the accused was the whole " +
+                 "cost of learning each.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
