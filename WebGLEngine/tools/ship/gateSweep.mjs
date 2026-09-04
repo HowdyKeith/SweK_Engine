@@ -1586,6 +1586,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "is recorded as a fact about the file rather than asserted as a leak. Twenty sabotages, all " +
                  "RED by name, three files md5-identical.",
     }),
+    // v4449 -- the seventy-first closing. The ship ritual had eight steps and none of them said PUBLISH.
+    since71: Object.freeze({
+        at: "v4449", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/releaseLedger-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, five sections, no network. *** THE FLEET DOWNLOADS " +
+                 "releases/latest AND FOR 261 SHIPPED VERSIONS IT HAS DOWNLOADED THREE OF THEM. *** " +
+                 "Measured from the API before a line was written: tree at v4448, newest published release " +
+                 "v4438 -- ten behind -- and 3 of the 261 versions in docs/CHANGELOG.md were ever published, " +
+                 "which is 1.1%. THE DOWNLOAD CHAIN WAS NEVER BROKEN: fetchEngineBuild, scanDownloads and the " +
+                 "installer have been complete and gated since v3907, and v3907's own header already said the " +
+                 "remaining work was on the publishing side. It pulled v4438 because v4438 was the newest " +
+                 "thing anybody published. The gate asserts the RATCHET -- you may not ship a new version " +
+                 "while the LAST one is unreleased -- and only REPORTS the ten-version lag, because checked " +
+                 "the naive way (ENGINE_VERSION must have a release) it would be red throughout every correct " +
+                 "ship, verify running before the commit and the release being published after the tag. A " +
+                 "gate red for the whole of every correct ship is one people learn to ignore. Four sabotages, " +
+                 "MEASURED 2/0-then-2/1/1 by name. *** THE ZERO WAS THE MOST USEFUL OF THE FOUR: *** deleting " +
+                 "the newest release row moved the reported lag from 10 to 148 and turned NOTHING red, " +
+                 "because the lag is reported rather than asserted -- a release the fleet was already running " +
+                 "could vanish to an upstream delete or a bad merge and this gate would have shrugged. Closed " +
+                 "with a two-number ratchet (minReleases, minLatest) that the refresh raises and nothing " +
+                 "lowers; the same sabotage is now exit=1 with both lines red by name. I also PREDICTED " +
+                 "sabotage 1 would name 144 owed versions and wrote that into the log before running it -- " +
+                 "the gate said 117, because I did the arithmetic in my head over a changelog with gaps in " +
+                 "it. Both corrections are in the gate's header rather than quietly fixed. WHAT IS NOT " +
+                 "CLAIMED: that any release carries a usable asset (the ledger records TAGS; release.yml is " +
+                 "what unzips and verifies the published archive on three platforms), or that the FETCH half " +
+                 "of refreshReleases works -- this sandbox's proxy answers the releases API with HTTP 401, so " +
+                 "only the pure rowsFrom parse could be exercised, which is why it was split out.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
