@@ -1,4 +1,4 @@
-// FILE: tools/roundhouse/zeroRangeFull.mjs -- v4426
+// FILE: tools/roundhouse/zeroRangeFull.mjs -- v4470
 //
 // *** THE SWEEP HAS HAD NO POSITIVE CONTROL SINCE v3313, AND THIS ROUND JUST MADE SIXTEEN CLAIMS WITH IT. ***
 //
@@ -83,8 +83,8 @@ export const PARALLEL_IS_LEGITIMATE = Object.freeze({
          "gives opposite answers on adjacent rounds because the two rounds measure different KINDS of thing.",
 });
 
-// ==== MEASURED_V4426 ====
-export const MEASURED_V4426 = Object.freeze({
+// ==== MEASURED_V4470 ====
+export const MEASURED_V4470 = Object.freeze({
      "rows": [
       {
        "device": "acoustics",
@@ -2005,7 +2005,7 @@ export const MEASURED_V4426 = Object.freeze({
      },
      "errors": []
     });
-// ==== /MEASURED_V4426 ====
+// ==== /MEASURED_V4470 ====
 
 /**
  * *** THE CANDIDATE REPLACEMENT CONTROL, AND THE MEASUREMENT THAT DISQUALIFIES THE STATED MECHANISM. ***
@@ -2038,6 +2038,20 @@ export const SPLAT_ISOROLL = Object.freeze({
 
 /** Is a proposed mechanism consistent with the measurement, or does another rule fit the same points? */
 export function mechanismFits(rows, rule) { return rows.every((r) => rule(r.sigma) === r.zero); }
+
+/**
+ * *** THE WHOLE optics DEVICE, SWEPT, AS THE CONTROL'S OBITUARY. ***
+ * The gate checks airy and slit. This is all five modes, so "the zero is gone from the mode that carried it"
+ * becomes "there is no exact zero anywhere in the device that carried it".
+ */
+export const OPTICS_SWEEP = Object.freeze({
+    modes: Object.freeze(["airy", "slit", "edge", "converge", "radiusconfusion"]),
+    builds: 175, errorFieldReadings: 140, exactZeros: 0, ms: 533200,
+    curedAt: "v2931", diagnosedAt: "v3314",
+    how: "firstMinimumRefined replaced the raw grid estimator, and grading moved from the rounded 1.22 to the " +
+         "exact j(1,1)/pi. The zero was the symptom of a defect and the defect was repaired; the control that " +
+         "watched for the symptom was never replaced.",
+});
 
 /** Verdict on the two pre-registered predictions, from a merged sweep result. */
 export function settle(found, { airy = "optics.airy.airyRingErrFrac" } = {}) {

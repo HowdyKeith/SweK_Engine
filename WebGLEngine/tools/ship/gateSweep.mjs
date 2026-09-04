@@ -747,6 +747,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "with NO 0 REDS. The round it gates re-timed all 378 finished exiles and found TEN reds on " +
                  "no register, every one recorded as passing; four were this session's and are repaired",
     }),
+    since42: Object.freeze({
+        at: "v4470", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/zeroRangeFull-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, four sections and 24 checks, pure -- it reads the frozen sweep " +
+                 "and builds no device at gate time. Driven RED by ten sabotages and restored; THREE GAPS THEY " +
+                 "FOUND AND CLOSED (an optics-only control fixture that passed vacuously because the real " +
+                 "optics set is empty, vacuousDevices checked on the wrong field, and a boundary sample with " +
+                 "no minimum span) and ONE EARNED 0. The round it gates settled a prediction frozen at v2912 " +
+                 "and found the sweep has had no positive control since v3313",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/roundhouse/zeroRangeFull-selfcheck.mjs -- v4426
+// tools/roundhouse/zeroRangeFull-selfcheck.mjs -- v4470
 //
 // Run: node tools/roundhouse/zeroRangeFull-selfcheck.mjs   (pure: reads the frozen sweep, runs no device)
 //
@@ -7,15 +7,16 @@
 "use strict";
 import { ZERO_RANGE_REGISTRATION } from "./zeroRangeSweep.mjs";
 import { EXACT_OK } from "./exactZeroRegister.mjs";
-import { SCOPE, PARALLEL_IS_LEGITIMATE, MEASURED_V4426, settle, vacuousDevices, coverage,
+import { SCOPE, PARALLEL_IS_LEGITIMATE, MEASURED_V4470, settle, vacuousDevices, coverage, OPTICS_SWEEP,
+         SPLAT_ISOROLL, mechanismFits,
          costConcentration, RESOLUTION_MS, NONTERMINATING } from "./zeroRangeFull.mjs";
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
 
-const rows = MEASURED_V4426.rows || [];
-const perDevice = MEASURED_V4426.perDevice || {};
+const rows = MEASURED_V4470.rows || [];
+const perDevice = MEASURED_V4470.perDevice || {};
 
 console.log("\n1. *** THE GATE HAS BEEN RE-CONFIRMING THE CONTROL AND NEVER TESTING THE BET ***");
 {
@@ -51,18 +52,58 @@ console.log("\n3. *** THE PREDICTIONS, SETTLED ***");
     const s = settle(rows);
     report(`${rows.length} exact-zero field(s) found, ${s.unregisteredTotal} not on the register ` +
         `(${Object.keys(EXACT_OK).length} entries)`);
-    ok("*** A HOLDS: the sweep finds the zero it was told to find ***", s.A.held,
-        s.A.at ? "optics.airy.airyRingErrFrac = 0 at " + s.A.at.slice(0, 3).join(", ") : "NOT FOUND");
+    // *** A DOES NOT HOLD, AND ASSERTING THAT IT SHOULD WOULD BE THIS ROUND MISREADING ITS OWN SUBJECT. ***
+    // zeroRangeSweep-selfcheck established at v3313/v3314 that the control was CURED, not lost. What v4470 adds
+    // is the width: the gate checks two optics modes, this swept all five and found no exact zero anywhere.
+    const O = OPTICS_SWEEP;
+    ok("*** the positive control is GONE FROM THE WHOLE DEVICE, not just the mode that carried it ***",
+        !s.A.held && O.exactZeros === 0 && O.modes.length === 5,
+        `${O.modes.length} modes, ${O.builds} builds, ${O.errorFieldReadings} error-field readings, ` +
+        `${O.exactZeros} exact zeros in ${(O.ms / 1000).toFixed(0)}s`);
+    ok("  and it was CURED rather than lost, which is a different fact with a different remedy",
+        /firstMinimumRefined/.test(O.how) && O.curedAt === "v2931",
+        "v2931 replaced the grid estimator and moved grading to the exact j(1,1)/pi. The zero was a symptom; " +
+        "the defect was repaired and the control that watched for the symptom was never replaced");
+    ok("*** SO THE INSTRUMENT IS UNCONTROLLED, AND THIS ROUND JUST MADE SIXTEEN CLAIMS WITH IT ***",
+        !s.A.held && s.B.count >= 10,
+        `${s.B.count} unregistered exact zeros from a detector with no demonstrated ability to find one. ` +
+        "That is the finding, and it is worth more than any of the sixteen");
     ok("*** B HOLDS: an unregistered exact zero somewhere other than optics ***", s.B.held,
         `${s.B.count} found: ${s.B.gates.slice(0, 6).join(", ")}${s.B.gates.length > 6 ? " ..." : ""}`);
     // *** THE SETTLEMENT HAS TO BE ABLE TO COME OUT THE OTHER WAY. ***
-    const onlyOptics = rows.filter((r) => r.device === "optics");
+    // *** THE REAL optics SUBSET IS EMPTY, SO USING IT AS THE CONTROL WOULD PASS VACUOUSLY. *** Caught by
+    // sabotage: widening `elsewhere` to include optics changed nothing, because there was no optics row to
+    // include. The control has to be a fixture that actually contains a hit.
+    const oneOffFixture = [{ device: "optics", mode: "airy", field: "someErr", at: [1], registered: false }];
     ok("  B is settled by evidence, not by construction: an optics-only result fails it",
-        settle(onlyOptics).B.held === false,
-        "if every unregistered zero were in optics, B would read false here -- which is what a one-off looks like");
-    ok("  and A fails when the control is absent",
-        settle(rows.filter((r) => !/airyRingErrFrac/.test(r.field))).A.held === false,
-        "a sweep that misses a zero known to exist is measuring nothing, and this check would say so");
+        settle(oneOffFixture).B.held === false && settle(oneOffFixture).unregisteredTotal === 1,
+        "an unregistered zero that IS in optics leaves B false -- which is what a one-off would look like");
+    ok("  and settle() would SAY SO if the control came back",
+        settle([...rows, { device: "optics", mode: "airy", field: "airyRingErrFrac", at: [2001], registered: false }]).A.held,
+        "the day v2931's repair is undone, this reads true again and someone has to come back and read this");
+
+    // *** AND THE ROUND DECLINES TO PLANT THE OBVIOUS REPLACEMENT, BECAUSE ITS MECHANISM IS NOT ESTABLISHED. ***
+    const P = SPLAT_ISOROLL;
+    const isDyadic = (x) => { let v = x; for (let i = 0; i < 24; i++) { if (Number.isInteger(v)) return true; v *= 2; } return false; };
+    const gatePts = P.measured.filter((r) => [...P.gateProbes.dyadic, ...P.gateProbes.nonDyadic].includes(r.sigma));
+    ok("*** the candidate control's recorded mechanism fits the sample that produced it and fails on a wider one ***",
+        mechanismFits(gatePts, isDyadic) && !mechanismFits(P.measured, isDyadic),
+        `"dyadic" is true on all ${gatePts.length} probes the gate chose and false over ${P.measured.length}`);
+    ok("  and the rule that does fit needs a second clause the gate's probes could never reach",
+        mechanismFits(P.measured, (x) => x >= 1 || isDyadic(x)) && !mechanismFits(P.measured, (x) => x >= 1),
+        "sigma >= 1 OR dyadic fits all of them; every non-dyadic probe the gate used is below 1, so a sample " +
+        "drawn entirely on one side of a boundary cannot show the boundary is there");
+    // The evidence for that second clause is the non-dyadic points AT OR ABOVE 1, and there must be several:
+    // one of them is an anecdote, and trimming the sample back to the gate's own probes must not go unnoticed.
+    const aboveNonDyadic = P.measured.filter((r) => r.sigma >= 1 && !isDyadic(r.sigma));
+    ok("  and the sample spans BOTH sides of the boundary, by more than one point",
+        aboveNonDyadic.length >= 3 && aboveNonDyadic.every((r) => r.zero) &&
+        P.measured.some((r) => r.sigma < 1 && !isDyadic(r.sigma) && !r.zero),
+        `${aboveNonDyadic.length} non-dyadic sigmas at or above 1 (${aboveNonDyadic.map((r) => r.sigma).join(", ")}), ` +
+        "all exactly zero, against non-dyadic sigmas below 1 that are not");
+    report("SO NO REPLACEMENT CONTROL IS PLANTED HERE. A control whose mechanism is not understood is not a " +
+        "control -- it is a second unexplained zero standing where the explanation should be. Naming the " +
+        "candidate and the incompleteness is what makes planting one a round somebody can actually do.");
 }
 
 console.log("\n4. *** WHAT THE RUN REACHED, AND WHAT IT BUILT NOTHING FOR ***");
@@ -116,7 +157,7 @@ console.log("\n4. *** WHAT THE RUN REACHED, AND WHAT IT BUILT NOTHING FOR ***");
         "more time will not produce one either, which is what makes this a different state from slow");
     const vac = vacuousDevices(perDevice);
     ok("*** and a device the sweep BUILDS NOTHING for is counted separately, not as a clean result ***",
-        vac.length > 0 && vac.every((n) => perDevice[n].zeros === 0),
+        vac.length > 0 && vac.every((n) => perDevice[n].builds === 0),
         `${vac.length} device(s) with 0 builds: ${vac.slice(0, 8).join(", ")}${vac.length > 8 ? " ..." : ""} -- ` +
         "an empty population prints the same thing as a population that was looked at");
     ok("  the vacuous ones are a strict subset of the reached ones", vac.every((n) => n in perDevice),

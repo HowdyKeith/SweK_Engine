@@ -334,7 +334,7 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
     // v4329 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
     // closing, and reading only since2 meant the next one had to edit this arithmetic as well as the record.
-    const closings = [SS.since2, SS.since3, SS.since4, SS.since5, SS.since6, SS.since7, SS.since8, SS.since9, SS.since10, SS.since11, SS.since12, SS.since13, SS.since14, SS.since15, SS.since16, SS.since17, SS.since18, SS.since19, SS.since20, SS.since21, SS.since22, SS.since23, SS.since24, SS.since25, SS.since26, SS.since27, SS.since28, SS.since29, SS.since30, SS.since31, SS.since32, SS.since33, SS.since34, SS.since35, SS.since36, SS.since37, SS.since38, SS.since39, SS.since40, SS.since41].filter(Boolean);
+    const closings = [SS.since2, SS.since3, SS.since4, SS.since5, SS.since6, SS.since7, SS.since8, SS.since9, SS.since10, SS.since11, SS.since12, SS.since13, SS.since14, SS.since15, SS.since16, SS.since17, SS.since18, SS.since19, SS.since20, SS.since21, SS.since22, SS.since23, SS.since24, SS.since25, SS.since26, SS.since27, SS.since28, SS.since29, SS.since30, SS.since31, SS.since32, SS.since33, SS.since34, SS.since35, SS.since36, SS.since37, SS.since38, SS.since39, SS.since40, SS.since41, SS.since42].filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
     const closed = closings.reduce((n, c) => n + (c.swept || 0), 0);
     const uncovered = surplus - SS.swept - closed;
