@@ -1313,6 +1313,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "that does not fall with h is not truncation while one equal to twice the signal is the " +
                  "signal negated. Four sabotages, MEASURED 7/2/4/3 by name, none zero.",
     }),
+    // v4441 -- the sixty-third closing. The Small Steps claim, tested against this tree's own solver, and it
+    // turns out to be CONDITIONAL with the condition located.
+    since63: Object.freeze({
+        at: "v4441", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/xpbd/smallSteps-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 17 checks in five sections. *** THE PLAN ITEM NAMED A MODULE THAT NO " +
+                 "LONGER EXISTS: warp.sim was deprecated in Warp 1.8 and REMOVED in Warp 1.10, its successor " +
+                 "being newton-physics/newton (Apache 2.0). *** Fifth round running in which checking a " +
+                 "premise before building changed the round. It matters less than it looks, because the " +
+                 "reference was never the source: warp, newton and Omniverse all implement Macklin et al. " +
+                 "2019, and a paper's claim can be tested against this solver directly. NOTHING IS VENDORED " +
+                 "AND NOTHING WAS READ -- the GitHub source was not reachable from this session, which is " +
+                 "said plainly rather than implied away. *** TWO RIGS COULD NOT SEE THE CLAIM AND THAT IS " +
+                 "WORTH MORE THAN THE THIRD ONE WORKING. *** The tree's OWN hangingLink rig has ONE " +
+                 "constraint, and at fixed budget its error falls MONOTONICALLY toward iterations, 4.0e-4 to " +
+                 "2.3e-14 -- the exact opposite of Small Steps, and not a refutation, because with one " +
+                 "constraint THERE IS NO NETWORK for information to propagate through. A chain of 32 " +
+                 "measured at its quasi-static tail still says iterations by under 2x -- also not a " +
+                 "refutation, because the steady stretch is what compliance makes iteration-independent, so " +
+                 "it asks the 2016 claim rather than the 2019 one. SWEEPING STIFFNESS MAKES IT APPEAR AT " +
+                 "ONCE, WITH A SIGN CHANGE: at compliance 1e-3 iterations win 1.38e-2 to 8.17e-3, and at " +
+                 "1e-5 SUBSTEPS win 9.80e-4 to 3.08e-2 -- THIRTY-ONE TIMES, at identical total work, " +
+                 "monotone in the iteration share. *** THE CROSSOVER IS AT COMPLIANCE 3.487e-4 AND THIS TREE " +
+                 "USES COMPLIANCES ON BOTH SIDES OF IT *** -- 0, 1e-6, 5e-6 and 1e-4 below; 5e-4, 8e-4, 1e-3 " +
+                 "and 2e-2 above. xpbd.js defaults to `iterations ?? 1`, which is what warp and newton do " +
+                 "and is right for the stiff half; modules passing 2, 4, 5 or 8 are right only above the " +
+                 "line. AND THE CROSSOVER IS NOT A CONSTANT: it moves 38x with the budget, monotonically, " +
+                 "and 620x with chain length, so quoting it as a property of the method would be quoting the " +
+                 "test setup. A BISECTION THAT RETURNED ITS OWN FLOOR was caught: at N = 2 substeps never " +
+                 "win anywhere in the range, and the search reported the lower bound 1.000e-6 as a crossover " +
+                 "a thousand times stiffer than its neighbours -- THE ABSENCE OF A CROSSOVER WEARING A " +
+                 "NUMBER. It reports saturation now. Four sabotages, MEASURED 3/6/4/8 by name, none zero.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

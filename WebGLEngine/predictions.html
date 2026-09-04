@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "Small Steps is conditional, and the condition is a compliance this tree straddles",
+    since: "v4441",
+    state: "open",
+    pred: "Macklin et al. 2019 says that for a FIXED budget, XPBD should spend it on substeps rather than iterations -- the design choice behind warp, newton and Omniverse, and the reason physics/xpbd/xpbd.js defaults to `iterations ?? 1`. The prediction under test is that the claim would hold on this tree's own solver. The sharper one behind it is that a rig which cannot exhibit a mechanism cannot test a claim about it.",
+    why: "The plan item said to check the tree's XPBD against warp.sim. warp.sim was REMOVED in Warp 1.10 and its successor is newton-physics/newton. The reference was never the source: the papers are, and papers make claims that can be tested here directly.",
+    measured: "CONDITIONAL, WITH A SIGN CHANGE. At compliance 1e-3 iterations win (1.38e-2 against 8.17e-3); at 1e-5 SUBSTEPS win by 31x (9.80e-4 against 3.08e-2) at identical total work, monotone in the iteration share. The crossover is compliance 3.487e-4 and THIS TREE USES COMPLIANCES ON BOTH SIDES: 0, 1e-6, 5e-6, 1e-4 below; 5e-4, 8e-4, 1e-3, 2e-2 above. TWO RIGS COULD NOT SEE IT FIRST: the tree's own one-link rig says iterations win monotonically (no network to propagate through), and a 32-chain measured at its quasi-static tail says iterations by under 2x (the steady stretch is what compliance makes iteration-independent, so it asks the 2016 claim, not the 2019 one).",
+    kill: "physics/xpbd/smallSteps-selfcheck.mjs. The chain rig has an ANALYTIC answer -- link k carries (N-k) masses -- asserted structurally: the exact length must scale linearly in compliance and as N(N+1)/2 in link count, so a per-link constant load would fail. SABOTAGE: ignore `iterations` and 3 rows go red, drop the per-link weight and 6 do, bisect linearly instead of in log space and 4 do, fix the chain's far end and 8 do -- MEASURED 3/6/4/8 by name, none zero. AND A BISECTION THAT RETURNED ITS OWN FLOOR WAS CAUGHT: at N=2 substeps never win in range, and the search reported the lower bound as a crossover a thousand times stiffer than its neighbours -- the absence of a crossover wearing a number. HONEST SCOPE: warp and newton were NOT read -- their source was unreachable from this session -- so this grades a PAPER'S CLAIM against this solver, which is smaller than a line-by-line differential. The crossover is not a constant: it moves 38x with budget and 620x with chain length. And no module's iteration count is called wrong; the round says which side of the line each compliance falls on and stops.",
+    page: "instruments.html",
+  },
+  {
     name: "Vorticity confinement is not a restoration, and the eps that makes the number right is chosen by the number being right",
     since: "v4440",
     state: "open",
