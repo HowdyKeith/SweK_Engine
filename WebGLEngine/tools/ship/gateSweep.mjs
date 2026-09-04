@@ -1414,6 +1414,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "scales with the parameter you tested at is invisible at that parameter. Four sabotages, " +
                  "MEASURED 0-then-1/2/2/1 by name.",
     }),
+    // v4444 -- the sixty-sixth closing. The integration v4443 closed as a model and left open, and the
+    // demonstration is a variance ratio that spans nine orders.
+    since66: Object.freeze({
+        at: "v4444", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/bssrdfSample-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 18 checks in five sections. v4443 shipped the diffusion profile and said " +
+                 "in its own honest scope that the gap was CLOSED AS A MODEL AND LEFT OPEN AS AN " +
+                 "INTEGRATION: a BSSRDF needs a SURFACE and principled.mjs is a BRDF at a single point. This " +
+                 "is that surface, and it is the one the tree already renders on -- pathTracer.mjs's furnace " +
+                 "sphere. With constant irradiance the surface integral collapses to one dimension in the " +
+                 "GEODESIC radius, whose area element is 2 pi a sin(r/a) dr. *** THE FLAT LIMIT IS A NUMBER " +
+                 "PROVED IN ANOTHER ROUND BY A DIFFERENT ARGUMENT: *** I(a) runs 0.529916, 0.834307, " +
+                 "0.977815, 0.999767, 0.999997 at a = 1, 3, 10, 100, 1000, ARRIVING AT THE PLANE " +
+                 "NORMALISATION v4443 PROVED ANALYTICALLY, from a spherical integral that knows nothing " +
+                 "about that proof. *** THE PAIR OF CHECKS IS THE DESIGN. *** Two estimators must AGREE IN " +
+                 "THE MEAN, because both are unbiased -- that is where a wrong Jacobian shows and it catches " +
+                 "WRONGNESS -- and DIFFER IN VARIANCE, which is the benefit and MEASURES it. Neither can be " +
+                 "faked by the other. Unbiasedness is judged against each estimator's OWN standard error " +
+                 "(v4437's lesson: a hand-picked tolerance went red on ordinary noise), and every case lands " +
+                 "inside 2.1 se. *** AND THE IMPORTANCE WEIGHT COLLAPSES TO THE JACOBIAN AND NOTHING ELSE: " +
+                 "a sin(r/a)/r, exactly, *** because every factor of the profile cancels between its own pdf " +
+                 "and the integrand -- which is what importance sampling MEANS when the sampler matches the " +
+                 "integrand. So as the sphere flattens the weight goes to 1 and THE ESTIMATOR BECOMES EXACT: " +
+                 "sd 4.07e-1, 2.56e-1, 5.19e-2, 6.03e-4 against uniform's 1.54e0, 4.28e0, 1.21e1, 5.49e1, a " +
+                 "VARIANCE RATIO RUNNING 14x TO 8.29e9. THE COMPANION MEASURES WHY v4443 CHOSE BURLEY: the " +
+                 "classical dipole's radial integral is 0.080, 0.226, 0.476 at reduced albedos 0.5, 0.8, " +
+                 "0.95 -- neither one NOR the albedo it was handed -- so ALBEDO IS NOT A FREE MULTIPLIER and " +
+                 "hitting a target reflectance means inverting a function of three parameters numerically. " +
+                 "Burley's integrates to 1 on the same quadrature, same limits, same shape. Four sabotages, " +
+                 "MEASURED 2/4/1/2 by name. The 1 is the interesting one: sampling the uniform estimator's " +
+                 "wrong density leaves the VARIANCE comparison looking entirely reasonable and only the MEAN " +
+                 "knows, so a round measuring only the benefit would have shipped it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
