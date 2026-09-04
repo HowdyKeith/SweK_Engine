@@ -1347,6 +1347,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a thousand times stiffer than its neighbours -- THE ABSENCE OF A CROSSOVER WEARING A " +
                  "NUMBER. It reports saturation now. Four sabotages, MEASURED 3/6/4/8 by name, none zero.",
     }),
+    // v4442 -- the sixty-fourth closing. The two PlayStation artefacts that have exact answers, and the two
+    // that do not, separated on purpose rather than by what was easy.
+    since64: Object.freeze({
+        at: "v4442", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/retroRaster-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 16 checks in five sections. From DaveFace/UnrealRetroShaders (MIT), " +
+                 "which is NOT PORTABLE AT THE FILE LEVEL at all -- UE4.27 Blueprint materials in binary " +
+                 ".uasset, with UE5 unsupported by its author's own statement, so a dead-ended asset pack " +
+                 "for one engine version. The techniques are 1994 console constraints and are not the " +
+                 "author's to license. *** THE ROUND'S REAL DECISION WAS WHAT NOT TO TAKE. *** Bayer " +
+                 "dithering is ALREADY HERE with its own gate. YUV and posterise are absent and AESTHETIC " +
+                 "ONLY -- there is no wrong answer for a check to catch -- so they are DELIBERATELY NOT " +
+                 "TAKEN, because shipping an aesthetic behind a gate that cannot fail is the problem v4435, " +
+                 "v4439 and v4441 each found in a different costume. What is taken is the half with exact " +
+                 "answers. AFFINE WARPING IS EXACTLY 'interpolate UV without dividing by w', so it has two " +
+                 "EXACT agreements: at equal w the affine answer IS the correct one over 612 samples (an " +
+                 "exact zero, not a tolerance, because the division cancels when barycentrics sum to one), " +
+                 "and the error is exactly zero AT ALL THREE VERTICES for wildly unequal w -- which is what " +
+                 "makes the artefact SWIM rather than shift, pinned at the corners and wrong in between. The " +
+                 "warp grows monotonically with depth ratio to 0.848 of a texture width at 16:1, and its " +
+                 "maximum always lies on the edge spanning the depth range rather than at a corner, which is " +
+                 "the mechanism and not a coincidence. VERTEX WOBBLE IS EXACTLY A LATTICE QUANTISER and owes " +
+                 "two things, both asserted exactly: idempotence over 20000 samples, and nothing moving " +
+                 "further than half a step. Its site count has a CLOSED FORM, n*2^bits + 1, so a wobble " +
+                 "subtler than it should be is countable where an eyeball sees 'about right'. Four " +
+                 "sabotages, MEASURED 3/3/1/1 by name. *** AND THE FIRST ATTEMPT AT ONE READ ZERO RED " +
+                 "BECAUSE THE SABOTAGE WAS INVALID, NOT THE GATE BLIND: *** it replaced affine()'s body with " +
+                 "perspectiveCorrect at equal w, which is ALGEBRAICALLY THE SAME FUNCTION. A substitution " +
+                 "that preserves the mathematics cannot break anything, and calling its zero evidence of a " +
+                 "weak gate would be the OPPOSITE mistake to the ones this session keeps finding. A third " +
+                 "kind of zero, and named as one.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

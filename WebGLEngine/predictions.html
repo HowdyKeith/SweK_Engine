@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "Half a retro look has exact answers and half has none, and the round is deciding which half to take",
+    since: "v4442",
+    state: "open",
+    pred: "DaveFace/UnrealRetroShaders (MIT) ships four PlayStation techniques. The prediction is that they split cleanly by whether the technique HAS A RIGHT ANSWER -- affine warping and vertex wobble do, YUV and posterise do not -- and that taking only the gradeable half is a better round than taking all four, because a gate that cannot fail is worse than no gate.",
+    why: "This tree grades things that can be wrong, and 'does it look like a PlayStation' cannot be. v4435, v4439 and v4441 each found an unfalsifiable check in a different costume; an aesthetic shipped behind one would be the same defect chosen on purpose.",
+    measured: "THE SPLIT IS CLEAN AND THE EXACT HALF IS VERY EXACT. Affine warping is 'interpolate UV without dividing by w', which gives TWO machine-precision agreements: at equal w the affine answer IS the correct one across 612 samples (the division cancels, since barycentrics sum to one), and the error is exactly zero AT ALL THREE VERTICES for wildly unequal w -- which is why the artefact SWIMS rather than shifts. The warp grows monotonically to 0.848 of a texture width at a 16:1 depth ratio, always maximal on the edge spanning the depth range. Vertex wobble is a lattice quantiser: idempotent over 20000 samples, never moving more than half a step, with a site count in closed form n*2^bits + 1. Bayer was already here with its own gate; YUV and posterise were left.",
+    kill: "render/retroRaster-selfcheck.mjs. Both exact agreements are asserted as exact ZEROS rather than tolerances. SABOTAGE: remove the artefact (compare correct against correct) and 3 rows go red, drop the perspective denominator and 3 do, use floor instead of round and 1 does -- MEASURED 3/3/1/1 by name. THE FLOOR SABOTAGE COSTS ONE ROW AND IT IS THE RIGHT ONE: floor is still idempotent and gives the same site count, so only the half-step bound can see it. AND THE FIRST ATTEMPT AT A SABOTAGE READ ZERO BECAUSE IT WAS INVALID, NOT BECAUSE THE GATE WAS BLIND -- it substituted perspectiveCorrect at equal w for affine, which is algebraically the same function. A change that preserves the mathematics cannot break anything, and that is a THIRD kind of zero, distinct from a check that cannot fail and a check nothing reaches. HONEST SCOPE: nothing here renders, so no claim is made that any of it LOOKS right. The real hardware also had no depth buffer, sorted per polygon, and clipped in fixed point -- none of which is here. And the quantiser snaps whatever it is handed, where the hardware snapped after projection; the caller decides, which is a gap rather than a design.",
+    page: "instruments.html",
+  },
+  {
     name: "Small Steps is conditional, and the condition is a compliance this tree straddles",
     since: "v4441",
     state: "open",
