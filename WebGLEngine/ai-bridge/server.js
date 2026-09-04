@@ -16420,6 +16420,12 @@ ${text.replace(/'/g, "''")}
     if (req.method === "POST" && req.url === "/github/publish-engine") { readJson(d => githubBridge.publishEngineBuild(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     // v3941 -- the only route from "pushed to GitHub" to "running here". See cloneEngineSource: the release
     // path cannot deliver a version the local tree does not already have.
+    // v4450 -- the ship ritual's step 7, reachable from the panel that cuts the release. The refresh needs the
+    // rig's token (which lives in ~/.voxelbridge/github.json, not in the environment), so it goes through the
+    // bridge rather than spawning tools/ship/refreshReleases.mjs; the check is offline and reads the same
+    // releaseLedger.mjs module the gate reads, so the panel and the gate cannot answer differently.
+    if (req.method === "POST" && req.url === "/github/ledger/refresh") { readJson(d => githubBridge.ledgerRefresh(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.method === "GET" && req.url === "/github/ledger/check") { githubBridge.ledgerCheck().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.method === "POST" && req.url === "/github/clone-source") { readJson(d => githubBridge.cloneEngineSource(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     // v3964 -- clone -> verify -> STOP, with publish behind the verdict. Keith asked for one button to start the
     // chain; the chain deliberately does NOT reach the release. See sourceChainBridge.js for why the middle step

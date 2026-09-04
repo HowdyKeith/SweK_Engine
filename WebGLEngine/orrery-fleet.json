@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "01a593651e8f67a671de70d62ea06a96dc7e4d53",
+ "head": "055acad22884d7d680017d359af9e77951b915e0",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1483588,
-    "sha": "35efe3368e14636f5d42d674e1dfc3c481183c1a"
+    "bytes": 1484436,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -208,8 +208,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1483588,
-    "sha": "35efe3368e14636f5d42d674e1dfc3c481183c1a"
+    "bytes": 1484436,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "clients.html",
@@ -218,8 +218,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 840633,
-    "sha": "78868b02282133ee3074904910174618294f8740"
+    "bytes": 843798,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -335,8 +335,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1483588,
-    "sha": "35efe3368e14636f5d42d674e1dfc3c481183c1a"
+    "bytes": 1484436,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "aquarelle.html",
@@ -505,8 +505,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2914656,
-    "sha": "01a593651e8f67a671de70d62ea06a96dc7e4d53"
+    "bytes": 2919398,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "mpm3d.html",
@@ -550,8 +550,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 840633,
-    "sha": "78868b02282133ee3074904910174618294f8740"
+    "bytes": 843798,
+    "sha": "055acad22884d7d680017d359af9e77951b915e0"
    },
    {
     "path": "shipavatar.html",

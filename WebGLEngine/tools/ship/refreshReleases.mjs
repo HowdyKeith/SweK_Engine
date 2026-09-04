@@ -55,24 +55,37 @@ if (RUN) for (let page = 1; page <= 10; page++) {
     if (j.length < 100) break;
 }
 
+// *** v4450 -- WHAT A LEDGER UPDATE IS, DECLARED ONCE. *** This block used to live inside the `if (RUN)`
+// tail, which made it reachable only from the command line. The GitHub panel's "Refresh the ledger" button
+// (v4450) needs exactly the same operation from a server route that already holds a token, and the cheap way
+// to give it one is to write the diff-and-merge a second time in githubBridge. TWO SPELLINGS OF "WHAT THE
+// LEDGER RECORDS" IS THE DEFECT THIS TREE KEEPS FINDING -- it is how a count goes stale on one path and not
+// the other. So the operation is a pure function over (rows, prev) that returns the new document and the
+// diff, and BOTH callers use it. It does no IO: the caller decides whether to write, which is what makes the
+// CLI's dry run and the route's write the same code with one branch outside it.
+export function ledgerUpdate({ rows, prev, repo, now } = {}) {
+    prev = prev || {};
+    rows = Array.isArray(rows) ? rows : [];
+    const before = new Set((prev.releases || []).map((r) => r.tag));
+    const added = rows.filter((r) => !before.has(r.tag)).map((r) => r.tag);
+    const gone = [...before].filter((t) => !rows.some((r) => r.tag === t));
+    const out = Object.assign({}, prev, {
+        refreshedAt: (now || new Date()).toISOString(),
+        source: `GET /repos/${repo}/releases (per_page=100)`,
+        releases: rows,
+    });
+    return { out, added, gone, count: rows.length };
+}
+
 if (RUN) {
 const rows = rowsFrom(all);
+const { out, added, gone, count } = ledgerUpdate({ rows, prev: readLedger() || {}, repo: REPO });
 
-const prev = readLedger() || {};
-const before = new Set((prev.releases || []).map((r) => r.tag));
-const added = rows.filter((r) => !before.has(r.tag)).map((r) => r.tag);
-const gone = [...before].filter((t) => !rows.some((r) => r.tag === t));
-
-console.log("[refreshReleases] " + rows.length + " published releases on " + REPO +
+console.log("[refreshReleases] " + count + " published releases on " + REPO +
             (added.length ? "; NEW: " + added.join(", ") : "; nothing new") +
             (gone.length ? "; VANISHED (deleted upstream?): " + gone.join(", ") : ""));
 
 if (!write) { console.log("[refreshReleases] dry run -- pass --write to update " + LEDGER); process.exit(0); }
-const out = Object.assign({}, prev, {
-    refreshedAt: new Date().toISOString(),
-    source: `GET /repos/${REPO}/releases (per_page=100)`,
-    releases: rows,
-});
 fs.writeFileSync(LEDGER, JSON.stringify(out, null, 2) + "\n");
 console.log("[refreshReleases] wrote " + LEDGER);
 }

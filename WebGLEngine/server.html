@@ -5070,12 +5070,18 @@ A password fetches a token from the list server; an unregistered callsign needs 
   // none at all; writing a second one for grab would have been two spellings of one dialog, which is the defect
   // this tree names most often. Only the SHELL moved -- every behaviour line in sendDialog is untouched, which
   // is the property the jsdom check below actually drives rather than assumes.
-  function swekOverlay(id, titleHtml, subHtml){
+  // v4450 -- THE WIDTH IS A PARAMETER WITH THE OLD LITERAL AS ITS DEFAULT. Every overlay on this page shared
+  // one hardcoded min(440px,92vw), so the GitHub Manager could not be widened without widening the peer
+  // picker, the grab picker and everything else that calls this. Widening them all to suit one caller is the
+  // shape of a shared constant being bent for a single reader; an optional argument lets exactly the caller
+  // that needs the room ask for it, and every existing call site keeps the width it was written against
+  // BECAUSE THE DEFAULT IS THE OLD LITERAL and not a new number that happens to agree.
+  function swekOverlay(id, titleHtml, subHtml, widthCss){
     var old=document.getElementById(id); if(old) old.remove();
     var dlg=document.createElement("div"); dlg.id=id;
     dlg.style.cssText="position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
-    card.style.cssText="background:#101822;border:1px solid #2a3a4c;border-radius:12px;padding:16px 18px;width:min(440px,92vw);font:13px system-ui;color:#dbe6f2;max-height:82vh;overflow:auto;";
+    card.style.cssText="background:#101822;border:1px solid #2a3a4c;border-radius:12px;padding:16px 18px;width:"+(widthCss||"min(440px,92vw)")+";font:13px system-ui;color:#dbe6f2;max-height:82vh;overflow:auto;";
     card.innerHTML="<div style='font-weight:700;margin-bottom:2px'>"+titleHtml+"</div>"+
                    "<div style='color:#8fa3bb;font-size:11px;margin-bottom:10px'>"+subHtml+"</div>";
     dlg.appendChild(card); document.body.appendChild(dlg);
@@ -6474,6 +6480,13 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
       const { makeStage } = await import("/ui/panelStage.mjs");
       const host=document.getElementById("stageBody"), wrap=document.getElementById("panelStage");
       const rail=document.getElementById("dialsRow"), railHome=rail&&rail.parentNode;
+      // v4450 -- READ THE HOME VALUE OFF THE NODE, DO NOT TYPE IT. #dialsRow's `flex:1 1 auto` lives in the
+      // element's INLINE style attribute, not in a stylesheet rule -- so the onRestore idiom this handler pair
+      // uses everywhere else (`el.style.X = ""`, let the sheet win) DELETES it instead of restoring it, and the
+      // row comes home with flex-grow 0. THE GATE CAUGHT THIS ON ITS FIRST RUN: computed flex after restore
+      // read "0 1 auto" where the markup says "1 1 auto", which would have quietly undone v4413's whole point
+      // the first time anybody staged a panel and closed it. Captured once, put back verbatim.
+      const railFlexHome = rail ? rail.style.flex : "";
       const info=document.getElementById("stageInfo");
       const bar=document.getElementById("stageBar"), what=document.getElementById("stageWhat");
       if(!host||!wrap||!rail||!railHome||!info) return;
@@ -6483,6 +6496,19 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
         onPresent:function(){
           wrap.style.display="flex"; bar.style.display="flex";
           rail.style.justifyContent="flex-start";
+          // *** v4450 -- `flex:1 1 auto` IS NOT AXIS-NEUTRAL, AND THIS NODE IS MOVED BETWEEN PARENTS OF
+          // DIFFERENT flex-direction AT RUNTIME. *** #dialsRow's home is a row-direction flex, so its
+          // `flex:1 1 auto` means GROW HORIZONTALLY -- which is what v4413 wanted when Keith asked for the
+          // avatar to "fill the entire space also to the left". #stageInfo is `flex-direction:column`, so the
+          // very same declaration on the very same node means GROW VERTICALLY the moment the rail is moved
+          // here, and the stage column is as tall as the staged panel. MEASURED on a live server.html at a
+          // 1600x1000 window: at home the avatar's SVG surface is 621x147; staged it is 230x576 -- NEARLY
+          // FOUR TIMES THE HEIGHT, from one declaration reinterpreted by a container it was not written for.
+          // That is the "svg grows huge and scrolls down screen" Keith reported. The row is pinned to its
+          // content height while it is a guest here; onRestore puts it back the same way it puts back
+          // justifyContent, which is the rule this handler pair already follows -- except that the value put
+          // back is READ FROM THE NODE (railFlexHome, above) rather than cleared, because this one is inline.
+          rail.style.flex="0 0 auto";
           // *** THE GAUGES AND THE AVATAR ARE HIDDEN BY RAISING THE INFO TAB, NOT BY REACHING FOR THEM. ***
           // show("info") already hides #dials and everything in hideWith -- #dialsRobot among them -- so
           // asking for the tab hides exactly the set the panel itself declares. A display:none typed here
@@ -6507,6 +6533,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           // a panel-stage bug becomes a "the gauges look wrong now" bug with no obvious cause -- and that
           // includes the TAB, which is why the info pin is released rather than left up over the dials.
           rail.style.justifyContent="";
+          rail.style.flex=railFlexHome;          // v4450 -- the markup's own value, captured above rather than re-typed here
           var gi=window._gaugeInfo;
           if(gi&&gi.lockInfo) gi.lockInfo(false); else if(gi&&gi.pinInfo) gi.pinInfo(false);   // v3823 -- unlock + back to gauges
           if(gi&&gi.setDock) gi.setDock(true);   // v3821 -- give the ordinary hover panel its dock back
@@ -8846,7 +8873,10 @@ import { mountGithubPanel } from "./ui/githubPanel.js";
         if (!ghRoot) { try { var m = mountGithubPanel(); ghRoot = m && m.root; } catch (e) { console.warn("github panel:", e); } }
         if (!ghRoot) return;
         if (typeof swekOverlay !== "function") { console.warn("swekOverlay missing -- cannot host the panel"); return; }
-        var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close");
+        // v4450 -- WIDER, because the Releases tab now explains itself. 640 is the panel root's own cap plus
+        // this card's 36px of horizontal padding, so the card offers exactly what the root will take and not
+        // a pixel that would sit empty. The vw clamp is kept: a laptop at 800px still gets a card that fits.
+        var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close", "min(676px,94vw)");
         o.card.appendChild(ghRoot);
     };
 })();

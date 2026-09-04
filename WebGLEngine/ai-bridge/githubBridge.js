@@ -981,4 +981,76 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
              warnings: [pv.hasReadme ? null : "no README.md", pv.hasLicense ? null : "no LICENSE", pv.hasWorkflow ? null : "no CI workflow (.github/workflows/)"].filter(Boolean) };
 }
 
-module.exports = { _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+// =====================================================================================
+// v4450 -- THE RELEASE LEDGER, FROM THE PANEL THAT CUTS THE RELEASE.
+//
+// v4449 built tools/ship/releases.json (what is actually on the releases page), refreshReleases.mjs (rewrite
+// it from the API) and releaseLedger-selfcheck.mjs (the ratchet: you may not ship a new version while the
+// LAST one is unreleased). All three were command-line only, and step 7 of the ship ritual therefore asked
+// somebody to leave the panel, open a terminal and remember two commands. *** THAT IS THE SAME SHAPE AS THE
+// DEFECT v4449 FIXED: a step nobody is asked for happens when somebody remembers, and 1.1% is what
+// remembering looked like over 261 rounds. *** So the two commands become two buttons beside the button that
+// publishes.
+//
+// *** AND THE REFRESH GOES THROUGH THIS FILE RATHER THAN SPAWNING THE SCRIPT, FOR A MEASURED REASON. ***
+// refreshReleases.mjs reads GITHUB_TOKEN from the environment. The rig's token does not live in the
+// environment -- it lives in ~/.voxelbridge/github.json, which is what effTok() reads -- so spawning the
+// script from here would hand it an ANONYMOUS request and the 60/hour unauthenticated rate limit. The parse
+// (rowsFrom) and the merge (ledgerUpdate) are imported from that file so there is ONE definition of what the
+// ledger records; only the fetch is this file's, because the credential is.
+async function _allReleasesRaw(repo) {
+    const out = [];
+    for (let page = 1; page <= 10; page++) {
+        const r = await _apiReadPublic(_repoPath(repo) + "/releases?per_page=100&page=" + page);
+        if (!r.ok) return { ok: false, status: r.status, error: r.error || ("HTTP " + r.status) };
+        const j = r.data;
+        if (!Array.isArray(j) || !j.length) break;
+        out.push(...j);
+        if (j.length < 100) break;
+    }
+    return { ok: true, raw: out };
+}
+
+/** Rewrite tools/ship/releases.json from the live releases page. `write:false` is the dry run the CLI has. */
+// *** fetchRaw AND writeFile ARE INJECTABLE, AND A SABOTAGE IS WHY. *** v4450's first gate for this asked
+// whether the refusal appeared BEFORE the write in the source text, and `if (false && up.gone.length)`
+// satisfied that check with the guard switched off -- 0 red on a real defect. An assertion over the position
+// of a string is satisfied by a branch that is present and dead. The decision is driven for real now: the
+// gate hands in a fetcher and a writer and asks what the function DID, which is the same discipline
+// mountAvatarSwitch's injectable `probe` already uses so a gate can drive the missing-asset path.
+async function ledgerRefresh({ repo, write, fetchRaw, writeFile } = {}) {
+    const c = loadCfg();
+    repo = (repo || c.engineRepo || c.defaultRepo || "").trim();
+    if (!repo) return { ok: false, error: "no repo (set engineRepo in Account, or pass repo)" };
+    const got = await (fetchRaw || _allReleasesRaw)(repo);
+    if (!got.ok) return { ok: false, error: "releases API: " + got.error + " -- the ledger was NOT written" };
+    const { rowsFrom, ledgerUpdate } = await import("../tools/ship/refreshReleases.mjs");
+    const { readLedger, LEDGER } = await import("../tools/ship/releaseLedger.mjs");
+    const rows = rowsFrom(got.raw);
+    const up = ledgerUpdate({ rows, prev: readLedger() || {}, repo });
+    if (!write) return { ok: true, dryRun: true, repo, file: LEDGER, count: up.count, added: up.added, gone: up.gone };
+    // *** THE VANISH CASE REFUSES RATHER THAN RECORDS, AND v4449'S SABOTAGE 2 IS WHY. *** Deleting the newest
+    // release row moved the reported lag from 10 to 148 and turned ZERO checks red, because the lag is
+    // reported and not asserted. The ratchet in releases.json closed that for a hand-edited ledger; a refresh
+    // that faithfully wrote "these releases are gone now" would walk straight past it, lowering the very
+    // numbers the ratchet exists to hold. A release the fleet was already running does not vanish in the
+    // normal course of things, so this stops and says so instead of recording it.
+    if (up.gone.length) {
+        return { ok: false, repo, vanished: up.gone,
+                 error: "REFUSING TO WRITE: " + up.gone.length + " release(s) the ledger already recorded are no longer on the " +
+                        "releases page (" + up.gone.join(", ") + "). That is an upstream delete or a wrong repo, not a refresh. " +
+                        "The fleet downloads releases/latest, so a release going missing is a fleet-visible event -- " +
+                        "check the repo, then edit tools/ship/releases.json by hand if it is really meant to go." };
+    }
+    (writeFile || fs.writeFileSync)(LEDGER, JSON.stringify(up.out, null, 2) + "\n");
+    return { ok: true, wrote: LEDGER, repo, count: up.count, added: up.added };
+}
+
+/** The offline question: does the fleet run what this tree built? Same module the gate reads. */
+async function ledgerCheck() {
+    const { ledgerState } = await import("../tools/ship/releaseLedger.mjs");
+    try { return Object.assign({ ok: true }, ledgerState()); }
+    catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+}
+
+module.exports = { ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

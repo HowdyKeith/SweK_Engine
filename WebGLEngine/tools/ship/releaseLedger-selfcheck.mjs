@@ -43,6 +43,14 @@
 //   3. reversed the ledger order (newest last)
 //      -> exit=1, section 1 red: releases[0] is what the fleet downloads, so a mis-sorted ledger answers a
 //         different question than the one it is asked.
+//   5. (v4450) raised baseline.throughVersion to 4449 for a real reason, with raisedAt/raisedWhy
+//      -> exit=1 on the OLD check, which pinned `=== 4448`. That is the check being wrong, not the ledger:
+//         a gate holding its own copy of the number it guards goes red on every legitimate move, and the
+//         edit that silences it looks exactly like the drift it exists to catch. Replaced with a receipt
+//         rule -- a raise must name the round and carry a reason over 200 chars, and the raise is REPORTED
+//         on every run so it cannot be quiet. Re-sabotaged: raisedWhy deleted -> exit=1 red by name;
+//         raisedAt set to "later" -> exit=1 red by name; baseline set to the tree's own version -> exit=1
+//         on the new second line, which is the edit that would make the ratchet vacuous forever.
 //   4. inserted v4999, a release NEWER than the tree
 //      -> exit=1, section 3 red: a tag ahead of the source is one pushed from a tree nobody committed, and
 //         the fleet would be running code this repo does not contain.
@@ -85,11 +93,29 @@ console.log("\n2. *** THE RATCHET: YOU MAY NOT SHIP A NEW VERSION WHILE THE LAST
               ". PUBLISH THE PREVIOUS VERSION BEFORE SHIPPING THIS ONE -- the ship skill's step 7 is the how" : "")
             : "nothing owed. Baseline is v" + S.floor + "; the tree is " + S.tree + "; " +
               "the rule binds from v" + (S.floor + 1) + " forward and it is satisfied");
-    ok("the baseline is the frozen number this round set, and moving it is a decision in the diff",
-        led.baseline && led.baseline.throughVersion === 4448,
-        "throughVersion " + (led.baseline && led.baseline.throughVersion) + " -- 258 of the 261 versions in " +
-        "the changelog shipped unreleased before the ritual asked for one. RAISING THIS WRITES OFF MORE DEBT " +
-        "and this line is what makes that an act rather than a drift.");
+    // *** v4450 -- THIS CHECK USED TO PIN THE LITERAL 4448, AND THAT WAS A SECOND COPY OF THE NUMBER. ***
+    // The intent was right -- moving the baseline must be an ACT, not a drift -- but `=== 4448` means the
+    // gate holds its own copy of a value that lives in releases.json, so a legitimate raise goes red until
+    // somebody edits the gate too, and EDITING THE GATE'S LITERAL IS EXACTLY HOW SOMEBODY WOULD DRIFT IT
+    // QUIETLY. It went red the first time the baseline moved for a real reason, which is the pinned-constant
+    // family this tree has now found about a dozen times. The property is kept and the copy is dropped: a
+    // raise must CARRY ITS OWN RECEIPT, and the receipt is printed on every run so it can never be quiet.
+    const bl = led.baseline || {};
+    const raised = !!bl.raisedAt;
+    ok("!! *** the baseline cannot be raised silently: a raise carries the round that did it and why ***",
+        typeof bl.throughVersion === "number" && bl.throughVersion > 0 &&
+        (!raised || (/^v\d+$/.test(bl.raisedAt) && typeof bl.raisedWhy === "string" && bl.raisedWhy.length > 200)),
+        "throughVersion " + bl.throughVersion + (raised ? ", raised at " + bl.raisedAt : ", never raised") +
+        ". 258 of the 261 versions in the changelog shipped unreleased before the ritual asked for one. " +
+        "RAISING THIS WRITES OFF MORE DEBT, and a written reason in the diff is what makes it an act. " +
+        "THE NUMBER IS NOT PINNED HERE ANY MORE: a gate holding its own copy of the value it guards goes red " +
+        "on every legitimate move, and the edit that silences it is indistinguishable from the drift.");
+    if (raised) report("*** DEBT WAS WRITTEN OFF AT " + bl.raisedAt + ", THROUGH v" + bl.throughVersion + " ***",
+        bl.raisedWhy.slice(0, 240) + (bl.raisedWhy.length > 240 ? "..." : ""));
+    ok("...and the baseline never covers the version being shipped",
+        bl.throughVersion < S.treeN,
+        "baseline v" + bl.throughVersion + " against tree " + S.tree + ". A baseline at or above ENGINE_VERSION " +
+        "writes off the round in progress, which would make the ratchet vacuous for every future ship in one edit");
     ok("...and it carries the reason it is frozen rather than a bare number",
         !!(led.baseline && typeof led.baseline.note === "string" && led.baseline.note.length > 120),
         "a baseline without a rule written on it becomes a dumping ground -- pageReach-baseline.json's lesson, " +

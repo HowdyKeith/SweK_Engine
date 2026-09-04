@@ -112,12 +112,25 @@ measured. No model identifiers anywhere in the message or in any file committed.
 
 ## 7. Publish the release -- THE FLEET RUNS releases/latest, NOT main
 
+Since v4450 the whole of this step is on the rig, in the GitHub panel's Releases tab, as a numbered route --
+steps 1..6 on screen, with the two shortcuts moved below it under a heading naming which step each one skips.
+Press them in order; the CLI below is the same thing without a browser.
+
     node tools/ship/refreshReleases.mjs            # dry run: what the releases page says right now
-    # publish from the RIG: GitHub panel -> "Release current engine". It packs the installable zip,
-    # creates the release, uploads the asset AND pushes the tag vNNNN, which starts release.yml.
-    node tools/ship/refreshReleases.mjs --write    # record it
-    node tools/ship/releaseLedger-selfcheck.mjs    # must read "THE FLEET RUNS WHAT IS BUILT"
+    # publish from the RIG: GitHub panel -> Releases. The SAFE route is step 3 then step 4 --
+    #   "Clone -> verify" (clones the pushed branch and runs THE CLONE's gates, publishes nothing), then
+    #   "Publish the verified clone" (packs the tree that just passed, uploads it, pushes the tag).
+    # "Release current engine" is step 4 with step 3 taken out: it zips THIS folder unverified. Faster, and
+    # it is the one that can put a tag on a commit the asset was not built from -- see below.
+    node tools/ship/refreshReleases.mjs --write    # or the panel's step 5 button, which uses the rig's token
+    node tools/ship/releaseLedger-selfcheck.mjs    # or step 6. Must read "THE FLEET RUNS WHAT IS BUILT"
     git add -A WebGLEngine/tools/ship/releases.json && git commit -m "vNNNN: record the release" && git push
+
+*** PUSH BEFORE YOU PUBLISH, AND THE REASON IS IN githubBridge. *** createRelease passes
+`target_commitish: target || undefined`, and publishVersion never passes a target -- so GITHUB PUTS THE TAG ON
+THE DEFAULT BRANCH'S HEAD while the zip is packed from a LOCAL folder. Those are the same commit only if step 6
+of this ritual has already run. Publish from an unpushed tree and the releases page carries a tag naming a
+commit that does not contain the code in the asset beside it, and nothing in the panel will say a word.
 
 *** THIS STEP IS WHY THE RITUAL EXISTS AND IT WAS MISSING FOR 261 ROUNDS. *** Measured at v4449 against the
 API: 3 of the 261 versions in the changelog were ever published -- 1.1% -- and the fleet's releases/latest sat

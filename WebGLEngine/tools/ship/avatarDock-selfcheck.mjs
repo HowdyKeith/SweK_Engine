@@ -1,5 +1,27 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/avatarDock-selfcheck.mjs -- v4413
+// WebGLEngine/tools/ship/avatarDock-selfcheck.mjs -- v4413, widened v4450
+//
+// ---- v4450: THE GROWTH AXIS, WHICH v4413 GAVE A FLOOR AND NO CEILING ON --------------------------------
+// Keith: "on server.html the svg grows huge and scrolls down screen." #dialsRow carries flex:1 1 auto and is
+// MOVED BETWEEN PARENTS OF DIFFERENT flex-direction at runtime -- row at home, column once panelStage puts it
+// in #stageInfo -- so one declaration means "grow wide" in one place and "grow tall" in the other. MEASURED
+// on one live page moments apart: staged, the row is 720 px tall before the fix and 184 after, 536 px of
+// column reclaimed. THE AVATAR ITSELF IS HIDDEN WHILE A PANEL IS STAGED (onPresent raises the info tab), so
+// what that 720 px held was NOTHING -- a gap, not a giant robot. Said plainly because it is not yet proof of
+// what Keith saw: three sections above measure the avatar at 621x147 at home and it does not move with the
+// window height, so a scene that is itself huge has NOT been reproduced here.
+//   SABOTAGE LOG for the v4450 section:
+//     A. removed the onPresent pin  -> exit=1, 2 red: the axis line reads 720 with and 720 without, and the
+//        home-height line reads staged 720 against home 184.
+//     B. onRestore clears the inline flex instead of restoring it -> exit=1, 1 red BY NAME, and this one
+//        FOUND A BUG IN THE FIX RATHER THAN CONFIRMING IT. The first draft of onRestore wrote
+//        rail.style.flex = "", the idiom the handler beside it uses for justifyContent -- but this flex lives
+//        in the element's INLINE style attribute, so clearing it DELETES the declaration instead of falling
+//        back to a sheet: computed "0 1 auto" where the markup says "1 1 auto", v4413's row silently
+//        un-filling itself after the first staged panel. The home value is read off the node at stage setup
+//        and put back verbatim. Note the width read 426 -> 426 in BOTH cases: in a narrow harness the row is
+//        the only child and fills anyway, so the flex comparison is what caught it and the width alone would
+//        have passed over it.
 //
 // *** THE AVATAR HAD TWENTY-SIX PER CENT OF ITS OWN ROW, AND WAS BUILT AT A SIZE IT WAS NEVER DISPLAYED AT. ***
 //
@@ -124,7 +146,35 @@ const say = (m) => console.log("  ----  " + m);
                     staged = { before, onInfo, back: snap() };
                 }
             } catch (e) { staged = { error: String(e && e.message) }; }
-            return { wide, narrow, staged, zoom: getComputedStyle(d.body).zoom,
+
+            // *** v4450 -- THE RAIL IS MOVED BETWEEN PARENTS OF DIFFERENT flex-direction AT RUNTIME, AND
+            // flex:1 1 auto MEANS A DIFFERENT AXIS IN EACH. *** #dialsRow's home is a row-direction flex,
+            // so v4413's flex:1 1 auto means grow HORIZONTALLY -- which is the whole of what that round was
+            // asked for. panelStage moves the same node into #stageInfo, which is flex-direction:column, and
+            // the identical declaration then means grow VERTICALLY, up to the height of the staged panel.
+            // The counterfactual is driven ON THE SAME LIVE PAGE rather than compared against a number from
+            // another run: present a tall panel, read the row, put the pre-v4450 value back, read it again.
+            let axis = null;
+            try {
+                const st = w._panelStage, row = d.getElementById("dialsRow");
+                if (st && st.present && row) {
+                    const tall = d.createElement("div"); tall.style.height = "900px"; tall.textContent = "staged";
+                    d.body.appendChild(tall);
+                    const h = () => Math.round(row.getBoundingClientRect().height);
+                    const home = h(), homeFlex = getComputedStyle(row).flex, homeW = Math.round(row.getBoundingClientRect().width);
+                    st.present(tall); await new Promise((r) => setTimeout(r, 900));
+                    const fixed = h();
+                    row.style.flex = "1 1 auto";                       // exactly what the stylesheet says, pre-v4450
+                    await new Promise((r) => setTimeout(r, 700));
+                    const before = h();
+                    row.style.flex = "0 0 auto";
+                    st.restore(); await new Promise((r) => setTimeout(r, 900));
+                    axis = { home, homeFlex, homeW, fixed, before, restored: h(),
+                             flex: getComputedStyle(row).flex, restoredW: Math.round(row.getBoundingClientRect().width) };
+                }
+            } catch (e) { axis = { error: String(e && e.message) }; }
+
+            return { wide, narrow, staged, axis, zoom: getComputedStyle(d.body).zoom,
                      dialsPresent: !!d.getElementById("dials") };
         }` });
 
@@ -186,7 +236,41 @@ const say = (m) => console.log("  ----  " + m);
              "MAKES IT FILL and that is not cleared -- said here because a reader of the markup would expect " +
              "inline-flex and measure block" : "not measured");
 
-        REPORT.table("the dock, before and after", ["what", "v4412", "v4413 wide", "v4413 narrow"], [
+        {
+        const a = (probe.result || {}).axis;
+        if (!a || a.error) {
+            ok("!! the staged growth AXIS could not be measured", false,
+               "no _panelStage on the page" + (a && a.error ? ": " + a.error : "") +
+               ". This is the half v4450 was reported about, and it is a layout claim -- there is no reading of " +
+               "the stylesheet that answers it, because the answer depends on which parent the node is in");
+        } else {
+            ok("!! *** THE RAIL DOES NOT GROW ON THE AXIS IT WAS NEVER SIZED FOR ***",
+               a.fixed > 0 && a.before > 0 && a.fixed < a.before * 0.6,
+               `staged: ${a.fixed} px tall with v4450's pin, ${a.before} px without it -- ` +
+               `${a.before - a.fixed} px of EMPTY column reclaimed, measured on one page moments apart. ` +
+               "The avatar itself is hidden while a panel is staged (onPresent raises the info tab, which is " +
+               "what hides it), so this box was empty at 720 px -- a gap, not a giant robot");
+            ok("...and the home height is untouched, so v4413's row is not narrowed to buy it",
+               a.home === a.restored && Math.abs(a.home - a.fixed) < 4,
+               `home ${a.home}, staged ${a.fixed}, restored ${a.restored}. RESTORE IS ASSERTED AND NOT ASSUMED: ` +
+               "leaving a style on a node that has gone home is how a panel-stage bug becomes a 'the gauges look " +
+               "wrong now' bug with no obvious cause, which is the rule onRestore already states for justifyContent");
+            // *** THIS LINE WENT RED ON THE FIRST RUN AND THE FIX WAS WRONG, NOT THE CHECK. *** onRestore
+            // first wrote `rail.style.flex = ""`, the idiom the handler beside it uses for justifyContent --
+            // but #dialsRow's flex is in the element's INLINE style attribute, so clearing it DELETES the
+            // declaration rather than falling back to a sheet. Measured: "0 1 auto" where the markup says
+            // "1 1 auto", which is v4413's row silently un-filling itself after the first staged panel. The
+            // home value is captured off the node at stage setup and put back verbatim; the width is checked
+            // too, because a flex-grow that never came back is invisible in the height.
+            ok("!! ...and the row comes home to the value the MARKUP gave it, in both flex and width",
+               a.flex === a.homeFlex && a.restoredW === a.homeW && a.homeW > 0,
+               `flex ${a.homeFlex} -> ${a.flex}, width ${a.homeW} -> ${a.restoredW}. COMPARED AGAINST THE NODE'S ` +
+               "OWN STARTING VALUE, not a literal: a gate that typed \"1 1 auto\" would be a second declaration " +
+               "of the thing the markup already says, and would go stale the day the markup changed");
+        }
+    }
+
+    REPORT.table("the dock, before and after", ["what", "v4412", "v4413 wide", "v4413 narrow"], [
             ["row width", 676, wide.row ? wide.row.w : 0, narrow.row ? narrow.row.w : 0],
             ["dials width", 288, wide.dials ? wide.dials.w : 0, narrow.dials ? narrow.dials.w : 0],
             ["avatar host width", 178, wide.host ? wide.host.w : 0, narrow.host ? narrow.host.w : 0],
