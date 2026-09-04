@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "The approximation's error changes sign, so no single scale factor repairs it",
+    since: "v4446",
+    state: "open",
+    pred: "v4445 wired the multi-scatter term in and could only BOUND the coloured case, naming a random-walk ground truth as the honest next step. The prediction is that an INDEPENDENT simulation -- bounces on a microsurface, consulting no table and no fit -- would turn that bound into a number, and that the Kulla-Conty approximation would prove good but not exact away from the white mirror it is derived for.",
+    why: "A bound is what you report when you cannot measure. v4445 said so in writing, and a round that leaves its own stated next step undone is how a plan rots.",
+    measured: "THE ERROR CHANGES SIGN, WHICH THE PREDICTION DID NOT ANTICIPATE. Kulla-Conty against truth at roughness 1: exact at F0 = 1, then -3.7%, -7.3%, -3.5%, -0.6%, and +4.0% at F0 = 0.04. It under-compensates in the middle and OVER-compensates at the dark end, so it cannot be repaired by one scale factor. THE WALK WAS VALIDATED TWICE FIRST: with Fresnel identically one it conserves EXACTLY 1.000000 at every roughness (a law, nothing tuned), and its single-scatter component reproduces microfacet.directionalAlbedo -- graded rounds ago by an unrelated quadrature -- to 3.4e-5.",
+    kill: "physics/render/microsurfaceWalk-selfcheck.mjs. Sections 1 and 2 validate the walk against a LAW and against an independently graded number, and nothing is claimed from it until they pass. SABOTAGE: use the unsigned Lambda and 4 rows go red, let downward rays escape and 10 do, sample the NDF instead of the visible NDF and 5 do (conservation goes with it, which is why section 1 is worth more than any number the walk produces), count truncated one-bounce paths and 1 does -- MEASURED 4/10/5/1 by name, none zero. THE TRUNCATION TRAP IS KEPT AS A ROW: capping the walk at one bounce reads FIFTY PER CENT HIGH, because a cap removes the escape test -- single scatter is not 'one bounce', it is 'one bounce and then escapes', and the gap IS the shadowing. HONEST SCOPE: this is the UNIFORM-HEIGHT Smith microsurface, one model of what a rough conductor is -- it measures the model this tree's D and G2 already assume, not reality. CONDUCTOR-ONLY: v4436's rough dielectric still has no ground truth and its multi-scatter loss is still unmeasured. Achromatic per run: three channels means three walks.",
+    page: "instruments.html",
+  },
+  {
     name: "F_avg is a ceiling and not a target, and the round wrote that backwards before measuring it",
     since: "v4445",
     state: "open",

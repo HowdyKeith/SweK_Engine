@@ -1485,6 +1485,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "defect again, a check that re-derives both candidates and grades the copy. Repaired to " +
                  "test behaviour.",
     }),
+    // v4446 -- the sixty-eighth closing. The ground truth v4445 said it needed, validated twice before it
+    // was believed, and the bound it was built for became a number with a sign change in it.
+    since68: Object.freeze({
+        at: "v4446", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/microsurfaceWalk-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 16 checks in four sections. v4445 wired the multi-scatter term in and " +
+                 "could only BOUND the coloured case, saying in its own honest scope that pinning it would " +
+                 "need a random-walk ground truth on a GGX microsurface. This is that walk -- Heitz et al. " +
+                 "2016, uniform-height Smith, a paper rather than a repository -- and it is INDEPENDENT by " +
+                 "construction: it simulates bounces and never consults a table, a fit, or any of the " +
+                 "machinery it checks. *** A GROUND TRUTH NOBODY CHECKED IS WORSE THAN NO GROUND TRUTH, SO " +
+                 "IT IS VALIDATED TWICE BEFORE ANYTHING IS CLAIMED FROM IT. *** With Fresnel identically " +
+                 "one it returns EXACTLY 1.000000 at every roughness -- a LAW, no parameter tuned -- and " +
+                 "its single-scatter component reproduces microfacet.directionalAlbedo, graded rounds ago " +
+                 "by an unrelated quadrature, to 3.4e-5 at roughness 1. *** AND THE SECOND VALIDATION " +
+                 "FAILED FIRST, FOR A REASON WORTH KEEPING: *** capping the walk at one bounce read " +
+                 "0.587860 against the table's 0.378889, FIFTY PER CENT HIGH, because a cap truncates " +
+                 "BEFORE THE ESCAPE TEST and a shadowed ray is counted as having left. SINGLE SCATTER IS " +
+                 "NOT 'ONE BOUNCE', IT IS 'ONE BOUNCE AND THEN ESCAPES', and the gap between those two " +
+                 "numbers IS the shadowing term. The walk was right and the way of asking it was wrong. " +
+                 "*** THE BOUND BECOMES A NUMBER AND THE ERROR CHANGES SIGN. *** Kulla-Conty against " +
+                 "truth at roughness 1: exact at F0 = 1, then -3.7%, -7.3%, -3.5%, -0.6% and +4.0% at " +
+                 "F0 = 0.04. It UNDER-compensates in the middle and OVER-compensates at the dark end, so " +
+                 "IT CANNOT BE REPAIRED BY ONE SCALE FACTOR and a claim that it is 'within a few per cent' " +
+                 "owes the reader a WHERE. The fair reading is also asserted: 7% off is not 62% off, and " +
+                 "the uncompensated model was the second one. AND THE WALK RETURNED ZERO AT EVERY " +
+                 "ROUGHNESS ON ITS FIRST RUN, because SMITH'S LAMBDA IS SIGNED and microfacet.mjs's is " +
+                 "not -- correct there, since that module only asks about directions above the horizon, " +
+                 "and wrong here, where a walk goes below it on its FIRST STEP. Four sabotages, MEASURED " +
+                 "4/10/5/1 by name, none zero.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
