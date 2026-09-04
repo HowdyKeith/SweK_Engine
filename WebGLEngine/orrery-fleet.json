@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "417259186e66b9392764d2f2e18d0a0eb729ab74",
+ "head": "7971512fb279f22506a6c382007662fe3713b990",
  "bodies": {
   "box3d": [
    {
@@ -12,7 +12,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1486291,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -209,7 +209,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1486291,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "clients.html",
@@ -218,8 +218,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 844630,
-    "sha": "417259186e66b9392764d2f2e18d0a0eb729ab74"
+    "bytes": 847120,
+    "sha": "7971512fb279f22506a6c382007662fe3713b990"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -336,7 +336,7 @@
    {
     "path": "ai-bridge/server.js",
     "bytes": 1486291,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "aquarelle.html",
@@ -505,8 +505,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2920709,
-    "sha": "417259186e66b9392764d2f2e18d0a0eb729ab74"
+    "bytes": 2918570,
+    "sha": "7971512fb279f22506a6c382007662fe3713b990"
    },
    {
     "path": "mpm3d.html",
@@ -550,8 +550,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 844630,
-    "sha": "417259186e66b9392764d2f2e18d0a0eb729ab74"
+    "bytes": 847120,
+    "sha": "7971512fb279f22506a6c382007662fe3713b990"
    },
    {
     "path": "shipavatar.html",
@@ -732,8 +732,8 @@
    },
    {
     "path": "tsl-probe.html",
-    "bytes": 4416,
-    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd"
+    "bytes": 4474,
+    "sha": "7971512fb279f22506a6c382007662fe3713b990"
    },
    {
     "path": "tsl-rig.html",

@@ -87,5 +87,6 @@ function step() { step2D(V, 1 / 60, P.sigma); if (jumpT != null) { jumpT += 1 / 
   (function loop() { step(); try { r.draw(); } catch (e) { tierEl.textContent = "render error"; } requestAnimationFrame(loop); })();
 })();
 </script>
+<script type="module" src="/ui/originNotice.js"></script>
 </body>
 </html>

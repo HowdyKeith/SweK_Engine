@@ -294,7 +294,20 @@ function shipMesh() {
 }
 
 async function initGPU() {
-  if (!navigator.gpu) { fallback("navigator.gpu is undefined (no WebGPU)."); return false; }
+  if (!navigator.gpu) {
+    // v4452 -- SAY WHICH OF THE TWO IT IS. "no WebGPU" reads as "this browser cannot do it", and on a LAN
+    // address that is false: navigator.gpu is only exposed in a SECURE CONTEXT, and http://192.168.x.x is
+    // not one while http://localhost is. Keith reopened these pages on localhost for weeks without the
+    // page ever saying that was the fix. ui/webgpuProbe.mjs has known the difference since v3981; this
+    // page simply never asked it.
+    try {
+      const m = await import("./ui/webgpuProbe.mjs");
+      const p = m.describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location });
+      if (p.reason === "insecure-origin") { m.showOriginBanner(p); fallback(p.message); return false; }
+    } catch (e) {}
+    fallback("navigator.gpu is undefined (no WebGPU in this browser).");
+    return false;
+  }
   let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
   if (!adapter) { fallback("no GPU adapter."); return false; }
   try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }

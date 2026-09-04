@@ -1685,6 +1685,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "writes `export const MU0 = 1.25e-6;   // CODATA`. Running one of the accused was the whole " +
                  "cost of learning each.",
     }),
+    // v4452 -- NO new gate file: three existing gates widened, and one non-gate module added.
+    since74: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate.
+        // ui/originNotice.js is a page module, not a -selfcheck, so enumerateGates does not see it.
+        at: "v4452", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "ui/webgpuOrigin-selfcheck.mjs (sections 8 and 9: the derived population, and the silent fallback)",
+            "tools/ship/pageRequirements-selfcheck.mjs (--have reachable from the panel; the import tell)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box. Keith: 'I don't know why the swek engine locally runs with an ip, and " +
+                 "then all the gpu pages have to be re opened with localhost. all the machines run webgpu " +
+                 "pages fully.' THE MACHINES ARE FINE AND SO IS THE CODE: navigator.gpu is exposed only in a " +
+                 "SECURE CONTEXT, a browser treats localhost and 127.0.0.1 as secure over plain http, and a " +
+                 "LAN address is not one -- so on http://192.168.50.57:8787 the property is simply absent. " +
+                 "ui/webgpuProbe.mjs has said exactly that since v3981, and MEASURED at v4452 only 16 of the " +
+                 "31 pages that acquire a device ever asked it. Now 31 of 31, by three routes, and the " +
+                 "population is DERIVED from source rather than listed. *** THE REASON THE SYMPTOM WAS " +
+                 "UNREADABLE IS THAT gfx/device.js FELL BACK IN SILENCE: *** requestDevice took webgl2 -- or " +
+                 "the null backend -- and returned a WORKING device with no throw and no console line, so the " +
+                 "page loaded, did less than it should, and the only clue was that localhost fixed it. It " +
+                 "explains now, before the fallback runs, once per page. SEPARATELY, RENDER QA: --have has " +
+                 "existed since v3171 so a box can state what it HAS and every unjudgeable page is NAMED " +
+                 "rather than failed (v3120's law) -- and renderQaBridge.run() never accepted it, so the " +
+                 "mechanism was terminal-only. That is v3563's own sentence, one flag along: 'A FRONT DOOR " +
+                 "THAT CANNOT REACH A FLAG THE TOOL DOCUMENTS IS HALF A DOOR', written while fixing --all and " +
+                 "leaving this. Threaded, with blank still meaning skip nothing. The webgpu detector also " +
+                 "learned the IMPORT tell it already used for webgl2, fixing two pages that hold their WGSL " +
+                 "in a string and get the device from gfx/device.js. Five sabotages, MEASURED " +
+                 "1/1/0-then-1/1/0-then-1 by name. *** BOTH ZEROS WERE DEFECTS IN THE GATES, NOT THE CODE: *** " +
+                 "one case was short-circuited by the once-per-page flag so it passed whatever the guard did, " +
+                 "and the detector widening had no assertion at all and could have been undone in silence.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

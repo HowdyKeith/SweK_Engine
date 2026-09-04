@@ -122,10 +122,50 @@ console.log();
     ok("...and the skipped pages are NAMED, not counted",
         /CANNOT JUDGE \$\{r\.name\} -- needs \$\{r\.missing\.join/.test(runner),
         "'17 skipped' tells you nothing; 'water needs webgl2, float_target' tells you which machine to move to");
+
+    // *** v4452 -- AND THE BUTTON CAN REACH IT NOW, WHICH IT COULD NOT FOR THE FLAG'S WHOLE LIFE. ***
+    // Every line above checks the RUNNER. renderQaBridge.run() destructured {only, updateBaselines, base,
+    // video, all} and nothing else, so the mechanism v3171 built existed and server.html could not send it --
+    // v3563's own words while fixing the flag beside it: "A FRONT DOOR THAT CANNOT REACH A FLAG THE TOOL
+    // DOCUMENTS IS HALF A DOOR." MEASURED at v4452: 36 of this tree's 38 GPU-shaped pages derive "needs
+    // webgpu", and on a box with no adapter every one comes back FAILED rather than unjudgeable -- 36 red
+    // results that mean nothing, which is how a report stops being read.
+    const bridge = fs.readFileSync(path.join(ENG, "ai-bridge", "renderQaBridge.js"), "utf8");
+    const page = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+    ok("!! *** the bridge accepts --have and passes it through ***",
+        /function run\(\{ only, updateBaselines, base, video, all, have \}/.test(bridge) &&
+        /args\.push\("--have", String\(have\)\)/.test(bridge),
+        "destructured AND pushed: an option a function accepts and never forwards is the same dead control " +
+        "one layer in, and harder to see");
+    ok("!! ...and the page offers it, on the ONE path both run buttons share",
+        /id="rqHave"/.test(page) && (page.match(/getElementById\("rqHave"\)/g) || []).length >= 2,
+        "read in rqStart (the per-page and subset runs) and in the full-sweep button, from a single input -- " +
+        "two inputs would let a sweep and a single-page run disagree about what the box is claimed to have");
+    // v4452 -- AND THE DETECTOR ITSELF, WHICH NOTHING ASSERTED. Sabotage E removed the import tell and every
+    // gate stayed green: the two pages it misclassifies are named here so the widening cannot be undone in
+    // silence. DERIVED by running the classifier, not by trusting a list.
+    const { requirementsOf } = await import(path.join(ENG, "tools", "render-qa", "pageRequirements.mjs"));
+    const viaImport = ["gfx-device.html", "nebula-device.html"];
+    const got = viaImport.map((f) => ({ f, needs: (requirementsOf(path.join(ENG, f)).needs || []) }));
+    ok("!! *** a page whose device comes from an IMPORT is still derived as needing webgpu ***",
+        got.every((g) => g.needs.includes("webgpu")),
+        got.map((g) => g.f + " -> [" + g.needs.join(",") + "]").join("; ") +
+        ". These hold their WGSL in a string and call gfx/device.js, which asks navigator.gpu four times. " +
+        "Matching only the direct call left them RUN AND FAILED on a box with no adapter -- the collapse of " +
+        "unsupported into broken that the whole --have mechanism exists to prevent");
+
+    ok("...and blank still means skip nothing",
+        /\|\|""\)\.trim\(\)\|\|undefined/.test(page.replace(/\s/g, "")),
+        "an empty box must send NO flag rather than an empty one, so the default behaviour is unchanged and " +
+        "a green run still covers every page unless somebody said otherwise");
 }
 
 console.log();
-console.log("  ----  STILL NOT DONE: the capability set is stated by hand with --have. A box could DETECT its");
+console.log("  ----  STILL NOT DONE (v4452: the flag is REACHABLE now, the set is still typed): a box could");
+console.log("  ----  DETECT its own capabilities rather than be told them. Not built this round because");
+console.log("  ----  Playwright is not installed in the sandbox it was written in, and shipping a");
+console.log("  ----  browser-launching probe nothing here can run is the untested-code this tree refuses.");
+console.log("  ----  The older note, still true about the remaining half:");
 console.log("  ----  own capabilities, but detection from Node cannot see a GPU the browser will get, so the");
 console.log("  ----  honest version of that needs the browser to report back -- a different round.");
 if (fails) { console.log("pageRequirements-selfcheck: " + fails + " FAILURES"); process.exit(1); }
