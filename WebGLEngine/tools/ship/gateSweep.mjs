@@ -1380,6 +1380,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "weak gate would be the OPPOSITE mistake to the ones this session keeps finding. A third " +
                  "kind of zero, and named as one.",
     }),
+    // v4443 -- the sixty-fifth closing. The fifth and last gap v4432 named, and the round's best finding was
+    // a zero-red against this gate's own headline row.
+    since65: Object.freeze({
+        at: "v4443", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/subsurface-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 22 checks in six sections. v4432 shipped the principled BSDF naming five " +
+                 "absent parameters -- sheen, clearcoat, anisotropy, transmission, subsurface. v4436 closed " +
+                 "the fourth; THIS CLOSES THE FIFTH. Christensen and Burley's normalised diffusion, which is " +
+                 "NORMALISED BY CONSTRUCTION where the classical dipole is not, so more can be ASSERTED here " +
+                 "than in any of the other four. Measured absent first: subsurface, burley, " +
+                 "diffusionProfile, translucency, meanFreePath and albedoInversion are all ZERO in code, and " +
+                 "the four `subsurface` hits are DENIALS -- v4432's and v4436's own notes saying so. Two " +
+                 "false friends named rather than counted: physics/em/currentLoop.mjs has a MAGNETIC dipole, " +
+                 "and render/atmosphere.mjs scatters Rayleigh and Mie through a medium rather than diffusing " +
+                 "under a surface. EXACT: the integral is 1 and independent of d; CDF(0) = 0 and " +
+                 "CDF(inf) = 1; E[r] = 2.5d; the profile is self-similar at the SECOND power. *** THE " +
+                 "SELF-SIMILARITY POWER WAS WRONG IN THE FIRST DRAFT AND THE MEASUREMENT CAUGHT IT: *** d R " +
+                 "had an IDENTICAL MANTISSA to twelve digits across three decades while the exponent stepped " +
+                 "by two, which is the signature of a missed power rather than a wrong formula -- R is a " +
+                 "density per unit AREA. A dimensional slip that leaves every digit right is invisible to " +
+                 "anything but the exponent, and the gate now asserts that d^1 does NOT collapse. *** AND " +
+                 "THE ROUND'S BEST FINDING WAS A ZERO-RED AGAINST ITS OWN HEADLINE ROW. *** normalisation() " +
+                 "integrated a HAND-SUBSTITUTED copy of the integrand, with d cancelled analytically -- so " +
+                 "it was bit-identical across seven decades and read as the strongest assertion in the file " +
+                 "-- and IT NEVER CALLED profile(), so replacing 8 pi with 4 pi cost NOTHING. A " +
+                 "normalisation that re-derives its own integrand grades the copy. It integrates the real " +
+                 "profile now: the bit-identity is gone, d-independence becomes MEASURED at 4.4e-16 rather " +
+                 "than tautological, and the sabotage bites. A SECOND NEAR-MISS: the E[r] quadrature used " +
+                 "1/2 where the measure needs 1/4, and was hand-checked AT d = 2, where a factor-of-two " +
+                 "error returns 5.000 because 2.5 x 2 and 2 x 2.5 are the same number -- a constant that " +
+                 "scales with the parameter you tested at is invisible at that parameter. Four sabotages, " +
+                 "MEASURED 0-then-1/2/2/1 by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

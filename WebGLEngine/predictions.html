@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "A normalisation that re-derives its own integrand grades the copy, and it read as the strongest row in the file",
+    since: "v4443",
+    state: "open",
+    pred: "The fifth and last gap v4432 named. Christensen and Burley's diffusion profile is NORMALISED BY CONSTRUCTION where the classical dipole is not, so the prediction was that this would be the most assertable of the five -- an integral that is exactly 1 for every d, a closed-form CDF, a mean radius of exactly 2.5d, and self-similarity in r/d.",
+    why: "Four of the five gaps were closed or declined with measurements. This one has a one-line proof of its own normalisation, which is unusual enough to be worth building a gate around.",
+    measured: "ALL FOUR IDENTITIES HOLD -- and the round's best finding was a ZERO-RED against its own headline row. normalisation() integrated a HAND-SUBSTITUTED copy of the integrand with d cancelled analytically, so it was BIT-IDENTICAL across seven decades and read as the strongest assertion in the file, and IT NEVER CALLED profile(): replacing 8 pi with 4 pi cost nothing. A normalisation that re-derives its own integrand grades the copy. Integrating the real profile costs the bit-identity and buys a check that can fail -- d-independence is now MEASURED at 4.4e-16 rather than tautological. TWO OTHER NEAR-MISSES: the self-similarity power was written as d and is d^2 (R is a density per unit AREA; the mantissa was identical to twelve digits while the exponent stepped by two), and the E[r] quadrature used 1/2 for 1/4 and was hand-checked AT d = 2, where a factor-of-two error returns exactly the right-looking 5.",
+    kill: "physics/render/subsurface-selfcheck.mjs. The normalisation integrates the actual profile; the exponent of the self-similarity is asserted BOTH ways, so a d^1 that collapsed would go red; the mean radius is checked as the dimensionless ratio E[r]/d, which has one right answer at every d. SABOTAGE: 4 pi for 8 pi is 1 RED (it was 0 before the repair), drop the factor of 3 and 2 go red, swap the CDF weights and 2 do, return d from meanRadius and 1 does -- MEASURED 0-then-1/2/2/1 by name. HONEST SCOPE: the fifth gap is closed as a MODEL and left open as an INTEGRATION -- a BSSRDF needs a surface to integrate over and principled.mjs has none, so nothing is wired in. Burley's albedo-to-distance relation is a CURVE FIT, labelled `fitted` in the export, and no row asserts anything exact about it. One channel, one scattering distance, grey.",
+    page: "instruments.html",
+  },
+  {
     name: "Half a retro look has exact answers and half has none, and the round is deciding which half to take",
     since: "v4442",
     state: "open",
