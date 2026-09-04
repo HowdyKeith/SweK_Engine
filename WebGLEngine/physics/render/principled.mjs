@@ -23,6 +23,7 @@
 "use strict";
 import { D, G2, G1, sampleHalfVector } from "./microfacet.mjs";
 import { schlick } from "./fresnel.mjs";
+import { msLobe } from "./energyCompensation.mjs";
 import { orenNayarBrdf, directionalAlbedo as diffuseAlbedo } from "./roughDiffuse.mjs";
 
 /** Disney's roughness-to-alpha convention: alpha = roughness^2, so the slider is perceptually even. */
@@ -49,7 +50,8 @@ export const f0Of = (baseColour, metallic, specular = 0.5) => {
  * of the projected azimuths. The specular lobe does not use it because GGX here is isotropic.
  */
 export function evaluate({ baseColour, metallic = 0, roughness = 0.5, specular = 0.5, sigma = 0,
-                          lobes = "both", coupled = false }, cosO, cosI, cosM, cosPhiDiff = 1, channel = 0) {
+                          lobes = "both", coupled = false, msTable = null },
+                         cosO, cosI, cosM, cosPhiDiff = 1, channel = 0) {
     const m = Math.min(1, Math.max(0, metallic));
     const alpha = alphaOf(roughness);
     const base = baseColour[channel];
@@ -86,7 +88,41 @@ export function evaluate({ baseColour, metallic = 0, roughness = 0.5, specular =
     const denom = 4 * Math.abs(cosO) * Math.abs(cosI);
     const spec = lobes === "diffuse" || denom <= 0 ? 0 : (Dv * Gv * Fv) / denom;
 
-    return diffuse + spec;
+    // *** THE MULTI-SCATTER TERM, AND IT IS OPT-IN SO NOTHING SILENTLY CHANGES. *** v4432 shipped this lobe as
+    // SINGLE-SCATTER GGX and said so in its honest scope: a white metal at roughness 1 returns 0.379 of what
+    // it receives, and physics/render/energyCompensation.mjs -- a multi-scatter table graded long before, and
+    // repaired at v4438 -- was not wired in. That made every furnace number v4432 and v4436 reported a
+    // CEILING rather than an answer. Passing `msTable` adds the Kulla-Conty lobe the table was built for;
+    // omitting it reproduces the old behaviour BIT FOR BIT, which the gate asserts rather than assumes.
+    //
+    // The lobe is scaled by F0 because the table is ACHROMATIC and assumes a perfect mirror. That is the
+    // standard cheap approximation and it is not exact for a coloured metal or a dielectric -- the gate
+    // MEASURES the residual in both cases rather than claiming it away.
+    // *** THE SCALING IS KULLA-CONTY'S COLOURED FACTOR AND NOT F0, AND THE DIFFERENCE WAS MEASURED. ***
+    // Scaling the achromatic lobe by F0 is the cheap approximation. It compensates a white mirror correctly
+    // and pushes darker materials UP TO ROUGHLY F_avg -- measured at roughness 1: 0.5007 at F0 = 0.5 against
+    // an F_avg of 0.5238, and 0.0414 at F0 = 0.04 against 0.0857.
+    //
+    // *** AND F_avg IS A CEILING RATHER THAN A TARGET, WHICH THE FIRST DRAFT OF THIS COMMENT HAD BACKWARDS.
+    // *** It called the F0 scaling "short" of F_avg, as though reaching it were the goal. It is not: F_avg is
+    // what a material would return if every bounce were free, and every bounce is not. Light that scatters
+    // twice on a rough conductor is attenuated TWICE, so the recovered energy is a GEOMETRIC SERIES in F_avg
+    // and lands well BELOW it -- 0.2912 at F0 = 0.5, not 0.5238. The cheap scaling is therefore too HIGH for
+    // a dark metal, not too low, and the sign of that error is the opposite of what was written here first.
+    //
+    //     F_ms = F_avg^2 Eavg / (1 - F_avg (1 - Eavg))
+    //
+    // For Schlick, F_avg has a closed form -- F0 + (1 - F0)/21, verified against quadrature to eight
+    // decimals -- because INT (1-mu)^5 2 mu dmu is exactly 1/21.
+    const fAvg = f0 + (1 - f0) / 21;
+    const Eavg = msTable ? msTable.Eavg : 0;
+    const fMs = msTable && fAvg > 0
+        ? (fAvg * fAvg * Eavg) / Math.max(1e-12, 1 - fAvg * (1 - Eavg))
+        : 0;
+    const ms = msTable && lobes !== "diffuse" && cosI > 0 && cosO > 0
+        ? fMs * msLobe(msTable, cosO, cosI)
+        : 0;
+    return diffuse + spec + ms;
 }
 
 /**

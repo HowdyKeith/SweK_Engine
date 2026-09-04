@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "F_avg is a ceiling and not a target, and the round wrote that backwards before measuring it",
+    since: "v4445",
+    state: "open",
+    pred: "v4432 and v4436 both shipped saying the specular lobe was single-scatter GGX, that a white metal at roughness 1 returns 0.379, and that energyCompensation.mjs was not wired in -- making every furnace number a CEILING rather than an answer. The prediction is that wiring the existing graded table in would close that, and that the two modules would already agree about the lobe before being connected.",
+    why: "A loose end named in writing by two separate rounds and left for a third. And the agreement question matters: if the table described a different lobe than principled has, connecting them would be a fit rather than a wiring.",
+    measured: "THEY AGREED FIRST: principled's specular-only albedo is 0.378889 where the table's E(mu) is 0.378981, two independent descriptions of single-scatter GGX matching to five decimals. Wired, the white metal goes 0.378889 to 0.999817 and conserves at every roughness, while omitting the table stays BIT-IDENTICAL to the old model across 27 configurations. AND THE FRAMING FOR THE COLOUR SCALING WAS BACKWARDS WHEN FIRST WRITTEN: the header called F0 scaling 'short' of F_avg, as though reaching F_avg were the goal. F_avg is what a material returns if every bounce is FREE. Light scattering twice on a rough conductor is attenuated twice, so the recovered energy is a geometric series landing WELL BELOW it -- 0.2912 at F0 = 0.5, not 0.5238 -- and the cheap scaling is too HIGH for a dark metal, the opposite sign.",
+    kill: "physics/render/multiScatter-selfcheck.mjs. TWO EXACT BOUNDS are asserted -- compensation can never remove energy, and can never exceed F_avg -- with the value between them MEASURED rather than claimed. F_avg = F0 + (1-F0)/21 is verified against quadrature to eight decimals. SABOTAGE: scale by F0 instead of the series and 3 rows go red, drop the F_ms denominator and 1 does, add the term to the diffuse lobe and 1 does, make msLobe asymmetric and 5 do -- MEASURED 0-then-3/1/1/5 by name. THE ZERO IS RECORDED: section 4 compared the two scalings ARITHMETICALLY, which is true whatever the module does, so swapping it back cost nothing -- v4443's defect again, a check that re-derives both candidates and grades the copy. HONEST SCOPE: a coloured metal is NOT claimed correct -- pinning the value needs a random-walk ground truth on a GGX microsurface, which is not here. The table is ACHROMATIC and scaled by one scalar, so a strongly coloured F0 gets one compensation for three channels. And reciprocity is decomposed: the added lobe is bit-exact, the composition is symmetric to one ulp because the base model already was.",
+    page: "instruments.html",
+  },
+  {
     name: "The importance weight collapses to the Jacobian, so a flattening sphere makes the estimator exact",
     since: "v4444",
     state: "open",

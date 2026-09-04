@@ -1448,6 +1448,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "wrong density leaves the VARIANCE comparison looking entirely reasonable and only the MEAN " +
                  "knows, so a round measuring only the benefit would have shipped it.",
     }),
+    // v4445 -- the sixty-seventh closing. The ceiling v4432 and v4436 both named, turned into an answer --
+    // and a framing this round wrote an hour earlier and had backwards.
+    since67: Object.freeze({
+        at: "v4445", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/multiScatter-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 17 checks in five sections. v4432 shipped the specular lobe as " +
+                 "SINGLE-SCATTER GGX and said so: 'a white metal at roughness 1 returns 0.379 of what it " +
+                 "receives, and this tree's own energyCompensation.mjs IS NOT WIRED IN. That makes every " +
+                 "furnace number above a CEILING rather than an answer.' v4436 repeated it. THIS IS THE " +
+                 "WIRING: 0.378889 becomes 0.999817, and the white metal conserves at EVERY roughness. THE " +
+                 "TWO MODULES AGREED ABOUT THE LOBE BEFORE THEY WERE CONNECTED -- principled's " +
+                 "specular-only albedo is 0.378889 where the table's E(mu) is 0.378981, two independent " +
+                 "descriptions of single-scatter GGX matching to five decimals, which is what made the " +
+                 "wiring a connection rather than a fit. IT IS OPT-IN AND OMITTING THE TABLE IS " +
+                 "BIT-IDENTICAL to the pre-v4445 model across 27 configurations, so every furnace number " +
+                 "the earlier rounds reported is still reproducible. *** THE SCALING IS KULLA-CONTY'S " +
+                 "COLOURED FACTOR AND NOT F0, AND THE FRAMING FOR WHY WAS WRITTEN BACKWARDS FIRST. *** The " +
+                 "header called F0 scaling 'short' of F_avg as though reaching F_avg were the goal. IT IS " +
+                 "NOT: F_avg is what a material returns if every bounce is FREE, and light scattering twice " +
+                 "on a rough conductor is attenuated TWICE, so the recovered energy is a geometric series " +
+                 "landing WELL BELOW it -- 0.2912 at F0 = 0.5, not 0.5238. The cheap scaling is too HIGH " +
+                 "for a dark metal, the opposite sign to what was first written. F_avg = F0 + (1-F0)/21 is " +
+                 "a CLOSED FORM verified against quadrature to eight decimals, because the integral of " +
+                 "(1-mu)^5 2mu is exactly 1/21. TWO EXACT BOUNDS are asserted and the value between them is " +
+                 "MEASURED rather than claimed: compensation can never REMOVE energy, and can never exceed " +
+                 "F_avg. Pinning the value would need a random-walk ground truth on a GGX microsurface, " +
+                 "which is NOT here and is named as the next step. RECIPROCITY DECOMPOSED HONESTLY: the " +
+                 "first version asserted the COMPOSITION was bit-exact and went red at 5.6e-17 -- the BASE " +
+                 "model is already 2.8e-17 asymmetric because the specular lobe divides by 4 cosO cosI, so " +
+                 "the added lobe is asserted bit-exact (it is) and the composition to one ulp (it is), " +
+                 "rather than blaming this round for inherited arithmetic. Four sabotages, MEASURED " +
+                 "0-then-3/1/1/5 by name. THE ZERO: section 4 compared the two scalings ARITHMETICALLY, " +
+                 "which is true whatever the module does, so swapping it back cost nothing -- v4443's " +
+                 "defect again, a check that re-derives both candidates and grades the copy. Repaired to " +
+                 "test behaviour.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
