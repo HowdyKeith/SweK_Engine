@@ -1280,6 +1280,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Repaired by asserting the mechanism: a planted table must BE the grid with the plant " +
                  "applied, row for row. Four sabotages, MEASURED 4/4/1/0-then-1 by name.",
     }),
+    // v4440 -- the sixty-second closing. Vorticity confinement, and a comparative claim that had been sitting
+    // in the tree unmeasured with both of its halves already present.
+    since62: Object.freeze({
+        at: "v4440", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fluid/vorticity-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 13 checks in five sections. *** THE ROUND SET OUT TO ADD A SMOKE SOLVER " +
+                 "AND FOUND THE TREE HAS TWO FLUID SOLVERS -- THE FOURTH ABSENCE CLAIM OF MINE IN FOUR " +
+                 "ROUNDS TO BE WRONG, AND THE FIRST CAUGHT BEFORE A LINE WAS WRITTEN. *** fluid/flip2d.mjs " +
+                 "and flip3d.mjs are FLIP/PIC solvers on a staggered MAC grid, and fx/vorton/vorton.js is a " +
+                 "VORTEX-PARTICLE method, which is the exact technique I had told Keith was absent. Only " +
+                 "`vorticity` and `confinement` really were zero. *** AND THE TREE ALREADY HELD THE CLAIM " +
+                 "THE TECHNIQUE EXISTS TO ADDRESS: *** vorton.js's header says its method keeps 'the " +
+                 "beautiful filamentary wisps A GRID SOLVER SMEARS AWAY' -- a comparative claim written in a " +
+                 "file that is not one, with both halves in this tree and nobody having put them in the same " +
+                 "room. MEASURED: semi-Lagrangian advection retains 45.4% of its enstrophy over sixty steps, " +
+                 "monotonically. Two things are EXACT: the discrete curl converges at second order against " +
+                 "an analytic Taylor-Green field (ratios 3.84, 3.96, 3.99, 4.00) and the confinement force " +
+                 "is perpendicular to its own gradient to 1.4e-17 over 3844 cells, because a cross product " +
+                 "is a cross product. *** AND THE HEADLINE IS THAT CONFINEMENT IS NOT A RESTORATION. *** " +
+                 "Bisected, the eps that returns enstrophy to exactly 100% is 15.546, AT WHICH KINETIC " +
+                 "ENERGY IS 109.6% OF INITIAL -- a dissipative scheme left with more energy than it started " +
+                 "with. There is no ceiling either: eps 40 reaches 286% enstrophy and 160 reaches 6837%. The " +
+                 "parameter that makes the vorticity number right is chosen BY the vorticity number being " +
+                 "right, which is circular, and that is what a hack with a free parameter looks like when " +
+                 "somebody finally measures it. AND vorton's OWN claim is checked for the first time: its " +
+                 "induced field is divergence-free to 1.3e-6 relative, with the residual shown to be THE " +
+                 "PROBE rather than the field by coarsening the finite difference and watching it worsen. " +
+                 "*** THE ANALYTIC REFERENCE HAD THE WRONG SIGN AND THE CODE DID NOT: *** the curl error sat " +
+                 "FLAT at 25.1 across four resolutions, exactly twice the amplitude of 4pi, and an error " +
+                 "that does not fall with h is not truncation while one equal to twice the signal is the " +
+                 "signal negated. Four sabotages, MEASURED 7/2/4/3 by name, none zero.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "Vorticity confinement is not a restoration, and the eps that makes the number right is chosen by the number being right",
+    since: "v4440",
+    state: "open",
+    pred: "fx/vorton/vorton.js has claimed since it was written that its method keeps 'the beautiful filamentary wisps A GRID SOLVER SMEARS AWAY'. Both halves of that comparison are in this tree and neither had been measured. The prediction under test is that confinement -- the standard remedy, from Fedkiw, Stam and Jensen 2001, read from the technique in mmacklin/sandbox's smoke demo and NOT vendored -- would turn out to be an energy injection rather than a recovery, and therefore to have no correct parameter.",
+    why: "Every renderer that ships confinement tunes its epsilon by eye. That is usually described as a practical matter. It is worth asking whether there is any criterion at all, and this tree has the furnace habit and both solvers already.",
+    measured: "CONFIRMED, AND SHARPER THAN PREDICTED. Semi-Lagrangian advection retains 45.4% of its enstrophy over sixty steps, monotonically -- that is 'smears away' as a number. Bisected, the eps that returns enstrophy to exactly 100% is 15.546, AT WHICH KINETIC ENERGY IS 109.6% OF INITIAL: a dissipative scheme left with more energy than it started with. There is no ceiling -- eps 40 reaches 286% enstrophy, eps 160 reaches 6837%. So the parameter that makes the vorticity right is chosen by the vorticity being right, which is circular. AND vorton's own claim is checked for the first time: divergence-free to 1.3e-6 relative, with the residual shown to be the PROBE by coarsening the difference.",
+    kill: "fluid/vorticity-selfcheck.mjs. Two things are exact and cannot be satisfied by a lucky constant: the discrete curl converges at SECOND ORDER against analytic Taylor-Green (ratios 3.84, 3.96, 3.99, 4.00 -- a rate, not a value), and the confinement force is perpendicular to its own gradient to 1.4e-17 over 3844 cells. SABOTAGE: flip the sign of du/dy and 7 rows go red, use a one-sided difference and 2 do (only two, and they are the RATE -- a value check would not notice, since one-sided is still roughly right), drop the cross product and 4 do, ignore eps and 3 do -- MEASURED 7/2/4/3 by name, none zero. HONEST SCOPE: no winner is declared between grid and vortons -- they are not the same discretisation of the same problem, so only vorton's OWN claim is checked. Nothing here is 3D or has a free surface. And the round's premise was wrong: I said the tree had no grid smoke solver and no vortex particles, and it has both.",
+    page: "instruments.html",
+  },
+  {
     name: "The symmetric error to assuming absence is assuming presence, and two of three integrators came back clean",
     since: "v4439",
     state: "open",
