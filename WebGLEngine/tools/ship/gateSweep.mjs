@@ -1517,6 +1517,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and wrong here, where a walk goes below it on its FIRST STEP. Four sabotages, MEASURED " +
                  "4/10/5/1 by name, none zero.",
     }),
+    // v4447 -- the sixty-ninth closing. The trial v4436's excess never got, and the innocent explanation is
+    // ruled out rather than assumed.
+    since69: Object.freeze({
+        at: "v4447", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/dielectricWalk-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, 18 checks in five sections. v4436 measured its own rough dielectric " +
+                 "creating TWENTY-EIGHT PER CENT more light than arrived and said plainly it could not say " +
+                 "why: 'WHY the single-scatter BTDF gains where the BRDF loses is NOT DERIVED here, only " +
+                 "measured and localised.' v4446 built the conductor walk and noted it was CONDUCTOR-ONLY. " +
+                 "This extends it to refraction and tries the accusation. VALIDATED TWICE FIRST, as v4446 " +
+                 "insisted: at alpha 0.002 the walk gives R 0.050833 and T 0.949167 against the exact " +
+                 "Fresnel equations' 0.050917 and 0.949083 -- a bounce simulation arriving at a closed form " +
+                 "graded rounds ago -- and R + T is EXACTLY 1.000000 at every roughness with ZERO stuck " +
+                 "paths, which is what makes the split a measurement rather than a normalisation. *** THE " +
+                 "VERDICT IS SHARPER THAN THE ACCUSATION: THE BTDF OVER-COUNTS ITS OWN SINGLE-SCATTER LOBE, " +
+                 "BY A FACTOR OF FOUR. *** At alpha 1, cosO 0.25 Walter's BTDF says T = 1.244351; the " +
+                 "walk's SINGLE-BOUNCE transmission is 0.306750 and its FULL multiple-scattering total is " +
+                 "0.953675. The innocent explanation -- that the excess was absent multiple scattering -- " +
+                 "is RULED OUT, because a missing term cannot make the complete answer smaller. And all " +
+                 "three agree within 0.003 at alpha 0.05, which is what licenses reading them apart where " +
+                 "the physics is hard. A SECOND FINDING ALONG THE WAY: a rougher dielectric transmits MORE " +
+                 "and reflects LESS -- T rises 0.9475 to 0.9791, R falls 0.0509 to 0.0199 -- because light " +
+                 "trapped in the microfacet valleys eventually gets through, which is the opposite of the " +
+                 "conductor's story and is asserted rather than remarked. Four sabotages, MEASURED " +
+                 "6/4/3/0-then-1 by name. THE ZERO: the stuck-path branch was UNREACHABLE, because nothing " +
+                 "gets stuck on any configuration in the file, so counting stuck paths as transmitted cost " +
+                 "nothing -- v4435's unfalsifiable path check in a new file. A bounce cap of one makes " +
+                 "every path stick and the branch has to be right. NO FIX IS OFFERED for the BTDF: the lobe " +
+                 "is convicted and left convicted, which is smaller and more honest than a repair nobody " +
+                 "has validated.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

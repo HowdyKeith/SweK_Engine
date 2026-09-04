@@ -70,6 +70,16 @@
 // optimistic guess is not.
 const CLAIMS = [
   {
+    name: "The BTDF over-counts its own single-scatter lobe, and the innocent explanation is ruled out rather than assumed",
+    since: "v4447",
+    state: "open",
+    pred: "v4436 measured its rough dielectric creating up to 28% more light than arrived and said in writing that it could not say why -- it cleared the reflection lobe against an independently graded module and left the transmission lobe accused without a trial. v4446 built the conductor walk and noted it was conductor-only. The prediction is that extending the walk to refraction would decide between two explanations: a MISSING multiple-scattering term, or an OVER-COUNTED single-scatter one.",
+    why: "An accusation with no trial is what a round leaves behind when it runs out of instrument. Two rounds had named this and neither could settle it.",
+    measured: "OVER-COUNTED, BY A FACTOR OF FOUR. At alpha 1, cosO 0.25 Walter's BTDF says T = 1.244351; the walk's SINGLE-BOUNCE transmission is 0.306750 and its FULL multiple-scattering total is 0.953675. The innocent explanation is ruled out because A MISSING TERM CANNOT MAKE THE COMPLETE ANSWER SMALLER. All three agree within 0.003 at alpha 0.05, which licenses reading them apart at alpha 1. A SECOND FINDING: a rougher dielectric transmits MORE and reflects LESS -- T rises 0.9475 to 0.9791, R falls 0.0509 to 0.0199 -- because light trapped in the valleys eventually gets through, the opposite of the conductor's story.",
+    kill: "physics/render/dielectricWalk-selfcheck.mjs. Sections 1 and 2 validate the walk against the exact Fresnel equations in the smooth limit and against exact termination (R + T = 1 with ZERO stuck paths) before any verdict is drawn. SABOTAGE: never flip the frame when the ray goes inside and 6 rows go red, always reflect and 4 do, use the reflectance where the transmittance belongs and 3 do -- MEASURED 6/4/3/0-then-1 by name. THE ZERO IS RECORDED: the stuck-path branch was UNREACHABLE, since nothing gets stuck on any configuration in the file, so counting stuck paths as transmitted cost nothing -- v4435's unfalsifiable path check in a new file, repaired by a bounce cap that makes every path stick. HONEST SCOPE: same UNIFORM-HEIGHT Smith microsurface as v4446, so this measures the model the tree assumes, not reality. The BTDF is not unusable -- it agrees to 0.003 at alpha 0.05, which is most of what a renderer ships, and the failure is at high roughness AND grazing incidence specifically. AND NO FIX IS OFFERED: the lobe is convicted and left convicted, which is smaller and more honest than a repair nobody has validated.",
+    page: "instruments.html",
+  },
+  {
     name: "The approximation's error changes sign, so no single scale factor repairs it",
     since: "v4446",
     state: "open",
