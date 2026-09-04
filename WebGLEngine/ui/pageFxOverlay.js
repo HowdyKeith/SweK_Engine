@@ -83,12 +83,18 @@ async function openPageFx(img, initial) {
     const state = { vg: null, t: 0, filter: initial || lastFilter(), ry: 0, rx: -0.12, target: { x: 1.1, y: 0 }, rainT: 0, phys: null, physBackend: "cpu", backendName: "cpu" };
     async function build() { const d = src.getContext("2d").getImageData(0, 0, src.width, src.height).data; state.vg = voxelizePage(d, src.width, src.height, { cell: 6 }); state.t = 0; state.phys = null; await FILTERS[state.filter].init(state.vg, state); refreshBar(); }
     function mkBtn(txt, on, hot) { const b = document.createElement("button"); b.textContent = txt; b.style.cssText = "background:rgba(10,16,28,.85);color:" + (hot || "#59d1ff") + ";border:1px solid #1c2942;border-radius:8px;padding:9px 13px;font:600 12px ui-monospace,monospace;letter-spacing:.04em;cursor:pointer;"; b.onclick = on; return b; }
+    // v4435 -- *** THE REC BUTTON ARMED A 20,200 ms TIMEOUT AND closePageFx CLEARED NONE OF THEM. ***
+    // Measured: click Rec, close the overlay, and the timer is still armed -- 0 of 1 cleared. When it fired
+    // it called refreshBar() against a DETACHED bar, silently -- no throw, so nothing would ever have shown
+    // it -- rebuilding buttons on a dead node, and holding this whole closure (state, cv, bar, the voxel
+    // grid) alive for twenty seconds after the overlay was gone. Same family as v4434's leaked listener:
+    // registered with no handle to cancel it by.
     let engineBtn = null, recBtn = null, recording = false;
     function refreshBar() {
         bar.innerHTML = "";
         for (const k of Object.keys(FILTERS)) { const active = k === state.filter; const b = mkBtn(FILTERS[k].label, async () => { state.filter = k; saveFilter(k); await build(); }, active ? "#f6a623" : "#59d1ff"); try { const th = thumbnailFor(k); b.style.backgroundImage = "url(" + th + ")"; b.style.backgroundSize = "22px"; b.style.backgroundRepeat = "no-repeat"; b.style.backgroundPosition = "7px center"; b.style.paddingLeft = "34px"; } catch (e) {} if (active) b.style.borderColor = "#f6a623"; bar.appendChild(b); }
         if (state.filter === "shatter") { engineBtn = mkBtn("engine: " + state.physBackend, async () => { state.physBackend = state.physBackend === "cpu" ? "box3d" : state.physBackend === "box3d" ? "jolt" : "cpu"; await build(); }); bar.appendChild(engineBtn); }
-        recBtn = mkBtn(recording ? "\u25A0 rec" : "\u25CF Rec", () => { if (!window.swekRecord) { recBtn.textContent = "no rec"; return; } if (recording) { window.swekRecord.stop(); recording = false; refreshBar(); } else if (window.swekRecord.start(20, cv)) { recording = true; refreshBar(); setTimeout(() => { recording = false; refreshBar(); }, 20200); } }, recording ? "#ff6a6a" : "#9be15d"); bar.appendChild(recBtn);
+        recBtn = mkBtn(recording ? "\u25A0 rec" : "\u25CF Rec", () => { if (!window.swekRecord) { recBtn.textContent = "no rec"; return; } if (recording) { window.swekRecord.stop(); recording = false; refreshBar(); } else if (window.swekRecord.start(20, cv)) { recording = true; refreshBar(); host._recTimer = setTimeout(() => { if (!host) return; recording = false; refreshBar(); }, 20200); } }, recording ? "#ff6a6a" : "#9be15d"); bar.appendChild(recBtn);
         bar.appendChild(mkBtn("Replay", () => build()));
         bar.appendChild(mkBtn("\u2715 Close", closePageFx, "#f6a623"));
     }
@@ -107,7 +113,7 @@ async function openPageFx(img, initial) {
     host._raf = 1; let last = performance.now();
     (function loop() { if (!host) return; host._raf = requestAnimationFrame(loop); const now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now; state.t += dt; try { FILTERS[state.filter].update(state.vg, state.t, dt, state); R.draw(); } catch (e) {} })();
 }
-function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); removeEventListener("resize", host._resize); removeEventListener("pointerup", host._pointerup); host.remove(); host = null; }
+function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); clearTimeout(host._recTimer); removeEventListener("resize", host._resize); removeEventListener("pointerup", host._pointerup); host.remove(); host = null; }
 
 if (typeof window !== "undefined") window.swekPageFx = { open: openPageFx, close: closePageFx, shatterTo: shatterTransition };
 // v4434 -- FILTERS is exported so a gate can DRIVE each entry rather than read the table and hope. It was

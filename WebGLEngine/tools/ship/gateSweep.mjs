@@ -1549,6 +1549,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "is convicted and left convicted, which is smaller and more honest than a repair nobody " +
                  "has validated.",
     }),
+    // v4448 -- NO new gate file: v4434's pageFxOverlay-selfcheck grew from twelve checks to nineteen, to cover
+    // the three paths v4434 named as undriven. Recorded because a sweep entry that only ever counts NEW files
+    // cannot see a gate widening, and widening is what closed this one.
+    since70: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept: a closing accounts for the gates
+        // it ADDED, and this round added none. The gate it widened is recorded beside that, in a field the
+        // accounting does not read -- *** SO THE LEDGER CANNOT SEE A GATE GROW, only a gate appear. *** Said
+        // here rather than forced into the count, because a malformed entry to make a point is worse than
+        // the point.
+        at: "v4448", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/pageFxOverlay-selfcheck.mjs (12 checks -> 19)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, jsdom with a clock the test owns. v4434 shipped the overlay's first gate " +
+                 "and named three paths it did not drive: shatterTransition, the WebGL renderer path and the " +
+                 "recorder button. Driven now: THE RECORDER BUTTON LEAKED A 20,200 ms TIMEOUT -- click Rec, " +
+                 "close the overlay, and 0 of 1 timers were cleared. It fired refreshBar() against a DETACHED " +
+                 "bar with NO THROW, rebuilding the toolbar on a dead node and holding state, cv, bar and the " +
+                 "voxel grid alive for twenty seconds after the overlay was gone. Same family as v4434's " +
+                 "listener: registered with no handle to cancel it by. closePageFx clears every armed timer " +
+                 "now and the callback refuses to touch a torn-down overlay. THE OTHER TWO ARE NEGATIVE " +
+                 "RESULTS: shatterTransition removes its own canvas in 136 frames (2.1 s at 16 ms), two " +
+                 "overlapping transitions both finish and both clean up, and an onDone that throws neither " +
+                 "escapes nor strands a canvas -- it has no cancel handle, which is a fact about the design " +
+                 "and not a leak. initVoxelGL is asked FIRST and returns null on a missing webgl2 context, so " +
+                 "the 2D renderer is a genuine fallback rather than the default. AND THE FIRST READING OF " +
+                 "shatterTransition SAID THE CANVAS IS NEVER REMOVED, which was the harness: its loop takes " +
+                 "dt from performance.now(), so rAF driven synchronously leaves dt ~ 0 and the 2.1 s cutoff " +
+                 "is unreachable. A negative result is worth nothing until the instrument can move. ONE " +
+                 "SABOTAGE READ ZERO RED and it repeated the bug inside the check for the bug: the guard " +
+                 "check fired the timers and passed if none THREW -- but running against a detached bar " +
+                 "throws nothing, which is exactly why the leak was invisible. It measures MUTATION now. " +
+                 "WHAT IS STILL NOT CLAIMED: that GL resources are released; nothing in voxelRender.js " +
+                 "disposes anything, and this harness has no GL and cannot measure context lifetime, so that " +
+                 "is recorded as a fact about the file rather than asserted as a leak. Twenty sabotages, all " +
+                 "RED by name, three files md5-identical.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

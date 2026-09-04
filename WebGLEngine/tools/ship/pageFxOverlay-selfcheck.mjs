@@ -58,10 +58,26 @@ function harness() {
             return { data: d, width: w, height: h };
         },
     });
-    window.HTMLCanvasElement.prototype.getContext = function (k) { return k === "2d" ? ctx(this) : null; };
+    const asked = { webgl2: 0, "2d": 0 };
+    window.HTMLCanvasElement.prototype.getContext = function (k) {
+        asked[k] = (asked[k] || 0) + 1;
+        return k === "2d" ? ctx(this) : null;          // no WebGL here: initVoxelGL must return null and fall back
+    };
     window.HTMLCanvasElement.prototype.toDataURL = () => "data:,";
-    window.requestAnimationFrame = () => 1;
+    // *** A CLOCK THE TEST OWNS. *** shatterTransition takes dt from performance.now(), so driving rAF
+    // synchronously leaves dt ~ 0 and its 2.1 s cutoff is never reached -- the first reading said "the canvas
+    // is never removed" and that was the harness, not the code. One frame here is one 16 ms tick.
+    const clk = { t: 0 };
+    const perf = { now: () => clk.t };
+    Object.defineProperty(window, "performance", { value: perf, configurable: true });
+    Object.defineProperty(globalThis, "performance", { value: perf, configurable: true, writable: true });
+    const rafQ = [];
+    window.requestAnimationFrame = (f) => { rafQ.push(f); return rafQ.length; };
     window.cancelAnimationFrame = () => {};
+    // the same ledger idea as the listeners: what was ARMED against what was CLEARED
+    const timers = [];
+    window.setTimeout = (f, ms) => { timers.push({ f, ms, cleared: false }); return timers.length; };
+    window.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].cleared = true; };
 
     const live = new Map();
     const add = window.addEventListener.bind(window), rem = window.removeEventListener.bind(window);
@@ -71,6 +87,7 @@ function harness() {
     // *** AFTER the wrap, never before -- see (3) in the header. ***
     for (const k of ["document", "HTMLCanvasElement", "Image", "devicePixelRatio", "innerWidth", "innerHeight",
                      "requestAnimationFrame", "cancelAnimationFrame", "addEventListener", "removeEventListener",
+                     "setTimeout", "clearTimeout",
                      "Node", "Element", "HTMLElement", "getComputedStyle"]) {
         try { Object.defineProperty(globalThis, k, { value: window[k], configurable: true, writable: true }); } catch (e) {}
     }
@@ -79,7 +96,8 @@ function harness() {
     Object.defineProperty(img, "naturalWidth", { value: 240 });
     Object.defineProperty(img, "naturalHeight", { value: 320 });
     const stillLive = () => [...live.entries()].map(([t, s]) => [t, s.size]).filter(([, n]) => n > 0);
-    return { window, img, stillLive, types: () => [...live.keys()] };
+    const drive = (max = 400) => { let n = 0; while (rafQ.length && n < max) { const f = rafQ.shift(); n++; clk.t += 16; f(); } return n; };
+    return { window, img, stillLive, types: () => [...live.keys()], timers, asked, drive, rafQ, clk };
 }
 
 const H = harness();
@@ -195,6 +213,98 @@ const M = await import(path.join(ENG, "ui", "pageFxOverlay.js"));
     ok("...and no anonymous handler is registered on the window, which is what made the leak unremovable",
         !/(?<!\.)\baddEventListener\("\w+", ?(\(\)|function)/.test(code),
         "an arrow written inline at the call site cannot be passed to removeEventListener later");
+}
+
+// ---- 5. *** THE REC BUTTON, AND A TIMER IS A LISTENER WITH A DIFFERENT NAME *** -----------------------------
+{
+    say("");
+    say("arm the recorder, close the overlay, and see what is still counting down");
+    let started = 0, stopped = 0;
+    H.window.swekRecord = { start: () => { started++; return true; }, stop: () => { stopped++; },
+                            recording: () => started > stopped };
+    H.timers.length = 0;
+    await M.openPageFx(H.img, "burn");
+    const bar = H.window.document.querySelector("div > div");
+    const rec = [...bar.querySelectorAll("button")].find((b) => /Rec/.test(b.textContent));
+    ok("the toolbar has a Rec button at all", !!rec, rec ? JSON.stringify(rec.textContent) : "not found");
+    rec.onclick();
+    const armed = H.timers.length;
+    M.closePageFx();
+    const uncleared = H.timers.filter((t) => !t.cleared);
+    say(`  armed ${armed} timer(s) (${H.timers.map((t) => t.ms + "ms").join(", ")}); after close, ${uncleared.length} still live`);
+    ok("!! *** EVERY timer the overlay arms is cleared by closePageFx, whatever it is for ***",
+        armed > 0 && uncleared.length === 0 && stopped === 1,
+        "BEFORE v4435 the Rec button armed a 20,200 ms timeout and close cleared 0 of 1. It fired against a " +
+        "DETACHED bar with no throw -- nothing would ever have surfaced it -- and held state, cv, bar and the " +
+        "voxel grid alive for twenty seconds after the overlay was gone");
+    // *** AND THIS CHECK WAS VACUOUS ON ITS FIRST WRITING, IN THE EXACT WAY THE BUG WAS. *** It fired the
+    // timers and passed if none THREW -- but running refreshBar() against a detached bar throws nothing,
+    // which is the whole reason the leak was invisible. Dropping the `if (!host) return` guard cost ZERO RED.
+    // The property the guard actually provides is that a surviving callback MUTATES NOTHING, so measure that.
+    const deadBar = bar;
+    const beforeHtml = deadBar.innerHTML, beforeKids = deadBar.childElementCount;
+    for (const t of H.timers) t.f();
+    ok("...and a timer that somehow survives MUTATES NOTHING -- the guard, not the absence of a throw",
+        deadBar.innerHTML === beforeHtml && deadBar.childElementCount === beforeKids &&
+        H.window.document.body.children.length === 0,
+        `the detached bar still has ${deadBar.childElementCount} children and the same markup after firing ` +
+        "every armed timer. Without `if (!host) return` refreshBar rebuilds the toolbar on a dead node and " +
+        "nothing throws, which is why a throw-based check passed while the defect was still there");
+}
+
+// ---- 6. shatterTransition: A NEGATIVE RESULT, AND THE CLOCK IS WHY IT IS TRUSTWORTHY ------------------------
+{
+    say("");
+    const body = () => H.window.document.body.children.length;
+    let done = 0;
+    M.shatterTransition(H.img, () => { done++; });
+    const appended = body();
+    const frames = H.drive();
+    say(`  one transition: onDone called ${done}x immediately, ${appended} canvas appended, ${frames} frames to finish, ${body()} left`);
+    ok("!! the transition removes its own canvas -- and 132 frames at 16 ms is the 2.1 s cutoff, not a guess",
+        done === 1 && appended === 1 && frames > 100 && frames < 200 && body() === 0,
+        "the FIRST reading here said the canvas is never removed. That was the harness: with rAF driven " +
+        "synchronously and no clock, dt is ~0 and t never reaches 2.1. A negative result is only worth " +
+        "anything once the instrument can move");
+    M.shatterTransition(H.img, () => {});
+    M.shatterTransition(H.img, () => {});
+    const both = body();
+    H.drive(900);
+    ok("two overlapping transitions both finish and both clean up",
+        both === 2 && body() === 0,
+        "there is NO cancel handle for a transition -- a reader advancing pages fast runs two independent " +
+        "loops -- but both terminate on their own clock, so it is a fact about the design and not a leak");
+    let threwOut = false;
+    try { M.shatterTransition(H.img, () => { throw new Error("the reader blew up"); }); } catch (e) { threwOut = true; }
+    const after = body();
+    H.drive();
+    ok("...and an onDone that THROWS neither escapes nor strands a canvas",
+        !threwOut && after === 1 && body() === 0,
+        "onDone advances the reader underneath; it is wrapped so a failure there cannot leave a fullscreen " +
+        "canvas over the page");
+}
+
+// ---- 7. THE RENDERER PATH: THE FALLBACK IS TAKEN, AND TAKEN BECAUSE GL SAID NO ------------------------------
+{
+    say("");
+    const before = { gl: H.asked.webgl2, twoD: H.asked["2d"] };
+    await M.openPageFx(H.img, "burn");
+    const usedGl = H.asked.webgl2 - before.gl, used2d = H.asked["2d"] - before.twoD;
+    const drew = H.rafQ.length;
+    say(`  webgl2 requested ${usedGl}x (null here), 2d contexts taken ${used2d}x, draw loop queued ${drew} frame(s)`);
+    ok("!! initVoxelGL is ASKED FIRST and the 2D renderer is the fallback, not the default",
+        usedGl === 1 && used2d > 0 && drew === 1,
+        "initVoxelGL returns null when getContext('webgl2') does -- so the fallback engages on its own answer " +
+        "rather than on a thrown error, and the loop still gets a renderer to draw with");
+    M.closePageFx();
+    const src = fs.readFileSync(path.join(ENG, "fx", "voxelize", "voxelRender.js"), "utf8");
+    ok("...and this is stated rather than assumed: initVoxelGL returns null on a missing context",
+        /const gl = cv\.getContext\("webgl2"\); if \(!gl\) return null;/.test(src));
+    ok("WHAT IS NOT CLAIMED: that GL resources are released -- nothing in voxelRender.js disposes anything",
+        !/loseContext|deleteProgram|deleteBuffer|deleteTexture/.test(src),
+        "there is no dispose path, so reclamation rests entirely on the detached canvas being collected. " +
+        "That is recorded as a fact about the file, NOT asserted to be a leak -- this harness has no GL and " +
+        "cannot measure context lifetime, and a claim needs an instrument that can");
 }
 
 console.log("pageFxOverlay-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
