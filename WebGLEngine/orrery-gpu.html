@@ -73,6 +73,7 @@ import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import { discLadderThresholds } from "./render/lodBudget.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
+import { sphereMesh, litPipelineDesc, litBind, LIGHT_AT_CENTRE } from "./render/litSphere.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
 import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
@@ -101,16 +102,24 @@ let device = null;
 try { device = await requestDevice(cv, {}); } catch (e) { say("requestDevice threw: " + e.message, true); throw e; }
 if (!device || device.backend === "null") { say("neither WebGPU nor WebGL2 is available on this origin -- nothing can be drawn (WebGPU needs https or localhost)", true); throw new Error("no device"); }
 
-// LODs: a finer disc up close, a coarser one far away; the ORDER is derived from the meshes, not typed here.
-// v4377 -- AND THEY ARE DISCS NOW, WHICH THIS COMMENT HAS CLAIMED SINCE THE LINE WAS WRITTEN. quadMesh builds a
-// SQUARE, and the default pipeline's fragment is `return v.color;` with no discard, so the bodies were square:
-// measured at v4376 as 1369 covered pixels against an inscribed disc's 1060, a ratio of 1.2915 against the
-// 4/pi = 1.2732 that pair must give. A body is now rounder and, being inscribed, 0.7743 of its old area.
-const lods = [{ name: "far", mesh: G.discMesh(5, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: G.discMesh(32, [0.62, 0.94, 0.71, 1]) }];
+// LODs: a finer sphere up close, a coarser one far away; the ORDER is derived from the meshes, not typed here.
+// v4377 -- AND THEY WERE DISCS FROM THAT ROUND, WHICH THIS COMMENT HAD CLAIMED SINCE THE LINE WAS WRITTEN. quadMesh
+// builds a SQUARE, and the default pipeline's fragment is `return v.color;` with no discard, so the bodies were
+// square: measured at v4376 as 1369 covered pixels against an inscribed disc's 1060, a ratio of 1.2915 against the
+// 4/pi = 1.2732 that pair must give.
+// v4473 -- AND NOW THEY ARE SPHERES, LIT FROM THE CENTRE. A disc lying in the orbit plane is an ellipse under any
+// tilt and carries no normal, so nothing in the picture said which way was up; render/litSphere.mjs draws an
+// icosphere (80 triangles far, 1280 near) through the LAYOUTS.lit layout with a point light AT THE ORIGIN, where
+// SweK sits, and the centre body itself is EMISSIVE (extra.w = 1) so the sun is not lit from inside. The silhouette
+// is still a disc -- measured at 1.0000 of a 64-gon's coverage by tools/ship/litSphere-selfcheck.mjs -- which is why
+// the DISC ladder's frozen pricing (render/lodRecord.mjs) still prices what the cull switches on; what it does not
+// price is the shading across the rung, and a sphere ladder's own record is the promotion step's (step 9, item 6).
+const lods = [{ name: "far", mesh: sphereMesh(1, [0.55, 0.75, 0.62, 1]) }, { name: "near", mesh: sphereMesh(3, [0.62, 0.94, 0.71, 1]) }];
 const source = makeOrbitSource(device, system);
 // v4318 -- GIT TIME ON THE GPU: every body record carries its market's opening day in extra.z and the cull is handed the
 // sim day; a body not yet vendored on day t is not drawn, not picked, not counted -- decided in the cull, not by the page.
 const bodyExtras = G.defaultExtras(source.count);
+bodyExtras[3] = 1;   // v4473 -- record 0 is the centre (gpuOrbits elementsOf puts it first): emissive, the sun
 // v4377 -- THE THRESHOLD IS DERIVED, NOT TYPED. render/lodBudget.mjs prices the disc ladder out of the frozen
 // record in render/lodRecord.mjs at a stated budget of 64 changed pixels per instance, and a pixel budget is an
 // AREA, so the angular size that meets it depends on the canvas: metric = K / width, K measured at three widths.
@@ -120,7 +129,8 @@ const bodyExtras = G.defaultExtras(source.count);
 // record and ran this page on WebGL2, which is the mismatch this line closes.
 const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
 window.__lodTh = { ...lodTh, used: [lodTh.thresholds[1]] };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
-const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [lodTh.thresholds[1]], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null) });
+const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [lodTh.thresholds[1]], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null),
+                                             layout: G.LAYOUTS.lit, pipeline: litPipelineDesc(), bind: litBind(LIGHT_AT_CENTRE) });   // v4473 -- lit spheres, the light at SweK
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
 
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.

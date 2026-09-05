@@ -61,7 +61,9 @@ const c = shaderCensus(ROOT);
     // DESIGN, because it is a device probe (a texel's bits written out as bytes) and the device's contract is a
     // pair. That is the same reason render/gpuDriven.mjs and render/gpuTerrain.mjs are on this list, and it is
     // not a translation an IR would have saved: the two fragments are eleven lines each. The trigger is still 20.
-    const DUAL_BASELINE = 11;
+    // v4473 -- 11 -> 12: render/litSphere.mjs, the lit sphere pair for the 3D orrery. Same shape as gpuTerrain's light:
+    // one Lambert term spelled twice, eleven lines each, so the twelfth is a module and not an inversion.
+    const DUAL_BASELINE = 12;
     const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
 
     ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",

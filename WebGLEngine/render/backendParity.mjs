@@ -177,8 +177,12 @@ export const PARITY_BASELINE = Object.freeze({
     // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
-    glslBearing: 147,
-    glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
+    // v4473 -- glslBearing 147 -> 148, glslDirective 130 -> 131, wgslBearing 65 -> 66, both 14 -> 15: render/litSphere.mjs,
+    // the 3D orrery's first step -- a sphere mesh with normals and a LIT render pair (a point light in the uniform,
+    // the normal at location 4, an emissive word in the extras) in both languages, so the orrery draws lit spheres on
+    // WebGPU and on WebGL2 alike. Graded against a CPU sphere it never rendered by tools/ship/litSphere-selfcheck.mjs.
+    glslBearing: 148,
+    glslDirective: 131,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 17,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -230,13 +234,13 @@ export const PARITY_BASELINE = Object.freeze({
     // the CPU_TWIN contract gfx/device.js's refusal asks for. Graded by tools/ship/xpbdDevice-selfcheck.mjs.
     // v4469 -- wgslBearing 64 -> 65, wgslOnly 50 -> 51: physics/chaos/logisticWgsl.mjs, the step loop's first consumer
     // (one compute kernel; its WebGL2 twin is orbitCpu, per the CPU_TWIN contract). Graded by tools/ship/stepLoop-selfcheck.mjs.
-    wgslBearing: 65,
-    both: 14,
+    wgslBearing: 66,
+    both: 15,
     glslOnly: 133,
     wgslOnly: 51,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs", "render/litSphere.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

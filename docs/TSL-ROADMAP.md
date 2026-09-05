@@ -457,6 +457,34 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         layouts; compile-only here, arithmetic graded by their own gates); the transport pipeline end to end on a
         device in this sandbox (brain/transport/pipeline.js takes a raw device and builds its own bind groups).
 
+9. **THE 3D ORRERY -- planned at v4472 after a survey of orrery-gpu.html.** The GPU orrery has drawn the system
+   through gfx/device.js with a perspective camera, a tilt slider, GPU-placed orbits, cull and LOD, picking and terrain
+   landing since v4299 -- and reads as flat for four specific reasons, none of them a missing renderer: the bodies
+   are DISCS in the orbit plane with no normal; every orbit is in ONE plane (axis and period are the only elements);
+   the camera is a slider, not an orbit; and the 2D page's moons, flybys and author view are not on the GPU path.
+   Six steps, in the tree's idiom (derived not typed, a CPU twin, a gate on both backends), the 2D page the product
+   until the last of them:
+     1. (task 32) A sphere mesh with normals and a lit pipeline in render/gpuDriven.mjs's LAYOUTS.lit, gated by the
+        analytic sphere. BUILT at v4473: render/litSphere.mjs -- sphereMesh (the icosphere with normals), a lit render
+        pair in both languages with a POINT light in the uniform (the orrery's is at the origin, where SweK sits) and an
+        emissive word in the per-instance extras (the sun is not lit from inside); shadeAt is the fragment stage's
+        arithmetic in JavaScript. tools/ship/litSphere-selfcheck.mjs holds every pixel inside the silhouette to the
+        shade of the ray's first hit on a sphere the GPU never drew, on WebGPU and WebGL2 (mean 0.30/255, worst 1),
+        with the flat pipeline and the emissive word as one-level controls and the silhouette at 1.0000 of a disc's
+        coverage. orrery-gpu.html draws sphereMesh(1) far and sphereMesh(3) near through it; the disc ladder's frozen
+        pricing still prices the silhouette, and a sphere ladder's own record is item 6's. NOT CLAIMED: specular,
+        shadows, a second light.
+     2. (task 33) A third orbital element -- inclination and node -- DERIVED from the vendor data the way distance comes
+        from arrival date and size from bytes; positionAt and orbitWgsl extended together under the gpuOrbits gate;
+        the 2D page's picture unchanged.
+     3. (task 34) An orbit camera: drag to rotate, wheel to dolly, follow a picked body -- pure functions gated headless,
+        the tilt slider kept as the initial pitch.
+     4. (task 35) Importer moons and reached flybys as GPU records through the same cull and ladder, picked by name,
+        held to the 2D page's CPU positions.
+     5. (task 36) Slug labels on the device path (steps 7.3 and 7.5's modules) for picked and near bodies.
+     6. (task 37) Promotion by measurement: the 3D page passes the 2D page's gates plus its own before the panel's
+        link points at it; the 2D page stays as the reference twin.
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

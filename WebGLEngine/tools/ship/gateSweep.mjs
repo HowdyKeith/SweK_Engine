@@ -2097,6 +2097,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "(main.js, brain/transport/scanTwin.mjs and vendored three all say the word); it sits above the quick " +
                  "sweep's budget, which is why no sweep named it.",
     }),
+    // v4473 -- the ninety-fifth closing. The 3D orrery's first step: a sphere, lit, held to arithmetic.
+    since95: Object.freeze({
+        at: "v4473", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/litSphere-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shippedLadder-selfcheck.mjs (section 1 and 4 read the orrery's ladder as spheres through the lit pipeline; the universe stays discs)",
+        ]),
+        verdict: "green on WebGPU and WebGL2 through gfx/device.js, 2.3-2.9 s. render/litSphere.mjs: sphereMesh " +
+                 "(world/spaceStructures.js's icosphere with normals, Euler's 2 at 42, 162 and 642 vertices) packed in the " +
+                 "LAYOUTS.lit layout gpuDriven declared at v4301 and nothing used; a lit render pair in both languages with a " +
+                 "point light in the uniform and an emissive word in the extras; shadeAt as the fragment stage's arithmetic. " +
+                 "The key is a sphere the GPU never drew: for the gate's camera and light, each pixel inside the silhouette " +
+                 "is held to the shade of the ray's first hit -- 316 pixels, mean 0.30/255, worst 1, on both backends, and " +
+                 "25,600 pixels identical between them; the silhouette covers 1.0000 of a 64-gon disc; the flat pipeline and " +
+                 "the emissive word are one-level controls. orrery-gpu.html draws lit spheres with the light at SweK and the " +
+                 "centre body emissive; makeGpuDrivenScene takes `layout` in its one-fleet form. Sabotages red at 4 / 2 / 5, " +
+                 "and C is the point: the picture right and the twin wrong reads red too, which a backend diff cannot say. " +
+                 "Pre-existing and not this round's: tools/ship/gitEconomy-selfcheck.mjs is red on trunk (2 broke of 15 at " +
+                 "the default upkeep; one departure off the best margin), above the quick sweep's budget and in no register.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

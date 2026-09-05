@@ -1403,6 +1403,12 @@ export const INSTRUMENTS = [
         key: "*** STEP 6 SAID FOR 140 ROUNDS THAT A TSL LOOP WANTS A JAVASCRIPT BOUND. IT DOES NOT: LoopNode builds a node `end`. *** The map is chaotic, so a loop that ran a step too many or read a baked bound is an unrelated orbit rather than a rounding -- which is why the claim can be a bit claim.",
     },
     {
+        id: "lit-sphere", area: "method", name: "The 3D orrery's bodies: a sphere with normals, lit from the centre, held to a sphere the GPU never drew",
+        gate: "tools/ship/litSphere-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "render/litSphere.mjs sphereMesh (world/spaceStructures.js's icosphere with normals: 42/162/642 vertices, Euler's 2 at every subdivision) packed in gpuDriven's LAYOUTS.lit; litPipelineDesc drawn through gfx/device.js on WebGPU and WebGL2 with a point light at the eye; every pixel inside the silhouette against shadeAt() on the ray's first hit of the analytic sphere (316 pixels, mean 0.30/255, worst 1 on both backends); the silhouette at 1.0000 of a 64-gon disc's coverage; the flat pipeline and the emissive word as one-level controls; 25,600 pixels identical across the backends.",
+        key: "*** A DISC IN THE ORBIT PLANE IS AN ELLIPSE UNDER ANY TILT AND CARRIES NO NORMAL; A SPHERE LIT FROM WHERE SWEK SITS SAYS WHICH WAY IS UP. *** The key is arithmetic, not the other backend: sabotage C left the picture right and the twin wrong and the gate went red either way, which a backend-to-backend diff cannot do.",
+    },
+    {
         id: "brain-kernels", area: "method", name: "The GPU Brain's kernels exported, in the corpus, and graded where every other GPU gate runs",
         gate: "tools/ship/brainKernels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "brain/mlp.js renders one body in two binding layouts (the brain's and the harnesses') and exports both with a probe manifest; the probe layout on Dawn returns render/brainTsl.mjs's f32 twin bit for bit (128 of 128, a 2-D dispatch); the shipped layout bound by the brain's own names through gfx/device.js returns the same bytes on the browser's WebGPU; brain/flowfield.js exports its four-entry module and it compiles on Dawn; tools/ship/brainTsl-page.js imports the kernel instead of regexing the module's source; brain/gpu.js's initGPU refuses a SwiftShader adapter by default and accepts it under allowSoftware or SWEK_ALLOW_SOFTWARE_GPU, reporting `software`, exercised on a stubbed adapter both ways.",

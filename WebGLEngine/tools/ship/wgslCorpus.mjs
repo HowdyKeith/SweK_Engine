@@ -54,6 +54,7 @@ import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL } from "../../render/gpuTerrain.mjs";
+import { LIT_WGSL } from "../../render/litSphere.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
@@ -239,6 +240,9 @@ export function corpus() {
         { id: "gpuDriven.PICK_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
           why: "a flat-interpolated identity output and u32 bit slicing in the vertex stage -- the pick picture's encoding",
           opts: { code: GD.PICK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "litSphere.LIT_WGSL", from: "render/litSphere.mjs", compileOnly: true,
+          why: "v4473 -- the lit render pair over LAYOUTS.lit (a normal at location 4, the extras at 5, a point light in the uniform); its picture is graded against the CPU sphere by tools/ship/litSphere-selfcheck.mjs on both backends, and here both must compile it",
+          opts: { code: LIT_WGSL, compileOnly: true, outCount: 0 } },
         // v4301 (Level 15) -- the fleet looks: vertex/fragment pairs, compile-only here (fleets-selfcheck draws them).
         { id: "fleets.LIT_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "a lambert hull over a per-vertex normal at location 4 -- the first fleet with a normal", opts: { code: FL.LIT_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.SPRITE_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "textureLoad by uv in the fragment stage with discard -- a sprite's shape from its alpha", opts: { code: FL.SPRITE_WGSL, compileOnly: true, outCount: 0 } },
