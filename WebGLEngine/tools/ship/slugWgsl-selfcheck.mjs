@@ -41,6 +41,15 @@
 // stream, and it is measured here rather than argued: the ortho case is asserted exact and the perspective
 // residual is asserted against the closed form and printed.
 //
+// SABOTAGE LOG (v4457), each applied to the probe text by replacement and asserted to have applied, measured on
+// the device against 22,045 sharp samples of the constructed font unless said otherwise:
+//     root code `i1 & ~2u` -> `i1 & 2u`                         12,148 wrong   red
+//     SolveHorizPoly's a == 0 branch removed                      2,205 wrong   red
+//     vertical loop's early-out on .x instead of .y               1,462 wrong   red
+//     probe compiled for width 256 over a width-128 Plex atlas    9,477 of 27,957 wrong   red
+//     THE SAME WIDTH PLANT OVER SIX SMALL GLYPHS AT WIDTH 64      0 of 10,016 wrong   NOT RED -- unreachable,
+//         because nothing wrapped; the section was rebuilt over the Plex alphabet, where 432 of 965 headers do.
+//
 // Run: node tools/ship/slugWgsl-selfcheck.mjs
 "use strict";
 
