@@ -2413,6 +2413,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "never asserted -- including my own power-of-two predicate, which Math.log2 made wrong at 252 " +
                  "of 2002 cells and which a hand-written list of literals would have passed",
     }),
+
+    // *** v4477 -- THE FOURTH ORDINAL COLLISION ON THIS PAIR OF BRANCHES, AND MAIN SAW IT COMING. ***
+    // The closing below arrived from main as `since80`, which this branch has held for v4424 since then. Main's
+    // own verdict text says it was built as v4451, lost that number to a concurrent session, and moved its
+    // ledger ordinal forward past ten concurrent closings -- and it STILL landed on one this branch was using.
+    // Moving forward by a guess is not a fix for a shared counter; it buys a round. Renumbered to since115, the
+    // next free seat here, with main's round note untouched: what moves is the seat, never the record.
+
+    // v4462 -- the eightieth closing on main, the HUNDRED AND FIFTEENTH here. #129's premise measured, and inverted.
+    since115: Object.freeze({
+        at: "v4462", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/runtimeGap-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, twelve checks in four sections. *** THE NUMBER COLLIDED: *** this round was built as v4451 and a concurrent session shipped a different v4451 to main first, so it ships as v4462 with its ledger ordinal moved forward past ten concurrent closings -- the same collision this file's own ordinals are checked for.  #129 asks what is missing besides threads " +
+                 "if the VBA transmitter were the runtime instead of Node/Bun. MEASURED OVER 3,814 " +
+                 "COMMENT-STRIPPED RUNTIME SOURCE FILES, THE QUESTION HAS ITS SCALE INVERTED: threads are 22 " +
+                 "files, 0.6%, RANK 11 OF 12 -- the second-smallest gap -- while ES modules are 3,523 and " +
+                 "first-class functions 3,404, which is 155 TIMES MORE OF THIS TREE THAN THREADS. And the gap " +
+                 "is inverted the other way too: a network stack and a GPU renderer are what anyone would " +
+                 "guess is hardest outside a browser, and they are the two the VBA side already has. THREE " +
+                 "EVIDENCE CLASSES ARE HELD APART BY A CHECK RATHER THAN A HEADING -- measured / language / " +
+                 "archive -- because the failure mode of a capability table is one where 'VBA has no closures' " +
+                 "and 'the transmitter's HTTP server works' look equally established. *** THE SABOTAGE PASS " +
+                 "FOUND THE HOLE THAT MATTERED: *** flipping `closures as values` to has:true -- crediting VBA " +
+                 "with the single capability the whole finding is about -- WAS A SILENT PASS, because the " +
+                 "check only asked whether a row declared an evidence CLASS, and a flipped row keeps the class " +
+                 "it had. A label is not a check. Every has:true row now names a `via` corroborator that must " +
+                 "be FOUND: a token in this tree's own .bas files, or a marker vba/archiveManifest.mjs really " +
+                 "holds. *** POINTING THE ROWS AT BYTES IMMEDIATELY CORRECTED TWO OF THEM: *** performance.now " +
+                 "claimed QueryPerformanceCounter, which appears in NO VBA in this tree (it is kernel32 " +
+                 "GetTickCount, ~15.6 ms, a whole frame at 60fps); and fetch/XHR was filed as an ARCHIVE claim " +
+                 "when modGPUBrain.bas drives WinHttp.WinHttpRequest.5.1 right here, so ONLY WebGL STILL RESTS " +
+                 "ON THE ARCHIVE -- there is no GL of any kind in the in-tree VBA. *** AND THE INSTRUMENT IS A " +
+                 "MAXIMAL FALSE POSITIVE FOR ITSELF: *** runtimeGap.mjs holds the PATTERNS table, so every " +
+                 "regex's literal text is in it, and a regex source is a string, which is prose the comment " +
+                 "strip cannot reach -- this round's two files match ALL TWELVE of their own patterns. Derived " +
+                 "by recounting with them excluded, not argued: threads 21 against WebAssembly 20 without " +
+                 "them, tied at 22 with them, so the rank-11 tie is my own note strings and is said rather " +
+                 "than hidden. Two more frozen numbers were wrong and unchecked (languageRowsAbsent read 8 " +
+                 "against nine rows; only 3 of 12 census rows were compared at all) -- all twelve are compared " +
+                 "now. Thirteen sabotages, ALL RED BY NAME, both files md5-identical. WHAT IS NOT CLAIMED: " +
+                 "that any of this RUNS. No Excel has ever run against SweK_VBA_v3499 from this box, the pages " +
+                 "still say so, and no VBA row is tagged `measured`.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
