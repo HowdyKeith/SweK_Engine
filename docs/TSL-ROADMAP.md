@@ -416,6 +416,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
      6. Vendor OFL fonts under vendor/fonts/<family>/, static glyf instances only (the parser refuses CFF and
         ttcf by name and reads no fvar), one OFL copy per family with its Reserved Font Name, and one
         vendoredLicences.mjs entry each, because that gate requires disk and list to agree exactly.
+        BUILT at v4486 (task 6), three families: vendor/fonts/cinzel (Cinzel Regular, RFN "Cinzel Decorative"),
+        vendor/fonts/jetbrains-mono (JetBrains Mono Regular, no RFN), vendor/fonts/source-sans-3 (Source Sans 3
+        Regular, RFN "Source", the TTF build) -- each a static glyf instance with its <Family>-OFL.txt beside it,
+        under the naming world/orrery.mjs's licence matcher recognises. The registry is text/fontRegistry.mjs, not
+        vendoredLicences.mjs: that gate reads the top level of vendor/ only, so vendor/fonts stays one entry under
+        the Plex grant and the per-family grants, sources, fetch dates, digests and expectations live with the
+        per-family facts. tools/ship/vendoredFonts-selfcheck.mjs holds disk and registry to each other both ways,
+        parses every file with slugFont (glyf, not CFF), refuses a VARIABLE font by its fvar (shown on the real
+        Orbitron[wght].ttf), holds each file's sha256, glyph count, unitsPerEm, kerning source and one measured pair,
+        and each licence to OFL-1.1 by world/licenceBodies.mjs's own identifier with its Reserved Font Name present.
+        MEASURED: Plex A/V -50, Cinzel -105, Source Sans 3 -14 (all GPOS), JetBrains Mono 0 -- a monospaced GPOS with
+        no pair kerning under its default script, which the layout reports as none rather than GPOS. NOT VENDORED:
+        Inter and Orbitron, the plan's minimal and sci-fi faces, reach this box only as variable builds (the static
+        instances live in release archives on a host the proxy refuses), and a variable font is refused by name;
+        Source Sans 3 stands in for the minimal sans. NOT CLAIMED: the three new faces' pictures (parsed and laid
+        out, not rasterised -- task 7's packer and task 9's rig page draw them).
      7. Pre-pack atlases at ship time with a hash gate, after MEASURING parse+pack time; the worker is not worth
         its message-passing unless that number is over a frame.
      8. Word wrap (maxWidth) in layoutText, pure and gated headless -- the one layout feature genuinely missing.

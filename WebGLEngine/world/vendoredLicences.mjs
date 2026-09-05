@@ -57,6 +57,9 @@ export const VENDORED = Object.freeze([
       upstream: "https://github.com/erincatto/box3d", pin: "v0.1.0 / 8441b4a06d6d09dcfb0b0f704df4d847d1437b92",
       note: "papered at v4256 alongside the vendored headers. PROVENANCE.md records the commit." },
     { path: "vendor/draco",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    // v4486 -- vendor/fonts holds FOUR families now (Plex flat, cinzel/, jetbrains-mono/, source-sans-3/), each with its own
+    // <Family>-OFL.txt beside it; this entry papers the directory under the Plex grant as before, and the per-family grants,
+    // Reserved Font Names, sources and digests are text/fontRegistry.mjs, held by tools/ship/vendoredFonts-selfcheck.mjs.
     { path: "vendor/fonts",     kind: KIND.THIRD_PARTY, spdx: "OFL-1.1",   grant: GRANT.NAMED_OTHER,  file: "IBMPlexSerif-OFL.txt",
       note: "*** THE ONE A FILENAME CENSUS CALLS UNPAPERED AND IS WRONG ABOUT. *** IBM Plex Serif, SIL Open " +
             "Font License 1.1, Copyright 2017 IBM Corp with Reserved Font Name Plex. A font licence is also " +

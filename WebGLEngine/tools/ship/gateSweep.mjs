@@ -2353,6 +2353,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the first triangle under a pixel where the device keeps the last drawn; kerned A and V overlap, and it read the " +
                  "wrong glyph's texcoord by 0.636 em on both backends until the walk was reversed. Sabotages red at 5 / 2 / 1 / 1.",
     }),
+    since108: Object.freeze({
+        at: "v4486", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/vendoredFonts-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. Three OFL families vendored as static glyf instances under vendor/fonts/<family>/ with their own " +
+                 "<Family>-OFL.txt (Cinzel, JetBrains Mono, Source Sans 3), registered in text/fontRegistry.mjs with source, fetch " +
+                 "date, sha256, Reserved Font Name and what slugFont reads; the gate holds disk and registry to each other both " +
+                 "ways, every file to glyf and static (a variable font refused by its fvar, shown on the real Orbitron[wght].ttf), " +
+                 "every digest, glyph count, kerning source and one pair, every licence to OFL-1.1 by the tree's own identifier. " +
+                 "Inter and Orbitron not vendored: variable-only on every host this box reaches. JetBrains Mono kerns by zero and " +
+                 "says so (a monospaced GPOS with no pair kerning). Sabotages red at 1 / 1 / 1 / 2.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
