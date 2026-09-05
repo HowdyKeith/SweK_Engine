@@ -25,6 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
+import { overNonEmpty } from "../ship/vacuity.mjs";
 import { kuramotoDevice } from "./kuramotoBind.mjs";
 import { COMPOSE_KNOB_CHOICES } from "./composeBind.mjs";
 import { BASES } from "../../physics/crystal/structureFactor.mjs";
@@ -948,8 +949,10 @@ console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
         notReached.length > 0 && devicesAsked === DEVICE_NAMES.length && elapsed < 120000,
         `${notReached.length} of ${devicesAsked} devices left unreached in ${elapsed} ms. Without it the front ` +
         "door attempts all 129 and takes 989.8 s.");
+    // v4459 -- the `rows.length > 0` above was bolted on after this check passed on an EMPTY census; the
+    // helper says the same thing where a reader will see it, and names the failure it is guarding against.
     ok("!! *** AND NOT REACHED IS NOT DEAD: no knob of an unreached device is called still ***",
-        rows.length > 0 && notReached.length > 0 &&
+        rows.length > 0 && overNonEmpty(notReached, () => true) &&
         stillKnobs(rows).every((k) => !notReached.some((d) => k.startsWith(d + "."))),
         "a device the census never entered contributes no rows, so it cannot be counted dead -- asserted " +
         "rather than assumed, because this file has twice reported a verdict that was an artefact of the " +

@@ -45,6 +45,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateComposition } from "./composeValidate.mjs";
+import { overNonEmpty } from "./vacuity.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          CALL_COST_V4458 as COST, NO_GATE_V4458 as NOGATE } from "./reportDoors.mjs";
 
@@ -203,10 +204,11 @@ console.log("\n5. the cost, which is the reason this convention was never checke
     // hangs by hanging would take the suite down instead of reporting. So the list is checked as a
     // DECLARATION: non-empty, every entry a real member, every entry the kind of thing this gate would
     // otherwise call, and no entry in the set anything actually called.
+    // v4459 -- overNonEmpty rather than `length > 0 && every(...)`: this is the guard whose sabotage went 0 RED,
+    // and the helper exists so the empty case cannot be forgotten the next time somebody edits this line.
     ok("!! the never-call list is non-empty, real, and absent from everything this gate called",
-       NEVER_CALL.length > 0 &&
-       NEVER_CALL.every((r) => rows.some((x) => x.rel === r && x.kind === "self-report")) &&
-       NEVER_CALL.every((r) => !CALLED.includes(r)),
+       overNonEmpty(NEVER_CALL, (r) => rows.some((x) => x.rel === r && x.kind === "self-report")) &&
+       overNonEmpty(NEVER_CALL, (r) => !CALLED.includes(r)),
        `${NEVER_CALL.length} entry: ${NEVER_CALL.join(", ")}, a zero-arity self-report that every walker of ` +
        `this convention will call, absent from all ${CALLED.length} modules this gate called. A call site that ` +
        "forgets the list fails here rather than hanging the suite.");
