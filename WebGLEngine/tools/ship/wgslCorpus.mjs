@@ -61,6 +61,8 @@ import * as XP from "../../physics/xpbd/xpbdWgsl.mjs";
 // v4466 -- the two physics kernels whose gates said "no GPU here": the HMC leapfrog (probe layout) and the MPM module
 import { WGSL_HMC_PROBE, probeUniforms as hmcProbeUniforms, makeBatch as hmcBatch } from "../roundhouse/hmcGpu.mjs";
 import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
+// v4469 -- the step loop's first consumer
+import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
@@ -335,6 +337,10 @@ export function corpus() {
         { id: "gpuKernel.MPM_WGSL", from: "physics/mpm/gpuKernel.mjs", compileOnly: true,
           why: "the 2D MPM loop: four entry points over five shared buffers, two of them atomic -- outside the one-buffer signature, driven by tools/ship/mpmDevice-selfcheck.mjs through the device; compiled on both here",
           opts: { code: MPM_WGSL, entryPoint: "p2g", compileOnly: true, outCount: 0 } },
+        // v4469 -- one step of the logistic map, the kernel render/stepLoop.mjs ping-pongs: src at 2, r at 3, dst out
+        { id: "logisticWgsl.logisticStepWgsl", from: "physics/chaos/logisticWgsl.mjs",
+          why: "x <- r x (1 - x) per element -- two multiplies and a subtract, and chaotic, so a one-ulp disagreement between backends is an unrelated orbit in the step loop that runs it 200 times",
+          opts: (() => { const F = LG.fixture(); return { code: LG.logisticStepWgsl(), outCount: F.count, uniforms: LG.packKnobs({ count: F.count }), workgroups: Math.ceil(F.count / 64), inputs: [{ binding: 2, data: F.x }, { binding: 3, data: F.r }] }; })() },
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },
@@ -420,7 +426,7 @@ export const EXCLUDED = Object.freeze([
  * *** THIS FILE MUST NOT COUNT ITSELF, *** which is the trap the tree has hit repeatedly: a file that grades a
  * marker and contains the marker grades its own prose. The scan skips this module and the gate that drives it.
  */
-export function census({ roots = ["render", "physics/render", "physics/xpbd", "shaders", "text"] } = {}) {
+export function census({ roots = ["render", "physics/render", "physics/xpbd", "physics/chaos", "shaders", "text"] } = {}) {
     const SELF = ["wgslCorpus.mjs", "crossBackend-selfcheck.mjs"];
     const found = [];
     const walk = (dir) => {

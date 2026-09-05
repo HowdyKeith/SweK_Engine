@@ -412,6 +412,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         four graded by the gate they name (a chaotic map, a silhouette, a tangency, the MPM device path). NOT
         CLAIMED: the keys' values (each module's gate), the browser path (crossBackend and deviceCompute).
      5. (task 28) A gated step-loop helper on the device, so samplers and solvers stop hand-rolling ping-pong buffers.
+        BUILT at v4469: render/stepLoop.mjs -- one state, two storage buffers, the kernel's own `src` and `dst`
+        names bound alternately, N dispatches in one frame, one readback through the device, and a `perStep`
+        uniform that turns each step into its own frame because a buffer written N times before one submit
+        shows every step its last value. First consumer physics/chaos/logisticWgsl.mjs, chosen because the map
+        is chaotic and every ping-pong mistake becomes an unrelated orbit: MEASURED by
+        tools/ship/stepLoop-selfcheck.mjs, 1,024 orbits over 200 steps bit-identical to the f32 twin on the
+        browser's WebGPU, odd and even step counts, two runs the same bits, and a schedule touching one step
+        matched bit for bit against a control that a last-value-only uniform would have produced. The kernel is
+        in the corpus and carries a manifest. NOT CLAIMED: several state buffers or kernels per step (the cloth
+        loop keeps its own runner), a staging ring per step (the flowfield's shape), the brain's Deno device.
      6. (task 29) The brain's kernels exported as text and in the corpus; brain/gpu.js accepting a software adapter
         under a flag so the shipped kernels can be graded where every other GPU gate runs.
      7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper.

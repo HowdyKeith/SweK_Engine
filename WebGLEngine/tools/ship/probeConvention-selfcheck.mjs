@@ -48,6 +48,7 @@ export const PHYSICS_KERNEL_MODULES = Object.freeze([
     "render/lyapunovWgsl.mjs", "render/heidlerWgsl.mjs", "render/blackbodyWgsl.mjs",
     "physics/render/pathTracerWgsl.mjs", "physics/render/pathTracerGpu.mjs", "physics/render/rtPipeline.mjs",
     "physics/mpm/gpuKernel.mjs", "physics/xpbd/xpbdWgsl.mjs", "tools/roundhouse/hmcGpu.mjs",
+    "physics/chaos/logisticWgsl.mjs",   // v4469 -- the step loop's first consumer
 ]);
 const val = (v, args) => (typeof v === "function" ? v(args) : v);
 

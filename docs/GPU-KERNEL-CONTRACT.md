@@ -60,5 +60,8 @@ render/lyapunovWgsl.mjs. Read it before writing a kernel module; every rule belo
 
 ## Not yet
 
-An iterative kernel (a sampler, a solver) still hand-rolls its ping-pong buffers; the step-loop helper is
-task 28. A TSL-generated kernel cannot take its loop bound from a buffer; that is task 30.
+An iterative kernel with ONE state buffer and one kernel per step runs through render/stepLoop.mjs (v4469:
+`makeStepLoop(device, { code, state, names: [read, write], buffers, workgroups, perStep })`, see
+physics/chaos/logisticWgsl.mjs for the consumer shape). Several state buffers or kernels per step (the cloth
+loop) still keep their own runner. A TSL-generated kernel cannot take its loop bound from a buffer; that is
+task 30.

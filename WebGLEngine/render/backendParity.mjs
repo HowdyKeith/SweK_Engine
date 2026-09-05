@@ -228,10 +228,12 @@ export const PARITY_BASELINE = Object.freeze({
     // physics/ that runs through gfx/device.js -- the cloth's predict, solve and finalize passes as WGSL compute.
     // WGSL-only by nature: WebGL2 has no compute stage, and the handle runs the shipped f64 solver there, which is
     // the CPU_TWIN contract gfx/device.js's refusal asks for. Graded by tools/ship/xpbdDevice-selfcheck.mjs.
-    wgslBearing: 64,
+    // v4469 -- wgslBearing 64 -> 65, wgslOnly 50 -> 51: physics/chaos/logisticWgsl.mjs, the step loop's first consumer
+    // (one compute kernel; its WebGL2 twin is orbitCpu, per the CPU_TWIN contract). Graded by tools/ship/stepLoop-selfcheck.mjs.
+    wgslBearing: 65,
     both: 14,
     glslOnly: 133,
-    wgslOnly: 50,
+    wgslOnly: 51,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs"]),

@@ -2020,6 +2020,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "gate they name. Sabotages red at 1 / 1 / 1: an entry deleted, a tolerance tightened past the floor, " +
                  "a twin rendered wrong.",
     }),
+    since91: Object.freeze({
+        at: "v4469", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/stepLoop-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on the browser's WebGPU through the device. render/stepLoop.mjs is the ping-pong once: one state, two " +
+                 "buffers bound alternately under the kernel's own names, N dispatches in one frame, one readback, and a " +
+                 "per-step uniform that makes each step its own frame because a buffer written N times before one submit " +
+                 "shows every step the last value. First consumer physics/chaos/logisticWgsl.mjs, chosen because the map " +
+                 "is chaotic and a ping-pong mistake is an unrelated orbit: 1,024 orbits over 200 steps bit-identical to the " +
+                 "f32 twin, odd and even step counts, two runs, and a schedule touching step 197 only matched bit for bit " +
+                 "against the control a last-value-only uniform gives. The kernel is in the corpus (identical across " +
+                 "backends and through the device) and carries a manifest. Sabotages red at 5 / 3 / 7, and B is the bug " +
+                 "the helper exists to know about.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "step-loop", area: "method", name: "The step loop on the device: one state, two buffers, N dispatches, one readback",
+        gate: "tools/ship/stepLoop-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "render/stepLoop.mjs through its first consumer, the logistic map (physics/chaos/logisticWgsl.mjs): 1,024 orbits over 200 steps on the browser's WebGPU bit-identical to the f32 twin, one, two and three steps (the holder alternates), two runs the same bits, a schedule that halves r on step 197 only matched bit for bit -- the semantics 'each step sees its own uniform', which a uniform written N times before one submit cannot give -- and on the null backend the alternating binds, one dispatch per step, one write per step under a schedule, refusals by name.",
+        key: "*** A PING-PONG MISTAKE ON A SMOOTH KERNEL IS A SMALL NUMBER; ON THE LOGISTIC MAP AT r NEAR 4 IT IS AN UNRELATED ORBIT WITHIN A FEW DOZEN STEPS. *** So every claim is a bit claim. The one thing the helper knows that a first draft does not: a per-step uniform means one frame per step.",
+    },
+    {
         id: "probe-convention", area: "method", name: "The probe convention lab-wide: every physics kernel's manifest run against its twin",
         gate: "tools/ship/probeConvention-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "docs/GPU-KERNEL-CONTRACT.md exists and names the template; nine physics kernel modules export PROBES (id, code, pack, cpu, key, tol | rel | graded, device); every runnable physics corpus entry has a manifest entry and every manifest id is a corpus id; all thirteen entries run on the headless Dawn device and the nine with a tolerance meet it (the furnace, the SBT pipeline and the three cloth passes at 0; HMC at its earned 5e-5; Heidler 1e-5; Planck 1e-5 relative; the LCG at the f32 neighbour gap), the four graded elsewhere returning finite numbers.",
