@@ -2072,6 +2072,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "7 / 14 / 14, and A is the finding: a baked bound leaves the storage variant's buffer unread, three emits " +
                  "no buffer the body does not touch, and the transplant refuses the graph by name.",
     }),
+    // v4472 -- the ninety-fourth closing. The census widened, and the first thing it found had never compiled.
+    since94: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
+        at: "v4472", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/crossBackend-selfcheck.mjs (physics/mpm, tools/roundhouse and brain/ asserted by what they find; .wgsl files as candidates; a tree-wide walk for strays)",
+            "tools/ship/wgslSpec-selfcheck.mjs (a reserved word declared as a name is refused, with the twin's name as the control)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on Dawn and the browser's WebGPU. tools/ship/wgslCorpus.mjs census() walks physics/mpm, " +
+                 "tools/roundhouse and brain/ and lists every .wgsl FILE under its roots as a candidate keyed by path; " +
+                 "81 candidates, 70 in the corpus, 27 excluded, none unaccounted. The nineteen new ones were adjudicated " +
+                 "by name: nine compile-only corpus entries (the HMC bench layout, Ising, the magnification map's base and " +
+                 "shipped variant, eight transport passes -- all multi-buffer layouts the one-buffer harness cannot drive, " +
+                 "each graded for arithmetic by its own gate) and five exclusions (the HMC step fragment and its renderer, " +
+                 "the variant transformer, the two v2661 cloth solvers nothing loads). THE FINDING: scatter.wgsl declared " +
+                 "`let target`, a WGSL reserved word, and both real backends refused it -- the three-pass transport route's " +
+                 "scatter had never compiled on any device, while render/wgslSpec.mjs called the file clean because it did " +
+                 "not know the reserved list. Renamed to the twin's `slot`; the validator carries the list with a control " +
+                 "in its gate. Sabotage: a root dropped and a stray .wgsl planted in one run, 2 red by name. Pre-existing " +
+                 "and not this round's: wgslSpec-selfcheck's 'requiredLimits appears 0 times' claim is red on trunk at 5 " +
+                 "(main.js, brain/transport/scanTwin.mjs and vendored three all say the word); it sits above the quick " +
+                 "sweep's budget, which is why no sweep named it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

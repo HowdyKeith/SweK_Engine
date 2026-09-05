@@ -61,7 +61,8 @@ console.log("\n1. ONE BODY, TWO LAYOUTS, EXPORTED; THE PAGE IMPORTS INSTEAD OF R
     const gpu = codeOf(read("brain/gpu.js"));
     ok("brain/gpu.js takes allowSoftware (and SWEK_ALLOW_SOFTWARE_GPU), keeps the refusal as the default, and reports `software`", /allowSoftware = false/.test(gpu) && /SWEK_ALLOW_SOFTWARE_GPU/.test(gpu) && /Refusing to run on a SOFTWARE adapter/.test(gpu) && /software: !!\(adapter\.isFallbackAdapter \|\| soft\)/.test(gpu));
     const corpus = codeOf(read("tools/ship/wgslCorpus.mjs"));
-    ok("  brain/ is a census root and the corpus carries the MLP probe and the flowfield module", /"brain"\]/.test(corpus) && /id: "mlp\.mlpLayerWgsl"/.test(corpus) && /id: "flowfield\.FLOWFIELD_WGSL"/.test(corpus));
+    // v4472: matched by membership in the default roots list rather than by `"brain"]` at its end -- tools/roundhouse joined after it.
+    ok("  brain/ is a census root and the corpus carries the MLP probe and the flowfield module", /roots = \[[^\]]*"brain"/.test(corpus) && /id: "mlp\.mlpLayerWgsl"/.test(corpus) && /id: "flowfield\.FLOWFIELD_WGSL"/.test(corpus));
 }
 
 console.log("\n2. initGPU ON A STUBBED SOFTWARE ADAPTER: REFUSED BY DEFAULT, ACCEPTED UNDER THE FLAG, AND SAYS WHICH");

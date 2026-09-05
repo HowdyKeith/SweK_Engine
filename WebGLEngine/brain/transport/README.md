@@ -56,7 +56,9 @@ use a multi-block scan with per-block carries; the CPU twin has no such limit an
 
 - `primeTransport.js` -- deterministic CPU reference / Node / WebGL2 fallback (filterFlag, exclusiveScan, scatter, compact)
 - `primeTransport-selfcheck.mjs` -- the gate (permutation-invariance is the spine)
-- `shaders/filter.wgsl`, `shaders/scan.wgsl`, `shaders/scatter.wgsl` -- the GPU port
+- `shaders/filter.wgsl`, `shaders/scan.wgsl`, `shaders/scatter.wgsl` -- the GPU port (v4472: scatter.wgsl declared
+  `let target`, a WGSL reserved word, and had never compiled on a device; renamed to the twin's `slot`, and every
+  pass here is now compiled on both real backends by tools/ship/crossBackend-selfcheck.mjs)
 - `pipeline.js` -- WebGPU orchestration + `parityCheck`
 
 ## Optimizations (adopted only with proof)

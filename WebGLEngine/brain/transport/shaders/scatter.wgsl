@@ -14,9 +14,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let index = gid.x;
     if (index >= arrayLength(&prime_candidates)) { return; }
     if (survived_flags[index] == 1u) {
-        let target = offsets[index];
-        if (target < uniforms.max_survivors) {                                        // BUG-2b FIX: guard the output write
-            surviving_continuations[target] = prime_candidates[index].state_id;
+        // v4472 -- this was `let target`, and `target` is a RESERVED WORD in WGSL: every compiler refused the module,
+        // so the three-pass route's scatter never ran on a device. Found the round the census learned to read .wgsl
+        // files and both real backends were asked to compile this one. `slot` is the twin's own name for it.
+        let slot = offsets[index];
+        if (slot < uniforms.max_survivors) {                                          // BUG-2b FIX: guard the output write
+            surviving_continuations[slot] = prime_candidates[index].state_id;
         }
     }
 }

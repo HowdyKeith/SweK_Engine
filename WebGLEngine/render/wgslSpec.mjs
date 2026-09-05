@@ -173,6 +173,25 @@ export function sizeOf(type) {
 }
 
 /**
+ * WGSL's reserved words (the spec's list, plus its keywords): identifiers a module may not declare. `target`,
+ * `filter`, `set`, `type`, `mod`, `from`, `get` and `pass` are the ones that read like ordinary variable names.
+ */
+export const RESERVED_WORDS = Object.freeze(new Set((
+    "NULL Self abstract active alignas alignof as asm asm_fragment async attribute auto await become binding_array " +
+    "cast catch class co_await co_return co_yield coherent column_major common compile compile_fragment concept " +
+    "const_cast consteval constexpr constinit crate debugger decltype delete demote demote_to_helper do dynamic_cast " +
+    "enum explicit export extends extern external fallthrough filter final finally friend from fxgroup get goto " +
+    "groupshared highp impl implements import inline instanceof interface layout lowp macro macro_rules match " +
+    "mediump meta mod module move mut mutable namespace new nil noexcept noinline nointerpolation non_coherent " +
+    "noncoherent noperspective null nullptr of operator package packoffset partition pass patch pixelfragment " +
+    "precise precision premerge priv protected pub public readonly ref regardless register reinterpret_cast require " +
+    "resource restrict self set shared sizeof smooth snorm static static_assert static_cast std subroutine super " +
+    "target template this thread_local throw trait try type typedef typeid typename typeof union unless unorm unsafe " +
+    "unsized use using varying virtual volatile wgsl where with writeonly yield " +
+    "alias break case const const_assert continue continuing default diagnostic discard else enable false fn for if " +
+    "let loop override requires return struct switch true var while").split(" ")));
+
+/**
  * Everything wrong with a WGSL module, against the given device limits.
  *
  * @param limits defaults to DEFAULT_LIMITS -- pass a real device's `device.limits` to check against it
@@ -183,6 +202,13 @@ export function validateWgsl(src, { limits = DEFAULT_LIMITS, allowTemplates = tr
     const code = stripComments(src);
     const entries = parseEntryPoints(src);
     if (!entries.length) p.push("no entry point -- a module needs at least one @vertex, @fragment or @compute function");
+    // v4472 -- *** A RESERVED WORD USED AS A NAME IS REFUSED BY EVERY COMPILER AND WAS INVISIBLE HERE. ***
+    // brain/transport/shaders/scatter.wgsl declared `let target`, this validator called the file clean for 265
+    // rounds, and the first time both real backends were asked to compile it (the widened WGSL census) they both
+    // said "'target' is a reserved keyword". Declaration sites only: let, var, const, override, fn, struct.
+    const decl = /\b(?:let|const|override|fn|struct|var(?:<[^>]*>)?)\s+([A-Za-z_]\w*)/g;
+    let dm;
+    while ((dm = decl.exec(code))) if (RESERVED_WORDS.has(dm[1])) p.push(`'${dm[1]}' is a reserved word in WGSL and cannot be declared as a name`);
 
     for (const e of entries) {
         // *** A COMPUTE ENTRY POINT WITHOUT @workgroup_size IS INVALID WGSL, FULL STOP. *** Not a style rule.

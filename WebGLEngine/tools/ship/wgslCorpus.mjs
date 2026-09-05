@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/wgslCorpus.mjs -- v4294; text/ and the two physics producers joined at v4464
+// WebGLEngine/tools/ship/wgslCorpus.mjs -- v4294; text/ and the two physics producers joined at v4464; physics/mpm, tools/roundhouse and the .wgsl FILES at v4472
 //
 // *** EVERY WGSL SHADER THE TREE CAN RUN, IN ONE PLACE, SO TWO BACKENDS CAN BE COMPARED ON ALL OF THEM. ***
 //
@@ -34,6 +34,16 @@
 // known. That is the census working and the answer not being written. Both are in the corpus now, run on both
 // backends, and the roots include text/ -- the Slug twin's three runnable modules (v4457) were outside the scan
 // altogether, which is the quieter failure: a producer the census cannot see is one it cannot name.
+//
+// *** v4472 -- THE SAME QUIET FAILURE, THREE ROOTS AND ONE FILE TYPE WIDE. *** The physics-lab survey (step 8 of
+// docs/TSL-ROADMAP.md) found physics/mpm, tools/roundhouse and brain/ unwalked -- the MPM kernel, three benched
+// roundhouse kernels and their renderers -- and found that the census read JavaScript exports only, so the ten
+// .wgsl FILES the tree ships (eight brain transport passes, two v2661 cloth solvers) could never be candidates.
+// The roots are widened and a .wgsl file is now one candidate keyed by its path. Every new candidate was
+// adjudicated by name: nine compile-only corpus entries (multi-buffer layouts the one-buffer harness cannot drive,
+// each graded for arithmetic by its own gate) and five exclusions (two source fragments and renderers, one
+// transformer, two superseded files nothing loads). tools/ship/crossBackend-selfcheck.mjs asserts each root by
+// what it finds and walks the whole tree for .wgsl files, so a file outside every root is a red line by name.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -59,7 +69,9 @@ import { testFontBytes } from "../../text/slugTestFont.mjs";
 // v4465 -- the cloth pillar's GPU path, the first physics/ module on gfx/device.js
 import * as XP from "../../physics/xpbd/xpbdWgsl.mjs";
 // v4466 -- the two physics kernels whose gates said "no GPU here": the HMC leapfrog (probe layout) and the MPM module
-import { WGSL_HMC_PROBE, probeUniforms as hmcProbeUniforms, makeBatch as hmcBatch } from "../roundhouse/hmcGpu.mjs";
+import { WGSL_HMC_PROBE, WGSL_HMC, probeUniforms as hmcProbeUniforms, makeBatch as hmcBatch } from "../roundhouse/hmcGpu.mjs";
+import { WGSL_ISING } from "../roundhouse/isingGpu.mjs";
+import { WGSL as MAGMAP_WGSL, SHIPPED_WGSL as MAGMAP_SHIPPED_WGSL } from "../roundhouse/magmapGpu.mjs";
 import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
 // v4469 -- the step loop's first consumer
 import * as LG from "../../physics/chaos/logisticWgsl.mjs";
@@ -82,6 +94,9 @@ const EMITTED_LOOP_PATH = path.join(path.dirname(fileURLToPath(import.meta.url))
 const EMITTED_LOOP = fs.existsSync(EMITTED_LOOP_PATH) ? JSON.parse(fs.readFileSync(EMITTED_LOOP_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+/** The brain's transport passes, by file: the census lists every .wgsl under its roots and each must be here or EXCLUDED. */
+export const TRANSPORT_FILES = Object.freeze(["filter.wgsl", "filter-packed.wgsl", "fused-single-workgroup.wgsl",
+                                              "mb-scan-block.wgsl", "mb-scan-blocks.wgsl", "mb-scatter.wgsl", "scan.wgsl", "scatter.wgsl"]);
 
 // ---- v4464 -- THE SLUG PROBES' INPUTS: THE FIRST CORPUS ENTRIES WITH READ-ONLY STORAGE BINDINGS ----------------
 //
@@ -362,6 +377,29 @@ export function corpus() {
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },
+        // v4472 -- the roundhouse's three kernels and the brain's eight transport passes, found the moment the census
+        // walked tools/roundhouse and read .wgsl FILES. Every one binds several storage buffers (a lattice and a
+        // threshold table; two trig tables and an output; candidates, a wheel, tuplets and flags), outside the
+        // one-buffer harness signature, so they are compile-only here; each is graded for its ARITHMETIC where it
+        // already was (tools/roundhouse/{hmcGpu,isingGpu,magmap,magmapVariants}-selfcheck.mjs against the CPU twins;
+        // brain/transport/primeTransport-selfcheck.mjs and tools/ship/scanLimits-selfcheck.mjs for the passes). What
+        // the corpus adds is the one fact those gates cannot: that BOTH real backends accept the text.
+        { id: "hmcGpu.WGSL_HMC", from: "tools/roundhouse/hmcGpu.mjs", compileOnly: true,
+          why: "the leapfrog kernel in the BENCH layout (uniform at 0, q/p/out storage after); the same step text as WGSL_HMC_PROBE, which the corpus runs, rendered in the layout the roundhouse bench binds",
+          opts: { code: WGSL_HMC, entryPoint: "main", compileOnly: true, outCount: 0 } },
+        { id: "isingGpu.WGSL_ISING", from: "tools/roundhouse/isingGpu.mjs", compileOnly: true,
+          why: "Philox4x32-10 and an integer-threshold Metropolis sweep over a lattice with a five-entry threshold table -- the lab's zero-tolerance kernel, u32 end to end",
+          opts: { code: WGSL_ISING, entryPoint: "main", compileOnly: true, outCount: 0 } },
+        { id: "magmapGpu.WGSL", from: "tools/roundhouse/magmapGpu.mjs", compileOnly: true,
+          why: "the magnification-map quadrature at @workgroup_size(64) reading two trig tables -- the base text every bench variant is rewritten from",
+          opts: { code: MAGMAP_WGSL, entryPoint: "k_magmap", compileOnly: true, outCount: 0 } },
+        { id: "magmapGpu.SHIPPED_WGSL", from: "tools/roundhouse/magmapGpu.mjs", compileOnly: true,
+          why: "the variant the lab actually runs: wg128 with the trig tables staged in workgroup memory behind a barrier that every thread reaches -- the barrier trap magmapVariants.mjs documents, checked by a compiler on both backends",
+          opts: { code: MAGMAP_SHIPPED_WGSL, entryPoint: "k_magmap", compileOnly: true, outCount: 0 } },
+        ...TRANSPORT_FILES.map((f) => ({
+          id: "brain/transport/shaders/" + f, from: "brain/transport/shaders/" + f, compileOnly: true,
+          why: "one pass of the brain's prime-transport pipeline (brain/transport/pipeline.js reads it with readText and binds it by its own layout); a .wgsl file, which the census could not see until v4472",
+          opts: { code: fs.readFileSync(path.join(ENG, "brain/transport/shaders", f), "utf8"), entryPoint: "main", compileOnly: true, outCount: 0 } })),
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },
@@ -441,7 +479,17 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "gpuDriven.OCC_FN_WGSL", kind: "source fragment",
                     why: "the Occ struct, the level arithmetic and hizOccluded() with no entry point -- cullLodWgsl({ occlusion: true }) is its runnable composition, graded by hiZ-selfcheck" }),
     Object.freeze({ id: "gpuDriven.CULL_FN_WGSL", kind: "source fragment",
-                    why: "the Cull struct and cullLod() with no entry point -- cullLodWgsl and cullProbeWgsl are its runnable compositions, and the probe IS in the corpus" }),
+                    why: "the Cull struct and cullLod() with no entry point -- cullLodWgsl and cullProbeWgsl are its runnable compositions, and the probe IS in the corpus" }),    // v4472 -- what the wider census found in tools/roundhouse and among the .wgsl files, adjudicated by name.
+    Object.freeze({ id: "hmcGpu.HMC_STEP_WGSL", kind: "source fragment",
+                    why: "the leapfrog step text with no bindings and no entry point, written once so the bench and probe layouts cannot drift; hmcKernelWgsl renders it into both, and both renderings ARE in the corpus" }),
+    Object.freeze({ id: "hmcGpu.hmcKernelWgsl", kind: "renderer of two layouts",
+                    why: "a function of { probe } that wraps HMC_STEP_WGSL in the bench layout or the harness layout; its two outputs are WGSL_HMC and WGSL_HMC_PROBE, both in the corpus, so it has no third text to grade" }),
+    Object.freeze({ id: "magmapVariants.variantWgsl", kind: "transformer, not producer",
+                    why: "rewrites a base kernel's workgroup size and stages its trig tables in workgroup memory; the shipped output of it (magmapGpu.SHIPPED_WGSL) is in the corpus and tools/roundhouse/magmapVariants-selfcheck.mjs grades every variant against the CPU twin" }),
+    Object.freeze({ id: "physics/xpbd/xpbd-distance.wgsl", kind: "superseded file, never loaded",
+                    why: "the v2661 graph-coloured distance solver; nothing in the tree reads the file (v4465 measured that), physics/xpbd/xpbdWgsl.mjs solveWgsl is its replacement and IS in the corpus, and the file keeps its SUPERSEDED note as the record" }),
+    Object.freeze({ id: "physics/xpbd/cloth-collision.wgsl", kind: "superseded file, never loaded",
+                    why: "the v2661 contact solver that did not accumulate lambda -- the disagreement with clothLoop.js that v4465 found by writing the mirror; xpbdWgsl.mjs solves contact with the same kernel as the fixed solve under a unilateral flag, and nothing loads this file" }),
 ]);
 
 /**
@@ -450,7 +498,7 @@ export const EXCLUDED = Object.freeze([
  * *** THIS FILE MUST NOT COUNT ITSELF, *** which is the trap the tree has hit repeatedly: a file that grades a
  * marker and contains the marker grades its own prose. The scan skips this module and the gate that drives it.
  */
-export function census({ roots = ["render", "physics/render", "physics/xpbd", "physics/chaos", "shaders", "text", "brain"] } = {}) {
+export function census({ roots = ["render", "physics/render", "physics/xpbd", "physics/chaos", "physics/mpm", "shaders", "text", "brain", "tools/roundhouse"] } = {}) {
     const SELF = ["wgslCorpus.mjs", "crossBackend-selfcheck.mjs"];
     const found = [];
     const walk = (dir) => {
@@ -459,20 +507,32 @@ export function census({ roots = ["render", "physics/render", "physics/xpbd", "p
         for (const e of entries) {
             const rel = path.join(dir, e.name);
             if (e.isDirectory()) { walk(rel); continue; }
+            // v4472 -- *** A .wgsl FILE IS A PRODUCER WITH NO EXPORT TO MATCH. *** The regex below reads JavaScript, so
+            // the ten files the tree ships as bare WGSL (the brain's transport passes, the two v2661 cloth solvers) sat
+            // outside the census for 180 rounds. Each file is one candidate, keyed by its path rather than a symbol.
+            if (/\.wgsl$/.test(e.name)) { found.push({ symbol: e.name, file: rel.replace(/\\/g, "/"), kind: "file" }); continue; }
             if (!/\.(mjs|js)$/.test(e.name) || SELF.includes(e.name)) continue;
             const src = fs.readFileSync(path.join(ENG, rel), "utf8");
             // An exported name that produces WGSL: a function returning it, or a frozen source constant.
             const re = /export\s+(?:function|const)\s+(\w*(?:Wgsl|WGSL)\w*)\b/g;
             let m;
-            while ((m = re.exec(src))) found.push({ symbol: m[1], file: rel.replace(/\\/g, "/") });
+            while ((m = re.exec(src))) found.push({ symbol: m[1], file: rel.replace(/\\/g, "/"), kind: "export" });
         }
     };
     for (const r of roots) walk(r);
-    const inCorpus = new Set(corpus().map((c) => c.id.split(".").pop().replace(/\+.*$/, "")));
-    const inExcluded = new Set(EXCLUDED.map((e) => e.id.split(".").pop()));
-    return found.map((f) => ({ ...f,
-        accounted: inCorpus.has(f.symbol) || inExcluded.has(f.symbol),
-        where: inCorpus.has(f.symbol) ? "corpus" : inExcluded.has(f.symbol) ? "excluded" : null }));
+    // Exported symbols resolve by their last id segment; files resolve by their whole path, because "filter.wgsl"
+    // split on dots is the word "wgsl" and would account for nothing in particular.
+    const isFileId = (id) => /\.wgsl$/.test(id);
+    const inCorpus = new Set(corpus().filter((c) => !isFileId(c.id)).map((c) => c.id.split(".").pop().replace(/\+.*$/, "")));
+    const inExcluded = new Set(EXCLUDED.filter((e) => !isFileId(e.id)).map((e) => e.id.split(".").pop()));
+    const fileInCorpus = new Set(corpus().filter((c) => isFileId(c.id)).map((c) => c.id));
+    const fileInExcluded = new Set(EXCLUDED.filter((e) => isFileId(e.id)).map((e) => e.id));
+    return found.map((f) => {
+        const where = f.kind === "file"
+            ? (fileInCorpus.has(f.file) ? "corpus" : fileInExcluded.has(f.file) ? "excluded" : null)
+            : (inCorpus.has(f.symbol) ? "corpus" : inExcluded.has(f.symbol) ? "excluded" : null);
+        return { ...f, accounted: where !== null, where };
+    });
 }
 
 /** Run one corpus entry through both harnesses and compare element for element. */

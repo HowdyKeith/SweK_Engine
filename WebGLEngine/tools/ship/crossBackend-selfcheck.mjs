@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/crossBackend-selfcheck.mjs -- v4294; widened at v4464 (text/ in the scan, storage inputs in the corpus)
+// and at v4472 (physics/mpm, tools/roundhouse and brain/ in the scan, and .wgsl FILES as candidates beside exported symbols)
 //
 // GRADES the browser-free WebGPU backend against the browser one on EVERY WGSL shader the tree exports.
 //
@@ -16,11 +17,22 @@
 //
 // Section 4 is the control. Agreement across seven shaders is a zero, and a zero with nothing beside it is the
 // shape of a comparison that cannot fail.
+//
+// v4472 -- THE WIDER CENSUS FOUND A SHADER THAT NEVER COMPILED. The first run over the new roots went red on
+// brain/transport/shaders/scatter.wgsl, "both compiled (browser false, native false)": `let target`, and `target` is
+// a reserved word in WGSL. render/wgslSpec.mjs had called the file clean since v4207 because it never knew the
+// reserved list; it does now, with a control in its gate. SABOTAGE (v4472), one run, both applied together:
+// "tools/roundhouse" dropped from the census's default roots AND a copy of scatter.wgsl planted at gfx/ -> exit=1,
+// 2 red BY NAME ("the scan reaches tools/roundhouse/" and "unwalked: gfx/stray-sabotage.wgsl"); restored.
 "use strict";
 import { runWgslCompute, runWgslComputeToTexture, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { runWgslComputeNative, runWgslComputeToTextureNative, headlessGpuSkipReason,
          exitCleanly } from "./headlessGpu.mjs";
 import { corpus, EXCLUDED, census, compare } from "./wgslCorpus.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 
 let fails = 0;
@@ -62,6 +74,38 @@ sec("1. THE CORPUS ACCOUNTS FOR EVERY WGSL PRODUCER IN THE TREE");
     ok(c.filter((f) => f.file.startsWith("text/")).length >= 4 && c.some((f) => f.file.startsWith("physics/render/")),
        "*** the scan reaches text/ and physics/render/, and resolves what it finds there ***",
        c.filter((f) => /^(text|physics\/render)\//.test(f.file)).map((f) => `${f.symbol}:${f.where}`).join(" "));
+    // v4472 -- the same rule for the three roots the physics-lab survey found unwalked: physics/mpm (the MPM kernel),
+    // tools/roundhouse (three benched kernels and their renderers) and brain/ (the transport passes). Asserted by
+    // what each root FINDS, so a root dropped from the default list is a red line naming it, not a shorter list.
+    for (const [root, least] of [["physics/mpm/", 1], ["tools/roundhouse/", 8], ["brain/", 9]])
+        ok(c.filter((f) => f.file.startsWith(root)).length >= least,
+           `the scan reaches ${root} and resolves what it finds there`,
+           c.filter((f) => f.file.startsWith(root)).map((f) => `${f.symbol}:${f.where}`).join(" "));
+    // *** A .wgsl FILE IS A PRODUCER TOO, AND FOR 180 ROUNDS THE CENSUS COULD NOT SEE ONE. *** The regex reads
+    // JavaScript exports; the brain's eight transport passes and the two v2661 cloth solvers are bare files. The
+    // census now lists them by path, and this walks the WHOLE tree for .wgsl files so one placed outside every root
+    // is a red line here rather than a producer nobody counted.
+    const files = c.filter((f) => f.kind === "file");
+    const everyWgsl = [];
+    const walkAll = (dir) => {
+        let ents = []; try { ents = fs.readdirSync(path.join(ENG, dir), { withFileTypes: true }); } catch { return; }
+        for (const e of ents) {
+            if (e.name === "node_modules" || e.name === ".git") continue;
+            const rel = dir ? `${dir}/${e.name}` : e.name;
+            if (e.isDirectory()) walkAll(rel); else if (/\.wgsl$/.test(e.name)) everyWgsl.push(rel);
+        }
+    };
+    walkAll("");
+    ok(files.length >= 10 && files.every((f) => f.accounted),
+       "*** the census lists every .wgsl FILE under its roots and each is in the corpus or excluded by name ***",
+       files.map((f) => `${f.file.split("/").pop()}:${f.where}`).join(" "));
+    const outside = everyWgsl.filter((f) => !files.some((c) => c.file === f));
+    ok(outside.length === 0 && everyWgsl.length === files.length,
+       "and NO .wgsl file in the tree sits outside the census roots",
+       outside.length ? "unwalked: " + outside.join(", ") : `${everyWgsl.length} .wgsl files in the tree, ${files.length} in the census`);
+    ok(files.some((f) => f.where === "corpus") && files.some((f) => f.where === "excluded"),
+       "CONTROL: the file candidates resolve into BOTH buckets too",
+       `${files.filter((f) => f.where === "corpus").length} compiled on both backends, ${files.filter((f) => f.where === "excluded").length} superseded`);
 }
 
 // ---------------------------------------------------------------------------------------------------------

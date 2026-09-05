@@ -446,7 +446,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         solver to its CPU twin), sigmoid layers.
      7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper. BUILT at v4471,
         and step 6's NOT CLAIMED line was an assumption: three's LoopNode builds a node `end`. See step 6.
-     8. (task 31) The WGSL census over physics/mpm, tools/roundhouse and brain/, seeing .wgsl files too.
+     8. (task 31) The WGSL census over physics/mpm, tools/roundhouse and brain/, seeing .wgsl files too. BUILT at
+        v4472: census() walks the three roots and lists every .wgsl file under its roots as a candidate keyed by
+        path; 81 candidates, none unaccounted; the crossBackend gate asserts each root by what it finds and walks
+        the whole tree for a .wgsl outside every root. THE FINDING, first run: brain/transport/shaders/scatter.wgsl
+        declared `let target`, a WGSL reserved word, and both real backends refused it -- the three-pass transport
+        route's scatter had never compiled on any device, and render/wgslSpec.mjs had called it clean since v4207
+        because it did not know the reserved list. Fixed (the twin's `slot`), and the validator now carries the list.
+        NOT CLAIMED: the roundhouse kernels and the transport passes RUNNING through the corpus (multi-buffer
+        layouts; compile-only here, arithmetic graded by their own gates); the transport pipeline end to end on a
+        device in this sandbox (brain/transport/pipeline.js takes a raw device and builds its own bind groups).
 
 ## The count that says when step 4 matters
 

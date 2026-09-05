@@ -74,6 +74,11 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
 }
 
 // 2) *** THE FINDING: THREE SHIPPED SHADERS EXCEED THE DEFAULT DEVICE LIMITS. ***
+//    v4472 -- and a fourth was WRONG in a way this validator could not see: scatter.wgsl declared `let target`, a
+//    reserved word, and "validates clean" here while both real backends refused it (tools/ship/crossBackend-selfcheck.mjs,
+//    the round the census learned to read .wgsl files). The rule is in validateWgsl now, with a control in section 4.
+//    SABOTAGE (v4472): `let slot` reverted to `let target` in scatter.wgsl -> exit=1, "all N of N .wgsl files validate
+//    clean" red naming the count; restored.
 {
     const results = WGSL_FILES.map((f) => [path.relative(ENG, f), validateWgsl(fs.readFileSync(f, "utf8"))]);
     // *** THIS ASSERTED 3 WHEN v4207 SHIPPED, AND v4208 FIXED THEM, SO IT ASSERTS 0 NOW. *** That is the
@@ -160,6 +165,14 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
 {
     const has = (src, re) => validateWgsl(src).some((x) => re.test(x));
     ok(validateWgsl("").length === 1, "an empty source is refused");
+    // v4472 -- the rule scatter.wgsl needed for 265 rounds: a reserved word declared as a name. The control is
+    // the same line with the twin's name, which every compiler accepts and this must too.
+    ok(validateWgsl("@compute @workgroup_size(64)\nfn m() { let target = 1u; }").some((x) => /reserved word/.test(x)),
+        "`let target` is refused: 'target' is a reserved word in WGSL (scatter.wgsl shipped it, v4472)");
+    ok(validateWgsl("@compute @workgroup_size(64)\nfn m() { let slot = 1u; }").every((x) => !/reserved word/.test(x)),
+        "CONTROL: `let slot`, the twin's name, passes");
+    ok(validateWgsl("@compute @workgroup_size(64)\nfn filter_pass() { var<workgroup> set : u32; }").filter((x) => /reserved word/.test(x)).length === 1,
+        "a `var<workgroup>` declaration is a declaration site too, and a fn whose name merely CONTAINS one is not");
     ok(has("fn helper() -> u32 { return 1u; }", /no entry point/), "a module with no entry point is refused");
     ok(has("@compute\nfn main() {}", /no @workgroup_size/), "@compute without @workgroup_size is refused -- the spec requires it");
     ok(has("@fragment @workgroup_size(8)\nfn main() {}", /only valid on @compute/), "@workgroup_size on a fragment stage is refused");
