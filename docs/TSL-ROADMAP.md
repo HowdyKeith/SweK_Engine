@@ -262,8 +262,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the wrong-width probe went 0 of 10,016 wrong); slug-selfcheck's own plant 3 says why and the section
         was rebuilt over 66 Plex glyphs at width 128, where 432 of 965 band headers point past their row.
      2. Blend state on gfx/device.js pipelines. Slug returns colour premultiplied by coverage and needs
-        (ONE, ONE_MINUS_SRC_ALPHA); the device carries topology, cull and frontFace and no blend at all, and its
-        texture path uploads rgba8unorm only, where Slug needs rgba16float and rg16uint.
+        (ONE, ONE_MINUS_SRC_ALPHA); the device carried topology, cull and frontFace and no blend at all, and its
+        texture path uploads rgba8unorm only, where Slug needs rgba16float and rg16uint. BUILT at v4458: `blend`
+        is a word on the descriptor (none, premultiplied, alpha, additive; BLEND_MODES in gfx/device.js), set at
+        use() on WebGL2 beside cull and on the colour target on WebGPU, refused by name when unknown, recorded by
+        the null backend, and carried by render/gpuDriven.mjs renderPipelineDesc the way topology is. MEASURED
+        by tools/ship/deviceBlend-selfcheck.mjs on both real backends: each mode within 1 byte of the blend
+        equation in f64, the two backends identical (pair worst 0 on all four), the untouched half exact. Three
+        sabotages red at 6 / 8 / 4 checks; the third (a wrong factor in the table) left both backends agreeing
+        with each other and was caught only by the equation. STILL MISSING before text can draw: depthWrite on
+        the WebGL2 backend (the WebGPU pipeline honours it; the WebGL2 one has no gl.depthMask) and the two
+        texture formats, both now in item 3's scope.
      3. A device-path text batch, drawn on both backends and diffed, with the orrery's four fillText calls or the
         ship labels' overlay canvas as the first consumer.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses

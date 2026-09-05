@@ -1382,6 +1382,13 @@ export const INSTRUMENTS = [
         measures: "Coverage from the WGSL Slug core run as a compute probe on the headless Dawn device, sample by sample against text/slugEval.js on the same packed atlas bytes and against the flattened-segment winding number; the row-wrap and three transliteration plants; SlugDilate's screen displacement against its closed form.",
         key: "*** THE SHADER THAT SHIPS IS THE SHADER THAT IS GRADED, NOT A COPY OF IT. *** slugShaderWgsl.js keeps the Slug fragment core -- root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender -- as ONE string, and both the render module and the compute probe interpolate it. Section 1 asserts that text identity before anything runs, because a probe that carried its own copy of the loop would be grading itself.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "device-blend", area: "render", name: "Blend state on the device, both backends, one equation",
+        gate: "tools/ship/deviceBlend-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "For each of the four blend words, the frame gfx/device.js draws on WebGPU and on WebGL2 against the blend equation evaluated in f64 and quantised to bytes, and the two frames against each other; the control half; the refusal of an unknown word.",
+        key: "*** UNTIL v4458 A DEVICE PIPELINE HAD TOPOLOGY, CULL AND FRONT FACE, AND NO BLEND AT ALL. *** Every draw through gfx/device.js landed opaque, on both backends, whatever alpha the fragment wrote. That was invisible because every consumer so far drew opaque geometry or a full-screen post effect.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

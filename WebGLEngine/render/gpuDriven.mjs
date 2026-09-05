@@ -361,13 +361,15 @@ export function layoutBuffers(layout = LAYOUTS.flat) {
         { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0, location: 2 }, { name: "ident", size: 4, offset: 16, location: 3 }, { name: "extra", size: 4, offset: 32, location: 5 }] },
     ];
 }
-export function renderPipelineDesc({ layout = LAYOUTS.flat, shaders = null, uniforms = null, topology = null, cull = null, frontFace = null } = {}) {
+export function renderPipelineDesc({ layout = LAYOUTS.flat, shaders = null, uniforms = null, topology = null, cull = null, frontFace = null, blend = null } = {}) {
     return {
         shaders: shaders || { wgsl: RENDER_WGSL, glsl: { vertex: RENDER_VERTEX_GLSL, fragment: RENDER_FRAGMENT_GLSL } },
         vs: "vs", fs: "fs",
         buffers: layoutBuffers(layout),
         uniforms: uniforms || [{ name: "viewProj", type: "mat4" }],
         ...(topology ? { topology } : {}), ...(cull ? { cull } : {}), ...(frontFace ? { frontFace } : {}),
+        // v4458 -- `blend` travels the same way topology does: a word gfx/device.js maps per backend.
+        ...(blend ? { blend } : {}),
     };
 }
 /**

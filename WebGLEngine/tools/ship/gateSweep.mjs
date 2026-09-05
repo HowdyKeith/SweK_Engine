@@ -1821,6 +1821,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "glyphs at width 128, where 432 of 965 band headers point past their own row. Five runs 5,235 to " +
                  "5,412 ms, all exit 0; the slowest is the MEASURED budget.",
     }),
+    since79: Object.freeze({
+        at: "v4458", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceBlend-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. gfx/device.js gains blend state by name (none, premultiplied, alpha, additive), and the gate " +
+                 "draws an opaque quad and a translucent one through the SHIPPING module on both backends for each " +
+                 "mode: every byte within 1 of the blend equation in f64, the two backends identical (pair worst 0 " +
+                 "on all four), the control half untouched, an unknown word refused before either backend builds " +
+                 "anything. Three sabotages red at 6 / 8 / 4 -- the third caught by the f64 equation alone, since " +
+                 "both backends agreed with each other on the wrong factor. 1.0 s.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

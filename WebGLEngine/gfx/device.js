@@ -5,6 +5,12 @@
 // carries both { wgsl } and { glsl } and each backend takes its own; everything else -- buffers, pipelines, passes,
 // draws -- is unified.
 //
+// ---- v4458 -- BLEND STATE, BY NAME, ON BOTH BACKENDS. `blend: "premultiplied" | "alpha" | "additive" | "none"` on the
+// pipeline descriptor (BLEND_MODES below), because Slug text returns colour premultiplied by coverage and until this
+// round every draw through this device landed opaque whatever alpha the fragment wrote. tools/ship/deviceBlend-
+// selfcheck.mjs holds all four modes on both backends to the blend equation in f64, within a byte, and the two
+// backends to each other. Still missing for a translucent overlay: depthWrite on the WebGL2 backend (no depthMask).
+//
 // ---- v4299 (Level 11) -- LEVEL 11: THE WebGPU BACKEND BINDS TEXTURES, AND THE DEVICE CAN BE DRIVEN FROM THE GPU ----------------
 //
 // Until this round pass.texture() on WebGPU THREW BY NAME (v4273 made it refuse; before that it was `() => {}` and
@@ -62,6 +68,27 @@ function _vertexLayouts(d) {
 }
 function _attrFormat(a) { return a.wgpuFormat || a.format || ("float32x" + a.size); }
 
+/**
+ * v4458 -- BLEND STATE, BY NAME, ON BOTH BACKENDS. A pipeline descriptor says `blend: "premultiplied" | "alpha" |
+ * "additive" | "none"` (default none, as every pipeline before this round drew). The words are the contract and
+ * each backend maps them to its own factors; an unknown word is refused here, once, before any backend sees it --
+ * the same shape as BUFFER_USAGES. Slug text (text/slugShaderWgsl.js) returns colour PREMULTIPLIED by coverage and
+ * needs (ONE, ONE_MINUS_SRC_ALPHA); until this round the descriptor carried topology, cull and frontFace and no
+ * blend at all, so that shader could compile on the WebGPU backend and still land every edge as opaque.
+ */
+const BLEND_MODES = Object.freeze({
+    none:          null,
+    premultiplied: Object.freeze({ src: "one",       dst: "one-minus-src-alpha", srcAlpha: "one", dstAlpha: "one-minus-src-alpha" }),
+    alpha:         Object.freeze({ src: "src-alpha", dst: "one-minus-src-alpha", srcAlpha: "one", dstAlpha: "one-minus-src-alpha" }),
+    additive:      Object.freeze({ src: "one",       dst: "one",                 srcAlpha: "one", dstAlpha: "one" }),
+});
+function _blendMode(d) {
+    const m = d.blend == null ? "none" : d.blend;
+    if (!Object.prototype.hasOwnProperty.call(BLEND_MODES, m))
+        throw new Error(`gfx/device: unknown blend mode ${JSON.stringify(m)} -- one of ${Object.keys(BLEND_MODES).join(", ")}`);
+    return m;
+}
+
 function detectBackends() {
     const out = { webgpu: false, webgl2: false };
     try { out.webgpu = (typeof navigator !== "undefined" && !!navigator.gpu); } catch (e) {}
@@ -86,6 +113,7 @@ function nullBackend(opts = {}) {
                      destroy: () => ops.push(["destroyBuffer"]) }; },
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
         pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
+                            blend: _blendMode(d),
                             bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? parseBindings(d.shaders.wgsl) : [] }),
         compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? parseBindings(d.wgsl) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
@@ -148,7 +176,7 @@ function webgl2Backend(canvas, opts = {}) {
         read: async (b) => { const out = new Uint8Array(b.size); gl.bindBuffer(b.tgt, b.gl); gl.getBufferSubData(b.tgt, 0, out); return out.buffer; },
         depthTexture: () => null,
         // v4301 -- `topology: "line-list"` draws gl.LINES, the same word the WebGPU pipeline takes; anything else is triangles.
-        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES }),
+        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES, blend: _blendMode(d) }),
         compute: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
         // *** `source` ACCEPTS A CANVAS OR IMAGE, WHICH v4273's FIRST REAL CONSUMER NEEDED AND THIS DID NOT HAVE.
         // *** ui/orreryPost.mjs feeds the orrery's 2D canvas through a post effect, and a post stage's source is
@@ -216,7 +244,13 @@ function webgl2Backend(canvas, opts = {}) {
                 begin: () => { cleared = true; },
                 use: (p) => { gl.useProgram(p.prog); cur = p;
                     if (p.cull && p.cull !== "none") { gl.enable(gl.CULL_FACE); gl.cullFace(p.cull === "front" ? gl.FRONT : gl.BACK); } else gl.disable(gl.CULL_FACE);
-                    gl.frontFace(p.frontFace === "cw" ? gl.CW : gl.CCW); },
+                    gl.frontFace(p.frontFace === "cw" ? gl.CW : gl.CCW);
+                    // v4458 -- blend state travels with the pipeline, set at use() as cull is, so two pipelines in one
+                    // frame each draw with their own. The GL factor names are the WebGPU words with the dashes taken out.
+                    const bm = BLEND_MODES[p.blend || "none"];
+                    if (!bm) gl.disable(gl.BLEND);
+                    else { const F = { "one": gl.ONE, "src-alpha": gl.SRC_ALPHA, "one-minus-src-alpha": gl.ONE_MINUS_SRC_ALPHA };
+                        gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFuncSeparate(F[bm.src], F[bm.dst], F[bm.srcAlpha], F[bm.dstAlpha]); } },
                 vertices: (b, slot = 0) => bindSlot(b, slot, 0),
                 instances: (b, byteOffset = 0) => bindSlot(b, 1, byteOffset),
                 indices: (b) => { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.gl); idx = b; },
@@ -396,7 +430,10 @@ async function webgpuBackend(canvas, opts = {}) {
                 attributes: l.attributes.map((a) => ({ shaderLocation: a.location != null ? a.location : loc++, offset: a.offset, format: _attrFormat(a) })) }));
             // Level 13 -- `cull: "back" | "front"` and `frontFace: "ccw" | "cw"` travel in the descriptor, so a terrain
             // sheet drops its underside on both backends by the same words. Default: no culling, as before.
-            const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt }] },
+            // v4458 -- the blend word becomes the colour target's blend state; "none" leaves the target as it was.
+            const bm = BLEND_MODES[_blendMode(d)];
+            const target = bm ? { format: fmt, blend: { color: { srcFactor: bm.src, dstFactor: bm.dst, operation: "add" }, alpha: { srcFactor: bm.srcAlpha, dstFactor: bm.dstAlpha, operation: "add" } } } : { format: fmt };
+            const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [target] },
                 primitive: { topology: d.topology || "triangle-list", cullMode: d.cull || "none", frontFace: d.frontFace || "ccw" },
                 ...(depth ? { depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: d.depthWrite !== false, depthCompare: d.depthCompare || "less" } } : {}) });
             const cls = classify(d.shaders.wgsl);
@@ -571,10 +608,10 @@ async function requestDevice(canvas, opts = {}) {
 
 /** What each backend can do, as data, so a consumer chooses by capability rather than by backend name. */
 const CAPABILITIES = Object.freeze({
-    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true }),
-    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false }),
-    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false }),
+    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true }),
+    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true }),
+    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true }),
 });
 
-export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, CAPABILITIES };
+export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, CAPABILITIES };
 if (typeof module !== "undefined" && module.exports) module.exports = { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend };
