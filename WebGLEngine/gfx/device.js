@@ -201,7 +201,8 @@ function _reachableCode(code, entries) {
 function nullBackend(opts = {}) {
     const ops = [];
     const dev = {
-        backend: "null", ops,
+        backend: "null", ops, features: Object.freeze([]),
+        capabilities: Object.freeze({ ...CAPABILITIES.null, features: Object.freeze([]), timestamps: false }),
         buffer: (d) => { const usage = _usageList(d.usage); const data = d.data ? d.data.slice() : null;
             return { __buf: true, usage, count: (d.data && d.data.length) || 0, size: d.data ? d.data.byteLength : (d.size || 0), data,
                      write: (v, off = 0) => { ops.push(["write", usage[0], off]); if (data && v && v.byteLength) new Uint8Array(data.buffer, data.byteOffset).set(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), off); },
@@ -219,6 +220,7 @@ function nullBackend(opts = {}) {
                           return { __tex: true, w, h, format, mipmaps, levels: mipmaps ? _mipLevels(w, h) : 1,
                                    nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }; },
         frame: (fn, o) => {
+            if (o && o.timing) ops.push(["timing"]);
             let cleared = false;
             const pass = {
                 dispatch: (c, wg) => { if (cleared) throw new Error("gfx/device: dispatch() must come before pass.clear() -- compute work runs before the frame's render pass"); ops.push(["dispatch", c && c.__compute ? "compute" : "?", wg]); },
@@ -230,7 +232,8 @@ function nullBackend(opts = {}) {
                 dispatchIndirect: (c, b, off = 0) => { if (cleared) throw new Error("gfx/device: dispatchIndirect() must come before pass.clear() -- compute work runs before the frame's render pass"); ops.push(["dispatchIndirect", c && c.__compute ? "compute" : "?", !!(b && b.__buf), off]); },
                 drawIndexedIndirect: (b, off = 0) => ops.push(["drawIndexedIndirect", !!(b && b.__buf), off]) };
             fn({ pass, device: dev }); ops.push(["submit"]);
-            if (o && o.read) return Promise.resolve({ pixels: null, width: 0, height: 0, backend: "null" }); },
+            if (o && o.read) return Promise.resolve({ pixels: null, width: 0, height: 0, backend: "null", gpuMs: null });
+            if (o && o.timing) return Promise.resolve({ gpuMs: null, backend: "null" }); },
         destroy: () => {}
     };
     return dev;
@@ -272,7 +275,8 @@ function webgl2Backend(canvas, opts = {}) {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
     const dev = {
-        backend: "webgl2", gl,
+        backend: "webgl2", gl, features: Object.freeze([]),
+        capabilities: Object.freeze({ ...CAPABILITIES.webgl2, features: Object.freeze([]), timestamps: false }),
         buffer: (d) => {
             const usage = _usageList(d.usage);
             if (usage.includes("storage") || usage.includes("indirect"))
@@ -304,6 +308,7 @@ function webgl2Backend(canvas, opts = {}) {
                           destroy: () => { gl.deleteTexture(t); for (const k of ["_fb", "_fbOut"]) if (tex[k]) gl.deleteFramebuffer(tex[k]); if (tex._rb) gl.deleteRenderbuffer(tex._rb); if (tex._scratch) gl.deleteTexture(tex._scratch); } };
             return tex; },
         frame: (fn, o) => {
+            if (o && o.timing) throw _refuse("webgl2", "timestamp queries (frame({ timing: true }))", "time the frame with performance.now() around device.frame(), which is CPU time, and say so");
             let cur = null, idx = null, cleared = false;
             // Level 13 -- an offscreen frame draws into an owned framebuffer (colour texture + depth renderbuffer)
             // sized to the canvas, so a pick picture is read back without touching what the page shows.
@@ -422,6 +427,11 @@ function _watchCompile(mod, what) {
         return errs.length ? `gfx/device: the WGSL for this ${what} did not compile, so it would draw nothing: ${errs.join(" | ")}` : null;
     }).catch(() => null);
 }
+// v4489 -- THE OPTIONAL FEATURES A DEVICE ASKS ITS ADAPTER FOR, BY DEFAULT. Each is requested only when the adapter offers
+// it, and what was GRANTED is what device.features and device.capabilities.features report -- SwiftShader may grant none,
+// and a page reads the list rather than the frozen table. `opts.features` replaces the list; `opts.requireFeatures` names
+// features the caller cannot do without, refused BY NAME before requestDevice would throw a TypeError at it.
+const DEFAULT_FEATURES = Object.freeze(["timestamp-query", "subgroups", "shader-f16"]);
 const GPU_USAGE = (usage) => {
     const U = BU(); let f = U.COPY_DST | U.COPY_SRC;
     for (const u of usage) f |= { vertex: U.VERTEX, index: U.INDEX, storage: U.STORAGE, indirect: U.INDIRECT | U.STORAGE, uniform: U.UNIFORM }[u];
@@ -433,7 +443,13 @@ async function webgpuBackend(canvas, opts = {}) {
     // rides on the handle as `adapterInfo`, so a page that reports a vendor no longer needs navigator.gpu itself.
     const adapter = await navigator.gpu.requestAdapter(opts.powerPreference ? { powerPreference: opts.powerPreference } : undefined); if (!adapter) return null;
     const adapterInfo = (() => { try { const i = adapter.info || {}; return { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null }; } catch (e) { return { vendor: null, architecture: null, description: null }; } })();
-    const gpu = await adapter.requestDevice(); const ctx = (canvas && canvas.getContext) ? canvas.getContext("webgpu") : null; if (!ctx) return null; const fmt = navigator.gpu.getPreferredCanvasFormat();
+    const wanted = Array.isArray(opts.features) ? opts.features : DEFAULT_FEATURES;
+    const offers = (f) => { try { return adapter.features.has(f); } catch (e) { return false; } };
+    for (const f of (opts.requireFeatures || [])) if (!offers(f)) throw new Error(`gfx/device: the adapter offers no "${f}" (it offers ${(() => { try { return [...adapter.features].join(", "); } catch (e) { return "?"; } })() || "no optional features"}); requireFeatures refuses here, by name, before requestDevice would throw at it`);
+    const asked = [...new Set([...wanted.filter(offers), ...(opts.requireFeatures || [])])];
+    const gpu = await adapter.requestDevice(asked.length ? { requiredFeatures: asked } : undefined);
+    const features = Object.freeze((() => { try { return [...gpu.features]; } catch (e) { return asked.slice(); } })());   // what was GRANTED
+    const ctx = (canvas && canvas.getContext) ? canvas.getContext("webgpu") : null; if (!ctx) return null; const fmt = navigator.gpu.getPreferredCanvasFormat();
     // *** Level 11 -- `offscreen: true` RENDERS INTO AN OWNED TEXTURE AND NEVER PRESENTS. *** Measured on the build
     // box's headless shell: ANY render pass whose attachment is the canvas's current texture loses the device
     // ("A valid external Instance reference no longer exists"), attached to the DOM or not, COPY_SRC or not,
@@ -550,8 +566,11 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
         if (!buf || !buf.gpu) throw new Error(`gfx/device: binding ${JSON.stringify(n)} needs a buffer from device.buffer(); got ${buf == null ? "nothing" : typeof buf}`);
         p._stor[n] = { buf, offset: o.offset || 0, size: o.size || 0 }; p._gen++;
     };
+    // v4489 -- one query set per device for timed frames; the resolve and staging buffers are per frame (a mapped buffer is busy)
+    let qset = null;
     const dev = {
-        backend: "webgpu", gpu, ctx, fmt, offscreen, depth, adapterInfo,
+        backend: "webgpu", gpu, ctx, fmt, offscreen, depth, adapterInfo, features,
+        capabilities: Object.freeze({ ...CAPABILITIES.webgpu, features, timestamps: features.includes("timestamp-query") }),
         /** The frame's depth texture as a bindable handle (null until a frame has cleared, or with depth off). */
         depthTexture: () => (dtex ? { gpu: dtex, view: dtex._view, w: dW, h: dH, nearest: true, depth: true } : null),
         buffer: (d) => { const usage = _usageList(d.usage); const size = Math.max(4, Math.ceil((d.data ? d.data.byteLength : (d.size || 0)) / 4) * 4);
@@ -656,6 +675,27 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             // presented canvas never sees it. The depth attachment is shared, so a pick frame that begin()s on
             // a drawn frame's depth would be wrong -- a pick frame clears, as its caller must.
             if (o && o.target && !(o.target.gpu && o.target.view)) throw new Error("gfx/device: frame target must be a texture from device.texture()");
+            // v4489 -- `timing: true`: every compute pass and the render pass write GPU timestamps at their start and end
+            // (query indices 2k / 2k+1 for compute pass k, 62 / 63 for the render pass -- the fields are beginningOfPassWriteIndex and
+            // endOfPassWriteIndex; the first draft spelled them without Write, and Chromium silently wrote NOTHING for a compute pass
+            // while refusing the render pass, so a timed compute frame read zeros that looked like SwiftShader), resolved and read
+            // back as `gpuMs` { compute, render, total, passes } in milliseconds. Needs the "timestamp-query" feature this
+            // device was granted; without it the frame is refused by name rather than timed by performance.now() in disguise.
+            const timing = !!(o && o.timing);
+            if (timing && !features.includes("timestamp-query")) throw new Error(`gfx/device: frame({ timing: true }) needs the "timestamp-query" feature, and this device was granted ${features.length ? features.join(", ") : "no optional features"} (device.capabilities.timestamps is false); time the frame with performance.now() around device.frame() instead, which is CPU time`);
+            const QN = 64, tw = timing ? { compute: 0 } : null;
+            if (timing && !qset) qset = gpu.createQuerySet({ type: "timestamp", count: QN });
+            const qres = timing ? gpu.createBuffer({ size: QN * 8, usage: BU().QUERY_RESOLVE | BU().COPY_SRC }) : null;
+            const qstage = timing ? gpu.createBuffer({ size: QN * 8, usage: BU().COPY_DST | BU().MAP_READ }) : null;
+            const computeWrites = () => { if (!timing) return undefined; const k = Math.min(tw.compute++, 30); return { timestampWrites: { querySet: qset, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 } }; };
+            const renderWrites = () => (timing ? { timestampWrites: { querySet: qset, beginningOfPassWriteIndex: QN - 2, endOfPassWriteIndex: QN - 1 } } : {});
+            const readTiming = () => qstage.mapAsync(MM().READ).then(() => {
+                const t = new BigUint64Array(qstage.getMappedRange().slice(0)); qstage.unmap(); qstage.destroy(); qres.destroy();
+                const ms = (a, b) => Number(t[b] - t[a]) / 1e6;
+                let compute = 0; const passes = Math.min(tw.compute, 31); for (let k = 0; k < passes; k++) compute += ms(2 * k, 2 * k + 1);
+                const render = rp ? ms(QN - 2, QN - 1) : 0;
+                return { compute, render, total: compute + render, passes, renderPass: !!rp };
+            });
             const enc = gpu.createCommandEncoder(); const target = (o && o.target) ? o.target.gpu : (offscreen || (o && o.offscreen)) ? ownTarget() : ctx.getCurrentTexture(); const view = target.createView(); let rp = null, cur = null, idx = null;
             const usedPipes = new Set();                          // v4461 -- every pipeline this frame bound, for the read path's check below
             // *** THE BIND GROUP'S OWN SCOPE IS NOT ENOUGH, MEASURED. *** A bind group created before its pipeline has finished
@@ -678,7 +718,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                 dispatch: (c, wg) => { if (rp) throw new Error("gfx/device: dispatch() must come before pass.clear() -- a compute pass cannot run inside the frame's render pass; put the compute work first");
                     if (!c || !c.__compute) throw new Error("gfx/device: dispatch() needs a pipeline from device.compute()");
                     if (c.error) throw new Error(c.error);
-                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); setBind(cp, c); const g = Array.isArray(wg) ? wg : [wg]; cp.dispatchWorkgroups(g[0] || 1, g[1] || 1, g[2] || 1); cp.end(); },
+                    const cp = enc.beginComputePass(computeWrites()); cp.setPipeline(c.pipe); setBind(cp, c); const g = Array.isArray(wg) ? wg : [wg]; cp.dispatchWorkgroups(g[0] || 1, g[1] || 1, g[2] || 1); cp.end(); },
                 // v4339 -- THE DISPATCH SIZE ITSELF IN A BUFFER. The cull pass has always been able to fill an indirect
                 // DRAW; this is the other half, and it is what lets one pass decide how much work the next one does
                 // without a readback. The buffer holds three u32 -- workgroupsX, Y, Z -- at `byteOffset`, and the GPU
@@ -687,16 +727,16 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                     if (!c || !c.__compute) throw new Error("gfx/device: dispatchIndirect() needs a pipeline from device.compute()");
                     if (c.error) throw new Error(c.error);
                     if (!b || !b.usage || !b.usage.includes("indirect")) throw new Error("gfx/device: dispatchIndirect() needs a buffer created with usage \"indirect\" -- it holds three u32 (workgroupsX, Y, Z) the GPU reads when the command runs");
-                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); setBind(cp, c); cp.dispatchWorkgroupsIndirect(b.gpu, byteOffset); cp.end(); },
+                    const cp = enc.beginComputePass(computeWrites()); cp.setPipeline(c.pipe); setBind(cp, c); cp.dispatchWorkgroupsIndirect(b.gpu, byteOffset); cp.end(); },
                 clear: (c) => { const dt = depthTarget(target.width, target.height);
                     rp = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: { r: c[0], g: c[1], b: c[2], a: c[3] == null ? 1 : c[3] }, loadOp: "clear", storeOp: "store" }],
-                        ...(dt ? { depthStencilAttachment: { view: dt._view, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } } : {}) }); },
+                        ...(dt ? { depthStencilAttachment: { view: dt._view, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } } : {}), ...renderWrites() }); },
                 // Level 13 -- begin(): the pass LOADS colour and depth instead of clearing them, so a second phase
                 // draws over the first. In canvas mode the current texture is the same object within one task,
                 // which is what makes two frames in one tick land on one picture.
                 begin: () => { const dt = depthTarget(target.width, target.height);
                     rp = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: "load", storeOp: "store" }],
-                        ...(dt ? { depthStencilAttachment: { view: dt._view, depthLoadOp: "load", depthStoreOp: "store" } } : {}) }); },
+                        ...(dt ? { depthStencilAttachment: { view: dt._view, depthLoadOp: "load", depthStoreOp: "store" } } : {}), ...renderWrites() }); },
                 use: (p) => { if (p.error) throw new Error(p.error); rp.setPipeline(p.pipe); cur = p; },
                 vertices: (b, slot = 0) => rp.setVertexBuffer(slot, b.gpu),
                 instances: (b, byteOffset = 0) => rp.setVertexBuffer(1, b.gpu, byteOffset),
@@ -716,7 +756,8 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                     rp.drawIndexedIndirect(b.gpu, byteOffset); }
             };
             fn({ pass, device: dev }); if (rp) rp.end();
-            if (!(o && o.read)) { gpu.queue.submit([enc.finish()]); frameCheck(); return; }
+            if (timing) { enc.resolveQuerySet(qset, 0, QN, qres, 0); enc.copyBufferToBuffer(qres, 0, qstage, 0, QN * 8); }
+            if (!(o && o.read)) { gpu.queue.submit([enc.finish()]); frameCheck(); return timing ? readTiming().then((gpuMs) => ({ gpuMs, backend: "webgpu" })) : undefined; }
             // Level 11 -- the readback: copy the presented texture before submit, then map. bytesPerRow is padded
             // to 256 as the API requires, and a bgra8unorm canvas is swizzled to RGBA so a caller comparing this
             // to the WebGL2 readback compares colours and not channel orders.
@@ -740,7 +781,8 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
                 st.unmap(); st.destroy();
                 let dz = null;
                 if (sd) { const rf = new Float32Array(sd.getMappedRange()); dz = new Float32Array(w * h); for (let y = 0; y < h; y++) dz.set(rf.subarray(y * bpr / 4, y * bpr / 4 + w), y * w); sd.unmap(); sd.destroy(); }
-                return { pixels: px, width: w, height: h, backend: "webgpu", format: fmt, depth: dz };
+                const res = { pixels: px, width: w, height: h, backend: "webgpu", format: fmt, depth: dz };
+                return timing ? readTiming().then((gpuMs) => ({ ...res, gpuMs })) : res;
             });
         },
         destroy: () => { try { own?.destroy(); } catch (e) {} try { gpu.destroy(); } catch (e) {} }
@@ -804,10 +846,12 @@ async function requestDevice(canvas, opts = {}) {
 
 /** What each backend can do, as data, so a consumer chooses by capability rather than by backend name. */
 const CAPABILITIES = Object.freeze({
-    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
-    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
-    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    // v4489 -- `features` and `timestamps` are RUNTIME facts: this table says what a backend may be granted (nothing, here);
+    // device.capabilities on a live device says what it was. A page reads the device, not the table.
+    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true, mipmaps: true, features: Object.freeze([]), timestamps: false, formats: Object.keys(TEXTURE_FORMATS) }),
+    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, features: Object.freeze([]), timestamps: false, formats: Object.keys(TEXTURE_FORMATS) }),
+    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, features: Object.freeze([]), timestamps: false, formats: Object.keys(TEXTURE_FORMATS) }),
 });
 
-export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES };
+export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES, DEFAULT_FEATURES };
 if (typeof module !== "undefined" && module.exports) module.exports = { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend };

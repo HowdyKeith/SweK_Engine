@@ -372,7 +372,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
  * (`compute() needs { wgsl } -- a compute pipeline is WGSL-only`), and the pair contract every other transplant in
  * this file is held to does not apply here because the pair does not exist.
  */
-export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformArrays = [], uniformVar = "u", workgroupSize = 64 } = {}) {
+export function computeShell({ name = "compute", storage = [{ name: "out", element: "f32" }], shared = [], uniforms = [], uniformArrays = [], uniformVar = "u", workgroupSize = 64, features = [] } = {}) {
     // v4363 -- the STRUCT element. An entry may give `struct: { name, fields: [{ name, type, atomic }] }` instead of an
     // element, and the shell declares that struct itself. Two rules, both refusals rather than compiler errors:
     // the atomic belongs to a FIELD (array<Cmd> is not an atomic buffer, one of Cmd's members is), and two entries
@@ -402,7 +402,7 @@ export function computeShell({ name = "compute", storage = [{ name: "out", eleme
     // rather than as a member of the scalar struct, so the shell declares it as one too -- a second uniform, not a field.
     const arrayDecls = uniformArrays.map((a, i) => `struct ${a.name}Buf { value: array<${a.element || "vec4<f32>"}, ${a.length}> };\n@group(0) @binding(${storage.length + (uniforms.length ? 1 : 0) + i}) var<uniform> ${a.name}: ${a.name}Buf;`);
     const sharedDecls = shared.map((w) => `var<workgroup> ${w.name}: array<${w.element || "u32"}, ${w.length}>;`);
-    return { name, storage, shared, uniforms, uniformArrays, uniformVar, workgroupSize, structs: structDecls, prefix: [...sharedDecls, ...structDecls, ...decls, ...arrayDecls].join("\n") };
+    return { name, storage, shared, uniforms, uniformArrays, uniformVar, workgroupSize, features, structs: structDecls, prefix: [...sharedDecls, ...structDecls, ...decls, ...arrayDecls].join("\n") };   // v4489: `features` -- the device's granted list, so the transplant may keep `enable subgroups;`
 }
 
 /**
@@ -524,12 +524,14 @@ export function transplantCompute(wgsl, shell) {
     const bodyAll = wgsl.slice(wgsl.indexOf(at[0]));
     let entry = bodyAll.slice(bodyAll.indexOf("fn main("));
     // three asks for a WGSL extension the device never requested, and takes a builtin only that extension defines
-    entry = entry.replace(/,?\s*@builtin\(\s*subgroup_size\s*\)\s*\w+\s*:\s*u32/g, "");
+    // v4489 -- kept when the shell says its device was granted "subgroups" (`features` from device.features); dropped otherwise, as before
+    const keepSubgroups = !!(shell.features && shell.features.includes("subgroups")) && /enable\s+subgroups\s*;/.test(wgsl);
+    if (!keepSubgroups) entry = entry.replace(/,?\s*@builtin\(\s*subgroup_size\s*\)\s*\w+\s*:\s*u32/g, "");
     let b = entry;
     for (const [g, name] of rename) b = b.replace(new RegExp(`\\b${g}\\b`, "g"), name);
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
     for (const a of memberUA) b = b.replace(new RegExp(`\\b${a.name}\\.value\\b`, "g"), `${shell.uniformVar}.${a.name}`);   // v4483: the array lives in the struct
-    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\nvar<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
+    const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\n${keepSubgroups ? "enable subgroups;\n" : ""}var<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
     return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
 }

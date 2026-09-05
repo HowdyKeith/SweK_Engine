@@ -110,6 +110,24 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    generated NodeBuffer_NNN becomes the shell's buffer, objectStruct becomes its uniform struct, and `enable
    subgroups;` with its @builtin(subgroup_size) is DROPPED, because three's renderer asks the adapter for that
    feature and the device never did (left in, the device refuses the module: sabotage S, 6 red).
+   *** v4489 (task 15) -- THE DEVICE ASKS ITS ADAPTER NOW. *** gfx/device.js requestDevice requests the optional
+   features the adapter OFFERS (DEFAULT_FEATURES: timestamp-query, subgroups, shader-f16; opts.features replaces
+   the list), refuses by name a feature the caller requires and the adapter lacks (opts.requireFeatures) before
+   WebGPU would throw at it, and reports what was GRANTED on device.features and device.capabilities -- the frozen
+   CAPABILITIES table now says only that a backend may be granted nothing; a page reads the device. A frame with
+   { timing: true } writes GPU timestamps around every compute pass and the render pass (a 64-entry query set,
+   two indices a pass) and returns gpuMs { compute, render, total, passes }; WebGL2 refuses it by name with the
+   CPU-time hint; the null backend records it. computeShell takes `features`, and transplantCompute keeps
+   `enable subgroups;` and the builtin when the shell's device has the feature, dropping them otherwise as before.
+   MEASURED on the build box: the headless Chromium's SwiftShader offers and grants timestamp-query AND subgroups
+   (plus core-features-and-limits unasked, reported as it is); a timed frame of one dispatch and one draw at 32 x
+   32 reads compute 0.101 ms and render 6.558 ms, held ABOVE ZERO because the first draft spelled the write
+   indices without "Write" and Chromium wrote nothing for the compute pass while refusing the render pass -- a
+   timed frame that read zeros and looked like a coarse clock. tools/ship/deviceFeatures-selfcheck.mjs holds the
+   default list, the table, the null record, the transplant's keep and drop, and in the browser the granted set
+   against the offered one, the timed and timed-read frames, 200 dispatches capped at 31 timed passes, and both
+   refusals by name. NOT CLAIMED: a kernel that uses subgroup operations (none in the tree calls one), shader-f16
+   (no adapter here offers it), a real GPU's timings (task 9's page).
    render/physicsTsl.mjs makeLyapunovComputeTsl sweeps r across a storage buffer; render/lyapunovWgsl.mjs
    lyapunovComputeWgsl is the hand-written twin, the module's own lyapunov() in the same shell.
    THE CLAIM IS NOT "TO THE BYTE", AND WHY IS THE FINDING: on every element whose exponent is negative the two passes

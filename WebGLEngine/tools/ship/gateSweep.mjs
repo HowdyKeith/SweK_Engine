@@ -2399,6 +2399,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "unchanged; the result names lineWidths and softBreaks. Held on the constructed font in font units, where every " +
                  "expected width is a sum somebody can check by hand. Sabotages red at 3 / 5 / 2 / 1 -- the break space kept, kerning carried across a break, the long-word fallback removed, an exact fit wrapped.",
     }),
+    since111: Object.freeze({
+        at: "v4489", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceFeatures-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on WebGPU, WebGL2 and the null backend. gfx/device.js requestDevice negotiates the optional features the " +
+                 "adapter offers (timestamp-query, subgroups, shader-f16 by default), refuses a required-but-absent one by name " +
+                 "before WebGPU would throw, and reports the granted set on device.features and device.capabilities; a frame with " +
+                 "timing: true brackets every compute pass and the render pass with GPU timestamps and returns gpuMs, WebGL2 " +
+                 "refuses it by name, the null backend records it; the transplant keeps enable subgroups; when a shell's device " +
+                 "has it. MEASURED here: SwiftShader grants timestamp-query and subgroups; a timed frame reads compute 0.101 ms " +
+                 "and render 6.558 ms, held above zero because a first draft spelled the write indices wrong and read zeros " +
+                 "that looked like a coarse clock. Sabotages red at 1 / 1 / 1 / 1 -- B went 0 red first (a lying report hid behind an unasked entry) and the entry-for-entry row was added for it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
