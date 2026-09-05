@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "0c8a692195898ed8f014863fbc56d7bcb18d06d6",
+ "head": "102700a1cad32bc0105ddfa618d56937a4ee66ba",
  "bodies": {
   "box3d": [
    {
@@ -171,7 +171,7 @@
    {
     "path": "tools/ship/slugWgsl-selfcheck.mjs",
     "bytes": 32804,
-    "sha": "0c8a692195898ed8f014863fbc56d7bcb18d06d6"
+    "sha": "83cf2161e3437babe0d4d42fc5686ce7b087bd89"
    }
   ],
   "gifenc": [
@@ -510,8 +510,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2916955,
-    "sha": "d8c650881fcbc51f3b4fd27ecf19b7d4f6b7fe8d"
+    "bytes": 2914849,
+    "sha": "83cf2161e3437babe0d4d42fc5686ce7b087bd89"
    },
    {
     "path": "mpm3d.html",
