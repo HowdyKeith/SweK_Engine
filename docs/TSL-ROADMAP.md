@@ -506,7 +506,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         passingWithin's. Found while building: a sabotage of the cube root's sign guard was blind because the stable
         form's argument is always positive -- the guard was dead code and is removed. NOT CLAIMED: the flyby trails
         the 2D page draws; moons tilted with their parent's plane (they circle in the ecliptic, as the 2D page draws).
-     5. (task 36) Slug labels on the device path (steps 7.3 and 7.5's modules) for picked and near bodies.
+     5. (task 36) Slug labels on the device path (steps 7.3 and 7.5's modules) for picked and near bodies. BUILT at
+        v4477: render/sceneLabels.mjs labelsFor -- the rule is the cull's own: a record is labelled when its angular
+        metric (radius over distance, cullLodCpuOne's number) reaches the scene's near-rung threshold, so the labelled
+        bodies ARE the bodies drawn at the near level of detail, and the gate holds the two counts equal on cullLodCpu's
+        twin; the picked record is labelled whatever its size; the projection is ev/esShipLabelsCore.js's, placed above
+        the body by its projected radius. orrery-gpu.html fetches the vendored IBM Plex Serif once, packs one
+        SlugFontDevice atlas on its device and draws the labels in a begin() frame over the sky and the traders, on
+        either backend, with a checkbox. LIMIT, measured: the cull tests a sphere against the frustum and the label a
+        point against the NDC box, so a body whose centre is just off-screen is drawn without a label. NOT CLAIMED:
+        label collisions, leader lines, fading.
      6. (task 37) Promotion by measurement: the 3D page passes the 2D page's gates plus its own before the panel's
         link points at it; the 2D page stays as the reference twin.
 

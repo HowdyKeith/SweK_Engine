@@ -1415,6 +1415,12 @@ export const INSTRUMENTS = [
         key: "*** THE POLE CLAMP IS FOR SOMETHING MEASURED, NOT A RULE FOR ITS OWN SAKE. *** gpuDriven's lookAt at the pole has a zero x axis (the control computes it unclamped), and the v4299 camera could reach exactly that at tilt 0.",
     },
     {
+        id: "scene-labels", area: "method", name: "The 3D orrery's labels: which records are named, by the cull's own rule, and where on the screen",
+        gate: "tools/ship/sceneLabels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "render/sceneLabels.mjs labelsFor against render/gpuDriven.mjs cullLodCpu on a 36-record grid the frustum contains: the label count equals the near rung's count at the same threshold and camera, and they are the same records; the picked record is labelled below the threshold and first; the cap keeps the picked and the largest metrics; a record of another kind is skipped unless picked; a record at the origin projects to the centre pixel, one on +x to the right, one behind the camera and one off the box to nothing; the edge limit measured (a sphere 2% past the edge drawn, not labelled); orrery-gpu.html's wiring read.",
+        key: "*** ONE RULE, TWO READERS. *** The labels use the cull's metric and the scene's threshold, so the labelled bodies ARE the bodies drawn at the near level of detail -- a second rule for 'near' would drift from the first without either gate noticing.",
+    },
+    {
         id: "brain-kernels", area: "method", name: "The GPU Brain's kernels exported, in the corpus, and graded where every other GPU gate runs",
         gate: "tools/ship/brainKernels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "brain/mlp.js renders one body in two binding layouts (the brain's and the harnesses') and exports both with a probe manifest; the probe layout on Dawn returns render/brainTsl.mjs's f32 twin bit for bit (128 of 128, a 2-D dispatch); the shipped layout bound by the brain's own names through gfx/device.js returns the same bytes on the browser's WebGPU; brain/flowfield.js exports its four-entry module and it compiles on Dawn; tools/ship/brainTsl-page.js imports the kernel instead of regexing the module's source; brain/gpu.js's initGPU refuses a SwiftShader adapter by default and accepts it under allowSoftware or SWEK_ALLOW_SOFTWARE_GPU, reporting `software`, exercised on a stubbed adapter both ways.",

@@ -55,6 +55,7 @@
     <label>tilt <input id="tilt" type="range" min="0" max="80" value="35"></label> <span style="color:#9fb8a8">drag turns, wheel dollies, click a body to follow it, click space to stop</span>
     <label>days/s <input id="speed" type="range" min="0" max="40" value="8"></label>
     <label><input id="occ" type="checkbox" checked> occlusion (WebGPU)</label>
+    <label><input id="labels" type="checkbox" checked> labels (Slug text on the device)</label> <span id="labelled" style="color:#9fb8a8"></span>
   </div>
   <div><label><input id="life" type="checkbox" checked> life: the economy's traders</label> <span id="pick" style="color:#f0e29e">point at something</span></div>
   <div style="color:#9fb8a8">races: <span id="races"></span></div>
@@ -80,6 +81,9 @@ import { REACHED_SOURCES, severityOf } from "./world/reachedLicences.mjs";
 import { models, mayVendor } from "./gpu/khronosSamples.mjs";
 import { sphereMesh, litPipelineDesc, litBind, LIGHT_AT_CENTRE } from "./render/litSphere.mjs";
 import { makeOrbitState, dragged, dollied, withPitch, followed, retargeted, eyeOf, pitchFromTilt, fitDistance, clipPlanes, UP } from "./render/orbitCamera.mjs";
+import { labelsFor, rowsFor, LABEL_CHARS, LABEL_PX } from "./render/sceneLabels.mjs";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { parseFont } from "./text/slugFont.js";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
 import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
@@ -325,6 +329,28 @@ const endDrag = (e) => {
 cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
 cv.addEventListener("wheel", (e) => { e.preventDefault(); orbit = dollied(orbit, e.deltaY); }, { passive: false });
 tiltEl.addEventListener("input", () => { orbit = withPitch(orbit, pitchFromTilt(Number(tiltEl.value))); });
+// v4477 -- LABELS THROUGH THE DEVICE: render/slugDevice.mjs text (v4460), placed by render/sceneLabels.mjs -- every body drawn
+// at the near rung gets its name, and so does whatever is under the pointer. The font is fetched once; until it arrives,
+// or if it never does, the page says so and draws none rather than pretending.
+let fontDevice = null, labelBatches = [];
+try {
+    const font = parseFont(new Uint8Array(await (await fetch("./vendor/fonts/IBMPlexSerif-Regular.ttf")).arrayBuffer()));
+    fontDevice = new SlugFontDevice(device, font, LABEL_CHARS);
+} catch (e) { document.getElementById("labelled").textContent = "no labels: " + e.message; }
+function drawLabels(cam) {
+    if (!fontDevice || !document.getElementById("labels").checked) { document.getElementById("labelled").textContent = fontDevice ? "" : document.getElementById("labelled").textContent; return; }
+    const picked = lastHit ? lastHit.id : (orbit.follow != null ? orbit.follow : null);
+    const list = labelsFor(source.cpu(), source.names, { proj: cam.proj, view: cam.view, eye: cam.eye, width: cv.width, height: cv.height, count: source.count, kinds: source.kinds,
+                                                          threshold: lodTh.thresholds[1], picked, max: 24, px: LABEL_PX });
+    const ready = [];
+    list.forEach((L, i) => {
+        if (!labelBatches[i]) labelBatches[i] = new SlugDeviceBatch(fontDevice);
+        const laid = labelBatches[i].set(L.name, { size: LABEL_PX, color: L.picked ? [1, 0.93, 0.6, 1] : [0.72, 0.9, 0.8, 1] });
+        if (laid && laid.width) ready.push({ b: labelBatches[i], rows: rowsFor(L, laid.width, cv.width, cv.height, LABEL_PX) });
+    });
+    if (ready.length) device.frame(({ pass }) => { pass.begin(); for (const r of ready) r.b.draw(pass, r.rows, [cv.width, cv.height]); });
+    document.getElementById("labelled").textContent = `${ready.length} labelled`;
+}
 let t = economy.t, last = performance.now();
 function camera() {
     // a followed body's place NOW, through the same positionAt3 the kernel mirrors (record 0 is SweK, at the origin)
@@ -380,6 +406,7 @@ async function frame(now) {
             else if (hit && life) { /* a trader */ } else if (!hit) {}
         } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }
     }
+    drawLabels(cam);   // v4477 -- after the sky and the traders, over both
     document.getElementById("t").textContent = t.toFixed(1);
     if ((frames++ & 31) === 0) { try { const c = await scene.readCounts(); if (c) document.getElementById("drawn").textContent = c.join(" + ") + " of " + source.count + (life ? " bodies, " + economy.ships.length + " traders" : ""); } catch (e) {} }
     requestAnimationFrame(frame);

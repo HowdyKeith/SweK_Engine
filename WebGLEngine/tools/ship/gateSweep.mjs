@@ -2179,6 +2179,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "W and the guard was dead code -- a sabotage that goes 0 red is a finding, per the ship skill, and the code " +
                  "it guarded is gone.",
     }),
+    // v4477 -- the ninety-ninth closing. Labels through the device, by the cull's own rule.
+    since99: Object.freeze({
+        at: "v4477", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/sceneLabels-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless, ~0.2 s, no browser. render/sceneLabels.mjs labelsFor picks the records to label by the " +
+                 "cull's own angular metric at the scene's near threshold, so the label count equals cullLodCpu's near-rung " +
+                 "count on the same camera (12 of 36 on the gate's grid, the same records); the picked one is labelled " +
+                 "however small; the projection is ev/esShipLabelsCore.js's, a record behind the camera or off the box gets " +
+                 "none; the limit is measured (a sphere 2% past the edge is drawn and not labelled). orrery-gpu.html packs " +
+                 "one SlugFontDevice atlas from the vendored IBM Plex Serif and draws the labels in a begin() frame over the " +
+                 "scene through render/slugDevice.mjs; gpuOrbits-selfcheck loads the page and it throws nothing. Sabotages " +
+                 "red at 7 / 4 / 1 by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
