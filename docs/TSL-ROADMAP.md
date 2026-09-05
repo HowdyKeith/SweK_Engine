@@ -236,6 +236,30 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    both variants, and the emitted loop reads `i < i32( u.bound.x )` and `i < i32( steps.value[ 0u ] )` from its
    text, not a literal. The two passes are in the corpus from tools/ship/tsl-emitted-loop.json. What is still not
    claimed: a bound that changes mid-dispatch and a bound per element.
+   *** v4483 (task 16) -- THE TRANSPLANT WIDENED: COMPUTED AND FLAT VARYINGS, THE CAMERA IN THE FRAGMENT, A UNIFORM
+   ARRAY INSIDE THE STRUCT. *** The shell transplant carried three varyings since v4322, but only bare attribute
+   copies; a varying made of an EXPRESSION (varying(uv.mul(scale), "vScaled"), a flat integer band) had three write
+   the expression in its vertex stage and the transplant refused it as unknown -- the one rule that kept a Slug
+   graph out of the device shell. Now render/tslSource.mjs vertexVaryingBlock takes those statements BY DEPENDENCY
+   (the assignment and every temporary it reads, wherever three put them: the first draft took a window and shipped
+   an unwritten temporary, 0 of 16,384 pixels), a shell says where they land ({{VARYINGS}} in its VOut and out/in
+   lines, {{ASSIGN}} in its vertex stage, nextLocation, outVar) and names its own matrices for three's
+   (matrices: { cameraProjectionMatrix: "cam.proj" }); @interpolate(flat) / flat out|in are preserved. computeShell
+   takes a uniform field { name, array: { element, length } } and folds the graph's uniformArray into the struct
+   (planes.value[i] -> u.planes[i]), so a generated pass reads struct Cull's forty floats from ONE binding -- the
+   limit v4364 called a limit is gone. render/tslWide.mjs is the consumer pair: a quad shell over a grid of cells
+   (p, uv), the graph with vScaled = uv * scale, vLin linear in the position, vBand the CELL's column as a flat i32,
+   the fragment reading cameraProjectionMatrix; and a planes pass (the least signed distance to six planes) with
+   its f32 CPU twin. tools/ship/tslWide-selfcheck.mjs: on both backends the generated quad is the hand twin's
+   picture on 16,384 of 16,384 pixels, AND equals quadColourAt -- a CPU function that never saw the shell -- at
+   1,024 pixel centres to a byte, which is the check twin-grading cannot do (the shell's attributes had no names
+   at first and the GL path bound nothing: both halves drew the same wrong picture, and only the CPU twin saw it);
+   the planes pass bit for bit against its twin through one uniform binding. THE FINDING: a flat varying whose
+   vertices disagree is BACKEND-DEPENDENT -- WebGPU takes a triangle's first vertex, OpenGL ES its last -- so the
+   cell-constant band draws the same picture on both (0 pixels apart) and a per-vertex band draws two (8,704 of
+   16,384 apart), each byte-exact against its own twin. The rule is the graph author's: compute a flat varying
+   from what the primitive shares. NOT CLAIMED: a vertex-stage texture read; cameraViewMatrix (same map, unread);
+   a flat u32 or vector; the Slug graph itself (task 4).
 
 7. **SLUG TEXT ON THE WebGPU BACKEND -- planned at v4457 after a review of an outside plan; item 1 built the same round.** The plan reviewed
    proposed a fresh Slug: opentype.js in a Web Worker, a TSL fragment loop, a JSON font registry, a ring buffer,

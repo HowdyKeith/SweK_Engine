@@ -2299,6 +2299,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "ulp changes 25,120, an f64 ulp changes nothing because the field is a Float32Array. The decision is " +
                  "todo.mjs's erosion-device-port and the gate holds it to the numbers. Sabotages red at 1 / 1 / 1.",
     }),
+    since105: Object.freeze({
+        at: "v4483", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/tslWide-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on WebGPU and WebGL2. render/tslSource.mjs's shell transplant carries COMPUTED varyings now -- the statements " +
+                 "three writes in its vertex stage, taken by dependency with the temporaries they read -- into a shell that says where " +
+                 "({{VARYINGS}}, {{ASSIGN}}), flat interpolation preserved, and the camera's projection matrix in the fragment by the " +
+                 "shell's own name; computeShell folds a uniformArray into the struct as a fixed-size array field. render/tslWide.mjs " +
+                 "is the consumer: on both backends the generated quad (three computed varyings, one flat, the camera in the fragment) " +
+                 "is the hand twin on 16,384 of 16,384 pixels AND the shell-blind CPU twin at 1,024 pixel centres to a byte; the planes " +
+                 "pass bit for bit through one uniform binding. THE FINDING: a flat varying whose vertices disagree is backend-dependent " +
+                 "(first vertex on WebGPU, last on OpenGL ES): 0 pixels apart when the band is the cell's, 8,704 of 16,384 when it is " +
+                 "the vertex's. Two first drafts caught by measurement: a positional window shipped an unwritten temporary (0 of " +
+                 "16,384 on WebGPU), and nameless attributes bound nothing on WebGL2 while both halves agreed -- the CPU twin saw it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

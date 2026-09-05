@@ -56,6 +56,7 @@ import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL, TERRAIN_PICK_WGSL } from "../../render/gpuTerrain.mjs";
 import * as WO from "../../render/worleyWgsl.mjs";
 import { LIT_WGSL } from "../../render/litSphere.mjs";
+import { QUAD_WGSL } from "../../render/tslWide.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
@@ -94,6 +95,9 @@ const EMITTED_COMPUTE = fs.existsSync(EMITTED_COMPUTE_PATH) ? JSON.parse(fs.read
 
 const EMITTED_LOOP_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-loop.json");
 const EMITTED_LOOP = fs.existsSync(EMITTED_LOOP_PATH) ? JSON.parse(fs.readFileSync(EMITTED_LOOP_PATH, "utf8")) : null;
+// v4483 -- the widened transplant's pair: the quad with computed and flat varyings, and the planes pass with its frustum in the struct
+const EMITTED_WIDE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-wide.json");
+const EMITTED_WIDE = fs.existsSync(EMITTED_WIDE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_WIDE_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 /** The brain's transport passes, by file: the census lists every .wgsl under its roots and each must be here or EXCLUDED. */
@@ -251,6 +255,9 @@ export function corpus() {
           why: "v4473 -- the lit render pair over LAYOUTS.lit (a normal at location 4, the extras at 5, a point light in the uniform); its picture is graded against the CPU sphere by tools/ship/litSphere-selfcheck.mjs on both backends, and here both must compile it",
           opts: { code: LIT_WGSL, compileOnly: true, outCount: 0 } },
         // v4301 (Level 15) -- the fleet looks: vertex/fragment pairs, compile-only here (fleets-selfcheck draws them).
+        { id: "tslWide.QUAD_WGSL", from: "render/tslWide.mjs", compileOnly: true,
+          why: "v4483 -- the hand-written twin of the widened transplant's quad: three computed varyings, one @interpolate(flat) i32, the camera's projection in the fragment; the generated pair is held to its picture by tools/ship/tslWide-selfcheck.mjs on both backends, and here both harnesses must compile it",
+          opts: { code: QUAD_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.LIT_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "a lambert hull over a per-vertex normal at location 4 -- the first fleet with a normal", opts: { code: FL.LIT_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.SPRITE_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "textureLoad by uv in the fragment stage with discard -- a sprite's shape from its alpha", opts: { code: FL.SPRITE_WGSL, compileOnly: true, outCount: 0 } },
         { id: "fleets.HOLO_WGSL", from: "render/fleets.mjs", compileOnly: true, why: "the HOLOGRAPHIC rainbow phase over @builtin(position) in a fragment, plus a scanline", opts: { code: FL.HOLO_WGSL, compileOnly: true, outCount: 0 } },
@@ -280,6 +287,9 @@ export function corpus() {
         // device's shell, written down by tslSource-selfcheck on its last run. Compiled here as any hand-written module is; absent
         // until that gate has run once, and said so rather than faked.
         ...(EMITTED ? [
+            ...(EMITTED_WIDE ? [
+            { id: "tslWide.quad (generated)", from: "tools/ship/tsl-emitted-wide.json", compileOnly: true, why: "v4483 -- the quad as three's WGSL builder wrote it from render/tslWide.mjs makeQuadVaryingsTsl, transplanted into the quad shell: computed varyings, a flat i32, cam.proj in the fragment -- a pair nobody typed", opts: { code: EMITTED_WIDE.quad.transplanted.wgsl, compileOnly: true, outCount: 0 } },
+            { id: "tslWide.planes (generated)", from: "tools/ship/tsl-emitted-wide.json", compileOnly: true, why: "v4483 -- the planes pass as three's compute builder wrote it, its uniformArray folded into the shell's struct as array<vec4<f32>, 6>; held bit for bit to the f32 twin by tslWide-selfcheck", opts: { code: EMITTED_WIDE.planes.transplanted, compileOnly: true, outCount: 0 } }] : []),
             { id: "tslSource.badTv (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "badTv's fragment as three's WGSL builder wrote it from render/badTvTsl.mjs, in the device's shell -- a pair nobody typed", opts: { code: EMITTED.badTv.transplanted.wgsl, compileOnly: true, outCount: 0 } },
             { id: "tslSource.blackbody (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "the blackbody key as three's WGSL builder wrote it from render/blackbodyTsl.mjs -- a Loop of Newton steps, generated", opts: { code: EMITTED.blackbody.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),

@@ -1,4 +1,4 @@
-// WebGLEngine/render/tslSource.mjs -- v4320, v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one), v4337 (an ATOMIC one), v4338 (one with WORKGROUP-SHARED memory)
+// WebGLEngine/render/tslSource.mjs -- v4320, v4483 (computed and flat varyings, the camera in the fragment, a uniform array inside the struct), v4322 (a transplant into ANY shell: a race look), v4323 (one language at a time; linear sampling), v4324 (the vertex stage: a position node), v4325 (the shell names its own locals: a second layout), v4326 (a texture crosses into a shell), v4331 (a COMPUTE pass crosses), v4336 (one that READS a buffer as well as writing one), v4337 (an ATOMIC one), v4338 (one with WORKGROUP-SHARED memory)
 //
 // TSL AS A SOURCE FOR gfx/device.js. three's node builders compile a TSL graph to WGSL (WebGPU backend) and to
 // GLSL (WebGL2 backend), and WebGPURenderer.debug.getShaderAsync hands the two texts out. What they hand out is a
@@ -116,9 +116,81 @@ export function devicePipelineFromTsl({ wgsl, glsl }) {
  */
 export function varyingSemantics(vertex, language) {
     const out = {};
-    const re = language === "wgsl" ? /varyings\.(nodeVarying\d+)\s*=\s*(\w+);/g : /^\s*(nodeVarying\d+)\s*=\s*(\w+);/gm;
-    for (const m of vertex.matchAll(re)) out[m[1]] = m[2];
+    // v4483 -- a NAMED varying (varying(node, "vScaled")) is emitted under its label, so the name is any identifier now
+    const re = language === "wgsl" ? /varyings\.(\w+)\s*=\s*(\w+);/g : /^\s*(\w+)\s*=\s*(\w+);/gm;
+    const declared = language === "wgsl" ? null : new Set(Object.keys(varyingDecls(vertex, language)));
+    for (const m of vertex.matchAll(re)) { if (declared && !declared.has(m[1])) continue; if (m[1] === "Vertex") continue; out[m[1]] = m[2]; }
     return out;
+}
+// ---- v4483: COMPUTED VARYINGS, and what three declares for each ------------------------------------------------------
+/**
+ * Every varying the vertex stage declares: { name: { type, flat } }, type in the language's own spelling. WGSL reads the
+ * VaryingsStruct (`@location(5) @interpolate(flat) vBand : i32`), GLSL the `out` lines (`flat out int vBand;`).
+ */
+export function varyingDecls(vertex, language) {
+    const out = {};
+    if (language === "wgsl") {
+        const m = vertex.match(/struct VaryingsStruct \{([\s\S]*?)\};/);
+        if (!m) return out;
+        for (const line of m[1].split("\n")) {
+            const f = line.trim().replace(/,$/, "").match(/^@location\(\s*\d+\s*\)\s*(@interpolate\([^)]*\)\s*)?(\w+)\s*:\s*(.+)$/);
+            if (f) out[f[2]] = { type: f[3].trim(), flat: /flat/.test(f[1] || "") };
+        }
+    } else {
+        for (const m of vertex.matchAll(/^\s*(flat\s+)?out\s+(\w+)\s+(\w+);/gm)) out[m[3]] = { type: m[2], flat: !!m[1] };
+    }
+    return out;
+}
+/** The names three gives an attribute in its vertex stage, which a shell maps to its own (the `locals` map). */
+export const ATTRIBUTE_NAMES = Object.freeze(["uv", "position", "normal", "color", "positionLocal", "normalLocal"]);
+/**
+ * v4483 -- THE VARYING BLOCK. A graph that makes a varying of an EXPRESSION (varying(uv.mul(scale), "vScaled"), or a flat
+ * integer band) has three write the expression in the vertex stage: `varyings.vScaled = (uv * object.scale);` in WGSL,
+ * `vScaled = (uv * v_scale);` in GLSL, in graph order, after the displacement and before the camera transform. Those
+ * statements are what a host shell takes, the way it takes a displacement: its vertex stage says `{{ASSIGN}}` and its
+ * VOut (WGSL) or its out/in lines (GLSL) say `{{VARYINGS}}`, and the transplant fills both, with three's names rewritten
+ * to the shell's -- the attributes by the shell's `locals`, `object.<u>` to its struct, `render.<m>` to its `matrices`.
+ * Bare attribute copies (`varyings.positionLocal = position;`, `varyings.nodeVarying3 = uv;`) are NOT carried: those are
+ * the shell's own varyings, mapped by semantic as before.
+ * Returns { computed: [{ name, type, flat }], statements, decls, uniforms, matrices, reads } or null when nothing is computed.
+ */
+export function vertexVaryingBlock(vertex, language) {
+    const decls = varyingDecls(vertex, language), sem = varyingSemantics(vertex, language);
+    const names = Object.keys(decls).filter((n) => n !== "Vertex");
+    const computed = names.filter((n) => !(n in sem) || !ATTRIBUTE_NAMES.includes(sem[n]));
+    if (!computed.length) return null;
+    const bodyAll = vertex.split(language === "wgsl" ? "fn main(" : "void main()")[1] || "";
+    const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
+    const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
+    const isAssign = (l, n) => language === "wgsl" ? new RegExp("^varyings\\." + n + "\\s*=").test(l) : new RegExp("^" + n + "\\s*=").test(l);
+    if (!computed.some((n) => lines.some((l) => isAssign(l, n)))) throw new Error(`tslSource: the vertex declares computed varying(s) ${computed.join(", ")} and never assigns them`);
+    // *** BY DEPENDENCY, NOT BY POSITION. *** three writes a temporary (nodeVar0 = uv * object.scale) right before the
+    // statement that first reads it, and that can be BEFORE the displacement's own positionLocal = position -- the first
+    // draft took a window from the first varying assignment and shipped `o.vScaled = nodeVar0` with nodeVar0 never
+    // written (0 of 16,384 pixels agreed on WebGPU). So: every statement before the camera transform is a candidate; a
+    // statement is taken when it assigns a computed varying, or a temporary that a taken statement reads. The shell's
+    // own locals (positionLocal, normalLocal: the shell writes those before {{ASSIGN}}, displaced or not) are never taken.
+    const stop = lines.findIndex((l) => /^(modelViewMatrix\s*=|v_positionView\s*=|nodeVar\d+\s*=\s*\(?\s*(render\.|v_)cameraProjectionMatrix|gl_Position|varyings\.Vertex)/.test(l));
+    const pre = lines.slice(0, stop < 0 ? lines.length : stop).filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint |bool )/.test(l));
+    const assigns = (l) => (l.match(language === "wgsl" ? /^(?:varyings\.)?(\w+)\s*=/ : /^(\w+)\s*=/) || [])[1];
+    const need = new Set(), taken = [];
+    for (let i = pre.length - 1; i >= 0; i--) {
+        const l = pre[i], lhs = assigns(l);
+        if (!lhs) continue;
+        if (lhs === "positionLocal" || lhs === "normalLocal") continue;
+        if (!(computed.includes(lhs) || need.has(lhs))) continue;
+        taken.unshift(l); need.delete(lhs);
+        for (const m of l.slice(l.indexOf("=") + 1).matchAll(/\b(nodeVar\d+)\b/g)) need.add(m[1]);
+    }
+    const statements = taken;
+    // three may have written a temporary (nodeVarN) that a statement in the block reads; declare it too
+    const declLines = lines.filter((l) => language === "wgsl" ? /^var \w+ : /.test(l) : /^(vec[234]|float|mat[234]|int|uint|bool) \w+;$/.test(l)).filter((l) => !/positionLocal|normalLocal|modelViewMatrix|v_positionView|v_modelViewProjection/.test(l));
+    const used = declLines.filter((d) => { const name = (d.match(language === "wgsl" ? /^var (\w+)/ : /(\w+);$/) || [])[1]; return name && statements.some((st) => new RegExp("\\b" + name + "\\b").test(st)); });
+    const text = [...used, ...statements].join(" ");
+    const uniforms = [...new Set([...text.matchAll(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(?!cameraProjectionMatrix|cameraViewMatrix|modelViewProjection|positionView)(\w+)/g)].map((m) => m[1]))];
+    const matrices = [...new Set([...text.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : /\bv_(cameraProjectionMatrix|cameraViewMatrix)\b/g)].map((m) => m[1]))];
+    const reads = ATTRIBUTE_NAMES.filter((n) => new RegExp("(^|[^.\\w])" + n + "\\b").test(text.replace(/varyings\./g, "")));
+    return { computed: computed.map((n) => ({ name: n, ...decls[n] })), statements, decls: used, uniforms, matrices, reads };
 }
 /**
  * v4324 -- THE VERTEX STAGE. A graph with a positionNode makes three's vertex shader compute `positionLocal = position;`
@@ -136,7 +208,10 @@ export function vertexDisplacement(vertex, language) {
     const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
     const start = lines.findIndex((l) => /^positionLocal\s*=\s*position;/.test(l));
     if (start < 0) return null;
-    const stop = lines.findIndex((l, i) => i > start && (/^varyings\.|^modelViewMatrix|^nodeVarying\d+\s*=|^gl_Position|^v_modelViewProjection/.test(l)));
+    // v4483 -- a NAMED varying (varying(node, "vLen")) is assigned by its label, so the stop must know the declared names, or the
+    // displacement window swallows the varying block (measured: vLen and vBand landed in {{DISPLACE}} AND in {{ASSIGN}} on WebGL2)
+    const varyingNames = Object.keys(varyingDecls(vertex, language));
+    const stop = lines.findIndex((l, i) => i > start && (/^varyings\.|^modelViewMatrix|^nodeVarying\d+\s*=|^gl_Position|^v_modelViewProjection/.test(l) || varyingNames.some((n) => new RegExp("^" + n + "\\s*=").test(l))));
     const mid = lines.slice(start + 1, stop < 0 ? lines.length : stop).filter((l) => !/^normalLocal\s*=\s*normal;/.test(l));
     const statements = mid.filter((l) => !/^(var |vec[234] |float |mat[234] |int |uint )/.test(l));
     if (!statements.length) return null;
@@ -167,7 +242,11 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
     for (const language of languages) {
         const em = language === "wgsl" ? wgsl : glsl;
         if (typeof em.fragment !== "string" || typeof em.vertex !== "string") throw new Error(`tslSource: transplantIntoShell needs the emitted { vertex, fragment } for ${language}`);
-        if (/\brender\./.test(em.fragment) || /cameraProjectionMatrix|modelViewMatrix/.test(em.fragment)) throw new Error("tslSource: the fragment reads camera or object matrices; a shell transplant carries only what its vertex stage passes");
+        // v4483 -- a CAMERA matrix in the fragment crosses when the shell names its own for it (`matrices: { cameraProjectionMatrix: "cam.proj" }`);
+        // the model matrix never does: three emits it as an unlabelled object uniform, which has no name to bind under.
+        if (/modelViewMatrix|\bobject\.nodeUniform\d+/.test(em.fragment)) throw new Error("tslSource: the fragment reads the object's model matrix (modelViewMatrix), which three emits unlabelled; a shell transplant carries only what its vertex stage passes and what the shell names");
+        const S0 = shell[language] || {}, matricesRead = [...new Set([...em.fragment.matchAll(language === "wgsl" ? /\brender\.(\w+)/g : /\bf_(cameraProjectionMatrix|cameraViewMatrix)\b/g)].map((m) => m[1]))];
+        for (const m of matricesRead) if (!(S0.matrices && S0.matrices[m])) throw new Error(`tslSource: the fragment reads three's ${m} and the shell "${shell.name}" names no matrix of its own for it (it names ${Object.keys(S0.matrices || {}).join(", ") || "none"})`);
         const uniforms = uniformFields(em.fragment, language), textures = textureNames(em.fragment, language);
         // v4326 -- a texture crosses when the SHELL declares it. The shell lists the names its own prefix binds
         // (`textures`), and the transplant keeps the fragment's name as it is, because the graph labelled the texture
@@ -189,29 +268,63 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
                 .replace(language === "wgsl" ? /\bobject\.(\w+)/g : /\bv_(\w+)/g, language === "wgsl" ? `${S.uniformVar}.$1` : "$1");
             vertexText = S.vertexTemplate.replace("{{DISPLACE}}", [...disp.decls, ...disp.statements].map(rename).join("\n  "));
         } else if (S.vertexTemplate) vertexText = S.vertexTemplate.replace("{{DISPLACE}}", "");
+        // v4483 -- COMPUTED VARYINGS cross into a shell that says where: {{VARYINGS}} (the declarations) and {{ASSIGN}} (the statements)
+        const block = vertexVaryingBlock(em.vertex, language);
+        let varyingDeclText = "", fragInText = "";
+        if (block) {
+            const hasHook = (t) => typeof t === "string" && t.includes("{{VARYINGS}}");
+            if (!vertexText || !vertexText.includes("{{ASSIGN}}") || !(language === "wgsl" ? hasHook(S.prefix) : (hasHook(S.vertexTemplate) && hasHook(S.fragmentPrefix))))
+                throw new Error(`tslSource: the graph computes varying(s) ${block.computed.map((c) => c.name).join(", ")} and the shell "${shell.name}" has no {{VARYINGS}} and {{ASSIGN}} to take them`);
+            for (const u of block.uniforms) { if (/^nodeUniform\d+$/.test(u)) throw new Error(`tslSource: a computed varying reads an UNLABELLED uniform (${u}); label it`); if (!shell.uniforms.find((x) => x.name === u)) throw new Error(`tslSource: a computed varying reads uniform "${u}", which is not in the shell "${shell.name}"'s struct`); }
+            for (const m of block.matrices) if (!(S.matrices && S.matrices[m])) throw new Error(`tslSource: a computed varying reads three's ${m} and the shell "${shell.name}" names no matrix of its own for it`);
+            const locals = S.locals || DEFAULT_LOCALS;
+            for (const n of block.reads) if (!locals[n]) throw new Error(`tslSource: a computed varying reads ${n}, which the shell "${shell.name}" does not carry (it carries ${Object.keys(locals).join(", ")})`);
+            if (!S.outVar && language === "wgsl") throw new Error(`tslSource: the shell "${shell.name}" names no outVar (the VOut variable its vertex stage fills) for computed varyings to land in`);
+            const nextLoc = Number.isFinite(S.nextLocation) ? S.nextLocation : null;
+            if (language === "wgsl" && nextLoc === null) throw new Error(`tslSource: the shell "${shell.name}" names no nextLocation for its computed varyings`);
+            const rename = (t) => {
+                let r = t;
+                // a varying read by name in a later expression: the computed ones land in the shell's VOut (WGSL) or stay globals (GLSL);
+                // the bare ones (positionLocal, the attribute copies) are the shell's locals
+                r = r.replace(/\bvaryings\.(\w+)/g, (_, n) => block.computed.some((c) => c.name === n) ? `${S.outVar}.${n}` : (locals[n] || locals[sem[n]] || `varyings.${n}`));
+                r = Object.keys(locals).sort((a, b) => b.length - a.length).reduce((acc, n) => acc.replace(new RegExp(`(^|[^.\\w])${n}\\b`, "g"), `$1${locals[n]}`), r);
+                if (language === "wgsl") { r = r.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`).replace(/\brender\.(\w+)/g, (_, m) => S.matrices[m]); }
+                else { r = r.replace(/\bv_(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]).replace(/\bv_(\w+)/g, "$1"); r = r.replace(new RegExp("^(" + block.computed.map((c) => c.name).join("|") + ")\\s*="), "$1 ="); }
+                return r;
+            };
+            if (/\bvaryings\./.test(block.statements.map(rename).join(" "))) throw new Error(`tslSource: a computed varying reads a varying the shell "${shell.name}" has no local for`);
+            const assign = [...block.decls, ...block.statements].map(rename).join("\n  ");
+            vertexText = vertexText.replace("{{ASSIGN}}", assign);
+            if (language === "wgsl") varyingDeclText = block.computed.map((c, i) => `@location(${nextLoc + i}) ${c.flat ? "@interpolate(flat) " : ""}${c.name}: ${c.type}`).join(", ");
+            else { varyingDeclText = block.computed.map((c) => `${c.flat ? "flat " : ""}out ${c.type} ${c.name};`).join(" "); fragInText = block.computed.map((c) => `${c.flat ? "flat " : ""}in ${c.type} ${c.name};`).join(" "); vertexText = vertexText.replace("{{VARYINGS}}", varyingDeclText); }
+        } else if (vertexText) vertexText = vertexText.replace("{{ASSIGN}}", "").replace("{{VARYINGS}}", "");
         if (language === "wgsl") {
-            const params = [...((em.fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
+            // v4483 -- a flat varying carries @interpolate(flat) between its location and its name; the first draft's pattern skipped it SILENTLY
+            const params = [...((em.fragment.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || "").matchAll(/@location\(\s*\d+\s*\)\s*(?:@interpolate\([^)]*\)\s*)?(\w+)\s*:\s*([\w<>]+)/g)].map((m) => ({ name: m[1], type: m[2] }));
+            const computedNames = block ? block.computed.map((c) => c.name) : [];
             const codes = (em.fragment.split("// codes")[1] || "").split("@fragment")[0].trim();
             const bodyAll = em.fragment.split("fn main(")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             b = b.replace(/output\.color\s*=\s*([^;]+);\s*return output;/, "return $1;");
             if (!/return /.test(b)) throw new Error("tslSource: the WGSL main() does not end in output.color = ...; return output;");
-            for (const p of params) { const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
-            b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`);
+            for (const p of params) { if (computedNames.includes(p.name)) { b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), `${S.varyingParam}.${p.name}`); continue; } const what = sem[p.name]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${p.name} (${what || "unknown"}), which the shell "${shell.name}" does not carry (it carries ${Object.keys(S.varyings).join(", ")})`); b = b.replace(new RegExp(`\\b${p.name}\\b`, "g"), to); }
+            b = b.replace(/\bobject\.(\w+)/g, `${S.uniformVar}.$1`).replace(/\brender\.(\w+)/g, (_, m) => S.matrices[m]);
             for (const t of textures) if (new RegExp(`\\b${t}_sampler\\b`).test(b)) {   // a SAMPLED texture needs the shell's own sampler; a textureLoad does not
                 if (!S.sampler) throw new Error(`tslSource: the fragment samples "${t}" through a sampler and the shell "${shell.name}" declares none (a textureLoad graph needs no sampler; a filtered one does)`);
                 b = b.replace(new RegExp(`\\b${t}_sampler\\b`, "g"), S.sampler);
             }
-            const prefix = vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix;
+            const prefix = (vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix).replace("{{VARYINGS}}", varyingDeclText ? ", " + varyingDeclText : "");
             if (vertexText && prefix === S.prefix) throw new Error("tslSource: the shell's prefix does not contain its own vertexTemplate, so the vertex could not be replaced");
             desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
         } else {
-            const ins = [...em.fragment.matchAll(/^in\s+\w+\s+(nodeVarying\d+);/gm)].map((m) => m[1]);
+            const computedNames = block ? block.computed.map((c) => c.name) : [];
+            const ins = [...em.fragment.matchAll(/^(?:flat\s+)?in\s+\w+\s+(\w+);/gm)].map((m) => m[1]).filter((n) => !computedNames.includes(n));
             const codes = (em.fragment.split("// codes")[1] || "").split("// structs")[0].trim();
             const bodyAll = em.fragment.split("void main()")[1]; let b = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
             if (!/fragColor\s*=/.test(b)) throw new Error("tslSource: the GLSL main() does not write fragColor");
             for (const n of ins) { const what = sem[n]; const to = what && S.varyings[what]; if (!to) throw new Error(`tslSource: the fragment reads varying ${n} (${what || "unknown"}), which the shell "${shell.name}" does not carry`); b = b.replace(new RegExp(`\\b${n}\\b`, "g"), to); }
             for (const u of uniforms) b = b.replace(new RegExp(`\\bf_${u.name}\\b`, "g"), u.name);
-            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix}\n${codes}\nvoid main() {${b}}\n` };
+            b = b.replace(/\bf_(cameraProjectionMatrix|cameraViewMatrix)\b/g, (_, m) => S.matrices[m]);
+            desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix.replace("{{VARYINGS}}", fragInText)}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
     return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), ...(shell.textures && shell.textures.length ? { textures: shell.textures } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
@@ -267,7 +380,10 @@ export function computeShell({ name = "compute", storage = [{ name: "out", eleme
     const elementOf = (b) => b.struct ? b.struct.name : (b.atomic ? `atomic<${b.element || "u32"}>` : (b.element || "f32"));
     const decls = [
         ...storage.map((b, i) => `struct ${b.name}Buf { value: array<${elementOf(b)}> };\n@group(0) @binding(${i}) var<storage, ${b.access === "read" ? "read" : "read_write"}> ${b.name}: ${b.name}Buf;`),
-        ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
+        // v4483 -- a field may be a FIXED-SIZE ARRAY ({ name, array: { element, length } }), which is how struct Cull holds its planes: inside
+        // the struct, at the offset packCullUniforms gives it, rather than as a second binding. The graph still emits its uniformArray as
+        // its own binding; the transplant folds the reads into this field (`planes.value[i]` -> `u.planes[i]`).
+        ...(uniforms.length ? [`struct ${uniformVar}Struct { ${uniforms.map((u) => `${u.name}: ${u.array ? `array<${u.array.element || "vec4<f32>"}, ${u.array.length}>` : Object.keys(WGSL_TYPES).find((k) => WGSL_TYPES[k] === u.type)}`).join(", ")} };\n@group(0) @binding(${storage.length}) var<uniform> ${uniformVar}: ${uniformVar}Struct;`] : []),
     ];
     // v4364 -- a UNIFORM whose element is a FIXED-SIZE ARRAY, which is what struct Cull's `planes: array<vec4<f32>, 6>`
     // is and what a storage buffer stood in for until now. three emits a TSL uniformArray() as its own uniform BINDING
@@ -372,7 +488,8 @@ export function transplantCompute(wgsl, shell) {
     // Refused by name when the shell does not carry it, when the element or the length differ, or when the graph left
     // it unlabelled -- a uniform nothing can bind by name is a buffer the device will ask for and never be handed.
     const uaFound = wgsl.split("var<uniform>").slice(1).map((t) => t.split(":")[0].trim()).filter((n) => n !== "object");
-    const wantUA = shell.uniformArrays || [];
+    const memberUA = shell.uniforms.filter((u) => u.array).map((u) => ({ name: u.name, element: u.array.element || "vec4<f32>", length: u.array.length, member: true }));
+    const wantUA = [...(shell.uniformArrays || []), ...memberUA];
     if (uaFound.length !== wantUA.length) throw new Error(`tslSource: the graph declares ${uaFound.length} uniform array(s) (${uaFound.join(", ") || "none"}) and the shell "${shell.name}" declares ${wantUA.length} (${wantUA.map((a) => a.name).join(", ") || "none"})`);
     for (const n of uaFound) {
         if (/^(NodeBuffer_|nodeUniform)/.test(n)) throw new Error(`tslSource: the graph carries an UNLABELLED uniform array (${n}); label it (uniformArray(v, "vec4").label("planes")) so the device can bind it by name`);
@@ -400,6 +517,7 @@ export function transplantCompute(wgsl, shell) {
     for (const [g, name] of rename) b = b.replace(new RegExp(`\\b${g}\\b`, "g"), name);
     sharedFound.forEach((f, i) => { b = b.replace(new RegExp(`\\b${f.name}\\b`, "g"), wantShared[i].name); });
     b = b.replace(/\bobject\.(\w+)/g, `${shell.uniformVar}.$1`);
+    for (const a of memberUA) b = b.replace(new RegExp(`\\b${a.name}\\.value\\b`, "g"), `${shell.uniformVar}.${a.name}`);   // v4483: the array lives in the struct
     const code = `// transplanted from three's WGSL compute builder by render/tslSource.mjs\nvar<private> instanceIndex : u32;\n${shell.prefix}\n@` + `compute @workgroup_size(${shell.workgroupSize})\n${b}`;
     return { wgsl: code, shared: wantShared.map((w) => w.name), storage: shell.storage.map((b2) => b2.name), reads: wantR.map((b2) => b2.name), writes: wantW.map((b2) => b2.name), uniforms, uniformArrays: wantUA.map((a) => a.name), workgroupSize: shell.workgroupSize, shell: shell.name };
 }

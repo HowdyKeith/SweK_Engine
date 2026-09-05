@@ -63,7 +63,10 @@ const c = shaderCensus(ROOT);
     // not a translation an IR would have saved: the two fragments are eleven lines each. The trigger is still 20.
     // v4473 -- 11 -> 12: render/litSphere.mjs, the lit sphere pair for the 3D orrery. Same shape as gpuTerrain's light:
     // one Lambert term spelled twice, eleven lines each, so the twelfth is a module and not an inversion.
-    const DUAL_BASELINE = 12;
+    // v4483 -- 12 -> 13: render/tslWide.mjs, the quad shell and its hand twin for the widened TSL transplant. Read before raising,
+    // as the line asks: the twin exists BECAUSE the generated pair is graded against it -- the module authors both halves so that
+    // three's two builders can be held to them, which is the opposite of the inversion this line watches for.
+    const DUAL_BASELINE = 13;
     const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
 
     ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",

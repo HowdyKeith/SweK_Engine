@@ -181,8 +181,10 @@ export const PARITY_BASELINE = Object.freeze({
     // the 3D orrery's first step -- a sphere mesh with normals and a LIT render pair (a point light in the uniform,
     // the normal at location 4, an emissive word in the extras) in both languages, so the orrery draws lit spheres on
     // WebGPU and on WebGL2 alike. Graded against a CPU sphere it never rendered by tools/ship/litSphere-selfcheck.mjs.
-    glslBearing: 148,
-    glslDirective: 131,  // raw WebGL2 -- the file writes its own version header
+    // v4483 -- render/tslWide.mjs: the quad shell for the widened transplant carries a WGSL prefix and a GLSL preamble, and the
+    // hand twin both languages (+1 GLSL, +1 WGSL, +1 both). Its fixture and its emitted pair are JSON.
+    glslBearing: 149,
+    glslDirective: 132,  // raw WebGL2 -- the file writes its own version header (v4483: +1, render/tslWide.mjs)
     glslFramework: 17,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -237,13 +239,13 @@ export const PARITY_BASELINE = Object.freeze({
     // v4480 -- wgslBearing 66 -> 67, wgslOnly 51 -> 52: render/worleyWgsl.mjs, the Worley biome field as a compute pass
     // (WGSL-only by nature: no compute stage on WebGL2, where the f32 twin paints the same bytes -- the CPU_TWIN contract).
     // Held to world/worleyBiomes.js through one implementation with one rounding knob by tools/ship/worleyDevice-selfcheck.mjs.
-    wgslBearing: 67,
-    both: 15,
+    wgslBearing: 68,
+    both: 16,
     glslOnly: 133,
     wgslOnly: 52,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs", "render/litSphere.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });
