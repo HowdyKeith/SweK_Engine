@@ -1,11 +1,14 @@
-// physics/render/btdfDomain.mjs -- v4454 -- WHERE Walter's BTDF over-counts, and it is not the term anyone
-// suspected.
+// physics/render/btdfDomain.mjs -- v4455 -- HALF of where Walter's BTDF over-counts, and that half is not a
+// term at all.
 //
 // *** v4436 MEASURED THE EXCESS. v4447 PROVED IT WAS REAL AND RULED OUT THE INNOCENT EXPLANATION. NEITHER
 // COULD SAY WHERE IT CAME FROM, AND BOTH SAID SO. *** v4447 closed by naming two suspects -- the height-
 // correlated G2 and the refraction Jacobian -- and said the walk was "now sharp enough to tell them apart".
-// It is. THE ANSWER IS NEITHER. The over-count is not in any TERM of eq. 21; it is in the SET OF DIRECTIONS
-// the formula is evaluated over. Walter's BTDF is right where it is defined and is being asked outside it.
+// It is, and the verdict is SPLIT: the Jacobian is innocent, G2 is guilty, and there is a THIRD defect
+// neither round had thought to suspect. This file convicts the third one. It is not in any TERM of eq. 21;
+// it is in the SET OF DIRECTIONS the formula is evaluated over -- Walter's BTDF is right where it is defined
+// and is being asked outside it. The G2 half is settled in transmission.mjs by the other branch, arrived at
+// the same day from a different instrument, and section 8 of the gate checks it against this file's walk.
 //
 // ---- *** THE FORMULA'S DOMAIN, WHICH IT NEVER STATES *** -------------------------------------------------
 //
@@ -69,22 +72,34 @@
 //
 // At cosI 0.25 and eta 1.5 that is |wo.n| < 0.16667, which IS bin 0 and the lower third of bin 1.
 //
-// ---- *** WHAT THIS ROUND RULES OUT, HAVING SUSPECTED IT LAST ROUND *** --------------------------------------
+// ---- *** THE JACOBIAN IS INNOCENT, AND G2 IS GUILTY OF A DIFFERENT CRIME *** -------------------------------
 //
-// G is not the culprit. Swapping the height-correlated G2 for the separable G1G1, for masking alone, and for
-// no G at all moves the total across 1.24 / 0.93 / 1.88 / 4.70 -- a factor of five -- while the impossible-
-// domain SHARE barely moves at all: 46.66%, 48.01%, 51.15%, 51.15%. A term that swings the answer five-fold
-// without touching the defect is not the defect. The Jacobian is
-// not the culprit either: it is the largest-varying factor across the exit cone (78.1 down to 1.89, a 41x
-// swing against D's flat 0.3183) and it is EXACTLY RIGHT -- it is what makes the o-space and h-space
-// integrals agree to 1.5e-3 on the honest domain. *** THE BIGGEST-LOOKING TERM WAS THE INNOCENT ONE. ***
+// The Jacobian is the largest-varying factor across the exit cone -- 78.1 down to 1.89, a 41x swing against
+// D's flat 0.3183 -- and it is EXACTLY RIGHT: it is what makes the o-space and h-space integrals agree to
+// 1.5e-3 once the domain is enforced. *** THE BIGGEST-LOOKING TERM WAS THE INNOCENT ONE. ***
+//
+// *** THE DOMAIN ERROR IS INDEPENDENT OF G, WHICH IS A NARROWER CLAIM THAN "G IS INNOCENT" AND THE ONLY ONE
+// THIS FILE'S MEASUREMENTS SUPPORT. *** Swapping the height-correlated G2 for the separable G1G1, for masking
+// alone, and for no G at all moves the total across 1.24 / 0.93 / 1.88 / 4.70 -- a factor of five -- while the
+// impossible-domain SHARE barely moves: 46.66%, 48.01%, 51.15%, 51.15%. That says the two defects are
+// SEPARABLE, not that the second one is absent. An earlier draft of this header read that result as "G is not
+// the culprit", which its own section 6 contradicted three paragraphs later by measuring the enforced lobe
+// still 2.17x the truth. *** THE FILE DISAGREED WITH ITSELF AND THE HEADLINE WAS THE HALF THAT WAS WRONG. ***
+//
+// G2 is guilty separately, and transmission.mjs now carries the fix (`g2: "beta"`, derived concurrently on the
+// other branch): the shipped G2 is the SAME-SIDE height-correlated form applied to two directions on OPPOSITE
+// sides of the interface, where the Smith uniform-height derivation gives the BETA FUNCTION
+// B(1 + Lambda_i, 1 + Lambda_o). Section 8 of the gate holds it against this file's walk, which shares no line
+// of code with it.
 //
 // ---- *** WHAT THIS DOES NOT CLAIM *** ------------------------------------------------------------------------
 //
-// That enforcing the domain FIXES the lobe. It does not. At alpha 1, cosI 0.25 the walk's single-scatter truth
-// is 0.306083; Walter with G2 as written gives 1.244343 (4.07x) and with the domain enforced 0.663694 (2.17x).
-// The domain error is roughly half the excess and the rest is the masking model, which is a different round.
-// What is settled is WHERE half of it lives, on a bound rather than on a fit.
+// That enforcing the domain FIXES the lobe. It does not, and this is the sentence the old headline should have
+// been read against. At alpha 1, cosI 0.25 the walk's single-scatter truth is 0.306083; Walter with G2 as
+// written gives 1.244343 (4.07x) and with the domain enforced 0.663694 (2.17x). The domain error is roughly
+// half the excess and THE OTHER HALF IS THE MASKING MODEL -- transmission.mjs's `g2: "beta"` takes it to
+// 0.305984 against this file's 0.306083, a 3e-4 agreement between a closed form and a Monte Carlo walk that
+// share no code. What THIS file settles is where the FIRST half lives, on a bound rather than on a fit.
 //
 // That the fix is free. Enforcing (D1) and (D2) makes the lobe darker, and a renderer that has been tuned
 // against the bright version will notice. This module therefore DIAGNOSES and does not patch transmission.mjs:
@@ -92,6 +107,17 @@
 //
 // That this is visible at production roughness. At alpha 0.05 the impossible domains carry under 1.3% at every
 // incidence tested. It is a HIGH-ROUGHNESS defect, which is why smooth-glass renders never caught it.
+//
+// ---- *** TWO BRANCHES ASKED THE SAME QUESTION AND THE NUMBERS MATCHED, WHICH IS WORTH MORE THAN EITHER *** ---
+//
+// Keith put "find where Walter's BTDF over-counts" to two lines at once, and they reached the missing chi+
+// independently -- one from an energy bound in half-vector space, this one from a Monte Carlo walk binned by
+// exit direction. The chi+-only integral came out 0.661386 there and 0.663694 here, from code sharing nothing
+// but the D and the Fresnel it is testing. *** THAT AGREEMENT IS EVIDENCE THE FINDING IS THE MODEL AND NOT
+// EITHER INSTRUMENT, AND NEITHER ROUND COULD HAVE PRODUCED IT ALONE. *** What did NOT replicate is what each
+// one could see: the other line derived the Beta-function G2 and reached the walk; this one has the exact
+// zeros, the closed-form flip boundary, and the split of one defect into TWO failures living in DIFFERENT
+// EXIT DIRECTIONS -- (D1) at grazing exit, (D2) at normal exit. Same conviction, different witnesses.
 //
 // ---- *** THE TRAP THIS ROUND FELL INTO FIRST, RECORDED BECAUSE IT IS THE FILE'S OWN LESSON *** ---------------
 //
@@ -234,7 +260,7 @@ export function walkBins(cosI, { alpha, nAbove, nBelow, walk, rand, n = 60000, b
 }
 
 // The measurements this round is willing to be held to. Frozen so a later round that moves them has to say so.
-export const OVERCOUNT_AT_V4454 = Object.freeze({
+export const OVERCOUNT_AT_V4455 = Object.freeze({
     at: Object.freeze({ alpha: 1, cosI: 0.25, nAbove: 1, nBelow: 1.5 }),
     vndfMass: 1.000000,
     ceiling: 0.916252,               // h-space, (1 - F) weighted
@@ -248,4 +274,12 @@ export const OVERCOUNT_AT_V4454 = Object.freeze({
     flipBoundaryHere: 0.166667,
     reverseTransportTrap: Object.freeze({ got: 0.553045, times: 2.25, gives: 1.244351 }),
     zeroBins: Object.freeze({ singleScatterBin0: 0, singleScatterBin9: 0, ofPaths: 300000 }),
+    // The other branch's numbers for the same interface, reached the same day from an energy bound rather
+    // than from a walk. `chiPlusTheirs` against `maskingEnforced`/`g2Enforced` here is the cross-check that
+    // neither line could have run alone; `betaG2` is the half this round did NOT solve, and it lands on the
+    // walk to 1e-4. Recorded so a later round that moves either parameter has to move these too.
+    corroboration: Object.freeze({
+        chiPlusTheirs: 0.661386, chiPlusHere: 0.663694,
+        separableG2: 0.483411, betaG2: 0.305984, walk: 0.306083,
+    }),
 });

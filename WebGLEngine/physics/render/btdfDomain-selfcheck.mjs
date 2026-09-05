@@ -1,11 +1,11 @@
-// physics/render/btdfDomain-selfcheck.mjs -- v4454 -- the gate for physics/render/btdfDomain.mjs.
+// physics/render/btdfDomain-selfcheck.mjs -- v4455 -- the gate for physics/render/btdfDomain.mjs.
 //
 // *** THE CHARGE IS THAT WALTER'S BTDF IS EVALUATED OUTSIDE ITS OWN DOMAIN, AND THE ONLY WAY TO PROVE THAT
 // RATHER THAN ASSERT IT IS A BOUND THE FORMULA BREAKS. *** So section 1 checks the INSTRUMENT -- the VNDF must
 // integrate to 1 -- before section 2 is allowed to convict anything with it. v4446's rule: a ground truth
 // nobody checked is worse than no ground truth.
 //
-// ---- *** FIVE SABOTAGES, RESULTS BY NAME, AND NONE OF THEM WENT ZERO-RED *** -------------------------------
+// ---- *** SIX SABOTAGES, RESULTS BY NAME, AND NONE OF THEM WENT ZERO-RED *** --------------------------------
 //
 //  A. Drop (D2) and keep (D1)                             -> 8 RED
 //  B. Make `flipBoundary` a fitted constant 0.15          -> 4 RED
@@ -14,8 +14,15 @@
 //     rejecting -- i.e. APPLY THE BUG AS THE FIX          -> 9 RED
 //  E. Read the FLIPPED half-vector in `classify`, which
 //     is what importing `halfVectorT` would have given    -> 6 RED
+//  F. Grade section 8 with the SHIPPED G2 instead of the
+//     beta one, i.e. claim chi+ alone reaches the walk    -> 1 RED, THEN 2 RED AFTER THE REPAIR
+//     *** ONE RED WAS TOO FEW AND THE REASON IS A SECOND COPY. *** The section named the fixed lobe twice --
+//     once in the headline comparison and once, spelled out again, inside the multi-configuration check --
+//     so reverting one left the other grading a configuration the sabotage never reached. Not a wrong
+//     answer, a NARROW one: half the section was measuring something else. There is one frozen FIXED object
+//     now and every check in the section reads it, so a single revert reds the point and its control both.
 //
-// *** THAT ALL FIVE WENT RED IS THE PART WORTH RECORDING, BECAUSE THE LAST SIX ROUNDS EACH FOUND ONE THAT DID
+// *** THAT ALL SIX WENT RED IS THE PART WORTH RECORDING, BECAUSE THE LAST SIX ROUNDS EACH FOUND ONE THAT DID
 // NOT. *** v4443 and v4445 both found a check that re-derived the thing under test and then graded its own
 // copy; v4435, v4436 and v4447 each found a check nothing reached. Every section here is pinned instead to a
 // number arrived at by a DIFFERENT ROUTE -- section 1 to a half-vector-space integral that never applies the
@@ -27,16 +34,16 @@
 //
 // ---- *** WHAT THIS GATE DOES NOT CLAIM *** ----------------------------------------------------------------
 //
-// That the enforced lobe is correct -- it is 2.17x the walk's single-scatter truth and section 6 says so out
-// loud rather than quietly not testing it. That the walk is reality; it is the same uniform-height Smith
+// That the enforced lobe is correct -- it is 2.17x the walk's single-scatter truth, section 6 says so out loud
+// rather than quietly not testing it, and section 8 shows what the remaining 2.17x actually was. That the walk is reality; it is the same uniform-height Smith
 // microsurface the tree's D and G2 already assume. And that transmission.mjs has been repaired: it has not
 // been touched, on purpose, so the two can be measured against each other.
 
 import {
     rawHalfVector, flipBoundary, classify, btdfDomain, domainSplit, vndfCeiling, walkBins,
-    DOMAIN, OVERCOUNT_AT_V4454 as REC,
+    DOMAIN, OVERCOUNT_AT_V4455 as REC,
 } from "./btdfDomain.mjs";
-import { btdf } from "./transmission.mjs";
+import { btdf, energySplit, LIMITS } from "./transmission.mjs";
 import { dielectricWalk } from "./dielectricWalk.mjs";
 import { rng } from "./microsurfaceWalk.mjs";
 
@@ -253,6 +260,51 @@ ok("the record is frozen", (() => {
     try { REC.ceiling = 0; } catch { /* strict mode throws, which is the pass */ }
     return REC.ceiling !== 0 && Object.isFrozen(REC);
 })());
+
+// ---- 8. THE OTHER BRANCH'S FIX, HELD AGAINST THIS FILE'S WALK -----------------------------------------------
+//
+// *** THE SAME QUESTION WENT TO TWO LINES AT ONCE AND THEY CONVICTED THE SAME chi+ FROM DIFFERENT
+// INSTRUMENTS. *** transmission.mjs now carries `chiPlus` (the domain this file convicts, under Walter's own
+// name for it) and `g2: "beta"` (the Smith uniform-height masking-shadowing form for directions on OPPOSITE
+// sides, which is the half THIS round did not solve). Neither shares a line with the walk below. Two
+// independent routes to one number is worth more than either route twice, so it is checked here rather than
+// taken on trust -- and it is the check that would go red if a later round quietly reverted either parameter.
+console.log("\n8. transmission.mjs's chiPlus and beta G2, graded against the Monte Carlo walk");
+
+{
+    const truth = REC.walkSingleScatter;                 // 0.306083, this file's own measurement
+    const at = { alpha: 1, ...LIMITS.glass };
+    const T = (opt) => energySplit({ ...at, ...opt }, COS_I, { N: 512, M: 256 }).T;
+    // ONE definition of "the fixed lobe", used by every check below -- section 8's own sabotage found that a
+    // second copy of the option object leaves half the section grading something the sabotage never touched.
+    const FIXED = Object.freeze({ chiPlus: true, g2: "beta" });
+    const shipped = T({}), chi = T({ chiPlus: true }), beta = T(FIXED);
+    say(`shipped ${shipped.toFixed(6)} | chiPlus ${chi.toFixed(6)} | chiPlus+beta ${beta.toFixed(6)} | walk ${truth.toFixed(6)}`);
+    ok("!! the other branch's chi+ reproduces THIS file's enforced domain, from unshared code",
+        Math.abs(chi - g2.honest) < 5e-3,
+        `theirs ${chi.toFixed(6)} vs this file's ${g2.honest.toFixed(6)} -- two routes, one number`);
+    ok("!! chi+ AND the beta G2 together reach the walk, which chi+ alone does not",
+        Math.abs(beta - truth) < 5e-3 && Math.abs(chi - truth) > 0.25,
+        `beta ${beta.toFixed(6)} vs walk ${truth.toFixed(6)}; chi+ alone is still ${(chi / truth).toFixed(2)}x`);
+    ok("the separable G1G1 would NOT have been the fix, so 'use Walter's own G' was not the answer either",
+        Math.abs(T({ chiPlus: true, g2: "separable" }) - truth) > 0.15,
+        "0.4834 against 0.3061 -- the obvious repair overshoots by 58%");
+    ok("the defaults are unchanged, so this round and that one moved no rendered pixel",
+        Math.abs(shipped - REC.g2AsWritten) < 5e-3,
+        "chiPlus and g2 are opt-in parameters; the bright lobe is still what ships");
+    ok("and the agreement is not an artefact of one configuration", (() => {
+        for (const [alpha, cosI] of [[1, 0.7], [0.4, 0.25]]) {
+            const b = energySplit({ alpha, ...LIMITS.glass, ...FIXED }, cosI, { N: 384, M: 192 }).T;
+            const w = walkBins(cosI, {
+                alpha, ...LIMITS.glass, walk: dielectricWalk, rand: rng(7), n: 60000, bins: 1,
+            });
+            const got = w.nSingle / w.n;
+            say(`alpha ${alpha} cosI ${cosI}: beta ${b.toFixed(6)} vs walk ${got.toFixed(6)}`);
+            if (Math.abs(b - got) > 0.01) return false;
+        }
+        return true;
+    })(), "a fix that only lands at the one point it was tuned at is a fit");
+}
 
 console.log(`\nbtdfDomain-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

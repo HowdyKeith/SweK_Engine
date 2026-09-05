@@ -62,7 +62,7 @@ export function refract(wi, n, eta) {
  * because a second copy of that arithmetic is a second thing to get the sign of Lambda wrong in -- and v4446
  * spent a run finding that sign the first time.
  */
-// *** v4454 ADDED `dir` TO THE RETURN, AND IT IS ONE LINE THAT TURNED A TOTAL INTO A DIAGNOSIS. *** This
+// *** v4455 ADDED `dir` TO THE RETURN, AND IT IS ONE LINE THAT TURNED A TOTAL INTO A DIAGNOSIS. *** This
 // walk already knew which direction each path left in; it threw it away and reported only reflected /
 // transmitted / stuck. v4447 could therefore say the BTDF over-counts by 4.07x and could NOT say where,
 // because a scalar has no shape to compare against. With the exit direction kept, binning by |dir.z| shows
