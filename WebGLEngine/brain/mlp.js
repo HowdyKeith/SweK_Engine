@@ -16,13 +16,28 @@
 // Layer spec: { nIn, nOut, W: Float32Array(nOut*nIn) row-major,
 //               b: Float32Array(nOut), act: "none"|"relu"|"sigmoid" }
 
-const WGSL = /* wgsl */ `
+import { mlpLayerCpu } from "../render/brainTsl.mjs";   // v4470 -- the f32 twin, for the probe manifest
+
+// v4470 -- ONE BODY, TWO BINDING LAYOUTS, AND THE TEXT EXPORTED. The brain binds the kernel as it always has
+// (uniform 0, X 1, W 2, B 3, Y 4); the cross-backend corpus and the probe convention take the harness layout
+// (Y at 0, the uniform at 1, X W B at 2 3 4). The body is written once and rendered around either declaration,
+// and MLP_LAYER_WGSL -- the shipped rendering -- is what tools/ship/brainTsl-page.js imports now instead of
+// regexing this file's source. The uniform struct keeps its u32s in both layouts; a harness carries them as the
+// f32 whose bits they are (probeUniforms below).
+const MLP_DECL_SHIPPED = `
 struct MP { batch: u32, nIn: u32, nOut: u32, act: u32 };
 @group(0) @binding(0) var<uniform> P: MP;
 @group(0) @binding(1) var<storage, read>       X: array<f32>;   // batch x nIn
 @group(0) @binding(2) var<storage, read>       W: array<f32>;   // nOut x nIn
 @group(0) @binding(3) var<storage, read>       B: array<f32>;   // nOut
-@group(0) @binding(4) var<storage, read_write> Y: array<f32>;   // batch x nOut
+@group(0) @binding(4) var<storage, read_write> Y: array<f32>;   // batch x nOut`;
+const MLP_DECL_PROBE = `struct MP { batch: u32, nIn: u32, nOut: u32, act: u32 };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // batch x nOut
+@group(0) @binding(1) var<uniform> P: MP;
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // batch x nIn
+@group(0) @binding(3) var<storage, read>       W: array<f32>;   // nOut x nIn
+@group(0) @binding(4) var<storage, read>       B: array<f32>;   // nOut`;
+const MLP_BODY = `
 
 @compute @workgroup_size(8, 8)
 fn k_layer(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -40,8 +55,33 @@ fn k_layer(@builtin(global_invocation_id) gid: vec3<u32>) {
     Y[r * P.nOut + o] = acc;
 }
 `;
+export function mlpLayerWgsl({ probe = false } = {}) { return "\n" + (probe ? MLP_DECL_PROBE : MLP_DECL_SHIPPED) + MLP_BODY; }
+export const MLP_LAYER_WGSL = mlpLayerWgsl();
+const WGSL = MLP_LAYER_WGSL;
 
 const ACT = { none: 0, relu: 1, sigmoid: 2 };
+
+/** The harness layout's uniform: batch, nIn, nOut, act as u32 bits carried in a Float32Array. */
+export function probeUniforms({ batch, nIn, nOut, act = "none" }) {
+    const b = new ArrayBuffer(16), u = new Uint32Array(b); u[0] = batch; u[1] = nIn; u[2] = nOut; u[3] = ACT[act] ?? 0; return new Float32Array(b);
+}
+/** A seeded layer and input, the fixture the corpus and the manifest share. */
+export function probeFixture({ batch = 16, nIn = 8, nOut = 8, act = "relu", seed = 3 } = {}) {
+    let s = seed >>> 0; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+    const x = new Float32Array(batch * nIn), W = new Float32Array(nOut * nIn), b = new Float32Array(nOut);
+    for (let i = 0; i < x.length; i++) x[i] = Math.fround(u()); for (let i = 0; i < W.length; i++) W[i] = Math.fround(u() * 0.5); for (let i = 0; i < b.length; i++) b[i] = Math.fround(u() * 0.1);
+    return { batch, nIn, nOut, act, x, W, b };
+}
+// The probe manifest (docs/GPU-KERNEL-CONTRACT.md): the layer in the harness layout against render/brainTsl.mjs's
+// mlpLayerCpu -- the f32 twin in the kernel's own summation order, which that module's gate found load-bearing.
+// Tolerance ZERO: relu is a specified operation. A 2-D dispatch, which the harnesses take as [x, y] since v4470.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "mlp.mlpLayerWgsl", code: () => mlpLayerWgsl({ probe: true }), entryPoint: "k_layer", args: Object.freeze({ batch: 16, nIn: 8, nOut: 8, act: "relu", seed: 3 }),
+    pack: (a) => probeUniforms(a), inputs: (a) => { const F = probeFixture(a); return [{ binding: 2, data: F.x }, { binding: 3, data: F.W }, { binding: 4, data: F.b }]; },
+    outCount: (a) => a.batch * a.nOut, workgroups: (a) => [Math.ceil(a.nOut / 8), Math.ceil(a.batch / 8)],
+    cpu: (a) => { const F = probeFixture(a); return mlpLayerCpu({ nIn: F.nIn, nOut: F.nOut, W: F.W, b: F.b, act: F.act }, F.x, F.batch); }, tol: 0,
+    key: () => ({ acts: ACT }),
+})]);
 
 export class BatchedMLP {
     constructor(device, layers, batchCap = 64) {

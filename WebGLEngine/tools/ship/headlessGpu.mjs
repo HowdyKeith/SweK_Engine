@@ -291,7 +291,8 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
         const cp = enc.beginComputePass();
-        cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(workgroups); cp.end();
+        // v4470 -- `workgroups` may be [x, y, z] for a 2-D kernel (the brain's MLP layer dispatches (nOut/8, batch/8)).
+        cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, bytes);
         dev.queue.submit([enc.finish()]);
         await readBuf.mapAsync(M.READ);
@@ -413,7 +414,7 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
         const cp = enc.beginComputePass();
-        cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(workgroups); cp.end();
+        cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [n, n]);
         dev.queue.submit([enc.finish()]);
         await readBuf.mapAsync(MM.READ);

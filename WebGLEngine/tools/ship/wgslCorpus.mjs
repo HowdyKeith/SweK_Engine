@@ -63,6 +63,9 @@ import { WGSL_HMC_PROBE, probeUniforms as hmcProbeUniforms, makeBatch as hmcBatc
 import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
 // v4469 -- the step loop's first consumer
 import * as LG from "../../physics/chaos/logisticWgsl.mjs";
+// v4470 -- the brain's kernels, exported at last
+import * as MLP from "../../brain/mlp.js";
+import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
@@ -341,6 +344,14 @@ export function corpus() {
         { id: "logisticWgsl.logisticStepWgsl", from: "physics/chaos/logisticWgsl.mjs",
           why: "x <- r x (1 - x) per element -- two multiplies and a subtract, and chaotic, so a one-ulp disagreement between backends is an unrelated orbit in the step loop that runs it 200 times",
           opts: (() => { const F = LG.fixture(); return { code: LG.logisticStepWgsl(), outCount: F.count, uniforms: LG.packKnobs({ count: F.count }), workgroups: Math.ceil(F.count / 64), inputs: [{ binding: 2, data: F.x }, { binding: 3, data: F.r }] }; })() },
+        // v4470 -- the GPU Brain's MLP layer in the harness layout (a 2-D dispatch, the first in the corpus), and the
+        // flow-field solver's module compiled: four entry points, seven bindings, two atomic, an explicit layout
+        { id: "mlp.mlpLayerWgsl", from: "brain/mlp.js",
+          why: "the brain's batched MLP layer: a row-per-thread matmul with fused bias and relu, the kernel brain/brain.js and blobBrain.js run every tick -- graded here for the first time without regexing its source",
+          opts: (() => { const P = MLP.PROBES[0], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
+          why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
+          opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },
@@ -385,6 +396,9 @@ export const EXCLUDED = Object.freeze([
                     why: "a vs+fs pair sampling a texture through its sampler at a quarter size, so the derivatives pick the level; same gate, with an unchained control" }),
     Object.freeze({ id: "texelProbe.UINT_PROBE_WGSL", kind: "render pair, graded through the device",
                     why: "a vs+fs pair reading an rg16uint texture; same reason, same gate (tools/ship/deviceFormats-selfcheck.mjs)" }),
+    // v4470 -- the brain's shipped MLP layout: the same body as the probe entry, bound in the Deno brain's order
+    Object.freeze({ id: "mlp.MLP_LAYER_WGSL", kind: "same body, the consumer's binding layout",
+                    why: "brain/mlp.js renders one body in two layouts; mlp.mlpLayerWgsl (the harness layout) is in the corpus and this is the rendering BatchedMLP binds, uniform first" }),
     Object.freeze({ id: "slugShaderWgsl.slugCoreWgsl", kind: "source fragment",
                     why: "the shared Slug core (root code, solvers, CalcBandLoc, CalcCoverage, SlugRender) with no entry point; slugShaderWgsl and slugProbeWgsl are its two runnable hosts and both ARE in the corpus" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
@@ -426,7 +440,7 @@ export const EXCLUDED = Object.freeze([
  * *** THIS FILE MUST NOT COUNT ITSELF, *** which is the trap the tree has hit repeatedly: a file that grades a
  * marker and contains the marker grades its own prose. The scan skips this module and the gate that drives it.
  */
-export function census({ roots = ["render", "physics/render", "physics/xpbd", "physics/chaos", "shaders", "text"] } = {}) {
+export function census({ roots = ["render", "physics/render", "physics/xpbd", "physics/chaos", "shaders", "text", "brain"] } = {}) {
     const SELF = ["wgslCorpus.mjs", "crossBackend-selfcheck.mjs"];
     const found = [];
     const walk = (dir) => {

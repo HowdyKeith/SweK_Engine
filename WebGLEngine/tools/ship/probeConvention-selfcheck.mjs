@@ -49,6 +49,7 @@ export const PHYSICS_KERNEL_MODULES = Object.freeze([
     "physics/render/pathTracerWgsl.mjs", "physics/render/pathTracerGpu.mjs", "physics/render/rtPipeline.mjs",
     "physics/mpm/gpuKernel.mjs", "physics/xpbd/xpbdWgsl.mjs", "tools/roundhouse/hmcGpu.mjs",
     "physics/chaos/logisticWgsl.mjs",   // v4469 -- the step loop's first consumer
+    "brain/mlp.js", "brain/flowfield.js",   // v4470 -- the GPU Brain's kernels, exported
 ]);
 const val = (v, args) => (typeof v === "function" ? v(args) : v);
 

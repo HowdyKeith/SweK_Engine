@@ -28,6 +28,7 @@
 const WATER_LEVEL = 8.0;
 const BIG = 1e9;
 
+// v4470 -- exported as FLOWFIELD_WGSL below, so the WGSL census, the corpus and the probe convention see it by name.
 const WGSL = /* wgsl */ `
 struct Params {
     w: u32,
@@ -462,3 +463,15 @@ export class FlowFieldSolver {
         this._slots = [];
     }
 }
+
+// v4470 -- THE KERNEL TEXT, EXPORTED, and the probe manifest (docs/GPU-KERNEL-CONTRACT.md). Four entry points over
+// seven bindings, two of them atomic, with an explicit layout shared by all four: outside the one-buffer harness, so
+// the entry is device-graded and names the gate that holds the solver to its CPU twin (brain/flowfieldCpu.js).
+export const FLOWFIELD_WGSL = WGSL;
+export const PROBES = Object.freeze([Object.freeze({
+    id: "flowfield.FLOWFIELD_WGSL", code: () => FLOWFIELD_WGSL, entryPoint: "k_relax", device: true,
+    graded: "brain/tools/flowfield-selfcheck.mjs -- the field's floor minima counted against the CPU solver; the GPU solver runs on the brain's own device",
+    pack: ({ w = 16, h = 16, cell = 1, slopeK = 1, waterK = 1, impassDh = 0, ff = 1 } = {}) => { const b = new ArrayBuffer(32), u = new Uint32Array(b), f = new Float32Array(b); u[0] = w; u[1] = h; f[2] = cell; f[3] = slopeK; f[4] = waterK; f[5] = impassDh; u[6] = ff; return new Float32Array(b); },
+    cpu: null,
+    key: () => ({ waterLevel: WATER_LEVEL, big: BIG }),
+})]);

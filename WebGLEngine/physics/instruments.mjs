@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "brain-kernels", area: "method", name: "The GPU Brain's kernels exported, in the corpus, and graded where every other GPU gate runs",
+        gate: "tools/ship/brainKernels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "brain/mlp.js renders one body in two binding layouts (the brain's and the harnesses') and exports both with a probe manifest; the probe layout on Dawn returns render/brainTsl.mjs's f32 twin bit for bit (128 of 128, a 2-D dispatch); the shipped layout bound by the brain's own names through gfx/device.js returns the same bytes on the browser's WebGPU; brain/flowfield.js exports its four-entry module and it compiles on Dawn; tools/ship/brainTsl-page.js imports the kernel instead of regexing the module's source; brain/gpu.js's initGPU refuses a SwiftShader adapter by default and accepts it under allowSoftware or SWEK_ALLOW_SOFTWARE_GPU, reporting `software`, exercised on a stubbed adapter both ways.",
+        key: "*** THE BRAIN'S KERNELS COULD NOT BE GRADED WHERE EVERY OTHER GPU GATE RUNS, AND THE ONE GATE THAT TRIED REGEXED THEM OUT OF THE SOURCE. *** Now the census walks brain/, the corpus runs the MLP layer across both backends and through the device, and the flag changes what a gate may do, not what the brain does.",
+    },
+    {
         id: "step-loop", area: "method", name: "The step loop on the device: one state, two buffers, N dispatches, one readback",
         gate: "tools/ship/stepLoop-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "render/stepLoop.mjs through its first consumer, the logistic map (physics/chaos/logisticWgsl.mjs): 1,024 orbits over 200 steps on the browser's WebGPU bit-identical to the f32 twin, one, two and three steps (the holder alternates), two runs the same bits, a schedule that halves r on step 197 only matched bit for bit -- the semantics 'each step sees its own uniform', which a uniform written N times before one submit cannot give -- and on the null backend the alternating binds, one dispatch per step, one write per step under a schedule, refusals by name.",

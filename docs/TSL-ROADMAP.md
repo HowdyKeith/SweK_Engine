@@ -423,7 +423,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         in the corpus and carries a manifest. NOT CLAIMED: several state buffers or kernels per step (the cloth
         loop keeps its own runner), a staging ring per step (the flowfield's shape), the brain's Deno device.
      6. (task 29) The brain's kernels exported as text and in the corpus; brain/gpu.js accepting a software adapter
-        under a flag so the shipped kernels can be graded where every other GPU gate runs.
+        under a flag so the shipped kernels can be graded where every other GPU gate runs. BUILT at v4470:
+        brain/mlp.js renders one body in two binding layouts -- the brain's (uniform first, as BatchedMLP has
+        always bound it) and the harnesses' (Y at 0) -- exports both, and carries a probe manifest against
+        render/brainTsl.mjs's f32 twin; brain/flowfield.js exports its four-entry module; brain/ is a census
+        root; tools/ship/brainTsl-page.js imports the kernel it used to regex out of the module's source; and
+        initGPU takes allowSoftware (or SWEK_ALLOW_SOFTWARE_GPU) with the refusal still the default. The
+        harnesses take a [x, y, z] workgroup count, which the layer's 2-D dispatch needed. MEASURED by
+        tools/ship/brainKernels-selfcheck.mjs: the probe layout on Dawn returns the twin's 128 bytes exactly,
+        the shipped layout bound by the brain's names through the device returns the same bytes on the browser's
+        WebGPU, the flow-field module compiles, the refusal is exercised both ways on a stubbed adapter. NOT
+        CLAIMED: the brain PROCESS (Deno, its own device), the flow-field solver running here (its gate holds the
+        solver to its CPU twin), sigmoid layers.
      7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper.
      8. (task 31) The WGSL census over physics/mpm, tools/roundhouse and brain/, seeing .wgsl files too.
 

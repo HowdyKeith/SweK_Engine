@@ -7,7 +7,7 @@ async (a) => {
   try {
     const adapter = await navigator.gpu.requestAdapter();
     const dev = await adapter.requestDevice();
-    const SHIPPED = (await (await fetch("/brain/mlp.js")).text()).match(/const WGSL = \/\* wgsl \*\/ `([\s\S]*?)`;/)[1];
+    const SHIPPED = (await import("/brain/mlp.js")).MLP_LAYER_WGSL;   // v4470 -- the module exports its kernel; no regex over its source
     const ACT = { none: 0, relu: 1, sigmoid: 2 };
     const runRaw = async (code, entry, c, bindU) => {
       const mod = dev.createShaderModule({ code });

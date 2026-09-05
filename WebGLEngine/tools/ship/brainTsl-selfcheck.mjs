@@ -61,7 +61,7 @@ console.log("brainTsl-selfcheck -- the GPU Brain's MLP layer as a node graph, ag
 console.log("1. *** THE TWIN IS SHIPPED CODE THIS ROUND DID NOT GET TO DESIGN ***");
 {
     ok("*** brain/mlp.js carries the hand-written kernel, and it is not a fixture ***",
-        /const WGSL = \/\* wgsl \*\/ `/.test(MLP) && /@compute @workgroup_size\(8, 8\)/.test(MLP) && /fn k_layer/.test(MLP),
+        /export const MLP_LAYER_WGSL = mlpLayerWgsl\(\)/.test(MLP) && /@compute @workgroup_size\(8, 8\)/.test(MLP) && /fn k_layer/.test(MLP),   // v4470 -- exported, not regexed
         "@workgroup_size(8, 8), fn k_layer -- one dispatch per layer, activations ping-ponging");
     // *** DERIVED, AND THE FIRST NUMBER THIS ROUND WROTE DOWN WAS WRONG. *** The module header said "five
     // modules ship through it", from a `grep -rln mlp.js` that matched COMMENTS: rl/dockPolicy.js says "it

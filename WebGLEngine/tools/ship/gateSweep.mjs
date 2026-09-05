@@ -2037,6 +2037,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backends and through the device) and carries a manifest. Sabotages red at 5 / 3 / 7, and B is the bug " +
                  "the helper exists to know about.",
     }),
+    since92: Object.freeze({
+        at: "v4470", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/brainKernels-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on Dawn and on the browser's WebGPU through the device. The GPU Brain's kernels are exported: " +
+                 "brain/mlp.js renders one body in two binding layouts (the brain's, uniform first; the harnesses', Y at 0) " +
+                 "and carries a probe manifest against render/brainTsl.mjs's f32 twin; brain/flowfield.js exports its " +
+                 "four-entry module; brain/ is a census root; the corpus runs the layer across both backends and through the " +
+                 "device (128 of 128 exact everywhere) and compiles the flow-field module; tools/ship/brainTsl-page.js " +
+                 "imports the kernel it used to regex out of the module's source; initGPU takes allowSoftware with the " +
+                 "refusal still the default, exercised both ways on a stubbed adapter. The harnesses take [x, y, z] " +
+                 "workgroups, and the first edit that added it commented out the pass end on the same line -- caught by " +
+                 "the gate's own run before anything shipped. Sabotages red at 4 / 2 / 1, and B first crashed the gate " +
+                 "with no red line, so the check catches now.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
