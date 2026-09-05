@@ -146,11 +146,24 @@ and verified with different bytes assembled elsewhere -- see the v4068 note in .
 which stopped trying after ten red runs. CI verifies the PUBLISHED archive on three platforms; it does not
 make one.
 
-`releaseLedger-selfcheck.mjs` enforces the ratchet: *** you may not ship a new version while the last one is
-unreleased. *** It is checked about the PREVIOUS version, not the current one, because verify runs before the
-commit and the release is published after the tag -- so "ENGINE_VERSION has a release" would be red
-throughout every correct ship. Versions at or below the v4448 baseline are written-off debt and cannot be
-back-filled: a zip built today for v4301 would carry bytes v4301 never had.
+`releaseLedger-selfcheck.mjs` enforces a LAG BUDGET: *** main may run at most `lagBudget.maxVersionsBehind`
+versions ahead of the releases page. *** It counts versions that reached MAIN (read from `origin/main`'s
+changelog), not ones sitting on an unmerged branch, and it excludes the version being shipped -- verify runs
+before the commit and the release is published after the tag, so "ENGINE_VERSION has a release" would be red
+throughout every correct ship.
+
+*** v4453 REPLACED A HARD ZERO WITH THAT BUDGET, AND THE REASON IS STRUCTURAL. *** v4449's rule was "you may
+not ship a new version while the last one is unreleased" -- correct when the ship and the publish happen on
+one machine, and unsatisfiable here, because rounds are built where there are no credentials to publish and
+the rig publishes afterwards by hand. The previous version was therefore unreleased at EVERY ship, the gate
+went red three rounds running, and each time the answer was to raise the baseline. THREE RAISES IN THREE
+ROUNDS IS A GATE COLLECTING SIGNATURES. The budget is what the rule actually protected: not zero lag, but a
+fleet that does not fall behind.
+
+Two floors, and they are deliberately separate. `baseline.throughVersion` forgives versions already gone by
+and cannot be back-filled (a zip built today for v4301 would carry bytes v4301 never had); `lagBudget` bounds
+how far the NEXT ones may drift. A baseline raise cannot widen the budget -- if one edit did both, the escape
+hatch would swallow the rule one level up. Raising either owes a written paragraph the gate checks for.
 
 ## Never
 

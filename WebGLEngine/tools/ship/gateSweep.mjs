@@ -1719,6 +1719,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "one case was short-circuited by the once-per-page flag so it passed whatever the guard did, " +
                  "and the detector widening had no assertion at all and could have been undone in silence.",
     }),
+    // v4453 -- NO new gate file: releaseLedger-selfcheck widened, and the rule it enforces replaced.
+    since75: Object.freeze({
+        at: "v4453", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/releaseLedger-selfcheck.mjs (the hard ratchet becomes a lag budget, asked about MAIN)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box. Keith: 'fix the structure before v4453.' v4449's ratchet -- you may not " +
+                 "ship a new version while the last one is unreleased -- is right when the ship and the " +
+                 "publish happen on ONE machine and UNSATISFIABLE when they do not: rounds are built where " +
+                 "there are no credentials to publish, so the previous version is unreleased at every ship BY " +
+                 "CONSTRUCTION. It went red at v4450, v4451 and v4452, and each time the only reachable answer " +
+                 "was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A GATE COLLECTING SIGNATURES, and " +
+                 "the escape hatch being sanctioned is what hid it -- every write-off was reasonable and the " +
+                 "sequence was not. Now: the question is asked about MAIN (v4449's own words said main and it " +
+                 "read the working tree, so an unmerged branch counted as debt nobody could download), with a " +
+                 "fallback to the working tree that is a SUPERSET and therefore stricter; and the hard zero " +
+                 "becomes a stated LAG BUDGET of 3, against a failure of 3 releases in 261 versions -- 87x the " +
+                 "budget. An unstated budget FAILS rather than passing, and it lives outside baseline because " +
+                 "one edit doing both jobs is the escape hatch eating the rule one level up. Six sabotages, " +
+                 "MEASURED 3/3/1/0-then-0-then-1/1/0-then-1. *** BOTH ZEROS WERE THE SAME BLINDNESS: *** a " +
+                 "module reading the working tree while reporting 'origin/main' passed a check that restated " +
+                 "its own label, and then passed a COUNT comparison too, because at that moment the branch and " +
+                 "main were IDENTICAL and no count separates two identical lists. Closed with an injectable " +
+                 "reader and a fixture ledger whose floor is low enough for owed to come back NON-EMPTY -- an " +
+                 "empty owed-set proves nothing about which list built it. AND A NOTE ON METHOD: two reported " +
+                 "zeros were counted by grepping '^  FAIL', which A CRASHING GATE PRINTS NONE OF; one was a " +
+                 "syntax error in the sabotage read as a gate failing to notice. Graded on exit codes now.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

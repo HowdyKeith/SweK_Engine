@@ -121,5 +121,9 @@
     "minReleases": 25,
     "minLatest": 4438,
     "note": "A RELEASE THE FLEET WAS ALREADY RUNNING MUST NOT VANISH. Found by sabotage 2: deleting the newest row moved the reported lag from 10 to 148 and turned NOTHING red, because the lag is reported rather than asserted. These two numbers may only RISE, and refreshReleases raises them when it writes. A release deleted upstream -- or a ledger truncated by a bad merge -- now fails here instead of quietly telling the fleet to run something older."
+  },
+  "lagBudget": {
+    "maxVersionsBehind": 3,
+    "why": "*** HOW FAR THE FLEET MAY FALL BEHIND MAIN BEFORE THE SHIP STOPS. *** v4449's rule was a hard zero -- the previous version must be released -- which is correct when the ship and the publish happen on one machine and impossible when they do not. Rounds are built where there are no credentials to publish; the rig publishes later, by hand. So the previous version was unreleased at EVERY ship and the gate went red three rounds running (v4450, v4451, v4452), each answered by raising the baseline. THREE RAISES IN THREE ROUNDS IS A RULE THAT HAS BEEN SWITCHED OFF POLITELY. Three is the number of rounds that may sit on main unpublished before this refuses, chosen so a normal run of work is not interrupted and a real backlog still is: the failure this whole mechanism exists for was 3 releases across 261 versions, which is 87 times this budget. *** A BASELINE RAISE CANNOT MOVE THIS. *** The baseline forgives versions already gone by; this bounds the next ones, and if one edit could do both the escape hatch would swallow the rule again one level up. Raising THIS number is a separate decision, in a separate field, with its own paragraph owed."
   }
 }

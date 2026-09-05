@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7971512fb279f22506a6c382007662fe3713b990",
+ "head": "b113bac6ac0c031b69f7af492f6e909143cafdec",
  "bodies": {
   "box3d": [
    {
@@ -219,7 +219,7 @@
    {
     "path": "server.html",
     "bytes": 847120,
-    "sha": "7971512fb279f22506a6c382007662fe3713b990"
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -505,8 +505,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2918570,
-    "sha": "7971512fb279f22506a6c382007662fe3713b990"
+    "bytes": 2915151,
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "mpm3d.html",
@@ -551,7 +551,7 @@
    {
     "path": "server.html",
     "bytes": 847120,
-    "sha": "7971512fb279f22506a6c382007662fe3713b990"
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "shipavatar.html",
@@ -733,7 +733,7 @@
    {
     "path": "tsl-probe.html",
     "bytes": 4474,
-    "sha": "7971512fb279f22506a6c382007662fe3713b990"
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "tsl-rig.html",

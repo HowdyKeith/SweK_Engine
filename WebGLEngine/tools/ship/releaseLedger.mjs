@@ -42,6 +42,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -64,6 +65,39 @@ export function shippedVersions(root = ROOT) {
     } catch { return []; }
 }
 
+/**
+ * *** v4453 -- THE VERSIONS THAT REACHED MAIN, WHICH IS WHAT THE RULE WAS ALWAYS ABOUT. ***
+ *
+ * The rule's own words, written at v4449: "a version that reaches MAIN and never reaches the releases page is
+ * a version nobody outside this repo will ever run." It was then checked against the WORKING TREE's changelog
+ * -- which gains a round's entry in the same commit as the version bump, long before anything merges. So a
+ * round sitting on an unmerged branch counted as debt the fleet was owed, when nobody could download it and
+ * nobody was missing anything.
+ *
+ * THE FALLBACK IS STRICTER, NEVER LOOSER, AND THAT IS THE WHOLE OF WHY IT IS SAFE. If origin/main cannot be
+ * read -- no git, no remote ref, a fresh checkout -- this returns the working tree's list, which is a SUPERSET
+ * (it holds main's rounds plus any unmerged ones). A gate that cannot see main therefore over-reports debt and
+ * says which it did; the failure mode of a missing tool is a stricter check, not a quieter one.
+ */
+// *** THE READER IS INJECTABLE, AND TWO SABOTAGES ARE WHY. *** Swapping this function's answer for the
+// working tree's went ZERO RED twice, because at the moment it was tested the branch and main were IDENTICAL
+// -- no count could tell them apart, so a check comparing counts was unfalsifiable on the very state it ran
+// in. That is v4435's family: a check that cannot fail on the thing it is about. With `read` injected, a gate
+// can hand in a main that DIFFERS from the tree and see which one the arithmetic used.
+export function mainVersions(root = ROOT, { read } = {}) {
+    try {
+        const out = read ? read() : execFileSync("git", ["show", "origin/main:docs/CHANGELOG.md"],
+            { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+        const v = [...out.matchAll(/^## v(\d+)/gm)].map((m) => +m[1]).sort((a, b) => b - a);
+        if (v.length) return { versions: v, source: "origin/main", degraded: false, why: "" };
+        return { versions: shippedVersions(root), source: "working tree", degraded: true,
+                 why: "origin/main's changelog parsed to zero versions" };
+    } catch (e) {
+        return { versions: shippedVersions(root), source: "working tree", degraded: true,
+                 why: "origin/main unreadable (" + String((e && e.message) || e).split("\n")[0].slice(0, 90) + ")" };
+    }
+}
+
 export function readLedger(file = LEDGER) {
     try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
 }
@@ -83,21 +117,46 @@ export const num = (tag) => +String(tag || "").replace(/^v/, "") || 0;
  * UNRELEASED. *** It is false only when somebody actually skipped a release, it is true during a correct
  * ship, and it makes the gap unable to grow past one.
  */
-export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER } = {}) {
+export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = null } = {}) {
     const led = readLedger(file);
     const tree = engineVersion(eng), treeN = num(tree);
     const tags = (led && Array.isArray(led.releases) ? led.releases.map((r) => r.tag) : []);
     const relN = tags.map(num).filter(Boolean).sort((a, b) => b - a);
     const latest = relN.length ? relN[0] : 0;
     const shipped = shippedVersions(root);
+    const onMain = mainVersions(root, readMain ? { read: readMain } : {});
     const floor = led && led.baseline && +led.baseline.throughVersion || 0;
 
-    // Versions shipped AFTER the baseline, excluding the one being shipped right now, that have no release.
-    const owed = shipped.filter((v) => v > floor && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
+    // Versions that reached MAIN after the baseline, excluding the one being shipped right now, with no release.
+    const owed = onMain.versions.filter((v) => v > floor && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
+
+    // *** v4453 -- A LAG BUDGET, BECAUSE THE HARD ZERO MADE A WRITE-OFF THE ONLY ANSWER. ***
+    //
+    // v4449's ratchet said the previous version must be released, full stop. That is the right rule when the
+    // ship and the publish happen on ONE machine. They do not: rounds are built where there are no
+    // credentials to publish and the rig publishes later, by hand -- so the previous version is unreleased AT
+    // EVERY SHIP, BY CONSTRUCTION, and the gate went red three rounds running. Each time the answer was to
+    // raise the baseline, which is the sanctioned escape hatch, and THREE RAISES IN THREE ROUNDS IS A RULE
+    // THAT HAS BEEN SWITCHED OFF POLITELY. A gate whose only reachable state is "write off the debt" is not
+    // enforcing anything; it is collecting signatures.
+    //
+    // The budget is what the rule was actually protecting: not "zero lag" but "the fleet does not fall
+    // behind". 1.1% over 261 rounds is the failure; two or three rounds between publishes is a workflow.
+    // *** IT IS NOT PART OF baseline AND A WRITE-OFF CANNOT MOVE IT. *** The baseline forgives versions that
+    // already went by; this bounds how far the NEXT ones may drift, and if the same edit could do both then
+    // the escape hatch would have swallowed the rule again one level up.
+    const budget = led && led.lagBudget && +led.lagBudget.maxVersionsBehind;
+    const budgetStated = Number.isFinite(budget) && budget >= 0;
     return {
         tree, treeN, latest, latestTag: latest ? "v" + latest : "",
         behind: treeN && latest ? treeN - latest : null,
         releaseCount: relN.length, shippedCount: shipped.length, floor, owed,
+        mainCount: onMain.versions.length, owedSource: onMain.source, owedDegraded: onMain.degraded,
+        owedDegradedWhy: onMain.why,
+        budget: budgetStated ? budget : null, budgetStated,
+        // An UNSTATED budget is not an infinite one. A ledger with no lagBudget fails the gate rather than
+        // passing it -- the v4413 defect (a floor and no ceiling) wearing this file's clothes.
+        withinBudget: budgetStated ? owed.length <= budget : false,
         refreshedAt: led && led.refreshedAt || "",
         // The headline Keith's sentence is about: does releases/latest equal what the tree builds?
         fleetRunsWhatIsBuilt: !!(latest && treeN && latest === treeN),
