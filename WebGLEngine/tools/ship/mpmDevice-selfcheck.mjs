@@ -92,7 +92,9 @@ console.log("\n1. THE STAGES, THE BINDINGS PER STAGE, AND THE NULL BACKEND'S DIS
     const dev = codeOf(read("gfx/device.js"));
     ok("gfx/device.js answers `used` over the functions reachable from the entry point", /_reachableCode\(code, entryPoints\)/.test(dev) && /classify\(d\.wgsl, \[d\.entryPoint \|\| "main"\]\)/.test(dev));
     const page = codeOf(read("mpm-gpu-check.html"));
-    ok("  and mpm-gpu-check.html builds each stage's bind group from the bindings that stage uses", /USES = \{ clear: \[0, 2\], p2g: \[0, 1, 2, 4\], grid: \[0, 2, 3\], g2p: \[0, 1, 3\] \}/.test(page) && /entries\.filter\(\(e\) => USES\[stage\]\.includes\(e\.binding\)\)/.test(page));
+    // v4467 -- the page no longer builds bind groups at all: it runs the kernel through makeMpmDevice, whose per-stage
+    // binding is the device's per-entry-point scan (the fix v4466 first applied to the page by hand).
+    ok("  and mpm-gpu-check.html runs the kernel through makeMpmDevice, building no bind group of its own", /import \{ makeMpmDevice \} from "\/physics\/mpm\/mpmDevice\.mjs"/.test(page) && /makeMpmDevice\(dev, \{ nx: NX, ny: NY, block, walls, mode \}/.test(page) && !/createBindGroup|createComputePipeline/.test(page));
     ok("a backend without compute is refused by name, pointing at the twin", (() => { try { makeMpmDevice({ backend: "webgl2" }, SCENES.column, { params: PARAMS, alpha: ALPHA }); return false; } catch (e) { return /webgl2 backend has no compute; run physics\/mpm\/step\.mjs/.test(e.message); } })());
 }
 

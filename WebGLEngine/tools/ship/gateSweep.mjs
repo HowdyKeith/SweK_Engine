@@ -1985,6 +1985,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "five entries to every stage -- a validation error on any real device. Sabotages red at 7 / 2 / 6; B " +
                  "went 0 red the first time and earned a section over 2,007 matrices.",
     }),
+    since89: Object.freeze({
+        at: "v4467", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceCompute-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on the browser's WebGPU through gfx/device.js, held to the headless Dawn harness. " +
+                 "render/computeRun.mjs is the one way a compute kernel runs through the device -- buffers bound by the " +
+                 "names the WGSL declares, one dispatch in a frame, readback through the device, unknown and missing " +
+                 "names refused by name -- and corpusSpec() maps the harnesses' one-buffer signature onto it, so every " +
+                 "runnable corpus entry (18 kernels, 69,517 floats) runs through the device and returns THE SAME BYTES " +
+                 "as the harness: a third path to the same numbers, and every future corpus entry covered for free. " +
+                 "hmc-bench.html and mpm-gpu-check.html no longer build adapters, pipelines, bind groups or staging " +
+                 "buffers by hand. Sabotages red at 2 / 12 / 1, and C is a finding about the check rather than the " +
+                 "code: the API accepted every unpadded uniform in the corpus, so the 16-byte floor is the harnesses' " +
+                 "convention, kept for byte-identical inputs, and the gate header says so.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

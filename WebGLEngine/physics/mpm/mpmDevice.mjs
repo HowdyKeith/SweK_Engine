@@ -34,7 +34,7 @@ export function packParticles(ps) {
  *
  *   const sim = makeMpmDevice(device, scene, opts); sim.step(15); const { parts, flags } = await sim.read(); sim.destroy();
  */
-export function makeMpmDevice(device, scene, { h = 0.5, dt = 1 / 240, gy = -9.81, gx = 0, params, alpha } = {}) {
+export function makeMpmDevice(device, scene, { h = 0.5, dt = 1 / 240, gy = -9.81, gx = 0, params, alpha, wgsl = MPM_WGSL } = {}) {
     if (device.backend !== "webgpu" && device.backend !== "null")
         throw new Error("mpmDevice: the " + device.backend + " backend has no compute; run physics/mpm/step.mjs, the graded twin");
     const ps = restBlock(scene.block), N = ps.length, nodes = (scene.nx + 1) * (scene.ny + 1);
@@ -49,7 +49,7 @@ export function makeMpmDevice(device, scene, { h = 0.5, dt = 1 / 240, gy = -9.81
     const flags = device.buffer({ data: new Uint32Array(4), usage: "storage" });
     const pipes = {};
     for (const stage of STAGES) {
-        const c = device.compute({ wgsl: MPM_WGSL, entryPoint: stage });
+        const c = device.compute({ wgsl, entryPoint: stage });   // `wgsl` is an option so mpm-gpu-check.html can plant its stencil sabotage
         for (const b of c.all || c.bindings || []) if (b.used !== false) c.bind(b.name, { P, parts, acc, gv, flags }[b.name]);
         pipes[stage] = c;
     }

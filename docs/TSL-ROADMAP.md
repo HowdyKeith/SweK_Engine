@@ -390,7 +390,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         clamped: 2.9e-8 / 7.4e-8 / 7.4e-8 relative in the three scenes, the free-fall key at 2.9e-7 with drift
         exactly zero, two contended runs bit-identical. gfx/device.js answers a binding's `used` per entry point,
         which is what a multi-entry module's auto layouts need and what mpm-gpu-check.html had wrong as written.
-     3. (task 26) physics/ GPU kernels built through device.compute() instead of raw pipelines.
+     3. (task 26) physics/ GPU kernels built through device.compute() instead of raw pipelines. BUILT at v4467:
+        render/computeRun.mjs is the one way -- a kernel's buffers bound by the names its WGSL declares, one
+        dispatch in a device frame, readback through the device, unknown and missing names refused by name -- and
+        corpusSpec() maps the harnesses' one-buffer signature onto it, so tools/ship/deviceCompute-selfcheck.mjs
+        runs every runnable corpus entry (18 kernels, 69,517 floats) through the device on the browser's WebGPU
+        and holds each to the headless Dawn harness byte for byte: the device is a third path to the same bytes,
+        and every kernel that joins the corpus is covered by it for free. hmc-bench.html runs its kernel through
+        the runner and mpm-gpu-check.html through physics/mpm/mpmDevice.mjs; neither builds an adapter, a
+        pipeline, a bind group or a staging buffer of its own any more. The device carries powerPreference to the
+        adapter and the adapter's description on the handle. NOT CLAIMED: the corpus's texture entries (the
+        storage-texture path has no device twin), and the pages RUNNING on a rig.
      4. (task 27) The probe convention (packUniforms + probeCpu + keyCpu) on every WebGPU physics module, with a
         census check, instead of three modules of thirty.
      5. (task 28) A gated step-loop helper on the device, so samplers and solvers stop hand-rolling ping-pong buffers.

@@ -44,7 +44,9 @@
   <div class="note" id="note"></div>
 </div>
 <script type="module">
-import { MPM_WGSL, packParams, fixedPointScales, clampLimits, PF, PARTICLE_FLOATS } from "/physics/mpm/gpuKernel.mjs";
+import { MPM_WGSL, PF, PARTICLE_FLOATS } from "/physics/mpm/gpuKernel.mjs";
+import { makeMpmDevice } from "/physics/mpm/mpmDevice.mjs";
+import { requestDevice } from "/gfx/device.js";
 import { makeGrid } from "/physics/mpm/transfer.mjs";
 import { lame } from "/physics/mpm/constitutive.mjs";
 import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
@@ -78,13 +80,18 @@ function settle(tr, text, ok) {
 }
 const breathe = () => new Promise((r) => setTimeout(r, 30));
 
+// v4467 -- THROUGH gfx/device.js. The adapter, module, four pipelines, four bind groups and the staging buffer this page
+// built by hand are physics/mpm/mpmDevice.mjs's now (the same runner tools/ship/mpmDevice-selfcheck.mjs grades), and the
+// bind groups are per stage because the device answers a binding's `used` per entry point -- which is the rule this
+// page had wrong as written (one five-entry group for all four stages is a validation error on any real device).
 async function device() {
   const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
   showOriginBanner(probe);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!probe.available) throw new Error(probe.message);
-  const adapter = await navigator.gpu.requestAdapter();
-  if (!adapter) throw new Error("WebGPU is present but this system offered no adapter -- presence is not capability");
-  return adapter.requestDevice();
+  const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+  const dev = await requestDevice(canvas, { backend: "webgpu", offscreen: true });
+  if (!dev || dev.backend !== "webgpu") throw new Error("WebGPU is present but the device came up as " + (dev ? dev.backend : "nothing") + " -- presence is not capability");
+  return dev;
 }
 
 /** Run the shipped kernel for `steps` steps and hand back the particle buffer and the saturation counter. */
@@ -95,77 +102,12 @@ async function gpuRun(dev, { block = {}, walls = null, mode = 1, steps = 60 } = 
   // failing on the identical mistake. Its effect is that the nine weights no longer sum to one, and the
   // transfer then scatters mass and momentum SHORT -- silently, as a slightly light material.
   if (sabotage) src = src.replace("o.w1 = 0.75 -", "o.w1 = 0.755 -");
-
-  const mod = dev.createShaderModule({ code: src });
-  const info = await mod.getCompilationInfo?.();
-  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
-
-  const ps = restBlock(block), N = ps.length, nodes = (NX + 1) * (NY + 1);
-  const parts = new Float32Array(N * PARTICLE_FLOATS);
-  ps.forEach((p, i) => {
-    const o = i * PARTICLE_FLOATS;
-    parts[o + PF.px] = p.x; parts[o + PF.py] = p.y;
-    parts[o + PF.f00] = 1; parts[o + PF.f11] = 1;
-    parts[o + PF.p00] = 1; parts[o + PF.p11] = 1;
-  });
-
-  const ST = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
-  const bufParts = dev.createBuffer({ size: N * PARTICLE_FLOATS * 4, usage: ST });
-  const bufAcc = dev.createBuffer({ size: nodes * 5 * 4, usage: ST });
-  const bufGv = dev.createBuffer({ size: nodes * 4 * 4, usage: ST });
-  const bufFlags = dev.createBuffer({ size: 16, usage: ST });
-  const bufUni = dev.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  dev.queue.writeBuffer(bufParts, 0, parts);
-  dev.queue.writeBuffer(bufFlags, 0, new Uint32Array([0, 0, 0, 0]));
-
-  const cl = clampLimits();
-  const scales = fixedPointScales({ h: H });
-  dev.queue.writeBuffer(bufUni, 0, packParams({
-    nx: NX, ny: NY, nParticles: N, plasticMode: mode, h: H, dt: DT, gx: 0, gy: GY,
-    mu: MAT.mu, lambda: MAT.lambda, alpha: ALPHA, pmass: ps[0].m, pvol: ps[0].vol0,
-    thetaC: cl.thetaC, thetaS: cl.thetaS, walls, scales,
-  }));
-
-  const entries = [
-    { binding: 0, resource: { buffer: bufUni } }, { binding: 1, resource: { buffer: bufParts } },
-    { binding: 2, resource: { buffer: bufAcc } }, { binding: 3, resource: { buffer: bufGv } },
-    { binding: 4, resource: { buffer: bufFlags } },
-  ];
-  // v4466 -- PER STAGE, NOT THE SAME FIVE ENTRIES FOR ALL FOUR. A layout: "auto" pipeline holds only the bindings its
-  // entry point reaches (clear touches P and acc; grid never sees parts), and a bind group carrying a binding the
-  // layout lacks is a VALIDATION ERROR -- so as first written this page could not have run a single stage on a real
-  // device. Found when the kernel first ran through gfx/device.js (tools/ship/mpmDevice-selfcheck.mjs), whose
-  // per-entry usage scan is the same rule, applied by name.
-  const USES = { clear: [0, 2], p2g: [0, 1, 2, 4], grid: [0, 2, 3], g2p: [0, 1, 3] };
-  const pipes = {}, binds = {};
-  for (const stage of ["clear", "p2g", "grid", "g2p"]) {
-    pipes[stage] = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: stage } });
-    binds[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries: entries.filter((e) => USES[stage].includes(e.binding)) });
-  }
-
-  const wg = (x) => Math.ceil(x / 64);
-  const enc = dev.createCommandEncoder();
-  for (let s = 0; s < steps; s++) {
-    for (const [stage, count] of [["clear", nodes * 5], ["p2g", N], ["grid", nodes], ["g2p", N]]) {
-      const p = enc.beginComputePass();
-      p.setPipeline(pipes[stage]); p.setBindGroup(0, binds[stage]);
-      p.dispatchWorkgroups(wg(count)); p.end();
-    }
-  }
-  dev.queue.submit([enc.finish()]);
-
-  const read = dev.createBuffer({ size: N * PARTICLE_FLOATS * 4 + 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-  const e2 = dev.createCommandEncoder();
-  e2.copyBufferToBuffer(bufParts, 0, read, 0, N * PARTICLE_FLOATS * 4);
-  e2.copyBufferToBuffer(bufFlags, 0, read, N * PARTICLE_FLOATS * 4, 16);
-  dev.queue.submit([e2.finish()]);
-  await read.mapAsync(GPUMapMode.READ);
-  const raw = read.getMappedRange();
-  const out = new Float32Array(raw.slice(0, N * PARTICLE_FLOATS * 4));
-  const sat = new Uint32Array(raw.slice(N * PARTICLE_FLOATS * 4, N * PARTICLE_FLOATS * 4 + 16))[0];
-  read.unmap();
-  for (const b of [bufParts, bufAcc, bufGv, bufFlags, bufUni, read]) b.destroy();
-  return { parts: out, N, sat, m: ps[0].m };
+  const sim = makeMpmDevice(dev, { nx: NX, ny: NY, block, walls, mode }, { h: H, dt: DT, gy: GY, params: MAT, alpha: ALPHA, wgsl: src });
+  sim.step(steps);
+  const { parts, flags } = await sim.read();
+  const out = { parts, N: sim.count, sat: flags[0], m: sim.m };
+  sim.destroy();
+  return out;
 }
 
 /** The graded loop, on the identical fixture. Nothing here re-implements it. */

@@ -24,44 +24,25 @@
 </div>
 <script type="module">
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
-import { WGSL_HMC, HMC_FIXTURE, HMC_TOL, fixtureInv, makeBatch, adjudicateDeviceRun } from "./tools/roundhouse/hmcGpu.mjs";
+import { WGSL_HMC, HMC_FIXTURE, HMC_TOL, fixtureInv, makeBatch, adjudicateDeviceRun, probeUniforms } from "./tools/roundhouse/hmcGpu.mjs";
+import { requestDevice } from "/gfx/device.js";
+import { runCompute } from "/render/computeRun.mjs";
 
 const out = document.getElementById("out"), jsonEl = document.getElementById("json");
 let report = null;
 
-async function runGpu(device, { qin, pin, n }) {
-  const mod = device.createShaderModule({ code: WGSL_HMC });
-  const pipe = device.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
-  const inv = fixtureInv();
-  const ub = new ArrayBuffer(32), f = new Float32Array(ub), u = new Uint32Array(ub);
-  f[0] = inv[0]; f[1] = inv[1]; f[2] = inv[2]; f[3] = HMC_FIXTURE.mu[0]; f[4] = HMC_FIXTURE.mu[1]; f[5] = HMC_FIXTURE.eps;
-  u[6] = HMC_FIXTURE.L; u[7] = n;
-  const uni = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  device.queue.writeBuffer(uni, 0, ub);
-  const mk = (arr, extra = 0) => { const b = device.createBuffer({ size: arr.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | extra });
-    device.queue.writeBuffer(b, 0, arr); return b; };
-  const bQ = mk(qin), bP = mk(pin);
-  const bQo = device.createBuffer({ size: qin.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-  const bPo = device.createBuffer({ size: pin.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-  const sQ = device.createBuffer({ size: qin.byteLength, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-  const sP = device.createBuffer({ size: pin.byteLength, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-  const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
-    { binding: 0, resource: { buffer: uni } }, { binding: 1, resource: { buffer: bQ } }, { binding: 2, resource: { buffer: bP } },
-    { binding: 3, resource: { buffer: bQo } }, { binding: 4, resource: { buffer: bPo } } ] });
+// v4467 -- THROUGH gfx/device.js, NOT A HAND-BUILT PIPELINE. render/computeRun.mjs binds the kernel's five buffers by
+// the names the WGSL declares and reads the two outputs back through the device; the adapter, module, pipeline, bind
+// group and staging buffers this page used to build itself are the device's now, the same code every other GPU
+// consumer in the tree runs. The kernel text is unchanged (WGSL_HMC, byte for byte since v3282).
+async function runGpu(dev, { qin, pin, n }) {
+  const P = probeUniforms(n);   // the shipped struct: i00 i01 i11 mu0 mu1 eps as f32, L and n as u32 bits
   const t0 = performance.now();
-  const enc = device.createCommandEncoder();
-  const pass = enc.beginComputePass();
-  pass.setPipeline(pipe); pass.setBindGroup(0, bg);
-  pass.dispatchWorkgroups(Math.ceil(n / 64));
-  pass.end();
-  enc.copyBufferToBuffer(bQo, 0, sQ, 0, qin.byteLength);
-  enc.copyBufferToBuffer(bPo, 0, sP, 0, pin.byteLength);
-  device.queue.submit([enc.finish()]);
-  await sQ.mapAsync(GPUMapMode.READ); const qout = new Float32Array(sQ.getMappedRange().slice(0)); sQ.unmap();
-  await sP.mapAsync(GPUMapMode.READ); const pout = new Float32Array(sP.getMappedRange().slice(0)); sP.unmap();
+  const r = await runCompute(dev, { code: WGSL_HMC, entryPoint: "main", workgroups: Math.ceil(n / 64),
+    buffers: { P: { data: P, usage: "uniform" }, qin: { data: qin }, pin: { data: pin }, qout: { size: qin.byteLength }, pout: { size: pin.byteLength } },
+    read: ["qout", "pout"] });
   const ms = performance.now() - t0;
-  for (const b of [uni, bQ, bP, bQo, bPo, sQ, sP]) b.destroy?.();
-  return { qout, pout, ms };
+  return { qout: new Float32Array(r.qout), pout: new Float32Array(r.pout), ms };
 }
 
 document.getElementById("run").onclick = async () => {
@@ -76,11 +57,11 @@ document.getElementById("run").onclick = async () => {
       return;
     }
   }
-  out.textContent = "requesting adapter…";
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-  if (!adapter) { out.innerHTML = "<span class='bad'>no adapter</span>"; return; }
-  const device = await adapter.requestDevice();
-  const info = adapter.info || {};
+  out.textContent = "requesting the device…";
+  const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;   // the device wants a canvas; nothing is drawn
+  const device = await requestDevice(canvas, { backend: "webgpu", offscreen: true, powerPreference: "high-performance" });
+  if (!device || device.backend !== "webgpu") { out.innerHTML = "<span class='bad'>no WebGPU device (" + (device ? device.backend : "none") + ")</span>"; return; }
+  const info = device.adapterInfo || {};
   const batch = makeBatch(4096, 77);
   out.textContent = "dispatching 4096 chains…";
   const { qout, pout, ms } = await runGpu(device, batch);

@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "device-compute", area: "render", name: "One way to run a compute kernel through the device, held to the harness on the whole corpus",
+        gate: "tools/ship/deviceCompute-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "render/computeRun.mjs: a kernel's buffers bound by the names its WGSL declares, one dispatch in a device frame, readback through the device; every runnable entry of the cross-backend corpus (18 kernels, 69,517 floats) run through it on the browser's WebGPU and held byte for byte to the headless Dawn harness; unknown and missing buffer names refused by name; hmc-bench.html and mpm-gpu-check.html read from source as device consumers with no hand-built pipeline.",
+        key: "*** THE DEVICE IS A THIRD PATH TO THE SAME BYTES. *** The corpus has held the browser's WebGPU and Dawn to each other since v4294 through two harnesses with a signature of their own; through gfx/device.js, bound by name, all 18 runnable kernels return the same bytes as the harness -- and every entry that ever joins the corpus is covered for free.",
+    },
+    {
         id: "mpm-device", area: "fluids", name: "The MPM kernel on a GPU, through the device, held to the graded loop",
         gate: "tools/ship/mpmDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "physics/mpm/gpuKernel.mjs's four stages on the browser's WebGPU through physics/mpm/mpmDevice.mjs: free fall, the collapsing column and the Drucker-Prager pile against physics/mpm/step.mjs particle by particle over 15 steps (a-priori 1e-5 relative, from the interpreter's record), the discrete free-fall parabola over 120 steps within 1e-4 with drift exactly zero, two contended runs bit-identical; the module compiling on Dawn; the null backend's per-stage bindings and dispatch count.",

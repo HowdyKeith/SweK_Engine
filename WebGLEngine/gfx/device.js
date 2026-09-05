@@ -429,7 +429,10 @@ const GPU_USAGE = (usage) => {
 };
 async function webgpuBackend(canvas, opts = {}) {
     if (typeof navigator === "undefined" || !navigator.gpu) return null;
-    const adapter = await navigator.gpu.requestAdapter(); if (!adapter) return null;
+    // v4467 -- `powerPreference` travels ("high-performance" for a bench page), and the adapter's own description
+    // rides on the handle as `adapterInfo`, so a page that reports a vendor no longer needs navigator.gpu itself.
+    const adapter = await navigator.gpu.requestAdapter(opts.powerPreference ? { powerPreference: opts.powerPreference } : undefined); if (!adapter) return null;
+    const adapterInfo = (() => { try { const i = adapter.info || {}; return { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null }; } catch (e) { return { vendor: null, architecture: null, description: null }; } })();
     const gpu = await adapter.requestDevice(); const ctx = (canvas && canvas.getContext) ? canvas.getContext("webgpu") : null; if (!ctx) return null; const fmt = navigator.gpu.getPreferredCanvasFormat();
     // *** Level 11 -- `offscreen: true` RENDERS INTO AN OWNED TEXTURE AND NEVER PRESENTS. *** Measured on the build
     // box's headless shell: ANY render pass whose attachment is the canvas's current texture loses the device
@@ -548,7 +551,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
         p._stor[n] = { buf, offset: o.offset || 0, size: o.size || 0 }; p._gen++;
     };
     const dev = {
-        backend: "webgpu", gpu, ctx, fmt, offscreen, depth,
+        backend: "webgpu", gpu, ctx, fmt, offscreen, depth, adapterInfo,
         /** The frame's depth texture as a bindable handle (null until a frame has cleared, or with depth off). */
         depthTexture: () => (dtex ? { gpu: dtex, view: dtex._view, w: dW, h: dH, nearest: true, depth: true } : null),
         buffer: (d) => { const usage = _usageList(d.usage); const size = Math.max(4, Math.ceil((d.data ? d.data.byteLength : (d.size || 0)) / 4) * 4);
