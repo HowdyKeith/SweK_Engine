@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="demo:desc" content="Slug text cost on THIS machine's GPU: a wall of glyphs per face at five sizes and three squashes, timed by GPU timestamps where the device was granted them, beside the atlas's own curves-per-band statistics -- the numbers the band-count question needs before anybody tunes one.">
+<title>SweK -- Slug on the rig</title>
+<style>
+  html, body { margin: 0; background: #06080a; color: #d7e0d9; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #out { padding: 12px 16px; max-width: 78em; }
+  .ok { color: #9fe0b8; } .fail { color: #f08080; } .warn { color: #f0e29e; } b { color: #fff; }
+  table { border-collapse: collapse; margin: 8px 0; } td, th { padding: 1px 10px 1px 0; text-align: right; } th { color: #9fb8a8; font-weight: normal; } td:first-child, th:first-child { text-align: left; }
+  textarea { width: 100%; height: 7em; background: #0b1010; color: #9fb8a8; border: 1px solid #23302a; font: 11px ui-monospace, monospace; }
+  canvas { display: block; width: 100%; background: #04060a; }
+</style>
+</head>
+<body>
+<!--
+  v4490 -- SLUG ON THE RIG (task 9). The reviewed plan estimated fragments from distance and proposed raising band counts
+  when a frame passed 1.5 ms. This page MEASURES instead: for every registered face (text/fontRegistry.mjs, Sawarabi
+  Gothic the dense CJK case) a wall of glyphs at five sizes and three squashes (an anisotropic scale standing in for the
+  grazing angle at which fwidth grows), timed on the GPU through gfx/device.js frame({ timing: true }) where the device
+  was granted timestamp-query and by performance.now() around the frame otherwise -- labelled as such -- beside the
+  atlas's own curves-per-band statistics (render/slugRig.mjs atlasStats). Save the JSON as tools/ship/slug-rig.json and
+  tools/ship/slugRig-selfcheck.mjs grades it; until then the cost is RIG-PENDING. ?webgl=1 forces WebGL2; ?quick=1 runs
+  a short plan (the ship gate uses it).
+-->
+<div id="out">starting&hellip;</div>
+<canvas id="c" width="1024" height="384"></canvas>
+<textarea id="json" readonly></textarea>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { layoutText } from "./text/slugText.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { rigPlan, atlasStats, wallPixels, FRAMES_PER_CONFIG, RIG_SIZES, RIG_SQUASHES } from "./render/slugRig.mjs";
+
+const out = document.getElementById("out"), cvs = document.getElementById("c"), lines = [];
+const say = () => { out.innerHTML = lines.join("<br>"); };
+const q = new URLSearchParams(location.search);
+const QUICK = q.get("quick") === "1", W = cvs.width, H = cvs.height;
+const result = { page: "slug-rig.html", at: "v4490", ua: navigator.userAgent, when: new Date().toISOString(), backend: null, timestamps: false, features: [], language: null, quick: QUICK, W, H, faces: {}, rows: [] };
+const median = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+// the four rows read as (m.x, m.y, -, m.w): pixels in, clip out, y down from the top; the squash scales the y rows
+const rows = (px, py, squash) => new Float32Array([2 / W, 0, 0, (2 / W) * px - 1, 0, (2 / H) * squash, 0, 1 - (2 / H) * py, 0, 0, 0, 0, 0, 0, 0, 1]);
+
+async function main() {
+    let device;
+    try { device = await requestDevice(cvs, q.get("webgl") === "1" ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+    catch (e) { lines.push('<span class="fail">requestDevice threw: ' + e.message + "</span>"); return say(); }
+    if (!device || device.backend === "null") { lines.push('<span class="fail">no GPU backend here (WebGPU needs a secure origin; WebGL2 a context)</span>'); return say(); }
+    result.backend = device.backend; result.timestamps = !!device.capabilities.timestamps; result.features = device.features.slice();
+    result.language = device.backend === "webgpu" ? "wgsl" : "glsl";
+    lines.push(`backend <b>${device.backend}</b> -- features granted: ${result.features.join(", ") || "none"} -- timing by <b>${result.timestamps ? "GPU timestamps" : "performance.now() around the frame (CPU time, not GPU time)"}</b>`);
+    say();
+    const plan = rigPlan().filter((p) => !QUICK || (p.squash === 1 && (p.size === RIG_SIZES[0] || p.size === RIG_SIZES[RIG_SIZES.length - 1])));
+    const faces = new Map();
+    for (const p of plan) {
+        if (!faces.has(p.face)) {
+            let font; try { font = parseFont(await (await fetch(p.url)).arrayBuffer()); } catch (e) { lines.push(`<span class="fail">${p.face}: ${e.message}</span>`); say(); continue; }
+            const chars = [...new Set([...p.text])].join("");
+            const fd = new SlugFontDevice(device, font, chars);
+            if (device.backend === "webgpu" && typeof fd.desc.shaders.wgsl !== "string") { lines.push(`<span class="fail">${p.face}: no WGSL twin on WebGPU -- refused</span>`); say(); continue; }
+            const st = atlasStats(fd.atlas); result.faces[p.face] = { ...st, atlasKiB: Math.round(fd.byteSize / 1024), logWidth: fd.logWidth };
+            faces.set(p.face, { font, fd });
+            lines.push(`${p.face}: ${st.glyphs} glyphs, ${st.curves} curves, ${st.bands} bands -- <b>${st.meanCurvesPerBand.toFixed(2)}</b> curves per band on average, ${st.maxCurvesPerBand} at most, ${st.meanBandsPerGlyph.toFixed(1)} bands a glyph`); say();
+        }
+        const f = faces.get(p.face); if (!f) continue;
+        // the wall: lines of the text until the canvas is full, at this size and squash
+        const lineH = p.size * 1.3 * p.squash, nLines = Math.max(1, Math.floor(H / lineH));
+        const laid0 = layoutText(f.font, p.text, { size: p.size });
+        const reps = Math.max(1, Math.ceil(W / Math.max(1, laid0.width)));
+        const text = Array.from({ length: nLines }, () => p.text.repeat(reps)).join("\n");
+        const b = new SlugDeviceBatch(f.fd); const laid = b.set(text, { size: p.size, color: [0.92, 0.95, 1, 1], lineHeight: 1.3 });
+        const pixels = wallPixels(laid, (gi) => f.fd.entryFor(gi), p.squash);
+        const times = [];
+        for (let k = 0; k < FRAMES_PER_CONFIG; k++) {
+            const draw = ({ pass }) => { pass.clear([0.02, 0.031, 0.024, 1]); b.draw(pass, rows(8, p.size * p.squash + 4, p.squash), [W, H]); };
+            if (result.timestamps) { const r = await device.frame(draw, { timing: true }); times.push(r.gpuMs.render); }
+            else { const t0 = performance.now(); device.frame(draw); if (device.gl) device.gl.finish(); else if (device.gpu) await device.gpu.queue.onSubmittedWorkDone(); times.push(performance.now() - t0); }
+        }
+        b.destroy();
+        const ms = median(times), row = { face: p.face, size: p.size, squash: p.squash, frames: times.length, glyphs: laid.glyphs.length, lines: laid.lines, pixels: Math.round(pixels), msMedian: ms, msMin: Math.min(...times), source: result.timestamps ? "gpu" : "cpu", nsPerPixel: pixels > 0 ? ms * 1e6 / pixels : null };
+        result.rows.push(row);
+        await new Promise((r) => requestAnimationFrame(r));
+    }
+    // the table
+    const t = ['<table><tr><th>face</th><th>px</th><th>squash</th><th>glyphs</th><th>pixels</th><th>ms median</th><th>ms min</th><th>ns/pixel</th><th>by</th></tr>'];
+    for (const r of result.rows) t.push(`<tr><td>${r.face}</td><td>${r.size}</td><td>${r.squash}</td><td>${r.glyphs}</td><td>${r.pixels}</td><td${r.msMedian > 1.5 ? ' class="warn"' : ""}>${r.msMedian.toFixed(3)}</td><td>${r.msMin.toFixed(3)}</td><td>${r.nsPerPixel == null ? "-" : r.nsPerPixel.toFixed(1)}</td><td>${r.source}</td></tr>`);
+    t.push("</table>");
+    const worst = result.rows.reduce((m, r) => (!m || r.msMedian > m.msMedian ? r : m), null);
+    lines.push(t.join(""));
+    if (worst) lines.push(`worst row: ${worst.face} at ${worst.size} px, squash ${worst.squash}: ${worst.msMedian.toFixed(3)} ms for ${worst.pixels} pixels; ${result.rows.filter((r) => r.msMedian > 1.5).length} of ${result.rows.length} rows over the plan's 1.5 ms`);
+    lines.push(`<span class="warn">Save the JSON below as tools/ship/slug-rig.json; tools/ship/slugRig-selfcheck.mjs grades it. Until a rig signs one the cost is RIG-PENDING${result.timestamps ? "" : " -- and this run timed the CPU, not the GPU"}.</span>`);
+    document.getElementById("json").value = JSON.stringify(result);
+    say();
+}
+main().catch((e) => { lines.push('<span class="fail">' + (e && e.message || e) + "</span>"); result.failed = String(e && e.message || e); document.getElementById("json").value = JSON.stringify(result); say(); });
+</script>
+</body>
+</html>

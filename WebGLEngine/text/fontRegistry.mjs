@@ -69,6 +69,14 @@ export const FONTS = Object.freeze([
         role: "the minimal sans, standing in for Inter (variable-only on every host this box can reach); the TTF build, not the CFF one",
         packs: Object.freeze([Object.freeze({ set: "label", sha256: "8d25bea2f6cec9deab3daaa28bc56a1dcc047af08efbc8b19bb6b881d2fbb475" })]),
     }),
+    Object.freeze({
+        family: "Sawarabi Gothic", dir: "sawarabi-gothic", file: "SawarabiGothic-Regular.ttf", licence: "SawarabiGothic-OFL.txt", rfn: null,
+        source: "https://raw.githubusercontent.com/google/fonts/main/ofl/sawarabigothic/SawarabiGothic-Regular.ttf", fetched: "2026-09-05",
+        sha256: "04f2f9111bb69cb8d3706c27b44879c2c0fac593a11edf5cfe8cec1efc92c789",
+        expect: Object.freeze({ glyphs: 6945, unitsPerEm: 1000, kerning: "none", pair: ["A", "V", 0] }),
+        role: "the dense glyf CJK face for slug-rig.html (v4490): 6,945 glyphs, a kanji carrying 94 curves against a Latin capital's 11 -- the loop-cost worst case measured rather than presumed; no kerning table at all; 1.9 MB, so a rig face and not a label face",
+        packs: Object.freeze([]),
+    }),
 ]);
 
 /** The path of a family's font file and licence file, relative to WebGLEngine. */

@@ -52,7 +52,8 @@ ok(CHAR_SETS.label === LABEL_CHARS, "the registry's `label` alphabet IS ev/esShi
 const fonts = new Map();
 for (const f of FONTS) {
     const font = parseFont(new Uint8Array(fs.readFileSync(path.join(ENG, fontPath(f))))); fonts.set(f.family, font);
-    ok(Array.isArray(f.packs) && f.packs.length >= 1 && f.packs.every((p) => CHAR_SETS[p.set] && /^[0-9a-f]{64}$/.test(String(p.sha256))), `${f.family}: declares at least one pack, each of a known alphabet with a digest`, (f.packs || []).map((p) => p.set).join());
+    // v4490 -- a family may declare NO pack (Sawarabi Gothic is a rig face, 6,945 glyphs, drawn from its TrueType by slug-rig.html)
+    ok(Array.isArray(f.packs) && f.packs.every((p) => CHAR_SETS[p.set] && /^[0-9a-f]{64}$/.test(String(p.sha256))), `${f.family}: declares ${f.packs.length} pack(s), each of a known alphabet with a digest`, (f.packs || []).map((p) => p.set).join() || "none (a rig face)");
     for (const p of f.packs || []) {
         const abs = path.join(ENG, packPath(f, p.set));
         if (!fs.existsSync(abs)) { ok(false, `${f.family}/${p.set}: the pack file is on disk`, packPath(f, p.set)); continue; }
@@ -112,7 +113,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const W = 320, H = 72, SIZE = 28, ORIGIN = [10, 50];
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT: PHRASE, CHARS: CHAR_SETS.label, packs: FONTS.map((f) => ({ family: f.family, font: "/" + fontPath(f), pack: "/" + packPath(f, "label") })) }, timeoutMs: 240000, script: `async (a) => {
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT: PHRASE, CHARS: CHAR_SETS.label, packs: FONTS.filter((f) => f.packs.some((p) => p.set === "label")).map((f) => ({ family: f.family, font: "/" + fontPath(f), pack: "/" + packPath(f, "label") })) }, timeoutMs: 240000, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js"); const { parseFont } = await import("/text/slugFont.js"); const { decodePack } = await import("/text/slugPack.mjs"); const M = await import("/render/slugDevice.mjs");
         const { W, H, SIZE, TEXT, CHARS } = a; const [px, py] = a.ORIGIN;
         const rows = new Float32Array([2 / W, 0, 0, (2 / W) * px - 1, 0, 2 / H, 0, 1 - (2 / H) * py, 0, 0, 0, 0, 0, 0, 0, 1]);
@@ -140,9 +141,9 @@ else {
     ok(r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, "the harness ran both backends", r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : r.reason);
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         for (const bk of ["webgpu", "webgl2"]) { const o = r.result[bk];
-            for (const f of FONTS) { const q = o.families[f.family];
+            for (const f of FONTS.filter((x) => x.packs.some((p) => p.set === "label"))) { const q = o.families[f.family];
                 ok(q && q.same === q.total && q.lit > 300 && o.errs.length === 0, `*** ${bk}: ${f.family} drawn FROM THE PACK is the parse path's picture on every pixel (${q.same} of ${q.total}, ${q.lit} lit) ***`, q ? `parse+pack ${q.parseMs.toFixed(1)} ms, fetch+decode+upload ${q.packMs.toFixed(1)} ms` : "no result"); } }
-        report("browser, parse path against pack path, ms per family (WebGPU)", FONTS.map((f) => { const q = r.result.webgpu.families[f.family]; return `${f.family} ${q.parseMs.toFixed(0)} / ${q.packMs.toFixed(0)}`; }).join("; "));
+        report("browser, parse path against pack path, ms per family (WebGPU)", FONTS.filter((x) => x.packs.some((p) => p.set === "label")).map((f) => { const q = r.result.webgpu.families[f.family]; return `${f.family} ${q.parseMs.toFixed(0)} / ${q.packMs.toFixed(0)}`; }).join("; "));
     }
 }
 

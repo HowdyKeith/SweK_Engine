@@ -484,6 +484,24 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         opportunity after a hyphen, and a right-to-left line, which are items 11 and below.
      9. A slug-rig.html measuring fragment cost by size, angle and band count on Keith's boxes, including one
         dense glyf CJK face, before any band-count tuning.
+        BUILT at v4490 (task 9), RIG-PENDING: slug-rig.html (linked from the front door) draws a wall of glyphs per
+        vendored face -- Plex, Source Sans 3, Cinzel, JetBrains Mono, and Sawarabi Gothic vendored this round as the
+        dense CJK case (6,945 glyphs, static glyf, no kerning, so no label pack) -- at five sizes and three SQUASHES,
+        twelve frames each, timed by the device's GPU timestamps where timestamp-query was granted and by
+        performance.now() otherwise, and every row says which (`source`). Two things the item asked for are not on
+        the page and the reasons are written down: the ANGLE is a squash of the y rows because the shipped vertex
+        stage is a 2-D affine with no perspective to graze, and what grazing does to the fragment (one axis's pixels
+        per em shrink, fwidth grows, every pixel walks its band) a squash does exactly; and the BAND COUNT is not
+        varied because the atlas packs one split per glyph -- the page reports instead the atlas's own statistics
+        (render/slugRig.mjs atlasStats reads every band header packAtlas wrote), which is the number tuning needs.
+        MEASURED, and the plan's guess corrected: Plex's wall walks 6.55 curves per band (17 at most) and the kanji
+        wall 8.00 (19 at most), 1.22x, with 39 curves a glyph against 32 -- not the "about twice" and "three times
+        the curves" the gate's first draft wrote before reading the numbers. The band split does its job on the dense
+        face. The gate (tools/ship/slugRig-selfcheck.mjs) holds the module headless, loads the page here on the WebGL2
+        route with ?quick=1 (this box is SwiftShader, CPU-timed, and the rows say so; a presented WebGPU frame loses
+        the device on the headless shell) and grades tools/ship/slug-rig.json once a rig has saved one; until then it
+        says RIG-PENDING, and a quick run can never be taken for the rig's signature (the grader reports `quick`).
+        No band count changes on this box's numbers: that is the rig's number to answer.
     10. Curved text by tessellated strips with per-strip Jacobians, or a planar target resampled -- never by
         bending vertices, because SlugDilate's half-pixel push needs the Jacobian constant over the quad.
     11. Bidi shaping and the CJK fallback recorded as wont in tools/ship/todo.mjs with reasons (two-letter

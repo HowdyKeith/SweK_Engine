@@ -2415,6 +2415,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and render 6.558 ms, held above zero because a first draft spelled the write indices wrong and read zeros " +
                  "that looked like a coarse clock. Sabotages red at 1 / 1 / 1 / 1 -- B went 0 red first (a lying report hid behind an unasked entry) and the entry-for-entry row was added for it.",
     }),
+    since112: Object.freeze({
+        at: "v4490", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugRig-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green here, RIG-PENDING on the rig. slug-rig.html draws a wall of glyphs per vendored face (Sawarabi Gothic " +
+                 "vendored as the dense CJK case) at five sizes and three squashes, timed by GPU timestamps where granted and " +
+                 "labelled cpu otherwise, beside the atlas's own curves-per-band statistics; render/slugRig.mjs holds the plan, " +
+                 "atlasStats and a grader that refuses eight lies and reports a quick run as quick. MEASURED: the kanji wall walks " +
+                 "1.22x the curves per band of Plex's (8.00 against 6.55; 19 against 17 at most), 39 curves a glyph against 32 -- " +
+                 "the header's a-priori 2x and 3x were wrong and were corrected to the measurement. Sabotages red at 1 / 1 / 1 / 1 " +
+                 "-- A went 0 red first (the OFFSET field read as the count passed every ratio hold at 76 a band) and the " +
+                 "no-band-counts-more-than-its-glyph row was added for it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
