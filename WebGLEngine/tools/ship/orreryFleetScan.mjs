@@ -57,6 +57,21 @@ export const NOT_IMPORTERS = Object.freeze([
     // would conclude, so it joined keyhunt's fleet the moment it existed. The name-frozen ratchet said WHICH
     // file within the minute, which is the whole reason v4412 made the baseline a list instead of a count.
     "tools/ship/provenanceRecord-selfcheck.mjs",
+    // v4472: FIFTH instance, and the first to join FOUR fleets at once. tools/ship/orreryUniverse-selfcheck.mjs
+    // is a census OF the vendor directories: it readdirSync's vendor/box3d, vendor/jolt, vendor/slug and
+    // vendor/wasm/quickjs to assert facts about what is inside them, and imports none of them -- its only
+    // imports are node builtins and three world/ modules. So box3d, jolt, slug and wasm each gained a
+    // "dependant" that depends on nothing.
+    //
+    // *** IT ARRIVED IN THE SAME REPORT AS TWO GATES THAT BELONG IN THE BASELINE, AND THE REPORT CANNOT TELL
+    // THEM APART. *** carveGpu-selfcheck and tslIsing-selfcheck showed up under three-webgpu on the same run,
+    // and they really do `await import("/vendor/three-webgpu/three.webgpu.js")` -- genuine importers, recorded
+    // in DEPENDANTS_AT_V4410 as this ratchet instructs. Two arrivals, identical in the output ("ARRIVED: <file>"),
+    // opposite fixes: one goes in this list and one goes in the baseline. The name-frozen ratchet says WHICH
+    // FILE, which v4412 bought and is worth having; it does not say WHICH KIND, and the kinds are decided by
+    // whether the path is imported or merely named -- which is exactly the distinction the substring rule
+    // cannot draw.
+    "tools/ship/orreryUniverse-selfcheck.mjs",
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */
@@ -84,8 +99,31 @@ export function engineSources(engineRoot) {
  * commit, and world/orreryFleet.mjs's satSourced reports that rather than substituting a zero. The NUL
  * prefix on the format is what separates a commit line from a filename -- a filename can look like anything,
  * including a hex string, and splitting on shape rather than on a delimiter is how that goes wrong.
+ *
+ * *** v4472 -- "ABSENT" WAS DOING THE WORK OF TWO ANSWERS, AND ONE OF THEM WAS FALSE. ***
+ *
+ * `git log --name-only` PRINTS NO FILENAMES FOR A MERGE COMMIT. That is git's default and it is not a bug in
+ * git: a merge's diff is ambiguous, so the file list is suppressed unless -m or --first-parent asks for one.
+ * The consequence here is that a file whose most recent touch is a merge is INVISIBLE to the bulk pass, and
+ * the paragraph above then reads that absence as "untracked, and that is a real answer". It is not. The file
+ * is tracked, it has a commit, and the bake records `sha: null` for it.
+ *
+ * Found by adding tools/ship/tslIsing-selfcheck.mjs to a fleet: orreryFleet-selfcheck went red on "every
+ * satellite's commit is a full 40-character hash git actually gave us", naming that file, while
+ * `git log -1 -- <path>` answered 59c6046 immediately. That commit has two parents.
+ *
+ * FOUR TRACKED ENGINE FILES ARE IN THIS STATE out of 4410 -- microfacetWgsl-selfcheck, isingTsl,
+ * carveJudged-selfcheck and tslIsing-selfcheck -- which is why it went unnoticed until one of them became a
+ * satellite. THE FIX IS NOT -m. A merge shows its changes against EACH parent, so -m attributes a file to
+ * whichever parent diff prints first, which is a different question from "when was this last touched".
+ * Instead the bulk pass keeps its speed and anything it missed is ASKED DIRECTLY, one call per path. After
+ * that, absent means untracked -- the answer the paragraph above always claimed it meant.
+ *
+ * @param repoRoot   the git root
+ * @param resolve    repo-relative paths that MUST get a definite answer; any the bulk pass missed are queried
+ *                   individually. Pass none and the behaviour is the old bulk pass exactly.
  */
-export function lastCommits(repoRoot) {
+export function lastCommits(repoRoot, resolve = []) {
     let out = "";
     try {
         out = execFileSync("git", ["log", "--format=%x00%H", "--name-only"],
@@ -99,6 +137,17 @@ export function lastCommits(repoRoot) {
         if (!p) continue;
         if (!map.has(p)) map.set(p, sha);      // newest first, so the first sighting is the latest commit
     }
+    // The merge-blind remainder, asked one at a time. `git log -1 -- <path>` follows merges, so a path that
+    // is still absent after this really has no commit.
+    for (const p of resolve) {
+        if (map.has(p)) continue;
+        let sha1 = "";
+        try {
+            sha1 = execFileSync("git", ["log", "-1", "--format=%H", "--", p],
+                                { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+        } catch { sha1 = ""; }
+        if (/^[0-9a-f]{40}$/.test(sha1)) map.set(p, sha1);
+    }
     return map;
 }
 
@@ -109,15 +158,20 @@ export function lastCommits(repoRoot) {
  */
 export function scanFleets(engineRoot, repoRoot, bodyNames) {
     const files = engineSources(engineRoot);
-    const commits = lastCommits(repoRoot);
     const engineRel = path.relative(repoRoot, engineRoot).split(path.sep).join("/");
+    const keyOf = (rel) => (engineRel ? engineRel + "/" + rel : rel);
+    // Only the paths that will actually be RECORDED are resolved individually -- the satellites, not the
+    // whole tree -- so the merge-blind fallback costs one git call per satellite the bulk pass missed and
+    // nothing at all when it missed none.
+    const satellites = new Set();
+    for (const name of bodyNames) for (const rel of dependantsOf(name, files)) satellites.add(keyOf(rel));
+    const commits = lastCommits(repoRoot, [...satellites]);
     const out = {};
     for (const name of bodyNames) {
         out[name] = dependantsOf(name, files).sort().map((rel) => {
             let bytes = 0;
             try { bytes = fs.statSync(path.join(engineRoot, rel)).size; } catch {}
-            const key = engineRel ? engineRel + "/" + rel : rel;
-            return { path: rel, bytes, sha: commits.get(key) || null };
+            return { path: rel, bytes, sha: commits.get(keyOf(rel)) || null };
         });
     }
     return out;

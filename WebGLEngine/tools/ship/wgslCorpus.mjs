@@ -52,6 +52,9 @@ import { ANISO_WGSL } from "../../physics/render/microfacetAnisoWgsl.mjs";
 import { MIS_WGSL } from "../../physics/render/misWgsl.mjs";
 import { buildSampleWgsl } from "../../physics/render/microfacetSampleWgsl.mjs";
 import { buildWgsl as buildMicrofacetWgsl } from "../../physics/render/microfacetWgsl.mjs";
+// v4472 -- the two the same census named next, for the same reason it named the nine.
+import * as PTG from "../../physics/render/pathTracerGpu.mjs";
+import * as RTP from "../../physics/render/rtPipeline.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -210,6 +213,24 @@ export function corpus() {
         { id: "fresnelWgsl.FRESNEL_WGSL", from: "physics/render/fresnelWgsl.mjs", compileOnly: true,
           why: "the exact Fresnel equations against Schlick, v4416: Brewster, TIR and the split directional albedo",
           opts: { code: FRESNEL_WGSL, compileOnly: true, outCount: 0 } },
+        // *** v4472 -- TWO MORE, AND THE COMMENT ABOVE PREDICTED THEM IN WRITING. *** It says the census gate
+        // "is exiled over the ship-time budget, which is why nine accumulated instead of the first being
+        // caught on arrival." Two arrived after v4425 and accumulated for exactly that reason: crossBackend
+        // caught both on its first honest run and nothing ran it, because budgetExile recorded the gate as
+        // "REPAIRED HERE" at v4425 and a repaired entry was never looked at again.
+        //
+        // Compile-only on the same rule the nine took: each already RUNS on a device in its own gate --
+        // pathTracerGpu-selfcheck and rtPipeline-selfcheck both hand these to runWgslCompute and read numbers
+        // back -- so what the corpus adds is the SECOND BACKEND'S COMPILER, which is a different question from
+        // whether the numbers are right.
+        { id: "pathTracerGpu.traceWgsl", from: "physics/render/pathTracerGpu.mjs", compileOnly: true,
+          why: "the path tracer's compute kernel as it actually ships: a @compute entry with the cosine-weighted " +
+               "hemisphere sample and the sky term, both of which carry plant flags a mutation round switches on",
+          opts: { code: PTG.traceWgsl({}), compileOnly: true, outCount: 0 } },
+        { id: "rtPipeline.pipelineWgsl", from: "physics/render/rtPipeline.mjs", compileOnly: true,
+          why: "the ray-tracing pipeline stage the tracer feeds, gradient path included -- the second half of the " +
+               "same @compute claim and the one that varies by workgroup size",
+          opts: { code: RTP.pipelineWgsl({}), compileOnly: true, outCount: 0 } },
         // v4331 -- the hand-written compute twin the generated pass is graded against: the module's own lyapunov() in the
         // shell a transplant lands in. It is a FUNCTION of that shell, so the corpus builds one to compile it.
         { id: "lyapunovWgsl.lyapunovComputeWgsl", from: "render/lyapunovWgsl.mjs", compileOnly: true,

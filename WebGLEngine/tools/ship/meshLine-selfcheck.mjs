@@ -14,7 +14,7 @@ import {
     DEFAULTS, dedupe, normalise, miterFactor, shouldBevel, turnAngle, expandPolyline, jointsOf,
     MESHLINE_VS, MESHLINE_FS,
 } from "../../render/meshLine.mjs";
-import { codeOnly } from "./sourceScan.mjs";
+import { codeOnly, noComments } from "./sourceScan.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
@@ -272,8 +272,93 @@ console.log("\n7. the claim about the gap, kept honest");
         if (n) { sites += n; users.push(`${rel}${n > 1 ? " x" + n : ""}`); }
     }
     console.log(`  still drawing gl.LINES, all one pixel wide: ${sites} call sites in ${users.length} files -- ${users.join(", ")}`);
+
+    // *** v4472 -- ONE ASSERTION WAS CARRYING TWO CLAIMS, AND IT REPORTED THE WRONG ONE AS FALSE. ***
+    //
+    // This read `sites === 7 && users.length === 5` under the label "the seven call sites the module header
+    // names are still there". Those are different claims: the label is about THE NAMED SEVEN (nothing was
+    // silently converted or deleted), the arithmetic is a tree-wide ratchet (nothing new appeared). When
+    // gfx/device.js arrived the gate printed "the seven call sites... are still there -- 8 sites in 6 files",
+    // which reads as though some of the seven had gone missing. ALL SEVEN ARE EXACTLY WHERE THEY WERE. The
+    // gate was right that something changed and wrong about what, and it was in the exiled bucket -- recorded
+    // OWED at v4425 -- so the misreport sat there unread.
+    //
+    // *** AND THE ARRIVAL IS NOT AN EIGHTH CALL SITE. *** gfx/device.js does not draw anything: line 151 is
+    // the device layer's topology switch, `d.topology === "line-list" ? gl.LINES : gl.TRIANGLES`, added at
+    // v4301 -- seventy-six versions after this module's header enumerated the tree. It is a DIFFERENT KIND of
+    // thing and a worse one for this module's purposes: a named call site is one place that chose a one-pixel
+    // line, while a topology switch is every pipeline that ever asks for "line-list", which an enumeration of
+    // call sites structurally cannot see. So it is named as its own fact rather than folded into a count that
+    // would make it look like a seventh wireframe.
+    const NAMED = Object.freeze({
+        "ev/galaxyMap.js": 2, "rig/RigSystem.js": 2, "demos/p3d/p3dDemo.js": 1,
+        "render/entityDebugRenderer.js": 1, "render/voxelhighlight.js": 1,
+    });
+    const GENERIC_PATHS = Object.freeze(["gfx/device.js"]);
+    const countIn = (rel) => {
+        try { return (codeOnly(fs.readFileSync(path.join(ROOT, rel), "utf8")).match(/gl\.LINES|gl\.LINE_STRIP|gl\.LINE_LOOP/g) || []).length; }
+        catch { return 0; }
+    };
+    // One function does the comparing, so the control below exercises the SAME instance the live check does
+    // rather than a second copy of the rule -- v4471's lesson, from a repair whose control re-implemented the
+    // thing it controlled and passed while the live one was sabotaged.
+    const disagreementsIn = (table) => Object.entries(table).filter(([rel, n]) => countIn(rel) !== n);
+    const missing = disagreementsIn(NAMED);
     ok("!! the seven call sites the module header names are still there, and still one pixel wide",
-        sites === 7 && users.length === 5, `${sites} sites in ${users.length} files`);
+        missing.length === 0 && Object.values(NAMED).reduce((a, b) => a + b, 0) === 7,
+        missing.length
+            ? missing.map(([rel, n]) => `${rel}: header says ${n}, tree has ${countIn(rel)}`).join("; ")
+            : `7 draws in ${Object.keys(NAMED).length} files, each counted where the header names it -- ` +
+              Object.entries(NAMED).map(([r, n]) => r.split("/").pop() + (n > 1 ? " x" + n : "")).join(", "));
+
+    // *** THE COMPARISON IS PROVED TO FAIL, BECAUSE EVERY ROW OF NAMED AGREES AND AGREEMENT IS NOT EVIDENCE.
+    // *** Sabotaging `missing` to a literal `[]` went 0 RED: on a table where nothing disagrees, the computed
+    // answer and the empty literal are the same value. The control feeds disagreementsIn a count that is
+    // deliberately wrong for a file that really exists, so the function is shown finding a disagreement rather
+    // than merely reporting none. WHAT THIS STILL DOES NOT CATCH is hardcoding the CALL above -- no check can
+    // tell a computation from the literal it currently equals, and past that point the edit is to the check.
+    const control = disagreementsIn({ "render/voxelhighlight.js": 99 });
+    ok("  and that comparison is shown FAILING, since a table where every row agrees proves nothing",
+        control.length === 1 && control[0][0] === "render/voxelhighlight.js",
+        `the same disagreementsIn(), given voxelhighlight at 99 draws, returns ${control.length} disagreement(s) -- ` +
+        `so the empty answer above is a measurement and not the shape of the function`);
+    // *** AND THE COUNTER IS PROVED TO READ THE TREE RATHER THAN THE TABLE, WHICH THE CONTROL ABOVE DOES NOT
+    // ESTABLISH. *** Sabotaging countIn to `return NAMED[rel] ?? 0` went 0 RED past both checks above: the
+    // live comparison agrees with itself, and the control's deliberately wrong 99 still differs from the
+    // table's 1, so it still finds its one disagreement. THE MEASUREMENT AND THE EXPECTATION HAD BECOME ONE
+    // OBJECT and every check downstream was comparing NAMED with NAMED.
+    //
+    // gfx/device.js settles it because it is the one file in this section with a draw that is DELIBERATELY
+    // ABSENT from NAMED -- it is a mechanism, not a call site. A counter that consults the table answers 0 for
+    // it; a counter that reads the file answers 1.
+    ok("  and the counter reads the TREE, not the table -- checked on the one drawing file NAMED omits",
+        countIn("gfx/device.js") === 1 && !("gfx/device.js" in NAMED),
+        `countIn("gfx/device.js") = ${countIn("gfx/device.js")} while NAMED has no entry for it. A counter ` +
+        `that returned the expected value would say 0 here and agree with every other check in this section`);
+
+    const normalisedRel = (u) => u.replace(/ x\d+$/, "");
+    const unexpected = users.map(normalisedRel).filter((r) => !(r in NAMED) && !GENERIC_PATHS.includes(r));
+    ok("  and nothing outside them draws a one-pixel line, except the device layer's topology switch",
+        unexpected.length === 0,
+        unexpected.length
+            ? "NEW: " + unexpected.join(", ") + " -- a new one-pixel draw, which is the thing render/meshLine.mjs exists to stop being necessary"
+            : `${sites} sightings in ${users.length} files: the named 7, plus ${GENERIC_PATHS.filter((g) => users.some((u) => normalisedRel(u) === g)).join(", ") || "none"}`);
+
+    ok("  and the device-layer switch is a MECHANISM, not a call site, so it is counted apart from the seven",
+        // *** noComments, NOT codeOnly, AND THE FIRST DRAFT USED THE WRONG ONE. *** sourceScan's codeOnly
+        // blanks STRING BODIES as well as comments, which is what makes it right for "does this file name a
+        // vendor path" and wrong for this: the construct being asserted CONTAINS a string literal, so under
+        // codeOnly the text "line-list" is gone before the regex sees it and this check COULD NEVER PASS. It
+        // failed on a tree where the line is plainly present, which is the only reason the mistake surfaced.
+        // noComments keeps the code and drops the prose, so line 150's comment about the switch cannot satisfy
+        // a check about the switch.
+        GENERIC_PATHS.every((g) => {
+            const src = noComments(fs.readFileSync(path.join(ROOT, g), "utf8"));
+            return /topology\s*===\s*"line-list"\s*\?\s*gl\.LINES/.test(src);
+        }),
+        `gfx/device.js turns topology "line-list" into gl.LINES for ANY pipeline that asks. The header's ` +
+        `enumeration is of places that chose a line; this is the place that grants one, and counting it as an ` +
+        `eighth wireframe would say the tree drew one more debug overlay when what it grew was a general path`);
 }
 
 console.log("\n----  WHAT THIS DOES NOT CLAIM");

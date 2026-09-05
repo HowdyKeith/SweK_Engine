@@ -31,6 +31,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runQuickSweep, selectGates, DEFAULTS } from "./quickSweep.mjs";
 
@@ -490,41 +491,66 @@ export const STALE_FAILURES = Object.freeze([
  * again." Four are repaired in this round. The rest are named, attributed where the evidence attributes them,
  * and left red.
  */
+/**
+ * *** v4472 -- THE FIELD WAS CALLED `state` AND IT WAS NEVER A STATE. IT IS A CLAIM ABOUT v4425. ***
+ *
+ * Every row below was hand-typed on the day this list was written and nothing has re-read a single one since.
+ * budgetExile-selfcheck asserted over them -- "four are this session's own", "what is owed says so" -- but it
+ * derived its population from MEASURED_V4425, the frozen snapshot, so it was checking the photograph against
+ * the photograph and passing. THE LEDGER OF THINGS THE TREE ADMITTED IT OWED WAS THE ONE RECORD NOBODY
+ * RE-MEASURED, and admitting a debt turned out to be where the matter rested.
+ *
+ * All ten were run at v4472. THE RECORD WAS WRONG IN BOTH DIRECTIONS:
+ *
+ *   - tools/ship/orreryPost-selfcheck.mjs was typed OWED and had been GREEN for some time. Nobody noticed a
+ *     debt being paid, which is the harmless direction and still means the number was fiction.
+ *   - tools/ship/crossBackend-selfcheck.mjs was typed "REPAIRED HERE" and was RED AGAIN, on the same check,
+ *     with two new WGSL producers unregistered. v4425 fixed nine instances of that species; two more arrived
+ *     and accumulated exactly as before. *** wgslCorpus's own v4425 import note PREDICTED THIS IN WRITING: ***
+ *     "The gate that says so is exiled over the ship-time budget, which is why nine accumulated instead of
+ *     the first being caught on arrival." The gate was working perfectly the whole time. It was exiled, and
+ *     the ledger said REPAIRED, so nothing ran it.
+ *   - tools/ship/physicsReach-selfcheck.mjs was 36 of 136 when recorded and is 49 of 151 now: the debt did
+ *     not sit still, it grew by thirteen while being carried as a fixed line of prose.
+ *
+ * So the field is renamed. `claimedAtV4425` is honest about what it is -- a claim about v4425, which stays
+ * true about v4425 -- and the CURRENT state is derived by running the gate, in LEDGER_AT_V4472 below.
+ */
 export const EXILED_REGRESSIONS = Object.freeze([
-    { gate: "tools/ship/runnerBudget-selfcheck.mjs", mine: "v4424", state: "REPAIRED HERE",
+    { gate: "tools/ship/runnerBudget-selfcheck.mjs", mine: "v4424", claimedAtV4425: "REPAIRED HERE",
       fails: "every runner that budgets a gate reads the one table, or says why it does not -- 4 runners, 1 silent: tools/ship/slowCensus.mjs",
       note: "v4424 shipped a module that spawns gates under a flat 180s cap and neither read gateBudget.mjs nor " +
             "declared its own. It declares one now, and the reason is real: every gate it runs is one with NO " +
             "measured budget, which is what put it in the bucket, so a per-gate table has nothing to say about it." },
-    { gate: "tools/ship/crossBackend-selfcheck.mjs", mine: "v4408-v4416", state: "REPAIRED HERE",
+    { gate: "tools/ship/crossBackend-selfcheck.mjs", mine: "v4408-v4416", claimedAtV4425: "REPAIRED HERE",
       fails: "every WGSL producer is either IN the corpus or excluded WITH A REASON -- NINE were neither",
       note: "COMP_WGSL, FRESNEL_WGSL, FURNACE_WGSL, ANISO_WGSL, MIS_WGSL, buildSampleWgsl and buildWgsl are in " +
             "the corpus now, compile-only: each already RUNS on a device in its own gate, and what the corpus " +
             "adds is the SECOND BACKEND'S COMPILER, which is a different question from whether the numbers are " +
             "right. lobeWgsl (a function with no entry point) and glslFnToWgsl (a translator) are EXCLUDED by " +
             "name, the way the six before them were. Corpus 43 -> 50." },
-    { gate: "tools/ship/staleness-selfcheck.mjs", mine: "the ritual itself", state: "REPAIRED HERE",
+    { gate: "tools/ship/staleness-selfcheck.mjs", mine: "the ritual itself", claimedAtV4425: "REPAIRED HERE",
       fails: "case-study gate count claims 1446, actual 1447", note: "staleness.mjs --fix, run after the gate was added rather than before" },
-    { gate: "tools/caseStudy-selfcheck.mjs", mine: "the ritual itself", state: "REPAIRED HERE",
+    { gate: "tools/caseStudy-selfcheck.mjs", mine: "the ritual itself", claimedAtV4425: "REPAIRED HERE",
       fails: "the baked subsystem and gate counts match reality", note: "the same stale number, read by a second gate" },
-    { gate: "tools/ship/physicsReach-selfcheck.mjs", mine: "v4408-v4416", state: "OWED",
+    { gate: "tools/ship/physicsReach-selfcheck.mjs", mine: "v4408-v4416", claimedAtV4425: "OWED",
       fails: "no more than 35 graded physics modules are unreachable from every door -- 36 of 136",
       note: "SEVEN of the 36 are this session's WGSL modules under physics/render/. A door is a roundhouse " +
             "device, an instruments row or a page, and being in the WGSL corpus is none of those. Moving the " +
             "baseline to 36 would be the 'record of having given up' this arc refused for graveyard at v4424, " +
             "and building a device page for seven shader-source modules is a round, not a patch." },
-    { gate: "tools/ship/orreryEjecta-selfcheck.mjs", mine: "partly -- not established here", state: "OWED",
+    { gate: "tools/ship/orreryEjecta-selfcheck.mjs", mine: "partly -- not established here", claimedAtV4425: "OWED",
       fails: "three-webgpu: 12 importers, recorded 7",
       note: "an importer-count baseline. This session added importers of that body; whether it added all five " +
             "is not established, and the gate's own note calls rebaking a separate decision because every " +
             "recorded figure citing a planet's size moves at once." },
-    { gate: "tools/ship/orreryFleet-selfcheck.mjs", mine: "same cause as orreryEjecta", state: "OWED",
+    { gate: "tools/ship/orreryFleet-selfcheck.mjs", mine: "same cause as orreryEjecta", claimedAtV4425: "OWED",
       fails: "every body's satellite count equals world/orreryEjecta.mjs's recorded importer count -- three-webgpu: fleet 12, ejecta baseline 7" },
-    { gate: "tools/ship/meshLine-selfcheck.mjs", mine: "not attributed here", state: "OWED",
+    { gate: "tools/ship/meshLine-selfcheck.mjs", mine: "not attributed here", claimedAtV4425: "OWED",
       fails: "the seven call sites the module header names are still there -- 8 sites in 6 files" },
-    { gate: "tools/ship/orreryPost-selfcheck.mjs", mine: "not attributed here", state: "OWED",
+    { gate: "tools/ship/orreryPost-selfcheck.mjs", mine: "not attributed here", claimedAtV4425: "OWED",
       fails: "CONTROL: the page is PAUSED, so a difference is the effect and not the clock -- the page is still moving" },
-    { gate: "tools/ship/wgslSpec-selfcheck.mjs", mine: "not attributed here", state: "OWED",
+    { gate: "tools/ship/wgslSpec-selfcheck.mjs", mine: "not attributed here", claimedAtV4425: "OWED",
       fails: "across 4283 files requiredLimits appears 5 times -- every device runs at the defaults, so a 1024-wide workgroup cannot be created here",
       note: "*** AND THIS ONE BROKE THE INSTRUMENT. *** It prints its verdict on STDERR and nothing on stdout, " +
             "so the first runner counted zero checks and called a RED a CRASH. v4424 argued its check counter's " +
@@ -532,6 +558,139 @@ export const EXILED_REGRESSIONS = Object.freeze([
             "nothing here was classified CRASH' -- SOUND FOR THAT DATA AND NOT A GENERAL LAW. The wider run is " +
             "what found the case, and slowCensus.runGateSerial counts both streams now." },
 ]);
+
+/**
+ * *** THE SAME TEN, RUN. *** Each gate spawned alone, exit code and wall time recorded, plus the first FAIL
+ * line for anything non-zero so a red is a sentence rather than a number.
+ *
+ * *** WHY THIS IS A RECORDED MEASUREMENT AND NOT A CHECK THAT RUNS EVERY TIME, WHICH IS THE UNCOMFORTABLE
+ * PART. *** Re-running all ten costs 50.5 seconds. The ship-time quick sweep kills a gate at 3000 ms, so a
+ * ledger that re-measured itself on every run would be exiled by the very absorbing state this module was
+ * written to document -- it would join its own list. That is not a joke at the design's expense, it is the
+ * design's actual constraint, and the choice was between a record that goes stale and a check nobody runs.
+ *
+ * The record is chosen, and three things keep it from being another photograph:
+ *   1. it says WHEN it was taken, per row and in total;
+ *   2. budgetExile-selfcheck RE-RUNS THE CHEAP ROWS LIVE on every single run -- the four under 3000 ms, about
+ *      4.1 s -- and compares them against these numbers, so the comparison itself is exercised continuously
+ *      and a wrong record shows up on the rows that can afford to tell you;
+ *   3. `measureExiled()` below regenerates the whole thing, so refreshing is a command rather than a retype.
+ *
+ * WHAT THIS DOES NOT FIX: the six expensive rows are trusted between refreshes. That is the same exposure the
+ * list already had, with the difference that it is now stated, dated, and one function call from being closed.
+ */
+export const LEDGER_AT_V4472 = Object.freeze({
+    at: "v4472",
+    totalMs: 50539,
+    cheapCapMs: 3000,
+    rows: Object.freeze({
+        "tools/ship/runnerBudget-selfcheck.mjs":  Object.freeze({ code: 0, ms: 4227,  first: null }),
+        "tools/ship/crossBackend-selfcheck.mjs":  Object.freeze({ code: 0, ms: 15490, first: null }),
+        "tools/ship/staleness-selfcheck.mjs":     Object.freeze({ code: 0, ms: 659,   first: null }),
+        "tools/caseStudy-selfcheck.mjs":          Object.freeze({ code: 0, ms: 876,   first: null }),
+        "tools/ship/physicsReach-selfcheck.mjs":  Object.freeze({ code: 1, ms: 619,
+            first: "NO MORE THAN 35 GRADED PHYSICS MODULES ARE UNREACHABLE FROM EVERY DOOR -- 49 of 151" }),
+        "tools/ship/orreryEjecta-selfcheck.mjs":  Object.freeze({ code: 0, ms: 1990,  first: null }),
+        "tools/ship/orreryFleet-selfcheck.mjs":   Object.freeze({ code: 0, ms: 13188, first: null }),
+        "tools/ship/meshLine-selfcheck.mjs":      Object.freeze({ code: 0, ms: 3672,  first: null }),
+        "tools/ship/orreryPost-selfcheck.mjs":    Object.freeze({ code: 0, ms: 6064,  first: null }),
+        "tools/ship/wgslSpec-selfcheck.mjs":      Object.freeze({ code: 1, ms: 3754,
+            first: "across 4407 files requiredLimits appears 5 times -- every device runs at the defaults" }),
+    }),
+});
+
+/**
+ * *** WHAT THE FIRST RE-MEASUREMENT FOUND, BEFORE v4472 REPAIRED ANYTHING. ***
+ *
+ * LEDGER_AT_V4472 above is the tree AFTER this round's repairs, so it cannot carry the finding: by the time
+ * it was taken, three of the reds had been fixed. This is the reading that opened the round -- every one of
+ * the ten run once, against the states typed at v4425, with nothing changed yet.
+ *
+ * *** AND IT IS SEPARATE BECAUSE THE FIRST DRAFT OF THE CHECK PINNED A COUNT AND THE COUNT MOVED. *** That
+ * draft asserted `moved.length === 2` against LEDGER_AT_V4472, which was true when written and false an hour
+ * later, because this round's own repairs took three more entries out of agreement with their v4425 state.
+ * A COUNT IS NOT A CONTRACT -- the error this branch names most often, committed inside the check written to
+ * name it. The drift between a v4425 claim and today is expected and will keep changing as debts are paid;
+ * what is fixed is what the FIRST honest re-reading discovered, so that is what is recorded and asserted.
+ */
+export const FOUND_AT_V4472 = Object.freeze({
+    at: "v4472, before any repair this round",
+    // Exit codes, one run each, in the tree as it stood at commit 7727191.
+    codes: Object.freeze({
+        "tools/ship/runnerBudget-selfcheck.mjs":  0,
+        "tools/ship/crossBackend-selfcheck.mjs":  1,
+        "tools/ship/staleness-selfcheck.mjs":     0,
+        "tools/caseStudy-selfcheck.mjs":          0,
+        "tools/ship/physicsReach-selfcheck.mjs":  1,
+        "tools/ship/orreryEjecta-selfcheck.mjs":  1,
+        "tools/ship/orreryFleet-selfcheck.mjs":   1,
+        "tools/ship/meshLine-selfcheck.mjs":      1,
+        "tools/ship/orreryPost-selfcheck.mjs":    0,
+        "tools/ship/wgslSpec-selfcheck.mjs":      1,
+    }),
+    // The two rows where the typed state and the run disagreed -- the round's finding, in both directions.
+    disagreed: Object.freeze({
+        "tools/ship/crossBackend-selfcheck.mjs": Object.freeze({
+            typed: "REPAIRED HERE", found: "OWED",
+            why: "RED AGAIN on the check v4425 repaired: traceWgsl and pipelineWgsl, two new WGSL producers, " +
+                 "neither in the corpus nor excluded by name. v4425 fixed nine instances of that species and " +
+                 "two more arrived. wgslCorpus's own v4425 import note says why in advance -- the census gate " +
+                 "is exiled over the ship-time budget -- and the ledger then recorded REPAIRED and stopped looking.",
+        }),
+        "tools/ship/orreryPost-selfcheck.mjs": Object.freeze({
+            typed: "OWED", found: "REPAIRED",
+            why: "green, and had been for an unknown length of time. The harmless direction, and still a " +
+                 "record stating something untrue about the tree for ten versions.",
+        }),
+    }),
+    // Not a disagreement -- the same verdict with a much worse number, which a two-state field cannot express.
+    grew: Object.freeze({
+        "tools/ship/physicsReach-selfcheck.mjs": Object.freeze({
+            atV4425: "36 of 136 graded modules unreachable", atV4472: "49 of 151",
+            why: "OWED both times, so no state check could ever have noticed. A debt carried as a fixed line " +
+                 "of prose grew by thirteen while the line stayed the same.",
+        }),
+    }),
+});
+
+/** What a row's exit code means for the ledger. A gate is OWED while it is red and REPAIRED when it is not. */
+export function stateOf(row) {
+    if (!row || typeof row.code !== "number") return "UNMEASURED";
+    return row.code === 0 ? "REPAIRED" : "OWED";
+}
+
+/**
+ * Run the named gates alone and report what they do. This is the function that makes LEDGER_AT_V4472
+ * refreshable rather than believed; the selfcheck calls it on the cheap rows every run and on all of them
+ * when asked.
+ */
+export function measureExiled(gates, { root = ENG, timeoutMs = 400000 } = {}) {
+    const out = {};
+    for (const g of gates) {
+        const t = Date.now();
+        let code = 0, txt = "";
+        try {
+            txt = execFileSync(process.execPath, [g], { cwd: root, encoding: "utf8",
+                                                       timeout: timeoutMs, stdio: ["ignore", "pipe", "pipe"] });
+        } catch (e) {
+            code = e.status == null ? -1 : e.status;
+            txt = (e.stdout || "") + "\n" + (e.stderr || "");
+        }
+        // BOTH STREAMS, because wgslSpec prints its verdict on stderr and reading only stdout is what made
+        // v4424's runner call a RED a CRASH -- the finding this very list records against wgslSpec.
+        const first = (txt.split("\n").find((l) => /^\s*FAIL/.test(l)) || "").trim().replace(/\s+/g, " ");
+        out[g] = { code, ms: Date.now() - t, first: first || null };
+    }
+    return out;
+}
+
+/** Rows whose recorded verdict disagrees with a fresh run. Codes, not times: a time is load, a code is a fact. */
+export function ledgerDrift(recorded, measured) {
+    return Object.keys(measured).filter((g) => {
+        const r = recorded[g];
+        return !r || stateOf(r) !== stateOf(measured[g]);
+    });
+}
 
 /** Of the exiled gates measured alone, how many would clear the budget today. */
 export function wouldRunNow(measured = MEASURED_V4425, budgetMs = DEFAULTS.budgetMs) {

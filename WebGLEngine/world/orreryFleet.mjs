@@ -344,3 +344,72 @@ export const COMMIT_BELT_V4418 = Object.freeze({
          "at exactly one, and AT TWO COMMITS IT IS STILL NOT A BELT -- the v4329 conclusion stands on its own " +
          "terms and only its NUMBERS are superseded here. The importers move; the vendored bytes do not.",
 });
+
+/**
+ * *** v4472 -- RE-MEASURED, AND THE RECORD ABOVE WAS WRONG ON ONE ROW THE DAY IT WAS WRITTEN. ***
+ *
+ * COMMIT_BELT_V4418 says `three: 2` and explains itself with a rule -- "v4416 recorded provenance for six
+ * bodies that had none... so six moved from one commit to two." FIVE of the six were at one. `three` was at
+ * TWO, because v4048 had already touched vendor/three for the .glb export round, so v4416 took it to THREE.
+ * THE RULE WAS APPLIED TO THE LIST INSTEAD OF EACH BODY BEING COUNTED, and the one body that did not fit the
+ * sentence was given the sentence's number.
+ *
+ * The gate that catches this is in the same repository and has been red ever since -- "the recorded per-body
+ * commit counts still match git". Nothing ran it: orreryFleet-selfcheck was in the exiled bucket, recorded as
+ * OWED at v4425, and recording a debt was where the matter rested.
+ *
+ * *** SO THIS RECORD KEEPS THE HASHES, NOT JUST THE COUNTS, AND THAT IS AIMED AT A FAILURE THIS FILE HAS
+ * ALREADY LOGGED THREE TIMES. *** Its own header records `three`'s count being corrected at v4330, reverted by
+ * a merge, re-applied at v4336, reverted again, re-applied at v4351 -- "this line will keep coming back as 2
+ * and this gate will keep going red on main, roughly every other round." A COUNT REVERTED TO A WRONG VALUE
+ * STILL LOOKS LIKE A COUNT. A hash list reverted to a wrong value names commits, and `git log` either produces
+ * those commits for that path or it does not, so the next merge conflict is a question with an answer instead
+ * of a choice between two plausible integers.
+ *
+ * Abbreviated hashes are what git prints and what a person compares; the check re-derives them from git rather
+ * than trusting this table, which is the whole point of writing them down.
+ *
+ * *** WHAT IS NOT CLAIMED HERE: that the counts on other branches are wrong. *** The header cites 6ba6776 as
+ * vendor/three's single commit, and that hash is not in this repository's history at all -- "Publish the full
+ * v3845 engine tree (code mirror)" replaced it. Two different histories can both be honestly measured and
+ * disagree, and this record says only what `git log` says HERE, which is why it names the commits.
+ */
+export const COMMIT_BELT_V4472 = Object.freeze({
+    at: "v4472",
+    perBody: Object.freeze({
+        box3d:          Object.freeze(["b9ea45a", "66db97c"]),
+        draco:          Object.freeze(["7e680f9", "7985f88"]),
+        fonts:          Object.freeze(["66db97c"]),
+        gifenc:         Object.freeze(["66db97c"]),
+        grass:          Object.freeze(["90cbc92"]),
+        heerich:        Object.freeze(["7e680f9", "445fe95"]),
+        htmx:           Object.freeze(["08647fd", "66db97c"]),
+        jolt:           Object.freeze(["7e680f9", "66db97c"]),
+        keyhunt:        Object.freeze(["7e680f9", "90cbc92"]),
+        krbn:           Object.freeze(["66db97c"]),
+        slug:           Object.freeze(["66db97c"]),
+        "taichi-js":    Object.freeze(["e6d46a7"]),
+        three:          Object.freeze(["7e680f9", "e08b1b6", "66db97c"]),
+        "three-webgpu": Object.freeze(["7e680f9", "614dbcf"]),
+        wasm:           Object.freeze(["66db97c"]),
+    }),
+    // The correction, stated as a correction rather than folded into the numbers above.
+    correctedSince4418: Object.freeze({
+        three: Object.freeze({ recorded: 2, measured: 3,
+            why: "v4048 (e08b1b6) touched vendor/three before v4416 (7e680f9) did, so it did not start at one " +
+                 "like the other five. COMMIT_BELT_V4418's own movedSince4329 names three among the six." }),
+    }),
+    // *** THE CONCLUSION, AND THE NUMBER IT ACTUALLY RESTS ON. *** v4418 defended "not a belt" with "at two
+    // commits it is still not a belt" -- a per-body ceiling, which is a bound somebody has to raise every time
+    // anything legitimate happens, and raising it is indistinguishable from widening a tolerance after it
+    // fails. The claim was never about the ceiling: TEN COMMITS IN THIS REPOSITORY'S ENTIRE HISTORY TOUCH
+    // vendor/ AT ALL, against 1095 commits. At 0.91% there is nothing to draw, and that stays true whether the
+    // busiest body is at two or at three.
+    vendorTouchingCommits: 10,
+    repoCommits: 1095,
+    why: "THE COMMIT BELT IS STILL NOT DRAWN, and the reason is no longer a per-body ceiling. Ten of 1095 " +
+         "commits reach vendor/ at all -- 0.91% of this repository's life -- and six of the fifteen bodies " +
+         "have never been touched by anything but the commit that vendored them. A belt needs a recurring " +
+         "cost to draw; this is ten commits, and it stays ten whether the busiest body sits at two or three. " +
+         "The importers move; the vendored bytes do not.",
+});

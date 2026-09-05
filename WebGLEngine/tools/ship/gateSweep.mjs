@@ -2248,6 +2248,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "shaderPairs-selfcheck into backendParity's census twice over, first as dual-language and " +
                  "then as GLSL-bearing. Neither was caught here -- both by the gate next door",
     }),
+    since107: Object.freeze({
+        // *** swept IS 0 AND THAT IS NOT MODESTY. *** This ledger's `swept` counts gates a closing takes OUT
+        // OF THE SURPLUS -- gates the tree had never run -- and the arithmetic above depends on it meaning
+        // exactly that. v4472 added no gate: it RE-RAN ten that were already in the tree and already exiled,
+        // which is a different fact and belongs in the verdict rather than in a column that feeds a total.
+        // The first draft wrote swept: 10 and gateSweep-selfcheck caught it on `added.length === swept`.
+        at: "v4472", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/crossBackend-selfcheck.mjs (traceWgsl and pipelineWgsl into wgslCorpus, compile-only, on v4425's own recorded rule)",
+            "tools/ship/orreryEjecta-selfcheck.mjs (a SCANNER counted as a dependant -- the fifth instance that file logs -- plus two genuine importers recorded)",
+            "tools/ship/orreryFleet-selfcheck.mjs (the belt keeps HASHES now; COMMIT_BELT_V4418 was wrong on `three` the day it was written)",
+            "tools/ship/meshLine-selfcheck.mjs (one assertion carrying two claims, reporting the wrong one as false)",
+            "tools/ship/orreryFleetScan.mjs (lastCommits could not see a file whose latest touch was a MERGE, and called that untracked)",
+            "tools/ship/budgetExile-selfcheck.mjs (the ledger derives its states by running the gates instead of reading typed prose)",
+        ]),
+        verdict: "No gate added, ten re-run, six repaired. THE TEN EXILED GATES WERE RUN FOR THE FIRST TIME SINCE v4425 and the debt ledger was wrong " +
+                 "in both directions: one entry typed REPAIRED was red again, one typed OWED had been green " +
+                 "for an unknown time, and a third stayed OWED while its debt grew from 36 of 136 to 49 of " +
+                 "151 -- which a two-state field cannot express. Five of the six owed are paid; physicsReach " +
+                 "and wgslSpec are named as rounds rather than patches. Sixteen sabotages, twelve red, and " +
+                 "FOUR of the zeros were this round's own defects: a pinned count of 2 that its own repairs " +
+                 "moved to 4, a counter reading the expectation table instead of the tree, a live re-run " +
+                 "replaced by a read of the record (0 RED past every control until a FRESH CLOCK was " +
+                 "asserted), and a runner reading only stdout -- invisible because the one gate that prints " +
+                 "its verdict to stderr is too slow to re-run every time",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

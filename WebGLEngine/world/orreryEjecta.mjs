@@ -345,6 +345,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "three-webgpu": Object.freeze([
         "orrery-gpu.html",
         "tools/ship/brainTsl-page.js",
+        "tools/ship/carveGpu-selfcheck.mjs",
+        "tools/ship/tslIsing-selfcheck.mjs",
         "tools/ship/divineEye-selfcheck.mjs",
         "tools/ship/generatedLadder-selfcheck.mjs",
         "tools/ship/img2three-selfcheck.mjs",
