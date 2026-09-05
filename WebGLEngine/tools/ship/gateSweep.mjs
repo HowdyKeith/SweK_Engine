@@ -2385,6 +2385,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "phrase drawn from the pack to the parse path's picture on 23,040 of 23,040 pixels for all four families on both " +
                  "backends -- 3 to 6 ms against 15 to 52. Sabotages red at 5 / 13 / 9 / 8 -- one flipped texel moved 3 pixels, and the picture rows saw it.",
     }),
+    since110: Object.freeze({
+        at: "v4488", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "text/slug-selfcheck.mjs (section 9: maxWidth word wrap -- the dropped break space, centred symmetry, exact fit, kerning reset, the long-word fallback, newline composition, the unwrapped default)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, headless. text/slugText.js layoutText takes opts.maxWidth: a break at the last space that fits with the " +
+                 "break's space dropped from the line (a centred wrapped line is placed by its glyphs' width alone), an exact fit " +
+                 "not wrapped, kerning reset across a soft break, a word wider than the width broken at the glyph that would " +
+                 "overflow and never before a line's first glyph, newlines composing with soft breaks, and the unwrapped default " +
+                 "unchanged; the result names lineWidths and softBreaks. Held on the constructed font in font units, where every " +
+                 "expected width is a sum somebody can check by hand. Sabotages red at 3 / 5 / 2 / 1 -- the break space kept, kerning carried across a break, the long-word fallback removed, an exact fit wrapped.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

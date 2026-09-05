@@ -49,7 +49,9 @@ import { slugShaderSource, VERTEX_LAYOUT, VERTEX_STRIDE, SLUG_NOTICE } from "./s
  * with (x, y) the pen origin in the caller's units (y up, baseline at y) and `size` the em size.
  *
  * opts: size (em -> units, default 1), lineHeight (multiple of em; default from font metrics),
- *       letterSpacing (em), align ("left" | "center" | "right"), kerning (default true).
+ *       letterSpacing (em), align ("left" | "center" | "right"), kerning (default true),
+ *       maxWidth (the caller's units; v4488 word wrap -- break at the last space that fits, a word wider than
+ *       the width broken at the glyph that would overflow, kerning reset across a break, an exact fit not wrapped).
  */
 export function layoutText(font, text, opts = {}) {
     const size = opts.size === undefined ? 1 : opts.size;
@@ -58,25 +60,67 @@ export function layoutText(font, text, opts = {}) {
     const defaultLineHeight = (font.ascent - font.descent + font.lineGap) || 1.2;
     const lineHeight = (opts.lineHeight === undefined ? defaultLineHeight : opts.lineHeight) * size;
     const align = opts.align || "left";
+    // v4488 -- WORD WRAP. `maxWidth` (the caller's units, like `size`) breaks a line at the last space that fits; the space that
+    // took the break is dropped from the line, so its width -- and so a centred or right-aligned line -- is the glyphs' alone;
+    // kerning does not cross a break (the first glyph of a line has no left neighbour); and a word wider than the whole
+    // width is broken at the glyph that would overflow, never before its first glyph, so no line is empty and the loop
+    // always advances. A line that fits EXACTLY does not wrap. Infinity (the default) and 0 mean no wrapping.
+    const maxWidth = Number.isFinite(opts.maxWidth) && opts.maxWidth > 0 ? opts.maxWidth : Infinity;
 
     const lines = [];
     let current = [];
     let penX = 0;
     let prevGlyph = -1;
+    let softBreaks = 0;
 
     const endLine = () => { lines.push({ glyphs: current, width: penX }); current = []; penX = 0; prevGlyph = -1; };
-
-    for (const ch of text) {                                  // iterating the string yields codepoints, not units
-        const cp = ch.codePointAt(0);
-        if (cp === 0x0A) { endLine(); continue; }
-        if (cp === 0x0D) continue;
-
-        const gi = font.glyphIndex(cp);
+    const place = (cp, gi) => {
         if (kerning && prevGlyph >= 0) penX += font.kern(prevGlyph, gi) * size;
-
         current.push({ glyphIndex: gi, codepoint: cp, x: penX, y: 0, size });
         penX += font.advance(gi) * size + letterSpacing;
         prevGlyph = gi;
+    };
+    /** The width a run of glyphs would add after the current pen, kerning from the line's last glyph included. */
+    const widthOf = (run) => {
+        let w = 0, prev = prevGlyph;
+        for (const { gi } of run) { if (kerning && prev >= 0) w += font.kern(prev, gi) * size; w += font.advance(gi) * size + letterSpacing; prev = gi; }
+        return w;
+    };
+    // tokens: a word is a run of non-space codepoints; a space is its own token; a newline ends the line outright
+    const tokens = [];
+    let word = [];
+    const flush = () => { if (word.length) { tokens.push({ word }); word = []; } };
+    for (const ch of text) {                                  // iterating the string yields codepoints, not units
+        const cp = ch.codePointAt(0);
+        if (cp === 0x0D) continue;
+        if (cp === 0x0A) { flush(); tokens.push({ newline: true }); continue; }
+        const gi = font.glyphIndex(cp);
+        if (cp === 0x20) { flush(); tokens.push({ space: { cp, gi } }); continue; }
+        word.push({ cp, gi });
+    }
+    flush();
+
+    for (let i = 0; i < tokens.length; i++) {
+        const tk = tokens[i];
+        if (tk.newline) { endLine(); continue; }
+        if (tk.space) {
+            // a space followed by a word that will not fit takes the break itself and is dropped; a space at a line's
+            // end otherwise keeps its advance, as it always has
+            const next = tokens[i + 1];
+            if (next && next.word && current.length) {
+                const after = widthOf([tk.space, ...next.word]);
+                if (penX + after > maxWidth) { endLine(); softBreaks++; continue; }
+            }
+            place(tk.space.cp, tk.space.gi);
+            continue;
+        }
+        // a word
+        if (current.length && penX + widthOf(tk.word) > maxWidth) { endLine(); softBreaks++; }
+        for (const g of tk.word) {
+            // the long-word fallback: break before a glyph that would overflow, but never before a line's first glyph
+            if (current.length && penX + widthOf([g]) > maxWidth) { endLine(); softBreaks++; }
+            place(g.cp, g.gi);
+        }
     }
     endLine();
 
@@ -97,6 +141,8 @@ export function layoutText(font, text, opts = {}) {
         glyphs, width,
         height: lines.length * lineHeight,
         lines: lines.length,
+        lineWidths: lines.map((l) => l.width),                 // v4488: each line's own width, for a caller that centres or wraps
+        softBreaks,                                             // v4488: how many breaks maxWidth made (newlines are not counted)
         lineHeight,
         kerningSource: font.kerningSource || (font.hasKernTable ? "kern" : "none")   // v4485: the font says (GPOS | kern | none), see slugFont.parseGpos
     };

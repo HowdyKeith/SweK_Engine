@@ -454,6 +454,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         a shipped page that fetches a pack (ev/esShipLabels.js and orrery-gpu.html still parse the TrueType; the pack
         is proven equal and offered); an alphabet beyond `label`; the evenOdd and weight variants.
      8. Word wrap (maxWidth) in layoutText, pure and gated headless -- the one layout feature genuinely missing.
+        BUILT at v4488 (task 8): opts.maxWidth in text/slugText.js layoutText, in the caller's units. The rules, each
+        held in text/slug-selfcheck.mjs section 9 on the constructed font: a line breaks at the last space that fits
+        and the space that took the break is DROPPED from the line, so a centred or right-aligned wrapped line is
+        placed by its glyphs' width alone (symmetric to the unit: 40 = (2000 - 1920) / 2); a line that fits exactly
+        does not wrap and one unit narrower does; kerning does not cross a soft break (C starts its line at 0, not at
+        the +40 B/C pair); a word wider than the whole width breaks at the glyph that would overflow and never
+        before a line's first glyph, so no line is empty and the loop always advances; a newline and a soft break
+        compose; without maxWidth nothing changes. The result names its line widths (lineWidths) and how many
+        breaks the width made (softBreaks). NOT CLAIMED: hyphenation, breaking at anything but U+0020, a break
+        opportunity after a hyphen, and a right-to-left line, which are items 11 and below.
      9. A slug-rig.html measuring fragment cost by size, angle and band count on Keith's boxes, including one
         dense glyf CJK face, before any band-count tuning.
     10. Curved text by tessellated strips with per-strip Jacobians, or a planar target resampled -- never by

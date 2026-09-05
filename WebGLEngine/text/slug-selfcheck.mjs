@@ -710,6 +710,32 @@ function packBuilt(built, key = "X") {
     const empty = layoutText(font, " ", { size: 100 });
     ok("a blank glyph occupies its advance and produces no quad",
        empty.glyphs.length === 1 && empty.width > 0);
+
+    // v4488 -- WORD WRAP, in font units (size U): A, B, C, D advance 1000, the space 600, A/B kerns -80, B/C +40.
+    // "AB CD" is 1920 + 600 + 2000 = 4520 wide unwrapped.
+    const wrap = (s, o) => layoutText(font, s, { size: U, ...o });
+    const w1 = wrap("AB CD", { maxWidth: 3000 });
+    ok("!! maxWidth breaks at the space, and the space that took the break is DROPPED from the line: widths 1920 and 2000, not 2520",
+       w1.lines === 2 && w1.softBreaks === 1 && w1.lineWidths.length === 2 && Math.abs(w1.lineWidths[0] - 1920) < 1e-9 && Math.abs(w1.lineWidths[1] - 2000) < 1e-9 && Math.abs(w1.width - 2000) < 1e-9 && w1.glyphs.length === 4,
+       `lines ${w1.lines}, widths ${w1.lineWidths.map((x) => x.toFixed(0)).join(" / ")}. A line whose width still counts the space it broke on sits 300 units left of centre when centred, which reads as the font's fault.`);
+    const wc = wrap("AB CD", { maxWidth: 3000, align: "center" });
+    ok("...and a centred wrapped paragraph is symmetric to the unit: the narrower line starts at half the difference (40) and the wider at 0",
+       Math.abs(wc.glyphs[0].x - 40) < 1e-9 && Math.abs(wc.glyphs[2].x - 0) < 1e-9 && Math.abs((wc.width - wc.lineWidths[0]) / 2 - 40) < 1e-9);
+    ok("a line that fits EXACTLY does not wrap; one unit narrower does",
+       wrap("AB CD", { maxWidth: 4520 }).lines === 1 && wrap("AB CD", { maxWidth: 4519 }).lines === 2);
+    const wk = wrap("ABC", { maxWidth: 2000 });
+    ok("!! kerning does not cross a soft break: C starts the second line at 0, not at the +40 B/C pair",
+       wk.lines === 2 && Math.abs(wk.glyphs[2].x) < 1e-9 && Math.abs(wk.lineWidths[0] - 1920) < 1e-9 && Math.abs(wk.lineWidths[1] - 1000) < 1e-9,
+       `C at ${wk.glyphs[2].x.toFixed(1)}`);
+    const wl = wrap("ABCD", { maxWidth: 500 });
+    ok("a word wider than the whole width breaks at the glyph that would overflow, never before a line's first glyph: one glyph a line, no empty line, no hang",
+       wl.lines === 4 && wl.softBreaks === 3 && wl.lineWidths.every((x) => Math.abs(x - 1000) < 1e-9) && wl.glyphs.every((q) => q.x === 0));
+    const wn = wrap("AB\nCD AB", { maxWidth: 3000 });
+    ok("a newline and a soft break compose: three lines, one of them soft",
+       wn.lines === 3 && wn.softBreaks === 1 && wn.lineWidths.map((x) => Math.round(x)).join() === "1920,2000,1920");
+    const w0 = wrap("AB CD", {});
+    ok("without maxWidth nothing changes: one line, 4520 wide, no soft break -- and the result now names its line widths",
+       w0.lines === 1 && w0.softBreaks === 0 && Math.abs(w0.width - 4520) < 1e-9 && w0.lineWidths.length === 1 && wrap("AB CD", { maxWidth: 0 }).lines === 1);
 }
 
 /* ============================================================================================================
