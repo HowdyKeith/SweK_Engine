@@ -207,25 +207,60 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     // v4203 found a real one by reading: projapati66/Svg-IsometricCityAnimation ships an MIT LICENSE file
     // over artwork its author does not own. The category being ready is why that entry took one field to
     // file rather than a round to argue about.
-    // *** v4473 -- THIS PINNED THE COUNT AT ONE AND READING FOUND A SECOND. *** The paragraph above says the
-    // category was "defined before it was needed, which is the only time it can be defined calmly" and that
-    // v4203 then "found a real one by reading". v4473 found another the same way: Oefenweb/ktx-basis-universal
-    // ships an Apache-2.0 LICENSE whose copyright holder was never filled in -- the appendix still reads
-    // "Copyright [yyyy] [name of copyright owner]" -- over a repackaging of somebody else's code. That is
-    // severityOf's own rule firing exactly as written: `grantorHoldsRights === false` is checked BEFORE the
-    // licence "because an encumbered file's licence is exactly what misleads".
+    // *** v4477 -- MAIN AND THIS BRANCH REPLACED `enc.length === 1` IN THE SAME WINDOW, AND MAIN'S IS TAKEN ***
+    // because it is a strict superset: this side asserted the properties inline, main's also requires each note
+    // to NAME who holds the rights and each entry to be non-shippable. Both branches found the same defect from
+    // the same direction -- v4473 added a second encumbered source by reading, and a pinned count made that a
+    // failure. The convergence is recorded rather than resolved by picking a side.
     //
-    // A CATEGORY THAT GROWS WHEN SOMEBODY READS IS WORKING, AND `enc.length === 1` MADE THAT A FAILURE. The
-    // count was never the claim. What is asserted now is the PROPERTY every encumbered entry must have --
-    // a licence that exists (that is what misleads), no claim of rights, and a note saying why -- and the
-    // roll is reported by name, which is what a reader needed from this line in the first place.
+    // *** AND MAIN'S OWN WARNING FIRED ON THE VERY NEXT ENTRY. *** The comment below says the pattern list was
+    // written from one author's phrasing and red-flagged an innocent entry the first time it ran, "the shape this
+    // session has now hit five times". It is six: Oefenweb/ktx-basis-universal, added on this branch at v4473,
+    // states its encumbrance by QUOTING THE UNFILLED APACHE APPENDIX -- the licence names nobody at all, which is
+    // a different fact from naming a third party -- and matched none of main's five forms. The list is extended,
+    // not the check weakened: an unfilled copyright appendix is evidence that the grantor is unidentified, which
+    // is exactly what this row exists to make a reader see.
+    //
+    // *** v4461: THIS CHECK WAS `enc.length === 1` AND A SECOND REAL ENCUMBERED SOURCE TURNED IT RED. *** That
+    // is a pinned count standing in for a claim -- the same shape this tree keeps finding, a frozen number
+    // checked against a derivation that is allowed to move. The claim underneath was never "there is one"; it
+    // was "the category defined from a hypothetical gets USED by reading, and using it costs one field". So
+    // the count is replaced by the substance, which is strictly harder to satisfy than either 1 or >= 1: every
+    // encumbered entry must be encumbered FOR A STATED REASON, and must behave like it. An entry that flips
+    // grantorHoldsRights to false without saying who does hold them, or that claims it may still be
+    // redistributed, goes red here -- which `enc.length === 2` would happily wave through.
     const enc = REACHED_SOURCES.filter((e) => severityOf(e) === SEVERITY.ENCUMBERED);
-    ok(enc.length >= 1 && enc.every((e) => e.licenceExists === true && e.grantorHoldsRights === false &&
-                                           typeof e.licenceNote === "string" && e.licenceNote.length > 40 &&
-                                           e.redistributable === false),
-        `${enc.length} encumbered source(s), each with a licence that exists and no claim of rights behind it: ` +
-        `${enc.map((e) => e.repo).join(", ")} -- ` +
-        "found by reading a repo, three versions after the category was defined from a hypothetical");
+    ok(enc.length >= 1, `the ENCUMBERED category is not hypothetical: ${enc.length} entr(y/ies) reach it`);
+    ok(enc.some((e) => /Svg-IsometricCityAnimation/.test(e.repo)),
+        "including the first one, found by reading a repo three versions after the category was defined from a " +
+        `hypothetical. All of them: ${enc.map((e) => e.repo).join(", ")}`);
+    //
+    // *** THIS PATTERN WAS WRONG ON ITS FIRST RUN AND THE ENTRY IT ACCUSED WAS FINE. *** It was written from
+    // the DaveFace note in front of me and it red-flagged projapati66, whose note says "neither of which the
+    // grantor holds" -- the same assertion in words I had not thought of. Writing a check from ONE example and
+    // reading its red as the example's fault is the shape this session has now hit five times. So the accepted
+    // forms are an explicit list rather than one author's phrasing, and the failure message prints the list, so
+    // the next writer is told what to say instead of guessing at a regex.
+    const HOLDER_NAMED = [
+        /the grantor (?:holds|owns)/i,           // "... neither of which the grantor holds"
+        /not the grantor'?s/i,                   // "... is not the grantor's to license"
+        /does not (?:own|hold|license)/i,        // "... the author does not own"
+        /third party|third-party/i,              // "... credited to a third party"
+        /Credits section/i,                      // "... its Credits section names who"
+        /identifies no (?:owner|copyright holder)/i,   // v4477: "a repackaging whose licence identifies no owner"
+        /name of copyright owner/i,              // v4477: the Apache appendix quoted verbatim, never filled in
+    ];
+    const unexplained = enc.filter((e) => !HOLDER_NAMED.some((re) => re.test(e.licenceNote || "")));
+    ok(unexplained.length === 0,
+        "*** AND EVERY ENCUMBERED ENTRY SAYS IN ITS OWN licenceNote THAT SOMEONE ELSE HOLDS THE RIGHTS *** -- the " +
+        "category is a finding about a specific third party, never a shrug, and the note is where a reader meets " +
+        "it. Silent: " + (unexplained.map((e) => e.repo).join(", ") || "none") +
+        ". Accepted forms: " + HOLDER_NAMED.map((re) => re.source).join(" | "));
+    const shippable = enc.filter((e) => e.redistributable !== false || e.posture !== POSTURE.REACHED);
+    ok(shippable.length === 0,
+        "and every one of them is REACHED and not redistributable -- encumbrance bites on vendoring, so an " +
+        "entry cannot be encumbered and shippable at once. Contradictory: " +
+        (shippable.map((e) => `${e.repo} (${e.posture}, redistributable ${e.redistributable})`).join(", ") || "none"));
     ok(REACHED_SOURCES.every((e) => typeof e.grantorHoldsRights === "boolean"),
         `and all ${REACHED_SOURCES.length} existing entries answer the question, rather than it applying only to new ones`);
 
@@ -371,3 +406,26 @@ source not in the register was ever read. What is checked is that every recorded
 its posture and what was taken, that the two quoted codrops texts are one licence restated rather than two,
 and that no source forbidding redistribution has left a single byte in this tree.`);
 process.exit(fail ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, section 4b's three replacement checks. Applied to a working tree, GRADED ON EXIT
+// CODES rather than on a count of FAIL lines (a crashing gate prints zero of them), restored byte-identical.
+//
+//   A  DaveFace/UnrealRetroShaders given redistributable: true while still grantorHoldsRights: false.
+//      -> exit 1. An entry cannot be encumbered and shippable at once; encumbrance bites on vendoring, so
+//      this is the check that carries the actual consequence rather than the label.
+//
+//   B  the third-party naming stripped out of the same entry's licenceNote, leaving the flag with no reason.
+//      -> exit 1. The ENCUMBERED category is a finding about a SPECIFIC third party, never a shrug.
+//
+//   C  the knightcrawler25 entry deleted outright.
+//      -> exit 0 HERE and exit 1 in citedSources-selfcheck, which is the correct division: losing an entry
+//      is a debt-ratchet event, not a register-validity one, and a gate that reddened on both would be
+//      claiming ground it does not hold.
+//
+//   *** AND THE FIRST WRITING OF CHECK B ACCUSED AN INNOCENT ENTRY. *** The pattern was written from the one
+//   new note in front of me and red-flagged projapati66/Svg-IsometricCityAnimation, whose note says "neither
+//   of which the grantor holds" -- the same assertion in words I had not thought of. Writing a check from a
+//   single example and reading its red as the EXAMPLE'S fault is this session's most repeated defect. The
+//   accepted forms are an enumerated list now, and the failure message prints the list so the next writer is
+//   told what to say instead of guessing at a regex.

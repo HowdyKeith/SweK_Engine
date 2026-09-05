@@ -101,6 +101,9 @@ function harness() {
 }
 
 const H = harness();
+// v4461 -- pathToFileURL, not a raw path: on Windows path.join yields "C:\\...\\x.js" and dynamic import()
+// requires a file:// URL, so this line CRASHES ON THE BOX THIS ENGINE IS DEVELOPED ON. Caught by
+// tools/ship/windowsImport-selfcheck.mjs, which exists for exactly this and had been red on it.
 const M = await import(pathToFileURL(path.join(ENG, "ui", "pageFxOverlay.js")).href);
 
 // ---- 1. *** EVERY WINDOW LISTENER THE OVERLAY REGISTERS MUST BE REMOVED, WHATEVER IT IS CALLED *** ----------

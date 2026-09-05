@@ -309,11 +309,35 @@ async function uploadAsset({ repo, releaseId, filePath, uploadUrl } = {}) {
     const fname = path.basename(filePath);
     const data = fs.readFileSync(filePath);
     try {
-        const r = await _to(base + "?name=" + encodeURIComponent(fname), { method: "POST", headers: _hdrs({ "Content-Type": "application/octet-stream", "Content-Length": String(data.length) }), body: data }, 180000);
+        // *** THE 180-SECOND CAP WAS A TYPED CONSTANT THAT ASSUMED A FAST UPLINK, AND IT LOST A RELEASE. ***
+        // v4460 published with `"assets": []` -- release created, tag pushed, CI fired, NO ZIP. A release with
+        // no asset is invisible to fetchEngineBuild and scanDownloads, which match the installable zip BY
+        // NAME, so the fleet could not update from a release that looked published. The engine zip is ~32 MB
+        // and 180 s of it demands 1.5 Mbps SUSTAINED; below that the AbortController fires mid-flight and the
+        // release is left empty. Domestic upstream is routinely slower than that.
+        //
+        // DERIVED FROM THE FILE, NOT A BIGGER GUESS. A larger magic number would be the same defect with more
+        // headroom; this states a floor RATE and lets the size decide the time. 50 KB/s is deliberately
+        // pessimistic -- roughly 400 kbps, slower than almost any real link -- so the timeout stops being the
+        // thing that fails while a genuine hang still ends.
+        const MIN_UPLOAD_BYTES_PER_S = 50 * 1024;
+        const upMs = Math.max(180000, Math.ceil(data.length / MIN_UPLOAD_BYTES_PER_S) * 1000);
+        const r = await _to(base + "?name=" + encodeURIComponent(fname), { method: "POST", headers: _hdrs({ "Content-Type": "application/octet-stream", "Content-Length": String(data.length) }), body: data }, upMs);
         const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch {}
         if (!r.ok) return { ok: false, status: r.status, error: (j && j.message) || ("upload HTTP " + r.status) };
         return { ok: true, name: j.name, size: j.size, url: j.browser_download_url };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) {
+        // An AbortError and a refused connection produced the same sentence, and the release is ALREADY
+        // CREATED by the time this runs -- so the one message somebody reads has to say which happened and
+        // what state the release was left in.
+        const msg = String((e && e.message) || e);
+        const aborted = /abort/i.test(msg) || (e && e.name === "AbortError");
+        return { ok: false, timedOut: aborted, bytes: data.length, error: aborted
+            ? "upload TIMED OUT after " + Math.round(upMs / 1000) + "s for " + (data.length / 1048576).toFixed(1) +
+              " MB (floor assumed 50 KB/s). THE RELEASE EXISTS AND HAS NO ASSET -- delete it and re-publish, " +
+              "or attach the zip on the release page by hand."
+            : msg };
+    }
 }
 
 // one-shot: "set a version for our repo and upload a new version from our panel"

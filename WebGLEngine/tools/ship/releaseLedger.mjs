@@ -128,7 +128,28 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     const floor = led && led.baseline && +led.baseline.throughVersion || 0;
 
     // Versions that reached MAIN after the baseline, excluding the one being shipped right now, with no release.
-    const owed = onMain.versions.filter((v) => v > floor && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
+    //
+    // *** v4461 -- A VERSION BELOW THE NEWEST PUBLISHED RELEASE IS SUPERSEDED, NOT OWED, AND COUNTING IT WAS
+    // THE THING THAT KEPT DEMANDING A BASELINE RAISE. *** `latest` was computed six lines up and never
+    // consulted here, so publishing v4460 -- which contains every line of v4452 through v4459 -- cleared
+    // exactly one name off the list and left seven, against a budget of three. The only reachable answer was
+    // the escape hatch, for the FOURTH round running, and the ritual's own text says what to do instead:
+    // "the next round that reaches for this line should fix the structure instead".
+    //
+    // The debt this file exists to measure is what the fleet CANNOT GET. A box that downloads releases/latest
+    // at v4460 is running v4459's code, and v4458's, and v4452's; no separate build for any of them will ever
+    // exist (the zip is not byte-reproducible, so one made today would carry bytes that version never had) and
+    // nobody would download one if it did. Counting them was counting version NUMBERS where the rule is about
+    // CODE IN SOMEBODY'S HANDS -- a proxy standing in for the fact, which is the defect this whole round is
+    // about, sitting in the gate that polices the round.
+    //
+    // *** AND IT IS STRICTLY TIGHTER WHERE IT MATTERS, WHICH IS WHY IT IS NOT AN ESCAPE HATCH. *** It forgives
+    // ONLY versions provably beneath a real, published, downloadable release. Publish nothing and `latest`
+    // stops moving while main does not, so the list grows without bound and the gate goes red exactly as
+    // before -- the do-nothing path is not made easier by one version. Unlike the baseline, which is a number
+    // a person types, this floor can only be raised BY PUBLISHING SOMETHING.
+    const supersededBy = Math.max(floor, latest);
+    const owed = onMain.versions.filter((v) => v > supersededBy && v < treeN && !relN.includes(v)).sort((a, b) => b - a);
 
     // *** v4453 -- A LAG BUDGET, BECAUSE THE HARD ZERO MADE A WRITE-OFF THE ONLY ANSWER. ***
     //
@@ -165,7 +186,10 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     return {
         tree, treeN, latest, latestTag: latest ? "v" + latest : "",
         behind: treeN && latest ? treeN - latest : null,
-        releaseCount: relN.length, shippedCount: shipped.length, floor, owed,
+        releaseCount: relN.length, shippedCount: shipped.length, floor, owed, supersededBy,
+        // Named separately from `floor` so the two cannot be confused in a report: `floor` is a declared
+        // write-off and `latest` is an observed publish. Only one of them can be raised by typing.
+        supersededByPublish: latest > floor ? latest : 0,
         mainCount: onMain.versions.length, owedSource: onMain.source, owedDegraded: onMain.degraded,
         owedDegradedWhy: onMain.why,
         budget: budgetStated ? budget : null, budgetStated,

@@ -144,6 +144,10 @@ console.log();
     // v4452 -- AND THE DETECTOR ITSELF, WHICH NOTHING ASSERTED. Sabotage E removed the import tell and every
     // gate stayed green: the two pages it misclassifies are named here so the widening cannot be undone in
     // silence. DERIVED by running the classifier, not by trusting a list.
+    // v4461 -- pathToFileURL, not a raw path: on Windows path.join yields "C:\\...\\x.js" and dynamic import()
+// requires a file:// URL, so this line CRASHES ON THE BOX THIS ENGINE IS DEVELOPED ON. Caught by
+// tools/ship/windowsImport-selfcheck.mjs, which exists for exactly this and had been red on it.
+    // THIS ONE IS v4452'S, added three rounds ago for the import-tell assertion below.
     const { requirementsOf } = await import(pathToFileURL(path.join(ENG, "tools", "render-qa", "pageRequirements.mjs")).href);
     const viaImport = ["gfx-device.html", "nebula-device.html"];
     const got = viaImport.map((f) => ({ f, needs: (requirementsOf(path.join(ENG, f)).needs || []) }));

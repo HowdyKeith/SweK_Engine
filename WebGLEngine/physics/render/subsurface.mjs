@@ -123,3 +123,54 @@ export const fitted = Object.freeze({
     note: "a fit to Monte Carlo ground truth, not a derivation -- carried because a renderer needs it, and " +
           "named `fitted` so nothing downstream mistakes it for the exact half of this module",
 });
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report keeps this module's own division visible:
+// the EXACT half (a profile that integrates to one by construction, and a CDF that inverts) printed apart
+// from the FITTED half, so a reader cannot take Burley's albedo fit for a derivation.
+
+export function reportLines() {
+    const L = [];
+    L.push("[subsurface] Christensen-Burley: the exact half, and the fit, kept apart");
+    L.push("");
+    L.push("  *** THE EXACT HALF: the profile is normalised BY CONSTRUCTION, so this is the instrument");
+    L.push("      checking itself before it measures anything. ***");
+    L.push("     d        integral 2*pi*r*R(r) dr     error");
+    for (const d of [0.05, 0.2, 1, 5, 20]) {
+        const s = normalisation(d, { N: 40000 });
+        L.push("   " + String(d).padStart(5) + "        " + s.toFixed(9).padStart(14) + "     " +
+               Math.abs(s - 1).toExponential(2).padStart(9));
+    }
+    L.push("");
+    L.push("  the CDF inverts -- sampleRadius(u) then cdf() must return u");
+    L.push("     u        radius / d        cdf(radius)        error");
+    for (const u of [0.05, 0.25, 0.5, 0.75, 0.95, 0.999]) {
+        const r = sampleRadius(u, 1);
+        const back = cdf(r, 1);
+        L.push("   " + u.toFixed(3).padStart(6) + "     " + r.toFixed(6).padStart(10) + "     " +
+               back.toFixed(9).padStart(12) + "     " + Math.abs(back - u).toExponential(2).padStart(9));
+    }
+    L.push("");
+    // *** ONE STATEMENT READ ALONG TWO AXES, NOT TWO COINCIDENCES. *** The profile is self-similar, so the
+    // fraction emerging within eps depends on eps/d alone -- which is why "d -> 0 becomes a BRDF" and
+    // "eps -> large captures everything" are the SAME collapse and are printed as one table.
+    L.push("  the searchlight limit is ONE statement: fractionWithin depends on eps/d alone");
+    L.push("     eps/d     fraction within");
+    for (const k of [0.1, 0.5, 1, 2.5, 5, 10]) {
+        const a = fractionWithin(k * 0.01, 0.01), b = fractionWithin(k * 7.3, 7.3);
+        L.push("   " + String(k).padStart(6) + "     " + a.toFixed(9).padStart(12) +
+               "   (at d = 7.3: " + b.toFixed(9) + ", same to " + Math.abs(a - b).toExponential(1) + ")");
+    }
+    L.push("  meanRadius(d) = 2.5 d -- at d = 1 that is " + meanRadius(1).toFixed(3) + ", capturing " +
+           (fractionWithin(meanRadius(1), 1) * 100).toFixed(2) + "% of the light");
+    L.push("");
+    L.push("  *** THE FITTED HALF, LABELLED SO NOTHING DOWNSTREAM MISTAKES IT FOR THE EXACT ONE. ***");
+    L.push("  " + fitted.note);
+    L.push("     albedo A     s = 1.85 - A + 7|A-0.8|^3     d for mean free path 1");
+    for (const A of [0.1, 0.3, 0.5, 0.8, 0.95, 1.0]) {
+        L.push("   " + A.toFixed(2).padStart(8) + "     " + fitted.scalingFactor(A).toFixed(6).padStart(14) +
+               "               " + fitted.distanceFor(A, 1).toFixed(6));
+    }
+    return L;
+}

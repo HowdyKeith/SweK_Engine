@@ -85,6 +85,23 @@ export const NOT_IMPORTERS = Object.freeze([
     // here. Identical in the report ("ARRIVED: <file>"), opposite fixes, and the substring rule cannot tell
     // an import from a readFileSync.
     "tools/ship/gltfKtx2-selfcheck.mjs",
+
+    // *** v4477 -- MAIN REACHED THE SAME ENTRY INDEPENDENTLY, AT v4461, AND ARGUED IT BETTER. ***
+    // Both branches added orreryUniverse-selfcheck.mjs to this list in the same window; main's reasoning is
+    // kept verbatim below because it states the counter-argument this side only implied -- the gate really
+    // does readdirSync and readFileSync those paths, so ejecting a body WOULD break it, and what decides the
+    // question is what the orrery MODELS rather than what would throw. A census counting itself makes every
+    // vendor body look consumed when its only consumer is the thing doing the counting.
+    // v4461: FIFTH instance, and it reached FOUR bodies at once -- box3d, jolt, slug and wasm -- which is why
+    // it is worth a sentence rather than a line. orreryUniverse-selfcheck.mjs is the gate on the vendor CENSUS:
+    // its subject IS the vendor tree. It imports nothing from vendor/; it names vendor/box3d and vendor/jolt in
+    // assertion messages ("vendor/jolt has N C++ files while vendor/box3d has M"), lists vendor/slug's contents,
+    // and reads vendor/wasm/quickjs's README to check an author attribution.
+    // *** THE HONEST COUNTER-ARGUMENT, RECORDED SO A LATER ROUND CAN DISAGREE WITH IT: *** it really does
+    // readdirSync and readFileSync those paths, so eject the body and this gate throws. What decides it is what
+    // the orrery MODELS -- "which engine files would break if this dependency were removed" -- and a census
+    // counting itself makes every vendor body look consumed when its only consumer is the thing counting them.
+    // That is the same argument as the four above, arriving through a gate rather than through a fixture.
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */

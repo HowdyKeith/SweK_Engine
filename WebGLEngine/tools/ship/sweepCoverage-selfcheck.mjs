@@ -58,6 +58,53 @@
 //   BH. a repair with no account of what it was               -> 1 RED
 //   BI. the census edited down to agree with today            -> 2 RED
 //
+// ---- *** v4461 -- THE DOOR WAS WALKED THROUGH ONCE AND THE WALK WAS UNDONE INSIDE THE SAME VERSION *** -----
+//
+// v4408 built the rotation and section 4 checks it covers the pool in a derived number of rounds. NOTHING
+// CHECKED THAT WHAT WALKED THROUGH IT STAYED THROUGH -- and that is the whole of what went wrong. The
+// 2026-09-03 rotation re-timed 150 gates serially; 146 came back under the budget that had evicted them,
+// median 2.80x faster and worst 29.12x, written back with fresh stamps. The NEXT commit to touch the timings,
+// titled "the sweep timings as verify left them", has all 146 at EXACTLY their pre-rotation readings carrying
+// "unknown -- before v4408" -- a stamp no post-v4408 writer can produce for an entry that had a real one.
+// referenceScan has read 3002 ms across thirty commits and really takes 733, and once over budget nothing
+// runs it again, so the mechanism that recorded the number cannot correct it. 49 versions, no rotation.
+//
+// The check costs a FILE READ, and the evidence was in the tree the whole time: the rotation keeps its own
+// ledger, which survived. What it measured under budget must still be under budget.
+//
+//   CA. a rotated gate is put back over budget (THE REAL ONE)   -> 1 RED
+//   CB. a rotated gate's stamp reverts to the pre-v4408 marker  -> 1 RED
+//   CC. rotationHeld trusts the ledger and ignores the timings  -> 1 RED
+//   CD. rotationHeld counts gates never brought under budget    -> 3 RED
+//   CE. the loss record's pool arithmetic stops reconciling     -> 1 RED
+//   CF. a returned gate is claimed that was not in the twelve   -> 1 RED
+//   CG. the four-way split stops summing to what ran            -> 1 RED
+//   CH. a returned gate is put back over budget in the timings  -> 2 RED
+//
+// *** AND IT HAPPENED AGAIN, LIVE, MID-ROUND, WHICH IS HOW THE MECHANISM STOPPED BEING A GUESS. *** This
+// round's rotation ran at 14:24 and returned 72 gates. A CONCURRENT SESSION shipping an unrelated fix, from a
+// tree checked out before that, ran verify at 15:56 and pushed its own whole-file sweep-timings.json. All 72
+// were back over budget in it, 69 carrying the pre-v4408 stamp, referenceScan at 3002 against the 675 ms
+// measured here -- AND BOTH ROWS ABOVE WENT RED ON IT BY NAME, on their first exposure to a real instance
+// rather than a fixture. quickSweep reads the timings once, carries them forward and rewrites the whole file,
+// so two ships in flight means the later push wins wholesale. Nobody did anything wrong.
+//
+// *** I NEARLY COMMITTED THE SAME CLOBBER RESOLVING IT: *** `git checkout --theirs` in a REBASE takes the
+// commit being applied, not the upstream, so it kept this round's file and discarded the other session's
+// fresh sweep. Caught by comparing the `captured` stamps instead of trusting the flag. The resolution is to
+// take their file and RE-RUN the rotation -- measurement, not a resurrected snapshot -- which is why every
+// number in the repair record is from the second run.
+//
+// One more thing this round got wrong and the gate caught: the `returnedAt_v4461` row first pinned the exact
+// millisecond each returned gate had been measured at, and the second rotation moved them (518 -> 580) so the
+// row went red for the crime of being measured again. A THRESHOLD IS THE PROPERTY; A MILLISECOND IS AN
+// OBSERVATION.
+//
+// The repair rotation ran 80 and returned 72; the pool went 385 -> 313. Its 8 reds were ALL already in
+// v4460's census of 22, reached by a different instrument over a different population -- and FIVE of them are
+// now under budget and unregistered, so the next ship reports them as NEW reds. That is an instrument that
+// just started working, not a regression.
+//
 // *** X AND Y ARE MECHANISMS vacuity.mjs NAMED ONE ROUND EARLIER, BOTH IN THE ROUND AFTER IT. *** Y is
 // mechanism 1, the empty collection: `none` is empty in this tree, so folding it into `green` changed nothing.
 // X is mechanism 2, the unreachable branch: backfillStamps guarantees every entry has an `at`, so the
@@ -327,6 +374,71 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // them, true about v4460 forever -- and the live half now asserts the PAYMENT: those gates no longer
     // carry the evicting number, eleven were re-timed, and the twelfth is named with the reason it stays out.
     const back = REC.returnable;
+    // *** v4477 -- BOTH BRANCHES REPLACED THIS ROW IN THE SAME WINDOW AND BOTH ARE KEPT, BECAUSE THEY ASSERT
+    // DIFFERENT THINGS. *** v4460 built the row to go red the day somebody fixed what it named, and it did --
+    // twice, independently. Main's v4461 rotation re-timed six of the twelve and the row fired; this branch's
+    // v4476 re-timed eleven and it fired here. Main's repair is the more general PROPERTY -- an entry either
+    // still carries the reading that evicted it, or is named as returned AND is under budget, checked against
+    // the threshold rather than against a millisecond, because a re-timed gate gets a new number every run.
+    // This branch's repair is the v4476 ACCOUNTING -- eleven re-timed plus one named as still over must equal
+    // twelve, and the one still over must carry a reason. Neither subsumes the other, so both rows stand.
+
+    // ---- main's, taken as written ----
+    // v4461: an entry either still carries the reading that evicted it, or is NAMED as returned -- and a
+    // returned one is checked against the BUDGET, not against a millisecond. The first draft pinned the exact
+    // reading the repair had taken, and the second rotation moved it (518 -> 580, 1023 -> 1062) so the row
+    // went red for the crime of being measured again. *** A THRESHOLD IS THE PROPERTY; A MILLISECOND IS AN
+    // OBSERVATION, and pinning one is a claim that cannot survive the re-measurement this round exists to
+    // encourage. *** The row keeps its teeth: an entry that is neither at its evicting reading nor under
+    // budget still fails.
+    // *** v4477 -- THE MERGED TREE CARRIES TWO RETURN RECORDS, AND THE ROW ONLY KNEW ITS OWN. ***
+    // v4460 built this row to fire the day somebody re-timed what it named, and it fired TWICE, independently:
+    // main's v4461 rotation returned six, and this branch's v4476 re-timed eleven. Reading only one of the two
+    // ledgers makes the other branch's repair look like a lost measurement. The property is unchanged -- an
+    // entry is either still at the reading that evicted it, or it is NAMED as returned and is now under budget
+    // -- and what widens is the set of ledgers consulted, not what counts as an answer.
+    // RETURNED_AT_V4476 records a COUNT and the exceptions, not a roll, so the roll is DERIVED from the two --
+    // the twelve, minus the ones it names as still over -- and the derivation is checked against the frozen
+    // count rather than trusted. A list typed out beside a count is the second copy that never gets updated.
+    const V76 = SC.RETURNED_AT_V4476;
+    const stillOverGates = new Set(V76.stillOver.map((x) => x.gate));
+    const reTimedHere = back.filter((r) => !stillOverGates.has(r.gate));
+    const stillOverNamed = (g) => {
+        const row = V76.stillOver.find((x) => x.gate === g);
+        return !!row && typeof row.why === "string" && row.why.length > 40 &&
+               (FILE.timings || {})[g] > SC.BUDGET_MS;
+    };
+    const returned = new Map([
+        ...REC.returnedAt_v4461.map((r) => [r.gate, r]),
+        ...(reTimedHere.length === V76.reTimed ? reTimedHere.map((r) => [r.gate, r]) : []),
+    ]);
+    // v4461: the title carried TWELVE, TWENTY-TWO and SIX as typed words beside the same numbers derived in
+    // the body -- and the second rotation of this same version moved the third of them, so the headline said
+    // SIX while the sentence under it said seven. A count typed into a title is a count nobody re-derives,
+    // which is this round's whole subject; all three come off the record now.
+    ok(`!! *** ${back.length} OF THE ${REC.confirmed.total} NOW FINISH UNDER THE BUDGET THAT EXCLUDES THEM; ` +
+       `${REC.returnedAt_v4461.length} ARE BACK IN ***`,
+       back.length === REC.confirmed.nowUnderBudget &&
+       overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
+                                 ((FILE.timings || {})[r.gate] === r.recordedMs ||
+                                  (returned.has(r.gate) && (FILE.timings || {})[r.gate] < SC.BUDGET_MS) ||
+                                  // v4477: the THIRD state, which the merged tree created and neither branch
+                                  // had alone -- RE-MEASURED AND STILL OVER. crossBackend was re-timed at v4476
+                                  // to 12,851 ms here against main's 376, a 34x disagreement between two boxes
+                                  // that is recorded rather than averaged away. It no longer carries the reading
+                                  // that evicted it and it is not back either. Accepting it needs a NAMED entry
+                                  // carrying a reason and a live reading that is genuinely still over -- an
+                                  // entry that merely drifted off its recorded number still fails.
+                                  stillOverNamed(r.gate))) &&
+       overNonEmpty(REC.returnedAt_v4461, (r) => back.some((b) => b.gate === r.gate) && r.nowMs < SC.BUDGET_MS),
+       `${back.length} gates, worst ${Math.max(...back.map((r) => r.nowMs))} ms against the ${SC.BUDGET_MS} ms ` +
+       `budget, each still recorded at the time that evicted it (box3dFilter 89 ms now, ${back[0].recordedMs} ms ` +
+       "on file). *** THEY ARE HIDDEN BY A NUMBER THAT IS WRONG IN THE DIRECTION THAT HIDES THEM *** -- the " +
+       "recorded time is checked against the live file here, so a re-timing that fixes it fails this row " +
+       `rather than leaving a record nobody re-derives -- AND IT DID: ${REC.returnedAt_v4461.length} were ` +
+       "returned by v4461's rotation and this row fired on the next run until they were named.");
+
+    // ---- this branch's v4476 accounting, kept beside it ----
     const T = FILE.timings || {};
     const stillStale = back.filter((r) => T[r.gate] === r.recordedMs);
     const RET = SC.RETURNED_AT_V4476;
@@ -402,6 +514,105 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
          ["no code", String(cls.none.length), "never observed at all"]],
         "Section 2 asked whether a nonzero code is a verdict. This asks whether a zero one is, and the answer " +
         "is 22 gates, 18 of them in no register.");
+}
+
+console.log("\n10. *** THE ROTATION WAS WALKED THROUGH ONCE AND THE WALK WAS UNDONE INSIDE THE SAME VERSION ***");
+// v4408 built the door and section 4 checks it covers the pool in a derived number of rounds. NOTHING CHECKED
+// THAT WHAT WALKED THROUGH IT STAYED THROUGH. The 2026-09-03 rotation re-timed 150 over-budget gates serially;
+// 146 came back under the budget that had evicted them, median 2.80x faster, worst 29.12x, and it wrote them
+// into sweep-timings.json with fresh stamps. The next commit to touch that file -- titled "the sweep timings
+// as verify left them" -- has all 146 back at EXACTLY their pre-rotation readings, carrying the stamp
+// "unknown -- before v4408", which no post-v4408 writer can produce for an entry that had a real one.
+// referenceScan has read 3002 ms ever since, identical across thirty commits, and really takes 733.
+//
+// *** THE CHECK COSTS A FILE READ AND THE DATA HAS BEEN IN THE TREE FOR FORTY-NINE VERSIONS. *** The rotation
+// keeps its OWN ledger, which survived: a gate it measured under budget must still be under budget in the
+// timings, or the timings have lost work somebody paid for.
+{
+    const rot = SC.readRotation();
+    const held = SC.rotationHeld(FILE, rot);
+    const REC = SC.ROTATION_LOST_V4461;
+
+    const ageDays = held.rotatedAt ? (Date.now() - Date.parse(held.rotatedAt)) / 86400000 : null;
+    say(`rotation ledger written ${held.rotatedAt || "(never)"}` +
+        (ageDays === null ? "" : ` -- ${ageDays.toFixed(1)} days ago`) +
+        ` -- ${held.measuredUnder} entries measured under ${SC.BUDGET_MS} ms, ${held.held} still under it`);
+    // *** REPORTED, NOT ASSERTED, AND THE REASON IS THE REPAIR THIS ROW WOULD DEMAND. *** A gate that goes red
+    // because time passed fires at an arbitrary moment on whoever is shipping, and the fix -- run the
+    // rotation -- takes minutes they did not plan for. The ledger's AGE is a number a person reads; what is
+    // asserted is that the ledger is real and that what it bought has not been taken back. The ship ritual
+    // asks for the rotation (step 3b); this says how long it has been since anybody answered.
+    ok("!! the rotation ledger is real and dated, so its age is a number rather than a guess",
+       !!held.rotatedAt && Number.isFinite(Date.parse(held.rotatedAt)) && held.measuredUnder > 0,
+       held.rotatedAt
+         ? `${held.measuredUnder} entries, ${ageDays.toFixed(1)} days old. Between 2026-09-03 and v4460 this ` +
+           "read 49 shipped versions with no rotation at all, and nothing in the tree said so."
+         : "NO LEDGER: the rotation has never been run, or its file was lost");
+    ok("!! *** WHAT THE ROTATION MEASURED UNDER BUDGET IS STILL UNDER BUDGET IN THE TIMINGS ***",
+       held.lost.length === 0 && held.measuredUnder > 0,
+       held.lost.length
+         ? `${held.lost.length} LOST: ${held.lost.slice(0, 4).map((r) => r.gate.split("/").pop() + " " + r.ms + " -> " + (FILE.timings || {})[r.gate]).join(", ")}`
+         : `${held.held} of ${held.measuredUnder} held. At v4460 this row read 0 of 146 -- every gate the ` +
+           "rotation freed had been put back, and no gate in the tree could say so.");
+    ok("...and none of them carries the pre-v4408 stamp, which is the fingerprint of a REPLACED file",
+       held.unstamped.length === 0,
+       held.unstamped.length
+         ? `${held.unstamped.length} entries the rotation stamped now read "${SC.UNKNOWN_AT}"`
+         : `0 of ${held.measuredUnder}. A gate that merely got SLOWER keeps its stamp and moves its number; ` +
+           "one whose file was replaced loses both, and those are different faults with different repairs.");
+
+    // The frozen measurement of the loss, checked against its own parts -- v4296's rule.
+    ok("!! the loss is recorded with its witness, and every count adds up",
+       REC.cameBackUnderBudget === REC.recordedAtExactlyThePreRotationReading &&
+       REC.stillUnderBudgetInTheTimings === 0 &&
+       REC.cameBackUnderBudget <= REC.rotated &&
+       REC.repair.ran === REC.repair.underGreen + REC.repair.underRed + REC.repair.overGreen + REC.repair.overRed &&
+       REC.repair.cameBackUnder === REC.repair.underGreen + REC.repair.underRed &&
+       REC.repair.red === REC.repair.underRed + REC.repair.overRed &&
+       REC.repair.poolBefore - REC.repair.poolAfter === REC.repair.cameBackUnder &&
+       REC.witness.evictedAt > SC.BUDGET_MS && REC.witness.serialTruth < SC.BUDGET_MS,
+       `${REC.rotated} rotated, ${REC.cameBackUnderBudget} came back under, ${REC.stillUnderBudgetInTheTimings} ` +
+       `survived. The repair ran ${REC.repair.ran} and returned ${REC.repair.cameBackUnder}, so the pool went ` +
+       `${REC.repair.poolBefore} -> ${REC.repair.poolAfter} -- and THE DIFFERENCE IS THE RETURNEES, checked ` +
+       `rather than stated. Witness: ${REC.witness.gate.split("/").pop()} evicted at ${REC.witness.evictedAt} ms, ` +
+       `truth ${REC.witness.serialTruth} ms.`);
+
+    // *** THE ROTATION'S REDS ARE NOT A SECOND OPINION, THEY ARE AN INDEPENDENT ONE. *** Section 7's census
+    // found its 22 by re-running every over-budget entry recorded green. The rotation found 8 by re-timing a
+    // staleness-ordered slice. Different populations, different orderings, and every one of the 8 is in the 22.
+    ok("!! every red the repair rotation found was already named by the v4460 census, reached another way",
+       REC.repair.redsAllPreviouslyNamed === true && REC.repair.red > 0 &&
+       REC.repair.newlyVisibleReds > 0 && REC.repair.newlyVisibleReds <= REC.repair.red,
+       `${REC.repair.ran} rotated: ${REC.repair.underGreen} under+green, ${REC.repair.underRed} under+RED, ` +
+       `${REC.repair.overGreen} over+green, ${REC.repair.overRed} over+RED. All ${REC.repair.red} reds already in the list of ` +
+       `${SC.STALE_GREENS_V4460.confirmed.total}. *** ${REC.repair.newlyVisibleReds} OF THEM ARE NOW UNDER ` +
+       "BUDGET AND UNREGISTERED, SO THE NEXT SHIP WILL REPORT THEM AS NEW REDS *** -- which is the correct " +
+       "behaviour of an instrument that just started working. They were always red; they were invisible. " +
+       "Registering them to keep the ship green is the one move this tree forbids.");
+
+    // *** HERMETIC, because the live data cannot drive it: the repair just ran, so `lost` is 0 and the row
+    // above is asserted on a file that agrees with itself. The fault it guards is a PAST state, and a fixture
+    // is the only way to exercise a guard whose defect has been repaired. ***
+    {
+        const file = { timings: { "a.mjs": 900, "b.mjs": 3500, "c.mjs": 800 },
+                       at: { "a.mjs": "2026-09-05T00:00:00Z", "b.mjs": "2026-09-05T00:00:00Z", "c.mjs": SC.UNKNOWN_AT } };
+        const led = { at: "2026-09-04T00:00:00Z", rotated: [
+            { gate: "a.mjs", ms: 900, code: 0, priorMs: 3100 },     // held
+            { gate: "b.mjs", ms: 1200, code: 0, priorMs: 3500 },    // LOST: back over budget
+            { gate: "c.mjs", ms: 800, code: 0, priorMs: 3200 },     // held, but the stamp was replaced
+            { gate: "d.mjs", ms: 4000, code: 0, priorMs: 5000 },    // never came under: not this guard's business
+        ] };
+        const h = SC.rotationHeld(file, led);
+        ok("!! FIXTURE: a gate put back over budget is LOST, one that never came under is not counted",
+           h.measuredUnder === 3 && h.lost.length === 1 && h.lost[0].gate === "b.mjs" && h.held === 2,
+           `measuredUnder ${h.measuredUnder} (d.mjs at 4000 ms is excluded -- it never returned, so losing it ` +
+           `is not possible), lost ${h.lost.map((r) => r.gate).join(",")}, held ${h.held}`);
+        ok("!! FIXTURE: the pre-v4408 stamp is caught even on a gate whose TIMING is still fine",
+           h.unstamped.length === 1 && h.unstamped[0].gate === "c.mjs" && !h.lost.some((r) => r.gate === "c.mjs"),
+           "c.mjs reads 800 ms -- under budget, held, and its stamp says nobody has observed it since before " +
+           "v4408. THE NUMBER SURVIVED AND THE PROVENANCE DID NOT, which is exactly how 146 gates were put " +
+           "back without a single reading looking wrong.");
+    }
 }
 
 say("WHAT THIS DOES NOT CLAIM. That the 22 are the whole of it -- section 7 re-ran the 371 entries " +

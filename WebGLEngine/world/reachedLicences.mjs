@@ -1014,6 +1014,78 @@ export const REACHED_SOURCES = Object.freeze([
              "than upstream; the licence question above is reason enough not to prefer it, and the " +
              "measurement is reason enough not to want one yet.",
     },
+    {
+        // v4461 -- cited in render/retroRaster.mjs since v4442 and registered by nobody (the #137 shape, a sixth
+        // time). *** THE UPSTREAM WAS OPENED FOR THE FIRST TIME TO WRITE THIS ENTRY, AND WHAT IT SAID CHANGED
+        // THE RECORD RATHER THAN CONFIRMING IT: *** the v4442 header split the pack on FALSIFIABILITY and the
+        // author's own Credits section splits it on OWNERSHIP, and the two lines fall in the same place.
+        repo: "DaveFace/UnrealRetroShaders", sourceUrl: "https://github.com/DaveFace/UnrealRetroShaders",
+        grantorHoldsRights: false, licenceExists: true, publisher: "Dave Watts (DaveFace)", year: 2020,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2020 Dave Watts. READ FIRST-HAND at v4461 from a shallow clone at bc2e5654: " +
+                     "LICENSE, 21 lines, sha256 8e04615e7298ee64bc2408934fcc709889cda7495d4763fe29368898bd037cc9, " +
+                     "unmodified MIT text; and the HEAD commit's git author is 'Dave Watts " +
+                     "<dave.today.gone.tomorrow@gmail.com>', which is the copyright line and the repository owner " +
+                     "agreeing. *** BUT grantorHoldsRights IS false ON THE AUTHOR'S OWN WORDS, NOT ON AN INFERENCE. *** " +
+                     "README.md, 87 lines, sha256 5ee544dcbd4d621677c1015a35b27acb2b51275d4cfb89dfa836403e83b5b9b9, " +
+                     "says at line 16 'Some functions are based on stuff I've found online, I've tried to include " +
+                     "comments linking to their work where I can remember', and its Credits section names who: " +
+                     "'YUV colour conversion / Bayer implementation by Jazz Mickle' under Core Content, and under " +
+                     "Demo Content 'Texures based on images from www.textures.com' and 'a couple Epic samples'.",
+        redistributable: false, posture: POSTURE.REACHED,
+        taken: "Two techniques, REWRITTEN from their closed forms in JavaScript: affine texture interpolation " +
+             "(sum(b_i a_i), against the perspective-correct sum(b_i a_i / w_i) / sum(b_i / w_i)) and vertex " +
+             "quantisation to a fixed-point lattice. No .uasset, no material graph and no upstream text is in " +
+             "the tree -- the pack is 321 binary UE4.27 assets over 55 MB and nothing in it is portable at the " +
+             "file level.",
+        takenPaths: ["render/retroRaster.mjs"],
+        citedPaths: ["render/retroRaster-selfcheck.mjs", "tools/ship/gateSweep.mjs"],
+        why: "*** THE ENTRY EXISTS BECAUSE OF WHAT THE UPSTREAM SAID ABOUT THE HALF v4442 REFUSED. *** v4442 took " +
+             "affine warping and vertex snapping because each has a right answer a gate can fail, and left Bayer " +
+             "dithering (already in fx/dither.js) and YUV/posterise (aesthetic, so no wrong answer to catch). " +
+             "Reading the README to write this record found that Bayer and YUV are exactly the two the author " +
+             "credits to a third party. So a split made on whether a check could fail turns out to be the same " +
+             "cut as the licence boundary, and the tree took only the part the grantor holds -- by accident of " +
+             "reasoning rather than by having looked. That is worth keeping precisely because it was luck: the " +
+             "look should have come first, and this entry is what makes the next one come first. Nothing is " +
+             "redistributable from here regardless -- the credited pieces are not the grantor's to license and " +
+             "the taken pieces are 1994 console constraints that are nobody's.",
+    },
+    {
+        // v4461 -- cited in physics/render/principled.mjs since v4432 and registered by nobody. Registered in
+        // the same sweep as the retro pack above, and the pair is the contrast: one grantor holds the rights
+        // to what was read and one does not.
+        repo: "knightcrawler25/GLSL-PathTracer", sourceUrl: "https://github.com/knightcrawler25/GLSL-PathTracer",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Asif Ali", year: 2019,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2019 Asif Ali. READ FIRST-HAND at v4461 from a shallow clone at 291c1fdc: LICENSE, " +
+                     "21 lines, sha256 449495ccec87c244499c7821d0c7ca9d718a4a9a38b6d7066fa1e7028f8a8d5f, " +
+                     "unmodified MIT text; the HEAD commit's git author is 'Asif <knightcrawler25@gmail.com>', " +
+                     "matching the copyright line and the repository owner. *** AND THE FILE ACTUALLY READ CARRIES " +
+                     "THE GRANT ITSELF: *** src/shaders/common/disney.glsl, 350 lines, sha256 " +
+                     "24de7964b6e1b051d1e30c66eeea02e4776916274b30ad9e0e0db77d553cdb77, opens with the same MIT " +
+                     "block in a comment, so the licence does not have to be inherited from the repository root " +
+                     "to cover it. Its own References list is nine published papers and other renderers " +
+                     "(the Disney BRDF and BSDF course notes, Heitz's visible-normal sampling, Walter's rough " +
+                     "refraction, tinsel, mitsuba3) -- ideas the author does not claim and did not need to. " +
+                     "Vendored third-party code is quarantined under thirdparty/ (RadeonRays, SDL2, imgui, oidn, " +
+                     "stb, tinygltf and five more), none of which was opened and none of which is covered by this note.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The COMPOSITION, not a lobe. physics/render/principled.mjs assembles a principled BSDF out of " +
+             "modules this tree already had -- GGX from microfacet.mjs, Fresnel from fresnel.mjs, the multi-scatter " +
+             "table from energyCompensation.mjs, Oren-Nayar from roughDiffuse.mjs -- and grades whether the seams " +
+             "double-count energy. No GLSL is in the tree and nothing was translated line for line.",
+        takenPaths: ["physics/render/principled.mjs"],
+        citedPaths: ["physics/render/principled-selfcheck.mjs", "tools/ship/gateSweep.mjs"],
+        why: "The absence was real: before v4432 `grep -i disney` over this tree returned one comment about a " +
+             "sphere radius, while every PIECE of a principled model was already here and unassembled. What the " +
+             "upstream supplied was the ANSWER TO 'WHICH LOBES, IN WHAT PROPORTION', which is the one question a " +
+             "pile of correct lobes cannot answer for itself -- and it is a design, not code, which is why the " +
+             "taking is a composition over this tree's own modules rather than a port. MIT and redistributable, " +
+             "so vendoring was permitted and was still refused: re-implementing the sampler or the intersection " +
+             "would be a second declaration of something the tree already declares, which is the rule " +
+             "physics/render/pathTracer.mjs states.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
@@ -1041,6 +1113,14 @@ export const REACHED_SOURCES = Object.freeze([
  */
 // v4305 clears a fifth, krispuckett/SwiftUIShaders, leaving 49 -- found the same way as the fourth: a round that
 // had to open the upstream for another reason (#35's last thirteen shaders) read the LICENSE while it was there.
+//
+// *** v4442 AND v4432 EACH TOOK AN IDEA AND RECORDED NOTHING, SO THE RATCHET WENT UP TO 51 AND THE GATE WENT
+// RED -- WHICH IS THE ONLY THING IT IS FOR. *** v4461 clears both by cloning the two upstreams and reading their
+// licence files first-hand, and the reading was not a formality in either case. DaveFace/UnrealRetroShaders came
+// back grantorHoldsRights:false on the author's own Credits section, and the two techniques he credits to a third
+// party are exactly the two v4442 declined to take for an unrelated reason. knightcrawler25/GLSL-PathTracer came
+// back clean, with the MIT block repeated inside the one file that was actually read. Back to 49, and the number
+// has now been up as well as down, which is what makes it evidence rather than decoration.
 export const UNREGISTERED_CITED_BASELINE = 49;
 
 export function validateEntry(e) {

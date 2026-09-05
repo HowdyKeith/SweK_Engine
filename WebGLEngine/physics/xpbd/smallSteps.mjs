@@ -136,3 +136,47 @@ export const CROSSOVER_AT_V4441 = Object.freeze({
     solverDefault: 1,
     otherIterationCounts: Object.freeze([2, 4, 5, 8]),
 });
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report re-bisects the crossover live and prints
+// `saturated` beside every value, because this module's own finding is that a bisection returning its bracket
+// is the ABSENCE of a crossover wearing a number, and a report that hid that would recreate the defect.
+
+export function reportLines() {
+    const L = [];
+    const R = CROSSOVER_AT_V4441;
+    L.push("[smallSteps] where many substeps stop beating many iterations, at a fixed solver budget");
+    L.push("");
+    L.push("  " + R.reference);
+    L.push("");
+    L.push("  budget " + R.budget + " solver operations, split six ways, chain of " + R.links + " links");
+    L.push("   iterations   substeps    rel error");
+    for (const row of budgetSplit(R.links, R.budget)) {
+        L.push("   " + String(row.iterations).padStart(10) + "   " + String(row.substeps).padStart(8) +
+               "   " + row.relErr.toExponential(3).padStart(10));
+    }
+    L.push("");
+    L.push("  crossover, re-bisected now against the record at " + R.at);
+    L.push("   budget      crossover      saturated   recorded       ratio");
+    for (const b of Object.keys(R.budgetAxis).map(Number).sort((a, c) => a - c)) {
+        const d = crossoverDetail(R.links, b);
+        const want = R.budgetAxis[b];
+        L.push("   " + String(b).padStart(6) + "   " + d.value.toExponential(3).padStart(11) + "   " +
+               (d.saturated ? "SATURATED at " + d.at : "      no   ").padStart(14) + "   " +
+               want.toExponential(3).padStart(9) + "   " + (d.value / want).toFixed(3).padStart(7));
+    }
+    L.push("");
+    // *** THE SATURATION COLUMN IS THE WHOLE REASON THIS PRINTS A TABLE RATHER THAN A CONSTANT. ***
+    const short = crossoverDetail(2, R.budget);
+    L.push("  and at N = 2 it saturates: " + short.value.toExponential(3) + " at the " + short.at +
+           " bound, wins(lo) = " + short.atLo + ", wins(hi) = " + short.atHi);
+    L.push("  which is NOT a crossover a thousand times stiffer than its neighbours -- it is no crossover at all.");
+    L.push("");
+    L.push("  it is not a constant of XPBD: " + R.budgetSpread + "x across budget alone, monotonically.");
+    L.push("  the tree sits on BOTH sides -- below " + R.crossover.toExponential(3) + ": " +
+           R.belowCrossover.join(", ") + "   above: " + R.aboveCrossover.join(", "));
+    L.push("  xpbd.js defaults to iterations = " + R.solverDefault + " (the small-steps convention, right for " +
+           "the stiff half). Modules passing " + R.otherIterationCounts.join(", ") + " are only right above it.");
+    return L;
+}
