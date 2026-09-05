@@ -1,0 +1,35 @@
+basis_transcoder.js + basis_transcoder.wasm -- vendored
+https://github.com/mrdoob/three.js  (examples/jsm/libs/basis/, tag r160)
+
+Recorded at v4475.
+
+*** NOT ONE OF THESE FILES CARRIES A LICENCE HEADER, AND THE DIRECTORY HAS NO LICENSE FILE. ***
+Checked directly: basis_transcoder.js (62,337 bytes) and basis_transcoder.wasm (499,935 bytes)
+contain no "copyright", no "Apache", no SPDX tag, in any part of the file. Upstream has no
+examples/jsm/libs/basis/LICENSE either -- fetched, 404.
+
+WHERE THE ATTRIBUTION ACTUALLY IS: README.md, vendored here beside them, which names
+https://github.com/BinomialLLC/basis_universal as the source of the transcoder. That repository's
+LICENSE was read FIRST-HAND at v4473 and is recorded in world/reachedLicences.mjs: Apache License
+2.0, 201 lines, sha256 065fcf48d6af21c0, appendix filled in as "Copyright 2019-2026 Binomial LLC".
+
+The wasm's own strings corroborate what it is without saying who owns it: BasisFile, isUASTC,
+BASISLZ, BasisImageDesc.
+
+*** THE ASSUMPTION THIS RECORD EXISTS TO REFUSE: "it is inside the three.js repository, so it is
+three.js's MIT." *** These are BUILT ARTIFACTS OF ANOTHER PROJECT, bundled. gpu/khronosSamples.mjs
+records the same shape for sample assets and found two that are not free at all. Here the answer is
+benign -- Apache-2.0 -- and it is benign as a READ FACT rather than as an inference from where the
+bytes happen to sit.
+
+SIBLINGS THIS LOADER NEEDS, vendored at the same time and also carrying no in-file licence:
+  vendor/three/jsm/libs/ktx-parse.module.js  -- donmccurdy/KTX-Parse, MIT, (c) 2020 Don McCurdy
+  vendor/three/jsm/libs/zstddec.module.js    -- donmccurdy/zstddec,   MIT, (c) 2020 Don McCurdy
+  vendor/three/jsm/loaders/KTX2Loader.js     -- three.js, MIT (see ../../../LICENSE)
+  vendor/three/jsm/utils/WorkerPool.js       -- three.js, MIT (see ../../../LICENSE)
+Both McCurdy licences were fetched and read first-hand at v4475.
+
+EVERY FILE IS BYTE-IDENTICAL TO UPSTREAM r160. Nothing was rewritten -- KTX2Loader.js keeps its
+bare `from 'three'` specifier and its relative '../utils/' and '../libs/' imports, which is why the
+directory layout mirrors upstream exactly and why the pages that use it need the import map they
+already carry for GLTFLoader.

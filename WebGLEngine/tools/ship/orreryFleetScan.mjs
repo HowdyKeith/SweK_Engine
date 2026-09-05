@@ -79,6 +79,12 @@ export const NOT_IMPORTERS = Object.freeze([
     // session that wrote it, which is exactly what v4412 bought when it made the baseline a list of names
     // rather than a count. A count would have said "72, was 71" and left somebody to find out why.
     "tools/ship/glbTexture-selfcheck.mjs",
+    // v4475: SEVENTH instance, and it arrived beside a GENUINE importer in the same run -- the pair v4472
+    // recorded. gpu/gltfKtx2.js really does `import("/vendor/three/jsm/loaders/KTX2Loader.js")` and belongs
+    // in three's baseline; this gate only READS that file to assert what detectSupport does, and belongs
+    // here. Identical in the report ("ARRIVED: <file>"), opposite fixes, and the substring rule cannot tell
+    // an import from a readFileSync.
+    "tools/ship/gltfKtx2-selfcheck.mjs",
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */

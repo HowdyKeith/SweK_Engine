@@ -87,6 +87,25 @@ console.log("1. THE FIXTURES, BUILT FROM THIS TREE'S OWN GLB CONSTANTS");
         v("required").outcome === OUTCOME.THROWS,
         "the same bytes read as THROWS with no KTX2Loader and NONE with one -- the file is not the problem, the wiring is");
 
+    // *** v4475 -- AND A .gltf IS READ TOO, WHICH THIS MODULE COULD NOT DO WHEN IT WAS WRITTEN. ***
+    // Every one of the five KTX2 variants in khronosSamples's catalogue is a `.gltf` with sibling .ktx2
+    // files, because that is what the compression toolchains emit. So the module built to predict what this
+    // tree does with a KTX2 asset answered "not a GLB" to every real one. Found by wiring the viewer.
+    {
+        const asGltf = Buffer.from(JSON.stringify({ asset: { version: "2.0" }, extensionsUsed: [BASISU_EXT],
+            extensionsRequired: [BASISU_EXT], textures: [{ extensions: { [BASISU_EXT]: { source: 0 } } }],
+            images: [{ uri: "t.ktx2" }] }), "utf8");
+        const vg = textureVerdict(asGltf), vb = textureVerdict(FIX.required);
+        ok("!! *** the same asset is read the same way whether it arrives as GLB or as glTF JSON ***",
+            vg.ok && vg.outcome === vb.outcome && vg.required === vb.required && vg.usingBasisu === vb.usingBasisu,
+            vg.ok ? `both read ${vg.outcome}, required ${vg.required}, ${vg.usingBasisu} basisu texture(s) -- ` +
+                    "one verdict, two containers, because the container is not the claim"
+                  : "the JSON form failed: " + vg.error);
+        ok("  and something that is neither still fails cleanly rather than throwing",
+            textureVerdict(Buffer.from("not a model at all")).ok === false,
+            "peekGltf's whole job, like peekGlb's, is answering about files that may be broken");
+    }
+
     ok("  and needsKtx2 agrees with the verdict rather than re-deriving it",
         needsKtx2(FIX.required) && needsKtx2(FIX.optionalNoFallback) &&
         needsKtx2(FIX.optionalWithFallback) && !needsKtx2(FIX.plain) && !needsKtx2(FIX.declaredUnused),
@@ -104,10 +123,18 @@ console.log("\n2. *** THE THREE OUTCOMES ARE READ OUT OF THE VENDORED LOADER, NO
         "GLTFTextureBasisUExtension, setKTX2Loader and the spec link are all present -- three r160 has spoken " +
         "this extension the whole time. WHAT IS MISSING IS THE TRANSCODER, exactly as gltfDraco found for geometry");
 
-    ok("  and nothing in this tree attaches one",
-        sourcesNaming("setKTX2Loader").length === 0,
-        "no call to setKTX2Loader outside vendor/, and no KTX2Loader vendored -- so every basisu asset takes " +
-        "one of the three paths below");
+    // *** v4475 -- THIS SAID "AND NOTHING IN THIS TREE ATTACHES ONE", AND THE WIRING ROUND MADE THAT FALSE. ***
+    // It was accurate when written: no KTX2Loader vendored, no call to setKTX2Loader, so every basisu asset
+    // took one of the three outcomes below and none of them was "it works". The claim is SUPERSEDED rather
+    // than deleted -- the tree now attaches one, and the property worth holding is that it does so LAZILY.
+    // A page that attached unconditionally would make every model it opens pay 562 KB of wasm and wrapper.
+    const attachers = sourcesNaming("setKTX2Loader");
+    ok("!! *** and the tree attaches one now -- lazily, only after reading the header ***",
+        attachers.length > 0 && attachers.every((f) => /gltfKtx2\.js$|\.html$|-selfcheck\.mjs$/.test(f)) &&
+        fs.existsSync(path.join(ROOT, "vendor/three/jsm/loaders/KTX2Loader.js")),
+        `${attachers.join(", ")} -- gpu/gltfKtx2.js decides from the GLB or glTF header and the page obeys, ` +
+        "which is gltfDraco's shape for a 256 KB decoder applied to a 562 KB transcoder. Until v4475 this " +
+        "line asserted the opposite and was right to");
 
     ok("!! outcome 1 -- REQUIRED throws, and the message names the missing thing",
         /setKTX2Loader must be called before loading KTX2 textures/.test(src),

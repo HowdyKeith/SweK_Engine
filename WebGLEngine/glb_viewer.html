@@ -55,6 +55,8 @@ import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 
 import { models, model, urlFor, licenceFor, mayVendor } from "/gpu/khronosSamples.mjs";
+// v4475 -- the transcoder, fetched only for files that carry KTX2. gpu/gltfKtx2.js reads the header first.
+import { ktx2Loader, describeGlb as describeKtx2 } from "/gpu/gltfKtx2.js";
 
 // v4175 -- the Fox button used to be the only Khronos model this viewer could reach, as a URL pasted inline,
 // and its provenance was invisible: nothing in the tree said where that fox came from or what its licence
@@ -168,17 +170,31 @@ function toggleBones(on) {
   if (on && root) { skelHelper = new THREE.SkeletonHelper(root); skelHelper.material.linewidth = 2; scene.add(skelHelper); }
 }
 
-async function loadArrayBuffer(buf, label) {
+// v4475 -- *** THE BASE PATH IS PASSED NOW, AND THE TRANSCODER IS ATTACHED ONLY WHEN THE FILE ASKS. ***
+// This parsed with an empty base path, so a .gltf whose buffers and textures sit beside it could never
+// resolve them -- which is why the picker below offered only self-contained GLBs. EVERY KTX2 VARIANT IN THE
+// KHRONOS CATALOGUE IS A .gltf WITH SIBLINGS, so that restriction excluded exactly the assets this round is
+// about. Passing the directory is all it took; three resolves relative URIs against it.
+async function loadArrayBuffer(buf, label, base = "") {
   try {
-    msg("parsing " + (label || "model") + " …");
-    loader.parse(buf, "", onLoaded, (e) => { msg("parse failed: " + (e?.message || e)); console.error(e); });
-  } catch (e) { msg("parse failed: " + (e?.message || e)); }
+    const k = describeKtx2(buf);
+    if (k.ok && k.needsKtx2) {
+      // 562 KB of wasm and wrapper, fetched once per page and only for a file that carries KTX2. The
+      // renderer is what chooses the transcode target -- BC7, ASTC or ETC2 -- so it is handed over here.
+      msg("fetching the Basis transcoder for " + k.basisuTextures + " KTX2 texture(s) …");
+      loader.setKTX2Loader(await ktx2Loader(renderer));
+    }
+    msg("parsing " + (label || "model") + (k.ok && k.needsKtx2 ? " (KTX2)" : "") + " …");
+    loader.parse(buf, base, onLoaded, (e) => { msg("parse failed: " + (e?.message || e)); console.error(e); });
+  } catch (e) { msg("parse failed: " + (e?.message || e)); console.error(e); }
 }
 async function loadUrl(url) {
   if (!url) return;
   msg("fetching " + url + " …");
-  try { const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status); await loadArrayBuffer(await r.arrayBuffer(), url.split("/").pop()); }
-  catch (e) { msg("fetch failed: " + (e?.message || e)); }
+  try {
+    const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status);
+    await loadArrayBuffer(await r.arrayBuffer(), url.split("/").pop(), url.replace(/[^/]*$/, ""));
+  } catch (e) { msg("fetch failed: " + (e?.message || e)); }
 }
 async function loadAsset(id) {
   msg("loading asset …");
@@ -219,9 +235,16 @@ $("btnFox").addEventListener("click", () => { $("url").value = FOX_URL; loadUrl(
     const sel = $("khronos");
     const entries = [];
     for (const name of models()) {
+        // *** AND WHERE A MODEL HAS A KTX2 VARIANT, IT GETS ITS OWN ROW. *** v4474 measured three of these:
+        // 71.7-91.6 MB of VRAM as PNG against 8.5-22.5 MB transcoded. Seeing them side by side in one picker
+        // is the whole point of having wired the transcoder.
+        const kv = model(name).variants.find((v) => /KTX|Basis/i.test(v));
+        if (kv) { const ku = urlFor(name, kv); if (ku.ok) entries.push({ name: name + " (KTX2)", variant: kv, url: ku.url, ktx: true }); }
         for (const v of model(name).variants) {
             const u = urlFor(name, v);
-            if (u.ok && u.kind === "self-contained") { entries.push({ name, variant: v, url: u.url }); break; }
+            // v4475 -- a .gltf is offered too now that loadArrayBuffer passes a base path. The KTX2
+            // variants are ALL of that shape, so the old self-contained-only rule hid every one of them.
+            if (u.ok) { entries.push({ name, variant: v, url: u.url }); break; }
         }
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -232,11 +255,13 @@ $("btnFox").addEventListener("click", () => { $("url").value = FOX_URL; loadUrl(
         // *** THESE IT IS NOT EVEN CLOSE. BrainStem is under a Poser EULA and Duck under Sony's SCEA licence.
         // Streaming either into this viewer is fine -- the browser fetches it, nothing is redistributed --
         // but somebody reading this list should not have to find that out later.
-        const l = licenceFor(e.name), v = mayVendor(e.name);
-        o.title = e.name + " (" + e.variant + ")\n" +
+        const baseName = e.name.replace(/ \(KTX2\)$/, "");
+        const l = licenceFor(baseName), v = mayVendor(baseName);
+        o.title = baseName + " (" + e.variant + ")\n" +
                   (l.read ? "licence: " + l.spdx.join(", ") + (l.who ? " -- " + l.who : "") : "licence: not read yet") +
                   "\nstream: yes. vendor: " + (v.ok ? "yes" + (v.needsAttribution ? ", with attribution" : "") : "NO -- " + v.why);
         if (l.posture === "restricted") o.textContent = e.name + " \u26a0";
+        if (e.ktx) o.title += "\nKTX2/Basis: the transcoder is fetched on demand, once per page";
         sel.appendChild(o);
     }
     sel.addEventListener("change", () => { const u = sel.value; if (u) { $("url").value = u; loadUrl(u); } });

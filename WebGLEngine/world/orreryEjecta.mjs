@@ -298,6 +298,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "fpscontrol.html",
         "fpsmirror.html",
         "glb_viewer.html",
+        "gpu/gltfKtx2.js",
         "graph_viewer.html",
         "heerich-avatar.html",
         "krbn-avatar.html",

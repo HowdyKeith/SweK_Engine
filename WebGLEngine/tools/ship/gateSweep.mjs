@@ -2317,6 +2317,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "measurement was FICTION -- a cache keyed on the first thirty characters of the URL made " +
                  "three models report identical assets, caught by reading the numbers rather than by a check",
     }),
+    since110: Object.freeze({
+        at: "v4475", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/gltfKtx2-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "gpu/glbTexture.mjs (peekGltf: it read GLB magic only, and every real KTX2 asset is a .gltf)",
+            "glb_viewer.html (parsed with an empty base path, so a .gltf could never find its siblings)",
+            "tools/ship/orreryFleetScan.mjs (gltfKtx2-selfcheck joined three's fleet by reading KTX2Loader.js -- the seventh instance)",
+        ]),
+        verdict: "THE WIRING. Six files vendored from three.js r160, byte-identical and hashed in the gate; " +
+                 "gpu/gltfKtx2.js fetches the 562 KB transcoder only for files whose header carries KTX2, " +
+                 "which is gltfDraco's rule applied to textures. Not one vendored file carries a licence " +
+                 "header and the record says so, citing the Apache-2.0 this tree read first-hand at v4473. " +
+                 "Eight sabotages, eight red; orreryEjecta and gateQuality each caught a mistake of this " +
+                 "round's own making",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

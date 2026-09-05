@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "b6de9c9c6a7e0abffd94d41fa1dd93dfc67c005f",
+ "head": "10d23c77326d3ebe96bfa2b7739a1ad5298ebf47",
  "bodies": {
   "box3d": [
    {
@@ -449,8 +449,13 @@
    },
    {
     "path": "glb_viewer.html",
-    "bytes": 14049,
+    "bytes": 16117,
     "sha": "22dd961165d358d15814c8fe839236ef9ba047c2"
+   },
+   {
+    "path": "gpu/gltfKtx2.js",
+    "bytes": 6444,
+    "sha": null
    },
    {
     "path": "graph_viewer.html",
@@ -490,7 +495,7 @@
    {
     "path": "main.js",
     "bytes": 3120215,
-    "sha": "b6de9c9c6a7e0abffd94d41fa1dd93dfc67c005f"
+    "sha": "10d23c77326d3ebe96bfa2b7739a1ad5298ebf47"
    },
    {
     "path": "mpm3d.html",

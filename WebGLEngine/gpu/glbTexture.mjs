@@ -59,8 +59,30 @@ export const OUTCOME = Object.freeze({
  * Returns { ok, declared, required, textures: [...], outcome, why }. Never throws: like peekGlb, its whole
  * job is to answer questions about files that may be broken.
  */
+/**
+ * *** A KTX2 ASSET IS USUALLY NOT A GLB, AND THIS MODULE READ ONLY GLB UNTIL v4475. ***
+ *
+ * peekGlb answers about the binary container. Every one of the five KTX2 variants in
+ * gpu/khronosSamples.mjs's catalogue is a `.gltf` -- plain JSON with the .ktx2 files as siblings -- because
+ * that is what the texture-compression toolchains emit. So the module built to predict what this tree does
+ * with a KTX2 asset could not read the shape KTX2 assets actually come in, and would have answered
+ * "not a GLB" to every real one. Found by wiring the viewer, not by a check.
+ *
+ * Both containers, one answer: GLB magic goes to peekGlb, anything else is tried as glTF JSON.
+ */
+export function peekGltf(buf) {
+    const u8 = buf instanceof Uint8Array ? buf : (buf && buf.byteLength !== undefined ? new Uint8Array(buf) : null);
+    if (!u8) return { ok: false, error: "not a buffer" };
+    if (u8.byteLength >= 4 && new DataView(u8.buffer, u8.byteOffset, 4).getUint32(0, true) === 0x46546C67) return peekGlb(u8);
+    try {
+        const j = JSON.parse(new TextDecoder().decode(u8));
+        if (!j || typeof j !== "object" || !j.asset) return { ok: false, error: "JSON without a glTF `asset` block" };
+        return { ok: true, json: j, container: "gltf" };
+    } catch (e) { return { ok: false, error: "neither a GLB nor glTF JSON: " + (e && e.message) }; }
+}
+
 export function textureVerdict(buf, { hasKtx2Loader = false } = {}) {
-    const p = typeof buf === "object" && buf && buf.ok !== undefined ? buf : peekGlb(buf);
+    const p = typeof buf === "object" && buf && buf.ok !== undefined ? buf : peekGltf(buf);
     if (!p.ok) return { ok: false, error: p.error, declared: false, required: false, textures: [], outcome: OUTCOME.NONE };
     const j = p.json || {};
     const used = j.extensionsUsed || [], req = j.extensionsRequired || [];

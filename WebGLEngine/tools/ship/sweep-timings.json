@@ -1515,7 +1515,8 @@
   "tools/ship/shaderPairs-selfcheck.mjs": 1168,
   "tools/ship/slowCensus-selfcheck.mjs": 425,
   "tools/ship/tslIsing-selfcheck.mjs": 2132,
-  "tools/ship/glbTexture-selfcheck.mjs": 2194
+  "tools/ship/glbTexture-selfcheck.mjs": 2194,
+  "tools/ship/gltfKtx2-selfcheck.mjs": 91
  },
  "codes": {
   "ai-bridge/brainCensus-selfcheck.mjs": 0,
@@ -3029,7 +3030,8 @@
   "tools/ship/shaderPairs-selfcheck.mjs": 0,
   "tools/ship/slowCensus-selfcheck.mjs": 0,
   "tools/ship/tslIsing-selfcheck.mjs": 0,
-  "tools/ship/glbTexture-selfcheck.mjs": 0
+  "tools/ship/glbTexture-selfcheck.mjs": 0,
+  "tools/ship/gltfKtx2-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/bootSidecar-selfcheck.mjs": "2026-09-05T13:05:36.267Z",
@@ -4543,6 +4545,7 @@
   "tools/ship/shaderPairs-selfcheck.mjs": "2026-09-05T13:05:36.267Z",
   "tools/ship/slowCensus-selfcheck.mjs": "2026-09-05T13:05:36.267Z",
   "tools/ship/tslIsing-selfcheck.mjs": "2026-09-05T13:05:36.267Z",
-  "tools/ship/glbTexture-selfcheck.mjs": "2026-09-05T13:05:36.267Z"
+  "tools/ship/glbTexture-selfcheck.mjs": "2026-09-05T13:05:36.267Z",
+  "tools/ship/gltfKtx2-selfcheck.mjs": "v4475 -- timed on arrival, three runs 88/86/91 ms, slowest recorded"
  }
 }
