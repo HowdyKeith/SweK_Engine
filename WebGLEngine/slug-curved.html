@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Curved Slug Text (WebGL2 / WebGPU)">
+<meta name="demo:desc" content="Slug outline text bent along circular arcs by tessellated strips, each strip carrying its own Jacobian so the half-pixel dilation stays exact: text/slugCurve.mjs through gfx/device.js on either backend, with the measured texcoord error of each arc beside it.">
+<meta name="demo:category" content="fx">
+<title>Curved Slug Text</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Curved Slug text: strips with per-strip Jacobians</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
+    &middot; <a href="./slug-device.html">flat text on the device</a> &middot; <a href="?webgl=1">force WebGL2</a><div id="err"></div></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { layoutText } from "./text/slugText.js";
+import { arcCurve, buildCurvedVertices, tessellationError } from "./text/slugCurve.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
+const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+const SAMPLE = "Sphinx of black quartz, judge my vow";
+const SIZE = 22;                                   // css px; the arcs below are css px too
+const ARCS = [{ r: 130, ccw: false }, { r: 260, ccw: false }, { r: 520, ccw: false }, { r: 130, ccw: true }];
+const CHARS = " " + SAMPLE + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,'%";
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+
+// Four rows read as (m.x, m.y, -, m.w): vertices arrive in PIXELS (em * size), y-up, baseline at Y = 0; this places the
+// baseline origin at screen pixel (px, py) with y down. The same rows slug-text.html uses.
+function placeRows(W, H, px, py) {
+  return new Float32Array([2 / W, 0, 0, (2 / W) * px - 1,  0, 2 / H, 0, 1 - (2 / H) * py,  0, 0, 0, 0,  0, 0, 0, 1]);
+}
+
+let device, fontDevice, batches = [];
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
+  let font;
+  try { font = parseFont(ab); fontDevice = new SlugFontDevice(device, font, CHARS); }
+  catch (e) { return fail("font/atlas/pipeline: " + e.message); }
+  document.getElementById("notice").textContent = fontDevice.notice;
+  const kb = (fontDevice.byteSize / 1024).toFixed(0);
+  beEl.textContent = "backend: " + device.backend + " · atlas " + kb + " KiB (rgba16float + rg16uint) · logWidth " + fontDevice.logWidth;
+  build();
+  draw();
+  addEventListener("resize", () => { build(); draw(); });
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+// Each arc: the text reads along the TOP of a circle (ccw false) or the BOTTOM (ccw true), strips per glyph from
+// stripsFor's chord bound at 0.25 px, and the texcoord error measured on the CPU against the arc's exact inverse.
+function build() {
+  const d = dpr(), s = SIZE * d;
+  for (const b of batches) b.b.destroy();
+  batches = [];
+  const laid = layoutText(fontDevice.font, SAMPLE, { size: s });
+  const lines = [];
+  for (const a of ARCS) {
+    const r = a.r * d, half = Math.min(Math.PI, laid.width / (2 * r));
+    // outside: reads along the top of the circle; inside: along the bottom, glyph tops toward the centre
+    const curve = arcCurve({ cx: 0, cy: 0, r, theta0: a.ccw ? -Math.PI / 2 - half : Math.PI / 2 + half, ccw: a.ccw });
+    const built = buildCurvedVertices(laid.glyphs, (gi) => fontDevice.entryFor(gi), curve, { color: [0.92, 0.95, 1, 1] });
+    const err = tessellationError(built, curve, 6);
+    const b = new SlugDeviceBatch(fontDevice); b.setBuilt(built, laid);
+    batches.push({ a, r, b, sag: r * (1 - Math.cos(half)), ascent: 0.85 * s, descent: 0.3 * s });
+    lines.push("r " + a.r + " css px " + (a.ccw ? "(inside)" : "(outside)") + ": " + built.strips + " strips for " + laid.glyphs.length + " glyphs, worst texcoord error " + err.worstPx.toFixed(3) + " px");
+  }
+  document.getElementById("err").textContent = lines.join(" \u00b7 ");
+}
+function draw() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d);
+  // one band per arc: the text's ascent, the arc's sag over the text's length, the descent, and a gap
+  let h = 16 * d; const centres = [];
+  for (const { a, r, sag, ascent, descent } of batches) {
+    // screen y (down) of the circle's centre: outside arcs have their top at h + ascent; inside arcs their bottom at h + sag + ascent
+    centres.push(a.ccw ? h + sag + ascent - r : h + ascent + r);
+    h += ascent + sag + descent + 18 * d;
+  }
+  h = Math.round(h);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  device.frame(({ pass }) => {
+    pass.clear([0.02, 0.031, 0.024, 1]);
+    batches.forEach(({ b }, i) => b.draw(pass, placeRows(w, h, w / 2, centres[i]), [w, h]));
+  });
+}
+init();
+</script>
+</body>
+</html>

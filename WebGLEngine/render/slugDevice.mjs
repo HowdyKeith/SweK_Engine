@@ -215,6 +215,24 @@ export class SlugDeviceBatch {
     }
 
     /**
+     * Upload a vertex stream somebody else built in text/slugShader.js's VERTEX_LAYOUT -- text/slugCurve.mjs
+     * buildCurvedVertices, for one. `built` is { buffer, indices, quadCount }; `layout` is recorded as given.
+     */
+    setBuilt(built, layout = null) {
+        if (!built || !(built.buffer instanceof ArrayBuffer) || !(built.indices instanceof Uint32Array)) throw new Error("slugDevice: setBuilt wants { buffer: ArrayBuffer, indices: Uint32Array }");
+        if (this.vb) { this.vb.destroy(); this.ib.destroy(); this.vb = this.ib = null; }
+        this.indexCount = built.indices.length;
+        this.quads = built.quadCount;
+        this.layout = layout;
+        this.built = built;
+        if (this.indexCount) {
+            this.vb = this.device.buffer({ usage: "vertex", data: new Float32Array(built.buffer) });
+            this.ib = this.device.buffer({ usage: "index", data: built.indices });
+        }
+        return layout;
+    }
+
+    /**
      * Draw inside a device pass. `matrixRows` is 16 floats -- four rows, each read as (m.x, m.y, -, m.w);
      * orthoRows() builds the screen-space case. `viewport` is [width, height] in pixels.
      */

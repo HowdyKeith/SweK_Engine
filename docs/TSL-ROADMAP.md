@@ -504,6 +504,27 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         No band count changes on this box's numbers: that is the rig's number to answer.
     10. Curved text by tessellated strips with per-strip Jacobians, or a planar target resampled -- never by
         bending vertices, because SlugDilate's half-pixel push needs the Jacobian constant over the quad.
+        BUILT at v4491 (task 10): text/slugCurve.mjs. arcCurve (a circle parametrised by arc length, with a closed-form
+        inverse that takes a branch hint) and lineCurve (the control); buildCurvedVertices cuts each glyph into strips
+        along the curve -- the flat x becomes arc length, the flat y the offset along the normal -- each strip carrying
+        its midpoint frame's Jacobian (T/s, N/s) and its outward push directions rotated into that frame, its edges
+        placed at their own arc-length normals so adjacent strips share the edge float for float, and interior edges
+        pushing only along the normal so a seam is never dilated from both sides; tessellationError measures the
+        interpolated texcoord against the inverse; stripsFor is the chord-sag bound. SlugDeviceBatch.setBuilt takes the
+        stream. MEASURED (Plex, 28 px, 202 px of text on r = 120): one bent quad per glyph -- the thing this item says
+        never to do -- is wrong by 0.84 px, more than the half-pixel dilation it corrupts; 2 / 4 / 8 / 16 strips give
+        0.35 / 0.17 / 0.08 / 0.04 px, halving per doubling: FIRST order, because a strip is a trapezoid (its far edge
+        shorter by height over radius) and two affine triangles cannot interpolate a trapezoid, so the chord-sag bound
+        (second order) is not the bound that matters -- stripsFor at 0.25 px buys 0.51 px of texcoord error, twice
+        what it asks. On the device (tools/ship/slugCurve-selfcheck.mjs, both backends): the flat gate's rasteriser
+        model with the strips' Jacobians reproduces the fragment's texcoord to 5.6e-7 em and the frame to the last
+        level of 255 -- after the model learned that SlugDilate pushes half a pixel PER COMPONENT of aPos.zw (an outer
+        corner moves 0.707 px, an interior one 0.5), not half a pixel along its unit vector. Against the exact planar
+        resample the strips cost 5.0 of 255 on average over the lit pixels at 8 strips; the worst pixel (89) is the
+        shipped evaluator's own: slugEval's coverage steps from 0.000 to 0.346 across 0.0002 em at A's texcoord
+        (0.4341, 0.0537), same band index both sides, and the interpolated texcoord lands across it -- a Slug finding,
+        recorded, not chased here. slug-curved.html draws four arcs (three outside, one inside) with each arc's strip
+        count and measured error in its HUD. A line with one strip is buildVertices' stream float for float.
     11. Bidi shaping and the CJK fallback recorded as wont in tools/ship/todo.mjs with reasons (two-letter
         presentation-form shaping and a whole-string reverse is not UAX #9; canvas fillText is not an MSDF).
     12. Measure SlugTextBatch's per-frame bufferData before any ring buffer; the plan's ring resets to 0 on

@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 449,
+  "page": 450,
   "demo": 49,
   "builtin": 34
  },
@@ -2944,6 +2944,14 @@
    "display": "Slotmachine",
    "href": "/slotmachine.html",
    "section": "Game Theory",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slug-curved.html",
+   "display": "Slug Curved",
+   "href": "/slug-curved.html",
+   "section": null,
    "collision": false
   },
   {

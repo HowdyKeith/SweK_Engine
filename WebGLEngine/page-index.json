@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 449,
+ "count": 450,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2556,6 +2556,13 @@
    "t": "SweK Slots",
    "d": "",
    "g": "gametheory",
+   "p": 0
+  },
+  {
+   "f": "slug-curved.html",
+   "t": "Curved Slug Text",
+   "d": "Slug outline text bent along circular arcs by tessellated strips, each strip carrying its own Jacobian so the half-pixel dilation stays exact: text/slugCurve.mjs through gfx/device.js on either backend, with the measured texcoord error of each arc beside it.",
+   "g": "",
    "p": 0
   },
   {

@@ -2431,6 +2431,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "-- A went 0 red first (the OFFSET field read as the count passed every ratio hold at 76 a band) and the " +
                  "no-band-counts-more-than-its-glyph row was added for it.",
     }),
+    since113: Object.freeze({
+        at: "v4491", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugCurve-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. text/slugCurve.mjs bends Slug text along a curve by strips, each with its midpoint " +
+                 "frame's Jacobian and edges at their own normals (no crack, no double-dilated seam); SlugDeviceBatch.setBuilt " +
+                 "takes the stream; slug-curved.html draws four arcs. MEASURED: one bent quad is wrong by 0.84 px, eight strips " +
+                 "by 0.08, halving per doubling (first order: a strip is a trapezoid); the rasteriser model reproduces the " +
+                 "device to 5.6e-7 em once it pushed half a pixel per component of aPos.zw rather than along its unit vector; " +
+                 "the strips cost 5.0 of 255 on average against the exact resample, and the worst pixel is a coverage step in " +
+                 "slugEval itself. Sabotages red at 3 / 7 / 8 / 6 -- A went red first only on the cost rows (the model read the " +
+                 "same wrong Jacobian and the headless hold was a property the flat one shares) and the hold became the frame itself.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

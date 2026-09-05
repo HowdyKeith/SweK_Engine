@@ -167,11 +167,13 @@ export const HOT_UNREGISTERED = Object.freeze([
  * for the two backends' pictures; it draws nothing additively, so the overlap stays 0 and section 2 is untouched.
  * v4490: 76 -> 77. The arrival is slug-rig.html, whose table styles a row over the plan's 1.5 ms and its verdict lines with named hexes;
  * it draws its glyph wall through render/slugDevice.mjs and nothing additively, so the overlap stays 0.
+ * v4491: 77 -> 78. The arrival is slug-curved.html (the same HUD as slug-device.html, the same hexes), drawing its
+ * arcs through render/slugDevice.mjs and nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 77,
+    literalColourFiles: 78,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 20,
     // The three Keith named, and what the old detector saw of them.
