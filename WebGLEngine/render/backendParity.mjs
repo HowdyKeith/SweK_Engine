@@ -39,6 +39,12 @@
 //
 // That is the actual blocker, it is one file, and it is now a number instead of a hunch.
 //
+// v4457 -- AND THE FILE HAS ITS TWIN: text/slugShaderWgsl.js, WGSL-only, held to text/slugEval.js on a device by
+// tools/ship/slugWgsl-selfcheck.mjs. slugShader.js stays GLSL-only so it still diffs line for line against the
+// HLSL, which is why the count above did not move and wgslOnly did. The next blocker is in gfx/device.js: a
+// pipeline descriptor with no blend state (Slug needs ONE, ONE_MINUS_SRC_ALPHA) and a texture path that uploads
+// rgba8unorm only, where the atlas is rgba16float and rg16uint. docs/TSL-ROADMAP.md step 7 carries the order.
+//
 // *** AND A CORRECTION THIS FILE OWES ITS OWN ROUND. *** v4269 said the port could only be checked
 // structurally because nothing here can execute WGSL. That was inferred, never tested, and is false: Chromium
 // on this box serves a WebGPU adapter over a SECURE origin -- http://127.0.0.1, not about:blank, which is the
@@ -192,10 +198,17 @@ export const PARITY_BASELINE = Object.freeze({
     // *** THAT THIS RATCHET HAS NOW GONE RED TWO ROUNDS RUNNING IS THE RATCHET WORKING, NOT A NUISANCE: ***
     // both times it named the arriving file rather than showing a number that moved, which is exactly what
     // v4399's rule asked of a count baseline. The same file is why wgslOnly moves too; nothing else changed.
-    wgslBearing: 60,
+    // v4457 -- 60 -> 61, a SHIPPING MODULE that carries WGSL and no GLSL, and the one this ratchet was waiting
+    // for: text/slugShaderWgsl.js is the WGSL twin of text/slugShader.js, whose GLSL-only state this file's own
+    // header names as "the actual blocker, it is one file". The pair is split across two files rather than one
+    // because the GLSL port's whole value is that it diffs line for line against SlugPixelShader.hlsl, and a
+    // second language interleaved in it would end that; so `both` does not move and wgslOnly does. The twin is
+    // held to text/slugEval.js on a real device by tools/ship/slugWgsl-selfcheck.mjs: exact on 83,137 sharp
+    // samples, inside 3.2e-6 at 28 and 12 px/em. The same file is why wgslOnly moves too; nothing else changed.
+    wgslBearing: 61,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 47,
+    wgslOnly: 48,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

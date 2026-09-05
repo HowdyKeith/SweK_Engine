@@ -1803,6 +1803,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "would be fabrication -- `baselineByName: false` is a graded value, not a sentence), or that " +
                  "a gate a closing names was actually run by that round.",
     }),
+    since78: Object.freeze({
+        at: "v4457", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugWgsl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. The WGSL twin of the Slug shader (text/slugShaderWgsl.js), graded on the headless Dawn " +
+                 "device against text/slugEval.js on the same packed bytes: 22,045 + 61,092 sharp samples exact " +
+                 "against slugEval AND the flattened-segment winding number, worst |gpu - cpu| 3.1e-6 at 28 px/em " +
+                 "against an a-priori 1/512, the row-wrap plant 9,477 of 27,957 wrong at the wrong width, three " +
+                 "transliteration plants red at 12,148 / 2,205 / 1,462 of 22,045, and SlugDilate half a pixel per " +
+                 "axis to 3.8e-6 px under an orthographic matrix. *** THE FIRST DRAFT OF ITS SECTION 5 HAD AN " +
+                 "UNREACHABLE PLANT *** -- six small glyphs at width 64 never leave row one, so the wrong-width " +
+                 "probe went 0 of 10,016 wrong -- caught on the first run and rebuilt over the 66 Plex label " +
+                 "glyphs at width 128, where 432 of 965 band headers point past their own row. Five runs 5,235 to " +
+                 "5,412 ms, all exit 0; the slowest is the MEASURED budget.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

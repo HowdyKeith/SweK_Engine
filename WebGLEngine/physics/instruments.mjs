@@ -1375,6 +1375,13 @@ export const INSTRUMENTS = [
         measures: "The union of every sweep closing as a SET: gates claimed by two closings and by whom, claimed names with no file, and the credit a duplicate buys against future unswept gates.",
         key: "*** THE SWEEP LEDGER COUNTS GATES AND NEVER NAMES THEM, SO A DUPLICATE CLOSING IS A CREDIT RATHER THAN AN ERROR. *** main is carrying a gate, reportDoors-selfcheck.mjs, landed by an in-flight round on the other branch with no closing written for it, so gateSweep-selfcheck reads \"1 STILL UNSWEPT\" on the trunk right now. *** THE HAZARD IS NOT HYPOTHETICAL AND IT ALMOST HAPPENED THIS ROUND. *** The obvious repair -- write the closing here -- is the one thing that must not be done blind, because when that round ships it will write its own closing for the same gate. Two closings, one gate. The question is what the ledger does about that, and the answer is NOTHING, in a way that is worse than merely missing it. ---- *** THE ARITHMETIC IS A SUM, AND A SUM CANNOT TELL DOUBLE-COUNTING FROM COVERAGE *** ------------------- gateSweep-selfcheck's coverage line is uncovered = (gatesNow - 1366 - 1) - SWEEP_SINCE_V4297.swept - sum(closing.swept) and asserts <= 0",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "slug-wgsl", area: "render", name: "The Slug shader in WGSL, held to the CPU key on a device",
+        gate: "tools/ship/slugWgsl-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module, which the bench cannot serve
+        measures: "Coverage from the WGSL Slug core run as a compute probe on the headless Dawn device, sample by sample against text/slugEval.js on the same packed atlas bytes and against the flattened-segment winding number; the row-wrap and three transliteration plants; SlugDilate's screen displacement against its closed form.",
+        key: "*** THE SHADER THAT SHIPS IS THE SHADER THAT IS GRADED, NOT A COPY OF IT. *** slugShaderWgsl.js keeps the Slug fragment core -- root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender -- as ONE string, and both the render module and the compute probe interpolate it. Section 1 asserts that text identity before anything runs, because a probe that carried its own copy of the loop would be grading itself.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
