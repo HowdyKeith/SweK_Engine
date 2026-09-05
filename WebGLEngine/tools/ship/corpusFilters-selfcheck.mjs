@@ -111,8 +111,27 @@ const files = treeFiles();
     ok("the long tail is reported rather than counted as debt", census(files).filter((r) => r.files.length === 1).length > 3,
        "corpora used by exactly one tool each: a launcher lint genuinely wants .bat and a prose audit genuinely " +
        "wants .md, but it means no two tools in the tail agree on what 'the tree' means");
+    // *** v4476 -- THIS GREPPED FOR A SPELLING THAT ONLY A WINDOWED TABLE EMITS. *** "MISSES" is printed by
+    // the top-twelve table, so the row asserted that a shortfall group happens to RANK in the top twelve by
+    // admitted-count -- an arrangement, not a property. The tree grew, the narrow groups fell out of the
+    // window, and the check went red while THE SHORTFALL WAS STILL THERE: 39 groups admit less than
+    // SOURCE_EXT, the largest missing 456 html files across 41 tools.
+    //
+    // The report never stopped naming it. The PURE EXTENSION FILTERS section below the table is derived from
+    // the whole census rather than a slice of it, and prints "missing N (exts)" for each. So the property is
+    // asserted where it cannot fall out of a window, and it is tied to the census so an empty report cannot
+    // satisfy it either.
     const rep = reportLines();
-    ok("the report renders and names the shortfall", rep.length > 15 && rep.join("\n").includes("MISSES"), rep.length + " lines");
+    const text = rep.join("\n");
+    const narrow = census(files).filter((r) => r.pure && !r.identicalToSourceExt &&
+                                               r.admitsBeyondSourceExt === 0 && r.missesFromSourceExt > 0);
+    const named = narrow.length > 0 && new RegExp("missing " + narrow[0].missesFromSourceExt + " \\(").test(text);
+    ok("the report renders and names the shortfall, from the whole census rather than the top of a table",
+       rep.length > 15 && /PURE EXTENSION FILTERS NARROWER THAN SOURCE_EXT/.test(text) && named,
+       `${rep.length} lines; ${narrow.length} pure-extension groups narrower than SOURCE_EXT, the largest ` +
+       `missing ${narrow.length ? narrow[0].missesFromSourceExt : 0} (${narrow.length ? narrow[0].missedExtensions.join(",") : "-"}) ` +
+       `across ${narrow.length ? narrow[0].files.length : 0} tools -- and the report names that number. THE OLD ROW ` +
+       "grepped for \"MISSES\", which only the top-twelve table prints, so it asserted a ranking rather than a shortfall");
 }
 
 console.log(fails ? "\ncorpusFilters-selfcheck: " + fails + " FAILED" : "\ncorpusFilters-selfcheck: all checks pass");

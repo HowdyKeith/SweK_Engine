@@ -321,16 +321,28 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
 
     // *** THE DOOR AND THE VERDICT ARE THE SAME DEFECT. *** v4408 found the eviction runs on a stale time;
     // this finds the verdict behind it is a stale green. Twelve gates carry both.
+    // *** v4476 -- THE ROW WAS BUILT TO GO RED THE DAY IT WAS FIXED, AND THIS IS THAT DAY. *** Its own detail
+    // said so: "a re-timing that fixes it FAILS THIS ROW rather than leaving a record nobody re-derives." So
+    // the v4460 finding is asserted as HISTORY -- twelve gates whose recorded time was the one that evicted
+    // them, true about v4460 forever -- and the live half now asserts the PAYMENT: those gates no longer
+    // carry the evicting number, eleven were re-timed, and the twelfth is named with the reason it stays out.
     const back = REC.returnable;
-    ok("!! *** TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE BUDGET THAT EXCLUDES THEM ***",
+    const T = FILE.timings || {};
+    const stillStale = back.filter((r) => T[r.gate] === r.recordedMs);
+    const RET = SC.RETURNED_AT_V4476;
+    ok("!! *** the twelve v4460 found returnable no longer carry the time that evicted them ***",
        back.length === REC.confirmed.nowUnderBudget &&
-       overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
-                                 (FILE.timings || {})[r.gate] === r.recordedMs),
-       `${back.length} gates, worst ${Math.max(...back.map((r) => r.nowMs))} ms against the ${SC.BUDGET_MS} ms ` +
-       `budget, each still recorded at the time that evicted it (box3dFilter 89 ms now, ${back[0].recordedMs} ms ` +
-       "on file). *** THEY ARE HIDDEN BY A NUMBER THAT IS WRONG IN THE DIRECTION THAT HIDES THEM *** -- the " +
-       "recorded time is checked against the live file here, so a re-timing that fixes it fails this row " +
-       "rather than leaving a record nobody re-derives.");
+       overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS) &&
+       stillStale.length === 0 && RET.reTimed + RET.stillOver.length === RET.ofTwelve &&
+       overNonEmpty(RET.stillOver, (x) => T[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40),
+       stillStale.length
+         ? `${stillStale.length} of ${back.length} STILL carry the evicting time: ` +
+           stillStale.map((r) => r.gate.split("/").pop() + " " + r.recordedMs + " ms on file, " + r.nowMs + " ms now").join("; ")
+         : `${back.length} found returnable at v4460, ${RET.reTimed} re-timed and ${RET.stillOver.length} named as ` +
+           `still over: ${RET.stillOver.map((x) => x.gate.split("/").pop() + " at " + x.hereMs + " ms").join(", ")}. ` +
+           "THEY WERE HIDDEN BY A NUMBER WRONG IN THE DIRECTION THAT HIDES THEM, and putting the true number " +
+           `back exposed four reds a stale green was covering -- ${Object.keys(RET.reds).length} registered or ` +
+           `already owed, ${Object.keys(RET.repairedHere).length} REPAIRED here rather than registered.`);
 
     // *** TWO OF THIS SECTION'S SABOTAGES WENT 0 RED, AND BOTH ARE MECHANISMS vacuity.mjs NAMED ONE ROUND
     // AGO. *** X broke undatedVerdicts' `at[g] || UNKNOWN_AT` fallback and nothing moved, because

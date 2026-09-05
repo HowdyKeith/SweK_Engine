@@ -97,6 +97,58 @@ export function verdictClasses(c, { codes = {} } = {}) {
 
 // *** THE MEASUREMENT, FROZEN BY NAME (v4399's rule), BECAUSE A GATE CANNOT AFFORD TO RE-TAKE IT. ***
 // Every number below was taken by running the gate in its own process with a wall clock around it.
+/**
+ * *** v4476 -- THE TWELVE, RETURNED. *** STALE_GREENS_V4460's `returnable` row was built to go red the day
+ * somebody fixed it: "the recorded time is checked against the live file here, so a re-timing that fixes it
+ * FAILS THIS ROW rather than leaving a record nobody re-derives." This is that day, and this is the record.
+ *
+ * Eleven of the twelve were re-timed by hand and their rows in sweep-timings.json now carry what they cost.
+ * The twelfth is named rather than quietly dropped: crossBackend was recorded at 13,851 ms, main measured it
+ * at 376, and it runs at 12,851 ms HERE -- genuinely over the 3,000 ms budget on this box, so it stays out
+ * and its number is at least true now. A disagreement that large between two boxes is worth stating and is
+ * not resolved here.
+ *
+ * *** AND THE RE-TIMING PUT FOUR REDS BACK IN THE SWEEP'S SIGHT, WHICH IS THE POINT. *** A stale green over
+ * an evicting time hides a red twice over. box3dFilter was already on RED_AT_V4408; physicsReach and wgslSpec
+ * are the two debts budgetExile recorded as OWED at v4472 with reasons, now visible instead of hidden; and
+ * sweepBudget and corpusFilters were REPAIRED in this round rather than registered -- sweepBudget by
+ * restoring the 4.79 hours of device measurement a v4420 re-freeze had overwritten with {}, and corpusFilters
+ * by asserting its shortfall from the whole census instead of grepping a windowed table for a spelling.
+ */
+export const RETURNED_AT_V4476 = Object.freeze({
+    at: "v4476",
+    ofTwelve: 12,
+    reTimed: 11,
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/crossBackend-selfcheck.mjs", recordedWas: 13851, mainMeasured: 376,
+            hereMs: 12851, why: "over the 3,000 ms budget on this box by a factor of four. Main's 376 ms and " +
+            "this 12,851 ms are two boxes disagreeing by 34x on one gate, which is a finding of its own and " +
+            "is recorded rather than averaged away." }),
+    ]),
+    repairedHere: Object.freeze({
+        "tools/roundhouse/sweepBudget-selfcheck.mjs":
+            "every row read 0 -- 0 measured, 0.00 h across 0 devices -- because tools/roundhouse/" +
+            "device-cost-baseline.json held entries: 0 and three empty maps. v4420 RE-FROZE IT AND CAPTURED " +
+            "NOTHING: 484 entries and 116 sweep costs, 4.79 hours of device measurement, replaced with {} in a " +
+            "round about comparing predicates whose message never mentions the file. Restored from 740dd6f^ -- " +
+            "the exact bytes, not a reconstruction -- and the gate's own prose corroborates them to two " +
+            "decimals: it claims 4.79 hours and the restored record sums to 4.79 hours across 116 devices.",
+        "tools/ship/corpusFilters-selfcheck.mjs":
+            "its row grepped the report for \"MISSES\", a spelling only the TOP-TWELVE table emits, so it " +
+            "asserted that a narrow group happens to RANK in that window. The tree grew, the narrow groups " +
+            "fell out of it, and the row went red WHILE THE SHORTFALL WAS STILL THERE -- six pure-extension " +
+            "groups narrower than SOURCE_EXT, the largest missing 456 html files across 41 tools. It asserts " +
+            "the shortfall from the whole census now, where it cannot fall out of a window.",
+    }),
+    reds: Object.freeze({
+        "tools/ship/box3dFilter-selfcheck.mjs": "already on redCensus.RED_AT_V4408 -- visible, not hidden",
+        "tools/ship/physicsReach-selfcheck.mjs": "budgetExile's OWED at v4472: a door for seven WGSL modules under physics/render/, which is a round",
+        "tools/ship/wgslSpec-selfcheck.mjs": "budgetExile's OWED at v4472: requiredLimits at device creation, an engine decision",
+    }),
+    notClaimed: "that the other ten of the twenty-two reds are fixed. This round returned the twelve that " +
+                "FINISH under budget; the rest are over it for real and are a separate question.",
+});
+
 export const STALE_GREENS_V4460 = Object.freeze({
     at: "v4460",
     population: 371,          // over-budget entries carrying code 0

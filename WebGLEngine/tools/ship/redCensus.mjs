@@ -444,6 +444,53 @@ export const RED_AT_V4424 = Object.freeze(RED_AT_V4424_GATES.map((gate) => Objec
     get derived() { const r = auditRow(gate); return !!(r && r.first); },
 })));
 
+/**
+ * *** v4476 -- TWO DEBTS THAT WERE NEVER REGISTERED BECAUSE THEY WERE HIDDEN, NOT BECAUSE THEY WERE ACCEPTED. ***
+ *
+ * Both gates carried an over-budget time with a stale exit code of 0, so the quick sweep skipped them and read
+ * them as green. sweepCoverage named that shape at v4460 -- "a stale green over an evicting time" -- and v4476
+ * put the true numbers back: physicsReach runs in 528 ms and wgslSpec in 2,592 ms, both well inside the cap,
+ * and both RED.
+ *
+ * *** REGISTERING THESE IS NOT THE WRITE-OFF THIS TREE REFUSES ELSEWHERE, AND THE DIFFERENCE IS WORTH STATING.
+ * *** gateSweep.SWEEP_V4297's rule is that a REGRESSION is a thing to repair and registering it would make its
+ * red acceptable again. Neither of these is a regression: both were measured, diagnosed and written down as
+ * OWED at v4472, in budgetExile, with the reason each is a round rather than a line. What changed at v4476 is
+ * only that they are now VISIBLE. A debt on the register is worse-looking and better than a debt behind a
+ * stale green, and the alternative -- leaving the evicting time in place -- is the concealment this round
+ * exists to end.
+ *
+ * WHAT WOULD CLEAR THEM is recorded with each, and neither is a number anybody may raise.
+ */
+export const RED_AT_V4476_GATES = Object.freeze([
+    "tools/ship/physicsReach-selfcheck.mjs",
+    "tools/ship/wgslSpec-selfcheck.mjs",
+]);
+
+const WHY_V4476 = Object.freeze({
+    "tools/ship/physicsReach-selfcheck.mjs":
+        "49 of 151 graded physics modules are named by no roundhouse device, no instruments row and no page, " +
+        "against a baseline of 35. NOT a timing failure -- it finishes in 528 ms. Seven of the unreachable are " +
+        "this arc's own WGSL modules under physics/render/, and being in the WGSL corpus is not a door. " +
+        "CLEARED BY building a door for them, which is a round; NOT by moving the baseline to 49, which " +
+        "budgetExile already refused at v4425 as 'the record of having given up'. *** AND IT GREW WHILE OWED: " +
+        "36 of 136 at v4425, 49 of 151 now, which no two-state OWED field could have shown.",
+    "tools/ship/wgslSpec-selfcheck.mjs":
+        "across 4,407 files requiredLimits appears 5 times, so every device in this tree runs at the defaults " +
+        "and a 1024-wide workgroup cannot be created here. Finishes in 2,592 ms. CLEARED BY asking for the " +
+        "limits at device creation, which changes what every device in the tree requests and is an engine " +
+        "decision rather than a line. *** IT ALSO BROKE AN INSTRUMENT ONCE: it prints its verdict on STDERR " +
+        "and nothing on stdout, so v4424's runner counted zero checks and called a RED a CRASH.",
+});
+
+export const RED_AT_V4476 = Object.freeze(RED_AT_V4476_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4476[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
+
 export const FIXED_SINCE_V4408 = Object.freeze([
     { gate: "tools/ship/orreryEjecta-selfcheck.mjs", round: "v4410",
       why: "REGISTERED AT v4408 AND REPAIRED BY RE-DERIVING, NOT BY RAISING A NUMBER. It compared the fleet " +

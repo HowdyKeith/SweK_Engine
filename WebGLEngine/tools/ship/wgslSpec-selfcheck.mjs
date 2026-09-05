@@ -26,7 +26,13 @@ import { codeOnly, noComments, prose } from "./sourceScan.mjs";
 import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
 
 let pass = 0, fail = 0;
-const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
+// *** v4476 -- THIS PRINTED ITS FAIL LINE TO STDERR, AND THAT BROKE AN INSTRUMENT TWO ROUNDS RUNNING. ***
+// A verdict on stderr and nothing on stdout made v4424's serial runner count ZERO CHECKS and report this
+// gate's RED as a CRASH -- a different thing entirely, and the reason v4424's claim that its undercount
+// "cannot change a verdict" was true of its data and not a law. budgetExile records the case; slowCensus
+// reads both streams because of it; and registerDrift asserts that every registered gate prints where the
+// tree reads. The gate exits 1 either way; what changes is whether anything downstream can SAY WHY.
+const ok = (c, m) => { if (c) pass++; else { fail++; console.log("  FAIL  " + m); } };
 const note = (m) => console.log("  ....  " + m);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");

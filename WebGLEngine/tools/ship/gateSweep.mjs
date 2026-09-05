@@ -2376,6 +2376,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Eight sabotages, eight red; orreryEjecta and gateQuality each caught a mistake of this " +
                  "round's own making",
     }),
+    since113: Object.freeze({
+        at: "v4476", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/sweepBudget-selfcheck.mjs (every row read zero; device-cost-baseline.json had been re-frozen to {} at v4420, losing 4.79 hours -- restored from 740dd6f^)",
+            "tools/ship/corpusFilters-selfcheck.mjs (it grepped for a spelling only the top-twelve table emits, so it asserted a RANKING rather than a shortfall)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (its returnable row was built to go red when fixed; the payment is recorded and eleven of twelve are re-timed)",
+            "tools/ship/bakeShrinkGuard.mjs (keyMaps: its identities() read VALUES, and the one bake that lost data has its identities in KEYS -- an empty set that could never refuse)",
+        ]),
+        verdict: "No gate added. THE STALE GREEN AND THE STALE TIME ARE ONE DEFECT, found by main from the " +
+                 "verdict side and by this branch from the timing side, and the merge let them meet. Putting " +
+                 "the true numbers back exposed four reds a stale green was covering; two were repaired here " +
+                 "and two were already owed by name. Eight sabotages, four red -- AND ALL FOUR ZEROS WERE ONE " +
+                 "SPECIES, the component tested and the connection not: guardWrite accepting keyMaps and " +
+                 "dropping them, costRecord skipping the guard, and two checks of my own that could not fail " +
+                 "-- one with the label passed where the condition goes, one inserted below the exit line",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
