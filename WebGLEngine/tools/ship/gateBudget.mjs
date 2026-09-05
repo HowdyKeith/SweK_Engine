@@ -125,6 +125,11 @@ export const MEASURED = {
     // sweep's 3000 ms cap by construction, not by accident. FIVE RUNS, ALL EXIT 0: 5412, 5341, 5235, 5252,
     // 5284 ms on an otherwise idle box. The SLOWEST is recorded, per the entry above.
     "tools/ship/slugWgsl-selfcheck.mjs": 5412,
+    // *** v4460 -- MEASURED AT BIRTH. *** tools/ship/slugDevice-selfcheck.mjs launches one browser and draws through both
+    // backends: the coverage frame, four texcoord-capture frames, and the shipped raw-WebGL2 batch, then runs the
+    // rasteriser-model key over 23,040 pixels twice. FIVE RUNS, ALL EXIT 0: 6507, 6249, 6063, 6194, 6172 ms; the
+    // slowest is recorded, per the entries above.
+    "tools/ship/slugDevice-selfcheck.mjs": 6507,
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

@@ -1396,6 +1396,13 @@ export const INSTRUMENTS = [
         measures: "For rgba16float and rg16uint uploads through gfx/device.js on WebGPU and WebGL2, every byte of every texel read back through render/texelProbe.mjs against the uploaded bits; update(); the forced nearest filter on the integer format; depthWrite and depthCompare on both backends; the row mirror between the backends, applied by name.",
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "slug-device", area: "render", name: "Slug text through the device, held to the CPU key through a rasteriser model",
+        gate: "tools/ship/slugDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "A line of text drawn through gfx/device.js on WebGPU and WebGL2 against text/slugEval.js at every pixel, fed the texcoord and fwidth a snapped-corner rasteriser model gives it, the model's sub-pixel precision fitted from the fragment's captured inputs; the device WebGL2 picture against the shipped raw-WebGL2 batch; the two backends against each other.",
+        key: "*** THE FIRST DRAFT OF THIS GATE WAS WRONG ABOUT WHAT A PIXEL CENTRE IS, AND THE FRAME SAID SO. *** It gave slugEval the exact pixel centre in em space and emsPerPixel = 1/size, and 482 of 23,040 pixels disagreed with the frame by more than 2 of 255, one by 43 -- while the WebGPU frame, the device's WebGL2 frame and the SHIPPED raw-WebGL2 batch agreed with each other byte for byte.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

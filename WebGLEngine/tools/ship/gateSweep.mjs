@@ -1850,6 +1850,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backends agree byte for byte once WebGL2's rows are turned over (722 bytes differ without the " +
                  "turn -- the v4272 mirror, at the fetch). Four sabotages red at 5 / 2 / 2 / 4. 1.9 s.",
     }),
+    since81: Object.freeze({
+        at: "v4460", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. Slug text through gfx/device.js (render/slugDevice.mjs) drawn on both real backends: 23,040 of " +
+                 "23,040 pixels EXACT against text/slugEval.js through a rasteriser model whose sub-pixel precision is " +
+                 "FITTED from the fragment's own captured texcoords (four bits on this SwiftShader; the exact-centre " +
+                 "model missed by 1.06e-3 em and 43 of 255 at the worst pixel), the device's WebGL2 picture equal to " +
+                 "the shipped raw-WebGL2 batch byte for byte, the two backends identical. *** THE FIRST DRAFT OF THE " +
+                 "KEY WAS WRONG ABOUT PIXEL CENTRES AND THE FRAME SAID SO *** -- recorded in the header. Four " +
+                 "sabotages red at 4 / 11 / 6 / 6. Five runs 6,063 to 6,507 ms; the slowest is the MEASURED budget.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

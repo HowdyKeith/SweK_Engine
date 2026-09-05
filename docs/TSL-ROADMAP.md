@@ -285,7 +285,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         red at 5 / 2 / 2 / 4. Mipmaps are split out (task 21): WebGPU has no generateMipmap, so that half is a
         blit pipeline of its own, and Slug does not need it.
      3. A device-path text batch, drawn on both backends and diffed, with the orrery's four fillText calls or the
-        ship labels' overlay canvas as the first consumer.
+        ship labels' overlay canvas as the first consumer. BUILT at v4460: render/slugDevice.mjs (SlugFontDevice,
+        SlugDeviceBatch) packs the atlas into the device's rgba16float and rg16uint textures, builds one pipeline
+        from the WGSL twin and the GLSL port -- the GLSL's uniform names rewritten to the struct's, the rewrite
+        COUNTED (18 occurrences; the first expectation miscounted row 2 and the check refused it on its first run)
+        -- and draws with premultiplied blend, no depth write, compare always. slug-device.html is the page.
+        MEASURED by tools/ship/slugDevice-selfcheck.mjs on both real backends: 23,040 of 23,040 pixels EXACT against
+        text/slugEval.js, the device's WebGL2 picture equal to the shipped raw-WebGL2 SlugTextBatch byte for byte,
+        the two backends identical. *** AND THE KEY HAD TO LEARN WHAT A PIXEL CENTRE IS. *** Fed the exact centre,
+        482 pixels missed by more than 2 and one by 43 -- while all three GPU pictures agreed. A variant of the
+        pipeline writing the f32 bits of the fragment's texcoord and fwidth showed the rasteriser SNAPPING THE
+        DILATED CORNERS TO 1/16 PX and interpolating each triangle from the snapped positions (texcoord off the
+        centre by 0.028 px, fwidth wandering by half a percent), and Slug's estimator is locally steep enough
+        (0.08 of 255 per 1e-6 em at the worst pixel) to turn that into 43. The gate now FITS the sub-pixel
+        precision from the captured texcoords over 2..8 bits and no-snap: four bits here, model within 8.8e-8 em,
+        and a rig with eight bits will print eight. FOUND ON THE WAY, filed as task 22: a WGSL fragment that
+        declares a texture it does not read makes layout "auto" drop the binding, the device still binds it, and
+        the frame is BLANK with no error -- four all-zero capture frames beside four good WebGL2 ones. THE
+        CONSUMER is chosen (ev/esShipLabels.js) and not wired (task 23): a WebGPU canvas pass loses the device on
+        this box, so the switch can only be verified once task 19's presented-frame gate runs on the rig.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
         more than one varying and Slug's vertex stage carries five, so the device shell is not its route.
      5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,

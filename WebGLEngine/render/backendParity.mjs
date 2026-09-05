@@ -177,9 +177,9 @@ export const PARITY_BASELINE = Object.freeze({
     // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
-    glslBearing: 146,
+    glslBearing: 147,
     glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
-    glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
+    glslFramework: 17,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
     // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
@@ -211,9 +211,15 @@ export const PARITY_BASELINE = Object.freeze({
     // the first draft put the pair inside tools/ship/deviceFormats-selfcheck.mjs, and this census counted the
     // gate as a device consumer beside the two demos -- correctly, since it carried both languages and imported
     // gfx/device.js. The v4278 note below section 4 records the same shape; the module is the honest answer.
+    // v4460 -- glslBearing 146 -> 147, glslOnly 132 -> 133, framework 16 -> 17: render/slugDevice.mjs, which carries
+    // no shader of its own but REWRITES text/slugShader.js's GLSL uniform declarations to the WGSL struct's names
+    // for gfx/device.js, and the rewrite's replacement text is a GLSL declaration. Counted, not exempted, as
+    // v4392 ruled for gates: a file that writes GLSL text is GLSL-bearing whatever its reason. (Its gate carried
+    // the same declaration in an assertion for one run and was counted as a device consumer for it; the gate now
+    // assembles the words, per the rule this file states below section 4.)
     wgslBearing: 62,
     both: 14,
-    glslOnly: 132,
+    glslOnly: 133,
     wgslOnly: 48,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.

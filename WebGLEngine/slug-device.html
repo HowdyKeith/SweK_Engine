@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Slug Text on the Device (WebGL2 / WebGPU)">
+<meta name="demo:desc" content="Resolution-independent Slug text drawn through gfx/device.js on whichever backend the page has: the same atlas, the same batch, the WGSL twin on WebGPU and the GLSL port on WebGL2, premultiplied blend from the descriptor. slug-text.html is the raw WebGL2 original; this page is the device path that any device frame can draw text inside. ?webgl=1 forces the WebGL2 backend.">
+<meta name="demo:category" content="fx">
+<title>Slug Text on the Device</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Slug text through gfx/device.js</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
+    &middot; <a href="./slug-text.html">raw WebGL2 original</a> &middot; <a href="?webgl=1">force WebGL2</a></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
+const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+const SAMPLE = "Sphinx of black quartz, judge my vow — 0123456789";
+const SIZES = [8, 11, 14, 18, 24, 36, 64, 132];
+const CHARS = " " + SAMPLE + "SweKdevicetext·ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,'%";
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+
+// Four rows read as (m.x, m.y, -, m.w): vertices arrive in PIXELS (em * size), y-up, baseline at Y = 0; this places the
+// baseline origin at screen pixel (px, py) with y down. The same rows slug-text.html uses.
+function placeRows(W, H, px, py) {
+  return new Float32Array([2 / W, 0, 0, (2 / W) * px - 1,  0, 2 / H, 0, 1 - (2 / H) * py,  0, 0, 0, 0,  0, 0, 0, 1]);
+}
+
+let device, fontDevice, batches = [];
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
+  let font;
+  try { font = parseFont(ab); fontDevice = new SlugFontDevice(device, font, CHARS); }
+  catch (e) { return fail("font/atlas/pipeline: " + e.message); }
+  document.getElementById("notice").textContent = fontDevice.notice;
+  const kb = (fontDevice.byteSize / 1024).toFixed(0);
+  beEl.textContent = "backend: " + device.backend + " · atlas " + kb + " KiB (rgba16float + rg16uint) · logWidth " + fontDevice.logWidth;
+  for (const s of SIZES) { const b = new SlugDeviceBatch(fontDevice); b.set(s + " px · " + SAMPLE, { size: s * dpr(), color: [0.92, 0.95, 1, 1] }); batches.push({ s, b }); }
+  draw();
+  addEventListener("resize", draw);
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function draw() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d);
+  let h = 24 * d; for (const s of SIZES) h += (s + Math.max(10, s * 0.35)) * d; h = Math.round(h);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  device.frame(({ pass }) => {
+    pass.clear([0.02, 0.031, 0.024, 1]);
+    let y = 24 * d;
+    for (const { s, b } of batches) { y += s * d; b.draw(pass, placeRows(w, h, 16 * d, y), [w, h]); y += Math.max(10, s * 0.35) * d; }
+  });
+}
+init();
+</script>
+</body>
+</html>
