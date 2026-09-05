@@ -24,6 +24,18 @@
 
 export const FONT_DIR = "vendor/fonts";
 
+/**
+ * v4487 -- THE ALPHABETS A PACK IS BAKED FOR. `label` is ev/esShipLabels.js LABEL_CHARS, spelled here so the packer and
+ * the registry need no import from ev/ -- and tools/ship/fontPacks-selfcheck.mjs holds the two spellings equal, so they
+ * cannot drift apart without a red.
+ */
+export const CHAR_SETS = Object.freeze({
+    label: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 %#.-",
+});
+/** The pack file a family's alphabet bakes to, beside the font: <Name>.<set>.slug.bin. */
+export const packFile = (f, set) => f.file.replace(/\.ttf$/i, "") + "." + set + ".slug.bin";
+export const packPath = (f, set) => (f.dir ? `${FONT_DIR}/${f.dir}/${packFile(f, set)}` : `${FONT_DIR}/${packFile(f, set)}`);
+
 export const FONTS = Object.freeze([
     Object.freeze({
         family: "IBM Plex Serif", dir: "", file: "IBMPlexSerif-Regular.ttf", licence: "IBMPlexSerif-OFL.txt", rfn: "Plex",
@@ -31,6 +43,7 @@ export const FONTS = Object.freeze([
         sha256: "77cd233a2af8dc6b1022faea3bb3b01f3c75af68bcf530cb6aeb15982ff3dbb7",
         expect: Object.freeze({ glyphs: null, unitsPerEm: 1000, kerning: "GPOS", pair: ["A", "V", -50] }),
         role: "the label face this tree has drawn since v3823 (ev/esShipLabels.js, orrery-gpu.html, slug-device.html)",
+        packs: Object.freeze([Object.freeze({ set: "label", sha256: "b81815c672602a2072bf759d7d2d1560e98991412e2d92a6540b35f24962c390" })]),
     }),
     Object.freeze({
         family: "Cinzel", dir: "cinzel", file: "Cinzel-Regular.ttf", licence: "Cinzel-OFL.txt", rfn: "Cinzel Decorative",
@@ -38,6 +51,7 @@ export const FONTS = Object.freeze([
         sha256: "af0031129f27dc752e8629a80b793d27abea94027faa27cc660c3fc33f607a1f",
         expect: Object.freeze({ glyphs: 548, unitsPerEm: 1000, kerning: "GPOS", pair: ["A", "V", -105] }),
         role: "the fantasy face: Roman capitals, static Regular instance",
+        packs: Object.freeze([Object.freeze({ set: "label", sha256: "f6c34d9fc51035ecfe362585b6a4edf170bc89cfcff7f9f31008e5f38a29ff8d" })]),
     }),
     Object.freeze({
         family: "JetBrains Mono", dir: "jetbrains-mono", file: "JetBrainsMono-Regular.ttf", licence: "JetBrainsMono-OFL.txt", rfn: null,
@@ -45,6 +59,7 @@ export const FONTS = Object.freeze([
         sha256: "e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1",
         expect: Object.freeze({ glyphs: 1754, unitsPerEm: 1000, kerning: "none (a GPOS with no pair kerning under the default script)", pair: ["A", "V", 0] }),
         role: "the telemetry face: monospaced, so no pair kerns, and the layout must say none rather than GPOS",
+        packs: Object.freeze([Object.freeze({ set: "label", sha256: "095186cc3f112593b75ad5e0577e8a19ce866d2836b5893d971b0b3bea090797" })]),
     }),
     Object.freeze({
         family: "Source Sans 3", dir: "source-sans-3", file: "SourceSans3-Regular.ttf", licence: "SourceSans3-OFL.txt", rfn: "Source",
@@ -52,6 +67,7 @@ export const FONTS = Object.freeze([
         sha256: "4644c81b86ec9caaa76b634889968ed3c4f4f52f054855933acc7c2b21e53b0f",
         expect: Object.freeze({ glyphs: 2478, unitsPerEm: 1000, kerning: "GPOS", pair: ["A", "V", -14] }),
         role: "the minimal sans, standing in for Inter (variable-only on every host this box can reach); the TTF build, not the CFF one",
+        packs: Object.freeze([Object.freeze({ set: "label", sha256: "8d25bea2f6cec9deab3daaa28bc56a1dcc047af08efbc8b19bb6b881d2fbb475" })]),
     }),
 ]);
 

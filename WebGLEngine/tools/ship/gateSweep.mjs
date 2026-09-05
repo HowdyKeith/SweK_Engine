@@ -2368,6 +2368,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Inter and Orbitron not vendored: variable-only on every host this box reaches. JetBrains Mono kerns by zero and " +
                  "says so (a monospaced GPOS with no pair kerning). Sabotages red at 1 / 1 / 1 / 2.",
     }),
+    since109: Object.freeze({
+        at: "v4487", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fontPacks-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on WebGPU and WebGL2. Measured first: parse + outline + pack of the 67-glyph label alphabet in the browser " +
+                 "is 29 / 20 ms for Plex (cold / warm), 16 / 11 Cinzel, 8 / 8 JetBrains Mono, 10 / 13 Source Sans 3 -- about a frame, " +
+                 "once, so the worker is a won't-do and the build step is the ticket. text/slugPack.mjs packs an alphabet into one " +
+                 "byte-reproducible file (atlas texels, glyph records, the subset's cmap, advances, kern pairs, metrics); " +
+                 "tools/ship/packFonts.mjs bakes every registered family's alphabets to vendor/fonts and writes the digests into " +
+                 "text/fontRegistry.mjs; fromPack on both font classes goes from bytes to textures with no parse. The gate holds " +
+                 "each pack to a fresh pack byte for byte, to its digest, its decoded layout and atlas to the parse path's, and the " +
+                 "phrase drawn from the pack to the parse path's picture on 23,040 of 23,040 pixels for all four families on both " +
+                 "backends -- 3 to 6 ms against 15 to 52. Sabotages red at 5 / 13 / 9 / 8 -- one flipped texel moved 3 pixels, and the picture rows saw it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

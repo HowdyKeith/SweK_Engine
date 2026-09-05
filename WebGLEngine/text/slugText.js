@@ -305,6 +305,27 @@ export class SlugFontGPU {
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
+    /** v4487 -- from a decoded slug pack (text/slugPack.mjs), no parse: the same object the constructor builds, its atlas from the file. */
+    static fromPack(gl, pack, opts = {}) {
+        if (!gl || typeof gl.texStorage2D !== "function") throw new Error("slugText: a WebGL2 context is required");
+        if (!pack || !pack.atlas || !pack.font || !pack.font.packed) throw new Error("slugText: fromPack needs a decoded slug pack ({ font, atlas })");
+        const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        if ((1 << pack.atlas.logWidth) > maxSize) throw new Error("slugText: the pack was baked at width " + (1 << pack.atlas.logWidth) + " and MAX_TEXTURE_SIZE is " + maxSize);
+        const self = Object.create(SlugFontGPU.prototype);
+        self.gl = gl; self.font = pack.font; self.opts = opts; self.atlas = pack.atlas; self.logWidth = pack.atlas.logWidth; self.packed = true;
+        const src = slugShaderSource(self.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight });
+        self.program = gl.createProgram();
+        const vs = compile(gl, gl.VERTEX_SHADER, src.vertex), fs = compile(gl, gl.FRAGMENT_SHADER, src.fragment);
+        gl.attachShader(self.program, vs); gl.attachShader(self.program, fs); gl.linkProgram(self.program);
+        if (!gl.getProgramParameter(self.program, gl.LINK_STATUS)) throw new Error("slugText: program link failed: " + gl.getProgramInfoLog(self.program));
+        gl.deleteShader(vs); gl.deleteShader(fs);
+        self.uMatrix = gl.getUniformLocation(self.program, "slug_matrix"); self.uViewport = gl.getUniformLocation(self.program, "slug_viewport");
+        self.uCurve = gl.getUniformLocation(self.program, "curveTexture"); self.uBand = gl.getUniformLocation(self.program, "bandTexture");
+        self._uploadTextures();
+        self.notice = SLUG_NOTICE;
+        return self;
+    }
+
     /** Bytes of GPU memory the two textures occupy. Text is usually the cheapest thing in a frame; prove it. */
     get byteSize() {
         const a = this.atlas;

@@ -434,6 +434,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         out, not rasterised -- task 7's packer and task 9's rig page draw them).
      7. Pre-pack atlases at ship time with a hash gate, after MEASURING parse+pack time; the worker is not worth
         its message-passing unless that number is over a frame.
+        MEASURED AND BUILT at v4487 (task 7). The measurement first, in the harness's headless Chromium for the 67-glyph
+        label alphabet, cold / warm: Plex 29 / 20 ms (parse 6, outline 3, pack 20), Cinzel 16 / 11, JetBrains Mono 8 / 8,
+        Source Sans 3 10 / 13 -- about one frame, once, per family, so the worker is a won't-do (tools/ship/todo.mjs
+        slug-atlas-worker) and the build step is the ticket. text/slugPack.mjs packs a family's alphabet into one
+        byte-reproducible file ("SLUG", a JSON header with the atlas's shape and glyph records and the subset's cmap,
+        advances, kern pairs and vertical metrics, then the rgba16float curve texels and the rg16uint band texels);
+        decodePack hands back { font, atlas } where the font answers everything layoutText asks (glyphIndex, advance,
+        kern, the metrics, kerningSource) and refuses outlines by name. tools/ship/packFonts.mjs bakes every
+        registered family's declared alphabets (text/fontRegistry.mjs CHAR_SETS, `label` held equal to
+        ev/esShipLabels.js LABEL_CHARS) to vendor/fonts/<family>/<Name>.<set>.slug.bin and writes their digests into
+        the registry; without --write it reports stale / missing / current and exits 1 on either. SlugFontDevice.fromPack
+        and SlugFontGPU.fromPack take a decoded pack straight to textures and a pipeline, refusing a device narrower
+        than the pack was baked for. tools/ship/fontPacks-selfcheck.mjs holds every pack on disk to a fresh pack of
+        its TrueType BYTE FOR BYTE (a stale pack is a red), to its digest, its decoded layout of "Sphinx 42% AV" to the
+        parsed font's (indices, pen positions, width, kerning source), its atlas records and texels to packAtlas's, and
+        on WebGPU and WebGL2 the phrase drawn FROM THE PACK to the parse path's picture on 23,040 of 23,040 pixels for
+        all four families -- the pack path 3 to 6 ms against 15 to 52 for parse and pack in the browser. NOT CLAIMED:
+        a shipped page that fetches a pack (ev/esShipLabels.js and orrery-gpu.html still parse the TrueType; the pack
+        is proven equal and offered); an alphabet beyond `label`; the evenOdd and weight variants.
      8. Word wrap (maxWidth) in layoutText, pure and gated headless -- the one layout feature genuinely missing.
      9. A slug-rig.html measuring fragment cost by size, angle and band count on Keith's boxes, including one
         dense glyf CJK face, before any band-count tuning.

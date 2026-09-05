@@ -157,6 +157,27 @@ export class SlugFontDevice {
         this.notice = SLUG_NOTICE;
     }
 
+    /**
+     * v4487 -- FROM A PACK, NO PARSE: text/slugPack.mjs decodePack's { font, atlas } become the textures and the pipeline directly.
+     * The pack was baked at logWidth 12; a device that cannot carry a 4096-wide texture is refused by name rather than handed an
+     * atlas whose band rows wrap at a width its shader was not compiled for (text/slugAtlas.js's rule 1, the v3823 plant).
+     */
+    static fromPack(device, pack, opts = {}) {
+        if (!device || typeof device.texture !== "function" || typeof device.pipeline !== "function") throw new Error("slugDevice: a gfx/device.js device is required");
+        if (!pack || !pack.atlas || !pack.font || !pack.font.packed) throw new Error("slugDevice: fromPack needs a decoded slug pack ({ font, atlas } from text/slugPack.mjs decodePack)");
+        const lw = logWidthFor(device);
+        if (pack.atlas.logWidth > lw) throw new Error(`slugDevice: the pack was baked at width ${1 << pack.atlas.logWidth} and this device carries ${1 << lw} at most; pack it narrower or parse the TrueType here`);
+        const self = Object.create(SlugFontDevice.prototype);
+        self.device = device; self.font = pack.font; self.opts = opts; self.logWidth = pack.atlas.logWidth; self.atlas = pack.atlas; self.packed = true;
+        const a = pack.atlas;
+        self.curveTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.curve, width: a.width, height: a.curveTexels, data: a.curveData, nearest: true });
+        self.bandTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.band, width: a.width, height: a.bandTexels, data: a.bandData, nearest: true });
+        self.desc = slugPipelineDesc(self.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight });
+        self.pipeline = device.pipeline(self.desc);
+        self.notice = SLUG_NOTICE;
+        return self;
+    }
+
     /** Bytes the two textures occupy, the same arithmetic as slugText.SlugFontGPU.byteSize. */
     get byteSize() { const a = this.atlas; return a.width * a.curveTexels * 8 + a.width * a.bandTexels * 4; }
 

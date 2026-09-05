@@ -245,6 +245,20 @@ export const TODO = [
                 "read as positive). Re-open only if a three-rendered page needs text three itself must draw.",
         evidence: "node tools/ship/slugTsl-selfcheck.mjs",
     },
+    {
+        id: "slug-atlas-worker",
+        status: "wont",
+        title: "A Web Worker parsing and packing the label font at page load",
+        why: "docs/TSL-ROADMAP.md step 7 item 7 (task 7): the reviewed plan ran opentype.js in a worker on every page load. " +
+             "Measure parseFont + packAtlas for the Plex label subset in the browser first; if it is under a frame the worker " +
+             "is not worth its message-passing code and the ticket is the build step alone.",
+        reason: "MEASURED at v4487 in the harness's headless Chromium, the 67-glyph label alphabet, cold / warm: Plex 29 / 20 ms " +
+                "(parse 6, outline 3, pack 20), Cinzel 16 / 11, JetBrains Mono 8 / 8, Source Sans 3 10 / 13 -- about one frame, once, " +
+                "per family. A worker would spend more lines on messages than the work it hid, and the build step removes the work " +
+                "instead: tools/ship/packFonts.mjs bakes each family's alphabet into a .slug.bin the runtime decodes and uploads " +
+                "(fromPack on both font classes), held stale-or-current byte for byte and pixel-identical to the parse path on both backends.",
+        evidence: "node tools/ship/fontPacks-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);
