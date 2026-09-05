@@ -62,6 +62,88 @@ export function notVerdicts(c, { codes = {} } = {}) {
     return c.killed.filter((g) => codes[g] !== 0 && codes[g] !== undefined);
 }
 
+// *** v4460 -- standingReds HAD NO MIRROR, AND THE MIRROR IS WHERE THE TREE'S RED GATES WERE HIDING. ***
+//
+// The comment above standingReds is careful in one direction: a nonzero code beside a killed process is not a
+// failure. NOBODY ASKED THE OTHER DIRECTION. A ZERO beside an over-budget reading is not a pass either -- it
+// is the exit status the gate had THE LAST TIME IT WAS CHEAP ENOUGH TO RUN, carried forward untouched by
+// every sweep since (quickSweep.mjs writes `codes[r.gate]` only for gates in `rows`). Once a gate crosses the
+// budget its verdict freezes, and the file goes on reporting it.
+//
+// MEASURED AT v4460, and see STALE_GREENS_V4460 for the whole table: 371 over-budget entries carry code 0,
+// 360 of them stamped UNKNOWN_AT. Run one at a time, TWENTY-TWO ARE RED -- eighteen in no register at all.
+//
+// *** AND TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE 3,000 ms BUDGET. *** So v4408's one-way door and this
+// stale verdict are the same defect seen twice: the door is shut on a time the gate no longer has, and what
+// it shuts in is a green nobody has re-observed. box3dFilter is recorded at 3,763 ms and runs in 89.
+export function standingGreens(c, { codes = {} } = {}) {
+    return c.over.filter((g) => codes[g] === 0);
+}
+
+// A verdict whose age the file cannot state. `at` was made per-entry at v4408 and used only for the
+// MILLISECONDS; the exit code sitting beside it has the same provenance and nothing ever paired them.
+export function undatedVerdicts(c, { codes = {}, at = {} } = {}) {
+    return c.over.filter((g) => codes[g] !== undefined && (at[g] || UNKNOWN_AT) === UNKNOWN_AT);
+}
+
+// The three verdict classes over `over`, as a PARTITION -- v4401's rule applied to codes rather than to
+// times. An entry with no code at all is its own class, because "never observed" and "observed green" are
+// the two things this file spent a round proving are different.
+export function verdictClasses(c, { codes = {} } = {}) {
+    const green = [], red = [], none = [];
+    for (const g of c.over) (codes[g] === undefined ? none : codes[g] === 0 ? green : red).push(g);
+    return { green, red, none, sum: green.length + red.length + none.length, partitions: green.length + red.length + none.length === c.over.length };
+}
+
+// *** THE MEASUREMENT, FROZEN BY NAME (v4399's rule), BECAUSE A GATE CANNOT AFFORD TO RE-TAKE IT. ***
+// Every number below was taken by running the gate in its own process with a wall clock around it.
+export const STALE_GREENS_V4460 = Object.freeze({
+    at: "v4460",
+    population: 371,          // over-budget entries carrying code 0
+    undated: 360,             // ...of which stamped UNKNOWN_AT: a green whose age the file cannot state
+    // *** THE FIRST PASS WAS 8-WAY PARALLEL AND IT WAS THE WRONG INSTRUMENT, WHICH quickSweep ALREADY SAYS
+    // IN ITS OWN GATE: "a parallel FAILURE on its own is `unconfirmed`, not `red`". I ran it anyway, and then
+    // ran it a SECOND time by accident -- and the two passes of the same 371 gates disagreed on FIVE. ***
+    parallelPassA: Object.freeze({ green: 333, nonGreen: 38 }),
+    parallelPassB: Object.freeze({ green: 328, nonGreen: 43, exit1: 27, killedAt45s: 16 }),
+    passesDisagreeOn: 5,
+    // The serial re-run is the verdict. Every one of pass B's 43 finished inside 150 s.
+    serial: Object.freeze({ ofParallelNonGreen: 43, greenAlone: 21, redAlone: 22, unresolved: 0 }),
+    falseRedRate: "21 of 43 -- 49% of an 8-way parallel pass's non-greens were the parallelism",
+    // What the 22 actually are, because "22 red gates" is a headline and the split is the fact.
+    confirmed: Object.freeze({ total: 22, realAssertion: 17, needsGpuAbsentHere: 3, networkDependent: 2,
+                              unregistered: 18, nowUnderBudget: 12 }),
+    unregistered: Object.freeze([
+        "gfx/frontDoor-selfcheck.mjs", "tools/mutate/shadowedDefaults-selfcheck.mjs",
+        "tools/roundhouse/sweepBudget-selfcheck.mjs", "tools/ship/citedSources-selfcheck.mjs",
+        "tools/ship/corpusFilters-selfcheck.mjs", "tools/ship/gateReport-selfcheck.mjs",
+        "tools/ship/gitEconomy-selfcheck.mjs", "tools/ship/headlessGpu-selfcheck.mjs",
+        "tools/ship/meshLine-selfcheck.mjs", "tools/ship/orreryFleet-selfcheck.mjs",
+        "tools/ship/orreryPost-selfcheck.mjs", "tools/ship/orreryReached-selfcheck.mjs",
+        "tools/ship/physicsReach-selfcheck.mjs", "tools/ship/quickSweep-selfcheck.mjs",
+        "tools/ship/releasePanelRoute-selfcheck.mjs", "tools/ship/traderGraph-selfcheck.mjs",
+        "tools/ship/wgslSpec-selfcheck.mjs", "tools/ship/windowsImport-selfcheck.mjs",
+    ]),
+    // The door and the verdict are the same defect: excluded by a time they no longer have.
+    returnable: Object.freeze([
+        Object.freeze({ gate: "tools/ship/box3dFilter-selfcheck.mjs", nowMs: 89, recordedMs: 3763 }),
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", nowMs: 107, recordedMs: 4518 }),
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", nowMs: 316, recordedMs: 5526 }),
+        Object.freeze({ gate: "tools/ship/crossBackend-selfcheck.mjs", nowMs: 376, recordedMs: 13851 }),
+        Object.freeze({ gate: "tools/ship/physicsReach-selfcheck.mjs", nowMs: 537, recordedMs: 3143 }),
+        Object.freeze({ gate: "tools/ship/windowsImport-selfcheck.mjs", nowMs: 629, recordedMs: 3089 }),
+        Object.freeze({ gate: "tools/ship/citedSources-selfcheck.mjs", nowMs: 979, recordedMs: 3103 }),
+        Object.freeze({ gate: "tools/ship/corpusFilters-selfcheck.mjs", nowMs: 1244, recordedMs: 3141 }),
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", nowMs: 1677, recordedMs: 3368 }),
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", nowMs: 1717, recordedMs: 3314 }),
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", nowMs: 2618, recordedMs: 5162 }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", nowMs: 2929, recordedMs: 4404 }),
+    ]),
+    notClaimed: "that the 22 are the whole of it. This measured the 371 entries recorded GREEN; the 144 " +
+                "recorded nonzero and the `killed` bucket were not re-run, and a gate that is red for a " +
+                "reason this sandbox creates (no GPU, no network) is separated above rather than counted in.",
+});
+
 // The door: entries the sweep excludes, ordered by how cheaply they might come back. A gate recorded just over
 // the budget is the likeliest returnee, and v4406 measured three that finish in 1.3-2.2 s.
 export function doorCandidates(c, { timings = {} } = {}, { lo = BUDGET_MS, hi = 6000 } = {}) {

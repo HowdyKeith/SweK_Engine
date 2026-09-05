@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/sweepCoverage-selfcheck.mjs
+// WebGLEngine/tools/ship/sweepCoverage-selfcheck.mjs -- v4460
 //
 // Run: node tools/ship/sweepCoverage-selfcheck.mjs   (~2s -- MEASURED)
 //
@@ -22,6 +22,44 @@
 // data file 130 entries deep -- and `never` is separated because an absence read as a skip is an absence read
 // as a pass.
 //
+// ---- *** v4460 -- THE MIRROR standingReds NEVER HAD *** ------------------------------------------------------
+//
+// Section 2 of this file is careful in ONE direction: a nonzero exit code beside a killed process is not a
+// failure. NOBODY EVER ASKED THE OTHER DIRECTION. A ZERO beside an over-budget reading is not a pass either --
+// quickSweep writes `codes[r.gate]` only for the gates it ran, so an over-budget entry keeps whatever status
+// it had the last time it was cheap enough to run, and the file publishes it forever.
+//
+// MEASURED: 371 over-budget entries carry code 0, 360 of them stamped UNKNOWN_AT. Run one at a time,
+// *** TWENTY-TWO ARE RED -- EIGHTEEN IN NO REGISTER -- AND TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE
+// 3,000 ms BUDGET THAT EXCLUDES THEM. *** v4408's one-way door and this stale verdict are one defect seen
+// twice: the door is shut on a time the gate no longer has, and behind it is a green nobody re-observed.
+// box3dFilter is recorded at 3,763 ms and runs in 89.
+//
+// *** AND THE FIRST INSTRUMENT WAS THE WRONG ONE, WHICH THIS TREE ALREADY HAD IN WRITING. *** The first pass
+// was 8-way parallel. quickSweep-selfcheck prints "a parallel FAILURE on its own is `unconfirmed`, not `red`";
+// I ran it in parallel anyway and quoted its number to myself before a serial pass existed. TWO parallel passes
+// of the same 371 gates disagreed on FIVE (38 non-green against 43), and the serial re-run resolved 21 of the
+// 43 to GREEN ALONE -- a 49% false-red rate in my own measurement, in the round about false verdicts.
+//
+// v4460 SABOTAGES, RESULTS BY NAME:
+//   W. standingGreens counts nonzero codes too              -> 1 RED
+//   X. undatedVerdicts treats a missing stamp as dated       -> *** 0 RED, THEN 0 RED AGAIN, THEN 1 RED ***
+//   Y. verdictClasses folds the uncoded class into green     -> *** 0 RED, THEN 1 RED ***
+//   Z. the record's 17+3+2 split stops adding up             -> 1 RED
+//   AA. the two parallel passes are recorded as agreeing     -> 2 RED
+//   AB. a returnable gate's recorded time is retyped         -> 1 RED
+//   AC. an unregistered gate name that names no file         -> 1 RED
+//   AD. the serial re-run is dropped, parallel non-greens ARE the reds -> 1 RED
+//   AE. emptyOfNonEmpty accepts an empty list                -> 1 RED
+//
+// *** X AND Y ARE MECHANISMS vacuity.mjs NAMED ONE ROUND EARLIER, BOTH IN THE ROUND AFTER IT. *** Y is
+// mechanism 1, the empty collection: `none` is empty in this tree, so folding it into `green` changed nothing.
+// X is mechanism 2, the unreachable branch: backfillStamps guarantees every entry has an `at`, so the
+// `|| UNKNOWN_AT` fallback never fires. Both are pure functions over maps they are handed, so a fixture drives
+// them -- AND THE FIRST FIXTURE STILL DID NOT DRIVE X, because it gave every entry a stamp too. An unreachable
+// branch inside the fixture written to reach it, which is the third time this session. e.mjs carries a code
+// and no stamp and X now bites.
+//
 // SABOTAGES (4, all logged, MEASURED 3/1/1/2 reds by name):
 //   A. counted the cap-hitters as reds  -> section 2 went red in all three rows, and the "13 finished nonzero"
 //      count read 140. Restored. That is the row that matters most: 130 killed processes reading as failures
@@ -42,6 +80,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
 import * as SC from "./sweepCoverage.mjs";
+import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
 
@@ -215,7 +254,126 @@ console.log("\n6. what the first rotation actually found");
     }
 }
 
-say("WHAT THIS DOES NOT CLAIM. That the over-budget gates are GREEN -- it re-times them and reports the exit " +
+console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE READING BESIDE IT ***");
+// Section 2's comment is careful in ONE direction -- a nonzero code beside a killed process is not a failure.
+// NOBODY ASKED THE OTHER DIRECTION, and that is where this tree's red gates were. quickSweep writes
+// `codes[r.gate]` only for the gates in `rows`, so an over-budget entry keeps whatever exit status it had the
+// last time it was cheap enough to run, forever, and the file goes on publishing it.
+{
+    const codes = FILE.codes || {}, at = FILE.at || {};
+    const greens = SC.standingGreens(C, { codes });
+    const reds = SC.standingReds(C, { codes });
+    const cls = SC.verdictClasses(C, { codes });
+    const REC = SC.STALE_GREENS_V4460;
+
+    ok("!! *** every over-budget entry is a standing green, a standing red, or has no code -- a PARTITION ***",
+       cls.partitions && cls.green.length > 0 && cls.red.length > 0,
+       `${cls.green.length} green + ${cls.red.length} red + ${cls.none.length} uncoded = ${cls.sum} of ` +
+       `${C.over.length}. Section 2 counted one of these three and called the answer complete.`);
+    ok("...and the two verdict classes do not overlap",
+       greens.filter((g) => reds.includes(g)).length === 0 && !emptyOfNonEmpty(greens, C.over),
+       "a gate cannot be both, and an empty green list against a non-empty `over` would mean the mirror " +
+       "stopped matching rather than that the tree got clean");
+
+    const undated = SC.undatedVerdicts(C, { codes, at });
+    const undatedGreen = undated.filter((g) => codes[g] === 0);
+    ok("!! *** A VERDICT WHOSE AGE THE FILE CANNOT STATE IS REPORTED, NOT COUNTED AS A PASS ***",
+       undatedGreen.length > 0 && undatedGreen.every((g) => greens.includes(g)),
+       `${undatedGreen.length} of ${greens.length} standing greens read "${SC.UNKNOWN_AT}". v4408 gave every ` +
+       "entry its own capture AND USED IT ONLY FOR THE MILLISECONDS -- the exit code sitting beside it has " +
+       "the same provenance, and until now nothing paired them.");
+
+    // *** THE MEASUREMENT, AND THE FIRST INSTRUMENT WAS THE WRONG ONE. *** See STALE_GREENS_V4460.
+    ok("!! the frozen measurement reconciles against itself, both passes and the serial re-run",
+       REC.parallelPassA.green + REC.parallelPassA.nonGreen === REC.population &&
+       REC.parallelPassB.green + REC.parallelPassB.nonGreen === REC.population &&
+       REC.parallelPassB.exit1 + REC.parallelPassB.killedAt45s === REC.parallelPassB.nonGreen &&
+       REC.serial.ofParallelNonGreen === REC.parallelPassB.nonGreen &&
+       REC.serial.greenAlone + REC.serial.redAlone + REC.serial.unresolved === REC.serial.ofParallelNonGreen &&
+       REC.serial.redAlone === REC.confirmed.total &&
+       REC.confirmed.realAssertion + REC.confirmed.needsGpuAbsentHere + REC.confirmed.networkDependent === REC.confirmed.total &&
+       Math.abs(REC.parallelPassA.nonGreen - REC.parallelPassB.nonGreen) === REC.passesDisagreeOn,
+       `${REC.population} = ${REC.parallelPassB.green} + ${REC.parallelPassB.nonGreen}; the 43 resolve to ` +
+       `${REC.serial.greenAlone} green alone and ${REC.serial.redAlone} red alone; the 22 split ` +
+       `${REC.confirmed.realAssertion} real / ${REC.confirmed.needsGpuAbsentHere} no-GPU-here / ` +
+       `${REC.confirmed.networkDependent} network. EVERY COUNT IN THE RECORD IS CHECKED AGAINST ITS OWN PARTS, ` +
+       "because v4296's mistake was a headline beside a list that did not add up.");
+
+    ok("!! *** THE PARALLEL PASS WAS THE WRONG INSTRUMENT AND THE RECORD SAYS SO IN A NUMBER ***",
+       REC.serial.greenAlone > REC.serial.redAlone * 0.5 && REC.passesDisagreeOn > 0,
+       `${REC.serial.greenAlone} of ${REC.serial.ofParallelNonGreen} parallel non-greens are GREEN alone -- ` +
+       `${REC.falseRedRate}. AND TWO 8-WAY PASSES OF THE SAME ${REC.population} GATES DISAGREED ON ` +
+       `${REC.passesDisagreeOn}: ${REC.parallelPassA.nonGreen} against ${REC.parallelPassB.nonGreen}. ` +
+       "quickSweep-selfcheck already prints 'a parallel FAILURE on its own is unconfirmed, not red'; I ran " +
+       "the parallel pass anyway and quoted its number to myself before the serial one existed.");
+
+    ok("!! every gate the record names as still red is a real file, and the unregistered ones are named",
+       overNonEmpty(REC.unregistered, (g) => fs.existsSync(path.join(SC.ENG, g))) &&
+       REC.unregistered.length === REC.confirmed.unregistered,
+       `${REC.unregistered.length} of the ${REC.confirmed.total} are in no red register at all -- NAMED here, ` +
+       "not counted, so a round that fixes one can say which. v4399's rule: freeze by NAME, never by COUNT.");
+
+    // *** THE DOOR AND THE VERDICT ARE THE SAME DEFECT. *** v4408 found the eviction runs on a stale time;
+    // this finds the verdict behind it is a stale green. Twelve gates carry both.
+    const back = REC.returnable;
+    ok("!! *** TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE BUDGET THAT EXCLUDES THEM ***",
+       back.length === REC.confirmed.nowUnderBudget &&
+       overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
+                                 (FILE.timings || {})[r.gate] === r.recordedMs),
+       `${back.length} gates, worst ${Math.max(...back.map((r) => r.nowMs))} ms against the ${SC.BUDGET_MS} ms ` +
+       `budget, each still recorded at the time that evicted it (box3dFilter 89 ms now, ${back[0].recordedMs} ms ` +
+       "on file). *** THEY ARE HIDDEN BY A NUMBER THAT IS WRONG IN THE DIRECTION THAT HIDES THEM *** -- the " +
+       "recorded time is checked against the live file here, so a re-timing that fixes it fails this row " +
+       "rather than leaving a record nobody re-derives.");
+
+    // *** TWO OF THIS SECTION'S SABOTAGES WENT 0 RED, AND BOTH ARE MECHANISMS vacuity.mjs NAMED ONE ROUND
+    // AGO. *** X broke undatedVerdicts' `at[g] || UNKNOWN_AT` fallback and nothing moved, because
+    // backfillStamps guarantees EVERY entry in this file has a stamp -- the default is unreachable against
+    // the only input it ever sees (vacuity mechanism 2). Y folded the `none` class into `green` and nothing
+    // moved, because `none` is EMPTY in this tree -- every over-budget entry has a code (mechanism 1). Both
+    // functions are pure over the maps they are handed, so a fixture reaches the branches the tree cannot.
+    {
+        const fx = { over: ["a.mjs", "b.mjs", "c.mjs", "d.mjs", "e.mjs"], killed: [] };
+        const codes = { "a.mjs": 0, "b.mjs": 1, "c.mjs": 0, "e.mjs": 0 };   // d.mjs has NO code
+        // *** e.mjs HAS A CODE AND NO STAMP AT ALL, and it is the whole reason this fixture exists. *** The
+        // first draft gave every entry an `at`, so the `|| UNKNOWN_AT` fallback stayed unreachable and
+        // sabotage X went 0 RED A SECOND TIME -- an unreachable branch inside the fixture written to reach it.
+        const at = { "a.mjs": "2026-01-01T00:00:00Z", "b.mjs": SC.UNKNOWN_AT, "c.mjs": SC.UNKNOWN_AT };
+        const v = SC.verdictClasses(fx, { codes });
+        ok("!! FIXTURE: an entry with NO code is its own class, not folded into green",
+           v.none.length === 1 && v.none[0] === "d.mjs" && v.green.length === 3 && v.red.length === 1 && v.partitions,
+           `green ${v.green.length}, red ${v.red.length}, none ${v.none.length}. THE TREE CANNOT DRIVE THIS ` +
+           "ROW -- its `none` class is empty, so folding it into `green` passed every check here until a " +
+           "fixture existed. 'Never observed' and 'observed green' are the two things v4408 proved are " +
+           "different, and one bucket for both is how the second becomes the first.");
+        const u = SC.undatedVerdicts(fx, { codes, at });
+        ok("!! FIXTURE: a MISSING stamp is undated, not dated -- the fallback is EXERCISED, not assumed",
+           u.length === 3 && u.includes("b.mjs") && u.includes("c.mjs") && u.includes("e.mjs") &&
+           !u.includes("a.mjs") && !u.includes("d.mjs"),
+           `${u.join(", ")} -- b and c carry ${JSON.stringify(SC.UNKNOWN_AT)} explicitly, E CARRIES NOTHING ` +
+           "AT ALL and reaches the same answer through the fallback, a carries a real date, and d has no code " +
+           "so it is not a verdict. backfillStamps means the real file never exercises that branch, so " +
+           "without e.mjs the default was decoration and its sabotage went 0 RED twice.");
+        // The vacuity guard on the tree's own population, exercised where the tree cannot exercise it: an
+        // empty list against a non-empty source is the state `greens.every(...)` would call a pass.
+        ok("!! FIXTURE: an empty verdict list against a non-empty population is a FINDING, not a pass",
+           emptyOfNonEmpty([], fx.over) && !emptyOfNonEmpty(SC.standingGreens(fx, { codes }), fx.over),
+           "the guard on the row above cannot be driven from this tree -- 371 standing greens is not zero -- " +
+           "so its sabotage goes 0 RED and it is exercised here instead. v4459's helper, on a fixture.");
+    }
+
+    REPORT.table("the over-budget population by VERDICT, not by time", ["class", "gates", "what it means"],
+        [["standing green", String(cls.green.length), "a zero carried forward; 22 of the 371 measured are red"],
+         ["standing red", String(cls.red.length), "a nonzero that finished -- section 2's population"],
+         ["no code", String(cls.none.length), "never observed at all"]],
+        "Section 2 asked whether a nonzero code is a verdict. This asks whether a zero one is, and the answer " +
+        "is 22 gates, 18 of them in no register.");
+}
+
+say("WHAT THIS DOES NOT CLAIM. That the 22 are the whole of it -- section 7 re-ran the 371 entries " +
+    "recorded GREEN, and the 144 recorded nonzero and the whole `killed` bucket were NOT re-run; nor that a " +
+    "gate red here is red on the rig, which is why the no-GPU and network-dependent ones are split out rather " +
+    "than counted in. That the over-budget gates are GREEN -- it re-times them and reports the exit " +
     "codes it saw, and a gate that is genuinely slow stays out; the rotation shrinks the population that has " +
     "never been looked at, it does not certify it. That the 3,000 ms budget is the right number -- nothing here " +
     "argues for it, and the case for changing it would need the distribution this file now makes readable. And " +
