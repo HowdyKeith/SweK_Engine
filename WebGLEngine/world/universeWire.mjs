@@ -43,6 +43,81 @@ export function wireFromParams(params, transports = {}) {
  * trades. So the key names its `today`, and a page building its key must build the sky for that day, not its own.
  */
 export const KEY_TODAY = "2026-09-01";
+
+// *** v4460 -- THE KEY WAS WRONG FOR FORTY-TWO SHIPPED VERSIONS, AND THE ONLY GATE THAT COULD SAY SO
+// OVERWROTE IT EVERY RUN. *** universeWire-selfcheck computed the key, WROTE it to
+// tools/ship/universe-hash-expected.json, and then asserted against the file it had just written -- so the
+// row could not fail on a hash change, and the browser half read AGREES because it fetched a file the same
+// run had produced. THE WHOLE CHAIN AGREED WITH ITSELF. The gate was green, exit 0, and is in no red
+// register because it was never red.
+//
+// *** AND v4316's OWN SABOTAGE LOG NAMED THE DEFECT AND THE FIX, AND THE FIX WAS NEVER MADE. *** Its
+// sabotage B reads: "The page's key, built by the same code, still AGREED with the file the same sabotaged
+// code wrote -- ... and why the file another engine checks against is the one COMMITTED, not the one a page
+// computes." True of the intent, false of the mechanism, for 144 rounds.
+//
+// WHAT ACTUALLY MOVED IT, BISECTED FILE BY FILE AND THEN FIELD BY FIELD. Both moves are orrery.json and
+// NEITHER ROUND WAS ABOUT THE ECONOMY.
+//
+// *** AND MY FIRST TWO ATTRIBUTIONS WERE WRONG, BOTH READ OFF A DIFF HUNK INSTEAD OF MEASURED. *** I wrote
+// that a body's radius is the cube root of its byte count -- which is true, radiusFor does exactly that --
+// and concluded the key moved because bodies changed size. IT DOES NOT. Adding 964 bytes to each of the
+// fifteen bodies IN TURN moves the hash NOT AT ALL: `bytes` feeds `radius`, and the economy never reads
+// either. The sabotage that reproduced the historical change went 0 RED and that is how the story got
+// corrected -- the plant that "failed" was the one saying the explanation was wrong.
+//
+//   v4409  2ac2a467   the last correct key, and the last time the file was committed
+//
+//   v4414  43f055b1   "papered is not attributed". Every body's `arrived` DATE was rewritten to 2026-08-31 --
+//                     14 of 15 -- and a body's orbit is set by its age (buildOrrery: days since `arrived`,
+//                     floored, into orbitFor). *** THE WHOLE SKY MOVED. *** Different orbits, different
+//                     flight times, different trades. Confirmed by changing one body's `arrived` on today's
+//                     tree: box3d at 2026-08-30 gives b6fd8ff5, at 2026-08-19 gives 6715cd16.
+//
+//   v4416  df581d2d   "five narrow patterns in one function". PROVENANCE.txt ATTRIBUTION FILES were added to
+//                     six vendored dependencies -- and gitEconomy's stockOfFiles turns EVERY FILE INTO CARGO:
+//                     `stock[goodOf(f.path)] += Math.max(1, Math.round(f.bytes / BYTES_PER_TON))`. Every one
+//                     of the six is under 1 KB against a BYTES_PER_TON of 4096, so each rounds to ZERO and is
+//                     lifted to a full ton by that Math.max. *** SIX TONS OF `docs` APPEARED IN THE SYSTEM,
+//                     ONE PER LICENCE NOTE. *** draco 964 B, heerich 525 B, jolt 909 B, keyhunt 789 B,
+//                     three 902 B, three-webgpu 960 B -- 4,049 bytes of attribution, six tons of freight.
+//
+// *** WRITING DOWN WHO OWNS A DEPENDENCY PUT CARGO ON SIX PLANETS. *** Not a defect in either round: the
+// economy is stocked from the tree and the tree gained files. The defect is that the key nobody could
+// re-derive went stale and the gate that published it re-baked itself green.
+export const KEY_DRIFT_V4460 = Object.freeze({
+    at: "v4460",
+    lastCommittedCorrect: Object.freeze({ version: "v4409", commit: "2b693ec8", hash: "2ac2a467" }),
+    moves: Object.freeze([
+        Object.freeze({ version: "v4414", commit: "aefc87ad", hash: "43f055b1", file: "orrery.json",
+            field: "arrived", bodiesTouched: 14,
+            cause: "every body's arrival date rewritten to 2026-08-31, so every ORBIT moved -- a body's " +
+                   "orbit is set by its age, and the economy's flight times come from the orbits",
+            control: "on today's tree, box3d arrived=2026-08-30 gives b6fd8ff5 and 2026-08-19 gives 6715cd16" }),
+        Object.freeze({ version: "v4416", commit: "7e680f96", hash: "df581d2d", file: "orrery.json",
+            field: "files", bodiesTouched: 6,
+            cause: "PROVENANCE.txt attribution files added to six vendored dependencies, and stockOfFiles " +
+                   "turns every file into cargo at Math.max(1, round(bytes / 4096)) -- all six are under 1 KB " +
+                   "so each rounds to ZERO and is lifted to one ton",
+            cargoAdded: 6, cargoGood: "docs", attributionBytes: 4049,
+            control: "adding one file entry to draco on today's tree gives deaa019b, WITH OR WITHOUT the " +
+                     "body's `bytes` field updated -- so it is the file list, not the size" }),
+    ]),
+    current: "df581d2d",
+    // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
+    // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
+    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 15, movedTheHash: 0,
+        note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates" }),
+    staleFor: 42,             // shipped changelog entries strictly after v4416 up to v4459, COUNTED not subtracted
+    // The gate reads the file and compares. Writing is behind --write, and the default mode is asserted to
+    // have left the bytes alone -- v3698's rule, the one claimCheck states about itself: A LOOP THAT BOTH
+    // WRITES THE RECORD AND GRADES IT CAN MARK ITS OWN WORK PASSED.
+    writeIsExplicit: "node tools/ship/universeWire-selfcheck.mjs --write",
+    notClaimed: "that df581d2d is right on any engine but this one. It is Node/V8 here, and the cross-engine " +
+                "answer is still a person on Firefox or Safari reading the page's line -- unchanged from " +
+                "v4316. What changed is that the file they read is now the COMMITTED key rather than one " +
+                "this gate wrote a second earlier.",
+});
 export function hashKey(makeEconomy, { seed = 7, ticks = 400, dt = 0.25, today = KEY_TODAY } = {}) {
     const e = makeEconomy(seed, today);
     for (let i = 0; i < ticks; i++) e.step(dt);
