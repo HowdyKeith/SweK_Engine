@@ -1409,6 +1409,12 @@ export const INSTRUMENTS = [
         key: "*** A DISC IN THE ORBIT PLANE IS AN ELLIPSE UNDER ANY TILT AND CARRIES NO NORMAL; A SPHERE LIT FROM WHERE SWEK SITS SAYS WHICH WAY IS UP. *** The key is arithmetic, not the other backend: sabotage C left the picture right and the twin wrong and the gate went red either way, which a backend-to-backend diff cannot do.",
     },
     {
+        id: "orbit-camera", area: "method", name: "The 3D orrery's camera: drag, dolly and follow as pure arithmetic on a frozen state",
+        gate: "tools/ship/orbitCamera-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "render/orbitCamera.mjs: a drag turns the yaw by exactly dx times radiansPerPixel and tips the pitch, clamped short of the poles; a wheel dollies by exactly dollyPerNotch per notch, compounding, clamped to the state's limits; the eye is |distance| from the target through fifty drags; the target projects to (0, 0) in NDC through gpuDriven's own lookAt and perspective at four states; following moves the eye rigidly; the tilt slider maps to a pitch and back; orrery-gpu.html's wiring read from the page.",
+        key: "*** THE POLE CLAMP IS FOR SOMETHING MEASURED, NOT A RULE FOR ITS OWN SAKE. *** gpuDriven's lookAt at the pole has a zero x axis (the control computes it unclamped), and the v4299 camera could reach exactly that at tilt 0.",
+    },
+    {
         id: "brain-kernels", area: "method", name: "The GPU Brain's kernels exported, in the corpus, and graded where every other GPU gate runs",
         gate: "tools/ship/brainKernels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "brain/mlp.js renders one body in two binding layouts (the brain's and the harnesses') and exports both with a probe manifest; the probe layout on Dawn returns render/brainTsl.mjs's f32 twin bit for bit (128 of 128, a 2-D dispatch); the shipped layout bound by the brain's own names through gfx/device.js returns the same bytes on the browser's WebGPU; brain/flowfield.js exports its four-entry module and it compiles on Dawn; tools/ship/brainTsl-page.js imports the kernel instead of regexing the module's source; brain/gpu.js's initGPU refuses a SwiftShader adapter by default and accepts it under allowSoftware or SWEK_ALLOW_SOFTWARE_GPU, reporting `software`, exercised on a stubbed adapter both ways.",

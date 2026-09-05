@@ -52,7 +52,7 @@
   <div><b>SweK orrery, GPU-driven</b> &mdash; <span id="route">starting&hellip;</span></div>
   <div id="bodies"></div>
   <div>
-    <label>tilt <input id="tilt" type="range" min="0" max="80" value="35"></label>
+    <label>tilt <input id="tilt" type="range" min="0" max="80" value="35"></label> <span style="color:#9fb8a8">drag turns, wheel dollies, click a body to follow it, click space to stop</span>
     <label>days/s <input id="speed" type="range" min="0" max="40" value="8"></label>
     <label><input id="occ" type="checkbox" checked> occlusion (WebGPU)</label>
   </div>
@@ -69,12 +69,13 @@
 </div>
 <script type="module">
 import { buildOrrery } from "./world/orrery.mjs";
-import { extentOf, slowestPeriod, positionAt } from "./world/orreryView.mjs";
+import { extentOf, slowestPeriod, positionAt, positionAt3 } from "./world/orreryView.mjs";
 import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import { discLadderThresholds } from "./render/lodBudget.mjs";
 import { makeOrbitSource } from "./render/gpuOrbits.mjs";
 import { sphereMesh, litPipelineDesc, litBind, LIGHT_AT_CENTRE } from "./render/litSphere.mjs";
+import { makeOrbitState, dragged, dollied, withPitch, followed, retargeted, eyeOf, pitchFromTilt, fitDistance, clipPlanes, UP } from "./render/orbitCamera.mjs";
 import { makeGitEconomy } from "./world/gitEconomy.mjs";
 import { standardFleets, fleetsForNames, userModelSources, loadUserModel, RACES } from "./render/fleets.mjs";
 import { makePeer, broadcastWire } from "./world/economyLockstep.mjs";
@@ -287,14 +288,33 @@ function flyYou(now) { const dt = Math.min(0.05, (now - lastFlight) / 1000); las
     const sc = cockpit.screen(), near = s.landed ? null : flight.nearest(economy.markets, (m) => { const p = positionAt(m.body, economy.t); return [p.x, p.y]; });
     document.getElementById("cockpit").textContent = sc ? `landed at ${sc.market}: ${sc.credits} cr, hold ${sc.held}/${sc.holdTons}; ` + sc.goods.map((g) => `${g.good} ${g.price} (buy ${g.canBuy}, sell ${g.canSell})`).join(", ") + " -- B buys, S sells, L launches"
         : `you: ${s.store.get("credits")} cr, ${near ? "over " + near.name + " -- L lands" : "flying (arrows)"}`; }
-cv.addEventListener("pointermove", (e) => { const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d]; });
 const ext = Math.max(1, extentOf(system)), span = slowestPeriod(system) / 24;
+// v4475 -- THE ORBIT CAMERA (render/orbitCamera.mjs): drag to turn, wheel to dolly, click a body to follow it, the tilt
+// slider the initial pitch and a second way to set it. The state is pure; this page only owns the events.
+const tiltEl = document.getElementById("tilt");
+let orbit = makeOrbitState({ yaw: 0, pitch: pitchFromTilt(Number(tiltEl.value)), distance: fitDistance(ext), distMin: ext * 0.15, distMax: ext * 12 });
+let drag = null, lastHit = null;   // drag = { x, y, moved }; lastHit = the body under the pointer at the last pick
+cv.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; try { cv.setPointerCapture(e.pointerId); } catch (err) {} });
+cv.addEventListener("pointermove", (e) => {
+    const d = window.devicePixelRatio || 1; pointer = [e.clientX * d, e.clientY * d];
+    if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy); orbit = dragged(orbit, dx, dy); }
+});
+const endDrag = (e) => {
+    if (!drag) return;
+    // a click (no real drag) on a body follows it; on nothing, stops following and holds the target where it is
+    if (drag.moved < 4 && !landing.on) orbit = followed(orbit, lastHit && lastHit.id > 0 ? lastHit.id : null, lastHit && lastHit.id > 0 ? null : orbit.target);
+    drag = null;
+};
+cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("wheel", (e) => { e.preventDefault(); orbit = dollied(orbit, e.deltaY); }, { passive: false });
+tiltEl.addEventListener("input", () => { orbit = withPitch(orbit, pitchFromTilt(Number(tiltEl.value))); });
 let t = economy.t, last = performance.now();
 function camera() {
-    const tilt = Number(document.getElementById("tilt").value) * Math.PI / 180, dist = ext * 2.4;
-    const eye = [0, Math.sin(tilt) * dist, Math.cos(tilt) * dist];
+    // a followed body's place NOW, through the same positionAt3 the kernel mirrors (record 0 is SweK, at the origin)
+    if (orbit.follow != null) { const b = system.bodies[orbit.follow - 1]; const p = b ? positionAt3(b, t) : { x: 0, y: 0, z: 0 }; orbit = retargeted(orbit, [p.x, p.y, p.z]); }
+    const eye = eyeOf(orbit), { near, far } = clipPlanes(orbit, ext);
     const aspect = cv.width / Math.max(1, cv.height);
-    const proj = G.perspective(0.9, aspect, 0.1, dist * 4), view = G.lookAt(eye, [0, 0, 0], [0, 0, -1]);
+    const proj = G.perspective(0.9, aspect, near, far), view = G.lookAt(eye, orbit.target, UP);
     return { eye, proj, view, viewProj: G.multiply(proj, view) };
 }
 let frames = 0;
@@ -335,6 +355,7 @@ async function frame(now) {
             let hit = life ? await lifeScene.pick(pointer[0], pointer[1]) : null;
             document.getElementById("pick").textContent = hit ? `[${hit.fleetName}: ${RACES[hit.fleet].architecture}] ` + economy.describe(hit.id)
                 : ((hit = await scene.pick(pointer[0], pointer[1])) ? `${bodyNames[hit.id]}${hit.id ? " -- " + Object.entries(economy.markets[hit.id - 1].trade).map(([g, p]) => g + " " + p).join(", ") : ""}` : "nothing under the pointer");
+            lastHit = hit && !life ? hit : (hit && life && hit.fleetName == null ? hit : null);   // v4475 -- a body under the pointer, for click-to-follow (a trader is not a body)
             if (hit && !life && hit.id > 0) { landing.last = hit.id; if (document.getElementById("landmode").checked) landOn(hit.id); }
             else if (hit && life) { /* a trader */ } else if (!hit) {}
         } catch (e) { document.getElementById("pick").textContent = "pick failed: " + e.message; }

@@ -486,7 +486,14 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         unrolled into it, which it always did. NOT CLAIMED: eccentricity; the economy's distances, which stay in the
         ecliptic projection (world/gitEconomy.mjs positionOf reads positionAt).
      3. (task 34) An orbit camera: drag to rotate, wheel to dolly, follow a picked body -- pure functions gated headless,
-        the tilt slider kept as the initial pitch.
+        the tilt slider kept as the initial pitch. BUILT at v4475: render/orbitCamera.mjs -- a frozen state (yaw, pitch,
+        distance, target, follow) and dragged / dollied / withPitch / followed / retargeted / eyeOf, orbiting about +z,
+        the ecliptic's north; the pitch stops short of the poles because gpuDriven's lookAt collapses to a zero basis
+        there (measured: the old camera could reach it at tilt 0). tools/ship/orbitCamera-selfcheck.mjs holds the
+        arithmetic: a drag turns by exactly the stated radians, a dolly scales by exactly the factor, the eye stays on
+        its sphere through fifty drags, the target projects to (0, 0) through gpuDriven's own matrices, following
+        moves the eye rigidly. orrery-gpu.html: drag, wheel, click a body to follow it (retargeted each frame to
+        positionAt3), click space to stop; the slider is the initial pitch. NOT CLAIMED: inertia, touch, roll.
      4. (task 35) Importer moons and reached flybys as GPU records through the same cull and ladder, picked by name,
         held to the 2D page's CPU positions.
      5. (task 36) Slug labels on the device path (steps 7.3 and 7.5's modules) for picked and near bodies.

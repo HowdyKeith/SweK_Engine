@@ -2141,6 +2141,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and not this round's: orreryView-selfcheck's bake-drift check is red on trunk (orrery.json's arrivals and " +
                  "shas against git after v4414's commit); the bake is the rig's to rewrite.",
     }),
+    // v4475 -- the ninety-seventh closing. The orbit camera: three gestures as arithmetic.
+    since97: Object.freeze({
+        at: "v4475", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/orbitCamera-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green headless, ~0.2 s, no browser. render/orbitCamera.mjs: a frozen state and pure functions -- a drag " +
+                 "turns the yaw by exactly dx times radiansPerPixel and tips the pitch, clamped short of the poles; a wheel " +
+                 "dollies geometrically, clamped to the state's limits; eyeOf is on the sphere about the target through " +
+                 "fifty drags; the target projects to (0, 0) through gpuDriven's own lookAt and perspective; following " +
+                 "moves the eye rigidly. The pole clamp is for something measured: lookAt at the pole has a zero x axis. " +
+                 "orrery-gpu.html wires drag, wheel, click-to-follow (retargeted to positionAt3 each frame) and the tilt " +
+                 "slider as the initial pitch; gpuOrbits-selfcheck still loads the page and sees it move. Sabotages red " +
+                 "at 4 / 4 / 1 by name. Found while building: a dolly overflowing to Infinity was defaulting to 10 rather " +
+                 "than clamping to the limit; an infinite request now clamps and only a NaN defaults.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
