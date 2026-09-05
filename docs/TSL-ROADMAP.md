@@ -378,8 +378,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         finalize passes were WebGL2 transform-feedback shaders no single context could run beside the WebGPU solve.
         NOT CLAIMED: a GPU pair finder (contact reads the prediction back once per frame, because the pairs must be
         SORTED before anything downstream sees them), and physics-lab.html, which still draws the CPU solver.
-     2. (task 25) hmcGpu.mjs and mpm/gpuKernel.mjs on the headless Dawn device; both gates still say there is no GPU
-        in the sandbox, which has been false since v4292.
+     2. (task 25) hmcGpu.mjs and mpm/gpuKernel.mjs on the headless Dawn device; both gates said there is no GPU in
+        the sandbox, which had been false since v4292. BUILT at v4466. HMC: the kernel's step text is written once
+        and rendered in two binding layouts (the shipped one, byte-identical to before, and the harness's), the
+        seeded 4,096-chain batch runs on Dawn and the CPU adjudicator passes it at 3.1e-6 against the earned 5e-5;
+        the corpus holds the two backends to it on 16,384 floats. MPM: the four stages run on the browser's WebGPU
+        through gfx/device.js (physics/mpm/mpmDevice.mjs) with the atomics contended for real, AND THE INTERPRETER'S
+        f64 HAD BEEN HIDING THE RETURN MAP -- free fall 1.55e-4 relative off the graded loop, because F = U Sc V was
+        rebuilt through the rasteriser's cos (4.5e-5 off at pi/4) and every resting particle dilated by 1.000126 a
+        step. svd2 is trig-free now (stable half-angles, + - * / sqrt) and skips the round trip when nothing was
+        clamped: 2.9e-8 / 7.4e-8 / 7.4e-8 relative in the three scenes, the free-fall key at 2.9e-7 with drift
+        exactly zero, two contended runs bit-identical. gfx/device.js answers a binding's `used` per entry point,
+        which is what a multi-entry module's auto layouts need and what mpm-gpu-check.html had wrong as written.
      3. (task 26) physics/ GPU kernels built through device.compute() instead of raw pipelines.
      4. (task 27) The probe convention (packUniforms + probeCpu + keyCpu) on every WebGPU physics module, with a
         census check, instead of three modules of thirty.

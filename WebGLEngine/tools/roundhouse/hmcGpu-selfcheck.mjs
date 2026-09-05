@@ -1,16 +1,21 @@
 // tools/roundhouse/hmcGpu-selfcheck.mjs — v3282
 //
-// Run: node tools/roundhouse/hmcGpu-selfcheck.mjs   (~0.1s — MEASURED)
+// Run: node tools/roundhouse/hmcGpu-selfcheck.mjs   (~0.1s for sections 1-5, MEASURED; section 6 adds a Dawn run)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // What can be gated WITHOUT a GPU, gated: (1) the f64 flat mirror is BIT-IDENTICAL to the shipping leapfrog in
 // physics/hmc/hmc.js, so this file is not a second drifting definition of the step; (2) the f32 floor is
 // RE-MEASURED every run and must sit under the device tolerance — the earned-tolerance rule, enforced forever;
 // (3) a sabotaged kernel mirror (one sign flipped) is caught by the adjudicator; (4) the WGSL text keeps its
-// specified-operations-only promise. The real device run happens on hmc-bench.html and its verdict is
-// recomputed by adjudicateDeviceRun from raw endpoints — never taken from the device.
+// specified-operations-only promise.
+//
+// v4466 -- AND WHAT NEEDED A GPU IS GATED TOO, BECAUSE THE SANDBOX HAS HAD ONE SINCE v4292. Section 6 runs the
+// kernel's step text on the headless Dawn device over the seeded 4096-chain batch and grades the endpoints with
+// adjudicateDeviceRun -- hmc-bench.html's route, on this box, every run. The verdict is still recomputed from raw
+// endpoints, never taken from the device; the page remains where a REAL vendor gets its verdict.
 
-import { WGSL_HMC, HMC_FIXTURE, HMC_TOL, F32_FLOOR_HMC, leapfrogF64Flat, leapfrogF32, fixtureInv, makeBatch, measureF32Floor, adjudicateDeviceRun, shippingLeapfrogEndpoint } from "./hmcGpu.mjs";
+import { WGSL_HMC, WGSL_HMC_PROBE, HMC_STEP_WGSL, hmcKernelWgsl, probeUniforms, HMC_FIXTURE, HMC_TOL, F32_FLOOR_HMC, leapfrogF64Flat, leapfrogF32, fixtureInv, makeBatch, measureF32Floor, adjudicateDeviceRun, shippingLeapfrogEndpoint } from "./hmcGpu.mjs";
+import { runWgslComputeNative, headlessGpuSkipReason } from "../ship/headlessGpu.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -83,6 +88,39 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
     const a = makeBatch(64, 5), b = makeBatch(64, 5);
     let same = true; for (let i = 0; i < a.qin.length; i++) if (a.qin[i] !== b.qin[i] || a.pin[i] !== b.pin[i]) same = false;
     ok("seeded batches are bit-identical (device runs are reproducible end to end)", same);
+}
+
+// ---- 6. v4466 -- THE KERNEL ON A REAL DEVICE, HERE. The header used to say the sandbox has no GPU; it has had the
+// headless Dawn device since v4292. The probe layout (WGSL_HMC_PROBE, the same step text as the shipped kernel) runs
+// the seeded 4096-chain batch on it and the CPU adjudicator grades the endpoints -- the bench page's route, on this
+// box, every run. The verdict comes from adjudicateDeviceRun, never from the device.
+{
+    const skip = headlessGpuSkipReason();
+    if (skip) { console.log("  SKIP  " + skip); fails++; }
+    else {
+        ok("!! the shipped kernel and the probe layout carry ONE step text", WGSL_HMC.includes(HMC_STEP_WGSL) && WGSL_HMC_PROBE.includes(HMC_STEP_WGSL) && WGSL_HMC === hmcKernelWgsl({ probe: false }),
+           "hmcKernelWgsl renders both layouts around HMC_STEP_WGSL; the shipped string is the non-probe rendering");
+        const c = await runWgslComputeNative({ code: WGSL_HMC, outCount: 1, compileOnly: true });
+        ok("!! the SHIPPED kernel compiles on Dawn", c.ok, c.ok ? c.adapter.description : c.reason + " " + (c.errors || []).join(" | "));
+        const { qin, pin, n } = makeBatch(4096, 77);
+        const r = await runWgslComputeNative({ code: WGSL_HMC_PROBE, outCount: 4 * n, uniforms: probeUniforms(n), workgroups: Math.ceil(n / 64),
+                                               inputs: [{ binding: 2, data: qin }, { binding: 3, data: pin }] });
+        ok("!! the probe layout ran the 4096-chain batch on the headless device", r.ok, r.ok ? "" : r.reason + " " + (r.errors || []).join(" | "));
+        if (r.ok) {
+            const qout = new Float32Array(2 * n), pout = new Float32Array(2 * n);
+            for (let i = 0; i < n; i++) { qout[2 * i] = r.values[4 * i]; qout[2 * i + 1] = r.values[4 * i + 1]; pout[2 * i] = r.values[4 * i + 2]; pout[2 * i + 1] = r.values[4 * i + 3]; }
+            const v = adjudicateDeviceRun(qin, pin, qout, pout, n);
+            ok("!! *** THE DEVICE RUN PASSES THE CPU ADJUDICATOR -- every chain inside the earned tolerance ***", v.pass, "worst |f64 - device| " + v.worst.toExponential(3) + " over " + n + " chains, " + v.bad + " out of tolerance " + HMC_TOL.toExponential(1));
+            const inv = fixtureInv(), { mu, eps, L } = HMC_FIXTURE;
+            let same = 0, worst32 = 0;
+            for (let i = 0; i < n; i++) { const m = leapfrogF32(qin[2 * i], qin[2 * i + 1], pin[2 * i], pin[2 * i + 1], inv, mu, eps, L);
+                const got = [qout[2 * i], qout[2 * i + 1], pout[2 * i], pout[2 * i + 1]];
+                for (let k = 0; k < 4; k++) { if (got[k] === m[k]) same++; worst32 = Math.max(worst32, Math.abs(got[k] - m[k])); } }
+            console.log("  ----  against the f32 mirror: " + same + " of " + (4 * n) + " endpoint values bit-identical, worst " + worst32.toExponential(3) +
+                        " (measured, not asserted: tslPhysics-selfcheck found the browser's WebGPU 1.371e-6 from the mirror at v4370, and this is the same rasteriser)");
+            ok("...and the device is not the mirror's copy: the batch actually moved", (() => { let d = 0; for (let i = 0; i < 2 * n; i++) d = Math.max(d, Math.abs(qout[i] - qin[i])); return d > 0.1; })());
+        }
+    }
 }
 
 console.log(fails ? ("[hmcGpu-selfcheck] FAILED " + fails) : "[hmcGpu-selfcheck] all passed");

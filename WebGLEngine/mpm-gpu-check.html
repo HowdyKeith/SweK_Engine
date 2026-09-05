@@ -131,10 +131,16 @@ async function gpuRun(dev, { block = {}, walls = null, mode = 1, steps = 60 } = 
     { binding: 2, resource: { buffer: bufAcc } }, { binding: 3, resource: { buffer: bufGv } },
     { binding: 4, resource: { buffer: bufFlags } },
   ];
+  // v4466 -- PER STAGE, NOT THE SAME FIVE ENTRIES FOR ALL FOUR. A layout: "auto" pipeline holds only the bindings its
+  // entry point reaches (clear touches P and acc; grid never sees parts), and a bind group carrying a binding the
+  // layout lacks is a VALIDATION ERROR -- so as first written this page could not have run a single stage on a real
+  // device. Found when the kernel first ran through gfx/device.js (tools/ship/mpmDevice-selfcheck.mjs), whose
+  // per-entry usage scan is the same rule, applied by name.
+  const USES = { clear: [0, 2], p2g: [0, 1, 2, 4], grid: [0, 2, 3], g2p: [0, 1, 3] };
   const pipes = {}, binds = {};
   for (const stage of ["clear", "p2g", "grid", "g2p"]) {
     pipes[stage] = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: stage } });
-    binds[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries });
+    binds[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries: entries.filter((e) => USES[stage].includes(e.binding)) });
   }
 
   const wg = (x) => Math.ceil(x / 64);

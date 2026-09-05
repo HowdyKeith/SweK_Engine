@@ -14,11 +14,24 @@
 // earns the discrete free-fall parabola by itself at 4.7e-6 over 120 steps with a sideways drift of exactly
 // zero, and two identical runs come back BIT-IDENTICAL.
 //
-// *** WHAT THAT STILL DOES NOT ESTABLISH, AND IT IS THE INTERESTING HALF. *** An interpreter is not a driver.
+// *** WHAT THAT STILL DID NOT ESTABLISH, AND IT WAS THE INTERESTING HALF. *** An interpreter is not a driver.
 // It does not prove the shader COMPILES on real hardware, it runs invocations one after another so IT CANNOT
-// SEE A RACE, and it does not reproduce a vendor's f32. The LBM kernel had the same shape of problem at v2977
-// and the answer was an adjudicator that runs on Keith's machine: mpm-gpu-check.html does that here, and until
-// it has been opened once the honest status of this file is CORRECT ON AN INTERPRETER, UNTRIED ON A GPU.
+// SEE A RACE, and it does not reproduce a vendor's f32. Until v4466 the honest status of this file was CORRECT
+// ON AN INTERPRETER, UNTRIED ON A GPU.
+//
+// *** v4466 -- RUN ON A GPU, THROUGH gfx/device.js (physics/mpm/mpmDevice.mjs), AND THE INTERPRETER'S f64 HAD BEEN
+// HIDING TWO THINGS. *** tools/ship/mpmDevice-selfcheck.mjs runs the four stages on the browser's WebGPU with the
+// atomics contended for real. First run: free fall 1.55e-4 relative off the graded loop, not the interpreter's
+// 1.6e-7, and the sideways drift 3.7e-7 rather than zero. Cause: the return map rebuilt F = U Sc V every step
+// through cos and sin, and this rasteriser's cos(pi/4) is 0.70715135 (4.5e-5 off), so a particle at rest -- whose
+// SVD is free to pick any rotation pair and whose atan2 picked +-pi/2 -- dilated by cos^2 + sin^2 = 1.000126
+// PER STEP. In f64 that number is 1 to 1e-16. Two repairs, both in svd2's text: the round trip is skipped when
+// the clamp changed nothing, and the rotations are built from half-angles with + - * / sqrt only (stably: the
+// direct half-angle formula loses a small angle to cancellation in f32, found on the second run at 2.85e-4).
+// MEASURED after: all three scenes within 7.4e-8 relative of the graded loop over 15 steps, the free-fall key at
+// 2.9e-7 over 120 with drift EXACTLY zero, and two contended runs bit-identical. mpm-gpu-check.html stays the
+// page for a REAL vendor's f32; its bind groups are per stage now (one five-entry group for all four stages was a
+// validation error on any real device, found the same round).
 //
 // *** AND THE FIRST THING THE INTERPRETER FOUND WAS A BUG IN ITSELF. *** It disagreed with the CPU loop by
 // exactly one particle's mass, and the temptation was to go looking through the scatter. At workgroup_size(64)
@@ -304,20 +317,40 @@ fn mul2(A: vec4<f32>, B: vec4<f32>) -> vec4<f32> {
 }
 fn tr2(A: vec4<f32>) -> vec4<f32> { return vec4<f32>(A.x, A.z, A.y, A.w); }
 
-// *** JAVASCRIPT DEFINES atan2(0, 0) AS 0. WGSL LEAVES IT UNDEFINED. ***
-// That is not a footnote here: an undeformed particle has F = identity, which gives atan2(0, 0) on BOTH
-// half-angles, so on a backend that returns NaN there EVERY PARTICLE AT REST WOULD GO NaN ON THE FIRST STEP
-// and the page would show nothing with no error anywhere. The guard reproduces JavaScript's defined value and
-// touches nothing else -- atan2 is well defined the moment either argument is non-zero.
-fn satan2(y: f32, x: f32) -> f32 {
-    if (x == 0.0 && y == 0.0) { return 0.0; }
-    return atan2(y, x);
+// v4466 -- THE SVD WITHOUT TRIGONOMETRY, BECAUSE THE FIRST REAL DEVICE RUN SHOWED THE DEVICE'S TRIGONOMETRY.
+// plasticity.mjs svd2 takes two atan2 half-angles and rebuilds U and V with cos and sin; transliterated, the kernel
+// did the same, and on the rasteriser both harnesses run cos(pi/4) is 0.70715135 -- 4.5e-5 off, cos(0.3) is 1.4e-4
+// off -- so U V for a matrix with EQUAL singular values (any rotation pair is a valid SVD, atan2 picks +-pi/2) came
+// back as 1.000126 I, and the granular pile drifted from the graded loop by 3.2e-5 relative in fifteen steps. The
+// half-angles are computed here from the same e, f, g, h with + - * / sqrt only: cos(a/2) = sqrt((1 + x/rho)/2) and
+// sin(a/2) = sign(y) sqrt((1 - x/rho)/2) for a = atan2(y, x), then the sum and difference formulas for theta and phi.
+// Specified operations only, which is the rule tools/roundhouse/hmcGpu.mjs states and magmap engineered around; the
+// value of atan2(0, 0), which JavaScript defines as 0 and WGSL does not, no longer arises because the origin is
+// answered by name (cos 1, sin 0 -- the same half-angle JavaScript's 0 gives).
+// *** AND THE HALF-ANGLE FORMULA HAS ITS OWN f32 TRAP, FOUND ON THE SECOND RUN. *** sqrt((1 - cos a)/2) for a small
+// angle is the square root of a cancellation: cos a rounds to 1 - 2^-24 and the sine comes back as 2^-12 whatever
+// the angle was (2.44e-4 for a true 2.7e-4; 2.85e-4 off the CPU on a matrix with entries near 1). So whichever of
+// cos(a/2), sin(a/2) the direct formula computes ACCURATELY (the one away from zero) is computed that way, and the
+// other follows from sin a = 2 sin(a/2) cos(a/2), which divides by the accurate one and never by a small number.
+fn halfAngle(x: f32, y: f32) -> vec2<f32> {
+    let rho = sqrt(x * x + y * y);
+    if (rho == 0.0) { return vec2<f32>(1.0, 0.0); }
+    let cx = clamp(x / rho, -1.0, 1.0);
+    let sy = y / rho;
+    if (cx >= 0.0) {
+        let c = sqrt((1.0 + cx) * 0.5);          // accurate: the cosine of a/2 is at least sqrt(1/2) here
+        return vec2<f32>(c, sy / (2.0 * c));
+    }
+    var s = sqrt((1.0 - cx) * 0.5);              // accurate: the sine of a/2 is at least sqrt(1/2) in size here
+    let c = abs(sy) / (2.0 * s);
+    if (y < 0.0) { s = -s; }
+    return vec2<f32>(c, s);
 }
 
 struct Svd { u: vec4<f32>, s: vec2<f32>, v: vec4<f32> };
 
-// A transliteration of plasticity.mjs svd2, including the sign fix-up that keeps both singular values
-// non-negative by absorbing the sign into U.
+// plasticity.mjs svd2 -- the same e, f, g, h, q, r and the same sign fix-up that keeps both singular values
+// non-negative by absorbing the sign into U -- with the two rotations built from half-angles algebraically.
 fn svd2(A: vec4<f32>) -> Svd {
     let a = A.x; let b = A.y; let c = A.z; let d = A.w;
     let e = (a + d) * 0.5;
@@ -326,12 +359,14 @@ fn svd2(A: vec4<f32>) -> Svd {
     let hh = (c - b) * 0.5;
     let q = length(vec2<f32>(e, hh));
     let r = length(vec2<f32>(f, g));
-    let a1 = satan2(g, f);
-    let a2 = satan2(hh, e);
-    let theta = (a2 - a1) * 0.5;
-    let phi = (a2 + a1) * 0.5;
-    var U = vec4<f32>(cos(phi), -sin(phi), sin(phi), cos(phi));
-    let V = vec4<f32>(cos(theta), -sin(theta), sin(theta), cos(theta));
+    let h1 = halfAngle(f, g);     // cosine and sine of a1/2, where a1 is the angle of (f, g)
+    let h2 = halfAngle(e, hh);    // cosine and sine of a2/2, where a2 is the angle of (e, hh)
+    let ct = h2.x * h1.x + h2.y * h1.y;   // theta = (a2 - a1) / 2
+    let st = h2.y * h1.x - h2.x * h1.y;
+    let cp = h2.x * h1.x - h2.y * h1.y;   // phi = (a2 + a1) / 2
+    let sp = h2.y * h1.x + h2.x * h1.y;
+    var U = vec4<f32>(cp, -sp, sp, cp);
+    let V = vec4<f32>(ct, -st, st, ct);
     var s0 = q + r;
     var s1 = q - r;
     if (s1 < 0.0) { s1 = -s1; U = vec4<f32>(U.x, -U.y, U.z, -U.w); }
@@ -518,9 +553,20 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
         let lo = 1.0 - P.thetaC;
         let hi = 1.0 + P.thetaS;
         let Sc = vec2<f32>(clamp(d.s.x, lo, hi), clamp(d.s.y, lo, hi));
-        F = fromSvd(d.u, Sc, d.v);
-        let inv = mul2(mul2(tr2(d.v), vec4<f32>(1.0 / Sc.x, 0.0, 0.0, 1.0 / Sc.y)), tr2(d.u));
-        Fp = mul2(inv, total);
+        // v4466 -- RECOMPOSE ONLY WHEN THE CLAMP DID SOMETHING. plasticity.mjs rebuilds F = U Sc V every step
+        // and in f64 that is the identity to 1e-16; on a GPU it is not. The first real-device run (SwiftShader
+        // through gfx/device.js) dilated every free-falling particle by 1.26e-4 PER STEP with nothing clamped:
+        // a 1e-9 quantisation ripple in C makes F = I + 1e-12 skew, the SVD of a matrix with equal singular
+        // values is free to pick any rotation pair and atan2 picks +-pi/2, and U V is then cos^2 + sin^2 at pi/4
+        // -- 1.000126 on a rasteriser whose cos(pi/4) is 0.70715135 (4.5e-5 off). An interpreter in f64 could
+        // never show it. Where nothing was clamped the round trip is skipped, which is what the f64 code does
+        // to within its own noise; where something was, U Sc V is the physics and the trig error is the
+        // device's, measured beside it in tools/ship/mpmDevice-selfcheck.mjs.
+        if (Sc.x != d.s.x || Sc.y != d.s.y) {
+            F = fromSvd(d.u, Sc, d.v);
+            let inv = mul2(mul2(tr2(d.v), vec4<f32>(1.0 / Sc.x, 0.0, 0.0, 1.0 / Sc.y)), tr2(d.u));
+            Fp = mul2(inv, total);
+        }
     } else if (P.plasticMode == 2u) {
         // druckerPrager.mjs dpReturn. Fp is NOT tracked by this surface on any projecting path -- the CPU
         // returns null there and step.mjs leaves p.Fp alone -- so Fp is untouched in every branch below.

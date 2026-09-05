@@ -16,10 +16,11 @@
 //                     MEASURED FLOOR, and the tolerance a device must beat is earned from it here, once — not
 //                     widened after the first failure.
 //
-// SCOPE, STATED SO IT CANNOT BE OVERSOLD: the sandbox has no GPU. What is gated headlessly is the WGSL text,
-// the mirror equivalence, and the floor; a real device run (hmc-bench.html) is where a vendor gets its verdict,
-// and that verdict is recomputed by the CPU adjudicator from the returned endpoints — the device reports a
-// measurement, never a verdict, which is the fleet's standing rule.
+// SCOPE, STATED SO IT CANNOT BE OVERSOLD. Until v4466 this paragraph said the sandbox has no GPU; it has had the
+// headless Dawn device (tools/ship/headlessGpu.mjs) since v4292, and the gate now runs the kernel's step text on it
+// over the seeded batch and grades the endpoints with the CPU adjudicator (section 6). What a REAL vendor's f32 does
+// is still hmc-bench.html's question, and that verdict is recomputed by the CPU adjudicator from the returned
+// endpoints — the device reports a measurement, never a verdict, which is the fleet's standing rule.
 "use strict";
 import { leapfrog, gaussian2D } from "../../physics/hmc/hmc.js";
 
@@ -32,16 +33,46 @@ export const HMC_TOL = 5e-5;
 // the fixture the kernel is graded on — the same one every HMC gate uses.
 export const HMC_FIXTURE = { mu: [1, -1], S: [[1, 0.8], [0.8, 1]], eps: 0.18, L: 24 };
 
-export const WGSL_HMC = /* wgsl */ `
-// hmc-leapfrog.wgsl -- one thread per chain: L kick-drift-kick steps over U = 0.5 (q-mu)^T Sinv (q-mu).
-// SPECIFIED OPERATIONS ONLY: + - * /. The gradient is Sinv (q - mu); no transcendentals anywhere, so the only
-// arithmetic in play is IEEE f32 add/mul, which the CPU mirror (Math.fround) reproduces exactly.
-struct Params { i00: f32, i01: f32, i11: f32, mu0: f32, mu1: f32, eps: f32, L: u32, n: u32 };
+// v4466 -- ONE BODY, TWO BINDING LAYOUTS. The bench page and the fleet job bind the kernel as it has always been
+// (uniform 0, qin 1, pin 2, qout 3, pout 4); the cross-backend corpus and the headless harness take ONE out buffer
+// at binding 0 and a float uniform at 1. Rather than a second copy of the leapfrog that could drift, the step text
+// is written once (HMC_STEP_WGSL) and both layouts are rendered around it by hmcKernelWgsl(); the gate asserts the
+// shipped string is byte for byte what it was before the split, and that both renderings contain the same step.
+export const HMC_STEP_WGSL = `  var g = gradU(qx, qy);
+  for (var s: u32 = 0u; s < P.L; s = s + 1u) {
+    px = px - 0.5 * P.eps * g.x;  py = py - 0.5 * P.eps * g.y;   // half kick
+    qx = qx + P.eps * px;         qy = qy + P.eps * py;          // full drift
+    g = gradU(qx, qy);
+    px = px - 0.5 * P.eps * g.x;  py = py - 0.5 * P.eps * g.y;   // half kick
+  }`;
+
+/**
+ * The kernel text. { probe: false } is the shipped layout (WGSL_HMC); { probe: true } is the harness layout: out at
+ * binding 0 holding qx, qy, px, py per chain, a float uniform at 1 (i00, i01, i11, mu0, mu1, eps, L, n), qin at 2
+ * and pin at 3 -- the same arithmetic, so the corpus can hold the two backends to it byte for byte.
+ */
+export function hmcKernelWgsl({ probe = false } = {}) {
+    const decl = probe
+        ? `struct Params { i00: f32, i01: f32, i11: f32, mu0: f32, mu1: f32, eps: f32, L: u32, n: u32 };
+@group(0) @binding(0) var<storage, read_write> out : array<f32>;   // 4*n: qx qy px py per chain
+@group(0) @binding(1) var<uniform> P : Params;
+@group(0) @binding(2) var<storage, read> qin : array<f32>;    // 2*n: q0x q0y per chain
+@group(0) @binding(3) var<storage, read> pin : array<f32>;    // 2*n`
+        : `struct Params { i00: f32, i01: f32, i11: f32, mu0: f32, mu1: f32, eps: f32, L: u32, n: u32 };
 @group(0) @binding(0) var<uniform> P : Params;
 @group(0) @binding(1) var<storage, read> qin : array<f32>;    // 2*n: q0x q0y per chain
 @group(0) @binding(2) var<storage, read> pin : array<f32>;    // 2*n
 @group(0) @binding(3) var<storage, read_write> qout : array<f32>;
-@group(0) @binding(4) var<storage, read_write> pout : array<f32>;
+@group(0) @binding(4) var<storage, read_write> pout : array<f32>;`;
+    const bound = `  if (i >= P.n) { return; }`;
+    const write = probe ? `  out[4u*i] = qx; out[4u*i+1u] = qy; out[4u*i+2u] = px; out[4u*i+3u] = py;`
+                        : `  qout[2u*i] = qx; qout[2u*i+1u] = qy;
+  pout[2u*i] = px; pout[2u*i+1u] = py;`;
+    return `
+// hmc-leapfrog.wgsl -- one thread per chain: L kick-drift-kick steps over U = 0.5 (q-mu)^T Sinv (q-mu).
+// SPECIFIED OPERATIONS ONLY: + - * /. The gradient is Sinv (q - mu); no transcendentals anywhere, so the only
+// arithmetic in play is IEEE f32 add/mul, which the CPU mirror (Math.fround) reproduces exactly.
+${decl}
 
 fn gradU(qx: f32, qy: f32) -> vec2<f32> {
   let dx = qx - P.mu0; let dy = qy - P.mu1;
@@ -51,20 +82,28 @@ fn gradU(qx: f32, qy: f32) -> vec2<f32> {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let i = gid.x;
-  if (i >= P.n) { return; }
+${bound}
   var qx = qin[2u*i]; var qy = qin[2u*i+1u];
   var px = pin[2u*i]; var py = pin[2u*i+1u];
-  var g = gradU(qx, qy);
-  for (var s: u32 = 0u; s < P.L; s = s + 1u) {
-    px = px - 0.5 * P.eps * g.x;  py = py - 0.5 * P.eps * g.y;   // half kick
-    qx = qx + P.eps * px;         qy = qy + P.eps * py;          // full drift
-    g = gradU(qx, qy);
-    px = px - 0.5 * P.eps * g.x;  py = py - 0.5 * P.eps * g.y;   // half kick
-  }
-  qout[2u*i] = qx; qout[2u*i+1u] = qy;
-  pout[2u*i] = px; pout[2u*i+1u] = py;
+${HMC_STEP_WGSL}
+${write}
 }
 `;
+}
+export const WGSL_HMC = hmcKernelWgsl({ probe: false });
+export const WGSL_HMC_PROBE = hmcKernelWgsl({ probe: true });
+
+/**
+ * The probe layout's uniform. The struct is the SHIPPED one -- L and n are u32 -- so the kernel body is the same
+ * text in both layouts; the harnesses carry uniforms as a Float32Array, so the two integers travel as the f32 whose
+ * bits they are (a denormal, which JavaScript copies without flushing) and the shader reads them back as u32.
+ */
+export function probeUniforms(n, { inv = fixtureInv(), mu = HMC_FIXTURE.mu, eps = HMC_FIXTURE.eps, L = HMC_FIXTURE.L } = {}) {
+    const buf = new ArrayBuffer(32), dv = new DataView(buf);
+    [inv[0], inv[1], inv[2], mu[0], mu[1], eps].forEach((v, k) => dv.setFloat32(4 * k, v, true));
+    dv.setUint32(24, L >>> 0, true); dv.setUint32(28, n >>> 0, true);
+    return new Float32Array(buf);
+}
 
 // ---- flat CPU mirrors -------------------------------------------------------------------------------------------
 // rounder r is identity for the f64 reference and Math.fround for the f32 mirror — ONE implementation, one knob,

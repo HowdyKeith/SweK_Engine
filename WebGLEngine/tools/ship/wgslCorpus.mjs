@@ -58,6 +58,9 @@ import { packAtlas, packGlyphLoc, packGlyphFlags } from "../../text/slugAtlas.js
 import { testFontBytes } from "../../text/slugTestFont.mjs";
 // v4465 -- the cloth pillar's GPU path, the first physics/ module on gfx/device.js
 import * as XP from "../../physics/xpbd/xpbdWgsl.mjs";
+// v4466 -- the two physics kernels whose gates said "no GPU here": the HMC leapfrog (probe layout) and the MPM module
+import { WGSL_HMC_PROBE, probeUniforms as hmcProbeUniforms, makeBatch as hmcBatch } from "../roundhouse/hmcGpu.mjs";
+import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
@@ -325,6 +328,13 @@ export function corpus() {
         { id: "xpbdWgsl.finalizeWgsl", from: "physics/xpbd/xpbdWgsl.mjs",
           why: "the finalize pass: velocity from prediction minus the saved position, position committed",
           opts: xpbdCases().finalize },
+        // v4466 -- the HMC leapfrog over the seeded 4096-chain batch (24 steps each), and the MPM module's four entry points
+        { id: "hmcGpu.WGSL_HMC_PROBE", from: "tools/roundhouse/hmcGpu.mjs",
+          why: "the fleet's HMC bench kernel in the harness layout: 4096 chains x 24 kick-drift-kick steps of specified operations only, the deepest loop over the most chains in the corpus",
+          opts: (() => { const { qin, pin, n } = hmcBatch(4096, 77); return { code: WGSL_HMC_PROBE, outCount: 4 * n, uniforms: hmcProbeUniforms(n), workgroups: Math.ceil(n / 64), inputs: [{ binding: 2, data: qin }, { binding: 3, data: pin }] }; })() },
+        { id: "gpuKernel.MPM_WGSL", from: "physics/mpm/gpuKernel.mjs", compileOnly: true,
+          why: "the 2D MPM loop: four entry points over five shared buffers, two of them atomic -- outside the one-buffer signature, driven by tools/ship/mpmDevice-selfcheck.mjs through the device; compiled on both here",
+          opts: { code: MPM_WGSL, entryPoint: "p2g", compileOnly: true, outCount: 0 } },
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },

@@ -427,11 +427,15 @@ console.log("\n7. THE STRUCTURE A READER CANNOT CHECK WITHOUT HARDWARE, CHECKED 
     const force = code.indexOf("(fx / m) * P.dt");
     ok("...and the stress kick lands between them, as step.mjs orders it", force > divide && force < gravity);
 
-    ok("!! *** atan2 IS GUARDED, BECAUSE WGSL LEAVES atan2(0,0) UNDEFINED AND JAVASCRIPT DEFINES IT AS 0 ***",
-        /fn satan2/.test(code) && !/[^s]atan2\(g, f\)/.test(code) && /return atan2\(y, x\)/.test(code),
-        "an undeformed particle has F = identity, which hits atan2(0,0) on BOTH half-angles -- so on a backend " +
-        "returning NaN there, EVERY PARTICLE AT REST WOULD GO NaN ON STEP ONE and the page would show an empty " +
-        "canvas with no error anywhere");
+    // v4466 -- the guard this check used to assert (satan2, for WGSL's undefined atan2(0,0)) is gone with the atan2:
+    // the first real-device run (tools/ship/mpmDevice-selfcheck.mjs) showed the rasteriser's cos(pi/4) 4.5e-5 off,
+    // which turned U V for a particle at rest into 1.000126 I every step. The SVD's rotations are built from
+    // half-angles with + - * / sqrt only now, and the origin is answered by name inside halfAngle.
+    ok("!! *** THE SVD USES NO TRIGONOMETRY: no atan2, cos or sin anywhere in the kernel ***",
+        !/\batan2\(|\bcos\(|\bsin\(/.test(code) && /fn halfAngle/.test(code) && /if \(rho == 0\.0\) \{ return vec2<f32>\(1\.0, 0\.0\); \}/.test(code),
+        "a rotation pair from a vendor's cos and sin is only as orthonormal as that vendor's cos^2 + sin^2, and on " +
+        "SwiftShader that is 1.000126 at pi/4; the half-angle algebra has no such number in it, and atan2(0,0) -- " +
+        "undefined in WGSL, 0 in JavaScript -- is answered by name at the origin");
 
     ok("!! the scatter counts saturation rather than wrapping quietly",
         /atomicAdd\(&flags\[0\], 1u\)/.test(code) && /clamp\(x, -CLIP, CLIP\)/.test(code),
@@ -515,14 +519,16 @@ report("THE KERNEL HAS BEEN RUN, AND HERE IS WHAT IT DID",
     "The harness is NOT gated -- it needs an npm package that is not in the tree, and a gate that fails for a " +
     "missing dependency teaches you to ignore gates.");
 
-report("WHAT THIS GATE STILL CANNOT DO",
-    "IT CANNOT RUN THE KERNEL. There is no GPU and no browser here, so nothing above is evidence that the " +
-    "shader COMPILES, that the atomics are contended correctly, or that the dispatch order is right. What is " +
-    "established is that the stencil is numerically identical to the graded modules, that the quantisation " +
-    "costs the free-fall key about 2.6e-7 against f32's own 4.2e-7, that the range covers the measured peaks " +
-    "with " + HEADROOM + "x to spare, and that nothing else was retyped. *** THE REST IS mpm-gpu-check.html'S " +
-    "JOB AND IT NEEDS KEITH'S HARDWARE. Until that page has been opened once, the honest status of this kernel " +
-    "is UNRUN. ***");
+report("WHAT THIS GATE STILL CANNOT DO, AND WHAT DOES IT SINCE v4466",
+    "IT CANNOT RUN THE KERNEL: this gate is CPU-only and reads source. What is established here is that the " +
+    "stencil is numerically identical to the graded modules, that the quantisation costs the free-fall key about " +
+    "2.6e-7 against f32's own 4.2e-7, that the range covers the measured peaks with " + HEADROOM + "x to spare, " +
+    "and that nothing else was retyped. *** THE KERNEL IS RUN, ON A GPU, BY tools/ship/mpmDevice-selfcheck.mjs " +
+    "(v4466): the four stages on the browser's WebGPU through gfx/device.js, all three scenes within 7.4e-8 " +
+    "relative of step.mjs over 15 steps, the free-fall key at 2.9e-7 with drift exactly zero, and contended " +
+    "atomics bit-identical run to run. The first such run found the trig-built SVD dilating every resting " +
+    "particle by 1.26e-4 per step -- which is why svd2 is trig-free now. mpm-gpu-check.html remains the page " +
+    "for a real vendor's f32. ***");
 
 console.log("\ngpuKernel-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

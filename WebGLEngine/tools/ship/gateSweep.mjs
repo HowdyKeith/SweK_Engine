@@ -1963,6 +1963,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "files found by writing the mirror: contact did not accumulate lambda where the twin does, and the " +
                  "predict/finalize passes were WebGL2 transform feedback no WebGPU context could run.",
     }),
+    since88: Object.freeze({
+        at: "v4466", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/mpmDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/roundhouse/hmcGpu-selfcheck.mjs (8 checks -> 14: the kernel on the headless device, adjudicated)",
+                                "tools/ship/crossBackend-selfcheck.mjs (the HMC probe layout, 16384 floats identical; the MPM module compiled on both)",
+                                "physics/mpm/gpuKernel-selfcheck.mjs (the atan2-guard check becomes the no-trigonometry check)"]),
+        verdict: "green on the headless Dawn device and on the browser's WebGPU through gfx/device.js. Two gates had said " +
+                 "there is no GPU in the sandbox since v3282 and v3809; there has been one since v4292. HMC: the kernel's " +
+                 "step text in a harness layout runs the seeded 4096-chain batch on Dawn and the CPU adjudicator passes it " +
+                 "(worst 3.1e-6 against 5e-5), the shipped string byte-identical to before. MPM: the four stages on the " +
+                 "browser's WebGPU with contended atomics -- and THE INTERPRETER'S f64 HAD BEEN HIDING THE RETURN MAP: " +
+                 "free fall came back 1.55e-4 relative off the graded loop because F = U Sc V was rebuilt through this " +
+                 "rasteriser's cos (4.5e-5 off at pi/4), dilating every resting particle by 1.000126 per step. svd2 is " +
+                 "trig-free now and skips the unclamped round trip: 2.9e-8 / 7.4e-8 / 7.4e-8 relative in the three " +
+                 "scenes, the key at 2.9e-7, drift exactly zero, reruns bit-identical. gfx/device.js answers `used` per " +
+                 "entry point (a multi-entry module's auto layouts differ), which also found mpm-gpu-check.html binding " +
+                 "five entries to every stage -- a validation error on any real device. Sabotages red at 7 / 2 / 6; B " +
+                 "went 0 red the first time and earned a section over 2,007 matrices.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

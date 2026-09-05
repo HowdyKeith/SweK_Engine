@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "mpm-device", area: "fluids", name: "The MPM kernel on a GPU, through the device, held to the graded loop",
+        gate: "tools/ship/mpmDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "physics/mpm/gpuKernel.mjs's four stages on the browser's WebGPU through physics/mpm/mpmDevice.mjs: free fall, the collapsing column and the Drucker-Prager pile against physics/mpm/step.mjs particle by particle over 15 steps (a-priori 1e-5 relative, from the interpreter's record), the discrete free-fall parabola over 120 steps within 1e-4 with drift exactly zero, two contended runs bit-identical; the module compiling on Dawn; the null backend's per-stage bindings and dispatch count.",
+        key: "*** THE INTERPRETER'S f64 HAD BEEN HIDING TWO THINGS. *** First real-device run: free fall 1.55e-4 relative off the graded loop and a nonzero drift, because the return map rebuilt F = U Sc V through this rasteriser's cos (4.5e-5 off at pi/4) and a resting particle dilated by 1.000126 per step. svd2 is trig-free now and skips the round trip when nothing was clamped: all three scenes within 7.4e-8 relative, drift exactly zero.",
+    },
+    {
         id: "xpbd-device", area: "soft bodies", name: "The cloth pillar's GPU path, run through the device and held to the CPU solver",
         gate: "tools/ship/xpbdDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "physics/xpbd/xpbdWgsl.mjs on the headless Dawn device (each kernel against an f32 mirror of clothLoop, word for word), in the browser through gfx/device.js on WebGPU (40 frames within an a-priori 1e-4 of the f64 solver, deterministic across runs and a within-color shuffle, contact pairs found and solved) and on WebGL2 (the shipped twin, byte for byte); the mirror at f64 pinned to clothLoop by hash; the null backend's dispatch count per frame.",

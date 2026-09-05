@@ -161,11 +161,40 @@ const CPU_TWIN = "render/gpuDriven.mjs cullLodCpu() produces the same per-LOD in
 
 
 /** v4461 -- which declared bindings the shader statically references; see the WebGPU backend's note at classify(). */
-function usedNames(wgsl, all) {
+function usedNames(wgsl, all, entryPoints = null) {
     let code = wgsl.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
     code = code.replace(/@group\s*\(\s*\w+\s*\)\s*@binding\s*\(\s*\w+\s*\)\s*var\s*(?:<[^>]*>)?\s*[A-Za-z_]\w*\s*:\s*[^;]+;/g, " ");
-    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(code);
+    // v4466 -- PER ENTRY POINT, BECAUSE THE AUTO LAYOUT IS. A module with several @compute entries (physics/mpm's
+    // clear / p2g / grid / g2p share one text and five bindings) gets one layout PER PIPELINE, holding only what that
+    // entry's call graph reaches; a bind group carrying a binding the entry never touches is refused by the API. So
+    // "used" is answered over the functions reachable from the named entry points, falling back to the whole text
+    // when none are named (the null backend, or a module whose functions this scanner cannot delimit).
+    const reach = entryPoints ? _reachableCode(code, entryPoints) : null;
+    const scope = reach == null ? code : reach;
+    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(scope);
     return all;
+}
+/** The bodies of every function reachable from `entries`, concatenated; null if an entry is not found. */
+function _reachableCode(code, entries) {
+    const fns = {};
+    const re = /\bfn\s+([A-Za-z_]\w*)\s*\(/g;
+    let m;
+    while ((m = re.exec(code))) {
+        const open = code.indexOf("{", m.index); if (open < 0) return null;
+        let depth = 0, i = open;
+        for (; i < code.length; i++) { const ch = code[i]; if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth === 0) break; } }
+        if (depth !== 0) return null;
+        fns[m[1]] = code.slice(m.index, i + 1);
+    }
+    const seen = new Set(), todo = [...entries].filter((e) => e);
+    if (!todo.length || !todo.every((e) => fns[e])) return null;
+    let out = "";
+    while (todo.length) {
+        const n = todo.pop(); if (seen.has(n)) continue; seen.add(n);
+        const body = fns[n]; out += body + "\n";
+        for (const k of Object.keys(fns)) if (!seen.has(k) && new RegExp("\\b" + k + "\\s*\\(").test(body)) todo.push(k);
+    }
+    return out;
 }
 
 // --- null backend: implements the full interface, records the op stream. Used for tests + as a headless fallback. ----
@@ -180,8 +209,8 @@ function nullBackend(opts = {}) {
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
         pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
                             blend: _blendMode(d), depthWrite: d.depthWrite !== false, depthCompare: _depthCompare(d),
-                            bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? usedNames(d.shaders.wgsl, parseBindings(d.shaders.wgsl)) : [] }),
-        compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? usedNames(d.wgsl, parseBindings(d.wgsl)) : [], _bound: {},
+                            bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? usedNames(d.shaders.wgsl, parseBindings(d.shaders.wgsl), [d.vs || "vs", d.fs || "fs"]) : [] }),
+        compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? usedNames(d.wgsl, parseBindings(d.wgsl), [d.entryPoint || "main"]) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
                            bindTexture: function (n, t) { this._bound[n] = t; ops.push(["bindTexture", n, !!(t && t.__tex)]); return this; } }),
         depthTexture: () => null,
@@ -507,8 +536,8 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
     // WebGL2. (A struct field sharing a binding's name reads as a use; the safe direction, and rare.) And as the
     // backstop for whatever the text cannot see, createBindGroup runs inside a validation error scope whose message
     // becomes the pipeline's `error`, which the next use() or dispatch() refuses with, by name.
-    const classify = (wgsl) => {
-        const all = usedNames(wgsl, parseBindings(wgsl).filter((b) => b.group === 0));
+    const classify = (wgsl, entryPoints = null) => {
+        const all = usedNames(wgsl, parseBindings(wgsl).filter((b) => b.group === 0), entryPoints);
         return { texBindings: all.filter((b) => /^texture_/.test(b.type)), samplerBindings: all.filter((b) => /^sampler/.test(b.type)),
                  storageBindings: all.filter((b) => b.addressSpace === "storage"), uniformBindings: all.filter((b) => b.addressSpace === "uniform"), all };
     };
@@ -574,7 +603,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [target] },
                 primitive: { topology: d.topology || "triangle-list", cullMode: d.cull || "none", frontFace: d.frontFace || "ccw" },
                 ...(depth ? { depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: d.depthWrite !== false, depthCompare: _depthCompare(d) } } : {}) });
-            const cls = classify(d.shaders.wgsl);
+            const cls = classify(d.shaders.wgsl, [d.vs || "vs", d.fs || "fs"]);
             let ubuf = null, uni = null, uniformBinding = 0;
             if (d.uniforms && d.uniforms.length) {
                 // The uniform buffer lives at whichever binding the shader gave its uniform struct -- badTv says 0,
@@ -591,7 +620,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
             const mod = gpu.createShaderModule({ code: d.wgsl });
             const compiled = _watchCompile(mod, "compute pipeline");
             const pipe = gpu.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: d.entryPoint || "main" } });
-            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
+            const c = { __compute: true, pipe, ubuf: null, uniformBinding: -1, ...classify(d.wgsl, [d.entryPoint || "main"]), _tex: {}, _stor: {}, _gen: 1, _bg: null, _bgGen: 0, error: null, compiled };
             compiled.then((e) => { c.error = e; });
             c.bind = (n, buf, o) => { bindByName(c, n, buf, o); return c; };
             // Level 12 -- a compute pass may read a texture (the Hi-Z build reads the frame's depth). Same rule as
