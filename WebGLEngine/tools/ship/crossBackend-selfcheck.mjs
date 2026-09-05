@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/crossBackend-selfcheck.mjs -- v4294
+// WebGLEngine/tools/ship/crossBackend-selfcheck.mjs -- v4294; widened at v4464 (text/ in the scan, storage inputs in the corpus)
 //
 // GRADES the browser-free WebGPU backend against the browser one on EVERY WGSL shader the tree exports.
 //
@@ -57,6 +57,11 @@ sec("1. THE CORPUS ACCOUNTS FOR EVERY WGSL PRODUCER IN THE TREE");
     // The census is a candidate finder. If it ever matches nothing, it has stopped working rather than passed.
     ok(c.some((f) => f.where === "corpus") && c.some((f) => f.where === "excluded"),
        "CONTROL: the scan resolves symbols into BOTH buckets, so neither is empty by construction");
+    // v4464 -- the Slug twin sat in text/ for seven rounds where the scan never looked. A root that is not walked
+    // is a producer the census cannot name, so the roots are asserted by what they FIND, not by their list.
+    ok(c.filter((f) => f.file.startsWith("text/")).length >= 4 && c.some((f) => f.file.startsWith("physics/render/")),
+       "*** the scan reaches text/ and physics/render/, and resolves what it finds there ***",
+       c.filter((f) => /^(text|physics\/render)\//.test(f.file)).map((f) => `${f.symbol}:${f.where}`).join(" "));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -113,6 +118,17 @@ sec("3. AND EVERY ONE IS BYTE-IDENTICAL");
        "and the CLIPPING format, where the two must agree on what an out-of-range value becomes",
        clip ? `${clip.format}, ${clip.same}/${clip.n}` : "absent");
 
+    // v4464 -- the first entries with read-only storage INPUTS (the `inputs` option both harnesses grew at v4457):
+    // the Slug coverage probe reads a packed atlas and a sample list through five bindings. Until this line the
+    // corpus had held the two harnesses to each other on a uniform array and one out buffer only.
+    const slug = results.find((r) => /slugProbeWgsl/.test(r.id));
+    ok(slug && slug.identical && slug.n > 1000,
+       "*** and the entries with read-only storage INPUTS agree -- a binding class the corpus had none of until v4464 ***",
+       slug ? `${slug.same}/${slug.n} coverage samples through five storage bindings` : "absent");
+    const physics = results.filter((r) => /traceWgsl|pipelineWgsl/.test(r.id));
+    ok(physics.length === 2 && physics.every((r) => r.identical && r.n === 576),
+       "*** and the two physics producers the census named as unaccounted since v4418 now run on both ***",
+       physics.map((r) => `${r.id} ${r.same}/${r.n}`).join(", "));
     const planted = results.find((r) => /shaderTan/.test(r.id));
     ok(planted && planted.identical,
        "*** including the PLANTED camera, which runs the low-accuracy tan() path ***",
@@ -158,6 +174,12 @@ sec("4. THE CONTROL: THE COMPARISON CAN FAIL, ON THE SAME PAIR OF HARNESSES");
 // A and B behaved as written. C did not, and it is the fifth time this session that the sharpest sabotage
 // found a check that could not fail rather than code that was wrong.
 //
+//   E  (v4464) "text" removed from the census roots.
+//      -> exit=1, 1 red: the roots line, since text/'s four producers are then found nowhere -- while the
+//      "every one accounted" line stays GREEN, because a producer the scan never sees needs no entry. That is
+//      the failure this widening is for: the Slug twin shipped at v4457 into a directory the scan did not walk
+//      and nothing said so for seven rounds.
+//
 //   D  (v4295) the native texture reader reads rows at their UNPADDED stride.
 //      -> exit=1, and ONLY the padded entry goes red: 4117/6400, max diff 1.748e+0. The two N=64 entries stay
 //      green because a 64-wide rgba16float row is 512 bytes and already 256-aligned, which is exactly what
@@ -182,5 +204,6 @@ console.log("unchecked here: ANY GPU BUT THIS ONE. Both backends land on the sam
     "this says the two HARNESSES agree, not that Dawn and a browser agree on real hardware where a driver " +
     "decides the numbers. Also unchecked: the two excluded shaders, which keep the browser harness for the " +
     "reasons wgslCorpus.EXCLUDED records -- a storage-texture path this backend does not have, and a probe " +
-    "that is assembled inside its own gate on purpose.");
+    "that is assembled inside its own gate on purpose. And the Slug RENDER module is compiled here only; " +
+    "its picture is the device's claim (tools/ship/slugDevice-selfcheck.mjs), not this corpus's.");
 exitCleanly(fails ? 1 : 0);

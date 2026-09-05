@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/wgslCorpus.mjs -- v4294
+// WebGLEngine/tools/ship/wgslCorpus.mjs -- v4294; text/ and the two physics producers joined at v4464
 //
 // *** EVERY WGSL SHADER THE TREE CAN RUN, IN ONE PLACE, SO TWO BACKENDS CAN BE COMPARED ON ALL OF THEM. ***
 //
@@ -27,6 +27,13 @@
 // `census()` exists so those two cannot become five without anybody noticing: it scans the tree for exported
 // WGSL producers and reports which are absent from the corpus. A corpus that is only ever appended to is a
 // list of what somebody remembered.
+//
+// *** v4464 -- AND IT DID NOTICE, FOR A HUNDRED AND SEVENTY ROUNDS, WHILE NOBODY ANSWERED. *** physics/render's
+// traceWgsl (v4417) and pipelineWgsl (v4418) were census candidates with no corpus entry and no exclusion from
+// the round they landed; the crossBackend gate went red on the line naming them and the red was registered as
+// known. That is the census working and the answer not being written. Both are in the corpus now, run on both
+// backends, and the roots include text/ -- the Slug twin's three runnable modules (v4457) were outside the scan
+// altogether, which is the quieter failure: a producer the census cannot see is one it cannot name.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -42,6 +49,13 @@ import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
 import * as BB from "../../render/blackbodyWgsl.mjs";
 import * as FM from "../../render/fleetMask.mjs";
+// v4464 -- the two physics producers the census named for a hundred and seventy rounds without a corpus entry, and text/
+import * as G from "../../physics/render/pathTracerGpu.mjs";
+import * as R from "../../physics/render/rtPipeline.mjs";
+import { slugShaderWgsl, slugProbeWgsl, slugDilateProbeWgsl, PROBE_BINDINGS, DILATE_PROBE_BINDINGS } from "../../text/slugShaderWgsl.js";
+import { parseFont } from "../../text/slugFont.js";
+import { packAtlas, packGlyphLoc, packGlyphFlags } from "../../text/slugAtlas.js";
+import { testFontBytes } from "../../text/slugTestFont.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -53,6 +67,69 @@ const EMITTED_COMPUTE_PATH = path.join(path.dirname(fileURLToPath(import.meta.ur
 const EMITTED_COMPUTE = fs.existsSync(EMITTED_COMPUTE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_COMPUTE_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// ---- v4464 -- THE SLUG PROBES' INPUTS: THE FIRST CORPUS ENTRIES WITH READ-ONLY STORAGE BINDINGS ----------------
+//
+// Every buffer entry above v4464 was "one out buffer and a uniform array". text/slugShaderWgsl.js's coverage probe
+// reads the packed atlas (curve halves, band words) and a sample list through FIVE read-only storage bindings --
+// the `inputs` option both harnesses grew at v4457 -- and this is the first place the corpus drives that option,
+// so the browser and the native side are held to each other on it. The font is the constructed one
+// text/slugTestFont.mjs ships (six glyphs, A-F), packed at width 16, where its curve list wraps to two rows and its band list to three (at 64 or 128 nothing wraps, which is the unreachable plant v4457 found); the samples are pixel
+// centres at 28 px/em over each glyph's box, the same set slugWgsl-selfcheck grades against slugEval. The
+// corpus does not carry the CPU key -- that is the gate's job -- it asks whether two backends agree on it.
+const f32 = Math.fround;
+function slugProbeCase(logWidth = 4, px = 28) {
+    const font = parseFont(testFontBytes());
+    const seen = new Map();
+    for (const ch of "ABCDEF") {
+        const gi = font.glyphIndex(ch.codePointAt(0));
+        if (!seen.has(gi)) seen.set(gi, { key: gi, contours: font.outline(gi).contours });
+    }
+    const list = [...seen.values()];
+    const atlas = packAtlas(list, { logWidth });
+    if (atlas.format !== "16f") throw new Error("wgslCorpus: the probe reads rgba16float halves; the atlas packed as " + atlas.format);
+    const ems = f32(1 / px);
+    const samples = [], words = [], banding = [];
+    for (const g of list) {
+        const e = atlas.glyphs.get(g.key);
+        if (!e || e.empty) continue;
+        const bb = e.bbox, N = Math.max(4, Math.ceil(Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0) * px));
+        const loc = packGlyphLoc(e.loc[0], e.loc[1]), flg = packGlyphFlags(e.bandMax[0], e.bandMax[1], false);
+        for (let iy = 0; iy < N; iy++) for (let ix = 0; ix < N; ix++) {
+            samples.push(f32(bb.x0 + (bb.x1 - bb.x0) * (ix + 0.5) / N), f32(bb.y0 + (bb.y1 - bb.y0) * (iy + 0.5) / N), ems, ems);
+            words.push(loc, flg);
+            banding.push(f32(e.transform[0]), f32(e.transform[1]), f32(e.transform[2]), f32(e.transform[3]));
+        }
+    }
+    const count = words.length / 2;
+    return {
+        code: slugProbeWgsl(logWidth), outCount: count, workgroups: Math.ceil(count / 64),
+        uniforms: new Float32Array([count, atlas.curveTexels, atlas.bandTexels, 0]),
+        inputs: [
+            { binding: PROBE_BINDINGS.curveData, data: atlas.curveData },
+            { binding: PROBE_BINDINGS.bandData, data: atlas.bandData },
+            { binding: PROBE_BINDINGS.samples, data: new Float32Array(samples) },
+            { binding: PROBE_BINDINGS.glyphWords, data: new Uint32Array(words) },
+            { binding: PROBE_BINDINGS.banding, data: new Float32Array(banding) },
+        ],
+        // For the gate's report line: how much atlas the probe walked, and whether the lists wrapped.
+        atlas: { width: atlas.width, curveTexels: atlas.curveTexels, bandTexels: atlas.bandTexels, glyphs: list.length, samples: count },
+    };
+}
+
+/** SlugDilate over four quad corners under a matrix with a perspective row, so the divide is not a no-op. */
+function slugDilateCase() {
+    const W = 256, H = 128, invS = 2;
+    const M = [0.3125, 0.05, 0, -0.3,   -0.08, 0.625, 0, 0.1,   0, 0, 0, 0,   0.1, -0.05, 0, 1];
+    const corners = [[-0.3, -0.2, -1, -1], [0.4, -0.2, 1, -1], [0.4, 0.5, 1, 1], [-0.3, 0.5, -1, 1]];
+    const cases = new Float32Array(corners.length * 12);
+    corners.forEach(([px, py, nx, ny], i) => cases.set([px, py, nx, ny, 0.1, 0.2, 0, 0, invS, 0, 0, invS], i * 12));
+    return {
+        code: slugDilateProbeWgsl(), outCount: corners.length * 8, workgroups: 1,
+        uniforms: new Float32Array([...M, W, H, corners.length, 0]),
+        inputs: [{ binding: DILATE_PROBE_BINDINGS.cases, data: cases }],
+    };
+}
 
 /**
  * The runnable corpus. Each entry is a name, where it came from, WHY it is worth running, and the exact
@@ -193,6 +270,33 @@ export function corpus() {
         { id: "badTv.FIELD_FRAGMENT_WGSL", from: "render/badTvWgsl.mjs", compileOnly: true,
           why: "FRAGMENT_WGSL with a second texture binding, the strength field, derived by substitution -- proves the derivation still compiles",
           opts: { code: FIELD_FRAGMENT_WGSL, compileOnly: true, outCount: 0 } },
+        // *** v4464 -- THE TWO PRODUCERS THE CENSUS HAD NAMED SINCE v4417 AND NOBODY ANSWERED. *** traceWgsl and
+        // pipelineWgsl were graded against a CPU f64 tracer by their own gates on the BROWSER harness only, and the
+        // census line naming them as unaccounted was a standing red every quick sweep listed. They fit the
+        // one-buffer signature exactly (an out array and a uniform vec4 array), so they run here on both.
+        { id: "pathTracerGpu.traceWgsl", from: "physics/render/pathTracerGpu.mjs",
+          why: "the v4417 furnace: a cosine-weighted bounce loop with an LCG per pixel over 24x24 -- the deepest control flow in the corpus, and the first physics shader in it",
+          opts: { code: G.traceWgsl({}), outCount: G.VIEW.w * G.VIEW.h,
+                  uniforms: G.traceUniforms({ spp: 16, view: G.VIEW, eps: 1e-4 }), workgroups: Math.ceil(G.VIEW.w * G.VIEW.h / 64) } },
+        { id: "rtPipeline.pipelineWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "the v4418 shader-binding-table pipeline: a two-record table with a lambertian AND a mirror hit shader, which the CPU oracle cannot express and only a second backend can check",
+          opts: { code: R.pipelineWgsl({}), outCount: R.VIEW.w * R.VIEW.h,
+                  uniforms: R.pipelineUniforms([R.sbtRecord({ centre: [-1.2, 0, 0], radius: 0.6, albedo: 0.5 }),
+                                                R.sbtRecord({ centre: [1.2, 0, 0], radius: 0.6, albedo: 0.25, hit: "mirror" })],
+                                               { spp: 16, view: R.VIEW, eps: 1e-4 }),
+                  workgroups: Math.ceil(R.VIEW.w * R.VIEW.h / 64) } },
+        // *** v4464 -- text/ JOINS THE CENSUS. *** The Slug twin (v4457) lived outside the corpus roots, so its
+        // three runnable modules were nobody's cross-backend claim. The render module compiles on both; the two
+        // probes RUN on both, and the coverage probe is the corpus's first entry with read-only storage inputs.
+        { id: "slugShaderWgsl.slugShaderWgsl", from: "text/slugShaderWgsl.js", compileOnly: true,
+          why: "the Slug fragment over textureLoad of an rgba16float and an rg16uint texture with fwidth -- the first text shader on the device; drawn and diffed on both backends by tools/ship/slugDevice-selfcheck.mjs",
+          opts: { code: slugShaderWgsl(12).wgsl, compileOnly: true, outCount: 0 } },
+        { id: "slugShaderWgsl.slugProbeWgsl", from: "text/slugShaderWgsl.js",
+          why: "the SAME core as the fragment, over five read-only storage buffers: root code, two solvers and band walks per sample, on a width-16 atlas whose curve list wraps to two rows and band list to three",
+          opts: slugProbeCase(4, 28) },
+        { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
+          why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
+          opts: slugDilateCase() },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
@@ -230,6 +334,8 @@ export const EXCLUDED = Object.freeze([
                     why: "a vs+fs pair that declares two textures and reads one, to hold the device to the auto-layout rule; graded by tools/ship/deviceUnused-selfcheck.mjs on both backends" }),
     Object.freeze({ id: "texelProbe.UINT_PROBE_WGSL", kind: "render pair, graded through the device",
                     why: "a vs+fs pair reading an rg16uint texture; same reason, same gate (tools/ship/deviceFormats-selfcheck.mjs)" }),
+    Object.freeze({ id: "slugShaderWgsl.slugCoreWgsl", kind: "source fragment",
+                    why: "the shared Slug core (root code, solvers, CalcBandLoc, CalcCoverage, SlugRender) with no entry point; slugShaderWgsl and slugProbeWgsl are its two runnable hosts and both ARE in the corpus" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
                     why: "assembled in its own gate by concatenation to dodge a self-counting trap; copying it here would defeat that",
                     keeps: "tools/ship/wgslLayout-selfcheck.mjs stays on the browser harness" }),
@@ -269,7 +375,7 @@ export const EXCLUDED = Object.freeze([
  * *** THIS FILE MUST NOT COUNT ITSELF, *** which is the trap the tree has hit repeatedly: a file that grades a
  * marker and contains the marker grades its own prose. The scan skips this module and the gate that drives it.
  */
-export function census({ roots = ["render", "physics/render", "shaders"] } = {}) {
+export function census({ roots = ["render", "physics/render", "shaders", "text"] } = {}) {
     const SELF = ["wgslCorpus.mjs", "crossBackend-selfcheck.mjs"];
     const found = [];
     const walk = (dir) => {

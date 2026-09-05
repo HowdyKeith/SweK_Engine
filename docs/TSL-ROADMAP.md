@@ -261,6 +261,14 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         *** THE FIRST DRAFT OF THE GATE HAD AN UNREACHABLE PLANT *** (six small glyphs never leave row one, so
         the wrong-width probe went 0 of 10,016 wrong); slug-selfcheck's own plant 3 says why and the section
         was rebuilt over 66 Plex glyphs at width 128, where 432 of 965 band headers point past their row.
+        *** v4464 (task 20): THE CROSS-BACKEND CORPUS NOW SEES text/. *** tools/ship/wgslCorpus.mjs's census walked
+        render, physics/render and shaders, so the twin's three runnable modules were nobody's cross-backend claim
+        for seven rounds; text/ is a root now, the roots are asserted by what they find, the render module compiles
+        on both backends, the coverage probe is the corpus's first entry with read-only storage inputs (2,313 of
+        2,313 identical through five bindings, on a width-16 atlas whose lists wrap) and the dilation probe agrees
+        32 of 32. The same round answered the census line that had stood red since v4418: pathTracerGpu.traceWgsl
+        and rtPipeline.pipelineWgsl fit the one-buffer signature and run on both, 576 of 576 identical each, the
+        pipeline entry carrying a mirror hit shader the CPU oracle cannot express.
      2. Blend state on gfx/device.js pipelines. Slug returns colour premultiplied by coverage and needs
         (ONE, ONE_MINUS_SRC_ALPHA); the device carried topology, cull and frontFace and no blend at all, and its
         texture path uploads rgba8unorm only, where Slug needs rgba16float and rg16uint. BUILT at v4458: `blend`

@@ -1909,6 +1909,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the rig line. Two sabotages red at 1 / 2. One second, after a 66-second first draft that " +
                  "shipped three pictures through the harness as JSON.",
     }),
+    since85: Object.freeze({
+        at: "v4464", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/crossBackend-selfcheck.mjs (111 checks -> 114)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, and a standing red cleared by ANSWERING it rather than registering it. The WGSL census had " +
+                 "named physics/render's traceWgsl (v4417) and pipelineWgsl (v4418) as producers with no corpus entry " +
+                 "and no exclusion for a hundred and seventy rounds; both fit the corpus's one-buffer signature and now " +
+                 "run on both backends, 576/576 identical each, the pipeline entry carrying a MIRROR hit shader the CPU " +
+                 "oracle cannot express. The census roots include text/: the Slug twin's three runnable modules " +
+                 "(v4457) were outside the scan altogether, which is the quieter failure -- a producer the census " +
+                 "cannot see is one it cannot name -- and the roots are now asserted by what they FIND. The coverage " +
+                 "probe is the corpus's first entry with read-only storage INPUTS (2313/2313 identical through five " +
+                 "bindings, on a width-16 atlas whose lists wrap); the dilation probe 32/32; the render module compiles " +
+                 "on both. Sabotage E (text dropped from the roots) goes 1 red on the roots line while the accounting " +
+                 "line stays green, which is exactly the hole it closes. colourReach's literal-colour count re-taken " +
+                 "75 -> 76 for slug-device.html's legend.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

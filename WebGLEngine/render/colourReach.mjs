@@ -161,11 +161,15 @@ export const HOT_UNREGISTERED = Object.freeze([
     "world/kaijuAttackFx.js",
 ]);
 
-/** What v4424 measured. Re-take with: node render/colourReach-selfcheck.mjs */
+/**
+ * What v4424 measured. Re-take with: node render/colourReach-selfcheck.mjs
+ * v4464: literalColourFiles 75 -> 76. The arrival is slug-device.html (v4460), whose legend names five hex colours
+ * for the two backends' pictures; it draws nothing additively, so the overlap stays 0 and section 2 is untouched.
+ */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 75,
+    literalColourFiles: 76,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 20,
     // The three Keith named, and what the old detector saw of them.
