@@ -2304,6 +2304,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "unguarded dereference underneath it (gateQuality's prose-matching ratchet). Eight sabotages " +
                  "by name, eight red",
     }),
+    since109: Object.freeze({
+        at: "v4474", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([]),
+        verdict: "No gate added and none red: gpu/glbTexture.mjs gains STREAMED and its gate gains a fourth " +
+                 "section. THE STREAMED NUMBER OVERTURNS v4473's VERDICT -- one Khronos model costs 71.7 to " +
+                 "91.6 MB of VRAM as PNG against 8.5 to 22.5 MB transcoded, where this whole repository's " +
+                 "own textures come to 4.25 MB. The saving is exactly 32/bpp, asserted with no tolerance " +
+                 "because the mip chain cancels. Eleven sabotages, nine red; the first run of the " +
+                 "measurement was FICTION -- a cache keyed on the first thirty characters of the URL made " +
+                 "three models report identical assets, caught by reading the numbers rather than by a check",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

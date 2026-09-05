@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { textureVerdict, needsKtx2, BASISU_EXT, OUTCOME, BUDGET } from "../../gpu/glbTexture.mjs";
+import { textureVerdict, needsKtx2, BASISU_EXT, OUTCOME, BUDGET, STREAMED } from "../../gpu/glbTexture.mjs";
 import { extensionsOf } from "../../gpu/glbPeek.mjs";
 import { MAGIC, JSON_CHUNK } from "../export/voxelGlb.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -221,6 +221,105 @@ console.log("\n3. *** THE MEASUREMENT THAT SAYS NOT YET, RE-DERIVED FROM THE TRE
 // re-time it. So the strip is done only where it can matter: "raw text contains the needle" is a strict
 // superset of "code contains the needle", so filtering on the raw text first and stripping only the survivors
 // gives the identical answer for a fraction of the work.
+// =============================================================================================================
+console.log("\n4. *** THE STREAMED NUMBER, WHICH OVERTURNS SECTION 3's VERDICT ***");
+{
+    const M = STREAMED.models;
+    const MB = (n) => (n / 1048576).toFixed(1);
+    M.forEach((m) => report(`${m.name.padEnd(20)} ${String(m.textures).padStart(2)} textures  ` +
+        `PNG/JPEG VRAM ${MB(m.plainVramBytes).padStart(5)} MB  ->  KTX2 disk ${MB(m.ktxTextureBytes)} MB`));
+
+    // *** THE ARITHMETIC IS RE-DERIVED HERE FROM THE RECORDED PIXELS, NOT READ OUT OF A SUMMARY. *** The
+    // saving depends on the TRANSCODE TARGET, so it is computed at each target this catalogue names rather
+    // than quoted as one figure. A single number for "the KTX2 saving" has silently chosen a fallback chain.
+    // *** EACH VRAM FIGURE IS RE-DERIVED FROM ITS OWN ROW'S PIXELS, WHICH A SABOTAGE FORCED. *** Multiplying
+    // one model's plainVramBytes by ten went 0 RED: nothing tied a recorded byte count to anything, and the
+    // "bigger than the repo" comparison only gets EASIER when the number is inflated. A figure that does not
+    // follow from its own pixel count is now a failure, so the record cannot drift in the flattering direction.
+    const rgba8Mips = (px) => Math.round(px * 4 * 4 / 3);
+    const badVram = M.filter((m) => rgba8Mips(m.plainPixels) !== m.plainVramBytes);
+    ok("!! *** each recorded VRAM figure follows from that model's own pixel count ***",
+        badVram.length === 0,
+        badVram.length
+            ? badVram.map((m) => `${m.name}: recorded ${m.plainVramBytes}, ${m.plainPixels} px imply ${rgba8Mips(m.plainPixels)}`).join("; ")
+            : M.map((m) => `${m.name.split(/(?=[A-Z])/).pop()} ${m.plainPixels} px -> ${m.plainVramBytes} B`).join(", ") +
+              " -- RGBA8 with a 4/3 mip chain, re-derived here rather than trusted. TWO OF THESE WERE WRONG in " +
+              "the first draft, transcribed off a formatted table: 71_650_509 for 71_652_693 and 91_567_718 " +
+              "for 91_575_637");
+
+    // The mip chain multiplies both sides by 4/3 and cancels, so the ratio is (px*4) / (px*bpp/8) with no
+    // rounding anywhere -- which is why it can be asserted exactly. Routing it through the ROUNDED byte
+    // figures instead gave 4.000000043679741 and 7.99999973792157, and the honest response to that was to
+    // drop the rounding rather than to open a window wide enough to swallow it.
+    // *** AND PIXELS ARE CROSS-CHECKED AGAINST ENCODED BYTES, BECAUSE MOVING BOTH TOGETHER WAS 0 RED. ***
+    // The check above catches an inflated VRAM figure; inflating the PIXEL COUNT to match it passed, which is
+    // fabrication rather than error and no repository can rule that out -- gateBudget.MEASURED_RUNS says so
+    // in as many words. What it CAN do is make the fabrication have to be coherent across quantities that
+    // were measured separately. plainTextureBytes comes from the encoded files and plainPixels from their
+    // headers, and the ratio between them is physically bounded: an encoded PNG or JPEG cannot exceed raw
+    // RGBA8 at 4 bytes per pixel, and real texture content does not compress below roughly 0.05.
+    //
+    // THE BAND IS NOT FITTED TO THE DATA. Measured here: 0.246, 0.442 and 0.537 bytes per pixel -- the
+    // window is five times clear of the highest and five times clear of the lowest, and it is set by what an
+    // image format can do rather than by what these three happen to be. Inflating pixels tenfold puts
+    // AnisotropyBarnLamp at 0.044 and this goes red.
+    const BPP_FLOOR = 0.05, BPP_CEIL = 4.0;
+    const bad = M.filter((m) => { const r = m.plainTextureBytes / m.plainPixels; return !(r > BPP_FLOOR && r < BPP_CEIL); });
+    ok("  and the pixel counts are cross-checked against the encoded bytes, which were measured separately",
+        bad.length === 0,
+        bad.length
+            ? bad.map((m) => `${m.name}: ${(m.plainTextureBytes / m.plainPixels).toFixed(3)} encoded bytes/px is outside [${BPP_FLOOR}, ${BPP_CEIL}]`).join("; ")
+            : M.map((m) => (m.plainTextureBytes / m.plainPixels).toFixed(3)).join(", ") +
+              " bytes/px, all inside [" + BPP_FLOOR + ", " + BPP_CEIL + "] -- a bound from what PNG and JPEG " +
+              "can physically do, not from these three numbers. Two records measured apart have to agree");
+
+    const bpps = Object.values(STREAMED.targetsBpp);
+    const ratios = M.flatMap((m) => bpps.map((bpp) => (m.plainPixels * 4) / (m.plainPixels * bpp / 8)));
+    const lo = Math.min(...ratios), hi = Math.max(...ratios);
+    // *** ASSERTED EXACTLY, WITH NO TOLERANCE, BECAUSE THE RATIO IS ARITHMETIC. *** RGBA8 is 32 bits per
+    // pixel against a block format's `bpp`, and the 4/3 mip chain multiplies both sides and cancels: the
+    // saving is 32/bpp for every texture of every size. The first draft recorded a minimum of 3.9 -- a
+    // rounded 87.33/22.50 read off the printed table -- and gave itself a 0.2 window to cover the difference.
+    // A tolerance invented to absorb a rounding error is one nobody earned, and the exact number was there.
+    ok("!! *** the VRAM saving is a RANGE set by the transcode target, and it is re-derived here ***",
+        Math.abs(lo - STREAMED.savingRange.min) < 1e-9 && Math.abs(hi - STREAMED.savingRange.max) < 1e-9 &&
+        bpps.every((bpp) => Math.abs(32 / bpp - (bpp === 4 ? hi : lo)) < 1e-9),
+        `exactly ${lo}x to ${hi}x across ${Object.keys(STREAMED.targetsBpp).join(", ")} -- 32/bpp, identical ` +
+        `for every texture of every size, so no tolerance is needed or given. UASTC and ETC1S are how ` +
+        "the bytes TRAVEL; 4 bpp or 8 bpp is how the GPU STORES them, and only the second sets VRAM");
+
+    ok("!! *** one streamed model costs many times this whole repository's texture budget ***",
+        M.every((m) => m.plainVramBytes > BUDGET.withMipsBytes * 10),
+        `smallest of the three is ${MB(Math.min(...M.map((m) => m.plainVramBytes)))} MB against the tree's own ` +
+        `${MB(BUDGET.withMipsBytes)} MB. BUDGET's "not yet" was a claim about 16 files and said so; it does ` +
+        "not survive one streamed asset, and this is the number it named as the one that would settle it");
+
+    ok("  and where the two variants are not the same texture set, the record says so rather than averaging it",
+        M.some((m) => m.ktxTextures !== m.textures || m.ktxPixels !== m.plainPixels),
+        M.filter((m) => m.ktxTextures !== m.textures || m.ktxPixels !== m.plainPixels)
+            .map((m) => `${m.name}: ${m.textures} plain textures / ${m.ktxTextures} ktx, ${m.plainPixels} px / ${m.ktxPixels} px`).join("; ") +
+        " -- these are two AUTHORED variants of a model, not one input re-encoded, so the totals compare what " +
+        "a client downloads and a strict like-for-like re-encode is a different experiment");
+
+    ok("  and the two models whose KTX variant is ALSO Draco are excluded by name, not quietly dropped",
+        Object.keys(STREAMED.excluded).length === 2 &&
+        Object.values(STREAMED.excluded).every((w) => /Draco/.test(w)),
+        Object.entries(STREAMED.excluded).map(([n, w]) => n + ": " + w).join("; ") +
+        " -- a difference from two compressions at once is attributable to neither");
+
+    // *** AND THE HAZARD THIS MODULE PREDICTED IS NARROWED BY THE REAL ASSETS, WHICH IS THE HONEST DIRECTION.
+    ok("!! all three are REQUIRED with no fallback, so this tree throws on them -- the good failure",
+        M.every((m) => m.required === true && m.fallbacks === 0) && STREAMED.verdictAllThree === OUTCOME.THROWS,
+        `${M.reduce((n, m) => n + m.ktxTextures, 0)} basisu textures across three models and NOT ONE carries a ` +
+        "fallback `source`. So outcome 3 -- the TypeError naming 'uri' -- is real in the loader and DOES NOT " +
+        "ARISE in Khronos's authored samples: it is a hazard for a toolchain that emits the extension as " +
+        "optional without a fallback, and this round narrows the claim rather than keeping it broad");
+
+    ok("  and what is NOT measured is named, because the case has two halves and this is one",
+        /transcode time/.test(STREAMED.notMeasured) && /nothing vendored/.test(STREAMED.source),
+        STREAMED.notMeasured);
+}
+
 function sourcesNaming(needle) {
     const out = [];
     (function walk(d) {
