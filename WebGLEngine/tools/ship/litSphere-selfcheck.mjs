@@ -91,6 +91,15 @@ sec("2. THE TWIN: shadeAt is the fragment stage's arithmetic");
     const desc = L.litPipelineDesc();
     ok(desc.buffers[0].stride === 40 && desc.buffers[0].attributes.some((a) => a.name === "n" && a.location === 4) && desc.uniforms.length === 2 && desc.uniforms[1].name === "light",
        "litPipelineDesc: the lit layout's two slots and the light uniform after viewProj");
+    // v4478 -- tints: a palette baked into both shaders as an if-chain on extra.y
+    const tints = L.tintsFromHex(["#9fe6c0", "#ff6b5e", "#33ccff"]);
+    ok(tints.length === 3 && Math.abs(tints[1][0] - 1) < 1e-9 && Math.abs(tints[1][1] - 0x6b / 255) < 1e-9 && Math.abs(tints[2][2] - 1) < 1e-9, "tintsFromHex reads #rrggbb into 0..1 channels");
+    const tinted = L.litPipelineDesc({ tints });
+    ok(validateWgsl(tinted.shaders.wgsl).length === 0 && /if \(i == 3\)/.test(tinted.shaders.wgsl) && /if \(i == 3\)/.test(tinted.shaders.glsl.fragment) && !/if \(i == 4\)/.test(tinted.shaders.wgsl),
+       "a three-tint palette is three branches in BOTH languages and no fourth");
+    ok((() => { try { L.litPipelineDesc({ tints: new Array(L.MAX_TINTS + 1).fill([0, 0, 0]) }); return false; } catch (e) { return /tints/.test(e.message); } })() &&
+       (() => { try { L.tintsFromHex(["red"]); return false; } catch (e) { return /rrggbb/.test(e.message); } })(), "nine tints and a colour name are refused by name");
+    ok(L.LIT_WGSL === L.litWgsl(null) && !/if \(i == 1\)/.test(L.LIT_WGSL), "CONTROL: the untinted constant the corpus compiles is the empty chain");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -121,6 +130,13 @@ else {
             const flat = await shoot(L.sphereMesh(3, WHITE), { lit: false });
             const emis = await shoot(L.sphereMesh(3, WHITE), { lit: true, emissive: 1 });
             const disc = await shoot(G.discMesh(64, WHITE), { lit: false });
+            // v4478 -- a tinted, emissive sphere is the palette's colour flat, and index 0 keeps the mesh's own
+            const TINTS = [[0.2, 0.4, 0.8], [1.0, 0.42, 0.37]];
+            const shootTint = async (idx) => { const extras = new Float32Array(G.EXTRA_FLOATS); extras[1] = idx; extras[3] = 1;
+                const sc = G.makeGpuDrivenScene(dev, { lods: [{ name: "only", mesh: L.sphereMesh(3, WHITE) }], thresholds: [], records: Float32Array.from([0, 0, 0, a.RAD]),
+                    layout: G.LAYOUTS.lit, pipeline: L.litPipelineDesc({ tints: TINTS }), bind: L.litBind(light), headings: { cpu: () => extras } });
+                const f = await sc.frame({ ...cam, read: true, clear: [0, 0, 0, 1] }).pixels; const c = ((a.W / 2) * a.W + a.W / 2) * 4; return [f.pixels[c], f.pixels[c + 1], f.pixels[c + 2]]; };
+            const tint = { t0: await shootTint(0), t1: await shootTint(1), t2: await shootTint(2), want: TINTS.map((t) => t.map((v) => Math.round(v * 255))) };
             const covered = (px) => { let c = 0; for (let i = 0; i * 4 < px.length; i++) if (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2] > 24) c++; return c; };
             const levels = (px) => { const s = new Set(); for (let i = 0; i * 4 < px.length; i++) if (px[i * 4] > 8) s.add(px[i * 4]); return s.size; };
             // THE KEY: for every pixel whose ray hits the sphere at least 1.5 px inside the silhouette, the twin's shade.
@@ -143,7 +159,7 @@ else {
             out[backend] = { path: lit.path, errs, covered: { lit: covered(lit.px), flat: covered(flat.px), disc: covered(disc.px), emissive: covered(emis.px) },
                              levels: { lit: levels(lit.px), flat: levels(flat.px), emissive: levels(emis.px) },
                              centre: lit.px[((a.W / 2) * a.W + a.W / 2) * 4], flatCentre: flat.px[((a.W / 2) * a.W + a.W / 2) * 4],
-                             key: { n, mean: n ? sum / n : null, worst, worstAt }, lit: Array.from(lit.px) };
+                             key: { n, mean: n ? sum / n : null, worst, worstAt }, tint, lit: Array.from(lit.px) };
         }
         return out;
     }` });
@@ -163,6 +179,9 @@ else {
                `${b}: CONTROL: the same mesh through the flat pipeline is ONE level -- no normal reaches it`, `${o.levels.flat} level(s), centre ${o.flatCentre}`);
             ok(o.levels.emissive === 1 && o.covered.emissive === o.covered.lit,
                `${b}: CONTROL: extra.w = 1 (emissive) makes the lit pipeline flat again, covering the same pixels`, `${o.levels.emissive} level(s)`);
+            const tOk = (got, want) => got.every((c, k) => Math.abs(c - want[k]) <= 2);
+            ok(tOk(o.tint.t1, o.tint.want[0]) && tOk(o.tint.t2, o.tint.want[1]) && tOk(o.tint.t0, [255, 255, 255]),
+               `${b}: tint 1 and 2 paint the palette's colours flat (emissive) and tint 0 keeps the mesh's white`, `${o.tint.t1.join(",")} / ${o.tint.t2.join(",")} / ${o.tint.t0.join(",")}`);
             ok(o.key.n >= 250 && o.key.mean <= 2.0 && o.key.worst <= 8,
                `*** ${b}: ${o.key.n} pixels inside the silhouette against the twin's sphere -- mean error ${o.key.mean == null ? "?" : o.key.mean.toFixed(3)}/255, worst ${o.key.worst} ***`,
                `light at the eye, ambient ${AMB}: the twin says 255 at the centre and ${Math.round(255 * AMB)} at the limb`);

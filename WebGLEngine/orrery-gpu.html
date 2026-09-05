@@ -79,7 +79,10 @@ import { fleetsFor } from "./world/orreryFleet.mjs";
 import { reachedBodies, fromReachedRegister, fromKhronos } from "./world/orreryReached.mjs";
 import { REACHED_SOURCES, severityOf } from "./world/reachedLicences.mjs";
 import { models, mayVendor } from "./gpu/khronosSamples.mjs";
-import { sphereMesh, litPipelineDesc, litBind, LIGHT_AT_CENTRE } from "./render/litSphere.mjs";
+import { sphereMesh, litPipelineDesc, litBind, LIGHT_AT_CENTRE, tintsFromHex } from "./render/litSphere.mjs";
+import { STATE_COLOUR, REACHED_COLOUR } from "./ui/orreryDraw.js";   // v4478 -- the 2D page's own colours, as the device's tints
+import { CAPTURED, UNPAPERED, REACHED } from "./world/orrery.mjs";
+import { MAY_TAKE, MAY_NOT_TAKE, NOT_ASKED } from "./world/orreryReached.mjs";
 import { makeOrbitState, dragged, dollied, withPitch, followed, retargeted, eyeOf, pitchFromTilt, fitDistance, clipPlanes, UP } from "./render/orbitCamera.mjs";
 import { labelsFor, rowsFor, LABEL_CHARS, LABEL_PX } from "./render/sceneLabels.mjs";
 import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
@@ -144,6 +147,18 @@ document.getElementById("bodies").textContent += `; ${source.counts.satellites} 
 // sim day; a body not yet vendored on day t is not drawn, not picked, not counted -- decided in the cull, not by the page.
 const bodyExtras = G.defaultExtras(source.count);
 bodyExtras[3] = 1;   // v4473 -- record 0 is the centre (gpuOrbits elementsOf puts it first): emissive, the sun
+// v4478 -- TINTS ARE THE 2D PAGE'S COLOURS: a body by its licence state, a flyby by whether SweK may take it, the fleet's
+// two marks, the sun amber -- ui/orreryDraw.js's own constants, so the two pages cannot disagree about what a colour means.
+const TINT_HEX = ["#ffcc66", STATE_COLOUR[CAPTURED], STATE_COLOUR[UNPAPERED], STATE_COLOUR[REACHED], "#7fe3a8", "#8b7a52", REACHED_COLOUR[MAY_TAKE], REACHED_COLOUR[MAY_NOT_TAKE]];
+const TINT = { sun: 1, captured: 2, unpapered: 3, reached: 4, importer: 5, paperwork: 6, mayTake: 7, mayNotTake: 8 };   // NOT_ASKED flybys keep the rung's colour: nobody has decided
+const tints = tintsFromHex(TINT_HEX);
+source.layout.forEach((L, i) => {
+    let t = 0;
+    if (L.kind === KIND.body) t = !L.body ? TINT.sun : L.body.state === CAPTURED ? TINT.captured : L.body.state === UNPAPERED ? TINT.unpapered : TINT.reached;
+    else if (L.kind === KIND.satellite) t = /\(imports /.test(L.name) ? TINT.importer : TINT.paperwork;
+    else t = L.flyby.may === MAY_TAKE ? TINT.mayTake : L.flyby.may === MAY_NOT_TAKE ? TINT.mayNotTake : 0;
+    bodyExtras[i * G.EXTRA_FLOATS + 1] = t;
+});
 // v4377 -- THE THRESHOLD IS DERIVED, NOT TYPED. render/lodBudget.mjs prices the disc ladder out of the frozen
 // record in render/lodRecord.mjs at a stated budget of 64 changed pixels per instance, and a pixel budget is an
 // AREA, so the angular size that meets it depends on the canvas: metric = K / width, K measured at three widths.
@@ -154,7 +169,7 @@ bodyExtras[3] = 1;   // v4473 -- record 0 is the centre (gpuOrbits elementsOf pu
 const lodTh = discLadderThresholds(cv.width || 256, { backend: device.backend });
 window.__lodTh = { ...lodTh, used: [lodTh.thresholds[1]] };   // v4377 -- what the page actually RAN, so tools/ship/shippedLadder-selfcheck.mjs can hold it to the record
 const scene = G.makeGpuDrivenScene(device, { lods, thresholds: [lodTh.thresholds[1]], records: source, occlusion: true, headings: { cpu: () => bodyExtras }, clock: () => (history ? (scrub.ghost || economy).t : null),
-                                             layout: G.LAYOUTS.lit, pipeline: litPipelineDesc(), bind: litBind(LIGHT_AT_CENTRE) });   // v4473 -- lit spheres, the light at SweK
+                                             layout: G.LAYOUTS.lit, pipeline: litPipelineDesc({ tints }), bind: litBind(LIGHT_AT_CENTRE) });   // v4473 -- lit spheres, the light at SweK; v4478 -- tinted the 2D page's colours
 say(`${device.backend} &middot; orbits by ${device.backend === "webgpu" ? "compute" : "the CPU twin"} &middot; ${scene.path}${scene.occlusion ? " &middot; Hi-Z occlusion" : ""}`);
 
 // the economy: haulers as a second scene over the bodies. Its records come from the CPU sim every frame.

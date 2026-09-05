@@ -121,7 +121,7 @@ console.log("\n1. WHAT THE PAGES ACTUALLY DECLARE, read out of the pages rather 
         `orrery ${colours(oL).join(" | ")}; universe ${colours(uL).join(" | ")}`);
     ok("  the universe page brings no render pipeline (gpuDriven's flat look: `p` and `color`, no normal); the orrery brings litSphere's over LAYOUTS.lit, which is the one that READS a normal",
         !/makeGpuDrivenScene\(device, \{ lods[^}]*pipeline:/.test(universe) &&
-        /layout: G\.LAYOUTS\.lit, pipeline: litPipelineDesc\(\), bind: litBind\(LIGHT_AT_CENTRE\)/.test(orrery),
+        /layout: G\.LAYOUTS\.lit, pipeline: litPipelineDesc\([^)]*\), bind: litBind\(LIGHT_AT_CENTRE\)/.test(orrery),
         "a flat quad's subdivision changes nothing because no stage reads the extra vertices; a sphere's subdivision changes the silhouette AND the shading, and only the silhouette is priced by the disc record");
     ok("*** and the comment and the code AGREE: the orrery's ladder said \"a finer disc up close\" from v4377, and says and builds \"a finer sphere up close\" from v4473 ***",
         /a finer sphere up close, a coarser one far away/.test(orrery) && /sphereMesh\(1, /.test(orrery) && /sphereMesh\(3, /.test(orrery),

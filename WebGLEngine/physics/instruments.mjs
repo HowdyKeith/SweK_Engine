@@ -1421,6 +1421,12 @@ export const INSTRUMENTS = [
         key: "*** ONE RULE, TWO READERS. *** The labels use the cull's metric and the scene's threshold, so the labelled bodies ARE the bodies drawn at the near level of detail -- a second rule for 'near' would drift from the first without either gate noticing.",
     },
     {
+        id: "orrery-promotion", area: "method", name: "Whether the 3D orrery is the product, decided by a table of measured picture facts and a button that must agree",
+        gate: "tools/ship/orreryPromotion-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "ten picture facts the 2D orrery holds -- the bodies from one bake, every body's place at day 0 (positionAt3 against positionAt), the fleets (148 importers, 35 paperwork), the flybys (189), a pick that names, the colours (ui/orreryDraw.js's constants as the lit pipeline's tints), the planet zoom level, the author view, the post stage, the flyby trails -- each row's evidence read from the modules and the pages; the count held (6 of 10 at v4478); the panel's orrery button required to open the page the table names, both ways; each page linking the other.",
+        key: "*** A PROMOTION IS A CHANGE THE TABLE ALREADY ASKED FOR. *** The button pointed at the 3D page with rows open is red; the table closed with the button on the 2D page is red too. What a viewer prefers is not in the table and is said so.",
+    },
+    {
         id: "brain-kernels", area: "method", name: "The GPU Brain's kernels exported, in the corpus, and graded where every other GPU gate runs",
         gate: "tools/ship/brainKernels-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "brain/mlp.js renders one body in two binding layouts (the brain's and the harnesses') and exports both with a probe manifest; the probe layout on Dawn returns render/brainTsl.mjs's f32 twin bit for bit (128 of 128, a 2-D dispatch); the shipped layout bound by the brain's own names through gfx/device.js returns the same bytes on the browser's WebGPU; brain/flowfield.js exports its four-entry module and it compiles on Dawn; tools/ship/brainTsl-page.js imports the kernel instead of regexing the module's source; brain/gpu.js's initGPU refuses a SwiftShader adapter by default and accepts it under allowSoftware or SWEK_ALLOW_SOFTWARE_GPU, reporting `software`, exercised on a stubbed adapter both ways.",

@@ -492,6 +492,9 @@ export const EXCLUDED = Object.freeze([
                     why: "rewrites a base kernel's workgroup size and stages its trig tables in workgroup memory; the shipped output of it (magmapGpu.SHIPPED_WGSL) is in the corpus and tools/roundhouse/magmapVariants-selfcheck.mjs grades every variant against the CPU twin" }),
     Object.freeze({ id: "physics/xpbd/xpbd-distance.wgsl", kind: "superseded file, never loaded",
                     why: "the v2661 graph-coloured distance solver; nothing in the tree reads the file (v4465 measured that), physics/xpbd/xpbdWgsl.mjs solveWgsl is its replacement and IS in the corpus, and the file keeps its SUPERSEDED note as the record" }),
+    // v4478 -- the lit pair's renderer: a function of the tint palette. Its empty rendering IS litSphere.LIT_WGSL, in the corpus.
+    Object.freeze({ id: "litSphere.litWgsl", kind: "renderer of a palette",
+                    why: "renders the lit render pair with a tint if-chain baked in; litWgsl(null) is LIT_WGSL, which the corpus compiles on both backends, and a tinted rendering is painted and read back on both by tools/ship/litSphere-selfcheck.mjs" }),
     Object.freeze({ id: "physics/xpbd/cloth-collision.wgsl", kind: "superseded file, never loaded",
                     why: "the v2661 contact solver that did not accumulate lambda -- the disagreement with clothLoop.js that v4465 found by writing the mirror; xpbdWgsl.mjs solves contact with the same kernel as the fixed solve under a unilateral flag, and nothing loads this file" }),
 ]);

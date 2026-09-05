@@ -2196,6 +2196,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "scene through render/slugDevice.mjs; gpuOrbits-selfcheck loads the page and it throws nothing. Sabotages " +
                  "red at 7 / 4 / 1 by name.",
     }),
+    // v4478 -- the hundredth closing. Promotion by table: six of ten rows held, four open, the button where the table says.
+    since100: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/orreryPromotion-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/litSphere-selfcheck.mjs (a baked tint palette on extra.y, painted flat on both backends; nine tints refused)",
+        ]),
+        verdict: "green headless (~0.5 s) and on both backends for the tints. The 3D orrery is NOT promoted, and the reason " +
+                 "is a table rather than a preference: ten picture facts the 2D page holds, each measured from the modules and " +
+                 "the pages; six held by the 3D page, four open by name (the planet zoom level, the author view, the post stage, " +
+                 "the flyby trails); the panel's orrery button must agree with the verdict both ways, so a promotion on a good " +
+                 "day and a closed table with a stale button are both red. Closed this round: the colours -- render/litSphere.mjs " +
+                 "bakes a palette into both shaders as an if-chain on extra.y (WGSL cannot index a const array by a runtime " +
+                 "value), and orrery-gpu.html tints every record with ui/orreryDraw.js's own STATE_COLOUR and REACHED_COLOUR, " +
+                 "so a captured body is one green and a flyby SweK may not take one purple on both pages. Each page links the " +
+                 "other. Sabotages red at 1 / 2 by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

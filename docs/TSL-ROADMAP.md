@@ -517,7 +517,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         point against the NDC box, so a body whose centre is just off-screen is drawn without a label. NOT CLAIMED:
         label collisions, leader lines, fading.
      6. (task 37) Promotion by measurement: the 3D page passes the 2D page's gates plus its own before the panel's
-        link points at it; the 2D page stays as the reference twin.
+        link points at it; the 2D page stays as the reference twin. MEASURED at v4478, NOT PROMOTED, and the
+        measurement is a gate: tools/ship/orreryPromotion-selfcheck.mjs is a table of ten picture facts the 2D page
+        holds, each row's evidence read from the modules and the pages, and the panel's orrery button is REQUIRED to
+        agree with the verdict both ways. Six rows held (the bodies from one bake; every body's place at day 0;
+        the fleets; the flybys; a pick that names; the colours -- closed this round, the GPU page tinting its
+        records with ui/orreryDraw.js's own STATE_COLOUR and REACHED_COLOUR through render/litSphere.mjs's baked
+        palette). Four open, by name: the planet zoom level (a seeded or measured micro planet between the sky and
+        the terrain), the author view, the post stage, the flyby trails. The button stays on orrery.html; each page
+        links the other. The 2D page's own gates (orreryView, orreryPost) hold the data model both pages read and
+        are red on trunk for reasons that are not this page's (the bake's drift, a 6/255 post-effect pixel).
 
 ## The count that says when step 4 matters
 
