@@ -94,6 +94,42 @@ export const LICENCE_TEXTS = Object.freeze({
         sha256: "1fb1764108a736f8b1b7bfbc0b9e63dd3c2dd6acbf0e067021ce965c11a53a43",
         note: "v4198 recorded 48 of these 77 words and spelled 'build' as 'built'",
     },
+    // v4473 -- two licences that are NOT standard identifiers, which is exactly why they are quoted here.
+    "crunch-public-domain-2020": {
+        text:
+            'THIS SOFTWARE IS IN THE PUBLIC DOMAIN THIS IS FREE AND UNENCUMBERED SOFTWARE EXPLICITLY AND OVERTLY RELEASED AND\n' +
+            'CONTRIBUTED TO THE PUBLIC DOMAIN, PERMANENTLY, IRREVOCABLY AND UNCONDITIONALLY\n' +
+            'WAIVING ANY AND ALL CLAIM OF COPYRIGHT, IN PERPETUITY ON SEPTEMBER 15, 2020.',
+        sourceUrls: ["https://raw.githubusercontent.com/BinomialLLC/crunch/master/license.txt"],
+        retrieved: "2026-09-05", words: 40, chars: 268,
+        sha256: "4524c0b57209bd6db9ff15bb582a6594425a4652dad2973f0fe2eae404dea26d",
+        note: "the declaration and its first paragraph, from a 3249-byte license.txt that goes on to four " +
+              "numbered fallback clauses. *** THE FILENAME IS LOWER CASE AND raw.githubusercontent IS " +
+              "CASE-SENSITIVE: *** a sweep over LICENSE, LICENSE.md, LICENSE.txt and COPYING returned NOT " +
+              "FOUND for a repository that has a licence, and the README is what named it.",
+    },
+    "gltf-four-class-2021": {
+        text:
+            '= LICENSE file for the KhronosGroup/glTF project\n\n' +
+            'Files in this repository fall under one of these licenses:\n\n' +
+            '  * SPDX license identifier: "`Apache-2.0`"\n  ** Apache License 2.0.\n  ** For scripts and build tooling.\n\n' +
+            '  * SPDX license identifier: "`CC-BY-4.0`"\n  ** Creative Commons Attribution 4.0 International\n' +
+            '  ** For specification source markup documents such as the glTF 2.0 AsciiDoc\n     sources. The glTF 2.0 specification HTML and PDF *outputs* built from\n' +
+            '     these sources are ratified and published in the\n     link:https://www.khronos.org/registry/glTF[Khronos glTF Registry].\n' +
+            '  ** Also for miscellaneous metadocumentation such as this LICENSE file.\n\n' +
+            '  * SPDX license identifier: "`LicenseRef-KhronosSpecCopyright`"\n  ** Khronos Specification Copyright.\n' +
+            '  ** For Markdown format specification files such as glTF 1.0 and Khronos\n     extensions, which are ratified by the Khronos Board of Promoters in\n     this form.\n\n' +
+            '  * SPDX license identifier: "`LicenseRef-TBD"\n  ** To Be Determined copyright - exact copyright holder and license terms\n     currently unknown.\n' +
+            '  ** Only for vendor extensions to glTF. We are working on determining full\n     details of these licenses in each case.',
+        sourceUrls: ["https://raw.githubusercontent.com/KhronosGroup/glTF/master/LICENSE.adoc"],
+        retrieved: "2026-09-05", words: 160, chars: 1195,
+        sha256: "4661d083212bd17d62000f06afa287f6c4e8fe3d950c0ef2ddf70b0d496ede43",
+        note: "LICENSE.adoc's enumeration of its four licence classes, ending at the last sentence of the " +
+              "LicenseRef-TBD entry. Dropped: the file's two leading `//` comment lines (its own copyright " +
+              "and SPDX tag) and the closing list of URLs where each licence's full text lives. Quoted at " +
+              "this length because the finding IS the enumeration: FOUR classes, one of which states that " +
+              "the copyright holder and terms are unknown.",
+    },
 });
 
 /** Verbatim, from three repositories spanning 2015-2016. See LICENCE_TEXTS for the URLs and the digest. */
@@ -251,7 +287,12 @@ export const REACHED_SOURCES = Object.freeze([
              "them. No bytes. That renderer ships a Disney BSDF in C++/OpenGL; this tree had every piece of one " +
              "and no composed model at all -- `grep -i disney` returned a comment about a sphere radius.",
         takenPaths: ["physics/render/principled.mjs"],
-        citedPaths: ["physics/render/principled.mjs", "physics/render/principled-selfcheck.mjs"],
+        // *** v4473 -- principled.mjs WAS IN BOTH LISTS AND THEY ARE OPPOSITE CLAIMS. *** citedPaths means
+        // "names the source WITHOUT taking from it"; a file that took cannot also be one that did not.
+        // v4471 wrote the same path into both, reachedLicences-selfcheck said so, and nothing ran it -- the
+        // gate has a recorded sweep time of 3724 ms stamped "before v4408", over the 3000 ms cap, so the quick
+        // sweep has skipped it ever since. It runs in 1497 ms.
+        citedPaths: ["physics/render/principled-selfcheck.mjs"],
         why: "*** THE REASON THIS IS A ROUND RATHER THAN A COPY IS THAT A COMPOSED MODEL HAS BOUNDARIES THE " +
              "PIECES ALREADY GRADE. *** metallic 0 / roughness 1 must be the diffuse lobe alone; metallic 1 " +
              "with roughness to 0 must be mirror Fresnel; and directional albedo must stay under 1 at any " +
@@ -272,7 +313,8 @@ export const REACHED_SOURCES = Object.freeze([
              "zero at the vertices. Vertex wobble is quantisation to a fixed-point lattice, so it is idempotent. " +
              "Both are 1994 console constraints rather than anyone's invention. No bytes.",
         takenPaths: ["render/retroRaster.mjs"],
-        citedPaths: ["render/retroRaster.mjs", "render/retroRaster-selfcheck.mjs"],
+        // v4473 -- retroRaster.mjs is TAKEN-from; it cannot also be a file that only cites.
+        citedPaths: ["render/retroRaster-selfcheck.mjs"],
         why: "*** WHAT WAS REFUSED IS THE PART WORTH RECORDING. *** Bayer dithering was already here in " +
              "fx/dither.js; YUV and posterise are AESTHETIC ONLY -- there is no wrong answer to catch -- so they " +
              "were left, and the round said so rather than shipping a gate that cannot fail. That is the " +
@@ -832,6 +874,145 @@ export const REACHED_SOURCES = Object.freeze([
         why: "The one source in this ledger whose taking is 41 functions deep and was graded on a GPU before its " +
              "licence file was ever opened. #35 closed at v4305 with all 41 ported; the register entry closes the " +
              "paperwork half, and moves the cited-but-unregistered debt from 50 to 49.",
+    },
+    // =========================================================================================================
+    // v4473 -- SIX REPOSITORIES PUT TO THE TREE AS THE TEXTURE HALF OF THE DRACO QUESTION, AND THE LICENCES
+    // ARE WHERE THE SURPRISES WERE. Every one below was fetched over the network and read in full; not one is
+    // taken from a header that cites it. gpu/khronosSamples.mjs set the standing warning -- "it is published
+    // by Khronos as a sample, so it must be free" IS FALSE -- and it is false again here, twice.
+    //
+    // SEVEN URLS WERE GIVEN AND THERE ARE SIX REPOSITORIES: binomialLLC/basis_universal and
+    // BinomialLLC/basis_universal differ only in the owner's capitalisation, and GitHub owners are
+    // case-insensitive. Recorded because a list that counts it twice would report a source it never read.
+    // =========================================================================================================
+    {
+        repo: "BinomialLLC/basis_universal", sourceUrl: "https://github.com/BinomialLLC/basis_universal",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Binomial LLC", year: 2019,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "Apache License 2.0. *** READ FIRST-HAND AT v4473: *** LICENSE on master, 201 lines, " +
+             "sha256 065fcf48d6af21c0, appendix filled in as 'Copyright 2019-2026 Binomial LLC'. Filling the " +
+             "appendix in is worth noting because the wrapper below did not.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs", "tools/ship/glbTexture-selfcheck.mjs"],
+        why: "The supercompressed texture format KHR_texture_basisu carries. NOTHING WAS TAKEN because the " +
+             "measurement said not to: gpu/glbTexture.BUDGET records 0.37 MB of images on disk decoding to " +
+             "4.25 MB of VRAM with mips, of which ONE unreferenced preview PNG is 81%. Everything this engine " +
+             "actually loads decodes to 0.60 MB, and ETC1S would make that 0.08 MB -- a saving of under a " +
+             "megabyte against a transcoder, a build step and a vendored dependency.",
+    },
+    {
+        repo: "BinomialLLC/crunch", sourceUrl: "https://github.com/BinomialLLC/crunch",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Binomial LLC / Rich Geldreich", year: 2020,
+        // A quoted licence needs an id, and the text lives in LICENCE_TEXTS with its URL, its retrieval date
+        // and its digest -- the rule the codrops rows established, so a quote can be re-fetched and compared
+        // rather than believed.
+        spdx: null, licence: LICENCE_TEXTS["crunch-public-domain-2020"].text,
+        licenceId: "crunch-public-domain-2020",
+        licenceNote: "*** NOT AN SPDX LICENCE, AND spdx IS NULL FOR THAT REASON. *** license.txt on master, " +
+             "3249 bytes, sha256 f46d74fe8d0c981a: a bespoke public-domain dedication with four numbered " +
+             "fallback clauses, closer to CC0 in intent than to any identifier. *** AND IT WAS NEARLY MISSED: " +
+             "*** the file is `license.txt`, lower case, and raw.githubusercontent is case-sensitive, so a " +
+             "sweep over LICENSE/LICENSE.md/LICENSE.txt/COPYING returned NOT FOUND for a repository that has " +
+             "one. The README named it; the sweep had stopped looking.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs"],
+        why: "The DXT-era ancestor of Basis, and the reason it is recorded rather than pursued is that its " +
+             "output formats are the ones WebGPU does not name: crunch targets DXT1/DXT5, where the question " +
+             "here is a transcodable format that reaches ETC, ASTC and BC alike.",
+    },
+    {
+        repo: "KhronosGroup/KTX-Software", sourceUrl: "https://github.com/KhronosGroup/KTX-Software",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Mark Callow / The Khronos Group Inc.", year: 2013,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "*** 'Apache-2.0' IS TRUE OF THE REPOSITORY AND FALSE OF SEVERAL FILES IN IT. *** " +
+             "LICENSE.md on master, 36 lines, sha256 0f92b4ce771585df, says files unique to the repository " +
+             "'generally' fall under Apache-2.0 and that 'there are many other licenses in this repository'. " +
+             "A shallow clone at 16059fa shows LICENSES/ holding THIRTEEN: Apache-2.0, BSD-1/2/3-Clause, " +
+             "BSL-1.0, CC-BY-3.0, CC0-1.0, MIT, Zlib, LicenseRef-ETCSLA, LicenseRef-HI-Trademark, " +
+             "LicenseRef-Kodak, LicenseRef-fmt. *** AND ONE FILE IS NOT OPEN SOURCE AT ALL. *** LICENSE.md's " +
+             "own Special Cases section says so: etcdec.cxx is under an Ericsson SLA. THE PATH IT GIVES IS " +
+             "STALE -- it says lib/etcdec.cxx and the file is at external/etcdec/etcdec.cxx (68366 bytes) -- " +
+             "so the fact is right and the location is not, which is the shape v4472 spent a round on.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs", "tools/ship/glbTexture-selfcheck.mjs"],
+        why: "*** THE ERICSSON TERMS ARE RECORDED VERBATIM BECAUSE THEIR SCOPE IS NAMED SPECIFICATIONS AND " +
+             "WebGPU IS NOT AMONG THEM. *** LicenseRef-ETCSLA grants a free-of-charge perpetual worldwide " +
+             "licence 'but only for the purpose of developing, manufacturing, selling, using and distributing " +
+             "products including the Software in binary form, which products are used for compression and/or " +
+             "decompression according to the Khronos standard specifications OpenGL, OpenGL ES and WebGL'. It " +
+             "permits source redistribution of etcdec.cxx only unmodified and inside software the licensee " +
+             "owns, and lets Ericsson terminate on patent litigation within the Khronos framework. THIS ENTRY " +
+             "STATES WHAT THE TEXT SAYS AND DRAWS NO LEGAL CONCLUSION: a tree moving to WebGPU should have a " +
+             "person read that scope before vendoring, which is precisely the judgement khronosSamples exists " +
+             "to force rather than assume. Also structural: external/basis_universal is vendored INSIDE this " +
+             "repository, so taking KTX-Software is taking Basis too.",
+    },
+    {
+        repo: "BinomialLLC/KTX-Software-Binomial-Fork",
+        sourceUrl: "https://github.com/BinomialLLC/KTX-Software-Binomial-Fork",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Mark Callow / The Khronos Group Inc.", year: 2013,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "*** THE LICENCE FILE IS BYTE-IDENTICAL TO UPSTREAM'S -- SAME sha256 0f92b4ce771585df -- " +
+             "AND STILL TITLED 'LICENSE file for the KhronosGroup/KTX-Software project'. *** A fork carrying " +
+             "the parent's licence unchanged inherits every one of the thirteen, the Ericsson SLA included; it " +
+             "does not inherit the parent's maintenance. Recorded as its own row rather than folded into the " +
+             "one above, because a fork is a different grantor even when the text is the same bytes.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs"],
+        why: "Read to establish whether the fork diverges in what it grants. It does not: the comparison is " +
+             "a hash, not a reading of two documents, which is the only way to say 'identical' and mean it.",
+    },
+    {
+        repo: "KhronosGroup/glTF", sourceUrl: "https://github.com/KhronosGroup/glTF",
+        grantorHoldsRights: true, licenceExists: true, publisher: "The Khronos Group Inc.", year: 2020,
+        spdx: null, licence: LICENCE_TEXTS["gltf-four-class-2021"].text,
+        licenceId: "gltf-four-class-2021",
+        licenceNote: "*** FOUR LICENCE CLASSES, NOT ONE, WHICH IS WHY spdx IS NULL. *** LICENSE.adoc on " +
+             "master, 37 lines, sha256 efd59d5f99852785, itself CC-BY-4.0. Apache-2.0 covers scripts and " +
+             "tooling; CC-BY-4.0 the AsciiDoc specification sources; LicenseRef-KhronosSpecCopyright the " +
+             "Markdown specification files -- WHICH IS THE CLASS KHR_texture_basisu FALLS IN, since it is a " +
+             "ratified Khronos extension and not tooling. *** AND ONE CLASS ADMITS IT IS UNKNOWN: *** " +
+             "LicenseRef-TBD, for vendor extensions, reads 'exact copyright holder and license terms " +
+             "currently unknown. We are working on determining full details of these licenses in each case.' " +
+             "A repository that says out loud which of its files it cannot license is more honest than most " +
+             "and still means a vendor extension carries no grant anybody can name.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs", "tools/ship/glbTexture-selfcheck.mjs"],
+        why: "The specification for the extension this round measured. What was taken from it is the SHAPE of " +
+             "KHR_texture_basisu -- that a texture may carry the extension alongside an optional fallback " +
+             "`source` -- which gpu/glbTexture.mjs uses to predict, from a header alone, which of three " +
+             "outcomes a load will reach. No specification text was copied.",
+    },
+    {
+        repo: "Oefenweb/ktx-basis-universal", sourceUrl: "https://github.com/Oefenweb/ktx-basis-universal",
+        grantorHoldsRights: false, licenceExists: true, publisher: null, year: null,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "*** THE APACHE APPENDIX WAS NEVER FILLED IN, SO THE GRANT NAMES NOBODY. *** LICENSE on " +
+             "master, 201 lines, sha256 c71d239df91726fc. It differs from BinomialLLC/basis_universal's copy " +
+             "at EXACTLY ONE LINE, 189: upstream reads 'Copyright 2019-2026 Binomial LLC' and this reads the " +
+             "unedited template, 'Copyright [yyyy] [name of copyright owner]'. The form is Apache-2.0 and the " +
+             "copyright holder is a placeholder, so `publisher` and `year` are null and `grantorHoldsRights` " +
+             "is FALSE -- not because anything suggests bad faith, but because a repackaging whose licence " +
+             "identifies no owner is not evidence that its packager holds rights in what it repackages. THE " +
+             "DIFF IS THE FINDING and it took one line of comparison; reading either file alone would have " +
+             "reported 'Apache-2.0' and stopped.",
+        redistributable: false, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: ["gpu/glbTexture.mjs"],
+        why: "A packaging of Basis Universal. Read to see whether it offered a shorter path to a transcoder " +
+             "than upstream; the licence question above is reason enough not to prefer it, and the " +
+             "measurement is reason enough not to want one yet.",
     },
 ]);
 

@@ -692,6 +692,54 @@ export function ledgerDrift(recorded, measured) {
     });
 }
 
+/**
+ * *** v4473 -- THE ABSORBING STATE, CAUGHT HIDING A DEFECT OF THIS SESSION'S OWN MAKING. ***
+ *
+ * v4471 recorded three gates that "arrived red from a merge" -- windowsImport, citedSources and quickSweep --
+ * and every one was found BY RUNNING GATES BY HAND. The reason the sweep could not find them is in this file:
+ * windowsImport carries a recorded 3089 ms and citedSources 3103 ms, both over the 3000 ms cap, both stamped
+ * "unknown -- before v4408". selectGates skips them; runQuickSweep rewrites timings only for gates that RAN;
+ * so the number that exiled them can never be corrected by the sweep. THE DOOR IS ONE-WAY, WHICH IS WHAT
+ * ABOVE ALREADY SAYS -- and this is what it costs.
+ *
+ * It happened again in the same session. v4471 added two entries to world/reachedLicences.mjs with the same
+ * path in `takenPaths` and `citedPaths`; reachedLicences-selfcheck says in as many words that those are
+ * opposite claims about one file, and it went red. NOTHING RAN IT FOR TWO ROUNDS. Its recorded time is
+ * 3724 ms and it finishes in 1420 ms.
+ *
+ * *** THE POPULATION, COUNTED: 503 gates carry a timing over the cap stamped before v4408, AND 360 OF THEM
+ * WERE GREEN WHEN THEY WERE EXILED. *** Twenty-one were re-timed by hand -- the twenty nearest the cap, plus
+ * reachedLicences -- and ALL TWENTY-ONE finish under it, most by a factor of two to five: 3002 ms recorded
+ * against 830 ms measured, 3047 against 543, 3724 against 1420. Their rows in sweep-timings.json now carry
+ * the measured value and a v4473 stamp, so those twenty-one are back in the sweep.
+ *
+ * *** WHAT THIS DOES NOT DO, AND IT IS THE LARGER HALF. *** The other 482 are untouched. The sample was
+ * deliberately taken NEAREST THE CAP, where a gate is likeliest to have been exiled by a hair, so 21-of-21
+ * CANNOT be read as a rate over the whole 503 -- it establishes that the cap holds gates that would clear it,
+ * not how many. And re-timing by hand is a bucket under a leak: the mechanism that made those numbers
+ * permanent is untouched, so today's honest timings will be tomorrow's stale ones. THE STRUCTURAL FIX IS FOR
+ * THE SWEEP TO RE-TIME AN EXILED GATE NOW AND THEN so the state stops being absorbing, and that is a change
+ * to quickSweep's selection with its own cost to measure -- a round, not a line.
+ */
+export const STALE_EXILE_V4473 = Object.freeze({
+    at: "v4473",
+    overCapStampedBeforeV4408: 503,
+    ofThoseRecordedGreen: 360,
+    reTimedHere: 21,
+    clearedTheCap: 21,
+    sampleBias: "the twenty nearest the cap plus reachedLicences -- chosen where exile-by-a-hair is likeliest, " +
+                "so this establishes THAT the cap holds gates that would pass it, never a rate over the 503",
+    costOfTheirReturn: "about 28 s of gate time added to the sweep, against 35.7 s of recorded time that was " +
+                       "never real",
+    hidThisSession: Object.freeze([
+        "tools/ship/windowsImport-selfcheck.mjs (3089 recorded, 736 measured) -- red on origin/main at v4471 and found by hand",
+        "tools/ship/citedSources-selfcheck.mjs (3103 recorded, 1129 measured) -- the same",
+        "tools/ship/reachedLicences-selfcheck.mjs (3724 recorded, 1420 measured) -- red from v4471 to v4473 on a defect v4471 itself wrote",
+    ]),
+    unfixed: "482 rows, and the mechanism: runQuickSweep rewrites timings only for gates that ran, so a gate " +
+             "over the cap can never correct the number that put it there",
+});
+
 /** Of the exiled gates measured alone, how many would clear the budget today. */
 export function wouldRunNow(measured = MEASURED_V4425, budgetMs = DEFAULTS.budgetMs) {
     const done = Object.entries(measured).filter(([, m]) => m.verdict === "GREEN" || m.verdict === "RED");

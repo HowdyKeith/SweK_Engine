@@ -72,6 +72,13 @@ export const NOT_IMPORTERS = Object.freeze([
     // whether the path is imported or merely named -- which is exactly the distinction the substring rule
     // cannot draw.
     "tools/ship/orreryUniverse-selfcheck.mjs",
+    // v4473: SIXTH instance, and it arrived in the SAME ROUND that recorded the fifth. glbTexture-selfcheck
+    // reads vendor/three/jsm/loaders/GLTFLoader.js to assert what that loader does with KHR_texture_basisu --
+    // it imports nothing from three -- and joined three's fleet the moment it existed, taking it 71 -> 72.
+    // *** THE POINT IS HOW LONG IT LASTED: MINUTES. *** The name-frozen ratchet said WHICH FILE, in the same
+    // session that wrote it, which is exactly what v4412 bought when it made the baseline a list of names
+    // rather than a count. A count would have said "72, was 71" and left somebody to find out why.
+    "tools/ship/glbTexture-selfcheck.mjs",
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */

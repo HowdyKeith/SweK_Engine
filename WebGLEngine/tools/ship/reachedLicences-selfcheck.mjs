@@ -207,9 +207,24 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     // v4203 found a real one by reading: projapati66/Svg-IsometricCityAnimation ships an MIT LICENSE file
     // over artwork its author does not own. The category being ready is why that entry took one field to
     // file rather than a round to argue about.
+    // *** v4473 -- THIS PINNED THE COUNT AT ONE AND READING FOUND A SECOND. *** The paragraph above says the
+    // category was "defined before it was needed, which is the only time it can be defined calmly" and that
+    // v4203 then "found a real one by reading". v4473 found another the same way: Oefenweb/ktx-basis-universal
+    // ships an Apache-2.0 LICENSE whose copyright holder was never filled in -- the appendix still reads
+    // "Copyright [yyyy] [name of copyright owner]" -- over a repackaging of somebody else's code. That is
+    // severityOf's own rule firing exactly as written: `grantorHoldsRights === false` is checked BEFORE the
+    // licence "because an encumbered file's licence is exactly what misleads".
+    //
+    // A CATEGORY THAT GROWS WHEN SOMEBODY READS IS WORKING, AND `enc.length === 1` MADE THAT A FAILURE. The
+    // count was never the claim. What is asserted now is the PROPERTY every encumbered entry must have --
+    // a licence that exists (that is what misleads), no claim of rights, and a note saying why -- and the
+    // roll is reported by name, which is what a reader needed from this line in the first place.
     const enc = REACHED_SOURCES.filter((e) => severityOf(e) === SEVERITY.ENCUMBERED);
-    ok(enc.length === 1 && /Svg-IsometricCityAnimation/.test(enc[0].repo),
-        `exactly one source in the register is encumbered: ${enc.map((e) => e.repo).join(", ")} -- ` +
+    ok(enc.length >= 1 && enc.every((e) => e.licenceExists === true && e.grantorHoldsRights === false &&
+                                           typeof e.licenceNote === "string" && e.licenceNote.length > 40 &&
+                                           e.redistributable === false),
+        `${enc.length} encumbered source(s), each with a licence that exists and no claim of rights behind it: ` +
+        `${enc.map((e) => e.repo).join(", ")} -- ` +
         "found by reading a repo, three versions after the category was defined from a hypothetical");
     ok(REACHED_SOURCES.every((e) => typeof e.grantorHoldsRights === "boolean"),
         `and all ${REACHED_SOURCES.length} existing entries answer the question, rather than it applying only to new ones`);

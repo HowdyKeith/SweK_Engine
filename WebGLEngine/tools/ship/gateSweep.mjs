@@ -2276,6 +2276,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "asserted), and a runner reading only stdout -- invisible because the one gate that prints " +
                  "its verdict to stderr is too slow to re-run every time",
     }),
+    since108: Object.freeze({
+        at: "v4473", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/glbTexture-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/reachedLicences-selfcheck.mjs (v4471 put one path in both takenPaths and citedPaths; the gate says those are opposite claims and nothing ran it for two rounds)",
+            "tools/ship/sweep-timings.json (21 rows re-timed; every one had an over-cap number stamped before v4408 and every one clears the cap today)",
+            "tools/ship/orreryFleetScan.mjs (glbTexture-selfcheck joined three's fleet by READING GLTFLoader.js -- the sixth instance, caught in the same session that recorded the fifth)",
+        ]),
+        verdict: "THE TEXTURE HALF OF THE DRACO QUESTION, ANSWERED NOT YET. gpu/glbTexture.mjs predicts, from " +
+                 "a GLB header alone, which of three outcomes a KHR_texture_basisu asset reaches in this tree " +
+                 "-- including the one the vendored loader's own comment assumes away, where an optional " +
+                 "basisu texture with no fallback dies on json.images[undefined].uri with an error naming " +
+                 "neither Basis nor KTX2. The adoption is refused on a measurement: everything this engine " +
+                 "loads decodes to 0.60 MB and ETC1S would save under a megabyte. Six licences read " +
+                 "first-hand, three with surprises -- thirteen licences inside one 'Apache-2.0' repository " +
+                 "and an Ericsson SLA scoped to OpenGL, OpenGL ES and WebGL with WebGPU unnamed; four licence " +
+                 "classes in glTF, one of them stating its own terms are unknown; and an Apache appendix that " +
+                 "names no copyright holder. AND THE ABSORBING STATE WAS CAUGHT HIDING THIS SESSION'S OWN " +
+                 "DEFECT: 503 gates carry an over-cap timing stamped before v4408, 360 were green when " +
+                 "exiled, and all 21 re-timed here clear the cap -- among them the two gates v4471 could only " +
+                 "find by hand. THE NEW GATE COST THREE CORRECTIONS OF ITS OWN, every one found by a " +
+                 "neighbour: it joined a vendor fleet by reading GLTFLoader.js (orreryEjecta), it was born at " +
+                 "9.7 s and would have been exiled on arrival by the state it documents (re-timed to 833 ms " +
+                 "by filtering before stripping), and it asserted the loader's COMMENT TEXT rather than the " +
+                 "unguarded dereference underneath it (gateQuality's prose-matching ratchet). Eight sabotages " +
+                 "by name, eight red",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
