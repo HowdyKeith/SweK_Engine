@@ -1875,6 +1875,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "that any of this RUNS. No Excel has ever run against SweK_VBA_v3499 from this box, the pages " +
                  "still say so, and no VBA row is tagged `measured`.",
     }),
+    // v4463 -- the eighty-first closing. The spherical member of a family the tree only had the cylinder of.
+    since81: Object.freeze({
+        at: "v4463", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/stereographic-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, fifteen checks in five sections. render/panini.js has quoted its own " +
+                 "primary source since v2571 -- Panini is 'THE CYLINDRICAL ANALOG OF THE STEREOGRAPHIC " +
+                 "PROJECTION OF A SPHERE' -- and this tree has held the cylindrical member of that family for " +
+                 "1,892 versions and never the spherical one. Nothing is ported: the projection is four " +
+                 "hundred years old and the construction is three lines of similar triangles, u = 2x/(1-z). " +
+                 "*** THE GATE'S PRIMARY CHECK IS AN IDENTITY AGAINST THE MODULE THAT NAMED IT, NOT SELF- " +
+                 "CONSISTENCY: *** on the horizon, where a cylinder and a sphere ARE the same surface, " +
+                 "paniniProject at d=1 and stereoProject are the same function to 4.18e-11 over 180 azimuths " +
+                 "-- and at d = 0.5, 2 and 4 they miss by 14 to 23 whole units, which is what stops the " +
+                 "identity being a tautology. *** AND 'ANALOG' IS EXACT ON ONE CURVE AND WRONG BY 88 DEGREES " +
+                 "OFF IT: *** stereographic is CONFORMAL, asserted through the ANALYTIC Jacobian (right angle " +
+                 "preserved to 1.4e-14 deg, isotropy to 4.4e-16), while Panini at d=1 flattens a right angle " +
+                 "to two degrees at the NADIR -- which is exactly where a little planet points, because " +
+                 "Panini's height term y/hypot(x,z) diverges at the poles. THE FIRST DRAFT SAID 35 DEGREES: " +
+                 "that number was measured over six directions and the gate runs seven, a frozen number taken " +
+                 "over a different sample than the check runs -- v4462's own defect, one round later, left " +
+                 "visible. Two more corrections the build produced: a finite-difference version of the " +
+                 "conformality check reads 4.5e-5 deg against the analytic 1.4e-14 and would hide a real " +
+                 "defect of that size, so the blunt instrument is RECORDED and the sharp one is what the gate " +
+                 "stands on; and the horizon landmark is EXACTLY 2 through stereoProject and ONE ULP SHORT " +
+                 "through stereoRadiusFor, because Math.PI/2 is not pi/2 -- which is why the construction has " +
+                 "no trigonometry in it and why the gate asserts landmarks through the exact path. Thirteen " +
+                 "sabotages, all RED BY NAME, two files md5-identical. *** TWO OF THEM COST ZERO RED FIRST " +
+                 "AND BOTH WERE FINDINGS ABOUT THE CHECK. *** Turning the nadir map into a REFLECTION changed " +
+                 "nothing, because the handedness check computed a determinant from a HARD-CODED COPY of the " +
+                 "rotation written out again inside the gate -- a second copy of a function cannot disagree " +
+                 "with the first -- and both landmarks are blind to a mirror by construction, since both have " +
+                 "y = 0 after the rotation, exactly as that check's own comment predicted and then failed to " +
+                 "test for. It probes littlePlanetDir itself now, by signed volume. And changing a constant in " +
+                 "the GLSL cost zero red because the shader check was a handful of regexes that happened not " +
+                 "to cover it: a regex over shader text tests the regexes. #118 settled that idiom for this " +
+                 "tree -- 'no gate has ever compared their VALUES' -- so the shader is now mechanically " +
+                 "rewritten into JS and compared numerically, 0.00e+0 over 240 directions and 240 plane " +
+                 "points. WHAT IS NOT CLAIMED: that a GPU agrees. The rewrite is textual, a real driver may " +
+                 "differ in precision or in normalize(), and the shader's actual output still needs a " +
+                 "screenshot on the rig -- the same limit panini.js declared and this inherits rather than " +
+                 "pretending past.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

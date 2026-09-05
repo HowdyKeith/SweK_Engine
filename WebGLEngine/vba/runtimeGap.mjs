@@ -4,10 +4,10 @@
 // NODE/BUN. MEASURED, THREADS ARE THE SECOND-SMALLEST GAP OF TWELVE, AND THE QUESTION HAS ITS SCALE INVERTED. ***
 //
 // The item's phrasing carries an assumption -- that threads are the big one and the rest is detail. Counted
-// over the 3,814 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
+// over the 3,816 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
 //
-//     ES modules              3523 files   92.4%
-//     closures as values      3404 files   89.3%
+//     ES modules              3525 files   92.4%
+//     closures as values      3405 files   89.2%
 //     async / await           1314 files   34.5%
 //     typed arrays             662 files   17.4%
 //     Promises                 329 files    8.7%
@@ -19,7 +19,7 @@
 //     workers / threads         22 files    0.6%     <-- the thing the item asks "besides"
 //     WebAssembly               22 files    0.6%   <-- tied with it, and the tie is this round's own doing
 //
-// *** FIRST-CLASS FUNCTIONS ARE 155 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,404 files against 22. A
+// *** FIRST-CLASS FUNCTIONS ARE 155 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,405 files against 22. A
 // runtime that had threads and no closures could run 0.6% of what a runtime with closures and no threads
 // could. So the answer to "what is missing besides threads" is: nearly all of it, and threads barely register.
 //
@@ -165,11 +165,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // by luck, and the numbers below are the ones a reader can reproduce. They moved a second time when
     // origin/main was merged in before shipping -- TWICE, and the gate caught it both times. First v4449 and
     // v4450 (four rows, four files). Then TEN concurrent versions, v4452 to v4461, which moved five rows and
-    // thirteen files and pushed the ratio from 154 to 155. A table read back rather than re-derived would
-    // have shipped the first set of numbers three times over. *** AND THE ROUND'S OWN NUMBER COLLIDED: *** a
+    // thirteen files and pushed the ratio from 154 to 155. Then v4463's own two files, one round later, moved
+    // two more rows -- the FOURTH drift this table has survived, and the fourth time the gate named it. A table
+    // read back rather than re-derived would have shipped the first set of numbers four times over. *** AND THE ROUND'S OWN NUMBER COLLIDED: *** a
     // concurrent session shipped a different v4451 and reached main first, so this round is v4462.
-    files: 3814,
-    esModules: 3523, closures: 3404, asyncAwait: 1314, typedArrays: 662, promises: 329,
+    files: 3816,
+    esModules: 3525, closures: 3405, asyncAwait: 1314, typedArrays: 662, promises: 329,
     fetchXhr: 223, performanceNow: 202, raf: 116, webgl: 102, webgpu: 35, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -190,7 +191,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 155,     // 3404 / 22, rounded
+    closuresOverThreads: 155,     // 3405 / 22, rounded
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,
