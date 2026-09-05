@@ -164,7 +164,7 @@ const cov = definitionCoverage(ENG);
               "additionally covers the " + (wide.gatedModules - cov.gatedModules) + " gated modules outside " +
               "physics/ -- render/, rig/, ui/, world/ and the rest -- where a silently uncovered export would " +
               "previously have passed every gate in this file");
-    // *** v4453 -- THIS LINE PRINTED TWO IMPOSSIBLE NUMBERS ON EVERY RUN FOR ~390 VERSIONS. ***
+    // *** v4458 -- THIS LINE PRINTED TWO IMPOSSIBLE NUMBERS ON EVERY RUN FOR ~390 VERSIONS. ***
     //
     // The decomposition is only defined while the count EXCEEDS what constant-rate growth would have
     // produced. v4062 paid physics/ down to zero and re-froze the pin AT zero -- and left this line

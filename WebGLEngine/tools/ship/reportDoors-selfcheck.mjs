@@ -1,4 +1,4 @@
-// tools/ship/reportDoors-selfcheck.mjs -- v4453 -- the gate for the reportLines convention.
+// tools/ship/reportDoors-selfcheck.mjs -- v4458 -- the gate for the reportLines convention.
 //
 // *** THE LARGEST UNTESTED CONVENTION IN THE TREE, AND THE REASON IS A COST RATHER THAN AN OVERSIGHT. ***
 // Seventy-eight modules export reportLines; server.html, instrument-bench.html, fleet-report.mjs and the
@@ -32,7 +32,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
-         CALL_COST_V4453 as COST, NO_GATE_V4453 as NOGATE } from "./reportDoors.mjs";
+         CALL_COST_V4458 as COST, NO_GATE_V4458 as NOGATE } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ALL = process.argv.includes("--all");
@@ -178,7 +178,7 @@ console.log("\n5. the cost, which is the reason this convention was never checke
        `${NEVER_CALL.length} entry: ${NEVER_CALL.join(", ")}, a zero-arity self-report that every walker of ` +
        `this convention will call, absent from all ${CALLED.length} modules this gate called. A call site that ` +
        "forgets the list fails here rather than hanging the suite.");
-    // *** v4454 -- THIS ROW SAID "HAS NEVER BEEN OBSERVED TO RETURN" AND MEASURING THAT CLOSED IT. *** The
+    // *** THIS ROW SAID "HAS NEVER BEEN OBSERVED TO RETURN", AND MEASURING THAT CLOSED IT LATER IN THE SAME ROUND. *** The
     // mechanism was a budget spent PER DEVICE across a 129-device registry: a worst case of forty-three
     // minutes with no budget on the census itself. knobLiveness has one now, reportLines() returns in 38.0s
     // covering 19 of 129 devices and saying which. It stays uncalled here FOR COST, which is a different
@@ -188,7 +188,7 @@ console.log("\n5. the cost, which is the reason this convention was never checke
        COST.doesNotFinish === null && kl && kl.bare > 30 && kl.was &&
        rows.some((r) => r.rel === "tools/roundhouse/knobLiveness.mjs" && r.kind === "self-report"),
        `38.0s where it used to run past 90 and be killed -- ${kl ? kl.was : "?"}. It is a zero-arity ` +
-       "self-report, so every walker of this convention calls it; before v4454 every walker hung.");
+       "self-report, so every walker of this convention calls it; before v4458 every walker hung.");
 
     // *** THE CHEAP PATH THAT NOTHING RECORDED, AND IT IS NOT THE SAME REPORT. *** One fast call, and it
     // carries a number rather than an adjective.

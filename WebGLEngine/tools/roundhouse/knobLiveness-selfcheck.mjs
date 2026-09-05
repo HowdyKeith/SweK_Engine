@@ -922,7 +922,7 @@ console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
               + "BLIND SPOT. THE RIGHT RESPONSE IS DELETION, NOT LOOSENING (v3195).");
 }
 
-// ---- v4454 -- THE CENSUS HAS A BUDGET OF ITS OWN, AND A PARTIAL CENSUS MUST SAY SO ---------------------------
+// ---- THE CENSUS HAS A BUDGET OF ITS OWN, AND A PARTIAL CENSUS MUST SAY SO ---------------------------
 //
 // *** THE BUDGET GUARDED THE DEVICE AND NOTHING GUARDED THE CENSUS. *** budgetMs is spent PER DEVICE and the
 // registry holds 129, so reportLines() -- this module's front door on the reportLines convention, and the one

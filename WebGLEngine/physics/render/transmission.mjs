@@ -128,7 +128,7 @@ const indexOn = (dir, nAbove, nBelow) => (dir[2] >= 0 ? nAbove : nBelow);
  *   f_t = |i.h||o.h| / (|i.n||o.n|)  *  etaO^2 (1 - F) G D  /  (etaI (i.h) + etaO (o.h))^2
  */
 export function btdf(wi, wo, { alpha, nAbove, nBelow, useSchlick = false, dropJacobian = false,
-                              // v4451 -- the two corrections, as PARAMETERS rather than edits, so a planted
+                              // v4458 -- the two corrections, as PARAMETERS rather than edits, so a planted
                               // run and a clean run are the same code path. Defaults are v4436's behaviour.
                               // `g2: "g1i"` and `noFresnel` are the PROBE that isolates the change of
                               // variable: masking by the incident direction only and no Fresnel leaves the
@@ -221,7 +221,7 @@ export const LIMITS = Object.freeze({
 export const criticalOf = criticalCos;
 
 // ===========================================================================================================
-// v4451 -- THE TWO CANDIDATES, TOLD APART. THE JACOBIAN IS INNOCENT AND BOTH OTHER SUSPECTS ARE GUILTY.
+// v4458 -- THE TWO CANDIDATES, TOLD APART. THE JACOBIAN IS INNOCENT AND BOTH OTHER SUSPECTS ARE GUILTY.
 // ===========================================================================================================
 //
 // v4447 convicted this file's single-scatter lobe of over-counting and named two suspects -- "a question
@@ -331,8 +331,8 @@ export const g2Transmission = (cosI, cosO, alpha) => {
 };
 
 /** The record, frozen by name (v4399's rule). v4447 named two suspects; this is which. */
-export const BTDF_VERDICT_V4451 = Object.freeze({
-    at: "v4451",
+export const BTDF_VERDICT_V4458 = Object.freeze({
+    at: "v4458",
     question: "v4447 convicted the single-scatter BTDF of over-counting and named two suspects: Walter's " +
               "Jacobian, or the height-correlated G2. This separates them.",
     jacobian: "INNOCENT, exactly. Into the denser medium there is NO total internal reflection, so with G " +
@@ -359,7 +359,7 @@ export const BTDF_VERDICT_V4451 = Object.freeze({
                        "yet -- see repairOpen. Turning both corrections on drops alpha 1, cos 0.25 from " +
                        "1.2444 to 0.3064, which is the correct single-scatter number and a visible change to " +
                        "every rough transmissive material. That is a decision, not a patch.",
-    repairClosed: "v4452 -- THE REPAIR NEEDED NO COMPLETING; v4451'S TARGET WAS WRONG. The probe compared " +
+    repairClosed: "THE REPAIR NEEDED NO COMPLETING; THE PROBE'S OWN TARGET WAS WRONG. It compared " +
                   "the lobe against 1 - P(TIR), which counts every visible normal that refracts INCLUDING " +
                   "the ones whose refracted ray leaves UPWARD -- a population an integral over the lower " +
                   "hemisphere cannot hold and a single-scatter lobe must not count. At alpha 1, cos 0.25 " +

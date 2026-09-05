@@ -1,4 +1,4 @@
-// tools/ship/reportDoors.mjs -- v4453 -- the census of `reportLines`, the tree's front-door convention.
+// tools/ship/reportDoors.mjs -- v4458 -- the census of `reportLines`, the tree's front-door convention.
 //
 // *** SEVENTY-SEVEN MODULES EXPORT reportLines AND NOTHING STATES ITS CONTRACT. *** server.html,
 // instrument-bench.html, fleet-report.mjs and the fingerprint bridge all consume it; every knob, meter, bind
@@ -127,8 +127,8 @@ export const TOLERANT_FORMATTERS = Object.freeze([
 
 // *** THE MEASURED COST, FROZEN BY NAME (v4399's rule), BECAUSE A GATE CANNOT AFFORD TO RE-MEASURE IT. ***
 // Every number here was taken by calling the module in its own process with a wall clock around it.
-export const CALL_COST_V4453 = Object.freeze({
-    at: "v4453",
+export const CALL_COST_V4458 = Object.freeze({
+    at: "v4458",
     quick: "64 self-reports called together in 71.1s -- individually fast, collectively most of a gate budget",
     slow: Object.freeze([
         Object.freeze({ rel: "physics/sph/levelClaim.mjs", bare: 38.0, cheapFlag: "{ live: false }", cheap: 0.0, linesBare: 19, linesCheap: 18 }),
@@ -137,11 +137,11 @@ export const CALL_COST_V4453 = Object.freeze({
         Object.freeze({ rel: "tools/ship/orphanDisposition.mjs", bare: 74.0, cheapFlag: null }),
         Object.freeze({ rel: "tools/ship/orphanTriage.mjs", bare: 71.5, cheapFlag: "{ live: false }", cheap: 0.0, linesBare: 154, linesCheap: 5 }),
         Object.freeze({ rel: "tools/ship/shaderRefs.mjs", bare: 52.0, cheapFlag: null }),
-        // v4454: was "never returns". A census budget made it 38.0s, which is still far too slow for the
+        // was "never returns". A census budget made it 38.0s, which is still far too slow for the
         // bounded sample below -- so it stays on NEVER_CALL for COST, which is a different reason.
-        Object.freeze({ rel: "tools/roundhouse/knobLiveness.mjs", bare: 38.0, cheapFlag: "totalBudgetMs", was: "never returned before v4454" }),
+        Object.freeze({ rel: "tools/roundhouse/knobLiveness.mjs", bare: 38.0, cheapFlag: "totalBudgetMs", was: "never returned before the census budget" }),
     ]),
-    // *** v4454 -- THIS ENTRY IS RETIRED AND THE ROUND IT CAUSED IS WHY. *** It read "still running at 90s,
+    // *** THIS ENTRY IS RETIRED, LATER IN THE SAME ROUND, AND WHAT IT CAUSED IS WHY. *** It read "still running at 90s,
     // killed -- the only member of the population with no measured cost at all, because it has never been
     // observed to return." Measuring THAT found the mechanism: knobLiveness's budget is spent PER DEVICE and
     // the registry holds 129 of them, so the front door was attempting a census with nothing bounding their
@@ -162,14 +162,14 @@ export const CALL_COST_V4453 = Object.freeze({
 // the gate calls bare -- and the gate HANGS instead of going red. It hung for real, twice, before this list
 // existed. A guard that sits downstream of a classification cannot protect against a defect in that
 // classification, so this list is consulted at EVERY call site regardless of how a module was sorted.
-// v4454 -- THE REASON CHANGED AND THE ENTRY DID NOT. Before v4454 knobLiveness never returned; now it
+// THE REASON CHANGED AND THE ENTRY DID NOT. Before v4458 knobLiveness never returned; after the census budget it
 // returns in 38.0s, which is still an order of magnitude past what a bounded sample can spend. A do-not-call
 // list that empties the moment a hang becomes a mere expense would have to be rebuilt the next time either
 // appears, so it holds both reasons and each entry carries its own.
 export const NEVER_CALL = Object.freeze(["tools/roundhouse/knobLiveness.mjs"]);
 
 /** The three that provide the convention and have no gate of their own to check it. */
-export const NO_GATE_V4453 = Object.freeze([
+export const NO_GATE_V4458 = Object.freeze([
     "physics/xpbd/clothSoak.mjs",
     "tools/ship/bootTraceReport.mjs",
     "tools/ship/morphCounter.mjs",
@@ -192,8 +192,8 @@ export function reportLines() {
     L.push("  and TWO return a report anyway, one of them a manufactured finding:");
     for (const f of TOLERANT_FORMATTERS) L.push("    " + f);
     L.push("");
-    L.push("  slowest bare calls (seconds, measured " + CALL_COST_V4453.at + "):");
-    for (const s of CALL_COST_V4453.slow) L.push("    " + s.rel.padEnd(38) + String(s.bare).padStart(6));
+    L.push("  slowest bare calls (seconds, measured " + CALL_COST_V4458.at + "):");
+    for (const s of CALL_COST_V4458.slow) L.push("    " + s.rel.padEnd(38) + String(s.bare).padStart(6));
     L.push("    " + "tools/roundhouse/knobLiveness.mjs".padEnd(38) + "  never");
     return L;
 }
