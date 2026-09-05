@@ -243,7 +243,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // v4472 -- the belt is read as HASHES now, not counts. COMMIT_BELT_V4472's header says why: this exact
     // number has been corrected and reverted by merges three times, and a count reverted to a wrong value
     // still looks like a count. `git log` either lists these commits for this path or it does not.
-    const R = F.COMMIT_BELT_V4472, R18 = F.COMMIT_BELT_V4418, R0 = F.COMMIT_BELT_V4329;
+    const R = F.COMMIT_BELT_V4475, R72 = F.COMMIT_BELT_V4472, R18 = F.COMMIT_BELT_V4418, R0 = F.COMMIT_BELT_V4329;
     const liveShas = {};
     for (const n of names) {
         try {
@@ -292,15 +292,19 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
         `THE 5% LINE IS NOT A TUNED THRESHOLD: it is two orders of magnitude of headroom over the measured 0.91%, ` +
         `and a belt would need this to be a recurring cost rather than ten commits in the repository's life`);
     ok("  and where an earlier record and git disagree, the disagreement is recorded rather than overwritten",
-        Object.entries(R.correctedSince4418).every(([n, c]) => R18.perBody[n] === c.recorded && live[n] === c.measured),
-        Object.entries(R.correctedSince4418).map(([n, c]) => `${n}: v4418 recorded ${c.recorded}, git says ${c.measured}`).join("; ") +
+        // *** ASSERTED AS HISTORY PLUS A DIRECTION, NOT AS TODAY'S COUNT. *** The first version required
+        // live[n] === c.measured, which pinned the present to a correction taken at v4472 and went red the
+        // moment v4475's own commit touched vendor/three. The finding is that v4418 recorded 2 where git said
+        // 3; that stays true forever. What must hold NOW is only that the count has not gone backwards.
+        Object.entries(R72.correctedSince4418).every(([n, c]) => R18.perBody[n] === c.recorded && live[n] >= c.measured),
+        Object.entries(R72.correctedSince4418).map(([n, c]) => `${n}: v4418 recorded ${c.recorded}, v4472 measured ${c.measured}, git now says ${live[n]}`).join("; ") +
         " -- v4418 explained six bodies with one rule, 'six moved from one commit to two'. Five were at one; " +
         "three was at two, so v4416 took it to three. THE RULE WAS APPLIED TO THE LIST INSTEAD OF EACH BODY BEING COUNTED");
     ok("  and the six that moved at v4418 really did move, per body rather than by a shared rule",
         R18.movedSince4329.every((n) => live[n] > (R0.perBody[n] ?? 0)),
         R18.movedSince4329.map((n) => `${n} ${R0.perBody[n] ?? "?"}->${live[n]}`).join(", ") + " -- v4416 wrote a PROVENANCE record into each");
     ok("  so the refusal is recorded with its reason rather than left as an absence",
-        /belt/i.test(R.why) && R.at === "v4472" && R18.at === "v4418" && R0.at === "v4329");
+        /belt/i.test(R.why) && R.at === "v4475" && R72.at === "v4472" && R18.at === "v4418" && R0.at === "v4329");
     report("VENDORED CODE DOES NOT CHANGE; THE CODE THAT USES IT DOES. That is why a satellite is an importer " +
         "and not a commit, and it is a measurement rather than a preference.");
 }

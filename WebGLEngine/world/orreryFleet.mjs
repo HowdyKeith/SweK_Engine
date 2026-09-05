@@ -413,3 +413,23 @@ export const COMMIT_BELT_V4472 = Object.freeze({
          "cost to draw; this is ten commits, and it stays ten whether the busiest body sits at two or three. " +
          "The importers move; the vendored bytes do not.",
 });
+
+/**
+ * *** v4475 -- THE BELT MOVED, AND THIS ROUND IS WHY. *** Vendoring the KTX2 loader and the Basis transcoder
+ * put six files under vendor/three/jsm/, so the commit that did it is the fourth ever to touch vendor/three.
+ *
+ * *** THIS IS THE HASH RECORD EARNING ITS KEEP ON ITS FIRST REAL EVENT. *** COMMIT_BELT_V4472 kept commits
+ * rather than counts precisely because this file logs `three`'s count being corrected and reverted by merges
+ * three times, and "a count reverted to a wrong value still looks like a count". The gate did not report that
+ * a number went 3 to 4; it NAMED THE ARRIVING COMMIT, which is a fact somebody can check against git in one
+ * command. A count would have left the reader to work out whether the move was legitimate.
+ *
+ * The conclusion is unchanged and so is the reason: eleven of this repository's commits reach vendor/ at all.
+ */
+export const COMMIT_BELT_V4475 = Object.freeze({
+    at: "v4475",
+    perBody: Object.freeze({ ...COMMIT_BELT_V4472.perBody, three: Object.freeze(["8421164", "7e680f9", "e08b1b6", "66db97c"]) }),
+    movedSince4472: Object.freeze({ three: "the v4475 wiring commit, which vendored six files from three.js r160 " +
+        "into vendor/three/jsm/ -- KTX2Loader, WorkerPool, ktx-parse, zstddec and the Basis transcoder's js and wasm" }),
+    why: COMMIT_BELT_V4472.why,
+});
