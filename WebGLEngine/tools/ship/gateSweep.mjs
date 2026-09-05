@@ -1747,6 +1747,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "zeros were counted by grepping '^  FAIL', which A CRASHING GATE PRINTS NONE OF; one was a " +
                  "syntax error in the sabotage read as a gate failing to notice. Graded on exit codes now.",
     }),
+    since76: Object.freeze({
+        at: "v4454", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/btdfDomain-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, seven sections. v4436 measured the transmission lobe creating 28% more light than " +
+                 "arrived and said it could not say why; v4447 proved the excess real and named two suspects, " +
+                 "the height-correlated G2 and the refraction Jacobian. THE ANSWER IS NEITHER, AND IT IS NOT " +
+                 "A TERM AT ALL. Walter eq. 21 needs the half-vector to be a facet that EXISTS (h.n > 0) and " +
+                 "is LIT (h.wi > 0); transmission.mjs evaluates outside both, through halfVectorT's " +
+                 "`h[2] < 0 ? -h : h` (which invents a facet pointing the other way) and Math.abs(iDotH) " +
+                 "(which lights a facet from behind). *** TWO ABS()ES, AND AN ABS IS THE MOST INNOCENT-" +
+                 "LOOKING THING IN A SHADER. *** Proved on a bound rather than a fit: with masking alone " +
+                 "eq. 21 times |wo.n| IS the (1-F)-weighted VNDF, a probability density; measured 0.917790 " +
+                 "with the domain enforced against a ceiling of 0.916252, and 1.878929 as written -- 2.05x a " +
+                 "probability. The walk gives EXACTLY ZERO single-scatter paths in both bins the abs()es pay " +
+                 "out in, 0 of 300000 twice, while multiple scattering fills both. G ruled out by the same " +
+                 "measurement: four G choices swing the total five-fold and the impossible share moves 46.7 " +
+                 "to 51.2 per cent. FIVE SABOTAGES, 8/4/9/9/6 BY NAME, AND NONE WENT ZERO-RED for the first " +
+                 "time in seven rounds -- every section is pinned to a number reached by a different route. " +
+                 "NOT CLAIMED: that it fixes the lobe (4.07x truth becomes 2.17x, and the rest is the " +
+                 "masking model), or that it is visible below alpha 0.3. transmission.mjs is deliberately " +
+                 "unpatched so the two can be measured against each other.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

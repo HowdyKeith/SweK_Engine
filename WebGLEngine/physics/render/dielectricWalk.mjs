@@ -62,6 +62,13 @@ export function refract(wi, n, eta) {
  * because a second copy of that arithmetic is a second thing to get the sign of Lambda wrong in -- and v4446
  * spent a run finding that sign the first time.
  */
+// *** v4454 ADDED `dir` TO THE RETURN, AND IT IS ONE LINE THAT TURNED A TOTAL INTO A DIAGNOSIS. *** This
+// walk already knew which direction each path left in; it threw it away and reported only reflected /
+// transmitted / stuck. v4447 could therefore say the BTDF over-counts by 4.07x and could NOT say where,
+// because a scalar has no shape to compare against. With the exit direction kept, binning by |dir.z| shows
+// the single-scatter walk giving EXACTLY ZERO in the two bins Walter pays 9.8% of its energy into, which is
+// what btdfDomain.mjs convicts on. The measurement that was missing was not a harder one; it was the one
+// nobody kept.
 export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces = 128 } = {}) {
     const so = Math.sqrt(Math.max(0, 1 - cosO * cosO));
     let wr = [-so, 0, -cosO];
@@ -69,7 +76,7 @@ export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces =
     while (bounces < maxBounces) {
         const s = outside ? 1 : -1;
         const hNext = sampleHeight([wr[0], wr[1], s * wr[2]], s * h, rand(), alpha);
-        if (!Number.isFinite(hNext)) return { exit: outside ? "reflected" : "transmitted", bounces, tir };
+        if (!Number.isFinite(hNext)) return { exit: outside ? "reflected" : "transmitted", bounces, tir, dir: wr };
         h = s * hNext;
         const wo = [-wr[0], -wr[1], -wr[2]];
         const wmFlip = sampleVNDF([wo[0], wo[1], s * wo[2]], alpha, rand(), rand());
@@ -91,7 +98,7 @@ export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces =
         }
         bounces++;
     }
-    return { exit: "stuck", bounces, tir };
+    return { exit: "stuck", bounces, tir, dir: wr };
 }
 
 /**
