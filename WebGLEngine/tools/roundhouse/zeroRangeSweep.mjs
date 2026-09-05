@@ -49,11 +49,24 @@ export function knobRange(value) {
     return [...new Set(out)];
 }
 
-export async function zeroRangeSweep({ modes = null, verbose = false } = {}) {
+/**
+ * v4477 -- TWO CHANGES, BOTH IN SERVICE OF THE POSITIVE CONTROL THIS SWEEP HAS LACKED SINCE v3313.
+ *
+ * `ranges` lets a caller replace the knob values for one device.mode.knob, keyed "device.mode.knob". It exists so
+ * the control can run THIS FUNCTION over a sigma range containing no dyadic value and watch the hit disappear.
+ * Without it the negative arm would have to re-implement the zero-detection, and a control made of a different
+ * object than the instrument it certifies is not a control.
+ *
+ * Every hit now carries `effective` -- the value the device used -- beside `value`, the value it was asked for.
+ * These differ at 5612 of the 17759 points this sweep visits. A hit reported "at sigma=2" against a clamp of 1
+ * is a true statement about a build that never happened.
+ */
+export async function zeroRangeSweep({ modes = null, ranges = {}, knobs = null, verbose = false } = {}) {
     // v3211 -- BUILT, NOT LISTED, AND IT REFUSES AN EMPTY TABLE. A caller may still pass its own.
     if (!modes) modes = await deviceModeTable();
     const hits = [];
     let builds = 0, checked = 0;
+    const coercion = { points: 0, answerable: 0, coerced: 0, collapsedRanges: 0, pointsLostToCollapse: 0 };
 
     for (const name of DEVICE_NAMES) {
         const ms = modes[name];
@@ -67,7 +80,11 @@ export async function zeroRangeSweep({ modes = null, verbose = false } = {}) {
                 const def = dev.defaults ? dev.defaults({ mode }) : null;
                 cfg = (def && def.config) ? def.config : {};
             } catch { continue; }
-            const keys = Object.entries(cfg).filter(([, v]) => isNum(v)).map(([k]) => k);
+            let keys = Object.entries(cfg).filter(([, v]) => isNum(v)).map(([k]) => k);
+            // v4477 -- `knobs` narrows which knobs are swept. The control needs to move sigma AND NOTHING ELSE:
+            // isoRollDeviation reaches exactly zero through z and through f as well, so a run that sweeps every
+            // knob cannot be read as a statement about sigma. Narrowing is the caller's, not this file's default.
+            if (knobs) keys = keys.filter((k) => knobs.includes(k));
 
             // v3313 -- THE SWEEP LOOP IS NOW sweepDevice's, NOT THIS FILE'S. v3304 built the general instrument
             // that this file, shedOnset, defaultPlacementSweep and floorAtlas were each a hand-written instance
@@ -77,9 +94,17 @@ export async function zeroRangeSweep({ modes = null, verbose = false } = {}) {
             // part that is actually this file's question -- which fields are error-like, and which exact zeros
             // are on the register. The tool sweeps; the file still decides what a hit means.
             for (const key of keys) {
-                const values = knobRange(cfg[key]);
+                const values = ranges[`${name}.${mode}.${key}`] || knobRange(cfg[key]);
                 let sw;
                 try { sw = await sweepDevice(name, mode, { knob: key, values, config: cfg }); } catch { continue; }
+                // Totalled from the sweeps themselves, not recomputed from a second copy of the clamps.
+                coercion.points += sw.coercion.points;
+                coercion.answerable += sw.coercion.answerable;
+                coercion.coerced += sw.coercion.coerced;
+                if (sw.coercion.distinctEffective !== null && sw.coercion.distinctEffective < sw.coercion.distinctRequested) {
+                    coercion.collapsedRanges++;
+                    coercion.pointsLostToCollapse += sw.coercion.distinctRequested - sw.coercion.distinctEffective;
+                }
                 for (const pt of sw.points) {
                     const obs = pt.out;
                     if (pt.error || !obs || typeof obs !== "object") continue;
@@ -91,6 +116,8 @@ export async function zeroRangeSweep({ modes = null, verbose = false } = {}) {
                         const regKey = `${name}.${mode}.${f}`;
                         hits.push({
                             device: name, mode, field: f, knob: key, value: pt[key],
+                            // v4477 -- the value the DEVICE used. `value` is what it was asked for.
+                            effective: pt.sweptAt.effective, coerced: pt.sweptAt.coerced,
                             registered: !!EXACT_OK[regKey],
                             reason: EXACT_OK[regKey] || null,
                         });
@@ -106,14 +133,16 @@ export async function zeroRangeSweep({ modes = null, verbose = false } = {}) {
     for (const h of hits) {
         const k = `${h.device}.${h.mode}.${h.field}`;
         if (!byField.has(k)) byField.set(k, { ...h, at: [] });
-        byField.get(k).at.push(`${h.knob}=${h.value}`);
+        // A coerced point is written "requested->effective" so nothing reading this line can mistake the
+        // label for the configuration. Before v4477 it printed the label alone.
+        byField.get(k).at.push(h.coerced ? `${h.knob}=${h.value}->${h.effective}` : `${h.knob}=${h.value}`);
     }
     const rows = [...byField.values()];
     return {
-        rows, builds, checked,
+        rows, builds, checked, coercion,
         unregistered: rows.filter((r) => !r.registered),
         summary: {
-            builds, checked,
+            builds, checked, coercion,
             zeroFields: rows.length,
             unregistered: rows.filter((r) => !r.registered).length,
             registerSize: Object.keys(EXACT_OK).length,

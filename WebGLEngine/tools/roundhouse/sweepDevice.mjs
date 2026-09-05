@@ -91,18 +91,89 @@ export function trend(values, eps = 0) {
  */
 const RELATIVE_NAME = /Frac$|^rel|relWorst|relErr/i;
 
+/**
+ * v4477 -- A POINT NOW RECORDS THE VALUE THE DEVICE USED, NOT ONLY THE VALUE IT WAS ASKED FOR.
+ *
+ * Every device clamps. `sweepDevice` handed `{ [knob]: value }` straight from the request list, so a point that
+ * asked for gridN = 2560 against a clamp of 1024 was LABELLED 2560 and MEASURED 1024 -- and the point beside it
+ * that asked for 1024 was the same build. Across the live device table 5612 of 17759 swept points are recorded
+ * at a value the device did not use, and 1225 knob-ranges contain duplicate effective values: the sweep believes
+ * it visited seven points where it visited as few as three.
+ *
+ * THIS IS NOT COSMETIC, AND IT IS NOT HYPOTHETICAL. v4477 built a mechanism for splat's isoRollDeviation on the
+ * reading that it is exactly zero at "sigma >= 1 OR dyadic sigma" -- two disjuncts, one of them unexplained.
+ * There is no second disjunct. splat clamps sigma to 1, so every row at sigma 1.05, 1.1, 1.2, 1.3, 1.5, 2 and 3
+ * was the sigma = 1 row wearing another label. The sweep's own coordinate manufactured a false mechanism, and
+ * that mechanism was one edit away from being planted as a positive control.
+ *
+ * A knob whose name collides with a point's own keys is REFUSED rather than silently overwritten -- `out` and
+ * `error` were already unprotected, and the meta keys added here widen that door if it is left open.
+ */
+const RESERVED_POINT_KEYS = ["out", "error", "sweptAt"];
+
+/**
+ * The value a device will actually use for one knob, asked of the device's own defaults() rather than re-derived
+ * from a copy of its clamps. `undefined` means NOT ANSWERABLE -- the device exposes no defaults(), or does not
+ * echo the knob back -- and callers must report that as null rather than as "not coerced": an unknown is not a
+ * clean bill of health.
+ *
+ * EXPORTED SO THE UNANSWERABLE BRANCH CAN BE RUN. The only device in the live table without defaults() is lbm,
+ * and a single lbm build does not finish in two minutes, so a gate cannot reach that branch by sweeping the
+ * device that exercises it in production. Taking the device as an argument lets the gate call THIS function --
+ * the one sweepDevice uses -- with a device that has no defaults, instead of asserting the branch from a
+ * distance or reimplementing it.
+ */
+/**
+ * A point's coordinate record. `coerced` is null -- never false -- when the effective value is unanswerable.
+ * EXPORTED for the same reason as effectiveKnob: the unanswerable case belongs to lbm, which cannot be swept
+ * inside a gate's budget, and a branch nothing runs is a branch nothing guards.
+ */
+export function sweptAtOf(knob, requested, effective) {
+    return { knob, requested, effective, coerced: effective === undefined ? null : effective !== requested };
+}
+
+/**
+ * How much of a sweep is not where it says it is. Derived from the points, so it cannot drift from them.
+ * `distinctEffective` is null unless EVERY point could answer: counting a Set of undefineds would report one
+ * distinct configuration -- a maximally collapsed sweep -- for a device that simply cannot say.
+ */
+export function coercionSummary(points, values) {
+    const effs = points.map((p) => p.sweptAt.effective);
+    const answerable = effs.filter((e) => e !== undefined).length;
+    return {
+        points: points.length,
+        answerable,
+        coerced: points.filter((p) => p.sweptAt.coerced === true).length,
+        distinctRequested: new Set(values).size,
+        distinctEffective: answerable === points.length ? new Set(effs).size : null,
+    };
+}
+
+export function effectiveKnob(dev, mode, config, knob, value) {
+    if (!dev || typeof dev.defaults !== "function") return undefined;
+    try {
+        const d = dev.defaults({ mode, config: { ...config, [knob]: value } });
+        return d && d.config ? d.config[knob] : undefined;
+    } catch { return undefined; }
+}
+
 export async function sweepDevice(deviceName, mode, { knob, values, config = {} } = {}) {
     if (!knob || !Array.isArray(values) || values.length < 2) {
         throw new Error("sweepDevice needs a knob name and at least two values");
     }
+    if (RESERVED_POINT_KEYS.includes(knob)) {
+        throw new Error("sweepDevice: knob name '" + knob + "' collides with a point's own key (" + RESERVED_POINT_KEYS.join(", ") + ")");
+    }
     const dev = await getDevice(deviceName);
+    const effectiveOf = (value) => effectiveKnob(dev, mode, config, knob, value);
     const points = [];
     for (const value of values) {
         let out = null, error = null;
         try { out = await dev.build({ mode, config: { ...config, [knob]: value } }); }
         catch (e) { error = String((e && e.message) || e); }
-        points.push({ [knob]: value, out, error });
+        points.push({ [knob]: value, out, error, sweptAt: sweptAtOf(knob, value, effectiveOf(value)) });
     }
+    const coercion = coercionSummary(points, values);
 
     // collect every numeric observable that appeared anywhere in the sweep
     const names = new Set();
@@ -132,7 +203,7 @@ export async function sweepDevice(deviceName, mode, { knob, values, config = {} 
 
     return {
         device: deviceName, mode, knob, values,
-        points, observables,
+        points, observables, coercion,
         failedRuns: points.filter((p) => p.error).length,
         // an observable that moved for NO knob value is the unwired-knob signature
         constantObservables: Object.entries(observables).filter(([, o]) => o.constant).map(([k]) => k),

@@ -46,6 +46,28 @@
 // not a control; it is a second unexplained zero standing where the explanation should be. Naming the candidate
 // and the confound is what makes planting one a round somebody can actually do.
 //
+// ---- *** v4477 -- PLANTED. AND THE SECOND DISJUNCT ABOVE DOES NOT EXIST. *** -----------------------------------
+//
+// The table above is a correct transcript of what the sweep printed and a wrong statement about what was built.
+// splatDefaults clamps sigma to 1. The eight rows reading "1 1.05 1.1 1.2 1.3 1.5 2 3 -> EXACTLY 0" ARE ONE ROW:
+// every request at or above 1 built sigma = 1, which is dyadic. sweepDevice recorded the value it ASKED FOR
+// rather than the value the device used, so "sigma >= 1" is not a boundary in the arithmetic -- it is the shape
+// of the clamp, read back as physics. There was never a second disjunct to explain.
+//
+// THE REASONING ABOVE IS OTHERWISE EXACTLY RIGHT, AND IS WHY THIS WAS FINDABLE. "Tested as rules rather than
+// described" is what produced a rule that fit all twenty points, and a rule that fits while making no sense is
+// the signal that a coordinate is wrong. The failure was not in the method; it was that the instrument reported
+// a label instead of a configuration, at 5612 of its 17759 points.
+//
+// WHAT THE MECHANISM ACTUALLY IS, both conditions, in tools/roundhouse/zeroControl.mjs:
+//   (1) sigma^2 is a power of two -- every multiplication by it is an exact exponent shift; AND
+//   (2) fl(cos^2 t + sin^2 t) === 1 at every roll angle -- true for the device's three, false for about one
+//       angle in six, and NEVER STATED ANYWHERE before v4477.
+// Sufficient, not necessary: sigma 0.13 is neither dyadic nor guaranteed and reads exactly zero anyway.
+//
+// The control is planted with both directions of the instrument arm -- the sweep must find the zero when one is
+// present and must decline when none is -- so this file's paragraph is answered rather than merely quoted.
+//
 // ---- *** THE COST THAT WAS MEASURED ONCE AND BECAME A STANDING FACT *** ---------------------------------------
 //
 // "Did not finish in twenty minutes" was true at v2912 and nobody has re-measured it since. v4425 spent a whole

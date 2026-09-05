@@ -2394,6 +2394,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "dropping them, costRecord skipping the guard, and two checks of my own that could not fail " +
                  "-- one with the label passed where the condition goes, one inserted below the exit line",
     }),
+    since114: Object.freeze({
+        at: "v4477", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/zeroControl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/sweepDevice.mjs (a point recorded the value it was ASKED FOR: 5612 of 17759 swept points were labelled with a configuration that was never built)",
+            "tools/roundhouse/exactZeroRegister.mjs (the isoRollDeviation sentence named one of two conditions, and its 'sigma 2' measurement is the sigma 1 row wearing the clamp's label)",
+            "tools/roundhouse/zeroRangeSweep-selfcheck.mjs (its mechanism evidence counted five dyadic sigmas where the device built four)",
+            "tools/roundhouse/zeroRangeFull.mjs (the 'sigma >= 1 OR dyadic' reading corrected: the second disjunct is the clamp, not the arithmetic)",
+        ]),
+        verdict: "THE POSITIVE CONTROL THE SWEEP HAS LACKED SINCE v3313, PLANTED. Both conditions derived -- " +
+                 "dyadic sigma^2 AND fl(cos^2+sin^2)===1 at every roll angle, the second silent since v2912 -- " +
+                 "and claimed in ONE direction, because sigma 0.13 reads exactly zero outside the derivation. " +
+                 "The arms run zeroRangeSweep itself over a range carrying a derived zero and one carrying " +
+                 "none, matching its verdict to the device point for point. Thirty-one sabotages, four zeros, " +
+                 "every one the same species: a component asserted and its ability to give the OTHER answer " +
+                 "never asserted -- including my own power-of-two predicate, which Math.log2 made wrong at 252 " +
+                 "of 2002 cells and which a hand-written list of literals would have passed",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

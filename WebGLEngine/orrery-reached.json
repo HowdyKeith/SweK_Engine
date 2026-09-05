@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "55aa21f378edcfb4fd7a82e72c3327ce60341d81",
+ "head": "9eeb64ad7a19e6335b9e77baadc10292499c6f62",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -21,7 +21,7 @@
    ]
   }
  ],
- "wideCount": 13,
+ "wideCount": 17,
  "wideTop": [
   {
    "name": "DirectionalLight",
@@ -52,9 +52,9 @@
    "hits": 13
   },
   {
-   "name": "Triangle",
+   "name": "ABeautifulGame",
    "hits": 12
   }
  ],
- "registerSources": 39
+ "registerSources": 47
 }
