@@ -1803,6 +1803,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "would be fabrication -- `baselineByName: false` is a graded value, not a sentence), or that " +
                  "a gate a closing names was actually run by that round.",
     }),
+    since78: Object.freeze({
+        at: "v4457", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugWgsl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. The WGSL twin of the Slug shader (text/slugShaderWgsl.js), graded on the headless Dawn " +
+                 "device against text/slugEval.js on the same packed bytes: 22,045 + 61,092 sharp samples exact " +
+                 "against slugEval AND the flattened-segment winding number, worst |gpu - cpu| 3.1e-6 at 28 px/em " +
+                 "against an a-priori 1/512, the row-wrap plant 9,477 of 27,957 wrong at the wrong width, three " +
+                 "transliteration plants red at 12,148 / 2,205 / 1,462 of 22,045, and SlugDilate half a pixel per " +
+                 "axis to 3.8e-6 px under an orthographic matrix. *** THE FIRST DRAFT OF ITS SECTION 5 HAD AN " +
+                 "UNREACHABLE PLANT *** -- six small glyphs at width 64 never leave row one, so the wrong-width " +
+                 "probe went 0 of 10,016 wrong -- caught on the first run and rebuilt over the 66 Plex label " +
+                 "glyphs at width 128, where 432 of 965 band headers point past their own row. Five runs 5,235 to " +
+                 "5,412 ms, all exit 0; the slowest is the MEASURED budget.",
+    }),
+    since79: Object.freeze({
+        at: "v4459", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/vacuity-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, five runs of five, 0.043 s -- the cheapest gate this ledger has ever closed, because " +
+                 "its subject is a SHAPE rather than a device. vacuity.mjs names the 0-RED sabotage as ONE " +
+                 "SYMPTOM WITH FOUR CAUSES -- an empty collection under every(), an unreachable branch, a guard " +
+                 "sitting downstream of the classification it depends on, and a harness that damaged what it was " +
+                 "measuring -- and supplies overNonEmpty and emptyOfNonEmpty so the empty case cannot be " +
+                 "forgotten at the call site. *** THE TREE-WIDE SCAN FOR THE FIRST CAUSE WAS REFUSED RATHER THAN " +
+                 "SHIPPED: *** 948 of 1,482 gates use the shape, and a census that flags 64% of the tree is one " +
+                 "nobody reads, so the refusal is recorded with its number instead of a report nobody would act " +
+                 "on. NOT CLAIMED: that the four causes are exhaustive -- they are the four this session " +
+                 "actually met, and the record says so.",
+    }),
+    // *** v4476 MERGE -- RENUMBERED A THIRD TIME, since78-110 -> since80-112. *** main took since78 and
+    // since79 for v4457 and v4460 while this branch was using them, which is the same collision the first
+    // pass hit at since40 and the second at since73. THREE TIMES IN ONE ARC IS NOT BAD LUCK, IT IS THE
+    // SHAPE: the ordinal is picked by hand, two branches shipping in parallel both reach for the next free
+    // one, and Object.freeze sees one key where the reader sees two. main's v4456 wrote down the same
+    // hazard from its own side -- "the sweep ledger counts gates and never names them, so a duplicate
+    // closing is a credit" -- and gateSweep-selfcheck's duplicate-ordinal check is what catches it each time.
 
     // *** v4470 MERGE, SECOND PASS -- RENUMBERED AGAIN, since73-100 -> since78-105. *** main took since73-77 for
     // its own rounds in the eleven commits after the first pass, and one of them is v4456: "the sweep ledger
@@ -1817,7 +1860,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // overwrites the earlier, so v4366's closing would have vanished with no error anywhere". A duplicate key
     // is not a syntax error and the derived closings list in gateSweep-selfcheck.mjs reads keys, so nothing
     // would have said a word. Caught by reading the merged file, again.
-    since78: Object.freeze({
+    since80: Object.freeze({
         at: "v4424", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/slowCensus-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1829,7 +1872,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "standing reds inside redCensus.UNCONFIRMED_SLOW, filed as redCensus.RED_AT_V4424, and a " +
                  "FOURTH outside it -- redCensus-selfcheck, broken by v4414 and repaired here",
     }),
-    since79: Object.freeze({
+    since81: Object.freeze({
         at: "v4425", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/budgetExile-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1839,7 +1882,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "with NO 0 REDS. The round it gates re-timed all 378 finished exiles and found TEN reds on " +
                  "no register, every one recorded as passing; four were this session's and are repaired",
     }),
-    since80: Object.freeze({
+    since82: Object.freeze({
         at: "v4470", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/roundhouse/zeroRangeFull-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1857,7 +1900,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // the file still parsed, the list still derived, and the only thing that noticed was the arithmetic --
     // "1505 in the tree = ... 25 STILL UNSWEPT". THAT ROW IS THE WHOLE REASON THIS OBJECT COUNTS RATHER THAN
     // LISTS, and it earned its keep on the third merge in a row that hit this same collision.
-    since81: Object.freeze({
+    since83: Object.freeze({
         at: "v4400", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1871,7 +1914,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // parameter that round did not vary. It has been numbered three times -- since13 in a draft that went into a
     // dropped stash, then since13, then since15, and since16 here once main's own since13 landed. The number is
     // bookkeeping and moves freely; the `at` is the round and does not.
-    since82: Object.freeze({
+    since84: Object.freeze({
         at: "v4401", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/carveJudged-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1883,7 +1926,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // render/tslSource.mjs's uniform vocabulary (ivec/uvec), which every earlier closing's gate runs through, so
     // tslPhysics, tslRace, tslRig and carveGpu were re-run to completion beside this one rather than left to the
     // quick sweep's cap -- machinery that changed is what a 3 s cap cannot vouch for.
-    since83: Object.freeze({
+    since85: Object.freeze({
         at: "v4402", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/tslIsing-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1895,7 +1938,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4403 -- the SEVENTEENTH closing, and the first for a module the triage had written off. Its round moved
     // simulation/euler/eulerShader.js from HARDWARE to GATEABLE by running it, so tools/ship/coverageTriage.mjs
     // changed too and coverageTriage-selfcheck was run beside this one.
-    since84: Object.freeze({
+    since86: Object.freeze({
         at: "v4403", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/eulerGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1907,7 +1950,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // did not merely go ungated: it did not COMPILE. Its round also changed gfx/device.js (multi-entry-point
     // binding sets), so every gate that builds a compute pipeline -- tslPhysics, tslRace, tslRig, tslIsing,
     // carveGpu, eulerGpu and the four device* gates -- was run to completion beside this one.
-    since85: Object.freeze({
+    since87: Object.freeze({
         at: "v4404", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/lbmGpu-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1918,7 +1961,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4404 -- the NINETEENTH closing, and it is in the same round as the eighteenth because the round produced
     // two gates: one for a kernel that never compiled, and one for the merge hazard that shipped a conflicted
     // file into a commit WHILE that kernel was being fixed.
-    since86: Object.freeze({
+    since88: Object.freeze({
         at: "v4404", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/conflictMarkers-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1931,7 +1974,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // so tools/roundhouse's magmap family (magmap, magmapAndroid, magmapVariants, magmapDefault, magmapEvidence,
     // magmapFastPath, magmapBenchVerdict, magmapTaichi, androidPeer, iosPeer, fmaAssumption) was run to
     // completion beside it -- eleven gates read F32_FLOOR.
-    since87: Object.freeze({
+    since89: Object.freeze({
         at: "v4405", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/roundhouse/magmapDevice-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1942,7 +1985,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4406 -- the TWENTY-FIRST closing, and the fifth round running for a kernel nothing had ever given a
     // device. This one found the CHECK PAGE itself broken, so mpm-gpu-check.html changed too and the MPM family
     // (gpuKernel, gpuKernelInterp and the step/transfer/plasticity gates behind them) was run beside it.
-    since88: Object.freeze({
+    since90: Object.freeze({
         at: "v4406", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/mpm/mpmDevice-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1954,7 +1997,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // v4407 -- the TWENTY-SECOND closing, and the first in six rounds that did NOT find a kernel broken: this
     // one is graded against six analytic constants rather than against another renderer, so there was no
     // comparison to be wrong about. Its round touched no shipped module, only added two files.
-    since89: Object.freeze({
+    since91: Object.freeze({
         at: "v4407", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/furnaceWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1969,7 +2012,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // NDF identity then reads 0.837 at roughness 0.02), and pins the cause by handing the same kernel the
     // host's trig. Two of its six sabotages went 0 red and earned a section that MEASURES the two guards this
     // quadrature never reaches, rather than letting dead branches look covered.
-    since90: Object.freeze({
+    since92: Object.freeze({
         at: "v4408", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/microfacetWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1984,7 +2027,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // analytic keys (an algebraic identity with no statistics, the zero-variance mirror limit, and a measured
     // blindness to D), and finds that v4408's quadrature is 49% wrong at the roughness where this estimator is
     // exact -- so the two rounds together say which instrument to believe where.
-    since91: Object.freeze({
+    since93: Object.freeze({
         at: "v4409", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/microfacetSampleWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -1999,7 +2042,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // earlier rounds: it reaches the frame error v4409's section 7 proved that fixture could not see, and it
     // finds that v4409's stratified sample pattern -- chosen to keep an unportable RNG out of the comparison --
     // does not converge for a sampler that maps its two numbers onto a disk.
-    since92: Object.freeze({
+    since94: Object.freeze({
         at: "v4410", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/microfacetVndf-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2014,7 +2057,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // that the E it was handed was 85% wrong, because the closure is algebra in whatever table it gets. This
     // gate reads the TABLE against something external, ports the lobe, and finds the device's whole f32
     // residual is its sin and cos -- the third round in a row to land there.
-    since93: Object.freeze({
+    since95: Object.freeze({
         at: "v4411", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/energyCompWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2030,7 +2073,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // anisotropy makes the frame a physical parameter, so the same class of error is now visible. It also
     // carries a key with no isotropic counterpart -- the swap identity, bit-exact at f32 -- and that
     // exactness was earned by the gate going red on its own first draft.
-    since94: Object.freeze({
+    since96: Object.freeze({
         at: "v4412", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/microfacetAnisoWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2045,7 +2088,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // unity, so a wrong pdf inside the heuristic cannot move the mean and every mean-based check is blind to
     // it by construction. The gate now compares the two routes to the pdf directly, on the device as well as
     // on the CPU, because the WGSL is a separate transcription.
-    since95: Object.freeze({
+    since97: Object.freeze({
         at: "v4413", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/misWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2060,7 +2103,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // counted co-occurrence where the decision needed duplication -- and that the population included the
     // emitter that would BE the IR, so building it raised the number the trigger read. A ~200-round standing
     // red is repaired by replacing the instrument, and shaderCensus leaves the register.
-    since96: Object.freeze({
+    since98: Object.freeze({
         at: "v4414", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/shaderPairs-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2074,7 +2117,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // the module's own header named a sharper version of it; the other was already gated, and the key the
     // triage imagined is structurally unavailable because that coupling is deliberately one-way. Both entries
     // are corrected rather than left standing, which is the point of a list somebody reads.
-    since97: Object.freeze({
+    since99: Object.freeze({
         at: "v4415", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/voxel/fracture-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2091,7 +2134,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // found somewhere other than in a tolerance. It also corrects its own first draft, which borrowed a
     // sentence about one interface for a lobe where it does not hold -- and a 0-red sabotage now keeps that
     // correction from drifting back.
-    since98: Object.freeze({
+    since100: Object.freeze({
         at: "v4416", swept: 1, green: 1, red: 0,
         added: Object.freeze(["physics/render/fresnelWgsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2108,7 +2151,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // that the painter's shape budget cannot see the composition's declared prop count at all, and proved the
     // null with a control rather than reporting an absence of signal. It also found that the painter's target
     // has always been inside its own model class, and that this turns out not to be what governs it.
-    since99: Object.freeze({
+    since101: Object.freeze({
         at: "v4417", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/paintFloor-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2124,7 +2167,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // settled bridge to a surface. Wiring them splits the painter's single distance into "on the object" and
     // "the empty space around it" -- a third to a half of what it reports -- and shows that telling the same
     // search which pixels are the object buys 16% to 34% at no cost.
-    since100: Object.freeze({
+    since102: Object.freeze({
         at: "v4418", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/krbnPaint-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2139,7 +2182,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // a control rather than a result: on a still target, warm-starting and refitting are the same computation
     // to the last bit, so on a moving one the whole gap between them is the motion. It also corrects v4418's
     // "a fourth generator lands in the same band" with a fifth that does not, one round later.
-    since101: Object.freeze({
+    since103: Object.freeze({
         at: "v4419", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/firePaint-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2155,7 +2198,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // and one generator over the sign flips: seven of eight off-diagonal cells in a two-row transfer matrix
     // are BELOW uniformly random placement, the worst at -12 sd. The earlier claim is reproduced rather than
     // contradicted -- what changes is what it was ever evidence about.
-    since102: Object.freeze({
+    since104: Object.freeze({
         at: "v4420", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/paintTransfer-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2171,7 +2214,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // rule turned out to be a convex assumption nothing had stated; its arrival silently changed the search
     // distribution for every existing caller, which an unrelated gate caught; and the brush loses to a
     // rectangle on a picture made entirely of glyphs, with both obvious excuses ruled out by measurement.
-    since103: Object.freeze({
+    since105: Object.freeze({
         at: "v4421", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/polyBrush-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2186,7 +2229,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // pictures, re-rendered. A scanline mask inverts the learned policy where a 13-pixel warp does not, and
     // the mechanism is measured -- the CRT's energy sits above the Nyquist of the policy's own 4x4
     // observation grid, so the grid goes flat. Its null control shares the code path with the real ones.
-    since104: Object.freeze({
+    since106: Object.freeze({
         at: "v4422", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/paintTransforms-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2201,7 +2244,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // instruments. Eleven transfer columns show v4420's "worse than random on everything else" was drawn from
     // four, and the tempting reading of v4422's mechanism as a variable that ORDERS targets does not survive
     // (r = 0.34). It also adds the first target that is not a picture: a scalar radiance field.
-    since105: Object.freeze({
+    since107: Object.freeze({
         at: "v4423", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/paintFields-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2216,7 +2259,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // two were defects and the third was a fixture that named the other two; all three are repaired rather
     // than registered. A closing with an empty `added` is honest about that: the sweep's population did not
     // move, and what changed is that three of its members tell the truth again.
-    since106: Object.freeze({
+    since108: Object.freeze({
         at: "v4471", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
@@ -2248,7 +2291,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "shaderPairs-selfcheck into backendParity's census twice over, first as dual-language and " +
                  "then as GLSL-bearing. Neither was caught here -- both by the gate next door",
     }),
-    since107: Object.freeze({
+    since109: Object.freeze({
         // *** swept IS 0 AND THAT IS NOT MODESTY. *** This ledger's `swept` counts gates a closing takes OUT
         // OF THE SURPLUS -- gates the tree had never run -- and the arithmetic above depends on it meaning
         // exactly that. v4472 added no gate: it RE-RAN ten that were already in the tree and already exiled,
@@ -2276,7 +2319,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "asserted), and a runner reading only stdout -- invisible because the one gate that prints " +
                  "its verdict to stderr is too slow to re-run every time",
     }),
-    since108: Object.freeze({
+    since110: Object.freeze({
         at: "v4473", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/glbTexture-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2304,7 +2347,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "unguarded dereference underneath it (gateQuality's prose-matching ratchet). Eight sabotages " +
                  "by name, eight red",
     }),
-    since109: Object.freeze({
+    since111: Object.freeze({
         at: "v4474", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
@@ -2317,7 +2360,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "measurement was FICTION -- a cache keyed on the first thirty characters of the URL made " +
                  "three models report identical assets, caught by reading the numbers rather than by a check",
     }),
-    since110: Object.freeze({
+    since112: Object.freeze({
         at: "v4475", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/gltfKtx2-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),

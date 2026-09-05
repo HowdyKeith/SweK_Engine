@@ -1375,6 +1375,26 @@ export const INSTRUMENTS = [
         measures: "The union of every sweep closing as a SET: gates claimed by two closings and by whom, claimed names with no file, and the credit a duplicate buys against future unswept gates.",
         key: "*** THE SWEEP LEDGER COUNTS GATES AND NEVER NAMES THEM, SO A DUPLICATE CLOSING IS A CREDIT RATHER THAN AN ERROR. *** main is carrying a gate, reportDoors-selfcheck.mjs, landed by an in-flight round on the other branch with no closing written for it, so gateSweep-selfcheck reads \"1 STILL UNSWEPT\" on the trunk right now. *** THE HAZARD IS NOT HYPOTHETICAL AND IT ALMOST HAPPENED THIS ROUND. *** The obvious repair -- write the closing here -- is the one thing that must not be done blind, because when that round ships it will write its own closing for the same gate. Two closings, one gate. The question is what the ledger does about that, and the answer is NOTHING, in a way that is worse than merely missing it. ---- *** THE ARITHMETIC IS A SUM, AND A SUM CANNOT TELL DOUBLE-COUNTING FROM COVERAGE *** ------------------- gateSweep-selfcheck's coverage line is uncovered = (gatesNow - 1366 - 1) - SWEEP_SINCE_V4297.swept - sum(closing.swept) and asserts <= 0",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "slug-wgsl", area: "render", name: "The Slug shader in WGSL, held to the CPU key on a device",
+        // v4459: `page` was DECLARED IN A COMMENT here and the field was left undefined, so v4457 shipped
+        // this entry with instruments-selfcheck red on "every entry DECLARES a page, even if that
+        // declaration is `null`" -- the whole point of that check being that forgetting the field and
+        // choosing no page are different states. A sentence beside a field is not the field.
+        page: null,   // pageless: a standalone gate with no reportLines() module, which the bench cannot serve
+        gate: "tools/ship/slugWgsl-selfcheck.mjs",
+        measures: "Coverage from the WGSL Slug core run as a compute probe on the headless Dawn device, sample by sample against text/slugEval.js on the same packed atlas bytes and against the flattened-segment winding number; the row-wrap and three transliteration plants; SlugDilate's screen displacement against its closed form.",
+        key: "*** THE SHADER THAT SHIPS IS THE SHADER THAT IS GRADED, NOT A COPY OF IT. *** slugShaderWgsl.js keeps the Slug fragment core -- root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender -- as ONE string, and both the render module and the compute probe interpolate it. Section 1 asserts that text identity before anything runs, because a probe that carried its own copy of the loop would be grading itself.",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "vacuity", area: "ship", name: "The 0-RED sabotage: one symptom, four causes",
+        page: "instrument-bench.html", gate: "tools/ship/vacuity-selfcheck.mjs",
+        measures: "The four ways a control can be unable to fail, each named from a real instance, and the tree-wide census of the one shape a scanner could find -- reported as a refusal with its number.",
+        key: "*** THIS TREE'S STANDING RULE IS \"A CONTROL THAT CANNOT FAIL IS DECORATION\", AND ONE SESSION PRODUCED FOUR INSTANCES OF IT IN GATES WRITTEN THAT SAME SESSION. *** Every one surfaced the same way and only that way: a sabotage that went 0 RED. The ship ritual already says a 0-RED sabotage is a finding rather than a pass. What it does not say -- and what cost four rounds to learn -- is that THE SYMPTOM IS ONE AND THE CAUSES ARE FOUR, so there is nothing to search for: an empty collection under every(), a branch the population never enters, a guard an earlier test already implies, and a harness that corrupted what it measured. *** AND THE SCAN IS REFUSED, WITH THE NUMBER AS THE REASON: *** 3,206 such assertions in 948 of 1,482 gates -- SIXTY-FOUR PER CENT OF THE GATES -- so a census of them is a report nobody reads, and only the FIRST mechanism is mechanically preventable at all.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

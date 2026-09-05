@@ -178,6 +178,11 @@ export const MEASURED_RUNS = Object.freeze({
         observedHere: true, at: "v4471",
         runs: Object.freeze([{ ms: 22204, code: 0 }, { ms: 21302, code: 0 }, { ms: 21602, code: 0 }]),
     }),
+    "tools/ship/slugWgsl-selfcheck.mjs": Object.freeze({
+        observedHere: false, at: "v4457 (main)",
+        runs: Object.freeze([{ ms: 5412, code: 0 }, { ms: 5341, code: 0 }, { ms: 5235, code: 0 },
+                             { ms: 5252, code: 0 }, { ms: 5284, code: 0 }]),
+    }),
     "tools/ship/eulerGpu-selfcheck.mjs": Object.freeze({
         observedHere: true, at: "v4471",
         runs: Object.freeze([{ ms: 22726, code: 0 }, { ms: 22192, code: 0 }, { ms: 22189, code: 0 }]),
@@ -252,6 +257,18 @@ export const MEASURED = {
     "tools/ship/paintTransfer-selfcheck.mjs":        slowestRun("tools/ship/paintTransfer-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
     "tools/ship/carveGpu-selfcheck.mjs":             slowestRun("tools/ship/carveGpu-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
     "tools/ship/eulerGpu-selfcheck.mjs":             slowestRun("tools/ship/eulerGpu-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
+    // *** v4457 (main) -- MEASURED AT BIRTH, so it never enters the "never run" state the entry above was
+    // rescued from. *** tools/ship/slugWgsl-selfcheck.mjs runs the WGSL Slug core on the headless Dawn device
+    // over ~130,000 samples across eight dispatches, plus five compiles and two dilation probes; that is over
+    // the quick sweep's 3000 ms cap by construction, not by accident.
+    //
+    // *** v4476 MERGE -- CONVERTED TO THE DERIVED FORM, BECAUSE MAIN'S NOTE HAPPENS TO CARRY ALL FIVE RUNS. ***
+    // It arrived as a bare 5412 with "FIVE RUNS, ALL EXIT 0: 5412, 5341, 5235, 5252, 5284 ms" beside it -- the
+    // measurement attached to the reader rather than to anything that checks, which is the exact gap
+    // MEASURED_RUNS was built for. The rows are in MEASURED_RUNS now and the basis is derived from them.
+    // observedHere is FALSE: these five readings are main's, transcribed, not re-run here. Their only
+    // corroboration is internal, and it holds -- the maximum of the five IS the 5412 that note recorded.
+    "tools/ship/slugWgsl-selfcheck.mjs": slowestRun("tools/ship/slugWgsl-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

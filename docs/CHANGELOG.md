@@ -86,6 +86,189 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
 *** THE ZERO-RANGE SWEEP HAS HAD NO POSITIVE CONTROL SINCE v3313, AND THIS ROUND DROVE IT ACROSS 78 DEVICES AND CAME BACK WITH SIXTEEN CLAIMS. *** tools/roundhouse/zeroRangeSweep.mjs carries a real pre-registration: A, a POSITIVE CONTROL -- the sweep must find optics.airy.airyRingErrFrac = 0, because "if the sweep misses a zero known to be present, it is not measuring what it claims and nothing else it reports counts" -- and B, the bet that it finds at least one FURTHER unregistered exact zero elsewhere. *** A DOES NOT HOLD, AND THE ZERO WAS CURED RATHER THAN LOST. *** v2931 replaced the raw grid estimator with firstMinimumRefined and moved grading from the rounded 1.22 to the exact j(1,1)/pi, destroying the coincidence on purpose; v3314 read that out of the source after v3313 had guessed at the cause and written the guess into a changelog. The gate already asserts the control's ABSENCE and states the cost in its own words -- "the sweep now has NO DEMONSTRATED DETECTION POWER for exact zeros ... UNPROVEN until a replacement control is planted". *** NO REPLACEMENT WAS EVER PLANTED, AND THAT SENTENCE HAS STOOD FOR ELEVEN HUNDRED VERSIONS. *** THE LOSS IS CONFIRMED WIDER THAN THE GATE CHECKS: the gate looks at optics.airy and optics.slit; all FIVE optics modes -- airy, slit, edge, converge, radiusconfusion, 175 builds and 140 error-field readings in 533 s -- produce not one exact zero anywhere. *** B HOLDS SIXTEEN TIMES OVER, WHICH IS THE PROBLEM AND NOT THE PAYOFF. *** acoustics.propagate, chaos.feigenbaum, fdtd.dispersion, freeze.asymmetry, invariants.gzk, invariants.naive, three fields of mpmstep.freefall/noplastic, multigridgpu.window, nuclear.chain, refscan.decision, refscan.furnace, sdfmarch.sphere, splat.detnotsqrt and strokeMorph.morph. Sixteen positive results from a detector with no demonstrated ability to find a positive is worth more than any of the sixteen. *** AND THE OBVIOUS REPLACEMENT CONTROL IS DISQUALIFIED BY MEASUREMENT. *** The natural candidate is the hit B already rested on, splat.integral.isoRollDeviation, which the gate reports as exactly 0 "at dyadic sigma" from five dyadic probes against three non-dyadic. Tested as RULES over twenty values rather than described: "dyadic" is true on all eight points the gate chose and FALSE over twenty; "sigma >= 1" fits neither; "sigma >= 1 OR dyadic" fits all twenty. 1.05, 1.1, 1.2, 1.3 and 1.5 are not dyadic and are exactly zero. THE RECORDED MECHANISM IS NOT WRONG, IT IS INCOMPLETE -- one of two disjuncts, and the second operates only at or above 1 where all three of the gate's non-dyadic probes never went. A SAMPLE DRAWN ENTIRELY ON ONE SIDE OF A BOUNDARY CANNOT SHOW THE BOUNDARY IS THERE. So no replacement control is planted here: a control whose mechanism is not understood is not a control, it is a second unexplained zero standing where the explanation should be. *** THE SCOPE THAT MADE THIS POSSIBLE WAS A COST MEASURED ONCE. *** The gate sweeps FOUR of the lab's 484 device/modes because v2912 wrote "the full sweep is seven values per knob across 642 knobs and did not finish in twenty minutes" and nobody re-measured it -- the same shape v4425 spent a round on one level down, an observation taken once over a budget and therefore never taken again. Measured now: 199 minutes across 78 devices, TWO OF WHICH HOLD HALF THE TOTAL, eight hold 91%, and the MEDIAN DEVICE TAKES 1.5 SECONDS. *** AND THIS ROUND GOT THAT WRONG ONCE, ON ITS OWN DATA, AND COMMITTED IT. *** At 20 devices the top was bell at 89% of the total; at 78 it is blobbodies at 40% and bell is THIRD. The claim was not false so much as measured on a sample too small to carry it, which is corroborationCensus.mjs's complaint quoted approvingly in this same session one round earlier -- "a rate measured on a sample I selected is not a rate". The share is REPORTED now and what is GATED are the properties that do not move with the sample. *** THREE STATES, NOT TWO, EACH WITH A DIFFERENT REMEDY: *** nine devices BUILD NOTHING and their clean result is vacuous; the expensive ones finish; and diffusion RAN 4.3 HOURS WITHOUT TERMINATING and produced no verdict -- slow can be answered with a bigger budget and that cannot. *** PARALLEL HERE, SERIAL IN THE LAST TWO ROUNDS, AND THE REASON IS WHAT IS BEING MEASURED. *** redCensus.mjs's warning -- an 8-way sweep turned seven green gates red by starving them -- is about DURATIONS, and a starved process misses a clock deadline without computing a different float. This sweep asks whether a value is exactly zero. Getting it backwards costs either way: serial here would be four times the wall clock for nothing, parallel in v4425 would have manufactured red gates. Also recorded: the per-device costs are quantised to 100 ms because they were parsed from a progress log, so a 0 meaning "built nothing" is kept distinct from a 0 meaning "faster than the log resolves" (13 devices); and THE FIRST DRAFT OF THAT PARSE WAS WRONG BY FIFTY TIMES -- a regex swallowed the integer part of each duration and fourteen devices reported six seconds of work. IT WAS CAUGHT BY READING THE NUMBER, NOT BY A CHECK, and catching it needs the raw duration rather than the log's, which is named rather than faked with a floor. tools/roundhouse/zeroRangeFull.mjs and tools/roundhouse/zeroRangeFull-selfcheck.mjs, four sections and 24 checks, pure; ten sabotages by name, THREE GAPS FOUND AND CLOSED (the optics control set was EMPTY so an optics-only fixture passed vacuously, vacuousDevices was checked on the wrong field, and the boundary sample needed a minimum span) and ONE EARNED 0: deleting one of five redundant non-dyadic points above the boundary does not change the conclusion and should not, and tightening the threshold to notice it would be pinning a sample size for its own sake. STILL UNMEASURED AND NAMED: 50 of the 128 devices were never reached, and diffusion has no verdict at any budget. The tree stands at 1448 gates. Full changelog on docs/CHANGELOG.md
 
+## v4460 -- TWO GATES THAT COULD NOT FAIL, AND ONE HAD BEEN GREEN OVER A WRONG ANSWER FOR FORTY-TWO VERSIONS
+
+### THE GATE THAT WROTE THE KEY IT GRADED
+
+`universeWire-selfcheck` computed the cross-engine economy key, **wrote** it to
+`tools/ship/universe-hash-expected.json`, and then asserted against the file it had just written. The browser
+half read AGREES because it fetched a file the same run had produced a second earlier. **THE WHOLE CHAIN
+AGREED WITH ITSELF** -- ALL GREEN, exit 0, and the gate sits in no red register because it was never red.
+
+*** v4316's OWN SABOTAGE LOG NAMED THE DEFECT AND THE FIX. *** It reads: "the file another engine checks
+against is the one COMMITTED, not the one a page computes." True of the intent and false of the mechanism,
+for 144 rounds.
+
+    committed key   2ac2a467          the tree computes   df581d2d, five fresh processes for five
+
+### AND MY FIRST TWO ATTRIBUTIONS WERE WRONG, BOTH READ OFF A DIFF HUNK RATHER THAN MEASURED
+
+I wrote that the key moved because vendored dependencies changed SIZE -- and `radiusFor` really is the cube
+root of a body's byte count, so it reads true. **The sabotage that reproduced the historical change went
+0 RED**, and measuring it properly showed why: 964 bytes added to each of the FIFTEEN bodies *in turn* moves
+the hash **not at all**. `bytes` sets a body's drawn radius and the economy integrates none of it.
+
+*** THE PLANT THAT "FAILED" WAS THE ONE TELLING ME THE EXPLANATION WAS WRONG. *** It is kept as a permanent
+negative control that must stay 0 RED, with the same negative asserted in the record as a number.
+
+Bisected file by file and then field by field, the real causes:
+
+    v4414  43f055b1   every body's ARRIVAL DATE rewritten to 2026-08-31, 14 of 15. A body's orbit is set by
+                      its age, so THE WHOLE SKY MOVED -- different orbits, flight times, trades.
+    v4416  df581d2d   PROVENANCE.txt ATTRIBUTION FILES added to six dependencies. stockOfFiles turns every
+                      file into cargo at max(1, round(bytes / 4096)), and all six are under 1 KB, so each
+                      rounds to ZERO and is lifted to a full ton.
+
+*** SIX TONS OF `docs` APPEARED IN THE ECONOMY BECAUSE SOMEBODY WROTE DOWN WHO OWNS THE CODE *** -- 4,049
+bytes of attribution, six tons of freight. Neither round was about the economy and neither did anything
+wrong: the economy is stocked from the tree and the tree gained files. **The defect is the gate.**
+
+It COMPARES now and goes red on a mismatch; writing is behind `--write`; `--write` passes only if the drift
+record already names the hash being baked, so the reason is owed at the moment the number moves; and the
+bytes are re-read after the comparison, so *this gate did not touch the file it grades* is asserted by
+mechanism. **A comparison against a file the comparer may have written is not a comparison.**
+
+### THE MIRROR standingReds NEVER HAD
+
+`sweepCoverage` is careful in ONE direction -- a nonzero exit code beside a killed process is not a failure --
+and nobody ever asked the other. A ZERO beside an over-budget reading is not a pass either: `quickSweep`
+writes `codes[gate]` only for gates it ran, so an over-budget entry keeps whatever status it had the last
+time it was cheap enough to run.
+
+    371 over-budget entries carry code 0     360 stamped "unknown -- before v4408"
+    run one at a time:  22 ARE RED           18 of them in no register at all
+
+**TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE 3,000 ms BUDGET THAT EXCLUDES THEM** -- `box3dFilter` is
+recorded at 3,763 ms and runs in 89. v4408's one-way door and this stale verdict are one defect seen twice:
+the door is shut on a time the gate no longer has, and behind it is a green nobody re-observed. Among the 22
+is `quickSweep-selfcheck` itself, whose fixture names three "cheap green gates" of which two have since gone
+red -- the gate that grades the sweep that gates every ship.
+
+### AND MY FIRST INSTRUMENT THERE WAS THE WRONG ONE, WHICH THIS TREE ALREADY HAD IN WRITING
+
+`quickSweep-selfcheck` prints *"a parallel FAILURE on its own is `unconfirmed`, not `red`"*. I ran an 8-way
+parallel pass anyway and quoted its number to myself before a serial pass existed. Two parallel passes of the
+same 371 gates **disagreed on five** (38 non-green against 43), and the serial re-run resolved **21 of 43 to
+GREEN ALONE -- a 49% false-red rate in my own measurement**, in the round about false verdicts. The 22 split
+17 real assertion failures / 3 needing a GPU this box lacks / 2 network-dependent; the split is in the record
+rather than folded into a headline.
+
+New: `standingGreens`, `undatedVerdicts`, `verdictClasses` as a partition, and `STALE_GREENS_V4460` with
+every count checked against its own parts.
+
+### EIGHTEEN SABOTAGES; THREE WENT 0 RED AND EVERY ONE WAS A FINDING
+
+Two of the three are mechanisms `vacuity.mjs` named one round earlier and were committed in the round after
+it: the **empty collection** (the uncoded class is empty in this tree, so folding it into green changed
+nothing) and the **unreachable branch** (`backfillStamps` guarantees every entry has a stamp, so the fallback
+never fires). *** AND THE FIRST FIXTURE WRITTEN TO REACH THE SECOND STILL DID NOT REACH IT, *** because it
+gave every fixture entry a stamp too -- an unreachable branch inside the fixture written to reach it, the
+third time this session.
+
+### ALSO CLEARED, ALL PRE-EXISTING
+
+`vacuity-selfcheck` had no sweep closing and `vacuity.mjs` no registry entry, both owed by the round before
+v4459; and v4457's `slug-wgsl` entry declared its page **in a comment** with the field left `undefined`,
+which is the exact state `instruments-selfcheck` exists to catch.
+
+### UNCHECKED AND SAID PLAINLY
+
+- `df581d2d` is Node/V8 on this box. The cross-engine answer is still a person on Firefox or Safari reading
+  the page's line, unchanged from v4316; what changed is that the file they read is the committed key.
+- **None of the 22 red gates is fixed by this round** -- only named, so a round that fixes one can say which.
+  The 144 entries recorded nonzero and the whole `killed` bucket were not re-run.
+- The BTDF defaults are still not flipped and no rendered image moves.
+- The release backlog is still owed on the rig. `releaseLedger` reads **7 of a budget of 3** at this ship --
+  the gate excludes the version being shipped, so v4460 makes it 8. The backlog is v4452, v4453, v4455,
+  v4456, v4457, v4458, v4459.
+
+The tree stands at 1483 gates.
+## v4459 -- THE CORRECTION REACHED FOUR COPIES OF THE PROSE AND NOT THE PRINT STATEMENT, AND THE PRINT STATEMENT IS THE ONLY COPY ANYBODY RUNS
+
+v4458 recorded `composeValidate.reportLines()` as manufacturing a finding. v4459's first act was to retract
+that -- in the module header, in this changelog, in main.js and in brain.js. **Four copies of the prose,
+corrected in place with the reason left standing.** `reportDoors.reportLines()` went on publishing
+`and TWO return a report anyway, one of them a manufactured finding` the entire time.
+
+*** AND SO DID THE LAST SENTENCE OF THE v4458 NOTE, IN ALL THREE OF THE PLACES THE CORRECTION HAD JUST BEEN
+APPLIED TO. *** Its NOT DONE list read "the two fabricating formatters are recorded rather than changed" --
+the withdrawn word, forty lines under the paragraph withdrawing it, in the files the withdrawal was written
+into. **FIVE COPIES; FOUR CORRECTED; THE ONE THAT EXECUTES WAS NOT AMONG THEM.** Both are fixed here, and
+the summary line is built from a `RETURNS_BARE_BECAUSE` map now rather than typed, so a reason cannot be
+corrected in one place and shipped from another.
+
+### THE SAME FRONT DOOR WAS PRINTING A DUPLICATE OF A MEMBER AND A RETIRED CLAIM ABOUT IT
+
+    tools/roundhouse/knobLiveness.mjs         38      <- derived from the cost table
+    tools/roundhouse/knobLiveness.mjs      never      <- a hand-typed eighth row for seven entries
+
+Sixty lines below the paragraph explaining that "never returns" was an observation at ninety seconds promoted
+to a property. The printer types no member name of its own now; every row comes from the table, and the row
+count is asserted against it.
+
+### THE COST RECORD COULD NOT SAY "NOT MEASURED", AND THE DERIVATION THAT FIXED IT FAILED ON ITS FIRST RUN
+
+`cheapFlag: null` stood for two different things: "measured, and there is no cheap path" and "nobody has ever
+measured this". The column is four explicit states now -- IMPOSSIBLE / MEASURED / NONE / UNMEASURED -- and
+**IMPOSSIBLE is DERIVED from the live signature, in both directions**, so it cannot be typed onto a member
+that takes a parameter nor omitted from one that does not.
+
+*** THAT DERIVATION CORRECTED THE ROUND THAT WROTE IT ON ITS FIRST RUN. *** `doorKinds` is
+`export async function reportLines()` with NO PARAMETER too. So v4458's
+`cheapFlag: "{ live: false } -- HAS NO EFFECT", cheap: 72.3` -- **the only entry carrying a flag, a verdict
+AND a number, and therefore the best-supported-looking row in the table** -- was an argument passed to a
+function with nowhere to put one. 71.0 and 72.3 are the bare call timed twice, 1.3 s apart.
+
+### SABOTAGE S WENT 0 RED, AND THAT IS THE ROUND
+
+Moving knobLiveness from UNMEASURED to `MEASURED, cheapFlag: "totalBudgetMs", cheapSeconds: 38.0` satisfied
+every check the new section made and nothing went red. Those checks ask whether an entry has the SHAPE of a
+measurement -- a flag and a finite number -- and *** A FABRICATED MEASUREMENT HAS THAT SHAPE BY
+CONSTRUCTION. *** It is v4458's 72.3 exactly: a number beside a claim, indistinguishable from a number taken
+with a clock, missed by the gate written to catch it.
+
+So MEASURED stopped being a claim. The record carries the ARGUMENT ITSELF; the gate applies it, times it and
+compares the line counts every run:
+
+    physics/sph/levelClaim.mjs    { live: false } ->  18 lines in 0.00s   (against  19 in 38.0s)
+    tools/ship/orphanTriage.mjs   { live: false } ->   5 lines in 0.00s   (against 154 in 71.5s)
+
+And a member of `NEVER_CALL` may not be MEASURED at all, because a cheap path nobody can afford to take is a
+cheap path nobody has verified -- which is precisely the state sabotage S constructed.
+
+Eight sabotages, results by name: the "never" row returning **2 RED**, the manufactured-finding summary
+**1**, doorKinds' flag returning **1**, levelClaim typed IMPOSSIBLE **1**, the fabricated measurement
+**0 RED THEN 3 RED after the repair**, a formatter losing its reason **1**, a MEASURED line count off by one
+**2**, the cheap flag ceasing to be a different question **1**.
+
+### ALSO IN THIS ROUND, FROM THE ROUND BEFORE IT
+
+`tools/ship/vacuity.mjs` names the 0-RED sabotage as **one symptom with four causes** -- an empty collection
+under `every()`, an unreachable branch, a guard sitting downstream of the classification it depends on, and a
+harness that damaged what it was measuring -- and supplies `overNonEmpty` and `emptyOfNonEmpty` so the empty
+case cannot be forgotten at the call site. A tree-wide scan for the first cause was **REFUSED rather than
+shipped**: 948 of 1,482 gates use the shape, and a census that flags 64% of the tree is one nobody reads.
+
+### UNCHECKED AND SAID PLAINLY
+
+- The BTDF defaults are **still not flipped** and no rendered image moves.
+- The retired-claim check is a match on **two exact words**, so a withdrawn claim REPHRASED passes it. It is
+  kept because it is the check that would have caught the two that actually happened.
+- **A wrong `cheapArg` makes the gate SLOW before it makes it red** -- sabotage V pays orphanTriage's full
+  71 s and then fails on the line count. The clock is an assertion, not a budget, and this gate cannot
+  abandon a call it has started.
+- `knobLiveness-selfcheck` stands at its 7 pre-existing reds. `definitionGates` stands at 23 and 269,
+  **verified identical at HEAD~1**, so this round grew neither.
+- The release backlog is still owed on the rig: `releaseLedger` reads 5 against a lag budget of 3.
+
+`CALL_COST_V4458` becomes `CALL_COST_V4459` -- the seconds are unchanged and still stamped v4458, only the
+cheap-path column moved. `NO_GATE_V4458` is untouched and keeps its stamp. The tree stands at 1483 gates.
+## v4458 -- an observation promoted to a property, twice, and the four sabotages that went 0 red
+
+*** TWO THINGS THIS ROUND SAID BEFORE IT MEASURED, AND BOTH WERE WRONG IN THE SAME DIRECTION -- AN OBSERVATION PROMOTED TO A PROPERTY. *** First: reportDoors recorded knobLiveness.reportLines() as "never observed to return", from a kill at 90 seconds. Run with no budget it RETURNS AFTER 989.8 s -- 16.5 minutes, 767 lines -- against the 43 minutes the arithmetic suggested (129 devices x 20 s). Not a hang, and "hangs" and "takes sixteen minutes" call for different repairs. Second: the BTDF's chi+ was pinned as "incomplete leaving the denser medium" because a probe read 0.393540 against 0.510957 and did not move under refinement, so by this tree's own rule it was the model. IT WAS THE TARGET: 1 - P(TIR) counts refractions whose ray leaves UPWARD, a population the lower hemisphere cannot hold -- and that population is EMPTY entering the denser medium, so the wrong target agreed with the right one across the whole direction anybody had measured. THE ROUND: v4447 convicted the single-scatter BTDF of over-counting and named two suspects, "Walter's Jacobian or the height-correlated G2". THE JACOBIAN IS INNOCENT, proven without the walk -- entering the denser medium there is no total internal reflection, so with masking reduced to G1(i) and Fresnel off the transmitted integral must be EXACTLY 1; with chi+ restored it is 1.0016 / 0.9989 / 0.9998 / 1.0005 / 1.0000 across the roughness range and as shipped it reads up to 2.0586. What is missing is Walter's chi+, replaced here by Math.abs() on both dots and a half-vector flipped up when it points down: a downward half-vector is not a facet, so D() is asked about an orientation the distribution does not contain and the answer is added to the lobe. AND THE SECOND SUSPECT IS GUILTY SEPARATELY: the shipped G2 is the SAME-SIDE correlated form used on two directions on OPPOSITE sides, where the Smith uniform-height derivation gives the BETA FUNCTION B(1+Lambda_i, 1+Lambda_o) -- a factor of two at Lambda 1 and six at Lambda 2 -- and the two corrections together reproduce the walk's single bounce to 8.1e-4 entering glass and 1.5e-3 leaving it, where the shipped lobe is TEN times the truth. Walter's own separable G1(i)G1(o) would NOT have fixed it: 0.4847 against 0.3066. DEFAULTS UNCHANGED and no rendered image moves; both corrections are parameters, and turning them on is a product decision because it darkens every rough transmissive material. ALSO: definitionGates has been printing "~106 is GROWTH and ~-83 is REGRESSION" on every run since v4062 -- a growth term five times the population of 23 and a NEGATIVE regression -- because the decomposition is only defined above the constant-rate line and v4062 paid physics to zero while leaving the line comparing against the v3323 era's rate. Fixed as a branch, and the terms are CHECKED now, because a `----` line asserts nothing. AND THE reportLines CONVENTION IS COUNTED FOR THE FIRST TIME: 78 modules, consumed by server.html, instrument-bench.html and fleet-report, and THREE INSTRUMENTS GIVE THREE ANSWERS -- the source text says 20 take a parameter, Function.length says 6 REQUIRE one, and CALLING says 4 refuse and 2 return a report anyway. *** THIS SENTENCE ORIGINALLY SAID ONE OF THOSE TWO MANUFACTURES A FINDING, AND THAT WAS WRONG -- CORRECTED IN PLACE AT v4459 RATHER THAN DELETED. *** composeValidate.reportLines() with no argument returns "[composeValidate] 1 problem(s):" and THE LINE UNDER IT NAMES THE CAUSE -- "(root): not an object -- a composition is { avatar, scene, pet, room, gauges, props }" -- which is an accurate report of what it was handed; an actual empty composition reports SIX problems against that one, so the count tracks the input rather than being canned. The other returns for an unrelated reason: curriculum is required in the declaration and optional in fact, because propose() defaults every field one call deeper, so reportLines() and reportLines({}) are identical. NEITHER FABRICATES. The claim was a headline promoted to a property, made in the round whose own subject was that error -- the fourth instance in it, and the one that got shipped. knobLiveness's census has a budget of its own now, its front door returns in 38.0s covering 19 of 129 devices and says which, and a partial census can no longer print MOVES NOTHING ANYWHERE without naming its scope. FOUR SABOTAGES WENT 0 RED AND EVERY ONE WAS A FINDING: the BTDF's back-face test was unreachable and chasing it found a chi+ that returned ZERO transmission for every direction leaving glass; contractOf's failure branches are unreachable from a population where every member is well-formed; emptying the never-call list changed nothing while removing the only guard against a future call site hanging, and A HANG IS NOT A RED; and the census check first ran at a budget that produced zero rows, so "not reached is not dead" passed on an empty list. Nineteen sabotages in total, and the four repairs are what the round is. NOT DONE AND SAID PLAINLY: the BTDF defaults are not flipped, the two formatters that return a bare report are recorded rather than changed -- and NEITHER FABRICATES, which this sentence went on denying for a whole round after the claim above it was withdrawn; corrected at v4459, knobLiveness-selfcheck stands at its 7 pre-existing reds (verified identical at HEAD), and the reportLines contract is checked on a bounded sample because the whole convention costs about twenty-four minutes. The tree stands at 1482 gates.
+## v4457 -- the Slug shader in WGSL, held to the CPU key on a real device, and two corrections to what the round said first
+
+*** TWO CORRECTIONS TO WHAT THIS ROUND SAID BEFORE IT MEASURED, AND THEN THE SLUG SHADER IN WGSL. *** First: the sidebar plan and the first draft of docs/TSL-ROADMAP.md step 7 said the backend-parity census would move '10 both to 11'. Wrong twice: the census stands at 13 both (the 10 was v4383's figure, stale by four rounds of two-language modules), and this round does not move `both` at all, because the WGSL twin is a SECOND FILE rather than a second language in text/slugShader.js -- that file's whole value is that it diffs line for line against SlugPixelShader.hlsl, and interleaving WGSL into it would end that. What moves is wgslOnly, 47 to 48, and PARITY_BASELINE says so by name. Second: the first draft of the new gate's section 5 had an UNREACHABLE PLANT. It packed the six constructed test glyphs at width 64 and compiled the probe for width 128; the plant went 0 of 10,016 wrong, because six small glyphs never leave row one and nothing wrapped -- text/slug-selfcheck.mjs's own plant 3 says exactly this and packs rosettes for it. Caught on the first run, rebuilt over the 66 IBM Plex label glyphs at width 128, where 432 of 965 band headers point past their own row, and the wrong-width probe is now wrong on 9,477 of 27,957 samples. That is v4456's finding -- a check that cannot reach the branch it guards -- made once more, one file over, and logged in the gate's header with the other four sabotages. THE ROUND: an outside plan for 'TSL / WebGPU / pipeline' text was reviewed against this tree. It rebuilt text/ from scratch (opentype.js in a worker, a TSL loop whose winding test ignores the middle control point so every curve is a chord, a band packer returning offset 0, a verification harness returning 1.0 unconditionally, TSL APIs the vendored 0.178 does not have) -- but its direction was right, and the tree had already said so: tools/ship/backendParity-selfcheck.mjs asserts text/slugShader.js is GLSL-only and ui/orreryPost.mjs kept the orrery on canvas 2D for want of a WGSL glyph renderer. The review is docs/TSL-ROADMAP.md step 7, thirteen items in dependency order, and item 1 shipped: text/slugShaderWgsl.js. THE PORT IS LITERAL WHERE WGSL ALLOWS IT and every departure is listed in its header (bitcast<u32> for floatBitsToUint, textureLoad on texture_2d<f32> and texture_2d<u32> with no sampler, @interpolate(flat) on the integer varying, named uniform fields m0..m3 because gfx/device.js packs a struct and has no array element, generated text for the #if branches, a struct return for the out parameter). THE ONE STRUCTURAL DEPARTURE IS THE REASON IT CAN BE GRADED: SlugRender takes emsPerPixel as a parameter instead of computing fwidth() inside, so the SAME core string is interpolated into the render module (which passes fwidth) and into a compute probe (which passes what the gate asks, and reads the atlas's own Uint16Arrays as array<u32> through unpack2x16float -- the bytes a texture would hold, with fetches that REFUSE TO WRAP, as slugEval's texelFetch does and for the same reason). tools/ship/slugWgsl-selfcheck.mjs asserts that text identity before anything runs, then runs it on the headless Dawn device (tools/ship/headlessGpu.mjs, which gained read-only storage inputs this round, and the browser harness the same option so the two keep one signature). MEASURED: in the sharp limit (emsPerPixel 1e-7) the GPU equals text/slugEval.js EXACTLY on 22,045 of 22,045 samples of the constructed font and 61,092 of 61,092 of the Plex label alphabet, and equals the flattened-segment winding number -- the key with no bands, texels, offsets or root code in it -- on every one of them, so the claim does not rest on two transliterations of one HLSL file sharing a misreading. At 28 and 12 px/em the worst |gpu - cpu| is 3.1e-6 against a tolerance of 1/512 set BEFORE the run from what coverage is for (half an 8-bit step; no byte in a picture can move), with 0 samples rounding to a different byte, that count reported and not asserted. Three transliteration plants go red on the device at 12,148 / 2,205 / 1,462 of 22,045 -- a dropped complement in the root code, the a == 0 branch removed (straight lines are EXACTLY a = 0 by construction), the vertical early-out on the wrong axis -- each asserted to have applied first. AND THE DILATION IS HELD TO A DERIVATION, NOT A TWIN: the GPU's dilated corner is pushed through the full projection in f64 and its screen displacement compared with the closed form sqrt(2)*sqrt(uv)/(2*(sqrt(uv)+(sqrt(2)-1)*s*t)). Under an orthographic matrix that is HALF A PIXEL PER AXIS, exactly, and the device lands 3.8e-6 px from it at every corner; under perspective it matches the closed form to 3.6e-6 px, and the closed form is NOT half a pixel per axis (off by up to 0.07 px at the test's depth) -- because slugText.buildVertices passes the corner normal as (+-1, +-1), unnormalised, and the reference's exact half-pixel property holds for a unit normal. Harmless at label sizes, a real fact about the shipped vertex stream, and written down rather than argued. HOUSEKEEPING: the constructed test font moved to text/slugTestFont.mjs so two gates read one copy; sweep closing since78; MEASURED budget 5,412 ms (five runs 5,235 to 5,412, all exit 0, the slowest recorded, so the gate never enters 'never run'); an instruments entry, pageless because a standalone gate has no reportLines() for the bench; a --affected run of the 253 reachable gates was started and its process died without writing a ledger, so the quick sweep at verify is the check that stands. NOT CLAIMED: A FRAME. Nothing binds the two textures to the render module, runs the six-attribute vertex stream, or diffs a picture against the WebGL2 draw; that is step 7 item 3, and it is blocked on item 2 -- gfx/device.js has no blend state (Slug needs ONE, ONE_MINUS_SRC_ALPHA) and its texture path uploads rgba8unorm only, where the atlas is rgba16float and rg16uint. Also unchecked: fwidth() on the device, the even-odd and weight variants beyond compiling, timing on a software rasteriser, and the trunk's standing reds (windowsImport, citedSources, and crossBackend's two unaccounted WGSL producers from v4416/v4418) which this round neither caused nor clears. The tree stands at 1482 gates.
 ## v4456 -- the sweep ledger counts gates and never names them, so a duplicate closing is a credit
 
 *** THE SWEEP LEDGER COUNTS GATES AND NEVER NAMES THEM, SO A DUPLICATE CLOSING IS A CREDIT RATHER THAN AN ERROR, AND THE ROUND EXISTS BECAUSE I REFUSED TO WRITE ONE. *** main is carrying tools/ship/reportDoors-selfcheck.mjs, landed by an in-flight round on the other branch with no closing written for it, so gateSweep-selfcheck read "1 STILL UNSWEPT" on the trunk for three unnumbered commits. The obvious repair is to write the closing. I declined, on the ground that when that round ships it will write its own for the same gate -- and then went to look at what the ledger actually does about two closings naming one gate. IT DOES NOTHING, IN A WAY THAT IS WORSE THAN MERELY MISSING IT. The coverage line is uncovered = (gatesNow - 1366 - 1) - SWEEP_SINCE_V4297.swept - sum(closing.swept), asserted <= 0. Every term is a COUNT. `added` holds the names and the check has never read them. MEASURED on a fixture built to hold exactly one uncovered gate: as it stands, uncovered 1, FAIL; TWO BRANCHES CLOSING THE SAME GATE, UNCOVERED 0, PASS. That is not a future risk, it is this week's red going green. A gate nobody sweeps at all gives 2 and still reds; a duplicate AND a second unswept gate gives 1 and reds for the wrong reason, reporting one gap where there are three problems, in a message that names no file. *** AND THE CREDIT IS PERMANENT, BECAUSE `<= 0` CAN NEVER GO RED NO MATTER HOW FAR THE SUM OVER-RUNS: *** measured at +1, +2, +10, +100 and +1000 over coverage, the old line passes every time. One duplicate buys exactly one future unswept gate, three buy three, and the quantity is linear -- so it is nameable rather than a threshold. THE FIX IS THE TREE'S OWN RULE REACHING THE ONE LINE THAT HAD NEVER FOLLOWED IT: v4399 said freeze by NAME, not by COUNT, and v4402 said an absence read as a skip is an absence read as a pass. NEW tools/ship/closingCoverage.mjs reads the union of every `added` list as a SET -- duplicates ATTRIBUTED to both claimants by ordinal, claimed names checked against the FILESYSTEM rather than the caller's list, and the credit reported as its own number instead of folded into a total. Everything is injectable, ledger and baseline and gate list alike, because a check for double-counting that cannot be handed a double-counted ledger is a check nobody has run. Its gate reimplements nothing: section 4 RECOMPUTES THE SHIPPED EXPRESSION FROM THE SHIPPED RECORD and prints the two verdicts side by side, so the claim "the old check cannot see this" is a run rather than an argument. SIX SABOTAGES, MEASURED 4/1/0-THEN-2/1/1/9 BY NAME. *** THE ZERO WAS AN UNREACHABLE CHECK INSIDE A ROUND ABOUT UNREACHABLE CHECKS, WHICH IS THE FINDING I DID NOT EXPECT TO MAKE ABOUT MYSELF. *** Deleting the filesystem clause from `phantom` cost NOTHING: both fixtures named a gate missing from the enumeration as well as from disk, so `!onDiskSet.has(g)` convicted it alone and the second half never ran. The clause is load-bearing in exactly one direction -- a claimed gate the CALLER'S LIST omits but the disk holds -- and neither fixture went that way. An empty population drives it now, where all 98 claimed names would read as missing and every one of them is a real file. That is the FIFTH unreachable check this session, after v4435, v4436, v4447, v4443 and v4445, and the first one inside a round whose whole subject is checks that cannot see what they are for; an earlier draft of the gate's header claimed all six sabotages went red. A SECOND SELF-INFLICTED FINDING, TWICE: the first draft of section 4 pinned its fixtures to the live tree, and then this round added its own gate, the uncovered count went 1 to 2, and five checks went red on a tree with no new defect -- a fixture that moves when the thing around it moves is not a fixture, so the population is now constructed to hold exactly one gap whatever the tree holds. THEN THE SAME MISTAKE AGAIN one section down, where a check pinned `closings === 75` and writing this round's own closing made it 76. Both are relationships now. AND A THIRD, IN THE INSTRUMENT ITSELF: the first version of "no second copy of 1366" grepped the whole file and went red on its own header comment, where the number is SAID and not USED -- v4435's two strippers and two questions, `noComments` for what a file says and `codeOnly` for what it does, and a question about a duplicated VALUE is a question about what it does. WITH THAT GATE IN PLACE THE CLOSING IS SAFE TO WRITE AND IS WRITTEN: since77 accounts for two gates, this round's own and reportDoors-selfcheck.mjs, which this round RAN (exit 0) and did not author -- the entry says so, because a ledger line that reads as a claim somebody did not earn is worth less than the gap it closes. Both gates now have INSTRUMENTS entries, with keys LIFTED from their own module headers per v3585's rule rather than composed. *** AND BEING LIFTED INTO THE REGISTRY FOUND A FLAW IN THE LIFTER: *** registryOrphans' headerClaim drops any line matching /^tools\/|^physics\/|^WebGLEngine\//, on the reasoning that the path banner is not a claim -- but it runs that filter over EVERY line, not just the first, so this module's header, whose second paragraph opened with a filename, came back as "main is carrying written for it", a sentence with its middle silently removed. Reworded here and recorded rather than repaired there, because the fix belongs to that gate and a mangled key would have been the more expensive thing to leave. WHAT IS NOT CLAIMED: that the 1366 gates swept at v4297 are covered by NAME -- they are not, that record is a count, rebuilding its membership now would be fabrication, and `baselineByName: false` is a GRADED VALUE rather than a sentence in a comment; that a gate a closing names was actually run by the round that named it, since this reads a record somebody wrote; or that gateSweep-selfcheck is wrong to pass today, because it is right today, on a ledger with no duplicates -- what is wrong is that it would be right for the same reason on a ledger with one. THIS ROUND CLEARS TWO OF THE TRUNK'S SIX REDS, gateSweep and registryOrphans, and clears neither of the other four: windowsImport names one dynamic import of a raw filesystem path, citedSources is a ratchet at 51 against a baseline of 49 whose entries need judgements this round has no standing to compose, and budgetEvidence, which WAS empty because transmission-selfcheck takes far longer than the quick sweep's 3000 ms cap, is closed here by the path that gate's own header prescribes rather than by a workaround: the sweep kills it at the cap with a 124, a 124 says nothing, and so a gate that passes in fifteen seconds had fallen into NEVER RUN -- the fourth state that header calls the one that hides things. Five runs, all exit 0, 20387 / 20480 / 15175 / 15405 / 13477 ms; the spread is contention rather than the gate, since the two twenty-second readings were taken while a ship verify ran on the same box, and the SLOWEST is recorded because a budget set to the average of a contended measurement re-creates the timeout it exists to prevent. It is slow on purpose: it integrates the transmitted lobe over four G forms at several roughnesses, which is the measurement that round is FOR. Those are named here rather than folded into a count. The tree stands at 1481 gates.

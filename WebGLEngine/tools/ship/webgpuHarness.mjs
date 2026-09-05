@@ -41,6 +41,7 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
+import { storageWords } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share
 
 /** The flags that worked, kept as data so a caller can report them and a future box can extend the list. */
 export const LAUNCH_ARGS = Object.freeze(["--enable-unsafe-webgpu"]);
@@ -67,7 +68,8 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
  * RESULT a gate should report, not an exception that hides which line failed.
  */
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
-                                       workgroups = 1, compileOnly = false, timeoutMs = 60000 }) {
+                                       workgroups = 1, compileOnly = false, timeoutMs = 60000,
+                                       inputs = null }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -119,6 +121,14 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
                 dev.queue.writeBuffer(uniBuf, 0, new Float32Array(a.uniforms));
                 entries.push({ binding: 1, resource: { buffer: uniBuf } });
             }
+            // v4457 -- read-only storage inputs, the same option headlessGpu.runWgslComputeNative takes, so the
+            // two harnesses keep one signature (crossBackend-selfcheck's corpus depends on that).
+            for (const inp of a.inputs || []) {
+                const words = new Uint32Array(inp.words);
+                const b = dev.createBuffer({ size: words.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+                dev.queue.writeBuffer(b, 0, words);
+                entries.push({ binding: inp.binding, resource: { buffer: b } });
+            }
             const pipe = dev.createComputePipeline({ layout: "auto",
                 compute: { module: mod, entryPoint: a.entryPoint } });
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
@@ -134,7 +144,8 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             return { ok: true, values, errors: [],
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
-        }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly });
+        }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+             inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null });
         return { skipped: false, errors: [], values: [], ...out };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };

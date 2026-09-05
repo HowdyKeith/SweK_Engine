@@ -220,11 +220,17 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "gpu/gltfDraco.js",
         "tools/ship/dracoWeld-selfcheck.mjs",
     ]),
+    // v4476 MERGE -- tools/ship/slugWgsl-selfcheck.mjs (main, v4457) reads
+    // vendor/fonts/IBMPlexSerif-Regular.ttf as its test corpus. IT IS A DEPENDANT, NOT A SCANNER: the
+    // NOT_IMPORTERS rows are files that ENUMERATE a vendor directory to assert facts about it, and this one
+    // consumes a specific font in order to grade glyph rasterisation against it. A font is data; readFileSync
+    // is how you depend on one.
     "fonts": Object.freeze([
         "ev/esShipLabels-selfcheck.mjs",
         "ev/esShipLabels.js",
         "slug-text.html",
-    ]),
+    
+        "tools/ship/slugWgsl-selfcheck.mjs",]),
     "gifenc": Object.freeze([
         "render/gifRecorder-selfcheck.mjs",
         "render/gifRecorder.js",

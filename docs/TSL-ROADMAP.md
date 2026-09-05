@@ -248,6 +248,65 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    never enters the claim. NOT MEASURED, and it is the reason the pass exists: whether it is faster. The sandbox
    device is SwiftShader, so a timing here would clock a CPU pretending to be a GPU.
 
+7. **SLUG TEXT ON THE WebGPU BACKEND -- planned at v4457 after a review of an outside plan; item 1 built the same round.** The plan reviewed
+   proposed a fresh Slug: opentype.js in a Web Worker, a TSL fragment loop, a JSON font registry, a ring buffer,
+   bidi shaping, an MSDF fallback for CJK, cylindrical text, bloom. Graded against this tree it rebuilds text/
+   (slugFont.js, slugAtlas.js, slugShader.js, slugEval.js, slugText.js and an 837-line gate, shipping since v3823
+   in ev/esShipLabels.js) and builds it worse: its winding loop ignores the middle control point, so every curve
+   is a chord; its band packer returns offset 0 for every band; its verification harness returns 1.0
+   unconditionally; and its TSL uses APIs the vendored 0.178 does not have (toAttribute, mutable, UniformNode)
+   while pinning three ^0.170 from unpkg. What it got RIGHT is the direction, and the tree already says so:
+   backendParity-selfcheck asserts text/slugShader.js is GLSL-only, and ui/orreryPost.mjs kept canvas 2D because
+   no WGSL glyph renderer exists. So the arc is, in order, with the sidebar's task numbers:
+     1. text/slugShaderWgsl.js -- the WGSL twin of the Slug shader, a SHARED core (root code, the two solvers,
+        CalcBandLoc, CalcCoverage, SlugRender with emsPerPixel as a parameter) wrapped twice: the fragment shader
+        over textureLoad and fwidth, and a compute probe over storage buffers holding the SAME packed atlas bytes.
+        Graded on the headless Dawn harness against text/slugEval.js sample by sample, and against the
+        flattened-segment winding number, which is the key slug-selfcheck already trusts. BUILT at v4457: the
+        twin is a second file (text/slugShaderWgsl.js) rather than a second language in slugShader.js, whose
+        value is that it diffs line for line against the HLSL, so the census moves wgslOnly 47 to 48 and `both`
+        stays 13. MEASURED on the headless Dawn device (tools/ship/slugWgsl-selfcheck.mjs, 5.4 s): in the sharp
+        limit the GPU equals slugEval AND the winding number on 22,045 of 22,045 samples of the constructed font
+        and 61,092 of 61,092 of the Plex label alphabet, exactly; at 28 and 12 px/em the worst |gpu - cpu| is
+        3.1e-6 against an a-priori 1/512 (half an 8-bit step), with zero samples rounding to a different byte;
+        the wrong-width probe is wrong on 9,477 of 27,957 samples of a width-128 atlas whose lists wrap; three
+        transliteration plants (a dropped complement in the root code, the a == 0 branch removed, the vertical
+        early-out on the wrong axis) go red at 12,148 / 2,205 / 1,462 of 22,045, each asserted to have applied
+        first. SlugDilate moves a corner HALF A PIXEL PER AXIS to 3.8e-6 px under an orthographic matrix, and
+        under perspective its screen shift matches the closed form sqrt(2)*sqrt(uv)/(2*(sqrt(uv)+(sqrt(2)-1)*s*t))
+        to 3.6e-6 px -- which is the finding: buildVertices passes the normal as (+-1, +-1), unnormalised, and
+        the reference's exact half-pixel property holds for a UNIT normal, so in perspective the per-axis push
+        is off by up to 0.07 px at the test's depth. Harmless at these sizes and now written down. NOT CLAIMED:
+        a frame. Nothing binds the textures or runs the vertex stream; that is step 3, and it is blocked on step 2.
+        *** THE FIRST DRAFT OF THE GATE HAD AN UNREACHABLE PLANT *** (six small glyphs never leave row one, so
+        the wrong-width probe went 0 of 10,016 wrong); slug-selfcheck's own plant 3 says why and the section
+        was rebuilt over 66 Plex glyphs at width 128, where 432 of 965 band headers point past their row.
+     2. Blend state on gfx/device.js pipelines. Slug returns colour premultiplied by coverage and needs
+        (ONE, ONE_MINUS_SRC_ALPHA); the device carries topology, cull and frontFace and no blend at all, and its
+        texture path uploads rgba8unorm only, where Slug needs rgba16float and rg16uint.
+     3. A device-path text batch, drawn on both backends and diffed, with the orrery's four fillText calls or the
+        ship labels' overlay canvas as the first consumer.
+     4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
+        more than one varying and Slug's vertex stage carries five, so the device shell is not its route.
+     5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,
+        Cinzel, JetBrains Mono, Source Sans 3, Cormorant, Lora, Merriweather, Fira) kerns through GPOS only, and
+        layoutText reports kerningSource "none" for them today.
+     6. Vendor OFL fonts under vendor/fonts/<family>/, static glyf instances only (the parser refuses CFF and
+        ttcf by name and reads no fvar), one OFL copy per family with its Reserved Font Name, and one
+        vendoredLicences.mjs entry each, because that gate requires disk and list to agree exactly.
+     7. Pre-pack atlases at ship time with a hash gate, after MEASURING parse+pack time; the worker is not worth
+        its message-passing unless that number is over a frame.
+     8. Word wrap (maxWidth) in layoutText, pure and gated headless -- the one layout feature genuinely missing.
+     9. A slug-rig.html measuring fragment cost by size, angle and band count on Keith's boxes, including one
+        dense glyf CJK face, before any band-count tuning.
+    10. Curved text by tessellated strips with per-strip Jacobians, or a planar target resampled -- never by
+        bending vertices, because SlugDilate's half-pixel push needs the Jacobian constant over the quad.
+    11. Bidi shaping and the CJK fallback recorded as wont in tools/ship/todo.mjs with reasons (two-letter
+        presentation-form shaping and a whole-string reverse is not UAX #9; canvas fillText is not an MSDF).
+    12. Measure SlugTextBatch's per-frame bufferData before any ring buffer; the plan's ring resets to 0 on
+        overflow with no fence, so it overwrites text still being drawn.
+    13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

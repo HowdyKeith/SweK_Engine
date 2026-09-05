@@ -249,6 +249,16 @@ console.log("\n6. THE ORRERY AND THE GLYPH SHADER, WHICH IS THE ACTUAL BLOCKER")
         "slugEval.js transliterates the fragment shader and is graded against a segment winding number");
     ok("CONTROL: shortfall() returns null for a module that is already ready",
         shortfall("x", GLSL_MARK + " " + WGSL_MARKS[0]) === null);
+    // v4457 -- *** THE PORT EXISTS, AS A SECOND FILE, AND THE ASSERTION ABOVE STAYS TRUE ON PURPOSE. ***
+    // text/slugShaderWgsl.js is the WGSL twin; slugShader.js keeps its GLSL alone because its value is a
+    // line-for-line diff against SlugPixelShader.hlsl. So the blocker this paragraph named is gone and the
+    // count that said so is unchanged -- what moved is wgslOnly, 47 -> 48, and the next blocker is
+    // gfx/device.js itself: no blend state, and a texture path that uploads rgba8unorm only.
+    const twin = read("text/slugShaderWgsl.js");
+    ok("*** and text/slugShaderWgsl.js, the WGSL twin, is WGSL-only ***", classify(twin) === LANG.WGSL);
+    ok("  it is held to the CPU model on a device by tools/ship/slugWgsl-selfcheck.mjs",
+        fs.existsSync(path.join(ENG, "tools/ship/slugWgsl-selfcheck.mjs")) && /slugEval/.test(twin),
+        "the gate compares SlugRender's coverage sample by sample with slugEval.js on the same packed bytes");
     // *** v4270 WITHDREW HALF OF WHAT THIS PARAGRAPH USED TO SAY. *** It read "NOTHING HERE CAN EXECUTE
     // WGSL", which was inferred from render/wgslSpec.mjs's true statement that the build box has no GPU, and
     // was never tested. Chromium here serves a WebGPU adapter (google/swiftshader) over a SECURE origin and
