@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/quickSweep-selfcheck.mjs -- v4303
+// WebGLEngine/tools/ship/quickSweep-selfcheck.mjs -- v4461 (was v4303)
 //
 // GATES tools/ship/quickSweep.mjs -- the ship-time sweep that closes #134. The pure parts are checked as
 // arithmetic on hand-made inputs: selection by budget (and that a gate with no timing is always run),
@@ -9,10 +9,43 @@
 // runs -- and a control with a gate that always exits 1 proves it can report a NEW red, because a runner
 // that reports green for everything would pass every other line here.
 //
+// ---- *** v4461 -- THE POSITIVE ROW WAS EXACTLY BACKWARDS, AND ITS CONTROL SAT THREE LINES BELOW IT *** ----
+//
+// Section 4 named three live gates and asserted `r.green === 3`. That is a claim about THE TREE; the header
+// two paragraphs up says the block exists to prove "the runner runs". Two of the three have since gone red,
+// so this gate was RED -- and at 5,981 ms it is above the 3,000 ms ship-time budget, so the sweep it grades
+// never runs it. *** THE GATE THAT GRADES THE SWEEP THAT GATES EVERY SHIP WAS RED AND INVISIBLE, and it took
+// v4460's census of stale green verdicts to find it. ***
+//
+// MEASURED BOTH WAYS, which is the only thing that settles what a row is actually testing:
+//
+//     runner CORRECT, two named gates red        -> the row FAILS
+//     runner SABOTAGED to call EVERYTHING green  -> the row PASSES
+//
+// Under that one sabotage the two rows moved in OPPOSITE directions -- the hermetic control PASS -> FAIL and
+// this row FAIL -> PASS. A runner that reports green for everything is the exact failure the header says the
+// control exists to catch, and this row was not merely blind to it, it was REPAIRED by it.
+//
+// v4461 SABOTAGES, RESULTS BY NAME:
+//   BA. the runner calls EVERYTHING green (the one that used to repair the row) -> 4 RED
+//   BB. the runner calls everything RED                                         -> 4 RED
+//   BC. write:false writes the timings file anyway                              -> 2 RED
+//   BD. one hermetic gate exits 1 instead of 0                                  -> 2 RED
+//   BE. the agreement row reads greenness instead of agreement                  -> 2 RED
+//   BF. the hermetic row is pointed back at real tree gates                     -> 2 RED
+//
+// *** BC WAS A CRASH BEFORE IT WAS A VERDICT, AND MY OWN HARNESS READ THE CRASH AS 0 RED. *** Forcing the
+// write made the hermetic run die on ENOENT -- no tools/ship/ under the temp root -- so the gate exited 1
+// while naming nothing, and a sabotage harness that counts FAIL lines saw zero. A CRASH IS NOT A VERDICT
+// (v3201), and counting the wrong thing is the same defect as this round's subject, committed by me inside
+// the round about it. The harness reads the exit code now, the temp root carries its directory, and BC lands
+// on the row whose name it belongs to.
+//
 // Run: node tools/ship/quickSweep-selfcheck.mjs
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
@@ -77,25 +110,79 @@ sec("3. RECONCILIATION: KNOWN, NEW, AND NOT-A-VERDICT ARE THREE DIFFERENT THINGS
 }
 
 // ---------------------------------------------------------------------------------------------------------
-sec("4. A REAL RUN OVER THREE CHEAP GATES, THE TIMINGS FILE UNTOUCHED; AND A CONTROL THAT MUST GO RED");
+sec("4. THE RUNNER RUNS AND CLASSIFIES -- HERMETICALLY, THEN AGAINST REAL GATES BY AGREEMENT");
 // ---------------------------------------------------------------------------------------------------------
+// *** v4461 -- THE POSITIVE ROW HERE WAS EXACTLY BACKWARDS, AND ITS OWN CONTROL SAT THREE LINES BELOW IT. ***
+//
+// It named three live gates -- windowsImport, backendParity, citedSources -- and asserted `r.green === 3`.
+// That is a claim about THE TREE, not about the runner, and this file's header says the block exists to
+// prove "the runner runs". Two of the three have since gone red, so the row was red; and because this gate
+// costs 5,981 ms it sits above the 3,000 ms ship-time budget, so the sweep it grades never runs it and
+// nobody saw. *** THE GATE THAT GRADES THE SWEEP THAT GATES EVERY SHIP WAS RED AND INVISIBLE. ***
+//
+// MEASURED BOTH WAYS, which is the only thing that settles what a row is really testing:
+//
+//   the runner is CORRECT and two named gates are red   -> the row FAILS
+//   the runner is SABOTAGED to call EVERYTHING green    -> the row PASSES
+//
+// A runner that reports green for everything is the exact failure this file's header says the control exists
+// to catch -- and this row is not merely blind to it, it is REPAIRED by it. Under that one sabotage the two
+// rows moved in opposite directions: the hermetic control PASS -> FAIL, this row FAIL -> PASS.
+//
+// So the positive case is hermetic now, and the live-tree run stays -- because synthetic one-line gates do
+// not exercise real imports, real paths or real durations -- but its claim is AGREEMENT rather than
+// greenness: every gate the runner called green must exit 0 when run alone, and every gate it called red
+// must not. That grades the runner on real modules and says nothing whatever about whether the tree is
+// healthy, so it cannot rot when an unrelated gate goes red.
 {
-    // not staleness: it compares case-study.html's gate count with the tree and is red mid-round by design, until the ritual runs --fix
-    const cheap = ["tools/ship/windowsImport-selfcheck.mjs", "tools/ship/backendParity-selfcheck.mjs", "tools/ship/citedSources-selfcheck.mjs"];
-    const before = fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null;
-    const r = await Q.runQuickSweep({ gates: cheap, budgetMs: 60000, workers: 3, capMs: 60000, write: false });
-    const after = fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null;
-    ok(r.ran === 3 && r.green === 3 && r.newRed.length === 0 && r.knownRed.length === 0,
-       "*** three green gates run green: the runner runs and classifies ***", `${r.green} green in ${r.ms} ms`);
-    ok(before === after, "and with write:false the timings file is byte-identical afterwards");
-    // the control: a gate that always fails, outside the register, in a temp dir that enumerates as a root
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "quickSweep-"));
-    fs.writeFileSync(path.join(tmp, "always-selfcheck.mjs"), "process.exit(1);\n");
-    fs.writeFileSync(path.join(tmp, "never-selfcheck.mjs"), "process.exit(0);\n");
+    // *** THE TIMINGS DIRECTORY EXISTS UNDER THE HERMETIC ROOT ON PURPOSE. *** Without it, a runner that
+    // writes when told not to dies on ENOENT before any row runs -- and A CRASH IS NOT A VERDICT (v3201): it
+    // exits 1 while naming nothing, so the "byte-identical afterwards" row below could never be driven and
+    // was asserted rather than exercised. With the directory here, a forced write lands in the temp tree, the
+    // gate keeps running, and that row FAILS BY NAME. Found by sabotage, and by a harness of my own that read
+    // the crash as 0 RED because it counted FAIL lines instead of the exit code.
+    fs.mkdirSync(path.join(tmp, "tools", "ship"), { recursive: true });
+    const mk = (n, body) => fs.writeFileSync(path.join(tmp, n), body);
+    mk("g1-selfcheck.mjs", "process.exit(0);\n");
+    mk("g2-selfcheck.mjs", "process.exit(0);\n");
+    mk("g3-selfcheck.mjs", "process.exit(0);\n");
+    const before = fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null;
+    const g = await Q.runQuickSweep({ root: tmp, gates: ["g1-selfcheck.mjs", "g2-selfcheck.mjs", "g3-selfcheck.mjs"], budgetMs: 60000, workers: 3, capMs: 20000, write: false });
+    ok(g.ran === 3 && g.green === 3 && g.newRed.length === 0 && g.knownRed.length === 0 && g.unmeasured.length === 0,
+       "*** three gates that exit 0 run green: the runner runs and classifies ***",
+       `${g.green} green of ${g.ran} in ${g.ms} ms, and NOT ONE OF THEM IS A GATE IN THIS TREE -- the old ` +
+       "version of this row named three real gates and went red when two of them did");
+
+    // *** THE LIVE RUN, GRADED ON AGREEMENT. *** Real modules, real imports, real durations -- and the
+    // assertion is that the runner AGREES with each gate taken alone, whatever that gate's verdict is.
+    const live = ["tools/ship/windowsImport-selfcheck.mjs", "tools/ship/backendParity-selfcheck.mjs", "tools/ship/citedSources-selfcheck.mjs"];
+    const r = await Q.runQuickSweep({ gates: live, budgetMs: 60000, workers: 3, capMs: 60000, write: false });
+    const said = new Map();
+    for (const x of r.newRed) said.set(x.gate, "red");
+    for (const x of r.knownRed) said.set(typeof x === "string" ? x : x.gate, "red");
+    for (const x of r.unmeasured) said.set(typeof x === "string" ? x : x.gate, "unmeasured");
+    for (const x of live) if (!said.has(x)) said.set(x, "green");
+    const alone = new Map(live.map((x) => {
+        const p = spawnSync(process.execPath, [x], { cwd: ENG, timeout: 120000, stdio: "ignore" });
+        return [x, p.signal ? "unmeasured" : p.status === 0 ? "green" : "red"];
+    }));
+    const disagree = live.filter((x) => said.get(x) !== alone.get(x));
+    ok(r.ran === live.length && disagree.length === 0 && said.size === live.length,
+       "*** ON REAL GATES THE RUNNER AGREES WITH EACH ONE RUN ALONE -- WHATEVER ITS VERDICT ***",
+       live.map((x) => x.split("/").pop().replace("-selfcheck.mjs", "") + " " + said.get(x)).join(", ") +
+       (disagree.length ? ` -- DISAGREES ON ${disagree.join(", ")}` : "") +
+       ". This row passes on a red tree and fails on a wrong runner, which is the way round it was not.");
+    ok(before === (fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null),
+       "and with write:false the timings file is byte-identical afterwards");
+
+    // the control: a gate that always fails, outside the register, in a temp dir that enumerates as a root
+    mk("always-selfcheck.mjs", "process.exit(1);\n");
+    mk("never-selfcheck.mjs", "process.exit(0);\n");
     const c = await Q.runQuickSweep({ root: tmp, gates: ["always-selfcheck.mjs", "never-selfcheck.mjs"], budgetMs: 60000, workers: 2, capMs: 20000, write: false });
     ok(c.newRed.length === 1 && c.newRed[0].gate === "always-selfcheck.mjs" && c.green === 1,
        "*** CONTROL: a gate that exits 1 and is in no register is reported as NEW red, and its neighbour green ***", JSON.stringify(c.newRed));
-    fs.writeFileSync(path.join(tmp, "hang-selfcheck.mjs"), "setTimeout(() => {}, 60000);\n");
+    mk("hang-selfcheck.mjs", "setTimeout(() => {}, 60000);\n");
     const h = await Q.runQuickSweep({ root: tmp, gates: ["hang-selfcheck.mjs"], budgetMs: 60000, workers: 1, capMs: 1500, write: false });
     ok(h.unmeasured.length === 1 && h.newRed.length === 0, "a gate that hangs past the cap is UNMEASURED, not red", `${h.ms} ms`);
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}

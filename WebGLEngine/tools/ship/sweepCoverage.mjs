@@ -139,6 +139,21 @@ export const STALE_GREENS_V4460 = Object.freeze({
         Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", nowMs: 2618, recordedMs: 5162 }),
         Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", nowMs: 2929, recordedMs: 4404 }),
     ]),
+    // *** REPAIRED SINCE, NAMED RATHER THAN QUIETLY REMOVED FROM THE LIST ABOVE. *** The census stays as it
+    // was measured at v4460 -- a snapshot edited to agree with today is not a snapshot -- and what has been
+    // fixed since is recorded beside it. AND FIXING ONE DOES NOT MAKE IT VISIBLE: quickSweep-selfcheck still
+    // costs about six seconds, still sits above the 3,000 ms ship-time budget, and is still run by no
+    // ship-time step, so its NEXT regression is invisible exactly as this one was. The repair is to the gate,
+    // not to the hole it was hiding in.
+    fixedSince: Object.freeze([
+        Object.freeze({ gate: "tools/ship/quickSweep-selfcheck.mjs", at: "v4461",
+            was: "its section 4 named three live gates and asserted all three GREEN -- a claim about the " +
+                 "tree, in the block whose stated purpose is proving the runner runs. Two had gone red.",
+            now: "the positive case is hermetic (synthetic gates in a temp root) and the live run is graded " +
+                 "on AGREEMENT with each gate taken alone, so it passes on a red tree and fails on a wrong " +
+                 "runner -- which is the way round it was not",
+            stillOverBudget: true }),
+    ]),
     notClaimed: "that the 22 are the whole of it. This measured the 371 entries recorded GREEN; the 144 " +
                 "recorded nonzero and the `killed` bucket were not re-run, and a gate that is red for a " +
                 "reason this sandbox creates (no GPU, no network) is separated above rather than counted in.",

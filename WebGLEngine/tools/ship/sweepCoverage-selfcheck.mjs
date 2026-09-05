@@ -52,6 +52,12 @@
 //   AD. the serial re-run is dropped, parallel non-greens ARE the reds -> 1 RED
 //   AE. emptyOfNonEmpty accepts an empty list                -> 1 RED
 //
+// v4461: the first of the 22 is repaired -- quickSweep-selfcheck -- and `fixedSince` records it rather than
+// removing it from the census, which keeps its measured numbers. Three more sabotages:
+//   BG. a repair claimed for a gate the census never named    -> 1 RED
+//   BH. a repair with no account of what it was               -> 1 RED
+//   BI. the census edited down to agree with today            -> 2 RED
+//
 // *** X AND Y ARE MECHANISMS vacuity.mjs NAMED ONE ROUND EARLIER, BOTH IN THE ROUND AFTER IT. *** Y is
 // mechanism 1, the empty collection: `none` is empty in this tree, so folding it into `green` changed nothing.
 // X is mechanism 2, the unreachable branch: backfillStamps guarantees every entry has an `at`, so the
@@ -361,6 +367,22 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
            "the guard on the row above cannot be driven from this tree -- 371 standing greens is not zero -- " +
            "so its sabotage goes 0 RED and it is exercised here instead. v4459's helper, on a fixture.");
     }
+
+    // A repair is named, not subtracted: the v4460 census keeps its numbers and `fixedSince` records what
+    // has moved. Checked structurally -- every entry must be one of the gates this census actually named --
+    // and NOT by re-running it, because this gate does not run other gates. The verification of a repair
+    // lives in the round that made it; what is checked here is that a repair cannot be claimed for a gate
+    // the census never found.
+    const fixed = SC.STALE_GREENS_V4460.fixedSince;
+    ok("!! a gate claimed as repaired is one this census actually named, and the census keeps its own numbers",
+       overNonEmpty(fixed, (f) => SC.STALE_GREENS_V4460.unregistered.includes(f.gate) && f.at && f.was && f.now) &&
+       SC.STALE_GREENS_V4460.confirmed.unregistered === SC.STALE_GREENS_V4460.unregistered.length,
+       `${fixed.length} repaired since: ${fixed.map((f) => f.gate.split("/").pop() + " at " + f.at).join(", ")}. ` +
+       `The census still reads ${SC.STALE_GREENS_V4460.confirmed.total} red and ` +
+       `${SC.STALE_GREENS_V4460.confirmed.unregistered} unregistered, ` +
+       "as measured -- a snapshot edited to agree with today is not a snapshot. AND FIXING ONE DOES NOT MAKE " +
+       "IT VISIBLE: every one of them is still over the ship-time budget, so its next regression is invisible " +
+       "in exactly the way this one was.");
 
     REPORT.table("the over-budget population by VERDICT, not by time", ["class", "gates", "what it means"],
         [["standing green", String(cls.green.length), "a zero carried forward; 22 of the 371 measured are red"],
