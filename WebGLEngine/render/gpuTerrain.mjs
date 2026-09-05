@@ -1,4 +1,4 @@
-// WebGLEngine/render/gpuTerrain.mjs -- v4299 (Level 12), lit at v4300 (Level 14)
+// WebGLEngine/render/gpuTerrain.mjs -- v4299 (Level 12), lit at v4300 (Level 14), its own pick pipeline at v4479
 //
 // LEVEL 12: TERRAIN ON THE GPU-DRIVEN PATH. A heightfield is a texture; the ground is a grid of chunk instances
 // culled and LOD-picked by render/gpuDriven.mjs's compute pass; each chunk's vertices are lifted in the VERTEX
@@ -103,6 +103,79 @@ precision highp float;
 in vec4 vColor; out vec4 fragColor;
 void main() { fragColor = vColor; }
 `;
+/**
+ * v4479 -- *** THE TERRAIN'S OWN PICK PIPELINE, AND THE DEFECT IT CLOSES. *** gpuDriven's default pick pipeline draws
+ * `rec.xyz + p * rec.w`: flat quads scaled by the RECORD'S RADIUS, which for a terrain chunk is the cull's sphere
+ * (half * sqrt2 + heightScale / 2), not its half-size, and with no height lift. So the identity picture was a sheet of
+ * oversized, overlapping, flat squares, and a pick named a neighbouring chunk: measured at v4479 on the treemap
+ * landing, 0 of 6 picks from 45 degrees and 1 of 6 from straight above landed on the chunk under the point (the v4317
+ * hills gate tolerated one miss in four and never saw it). This pipeline is the terrain vertex stage -- the same
+ * half-size recovery, the same texel lift, the same skirts -- writing gpuDriven's identity colour, so the picture a
+ * pick reads is the picture a viewer sees.
+ */
+export const TERRAIN_PICK_WGSL = `
+struct Cam { viewProj: mat4x4<f32>, terrain: vec4<f32> };   // terrain = (originX, originZ, extent, heightScale)
+@group(0) @binding(0) var<uniform> cam: Cam;
+@group(0) @binding(1) var heightTex: texture_2d<f32>;
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat) id: vec4<f32> };
+fn texelAt(x: f32, z: f32) -> vec2<i32> {
+  let dims = textureDimensions(heightTex);
+  let u = (x - cam.terrain.x) / cam.terrain.z; let v = (z - cam.terrain.y) / cam.terrain.z;
+  return vec2<i32>(clamp(i32(floor(u * f32(dims.x))), 0, i32(dims.x) - 1), clamp(i32(floor(v * f32(dims.y))), 0, i32(dims.y) - 1));
+}
+@vertex fn vs(@location(0) p: vec3<f32>, @location(2) rec: vec4<f32>, @location(3) ident: vec4<f32>) -> VOut {
+  let half = (rec.w - cam.terrain.w * 0.5) / ${RADIUS_PER_HALF};
+  let wx = rec.x + p.x * half; let wz = rec.z + p.y * half;
+  let h = textureLoad(heightTex, texelAt(wx, wz), 0).r;
+  var o: VOut;
+  o.pos = cam.viewProj * vec4<f32>(wx, (h + p.z) * cam.terrain.w, wz, 1.0);
+  let id = u32(ident.x);
+  o.id = vec4<f32>(f32(id & 255u) / 255.0, f32((id >> 8u) & 255u) / 255.0, (ident.y + ident.w * 8.0) / 255.0, f32(128u + ((id >> 16u) & 127u)) / 255.0);
+  return o;
+}
+@fragment fn fs(v: VOut) -> @location(0) vec4<f32> { return v.id; }
+`;
+export const TERRAIN_PICK_VERTEX_GLSL = `#version 300 es
+precision highp float;
+uniform mat4 viewProj;
+uniform vec4 terrain;
+uniform sampler2D heightTex;
+in vec3 p; in vec4 rec; in vec4 ident;
+flat out vec4 vId;
+ivec2 texelAt(float x, float z) {
+  ivec2 dims = textureSize(heightTex, 0);
+  float u = (x - terrain.x) / terrain.z; float v = (z - terrain.y) / terrain.z;
+  return ivec2(clamp(int(floor(u * float(dims.x))), 0, dims.x - 1), clamp(int(floor(v * float(dims.y))), 0, dims.y - 1));
+}
+void main() {
+  float half_ = (rec.w - terrain.w * 0.5) / ${RADIUS_PER_HALF};
+  float wx = rec.x + p.x * half_; float wz = rec.z + p.y * half_;
+  float h = texelFetch(heightTex, texelAt(wx, wz), 0).r;
+  gl_Position = viewProj * vec4(wx, (h + p.z) * terrain.w, wz, 1.0);
+  int id = int(ident.x);
+  vId = vec4(float(id & 255) / 255.0, float((id >> 8) & 255) / 255.0, (ident.y + ident.w * 8.0) / 255.0, float(128 + ((id >> 16) & 127)) / 255.0);
+}
+`;
+export const TERRAIN_PICK_FRAGMENT_GLSL = `#version 300 es
+precision highp float;
+flat in vec4 vId; out vec4 fragColor;
+void main() { fragColor = vId; }
+`;
+export function terrainPickPipelineDesc() {
+    return {
+        shaders: { wgsl: TERRAIN_PICK_WGSL, glsl: { vertex: TERRAIN_PICK_VERTEX_GLSL, fragment: TERRAIN_PICK_FRAGMENT_GLSL } },
+        vs: "vs", fs: "fs",
+        buffers: [
+            { stride: VERTEX_FLOATS * 4, stepMode: "vertex", attributes: [{ name: "p", size: 3, offset: 0 }] },
+            { stride: RECORD_BYTES, stepMode: "instance", attributes: [{ name: "rec", size: 4, offset: 0, location: 2 }, { name: "ident", size: 4, offset: 16, location: 3 }] },
+        ],
+        uniforms: [{ name: "viewProj", type: "mat4" }, { name: "terrain", type: "vec4" }],
+        cull: "back", frontFace: "cw",
+    };
+}
+/** The bind hook for the pick pipeline: the terrain params and the height texture, the same two the colour pipeline reads. */
+export function terrainPickBind(params, tex) { return (pass) => { pass.uniform("terrain", params); pass.texture("heightTex", tex, 0); }; }
+
 export function terrainPipelineDesc() {
     return {
         shaders: { wgsl: TERRAIN_WGSL, glsl: { vertex: TERRAIN_VERTEX_GLSL, fragment: TERRAIN_FRAGMENT_GLSL } },

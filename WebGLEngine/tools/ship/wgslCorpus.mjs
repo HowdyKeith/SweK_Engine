@@ -53,7 +53,7 @@ import { PROBE_WGSL, FRAGMENT_WGSL, packKnobs } from "../../render/badTvWgsl.mjs
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
-import { TERRAIN_WGSL } from "../../render/gpuTerrain.mjs";
+import { TERRAIN_WGSL, TERRAIN_PICK_WGSL } from "../../render/gpuTerrain.mjs";
 import { LIT_WGSL } from "../../render/litSphere.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
@@ -240,6 +240,9 @@ export function corpus() {
         { id: "gpuDriven.PICK_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
           why: "a flat-interpolated identity output and u32 bit slicing in the vertex stage -- the pick picture's encoding",
           opts: { code: GD.PICK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "gpuTerrain.TERRAIN_PICK_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
+          why: "v4479 -- the terrain's own pick pair: the terrain vertex stage (texel lift, half-size from the cull radius, skirts) writing the identity colour, so a pick reads the picture a viewer sees; graded by tools/ship/landing-selfcheck.mjs and repoLanding-selfcheck.mjs on both backends",
+          opts: { code: TERRAIN_PICK_WGSL, compileOnly: true, outCount: 0 } },
         { id: "litSphere.LIT_WGSL", from: "render/litSphere.mjs", compileOnly: true,
           why: "v4473 -- the lit render pair over LAYOUTS.lit (a normal at location 4, the extras at 5, a point light in the uniform); its picture is graded against the CPU sphere by tools/ship/litSphere-selfcheck.mjs on both backends, and here both must compile it",
           opts: { code: LIT_WGSL, compileOnly: true, outCount: 0 } },

@@ -36,6 +36,11 @@ console.log("\n1. THE SHADERS, THE CONTRACT, THE MODEL");
 {
     ok("TERRAIN_WGSL validates and declares the camera block and the height texture", validateWgsl(T.TERRAIN_WGSL).length === 0 && parseBindings(T.TERRAIN_WGSL).map((b) => b.name).join() === "cam,heightTex");
     ok("  the host uniform list matches struct Cam", checkHostUniforms(T.TERRAIN_WGSL, T.terrainPipelineDesc().uniforms).ok);
+    // v4479 -- the terrain's own pick pipeline: the same lift, the same half-size, the identity colour, the same two bindings
+    ok("  v4479: the PICK pipeline's vertex stage is the terrain's (texelAt, the half-size from the cull radius, the skirt offset) writing gpuDriven's identity colour",
+       /fn texelAt/.test(T.TERRAIN_PICK_WGSL) && T.TERRAIN_PICK_WGSL.includes(`/ ${T.RADIUS_PER_HALF}`) && /\(h \+ p\.z\) \* cam\.terrain\.w/.test(T.TERRAIN_PICK_WGSL) && /@location\(3\) ident/.test(T.TERRAIN_PICK_WGSL) && /128u \+ \(\(id >> 16u\) & 127u\)/.test(T.TERRAIN_PICK_WGSL) &&
+       /texelAt\(wx, wz\)/.test(T.TERRAIN_PICK_VERTEX_GLSL) && /\(h \+ p\.z\) \* terrain\.w/.test(T.TERRAIN_PICK_VERTEX_GLSL));
+    ok("  and its host uniform list matches ITS struct Cam (viewProj, terrain -- no light: an identity needs no shade)", checkHostUniforms(T.TERRAIN_PICK_WGSL, T.terrainPickPipelineDesc().uniforms).ok === true && validateWgsl(T.TERRAIN_PICK_WGSL).length === 0);
     ok("  the lift is an integer fetch on both languages", /textureLoad\(heightTex/.test(T.TERRAIN_WGSL) && /texelFetch\(heightTex/.test(T.TERRAIN_VERTEX_GLSL) && !/textureSample|texture\(/.test(T.TERRAIN_WGSL + T.TERRAIN_VERTEX_GLSL));
     ok("  the chunk colour is the CENTRE texel, flat, so a pixel names a texel", /texelAt\(rec\.x, rec\.z\)/.test(T.TERRAIN_WGSL) && /texelAt\(rec\.x, rec\.z\)/.test(T.TERRAIN_VERTEX_GLSL));
     ok("  v4300: both languages shade from the same central differences and the same light", /shadeAt/.test(T.TERRAIN_WGSL) && /shadeAt/.test(T.TERRAIN_VERTEX_GLSL) && T.terrainPipelineDesc().uniforms.some((u) => u.name === "light"));

@@ -64,7 +64,7 @@
   <div><button id="save">save universe</button> <button id="restore">restore</button> <button id="commits">a week of commits</button> <button id="live">live commits (the bridge)</button> <span id="persist" style="color:#f0e29e"></span></div>
   <div id="key" style="color:#9fb8a8">cross-browser key: computing&hellip;</div>
   <div id="cockpit" style="color:#f0e29e">you: starting&hellip;</div>
-  <div><label>mask a race with badTv (or, with ?twin=1, the window onto the twin universe) <select id="mask"><option value="">none</option></select></label> &middot; <label><input id="landmode" type="checkbox"> land on the pointed body (or press G)</label> <span id="landing" style="color:#9fb8a8"></span></div>
+  <div><label>mask a race with badTv (or, with ?twin=1, the window onto the twin universe) <select id="mask"><option value="">none</option></select></label> &middot; <label><input id="landmode" type="checkbox"> land on the pointed body (or press G)</label> <label>ground <select id="terrainKind"><option value="hills">hash hills (v4317)</option><option value="treemap">treemap -- the GitHub terrain (v4149, on the device at v4479)</option></select></label> <span id="landing" style="color:#9fb8a8"></span></div>
   <div><label>scrub <input id="scrub" type="range" min="0" max="0" value="0" style="width:40%"></label> <span id="scrubAt" style="color:#9fb8a8">live</span></div>
   <div><a href="./orrery.html">the 2D orrery</a> &middot; t = <span id="t">0</span> days &middot; drawn <span id="drawn">?</span></div>
 </div>
@@ -95,7 +95,7 @@ import { p2pTransport } from "./ev/p2p.js";
 import { crewForRaces } from "./world/racePolicies.mjs";
 import { makeFlight, makeCockpit } from "./world/playerShip.mjs";
 import { traders as gitTraders } from "./world/traderGraph.mjs";
-import { bodyHeightfield, landingRecords, fileOfChunk } from "./render/bodyTerrain.mjs";
+import { landingFor, landingRecords, fileOfChunk } from "./render/bodyTerrain.mjs";
 import * as T from "./render/gpuTerrain.mjs";
 import { makeMaskRig } from "./render/fleetMask.mjs";
 import { applyCommitsFeed, fixtureFeed, liveFeed, marketForRepo } from "./world/commitsFeed.mjs";
@@ -301,12 +301,17 @@ const landing = { on: false, body: null, scene: null, bt: null, tex: null, side:
 function landOn(bodyIndex) {
     const b = system.bodies[bodyIndex - 1]; if (!b || !b.files || !b.files.length) { document.getElementById("landing").textContent = b ? `${b.name} has no files to land on` : ""; return; }
     if (landing.scene) { try { landing.scene.destroy(); landing.tex.destroy(); } catch (e) {} }
-    const bt = bodyHeightfield(b), L = landingRecords(bt, landing.side);
+    // v4479 -- two grounds, one door: the hash hills or the treemap (world/repoHeightfield.js through render/bodyTerrain.mjs)
+    const bt = landingFor(b, document.getElementById("terrainKind").value), L = landingRecords(bt, landing.side);
     const tex = device.texture({ width: bt.field.width, height: bt.field.height, data: bt.field.data, nearest: true });
-    const scene = G.makeGpuDrivenScene(device, { lods: [{ name: "coarse", mesh: T.skirtedQuadMesh(1) }, { name: "fine", mesh: T.skirtedQuadMesh(6) }], thresholds: [0.08], records: L.records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", L.params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); } });
+    const scene = G.makeGpuDrivenScene(device, { lods: [{ name: "coarse", mesh: T.skirtedQuadMesh(1) }, { name: "fine", mesh: T.skirtedQuadMesh(6) }], thresholds: [0.08], records: L.records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", L.params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); },
+                                                   pickPipeline: T.terrainPickPipelineDesc(), pickBind: T.terrainPickBind(L.params, tex) });   // v4479 -- picks read the terrain's own picture, lifted and sized as drawn
     Object.assign(landing, { on: true, body: b, scene, bt, tex, name: b.name });
-    document.getElementById("landing").textContent = `landed on ${b.name}: ${bt.files.length} files as hills -- point at a ridge; G returns to the sky`;
+    document.getElementById("landing").textContent = bt.kind === "treemap"
+        ? `landed on ${b.name}: ${bt.files.length} files as a treemap -- ${bt.repo.stats.dirs} directories as landmasses, ${bt.repo.lakes.length} data files as lakes, the tallest ${bt.repo.peaks[0] ? bt.repo.peaks[0].path : "?"}; point at a rectangle; G returns to the sky`
+        : `landed on ${b.name}: ${bt.files.length} files as hills -- point at a ridge; G returns to the sky`;
 }
+document.getElementById("terrainKind").addEventListener("change", () => { if (landing.on && landing.last) landOn(landing.last); });
 addEventListener("keydown", (e) => { if (e.key === "g" || e.key === "G") { if (landing.on) { landing.on = false; document.getElementById("landing").textContent = "back in the sky"; } else if (landing.last) landOn(landing.last); } });
 // v4317 -- THE MASK: the pick picture as a strength field; badTv through it over one race, both pictures read back this round
 const maskSel = document.getElementById("mask"); for (const r of RACES) { const o = document.createElement("option"); o.value = r.name; o.textContent = r.name; maskSel.appendChild(o); }

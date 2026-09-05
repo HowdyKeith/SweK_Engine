@@ -59,7 +59,8 @@ else {
             const cv = document.createElement("canvas"); cv.width = a.N; cv.height = a.N;
             const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
             const tex = dev.texture({ width: bt.field.width, height: bt.field.height, data: bt.field.data, nearest: true });
-            const sc = G.makeGpuDrivenScene(dev, { lods: lods(), thresholds: [0.08], records: L.records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", L.params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); } });
+            const sc = G.makeGpuDrivenScene(dev, { lods: lods(), thresholds: [0.08], records: L.records, pipeline: T.terrainPipelineDesc(), bind: (pass) => { pass.uniform("terrain", L.params); pass.uniform("light", new Float32Array(T.LIGHT)); pass.texture("heightTex", tex, 0); },
+                                                   pickPipeline: T.terrainPickPipelineDesc(), pickBind: T.terrainPickBind(L.params, tex) });   // v4479 -- the terrain's own pick picture
             const f = sc.frame({ viewProj, eye, read: true, clear: [0, 0, 0, 1] }); const pix = await f.pixels;
             let lit = 0; for (let i = 0; i < pix.pixels.length; i += 4) if (pix.pixels[i] + pix.pixels[i + 1] > 0) lit++;
             const picks = [];
@@ -76,12 +77,16 @@ else {
             const R = r.result[b];
             ok(`${b}: the body's terrain draws (${R.path}), chunks culled into the ladder`, R.backend === b && R.lit > R.total * 0.1 && R.counts.reduce((x, y) => x + y, 0) > 0, `${R.lit} lit of ${R.total}, counts ${R.counts.join("/")}`);
             const named = R.picks.filter((p) => p.hit && p.file && p.file.path === p.path).length;
-            ok(`*** ${b}: a pick at the tallest hills' peaks names a chunk, and the chunk's file is the hill's file (${named} of ${R.picks.length}) ***`, named >= R.picks.length - 1 && R.picks.every((p) => p.hit), R.picks.map((p) => `${p.path.split("/").pop()} -> ${p.file ? p.file.path.split("/").pop() : "nothing"}`).join(", "));
+            ok(`*** ${b}: a pick at the tallest hills' peaks names a chunk, and the chunk's file is the hill's file (${named} of ${R.picks.length}) ***`, named === R.picks.length && R.picks.every((p) => p.hit), R.picks.map((p) => `${p.path.split("/").pop()} -> ${p.file ? p.file.path.split("/").pop() : "nothing"}`).join(", "));
         }
         ok("both backends name the same files at the same peaks", JSON.stringify(r.result.webgpu.picks.map((p) => p.file && p.file.path)) === JSON.stringify(r.result.webgl2.picks.map((p) => p.file && p.file.path)));
     }
 }
 
+// v4479 -- *** THE ONE-MISS TOLERANCE WAS HIDING A DEFECT. *** "named >= picks - 1" passed at 3 of 4 for 162 rounds while the pick
+// picture was gpuDriven's DEFAULT: flat squares scaled by the cull radius, not the terrain. The treemap landing (repoLanding-
+// selfcheck) missed 6 of 6 and found it; gpuTerrain.terrainPickPipelineDesc picks with the terrain's own vertex stage, and
+// this gate now requires every peak to name its file: 4 of 4 on both backends.
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4317.
 //   A  fileAt() answering the first file always -> exit=1, 3 red: 1 of 45 peaks names its own file on the CPU, and on
 //      both backends the four picks all name bench.ts.

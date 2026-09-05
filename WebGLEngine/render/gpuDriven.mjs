@@ -630,7 +630,7 @@ const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]
  * whose vertex stage moves the hull passes `pickPipeline` (and `pickBind`) so the identity picture moves it too --
  * the fleets gate found the default pick drawing unspun hulls under spun ones, and named the wrong pixels.
  */
-export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, layout = null, fleets = null, fleetOf = null, time = null, headings = null, clock = null, cull = null }) {
+export function makeGpuDrivenScene(device, { lods = null, thresholds, records, cap = null, occlusion = false, pipeline = null, bind = null, layout = null, pickPipeline = null, pickBind = null, fleets = null, fleetOf = null, time = null, headings = null, clock = null, cull = null }) {
     // v4373 -- `cull` lets a caller BRING THE COMPUTE PASS THAT DECIDES WHAT DRAWS, the way `pipeline`/`bind` let
     // one bring the render shaders. { wgsl, entryPoint, bind(pipe, buffers), write(u) }: the scene creates and owns
     // every buffer, hands them to bind() once, and calls write() each frame with the SAME packed uniforms
@@ -654,7 +654,9 @@ export function makeGpuDrivenScene(device, { lods = null, thresholds, records, c
     // one fleet or many: a scene without fleets is a scene with one, named "all", carrying the legacy pipeline/bind
     // v4473 -- `layout` joins the legacy one-fleet form: a scene that brings a pipeline over LAYOUTS.lit (render/litSphere.mjs)
     // must pack its meshes in that layout too, or the normals never reach the vertex buffer and the shader reads zeros.
-    const fleetDefs = fleets && fleets.length ? fleets : [{ name: "all", lods, pipeline, bind, layout }];
+    // v4479 -- and `pickPipeline` / `pickBind`: a scene whose vertex stage moves its geometry (the terrain lifts by a texture)
+    // must pick with the same stage, or the identity picture is not the picture -- the fleets learned this at v4317.
+    const fleetDefs = fleets && fleets.length ? fleets : [{ name: "all", lods, pipeline, bind, layout, pickPipeline, pickBind }];
     if (fleetDefs.length > MAX_FLEETS) throw new Error(`gpuDriven: ${fleetDefs.length} fleets; the pick picture packs the fleet in five bits, so at most ${MAX_FLEETS}`);
     const fleetCount = fleetDefs.length, hasFleets = !!(fleets && fleets.length);
     if (hasFleets && !(fleetOf && fleetOf.length >= count)) throw new Error(`gpuDriven: ${fleetCount} fleets need a fleetOf (Uint32Array) with one entry per record (${count}); without it nobody knows which architecture an instance is`);

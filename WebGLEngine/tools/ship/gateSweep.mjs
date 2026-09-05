@@ -2216,6 +2216,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "so a captured body is one green and a flyby SweK may not take one purple on both pages. Each page links the " +
                  "other. Sabotages red at 1 / 2 by name.",
     }),
+    // v4479 -- the hundred-and-first closing. The treemap on the device terrain, and a pick picture that was never the terrain.
+    since101: Object.freeze({
+        at: "v4479", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/repoLanding-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/landing-selfcheck.mjs (the terrain's own pick pipeline; every peak must name its file, 4 of 4 where 3 of 4 was tolerated)",
+            "tools/ship/gpuTerrain-selfcheck.mjs (the pick pipeline's vertex stage is the terrain's; its uniform list matches its struct)",
+        ]),
+        verdict: "green on Dawn and the browser's WebGPU, and on WebGL2. render/bodyTerrain.mjs repoTerrainOf puts world/" +
+                 "repoHeightfield.js's treemap -- the GitHub Terrain of v4149 -- into the RGBA8 field gpuTerrain lifts on both " +
+                 "backends; a line is 80 bytes, measured; fileAt is the leaf whose rectangle contains the point; landingFor is one " +
+                 "door and orrery-gpu.html offers both grounds by a select. Every texel within half a byte of repoHeightfield's " +
+                 "height, 233 of 233 rectangle centres naming their file, 12 lakes below their landmasses. THE FINDING: picks at " +
+                 "the six largest leaves missed 6 of 6 from 45 degrees and 5 of 6 from above, and the cause was the pick picture " +
+                 "-- gpuDriven's default pick pipeline draws flat quads scaled by the cull radius, so the terrain's identity " +
+                 "picture was a sheet of oversized overlapping squares since v4317; the hills gate's one-miss tolerance hid it " +
+                 "for 162 rounds. gpuTerrain.terrainPickPipelineDesc picks with the terrain's own vertex stage: 6 of 6 and 4 of 4 " +
+                 "on both backends, the tolerance gone. Sabotages red at 1 / 2 / 1 / 3 by name, D reproducing the old fault.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

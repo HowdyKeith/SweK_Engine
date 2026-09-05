@@ -528,6 +528,28 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         links the other. The 2D page's own gates (orreryView, orreryPost) hold the data model both pages read and
         are red on trunk for reasons that are not this page's (the bake's drift, a 6/255 post-effect pixel).
 
+10. **THE GIT TERRAIN ON THE DEVICE -- planned at v4478.** The GitHub Terrain of v4149 (world/repoHeightfield.js: a
+    repository as a squarified treemap, a directory a landmass, a file a peak, data files as lakes, extensions as
+    biomes) was stamped into the voxel world only, and the Worley biomes of v2779 are feature-flagged off there; the
+    orrery's landing (v4317) draws a thinner ground -- hashed hills -- through gfx/device.js. Four steps put the
+    treemap and its biomes on the device path; the voxel world's chunk fill, caves and meshing stay on the three.js
+    and WASM path and are NOT claimed:
+     1. (task 38) The treemap heightfield onto the device terrain in the orrery landing, beside the hash hills.
+        BUILT at v4479: render/bodyTerrain.mjs repoTerrainOf feeds repoHeightfield's smoothed heights (a line is 80
+        bytes -- the bridge's pseudo-line and this tree's measured 80.7 over 5,022 text files) into the same RGBA8
+        field gpuTerrain lifts; fileAt is the treemap's own answer, the leaf whose rectangle contains the point;
+        landingFor is the one door (hills | treemap), and orrery-gpu.html offers both by a select. tools/ship/
+        repoLanding-selfcheck.mjs holds every texel to repoHeightfield's height (half a byte), every rectangle
+        centre to its file (233 of 233 for krbn), every lake below its landmass, and on both backends a pick at a
+        leaf's centre to the chunk that contains it. THE FINDING: those picks missed 6 of 6, and the reason was
+        gpuTerrain's pick picture -- gpuDriven's default pick pipeline, flat and scaled by the cull radius, not the
+        terrain; the v4317 hills gate tolerated one miss in four and never saw it. gpuTerrain.terrainPickPipelineDesc
+        picks with the terrain's own vertex stage; the hills gate now requires 4 of 4 and gets them.
+     2. (task 39) The Worley biome field as a compute pass, world/worleyBiomes.js the bit-exact twin, biome and
+        blend in the field's green and blue channels.
+     3. (task 40) Biome colour and a water plane in gpuTerrain's fragment stage, both languages, a CPU colour twin.
+     4. (task 41) Erosion measured before any port: the step-loop kernel or a written won't-do, with the numbers.
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an
