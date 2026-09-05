@@ -1417,6 +1417,13 @@ export const INSTRUMENTS = [
         measures: "A known pattern drawn through gfx/device.js on a canvas the device presents to, read back by the device, by an offscreen frame with the same commands and by a 2D drawImage of the presented canvas, each against the expectation and against the others, on WebGL2 and on WebGPU; the WebGPU outcome on the build box named as lost-device rather than red.",
         key: "*** EVERY WebGPU FRAME THE TREE'S GATES CHECK GOES TO AN OWNED OFFSCREEN TEXTURE *** because this build box loses the device on any render pass whose attachment is the canvas's current texture. The canvas path is the product and, until this round, had no check anywhere.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "ship-labels-device", area: "render", name: "Ship labels on the device, with the fallback watched",
+        gate: "tools/ship/esShipLabelsDevice-selfcheck.mjs",   // pageless: a standalone gate; es-box3d-fly3d.html is the page
+        measures: "The dogfight's Slug labels drawn through gfx/device.js on WebGL2 against the v3831 raw batch's picture; the default path preferring WebGPU on the build box -- the device lost on the first presented frame, the fall back to the raw batch by name, and the labels drawn after it.",
+        key: "*** THE DEVICE PATH IS THE DEFAULT AND THE RAW WebGL2 BATCH IS THE FALLBACK, TAKEN AUTOMATICALLY. *** If the WebGPU device is LOST -- the lost promise fires, which is exactly what this box does on the first presented frame -- the overlay is rebuilt on a FRESH canvas with the v3831 raw batch, and the handle says so. A label layer that went blank would be worse than the one it replaces; this one cannot stay blank for longer than the loss takes to report.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

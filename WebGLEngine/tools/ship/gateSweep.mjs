@@ -1894,6 +1894,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "own message -- as the rig-pending state rather than a red nobody here can clear. Three sabotages " +
                  "red at 1 / 2 / 1. Under 1 s.",
     }),
+    since84: Object.freeze({
+        at: "v4463", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/esShipLabelsDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. ev/esShipLabels.js is the first consumer of render/slugDevice.mjs: the device path by default " +
+                 "(WebGPU where the page has it) with the v3831 raw batch as an automatic fallback on a fresh canvas " +
+                 "when the WebGPU device is lost. The gate WATCHES that happen on this box (device:webgpu, lost on " +
+                 "the first presented frame, raw afterwards with the labels drawn), holds the device's WebGL2 labels " +
+                 "to the raw picture (106 of 921,600 pixels differ, the raw canvas's MSAA on quad edges), and prints " +
+                 "the rig line. Two sabotages red at 1 / 2. One second, after a 66-second first draft that " +
+                 "shipped three pictures through the harness as JSON.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

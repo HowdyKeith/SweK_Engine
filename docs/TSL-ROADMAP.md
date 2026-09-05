@@ -312,7 +312,14 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         back three ways (device readback, offscreen frame, the compositor's drawImage copy); device-present.html
         runs it live; tools/ship/devicePresent-selfcheck.mjs holds WebGL2 to 0 of 2,048 differing on all three
         and names WebGPU's outcome here (device lost, the Level 11 message) as rig-pending, not red. The rig
-        line is in the gate's output; the answer is Galaxina's.
+        line is in the gate's output; the answer is Galaxina's. AND THE CONSUMER IS WIRED at v4463, safely
+        before that answer: ev/esShipLabels.js draws through gfx/device.js by default (WebGPU where the page has
+        it), with the v3831 raw batch as an AUTOMATIC fallback -- a lost WebGPU device rebuilds the overlay on a
+        fresh canvas and the handle says so in `path` and `reason`. tools/ship/esShipLabelsDevice-selfcheck.mjs
+        watches that happen on this box (device:webgpu, lost on the first presented frame, raw afterwards with
+        the labels drawn), holds the device's WebGL2 labels to the raw path's picture (106 of 921,600 pixels
+        differ, the raw canvas's MSAA on quad edges), and prints the rig line: on Galaxina the default path
+        must read device:webgpu after a frame, with labels visible.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
         more than one varying and Slug's vertex stage carries five, so the device shell is not its route.
      5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,
