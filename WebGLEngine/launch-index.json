@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 446,
+  "page": 448,
   "demo": 49,
   "builtin": 34
  },
@@ -127,7 +127,7 @@
    "id": "anime4k.html",
    "display": "Anime4k",
    "href": "/anime4k.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -351,7 +351,7 @@
    "id": "blackhole.html",
    "display": "Blackhole",
    "href": "/blackhole.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -423,7 +423,7 @@
    "id": "blobulator-gpu.html",
    "display": "Blobulator Gpu",
    "href": "/blobulator-gpu.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -695,7 +695,7 @@
    "id": "celltrack-viewer-gpu.html",
    "display": "Celltrack Viewer Gpu",
    "href": "/celltrack-viewer-gpu.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -967,6 +967,14 @@
    "id": "destructible.html",
    "display": "Destructible",
    "href": "/destructible.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "device-present.html",
+   "display": "Device Present",
+   "href": "/device-present.html",
    "section": null,
    "collision": false
   },
@@ -1399,7 +1407,7 @@
    "id": "fluid-webgpu-3d.html",
    "display": "Fluid Webgpu 3d",
    "href": "/fluid-webgpu-3d.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -1407,7 +1415,7 @@
    "id": "fluid-webgpu.html",
    "display": "Fluid Webgpu",
    "href": "/fluid-webgpu.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -1503,7 +1511,7 @@
    "id": "gauges3000.html",
    "display": "Gauges3000",
    "href": "/gauges3000.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -1551,7 +1559,7 @@
    "id": "gpu-rig-check.html",
    "display": "Gpu Rig Check",
    "href": "/gpu-rig-check.html",
-   "section": null,
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -1663,7 +1671,7 @@
    "id": "hmc-bench.html",
    "display": "Hmc Bench",
    "href": "/hmc-bench.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -1775,7 +1783,7 @@
    "id": "ising-bench.html",
    "display": "Ising Bench",
    "href": "/ising-bench.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -2047,7 +2055,7 @@
    "id": "magmap-bench.html",
    "display": "Magmap Bench",
    "href": "/magmap-bench.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -2199,7 +2207,7 @@
    "id": "nebula.html",
    "display": "Nebula",
    "href": "/nebula.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -2287,7 +2295,7 @@
    "id": "orrery-gpu.html",
    "display": "Orrery Gpu",
    "href": "/orrery-gpu.html",
-   "section": null,
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -2940,6 +2948,14 @@
   },
   {
    "kind": "page",
+   "id": "slug-device.html",
+   "display": "Slug Device",
+   "href": "/slug-device.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "slug-text.html",
    "display": "Slug Text",
    "href": "/slug-text.html",
@@ -3255,7 +3271,7 @@
    "id": "tsl-probe.html",
    "display": "Tsl Probe",
    "href": "/tsl-probe.html",
-   "section": null,
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -3263,7 +3279,7 @@
    "id": "tsl-rig.html",
    "display": "Tsl Rig",
    "href": "/tsl-rig.html",
-   "section": null,
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -3487,7 +3503,7 @@
    "id": "webgpu-bench.html",
    "display": "Webgpu Bench",
    "href": "/webgpu-bench.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -3543,7 +3559,7 @@
    "id": "wormhole-jump.html",
    "display": "Wormhole Jump",
    "href": "/wormhole-jump.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
@@ -3551,7 +3567,7 @@
    "id": "wormhole.html",
    "display": "Wormhole",
    "href": "/wormhole.html",
-   "section": null,
+   "section": "WebGPU",
    "collision": false
   },
   {
