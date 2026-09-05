@@ -1,4 +1,4 @@
-// tools/ship/reportDoors-selfcheck.mjs -- v4458 -- the gate for the reportLines convention.
+// tools/ship/reportDoors-selfcheck.mjs -- v4459 -- the gate for the reportLines convention.
 //
 // *** THE LARGEST UNTESTED CONVENTION IN THE TREE, AND THE REASON IS A COST RATHER THAN AN OVERSIGHT. ***
 // Seventy-eight modules export reportLines; server.html, instrument-bench.html, fleet-report.mjs and the
@@ -11,6 +11,29 @@
 // `node tools/ship/reportDoors-selfcheck.mjs --all`, which is where the expensive measurement lives rather
 // than in the 60-second suite. What is NOT claimed is that every member's report is correct -- only that it
 // exists, arrives, and is a non-empty array of ASCII strings.
+//
+// ---- *** v4459 (SECOND ROUND) SABOTAGES: THE FRONT DOOR AND THE COST RECORD *** -----------------------------
+//
+//   O. the "never" row comes back into the printer              -> 2 RED
+//   P. the summary calls one of them a manufactured finding     -> 1 RED
+//   Q. doorKinds goes back to a flag that HAS NO EFFECT + 72.3s -> 1 RED
+//   R. levelClaim, which DOES take a parameter, typed IMPOSSIBLE-> 1 RED
+//   S. knobLiveness's UNMEASURED borrows a measured shape       -> *** 0 RED, THEN 3 RED AFTER THE REPAIR ***
+//   T. a tolerant formatter loses its reason                    -> 1 RED
+//   U. a MEASURED entry's line count is off by one              -> 2 RED
+//   V. the cheap flag stops being a different question          -> 1 RED
+//
+// *** S IS THE ROUND. *** Section 8 checked that an unmeasured entry cannot wear the SHAPE of a measured one
+// -- a flag and a finite number -- and a FABRICATED entry has that shape by construction, so promoting
+// knobLiveness to `MEASURED, cheapFlag: "totalBudgetMs", cheapSeconds: 38.0` passed everything. That is
+// v4458's 72.3 exactly: a number beside a claim, indistinguishable from a number taken with a clock, in the
+// gate written to catch precisely that. Section 9 is the repair -- MEASURED entries are re-taken here, every
+// run, from an argument the record carries -- and S now goes 3 RED.
+//
+// HONEST WEAKNESS IN V, LEFT IN PLACE: a wrong cheapArg makes this gate SLOW before it makes it red. V points
+// orphanTriage's cheap call at `{ live: true }`, and section 9 pays the full 71 s and then fails on the line
+// count. The clock assertion is the check; it is not a budget, and this gate has no way to abandon a call it
+// has started.
 //
 // ---- *** v4459 SABOTAGES, RESULTS BY NAME *** ---------------------------------------------------------------
 //
@@ -45,9 +68,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateComposition } from "./composeValidate.mjs";
-import { overNonEmpty } from "./vacuity.mjs";
+import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
-         CALL_COST_V4458 as COST, NO_GATE_V4458 as NOGATE } from "./reportDoors.mjs";
+         RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
+         CALL_COST_V4459 as COST, NO_GATE_V4458 as NOGATE,
+         reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ALL = process.argv.includes("--all");
@@ -236,9 +261,10 @@ console.log("\n5. the cost, which is the reason this convention was never checke
     ok("!! *** THE CHEAP CALL IS FAST AND IS A DIFFERENT REPORT -- BOTH HALVES MEASURED ***",
        ms < 3000 && dead.length === rec.linesCheap && rec.linesCheap < rec.linesBare,
        `${rec.bare}s and ${rec.linesBare} lines becomes ${(ms / 1000).toFixed(2)}s and ${dead.length}. THE FLAG IS ` +
-       "NOT A PERFORMANCE SWITCH, IT IS A DIFFERENT QUESTION -- and doorKinds takes 71s with the flag and 72s " +
-       "without, so 'pass live:false' is not general advice either. Nothing recorded which members have a " +
-       "cheap path until now.");
+       "NOT A PERFORMANCE SWITCH, IT IS A DIFFERENT QUESTION -- and doorKinds takes no parameter at all, so " +
+       "'pass live:false' is not general advice, it is not even possible there. Nothing recorded which " +
+       "members have a cheap path until v4458, and v4458 recorded a flag for a function with nowhere to " +
+       "put one.");
 }
 
 // ---- 6. THE PROVIDERS WITH NO GATE OF THEIR OWN -----------------------------------------------------------
@@ -250,6 +276,181 @@ console.log("\n6. who provides the convention and cannot check it");
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
        `${noGate.length} of ${rows.length}. They are LISTED so that adding a member without a gate fails here ` +
        "rather than passing quietly under a number that moved by one.");
+}
+
+// ---- 7. *** THE FRONT DOOR IS THE LAST COPY CORRECTED AND THE ONLY COPY ANYBODY RUNS *** -------------------
+//
+// Every check above this line grades a RECORD. Nothing graded the print statement that publishes those
+// records, and two retired claims were shipping through it at v4458:
+//
+//   "one of them a manufactured finding"     retired in this module's header, the changelog, main.js and
+//                                            brain.js one round earlier. FOUR copies of the prose corrected,
+//                                            and the print statement -- the fifth copy, and the only
+//                                            executable one -- left saying the withdrawn thing.
+//   "knobLiveness ... never"                 a hand-typed eighth row, printed UNDERNEATH the seventh row the
+//                                            cost table derives at 38.0s, sixty lines below the paragraph
+//                                            explaining that "never returns" was an observation at ninety
+//                                            seconds promoted to a property.
+//
+// *** A DUPLICATE AND A WITHDRAWN CLAIM, IN THE FRONT DOOR OF THE MODULE WHOSE SUBJECT IS FRONT DOORS. ***
+// So this section grades the OUTPUT against the records, structurally where it can and by string where it
+// must, and the string half says so.
+console.log("\n7. the front door against the records it prints");
+{
+    const out = doorsReport();
+    const joined = out.join("\n");
+    const rowRe = /^ {4}(\S+\.mjs)\s/;
+    const printedRows = out.map((l) => (rowRe.exec(l) || [])[1]).filter(Boolean);
+
+    // (a) STRUCTURAL, AND IT IS THE ONE THAT CATCHES THE DUPLICATE. A name printed twice in the cost block
+    // is a printer disagreeing with its table, whatever the second row says.
+    const costRows = printedRows.filter((r) => COST.slow.some((s) => s.rel === r));
+    const costSet = new Set(costRows);
+    ok("!! *** THE COST BLOCK PRINTS EACH MEMBER ONCE AND PRINTS EXACTLY THE TABLE ***",
+       costRows.length === COST.slow.length && costSet.size === costRows.length &&
+       COST.slow.every((s) => costSet.has(s.rel)),
+       `${costRows.length} rows for ${COST.slow.length} entries, ${costSet.size} distinct. v4458 printed ` +
+       "EIGHT rows for seven entries -- knobLiveness at 38.0 from the table and knobLiveness at 'never' from " +
+       "a literal. The loop types no member name of its own now, so the second row cannot come back.");
+
+    // (b) Nothing is named in the output that is not a real member. A printer that outlives its subject
+    // reports on a module that is gone.
+    const members = new Set(rows.map((r) => r.rel));
+    const strays = printedRows.filter((r) => !members.has(r));
+    ok("!! every module named in the front door is a live member of the population",
+       strays.length === 0 && !emptyOfNonEmpty(printedRows, out),
+       `${printedRows.length} names printed, ${strays.length} of them stale` +
+       (strays.length ? ": " + strays.join(", ") : "") + ".");
+
+    // (c) *** THE RETIRED CLAIMS, BY STRING, AND THE FLOOR IS STATED. *** This cannot see a claim rephrased,
+    // only these two exact withdrawals -- which is worth having anyway, because both of them survived a
+    // correction round that touched four other copies. A structural check would need the printer to know
+    // which of its words were once wrong, and words do not carry that.
+    const retired = [
+        { re: /manufactur/i, was: 'v4458: "one of them a manufactured finding" -- composeValidate reports its own cause and its count varies with input' },
+        { re: /\bnever\b/i, was: 'v4458: knobLiveness printed as "never" -- it returns in 38.0s with the census budget, and in 989.8s without' },
+    ];
+    const alive = retired.filter((r) => r.re.test(joined));
+    ok("!! *** NO CLAIM THIS MODULE HAS WITHDRAWN IS STILL COMING OUT OF ITS FRONT DOOR ***",
+       alive.length === 0,
+       alive.length ? "STILL SHIPPING: " + alive.map((a) => a.was).join(" | ")
+                    : "both v4458 phrases gone from the output. Floor said plainly: this is a match on two " +
+                      "exact words, so a retired claim REPHRASED passes here. It is the check that would " +
+                      "have caught the two that actually happened.");
+
+    // (d) The reason each tolerant formatter returns is DATA, so the summary sentence cannot be corrected in
+    // the prose and shipped from the print statement -- which is precisely what happened to it.
+    const keys = Object.keys(RETURNS_BARE_BECAUSE).sort();
+    ok("!! every tolerant formatter carries its own reason, and nothing else does",
+       keys.length === TOLERANT_FORMATTERS.length &&
+       overNonEmpty(TOLERANT_FORMATTERS, (f) => typeof RETURNS_BARE_BECAUSE[f] === "string" &&
+                                                RETURNS_BARE_BECAUSE[f].length > 20 &&
+                                                joined.includes(RETURNS_BARE_BECAUSE[f])),
+       `${keys.length} reasons for ${TOLERANT_FORMATTERS.length} tolerant formatters, each printed verbatim. ` +
+       "The adjective in the summary line is gone: the line says NEITHER fabricates and then shows why each " +
+       "returns, from the map.");
+}
+
+// ---- 8. *** THE CHEAP-PATH STATE, DERIVED FROM THE LIVE SIGNATURES RATHER THAN TYPED *** -------------------
+//
+// v4458 wrote `cheapFlag: null` on three entries that had never been measured, beside a doorKinds entry
+// carrying a flag, a verdict and a number. Two states wearing one label, inside a record presented as fact.
+//
+// *** AND THIS SECTION FAILED ON ITS FIRST RUN AND CORRECTED THE ROUND THAT WROTE IT. *** All four are
+// `export [async] function reportLines()` with NO PARAMETER. The three nulls were accidentally right --
+// accidentally right is not a measurement -- and the FOURTH, the only one that looked measured, was the
+// worst: `{ live: false } -- HAS NO EFFECT` names a flag that has nowhere to go, and its 71.0 s and 72.3 s
+// are the bare call timed twice, 1.3 s apart. *** A NUMBER BESIDE A CLAIM MADE THE CLAIM LOOK MEASURED. ***
+// The state is derived from the live signature here, in both directions, which is what caught it.
+console.log("\n8. the cheap-path column, and no entry may sit in an unmeasured state without saying so");
+{
+    const decl = new Map(rows.map((r) => [r.rel, r.declaredParams]));
+    const bad = COST.slow.filter((s) => !CHEAP_STATES.includes(s.cheap));
+    ok("!! every entry declares one of the four states and none is null",
+       bad.length === 0 && COST.slow.length > 0,
+       `${COST.slow.length} entries over ${CHEAP_STATES.join(" / ")}` +
+       (bad.length ? "; BAD: " + bad.map((b) => b.rel + "=" + String(b.cheap)).join(", ") : "") + ".");
+
+    // *** BOTH DIRECTIONS. *** One direction lets IMPOSSIBLE be typed onto a member that does take a
+    // parameter; the other lets a member with no parameter be recorded as merely UNMEASURED, which is the
+    // state v4458 was in and could not express.
+    const wrongImp = COST.slow.filter((s) => s.cheap === "IMPOSSIBLE" && decl.get(s.rel) !== 0);
+    const wrongPos = COST.slow.filter((s) => s.cheap !== "IMPOSSIBLE" && decl.get(s.rel) === 0);
+    say("declared parameters: " + COST.slow.map((s) => s.rel.split("/").pop() + "=" + decl.get(s.rel)).join(", "));
+    ok("!! *** IMPOSSIBLE MEANS `reportLines()` TAKES NO PARAMETER, DERIVED FROM THE TREE, BOTH WAYS ***",
+       wrongImp.length === 0 && wrongPos.length === 0 &&
+       COST.slow.some((s) => s.cheap === "IMPOSSIBLE"),
+       `${COST.slow.filter((s) => s.cheap === "IMPOSSIBLE").length} entries take no parameter and say so; ` +
+       `${COST.slow.filter((s) => s.cheap !== "IMPOSSIBLE").length} take one and do not` +
+       (wrongImp.length ? "; TYPED WRONG: " + wrongImp.map((b) => b.rel).join(", ") : "") +
+       (wrongPos.length ? "; MISSING: " + wrongPos.map((b) => b.rel).join(", ") : "") +
+       ". The state is a claim about the source, so the source answers it.");
+
+    const needSecs = COST.slow.filter((s) => CHEAP_STATES_WITH_SECONDS.includes(s.cheap));
+    const missing = needSecs.filter((s) => !s.cheapFlag || typeof s.cheapSeconds !== "number" ||
+                                           !Number.isFinite(s.cheapSeconds));
+    const overclaim = COST.slow.filter((s) => !CHEAP_STATES_WITH_SECONDS.includes(s.cheap) &&
+                                              s.cheapSeconds !== undefined);
+    ok("!! *** MEASURED AND NONE CARRY SECONDS; IMPOSSIBLE AND UNMEASURED CARRY NONE ***",
+       missing.length === 0 && overclaim.length === 0 && needSecs.length > 0,
+       `${needSecs.length} measured entries all carry a flag and a number` +
+       (missing.length ? "; UNBACKED: " + missing.map((b) => b.rel).join(", ") : "") +
+       (overclaim.length ? "; SECONDS WITHOUT A MEASUREMENT: " + overclaim.map((b) => b.rel).join(", ") : "") +
+       ". An unmeasured entry cannot borrow the shape of a measured one, which is the whole reason the null " +
+       "read as a fact.");
+
+    const un = COST.slow.filter((s) => s.cheap === "UNMEASURED");
+    say(`UNMEASURED: ${un.map((s) => s.rel).join(", ") || "(none)"} -- the state v4458's shape could not hold`);
+}
+
+// ---- 9. *** MEASURED IS RE-TAKEN HERE, BECAUSE THE CHECKS ABOVE CANNOT TELL A CLOCK FROM A KEYBOARD *** ----
+//
+// Sabotage S moved knobLiveness from UNMEASURED to `MEASURED, cheapFlag: "totalBudgetMs", cheapSeconds: 38.0`
+// and went 0 RED. Section 8 asks whether a MEASURED entry has the SHAPE of a measurement -- a flag and a
+// finite number -- and a fabricated entry has that shape by construction. *** THAT IS v4458's 72.3 EXACTLY:
+// A NUMBER BESIDE A CLAIM, INDISTINGUISHABLE FROM A NUMBER TAKEN WITH A CLOCK. *** Building a control out of
+// the defect it controls for is the third time this session; this one was caught by its own sabotage.
+//
+// So MEASURED stops being a claim. The record carries the ARGUMENT, this gate applies it, times it and
+// compares the line counts, every run. Both cheap calls cost 0.0s, so the whole verification is free -- and
+// that is not a coincidence: an entry whose cheap path is too expensive for this gate to take is an entry
+// nobody has verified, which is UNMEASURED with a number attached. NEVER_CALL members cannot be MEASURED.
+console.log("\n9. the MEASURED entries, re-measured");
+{
+    const claimed = COST.slow.filter((s) => s.cheap === "MEASURED");
+    ok("!! no member of the never-call list claims a cheap path this gate could not have taken",
+       overNonEmpty(claimed, (s) => !NEVER_CALL.includes(s.rel)),
+       `${claimed.length} MEASURED entries, none of them on the ${NEVER_CALL.length}-entry never-call list. ` +
+       "A cheap path nobody can afford to exercise is a claim, not a measurement -- which is the state " +
+       "sabotage S constructed and this row refuses.");
+
+    const shaped = claimed.filter((s) => s.cheapArg && typeof s.cheapArg === "object" &&
+                                         typeof s.linesBare === "number" && typeof s.linesCheap === "number");
+    ok("!! every MEASURED entry carries the ARGUMENT ITSELF, not a sentence describing one",
+       shaped.length === claimed.length && claimed.length > 0,
+       `${shaped.length} of ${claimed.length} carry cheapArg and both line counts. cheapFlag is for the ` +
+       "reader; cheapArg is what makes the claim executable, and an entry without one cannot be re-taken.");
+
+    const taken = [];
+    for (const s of claimed) {
+        if (!s.cheapArg || NEVER_CALL.includes(s.rel)) continue;
+        const m = await import(pathToFileURL(path.join(ENG, s.rel)).href);
+        const t0 = Date.now();
+        const lines = await m.reportLines(s.cheapArg);
+        taken.push({ rel: s.rel, ms: Date.now() - t0, n: lines.length, rec: s });
+    }
+    for (const t of taken) {
+        say(`${t.rel}  ${t.rec.cheapFlag} -> ${t.n} lines in ${(t.ms / 1000).toFixed(2)}s ` +
+            `(record: ${t.rec.linesCheap} lines, ${t.rec.cheapSeconds}s, against ${t.rec.linesBare} bare)`);
+    }
+    ok("!! *** EVERY MEASURED CHEAP PATH IS TAKEN IN THIS RUN AND MATCHES THE RECORD ***",
+       taken.length === claimed.length && !emptyOfNonEmpty(taken, claimed) &&
+       overNonEmpty(taken, (t) => t.ms < 3000 && t.rec.cheapSeconds < 3.0 &&
+                                  t.n === t.rec.linesCheap && t.rec.linesCheap < t.rec.linesBare),
+       `${taken.length} of ${claimed.length} re-taken, worst ` +
+       `${(Math.max(0, ...taken.map((t) => t.ms)) / 1000).toFixed(2)}s. The line count is checked as well as ` +
+       "the clock, because a flag that returns fast and returns THE SAME REPORT is a performance switch and " +
+       "not the different question this record says it is.");
 }
 
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
