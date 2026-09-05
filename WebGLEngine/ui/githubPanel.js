@@ -303,6 +303,28 @@ export function mountGithubPanel() {
             w.append(E("div", "font-size:10.5px;color:#9fd;line-height:1.5;margin-bottom:2px;",
                        "The fleet downloads releases/latest and nothing else. Main is not what it runs."));
 
+            // *** v4451 -- ONE PRESS FOR 3 THROUGH 6, AND IT KEEPS v3964'S GUARANTEE RATHER THAN ITS RITUAL. ***
+            // Keith: "can we have a button that does 3, 4, 5, and also then 6?" v3964 deliberately split clone
+            // -> verify from publish, and its reason is worth restating before removing a press: "a clone that
+            // fails says so and an upload that fails says so, but A SUBTLY BROKEN TREE BOOTS FINE AND PACKAGES
+            // FINE... so Publish is a SECOND press, and it is disabled until the verdict is green."
+            //
+            // WHAT THAT PROTECTED IS "NEVER PUBLISH A RED TREE", AND THAT IS KEPT EXACTLY: this runner reads
+            // the verify verdict and STOPS on red, publishing nothing and saying which step it stopped at.
+            // WHAT IT GIVES UP IS THE HUMAN READING THE LOG BEFORE THE UPLOAD, AND THAT IS SAID OUT LOUD rather
+            // than quietly traded away -- a person who clicks a button that is only ENABLED on green has not
+            // necessarily read anything either, so the press was never the safeguard the predicate is.
+            // The predicate is still the server's: /source-chain/publish refuses on canPublish() regardless of
+            // what this button believes, so a bug here cannot publish a tree the backend thinks is red.
+            const runAll = BTN("⏩ Run 3 → 6 (verify, publish, record, confirm)", "#243c52", "#3f6b8f");
+            runAll.style.fontWeight = "600";
+            runAll.title = "One press for steps 3, 4, 5 and 6.\nSTOPS before publishing if verify comes back red.\n" +
+                           "Steps 1 and 2 are yours: push first, and pick the branch below.";
+            w.append(runAll);
+            const runAllNote = NOTE("Steps 1 and 2 stay yours — push to main first, and pick the branch. This runs " +
+                                    "the other four and stops at the first one that fails.");
+            w.append(runAllNote);
+
             // ---- 1. push -------------------------------------------------------------------------------
             STEP("Push your work to main. Not a button — do it in git first.",
                  "The tag is created on the repo's DEFAULT BRANCH head; the zip is packed from a local folder. " +
@@ -449,6 +471,60 @@ export function mountGithubPanel() {
                 say(j.ok ? "\u2713 published " + (j.tag || rel.tag) + "\nbuilt from the verified tree at " + (j.fromVerifiedTree || "?") + "\n" + (rel.url || "")
                          : "\u2717 " + (j.error || ""), !!j.ok);
             };
+            // v4451 -- the four-step runner. It calls the SAME endpoints the individual buttons call rather than
+            // synthesising clicks on them: a click on a disabled button does nothing at all and would have made
+            // a skipped step look like a completed one.
+            runAll.onclick = async () => {
+                let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) return say("pick a repo, or set engineRepo in Account", false);
+                const log = [];
+                const post = (u, body) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+                    .then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+                const stop = (n, why) => { log.push("", "\u2717 STOPPED AT STEP " + n + ": " + why,
+                    n < 4 ? "Nothing was published." : "The release is out; the ledger step did not finish."); say(log.join("\n"), false); };
+                runAll.disabled = true; chainB.disabled = true;
+                try {
+                    // ---- 3: clone + verify ------------------------------------------------------------
+                    log.push("3/6  cloning " + er + (brSel.value ? " @ " + brSel.value : " (default branch)") + " and verifying THE CLONE\u2026");
+                    say(log.join("\n"));
+                    const poll = setInterval(chainPoll, 1200);
+                    const j3 = await post("/source-chain/start", { repo: er });
+                    clearInterval(poll); await chainPoll();
+                    if (!j3.ok) return stop(3, j3.error || "the chain failed");
+                    if (!j3.verified) return stop(3, "VERIFY IS RED (exit " + j3.verifyExit + ") on " + j3.version +
+                        ". The checklist in the log above says which line failed.");
+                    log.push("     \u2713 " + j3.version + " cloned and VERIFY GREEN");
+                    say(log.join("\n"));
+                    // ---- 4: publish the tree that just passed -----------------------------------------
+                    log.push("4/6  packing the verified clone with its own packer, and uploading\u2026");
+                    say(log.join("\n"));
+                    const j4 = await post("/source-chain/publish", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked });
+                    await chainPoll();
+                    if (!j4.ok) return stop(4, j4.error || "the publish failed");
+                    const rel4 = j4.release || {};
+                    log.push("     \u2713 published " + (j4.tag || rel4.tag) + "   " + (rel4.url || ""));
+                    say(log.join("\n"));
+                    // ---- 5: record it -----------------------------------------------------------------
+                    log.push("5/6  rewriting the ledger from the releases page\u2026");
+                    say(log.join("\n"));
+                    const j5 = await post("/github/ledger/refresh", { repo: er, write: true });
+                    if (!j5.ok) return stop(5, j5.error || "the ledger refresh failed");
+                    log.push("     \u2713 " + j5.count + " release(s) recorded" + (j5.added && j5.added.length ? "; NEW: " + j5.added.join(", ") : ""));
+                    say(log.join("\n"));
+                    // ---- 6: ask the question this whole tab exists for --------------------------------
+                    const j6 = await fetch("/github/ledger/check", { cache: "no-store" }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+                    if (!j6.ok) return stop(6, j6.error || "the check failed");
+                    // THE LAST LINE IS GENERATED FROM THE STATE, NOT RESTATED BESIDE IT -- v4404 shipped with
+                    // conflict markers because a chain read a tail that said ALL GREEN while the run exited 1.
+                    log.push("6/6  " + (j6.fleetRunsWhatIsBuilt
+                        ? "\u2713 THE FLEET RUNS WHAT IS BUILT \u2014 releases/latest is " + j6.latestTag + ", the tree is " + j6.tree
+                        : "\u26a0 still behind: releases/latest " + (j6.latestTag || "(none)") + " vs tree " + j6.tree +
+                          (j6.owed && j6.owed.length ? "; OWED " + j6.owed.map((v) => "v" + v).join(", ") : "")));
+                    say(log.join("\n"), !!j6.fleetRunsWhatIsBuilt);
+                } finally { runAll.disabled = false; chainB.disabled = false; }
+            };
+
             chainLaunch.onclick = async () => {
                 if (chainLaunch.disabled) return;
                 chainLaunch.disabled = true;

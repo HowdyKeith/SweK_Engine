@@ -4365,6 +4365,25 @@ function _testRunActive() {
     try { const s = renderQaBridge.status(); if (s && s.running) return { active: true, what: "render QA" }; } catch {}
     try { if (typeof gatesBridge !== "undefined" && gatesBridge.running && gatesBridge.running()) return { active: true, what: "the gate suite" }; } catch {}
     try { if (typeof rigRunner !== "undefined" && rigRunner.running && rigRunner.running()) return { active: true, what: "a rig job" }; } catch {}
+    // *** v4451 -- AND THE GITHUB WORK, WHICH THIS PREDICATE COULD NOT SEE FOR ITS WHOLE LIFE. ***
+    //
+    // Keith: "we need to make sure that the running swek does not start an auto update that kills the github
+    // tasks." v3075 put the deferral here because "the guard belongs where the update is applied, not in each
+    // runner" -- correct, and it named three runners and then stopped. The clone (several hundred MB), the
+    // verify inside the clone, the pack (~30 MB zip built by walking a live tree) and the upload were all
+    // invisible to it, so an auto-update could restart the server in the middle of any of them. The upload is
+    // the worst case and it is not close: a release whose asset never finished arriving is one the installer
+    // will scan for and not find, and it is the action this tree already calls hardest to take back.
+    //
+    // ASKED OF THE RUNNERS THEMSELVES, never recomputed here -- sourceChainBridge.running() derives from its
+    // own phase and githubBridge.busy() from its own counter, which is updatePause-selfcheck's standing rule:
+    // "it derives from the runners' OWN state rather than a duplicate flag... a second flag would one day
+    // disagree with the thing it describes." Each is guarded, because a bridge that fails to answer must
+    // leave the update WORKING rather than throw inside the deferral check.
+    try { if (typeof sourceChainBridge !== "undefined" && sourceChainBridge.running && sourceChainBridge.running())
+        return { active: true, what: (sourceChainBridge.busyWhat && sourceChainBridge.busyWhat()) || "the source chain" }; } catch {}
+    try { if (typeof githubBridge !== "undefined" && githubBridge.busy && githubBridge.busy())
+        return { active: true, what: (githubBridge.busyWhat && githubBridge.busyWhat()) || "a GitHub operation" }; } catch {}
     return { active: false, what: null };
 }
 

@@ -122,7 +122,6 @@ const RED_AT_V4279_GATES = Object.freeze([
     "tools/ship/sunshineHost-selfcheck.mjs",
     "tools/ship/supersededFlag-selfcheck.mjs",
     "tools/ship/unattendedHold-selfcheck.mjs",
-    "tools/ship/updatePause-selfcheck.mjs",
     "tools/ship/wasmSupport-selfcheck.mjs",
     "tools/ship/wiringClaims-selfcheck.mjs",
 ]);
@@ -231,6 +230,17 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/updatePause-selfcheck.mjs", round: "v4451",
+      why: "RED SINCE v4279 AND THE CODE WAS RIGHT THE WHOLE TIME. Its last check required " +
+           "`c._errored = true; tally();` -- the two statements ADJACENT ON ONE LINE -- and somebody later " +
+           "inserted `c._result = {...}` between them in rig.html. Nothing about the behaviour changed: the " +
+           "catch still sets the flag, tally() still gives errored checks their own bucket, and the report " +
+           "still says '(error)'. A REGEX ABOUT THE LAYOUT OF TWO CORRECT STATEMENTS SAT ON THIS REGISTER FOR " +
+           "172 ROUNDS. Split into the three facts it was trying to state, none of which cares what sits " +
+           "between them. Found while widening the same file for v4451's update-deferral work, which is the " +
+           "argument for repairing a red by opening the file rather than by re-reading its entry -- and the " +
+           "identical trap was walked into one screen later in the new section, where codeOnly() blanks " +
+           "string literals and a check for `!== \"undefined\"` went red on correct code." },
     { gate: "tools/ship/budgetEvidence-selfcheck.mjs", round: "v4426",
       why: "RED SINCE v4279, ASKING FOR THREE MEASUREMENTS NOBODY HAD TAKEN. Its own register line said SIXTY-" +
            "SEVEN gates carried no evidence about their own runtime; run today the figure was THREE, so the " +
@@ -790,7 +800,19 @@ export const RECHECK_V4313 = Object.freeze({
                       "instruments-selfcheck went green-to-red in this very round, found at v4314 by a sweep " +
                       "with actual coverage. The zero this record used to carry would have been read as its " +
                       "denial",
-    nowGreenGates: Object.freeze(FIXED_SINCE_V4279.filter((e) => !/^v43(1[4-9]|[2-9])/.test(e.round)).map((e) => e.gate)),
+    // *** v4451 -- LITERAL, BECAUSE THE DERIVATION WENT STALE EXACTLY AS THE COMMENT BESIDE IT PREDICTED. ***
+    // redCensus-selfcheck's note here reads: "A RECORD OF ONE MOMENT MAY NOT DERIVE FROM A LIST THAT SPANS
+    // SEVERAL. RECHECK_V4313 read FIXED_SINCE_V4279.map(...) and was correct for exactly one round." The
+    // repair applied then was a REGEX OVER THE ROUND STRING -- still a derivation, and a more fragile one:
+    // /^v43(1[4-9]|[2-9])/ excludes v4314-v4319 and v432x-v439x AND NOTHING ELSE, so the moment round
+    // numbers crossed v4400 it stopped excluding anything. MEASURED: winPathGuard (v4423), budgetEvidence
+    // (v4426) and updatePause (v4451) were all being counted as gates v4313 found green, making a
+    // three-gate record name six. The names are typed now. A record of one moment is a LIST, not a filter.
+    nowGreenGates: Object.freeze([
+        "tools/roundhouse/deviceModes-selfcheck.mjs",
+        "tools/ship/launchIndex-selfcheck.mjs",
+        "tools/ship/shipRitual-selfcheck.mjs",
+    ]),
     causes: "one stale generated file (launch-index.json, 507 against 523) accounted for TWO of the three; the " +
             "third had been green since commit 9695918 and nobody pruned the entry",
     lesson: "a census entry is not a cause. Two of these three were one artefact read by two gates, so the red " +

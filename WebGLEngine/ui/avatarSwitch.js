@@ -160,7 +160,7 @@ const STORE_KEY = "swek.serverAvatarMode";
  * gate can drive the missing-asset path without a network.
  */
 export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, probe = null, store = null,
-                                    sizeFromHost = false, minSize = 96, onResize = null } = {}) {
+                                    sizeFromHost = false, minSize = 96, maxSize = 0, onResize = null } = {}) {
     if (!host) return null;
 
     // *** v4413 -- THE SIZE CAN COME FROM THE BOX INSTEAD OF FROM A TYPED NUMBER. ***
@@ -173,10 +173,25 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
     //
     // sizeFromHost makes the host the authority. minSize is a floor and not a default: a host measured at
     // zero is a host that has not been laid out yet, and building a 0x0 surface would be believing it.
+    //
+    // *** v4451 -- maxSize IS THE CEILING v4413 DID NOT GIVE IT, AND THE ROOM IT CAPS IS MEASURED DEAD. ***
+    // Keith: "cap the avatar width." v4413 handed this mount a floor and nothing above, so the surface tracked
+    // the host up without limit -- MEASURED on a live server.html at four window widths: 341 px at 900,
+    // 621 at 1600, 749 at 1920, 1005 at 2560. THE FIGURE INSIDE DID NOT GROW BY ONE PIXEL ACROSS THAT RANGE.
+    // The robot's viewBox is 60x88, a portrait aspect, and preserveAspectRatio letterboxes it, so its drawn
+    // width is min(boxW, boxH * 60/88) -- and boxH is pinned at 147 by the row, giving 100 px at EVERY one of
+    // those four widths. A box that grew from 341 to 1005 held the same 100 px robot and 905 px of nothing.
+    //
+    // The ceiling is symmetric with the floor rather than a new concept, and it is NOT optional for a measured
+    // box: `maxSize = 0` means "not stated", which avatarSwitch-embed-selfcheck refuses -- the same argument
+    // that file already makes about minSize ("a caller that says sizeFromHost:true and no minSize inherits
+    // minSize = 96, a second declaration of a floor"). A default ceiling would be a number nobody re-derives,
+    // which is the defect this whole family keeps being.
+    const cap = (n) => (maxSize > 0 ? Math.min(maxSize, n) : n);
     const measure = () => {
         if (!sizeFromHost) return { w: width, h: height };
         const b = host.getBoundingClientRect();
-        return { w: Math.max(minSize, Math.round(b.width)), h: Math.max(minSize, Math.round(b.height)) };
+        return { w: cap(Math.max(minSize, Math.round(b.width))), h: cap(Math.max(minSize, Math.round(b.height))) };
     };
     let box = measure();
     width = box.w; height = box.h;

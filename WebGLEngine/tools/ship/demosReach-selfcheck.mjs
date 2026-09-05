@@ -15,6 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import * as D from "./demosReach.mjs";
 
 let fails = 0;
@@ -23,7 +24,13 @@ const say = (m) => console.log("  ----  " + m);
 
 // ---- 1. THE EXCLUSION IS WHERE THIS ROUND SAYS IT IS ---------------------------------------------------------
 {
-    const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+    // v4451 -- fileURLToPath, not .pathname. On Windows `new URL(import.meta.url).pathname` yields
+    // "/C:/Users/..." -- a leading slash before the drive letter -- so every path built from it is wrong on
+    // the box this engine is actually developed on. v4423 replaced 28 of these across 16 files;
+    // winPathGuard-selfcheck has watched for the idiom ever since and went RED when this gate arrived
+    // carrying it. The guard worked and nothing was reading it: winPathGuard sits in the red register, and
+    // the gate that re-runs the register had been dead at import since v4430.
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const missing = D.EXCLUDED_BY.filter((rel) => {
         const src = fs.readFileSync(path.join(ENG, rel), "utf8");
         return !/const SKIP = \/[^\n]*demos_code/.test(src);

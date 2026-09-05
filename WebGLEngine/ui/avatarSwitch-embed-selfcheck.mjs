@@ -99,11 +99,26 @@ ok("svg is still first and rigged still second", MODES[0].id === "svg" && MODES[
         " of them; ui/avatarSwitch.js defaults to 143 AND THAT DEFAULT IS DEAD CODE. If this ever finds zero, " +
         "somebody deleted the sizing and the box silently fell back to 143 -- REWRITE THIS LINE TO NAME THE " +
         "NEW CALLER, do not weaken it");
+    // *** v4451 -- THE CEILING IS REQUIRED ON EXACTLY THE ARGUMENT THIS SECTION ALREADY MAKES ABOUT THE FLOOR. ***
+    // A measured box with no minSize inherits 96, "the unread default this whole section exists to keep out of
+    // the live path". A measured box with no maxSize inherited NOTHING AT ALL and grew without bound, which is
+    // the worse half of the same hole: MEASURED at v4451, the surface ran 341 / 621 / 749 / 1005 px at window
+    // widths 900 / 1400 / 1920 / 2560 while the robot drawn inside it stayed 100 px at all four. So the floor
+    // and the ceiling are asked for together rather than the second being added as an option somebody may pass.
+    const measuredCapped = measured.filter((a) => /\bmaxSize:\s*(\d+)/.test(a));
     ok("!! and a MEASURED box states its own floor, because minSize is the same second declaration one level down",
         measured.length === measuredFloored.length,
         measured.length + " caller(s) ask to be measured and " + measuredFloored.length + " state a minSize; " +
         "the rest inherit minSize = 96 from ui/avatarSwitch.js, which is exactly the unread default this " +
         "whole section exists to keep out of the live path");
+    ok("!! *** ...AND ITS CEILING, because a floor with nothing above it is the same hole facing the other way ***",
+        measured.length === measuredCapped.length,
+        measured.length + " measured caller(s), " + measuredCapped.length + " state a maxSize" +
+        (measuredCapped.length ? " (" + measuredCapped.map((a) => /\bmaxSize:\s*(\d+)/.exec(a)[1]).join(", ") + ")" : "") +
+        ". maxSize defaults to 0 = NOT STATED, and an unstated ceiling means unbounded: v4413 shipped the floor " +
+        "alone and the scene tracked its host up to a 1005 px box holding a 100 px figure. THERE IS NO USABLE " +
+        "DEFAULT TO FALL BACK ON HERE ON PURPOSE -- a ceiling that arrived by default would be a number nobody " +
+        "re-derives, which is the defect this whole family keeps being");
     ok("!! and the stage aspect is DERIVED from the box, never typed beside it",
         /width \/ height/.test(readFileSync(new URL("./avatarSwitch.js", import.meta.url), "utf8")),
         "frameFromBox computes width/height at mount time, so changing the box cannot leave a stale framing " +

@@ -338,12 +338,40 @@ export function wideValues(v) {
  * The whole register, one row per device/knob.
  * @returns rows of { device, knob, kind, modeSource, probed[], live[], still[], movedMost, note }
  */
-export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive = false } = {}) {
+// *** v4454 -- THE BUDGET GUARDED THE DEVICE AND NOTHING GUARDED THE CENSUS, AND THIS FILE ALREADY KNEW THE
+// RULE. *** Sixty lines up, v4044: "THE FIRST VERSION GUARDED THE WRONG THING. It timed only the BASE build
+// -- one build out of (modes x knobs x values + 1) -- so a device costing 20 s per build passed the guard and
+// then ran unbounded. THE COST OF A CENSUS IS WHAT THE CENSUS DOES, NOT WHAT ITS FIRST STEP COSTS."
+//
+// The same sentence, one scope out: budgetMs is spent PER DEVICE, the registry holds 129 of them, and nothing
+// bounds their sum. Every caller in the tree passes `only:` and never feels it. The one caller that does not
+// is reportLines() -- THE FRONT DOOR THIS MODULE PUTS ON THE reportLines CONVENTION -- and it was measured
+// for the first time by tools/ship/reportDoors.mjs, which called it and gave up at ninety seconds.
+//
+// *** AND THEN IT WAS RUN TO COMPLETION RATHER THAN ESTIMATED, WHICH CHANGED THE NUMBER AND THE VERDICT. ***
+// 129 x 20 s gives a worst case of forty-three minutes and reportDoors recorded "never observed to return".
+// Run with no budget at all it RETURNS AFTER 989.8 SECONDS -- 16.5 minutes, 767 lines. IT IS NOT A HANG AND
+// IT NEVER WAS; it is a cost nobody had paid, and the difference matters because "hangs" and "takes sixteen
+// minutes" call for different repairs. The estimate was 2.6x the truth and would have been quoted forever.
+//
+// So the census gets a budget of its own. It DEFAULTS TO INFINITY, because every existing caller narrows with
+// `only:` and a round that silently truncated their sweeps would be trading one wrong answer for another;
+// reportLines() sets a finite one, because that is the caller that is broken.
+//
+// *** AND THE DANGEROUS FAILURE IS NOT THE TIME, IT IS THE VERDICT. *** A device the census never reached
+// must be reported as NOT REACHED. It contributes no rows, so it cannot be counted dead -- but the summary
+// line says "MOVES NOTHING ANYWHERE", and a whole-tree verdict computed over a third of the tree is exactly
+// the shape this file's header records twice: a reading that is entirely an artefact of the question.
+export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive = false,
+                                     totalBudgetMs = Infinity } = {}) {
     const MODES = await deviceModeTable();
     const names = only && only.length ? only : DEVICE_NAMES;
     const rows = [], notes = [];
+    const censusStart = Date.now();
+    const notReached = [];
 
     for (const name of names) {
+        if (Date.now() - censusStart > totalBudgetMs) { notReached.push(name); continue; }
         const modes = MODES[name];
         // No declared modes is not "every mode" -- deviceModes' own v3191 finding. Nothing to probe, said so.
         if (!modes || !modes.length) { notes.push(name + ": no modes declared, not probed"); continue; }
@@ -507,7 +535,13 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
             unenteredModes: modes.filter((m) => !entered.includes(m)), ...a,
         });
     }
-    return { rows, notes };
+    // *** THE DEVICES THE CENSUS NEVER REACHED ARE PART OF THE READING, NOT BOOKKEEPING -- v4031's rule about
+    // modes, applied to devices. *** They contribute no rows, so nothing can call their knobs dead; what they
+    // can do is make a whole-tree summary read as whole-tree when it covered a third of the tree.
+    if (notReached.length) notes.push("CENSUS BUDGET SPENT at " + totalBudgetMs + " ms -- " + notReached.length +
+        " of " + names.length + " devices NEVER REACHED: " + notReached.slice(0, 8).join(", ") +
+        (notReached.length > 8 ? ", ..." : "") + ". NOT PROBED IS NOT DEAD.");
+    return { rows, notes, notReached, devicesAsked: names.length };
 }
 
 /**
@@ -828,8 +862,17 @@ export const STILL_OK = {
 };
 
 /** v3327's split: this half PRINTS, and knobLiveness-selfcheck beside it is what exits nonzero. */
+// *** THE FRONT DOOR SETS A CENSUS BUDGET AND THE OTHER CALLERS DO NOT. *** Every caller in the tree narrows
+// with `only:`; this one does not, and it is the one the reportLines convention exposes. 25 s is chosen to be
+// the same order as the other slow members of that convention (37-74 s measured at v4453) rather than to be
+// generous -- a front door is opened by a page, and a page cannot wait forty-three minutes. Pass
+// totalBudgetMs explicitly for a longer look; pass Infinity for the full census this used to attempt.
+const FRONT_DOOR_CENSUS_MS = 25000;
+
 export async function reportLines(opts = {}) {
-    const { rows, notes } = await knobLiveness(opts);
+    const askedAll = !(opts.only && opts.only.length);
+    const { rows, notes, notReached = [], devicesAsked } = await knobLiveness(
+        askedAll && opts.totalBudgetMs === undefined ? { ...opts, totalBudgetMs: FRONT_DOOR_CENSUS_MS } : opts);
     const exhaustive = !!opts.exhaustive;
     const L = [];
     const devices = new Set(rows.map((r) => r.device));
@@ -858,7 +901,19 @@ export async function reportLines(opts = {}) {
     L.push("");
     const unprobed = unprobedKnobs(rows);
     const partial = incompleteKnobs(rows);
-    L.push("  MOVES NOTHING ANYWHERE: " + (still.length ? still.join(", ") : "none"));
+    // *** THE SCOPE IS PART OF THE VERDICT. *** "MOVES NOTHING ANYWHERE" over a census that reached 40 of 129
+    // devices is a whole-tree claim made from a third of the tree, which is this file's own recurring defect:
+    // a reading that is entirely an artefact of the question. The line now carries what it covered.
+    const covered = devicesAsked ? devicesAsked - notReached.length : devices.size;
+    if (notReached.length) {
+        L.push("  *** THE CENSUS DID NOT REACH " + notReached.length + " OF " + devicesAsked + " DEVICES -- the " +
+               "verdicts below cover the " + covered + " it entered. NOT PROBED IS NOT DEAD. ***");
+        L.push("  never reached: " + notReached.slice(0, 10).join(", ") + (notReached.length > 10 ? ", ..." : ""));
+        L.push("  (pass totalBudgetMs: Infinity for the full census -- 989.8 s across 129 devices, measured)");
+        L.push("");
+    }
+    L.push("  MOVES NOTHING ANYWHERE" + (notReached.length ? " (of the " + covered + " devices reached)" : "") +
+           ": " + (still.length ? still.join(", ") : "none"));
     L.push("  NOT PROBED (no ordering to perturb the default along): " + (unprobed.length ? unprobed.join(", ") : "none"));
     L.push("  STILL SO FAR, BUT THE CENSUS RAN OUT OF BUDGET -- NOT A VERDICT: "
         + (partial.length ? partial.join(", ") : "none"));

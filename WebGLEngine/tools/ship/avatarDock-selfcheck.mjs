@@ -23,6 +23,23 @@
 //        the only child and fills anyway, so the flex comparison is what caught it and the width alone would
 //        have passed over it.
 //
+// ---- v4451: THE CEILING, AND A THIRD PROBE WIDTH ------------------------------------------------------
+// Keith: "cap the avatar width." v4413 gave this mount minSize and nothing above it, so MEASURED at four
+// window widths the surface ran 341 / 621 / 749 / 1005 px WHILE THE ROBOT DRAWN INSIDE IT STAYED 100 px AT
+// ALL FOUR -- viewBox 60x88 letterboxed into a 147 px-tall box, so the figure is height-bound and every
+// pixel of width past ~100 was empty. maxSize:420 caps it; the figure is unchanged at every width, which is
+// the proof the capped room was dead.
+//   *** v4413'S OWN CHECK HAD TO CHANGE SHAPE, AND THE OLD FORM WOULD NOW PASS ON A DEAD OBSERVER. *** It
+//   asserted surface(1400) > surface(900) + 20. With a ceiling both of those rows sit above it, so the two
+//   read equal -- and equal for a good reason is indistinguishable from equal because the ResizeObserver
+//   died. Split in two: TRACKS below the ceiling, PINNED above it, each driven at a width where it can fail.
+//   The narrow probe is 360 and not 500 BECAUSE 500 WAS MEASURED AND FOUND STILL ABOVE THE CEILING: the page
+//   reflows to one column below a breakpoint, so the row is 474 px wide at a 500 window and 334 at a 360
+//   one. The width of the window is not the width of the row, and picking the probe by eye tests nothing.
+//   SABOTAGE: maxSize removed from the one caller -> exit=1 here (the pinned line) AND exit=1 in
+//   ui/avatarSwitch-embed-selfcheck.mjs, which now requires the ceiling on the same argument it already
+//   made for the floor -- an unstated ceiling means unbounded, which is the worse half of the same hole.
+//
 // *** THE AVATAR HAD TWENTY-SIX PER CENT OF ITS OWN ROW, AND WAS BUILT AT A SIZE IT WAS NEVER DISPLAYED AT. ***
 //
 // MEASURED at v4412 on a live server.html: #dialsRow was 676 px wide, #dials (the SVG dials) took 288 of it
@@ -123,6 +140,17 @@ const say = (m) => console.log("  ----  " + m);
                          surface: sb ? { w: Math.round(sb.width), h: Math.round(sb.height) } : null };
             };
             const wide = read();
+            // v4451 -- A THIRD, GENUINELY NARROW WIDTH. With a ceiling in place, 1400 and 900 both sit ABOVE
+            // it, so the pair that proved "the surface follows its box" in v4413 now proves only that the cap
+            // holds -- the ResizeObserver could be dead and both would still read the same. 500 puts the row
+            // below the ceiling so the tracking half is actually exercised. TWO WIDTHS WERE ENOUGH FOR A FIXED
+            // NUMBER AND ARE NOT ENOUGH FOR A CLAMPED ONE. 360 rather than 500 BECAUSE 500 WAS MEASURED AND
+            // FOUND STILL ABOVE THE CEILING: the page reflows to one column below a breakpoint, so the row is
+            // 474 px wide at a 500 window and 334 at a 360 one -- the width of the WINDOW is not the width of
+            // the row, and picking the probe by eye would have tested nothing.
+            f.style.width = "360px";
+            await new Promise((r) => setTimeout(r, 1800));
+            const tiny = read();
             f.style.width = "900px";
             await new Promise((r) => setTimeout(r, 1800));
             const narrow = read();
@@ -174,7 +202,7 @@ const say = (m) => console.log("  ----  " + m);
                 }
             } catch (e) { axis = { error: String(e && e.message) }; }
 
-            return { wide, narrow, staged, axis, zoom: getComputedStyle(d.body).zoom,
+            return { wide, narrow, tiny, staged, axis, zoom: getComputedStyle(d.body).zoom,
                      dialsPresent: !!d.getElementById("dials") };
         }` });
 
@@ -204,11 +232,28 @@ const say = (m) => console.log("  ----  " + m);
            "IT WAS 178 OF 676 -- 0.263. Two widths, because the defect was a FIXED NUMBER and a fixed number " +
            "is right at exactly one width by luck");
 
-        ok("!! ...and the SURFACE follows the box when the box moves, which is what a ResizeObserver is for",
-           !!wide.surface && !!narrow.surface && wide.surface.w > narrow.surface.w + 20,
-           `surface ${wide.surface && wide.surface.w} px at the wide row, ${narrow.surface && narrow.surface.w} ` +
-           "at the narrow one. A SCENE MEASURED ONCE AT MOUNT IS A TYPED CONSTANT THAT ARRIVES LATE: the panel " +
+        // *** v4451 -- THIS CHECK CHANGED SHAPE BECAUSE THE DESIGN DID, AND THE OLD FORM WOULD NOW PASS ON A
+        // DEAD OBSERVER. *** v4413 asserted `wide.surface.w > narrow.surface.w + 20` at 1400 and 900. With
+        // maxSize:420 both of those rows are ABOVE the ceiling, so both surfaces read 336 and the old
+        // inequality is simply false -- but the failure mode that matters is the opposite one: had the cap
+        // been set just high enough, the two would have read equal for a GOOD reason and equal for a dead
+        // ResizeObserver would look identical. So the property is split in two and each half is driven at a
+        // width where it can actually fail.
+        const tiny = r.tiny || {};
+        ok("!! ...and the SURFACE follows the box BELOW the ceiling, which is what a ResizeObserver is for",
+           !!tiny.surface && !!narrow.surface && narrow.surface.w > tiny.surface.w + 20,
+           `surface ${narrow.surface && narrow.surface.w} px at the ${narrow.row && narrow.row.w} row, ` +
+           `${tiny.surface && tiny.surface.w} at the ${tiny.row && tiny.row.w} one. ` +
+           "A SCENE MEASURED ONCE AT MOUNT IS A TYPED CONSTANT THAT ARRIVES LATE: the panel " +
            "opening or the window resizing moves the box, and the scene has to move with it");
+        ok("!! *** ...and it is PINNED at the ceiling above it, which is the cap Keith asked for ***",
+           !!wide.surface && !!narrow.surface && wide.surface.w === narrow.surface.w &&
+           !!wide.row && !!narrow.row && wide.row.w > narrow.row.w + 100,
+           `row ${narrow.row && narrow.row.w} -> ${wide.row && wide.row.w} and the surface holds at ` +
+           `${wide.surface && wide.surface.w} px. MEASURED BEFORE THE CAP: 341 / 621 / 749 / 1005 px at window ` +
+           "widths 900 / 1400 / 1920 / 2560, WITH THE ROBOT INSIDE DRAWN 100 px WIDE AT ALL FOUR -- the viewBox " +
+           "is 60x88 and letterboxes into a 147 px-tall box, so every pixel past ~100 was empty and a box that " +
+           "tripled held the same figure. The row still grows; the scene no longer follows it into nothing");
 
         ok("...and the row keeps the height the dials used to prop it to",
            !!wide.row && wide.row.h >= 140,

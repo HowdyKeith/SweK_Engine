@@ -164,13 +164,45 @@ const cov = definitionCoverage(ENG);
               "additionally covers the " + (wide.gatedModules - cov.gatedModules) + " gated modules outside " +
               "physics/ -- render/, rig/, ui/, world/ and the rest -- where a silently uncovered export would " +
               "previously have passed every gate in this file");
+    // *** v4453 -- THIS LINE PRINTED TWO IMPOSSIBLE NUMBERS ON EVERY RUN FOR ~390 VERSIONS. ***
+    //
+    // The decomposition is only defined while the count EXCEEDS what constant-rate growth would have
+    // produced. v4062 paid physics/ down to zero and re-froze the pin AT zero -- and left this line
+    // comparing against the v3323 era's rate of 37/608. At 23 of 1739 the arithmetic reads
+    //
+    //     "~106 is GROWTH and ~-83 is REGRESSION"
+    //
+    // a growth term FIVE TIMES the whole population, and a NEGATIVE regression. Both printed as findings
+    // every run since v4062, in the file whose entire subject is a number nobody re-derived.
+    //
+    // *** THE FIX IS A BRANCH, NOT A BIGGER NUMBER. *** Below the constant-rate line there is no regression
+    // term to report, and the true statement is the one the old formula could not make: THE RATE FELL. And
+    // the terms are now CHECKED rather than printed, because a derived line that can go arithmetically
+    // impossible without a single gate going red is the defect this whole file exists to catch, committed
+    // inside the instrument that catches it.
     const rateNow = cov.ungated.length / cov.total, rateThen = 37 / 608;
+    const expected = Math.round(rateThen * cov.total);
+    const excess = cov.ungated.length - expected;
+    const terms = excess > 0 ? [expected, excess] : [];
+    const split = excess > 0
+        ? `so ~${expected} is GROWTH and ~${excess} is REGRESSION. Different fixes: growth is closed by ` +
+          "gating as modules land, regression by going back for the ones that slipped"
+        : `constant-rate growth would have produced ~${expected}, and the count is ${-excess} BELOW that -- ` +
+          `so there is NO regression term to report and the rate itself is the finding: it FELL from ` +
+          `${(100 * rateThen).toFixed(2)}% to ${(100 * rateNow).toFixed(2)}%. The decomposition does not ` +
+          "apply below its own line, and saying so is the whole repair";
     console.log("  ----  the count against its own denominator   " +
         `${cov.ungated.length} of ${cov.total} = ${(100 * rateNow).toFixed(2)}% now, against 37 of 608 = ` +
         `${(100 * rateThen).toFixed(2)}% when the pin was set. Corpus ${(cov.total / 608).toFixed(2)}x, ` +
-        `unmentioned ${(cov.ungated.length / 37).toFixed(2)}x -- so ~${Math.round(rateThen * cov.total)} is GROWTH ` +
-        `and ~${cov.ungated.length - Math.round(rateThen * cov.total)} is REGRESSION. Different fixes: growth is ` +
-        "closed by gating as modules land, regression by going back for the ones that slipped");
+        `unmentioned ${(cov.ungated.length / 37).toFixed(2)}x -- ${split}`);
+    ok("!! *** THE DECOMPOSITION CANNOT REPORT A TERM THAT DOES NOT EXIST ***",
+        terms.every((t) => t >= 0 && t <= cov.ungated.length) &&
+        (terms.length === 0 || terms[0] + terms[1] === cov.ungated.length),
+        terms.length === 0
+            ? `the count is BELOW the constant-rate line (${cov.ungated.length} against ~${expected}), so no ` +
+              "split is reported at all. THE OLD FORMULA REPORTED ONE ANYWAY: 106 and -83, unconditionally, " +
+              "and no check looked at either number because a `----` line asserts nothing"
+            : `${terms[0]} + ${terms[1]} = ${cov.ungated.length}, each inside the population it partitions`);
 }
 
 // ---- 2. MENTIONING IS NOT TESTING, AND THIS GATE SAYS SO ---------------------------------------------------------

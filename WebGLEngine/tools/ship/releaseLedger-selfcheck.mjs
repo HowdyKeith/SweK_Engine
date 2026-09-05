@@ -54,9 +54,49 @@
 //   4. inserted v4999, a release NEWER than the tree
 //      -> exit=1, section 3 red: a tag ahead of the source is one pushed from a tree nobody committed, and
 //         the fleet would be running code this repo does not contain.
+// ---- v4453: THE STRUCTURE, BECAUSE THE RULE HAD BEEN SWITCHED OFF POLITELY ---------------------------------
+// Keith: "fix the structure before v4453." v4449's ratchet was a hard zero -- the previous version must be
+// released -- which is right when the ship and the publish happen on ONE machine and unsatisfiable when they
+// do not. Rounds are built where there are no credentials to publish; the rig publishes afterwards, by hand.
+// So the previous version was unreleased AT EVERY SHIP, BY CONSTRUCTION, the gate went red at v4450, v4451 and
+// v4452, and each time the answer was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A GATE
+// COLLECTING SIGNATURES, NOT ENFORCING ANYTHING.
+//
+// Two changes, and neither loosens what the rule protects. (1) The question is asked about MAIN, which is what
+// v4449's own words always said -- "a version that reaches MAIN and never reaches the releases page" -- while
+// it read the WORKING TREE's changelog, so an unmerged branch counted as debt the fleet was owed. (2) The hard
+// zero becomes a stated LAG BUDGET: main may run at most N versions ahead of the releases page. N=3 here,
+// against a failure of 3 releases across 261 versions, which is 87 times the budget. The budget lives OUTSIDE
+// baseline on purpose: the baseline forgives what has gone by, the budget bounds what comes next, and if one
+// edit could do both the escape hatch would swallow the rule again one level up.
+//
+//   SABOTAGE LOG (v4453):
+//     1. removed lagBudget entirely -> exit=1, 3 red. AN UNSTATED BUDGET IS NOT AN INFINITE ONE: that is
+//        v4413's floor-with-no-ceiling wearing this file's clothes, so it fails rather than passes.
+//     2. dropped the six newest releases and lowered the baseline to v4290 -> exit=1, "132 of 3 allowed".
+//        The budget bites, and it bites at the scale the mechanism exists for.
+//     3. moved maxVersionsBehind INSIDE baseline -> exit=1, 1 red by name: one edit doing both jobs is the
+//        escape hatch eating the rule.
+//     4. degrade to the working tree while REPORTING "origin/main" -> *** exit=0 TWICE BEFORE IT CLOSED. ***
+//        The first check asked `owedSource === "origin/main" || owedDegraded`, which a lying label satisfies
+//        -- a restatement of what the thing under test says about itself. The second compared COUNTS against
+//        an independent read, and that was unfalsifiable too: at the moment it ran, the branch and main were
+//        IDENTICAL, so no count could tell them apart. Closed by making the reader INJECTABLE, so the gate
+//        hands in a main that differs; now exit=1 red by name.
+//     5. lagBudget.why cut to one word -> exit=1, 1 red: a bound with no argument behind it is the next thing
+//        somebody raises without one.
+//     6. owed built from the working tree instead of main -> exit=0 first (same identical-state blindness),
+//        then exit=1 red by name once a fixture ledger with a low floor made `owed` NON-EMPTY -- an empty
+//        owed-set proves nothing about which list produced it.
+//
+// *** AND A NOTE ON HOW TWO OF THOSE ZEROS LOOKED LIKE ZEROS: *** the sabotage runs counted lines matching
+// "^  FAIL", and a gate that CRASHES prints none of them. One "0 red" in this session was a syntax error in
+// the sabotage itself, read as a gate that failed to notice. Sabotages are graded on the EXIT CODE here.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { ledgerState, readLedger, engineVersion, shippedVersions, num, LEDGER, ENG, ROOT } from "./releaseLedger.mjs";
 import { rowsFrom } from "./refreshReleases.mjs";
 
@@ -68,6 +108,7 @@ console.log("releaseLedger-selfcheck -- does the fleet run what is actually buil
 
 const led = readLedger();
 const S = ledgerState();
+const LED = readLedger();
 
 console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
 {
@@ -83,16 +124,97 @@ console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
         led.source + "  refreshed " + led.refreshedAt);
 }
 
-console.log("\n2. *** THE RATCHET: YOU MAY NOT SHIP A NEW VERSION WHILE THE LAST ONE IS UNRELEASED ***");
+console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, BUT ONLY SO FAR ***");
 {
-    ok("!! *** every version shipped after the baseline, before the current one, has a release ***",
-        S.owed.length === 0,
-        S.owed.length
-            ? "OWED " + S.owed.length + ": " + S.owed.slice(0, 12).map((v) => "v" + v).join(", ") +
-              (S.owed.length > 12 ? " (+" + (S.owed.length - 12) + " more)" +
-              ". PUBLISH THE PREVIOUS VERSION BEFORE SHIPPING THIS ONE -- the ship skill's step 7 is the how" : "")
-            : "nothing owed. Baseline is v" + S.floor + "; the tree is " + S.tree + "; " +
-              "the rule binds from v" + (S.floor + 1) + " forward and it is satisfied");
+    // *** v4453 -- THE HARD ZERO BECAME A BUDGET, AND THE REASON IS THAT THE ZERO WAS UNSATISFIABLE HERE. ***
+    // v4449 wrote "you may not ship a new version while the last one is unreleased", which is exactly right
+    // when the ship and the publish happen on ONE machine. They do not: rounds are built where there are no
+    // credentials to publish and the rig publishes afterwards, by hand -- so the previous version is
+    // unreleased AT EVERY SHIP, BY CONSTRUCTION. The gate went red at v4450, v4451 and v4452, and each time
+    // the answer was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A RULE THAT HAS BEEN SWITCHED OFF
+    // POLITELY: a gate whose only reachable state is "write off the debt" is collecting signatures, not
+    // enforcing anything. Keith, on the third: "fix the structure before v4453."
+    //
+    // What the rule protects is not zero lag; it is that THE FLEET DOES NOT FALL BEHIND. 3 releases across
+    // 261 versions is the failure it was built for -- 87 times this budget.
+    ok("!! *** main runs no more than the budget ahead of the releases page ***",
+        S.withinBudget,
+        !S.budgetStated
+            ? "NO lagBudget IN releases.json. AN UNSTATED BUDGET IS NOT AN INFINITE ONE -- that is v4413's " +
+              "floor-with-no-ceiling wearing this file's clothes, and it fails rather than passes"
+            : S.owed.length
+                ? S.owed.length + " of " + S.budget + " allowed: " + S.owed.slice(0, 12).map((v) => "v" + v).join(", ") +
+                  (S.owed.length > 12 ? " (+" + (S.owed.length - 12) + " more)" : "") +
+                  (S.withinBudget ? " -- within budget" : ". PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how")
+                : "nothing owed at all. Baseline v" + S.floor + ", tree " + S.tree + ", budget " + S.budget +
+                  "; the rule binds from v" + (S.floor + 1) + " forward");
+
+    // *** THE QUESTION IS ABOUT MAIN, WHICH IS WHAT THE RULE ALWAYS SAID AND NOT WHAT IT MEASURED. ***
+    // v4449's own words: "a version that reaches MAIN and never reaches the releases page is a version nobody
+    // outside this repo will ever run." It then read the WORKING TREE's changelog, which gains a round's entry
+    // in the same commit as the version bump -- so a round sitting on an unmerged branch counted as debt the
+    // fleet was owed, when nobody could download it and nobody was missing anything.
+    // *** VERIFIED INDEPENDENTLY, BECAUSE THE FIRST DRAFT TRUSTED THE LABEL AND A SABOTAGE WALKED PAST IT. ***
+    // It asked `S.owedSource === "origin/main" || S.owedDegraded` -- which is satisfied by a module that
+    // silently reads the WORKING TREE and calls it origin/main. That is not a check, it is a restatement of
+    // what the thing under test says about itself, and it went ZERO RED on exactly that sabotage. The gate
+    // reads main for itself and compares counts; a lying label now disagrees with an independent read.
+    let ownMain = null, ownWhy = "";
+    try {
+        const out = execFileSync("git", ["show", "origin/main:docs/CHANGELOG.md"],
+            { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+        ownMain = [...out.matchAll(/^## v(\d+)/gm)].length;
+    } catch (e) { ownWhy = String((e && e.message) || e).split("\n")[0].slice(0, 70); }
+    ok("!! ...and the versions it counts really are main's, checked against an independent read",
+        ownMain === null ? S.owedDegraded === true : (S.owedDegraded === false && S.mainCount === ownMain),
+        ownMain === null
+            ? "this gate cannot read origin/main either (" + ownWhy + "), so the module MUST report degraded " +
+              "-- and it reports " + S.owedDegraded + ". A missing tool makes the check stricter, never quieter"
+            : "module says " + S.mainCount + " from " + S.owedSource + "; this gate read " + ownMain +
+              " straight from origin/main. THE COUNT IS COMPARED RATHER THAN THE LABEL BELIEVED: a module that " +
+              "read the working tree and called it main would pass a check written the obvious way, and did");
+
+    // *** AND THE PREFERENCE IS DRIVEN, NOT INFERRED. *** The check above compares counts, which can only
+    // tell main from the working tree WHEN THEY DIFFER -- and on the state this round shipped in, they were
+    // identical, so swapping the arithmetic to the working tree went ZERO RED twice. Here main is handed in
+    // deliberately SHORTER than the tree, and the answer says which list the owed-set was built from.
+    {
+        // A FIXTURE LEDGER, so the floor is low enough for `owed` to be NON-EMPTY: at the real floor nothing
+        // sits between it and the tree, and an empty owed-set proves nothing about which list built it.
+        const tmpL = path.join(os.tmpdir(), "swek-ledger-" + process.pid + ".json");
+        fs.writeFileSync(tmpL, JSON.stringify({
+            baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+            lagBudget: { maxVersionsBehind: 99, why: "z".repeat(220) },
+            releases: [{ tag: "v4001" }],
+        }));
+        // A main holding TWO versions the tree also has, and NOT the hundreds of others the tree carries.
+        const fakeMain = "## v4111 -- one\n\n## v4222 -- two\n";
+        const viaMain = ledgerState({ file: tmpL, readMain: () => fakeMain });
+        const viaTree = ledgerState({ readMain: () => { throw new Error("no main here"); } });
+        const owedIsMains = viaMain.owed.length === 2 && viaMain.owed.includes(4111) && viaMain.owed.includes(4222);
+        ok("!! *** the owed set is built from MAIN's versions, proven with a main that differs from the tree ***",
+            owedIsMains && viaMain.mainCount === 2 && viaMain.owedSource === "origin/main" && !viaMain.owedDegraded,
+            "handed a main holding only v4111 and v4222 against a floor of v4000, the module owed [" +
+            viaMain.owed.join(",") + "] -- EXACTLY MAIN'S TWO, not the " + shippedVersions(ROOT).length +
+            " this working tree carries. A COUNT COMPARISON ALONE COULD NOT SHOW THIS: main and the tree were " +
+            "identical when this round shipped, so swapping the arithmetic to the tree went ZERO RED TWICE");
+        try { fs.unlinkSync(tmpL); } catch {}
+        ok("!! ...and when main cannot be read it DEGRADES LOUDLY to the stricter list",
+            viaTree.owedDegraded === true && viaTree.owedSource === "working tree" &&
+            viaTree.mainCount === shippedVersions(ROOT).length,
+            "reader threw: degraded=" + viaTree.owedDegraded + ", source=" + viaTree.owedSource + ", counted " +
+            viaTree.mainCount + ". The working tree's list is a SUPERSET of main's, so a missing tool makes " +
+            "this OVER-report debt -- stricter, never quieter, and it says which it did");
+    }
+
+    ok("!! ...and the budget is NOT part of the baseline, so a write-off cannot widen it",
+        !!(LED && LED.lagBudget && LED.baseline && LED.baseline.maxVersionsBehind === undefined),
+        "the baseline forgives versions already gone by; the budget bounds the next ones. If ONE edit could " +
+        "do both, the escape hatch that swallowed this rule three times would swallow it again one level up");
+
+    ok("...and the budget carries the reason it is that number",
+        !!(LED && LED.lagBudget && typeof LED.lagBudget.why === "string" && LED.lagBudget.why.length > 200),
+        "a bound with no argument behind it is the next thing somebody raises without one");
     // *** v4450 -- THIS CHECK USED TO PIN THE LITERAL 4448, AND THAT WAS A SECOND COPY OF THE NUMBER. ***
     // The intent was right -- moving the baseline must be an ACT, not a drift -- but `=== 4448` means the
     // gate holds its own copy of a value that lives in releases.json, so a legitimate raise goes red until

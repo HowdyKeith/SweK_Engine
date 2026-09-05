@@ -525,10 +525,52 @@ async function webgpuBackend(canvas, opts = {}) {
 }
 
 // Pick a backend: prefer WebGPU (or opts.prefer / opts.backend), fall back to WebGL2, then the null recorder.
+// *** v4452 -- SAY WHY WebGPU IS MISSING, AT THE ONE PLACE THAT ASKS FOR IT. ***
+//
+// Keith: "I don't know why the swek engine locally runs with an ip, and then all the gpu pages have to be re
+// opened with localhost. all the machines run webgpu pages fully." The machines are fine and so is the code.
+// navigator.gpu is only exposed in a SECURE CONTEXT, and the browser's rule treats localhost / 127.0.0.1 as
+// secure over plain http while a LAN address like http://192.168.50.57:8787 is NOT. So on the IP the property
+// is simply absent, and ui/webgpuProbe.mjs has diagnosed exactly this since v3981.
+//
+// *** WHAT MADE IT UNREADABLE IS RIGHT HERE: THIS FUNCTION FELL BACK IN SILENCE. *** With no navigator.gpu,
+// detectBackends() reports webgpu:false, the loop quietly takes webgl2 -- or nullBackend -- and RETURNS A
+// WORKING DEVICE. No throw, no banner, nothing in the console: the page loads, does not do what it should,
+// and the only symptom is that reopening it on localhost fixes it. A fallback that cannot say it fell back is
+// indistinguishable from a page that is broken.
+//
+// The probe is loaded LAZILY and only on the failing path, so Node importers (backendParity-selfcheck and the
+// rest) never pull a browser module, and INJECTABLY, so a gate can drive this without a document.
+let _originSaid = false;
+// v4452 -- FOR GATES ONLY. The once-per-page flag is right for a page and wrong for a test: a gate driving
+// two cases in one process has the second short-circuited by the first, which made a sabotage on the
+// reason-guard go ZERO RED -- the check was passing because of the flag, not because of the thing it names.
+function _resetOriginNotice() { _originSaid = false; }
+async function _explainOrigin(opts) {
+    if (_originSaid) return null;                      // one banner per page, not one per device request
+    const env = opts._env || (typeof window !== "undefined" ? window : null);
+    if (!env) return null;
+    try {
+        const m = opts._probe ? { describeWebGPU: opts._probe, showOriginBanner: opts._banner }
+                              : await import("../ui/webgpuProbe.mjs");
+        const p = m.describeWebGPU({ navigator: env.navigator, isSecureContext: env.isSecureContext, location: env.location });
+        if (p && p.reason === "insecure-origin") {
+            _originSaid = true;
+            if (m.showOriginBanner) m.showOriginBanner(p, opts._doc);
+            try { console.warn("[gfx] " + p.message); } catch {}
+            return p;
+        }
+    } catch {}                                          // a missing probe must never break device acquisition
+    return null;
+}
+
 async function requestDevice(canvas, opts = {}) {
     if (opts.backend === "null") return nullBackend(opts);
     const avail = opts._backends || detectBackends();
     const order = opts.backend ? [opts.backend] : (opts.prefer === "webgl2" ? ["webgl2", "webgpu"] : ["webgpu", "webgl2"]);
+    // ASKED BEFORE THE FALLBACK RUNS, not after it succeeds: the point is that the caller WANTED WebGPU and is
+    // about to get something else, which is the moment the reason is worth reading.
+    if (order.includes("webgpu") && !avail.webgpu) await _explainOrigin(opts);
     for (const b of order) {
         if (b === "webgpu" && avail.webgpu) { const d = await webgpuBackend(canvas, opts); if (d) return d; }
         if (b === "webgl2" && avail.webgl2) { const d = webgl2Backend(canvas, opts); if (d) return d; }
@@ -543,5 +585,5 @@ const CAPABILITIES = Object.freeze({
     null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false }),
 });
 
-export { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, CAPABILITIES };
+export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, CAPABILITIES };
 if (typeof module !== "undefined" && module.exports) module.exports = { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend };

@@ -29,10 +29,40 @@
 // quadrature, which is item 11's whole reason for existing. And that the lobe is coloured, dispersive, or
 // nested -- one interface, one index, grey.
 
+// ---- *** v4452 SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
+//
+//   G. chi+ also rejects grazing facets (|i.h| < 0.3)        -> 5 RED
+//   H. halfVectorT stops flipping the half-vector up         -> 6 RED
+//   I. the Beta G2 becomes the reflection form               -> 3 RED
+//   J. chi+ drops the outgoing-side test                     -> 5 RED
+//   K. chi+ drops the incident-side test                     -> 4 RED
+//
+// J was the branch that went 0 RED at v4451 and is now reachable from two directions at once.
+
+// ---- *** v4451 SABOTAGES, RESULTS BY NAME *** --------------------------------------------------------------
+//
+//   A. chi+ drops the incident-side test                     -> 3 RED
+//   B. chi+ drops the outgoing-side test                     -> 4 RED
+//   C. the Beta G2 becomes the reflection form               -> 2 RED
+//   D. the Beta G2 becomes the separable form                -> 2 RED
+//   E. chiPlus becomes a no-op                               -> 4 RED
+//   F. the probe's noFresnel is ignored                      -> 3 RED
+//
+// *** B WENT 0 RED THE FIRST TIME, AND THAT IS WHERE THIS ROUND'S OWN DEFECT WAS FOUND. *** With the first
+// version of validHalfT the back-face test was unreachable -- on 460,800 configurations across eight index
+// ratios the earlier tests already implied it. Chasing the unreachable branch found the reason: that version
+// required the RAW half-vector to point up, which holds going INTO glass and fails coming OUT, so it returned
+// ZERO transmission for every direction leaving glass -- and no row in this file could see it, because every
+// row used LIMITS.glass. A predicate exercised on one side of a branch, committed inside the round whose
+// whole subject is a term nobody exercised. The repair made B reachable and it now goes 4 RED.
+
 import {
     refractCos, isTIR, split, halfVectorT, btdf, brdf, reciprocityPair, energySplit, dirFromCos,
-    LIMITS, criticalOf,
+    LIMITS, criticalOf, validHalfT, g2Transmission, BTDF_VERDICT_V4451 as V,
 } from "./transmission.mjs";
+import { refract, split as walkSplit } from "./dielectricWalk.mjs";
+import { rng, sampleHeight, sampleVNDF } from "./microsurfaceWalk.mjs";
+import { G1 } from "./microfacet.mjs";
 import { directionalAlbedo as ggxAlbedo } from "./microfacet.mjs";
 import { fresnel } from "./fresnel.mjs";
 
@@ -184,6 +214,226 @@ ok("!! the rough dielectric CREATES energy, and it is held to a range rather tha
    worstTotal > 1.2 && worstTotal < 1.4,
    `${worstTotal.toFixed(5)} -- v4432 measured 1.0796 creating energy on the OPAQUE model; the transmission ` +
    "lobe more than triples that, and the mechanism is not derived here");
+
+// ---- 6. v4451 -- THE TWO CANDIDATES v4447 NAMED, TOLD APART -------------------------------------------------
+//
+// v4447 left the lobe convicted and the mechanism open: "a question about Walter's Jacobian or the
+// height-correlated G2". Section 5 above still asserts the SHIPPED excess, because the defaults have not
+// changed; this section says which term makes it.
+console.log("\n6. which term over-counts: the Jacobian, or the height-correlated G2?");
+
+// *** THE CONFIGURATION WITH A CLOSED-FORM ANSWER, AND IT TESTS THE CHANGE OF VARIABLE AND NOTHING ELSE. ***
+// Going INTO the denser medium there is no total internal reflection at all, so with masking reduced to
+// G1(i) and Fresnel switched off, every visible microfacet refracts and the transmitted integral must be
+// EXACTLY 1 -- not converged, not bounded. No G2, no F, no walk, no multiple scattering.
+const probe = (alpha, cosI, chiPlus) =>
+    energySplit({ alpha, ...LIMITS.glass, g2: "g1i", noFresnel: true, chiPlus }, cosI, { N: 1024, M: 512 }).T;
+{
+    const rows = [[1, 0.25], [1, 0.5], [1, 0.7], [1, 0.9], [0.6, 0.5], [0.4, 0.25], [0.4, 0.7], [0.2, 0.5], [0.05, 0.7]];
+    const shipped = rows.map(([a, c]) => probe(a, c, false));
+    const fixed = rows.map(([a, c]) => probe(a, c, true));
+    say(`probe as shipped:  ${shipped.map((v) => v.toFixed(4)).join(" ")}`);
+    say(`probe with chi+:   ${fixed.map((v) => v.toFixed(4)).join(" ")}`);
+    ok("!! *** THE JACOBIAN IS INNOCENT: with chi+ restored the probe is 1 at every roughness and angle ***",
+       fixed.every((v) => Math.abs(v - 1) < 3e-3),
+       `worst departure ${Math.max(...fixed.map((v) => Math.abs(v - 1))).toExponential(2)} from an EXACT 1. ` +
+       "Walter's change of variable is right and was never the problem.");
+    ok("!! ...and as shipped the same probe reads up to 2.06, which is the missing chi+ and only that",
+       Math.max(...shipped) > 2 && shipped[shipped.length - 1] < 1.01,
+       `worst ${Math.max(...shipped).toFixed(6)} at alpha 1, and 1.0021 at alpha 0.05 -- the fabrication ` +
+       "vanishes with roughness, which is why the lobe looked correct where a renderer usually lives");
+}
+
+// *** THE ROW THAT STOOD HERE AT v4451 IS RETIRED, AND SECTION 7 IS WHY. *** It pinned "the chi+ is exact
+// INTO the denser medium and INCOMPLETE OUT OF IT" and said the gap would go red when the predicate was
+// completed. The predicate needed no completing: the TARGET was wrong. Section 7 carries the resolution and
+// the empty population that hid it, because a retired claim deleted without its reason is how a tree forgets
+// what it learned.
+
+// *** AND THE SECOND SUSPECT IS GUILTY TOO, SEPARATELY. *** With chi+ restored the lobe is still bright, and
+// the walk's SINGLE-BOUNCE transmission is the exact thing a single-scatter lobe should equal.
+{
+    const T = (alpha, cosO, opts) => energySplit({ alpha, ...LIMITS.glass, ...opts }, cosO, { N: 1024, M: 512 }).T;
+    let worstBeta = 0, worstSep = 0;
+    for (const r of V.rows) {
+        const w = walkSplit(r.cosO, r.alpha, 1, 1.5, { n: 200000, seed: 13, onlyBounces: 1 }).T;
+        const chiOnly = T(r.alpha, r.cosO, { chiPlus: true });
+        const beta = T(r.alpha, r.cosO, { chiPlus: true, g2: "beta" });
+        const sep = T(r.alpha, r.cosO, { chiPlus: true, g2: "separable" });
+        say(`alpha ${r.alpha} cos ${r.cosO}: shipped ${r.shipped.toFixed(6)}  chi+ ${chiOnly.toFixed(6)}  ` +
+            `+separable ${sep.toFixed(6)}  +BETA ${beta.toFixed(6)}  | walk one bounce ${w.toFixed(6)}`);
+        worstBeta = Math.max(worstBeta, Math.abs(beta - w));
+        worstSep = Math.max(worstSep, Math.abs(sep - w));
+    }
+    ok("!! *** BOTH CORRECTIONS TOGETHER REPRODUCE THE WALK'S SINGLE BOUNCE ***",
+       worstBeta < 2e-3,
+       `worst departure ${worstBeta.toExponential(2)} over six configurations, against a walk standard error ` +
+       "near 1e-3 at 200k paths. A single-scatter lobe should equal a single bounce, and now it does.");
+    ok("!! and WALTER'S OWN separable G1(i)G1(o) would NOT have fixed it -- the obvious repair, ruled out",
+       worstSep > 0.15,
+       `worst departure ${worstSep.toExponential(2)}, five times the correction that remains. The 2007 paper ` +
+       "uses the separable form; it lands at 0.4847 where the truth is 0.3066 at alpha 1, cos 0.25.");
+}
+
+// *** THE BETA FORM, CONFIRMED OFF THE MICROSURFACE, SHARING NO CODE WITH THE ENERGY INTEGRAL. *** Conditioned
+// on a facet being visible from i, the probability the refracted ray escapes below in ONE step is
+// G2_t / G1(i) = (1 + Lambda_i) B(1 + Lambda_i, 1 + Lambda_o). Counted on the walk's own heights.
+{
+    const measure = (cosI, alpha, n = 120000, seed = 5) => {
+        const rand = rng(seed), wi = dirFromCos(cosI, 1);
+        let refr = 0, esc = 0, pred = 0;
+        for (let k = 0; k < n; k++) {
+            const wrIn = [-wi[0], -wi[1], -wi[2]];
+            const h0 = sampleHeight(wrIn, 1 + 1e-4, rand(), alpha);
+            if (!Number.isFinite(h0)) continue;
+            const wm = sampleVNDF(wi, alpha, rand(), rand());
+            const t = refract(wrIn, wm, 1 / 1.5);
+            rand(); rand();
+            if (t === null) continue;
+            refr++;
+            pred += g2Transmission(wi[2], t[2], alpha) / G1(Math.abs(wi[2]), alpha);
+            if (!Number.isFinite(sampleHeight([t[0], t[1], -t[2]], -h0, rand(), alpha))) esc++;
+        }
+        return { measured: esc / refr, predicted: pred / refr };
+    };
+    let worst = 0;
+    for (const [alpha, cosI] of [[1, 0.25], [1, 0.5], [1, 0.7], [0.4, 0.5], [0.2, 0.7]]) {
+        const m = measure(cosI, alpha);
+        say(`alpha ${alpha} cos ${cosI}: escape measured ${m.measured.toFixed(6)} against (1+Li) B(1+Li,1+Lo) ${m.predicted.toFixed(6)}`);
+        worst = Math.max(worst, Math.abs(m.measured / m.predicted - 1));
+    }
+    ok("!! the Beta form predicts the walk's own escape probability, with no energy integral involved",
+       worst < 0.02,
+       `worst relative departure ${(100 * worst).toFixed(2)}%. Two routes to the same G2 that share no code: ` +
+       "one integrates a BSDF over the hemisphere, the other counts rays leaving a microsurface.");
+}
+
+// *** AND THE ENERGY CLOSES THE RIGHT WAY ROUND. *** A single-scatter lobe must LOSE energy -- it has no
+// multiple scattering to supply the rest -- and the deficit is what the walk's later bounces return.
+{
+    // *** ASSERTED BY REFINEMENT, NOT AT ONE GRID, AND THE FIRST VERSION OF THIS CHECK WENT RED FOR EXACTLY
+    // THE REASON v4436 WROTE DOWN. *** At N = 288 the corrected total reads 1.00114 at alpha 0.2 -- above
+    // one, which would convict the repair. Refine and it falls: 1.001138 -> 0.997470 -> 0.995462 -> 0.994964.
+    // A number that MOVES when you refine the grid is the grid. And the contrast is the whole argument:
+    // the SHIPPED excess does not move at all -- 1.282772 -> 1.282755 -> 1.282754 -- which is what makes it
+    // the model.
+    const tot = (a, c, N, opts) => energySplit({ alpha: a, ...LIMITS.glass, ...opts }, c, { N, M: N / 2 }).total;
+    const ladder = [288, 512, 1024, 2048].map((N) => tot(0.2, 0.98, N, { chiPlus: true, g2: "beta" }));
+    const shippedLadder = [288, 1024, 2048].map((N) => tot(1, 0.25, N, {}));
+    say(`corrected at alpha 0.2 cos 0.98, refining: ${ladder.map((v) => v.toFixed(6)).join(" -> ")}`);
+    say(`shipped at alpha 1 cos 0.25, refining:     ${shippedLadder.map((v) => v.toFixed(6)).join(" -> ")}`);
+    ok("!! the shipped excess is the MODEL: it does not move when the grid is refined",
+       Math.abs(shippedLadder[0] - shippedLadder[2]) < 1e-4 && shippedLadder[2] > 1.28,
+       `${shippedLadder.map((v) => v.toFixed(6)).join(" -> ")} -- v4436's rule, and the reason the excess was ` +
+       "ever believed rather than blamed on the integrator");
+    const hard = [[0.05, 0.98], [0.05, 0.85], [0.2, 0.98], [1, 0.25], [0.4, 0.7]];
+    const worstFine = Math.max(...hard.map(([a, c]) => tot(a, c, 2048, { chiPlus: true, g2: "beta" })));
+    ok("!! *** WITH BOTH CORRECTIONS THE ROUGH DIELECTRIC STOPS CREATING ENERGY ***",
+       ladder[3] < ladder[0] && worstFine <= 1.0005,
+       `worst R + T at a resolving grid over the five hardest cells: ${worstFine.toFixed(6)}, against the ` +
+       "shipped 1.28277. A DEFICIT is the correct sign for a single-scatter lobe, and the walk's later " +
+       "bounces are what supply the rest.");
+}
+
+// *** v4452 -- THE OPEN ROW ABOVE WAS THE CHECK, NOT THE PREDICATE, AND THE REASON IT HID IS AN EMPTY
+// POPULATION ON ONE SIDE OF A BRANCH -- THE SAME SHAPE AS THE SABOTAGE THAT WENT 0 RED. ***
+//
+// v4451 pinned "the chi+ is exact INTO the denser medium and INCOMPLETE OUT OF IT": the probe read 0.393540
+// leaving glass against a target of 0.510957, and it did not move under refinement, so it was called the
+// predicate. IT WAS THE TARGET. `1 - P(TIR)` counts every visible normal that refracts -- INCLUDING THE ONES
+// WHOSE REFRACTED RAY LEAVES UPWARD, which an integral over the lower hemisphere cannot contain and a
+// single-scatter lobe must not count. Measured off the microsurface at alpha 1, cos 0.25 leaving glass:
+//
+//        TIR 0.491565     leaves DOWN 0.392720     leaves UP 0.115715
+//
+// and the probe reads 0.393541. *** GOING INTO THE DENSER MEDIUM THE UP-LEAVING POPULATION IS EMPTY -- 0.000000
+// AT EVERY ROUGHNESS -- because refraction toward the normal cannot turn a downward ray upward. So the wrong
+// target agreed with the right one on the whole forward direction, and the first configuration that could
+// tell them apart was the one v4436 never measured. ***
+console.log("\n7. the chi+ in the direction v4436 never measured, and the target that was wrong");
+{
+    // the honest target: refracts AND leaves downward, counted on the same microsurface the walk uses
+    const fates = (cosI, alpha, ei, eo, n = 200000, seed = 3) => {
+        const rand = rng(seed), wi = dirFromCos(cosI, 1);
+        let tir = 0, down = 0, up = 0;
+        for (let k = 0; k < n; k++) {
+            const m = sampleVNDF(wi, alpha, rand(), rand());
+            const t = refract([-wi[0], -wi[1], -wi[2]], m, ei / eo);
+            if (t === null) { tir++; continue; }
+            if (t[2] < 0) down++; else up++;
+        }
+        return { tir: tir / n, down: down / n, up: up / n };
+    };
+    const probe = (alpha, cosI, L) =>
+        energySplit({ alpha, ...L, g2: "g1i", noFresnel: true, chiPlus: true }, cosI, { N: 1024, M: 512 }).T;
+
+    let worst = 0, upSeen = 0, upForward = 0;
+    for (const [L, ei, eo] of [[LIMITS.glass, 1, 1.5], [LIMITS.fromGlass, 1.5, 1]])
+        for (const [a, c] of [[1, 0.25], [1, 0.7], [0.4, 0.25], [0.4, 0.7], [0.4, 0.9], [0.05, 0.9]]) {
+            const f = fates(c, a, ei, eo), p = probe(a, c, L);
+            worst = Math.max(worst, Math.abs(p - f.down));
+            if (ei > eo) upSeen = Math.max(upSeen, f.up); else upForward = Math.max(upForward, f.up);
+        }
+    ok("!! *** THE chi+ IS EXACT IN BOTH DIRECTIONS: the probe is the down-leaving fraction, not 1 - P(TIR) ***",
+       worst < 2e-3,
+       `worst departure ${worst.toExponential(2)} over twelve rows spanning both index directions, against a ` +
+       "sampler standard error near 1e-3. v4451 called this predicate incomplete on a target that counted " +
+       "refractions the lower hemisphere cannot hold.");
+    ok("!! and the population that hid it is EMPTY going into the denser medium",
+       upForward === 0 && upSeen > 0.1,
+       `refracted rays leaving UPWARD: ${upForward.toFixed(6)} of every sample entering glass, up to ` +
+       `${upSeen.toFixed(6)} leaving it. Refraction toward the normal cannot turn a downward ray upward, so ` +
+       "the wrong target and the right one agree on the entire forward direction. THE BRANCH WAS NEVER WRONG " +
+       "WHERE ANYBODY HAD LOOKED.");
+
+    // *** STRONGER THAN THE INTEGRAL, AND CHEAPER: take REAL refractions off the microsurface and ask whether
+    // the formula's reconstruction admits them. This asks about every configuration one at a time rather than
+    // about their integral, so a rejection cannot be cancelled by an over-count somewhere else. ***
+    let admitted = 0, total = 0, reconstructed = 0;
+    for (const [ei, eo] of [[1, 1.5], [1.5, 1], [1, 1.33], [1.33, 1]])
+        for (const [a, c] of [[1, 0.25], [1, 0.7], [0.4, 0.5], [0.05, 0.9]]) {
+            const rand = rng(9), wi = dirFromCos(c, 1);
+            for (let k = 0; k < 20000; k++) {
+                const m = sampleVNDF(wi, a, rand(), rand());
+                const t = refract([-wi[0], -wi[1], -wi[2]], m, ei / eo);
+                if (t === null || t[2] >= 0) continue;
+                total++;
+                const h = halfVectorT(wi, t, ei, eo);
+                if (Math.hypot(h[0] - m[0], h[1] - m[1], h[2] - m[2]) < 1e-9) reconstructed++;
+                if (validHalfT(wi, t, ei, eo) !== null) admitted++;
+            }
+        }
+    ok("!! *** EVERY REAL REFRACTION IS ADMITTED BY THE chi+, ONE AT A TIME RATHER THAN IN AN INTEGRAL ***",
+       admitted === total && total > 100000,
+       `${admitted} of ${total} refractions sampled off the microsurface across four index ratios, and the ` +
+       `half-vector reconstructs the SAMPLED FACET NORMAL exactly in ${reconstructed} of them. So the chi+ ` +
+       "removes only configurations that are not refractions, which is the property it is for.");
+}
+
+// *** AND THE SECOND SUSPECT, CHECKED IN THE DIRECTION IT WAS NEVER CHECKED IN. *** v4451 validated the Beta
+// G2 against the walk going INTO glass. Leaving glass the shipped lobe is worse -- TEN TIMES the truth at
+// grazing -- and the correction holds there too.
+console.log("\n8. leaving glass: the same two corrections, against the same ground truth");
+{
+    let worst = 0, worstShipped = 0;
+    for (const [a, c] of [[1, 0.25], [1, 0.7], [1, 0.9], [0.4, 0.7], [0.4, 0.9], [0.05, 0.9]]) {
+        const P = (o) => energySplit({ alpha: a, ...LIMITS.fromGlass, ...o }, c, { N: 1024, M: 512 }).T;
+        const w = walkSplit(c, a, 1.5, 1, { n: 200000, seed: 13, onlyBounces: 1 }).T;
+        const beta = P({ chiPlus: true, g2: "beta" }), shipped = P({});
+        say(`alpha ${a} cos ${c}: shipped ${shipped.toFixed(6)}  corrected ${beta.toFixed(6)}  | walk one bounce ${w.toFixed(6)}`);
+        worst = Math.max(worst, Math.abs(beta - w));
+        worstShipped = Math.max(worstShipped, shipped / Math.max(w, 1e-9));
+    }
+    ok("!! *** BOTH CORRECTIONS REPRODUCE THE WALK LEAVING THE DENSER MEDIUM TOO ***",
+       worst < 2.5e-3,
+       `worst departure ${worst.toExponential(2)} over six configurations. The derivation never mentioned ` +
+       "which way the light was going, and now neither does the evidence.");
+    ok("!! ...and the shipped lobe is worse in this direction, not better",
+       worstShipped > 8,
+       `up to ${worstShipped.toFixed(1)}x the truth at alpha 1, cos 0.25 -- 0.553041 against 0.053250. ` +
+       "v4436 measured R + T going INTO glass, where the total still reads below one leaving it, so the " +
+       "worse half of the defect never appeared in the number that raised the alarm.");
+}
 
 console.log(`\ntransmission-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);
