@@ -192,9 +192,18 @@ export function reportLines() {
     say("  admits   sites  spellings  kind              vs SOURCE_EXT");
     for (const r of rows.slice(0, 12)) {
         const kind = r.identicalToSourceExt ? "SOURCE_EXT" : r.pure ? "pure extension" : "name filter";
-        const rel = r.identicalToSourceExt ? "identical"
-            : r.admitsBeyondSourceExt > 0 ? "admits " + r.admitsBeyondSourceExt + " it does not"
-            : "MISSES " + r.missesFromSourceExt + " (" + r.missedExtensions.join(",") + ")";
+        // *** v4461 -- A ROW CAN DO BOTH, AND THE else-if REPORTED ONLY THE FIRST HALF. *** Over-admitting and
+        // under-admitting are independent facts about a filter, and this chain treated them as alternatives:
+        // any row with admitsBeyondSourceExt > 0 printed that and NEVER reached the MISSES branch. MEASURED:
+        // 37 of 46 rows miss something, and rows 9, 10 and 11 -- inside the twelve this report prints -- miss
+        // ALL 456 HTML FILES while also admitting a few extras, so they showed as "admits N it does not" and
+        // the html shortfall vanished from the output. THAT SHORTFALL IS THIS FILE'S WHOLE SUBJECT: its header
+        // opens "IT MISSES ALL 355 HTML FILES IN THE TREE" (355 then, 456 now). A gate asserting the report
+        // names it had been red, correctly, and the report was the thing that was wrong.
+        const parts = [];
+        if (r.admitsBeyondSourceExt > 0) parts.push("admits " + r.admitsBeyondSourceExt + " it does not");
+        if (r.missesFromSourceExt > 0) parts.push("MISSES " + r.missesFromSourceExt + " (" + r.missedExtensions.join(",") + ")");
+        const rel = r.identicalToSourceExt ? "identical" : parts.join(", ");
         say("  " + String(r.count).padStart(6) + String(r.files.length).padStart(7) + String(r.spellings.length).padStart(10) +
             "  " + kind.padEnd(16) + "  " + rel);
     }
