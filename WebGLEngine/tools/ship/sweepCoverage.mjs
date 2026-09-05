@@ -154,9 +154,121 @@ export const STALE_GREENS_V4460 = Object.freeze({
                  "runner -- which is the way round it was not",
             stillOverBudget: true }),
     ]),
+    // *** v4461 RETURNED SIX OF THE TWELVE, AND THE ROW BELOW FIRED WHEN THEY MOVED -- WHICH IS WHAT IT WAS
+    // BUILT FOR. *** v4460 wrote: "the recorded time is checked against the live file here, so a re-timing
+    // that fixes it fails this row rather than leaving a record nobody re-derives." The repair rotation
+    // re-timed six, their recorded times stopped matching, and the gate said so on the next run. The
+    // measurement stays as taken; what changed is named here, and FIVE OF THE SIX ARE RED AND UNREGISTERED,
+    // so returning them makes the next ship report new reds. That is the instrument working, not a
+    // regression: they were red the whole time and nothing could see them.
+    // `nowMs` is the reading AT THE MOMENT OF RETURN, kept as evidence rather than as a target -- the gate
+    // checks these against the BUDGET, because a re-timed gate gets a new number every run.
+    returnedAt_v4461: Object.freeze([
+        Object.freeze({ gate: "tools/ship/physicsReach-selfcheck.mjs", recordedMs: 3143, nowMs: 518, red: true }),
+        Object.freeze({ gate: "tools/ship/windowsImport-selfcheck.mjs", recordedMs: 3089, nowMs: 610, red: true }),
+        Object.freeze({ gate: "tools/ship/citedSources-selfcheck.mjs", recordedMs: 3103, nowMs: 1023, red: true }),
+        Object.freeze({ gate: "tools/ship/corpusFilters-selfcheck.mjs", recordedMs: 3141, nowMs: 1179, red: true }),
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", recordedMs: 3314, nowMs: 1726, red: true }),
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedMs: 3368, nowMs: 2793, red: true }),
+    ]),
     notClaimed: "that the 22 are the whole of it. This measured the 371 entries recorded GREEN; the 144 " +
                 "recorded nonzero and the `killed` bucket were not re-run, and a gate that is red for a " +
                 "reason this sandbox creates (no GPU, no network) is separated above rather than counted in.",
+});
+
+// *** v4461 -- THE DOOR SWINGS BOTH WAYS, IT WAS WALKED THROUGH ONCE, AND THE WALK WAS UNDONE INSIDE THE
+// SAME VERSION. *** The rotation ran on 2026-09-03 and re-timed 150 over-budget gates SERIALLY. 146 of them
+// came back under the budget that had evicted them -- median 2.80x faster than the reading that shut the
+// door, worst 29.12x -- and it wrote them into sweep-timings.json with fresh stamps, so they were back in the
+// ship-time sweep. The very next commit to touch that file is titled "the sweep timings as verify left them",
+// and in it all 146 are back at EXACTLY their pre-rotation readings, carrying the stamp
+// "unknown -- before v4408" -- a stamp no post-v4408 writer can produce for an entry that had a real one.
+// The writer had read a file that did not contain the rotation's work.
+//
+// *** IT HAS READ 3002 ms EVER SINCE, IDENTICAL ACROSS THIRTY COMMITS, BECAUSE ONCE OVER BUDGET NOTHING RUNS
+// IT AGAIN -- so the number cannot be corrected by the mechanism that recorded it. *** referenceScan really
+// takes 733 ms. And the rotation has not run in the 49 shipped versions since.
+//
+// WHAT IS NOT CLAIMED: which mechanism reverted it. The stamp proves the writer read a file lacking the
+// rotation's entries; whether that was a stale checkout, a merge, or something else is not recoverable from
+// here and is not asserted.
+//
+// THE POINT IS THAT NOTHING NOTICED FOR FORTY-NINE VERSIONS, AND THE EVIDENCE WAS IN THE TREE THE WHOLE TIME:
+// the rotation keeps its OWN ledger, sweep-rotation.json, which survived. Comparing the two files is the
+// check -- a gate the rotation measured under budget must still be under budget in the timings, or the
+// timings have lost work somebody paid for. It costs a file read, and it would have caught this in one round.
+export function rotationHeld(file, rot, { budgetMs = BUDGET_MS } = {}) {
+    const timings = (file && file.timings) || {}, at = (file && file.at) || {};
+    const rows = (rot && rot.rotated) || [];
+    const measuredUnder = rows.filter((r) => r && typeof r.ms === "number" && r.ms < budgetMs);
+    const lost = measuredUnder.filter((r) => (timings[r.gate] || 0) >= budgetMs);
+    // A gate the rotation wrote carries the rotation's stamp. UNKNOWN_AT on one of them is the fingerprint of
+    // a file that was replaced rather than updated, which is a different fault from a gate that got slower.
+    const unstamped = measuredUnder.filter((r) => (at[r.gate] || UNKNOWN_AT) === UNKNOWN_AT);
+    return { measuredUnder: measuredUnder.length, lost, unstamped,
+             held: measuredUnder.length - lost.length, rotatedAt: (rot && rot.at) || null };
+}
+
+// *** THE MEASUREMENT OF THE LOSS, FROZEN BY NAME, because the ledger that proves it is REWRITTEN BY THE NEXT
+// ROTATION -- sweep-rotation.json holds only the last run, so this is the one place the 2026-09-03 run
+// survives outside git. ***
+export const ROTATION_LOST_V4461 = Object.freeze({
+    at: "v4461",
+    ranAt: "2026-09-03T18:15:21.194Z",
+    rotated: 150,
+    cameBackUnderBudget: 146,
+    stillUnderBudgetInTheTimings: 0,      // measured before this round re-ran the rotation
+    recordedAtExactlyThePreRotationReading: 146,
+    carryingTheStamp: "unknown -- before v4408",
+    speedupVsTheEvictingReading: Object.freeze({ median: 2.80, max: 29.12 }),
+    witness: Object.freeze({ gate: "tools/render-qa/referenceScan-selfcheck.mjs",
+        evictedAt: 3002, serialTruth: 733, atV4410: 1815, everySinceV4431: 3002,
+        note: "identical across thirty commits, because once over budget nothing runs it again -- so the " +
+              "number cannot be corrected by the mechanism that recorded it" }),
+    versionsWithNoRotation: 49,           // v4410 to v4460 inclusive of neither end's rotation
+    // WHAT THIS ROUND DID ABOUT IT, and the numbers are from the run, not from the plan.
+    // The numbers are from the SECOND run -- the first was clobbered mid-round (see secondInstance) and
+    // re-running it against the other session's file is the honest repair, not resurrecting my snapshot.
+    // A FOUR-WAY SPLIT, because "returned" and "red" overlap and a two-number summary hid that: a gate can
+    // come back under budget AND be red, which is the population that changes what the next ship reports.
+    repair: Object.freeze({ slots: 80, ran: 80, killed: 0, materiallySlower: 1,
+        underGreen: 66, underRed: 6, overGreen: 7, overRed: 1,
+        cameBackUnder: 72, red: 7,
+        poolBefore: 386, poolAfter: 314,
+        redsAllPreviouslyNamed: true,     // all 7 are in STALE_GREENS_V4460's list of 22, found independently
+        newlyVisibleReds: 5 }),           // under budget, red, and in no register: these turn the next ship red
+    // *** AND IT HAPPENED AGAIN, LIVE, WHILE THIS GUARD WAS BEING WRITTEN -- WHICH IS HOW THE MECHANISM
+    // STOPPED BEING A GUESS. *** v4461's rotation ran at 14:24 and returned 72 gates. A CONCURRENT SESSION,
+    // shipping the releaseLedger fix from a tree checked out before that, ran verify at 15:56 and pushed its
+    // sweep-timings.json -- a whole-file rewrite built from ITS OWN snapshot. In that file all 72 are back
+    // over budget, 69 of them carrying "unknown -- before v4408", and referenceScan reads 3002 again against
+    // the 675 ms this round measured. The guard above went RED on it by name, on its first exposure to a real
+    // instance rather than a fixture.
+    //
+    // *** SO THE MECHANISM IS A CONCURRENT WHOLE-FILE WRITER, AND IT IS NOT ANYBODY'S MISTAKE. *** quickSweep
+    // reads the timings once, carries `{...prior.timings}` forward, and rewrites the entire file at the end.
+    // Two ships in flight at once means the later push wins wholesale and any rotation work in the loser is
+    // erased -- silently, because a measurement file has no merge semantics and, until this round, nothing
+    // that compared it against what had been paid for.
+    //
+    // *** AND I NEARLY COMMITTED THE SAME CLOBBER RESOLVING IT. *** `git checkout --theirs` during a REBASE
+    // takes the commit being applied, not the upstream, so it kept this round's file and discarded the other
+    // session's fresh sweep of the whole tree. Caught by checking the `captured` stamps rather than trusting
+    // the flag. The resolution is the honest one: take their file, then RE-RUN THE ROTATION, so the returnees
+    // are re-established by measurement instead of by resurrecting a stale snapshot.
+    secondInstance: Object.freeze({
+        at: "v4461, during this round",
+        rotatedAt: "2026-09-05T14:24:02.657Z", clobberedBy: "2026-09-05T15:56:53.330Z",
+        returned: 72, lost: 72, unstamped: 69,
+        witness: Object.freeze({ gate: "tools/render-qa/referenceScan-selfcheck.mjs", measured: 675, restoredTo: 3002 }),
+        mechanism: "a concurrent ship's whole-file rewrite of sweep-timings.json, built from a snapshot taken " +
+                   "before the rotation ran. The later push wins the whole file.",
+        caughtBy: "rotationHeld, both rows, by name -- its first real instance",
+    }),
+    notClaimed: "that the FIRST instance had the same cause. The 2026-09-03 stamp evidence is consistent with " +
+                "it and the second instance is proof the mechanism exists, but the branch state of that day " +
+                "is not recoverable from here and is not asserted. What IS asserted for the first: that it " +
+                "happened, that nothing noticed for 49 versions, and that the evidence sat in the tree.",
 });
 
 // The door: entries the sweep excludes, ordered by how cheaply they might come back. A gate recorded just over

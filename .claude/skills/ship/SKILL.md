@@ -67,6 +67,36 @@ no byte sizes, so the version bump does not move it -- but it carries the head c
 demands POPULATION currency the same way, so bake it in the same step rather than remembering which of the
 two is sensitive to what.
 
+## 3b. Rotate the over-budget pool
+
+    node tools/ship/sweepRotation.mjs --slots 80 --budget-s 300 --write
+
+The quick sweep runs every gate under 3,000 ms and skips the rest. **The rest is 313 gates and no ship-time
+step touches them**, so a gate that goes red up there is invisible until somebody looks -- v4460 looked and
+found 22, eighteen of them in no register.
+
+The rotation re-times a staleness-ordered slice SERIALLY and writes back what it sees, which is how a gate
+that was evicted by a starved 8-way reading gets back in. *** IT IS WORTH RUNNING BECAUSE IT KEEPS PAYING:
+the 2026-09-03 run brought 146 of 150 back under budget, median 2.80x faster than the reading that had
+evicted them; the v4461 run brought 72 of 80. *** At 80 slots it covers the pool in about 5 rounds.
+
+Two things it will do that are correct and look alarming:
+
+- **It returns RED gates.** Five came back under budget red at v4461, so the next quick sweep reports them as
+  NEW reds and the ship goes red. They were red the whole time and nothing could see them. Fix them, or say
+  in the round why not -- *do not* register them to get green, and do not budget them back out. Both are
+  named in the Never list below.
+- **It changes `sweep-timings.json`.** That file ships with the round.
+
+*** AND THE ONE RUN BEFORE v4461 WAS UNDONE INSIDE ITS OWN VERSION. *** All 146 returnees were back at exactly
+their pre-rotation readings in the next commit to touch the timings, carrying the pre-v4408 stamp -- a file
+read that did not contain the rotation's work. Nothing noticed for 49 versions. `sweepCoverage-selfcheck`
+section 10 compares the rotation's own ledger against the timings every run and goes red if that happens
+again; it costs a file read.
+
+A step nobody is asked for happens when somebody remembers -- step 7 is the tree's measurement of what
+remembering is worth, at 1.1% over 261 rounds. This step is written down for that reason.
+
 ## 4. Verify
 
     node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"; echo "exit=$?"
