@@ -259,6 +259,33 @@ export const TODO = [
                 "(fromPack on both font classes), held stale-or-current byte for byte and pixel-identical to the parse path on both backends.",
         evidence: "node tools/ship/fontPacks-selfcheck.mjs",
     },
+    {
+        id: "slug-bidi-shaping",
+        status: "wont",
+        title: "Bidi and Arabic shaping for Slug text (the reviewed plan's two-letter presentation-form table and whole-string reverse)",
+        why: "docs/TSL-ROADMAP.md step 7 item 11 (task 11): the plan proposed 'bidi shaping' for the Slug text path.",
+        reason: "COUNTED at v4492 across every vendored face (Plex, Source Sans 3, Cinzel, JetBrains Mono, Sawarabi Gothic): 0 Hebrew, " +
+                "0 Arabic and 0 Devanagari codepoints in any cmap, so a Hebrew string on Plex lays out as .notdef three times over -- there " +
+                "is no glyph for shaping to shape and no presentation form to select. And the plan's mechanism is not the algorithm: a " +
+                "whole-string reverse of 'abc <hebrew> 123' yields '321 <hebrew> cba', while UAX #9 keeps the Latin and the digits in place " +
+                "and reverses the Hebrew run alone; a two-letter joining table is not Arabic shaping (four forms per letter, ligatures, marks). " +
+                "Doing this properly is a font with the script, a GSUB reader for its joining features and a UAX #9 run resolver -- a round " +
+                "of its own, started when somebody has a right-to-left label to draw, not before.",
+        evidence: "node tools/ship/slugShaping-selfcheck.mjs",
+    },
+    {
+        id: "slug-cjk-msdf-fallback",
+        status: "wont",
+        title: "An MSDF fallback for CJK drawn by canvas fillText, for glyphs 'too dense for Slug'",
+        why: "docs/TSL-ROADMAP.md step 7 item 11 (task 11): the plan proposed drawing CJK through a canvas fillText fallback instead of Slug.",
+        reason: "MEASURED at v4490 and v4492: Sawarabi Gothic (vendored, 6,945 glyphs, static glyf) maps every codepoint of the rig's kanji " +
+                "and kana text to a real glyph, every one packs into the same atlas Slug draws from, and slug-rig.html's dense wall walks 1.22x " +
+                "Plex's curves per band (8.00 against 6.55; 19 at most against 17) -- a dense face, not one Slug cannot draw. Canvas fillText " +
+                "is not an MSDF either: it rasterises at one size and blurs when scaled, which is the problem Slug exists to remove. If a " +
+                "rig ever measures the CJK wall past the plan's 1.5 ms the answer is the band count, which the rig page reports beside " +
+                "every timing, not a second renderer.",
+        evidence: "node tools/ship/slugShaping-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);

@@ -2447,6 +2447,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "slugEval itself. Sabotages red at 3 / 7 / 8 / 6 -- A went red first only on the cost rows (the model read the " +
                  "same wrong Jacobian and the headless hold was a property the flat one shares) and the hold became the frame itself.",
     }),
+    since114: Object.freeze({
+        at: "v4492", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugShaping-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. The reviewed plan's bidi shaping and CJK fillText fallback recorded as wont in tools/ship/todo.mjs " +
+                 "with the reasons measured: every vendored face maps 0 Hebrew, Arabic or Devanagari codepoints (a Hebrew string on Plex " +
+                 "is .notdef throughout), a whole-string reverse is held apart from UAX #9's visual order by name, and Sawarabi Gothic " +
+                 "lays out and packs the rig's kanji text with no .notdef (4,469 ideographs, 188 kana in its cmap). Sabotages red at " +
+                 "1 / 2 / 2 / 3 -- D went 0 red first (a predicate loosened to admit .notdef never met one on fully-mapped text) and the " +
+                 "control row plus the input-side sabotage were added for it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

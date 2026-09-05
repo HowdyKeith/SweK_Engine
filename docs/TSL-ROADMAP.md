@@ -527,6 +527,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         count and measured error in its HUD. A line with one strip is buildVertices' stream float for float.
     11. Bidi shaping and the CJK fallback recorded as wont in tools/ship/todo.mjs with reasons (two-letter
         presentation-form shaping and a whole-string reverse is not UAX #9; canvas fillText is not an MSDF).
+        RECORDED at v4492 (task 11): todo.mjs slug-bidi-shaping and slug-cjk-msdf-fallback, both wont, with the
+        reasons measured by tools/ship/slugShaping-selfcheck.mjs rather than asserted. COUNTED: every vendored face
+        maps 0 Hebrew, 0 Arabic and 0 Devanagari codepoints (Plex 754 codepoints in its cmap, Cinzel 367, JetBrains
+        Mono 1,372, Source Sans 3 1,614, Sawarabi Gothic 6,884 -- all 52 basic Latin letters in each), so a Hebrew
+        string on Plex is .notdef three times over and shaping has nothing to shape; the plan's whole-string reverse
+        turns 'abc <hebrew> 123' into '321 <hebrew> cba', which UAX #9 does not (the Latin and the digits stay, the
+        Hebrew run alone reverses). The CJK fallback's premise is gone: Sawarabi Gothic carries 4,469 CJK Unified
+        ideographs and 188 kana, the rig's kanji text lays out to a real glyph for every codepoint (a control shows an
+        unmapped alef IS .notdef on it), all of them pack into the atlas Slug draws from (592 curves), and the dense
+        wall was measured at 1.22x Plex's curves per band at v4490. Both are rounds of their own when somebody has a
+        right-to-left label to draw or a rig measures the CJK wall past 1.5 ms; neither is a fallback renderer.
     12. Measure SlugTextBatch's per-frame bufferData before any ring buffer; the plan's ring resets to 0 on
         overflow with no fence, so it overwrites text still being drawn.
     13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
