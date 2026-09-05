@@ -630,3 +630,28 @@ export const surfaceUniforms = ({ R = SURFACE.R, delta = SURFACE.delta, eps = EP
 
 export const surfaceCpu = ({ R = SURFACE.R, delta = SURFACE.delta, eps = EPS } = {}) =>
     raySphere([0, 0, -(R + delta)], [0, 0, 1], [0, 0, 0], R, { eps });
+
+// v4468 -- THE PROBE MANIFEST (docs/GPU-KERNEL-CONTRACT.md), three kernels. The LCG is graded here: two exact 16-bit
+// halves and a value that WGSL promises only to one of two neighbours, so the tolerance is the neighbour gap. The
+// primary ray and the grazing ladder name their gate: a hit at the silhouette and a root at tangency are graded by
+// BAND and by BRACKET in tools/ship/pathTracerWgsl-selfcheck.mjs, and an element-for-element tolerance would either
+// admit a wrong pixel or refuse a right one.
+export const PROBES = Object.freeze([
+    Object.freeze({ id: "pathTracer.lcgWgsl", code: () => lcgWgsl(), entryPoint: "main", args: Object.freeze({ seed: 1, n: 512 }),
+        pack: (a) => lcgUniforms(a.seed, a.n), outCount: (a) => a.n * 3, workgroups: (a) => Math.ceil(a.n / 64), tol: 1.2e-7,
+        cpu: (a) => { const st = lcgStatesCpu(a.seed, a.n), v = lcgValuesF32(st), out = new Float32Array(3 * a.n);
+            for (let i = 0; i < a.n; i++) { out[3 * i] = st[i] >>> 16; out[3 * i + 1] = st[i] & 0xffff; out[3 * i + 2] = v[i]; } return out; },
+        key: () => ({ mul: LCG.mul, inc: LCG.inc, div: LCG.div }) }),
+    Object.freeze({ id: "pathTracer.coverageWgsl", code: () => coverageWgsl(), entryPoint: "main", args: Object.freeze({}),
+        pack: () => coverageUniforms(), outCount: VIEW.w * VIEW.h * COVERAGE_STRIDE, workgroups: Math.ceil(VIEW.w * VIEW.h / 64),
+        cpu: () => { const c = coverageCpu(), out = new Float32Array(c.length * COVERAGE_STRIDE);
+            c.forEach((p, i) => out.set([p.hit, p.t, p.dir[0], p.dir[1], p.dir[2], p.disc], i * COVERAGE_STRIDE)); return out; },
+        graded: "tools/ship/pathTracerWgsl-selfcheck.mjs -- hits graded within the silhouette band, not element for element",
+        key: () => ({ band: SILHOUETTE.band, pixels: bandInPixels() }) }),
+    Object.freeze({ id: "pathTracer.grazeWgsl", code: () => grazeWgsl(), entryPoint: "main", args: Object.freeze({}),
+        pack: () => grazeUniforms(grazeLadder()), outCount: 60 * GRAZE_STRIDE, workgroups: 1,
+        cpu: () => { const g = grazeCpu(grazeLadder()), out = new Float32Array(g.length * GRAZE_STRIDE);
+            g.forEach((r, i) => out.set([r.t !== null ? 1 : 0, r.t !== null ? r.t : -1], i * GRAZE_STRIDE)); return out; },
+        graded: "tools/ship/pathTracerWgsl-selfcheck.mjs -- the flip index of a ladder straddling tangency, where f32 and f64 legitimately part",
+        key: () => ({ R: SILHOUETTE.R || 1, eps: EPS }) }),
+]);

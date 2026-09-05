@@ -617,6 +617,16 @@ export const PF = { px: 0, py: 1, vx: 2, vy: 3, cxx: 4, cxy: 5, cyx: 6, cyy: 7,
 /** Uniform block: 24 scalars, 96 bytes, a multiple of 16 as the uniform address space requires. */
 export const PARAM_SCALARS = 24;
 
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md). Four entry points over five shared buffers do not fit
+// the one-buffer harness, so this entry is DEVICE-GRADED: it names the gate that runs it through gfx/device.js and
+// carries the key that gate holds the kernel to -- the discrete free-fall parabola, which needs no material at all.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "gpuKernel.MPM_WGSL", code: () => MPM_WGSL, entryPoint: "p2g", device: true,
+    graded: "tools/ship/mpmDevice-selfcheck.mjs -- the four stages through physics/mpm/mpmDevice.mjs against step.mjs",
+    pack: packParams, cpu: null,
+    key: ({ y0 = 0, gy = -9.81, dt = 1 / 240, n = 120 } = {}) => ({ discreteFall: y0 + gy * dt * dt * (n * (n + 1) / 2), drift: 0 }),
+})]);
+
 /**
  * Pack the uniform block. Everything physical in here was computed by a graded module; this function only
  * places the numbers, which is why it can be read at a glance and why nothing in the WGSL needs a constant.

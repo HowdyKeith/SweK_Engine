@@ -402,7 +402,15 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         adapter and the adapter's description on the handle. NOT CLAIMED: the corpus's texture entries (the
         storage-texture path has no device twin), and the pages RUNNING on a rig.
      4. (task 27) The probe convention (packUniforms + probeCpu + keyCpu) on every WebGPU physics module, with a
-        census check, instead of three modules of thirty.
+        census check, instead of three modules of thirty. BUILT at v4468: docs/GPU-KERNEL-CONTRACT.md writes the
+        convention down with render/lyapunovWgsl.mjs as the template, and each of the nine physics kernel modules
+        exports PROBES -- a manifest of { id, code, pack, cpu, key, tol | rel | graded, device } pointing at what
+        the module already had, so nothing was renamed. tools/ship/probeConvention-selfcheck.mjs is the census:
+        every runnable physics corpus entry must have a manifest entry and every manifest id must be a corpus id,
+        and all thirteen entries run on the headless Dawn device -- nine held to their own stated tolerance (five
+        at ZERO, HMC at its earned 5e-5, Heidler 1e-5, Planck 1e-5 relative, the LCG at the f32 neighbour gap),
+        four graded by the gate they name (a chaotic map, a silhouette, a tangency, the MPM device path). NOT
+        CLAIMED: the keys' values (each module's gate), the browser path (crossBackend and deviceCompute).
      5. (task 28) A gated step-loop helper on the device, so samplers and solvers stop hand-rolling ping-pong buffers.
      6. (task 29) The brain's kernels exported as text and in the corpus; brain/gpu.js accepting a software adapter
         under a flag so the shipped kernels can be graded where every other GPU gate runs.

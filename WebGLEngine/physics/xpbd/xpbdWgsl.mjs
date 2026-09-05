@@ -284,3 +284,60 @@ export function makeClothDevice(device, init, cons, colors, opts = {}) {
     };
     return handle;
 }
+
+// ---- v4468 -- THE PROBE MANIFEST (docs/GPU-KERNEL-CONTRACT.md): the three passes over the 5x5 sheet, each with an
+// f32 twin on the vec4 records (the same operation order as frameFlat), tolerance ZERO -- both harnesses and the
+// device returned the mirror's bytes at v4465.
+export function probeFixture() {
+    const W = 5, H = 5, N = W * H;
+    const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; pos[3 * i] = x * 0.3 + 0.01 * Math.sin(i); pos[3 * i + 1] = 0.02 * Math.cos(i); pos[3 * i + 2] = -y * 0.3; invMass[i] = y === 0 ? 0 : 1; }
+    const cons = []; const idx = (x, y) => y * W + x;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (x + 1 < W) cons.push({ i: idx(x, y), j: idx(x + 1, y), rest: 0.3, compliance: 0 });
+        if (y + 1 < H) cons.push({ i: idx(x, y), j: idx(x, y + 1), rest: 0.3, compliance: 0 });
+        if (x + 1 < W && y + 1 < H) { cons.push({ i: idx(x, y), j: idx(x + 1, y + 1), rest: 0.3 * Math.SQRT2, compliance: 0.001 }); cons.push({ i: idx(x + 1, y), j: idx(x, y + 1), rest: 0.3 * Math.SQRT2, compliance: 0.001 }); }
+        if (x + 2 < W) cons.push({ i: idx(x, y), j: idx(x + 2, y), rest: 0.6, compliance: 0.01 });
+        if (y + 2 < H) cons.push({ i: idx(x, y), j: idx(x, y + 2), rest: 0.6, compliance: 0.01 });
+    }
+    const colors = colorConstraints(cons);
+    const step = packStep({ dt: 0.016, unilateral: 0, count: N, gravity: [0, -10, 0] });
+    const P = packParticles(pos, invMass), V = packParticles(vel, new Float64Array(N));
+    const pred = Float32Array.from(P); for (let a = 0; a < N; a++) if (invMass[a] > 0) pred[4 * a + 1] -= 0.0016;
+    return { N, cons, colors, step, P, V, pred, dt: 0.016, gravity: [0, -10, 0] };
+}
+const f32 = Math.fround;
+/** PREDICT on vec4 records, in the kernel's order. */
+export function predictCpu(F) {
+    const out = new Float32Array(4 * F.N), g = F.gravity.map(f32), dt = f32(F.dt);
+    for (let a = 0; a < F.N; a++) { const w = F.P[4 * a + 3]; out[4 * a + 3] = w;
+        for (let c = 0; c < 3; c++) { if (w > 0) { const v = f32(F.V[4 * a + c] + f32(g[c] * dt)); out[4 * a + c] = f32(F.P[4 * a + c] + f32(v * dt)); } else out[4 * a + c] = F.P[4 * a + c]; } }
+    return out;
+}
+/** One SOLVE pass over a color on vec4 records, in the kernel's order (lambda carried in and out). */
+export function solveCpu(F, batch = F.colors[0], pred = F.pred, lambda = new Float32Array(F.cons.length)) {
+    const m = Float32Array.from(pred), dt = f32(F.dt), unilateral = F.step[1] > 0.5;
+    for (const ci of batch) { const c = F.cons[ci]; const ax = 4 * c.i, bx = 4 * c.j; const w1 = m[ax + 3], w2 = m[bx + 3], wsum = f32(w1 + w2); if (wsum === 0) continue;
+        const dx = f32(m[ax] - m[bx]), dy = f32(m[ax + 1] - m[bx + 1]), dz = f32(m[ax + 2] - m[bx + 2]);
+        const len = f32(Math.sqrt(f32(f32(f32(dx * dx) + f32(dy * dy)) + f32(dz * dz)))); if (len < 1e-12) continue;
+        const C = f32(len - f32(c.rest)); if (unilateral && C >= 0) continue;
+        const aT = f32(f32(c.compliance) / f32(dt * dt)); const dL = f32(f32(-C - f32(aT * lambda[ci])) / f32(wsum + aT)); lambda[ci] = f32(lambda[ci] + dL);
+        const s = f32(dL / len), s1 = f32(w1 * s), s2 = f32(w2 * s);
+        m[ax] = f32(m[ax] + f32(s1 * dx)); m[ax + 1] = f32(m[ax + 1] + f32(s1 * dy)); m[ax + 2] = f32(m[ax + 2] + f32(s1 * dz));
+        m[bx] = f32(m[bx] - f32(s2 * dx)); m[bx + 1] = f32(m[bx + 1] - f32(s2 * dy)); m[bx + 2] = f32(m[bx + 2] - f32(s2 * dz)); }
+    return m;
+}
+/** FINALIZE on vec4 records: the new positions are the prediction. */
+export function finalizeCpu(F) { return Float32Array.from(F.pred); }
+export const PROBES = Object.freeze([
+    Object.freeze({ id: "xpbdWgsl.predictWgsl", code: () => predictWgsl(), entryPoint: "main", args: Object.freeze({}), pack: () => probeFixture().step,
+        inputs: () => { const F = probeFixture(); return [{ binding: 2, data: F.P }, { binding: 3, data: F.V }, { binding: 4, data: new Float32Array(4 * F.N) }]; },
+        outCount: () => 4 * probeFixture().N, workgroups: 1, cpu: () => predictCpu(probeFixture()), tol: 0, key: () => ({ dt: 0.016, gravity: [0, -10, 0] }) }),
+    Object.freeze({ id: "xpbdWgsl.solveWgsl", code: () => solveWgsl(), entryPoint: "main", args: Object.freeze({}), pack: () => probeFixture().step,
+        inputs: () => { const F = probeFixture(); return [{ binding: 2, data: new Uint8Array(packConstraints(F.cons)) }, { binding: 3, data: Uint32Array.from(F.colors[0]) }, { binding: 4, data: new Float32Array(F.cons.length) }]; },
+        outInit: () => probeFixture().pred, outCount: () => 4 * probeFixture().N, workgroups: 1, cpu: () => solveCpu(probeFixture()), tol: 0,
+        key: () => { const F = probeFixture(); return { colors: F.colors.length, constraints: F.cons.length }; } }),
+    Object.freeze({ id: "xpbdWgsl.finalizeWgsl", code: () => finalizeWgsl(), entryPoint: "main", args: Object.freeze({}), pack: () => probeFixture().step,
+        inputs: () => { const F = probeFixture(); return [{ binding: 2, data: F.pred }, { binding: 3, data: F.P }, { binding: 4, data: F.V }]; },
+        outCount: () => 4 * probeFixture().N, workgroups: 1, cpu: () => finalizeCpu(probeFixture()), tol: 0, key: () => ({ dt: 0.016 }) }),
+]);

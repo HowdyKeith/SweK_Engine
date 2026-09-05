@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "probe-convention", area: "method", name: "The probe convention lab-wide: every physics kernel's manifest run against its twin",
+        gate: "tools/ship/probeConvention-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "docs/GPU-KERNEL-CONTRACT.md exists and names the template; nine physics kernel modules export PROBES (id, code, pack, cpu, key, tol | rel | graded, device); every runnable physics corpus entry has a manifest entry and every manifest id is a corpus id; all thirteen entries run on the headless Dawn device and the nine with a tolerance meet it (the furnace, the SBT pipeline and the three cloth passes at 0; HMC at its earned 5e-5; Heidler 1e-5; Planck 1e-5 relative; the LCG at the f32 neighbour gap), the four graded elsewhere returning finite numbers.",
+        key: "*** THREE MODULES OF NINE FOLLOWED THE CONVENTION; THE OTHER SIX EACH INVENTED A PACKER AND A TWIN. *** The manifest is one new export pointing at what each module already had, so nothing was renamed; the census is the corpus itself, so a kernel cannot join the corpus without a manifest, and a manifest cannot name a kernel the corpus does not run.",
+    },
+    {
         id: "device-compute", area: "render", name: "One way to run a compute kernel through the device, held to the harness on the whole corpus",
         gate: "tools/ship/deviceCompute-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "render/computeRun.mjs: a kernel's buffers bound by the names its WGSL declares, one dispatch in a device frame, readback through the device; every runnable entry of the cross-backend corpus (18 kernels, 69,517 floats) run through it on the browser's WebGPU and held byte for byte to the headless Dawn harness; unknown and missing buffer names refused by name; hmc-bench.html and mpm-gpu-check.html read from source as device consumers with no hand-built pipeline.",

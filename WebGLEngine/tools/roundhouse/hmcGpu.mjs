@@ -178,3 +178,14 @@ export function shippingLeapfrogEndpoint(qx, qy, px, py) {
     const r = leapfrog([qx, qy], [px, py], HMC_FIXTURE.eps, HMC_FIXTURE.L, t.gradU);
     return [r.q[0], r.q[1], r.p[0], r.p[1]];
 }
+
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): the seeded 4096-chain batch in the harness layout, the
+// f64 flat mirror as the twin, HMC_TOL as the tolerance -- exactly what adjudicateDeviceRun grades, by name.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "hmcGpu.WGSL_HMC_PROBE", code: () => WGSL_HMC_PROBE, entryPoint: "main", args: Object.freeze({ n: 4096, seed: 77 }),
+    pack: (a) => probeUniforms(a.n), inputs: (a) => { const b = makeBatch(a.n, a.seed); return [{ binding: 2, data: b.qin }, { binding: 3, data: b.pin }]; },
+    outCount: (a) => 4 * a.n, workgroups: (a) => Math.ceil(a.n / 64), tol: HMC_TOL,
+    cpu: (a) => { const { qin, pin, n } = makeBatch(a.n, a.seed), inv = fixtureInv(), { mu, eps, L } = HMC_FIXTURE, out = new Float32Array(4 * n);
+        for (let i = 0; i < n; i++) out.set(leapfrogF64Flat(qin[2 * i], qin[2 * i + 1], pin[2 * i], pin[2 * i + 1], inv, mu, eps, L), 4 * i); return out; },
+    key: () => ({ f32Floor: measureF32Floor(512, 77), tol: HMC_TOL, headroom: F32_FLOOR_HMC }),
+})]);

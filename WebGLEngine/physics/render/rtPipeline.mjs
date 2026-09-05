@@ -375,3 +375,14 @@ export const MEASURED_AT_V4418 = Object.freeze({
     // Mirror record against lambertian record, same geometry, two skies. The gap is the blindness.
     materialVisibility: Object.freeze({ constantSky: 15, gradientSky: 70, of: 576 }),
 });
+
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): a two-record LAMBERTIAN table (the CPU tracer has no
+// mirror), the twin delegated to pathTracer.mjs, tolerance zero on dyadic albedos. The corpus's mirror entry is the
+// cross-backend claim; this one is the CPU claim.
+const PROBE_SBT = Object.freeze([sbtRecord({ centre: [-1.2, 0, 0], radius: 0.6, albedo: 0.5 }), sbtRecord({ centre: [1.2, 0, 0], radius: 0.6, albedo: 0.25 })]);
+export const PROBES = Object.freeze([Object.freeze({
+    id: "rtPipeline.pipelineWgsl", code: () => pipelineWgsl({}), entryPoint: "main",
+    args: Object.freeze({ sbt: PROBE_SBT, spp: 16, view: VIEW, eps: 1e-4 }),
+    pack: (a) => pipelineUniforms(a.sbt, a), cpu: (a) => Float32Array.from(renderSbtCpu(a.sbt, a)), outCount: VIEW.w * VIEW.h, workgroups: Math.ceil(VIEW.w * VIEW.h / 64), tol: 0,
+    key: () => ({ exact: tablePreconditions(PROBE_SBT, 16).exact, stages: STAGES.length }),
+})]);

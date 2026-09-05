@@ -146,3 +146,12 @@ export async function readKey(device, { n = null, xLo = DEFAULTS.xLo, xHi = DEFA
         rows.push({ n: nv, peakX: xLo + (xHi - xLo) * ((bx + 0.5) / W), peak: best, col: bx }); }
     return { rows, width: W, height: H, binWidth: (xHi - xLo) / W, pixels: fr.pixels };
 }
+
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): the corpus's grid at n = 5, the f32 twin, 1e-5 RELATIVE
+// (the shape peaks near 21 at n = 5, and exp and pow are the device's).
+export const PROBES = Object.freeze([Object.freeze({
+    id: "blackbodyWgsl.blackbodyProbeWgsl", code: () => blackbodyProbeWgsl(), entryPoint: "probe",
+    args: Object.freeze({ xLo: 0, xHi: 12, n: 5, count: 2048 }),
+    pack: packProbeUniforms, cpu: probeCpu, outCount: 2048, workgroups: 32, rel: 1e-5,
+    key: () => keyCpu(),
+})]);

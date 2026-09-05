@@ -356,3 +356,12 @@ export const MEASURED_AT_V4415 = Object.freeze({
     notExactBySpp: Object.freeze({ 3: 26, 5: 36, 10: 39, 64: 0 }),
     furnaceValues: Object.freeze({ hit: 0.5, miss: 1, distinctAtSpp1: 2 }),
 });
+
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): the furnace at the corpus's own settings, the f64 twin
+// DELEGATED to the renderer, tolerance ZERO -- dyadic albedo and a power-of-two spp make the render exact in f32.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "pathTracerGpu.traceWgsl", code: () => traceWgsl({}), entryPoint: "main",
+    args: Object.freeze({ spp: 16, view: VIEW, eps: 1e-4, albedo: FURNACE.albedo }),
+    pack: (a) => traceUniforms(a), cpu: (a) => Float32Array.from(furnaceCpu(a)), outCount: VIEW.w * VIEW.h, workgroups: Math.ceil(VIEW.w * VIEW.h / 64), tol: 0,
+    key: () => ({ hit: MEASURED_AT_V4415.furnaceValues.hit, miss: MEASURED_AT_V4415.furnaceValues.miss, exact: furnacePreconditions({ spp: 16 }).exact }),
+})]);

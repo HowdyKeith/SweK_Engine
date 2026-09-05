@@ -2003,6 +2003,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "code: the API accepted every unpadded uniform in the corpus, so the 16-byte floor is the harnesses' " +
                  "convention, kept for byte-identical inputs, and the gate header says so.",
     }),
+    since90: Object.freeze({
+        at: "v4468", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/probeConvention-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on the headless Dawn device in half a second. The probe convention is lab-wide: " +
+                 "docs/GPU-KERNEL-CONTRACT.md writes it down with render/lyapunovWgsl.mjs as the template, and the nine " +
+                 "physics kernel modules each export PROBES -- id, code, pack, cpu, key, tol | rel | graded, device -- " +
+                 "pointing at what they already had, so nothing was renamed. The gate is the census: every runnable " +
+                 "physics corpus entry needs a manifest entry and every manifest id must be a corpus id; all 13 entries " +
+                 "run on Dawn, nine held to their own tolerance (five at zero, HMC 3.10e-6 against its earned 5e-5, " +
+                 "Heidler 2.98e-7, Planck 1.76e-6 relative, the LCG at the f32 neighbour gap) and four graded by the " +
+                 "gate they name. Sabotages red at 1 / 1 / 1: an entry deleted, a tolerance tightened past the floor, " +
+                 "a twin rendered wrong.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

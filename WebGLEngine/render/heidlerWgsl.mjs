@@ -56,3 +56,11 @@ export function probeCpu({ i0, t1, t2, eta, tLo, tHi, count, geometric = 1 }) {
 export function etasFor(set = PARAMS.first) { const tp = truePeak(set.t1, set.t2); return { standard: etaStandard(set.t1, set.t2), trueEta: tp.peak, tPeak: tp.tPeak, ratio: tp.peak / etaStandard(set.t1, set.t2) }; }
 /** The CPU's own number for the key, from the module the gate trusts: the waveform's peak over i0 at the true eta, and at the standard one. */
 export function keyCpu(set = PARAMS.first) { const e = etasFor(set); return { atTrueEta: heidler(e.tPeak, set.i0, set.t1, set.t2, e.trueEta) / set.i0, atStandardEta: heidler(e.tPeak, set.i0, set.t1, set.t2) / set.i0, shapePeak: shape(e.tPeak, set.t1, set.t2), ...e }; }
+
+// v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): the corpus's own grid, the f32 twin, 1e-5 absolute.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "heidlerWgsl.heidlerProbeWgsl", code: () => heidlerProbeWgsl(), entryPoint: "probe",
+    args: Object.freeze({ i0: PARAMS.first.i0, t1: PARAMS.first.t1, t2: PARAMS.first.t2, eta: etasFor().trueEta, tLo: PARAMS.first.t1 / 50, tHi: PARAMS.first.t2 * 8, count: 2048, geometric: 1 }),
+    pack: packProbeUniforms, cpu: probeCpu, outCount: 2048, workgroups: 32, tol: 1e-5,
+    key: () => keyCpu(),
+})]);

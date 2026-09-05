@@ -238,3 +238,14 @@ void main() {
 /** The look's uniforms and the knobs a fleet binds: fewer samples than the key, because a hull is drawn every frame. */
 export const LOOK_UNIFORMS = Object.freeze([{ name: "viewProj", type: "mat4" }, { name: "light", type: "vec4" }, { name: "chaos", type: "vec4" }]);
 export const LOOK_KNOBS = Object.freeze([DEFAULTS.rLo, DEFAULTS.rHi, 96, 32]);
+
+// v4468 -- THE PROBE MANIFEST (docs/GPU-KERNEL-CONTRACT.md): what a lab-wide gate needs to run this kernel and grade
+// it, by name. This module is the TEMPLATE the contract points at. A chaotic map is not compared element by element,
+// so the entry names the gate that grades it by column medians instead of a tolerance.
+export const PROBES = Object.freeze([Object.freeze({
+    id: "lyapunovWgsl.lyapunovProbeWgsl", code: () => lyapunovProbeWgsl(), entryPoint: "probe",
+    args: Object.freeze({ rLo: 3.4, rHi: 4.0, samples: 384, warmup: 64, seedLo: 0.05, seedHi: 0.95, cols: 64, rows: 32 }),
+    pack: packProbeUniforms, cpu: probeCpu, outCount: 2048, workgroups: 32,
+    graded: "tools/ship/physicsShaders-selfcheck.mjs -- column medians to 3e-2; the logistic map at r near 4 is chaotic, so element-for-element is not a claim",
+    key: () => ({ ln2: LN2, atR4: lyapunovCpu(4, 0.3, { samples: 4096, warmup: 256 }) }),
+})]);
