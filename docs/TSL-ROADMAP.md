@@ -495,7 +495,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         moves the eye rigidly. orrery-gpu.html: drag, wheel, click a body to follow it (retargeted each frame to
         positionAt3), click space to stop; the slider is the initial pitch. NOT CLAIMED: inertia, touch, roll.
      4. (task 35) Importer moons and reached flybys as GPU records through the same cull and ladder, picked by name,
-        held to the 2D page's CPU positions.
+        held to the 2D page's CPU positions. BUILT at v4476: render/gpuOrbits.mjs carries a KIND per record in a third
+        vec4 -- a body, a satellite (its circle in the ecliptic about a parent the kernel recomputes from the parent's
+        elements), a flyby (Barker's equation in f32, the cube roots in the stable form D = u - 1/u). The twins are the
+        2D page's own satelliteAt and flybyAt. orrery-gpu.html builds the fleets from orrery-fleet.json (compact, so
+        moons hug their planets at the system scale) and the flybys exactly as orrery.html does; 388 records -- 16
+        bodies, 148 importers, 35 paperwork, 189 passing -- through one cull and one ladder, a pick naming each.
+        tools/ship/gpuOrbits-selfcheck.mjs: satellites within 3e-4 (two trig terms), flybys within 2e-4, a satellite
+        minus its parent IS satelliteAt, a flyby at its epoch sits at q, and the GPU's count within a radius equals
+        passingWithin's. Found while building: a sabotage of the cube root's sign guard was blind because the stable
+        form's argument is always positive -- the guard was dead code and is removed. NOT CLAIMED: the flyby trails
+        the 2D page draws; moons tilted with their parent's plane (they circle in the ecliptic, as the 2D page draws).
      5. (task 36) Slug labels on the device path (steps 7.3 and 7.5's modules) for picked and near bodies.
      6. (task 37) Promotion by measurement: the 3D page passes the 2D page's gates plus its own before the panel's
         link points at it; the 2D page stays as the reference twin.

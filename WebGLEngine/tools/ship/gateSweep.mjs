@@ -2159,6 +2159,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "at 4 / 4 / 1 by name. Found while building: a dolly overflowing to Infinity was defaulting to 10 rather " +
                  "than clamping to the limit; an infinite request now clamps and only a NaN defaults.",
     }),
+    // v4476 -- the ninety-eighth closing. Fleets and flybys as records of the orbit kernel; a blind sabotage found and removed.
+    since98: Object.freeze({
+        // swept 0: no gate added -- gpuOrbits widened by a section.
+        at: "v4476", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gpuOrbits-selfcheck.mjs (section 2b: 388 records of three kinds against satelliteAt and flybyAt; the page's full count derived)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on Dawn and the browser's WebGPU. render/gpuOrbits.mjs places three kinds of record in one kernel: " +
+                 "bodies as before, satellites as circles in the ecliptic about a parent recomputed from its elements, flybys " +
+                 "by Barker's equation in f32 with the cube roots in the stable form D = u - 1/u. The twins are the 2D page's " +
+                 "satelliteAt and flybyAt; satellites within 3e-4 (the parent's 2e-4 and their own), flybys within 2e-4, a " +
+                 "flyby at its epoch at q, the GPU's count within a radius equal to passingWithin's (39 of 189). orrery-gpu.html " +
+                 "draws 388 records -- 16 bodies, 148 importers, 35 paperwork, 189 passing -- naming each on a pick, following " +
+                 "and landing on bodies only. Sabotages red at 3 / 3 / 2. THE FINDING IS ABOUT SABOTAGE: the first B dropped " +
+                 "the cube root's sign guard and nothing went red, because the stable form's argument is positive for every " +
+                 "W and the guard was dead code -- a sabotage that goes 0 red is a finding, per the ship skill, and the code " +
+                 "it guarded is gone.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

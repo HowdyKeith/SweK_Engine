@@ -14,6 +14,13 @@
 //                                                       tilted one" (all three z=0.000), and the two backends' frames part by 113 px
 //                   B  positionAt3's y-term sign flipped -> exit=1, 3 red: the in-plane identity with positionAt, the bound at 1.55
 //                                                       on three-webgpu, and the frames part by 847 px. Both restored byte for byte.
+// v4476 -- FLEETS AND FLYBYS as records of the same kernel (section 2b): 388 records, the twins satelliteAt about the parent's
+// positionAt3 and flybyAt (Barker, the stable cube root). SABOTAGE (v4476): A  the kernel's satellite drops its parent's offset
+// -> exit=1, 3 red: the satellite bound, "minus its parent IS satelliteAt" at 3.60, and the page's count. B  the flyby's
+// D = u - 1/u reduced to D = u -> exit=1, 3 red: the flyby bound at 2.26, the perihelion control (28.95 against q 14.47), and
+// passingWithin's count (2 against 39). A first B, the cube root's sign guard dropped, was BLIND: the argument is positive for
+// every W, so the guard was dead code and is gone. C  the page's source built without flybys -> exit=1, 2 red: the page's
+// wiring line and its count ("of 199" against 388). All restored byte for byte.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +30,10 @@ import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import * as O from "../../render/gpuOrbits.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
+import { fleetsFor, satelliteAt } from "../../world/orreryFleet.mjs";
+import { reachedBodies, fromReachedRegister, fromKhronos, flybyAt, passingWithin } from "../../world/orreryReached.mjs";
+import { REACHED_SOURCES, severityOf } from "../../world/reachedLicences.mjs";
+import { models, mayVendor } from "../../gpu/khronosSamples.mjs";
 import { phaseFor } from "../../world/orreryView.mjs";
 import { positionAt, positionAt3 } from "../../world/orreryView.mjs";
 import { nullBackend } from "../../gfx/device.js";
@@ -43,7 +54,7 @@ console.log("\n1. THE ELEMENTS ARE THE ORRERY'S OWN NUMBERS");
     const E = O.ELEMENT_FLOATS;
     ok("  every body's axis, period and radius come from buildOrrery unchanged", system.bodies.every((b, i) => elements[(i + 1) * E] === Math.fround(b.a) && elements[(i + 1) * E + 1] === Math.fround(b.period) && elements[(i + 1) * E + 3] === Math.fround(b.radius)));
     // v4474 -- and the third element: cos/sin of the inclination and of the node, precomputed in f64 so the kernel's own trig stays the one it always did
-    ok("  and so does the TILT: cos i, sin i, cos node, sin node in the second vec4, from buildOrrery's inclination and phaseFor", E === 8 && system.bodies.every((b, i) => { const ph = phaseFor(b.name), inc = b.inclination || 0;
+    ok("  and so does the TILT: cos i, sin i, cos node, sin node in the second vec4, from buildOrrery's inclination and phaseFor", E === 12 && system.bodies.every((b, i) => { const ph = phaseFor(b.name), inc = b.inclination || 0;
         return elements[(i + 1) * E + 4] === Math.fround(Math.cos(inc)) && elements[(i + 1) * E + 5] === Math.fround(Math.sin(inc)) && elements[(i + 1) * E + 6] === Math.fround(Math.cos(ph)) && elements[(i + 1) * E + 7] === Math.fround(Math.sin(ph)); }));
     const tilted = system.bodies.filter((b) => b.inclination > 0);
     ok(`  ${tilted.length} of ${system.bodies.length} bodies are tilted (their opacity, world/orrery.mjs) and the rest lie in the plane`, tilted.length >= 1 && tilted.length < system.bodies.length, tilted.map((b) => `${b.name} ${(b.inclination * 180 / Math.PI).toFixed(1)}deg`).join(", "));
@@ -112,11 +123,81 @@ else {
     if (r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
 }
 
+// v4476 -- THE FLEETS AND THE FLYBYS, as records of the same kernel, held to the 2D page's own functions.
+console.log("\n2b. SATELLITES, DEBRIS AND FLYBYS: three kinds of record, one kernel, the 2D page's functions as twins");
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    const fleetRaw = JSON.parse(fs.readFileSync(path.join(ENG, "orrery-fleet.json"), "utf8"));
+    const reachedRaw = JSON.parse(fs.readFileSync(path.join(ENG, "orrery-reached.json"), "utf8"));
+    const FLEET_OPTS = { altFloor: 0.12, altGain: 0.04 };   // the page's compact fleet, so moons hug their planets at the system scale
+    const far = Math.max(...system.bodies.map((b) => b.a + b.radius)), Q_NEAR = far * 1.3, Q_FAR = far * 3.2;
+    const FLYBY_OPTS = { nearest: Q_NEAR, farthest: Q_FAR, qGain: (Q_FAR - Q_NEAR) / Math.log1p(8), loop: Math.max(...system.bodies.map((b) => b.period)) * 10 };
+    const fleets = fleetsFor(system, fleetRaw.bodies, FLEET_OPTS);
+    const flybys = reachedBodies([...fromReachedRegister(REACHED_SOURCES, severityOf), ...fromKhronos(models(), (reachedRaw.visited || []).map((v) => v.name), mayVendor)], FLYBY_OPTS);
+    const full = O.elementsOf(system, { fleets, flybys });
+    const nSat = [...fleets.values()].reduce((n, f) => n + f.satellites.length, 0), nDeb = [...fleets.values()].reduce((n, f) => n + f.debris.length, 0);
+    ok(`the source carries 1 + ${system.bodies.length} bodies + ${nSat} satellites + ${nDeb} debris + ${flybys.length} flybys = ${full.count} records`,
+       full.count === 1 + system.bodies.length + nSat + nDeb + flybys.length && full.counts.satellites === nSat && full.counts.debris === nDeb && full.counts.flybys === flybys.length && nSat > 100 && flybys.length > 150);
+    ok("  every record has a NAME a pick can say: the file and which body it imports, the source and whether SweK may take it", full.names.every((n) => typeof n === "string" && n.length > 2) && full.names.some((n) => /\(imports /.test(n)) && full.names.some((n) => /\(reached, /.test(n)));
+    const T2 = 412.5, cpu2 = O.orbitRecordsCpu(system, T2, full.layout);
+    // the twin itself, against the 2D page's functions record by record
+    let twinOk = true;
+    full.layout.forEach((L, i) => { if (L.kind === O.KIND.satellite) { const c = positionAt3(full.layout[L.parent].body, T2), s = satelliteAt(L.sat, T2); if (Math.abs(cpu2[i * 4] - Math.fround(c.x + s.x)) > 1e-6 || Math.abs(cpu2[i * 4 + 2] - Math.fround(c.z)) > 1e-6) twinOk = false; }
+        else if (L.kind === O.KIND.flyby) { const f = flybyAt(L.flyby, T2); if (Math.abs(cpu2[i * 4] - Math.fround(f.x)) > 1e-6 || cpu2[i * 4 + 2] !== 0) twinOk = false; } });
+    ok("the twin IS satelliteAt about the parent's positionAt3, and flybyAt in the plane", twinOk);
+    const r2 = await runInEngineOrigin({ engineRoot: ENG, args: { T2, bodies: raw.bodies, TODAY, fleetBodies: fleetRaw.bodies, visited: (reachedRaw.visited || []).map((v) => v.name), FLEET_OPTS, FLYBY_OPTS, epochOf: flybys[7].epoch }, script: `async (a) => {
+        const O = await import("/render/gpuOrbits.mjs"); const { requestDevice } = await import("/gfx/device.js");
+        const { buildOrrery } = await import("/world/orrery.mjs"); const { fleetsFor } = await import("/world/orreryFleet.mjs");
+        const R = await import("/world/orreryReached.mjs"); const { REACHED_SOURCES, severityOf } = await import("/world/reachedLicences.mjs"); const K = await import("/gpu/khronosSamples.mjs");
+        const system = buildOrrery(a.bodies, { today: a.TODAY });
+        const fleets = fleetsFor(system, a.fleetBodies, a.FLEET_OPTS);
+        const flybys = R.reachedBodies([...R.fromReachedRegister(REACHED_SOURCES, severityOf), ...R.fromKhronos(K.models(), a.visited, K.mayVendor)], a.FLYBY_OPTS);
+        const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+        const src = O.makeOrbitSource(dev, system, { fleets, flybys });
+        const o = { count: src.count, path: src.advance(a.T2).path };
+        o.records = Array.from(await src.readRecords());
+        src.advance(a.epochOf); o.atEpoch = Array.from(await src.readRecords());
+        src.destroy(); dev.destroy(); return o;
+    }` });
+    ok("*** the kernel places all three kinds on WebGPU ***", r2.ok && r2.result.path === "compute" && r2.result.count === full.count, r2.ok ? `${r2.result.count} records` : r2.reason);
+    if (r2.ok) {
+        const W2 = r2.result.records;
+        const worst = { body: 0, satellite: 0, flyby: 0 }, worstName = { body: "", satellite: "", flyby: "" };
+        full.layout.forEach((L, i) => { const scale = Math.max(0.05, Math.hypot(cpu2[i * 4], cpu2[i * 4 + 1], cpu2[i * 4 + 2]));
+            const d = Math.hypot(W2[i * 4] - cpu2[i * 4], W2[i * 4 + 1] - cpu2[i * 4 + 1], W2[i * 4 + 2] - cpu2[i * 4 + 2]) / scale;
+            const k = L.kind === O.KIND.body ? "body" : L.kind === O.KIND.satellite ? "satellite" : "flyby"; if (d > worst[k]) { worst[k] = d; worstName[k] = L.name; } });
+        // A satellite's error is the parent's (2e-4 of the parent's axis, the bound above) PLUS its own circle's (2e-4 of its own,
+        // smaller, axis), both from SwiftShader's low-accuracy sin/cos, so the bound is the SUM: 2e-4 x (1 + a_sat / a_parent),
+        // at most 3e-4 here. Measured 2.04e-4 at v4476 -- over the single-term bound, as two terms must be allowed to be.
+        ok("*** every satellite is within 3e-4 (two trig terms: the parent's 2e-4 and its own) of the twin -- the parent recomputed in the kernel, the circle about it ***", worst.satellite < 3e-4, `worst ${worst.satellite.toExponential(2)} on ${worstName.satellite}`);
+        ok("*** every flyby is within 2e-4 of its distance of flybyAt -- Barker in f32, the stable cube root ***", worst.flyby < 2e-4, `worst ${worst.flyby.toExponential(2)} on ${worstName.flyby}`);
+        ok("  and the bodies still are", worst.body < 2e-4, `worst ${worst.body.toExponential(2)} on ${worstName.body}`);
+        // a satellite minus its parent is satelliteAt, on the GPU as on the CPU
+        let relOk = true, relWorst = 0;
+        full.layout.forEach((L, i) => { if (L.kind !== O.KIND.satellite) return; const pi = L.parent, s = satelliteAt(L.sat, T2);
+            const d = Math.hypot(W2[i * 4] - W2[pi * 4] - s.x, W2[i * 4 + 1] - W2[pi * 4 + 1] - s.y, W2[i * 4 + 2] - W2[pi * 4 + 2]); relWorst = Math.max(relWorst, d); if (d > 2e-4 * Math.max(1, s.a)) relOk = false; });
+        ok("  a satellite's GPU position minus its parent's GPU position IS satelliteAt", relOk, `worst ${relWorst.toExponential(2)}`);
+        // the flyby control: at a flyby's own epoch it is at perihelion, exactly q from the origin
+        const fi = full.layout.findIndex((L) => L.kind === O.KIND.flyby && L.flyby === flybys[7]);
+        const rEpoch = Math.hypot(r2.result.atEpoch[fi * 4], r2.result.atEpoch[fi * 4 + 1]);
+        ok("CONTROL: at its own epoch a flyby sits at perihelion, |p| = q", Math.abs(rEpoch - flybys[7].q) < 2e-4 * flybys[7].q, `${rEpoch.toFixed(4)} against q ${flybys[7].q.toFixed(4)} for ${flybys[7].name}`);
+        // what a frame can show: the count inside a radius, GPU against passingWithin
+        const RAD = Q_FAR * 1.5; let inside = 0;
+        full.layout.forEach((L, i) => { if (L.kind === O.KIND.flyby && Math.hypot(W2[i * 4], W2[i * 4 + 1]) <= RAD) inside++; });
+        const pw = passingWithin(flybys, T2, RAD);
+        ok(`*** the GPU's count of flybys within ${RAD.toFixed(1)} equals passingWithin's, the 2D page's own readout ***`, inside === pw && pw > 0 && pw < flybys.length, `${inside} on the GPU, ${pw} on the CPU, of ${flybys.length}`);
+    }
+}
+
 console.log("\n3. THE PAGE: orrery-gpu.html LOADS, PICKS A ROUTE AND SAYS WHICH");
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const page = fs.readFileSync(path.join(ENG, "orrery-gpu.html"), "utf8");
     ok("the page imports the orbit source, the GPU-driven scene and the device, and links the 2D orrery", /gpuOrbits\.mjs/.test(page) && /gpuDriven\.mjs/.test(page) && /gfx\/device\.js/.test(page) && /orrery\.html/.test(page));
+    // v4476 -- the page builds its flybys the way orrery.html does (the same registers, the same options) and hands fleets and flybys to the source
+    ok("  and builds the fleets and the flybys from the same registers the 2D page reads, handing both to makeOrbitSource", /fleetsFor\(system, fleetRaw\.bodies/.test(page) && /fromReachedRegister\(REACHED_SOURCES, severityOf\)/.test(page) && /fromKhronos\(models\(\), visited, mayVendor\)/.test(page) && /makeOrbitSource\(device, system, \{ fleets, flybys/.test(page));
+    ok("  and a pick names a satellite or a flyby by the source's own name, and only a BODY can be landed on or followed", /source\.names\[hit\.id\]/.test(page) && /source\.kinds\[hit\.id\] === KIND\.body/.test(page));
     ok("  and refuses to pretend when there is no device", /nothing can be drawn/.test(page));
     // Loaded WITHOUT WebGPU flags: this shell cannot present WebGPU to a canvas, so the page's WebGL2 fallback is
     // the route under test, and the HUD must say so. (The WebGPU route is graded in section 2, offscreen.)
@@ -138,9 +219,14 @@ else {
     // *** "of 15" WAS TYPED AND THE TREE GREW TO 15 BODIES PLUS THE CENTRE. *** The page prints its own
     // source.count, so the expected figure is read from the same bake the page loads rather than written here:
     // a sixteenth dependency must not need this line edited, and must not pass silently either.
-    const wantDrawn = "of " + (raw.bodies.length + 1);
+    // v4476 -- the page's source carries the fleets and the flybys too, so the count it reports is the FULL one, derived here
+    // from the same bakes and registers the page reads rather than typed
+    const fleetRawP = JSON.parse(fs.readFileSync(path.join(ENG, "orrery-fleet.json"), "utf8")), reachedRawP = JSON.parse(fs.readFileSync(path.join(ENG, "orrery-reached.json"), "utf8"));
+    const nFleet = [...fleetsFor(system, fleetRawP.bodies).values()].reduce((n, f) => n + f.satellites.length + f.debris.length, 0);
+    const nFly = fromReachedRegister(REACHED_SOURCES, severityOf).length + fromKhronos(models(), (reachedRawP.visited || []).map((v) => v.name), mayVendor).length;
+    const wantDrawn = "of " + (raw.bodies.length + 1 + nFleet + nFly);
     ok("  the clock runs and the counts are reported", st.t > 0 && st.drawn.includes(wantDrawn),
-        `t=${st.t} drawn ${st.drawn}, expected "${wantDrawn}" (${raw.bodies.length} bodies + SweK at the centre)`);
+        `t=${st.t} drawn ${st.drawn}, expected "${wantDrawn}" (${raw.bodies.length} bodies + SweK + ${nFleet} in the fleets + ${nFly} flybys)`);
     ok("  the picture moves", !shot1.equals(shot2));
     ok("  and the page threw nothing", errs.filter((e) => !/favicon/.test(e)).length === 0, errs.slice(0, 2).join(" | ") || "clean");
 }
