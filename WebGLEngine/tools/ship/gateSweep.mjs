@@ -1772,6 +1772,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "object now. NOT CLAIMED: that btdfDomain fixes anything -- transmission.mjs is deliberately " +
                  "unpatched by this round, and defaults on both branches are unchanged so no pixel moved.",
     }),
+    since77: Object.freeze({
+        at: "v4456", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/closingCoverage-selfcheck.mjs",     // this round's own
+            "tools/ship/reportDoors-selfcheck.mjs",         // ANOTHER round's gate, swept here -- see the verdict
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, both. *** THE SECOND NAME IS NOT THIS ROUND'S GATE AND SAYING SO IS THE POINT. *** " +
+                 "tools/ship/reportDoors-selfcheck.mjs arrived on main from an in-flight round on the other " +
+                 "branch, with no closing, so the trunk read '1 STILL UNSWEPT' for three unnumbered commits. " +
+                 "This round RAN it -- exit 0 -- and accounts for it here; it did not write it, and the round " +
+                 "that did will describe it. WRITING THIS ENTRY WAS REFUSED ONCE, DELIBERATELY, AND THAT " +
+                 "REFUSAL IS WHAT PRODUCED THE ROUND: when the other branch ships it will close the same gate, " +
+                 "two closings will claim one name, and the coverage line summed COUNTS rather than reading " +
+                 "the NAMES the ledger already holds -- so the duplicate would have cancelled the very red it " +
+                 "was meant to clear. MEASURED, on a fixture with exactly one uncovered gate: as it stands " +
+                 "uncovered 1 (FAIL); two branches closing the same gate, uncovered 0 (PASS). Not a future " +
+                 "risk, this week's red going green. A duplicate buys a CREDIT of exactly one against every " +
+                 "future unswept gate, permanently, because `<= 0` can never red no matter how far the sum " +
+                 "over-runs. NEW closingCoverage.mjs reads the union of every `added` list as a SET -- " +
+                 "duplicates attributed to both claimants by name, names checked against the filesystem rather " +
+                 "than the caller's list, and the credit reported as its own number. v4399's rule, freeze by " +
+                 "NAME not by COUNT, reaching the one line in the ledger that had never followed it. Six " +
+                 "sabotages, 4/1/0-then-2/1/1/9 by name. *** THE ZERO WAS AN UNREACHABLE CHECK INSIDE A ROUND " +
+                 "ABOUT UNREACHABLE CHECKS *** -- the filesystem clause never ran, because both fixtures named " +
+                 "a gate missing from the enumeration too; an empty population drives it now. NOT CLAIMED: " +
+                 "that the v4297 baseline is covered by name (it is a count, and rebuilding its membership " +
+                 "would be fabrication -- `baselineByName: false` is a graded value, not a sentence), or that " +
+                 "a gate a closing names was actually run by that round.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

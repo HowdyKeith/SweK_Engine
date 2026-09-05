@@ -1359,6 +1359,22 @@ export const INSTRUMENTS = [
       gate: "tools/ship/seamCensus-selfcheck.mjs",
       measures: "Finds the seams in strict-libm's piecewise approximations from the selector itself and measures the error at each.",
       key: "Seam locations are DERIVED FROM THE SELECTOR and never typed, so a seam that moves is followed rather than missed; 0 are hand-written." },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "report-doors", area: "ship", name: "The reportLines convention, counted",
+        page: "instrument-bench.html", gate: "tools/ship/reportDoors-selfcheck.mjs",
+        measures: "Every module exporting reportLines, CALLED rather than read: which are callable bare, which require an argument, and which throw.",
+        key: "*** SEVENTY-SEVEN MODULES EXPORT reportLines AND NOTHING STATES ITS CONTRACT. *** server.html, instrument-bench.html, fleet-report.mjs and the fingerprint bridge all consume it; every knob, meter, bind and census in the tree provides it. It is how a module says what it knows. It is also the largest untested convention in the tree, and the reason is measurable rather than cultural: EXERCISING IT COSTS ABOUT SEVEN AND A HALF MINUTES, so no gate has ever exercised it. ---- *** WHAT MEASURING IT FOUND, AND THE FIRST FINDING IS ABOUT HOW TO MEASURE IT *** -------------------- (1) READING THE SIGNATURE IS THE WRONG INSTRUMENT. Twenty modules declare a parameter; only SIX require one. The other fourteen have defaults -- `{ live = true } = {}`, `opts = {}`, `root = ROOT` -- so they are callable bare, and a census built on the source text would have called fourteen of them formatters and been wrong about every one. `Function.length` answers the question a consumer actually asks: CAN I CALL THIS WITH NOTHING? The source text answers a different one.",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "closing-coverage", area: "ship", name: "The ledger counts gates and never names them",
+        page: "instrument-bench.html", gate: "tools/ship/closingCoverage-selfcheck.mjs",
+        measures: "The union of every sweep closing as a SET: gates claimed by two closings and by whom, claimed names with no file, and the credit a duplicate buys against future unswept gates.",
+        key: "*** THE SWEEP LEDGER COUNTS GATES AND NEVER NAMES THEM, SO A DUPLICATE CLOSING IS A CREDIT RATHER THAN AN ERROR. *** main is carrying a gate, reportDoors-selfcheck.mjs, landed by an in-flight round on the other branch with no closing written for it, so gateSweep-selfcheck reads \"1 STILL UNSWEPT\" on the trunk right now. *** THE HAZARD IS NOT HYPOTHETICAL AND IT ALMOST HAPPENED THIS ROUND. *** The obvious repair -- write the closing here -- is the one thing that must not be done blind, because when that round ships it will write its own closing for the same gate. Two closings, one gate. The question is what the ledger does about that, and the answer is NOTHING, in a way that is worse than merely missing it. ---- *** THE ARITHMETIC IS A SUM, AND A SUM CANNOT TELL DOUBLE-COUNTING FROM COVERAGE *** ------------------- gateSweep-selfcheck's coverage line is uncovered = (gatesNow - 1366 - 1) - SWEEP_SINCE_V4297.swept - sum(closing.swept) and asserts <= 0",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
