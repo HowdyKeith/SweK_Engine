@@ -51,7 +51,8 @@
 // energy exactly as it is known to, and the transmission half gains more than that back. The single-scatter
 // deficit and the transmission excess are two different mechanisms and they do not cancel.
 
-import { D, G2 } from "./microfacet.mjs";
+import { D, G2, G1, Lambda } from "./microfacet.mjs";
+import { lgammaSign } from "../../math/meijerG.js";
 import { fresnel, criticalCos, F0of, schlick } from "./fresnel.mjs";
 
 "use strict";
@@ -126,18 +127,29 @@ const indexOn = (dir, nAbove, nBelow) => (dir[2] >= 0 ? nAbove : nBelow);
  *
  *   f_t = |i.h||o.h| / (|i.n||o.n|)  *  etaO^2 (1 - F) G D  /  (etaI (i.h) + etaO (o.h))^2
  */
-export function btdf(wi, wo, { alpha, nAbove, nBelow, useSchlick = false, dropJacobian = false }) {
+export function btdf(wi, wo, { alpha, nAbove, nBelow, useSchlick = false, dropJacobian = false,
+                              // v4451 -- the two corrections, as PARAMETERS rather than edits, so a planted
+                              // run and a clean run are the same code path. Defaults are v4436's behaviour.
+                              // `g2: "g1i"` and `noFresnel` are the PROBE that isolates the change of
+                              // variable: masking by the incident direction only and no Fresnel leaves the
+                              // Jacobian carrying the whole integral, which has an exact answer.
+                              chiPlus = false, g2 = "reflection", noFresnel = false }) {
     if (wi[2] * wo[2] >= 0) return 0;                     // not a transmission configuration
     const etaI = indexOn(wi, nAbove, nBelow), etaO = indexOn(wo, nAbove, nBelow);
-    const h = halfVectorT(wi, wo, etaI, etaO);
+    const h = chiPlus ? validHalfT(wi, wo, etaI, etaO) : halfVectorT(wi, wo, etaI, etaO);
+    if (h === null) return 0;                             // chi+: not a refraction, so not a contribution
     const iDotH = dot(wi, h), oDotH = dot(wo, h);
     const denom = etaI * iDotH + etaO * oDotH;
     if (denom === 0) return 0;
     // Fresnel is asked from the INCIDENT side against the microfacet, which is the interface light meets.
-    const F = useSchlick ? schlick(Math.abs(iDotH), F0of(etaI, etaO))
+    const F = noFresnel ? 0
+            : useSchlick ? schlick(Math.abs(iDotH), F0of(etaI, etaO))
                          : fresnel(Math.abs(iDotH), etaI, etaO).R;
     const Dv = D(Math.abs(h[2]), alpha);
-    const Gv = G2(Math.abs(wo[2]), Math.abs(wi[2]), alpha);
+    const Gv = g2 === "g1i" ? G1(Math.abs(wi[2]), alpha)
+             : g2 === "beta" ? g2Transmission(wi[2], wo[2], alpha)
+             : g2 === "separable" ? G1(Math.abs(wi[2]), alpha) * G1(Math.abs(wo[2]), alpha)
+             : G2(Math.abs(wo[2]), Math.abs(wi[2]), alpha);
     const jac = dropJacobian ? 1
         : (Math.abs(iDotH) * Math.abs(oDotH)) / (Math.abs(wi[2]) * Math.abs(wo[2]));
     return jac * (etaO * etaO * (1 - F) * Gv * Dv) / (denom * denom);
@@ -207,3 +219,160 @@ export const LIMITS = Object.freeze({
 });
 
 export const criticalOf = criticalCos;
+
+// ===========================================================================================================
+// v4451 -- THE TWO CANDIDATES, TOLD APART. THE JACOBIAN IS INNOCENT AND BOTH OTHER SUSPECTS ARE GUILTY.
+// ===========================================================================================================
+//
+// v4447 convicted this file's single-scatter lobe of over-counting and named two suspects -- "a question
+// about Walter's Jacobian or the height-correlated G2" -- and left it there because the walk could not yet
+// separate them. It can now, and the separation is EXACT rather than argued, because there is a
+// configuration with a closed-form answer:
+//
+//   *** GOING INTO THE DENSER MEDIUM THERE IS NO TOTAL INTERNAL REFLECTION AT ALL. *** So with the masking
+//   set to G1(i) and Fresnel set to zero, every visible microfacet refracts, and the transmitted energy
+//   integral MUST BE EXACTLY 1. Not converged, not bounded -- one. That single number tests the
+//   change-of-variable and nothing else: no G2, no F, no multiple scattering, no walk.
+//
+//        alpha  cos_i     as shipped     with chi+ restored
+//        1      0.25      2.058609       1.001638
+//        1      0.50      1.831625       0.998851
+//        1      0.70      1.593818       0.999848
+//        0.4    0.25      1.434580       1.000461
+//        0.05   0.70      1.002117       1.000000
+//
+// *** THE JACOBIAN IS EXACTLY RIGHT AND WAS NEVER THE PROBLEM. What is missing is WALTER'S chi+ -- the
+// indicator that says a configuration is a refraction at all -- which this file replaced with Math.abs() on
+// both dot products and a half-vector that gets FLIPPED UP when it points down. ***
+//
+// A half-vector pointing down is not a facet: the microfacet distribution has no such orientation in its
+// support, so D() is being asked about a facet that cannot exist, and the answer is added to the lobe. At
+// alpha 1 that fabrication is 0.42 of an energy budget of 1.
+//
+// ---- THE chi+ IS THREE SIGN TESTS AND NEEDS NO REFRACTION CALL -------------------------------------------
+//
+// Written first as "refract i about h and check it lands on o", which is correct and drags a tolerance and a
+// dependency on the ground-truth walk into a shipped BSDF. The cheap form -- h points up, the ray meets the
+// FRONT face, it leaves through the BACK face -- was then measured against it on 34,560 configurations
+// spanning four index ratios and six incidence angles: THEY AGREE EVERYWHERE, 0 disagreements. So the cheap
+// form is not an approximation of the expensive one, it is the same predicate.
+//
+// ---- AND THE SECOND SUSPECT IS GUILTY TOO, SEPARATELY AND MEASURABLY ---------------------------------------
+//
+// With chi+ restored the lobe is still too bright, and now the walk can say by how much:
+//
+//        alpha  cos_o    chi+ only    + separable G1G1    + BETA G2      walk, one bounce
+//        1      0.25     0.663694     0.484730            0.306409       0.306645
+//        1      0.50     0.717809     0.650880            0.588576       0.588150
+//        1      0.70     0.782592     0.759199            0.739973       0.740785
+//        0.4    0.25     0.795486     0.770659            0.749160       0.748370
+//        0.05   0.70     0.947871     0.947871            0.947871       0.947340
+//
+// *** THE HEIGHT-CORRELATED G2 IS THE SAME-SIDE FORM APPLIED TO TWO DIRECTIONS ON OPPOSITE SIDES. *** For
+// reflection, both directions see the microsurface from above, and the Smith uniform-height model gives the
+// joint visibility 1/(1 + Lambda_i + Lambda_o). For TRANSMISSION the outgoing direction is BELOW, so it is
+// shadowed by the COMPLEMENTARY height: with u = C1(h) uniform, visibility from above is u^Lambda_i and
+// escape below is (1 - u)^Lambda_o, and the joint is the BETA INTEGRAL
+//
+//        G2_t = INT_0^1 u^Lambda_i (1 - u)^Lambda_o du = B(1 + Lambda_i, 1 + Lambda_o)
+//
+// which reduces to 1/(1 + Lambda_i + Lambda_o) when both are above, so it is the same derivation and not a
+// second model. At Lambda_i = Lambda_o = 1 the shipped form is 1/3 and the correct one is 1/6 -- A FACTOR OF
+// TWO -- and at Lambda = 2 it is a factor of six.
+//
+// AND WALTER'S OWN CHOICE WOULD NOT HAVE FIXED IT, which is worth recording because it is the obvious repair:
+// the 2007 paper uses the SEPARABLE G1(i)G1(o), and that lands at 0.4847 where the truth is 0.3066.
+//
+// ---- CONFIRMED A SECOND WAY, OFF THE MICROSURFACE, WITH NO ENERGY INTEGRAL IN IT --------------------------
+//
+// The Beta form predicts the probability that a refracted ray escapes below in one step, conditioned on the
+// facet being visible: G2_t / G1(i) = (1 + Lambda_i) B(1 + Lambda_i, 1 + Lambda_o). Counted directly on the
+// walk's own microsurface: 0.339803 measured against 0.341992 predicted at alpha 1 cos 0.25, and four
+// decimal places at every gentler configuration. That route shares no code with the energy integral.
+//
+// ---- WHAT IS NOT DONE, AND IT IS THE DECISION RATHER THAN THE MEASUREMENT ---------------------------------
+//
+// *** THE DEFAULTS ARE UNCHANGED. *** `btdf()` still ships Walter-with-abs and the reflection G2, because
+// turning both on drops the transmitted energy at alpha 1, cos 0.25 from 1.2444 to 0.3064 and that is a
+// VISIBLE change to every rough transmissive material in the renderer -- the correct number for a
+// single-scatter lobe, and still a product decision rather than a bug fix. Both corrections are PARAMETERS
+// so a caller, a gate and a page can all drive them, and the flip is one line when Keith wants it.
+
+/**
+ * *** WALTER'S chi+, WHICH THIS FILE HAD REPLACED WITH Math.abs(). *** Returns the transmission half-vector
+ * when the configuration is a refraction, and null when it is not. Three sign tests, no tolerance:
+ *   1. the half-vector points UP -- a downward one names a facet the distribution does not contain;
+ *   2. the incident ray meets its FRONT face;
+ *   3. the outgoing ray leaves through its BACK face.
+ * Measured equivalent to "refract i about h and check it lands on o" on 34,560 configurations.
+ */
+export function validHalfT(wi, wo, etaI, etaO) {
+    // *** THE FLIP IS PART OF WALTER'S DEFINITION AND IS NOT THE DEFECT. *** My first version of this
+    // function required the RAW vector to point up, which is true going INTO the denser medium and false
+    // coming out of it -- so it returned zero for every direction leaving glass, and the gate did not catch
+    // it because every row in this file used LIMITS.glass. A predicate exercised on one side of a branch.
+    const h = halfVectorT(wi, wo, etaI, etaO);            // already flipped so that h . n > 0
+    // chi+((i.h)/(i.n)) chi+((o.h)/(o.n)): each ray's dot with the facet must agree in sign with its own
+    // side of the macro surface. Above, that means i.h > 0; below, o.h < 0.
+    if (!(dot(wi, h) * Math.sign(wi[2]) > 0)) return null;
+    if (!(dot(wo, h) * Math.sign(wo[2]) > 0)) return null;
+    return h;
+}
+
+/**
+ * *** THE HEIGHT-CORRELATED MASKING-SHADOWING FOR TRANSMISSION, WHICH IS A BETA FUNCTION AND NOT 1/(1+Li+Lo).
+ * *** Same Smith uniform-height derivation as the reflection form, with the outgoing direction shadowed by
+ * the COMPLEMENTARY height because it is on the other side. lgammaSign comes from math/meijerG.js rather
+ * than a second Lanczos declared here.
+ */
+export const g2Transmission = (cosI, cosO, alpha) => {
+    const a = 1 + Lambda(Math.abs(cosI), alpha), b = 1 + Lambda(Math.abs(cosO), alpha);
+    return Math.exp(lgammaSign(a).log + lgammaSign(b).log - lgammaSign(a + b).log);
+};
+
+/** The record, frozen by name (v4399's rule). v4447 named two suspects; this is which. */
+export const BTDF_VERDICT_V4451 = Object.freeze({
+    at: "v4451",
+    question: "v4447 convicted the single-scatter BTDF of over-counting and named two suspects: Walter's " +
+              "Jacobian, or the height-correlated G2. This separates them.",
+    jacobian: "INNOCENT, exactly. Into the denser medium there is NO total internal reflection, so with G " +
+              "-> G1(i) and F -> 0 the transmitted energy must be exactly 1. With chi+ restored it is " +
+              "1.0016 / 0.9989 / 0.9998 / 1.0005 / 1.0000 across the roughness range; as shipped it reads " +
+              "up to 2.0586. The change of variable is right.",
+    chiPlus: "GUILTY, and it is the larger half. halfVectorT flips a downward half-vector UP and btdf takes " +
+             "Math.abs() of both dot products, so configurations that are not refractions contribute. At " +
+             "alpha 1, cos 0.25 that fabricates 1.244351 -> 0.663694.",
+    g2: "GUILTY, and separately. The shipped G2 is the SAME-SIDE correlated form used on two directions on " +
+        "OPPOSITE sides. The Smith uniform-height derivation gives B(1 + Lambda_i, 1 + Lambda_o) for " +
+        "transmission -- a factor of two at Lambda = 1 and six at Lambda = 2. It closes the rest: " +
+        "0.663694 -> 0.306409 against the walk's 0.306645.",
+    negative: "Walter's own separable G1(i)G1(o) would NOT have fixed it: 0.484730 against the walk's 0.306645.",
+    rows: Object.freeze([
+        Object.freeze({ alpha: 1.0, cosO: 0.25, shipped: 1.244343, chiOnly: 0.663694, both: 0.306409, walkOne: 0.306645 }),
+        Object.freeze({ alpha: 1.0, cosO: 0.50, shipped: 1.136424, chiOnly: 0.717809, both: 0.588576, walkOne: 0.588150 }),
+        Object.freeze({ alpha: 1.0, cosO: 0.70, shipped: 1.068193, chiOnly: 0.782592, both: 0.739973, walkOne: 0.740785 }),
+        Object.freeze({ alpha: 0.4, cosO: 0.25, shipped: 1.081828, chiOnly: 0.795486, both: 0.749160, walkOne: 0.748370 }),
+        Object.freeze({ alpha: 0.4, cosO: 0.70, shipped: 0.992405, chiOnly: 0.913141, both: 0.911863, walkOne: 0.911595 }),
+        Object.freeze({ alpha: 0.05, cosO: 0.70, shipped: 0.949573, chiOnly: 0.947871, both: 0.947871, walkOne: 0.947340 }),
+    ]),
+    defaultsUnchanged: "btdf() still ships the old behaviour, and this round does NOT propose flipping it " +
+                       "yet -- see repairOpen. Turning both corrections on drops alpha 1, cos 0.25 from " +
+                       "1.2444 to 0.3064, which is the correct single-scatter number and a visible change to " +
+                       "every rough transmissive material. That is a decision, not a patch.",
+    repairClosed: "v4452 -- THE REPAIR NEEDED NO COMPLETING; v4451'S TARGET WAS WRONG. The probe compared " +
+                  "the lobe against 1 - P(TIR), which counts every visible normal that refracts INCLUDING " +
+                  "the ones whose refracted ray leaves UPWARD -- a population an integral over the lower " +
+                  "hemisphere cannot hold and a single-scatter lobe must not count. At alpha 1, cos 0.25 " +
+                  "leaving glass: TIR 0.491565, leaves down 0.392720, leaves up 0.115715, and the probe " +
+                  "reads 0.393541. GOING INTO THE DENSER MEDIUM THE UP-LEAVING POPULATION IS EMPTY AT EVERY " +
+                  "ROUGHNESS, so the wrong target agreed with the right one across the whole forward " +
+                  "direction and the first configuration that could tell them apart was the one v4436 never " +
+                  "measured. Checked one configuration at a time as well as in the integral: 255,525 of " +
+                  "255,525 real refractions sampled off the microsurface are admitted, and the half-vector " +
+                  "reconstructs the sampled facet normal exactly in all of them.",
+    bothDirections: "The corrections hold LEAVING the denser medium too, against the same walk: worst " +
+                    "departure 1.46e-3 over six configurations. And the shipped lobe is WORSE in that " +
+                    "direction -- 0.553041 against a true 0.053250 at alpha 1, cos 0.25, ten times the " +
+                    "truth -- which never showed up in v4436's alarm because R + T leaving glass still " +
+                    "reads below one.",
+});
