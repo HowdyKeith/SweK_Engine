@@ -1,4 +1,5 @@
 #version 300 es
+// v4465 -- SUPERSEDED by physics/xpbd/xpbdWgsl.mjs predictWgsl(), a compute kernel on the same device as the solve; this transform-feedback pass needed a WebGL2 context the WebGPU solve could not share. Never loaded by anything.
 // physics/xpbd/cloth-predict.vert -- transform-feedback PREDICT pass. RIG-ONLY. Mirrors predictPass in clothLoop.js.
 // Per vertex: save prev, integrate gravity into velocity, project the predicted position. Reads a_pos/a_vel from the
 // source buffers, writes v_prev/v_vel/v_pred via transform feedback into separate destination buffers -- no readback.

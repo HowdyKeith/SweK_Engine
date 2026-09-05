@@ -1,4 +1,5 @@
 // physics/xpbd/xpbd-distance.wgsl -- WebGPU graph-colored XPBD distance-constraint solve. RIG-ONLY.
+// v4465 -- SUPERSEDED by physics/xpbd/xpbdWgsl.mjs solveWgsl(), which the device runs and the corpus grades; this file was never loaded by anything. Kept as the text the v2661 design described.
 //
 // One thread per constraint in the CURRENT color batch. Because graph coloring guarantees no two constraints in a
 // batch share a particle, every thread writes particles[c.i] and particles[c.j] with NO atomics and NO race -- the

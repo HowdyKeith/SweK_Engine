@@ -224,10 +224,14 @@ export const PARITY_BASELINE = Object.freeze({
     // thing the driver already does. Counted, not exempted (v4392's rule); the device is now a WGSL bearer in
     // this census, which is the one honest reading of a backend that owns a shader. Graded on both backends by
     // tools/ship/deviceMipmaps-selfcheck.mjs, every level against a CPU box filter.
-    wgslBearing: 63,
+    // v4465 -- wgslBearing 63 -> 64, wgslOnly 49 -> 50: physics/xpbd/xpbdWgsl.mjs, the first shader module under
+    // physics/ that runs through gfx/device.js -- the cloth's predict, solve and finalize passes as WGSL compute.
+    // WGSL-only by nature: WebGL2 has no compute stage, and the handle runs the shipped f64 solver there, which is
+    // the CPU_TWIN contract gfx/device.js's refusal asks for. Graded by tools/ship/xpbdDevice-selfcheck.mjs.
+    wgslBearing: 64,
     both: 14,
     glslOnly: 133,
-    wgslOnly: 49,
+    wgslOnly: 50,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs"]),

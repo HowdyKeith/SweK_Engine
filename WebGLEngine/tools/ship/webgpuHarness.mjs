@@ -69,7 +69,7 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
  */
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
                                        workgroups = 1, compileOnly = false, timeoutMs = 60000,
-                                       inputs = null }) {
+                                       inputs = null, outInit = null }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -110,7 +110,9 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             }
 
             const outBuf = dev.createBuffer({ size: a.outCount * 4,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+            // v4465 -- outInit: starting contents for a kernel that works in place on binding 0 (headlessGpu takes the same).
+            if (a.outInit) dev.queue.writeBuffer(outBuf, 0, new Uint32Array(a.outInit).subarray(0, a.outCount));
             const readBuf = dev.createBuffer({ size: a.outCount * 4,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
             const entries = [{ binding: 0, resource: { buffer: outBuf } }];
@@ -145,7 +147,8 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
         }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
-             inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null });
+             inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
+             outInit: outInit ? Array.from(storageWords(outInit)) : null });
         return { skipped: false, errors: [], values: [], ...out };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };

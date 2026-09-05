@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "xpbd-device", area: "soft bodies", name: "The cloth pillar's GPU path, run through the device and held to the CPU solver",
+        gate: "tools/ship/xpbdDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "physics/xpbd/xpbdWgsl.mjs on the headless Dawn device (each kernel against an f32 mirror of clothLoop, word for word), in the browser through gfx/device.js on WebGPU (40 frames within an a-priori 1e-4 of the f64 solver, deterministic across runs and a within-color shuffle, contact pairs found and solved) and on WebGL2 (the shipped twin, byte for byte); the mirror at f64 pinned to clothLoop by hash; the null backend's dispatch count per frame.",
+        key: "*** FOR 1800 ROUNDS THE CLOTH'S GPU LOOP WAS FOUR SHADER FILES NOTHING LOADED. *** The first physics/ module on gfx/device.js. Measured on this box: every kernel returns the f32 mirror's bytes (100 of 100 words), 40 frames on WebGPU are bit-identical to the mirror on all 75 coordinates and 6.0e-6 from f64.",
+    },
+    {
         id: "device-mipmaps", area: "render", name: "Mip chains on the device, every level read back against a CPU box filter",
         gate: "tools/ship/deviceMipmaps-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
         measures: "For `mipmaps: true` on gfx/device.js -- gl.generateMipmap on WebGL2, a per-level blit pipeline the backend owns on WebGPU -- every level of a 32x32 rgba8unorm chain and two levels of an rgba16float chain read back through render/texelProbe.mjs within a byte of a CPU box filter on both backends; the sampled draw at a quarter size landing on level 2 against an unchained control that aliases; update() rebuilding the chain; the two backends against each other on every level with the row mirror applied by name; the refusals (rg16uint, render targets) by name.",

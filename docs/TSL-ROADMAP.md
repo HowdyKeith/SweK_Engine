@@ -359,6 +359,36 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         overflow with no fence, so it overwrites text still being drawn.
     13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
 
+8. **THE PHYSICS LAB ON THE DEVICE -- planned at v4464 after a survey of the lab's GPU paths.** The lab has one
+   strong convention on the CPU side (every instrument an exact key, a gate and a registry row) and none on the GPU
+   side: five physics families reach WebGPU five different ways and ZERO files under physics/ import gfx/device.js.
+   The survey's gaps, in the order they close, with the sidebar's task numbers:
+     1. (task 24) The XPBD cloth GPU path, reachable. physics/xpbd/xpbd-distance.wgsl, cloth-collision.wgsl and the
+        two transform-feedback .vert files described a closed GPU loop since v2661 and nothing loaded them. BUILT at
+        v4465: physics/xpbd/xpbdWgsl.mjs -- predict, one solve dispatch per color per iteration, finalize -- as
+        compute kernels over one Step uniform and vec4 particle records, run through gfx/device.js by
+        makeClothDevice() (the shipped f64 twin on any other backend, `path` saying which), and a flat mirror with one
+        rounding knob pinned to clothLoop byte for byte at f64. MEASURED by tools/ship/xpbdDevice-selfcheck.mjs: each
+        kernel returns the f32 mirror's bytes on the headless Dawn device (100 of 100 words, three kernels, the solve
+        in place through the harnesses' new outInit); in the browser through the device, 40 frames on WebGPU are
+        bit-identical to the f32 mirror on all 75 coordinates and within 6.0e-6 of the f64 solver against an
+        a-priori floor of 1e-4; a second run and a within-color shuffle return the same bits; with radius 0.4 the
+        path finds 1,920 pairs over 40 frames and stays deterministic. Two things the old files got wrong, found by
+        writing the mirror: cloth-collision.wgsl did not accumulate lambda where clothFrame does, and the predict and
+        finalize passes were WebGL2 transform-feedback shaders no single context could run beside the WebGPU solve.
+        NOT CLAIMED: a GPU pair finder (contact reads the prediction back once per frame, because the pairs must be
+        SORTED before anything downstream sees them), and physics-lab.html, which still draws the CPU solver.
+     2. (task 25) hmcGpu.mjs and mpm/gpuKernel.mjs on the headless Dawn device; both gates still say there is no GPU
+        in the sandbox, which has been false since v4292.
+     3. (task 26) physics/ GPU kernels built through device.compute() instead of raw pipelines.
+     4. (task 27) The probe convention (packUniforms + probeCpu + keyCpu) on every WebGPU physics module, with a
+        census check, instead of three modules of thirty.
+     5. (task 28) A gated step-loop helper on the device, so samplers and solvers stop hand-rolling ping-pong buffers.
+     6. (task 29) The brain's kernels exported as text and in the corpus; brain/gpu.js accepting a software adapter
+        under a flag so the shipped kernels can be graded where every other GPU gate runs.
+     7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper.
+     8. (task 31) The WGSL census over physics/mpm, tools/roundhouse and brain/, seeing .wgsl files too.
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

@@ -1,4 +1,5 @@
 #version 300 es
+// v4465 -- SUPERSEDED by physics/xpbd/xpbdWgsl.mjs finalizeWgsl(); same reason as cloth-predict.vert. Never loaded by anything.
 // physics/xpbd/cloth-finalize.vert -- transform-feedback FINALIZE pass. RIG-ONLY. Mirrors finalizePass in
 // clothLoop.js. Per vertex: derive velocity from the solved prediction minus the pre-solve position, then commit the
 // new position. Reads a_pred/a_prev, writes v_pos/v_vel via transform feedback. The v_pos buffer becomes next

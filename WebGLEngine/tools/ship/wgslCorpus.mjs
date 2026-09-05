@@ -56,6 +56,10 @@ import { slugShaderWgsl, slugProbeWgsl, slugDilateProbeWgsl, PROBE_BINDINGS, DIL
 import { parseFont } from "../../text/slugFont.js";
 import { packAtlas, packGlyphLoc, packGlyphFlags } from "../../text/slugAtlas.js";
 import { testFontBytes } from "../../text/slugTestFont.mjs";
+// v4465 -- the cloth pillar's GPU path, the first physics/ module on gfx/device.js
+import * as XP from "../../physics/xpbd/xpbdWgsl.mjs";
+import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
+import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -114,6 +118,22 @@ function slugProbeCase(logWidth = 4, px = 28) {
         ],
         // For the gate's report line: how much atlas the probe walked, and whether the lists wrapped.
         atlas: { width: atlas.width, curveTexels: atlas.curveTexels, bandTexels: atlas.bandTexels, glyphs: list.length, samples: count },
+    };
+}
+
+/** The XPBD kernels over clothLoop-selfcheck's 5x5 sheet: predict, one solve pass over color 0 in place (outInit), finalize. */
+function xpbdCases() {
+    const W = 5, H = 5, N = W * H, { cons } = buildClothConstraints(W, H, 0.3, { structural: 0, shear: 0.001, bending: 0.01 });
+    const colors = xpbdColors(cons);
+    const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; pos[3 * i] = x * 0.3 + 0.01 * Math.sin(i); pos[3 * i + 1] = 0.02 * Math.cos(i); pos[3 * i + 2] = -y * 0.3; invMass[i] = y === 0 ? 0 : 1; }
+    const step = XP.packStep({ dt: 0.016, unilateral: 0, count: N, gravity: [0, -10, 0] });
+    const P = XP.packParticles(pos, invMass), V = XP.packParticles(vel, new Float64Array(N));
+    const pred = Float32Array.from(P); for (let a = 0; a < N; a++) if (invMass[a] > 0) pred[4 * a + 1] -= 0.0016;   // a fallen prediction, so the solve has work
+    return {
+        predict: { code: XP.predictWgsl(), outCount: 4 * N, uniforms: step, workgroups: 1, inputs: [{ binding: 2, data: P }, { binding: 3, data: V }, { binding: 4, data: new Float32Array(4 * N) }] },
+        solve: { code: XP.solveWgsl(), outCount: 4 * N, uniforms: step, workgroups: 1, outInit: pred, inputs: [{ binding: 2, data: XP.packConstraints(cons) }, { binding: 3, data: Uint32Array.from(colors[0]) }, { binding: 4, data: new Float32Array(cons.length) }] },
+        finalize: { code: XP.finalizeWgsl(), outCount: 4 * N, uniforms: step, workgroups: 1, inputs: [{ binding: 2, data: pred }, { binding: 3, data: P }, { binding: 4, data: V }] },
     };
 }
 
@@ -294,6 +314,17 @@ export function corpus() {
         { id: "slugShaderWgsl.slugProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "the SAME core as the fragment, over five read-only storage buffers: root code, two solvers and band walks per sample, on a width-16 atlas whose curve list wraps to two rows and band list to three",
           opts: slugProbeCase(4, 28) },
+        // *** v4465 -- THE FIRST physics/ KERNELS ON gfx/device.js, AND THE FIRST CORPUS ENTRY THAT WORKS IN PLACE. *** The
+        // solve relaxes the prediction it is handed (outInit on binding 0); both harnesses grew the option for it.
+        { id: "xpbdWgsl.predictWgsl", from: "physics/xpbd/xpbdWgsl.mjs",
+          why: "the cloth's predict pass: gravity into velocity, position into prediction, pinned particles copied -- one vec4 record per thread",
+          opts: xpbdCases().predict },
+        { id: "xpbdWgsl.solveWgsl", from: "physics/xpbd/xpbdWgsl.mjs",
+          why: "one graph-colored XPBD solve pass: Eq (18) with the accumulated multiplier and Eq (17) on both particles, IN PLACE on the prediction",
+          opts: xpbdCases().solve },
+        { id: "xpbdWgsl.finalizeWgsl", from: "physics/xpbd/xpbdWgsl.mjs",
+          why: "the finalize pass: velocity from prediction minus the saved position, position committed",
+          opts: xpbdCases().finalize },
         { id: "slugShaderWgsl.slugDilateProbeWgsl", from: "text/slugShaderWgsl.js",
           why: "SlugDilate under a matrix with a live perspective row: the half-pixel push whose per-axis error the v4457 note wrote down",
           opts: slugDilateCase() },
@@ -379,7 +410,7 @@ export const EXCLUDED = Object.freeze([
  * *** THIS FILE MUST NOT COUNT ITSELF, *** which is the trap the tree has hit repeatedly: a file that grades a
  * marker and contains the marker grades its own prose. The scan skips this module and the gate that drives it.
  */
-export function census({ roots = ["render", "physics/render", "shaders", "text"] } = {}) {
+export function census({ roots = ["render", "physics/render", "physics/xpbd", "shaders", "text"] } = {}) {
     const SELF = ["wgslCorpus.mjs", "crossBackend-selfcheck.mjs"];
     const found = [];
     const walk = (dir) => {

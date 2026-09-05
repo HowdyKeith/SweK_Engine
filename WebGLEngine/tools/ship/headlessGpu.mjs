@@ -237,7 +237,7 @@ export function storageWords(data) {
 
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
-                                             inputs = null } = {}) {
+                                             inputs = null, outInit = null } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
@@ -264,7 +264,10 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const U = G.GPUBufferUsage || globalThis.GPUBufferUsage;
         const M = G.GPUMapMode || globalThis.GPUMapMode;
         const bytes = outCount * 4;
-        const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC });
+        const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC | U.COPY_DST });
+        // v4465 -- `outInit`: the out buffer's starting contents, for a kernel that works IN PLACE on binding 0 (the
+        // XPBD solve relaxes the prediction it is handed). Same option on the browser harness, same signature.
+        if (outInit) dev.queue.writeBuffer(outBuf, 0, storageWords(outInit).subarray(0, outCount));
         const readBuf = dev.createBuffer({ size: bytes, usage: U.COPY_DST | U.MAP_READ });
         const entries = [{ binding: 0, resource: { buffer: outBuf } }];
         let uniBuf = null;

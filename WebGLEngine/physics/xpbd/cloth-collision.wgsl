@@ -1,4 +1,5 @@
 // physics/xpbd/cloth-collision.wgsl -- WebGPU graph-colored UNILATERAL self-collision. RIG-ONLY.
+// v4465 -- SUPERSEDED by physics/xpbd/xpbdWgsl.mjs solveWgsl() with the unilateral flag, which ACCUMULATES lambda as clothFrame does (this file did not, and diverged from the twin at collisionIterations > 1). Never loaded by anything.
 //
 // The structural, shear and bending constraints are ordinary distance constraints -- physics/xpbd/xpbd-distance.wgsl
 // already solves them. This shader adds self-collision: one thread per collision pair in the current color batch,

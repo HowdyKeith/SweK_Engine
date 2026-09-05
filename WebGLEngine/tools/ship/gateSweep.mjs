@@ -1943,6 +1943,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "UNFLIPPED blit corrupts only the ODD levels (two flips cancel), so the level a minified draw reads " +
                  "stayed green while levels 1 and 3 were upside down. The gate reads every level for that reason.",
     }),
+    since87: Object.freeze({
+        at: "v4465", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/xpbdDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/crossBackend-selfcheck.mjs (three XPBD entries; census root physics/xpbd)"]),
+        verdict: "green on the headless Dawn device, on the browser's WebGPU through gfx/device.js, and on the null backend. " +
+                 "THE CLOTH PILLAR'S GPU LOOP WAS FOUR SHADER FILES NOTHING LOADED, for eighteen hundred rounds; " +
+                 "physics/xpbd/xpbdWgsl.mjs is the same three passes as clothLoop.js as compute kernels the device runs, " +
+                 "the first physics/ module on gfx/device.js. A flat mirror with one rounding knob is pinned to clothLoop " +
+                 "byte for byte at f64; at f32 it is 6.0e-6 from f64 after 40 frames; each kernel returns the mirror's " +
+                 "bytes on the headless device (100 of 100 words), the solve in place through the harnesses' new outInit; " +
+                 "40 frames in the browser are bit-identical to the mirror on all 75 coordinates, deterministic across " +
+                 "runs and a within-color shuffle, 1,920 contact pairs found and solved at radius 0.4. Sabotages red at " +
+                 "2 / 1 / 5, and A is the finding: a single-pass identity check cannot see Eq (18)'s term because a first " +
+                 "pass has lambda = 0, so a second native pass now carries the multiplier in. Two errors in the old " +
+                 "files found by writing the mirror: contact did not accumulate lambda where the twin does, and the " +
+                 "predict/finalize passes were WebGL2 transform feedback no WebGPU context could run.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
