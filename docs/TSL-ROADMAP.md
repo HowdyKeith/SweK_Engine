@@ -227,6 +227,15 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    NOT CLAIMED: the kernel's full signature. L and n are uniforms in WGSL_HMC and baked constants in the graph,
    because a TSL Loop wants a JavaScript bound (lyapunovNodes set that precedent at v4321). A graph whose step count
    comes from a buffer is the next thing here, and it is unbuilt.
+   *** CLAIMED AT v4471 (task 30): a TSL Loop takes its bound from a NODE. *** three's LoopNode builds `end` when
+   it is a node, so the bound may be a uniform or a storage buffer's element, and the sentence above was an
+   assumption nobody had measured. render/physicsTsl.mjs makeLogisticStepperTsl steps the logistic map `bound`
+   times with the bound read from a vec4 uniform in one variant and from a storage buffer's element 0 in the other;
+   tools/ship/tslLoopBound-selfcheck.mjs emits each variant ONCE, transplants it, and runs the one module at 1, 2,
+   3, 50 and 200 steps with only the buffer changed -- 1,024 orbits bit-identical to the f32 twin at every count in
+   both variants, and the emitted loop reads `i < i32( u.bound.x )` and `i < i32( steps.value[ 0u ] )` from its
+   text, not a literal. The two passes are in the corpus from tools/ship/tsl-emitted-loop.json. What is still not
+   claimed: a bound that changes mid-dispatch and a bound per element.
 
 7. **SLUG TEXT ON THE WebGPU BACKEND -- planned at v4457 after a review of an outside plan; item 1 built the same round.** The plan reviewed
    proposed a fresh Slug: opentype.js in a Web Worker, a TSL fragment loop, a JSON font registry, a ring buffer,
@@ -435,7 +444,8 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         WebGPU, the flow-field module compiles, the refusal is exercised both ways on a stubbed adapter. NOT
         CLAIMED: the brain PROCESS (Deno, its own device), the flow-field solver running here (its gate holds the
         solver to its CPU twin), sigmoid layers.
-     7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper.
+     7. (task 30) TSL compute with a loop bound read from a buffer, so TSL can generate a stepper. BUILT at v4471,
+        and step 6's NOT CLAIMED line was an assumption: three's LoopNode builds a node `end`. See step 6.
      8. (task 31) The WGSL census over physics/mpm, tools/roundhouse and brain/, seeing .wgsl files too.
 
 ## The count that says when step 4 matters

@@ -2055,6 +2055,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the gate's own run before anything shipped. Sabotages red at 4 / 2 / 1, and B first crashed the gate " +
                  "with no red line, so the check catches now.",
     }),
+    since93: Object.freeze({
+        at: "v4471", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/tslLoopBound-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on the browser's WebGPU through three 0.178, render/tslSource.mjs and gfx/device.js. Step 6 said for " +
+                 "140 rounds that a TSL Loop wants a JavaScript bound; three's LoopNode builds a node `end`, and the sentence " +
+                 "was an assumption. render/physicsTsl.mjs makeLogisticStepperTsl steps the logistic map `bound` times with " +
+                 "the bound a vec4 uniform in one variant and a storage buffer's element in the other; each variant emitted " +
+                 "once, transplanted, and run at 1, 2, 3, 50 and 200 steps with only the buffer changed -- 1,024 orbits " +
+                 "bit-identical to the f32 twin at every count, the loop's bound read from the emitted text as the uniform " +
+                 "or the element, the two passes in the corpus from tools/ship/tsl-emitted-loop.json. Sabotages red at " +
+                 "7 / 14 / 14, and A is the finding: a baked bound leaves the storage variant's buffer unread, three emits " +
+                 "no buffer the body does not touch, and the transplant refuses the graph by name.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

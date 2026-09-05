@@ -63,5 +63,5 @@ render/lyapunovWgsl.mjs. Read it before writing a kernel module; every rule belo
 An iterative kernel with ONE state buffer and one kernel per step runs through render/stepLoop.mjs (v4469:
 `makeStepLoop(device, { code, state, names: [read, write], buffers, workgroups, perStep })`, see
 physics/chaos/logisticWgsl.mjs for the consumer shape). Several state buffers or kernels per step (the cloth
-loop) still keep their own runner. A TSL-generated kernel cannot take its loop bound from a buffer; that is
-task 30.
+loop) still keep their own runner. A TSL-generated kernel CAN take its loop bound from a uniform or a storage
+element (v4471, render/physicsTsl.mjs makeLogisticStepperTsl); a bound that changes mid-dispatch cannot yet.

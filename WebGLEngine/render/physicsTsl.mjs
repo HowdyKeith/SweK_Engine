@@ -431,3 +431,32 @@ export const CMD_STRUCT = Object.freeze({ name: "Cmd", fields: Object.freeze([
     Object.freeze({ name: "baseVertex", type: "u32" }),
     Object.freeze({ name: "firstInstance", type: "u32" }),
 ]) });
+
+// ---- v4471 -- A LOOP WHOSE BOUND COMES FROM A BUFFER ---------------------------------------------------------------
+//
+// Step 6 of the roadmap said, from v4331 to v4470, that a TSL Loop wants a JavaScript bound, so every generated pass
+// baked its trip count into the text and a stepper whose step count arrives at run time was "a round of its own".
+// three's LoopNode takes `end` as a NODE (it builds it: `end.build(builder, type)`), so the bound may be a uniform
+// or an element of a storage buffer, and this graph is the measurement: the logistic map stepped `bound` times, the
+// bound read from a vec4 uniform (`boundFrom: "uniform"`) or from a storage buffer's element 0 (`"storage"`), r and
+// x0 per element from read-only buffers -- the SAME fixture physics/chaos/logisticWgsl.mjs hands its hand-written
+// kernel, so the generated stepper is held to that module's f32 twin bit for bit at every step count, with ONE emitted
+// module and the count changed in the buffer alone. tools/ship/tslLoopBound-selfcheck.mjs.
+export function makeLogisticStepperTsl(TSL, { count = 1024, steps = 200, boundFrom = "uniform" } = {}) {
+    const { Fn, float, int, uniform, vec4, instanceIndex, instancedArray, Loop } = TSL;
+    for (const n of ["Fn", "float", "int", "uniform", "vec4", "instancedArray", "Loop"]) if (typeof TSL[n] !== "function") throw new Error(`physicsTsl: the TSL namespace has no ${n}()`);
+    if (boundFrom !== "uniform" && boundFrom !== "storage") throw new Error("physicsTsl: boundFrom is \"uniform\" or \"storage\"");
+    const out = instancedArray(count, "float").label("out");
+    const rBuf = instancedArray(count, "float").label("r");
+    const x0Buf = instancedArray(count, "float").label("x0");
+    const stepsBuf = boundFrom === "storage" ? instancedArray(4, "float").label("steps") : null;
+    const uniforms = boundFrom === "uniform" ? { bound: uniform(vec4(steps, 0, 0, 0)).label("bound") } : {};
+    const node = Fn(() => {
+        const r = rBuf.element(instanceIndex);
+        const x = x0Buf.element(instanceIndex).toVar();
+        const n = boundFrom === "storage" ? int(stepsBuf.element(0)) : int(uniforms.bound.x);
+        Loop({ start: int(0), end: n }, () => { x.assign(r.mul(x).mul(float(1.0).sub(x))); });
+        out.element(instanceIndex).assign(x);
+    })().compute(count);
+    return { node, out, rBuf, x0Buf, stepsBuf, uniforms, count, steps, boundFrom };
+}

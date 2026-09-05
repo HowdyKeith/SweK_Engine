@@ -78,6 +78,9 @@ import { computeShell } from "../../render/tslSource.mjs";
 const EMITTED_COMPUTE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-compute.json");
 const EMITTED_COMPUTE = fs.existsSync(EMITTED_COMPUTE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_COMPUTE_PATH, "utf8")) : null;
 
+const EMITTED_LOOP_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-loop.json");
+const EMITTED_LOOP = fs.existsSync(EMITTED_LOOP_PATH) ? JSON.parse(fs.readFileSync(EMITTED_LOOP_PATH, "utf8")) : null;
+
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 // ---- v4464 -- THE SLUG PROBES' INPUTS: THE FIRST CORPUS ENTRIES WITH READ-ONLY STORAGE BINDINGS ----------------
@@ -287,6 +290,13 @@ export function corpus() {
         // v4331 -- the first GENERATED COMPUTE pass in the corpus: three's node builder wrote it, tslSource transplanted it
         ...(EMITTED_COMPUTE && EMITTED_COMPUTE.transplanted ? [
             { id: "tslSource.lyapunovCompute (generated)", from: "tools/ship/tsl-emitted-compute.json", compileOnly: true, why: "a compute stage nobody wrote by hand: a storage buffer, a uniform struct and two baked Loops, inside a gfx/device.js compute module", opts: { code: EMITTED_COMPUTE.transplanted, compileOnly: true, outCount: 0 } },
+        ] : []),
+        // v4471 -- THE FIRST GENERATED PASS WHOSE TRIP COUNT IS NOT IN ITS TEXT: the logistic map stepped `bound` times, the bound
+        // a vec4 uniform in one variant and a storage buffer's element in the other (render/physicsTsl.mjs makeLogisticStepperTsl,
+        // written by tools/ship/tslLoopBound-selfcheck.mjs, which holds both to the f32 twin at five step counts from ONE module)
+        ...(EMITTED_LOOP && EMITTED_LOOP.transplanted ? [
+            { id: "tslSource.logisticStepperUniform (generated)", from: "tools/ship/tsl-emitted-loop.json", compileOnly: true, why: "a TSL Loop whose end is a UNIFORM, emitted by three and transplanted: for (i < i32(u.bound.x)) -- the bound the roadmap said a Loop could not take", opts: { code: EMITTED_LOOP.transplanted, compileOnly: true, outCount: 0 } },
+            { id: "tslSource.logisticStepperStorage (generated)", from: "tools/ship/tsl-emitted-loop.json", compileOnly: true, why: "the same stepper with the bound read from a STORAGE buffer's element: for (i < i32(steps.value[0u]))", opts: { code: EMITTED_LOOP.transplantedStorage, compileOnly: true, outCount: 0 } },
         ] : []),
         // v4318 -- the mask on the device: two full-screen pipelines (vertex and fragment in one module), compiled here; they were
         // added after that round's corpus run and the crossBackend gate named them at v4320
