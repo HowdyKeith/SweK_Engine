@@ -569,6 +569,24 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         gpu.html offers the look by a select. NOT CLAIMED: reflections, waves, a shoreline; a language blend across a
         border (a file is one language).
      4. (task 41) Erosion measured before any port: the step-loop kernel or a written won't-do, with the numbers.
+        MEASURED at v4482, and the answer is a won't-do-yet with the measurement as a gate: tools/ship/erosionMeasure-
+        selfcheck.mjs. COST: a 160x160 padded tile is 1.9 / 3.0 / 2.4 ms (fill / hydraulic / thermal, median of 6) on
+        a synthetic base, 12.3 ms per tile on the engine's own generator in JavaScript and 8.3 ms in the WASM crate
+        (built here for wasm32 by cargo alone and driven raw), once per 128 voxels of travel and already sliced under
+        a 3 ms prewarm budget -- there is no hitch for a device pass to remove. SEQUENCE: the thermal pass is Gauss-
+        Seidel, and the Jacobi pass one dispatch per iteration computes differs from it on 2,678 cells from the same
+        field; the hydraulic pass is 1,500 droplets in RNG order, 6,485 of the 13,162 cells it touches are written by
+        two or more of them, and the same droplets in reverse order move 12,393 cells by up to 2.4 voxels. So a device
+        pass is a different algorithm, not a port: no tolerance short of voxels holds it to world/erosion.js, and a
+        twin off by voxels is a third generator under the rule that already forbids mixing two inside one tile (the
+        JavaScript and the crate differ on 1,207 of 16,384 columns of one tile, max 2 voxels, the crate eroding in
+        f64 where the JavaScript erodes a Float32Array). SENSITIVITY, measured while there: one cell moved by an f32
+        ulp changes one cell beside it; every cell moved by an f32 ulp changes 25,120 of 25,600, five by a voxel or
+        more; every cell moved by an f64 ulp changes nothing, the Float32Array swallowing it. Deterministic, 25,600 of
+        25,600. RE-OPEN when something on the device consumes an eroded field (the orrery landing's terrain is the
+        natural consumer; the voxel world's chunk fill is CPU and would only read it back), and then as a Jacobi pass
+        gated to itself in f32 under docs/GPU-KERNEL-CONTRACT.md, not as a twin of erosion.js. The record is
+        tools/ship/todo.mjs's erosion-device-port, and the gate holds the record to the numbers.
 
 ## The count that says when step 4 matters
 

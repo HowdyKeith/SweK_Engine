@@ -2279,6 +2279,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "texel is WATER_COLOUR over the Worley colour in the fragment and the plane is gone. Sabotages red at 5 / 7 / 1; " +
                  "B leaves the picture right and the twin wrong and reads red on both backends, which is the point of a twin.",
     }),
+    since104: Object.freeze({
+        at: "v4482", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/erosionMeasure-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. The last step of the git terrain asked whether world/erosion.js's hydraulic and thermal passes " +
+                 "are a render/stepLoop.mjs candidate, and the answer is a measured won't-do-yet with the measurement as the gate: " +
+                 "a 160x160 tile costs 1.9 / 3.0 / 2.4 ms (fill / hydraulic / thermal), 12.3 ms on the engine's generator in " +
+                 "JavaScript and 8.3 ms in the WASM crate (built here for wasm32 by cargo alone, driven raw with stub imports), " +
+                 "once per 128 voxels and already sliced under a 3 ms prewarm budget; the passes are sequential -- the thermal " +
+                 "pass is Gauss-Seidel and a Jacobi dispatch differs on 2,678 cells, the 1,500 droplets write 6,485 cells two or " +
+                 "more times and reversed move 12,393 cells by up to 2.4 voxels -- so a device pass is another algorithm that no " +
+                 "tolerance short of voxels holds to the CPU, and a twin off by voxels is a third generator under the one-per-tile " +
+                 "rule; the JavaScript and the crate already differ on 1,207 of 16,384 columns of one tile (max 2 voxels). " +
+                 "Deterministic 25,600 of 25,600; one cell moved an f32 ulp changes one cell beside it, every cell moved an f32 " +
+                 "ulp changes 25,120, an f64 ulp changes nothing because the field is a Float32Array. The decision is " +
+                 "todo.mjs's erosion-device-port and the gate holds it to the numbers. Sabotages red at 1 / 1 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

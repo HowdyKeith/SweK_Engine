@@ -7,3 +7,9 @@
 # physics/box3d/build-box3d-native.sh; without them the gate skips that section
 # and says so.
 vendor/box3d/native/
+
+# v4482 -- the terrain crate built for wasm32 by cargo alone, so tools/ship/erosionMeasure-selfcheck.mjs
+# can time it. Same rule as vendor/box3d/native/ above: a build product of one box, never committed;
+# the engine ships without it and world/terrainWasm.js says so.
+wasm-terrain/target/
+wasm-terrain/Cargo.lock

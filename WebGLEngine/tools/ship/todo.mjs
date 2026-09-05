@@ -210,6 +210,23 @@ export const TODO = [
             "guard that was actually missing, since tryStep's dt was a DEFAULT PARAMETER and nothing checked it.",
         evidence: "node physics/control/controlStateSpace-selfcheck.mjs   # section 4",
     },
+    {
+        id: "erosion-device-port",
+        status: "wont",
+        title: "Erosion on the device: world/erosion.js's hydraulic and thermal passes as a render/stepLoop.mjs kernel",
+        why: "docs/TSL-ROADMAP.md step 10 item 4 (task 41): two heightfields ping-ponged N steps, one readback, held " +
+             "to the CPU erosion per texel at a stated tolerance -- or a written won't-do with the measurement beside it.",
+        reason: "MEASURED at v4482 and not worth porting yet: a 160x160 tile costs 1.9 / 3.0 / 2.4 ms (fill / hydraulic / " +
+                "thermal) on the synthetic base, 12.3 ms on the engine's generator in JavaScript and 8.3 ms in the WASM crate, " +
+                "once per 128 voxels of travel and already sliced under a 3 ms prewarm budget, so there is no hitch to remove; " +
+                "the passes are SEQUENTIAL, so no kernel can be held to them -- the thermal pass is Gauss-Seidel and a Jacobi " +
+                "dispatch differs on 2,678 cells, the 1,500 droplets write 6,485 cells two or more times and reversed they move " +
+                "12,393 cells by up to 2.4 voxels -- and a twin off by voxels is a third generator under the one-generator-per-" +
+                "tile rule; and nothing on the device consumes an eroded field (chunk fill is CPU), so a pass would be a compute " +
+                "plus a readback. RE-OPEN when a device consumer exists (the orrery landing's terrain), as a Jacobi pass gated " +
+                "to itself in f32 under the kernel contract, not as a twin of erosion.js.",
+        evidence: "node tools/ship/erosionMeasure-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);
