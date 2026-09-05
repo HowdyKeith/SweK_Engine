@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RED_AT_V4279, RED_AT_V4408_GATES } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408_GATES, RED_AT_V4424_GATES } from "./redCensus.mjs";
 
 // *** v4400 -- THE VERSION WAS A STRING LITERAL AND THE AUDIT LIED ABOUT ITS OWN AGE FOR TWENTY ROUNDS. ***
 // This tool wrote `at: "v4380"` as text, so every re-freeze since has produced a file claiming to have been
@@ -43,7 +43,13 @@ const rows = [];
 // v4430 -- BOTH registers, because both derive their line from this audit now. RED_AT_V4408 held the last
 // typed `fails:` literal in the file and there was no run behind it; a second list with the same defect is the
 // second-copy shape, and the fix is one audit rather than one exemption.
-for (const e of [...RED_AT_V4279, ...RED_AT_V4408_GATES.map((gate) => ({ gate }))]) {
+// v4471 -- THREE registers, and the third is why this line is worth a comment rather than a merge. v4424
+// filed three more reds out of UNCONFIRMED_SLOW and the audit was not taught about them, so registerDrift's
+// "the admitted set may only SHRINK" went red: their lines had to be ADMITTED as unverified because nothing
+// ran them. THE FIX IS TO RUN THEM, not to admit them -- and their runtimes (75 s to 151 s) are why
+// SWEK_AUDIT_CAP_MS exists. A register that derives its readings needs every list it derives from in here.
+for (const e of [...RED_AT_V4279, ...RED_AT_V4408_GATES.map((gate) => ({ gate })),
+                 ...RED_AT_V4424_GATES.map((gate) => ({ gate }))]) {
     const r = await run(e.gate);
     rows.push({ gate: e.gate, exit: r.exit, ms: r.ms, first: r.fails[0] || "", all: r.fails, count: r.fails.length, onStderr: r.onStderr });
     console.log(String(r.exit).padStart(8), String(r.ms).padStart(7) + "ms", String(r.fails.length).padStart(2) + " fail(s)", r.onStderr ? "[stderr]" : "        ", e.gate);

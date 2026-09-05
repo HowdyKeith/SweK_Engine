@@ -106,6 +106,108 @@ export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
  * these twelve the completion time is measured directly, so 2x is ample and it keeps a genuine hang bounded --
  * 3x on a 280s gate would stall a suite for fourteen minutes before admitting anything was wrong.
  */
+/**
+ * *** THE RUNS THEMSELVES, AS DATA, BECAUSE THE HEADER ABOVE PROMISES SOMETHING THE TABLE DOES NOT DELIVER. ***
+ *
+ * That header says "A NUMBER WITH ITS MEASUREMENT ATTACHED CAN BE CONTRADICTED BY A RE-MEASURE; a bare number
+ * cannot." Every entry below MEASURED is a bare number with its measurement attached IN A COMMENT -- attached
+ * to the reader, not to anything that can check it. v4471 sabotaged its own four new entries to find out what
+ * that costs, and TWO SABOTAGES SURVIVED WITH ZERO REDS:
+ *
+ *   - paintTransfer's basis set to 1 ms. Nothing noticed. gateBudget-selfcheck's cross-check ("no gate is
+ *     budgeted from a basis its own recorded runtime already exceeds") reads gate-timings.json -- and a gate
+ *     is IN this table precisely because gate-timings.json has never timed it. THE CROSS-CHECK CAN ONLY
+ *     VALIDATE THE ENTRIES THAT DID NOT NEED IT.
+ *   - the FASTEST of three runs recorded instead of the slowest. Nothing noticed. The rule ("the SLOWEST is
+ *     recorded rather than the mean, because a budget set to the average of a contended measurement re-creates
+ *     the timeout it is meant to prevent") is stated in prose four lines above the number it governs, and
+ *     prose does not run.
+ *
+ * So the runs move out of the comment and into the file, and the basis for these gates is DERIVED from them by
+ * `slowestRun` below rather than typed beside them. That does not detect the second sabotage -- it makes it
+ * unrepresentable, which is the better outcome. The first is now checkable: gateBudget-selfcheck re-derives the
+ * maximum ITSELF, from these rows, and compares it against the exported MEASURED. It deliberately does not call
+ * slowestRun, because a check that borrows the arithmetic it is checking asserts only that a function equals
+ * itself.
+ *
+ * *** WHAT IS STILL NOT CHECKABLE, AND SAYING SO IS THE POINT: A FABRICATED RUN. *** If somebody types
+ * `{ ms: 1, code: 0 }` here, every check below passes. Nothing in a repository can tell a measurement from a
+ * number that looks like one; the most this structure buys is that fabricating now requires inventing three
+ * consistent readings instead of editing one digit, and that the fabrication sits where it can be re-measured
+ * and contradicted. That is exactly the property the header claimed and the table did not have.
+ *
+ * `observedHere` is false for rows transcribed from an earlier round's note rather than run by the round that
+ * wrote them down. It is not a soft "probably true": it marks the rows for which this file is repeating a
+ * claim, and the check below names them rather than averaging them in with the rest.
+ *
+ * *** TWO SABOTAGES OF THIS STRUCTURE STILL DO NOT GO RED, AND BOTH ARE RECORDED RATHER THAN PAPERED OVER. ***
+ *
+ * 1. MAKING `slowestRun` SKIP NON-COMPLETING RUNS IS A NO-OP HERE. Every row above is exit 0, so a filter on
+ *    `code === 0` removes nothing and no check can see the difference. That is not a hole so much as the shape
+ *    of the pair: the filtered version can only differ on a row the completion check FORBIDS, and the sabotage
+ *    that plants such a row AND filters it out was run -- it goes red on the completion check, which is the
+ *    line that matters. What survives is a change with no consequence while the data conforms.
+ *
+ * 2. DELETING A ROW WHOSE GATE IS STILL IN MEASURED IS A CRASH, NOT A RED. `slowestRun` throws "no recorded
+ *    runs for <gate>" at module load and the tree will not import. That is left as a throw on purpose, and the
+ *    difference from case 1 is the difference between a broken reference and a false fact: a MISSING row means
+ *    the two tables no longer wire together and nothing downstream can be trusted to mean anything, while a
+ *    WRONG row is a claim about the world that a check should read out loud and fail on. The first version of
+ *    this function threw for both, and that is the bug the split below fixed -- the throw on bad DATA made the
+ *    check that reports bad data unreachable.
+ */
+export const MEASURED_RUNS = Object.freeze({
+    // Transcribed from the v4456 note below, NOT run here. Its only corroboration is internal: the basis that
+    // note recorded, 20480, is already the maximum of the five readings it lists -- so the transcription and
+    // the number it was supposed to produce agree. That is worth something and it is not a measurement.
+    "physics/render/transmission-selfcheck.mjs": Object.freeze({
+        observedHere: false, at: "v4456",
+        runs: Object.freeze([{ ms: 20387, code: 0 }, { ms: 20480, code: 0 }, { ms: 15175, code: 0 },
+                             { ms: 15405, code: 0 }, { ms: 13477, code: 0 }]),
+    }),
+    // Run here at v4471, three each, `date +%s%N` around the process, exit status captured per run.
+    "tools/ship/paintFields-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4471",
+        runs: Object.freeze([{ ms: 20359, code: 0 }, { ms: 19890, code: 0 }, { ms: 19786, code: 0 }]),
+    }),
+    "tools/ship/paintTransfer-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4471",
+        runs: Object.freeze([{ ms: 29375, code: 0 }, { ms: 28883, code: 0 }, { ms: 29040, code: 0 }]),
+    }),
+    "tools/ship/carveGpu-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4471",
+        runs: Object.freeze([{ ms: 22204, code: 0 }, { ms: 21302, code: 0 }, { ms: 21602, code: 0 }]),
+    }),
+    "tools/ship/eulerGpu-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4471",
+        runs: Object.freeze([{ ms: 22726, code: 0 }, { ms: 22192, code: 0 }, { ms: 22189, code: 0 }]),
+    }),
+});
+
+/**
+ * The basis a gate gets from its recorded runs: the SLOWEST of them, per this table's rule.
+ *
+ * *** IT DOES NOT REFUSE A NON-COMPLETING RUN, AND THE FIRST VERSION OF IT DID. *** That version threw, and
+ * the sabotage that planted a `code: 124` row came back as a CRASH: the throw fires at module load, every gate
+ * in the tree imports this file, and so NOTHING RAN -- including gateBudget-selfcheck's own check that every
+ * recorded run is a completion. THE CHECK WAS UNREACHABLE IN EXACTLY THE CONDITION IT TESTS. A validator that
+ * lives inside the thing it validates gets to decide whether its own verdict is ever heard.
+ *
+ * So the two jobs are separated. DERIVING is conservative and total: the maximum over ALL recorded runs,
+ * whatever their exit code, because a run that was killed at 20 s still proves the gate wanted at least 20 s,
+ * and taking it can only RAISE a budget. REFUSING is gateBudget-selfcheck's job, where a bad row is one red
+ * line naming the gate instead of a tree that will not load.
+ *
+ * *** WHAT THIS COSTS, STATED SO IT IS NOT DISCOVERED LATER: *** while such a row sits here the budget is
+ * derived partly from a duration that is a kill rather than a completion. That is the safe direction and it is
+ * still wrong, which is why the check that names it is a FAIL and not a note.
+ */
+export function slowestRun(gate) {
+    const row = MEASURED_RUNS[gate];
+    if (!row) throw new Error("gateBudget.slowestRun: no recorded runs for " + gate);
+    return row.runs.reduce((m, r) => (r.ms > m ? r.ms : m), 0);
+}
+
 export const MEASURED = {
     // *** v4456 -- MEASURED BECAUSE IT HAD NO EVIDENCE AT ALL, WHICH IS THE STATE THIS TABLE EXISTS TO END. ***
     // physics/render/transmission-selfcheck.mjs was widened on the other branch (the chi+ and beta-G2 round)
@@ -118,7 +220,38 @@ export const MEASURED = {
     // gate -- the two twenty-second readings were taken while a ship verify was running on the same box. The
     // SLOWEST is recorded rather than the mean, because this is a budget and a budget set to the average of a
     // contended measurement re-creates the timeout it is meant to prevent.
-    "physics/render/transmission-selfcheck.mjs": 20480,
+    "physics/render/transmission-selfcheck.mjs": slowestRun("physics/render/transmission-selfcheck.mjs"),
+    // *** v4471 -- FOUR GATES THAT WERE KILLED FOR MISSING THE SWEEP CAP, THREE OF THEM BY UNDER THREE
+    // SECONDS. *** budgetEvidence-selfcheck named them as the four gates in the tree with no evidence of any
+    // kind, and the reason is mechanical: sweep-timings.json records each of them at ~20,0xx ms with code 124,
+    // which is the quick sweep killing them AT its 20 s cap. A 124 says nothing -- that is this file's own rule
+    // -- so a gate that misses the cap by a fraction of a second and a gate that hangs forever leave the
+    // IDENTICAL record, and both read as "never run".
+    //
+    // *** THE GATE PERMITS AN ADMISSION HERE AND AN ADMISSION WOULD HAVE BEEN FALSE. *** The wall's own wording
+    // is "carries evidence about its own runtime, OR ADMITS THAT IT DOES NOT FINISH", and UNRESOLVED would have
+    // satisfied it for all four without anybody running them. They were run first. TWELVE RUNS, THREE PER GATE,
+    // EVERY ONE EXIT 0 -- none of the four has ever failed to finish, so the sentence UNRESOLVED wanted would
+    // have been a false statement about four working gates, recorded permanently, to turn a check green.
+    //
+    //     paintFields     20359  19890  19786
+    //     paintTransfer   29375  28883  29040
+    //     carveGpu        22204  21302  21602
+    //     eulerGpu        22726  22192  22189
+    //
+    // The SLOWEST of each is recorded, not the mean, for the reason the transmission entry above states: a
+    // budget set to the average of a contended measurement re-creates the timeout it is meant to prevent. The
+    // spread is tight (under 4% on three of the four), so these are not contention artefacts -- this is what
+    // the gates cost.
+    //
+    // WHAT THIS DOES NOT DO: raise the sweep's 20 s cap. Three of these four would come inside a 25 s cap and
+    // the fourth would not, so moving the cap trades one arbitrary line for another and buys evidence for
+    // three gates by luck rather than by measurement. The cap's job is to keep a ship-time sweep bounded; the
+    // job of knowing what a slow gate costs is THIS TABLE'S, and it is done here by running them.
+    "tools/ship/paintFields-selfcheck.mjs":          slowestRun("tools/ship/paintFields-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
+    "tools/ship/paintTransfer-selfcheck.mjs":        slowestRun("tools/ship/paintTransfer-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
+    "tools/ship/carveGpu-selfcheck.mjs":             slowestRun("tools/ship/carveGpu-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
+    "tools/ship/eulerGpu-selfcheck.mjs":             slowestRun("tools/ship/eulerGpu-selfcheck.mjs"),   // exit 0 x3, MEASURED v4471
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

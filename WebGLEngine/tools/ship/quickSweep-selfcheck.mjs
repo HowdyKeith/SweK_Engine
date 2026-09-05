@@ -12,6 +12,7 @@
 // Run: node tools/ship/quickSweep-selfcheck.mjs
 "use strict";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,9 +91,63 @@ sec("4. A REAL RUN OVER THREE CHEAP GATES, THE TIMINGS FILE UNTOUCHED; AND A CON
     const before = fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null;
     const r = await Q.runQuickSweep({ gates: cheap, budgetMs: 60000, workers: 3, capMs: 60000, write: false });
     const after = fs.existsSync(path.join(ENG, Q.DEFAULTS.timingsFile)) ? fs.readFileSync(path.join(ENG, Q.DEFAULTS.timingsFile), "utf8") : null;
-    ok(r.ran === 3 && r.green === 3 && r.newRed.length === 0 && r.knownRed.length === 0,
-       "*** three green gates run green: the runner runs and classifies ***", `${r.green} green in ${r.ms} ms`);
+    // *** v4470 -- THIS USED TO ASSERT ALL THREE WERE GREEN, AND THAT IS A CLAIM ABOUT THREE OTHER GATES
+    // RATHER THAN ABOUT THE RUNNER. *** It went red twice in one day for reasons the runner had no part in:
+    // windowsImport and citedSources arrived red from a main merge, and this section reported "1 green in
+    // 3037 ms" as though the RUNNER were broken. A fixture that names gates it assumes are green is a fixture
+    // that inherits every unrelated failure in the tree.
+    //
+    // What the runner owes is AGREEMENT, not greenness: whatever verdict it reports for a real gate must be
+    // the verdict that gate gives when run by itself. So each one is re-run directly here and the two are
+    // compared. The section keeps its real point -- the runner works on the actual tree and not only on the
+    // temp-dir synthetics below -- and loses its dependence on what those three gates happen to be doing.
+    // *** ONE re-runner, USED FOR BOTH THE REAL GATES AND THE SYNTHETIC CONTROL BELOW. *** The draft before
+    // this had two copies -- one for the tree, one for the temp-dir pair -- so a comparator that answered
+    // "green" unconditionally broke the real comparison while the control, running its own copy, still passed.
+    // A control that exercises a DIFFERENT INSTANCE of the thing it controls is not a control.
+    const runVerdict = (file, cwd) => {
+        try { execFileSync(process.execPath, [file], { cwd, timeout: 60000, stdio: "ignore" }); return "green"; }
+        catch (e) { return e.status === 0 ? "green" : "red"; }
+    };
+    const verdictOf = (g) => runVerdict(g, ENG);
+    const reported = new Map(cheap.map((g) => [g, "green"]));
+    for (const n of r.newRed) reported.set(n.gate, "red");
+    for (const n of r.knownRed) reported.set(n.gate, "red");
+    for (const g of r.unmeasured || []) reported.set(g, "unmeasured");
+    // ONE comparison, used by the live check AND by the control below. The first draft wrote the filter out
+    // twice -- once live, once in the control -- so a sabotage of the live one left the control passing on its
+    // own copy. THE CHECK AND THE THING UNDER TEST WERE DIFFERENT OBJECTS, which is the defect this section is
+    // about, committed inside the repair for it. Caught by sabotage, 0 red, twice.
+    const disagreementsIn = (verdicts) =>
+        cheap.filter((g) => verdicts.get(g) !== "unmeasured" && verdicts.get(g) !== verdictOf(g));
+    const disagreed = disagreementsIn(reported);
+    ok(r.ran === 3 && disagreed.length === 0,
+       "*** the runner runs three REAL gates and its verdict for each is the verdict that gate gives alone ***",
+       `${r.ran} run, ${r.green} green, ${r.newRed.length + r.knownRed.length} red -- ` +
+       (disagreed.length ? "DISAGREED: " + disagreed.join(", ") : "no disagreement") + `, ${r.ms} ms`);
+    // *** AND THE AGREEMENT CHECK ABOVE IS VACUOUS WHILE EVERYTHING AGREES, WHICH IS THE SHAPE IT REPLACED. ***
+    // With three green gates and three green verdicts, a comparator that always answered "agree" would pass.
+    // So it is driven the other way here: a verdict deliberately mis-stated for a gate whose real answer is
+    // known must be caught. Same fixture, opposite expectation -- the control this section already applies to
+    // the runner, applied to the check on the runner.
+    const liedAbout = cheap[0];
+    const lying = new Map(reported); lying.set(liedAbout, reported.get(liedAbout) === "green" ? "red" : "green");
+    const caught = disagreementsIn(lying);
+    ok(caught.length === 1 && caught[0] === liedAbout,
+       "  ...and that comparison can FAIL: a mis-stated verdict for one real gate is caught",
+       `${liedAbout.split("/").pop()} reported as ${lying.get(liedAbout)}, runs ${verdictOf(liedAbout)}`);
     ok(before === after, "and with write:false the timings file is byte-identical afterwards");
+    // *** AND verdictOf NEEDS A CONTROL OF ITS OWN, BECAUSE EVERY REAL GATE HERE IS GREEN. *** A verdictOf
+    // that answered "green" unconditionally would agree with three green gates AND with a lie about one of
+    // them, and both checks above would pass. Two synthetics settle it: one that exits 1, one that exits 0.
+    const vtmp = fs.mkdtempSync(path.join(os.tmpdir(), "quickSweep-v-"));
+    fs.writeFileSync(path.join(vtmp, "red-selfcheck.mjs"), "process.exit(1);\n");
+    fs.writeFileSync(path.join(vtmp, "green-selfcheck.mjs"), "process.exit(0);\n");
+    ok(runVerdict("red-selfcheck.mjs", vtmp) === "red" && runVerdict("green-selfcheck.mjs", vtmp) === "green",
+       "  ...and the direct re-run itself tells red from green, on two synthetics that cannot drift",
+       "exit 1 reads red, exit 0 reads green -- and it is THE SAME runVerdict the real gates go through, so a comparator that always said green fails HERE");
+    try { fs.rmSync(vtmp, { recursive: true, force: true }); } catch {}
+
     // the control: a gate that always fails, outside the register, in a temp dir that enumerates as a root
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "quickSweep-"));
     fs.writeFileSync(path.join(tmp, "always-selfcheck.mjs"), "process.exit(1);\n");

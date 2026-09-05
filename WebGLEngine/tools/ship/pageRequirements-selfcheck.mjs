@@ -144,7 +144,7 @@ console.log();
     // v4452 -- AND THE DETECTOR ITSELF, WHICH NOTHING ASSERTED. Sabotage E removed the import tell and every
     // gate stayed green: the two pages it misclassifies are named here so the widening cannot be undone in
     // silence. DERIVED by running the classifier, not by trusting a list.
-    const { requirementsOf } = await import(path.join(ENG, "tools", "render-qa", "pageRequirements.mjs"));
+    const { requirementsOf } = await import(pathToFileURL(path.join(ENG, "tools", "render-qa", "pageRequirements.mjs")).href);
     const viaImport = ["gfx-device.html", "nebula-device.html"];
     const got = viaImport.map((f) => ({ f, needs: (requirementsOf(path.join(ENG, f)).needs || []) }));
     ok("!! *** a page whose device comes from an IMPORT is still derived as needing webgpu ***",

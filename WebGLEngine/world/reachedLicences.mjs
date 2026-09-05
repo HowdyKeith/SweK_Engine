@@ -231,6 +231,53 @@ export const REACHED_SOURCES = Object.freeze([
              "answer, and this is where the tree read it. Registering it also settles #100 without needing " +
              "the unpapered repository at all: the TSL door is open and it is MIT.",
     },
+    // v4470 -- *** TWO SOURCES MAIN TOOK FROM AND CITED WITHOUT RECORDING, WHICH IS EXACTLY WHAT
+    // citedSources-selfcheck EXISTS TO CATCH. *** Its rule: "a round that takes an idea from a new source and
+    // records it moves this down; one that takes without recording moves it UP and goes red." The debt went 49
+    // -> 51 across the v4450 and v4456 merges and these are the two. RECORDED RATHER THAN RE-BASELINED: the
+    // gate's own text says fabricating entries to clear a number is worse than owing it, and the corollary is
+    // that raising the number to match an unrecorded taking is worse still. Both licences READ FIRST-HAND at
+    // v4470 over the network, not taken from the module headers that cite them.
+    {
+        repo: "knightcrawler25/GLSL-PathTracer", sourceUrl: "https://github.com/knightcrawler25/GLSL-PathTracer",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Asif Ali", year: 2019,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2019 Asif Ali. *** READ FIRST-HAND AT v4470: *** LICENSE on master, 21 lines, " +
+             "sha256 449495ccec87c244. The module header cites it as MIT too; this entry does not rest on that.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The COMPOSITION, and only that. physics/render/principled.mjs states the rule it kept: every " +
+             "D, G, Fresnel and diffuse term is IMPORTED from this tree's own graded modules (microfacet.mjs, " +
+             "fresnel.mjs, energyCompensation.mjs, roughDiffuse.mjs) and what is new is the weighting between " +
+             "them. No bytes. That renderer ships a Disney BSDF in C++/OpenGL; this tree had every piece of one " +
+             "and no composed model at all -- `grep -i disney` returned a comment about a sphere radius.",
+        takenPaths: ["physics/render/principled.mjs"],
+        citedPaths: ["physics/render/principled.mjs", "physics/render/principled-selfcheck.mjs"],
+        why: "*** THE REASON THIS IS A ROUND RATHER THAN A COPY IS THAT A COMPOSED MODEL HAS BOUNDARIES THE " +
+             "PIECES ALREADY GRADE. *** metallic 0 / roughness 1 must be the diffuse lobe alone; metallic 1 " +
+             "with roughness to 0 must be mirror Fresnel; and directional albedo must stay under 1 at any " +
+             "parameters at all -- the white furnace, which is the test most implementations of this model are " +
+             "never run against. Reading the source told this tree WHAT to compose; the falsifiers are its own.",
+    },
+    {
+        repo: "DaveFace/UnrealRetroShaders", sourceUrl: "https://github.com/DaveFace/UnrealRetroShaders",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Dave Watts", year: 2020,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2020 Dave Watts. *** READ FIRST-HAND AT v4470: *** LICENSE on master, 21 lines, " +
+             "sha256 8e04615e7298ee64. *** AND THE LICENCE IS THE LEAST OF IT: *** the pack is UE4.27 Blueprint " +
+             "materials in binary .uasset, and its own author states UE5 is unsupported because the rendering " +
+             "systems it relies on changed. Nothing is portable at the file level even where the licence allows.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "Two techniques, chosen by whether they can be WRONG. Affine texture warping -- interpolate UV " +
+             "without dividing by w -- has a closed form, an exact agreement limit and an error that is exactly " +
+             "zero at the vertices. Vertex wobble is quantisation to a fixed-point lattice, so it is idempotent. " +
+             "Both are 1994 console constraints rather than anyone's invention. No bytes.",
+        takenPaths: ["render/retroRaster.mjs"],
+        citedPaths: ["render/retroRaster.mjs", "render/retroRaster-selfcheck.mjs"],
+        why: "*** WHAT WAS REFUSED IS THE PART WORTH RECORDING. *** Bayer dithering was already here in " +
+             "fx/dither.js; YUV and posterise are AESTHETIC ONLY -- there is no wrong answer to catch -- so they " +
+             "were left, and the round said so rather than shipping a gate that cannot fail. That is the " +
+             "unfalsifiable-check problem v4435 and v4439 both found, refused on purpose one round later.",
+    },
     {
         repo: "loov/jsfx", sourceUrl: "https://github.com/loov/jsfx",
         grantorHoldsRights: true, licenceExists: true, publisher: "loov", year: 2016,

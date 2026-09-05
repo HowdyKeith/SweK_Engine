@@ -2211,6 +2211,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "world unit made a +/-20 camera invisible -- and seedSpread caught it, the third generator " +
                  "in three rounds that check has caught",
     }),
+
+    // v4471 -- the hundred-and-sixth closing, and it ADDS NO GATE. Three gates arrived red from a main merge,
+    // two were defects and the third was a fixture that named the other two; all three are repaired rather
+    // than registered. A closing with an empty `added` is honest about that: the sweep's population did not
+    // move, and what changed is that three of its members tell the truth again.
+    since106: Object.freeze({
+        at: "v4471", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/windowsImport-selfcheck.mjs (three raw-path dynamic imports converted; one of them in a file whose line 30 already did it right)",
+            "tools/ship/citedSources-selfcheck.mjs (debt 51 -> 49 by RECORDING two sources main took, not by raising the baseline)",
+            "tools/ship/quickSweep-selfcheck.mjs (its fixture asserted three named gates were green; it asserts AGREEMENT now)",
+            "tools/ship/budgetEvidence-selfcheck.mjs (four gates with no runtime evidence, MEASURED from twelve real runs rather than admitted as non-finishing -- all twelve exit 0, so the admission the gate permits would have been a false record about four working gates)",
+            "tools/ship/gateBudget-selfcheck.mjs (MEASURED_RUNS: the individual runs as data, the basis DERIVED from them, and the maximum re-derived in the check rather than borrowed from the derivation)",
+            "tools/ship/shaderPairs-selfcheck.mjs (it pinned all three class sizes; main's v4383 detector fix took the population 14 -> 10 and the two decision-bearing classes did not move by one file)",
+        ]),
+        verdict: "green on this box, all three run singly, plus pageFxOverlay, pageRequirements and " +
+                 "backendParity which the same edits touch. Seven sabotages by name, five red and TWO EARNED " +
+                 "ZEROS of one shape -- replacing a computed value with the literal it currently equals. The " +
+                 "repair contained the defect it was repairing TWICE, both found by sabotage: a control that " +
+                 "re-implemented the comparison it controlled, and a second control that ran its own copy of " +
+                 "the re-runner. One disagreementsIn() and one runVerdict(file, cwd) serve both sides now. " +
+                 "The gateBudget half was sabotaged in three passes: the first found that a bare number with " +
+                 "its measurement in a COMMENT survives having the measurement contradicted (1 ms for a 29 s " +
+                 "gate, and fastest-of-three where the rule says slowest -- both 0 RED); the second found the " +
+                 "repair's own refusal was UNREACHABLE, because slowestRun threw at module load and took the " +
+                 "tree down before the check that reports a bad run could execute; the third confirmed both " +
+                 "replays now go red once deriving and refusing were separated. shaderPairs took five more " +
+                 "passes and every one found something: the ratio that failed on the boundary was REPLACED " +
+                 "rather than widened, the GENERIC filter turned out to be unproven on tree data, the fixture " +
+                 "built to prove it was generated FROM ITS OWN SUBJECT, its expectations were all alike so a " +
+                 "constant satisfied them, and the literal-versus-derived claim survived only in the source. " +
+                 "AND THE FIXTURE MADE THIS GATE A SHADER PAIR: written as literals its shader text put " +
+                 "shaderPairs-selfcheck into backendParity's census twice over, first as dual-language and " +
+                 "then as GLSL-bearing. Neither was caught here -- both by the gate next door",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

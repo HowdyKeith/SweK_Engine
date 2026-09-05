@@ -43,7 +43,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { RED_AT_V4279, RED_AT_V4408, UNVERIFIED_LINE } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, UNVERIFIED_LINE } from "./redCensus.mjs";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
 import { divergence, renderFor, auditAge } from "./registerRender.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -68,7 +68,12 @@ console.log("\n1. EVERY REGISTER ENTRY WAS ACTUALLY RUN, and the audit is not ol
 {
     // v4430 -- BOTH registers. The audit is the source of the failing line for RED_AT_V4279 and RED_AT_V4408
     // alike now, so it runs both, and a check that knew about one would report the other's row as an intruder.
-    const REGISTERED = [...RED_AT_V4279, ...RED_AT_V4408];
+    // v4471 -- THREE registers. v4424 filed three more out of UNCONFIRMED_SLOW and this line was not told,
+    // so the population here (25) and the audit's (28) disagreed and the gate reported "audited but not
+    // registered" about gates that ARE registered. The same omission that left their lines admitted rather
+    // than derived: a new register has to be added everywhere the old ones are read, and there are three
+    // such places -- here, freezeRegisterAudit.mjs, and quickSweep.redRegister().
+    const REGISTERED = [...RED_AT_V4279, ...RED_AT_V4408, ...RED_AT_V4424];
     const missing = REGISTERED.filter((e) => !byGate.has(e.gate));
     const extra = REGISTER_AUDIT.rows.filter((r) => !REGISTERED.some((e) => e.gate === r.gate));
     ok(`!! *** every one of the ${REGISTERED.length} standing reds appears in the audit, and the audit carries nothing the register does not ***`,

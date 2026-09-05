@@ -124,8 +124,26 @@ console.log("\n3. *** RE-MEASURED ONE AT A TIME, AND EVERY COMPARABLE VERDICT AG
     ok("  every one of them is FILED, with its failure, not left in the bucket it came out of",
         r.filed.length === r.gates.length && RED_AT_V4424.every((e) => e.fails.length > 40 && e.why.length > 60),
         `${r.filed.length} of ${r.gates.length} in redCensus.RED_AT_V4424, each with the check that fails and why`);
-    ok("  none of them is a timing failure", RED_AT_V4424.every((e) => e.ms < SERIAL_CAP_MS && e.ms > 60000),
-        "75s to 151s alone on an idle box, exit 1 -- they would fail at any cap that let them finish");
+    // *** v4471 -- THIS READ RED_AT_V4424's `ms` AND THAT FIELD IS null BY CONSTRUCTION FOR THESE THREE. ***
+    // The v4430 census makes `ms` a getter over tools/ship/register-audit.mjs, which is right for a register
+    // whose readings should come from a run rather than from a typed literal -- and the audit's cap does not
+    // reach these gates, WHICH IS THE REASON THEY WERE UNMEASURED IN THE FIRST PLACE. So the register honestly
+    // answers null and the check compared null to a number. The times are read from MEASURED_V4424 now: the
+    // thing that measured them is the thing that should be asked.
+    const serial = redsFound().gates.map((g) => MEASURED_V4424[g]);
+    ok("  none of them is a timing failure",
+        serial.length > 0 && serial.every((m) => m && m.ms < SERIAL_CAP_MS && m.ms > 60000),
+        serial.map((m) => (m.ms / 1000).toFixed(0) + "s").join(", ") + " alone on an idle box, exit 1 -- they " +
+        "would fail at any cap that let them finish");
+    // *** AND THIS CHECK WAS WRITTEN THE OTHER WAY ROUND AN HOUR AGO, WHICH IS WORTH KEEPING. *** It asserted
+    // the register answered `null` for these three and called that the honest answer -- true at the time, and
+    // true only because freezeRegisterAudit.mjs had never been told about a third register. The claim was a
+    // description of a gap dressed as a property. Teaching the audit (v4471) ran them at a raised cap and the
+    // readings became DERIVED, which falsified my own assertion by repairing the thing it described.
+    ok("  ...and the register DERIVES their readings from a run rather than from a typed literal",
+        RED_AT_V4424.every((e) => e.derived === true && e.ms > 60000),
+        RED_AT_V4424.map((e) => (e.ms / 1000).toFixed(0) + "s").join(", ") + " from the register audit at a " +
+        "raised cap. Until v4471 this read null, because the audit covered two registers and there are three");
     ok("*** zero crash ***", !Object.values(MEASURED_V4424).some((m) => m.verdict === "CRASH"),
         "a non-zero exit with no checks printed is a crash and would be counted separately -- which also " +
         "means the check counter's undercount on the second house style changed no verdict here");

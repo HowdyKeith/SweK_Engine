@@ -128,17 +128,6 @@ const RED_AT_V4279_GATES = Object.freeze([
 
 // What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
 export const UNVERIFIED_LINE = Object.freeze({
-    // v4424 -- measured on the serial run of all 63 of UNCONFIRMED_SLOW; the audit's cap does not reach them.
-    "tools/ship/doorKinds-selfcheck.mjs":
-        "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed -- UNEXPLAINED: " +
-        "tools/ship/verifyLicenceTexts.mjs, tools/ship/wgslDeviceLimits.mjs; and !! NO PROSE DOOR STANDS " +
-        "UNEXPLAINED -- orreryBake.mjs. 151.0 s, 2 of 20 failed.",
-    "tools/ship/graveyard-selfcheck.mjs":
-        "!! ORPHANED UTILITIES HAVE NOT INCREASED -- 145 now vs 93 recorded. These export functions and " +
-        "NOTHING calls them -- wire it, or delete it. 75.4 s, 1 of 11 failed.",
-    "tools/ship/orphanDisposition-selfcheck.mjs":
-        "!! 'imported by a gate named for something else' holds for EVERY member -- 24 of 26; !! ...so it " +
-        "discriminates NOTHING and is not used as a signal. 80.1 s, 2 of 24 failed.",
     "tools/ship/shaderRefs-selfcheck.mjs":
         "379,838 ms: the audit's cap ends the run before it prints a failing line. NOT a stale reading -- an " +
         "absent one. Measuring it needs a cap raised past six minutes, which is a decision about the audit.",
