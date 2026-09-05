@@ -217,10 +217,17 @@ export const PARITY_BASELINE = Object.freeze({
     // v4392 ruled for gates: a file that writes GLSL text is GLSL-bearing whatever its reason. (Its gate carried
     // the same declaration in an assertion for one run and was counted as a device consumer for it; the gate now
     // assembles the words, per the rule this file states below section 4.)
-    wgslBearing: 62,
+    // v4464 -- wgslBearing 62 -> 63, wgslOnly 48 -> 49: gfx/device.js ITSELF, which carried no shader text for
+    // sixty-odd levels and now holds the mip blit's WGSL -- a full-screen triangle sampling level i-1 into level i,
+    // the pass WebGPU runs where WebGL2 runs gl.generateMipmap. It is WGSL-only BY NATURE and not by omission:
+    // its GLSL twin is a single GL call, and writing a GLSL blit beside it would be a second implementation of a
+    // thing the driver already does. Counted, not exempted (v4392's rule); the device is now a WGSL bearer in
+    // this census, which is the one honest reading of a backend that owns a shader. Graded on both backends by
+    // tools/ship/deviceMipmaps-selfcheck.mjs, every level against a CPU box filter.
+    wgslBearing: 63,
     both: 14,
     glslOnly: 133,
-    wgslOnly: 48,
+    wgslOnly: 49,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs"]),

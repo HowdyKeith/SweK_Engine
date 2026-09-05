@@ -5,6 +5,15 @@
 // carries both { wgsl } and { glsl } and each backend takes its own; everything else -- buffers, pipelines, passes,
 // draws -- is unified.
 //
+// ---- v4464 -- MIPMAPS, ON BOTH BACKENDS, ONE WORD. `mipmaps: true` on device.texture() builds the full chain:
+// gl.generateMipmap on WebGL2, and on WebGPU -- which has no such call -- a per-level BLIT PIPELINE the backend owns
+// (a full-screen triangle sampling level i-1 with a linear sampler into level i, one render pass per level, one
+// submit). The handle carries `levels`; the WebGPU sampler for a chained texture filters between levels the way
+// LINEAR_MIPMAP_LINEAR does on GL, so a sampled draw minifies through the chain on both. A non-filterable format
+// (rg16uint) and a render target are refused by name: a chain of an integer texture cannot be sampled, and a target is
+// drawn into at level 0 only. tools/ship/deviceMipmaps-selfcheck.mjs reads every level of the chain back through
+// render/texelProbe.mjs against a CPU box filter, on both backends.
+//
 // ---- v4461 -- A DECLARED-BUT-UNREAD BINDING NO LONGER BLANKS THE FRAME: bindings carry `used` (the auto layout's own
 // question, answered from the text), unused ones are left out of the bind group, and createBindGroup runs inside a
 // validation error scope whose message becomes the pipeline's `error` for the next use() to refuse with. See usedNames.
@@ -117,6 +126,17 @@ function _textureFormat(d) {
         throw new Error(`gfx/device: a render target takes the canvas format; \`render: true\` cannot be ${f}`);
     return f;
 }
+/** v4464 -- the level count of a full chain, the WebGPU rule (1 + floor(log2(max(w, h)))), which is also GL's. */
+function _mipLevels(w, h) { return 1 + Math.floor(Math.log2(Math.max(1, w, h))); }
+/** v4464 -- whether a texture asks for a chain, refused by name where a chain is meaningless. */
+function _mipmaps(d, format) {
+    if (!d.mipmaps) return false;
+    if (!TEXTURE_FORMATS[format].filterable)
+        throw new Error(`gfx/device: mipmaps on ${format} are refused -- an integer format cannot be filtered on either backend, so a chain of it could never be sampled; upload the levels you need as separate textures`);
+    if (d.render)
+        throw new Error("gfx/device: mipmaps on a render target are refused -- a target is drawn into at level 0 and nothing rebuilds the chain after a frame; sample the target into a mipmapped texture instead");
+    return true;
+}
 
 /** v4459 -- depth compare words, the WebGPU ones, mapped to GL by the WebGL2 backend. */
 const DEPTH_COMPARES = Object.freeze(["never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always"]);
@@ -166,7 +186,8 @@ function nullBackend(opts = {}) {
                            bindTexture: function (n, t) { this._bound[n] = t; ops.push(["bindTexture", n, !!(t && t.__tex)]); return this; } }),
         depthTexture: () => null,
         texture: (d) => { const format = _textureFormat(d);
-                          return { __tex: true, w: d.width || (d.source && d.source.width) || 0, h: d.height || (d.source && d.source.height) || 0, format,
+                          const w = d.width || (d.source && d.source.width) || 0, h = d.height || (d.source && d.source.height) || 0, mipmaps = _mipmaps(d, format);
+                          return { __tex: true, w, h, format, mipmaps, levels: mipmaps ? _mipLevels(w, h) : 1,
                                    nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }; },
         frame: (fn, o) => {
             let cleared = false;
@@ -201,13 +222,24 @@ function webgl2Backend(canvas, opts = {}) {
     gl.enable(gl.DEPTH_TEST);
     let fbo = null, fboW = 0, fboH = 0;
     const glTarget = (usage) => usage.includes("index") ? gl.ELEMENT_ARRAY_BUFFER : gl.ARRAY_BUFFER;
-    const upload = (t, d, nearest, format = "rgba8unorm") => {
+    const upload = (t, d, nearest, format = "rgba8unorm", mipmaps = false) => {
         const F = TEXTURE_FORMATS[format], G = F.gl;
         if (d.source) { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !!d.flipY); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, d.source); }
         else { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl[G.internal], d.width, d.height, 0, gl[G.format], gl[G.type], d.data || null); }
         // v4459 -- an integer format is never filterable: LINEAR on it makes the texture incomplete and it samples black.
         const f = (nearest || !F.filterable) ? gl.NEAREST : gl.LINEAR;
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+        // v4464 -- the chain: generateMipmap after every upload (update() rebuilds it), and a MIN filter that reads it.
+        // RGBA16F is filterable in ES 3.0 but generateMipmap also wants it COLOUR-RENDERABLE, which is EXT_color_buffer_float;
+        // without the extension the call raises INVALID_OPERATION and the texture is incomplete, so that is refused by name.
+        if (mipmaps) {
+            if (format === "rgba16float" && !gl.getExtension("EXT_color_buffer_float"))
+                throw new Error("gfx/device: mipmaps on rgba16float need EXT_color_buffer_float on WebGL2 (generateMipmap wants a colour-renderable format) and this context has none");
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const err = gl.getError();
+            if (err) throw new Error("gfx/device: generateMipmap on " + format + " failed with GL error 0x" + err.toString(16) + " -- the chain was not built");
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_LINEAR);
+        } else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
     const dev = {
@@ -236,10 +268,10 @@ function webgl2Backend(canvas, opts = {}) {
         // Level 11: `nearest` selects point sampling on BOTH backends (a gate reading texels back needs it), and the
         // handle carries update() and destroy() so a per-frame source re-uploads into ONE texture instead of
         // allocating a new one every frame and never freeing it, which is what orreryPost did until this round.
-        texture: (d) => { const format = _textureFormat(d); const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest, format);
+        texture: (d) => { const format = _textureFormat(d), mipmaps = _mipmaps(d, format); const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest, format, mipmaps);
             const w = d.width || (d.source && d.source.width) || 0, h = d.height || (d.source && d.source.height) || 0;
-            const tex = { gl: t, w, h, format, nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render,
-                          update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, width: w, height: h, ...nd }, d.nearest, format); },
+            const tex = { gl: t, w, h, format, mipmaps, levels: mipmaps ? _mipLevels(w, h) : 1, nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render,
+                          update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, width: w, height: h, ...nd }, d.nearest, format, mipmaps); },
                           destroy: () => { gl.deleteTexture(t); for (const k of ["_fb", "_fbOut"]) if (tex[k]) gl.deleteFramebuffer(tex[k]); if (tex._rb) gl.deleteRenderbuffer(tex._rb); if (tex._scratch) gl.deleteTexture(tex._scratch); } };
             return tex; },
         frame: (fn, o) => {
@@ -395,23 +427,52 @@ async function webgpuBackend(canvas, opts = {}) {
     // One sampler per filter mode, made on first use. Repeat addressing and no mip chain: the WebGL2 backend's
     // texture parameters, which is what makes a pixel diff between the two a comparison of pictures and not of
     // sampler defaults.
+    // v4464 -- a CHAINED texture gets a sampler that filters between levels (mipmapFilter), the WebGPU spelling of
+    // LINEAR_MIPMAP_LINEAR / NEAREST_MIPMAP_NEAREST; an unchained one keeps the level-0-only sampler above.
     const samplers = {};
-    const samplerFor = (nearest) => { const k = nearest ? "nearest" : "linear"; if (!samplers[k]) samplers[k] = gpu.createSampler({ magFilter: k, minFilter: k, addressModeU: "repeat", addressModeV: "repeat" }); return samplers[k]; };
+    const samplerFor = (nearest, mips = false) => { const k = (nearest ? "nearest" : "linear") + (mips ? "+mips" : "");
+        if (!samplers[k]) samplers[k] = gpu.createSampler({ magFilter: nearest ? "nearest" : "linear", minFilter: nearest ? "nearest" : "linear", ...(mips ? { mipmapFilter: nearest ? "nearest" : "linear" } : {}), addressModeU: "repeat", addressModeV: "repeat" }); return samplers[k]; };
+    // v4464 -- THE BLIT THAT STANDS IN FOR generateMipmap. One pipeline per texture format, made on first use: a
+    // full-screen triangle whose fragment samples level i-1 with a linear, clamped sampler at the centre of each
+    // level-i texel -- which for an even-sized level is exactly the 2x2 box average, the filter GL's generateMipmap
+    // is specified to approximate. Each level is its own render pass on one encoder; one submit builds the chain.
+    const mipPipes = {};
+    let mipSampler = null;
+    const MIP_BLIT_WGSL = `@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var samp: sampler;
+struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VO { var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0)); var o: VO; o.pos = vec4f(p[vi], 0.0, 1.0); o.uv = vec2f(p[vi].x * 0.5 + 0.5, 0.5 - p[vi].y * 0.5); return o; }
+@fragment fn fs(@location(0) uv: vec2f) -> @location(0) vec4f { return textureSample(src, samp, uv); }`;
+    const buildMips = (t, format, levels) => {
+        if (levels < 2) return;
+        if (!mipPipes[format]) { const mod = gpu.createShaderModule({ code: MIP_BLIT_WGSL });
+            mipPipes[format] = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } }); }
+        if (!mipSampler) mipSampler = gpu.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" });
+        const pipe = mipPipes[format], enc = gpu.createCommandEncoder();
+        for (let i = 1; i < levels; i++) {
+            const src = t.createView({ baseMipLevel: i - 1, mipLevelCount: 1 }), dst = t.createView({ baseMipLevel: i, mipLevelCount: 1 });
+            const bg = gpu.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: src }, { binding: 1, resource: mipSampler }] });
+            const rp = enc.beginRenderPass({ colorAttachments: [{ view: dst, loadOp: "clear", storeOp: "store" }] });   // the blit covers every texel; the clear is the default zero
+            rp.setPipeline(pipe); rp.setBindGroup(0, bg); rp.draw(3); rp.end();
+        }
+        gpu.queue.submit([enc.finish()]);
+    };
     /** Assemble a bind group from what was bound by name against what the shader declares. Refuses by name. */
     const bindGroupFor = (p) => {
         if (p._bg && p._bgGen === p._gen) return p._bg;
         const entries = [];
         const uniformUsed = p.uniformBindings.find((b) => b.binding === p.uniformBinding);
         if (p.ubuf && (!uniformUsed || uniformUsed.used !== false)) entries.push({ binding: p.uniformBinding, resource: { buffer: p.ubuf } });
-        let nearest = null;
+        let nearest = null, mips = false;
         for (const t of p.texBindings) {
             if (t.used === false) continue;                       // v4461 -- not in the auto layout; see usedNames
             const tex = p._tex[t.name];
             if (!tex || !tex.view) throw new Error(`gfx/device: the shader declares texture "${t.name}" at @group(0) @binding(${t.binding}) and nothing was bound to it -- call pass.texture(${JSON.stringify(t.name)}, tex) before drawing. Drawing anyway would present the effect over nothing.`);
             if (nearest == null) nearest = !!tex.nearest;
+            if (tex.mipmaps) mips = true;                        // v4464 -- the sampler reads the chain when any bound texture has one
             entries.push({ binding: t.binding, resource: tex.view });
         }
-        for (const s of p.samplerBindings) { if (s.used === false) continue; entries.push({ binding: s.binding, resource: samplerFor(!!nearest) }); }
+        for (const s of p.samplerBindings) { if (s.used === false) continue; entries.push({ binding: s.binding, resource: samplerFor(!!nearest, mips) }); }
         for (const s of p.storageBindings) {
             if (s.used === false) continue;
             const b = p._stor[s.name];
@@ -546,13 +607,17 @@ async function webgpuBackend(canvas, opts = {}) {
             // can draw into it; never uploaded to (a bgra8unorm target would take RGBA bytes the wrong way round), sampled as any texture
             // RENDER_ATTACHMENT only where the format allows it: rg16uint and rgba16float are renderable in WebGPU, but a
             // sampled-only atlas has no business being a target, and the flag is what makes a format list a contract.
-            const t = gpu.createTexture({ size: [w, h], format: d.render ? fmt : format, usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().COPY_SRC | (format === "rgba8unorm" ? TU().RENDER_ATTACHMENT : 0) });
+            // v4464 -- a chained texture is allocated with every level and the blit's RENDER_ATTACHMENT usage (both float
+            // formats are renderable in WebGPU); the chain is rebuilt after every upload, as GL's generateMipmap would be.
+            const mipmaps = _mipmaps(d, format), levels = mipmaps ? _mipLevels(w, h) : 1;
+            const t = gpu.createTexture({ size: [w, h], mipLevelCount: levels, format: d.render ? fmt : format, usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().COPY_SRC | ((format === "rgba8unorm" || mipmaps) ? TU().RENDER_ATTACHMENT : 0) });
             const put = (nd) => {
                 if (nd.source) gpu.queue.copyExternalImageToTexture({ source: nd.source, flipY: !!(nd.flipY != null ? nd.flipY : d.flipY) }, { texture: t }, [w, h]);
                 else if (nd.data) gpu.queue.writeTexture({ texture: t }, nd.data, { bytesPerRow: w * F.bytes }, { width: w, height: h });
+                if (mipmaps) buildMips(t, format, levels);
             };
             put(d);
-            return { gpu: t, view: t.createView(), w, h, format, nearest: !!d.nearest || !F.filterable, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
+            return { gpu: t, view: t.createView(), w, h, format, mipmaps, levels, nearest: !!d.nearest || !F.filterable, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
         },
         frame: (fn, o) => {
             // Level 13 -- `offscreen` per FRAME: a pick picture is drawn to the owned texture and read back, and the
@@ -707,9 +772,9 @@ async function requestDevice(canvas, opts = {}) {
 
 /** What each backend can do, as data, so a consumer chooses by capability rather than by backend name. */
 const CAPABILITIES = Object.freeze({
-    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
-    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
-    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, formats: Object.keys(TEXTURE_FORMATS) }),
 });
 
 export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES };

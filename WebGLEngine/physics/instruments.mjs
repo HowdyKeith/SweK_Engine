@@ -1397,6 +1397,12 @@ export const INSTRUMENTS = [
         key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
     },
     {
+        id: "device-mipmaps", area: "render", name: "Mip chains on the device, every level read back against a CPU box filter",
+        gate: "tools/ship/deviceMipmaps-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "For `mipmaps: true` on gfx/device.js -- gl.generateMipmap on WebGL2, a per-level blit pipeline the backend owns on WebGPU -- every level of a 32x32 rgba8unorm chain and two levels of an rgba16float chain read back through render/texelProbe.mjs within a byte of a CPU box filter on both backends; the sampled draw at a quarter size landing on level 2 against an unchained control that aliases; update() rebuilding the chain; the two backends against each other on every level with the row mirror applied by name; the refusals (rg16uint, render targets) by name.",
+        key: "*** UNTIL v4464 NEITHER BACKEND OF THE DEVICE OFFERED A MIP CHAIN. *** WebGL2 has gl.generateMipmap and the device never called it; WebGPU has no such call at all, so its half is a blit pipeline -- one render pass per level, a full-screen triangle sampling level i-1 into level i with a linear clamped sampler, which at an even level's texel centre IS the 2x2 box. The two chains are shown to be the same chain: worst difference 0 of 255 across every level on both backends.",
+    },
+    {
         // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
         id: "slug-device", area: "render", name: "Slug text through the device, held to the CPU key through a rasteriser model",
         gate: "tools/ship/slugDevice-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module

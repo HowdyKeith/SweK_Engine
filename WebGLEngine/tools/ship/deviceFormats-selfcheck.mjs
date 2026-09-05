@@ -184,8 +184,8 @@ let result = null;
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: MIPMAPS (neither backend offers them; WebGPU has no generateMipmap, so that is a blit " +
-    "pipeline of its own and its own task), filtered sampling of rgba16float (only textureLoad is exercised; Slug " +
+console.log("unchecked here: MIPMAPS (v4464: tools/ship/deviceMipmaps-selfcheck.mjs, which reads every level back " +
+    "on both backends), filtered sampling of rgba16float (only textureLoad is exercised; Slug " +
     "needs no more), presenting to a canvas on WebGPU, and the six depthCompare words between less and always -- " +
     "the mapping is a table and two of its entries are exercised.");
 process.exit(fails ? 1 : 0);

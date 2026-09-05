@@ -1927,6 +1927,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "line stays green, which is exactly the hole it closes. colourReach's literal-colour count re-taken " +
                  "75 -> 76 for slug-device.html's legend.",
     }),
+    since86: Object.freeze({
+        at: "v4464", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceMipmaps-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both real backends. `mipmaps: true` on device.texture(): gl.generateMipmap on WebGL2 with a " +
+                 "MIPMAP min filter, and on WebGPU -- which has no such call -- a per-level blit pipeline the backend owns. " +
+                 "Every level of a 32x32 rgba8unorm chain and two levels of an rgba16float chain read back within a byte of " +
+                 "a CPU box filter on both backends, worst difference 0; the sampled draw at a quarter size lands on level " +
+                 "2 where an unchained control aliases; update() rebuilds the chain; the backends agree on every level " +
+                 "once the rows are turned over. Three sabotages red at 10 / 11 / 5 -- and the third is the finding: an " +
+                 "UNFLIPPED blit corrupts only the ODD levels (two flips cancel), so the level a minified draw reads " +
+                 "stayed green while levels 1 and 3 were upside down. The gate reads every level for that reason.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

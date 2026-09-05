@@ -290,8 +290,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the far quad through on both, and the two backends byte-identical once WebGL2's rows are turned over --
         the fetch at gl_FragCoord.y counts from the bottom, WebGPU's position.y from the top, 722 bytes differ
         without the turn, and the mapping is applied by name rather than hidden in a tolerance. Four sabotages
-        red at 5 / 2 / 2 / 4. Mipmaps are split out (task 21): WebGPU has no generateMipmap, so that half is a
-        blit pipeline of its own, and Slug does not need it.
+        red at 5 / 2 / 2 / 4. Mipmaps were split out (task 21): WebGPU has no generateMipmap, so that half is a
+        blit pipeline of its own, and Slug does not need it. BUILT at v4464: `mipmaps: true` on device.texture() is
+        one word for both -- gl.generateMipmap after every upload on WebGL2 with a MIPMAP min filter, and on WebGPU
+        every level allocated and filled by a blit pipeline the backend owns (a full-screen triangle sampling level
+        i-1 into level i with a linear clamped sampler, one pass per level, one submit), the draw sampler filtering
+        between levels only for a chained texture. rg16uint and render targets are refused by name. MEASURED by
+        tools/ship/deviceMipmaps-selfcheck.mjs through two new probe pairs in render/texelProbe.mjs: every level of
+        a 32x32 rgba8unorm chain and levels 1 and 3 of an rgba16float chain within a byte of a CPU box filter on
+        both backends (worst difference 0 across the chain on each), the sampled draw at a quarter size landing on
+        level 2 where an unchained control aliases (mean stripe error 64 of 64), update() rebuilding the chain,
+        and the two backends within a byte of each other on every level once WebGL2's rows are turned over. NOT
+        CLAIMED: odd-sized levels, a chain from a canvas source, trilinear blending between levels.
      3. A device-path text batch, drawn on both backends and diffed, with the orrery's four fillText calls or the
         ship labels' overlay canvas as the first consumer. BUILT at v4460: render/slugDevice.mjs (SlugFontDevice,
         SlugDeviceBatch) packs the atlas into the device's rgba16float and rg16uint textures, builds one pipeline
