@@ -207,10 +207,45 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     // v4203 found a real one by reading: projapati66/Svg-IsometricCityAnimation ships an MIT LICENSE file
     // over artwork its author does not own. The category being ready is why that entry took one field to
     // file rather than a round to argue about.
+    //
+    // *** v4461: THIS CHECK WAS `enc.length === 1` AND A SECOND REAL ENCUMBERED SOURCE TURNED IT RED. *** That
+    // is a pinned count standing in for a claim -- the same shape this tree keeps finding, a frozen number
+    // checked against a derivation that is allowed to move. The claim underneath was never "there is one"; it
+    // was "the category defined from a hypothetical gets USED by reading, and using it costs one field". So
+    // the count is replaced by the substance, which is strictly harder to satisfy than either 1 or >= 1: every
+    // encumbered entry must be encumbered FOR A STATED REASON, and must behave like it. An entry that flips
+    // grantorHoldsRights to false without saying who does hold them, or that claims it may still be
+    // redistributed, goes red here -- which `enc.length === 2` would happily wave through.
     const enc = REACHED_SOURCES.filter((e) => severityOf(e) === SEVERITY.ENCUMBERED);
-    ok(enc.length === 1 && /Svg-IsometricCityAnimation/.test(enc[0].repo),
-        `exactly one source in the register is encumbered: ${enc.map((e) => e.repo).join(", ")} -- ` +
-        "found by reading a repo, three versions after the category was defined from a hypothetical");
+    ok(enc.length >= 1, `the ENCUMBERED category is not hypothetical: ${enc.length} entr(y/ies) reach it`);
+    ok(enc.some((e) => /Svg-IsometricCityAnimation/.test(e.repo)),
+        "including the first one, found by reading a repo three versions after the category was defined from a " +
+        `hypothetical. All of them: ${enc.map((e) => e.repo).join(", ")}`);
+    //
+    // *** THIS PATTERN WAS WRONG ON ITS FIRST RUN AND THE ENTRY IT ACCUSED WAS FINE. *** It was written from
+    // the DaveFace note in front of me and it red-flagged projapati66, whose note says "neither of which the
+    // grantor holds" -- the same assertion in words I had not thought of. Writing a check from ONE example and
+    // reading its red as the example's fault is the shape this session has now hit five times. So the accepted
+    // forms are an explicit list rather than one author's phrasing, and the failure message prints the list, so
+    // the next writer is told what to say instead of guessing at a regex.
+    const HOLDER_NAMED = [
+        /the grantor (?:holds|owns)/i,           // "... neither of which the grantor holds"
+        /not the grantor'?s/i,                   // "... is not the grantor's to license"
+        /does not (?:own|hold|license)/i,        // "... the author does not own"
+        /third party|third-party/i,              // "... credited to a third party"
+        /Credits section/i,                      // "... its Credits section names who"
+    ];
+    const unexplained = enc.filter((e) => !HOLDER_NAMED.some((re) => re.test(e.licenceNote || "")));
+    ok(unexplained.length === 0,
+        "*** AND EVERY ENCUMBERED ENTRY SAYS IN ITS OWN licenceNote THAT SOMEONE ELSE HOLDS THE RIGHTS *** -- the " +
+        "category is a finding about a specific third party, never a shrug, and the note is where a reader meets " +
+        "it. Silent: " + (unexplained.map((e) => e.repo).join(", ") || "none") +
+        ". Accepted forms: " + HOLDER_NAMED.map((re) => re.source).join(" | "));
+    const shippable = enc.filter((e) => e.redistributable !== false || e.posture !== POSTURE.REACHED);
+    ok(shippable.length === 0,
+        "and every one of them is REACHED and not redistributable -- encumbrance bites on vendoring, so an " +
+        "entry cannot be encumbered and shippable at once. Contradictory: " +
+        (shippable.map((e) => `${e.repo} (${e.posture}, redistributable ${e.redistributable})`).join(", ") || "none"));
     ok(REACHED_SOURCES.every((e) => typeof e.grantorHoldsRights === "boolean"),
         `and all ${REACHED_SOURCES.length} existing entries answer the question, rather than it applying only to new ones`);
 
