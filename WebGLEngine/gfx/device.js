@@ -89,6 +89,39 @@ function _blendMode(d) {
     return m;
 }
 
+/**
+ * v4459 -- TEXTURE FORMATS, BY NAME, ON BOTH BACKENDS. device.texture() took bytes and made rgba8unorm of them; the
+ * Slug atlas (text/slugAtlas.js) is rgba16float control points and rg16uint band headers, read with textureLoad.
+ * `format` names one of these three; each backend maps it to its own enums, `bytes` is the row pitch per texel,
+ * and `filterable: false` forces point sampling (an integer texture cannot be filtered on either backend -- on
+ * WebGL2 a LINEAR filter makes it INCOMPLETE and it samples black, silently). A `source` (canvas, image) is 8-bit
+ * by nature and is refused for the other two. Depth formats stay the backend's own; `render: true` stays the
+ * canvas format, as v4318 says.
+ */
+const TEXTURE_FORMATS = Object.freeze({
+    rgba8unorm:  Object.freeze({ bytes: 4, filterable: true,  gl: { internal: "RGBA8",   format: "RGBA",       type: "UNSIGNED_BYTE" } }),
+    rgba16float: Object.freeze({ bytes: 8, filterable: true,  gl: { internal: "RGBA16F", format: "RGBA",       type: "HALF_FLOAT" } }),
+    rg16uint:    Object.freeze({ bytes: 4, filterable: false, gl: { internal: "RG16UI",  format: "RG_INTEGER", type: "UNSIGNED_SHORT" } }),
+});
+function _textureFormat(d) {
+    const f = d.format == null ? "rgba8unorm" : d.format;
+    if (!Object.prototype.hasOwnProperty.call(TEXTURE_FORMATS, f))
+        throw new Error(`gfx/device: unknown texture format ${JSON.stringify(f)} -- one of ${Object.keys(TEXTURE_FORMATS).join(", ")}`);
+    if (d.source && f !== "rgba8unorm")
+        throw new Error(`gfx/device: a texture with a \`source\` (canvas, image, video) is 8-bit by nature and cannot be ${f} -- upload \`data\` for that format`);
+    if (d.render && f !== "rgba8unorm")
+        throw new Error(`gfx/device: a render target takes the canvas format; \`render: true\` cannot be ${f}`);
+    return f;
+}
+
+/** v4459 -- depth compare words, the WebGPU ones, mapped to GL by the WebGL2 backend. */
+const DEPTH_COMPARES = Object.freeze(["never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always"]);
+function _depthCompare(d) {
+    const c = d.depthCompare == null ? "less" : d.depthCompare;
+    if (!DEPTH_COMPARES.includes(c)) throw new Error(`gfx/device: unknown depthCompare ${JSON.stringify(c)} -- one of ${DEPTH_COMPARES.join(", ")}`);
+    return c;
+}
+
 function detectBackends() {
     const out = { webgpu: false, webgl2: false };
     try { out.webgpu = (typeof navigator !== "undefined" && !!navigator.gpu); } catch (e) {}
@@ -113,14 +146,15 @@ function nullBackend(opts = {}) {
                      destroy: () => ops.push(["destroyBuffer"]) }; },
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
         pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
-                            blend: _blendMode(d),
+                            blend: _blendMode(d), depthWrite: d.depthWrite !== false, depthCompare: _depthCompare(d),
                             bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? parseBindings(d.shaders.wgsl) : [] }),
         compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? parseBindings(d.wgsl) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
                            bindTexture: function (n, t) { this._bound[n] = t; ops.push(["bindTexture", n, !!(t && t.__tex)]); return this; } }),
         depthTexture: () => null,
-        texture: (d) => ({ __tex: true, w: d.width || (d.source && d.source.width) || 0, h: d.height || (d.source && d.source.height) || 0,
-                           nearest: !!d.nearest, render: !!d.render, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }),
+        texture: (d) => { const format = _textureFormat(d);
+                          return { __tex: true, w: d.width || (d.source && d.source.width) || 0, h: d.height || (d.source && d.source.height) || 0, format,
+                                   nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render, update: () => ops.push(["updateTexture"]), destroy: () => ops.push(["destroyTexture"]) }; },
         frame: (fn, o) => {
             let cleared = false;
             const pass = {
@@ -154,11 +188,14 @@ function webgl2Backend(canvas, opts = {}) {
     gl.enable(gl.DEPTH_TEST);
     let fbo = null, fboW = 0, fboH = 0;
     const glTarget = (usage) => usage.includes("index") ? gl.ELEMENT_ARRAY_BUFFER : gl.ARRAY_BUFFER;
-    const upload = (t, d, nearest) => {
+    const upload = (t, d, nearest, format = "rgba8unorm") => {
+        const F = TEXTURE_FORMATS[format], G = F.gl;
         if (d.source) { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !!d.flipY); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, d.source); }
-        else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, d.width, d.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, d.data || null);
-        const f = nearest ? gl.NEAREST : gl.LINEAR;
+        else { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl[G.internal], d.width, d.height, 0, gl[G.format], gl[G.type], d.data || null); }
+        // v4459 -- an integer format is never filterable: LINEAR on it makes the texture incomplete and it samples black.
+        const f = (nearest || !F.filterable) ? gl.NEAREST : gl.LINEAR;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
     const dev = {
         backend: "webgl2", gl,
@@ -176,7 +213,7 @@ function webgl2Backend(canvas, opts = {}) {
         read: async (b) => { const out = new Uint8Array(b.size); gl.bindBuffer(b.tgt, b.gl); gl.getBufferSubData(b.tgt, 0, out); return out.buffer; },
         depthTexture: () => null,
         // v4301 -- `topology: "line-list"` draws gl.LINES, the same word the WebGPU pipeline takes; anything else is triangles.
-        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES, blend: _blendMode(d) }),
+        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES, blend: _blendMode(d), depthWrite: d.depthWrite !== false, depthCompare: _depthCompare(d) }),
         compute: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
         // *** `source` ACCEPTS A CANVAS OR IMAGE, WHICH v4273's FIRST REAL CONSUMER NEEDED AND THIS DID NOT HAVE.
         // *** ui/orreryPost.mjs feeds the orrery's 2D canvas through a post effect, and a post stage's source is
@@ -186,9 +223,10 @@ function webgl2Backend(canvas, opts = {}) {
         // Level 11: `nearest` selects point sampling on BOTH backends (a gate reading texels back needs it), and the
         // handle carries update() and destroy() so a per-frame source re-uploads into ONE texture instead of
         // allocating a new one every frame and never freeing it, which is what orreryPost did until this round.
-        texture: (d) => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest);
+        texture: (d) => { const format = _textureFormat(d); const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); upload(t, d, d.nearest, format);
             const w = d.width || (d.source && d.source.width) || 0, h = d.height || (d.source && d.source.height) || 0;
-            const tex = { gl: t, w, h, nearest: !!d.nearest, render: !!d.render, update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, ...nd }, d.nearest); },
+            const tex = { gl: t, w, h, format, nearest: !!d.nearest || !TEXTURE_FORMATS[format].filterable, render: !!d.render,
+                          update: (nd) => { gl.bindTexture(gl.TEXTURE_2D, t); upload(t, { flipY: d.flipY, width: w, height: h, ...nd }, d.nearest, format); },
                           destroy: () => { gl.deleteTexture(t); for (const k of ["_fb", "_fbOut"]) if (tex[k]) gl.deleteFramebuffer(tex[k]); if (tex._rb) gl.deleteRenderbuffer(tex._rb); if (tex._scratch) gl.deleteTexture(tex._scratch); } };
             return tex; },
         frame: (fn, o) => {
@@ -247,6 +285,10 @@ function webgl2Backend(canvas, opts = {}) {
                     gl.frontFace(p.frontFace === "cw" ? gl.CW : gl.CCW);
                     // v4458 -- blend state travels with the pipeline, set at use() as cull is, so two pipelines in one
                     // frame each draw with their own. The GL factor names are the WebGPU words with the dashes taken out.
+                    // v4459 -- depthWrite and depthCompare travel too; the WebGPU pipeline has honoured both since Level 12 and this
+                    // backend honoured neither, so a translucent overlay wrote depth here and not there.
+                    gl.depthMask(p.depthWrite !== false);
+                    gl.depthFunc({ "never": gl.NEVER, "less": gl.LESS, "equal": gl.EQUAL, "less-equal": gl.LEQUAL, "greater": gl.GREATER, "not-equal": gl.NOTEQUAL, "greater-equal": gl.GEQUAL, "always": gl.ALWAYS }[p.depthCompare || "less"]);
                     const bm = BLEND_MODES[p.blend || "none"];
                     if (!bm) gl.disable(gl.BLEND);
                     else { const F = { "one": gl.ONE, "src-alpha": gl.SRC_ALPHA, "one-minus-src-alpha": gl.ONE_MINUS_SRC_ALPHA };
@@ -435,7 +477,7 @@ async function webgpuBackend(canvas, opts = {}) {
             const target = bm ? { format: fmt, blend: { color: { srcFactor: bm.src, dstFactor: bm.dst, operation: "add" }, alpha: { srcFactor: bm.srcAlpha, dstFactor: bm.dstAlpha, operation: "add" } } } : { format: fmt };
             const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [target] },
                 primitive: { topology: d.topology || "triangle-list", cullMode: d.cull || "none", frontFace: d.frontFace || "ccw" },
-                ...(depth ? { depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: d.depthWrite !== false, depthCompare: d.depthCompare || "less" } } : {}) });
+                ...(depth ? { depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: d.depthWrite !== false, depthCompare: _depthCompare(d) } } : {}) });
             const cls = classify(d.shaders.wgsl);
             let ubuf = null, uni = null, uniformBinding = 0;
             if (d.uniforms && d.uniforms.length) {
@@ -463,16 +505,19 @@ async function webgpuBackend(canvas, opts = {}) {
             return c;
         },
         texture: (d) => {
+            const format = _textureFormat(d), F = TEXTURE_FORMATS[format];
             const w = d.width || (d.source && (d.source.width || d.source.videoWidth)) || 0, h = d.height || (d.source && (d.source.height || d.source.videoHeight)) || 0;
             // v4318 -- `render: true`: a target for frame({ target }), in the CANVAS format so every render pipeline (built for fmt)
             // can draw into it; never uploaded to (a bgra8unorm target would take RGBA bytes the wrong way round), sampled as any texture
-            const t = gpu.createTexture({ size: [w, h], format: d.render ? fmt : "rgba8unorm", usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().COPY_SRC | TU().RENDER_ATTACHMENT });
+            // RENDER_ATTACHMENT only where the format allows it: rg16uint and rgba16float are renderable in WebGPU, but a
+            // sampled-only atlas has no business being a target, and the flag is what makes a format list a contract.
+            const t = gpu.createTexture({ size: [w, h], format: d.render ? fmt : format, usage: TU().TEXTURE_BINDING | TU().COPY_DST | TU().COPY_SRC | (format === "rgba8unorm" ? TU().RENDER_ATTACHMENT : 0) });
             const put = (nd) => {
                 if (nd.source) gpu.queue.copyExternalImageToTexture({ source: nd.source, flipY: !!(nd.flipY != null ? nd.flipY : d.flipY) }, { texture: t }, [w, h]);
-                else if (nd.data) gpu.queue.writeTexture({ texture: t }, nd.data, { bytesPerRow: w * 4 }, { width: w, height: h });
+                else if (nd.data) gpu.queue.writeTexture({ texture: t }, nd.data, { bytesPerRow: w * F.bytes }, { width: w, height: h });
             };
             put(d);
-            return { gpu: t, view: t.createView(), w, h, nearest: !!d.nearest, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
+            return { gpu: t, view: t.createView(), w, h, format, nearest: !!d.nearest || !F.filterable, render: !!d.render, update: put, destroy: () => { try { t.destroy(); } catch (e) {} } };
         },
         frame: (fn, o) => {
             // Level 13 -- `offscreen` per FRAME: a pick picture is drawn to the owned texture and read back, and the
@@ -608,10 +653,10 @@ async function requestDevice(canvas, opts = {}) {
 
 /** What each backend can do, as data, so a consumer chooses by capability rather than by backend name. */
 const CAPABILITIES = Object.freeze({
-    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true }),
-    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true }),
-    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true }),
+    webgpu: Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: true, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    webgl2: Object.freeze({ textures: true, compute: false, indirect: false, storage: false, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
+    null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, formats: Object.keys(TEXTURE_FORMATS) }),
 });
 
-export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, CAPABILITIES };
+export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES };
 if (typeof module !== "undefined" && module.exports) module.exports = { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend };

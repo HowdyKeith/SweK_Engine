@@ -1835,6 +1835,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "anything. Three sabotages red at 6 / 8 / 4 -- the third caught by the f64 equation alone, since " +
                  "both backends agreed with each other on the wrong factor. 1.0 s.",
     }),
+    since80: Object.freeze({
+        at: "v4459", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceFormats-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. gfx/device.js gains texture formats by name (rgba8unorm, rgba16float, rg16uint), nearest " +
+                 "forced on the integer format, depthWrite and depthCompare honoured on WebGL2 at last; the gate " +
+                 "uploads half-float and uint patterns through the SHIPPING module on both backends and reads " +
+                 "their BITS back through render/texelProbe.mjs: 2048 half-float bytes and 1024 uint bytes exact " +
+                 "on each backend, update() exact, depthWrite false lets the far quad through on both, and the two " +
+                 "backends agree byte for byte once WebGL2's rows are turned over (722 bytes differ without the " +
+                 "turn -- the v4272 mirror, at the fetch). Four sabotages red at 5 / 2 / 2 / 4. 1.9 s.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

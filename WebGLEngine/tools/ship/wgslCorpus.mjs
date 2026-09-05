@@ -220,6 +220,14 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "heidlerWgsl.HEIDLER_FN_WGSL", kind: "source fragment", why: "the Heidler shape and current functions the probe splices in" }),
     Object.freeze({ id: "blackbodyWgsl.PLANCK_FN_WGSL", kind: "source fragment", why: "the Planck shape, Wien root and residual functions the probe and key splice in" }),
     Object.freeze({ id: "tslSource.TRI_VS_WGSL", kind: "source fragment", why: "the device's full-screen vertex stage render/tslSource.mjs wraps around a fragment three generated; the generated pairs themselves are in the corpus from tools/ship/tsl-emitted.json" }),
+    // v4459 -- the two texel probes: render pairs (vs + fs) reading a bound texture, which this corpus's compute
+    // harness cannot feed. They are graded on BOTH real backends, through gfx/device.js, by their own gate.
+    // (`keeps` is reserved for the ONE shader that stays on the browser harness; these are graded on both real
+    // backends by tools/ship/deviceFormats-selfcheck.mjs, which is named in `why` instead.)
+    Object.freeze({ id: "texelProbe.FLOAT_PROBE_WGSL", kind: "render pair, graded through the device",
+                    why: "a vs+fs pair reading an rgba16float texture; the corpus dispatches compute over buffers. tools/ship/deviceFormats-selfcheck.mjs reads its bits back on WebGPU and WebGL2" }),
+    Object.freeze({ id: "texelProbe.UINT_PROBE_WGSL", kind: "render pair, graded through the device",
+                    why: "a vs+fs pair reading an rg16uint texture; same reason, same gate (tools/ship/deviceFormats-selfcheck.mjs)" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",
                     why: "assembled in its own gate by concatenation to dodge a self-counting trap; copying it here would defeat that",
                     keeps: "tools/ship/wgslLayout-selfcheck.mjs stays on the browser harness" }),

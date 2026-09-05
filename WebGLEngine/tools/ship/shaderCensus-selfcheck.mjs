@@ -57,7 +57,11 @@ const c = shaderCensus(ROOT);
     // v4383 -- MEASURED WITH classify(), against v1's 14 measured on raw text. It is not comparable to v3274's
     // 3, which was measured with the discredited instrument; the honest v3274 figure cannot be recovered and is
     // not guessed at here. THE THRESHOLD THAT MATTERS IS THE ONE v3274 NAMED, and it is asserted separately.
-    const DUAL_BASELINE = 10;
+    // v4459 -- 10 -> 11, read before raising, as the line below asks: render/texelProbe.mjs authors both halves BY
+    // DESIGN, because it is a device probe (a texel's bits written out as bytes) and the device's contract is a
+    // pair. That is the same reason render/gpuDriven.mjs and render/gpuTerrain.mjs are on this list, and it is
+    // not a translation an IR would have saved: the two fragments are eleven lines each. The trigger is still 20.
+    const DUAL_BASELINE = 11;
     const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
 
     ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",

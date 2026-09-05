@@ -1389,6 +1389,13 @@ export const INSTRUMENTS = [
         measures: "For each of the four blend words, the frame gfx/device.js draws on WebGPU and on WebGL2 against the blend equation evaluated in f64 and quantised to bytes, and the two frames against each other; the control half; the refusal of an unknown word.",
         key: "*** UNTIL v4458 A DEVICE PIPELINE HAD TOPOLOGY, CULL AND FRONT FACE, AND NO BLEND AT ALL. *** Every draw through gfx/device.js landed opaque, on both backends, whatever alpha the fragment wrote. That was invisible because every consumer so far drew opaque geometry or a full-screen post effect.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "device-formats", area: "render", name: "Texture formats and depth state on the device, read back as bits",
+        gate: "tools/ship/deviceFormats-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "For rgba16float and rg16uint uploads through gfx/device.js on WebGPU and WebGL2, every byte of every texel read back through render/texelProbe.mjs against the uploaded bits; update(); the forced nearest filter on the integer format; depthWrite and depthCompare on both backends; the row mirror between the backends, applied by name.",
+        key: "*** UNTIL v4459 device.texture() MADE rgba8unorm OF WHATEVER BYTES IT WAS HANDED, AND THE WebGL2 PIPELINE WROTE DEPTH WHATEVER depthWrite SAID. *** The Slug atlas is rgba16float control points and rg16uint band headers read with textureLoad, so the WGSL twin and the blend state still had nothing to read.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

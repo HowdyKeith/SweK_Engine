@@ -177,8 +177,8 @@ export const PARITY_BASELINE = Object.freeze({
     // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
-    glslBearing: 145,
-    glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
+    glslBearing: 146,
+    glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -205,13 +205,19 @@ export const PARITY_BASELINE = Object.freeze({
     // second language interleaved in it would end that; so `both` does not move and wgslOnly does. The twin is
     // held to text/slugEval.js on a real device by tools/ship/slugWgsl-selfcheck.mjs: exact on 83,137 sharp
     // samples, inside 3.2e-6 at 28 and 12 px/em. The same file is why wgslOnly moves too; nothing else changed.
-    wgslBearing: 61,
-    both: 13,
+    // v4459 -- glslBearing 145 -> 146, wgslBearing 61 -> 62, both 13 -> 14, directive 129 -> 130: render/texelProbe.mjs,
+    // a SHIPPING pair that reads a texel's bits back out of a device texture in both languages, so a format the
+    // device uploads can be graded exactly rather than by picture. It is a module and not its gate on purpose:
+    // the first draft put the pair inside tools/ship/deviceFormats-selfcheck.mjs, and this census counted the
+    // gate as a device consumer beside the two demos -- correctly, since it carried both languages and imported
+    // gfx/device.js. The v4278 note below section 4 records the same shape; the module is the honest answer.
+    wgslBearing: 62,
+    both: 14,
     glslOnly: 132,
     wgslOnly: 48,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

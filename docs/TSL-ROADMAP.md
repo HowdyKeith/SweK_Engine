@@ -272,7 +272,18 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         sabotages red at 6 / 8 / 4 checks; the third (a wrong factor in the table) left both backends agreeing
         with each other and was caught only by the equation. STILL MISSING before text can draw: depthWrite on
         the WebGL2 backend (the WebGPU pipeline honours it; the WebGL2 one has no gl.depthMask) and the two
-        texture formats, both now in item 3's scope.
+        texture formats, both now in item 3's scope. BUILT at v4459, as item 3's first half: device.texture()
+        takes `format` (rgba8unorm, rgba16float, rg16uint; TEXTURE_FORMATS), nearest forced on the integer
+        format because a LINEAR filter makes it incomplete on WebGL2 and it samples black; a `source` or a render
+        target with a 16-bit format is refused by name; the WebGL2 pipeline honours depthWrite (gl.depthMask) and
+        depthCompare (the eight WebGPU words, mapped) at use(). MEASURED by tools/ship/deviceFormats-selfcheck.mjs
+        through render/texelProbe.mjs, a shipping pair that writes a texel's BITS as bytes: 2,048 half-float bytes
+        and 1,024 uint bytes exact on each backend, 0 and 65535 included, update() exact, depthWrite false letting
+        the far quad through on both, and the two backends byte-identical once WebGL2's rows are turned over --
+        the fetch at gl_FragCoord.y counts from the bottom, WebGPU's position.y from the top, 722 bytes differ
+        without the turn, and the mapping is applied by name rather than hidden in a tolerance. Four sabotages
+        red at 5 / 2 / 2 / 4. Mipmaps are split out (task 21): WebGPU has no generateMipmap, so that half is a
+        blit pipeline of its own, and Slug does not need it.
      3. A device-path text batch, drawn on both backends and diffed, with the orrery's four fillText calls or the
         ship labels' overlay canvas as the first consumer.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
