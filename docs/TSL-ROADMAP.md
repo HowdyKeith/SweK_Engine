@@ -540,6 +540,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         right-to-left label to draw or a rig measures the CJK wall past 1.5 ms; neither is a fallback renderer.
     12. Measure SlugTextBatch's per-frame bufferData before any ring buffer; the plan's ring resets to 0 on
         overflow with no fence, so it overwrites text still being drawn.
+        MEASURED at v4493 (task 12), and the cheap fix built instead of the ring. Both shipping consumers
+        (ev/esShipLabels.js, orrery-gpu.html) call set() on every label every frame: 24 labels are 343 glyph quads
+        and 115 KiB of vertices and indices a frame, 72 us of layout + buildVertices a label on this box, and before
+        this round SlugDeviceBatch.set destroyed and created two buffers per label per frame (1,920 over 40 frames
+        in the gate) while SlugTextBatch.set took a new bufferData store each time. Now a set() whose stream fits
+        the buffers it has writes into them (queue.writeBuffer / bufferSubData) -- the queue orders that write
+        behind the commands already submitted, which is the fence the plan's ring lacked, for free -- and growth
+        reallocates; both batches count sets, allocations and bytes. tools/ship/slugReupload-selfcheck.mjs, 24 labels
+        x 40 frames on both backends, CPU-timed with the queue drained on SwiftShader: recreate 9.6 / 0.9 ms a
+        frame (WebGPU / WebGL2), reuse 8.7 / 0.6, draw-only 8.4 / 0.2; reuse allocates nothing once warm and draws
+        the same pixels. AND A FINDING FROM THE SABOTAGE: skipping the index write on reuse was invisible, because
+        the index stream is STRUCTURAL -- quad k is 4k + (0,1,2, 0,2,3) whatever the text -- so a store written for
+        N quads already holds the indices of any M <= N. Both batches now write indices only on growth (107 KiB a
+        frame instead of 115), and the gate holds the structure by name. The ring buffer is a won't-do in
+        tools/ship/todo.mjs (slug-ring-buffer): nothing it would save is left to save at this label count, and its
+        reset-without-a-fence is the one thing the reuse write does not do.
     13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
 
 8. **THE PHYSICS LAB ON THE DEVICE -- planned at v4464 after a survey of the lab's GPU paths.** The lab has one

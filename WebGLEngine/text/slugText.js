@@ -419,11 +419,20 @@ export class SlugTextBatch {
         const built = buildVertices(laid.glyphs, (gi) => this.fontGPU.entryFor(gi), opts);
         const gl = this.gl;
 
+        // v4493 (task 12): bufferSubData into the store when the stream fits, bufferData (a new store) only on growth.
+        // Consumers call set() per label per frame; a fresh store per call was the reupload the roadmap asked to measure.
+        const st = this.stats || (this.stats = { sets: 0, allocations: 0, bytes: 0 });
+        // The index stream is structural (quad k is 4k+{0,1,2, 0,2,3}), so a store written for N quads already holds the
+        // indices of any M <= N: the index buffer is rewritten only on growth.
+        st.sets++; st.bytes += built.buffer.byteLength;
         gl.bindVertexArray(this.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.bufferData(gl.ARRAY_BUFFER, built.buffer, gl.DYNAMIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, built.indices, gl.DYNAMIC_DRAW);
+        if (built.buffer.byteLength <= (this._vboSize || 0)) gl.bufferSubData(gl.ARRAY_BUFFER, 0, built.buffer);
+        else { gl.bufferData(gl.ARRAY_BUFFER, built.buffer, gl.DYNAMIC_DRAW); this._vboSize = built.buffer.byteLength; st.allocations++; }
+        if (built.indices.byteLength > (this._iboSize || 0)) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, built.indices, gl.DYNAMIC_DRAW); this._iboSize = built.indices.byteLength; st.allocations++; st.bytes += built.indices.byteLength;
+        }
         gl.bindVertexArray(null);
 
         this.indexCount = built.indices.length;

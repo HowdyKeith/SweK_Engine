@@ -2461,6 +2461,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "1 / 2 / 2 / 3 -- D went 0 red first (a predicate loosened to admit .notdef never met one on fully-mapped text) and the " +
                  "control row plus the input-side sabotage were added for it.",
     }),
+    since115: Object.freeze({
+        at: "v4493", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugReupload-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. The per-frame Slug vertex reupload measured (24 labels: 343 quads, 115 KiB a frame, 1,920 buffer " +
+                 "creations over 40 frames on the old path) and the cheap fix built: SlugDeviceBatch and SlugTextBatch write into the " +
+                 "buffers they have when the stream fits (queue-ordered, no fence needed), reallocating on growth, and skip the index " +
+                 "write entirely because the index stream is structural (quad k is 4k + (0,1,2, 0,2,3)) -- found when sabotage D's " +
+                 "skipped index write was invisible. Reuse allocates nothing once warm and draws the same pixels; recreate 9.6 / 0.9 ms, " +
+                 "reuse 8.7 / 0.6, draw-only 8.4 / 0.2 (WebGPU / WebGL2, CPU-timed on SwiftShader). The ring buffer is a won't-do. " +
+                 "Sabotages red at 4 / 4 / 1 / 3.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

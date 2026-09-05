@@ -286,6 +286,21 @@ export const TODO = [
                 "every timing, not a second renderer.",
         evidence: "node tools/ship/slugShaping-selfcheck.mjs",
     },
+    {
+        id: "slug-ring-buffer",
+        status: "wont",
+        title: "A ring buffer for Slug label vertices (the reviewed plan's per-frame allocator, resetting to 0 on overflow)",
+        why: "docs/TSL-ROADMAP.md step 7 item 12 (task 12): measure the per-frame reupload before building the plan's ring, whose reset carries no fence.",
+        reason: "MEASURED at v4493 (tools/ship/slugReupload-selfcheck.mjs, 24 labels x 40 frames, SwiftShader, CPU-timed with the queue drained): " +
+                "the old path destroyed and created 1,920 buffers over 40 frames for 115 KiB of vertices a frame; the batches now write into " +
+                "the buffers they have when the stream fits (queue.writeBuffer / bufferSubData, ordered behind the frame already submitted -- the " +
+                "fence the ring lacked, for free), reallocate on growth, and skip the index write because the index stream is structural. " +
+                "Reuse allocates nothing once warm: recreate 9.6 / 0.9 ms a frame, reuse 8.7 / 0.6, draw-only 8.4 / 0.2 (WebGPU / WebGL2). " +
+                "What a ring would add is one allocation instead of 48 per frame -- already zero -- and a reset that overwrites text the " +
+                "previous frame is still drawing. If a rig measures the reuse write itself past a frame at hundreds of labels, the answer " +
+                "is one shared vertex buffer with a per-frame region and a fence, built then, against that number.",
+        evidence: "node tools/ship/slugReupload-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);

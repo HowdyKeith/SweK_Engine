@@ -202,16 +202,40 @@ export class SlugDeviceBatch {
         const f = this.fontDevice;
         const laid = layoutText(f.font, text, opts);
         const built = buildVertices(laid.glyphs, (gi) => f.entryFor(gi), opts);
-        if (this.vb) { this.vb.destroy(); this.ib.destroy(); this.vb = this.ib = null; }
+        this._upload(built, laid);
+        return laid;
+    }
+
+    /**
+     * v4493 (task 12): REUSE THE BUFFERS WHEN THE NEW STREAM FITS. Before, every set() destroyed both buffers and
+     * created two more -- ev/esShipLabels.js and orrery-gpu.html call set() on every label every frame, so 24 labels
+     * were 48 buffer creations a frame. A write into an existing buffer is ordered by the queue behind the commands
+     * already submitted (queue.writeBuffer on WebGPU, bufferSubData on WebGL2), so a batch drawn last frame may be
+     * rewritten this frame with no fence; that is the ordering the plan's ring buffer lacked. Growth reallocates.
+     * `stats` counts sets, allocations and bytes written, so a gate can hold "no allocation once warm".
+     */
+    _upload(built, laid) {
         this.indexCount = built.indices.length;
         this.quads = built.quadCount;
         this.layout = laid;
         this.built = built;
-        if (this.indexCount) {
-            this.vb = this.device.buffer({ usage: "vertex", data: new Float32Array(built.buffer) });
+        const st = this.stats || (this.stats = { sets: 0, allocations: 0, bytes: 0 });
+        st.sets++;
+        if (!this.indexCount) return;
+        const vdata = new Float32Array(built.buffer), vBytes = vdata.byteLength, iBytes = built.indices.byteLength;
+        if (this.vb && this.ib && vBytes <= this.vb.size && iBytes <= this.ib.size) {
+            // The index stream is STRUCTURAL: quad k is always 4k+{0,1,2, 0,2,3} (buildVertices and buildCurvedVertices both), so
+            // the indices written for N quads are the first 6M of any M <= N quads. A reuse never needs to write them (found by
+            // v4493's sabotage D: skipping the index write was invisible, because it was a write of the same bytes).
+            this.vb.write(vdata);
+            st.bytes += vBytes;
+        } else {
+            if (this.vb) { this.vb.destroy(); this.ib.destroy(); this.vb = this.ib = null; }
+            this.vb = this.device.buffer({ usage: "vertex", data: vdata });
             this.ib = this.device.buffer({ usage: "index", data: built.indices });
+            st.allocations += 2;
+            st.bytes += vBytes + iBytes;
         }
-        return laid;
     }
 
     /**
@@ -220,15 +244,7 @@ export class SlugDeviceBatch {
      */
     setBuilt(built, layout = null) {
         if (!built || !(built.buffer instanceof ArrayBuffer) || !(built.indices instanceof Uint32Array)) throw new Error("slugDevice: setBuilt wants { buffer: ArrayBuffer, indices: Uint32Array }");
-        if (this.vb) { this.vb.destroy(); this.ib.destroy(); this.vb = this.ib = null; }
-        this.indexCount = built.indices.length;
-        this.quads = built.quadCount;
-        this.layout = layout;
-        this.built = built;
-        if (this.indexCount) {
-            this.vb = this.device.buffer({ usage: "vertex", data: new Float32Array(built.buffer) });
-            this.ib = this.device.buffer({ usage: "index", data: built.indices });
-        }
+        this._upload(built, layout);
         return layout;
     }
 
