@@ -5,6 +5,10 @@
 // carries both { wgsl } and { glsl } and each backend takes its own; everything else -- buffers, pipelines, passes,
 // draws -- is unified.
 //
+// ---- v4461 -- A DECLARED-BUT-UNREAD BINDING NO LONGER BLANKS THE FRAME: bindings carry `used` (the auto layout's own
+// question, answered from the text), unused ones are left out of the bind group, and createBindGroup runs inside a
+// validation error scope whose message becomes the pipeline's `error` for the next use() to refuse with. See usedNames.
+//
 // ---- v4458 -- BLEND STATE, BY NAME, ON BOTH BACKENDS. `blend: "premultiplied" | "alpha" | "additive" | "none"` on the
 // pipeline descriptor (BLEND_MODES below), because Slug text returns colour premultiplied by coverage and until this
 // round every draw through this device landed opaque whatever alpha the fragment wrote. tools/ship/deviceBlend-
@@ -135,6 +139,15 @@ function _refuse(backend, what, instead) {
 }
 const CPU_TWIN = "render/gpuDriven.mjs cullLodCpu() produces the same per-LOD instance records on the CPU; draw them with pass.instances() + pass.drawIndexed().";
 
+
+/** v4461 -- which declared bindings the shader statically references; see the WebGPU backend's note at classify(). */
+function usedNames(wgsl, all) {
+    let code = wgsl.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+    code = code.replace(/@group\s*\(\s*\w+\s*\)\s*@binding\s*\(\s*\w+\s*\)\s*var\s*(?:<[^>]*>)?\s*[A-Za-z_]\w*\s*:\s*[^;]+;/g, " ");
+    for (const b of all) b.used = new RegExp("\\b" + b.name + "\\b").test(code);
+    return all;
+}
+
 // --- null backend: implements the full interface, records the op stream. Used for tests + as a headless fallback. ----
 function nullBackend(opts = {}) {
     const ops = [];
@@ -147,8 +160,8 @@ function nullBackend(opts = {}) {
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
         pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
                             blend: _blendMode(d), depthWrite: d.depthWrite !== false, depthCompare: _depthCompare(d),
-                            bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? parseBindings(d.shaders.wgsl) : [] }),
-        compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? parseBindings(d.wgsl) : [], _bound: {},
+                            bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? usedNames(d.shaders.wgsl, parseBindings(d.shaders.wgsl)) : [] }),
+        compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? usedNames(d.wgsl, parseBindings(d.wgsl)) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
                            bindTexture: function (n, t) { this._bound[n] = t; ops.push(["bindTexture", n, !!(t && t.__tex)]); return this; } }),
         depthTexture: () => null,
@@ -388,31 +401,53 @@ async function webgpuBackend(canvas, opts = {}) {
     const bindGroupFor = (p) => {
         if (p._bg && p._bgGen === p._gen) return p._bg;
         const entries = [];
-        if (p.ubuf) entries.push({ binding: p.uniformBinding, resource: { buffer: p.ubuf } });
+        const uniformUsed = p.uniformBindings.find((b) => b.binding === p.uniformBinding);
+        if (p.ubuf && (!uniformUsed || uniformUsed.used !== false)) entries.push({ binding: p.uniformBinding, resource: { buffer: p.ubuf } });
         let nearest = null;
         for (const t of p.texBindings) {
+            if (t.used === false) continue;                       // v4461 -- not in the auto layout; see usedNames
             const tex = p._tex[t.name];
             if (!tex || !tex.view) throw new Error(`gfx/device: the shader declares texture "${t.name}" at @group(0) @binding(${t.binding}) and nothing was bound to it -- call pass.texture(${JSON.stringify(t.name)}, tex) before drawing. Drawing anyway would present the effect over nothing.`);
             if (nearest == null) nearest = !!tex.nearest;
             entries.push({ binding: t.binding, resource: tex.view });
         }
-        for (const s of p.samplerBindings) entries.push({ binding: s.binding, resource: samplerFor(!!nearest) });
+        for (const s of p.samplerBindings) { if (s.used === false) continue; entries.push({ binding: s.binding, resource: samplerFor(!!nearest) }); }
         for (const s of p.storageBindings) {
+            if (s.used === false) continue;
             const b = p._stor[s.name];
             if (!b) throw new Error(`gfx/device: the shader declares storage buffer "${s.name}" at @group(0) @binding(${s.binding}) and nothing was bound to it -- call ${p.__compute ? "compute.bind" : "pass.storage"}(${JSON.stringify(s.name)}, buf) first.`);
             entries.push({ binding: s.binding, resource: { buffer: b.buf.gpu, offset: b.offset || 0, ...(b.size ? { size: b.size } : {}) } });
         }
         for (const u of p.uniformBindings) {
             if (p.ubuf && u.binding === p.uniformBinding) continue;
+            if (u.used === false) continue;
             const b = p._stor[u.name];
             if (!b) throw new Error(`gfx/device: the shader declares uniform "${u.name}" at @group(0) @binding(${u.binding}) and nothing was bound to it -- bind a buffer with usage "uniform" under that name.`);
             entries.push({ binding: u.binding, resource: { buffer: b.buf.gpu, offset: b.offset || 0, ...(b.size ? { size: b.size } : {}) } });
         }
+        // v4461 -- the backstop: a bind group the layout refuses is an error nothing else reports. Caught here, it
+        // becomes the pipeline's `error`, named with the entries it carried, and the next use() refuses with it.
+        if (typeof gpu.pushErrorScope === "function") gpu.pushErrorScope("validation");
         p._bg = gpu.createBindGroup({ layout: p.pipe.getBindGroupLayout(0), entries }); p._bgGen = p._gen;
+        p._bgCheck = (typeof gpu.popErrorScope === "function") ? gpu.popErrorScope().then((e) => { if (e) p.error = "gfx/device: createBindGroup was refused for this pipeline, so its draws land nothing: " +
+            e.message + " -- bound: " + entries.map((en) => "@binding(" + en.binding + ") " + (p.all.find((b) => b.binding === en.binding) || {}).name).join(", ") +
+            ". A texture bound under the wrong sample type (a uint texture to a texture_2d<f32>, a depth texture to a filterable one) is the usual cause."; }).catch(() => {}) : Promise.resolve();
         return p._bg;
     };
+    // v4461 -- *** A BINDING THE SHADER DECLARES AND NEVER READS IS NOT IN THE PIPELINE'S LAYOUT, AND BINDING IT DREW
+    // NOTHING, SILENTLY. *** `layout: "auto"` builds the bind group layout from what the entry points STATICALLY USE.
+    // This backend built its bind group from what the source DECLARES (parseBindings), so a fragment that declared
+    // a texture and stopped reading it handed createBindGroup an entry the layout did not have; the validation error
+    // lands asynchronously, the command buffer is dropped, and the frame is blank with no error on any path -- four
+    // all-zero capture frames at v4460 beside four good WebGL2 ones, where an unused sampler is just location -1.
+    // So every declared binding now carries `used`: whether its name occurs in the shader outside its own
+    // declaration, comments stripped -- the same question the auto layout asks, answered from the text. Unused
+    // bindings are left out of the bind group, which is what the layout did, and the frame draws -- as it does on
+    // WebGL2. (A struct field sharing a binding's name reads as a use; the safe direction, and rare.) And as the
+    // backstop for whatever the text cannot see, createBindGroup runs inside a validation error scope whose message
+    // becomes the pipeline's `error`, which the next use() or dispatch() refuses with, by name.
     const classify = (wgsl) => {
-        const all = parseBindings(wgsl).filter((b) => b.group === 0);
+        const all = usedNames(wgsl, parseBindings(wgsl).filter((b) => b.group === 0));
         return { texBindings: all.filter((b) => /^texture_/.test(b.type)), samplerBindings: all.filter((b) => /^sampler/.test(b.type)),
                  storageBindings: all.filter((b) => b.addressSpace === "storage"), uniformBindings: all.filter((b) => b.addressSpace === "uniform"), all };
     };
@@ -525,14 +560,28 @@ async function webgpuBackend(canvas, opts = {}) {
             // a drawn frame's depth would be wrong -- a pick frame clears, as its caller must.
             if (o && o.target && !(o.target.gpu && o.target.view)) throw new Error("gfx/device: frame target must be a texture from device.texture()");
             const enc = gpu.createCommandEncoder(); const target = (o && o.target) ? o.target.gpu : (offscreen || (o && o.offscreen)) ? ownTarget() : ctx.getCurrentTexture(); const view = target.createView(); let rp = null, cur = null, idx = null;
-            const ready = () => { if (!rp) throw new Error("gfx/device: draw before pass.clear() -- the render pass begins at clear()"); rp.setBindGroup(0, bindGroupFor(cur)); };
+            const usedPipes = new Set();                          // v4461 -- every pipeline this frame bound, for the read path's check below
+            // *** THE BIND GROUP'S OWN SCOPE IS NOT ENOUGH, MEASURED. *** A bind group created before its pipeline has finished
+            // building is validated LATE, after the scope that created it has popped; the only report is then the encoder's
+            // "[Invalid BindGroup] is invalid -- while encoding SetBindGroup", and THAT is raised when the pass ends or the
+            // command buffer is finished, not at the call (a scope around the SetBindGroup call alone measured null too).
+            // Drawn 200 ms after creation the first scope catches it; drawn in the same tick, as every gate here does, it
+            // does not. So the WHOLE ENCODING, through submit, runs inside a frame scope, and its first error is attributed
+            // to every pipeline the frame bound that has no more specific error of its own -- a frame binds few.
+            const setBind = (encoder, p) => { encoder.setBindGroup(0, bindGroupFor(p)); usedPipes.add(p); };
+            if (typeof gpu.pushErrorScope === "function") gpu.pushErrorScope("validation");
+            const frameCheck = () => (typeof gpu.popErrorScope === "function") ? gpu.popErrorScope().then((e) => { if (!e) return;
+                for (const p of usedPipes) if (!p.error) p.error = "gfx/device: a draw in a frame that used this pipeline was refused when the frame was encoded (the pipeline was still building when its bind group was made, so the layout check landed late): " +
+                    String(e.message).split("\n")[0] + " -- this pipeline bound: " + p.all.filter((b) => b.used !== false).map((b) => "@binding(" + b.binding + ") " + b.name).join(", ") +
+                    ". A texture bound under the wrong sample type (a uint texture to a texture_2d<f32>, a depth texture to a filterable one) is the usual cause."; }).catch(() => {}) : Promise.resolve();
+            const ready = () => { if (!rp) throw new Error("gfx/device: draw before pass.clear() -- the render pass begins at clear()"); setBind(rp, cur); };
             const pass = {
                 // Compute runs on the SAME encoder, before the render pass, so a cull that fills an indirect buffer
                 // is ordered before the draw that reads it without the caller managing a fence.
                 dispatch: (c, wg) => { if (rp) throw new Error("gfx/device: dispatch() must come before pass.clear() -- a compute pass cannot run inside the frame's render pass; put the compute work first");
                     if (!c || !c.__compute) throw new Error("gfx/device: dispatch() needs a pipeline from device.compute()");
                     if (c.error) throw new Error(c.error);
-                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); cp.setBindGroup(0, bindGroupFor(c)); const g = Array.isArray(wg) ? wg : [wg]; cp.dispatchWorkgroups(g[0] || 1, g[1] || 1, g[2] || 1); cp.end(); },
+                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); setBind(cp, c); const g = Array.isArray(wg) ? wg : [wg]; cp.dispatchWorkgroups(g[0] || 1, g[1] || 1, g[2] || 1); cp.end(); },
                 // v4339 -- THE DISPATCH SIZE ITSELF IN A BUFFER. The cull pass has always been able to fill an indirect
                 // DRAW; this is the other half, and it is what lets one pass decide how much work the next one does
                 // without a readback. The buffer holds three u32 -- workgroupsX, Y, Z -- at `byteOffset`, and the GPU
@@ -541,7 +590,7 @@ async function webgpuBackend(canvas, opts = {}) {
                     if (!c || !c.__compute) throw new Error("gfx/device: dispatchIndirect() needs a pipeline from device.compute()");
                     if (c.error) throw new Error(c.error);
                     if (!b || !b.usage || !b.usage.includes("indirect")) throw new Error("gfx/device: dispatchIndirect() needs a buffer created with usage \"indirect\" -- it holds three u32 (workgroupsX, Y, Z) the GPU reads when the command runs");
-                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); cp.setBindGroup(0, bindGroupFor(c)); cp.dispatchWorkgroupsIndirect(b.gpu, byteOffset); cp.end(); },
+                    const cp = enc.beginComputePass(); cp.setPipeline(c.pipe); setBind(cp, c); cp.dispatchWorkgroupsIndirect(b.gpu, byteOffset); cp.end(); },
                 clear: (c) => { const dt = depthTarget(target.width, target.height);
                     rp = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: { r: c[0], g: c[1], b: c[2], a: c[3] == null ? 1 : c[3] }, loadOp: "clear", storeOp: "store" }],
                         ...(dt ? { depthStencilAttachment: { view: dt._view, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } } : {}) }); },
@@ -570,7 +619,7 @@ async function webgpuBackend(canvas, opts = {}) {
                     rp.drawIndexedIndirect(b.gpu, byteOffset); }
             };
             fn({ pass, device: dev }); if (rp) rp.end();
-            if (!(o && o.read)) { gpu.queue.submit([enc.finish()]); return; }
+            if (!(o && o.read)) { gpu.queue.submit([enc.finish()]); frameCheck(); return; }
             // Level 11 -- the readback: copy the presented texture before submit, then map. bytesPerRow is padded
             // to 256 as the API requires, and a bgra8unorm canvas is swizzled to RGBA so a caller comparing this
             // to the WebGL2 readback compares colours and not channel orders.
@@ -582,7 +631,12 @@ async function webgpuBackend(canvas, opts = {}) {
             const sd = wantDepth ? gpu.createBuffer({ size: bpr * h, usage: BU().COPY_DST | BU().MAP_READ }) : null;
             if (sd) enc.copyTextureToBuffer({ texture: dtex, aspect: "depth-only" }, { buffer: sd, bytesPerRow: bpr }, [w, h]);
             gpu.queue.submit([enc.finish()]);
-            return Promise.all([st.mapAsync(MM().READ), sd ? sd.mapAsync(MM().READ) : null]).then(() => {
+            // v4461 -- a READ frame is the one moment a caller is waiting anyway, so the bind-group checks of every pipeline
+            // it used are awaited here and a refused one REJECTS the frame with its message, instead of handing back the
+            // blank picture the refused draw left. A presented frame has no such moment; its next use() refuses.
+            const fc = frameCheck();
+            return Promise.all([st.mapAsync(MM().READ), sd ? sd.mapAsync(MM().READ) : null, fc, ...[...usedPipes].map((p) => p._bgCheck)]).then(() => {
+                for (const p of usedPipes) if (p.error) { st.unmap(); st.destroy(); if (sd) { sd.unmap(); sd.destroy(); } throw new Error(p.error); }
                 const raw = new Uint8Array(st.getMappedRange()), px = new Uint8Array(w * h * 4), bgra = /^bgra/.test(fmt);
                 for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * bpr + x * 4, j = (y * w + x) * 4;
                     if (bgra) { px[j] = raw[i + 2]; px[j + 1] = raw[i + 1]; px[j + 2] = raw[i]; } else { px[j] = raw[i]; px[j + 1] = raw[i + 1]; px[j + 2] = raw[i + 2]; } px[j + 3] = raw[i + 3]; }

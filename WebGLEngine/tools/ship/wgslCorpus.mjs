@@ -226,6 +226,8 @@ export const EXCLUDED = Object.freeze([
     // backends by tools/ship/deviceFormats-selfcheck.mjs, which is named in `why` instead.)
     Object.freeze({ id: "texelProbe.FLOAT_PROBE_WGSL", kind: "render pair, graded through the device",
                     why: "a vs+fs pair reading an rgba16float texture; the corpus dispatches compute over buffers. tools/ship/deviceFormats-selfcheck.mjs reads its bits back on WebGPU and WebGL2" }),
+    Object.freeze({ id: "texelProbe.TWO_TEXTURE_PROBE_WGSL", kind: "render pair, graded through the device",
+                    why: "a vs+fs pair that declares two textures and reads one, to hold the device to the auto-layout rule; graded by tools/ship/deviceUnused-selfcheck.mjs on both backends" }),
     Object.freeze({ id: "texelProbe.UINT_PROBE_WGSL", kind: "render pair, graded through the device",
                     why: "a vs+fs pair reading an rg16uint texture; same reason, same gate (tools/ship/deviceFormats-selfcheck.mjs)" }),
     Object.freeze({ id: "wgslLayout probe", kind: "lives inside its gate",

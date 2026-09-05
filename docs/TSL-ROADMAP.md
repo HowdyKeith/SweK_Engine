@@ -301,7 +301,11 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         precision from the captured texcoords over 2..8 bits and no-snap: four bits here, model within 8.8e-8 em,
         and a rig with eight bits will print eight. FOUND ON THE WAY, filed as task 22: a WGSL fragment that
         declares a texture it does not read makes layout "auto" drop the binding, the device still binds it, and
-        the frame is BLANK with no error -- four all-zero capture frames beside four good WebGL2 ones. THE
+        the frame is BLANK with no error -- four all-zero capture frames beside four good WebGL2 ones. FIXED at v4461:
+        every declared binding carries `used` (the auto layout's own question, answered from the text), unused ones
+        stay out of the bind group so the frame draws, and createBindGroup runs inside a validation error scope
+        whose message a read frame rejects with and the next use() refuses with -- tools/ship/deviceUnused-selfcheck.mjs
+        holds both on both backends. THE
         CONSUMER is chosen (ev/esShipLabels.js) and not wired (task 23): a WebGPU canvas pass loses the device on
         this box, so the switch can only be verified once task 19's presented-frame gate runs on the rig.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses

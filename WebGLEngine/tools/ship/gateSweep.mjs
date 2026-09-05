@@ -1865,6 +1865,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "KEY WAS WRONG ABOUT PIXEL CENTRES AND THE FRAME SAID SO *** -- recorded in the header. Four " +
                  "sabotages red at 4 / 11 / 6 / 6. Five runs 6,063 to 6,507 ms; the slowest is the MEASURED budget.",
     }),
+    since82: Object.freeze({
+        at: "v4461", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deviceUnused-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. gfx/device.js marks every declared binding `used` from the shader text (the auto layout's own " +
+                 "question), leaves unused ones out of the bind group so the frame draws, and runs createBindGroup " +
+                 "inside a validation error scope whose message a READ frame rejects with and the next use() refuses " +
+                 "with. The gate draws a two-texture probe reading one texture with both bound (texA's texels exact " +
+                 "on both backends), and binds a uint texture under a texture_2d<f32> (the read frame rejects by " +
+                 "name, the next use() refuses). *** THE FIRST DRAFT WAITED 50 ms FOR THE ERROR SCOPE AND WENT " +
+                 "RED *** -- the contract is now the read path awaiting the check, not a timing. Under 1 s.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

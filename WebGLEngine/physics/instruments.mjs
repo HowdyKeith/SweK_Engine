@@ -1403,6 +1403,13 @@ export const INSTRUMENTS = [
         measures: "A line of text drawn through gfx/device.js on WebGPU and WebGL2 against text/slugEval.js at every pixel, fed the texcoord and fwidth a snapped-corner rasteriser model gives it, the model's sub-pixel precision fitted from the fragment's captured inputs; the device WebGL2 picture against the shipped raw-WebGL2 batch; the two backends against each other.",
         key: "*** THE FIRST DRAFT OF THIS GATE WAS WRONG ABOUT WHAT A PIXEL CENTRE IS, AND THE FRAME SAID SO. *** It gave slugEval the exact pixel centre in em space and emsPerPixel = 1/size, and 482 of 23,040 pixels disagreed with the frame by more than 2 of 255, one by 43 -- while the WebGPU frame, the device's WebGL2 frame and the SHIPPED raw-WebGL2 batch agreed with each other byte for byte.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "device-unused", area: "render", name: "A declared-but-unread binding draws; a refused bind group is named",
+        gate: "tools/ship/deviceUnused-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module
+        measures: "On both real backends: a two-texture probe with both textures bound and one read draws the read one's texels exactly; a uint texture bound under a texture_2d<f32> makes the read frame reject and the next use() refuse, with the layout's own message; the `used` scan against comments, prefixes and compute declarations.",
+        key: "*** FOUND AT v4460, MEASURED FOUR TIMES BEFORE IT WAS UNDERSTOOD. *** `layout: \"auto\"` builds a pipeline's bind group layout from what the entry points STATICALLY USE; the device built its bind group from what the source DECLARED; the two disagreed on the unread textures; createBindGroup failed validation asynchronously; the command buffer was dropped. A frame without its draw, indistinguishable from a frame with nothing in it.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

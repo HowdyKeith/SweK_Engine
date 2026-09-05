@@ -59,6 +59,28 @@ void main() {
   fragColor = vec4(float(v.x & 0xFFu), float(v.x >> 8u), float(v.y & 0xFFu), float(v.y >> 8u)) / 255.0;
 }`;
 
+/**
+ * v4461 -- THE TWO-TEXTURE PROBE: declares texA and texB, READS ONLY texA, and writes texA's texel as bytes. It exists
+ * to hold gfx/device.js to the rule that a declared-but-unread binding must not blank the frame: with layout "auto"
+ * texB is not in the pipeline's layout, and a bind group that carried it was refused, silently, until v4461.
+ */
+export const TWO_TEXTURE_PROBE_WGSL = `@group(0) @binding(0) var texA: texture_2d<f32>;
+@group(0) @binding(1) var texB: texture_2d<f32>;
+struct VSOut { @builtin(position) pos: vec4f };
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VSOut { var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0)); var o: VSOut; o.pos = vec4f(p[vi], 0.0, 1.0); return o; }
+@fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f { return textureLoad(texA, vec2i(pos.xy), 0); }`;
+export const TWO_TEXTURE_PROBE_VERTEX_GLSL = `#version 300 es
+void main() { vec2 p[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0)); gl_Position = vec4(p[gl_VertexID], 0.0, 1.0); }`;
+export const TWO_TEXTURE_PROBE_FRAGMENT_GLSL = `#version 300 es
+precision highp float; precision highp sampler2D;
+uniform sampler2D texA; uniform sampler2D texB; out vec4 fragColor;
+void main() { fragColor = texelFetch(texA, ivec2(gl_FragCoord.xy), 0); }`;
+/** Pipeline descriptor for the two-texture probe: textures `texA` (read) and `texB` (declared, never read), no uniforms. */
+export function twoTextureProbeDesc() {
+    return { shaders: { wgsl: TWO_TEXTURE_PROBE_WGSL, glsl: { vertex: TWO_TEXTURE_PROBE_VERTEX_GLSL, fragment: TWO_TEXTURE_PROBE_FRAGMENT_GLSL } },
+             vs: "vs", fs: "fs", attributes: [], stride: 0, uniforms: [] };
+}
+
 /** Pipeline descriptor for the half-float probe: uniform `pair` (0 -> channels xy, 1 -> zw), texture `tex`. */
 export function floatProbeDesc() {
     return { shaders: { wgsl: FLOAT_PROBE_WGSL, glsl: { vertex: FLOAT_PROBE_VERTEX_GLSL, fragment: FLOAT_PROBE_FRAGMENT_GLSL } },
