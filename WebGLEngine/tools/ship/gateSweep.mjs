@@ -1880,6 +1880,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "name, the next use() refuses). *** THE FIRST DRAFT WAITED 50 ms FOR THE ERROR SCOPE AND WENT " +
                  "RED *** -- the contract is now the read path awaiting the check, not a timing. Under 1 s.",
     }),
+    since83: Object.freeze({
+        at: "v4462", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/devicePresent-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. render/devicePresent.mjs draws a known pattern through gfx/device.js on a PRESENTED canvas and " +
+                 "reads it back three ways (the device's canvas readback, an offscreen frame, a 2D drawImage of the " +
+                 "canvas -- the compositor's copy); the gate holds WebGL2 to all three at 0 of 2,048 differing and " +
+                 "names WebGPU's outcome on this box -- the device lost on the presented pass, with the browser's " +
+                 "own message -- as the rig-pending state rather than a red nobody here can clear. Three sabotages " +
+                 "red at 1 / 2 / 1. Under 1 s.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

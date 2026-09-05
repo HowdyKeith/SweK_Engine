@@ -1410,6 +1410,13 @@ export const INSTRUMENTS = [
         measures: "On both real backends: a two-texture probe with both textures bound and one read draws the read one's texels exactly; a uint texture bound under a texture_2d<f32> makes the read frame reject and the next use() refuse, with the layout's own message; the `used` scan against comments, prefixes and compute declarations.",
         key: "*** FOUND AT v4460, MEASURED FOUR TIMES BEFORE IT WAS UNDERSTOOD. *** `layout: \"auto\"` builds a pipeline's bind group layout from what the entry points STATICALLY USE; the device built its bind group from what the source DECLARED; the two disagreed on the unread textures; createBindGroup failed validation asynchronously; the command buffer was dropped. A frame without its draw, indistinguishable from a frame with nothing in it.",
     },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "device-present", area: "render", name: "The presented frame, read back three ways",
+        gate: "tools/ship/devicePresent-selfcheck.mjs",   // pageless: a standalone gate; device-present.html is the rig's page
+        measures: "A known pattern drawn through gfx/device.js on a canvas the device presents to, read back by the device, by an offscreen frame with the same commands and by a 2D drawImage of the presented canvas, each against the expectation and against the others, on WebGL2 and on WebGPU; the WebGPU outcome on the build box named as lost-device rather than red.",
+        key: "*** EVERY WebGPU FRAME THE TREE'S GATES CHECK GOES TO AN OWNED OFFSCREEN TEXTURE *** because this build box loses the device on any render pass whose attachment is the canvas's current texture. The canvas path is the product and, until this round, had no check anywhere.",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

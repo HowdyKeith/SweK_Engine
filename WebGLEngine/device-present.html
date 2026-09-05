@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Presented Frame Check (WebGL2 / WebGPU)">
+<meta name="demo:desc" content="Draws a known two-colour pattern through gfx/device.js on a canvas the device PRESENTS to, and reads it back three ways -- the device's canvas readback, an offscreen frame with the same commands, and a 2D drawImage of the presented canvas (what the compositor sees) -- comparing all three with the expectation. Every other device gate reads an offscreen texture because the build box loses the WebGPU device on a presented pass; this page is the rig's answer to whether presentation itself is right. ?webgl=1 forces WebGL2.">
+<meta name="demo:category" content="fx">
+<title>Presented Frame Check</title>
+<style>
+  html,body { margin:0; background:#04060d; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #wrap { padding:12px 16px; } #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #c { display:block; width:256px; height:64px; margin:10px 0; image-rendering:pixelated; border:1px solid #22304a; }
+  .line { margin:3px 0; } .ok { color:#9be15d; } .bad { color:#ff9a9a; } .dim { color:#5f7aa0; } a { color:#59d1ff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="cap">Presented frame check</div>
+  <canvas id="c" width="256" height="64"></canvas>
+  <div id="out"><div class="line dim">running&hellip;</div></div>
+  <div class="line dim">Left half must be red, right half blue, on the canvas above AND in all three readbacks. <a href="?webgl=1">force WebGL2</a> &middot; <a href="?">prefer WebGPU</a> &middot; the numbers are in <code>window.__present</code> for a harness.</div>
+</div>
+<script type="module">
+import { presentCheck, describe } from "./render/devicePresent.mjs";
+const cv = document.getElementById("c"), out = document.getElementById("out");
+const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+const backends = forceGl ? ["webgl2"] : ((navigator.gpu ? ["webgpu"] : []).concat(["webgl2"]));
+const results = [];
+for (const b of backends) {
+  const canvas = b === backends[0] ? cv : Object.assign(document.createElement("canvas"), { width: cv.width, height: cv.height });
+  if (canvas !== cv) { canvas.style.cssText = cv.style.cssText; canvas.className = ""; cv.parentNode.insertBefore(canvas, out); canvas.style.display = "block"; canvas.style.width = "256px"; canvas.style.height = "64px"; canvas.style.marginBottom = "10px"; }
+  const r = await presentCheck(canvas, b);
+  results.push(r);
+  const good = r.state === "presented" && [r.A, r.B, r.C, r.AB, r.AC].every((c) => c && c.differing === 0);
+  const div = document.createElement("div"); div.className = "line " + (good ? "ok" : "bad"); div.textContent = (good ? "PASS  " : "FAIL  ") + describe(r); out.appendChild(div);
+}
+out.querySelector(".dim")?.remove();
+window.__present = { results, allGood: results.every((r) => r.state === "presented" && [r.A, r.B, r.C, r.AB, r.AC].every((c) => c && c.differing === 0)) };
+</script>
+</body>
+</html>

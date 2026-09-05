@@ -307,7 +307,12 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         whose message a read frame rejects with and the next use() refuses with -- tools/ship/deviceUnused-selfcheck.mjs
         holds both on both backends. THE
         CONSUMER is chosen (ev/esShipLabels.js) and not wired (task 23): a WebGPU canvas pass loses the device on
-        this box, so the switch can only be verified once task 19's presented-frame gate runs on the rig.
+        this box, so the switch can only be verified once task 19's presented-frame gate runs on the rig. THAT
+        GATE EXISTS at v4462: render/devicePresent.mjs draws a known pattern on a presented canvas and reads it
+        back three ways (device readback, offscreen frame, the compositor's drawImage copy); device-present.html
+        runs it live; tools/ship/devicePresent-selfcheck.mjs holds WebGL2 to 0 of 2,048 differing on all three
+        and names WebGPU's outcome here (device lost, the Level 11 message) as rig-pending, not red. The rig
+        line is in the gate's output; the answer is Galaxina's.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
         more than one varying and Slug's vertex stage carries five, so the device shell is not its route.
      5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,
