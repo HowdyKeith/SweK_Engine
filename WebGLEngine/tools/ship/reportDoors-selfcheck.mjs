@@ -133,7 +133,7 @@ console.log("\n4. the contract: a non-empty array of ASCII strings");
        "five fixtures, one per branch. The population exercises exactly one of them -- the passing one -- so " +
        "without these the other four could say anything at all.");
 
-    const slow = new Set(COST.slow.map((s) => s.rel).concat(NEVER_CALL));
+    const slow = new Set(COST.slow.map((s) => s.rel).concat(NEVER_CALL));   // both, always -- see NEVER_CALL
     const callable = selfReports.filter((r) => !slow.has(r.rel));
     const sample = ALL ? callable : callable.slice(0, 14);
     const broken = [];
@@ -178,11 +178,17 @@ console.log("\n5. the cost, which is the reason this convention was never checke
        `${NEVER_CALL.length} entry: ${NEVER_CALL.join(", ")}, a zero-arity self-report that every walker of ` +
        `this convention will call, absent from all ${CALLED.length} modules this gate called. A call site that ` +
        "forgets the list fails here rather than hanging the suite.");
-    ok("!! *** knobLiveness's reportLines HAS NEVER BEEN OBSERVED TO RETURN, AND IS NOT CALLED HERE ***",
+    // *** v4454 -- THIS ROW SAID "HAS NEVER BEEN OBSERVED TO RETURN" AND MEASURING THAT CLOSED IT. *** The
+    // mechanism was a budget spent PER DEVICE across a 129-device registry: a worst case of forty-three
+    // minutes with no budget on the census itself. knobLiveness has one now, reportLines() returns in 38.0s
+    // covering 19 of 129 devices and saying which. It stays uncalled here FOR COST, which is a different
+    // reason, and the record carries both.
+    const kl = COST.slow.find((s) => s.rel === "tools/roundhouse/knobLiveness.mjs");
+    ok("!! the member that never returned now does, and is still too expensive for a bounded sample",
+       COST.doesNotFinish === null && kl && kl.bare > 30 && kl.was &&
        rows.some((r) => r.rel === "tools/roundhouse/knobLiveness.mjs" && r.kind === "self-report"),
-       "still running at 90 seconds, killed. It is a zero-arity self-report, so every consumer that walks this " +
-       "convention will call it and hang. NAMED RATHER THAN CALLED: a gate that hung to prove a module hangs " +
-       "would take the suite down with it.");
+       `38.0s where it used to run past 90 and be killed -- ${kl ? kl.was : "?"}. It is a zero-arity ` +
+       "self-report, so every walker of this convention calls it; before v4454 every walker hung.");
 
     // *** THE CHEAP PATH THAT NOTHING RECORDED, AND IT IS NOT THE SAME REPORT. *** One fast call, and it
     // carries a number rather than an adjective.

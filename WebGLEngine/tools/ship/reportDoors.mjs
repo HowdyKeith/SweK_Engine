@@ -137,10 +137,24 @@ export const CALL_COST_V4453 = Object.freeze({
         Object.freeze({ rel: "tools/ship/orphanDisposition.mjs", bare: 74.0, cheapFlag: null }),
         Object.freeze({ rel: "tools/ship/orphanTriage.mjs", bare: 71.5, cheapFlag: "{ live: false }", cheap: 0.0, linesBare: 154, linesCheap: 5 }),
         Object.freeze({ rel: "tools/ship/shaderRefs.mjs", bare: 52.0, cheapFlag: null }),
+        // v4454: was "never returns". A census budget made it 38.0s, which is still far too slow for the
+        // bounded sample below -- so it stays on NEVER_CALL for COST, which is a different reason.
+        Object.freeze({ rel: "tools/roundhouse/knobLiveness.mjs", bare: 38.0, cheapFlag: "totalBudgetMs", was: "never returned before v4454" }),
     ]),
-    doesNotFinish: "tools/roundhouse/knobLiveness.mjs -- still running at 90s, killed. The only member of the " +
-                   "population with no measured cost at all, because it has never been observed to return.",
-    total: "about seven and a half minutes to exercise the whole convention once, which is why no gate does",
+    // *** v4454 -- THIS ENTRY IS RETIRED AND THE ROUND IT CAUSED IS WHY. *** It read "still running at 90s,
+    // killed -- the only member of the population with no measured cost at all, because it has never been
+    // observed to return." Measuring THAT found the mechanism: knobLiveness's budget is spent PER DEVICE and
+    // the registry holds 129 of them, so the front door was attempting a census with nothing bounding their
+    // sum. *** AND RUNNING IT TO COMPLETION CORRECTED THIS RECORD TWICE OVER: it is not a hang, it RETURNS
+    // AFTER 989.8 SECONDS -- 16.5 minutes, 767 lines -- against the 43-minute worst case the arithmetic
+    // suggested. "Never returns" was an observation at 90 seconds promoted to a property; the truth is a cost
+    // nobody had paid. *** The census has a budget of its own now and reportLines() returns in 38.0s covering
+    // 19 of 129 devices and saying which. A record that names a defect is doing its job when the defect stops
+    // being true and the record has to change.
+    doesNotFinish: null,
+    total: "about seven and a half minutes to exercise the whole convention once, which is why no gate does " +
+           "-- and that was measured BEFORE knobLiveness was known to return at all; the full picture is that " +
+           "plus its 989.8 s, so a complete sweep of this convention is closer to twenty-four minutes",
 });
 
 // *** THE NEVER-CALL LIST, AND IT IS ABSOLUTE RATHER THAN DERIVED. *** Found by sabotaging this round's own
@@ -148,6 +162,10 @@ export const CALL_COST_V4453 = Object.freeze({
 // the gate calls bare -- and the gate HANGS instead of going red. It hung for real, twice, before this list
 // existed. A guard that sits downstream of a classification cannot protect against a defect in that
 // classification, so this list is consulted at EVERY call site regardless of how a module was sorted.
+// v4454 -- THE REASON CHANGED AND THE ENTRY DID NOT. Before v4454 knobLiveness never returned; now it
+// returns in 38.0s, which is still an order of magnitude past what a bounded sample can spend. A do-not-call
+// list that empties the moment a hang becomes a mere expense would have to be rebuilt the next time either
+// appears, so it holds both reasons and each entry carries its own.
 export const NEVER_CALL = Object.freeze(["tools/roundhouse/knobLiveness.mjs"]);
 
 /** The three that provide the convention and have no gate of their own to check it. */
