@@ -557,6 +557,17 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         orrery-gpu.html paints every landing. Under the contract: PROBES, a corpus entry on both harnesses, the
         probe convention's list. NOT CLAIMED: the colours (step 3), the voxel materials, altitude cooling.
      3. (task 40) Biome colour and a water plane in gpuTerrain's fragment stage, both languages, a CPU colour twin.
+        BUILT at v4481: render/gpuTerrain.mjs takes a `look` uniform -- 0 the v4300 readout to the byte, 1 the Worley
+        biome (the fragment's own texel: primary * 16 + secondary in green, the blend in blue, the two shipped colours
+        lerped, times the chunk's shade), 2 the treemap's language biome (alpha) -- with both palettes baked into both
+        shaders from worleyBiomes.BIOMES and repoHeightfield.BIOME_ORDER; terrainColourAt is the twin. THE WATER IS
+        PER LAKE, IN THE FRAGMENT, AND THE PLANE WAS MEASURED WRONG FIRST: one sheet at the level covering every lake
+        bed sat at 0.80 and flooded 39 of 64 dry chunks, because a treemap's lakes lie at their own landmass's massif
+        height. Each bed is already flat at its own level, so a lake texel (alpha 1) is WATER_COLOUR over the Worley
+        colour beneath under either look, and nothing floods. tools/ship/terrainLook-selfcheck.mjs holds every chunk's
+        pixel to the twin at worst 0 of 255 on both backends under all three looks, lake and dry rows apart; orrery-
+        gpu.html offers the look by a select. NOT CLAIMED: reflections, waves, a shoreline; a language blend across a
+        border (a file is one language).
      4. (task 41) Erosion measured before any port: the step-loop kernel or a written won't-do, with the numbers.
 
 ## The count that says when step 4 matters

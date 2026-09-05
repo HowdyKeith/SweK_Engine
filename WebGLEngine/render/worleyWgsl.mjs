@@ -175,13 +175,19 @@ export function shippedAt(x, z, seed, { cellScale = DEFAULTS.cellScale, borderBa
 }
 export function unpack(v) { const p = Math.round(v); return { id1: (p >>> 16) & 255, id2: (p >>> 8) & 255, blendByte: p & 255 }; }
 
-/** Write a packed field into an RGBA8 terrain field's green (primary id), blue (blend byte) and alpha (extension biome or 0). */
+/**
+ * Write a packed field into an RGBA8 terrain field: green = primary * 16 + secondary (both ids are 1..8, so the byte
+ * holds both and the fragment can lerp their colours), blue = the blend byte, alpha = the caller's layer (the treemap's
+ * language biome + 1, so 0 means "no layer" and 1 the lake bed) -- the bytes render/gpuTerrain.mjs's looks read.
+ */
 export function paintField(field, packed, alphaOf = null) {
     const n = field.width * field.height;
     if (packed.length !== n * OUT_PER_TEXEL) throw new Error(`worleyWgsl: ${packed.length / OUT_PER_TEXEL} texels of biome for a ${field.width}x${field.height} field`);
-    for (let i = 0; i < n; i++) { const u = unpack(packed[2 * i]); field.data[i * 4 + 1] = u.id1; field.data[i * 4 + 2] = u.blendByte; field.data[i * 4 + 3] = alphaOf ? (alphaOf(i) & 255) : 0; }
+    for (let i = 0; i < n; i++) { const u = unpack(packed[2 * i]); field.data[i * 4 + 1] = u.id1 * 16 + u.id2; field.data[i * 4 + 2] = u.blendByte; field.data[i * 4 + 3] = alphaOf ? (alphaOf(i) & 255) : 0; }
     return field;
 }
+/** The green byte back into its two ids. */
+export function unpackGreen(g) { return { id1: Math.floor(g / 16), id2: g % 16 }; }
 
 /**
  * Paint a landing's field with its biomes: the kernel through gfx/device.js on WebGPU, the f32 twin elsewhere -- the
@@ -190,7 +196,7 @@ export function paintField(field, packed, alphaOf = null) {
 export async function paintBiomes(device, bt, { seed = 1, cellScale = null, borderBand = DEFAULTS.borderBand } = {}) {
     const p = { originX: bt.params.originX, originZ: bt.params.originZ, extent: bt.params.extent, size: bt.field.width,
                 cellScale: cellScale == null ? bt.params.extent / 4 : cellScale, borderBand, seed: seed >>> 0 };
-    const alphaOf = bt.repo && bt.repo.biomes ? (i) => bt.repo.biomes[i] : null;
+    const alphaOf = bt.repo && bt.repo.biomes ? (i) => bt.repo.biomes[i] + 1 : null;   // + 1: alpha 0 is "no language layer", 1 the lake bed
     if (device && device.backend === "webgpu" && typeof device.compute === "function") {
         const { runCompute } = await import("./computeRun.mjs");
         const n = p.size * p.size;

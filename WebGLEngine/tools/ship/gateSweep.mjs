@@ -2259,6 +2259,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "byte-identical either way, and orrery-gpu.html paints every landing. Sabotages red at 2 / 5 / 3 by name; " +
                  "B (a hash multiplier off by one) parts every side at once, which is what a twin pinned both ways is for.",
     }),
+    // v4481 -- the hundred-and-third closing. Biome looks and water on the device terrain; a plane measured wrong and replaced.
+    since103: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/terrainLook-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/worleyDevice-selfcheck.mjs (the green byte carries both biome ids, alpha the language layer + 1)",
+        ]),
+        verdict: "green on WebGPU and WebGL2 through gfx/device.js. render/gpuTerrain.mjs colours a fragment by a `look`: 0 the " +
+                 "v4300 readout to the byte, 1 the fragment's own texel's Worley biomes lerped by the blend times the chunk's " +
+                 "shade, 2 the treemap's language biome -- both palettes baked into both shaders from the shipped tables, " +
+                 "terrainColourAt the twin, every chunk's pixel at worst 0 of 255 against it on both backends under all three " +
+                 "looks. THE FINDING WAS THE PLANE: the first draft drew one translucent sheet at the level covering every lake " +
+                 "bed, and the gate measured it at 0.80 with 39 of 64 dry chunks under water -- a treemap's lakes lie at their " +
+                 "own landmass's height, so one level floods the rest. Each bed is flat at its own level already, so a lake " +
+                 "texel is WATER_COLOUR over the Worley colour in the fragment and the plane is gone. Sabotages red at 5 / 7 / 1; " +
+                 "B leaves the picture right and the twin wrong and reads red on both backends, which is the point of a twin.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -103,15 +103,16 @@ sec("3. THE PAINT: green is the biome, blue the blend byte, alpha the language l
     const packed = W.fieldCpuF32({ ...P, size });
     W.paintField(field, packed, (i) => 3 + (i % 2));
     let chanOk = true;
-    for (let i = 0; i < size * size; i++) { const u = W.unpack(packed[2 * i]); if (field.data[i * 4] !== i || field.data[i * 4 + 1] !== u.id1 || field.data[i * 4 + 2] !== u.blendByte || field.data[i * 4 + 3] !== 3 + (i % 2)) chanOk = false; }
-    ok(chanOk, "*** paintField: red kept, green = primary id, blue = blend byte, alpha = the caller's layer ***");
+    for (let i = 0; i < size * size; i++) { const u = W.unpack(packed[2 * i]); if (field.data[i * 4] !== i || field.data[i * 4 + 1] !== u.id1 * 16 + u.id2 || field.data[i * 4 + 2] !== u.blendByte || field.data[i * 4 + 3] !== 3 + (i % 2)) chanOk = false; }
+    ok(chanOk, "*** paintField: red kept, green = primary * 16 + secondary, blue = blend byte, alpha = the caller's layer ***");
+    ok(W.unpackGreen(5 * 16 + 7).id1 === 5 && W.unpackGreen(5 * 16 + 7).id2 === 7 && W.unpackGreen(8 * 16 + 8).id1 === 8, "  and unpackGreen reads both ids back (8 and 8 fit: 136)");
     ok((() => { try { W.paintField(field, new Float32Array(10)); return false; } catch (e) { return /texels of biome/.test(e.message); } })(), "a packed field of the wrong size is refused by name");
     const nb = nullBackend();
     const bt = { params: { originX: -4, originZ: -4, extent: 8, heightScale: 1 }, field: { width: size, height: size, data: new Uint8Array(size * size * 4) }, repo: { biomes: new Uint8Array(size * size).fill(5) } };
     const res = await W.paintBiomes(nb, bt, { seed: P.seed, cellScale: P.cellScale });
     const want = W.fieldCpuF32({ ...P, size, cellScale: P.cellScale });
-    let painted = true; for (let i = 0; i < size * size; i++) if (bt.field.data[i * 4 + 1] !== W.unpack(want[2 * i]).id1 || bt.field.data[i * 4 + 3] !== 5) painted = false;
-    ok(res.path === "cpu" && painted, "paintBiomes on a backend without compute takes the f32 twin and says `cpu`; the treemap's language layer lands in alpha");
+    let painted = true; for (let i = 0; i < size * size; i++) { const u = W.unpack(want[2 * i]); if (bt.field.data[i * 4 + 1] !== u.id1 * 16 + u.id2 || bt.field.data[i * 4 + 3] !== 6) painted = false; }
+    ok(res.path === "cpu" && painted, "paintBiomes on a backend without compute takes the f32 twin and says `cpu`; the treemap's language layer lands in alpha as its id + 1 (0 is no layer, 1 the lake bed)");
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -136,7 +137,7 @@ else {
     ok(r.ok && r.result.webgpu.path === "compute" && r.result.webgl2.path === "cpu", "WebGPU paints by the compute pass, WebGL2 by the twin, each saying so", r.ok ? "" : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok) {
         const twin = W.fieldCpuF32({ ...P, size: 32 }); let g = 0, b = 0;
-        for (let i = 0; i < 32 * 32; i++) { const u = W.unpack(twin[2 * i]); if (r.result.webgpu.data[i * 4 + 1] === u.id1 && r.result.webgpu.data[i * 4 + 2] === u.blendByte) g++; if (r.result.webgl2.data[i * 4 + 1] === u.id1 && r.result.webgl2.data[i * 4 + 2] === u.blendByte) b++; }
+        for (let i = 0; i < 32 * 32; i++) { const u = W.unpack(twin[2 * i]), gg = u.id1 * 16 + u.id2; if (r.result.webgpu.data[i * 4 + 1] === gg && r.result.webgpu.data[i * 4 + 2] === u.blendByte) g++; if (r.result.webgl2.data[i * 4 + 1] === gg && r.result.webgl2.data[i * 4 + 2] === u.blendByte) b++; }
         ok(g === 32 * 32 && b === 32 * 32, "*** and the two backends' fields are byte-identical to the twin and so to each other ***", `${g} / ${b} of ${32 * 32}`);
     }
     const page = fs.readFileSync(path.join(ENG, "orrery-gpu.html"), "utf8");
