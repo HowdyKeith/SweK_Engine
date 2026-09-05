@@ -27,7 +27,22 @@ function _push(chunk) { for (const line of String(chunk).split(/\r?\n/)) if (lin
 // *** SO THE BUTTON COULD NOT DO THE ONE THING THAT MATTERS AFTER A RUN OF ROUNDS TOUCHES MANY PAGES, and the
 // only way to get a full sweep was the command line -- which is exactly the CLI-only deliverable this project
 // refuses. A FRONT DOOR THAT CANNOT REACH A FLAG THE TOOL DOCUMENTS IS HALF A DOOR. ***
-function run({ only, updateBaselines, base, video, all } = {}) {
+// *** v4452 -- --have JOINS --all, AND v3563 WROTE THE ARGUMENT FOR THIS ROUND WHILE FIXING THE FLAG NEXT TO IT. ***
+//
+// That round's note above says it plainly: "A FRONT DOOR THAT CANNOT REACH A FLAG THE TOOL DOCUMENTS IS HALF A
+// DOOR." It reached for --all and left --have, which had shipped at v3171 for a sharper reason than
+// convenience. render-qa's own comment: a box "states what it HAS, and every page it cannot judge is named
+// with the capability it is missing -- BEFORE the browser opens it", so that "this laptop has no float
+// targets" and "this shader is broken" do not collapse into one word (v3120's law).
+//
+// UNREACHABLE FROM THE BUTTON, THAT LAW HELD ONLY FROM A TERMINAL. MEASURED at v4452: 26 of this tree's 28
+// GPU-shaped pages are correctly derived as needing webgpu, and on a box without an adapter every one of them
+// is reported FAILED rather than unjudgeable -- 26 red results that mean nothing, which is how a QA report
+// stops being read.
+//
+// EMPTY STAYS THE DEFAULT, deliberately: render-qa skips nothing without the flag, because "a green run over
+// fewer pages than you think is the failure that looks most like success". You must SAY what the box has.
+function run({ only, updateBaselines, base, video, all, have } = {}) {
     if (_child) return { ok: false, error: "render QA already running", pid: _child.pid };
     if (!isInstalled()) return { ok: false, error: "render-qa not installed on this box - run `npm install` in tools/render-qa/ first (it downloads Chromium)", needsInstall: true };
     const args = ["render-qa.mjs"];
@@ -36,7 +51,11 @@ function run({ only, updateBaselines, base, video, all } = {}) {
     if (base) args.push("--base", String(base));
     if (video) args.push("--video");
     if (all) args.push("--all");                 // v3563 -- bypass the fingerprint cache; see the note above
-    _log = []; _startedAt = Date.now(); _lastExit = null; _lastMode = updateBaselines ? "baseline" : video ? "qa+video" : all ? "qa (all pages)" : "qa";
+    // v4452 -- comma-separated capability list, passed through verbatim. The runner validates it: a --have
+    // that matches nothing leaves zero pages and EXITS NONZERO rather than reporting a green run over an
+    // empty set, which is renderQaDoor's law and the reason a typo here cannot look like a pass.
+    if (have) args.push("--have", String(have));
+    _log = []; _startedAt = Date.now(); _lastExit = null; _lastMode = (updateBaselines ? "baseline" : video ? "qa+video" : all ? "qa (all pages)" : "qa") + (have ? " [has: " + have + "]" : "");
     _push("[render-qa] starting: node " + args.join(" "));
     try { _child = spawn(process.execPath, args, { cwd: QA_DIR, windowsHide: true }); }
     catch (e) { _child = null; return { ok: false, error: "spawn failed: " + e.message }; }

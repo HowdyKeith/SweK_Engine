@@ -18,7 +18,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 // *** A MISSING DEV DEPENDENCY MUST SKIP RATHER THAN THROW, AND THIS IMPORT THREW. *** Repaired at v4435.
 // tools/ship/placementRender-selfcheck.mjs states the tree's convention in its own header -- jsdom is not
 // vendored, it is `npm i jsdom --no-save`, and a static import makes the shipped tree CRASH WITH A STACK
@@ -101,7 +101,10 @@ function harness() {
 }
 
 const H = harness();
-const M = await import(path.join(ENG, "ui", "pageFxOverlay.js"));
+// v4461 -- pathToFileURL, not a raw path: on Windows path.join yields "C:\\...\\x.js" and dynamic import()
+// requires a file:// URL, so this line CRASHES ON THE BOX THIS ENGINE IS DEVELOPED ON. Caught by
+// tools/ship/windowsImport-selfcheck.mjs, which exists for exactly this and had been red on it.
+const M = await import(pathToFileURL(path.join(ENG, "ui", "pageFxOverlay.js")).href);
 
 // ---- 1. *** EVERY WINDOW LISTENER THE OVERLAY REGISTERS MUST BE REMOVED, WHATEVER IT IS CALLED *** ----------
 {
@@ -143,7 +146,7 @@ const M = await import(path.join(ENG, "ui", "pageFxOverlay.js"));
 // ---- 3. THE FILTER TABLE, DRIVEN HEADLESSLY THROUGH THE REAL VOXEL MODULE ----------------------------------
 {
     say("");
-    const { voxelizePage } = await import(path.join(ENG, "fx", "voxelize", "pageVoxels.js"));
+    const { voxelizePage } = await import(pathToFileURL(path.join(ENG, "fx", "voxelize", "pageVoxels.js")).href);
     const src = fs.readFileSync(path.join(ENG, "ui", "pageFxOverlay.js"), "utf8");
     const keys = [...src.matchAll(/^\s{4}(\w+): \{ label:/gm)].map((m) => m[1]);
     say("  filters declared: " + keys.join(", "));

@@ -14,6 +14,9 @@
 // identified as the blocker -- and would risk the one thing the orrery does well. So the canvas becomes the
 // SOURCE TEXTURE of a post stage instead. The orrery keeps drawing exactly as it does; a device pipeline reads
 // the result.
+// (v4457: the WGSL glyph renderer now exists -- text/slugShaderWgsl.js, graded on a device -- so this reason has
+// moved one file over: gfx/device.js has no blend state and no rgba16float/rg16uint upload yet. The choice to
+// keep the 2D drawing stands until it does; docs/TSL-ROADMAP.md step 7 lists the order.)
 //
 // ---- *** THIS IS gfx/device.js's FIRST NON-DEMO CONSUMER, WHICH IS THE POINT AS MUCH AS THE EFFECT IS. *** -------
 //

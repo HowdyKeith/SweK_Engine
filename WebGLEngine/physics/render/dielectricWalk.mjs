@@ -62,6 +62,13 @@ export function refract(wi, n, eta) {
  * because a second copy of that arithmetic is a second thing to get the sign of Lambda wrong in -- and v4446
  * spent a run finding that sign the first time.
  */
+// *** v4455 ADDED `dir` TO THE RETURN, AND IT IS ONE LINE THAT TURNED A TOTAL INTO A DIAGNOSIS. *** This
+// walk already knew which direction each path left in; it threw it away and reported only reflected /
+// transmitted / stuck. v4447 could therefore say the BTDF over-counts by 4.07x and could NOT say where,
+// because a scalar has no shape to compare against. With the exit direction kept, binning by |dir.z| shows
+// the single-scatter walk giving EXACTLY ZERO in the two bins Walter pays 9.8% of its energy into, which is
+// what btdfDomain.mjs convicts on. The measurement that was missing was not a harder one; it was the one
+// nobody kept.
 export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces = 128 } = {}) {
     const so = Math.sqrt(Math.max(0, 1 - cosO * cosO));
     let wr = [-so, 0, -cosO];
@@ -69,7 +76,7 @@ export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces =
     while (bounces < maxBounces) {
         const s = outside ? 1 : -1;
         const hNext = sampleHeight([wr[0], wr[1], s * wr[2]], s * h, rand(), alpha);
-        if (!Number.isFinite(hNext)) return { exit: outside ? "reflected" : "transmitted", bounces, tir };
+        if (!Number.isFinite(hNext)) return { exit: outside ? "reflected" : "transmitted", bounces, tir, dir: wr };
         h = s * hNext;
         const wo = [-wr[0], -wr[1], -wr[2]];
         const wmFlip = sampleVNDF([wo[0], wo[1], s * wo[2]], alpha, rand(), rand());
@@ -91,7 +98,7 @@ export function dielectricWalk(cosO, alpha, nAbove, nBelow, rand, { maxBounces =
         }
         bounces++;
     }
-    return { exit: "stuck", bounces, tir };
+    return { exit: "stuck", bounces, tir, dir: wr };
 }
 
 /**
@@ -130,3 +137,39 @@ export const BTDF_AT_V4447 = Object.freeze({
     agreeAt: "alpha 0.05, where all three sit within 0.003 -- which is what makes the disagreement at alpha 1 " +
              "a finding rather than two unrelated calculations",
 });
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report re-runs the walk and prints Walter's
+// number BESIDE it from the record rather than importing transmission.mjs, because the accusation in
+// BTDF_AT_V4447 is against that module and an instrument that imports its defendant is not an instrument.
+
+export function reportLines() {
+    const L = [];
+    const R = BTDF_AT_V4447;
+    L.push("[dielectricWalk] a random walk on a rough dielectric, and where transmission.mjs's excess comes from");
+    L.push("");
+    L.push("  ACCUSED: " + R.accused);
+    L.push("");
+    L.push("  n = 40000 per row, nAbove 1, nBelow 1.5. `walter` is the recorded value at " + R.at + " --");
+    L.push("  not recomputed here, because importing the module under accusation would make this its own witness.");
+    L.push("");
+    L.push("   alpha   cosO      R        T      R+T     one bounce   all bounces   walter (" + R.at + ")");
+    for (const row of R.rows) {
+        const one = split(row.cosO, row.alpha, 1, 1.5, { n: 40000, seed: 13, onlyBounces: 1 });
+        const all = split(row.cosO, row.alpha, 1, 1.5, { n: 40000, seed: 13 });
+        L.push("   " + String(row.alpha).padStart(5) + "   " + String(row.cosO).padStart(4) + "  " +
+               all.R.toFixed(4).padStart(7) + "  " + all.T.toFixed(4).padStart(7) + "  " +
+               all.total.toFixed(4).padStart(7) + "   " + one.T.toFixed(6).padStart(9) + "    " +
+               all.T.toFixed(6).padStart(9) + "    " + row.walter.toFixed(6).padStart(9));
+    }
+    L.push("");
+    // *** THE INNOCENT EXPLANATION IS RULED OUT BY THE THIRD COLUMN, NOT BY THE SECOND. *** "The excess is
+    // missing multiple scattering" would require the walk's FULL total to exceed Walter's. It does not.
+    L.push("  *** R + T <= 1 EVERYWHERE ABOVE -- the walk cannot create light, which is what makes it usable");
+    L.push("      as a bound. Walter's single-scatter BTDF exceeds 1 at three of these four rows. ***");
+    L.push("  VERDICT: " + R.verdict);
+    L.push("  and the disagreement is a finding rather than two unrelated calculations because they AGREE at " +
+           R.agreeAt);
+    return L;
+}

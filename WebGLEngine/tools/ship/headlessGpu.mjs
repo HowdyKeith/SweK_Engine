@@ -219,8 +219,25 @@ export const MEASURED = Object.freeze({
  * gate can be moved from one backend to the other by changing the import and nothing else, and so the two can
  * be run side by side against the same inputs, which is what the gate does.
  */
+/**
+ * A storage input as whole 32-bit words: any ArrayBuffer or typed array, its byte length padded up to a
+ * multiple of 4 (WebGPU refuses an odd-sized buffer, and a Uint16Array of odd length is one). The padding is
+ * zero and sits past the last real element, where a shader that indexes correctly never reads.
+ */
+export function storageWords(data) {
+    const u8 = data instanceof ArrayBuffer ? new Uint8Array(data)
+             : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+             : null;
+    if (!u8) throw new Error("headlessGpu: a storage input must be an ArrayBuffer or a typed array");
+    const padded = Math.max(4, Math.ceil(u8.byteLength / 4) * 4);
+    const out = new Uint8Array(padded);
+    out.set(u8);
+    return new Uint32Array(out.buffer);
+}
+
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
-                                             workgroups = 1, compileOnly = false, requireFn = null } = {}) {
+                                             workgroups = 1, compileOnly = false, requireFn = null,
+                                             inputs = null } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
@@ -256,6 +273,17 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
             dev.queue.writeBuffer(uniBuf, 0, new Float32Array(uniforms));
             entries.push({ binding: 1, resource: { buffer: uniBuf } });
         }
+        // v4457 -- READ-ONLY STORAGE INPUTS, so a probe can read the bytes a texture would hold. The Slug gate
+        // hands the atlas's own Uint16Arrays in here and unpacks halves on the device; a uniform buffer could not
+        // carry them (64 KiB minimum limit, 16-byte array stride) and a texture path would need a second decoder.
+        const inBufs = [];
+        for (const inp of inputs || []) {
+            const words = storageWords(inp.data);
+            const b = dev.createBuffer({ size: words.byteLength, usage: U.STORAGE | U.COPY_DST });
+            dev.queue.writeBuffer(b, 0, words);
+            entries.push({ binding: inp.binding, resource: { buffer: b } });
+            inBufs.push(b);
+        }
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
@@ -267,6 +295,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const values = Array.from(new Float32Array(readBuf.getMappedRange()));
         readBuf.unmap();
         outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
+        for (const b of inBufs) b.destroy();
         return { ok: true, skipped: false, values, errors: [], ...meta };
     } catch (e) {
         return { ok: false, skipped: false, reason: "headlessGpu error: " + String(e).slice(0, 200), values: [], errors: [] };

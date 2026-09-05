@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7",
+ "head": "fff291f539eae47103c7b6590d7a85ed0d18b717",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1484436,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 1486291,
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -121,18 +121,13 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 18849,
-    "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
+    "bytes": 21105,
+    "sha": "fff291f539eae47103c7b6590d7a85ed0d18b717"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
     "bytes": 25144,
     "sha": "36f01db7295733b140e5661f1ea3e64acfe4a6ba"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
@@ -167,6 +162,11 @@
     "path": "slug-text.html",
     "bytes": 12133,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "tools/ship/slugWgsl-selfcheck.mjs",
+    "bytes": 32804,
+    "sha": "83cf2161e3437babe0d4d42fc5686ce7b087bd89"
    }
   ],
   "gifenc": [
@@ -208,8 +208,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1484436,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 1486291,
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "clients.html",
@@ -218,8 +218,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 843798,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 847120,
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -242,11 +242,6 @@
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    }
   ],
   "keyhunt": [
@@ -298,13 +293,7 @@
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    }
   ],
-  "slug": [
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
-   }
-  ],
+  "slug": [],
   "taichi-js": [
    {
     "path": "tools/roundhouse/androidPeer-selfcheck.mjs",
@@ -335,8 +324,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1484436,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 1486291,
+    "sha": "8d4739838f05a92bdeac10bf9aa1db9960de937c"
    },
    {
     "path": "aquarelle.html",
@@ -505,8 +494,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2924458,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 2920664,
+    "sha": "a692d400dc5fdc16c8e0d427b7ad1b095f8f104d"
    },
    {
     "path": "mpm3d.html",
@@ -550,8 +539,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 843798,
-    "sha": "8f1cf7316d16ae7cdd0f37241b5395616b09e7d7"
+    "bytes": 847120,
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "shipavatar.html",
@@ -625,8 +614,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 45788,
-    "sha": "7bb93e7a58b6eedbb283760e01db3c604434f23a"
+    "bytes": 46670,
+    "sha": "0c8a692195898ed8f014863fbc56d7bcb18d06d6"
    },
    {
     "path": "toroidal-wave.html",
@@ -732,8 +721,8 @@
    },
    {
     "path": "tsl-probe.html",
-    "bytes": 4416,
-    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd"
+    "bytes": 4474,
+    "sha": "b113bac6ac0c031b69f7af492f6e909143cafdec"
    },
    {
     "path": "tsl-rig.html",
@@ -756,11 +745,6 @@
     "path": "ai-bridge/wasmSandbox.js",
     "bytes": 3356,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "wasm-bench.html",

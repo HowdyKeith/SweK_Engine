@@ -26,6 +26,31 @@
 // would go green forever and catch the seventh page never. What is asserted is that NO PAGE DECIDES FOR ITSELF
 // WHAT AN ABSENT navigator.gpu MEANS -- six were found saying it and all six now ask the module.
 
+// ---- v4452: SECTIONS 8 AND 9 -- THE POPULATION, AND THE FALLBACK THAT SAID NOTHING --------------------------
+// Keith: "I don't know why the swek engine locally runs with an ip, and then all the gpu pages have to be re
+// opened with localhost. all the machines run webgpu pages fully." The machines ARE fine: navigator.gpu is
+// exposed only in a SECURE CONTEXT, localhost counts over plain http and a LAN address does not. This file has
+// diagnosed that since v3981 -- and section 6 only ever held the pages that VOLUNTEERED to ask it. MEASURED:
+// of the 31 pages that acquire a device, 16 asked and 15 did not. Now 31 of 31, by three routes: the page's
+// own probe, the ui/originNotice.js tag (a side effect, no control flow, so nine differently-shaped guards
+// did not have to be rewritten), or a device from gfx/device.js -- which explains on the fallback path and so
+// covers every one of its callers unedited. *** AND THE FALLBACK IS WHY THE SYMPTOM WAS UNREADABLE: ***
+// requestDevice took webgl2, or the null backend, and RETURNED A WORKING DEVICE -- no throw, no console line,
+// the page just quietly did less. A fallback that cannot say it fell back is indistinguishable from a broken
+// page.
+//   SABOTAGE LOG:
+//     A. removed the _explainOrigin call from requestDevice -> exit=1, 1 red: the silent fallback, by name.
+//     B. deleted the notice tag from nebula.html -> exit=1, 1 red naming the page. The population is DERIVED,
+//        so a page added tomorrow that asks for a device is in it tomorrow.
+//     C. dropped the `reason === "insecure-origin"` guard so the banner fires on any failure
+//        -> *** exit=0 FIRST TIME, AND THAT WAS A DEFECT IN THIS GATE. *** The once-per-page flag had already
+//        fired in the case above, so the secure-origin case was short-circuited and passed no matter what the
+//        guard did -- a check that cannot fail on the thing it names. gfx/device.js exports
+//        _resetOriginNotice() for gates only; re-run, the same sabotage is exit=1 red by name.
+//     D. (in tools/ship/pageRequirements-selfcheck.mjs) bridge accepts --have and never forwards it -> 1 red.
+//     E. (same file) detector forgets the import tell -> *** exit=0 FIRST TIME: NOTHING ASSERTED IT. *** The
+//        widening that fixed gfx-device.html and nebula-device.html could have been undone in silence. An
+//        assertion that runs the classifier on both was added; re-run, exit=1 red by name.
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -289,6 +314,91 @@ say("\nWHAT THIS DOES NOT DO: it cannot see Keith's screen. VERIFIED IN A HEADLE
     "tunnel's https address from another machine, should show the particles. If it still says no adapter " +
     "THERE, that is a different fault and a real one. *** brain-bench.html's sentence was corrected too, but " +
     "its #why element was empty on a headless load BEFORE AND AFTER the edit, so that one is unverified in situ.");
+
+/* -----------------------------------------------------------------------------------------------------------
+ * 8. *** v4452 -- THE POPULATION IS EVERY PAGE THAT ASKS FOR A DEVICE, NOT THE ONES THAT OPTED IN. ***
+ *
+ * Section 6 holds every page that CALLS the probe to also offer the link -- a contract over volunteers. It
+ * could not see the pages that never volunteered, and MEASURED at v4452 that was most of them: of the 31
+ * pages in this tree that acquire a WebGPU device, 16 asked and 15 did not. On a LAN address the fifteen said
+ * some version of "no WebGPU", which reads as a verdict on the browser, and Keith reopened them on localhost
+ * for weeks without any page saying that was the fix.
+ *
+ * THE POPULATION IS DERIVED, NOT TYPED. A frozen list of "pages that need this" is the defect this tree finds
+ * about once a round; the set is computed from the same source text every time this runs, so a page added
+ * tomorrow that asks for a device is in the population tomorrow.
+ * -------------------------------------------------------------------------------------------------------- */
+console.log("\n8. *** EVERY PAGE THAT ACQUIRES A DEVICE EXPLAINS THE ORIGIN, NOT JUST THE ONES THAT OPTED IN ***");
+{
+    const stripc = (t) => t.replace(/<!--[\s\S]*?-->/g, " ").replace(/\/\/[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+    const pages = readdirSync(ROOT).filter((f) => f.endsWith(".html"));
+    const acquiring = [], uncovered = [];
+    for (const f of pages) {
+        const src = stripc(readFileSync(path.join(ROOT, f), "utf8"));
+        const viaModule = /gfx\/device\.js/.test(src);
+        const asks = /navigator\.gpu\s*\.\s*requestAdapter/.test(src) || /\bnew\s+(THREE\.)?WebGPURenderer\b/.test(src)
+                  || (/\brequestDevice\s*\(/.test(src) && viaModule);
+        if (!asks) continue;
+        acquiring.push(f);
+        // Three ways to be covered, and the third is why this round needed only one new file: the page probes
+        // itself, it carries the side-effect tag, or it goes through gfx/device.js -- which explains on the
+        // fallback path, so every one of its callers is covered without being edited.
+        const covered = /describeWebGPU|showOriginBanner/.test(src) || /originNotice\.js/.test(src) || viaModule;
+        if (!covered) uncovered.push(f);
+    }
+    ok("the device-acquiring population was found at all", acquiring.length >= 20,
+       acquiring.length + " pages ask for a WebGPU device, DERIVED from their source rather than listed. " +
+       "A population that came back near-zero would pass the next line while checking nothing");
+    ok("!! *** every one of them explains an insecure origin instead of blaming the browser ***",
+       uncovered.length === 0,
+       uncovered.length ? "SILENT ON A LAN IP: " + uncovered.join(", ") +
+           " -- each needs its own probe, the ui/originNotice.js tag, or a device from gfx/device.js"
+         : acquiring.length + " of " + acquiring.length + " covered. BEFORE v4452 IT WAS 16 OF 31: navigator.gpu " +
+           "is exposed only in a SECURE CONTEXT, localhost counts and http://192.168.x.x does not, so the " +
+           "property is simply absent on the LAN address every other machine uses to reach the box");
+}
+
+/* -----------------------------------------------------------------------------------------------------------
+ * 9. *** AND THE FALLBACK THAT SAID NOTHING, WHICH IS WHY THE SYMPTOM WAS SO HARD TO READ. ***
+ * gfx/device.js's requestDevice took webgl2 -- or the null backend -- and RETURNED A WORKING DEVICE. No throw,
+ * no console line: the page loaded, did not do what it should, and the only clue was that localhost fixed it.
+ * Driven with an injected probe rather than a browser, so the branch is exercised in this sandbox.
+ * -------------------------------------------------------------------------------------------------------- */
+console.log("\n9. *** THE SILENT FALLBACK IN gfx/device.js NOW SAYS WHY ***");
+{
+    const dev = await import("../gfx/device.js");
+    const lan = { navigator: {}, isSecureContext: false,
+                  location: { hostname: "192.168.50.57", host: "192.168.50.57:8787", port: "8787", protocol: "http:", pathname: "/nebula.html" } };
+    let shown = null;
+    const d = await dev.requestDevice(null, {
+        _backends: { webgpu: false, webgl2: false }, _env: lan,
+        _probe: (env) => describeWebGPU(env), _banner: (p) => { shown = p; return true; },
+    });
+    ok("!! *** asking for WebGPU on a LAN origin and getting a fallback now RAISES THE REASON ***",
+       !!shown && shown.reason === "insecure-origin",
+       shown ? "banner raised: " + String(shown.message).slice(0, 80) + "..."
+             : "nothing was said. A FALLBACK THAT CANNOT SAY IT FELL BACK IS INDISTINGUISHABLE FROM A BROKEN PAGE");
+    ok("...and the device is still returned, so nothing that worked before stops working",
+       !!d && !!d.backend, "backend " + (d && d.backend) + " -- this is a diagnosis, not a refusal");
+    let again = 0;   // NOT reset: this one is ABOUT the flag still being set from the call above
+    await dev.requestDevice(null, { _backends: { webgpu: false, webgl2: false }, _env: lan,
+        _probe: (env) => describeWebGPU(env), _banner: () => { again++; return true; } });
+    ok("...and a second request does not raise a second banner", again === 0,
+       "one page, one message: a demo that requests a device per frame would otherwise paper the screen");
+    // *** RESET FIRST, AND A SABOTAGE IS WHY. *** The once-per-page flag had already fired above, so this
+    // case was short-circuited and passed no matter what the reason-guard did: removing
+    // `reason === "insecure-origin"` went ZERO RED. A check that cannot fail on the thing it names is the
+    // family this session has now found five times.
+    dev._resetOriginNotice();
+    let secure = null;
+    await dev.requestDevice(null, { _backends: { webgpu: false, webgl2: true },
+        _env: { navigator: {}, isSecureContext: true, location: { hostname: "localhost", host: "localhost:8787" } },
+        _probe: (env) => describeWebGPU(env), _banner: (p) => { secure = p; return true; } });
+    ok("!! ...and a box that simply HAS NO ADAPTER is told nothing about origins",
+       secure === null,
+       "v3981: 'isSecureContext alone would send somebody chasing a certificate they do not need'. Only the " +
+       "insecure-origin case is this file's business; a genuine absence of WebGPU is the page's own story");
+}
 
 console.log("\nwebgpuOrigin-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

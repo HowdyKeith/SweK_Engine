@@ -41,6 +41,7 @@ import { packAtlas, buildGlyph, assignBands, flattenContours, toHalf, fromHalf, 
 import { slugRender, calcRootCode, solveHorizPoly, flattenToSegments, windingNumber, distanceToSegments, texelFetchBand } from "./slugEval.js";
 import { slugShaderSource, VERTEX_LAYOUT, VERTEX_STRIDE } from "./slugShader.js";
 import { layoutText, buildVertices, orthoRows, snapSizeToCapHeight } from "./slugText.js";
+import { testFontBytes } from "./slugTestFont.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -60,20 +61,8 @@ const say = (m) => console.log("  ----  " + m);
  * unitsPerEm 1024, sCapHeight 700, and a legacy `kern` table carrying A/B = -80 and B/C = +40.
  * --------------------------------------------------------------------------------------------------------- */
 
-const FONT_B64 = "AAEAAAALAIAAAwAwT1MvMkb1QkYAAAE4AAAAYGNtYXAAhQCyAAABtAAAAEhnbHlmgFi1PAAAAgwAAACwaGVhZDBL1v4AAAC8AAAANmhoZWEH" +
-    "bgOMAAAA9AAAACRobXR4GJwC1AAAAZgAAAAca2VybgA5/9IAAAK8AAAAHmxvY2EAgQCqAAAB/AAAABBtYXhwAAwADgAAARgAAAAgbmFtZRKX" +
-    "90YAAALcAAAAcnBvc3Q+8VgMAAADUAAAAFAAAQAAAAEAAGU/2LdfDzz1AAEEAAAAAADmp8lBAAAAAOanyUEAZAAAA4QDhAAAAAMAAgAAAAAA" +
-    "AAABAAADIP84AGQD6ABkAGQDhAABAAAAAAAAAAAAAAAAAAAABwABAAAABwAIAAIAAwABAAIAAAAAAAAAAAAAAAAAAQABAAQDhAGQAAUABAAA" +
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAD8/Pz8AAAAgAEYDIP84AAAAAAAAAAAAAAAAAAAAAAK8AAAA" +
-    "IAAAAlgAAAPoAGQD6ABkA+gAZAPoAHwD6ABkArwAyAAAAAIAAAADAAAAFAADAAEAAAAUAAQANAAAAAYABAABAAIAIABG//8AAAAgAEH////g" +
-    "AAAAAQAAAAQAAAABAAIAAwAEAAYABQAAAAAADAAaACgAOABNAFgAAQBkAAADhAMgAAIAADMhAWQDIP5wAyAAAQBkAGQDhAOEAAIAAAABIQH0" +
-    "/nADIAOE/OAAAAEAZABkA4QDhAADAAA3EiATZMgBkMhkAyD84AABAHwAfAOEA4QAAwAACAMCAAGE/nz+fAOE/nz+fAGEAAIAZABkA4QDhAAD" +
-    "AAcAADchESETESERZAMg/ODIAZBkAyD9qAGQ/nAA//8A+gCWAooCJgELAAEAyACWIAAAAAAAAAEAAAAaAAEAAgAMAAEAAAABAAL/sAACAAMA" +
-    "KAAAAAAABAA2AAEAAAAAAAEADQAAAAEAAAAAAAIABwANAAMAAQQJAAEAGgAUAAMAAQQJAAIADgAuU2x1Z1NlbGZjaGVja1JlZ3VsYXIAUwBs" +
-    "AHUAZwBTAGUAbABmAGMAaABlAGMAawBSAGUAZwB1AGwAYQByAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHAAABAgEDAQQB" +
-    "BQDdAQYDdHJpCG9mZnN0YXJ0BnR3b29mZgZhbGxvZmYEY29tcA==";
 
-const FONT_BYTES = Uint8Array.from(Buffer.from(FONT_B64, "base64"));
+const FONT_BYTES = testFontBytes();          // v4457 -- the bytes moved to text/slugTestFont.mjs; see its header
 const font = parseFont(FONT_BYTES);
 const U = font.unitsPerEm;
 const gid = (ch) => font.glyphIndex(ch.codePointAt(0));

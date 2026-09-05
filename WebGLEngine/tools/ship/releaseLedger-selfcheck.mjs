@@ -54,9 +54,49 @@
 //   4. inserted v4999, a release NEWER than the tree
 //      -> exit=1, section 3 red: a tag ahead of the source is one pushed from a tree nobody committed, and
 //         the fleet would be running code this repo does not contain.
+// ---- v4453: THE STRUCTURE, BECAUSE THE RULE HAD BEEN SWITCHED OFF POLITELY ---------------------------------
+// Keith: "fix the structure before v4453." v4449's ratchet was a hard zero -- the previous version must be
+// released -- which is right when the ship and the publish happen on ONE machine and unsatisfiable when they
+// do not. Rounds are built where there are no credentials to publish; the rig publishes afterwards, by hand.
+// So the previous version was unreleased AT EVERY SHIP, BY CONSTRUCTION, the gate went red at v4450, v4451 and
+// v4452, and each time the answer was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A GATE
+// COLLECTING SIGNATURES, NOT ENFORCING ANYTHING.
+//
+// Two changes, and neither loosens what the rule protects. (1) The question is asked about MAIN, which is what
+// v4449's own words always said -- "a version that reaches MAIN and never reaches the releases page" -- while
+// it read the WORKING TREE's changelog, so an unmerged branch counted as debt the fleet was owed. (2) The hard
+// zero becomes a stated LAG BUDGET: main may run at most N versions ahead of the releases page. N=3 here,
+// against a failure of 3 releases across 261 versions, which is 87 times the budget. The budget lives OUTSIDE
+// baseline on purpose: the baseline forgives what has gone by, the budget bounds what comes next, and if one
+// edit could do both the escape hatch would swallow the rule again one level up.
+//
+//   SABOTAGE LOG (v4453):
+//     1. removed lagBudget entirely -> exit=1, 3 red. AN UNSTATED BUDGET IS NOT AN INFINITE ONE: that is
+//        v4413's floor-with-no-ceiling wearing this file's clothes, so it fails rather than passes.
+//     2. dropped the six newest releases and lowered the baseline to v4290 -> exit=1, "132 of 3 allowed".
+//        The budget bites, and it bites at the scale the mechanism exists for.
+//     3. moved maxVersionsBehind INSIDE baseline -> exit=1, 1 red by name: one edit doing both jobs is the
+//        escape hatch eating the rule.
+//     4. degrade to the working tree while REPORTING "origin/main" -> *** exit=0 TWICE BEFORE IT CLOSED. ***
+//        The first check asked `owedSource === "origin/main" || owedDegraded`, which a lying label satisfies
+//        -- a restatement of what the thing under test says about itself. The second compared COUNTS against
+//        an independent read, and that was unfalsifiable too: at the moment it ran, the branch and main were
+//        IDENTICAL, so no count could tell them apart. Closed by making the reader INJECTABLE, so the gate
+//        hands in a main that differs; now exit=1 red by name.
+//     5. lagBudget.why cut to one word -> exit=1, 1 red: a bound with no argument behind it is the next thing
+//        somebody raises without one.
+//     6. owed built from the working tree instead of main -> exit=0 first (same identical-state blindness),
+//        then exit=1 red by name once a fixture ledger with a low floor made `owed` NON-EMPTY -- an empty
+//        owed-set proves nothing about which list produced it.
+//
+// *** AND A NOTE ON HOW TWO OF THOSE ZEROS LOOKED LIKE ZEROS: *** the sabotage runs counted lines matching
+// "^  FAIL", and a gate that CRASHES prints none of them. One "0 red" in this session was a syntax error in
+// the sabotage itself, read as a gate that failed to notice. Sabotages are graded on the EXIT CODE here.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { ledgerState, readLedger, engineVersion, shippedVersions, num, LEDGER, ENG, ROOT } from "./releaseLedger.mjs";
 import { rowsFrom } from "./refreshReleases.mjs";
 
@@ -68,6 +108,7 @@ console.log("releaseLedger-selfcheck -- does the fleet run what is actually buil
 
 const led = readLedger();
 const S = ledgerState();
+const LED = readLedger();
 
 console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
 {
@@ -83,16 +124,173 @@ console.log("1. THE LEDGER IS A RECORD, NOT A BELIEF");
         led.source + "  refreshed " + led.refreshedAt);
 }
 
-console.log("\n2. *** THE RATCHET: YOU MAY NOT SHIP A NEW VERSION WHILE THE LAST ONE IS UNRELEASED ***");
+console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, BUT ONLY SO FAR ***");
 {
-    ok("!! *** every version shipped after the baseline, before the current one, has a release ***",
-        S.owed.length === 0,
-        S.owed.length
-            ? "OWED " + S.owed.length + ": " + S.owed.slice(0, 12).map((v) => "v" + v).join(", ") +
-              (S.owed.length > 12 ? " (+" + (S.owed.length - 12) + " more)" +
-              ". PUBLISH THE PREVIOUS VERSION BEFORE SHIPPING THIS ONE -- the ship skill's step 7 is the how" : "")
-            : "nothing owed. Baseline is v" + S.floor + "; the tree is " + S.tree + "; " +
-              "the rule binds from v" + (S.floor + 1) + " forward and it is satisfied");
+    // *** v4453 -- THE HARD ZERO BECAME A BUDGET, AND THE REASON IS THAT THE ZERO WAS UNSATISFIABLE HERE. ***
+    // v4449 wrote "you may not ship a new version while the last one is unreleased", which is exactly right
+    // when the ship and the publish happen on ONE machine. They do not: rounds are built where there are no
+    // credentials to publish and the rig publishes afterwards, by hand -- so the previous version is
+    // unreleased AT EVERY SHIP, BY CONSTRUCTION. The gate went red at v4450, v4451 and v4452, and each time
+    // the answer was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A RULE THAT HAS BEEN SWITCHED OFF
+    // POLITELY: a gate whose only reachable state is "write off the debt" is collecting signatures, not
+    // enforcing anything. Keith, on the third: "fix the structure before v4453."
+    //
+    // What the rule protects is not zero lag; it is that THE FLEET DOES NOT FALL BEHIND. 3 releases across
+    // 261 versions is the failure it was built for -- 87 times this budget.
+    // *** THE BUDGET DOES NOT BIND ON A REPUBLISH, AND SAYING SO IS THE WHOLE OF WHY THIS IS NOT A SKIP. ***
+    // v4453 put this assertion where verify runs it, and THE PUBLISH ROUTE RUNS VERIFY: `Clone -> verify`
+    // grades a clone of main, `Publish the verified clone` refuses on a red verdict. So the moment the lag
+    // exceeded the budget, the gate that exists to force a publish LOCKED THE PUBLISH THAT WOULD CLEAR IT --
+    // found at 7 of 3 with the fleet fourteen versions back. The budget now binds only on a tree that would
+    // ADD a version to main; a clone republishing what main already holds is the catch-up it wants.
+    if (!S.budgetBinds) report("the budget is NOT asserted on this tree, and here is why",
+        "ENGINE_VERSION " + S.tree + " is ALREADY ON MAIN, so this tree adds nothing and can only reduce the " +
+        "lag -- it is a republish, not a ship. The count is still printed below and is still " + S.owed.length +
+        " of " + S.budget + ". A CHECK THAT QUIETLY STOPS CHECKING IS THE DEFECT THIS FILE HAS CAUGHT THREE " +
+        "TIMES, so it says which question it declined and what the answer would have been.");
+    ok("!! *** main runs no more than the budget ahead of the releases page ***",
+        S.withinBudget,
+        !S.budgetStated
+            ? "NO lagBudget IN releases.json. AN UNSTATED BUDGET IS NOT AN INFINITE ONE -- that is v4413's " +
+              "floor-with-no-ceiling wearing this file's clothes, and it fails rather than passes"
+            : S.owed.length
+                ? S.owed.length + " of " + S.budget + " allowed: " + S.owed.slice(0, 12).map((v) => "v" + v).join(", ") +
+                  (S.owed.length > 12 ? " (+" + (S.owed.length - 12) + " more)" : "") +
+                  (!S.budgetBinds ? " -- NOT ASSERTED on this tree (a republish adds nothing to main); the " +
+                        "number is printed so nobody reads silence as zero"
+                     : S.withinBudget ? " -- within budget"
+                     : ". PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how")
+                : "nothing owed at all. Baseline v" + S.floor + ", tree " + S.tree + ", budget " + S.budget +
+                  "; the rule binds from v" + (S.floor + 1) + " forward");
+    ok("!! ...and it binds on the party that can make the gap WORSE, which is checked and not assumed",
+        typeof S.addsToMain === "boolean" && S.budgetBinds === S.addsToMain,
+        "addsToMain=" + S.addsToMain + " (tree " + S.tree + (S.addsToMain ? " is NOT on main -- shipping it " +
+        "pushes main one further, so the budget binds)" : " is already on main -- publishing it only reduces " +
+        "the lag, so the budget does not)") + ". DERIVED FROM MAIN'S OWN VERSION LIST, not a flag: a flag for " +
+        "'this is a republish' is a flag somebody sets to get past the gate");
+
+    // *** THE QUESTION IS ABOUT MAIN, WHICH IS WHAT THE RULE ALWAYS SAID AND NOT WHAT IT MEASURED. ***
+    // v4449's own words: "a version that reaches MAIN and never reaches the releases page is a version nobody
+    // outside this repo will ever run." It then read the WORKING TREE's changelog, which gains a round's entry
+    // in the same commit as the version bump -- so a round sitting on an unmerged branch counted as debt the
+    // fleet was owed, when nobody could download it and nobody was missing anything.
+    // *** VERIFIED INDEPENDENTLY, BECAUSE THE FIRST DRAFT TRUSTED THE LABEL AND A SABOTAGE WALKED PAST IT. ***
+    // It asked `S.owedSource === "origin/main" || S.owedDegraded` -- which is satisfied by a module that
+    // silently reads the WORKING TREE and calls it origin/main. That is not a check, it is a restatement of
+    // what the thing under test says about itself, and it went ZERO RED on exactly that sabotage. The gate
+    // reads main for itself and compares counts; a lying label now disagrees with an independent read.
+    let ownMain = null, ownWhy = "";
+    try {
+        const out = execFileSync("git", ["show", "origin/main:docs/CHANGELOG.md"],
+            { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+        ownMain = [...out.matchAll(/^## v(\d+)/gm)].length;
+    } catch (e) { ownWhy = String((e && e.message) || e).split("\n")[0].slice(0, 70); }
+    ok("!! ...and the versions it counts really are main's, checked against an independent read",
+        ownMain === null ? S.owedDegraded === true : (S.owedDegraded === false && S.mainCount === ownMain),
+        ownMain === null
+            ? "this gate cannot read origin/main either (" + ownWhy + "), so the module MUST report degraded " +
+              "-- and it reports " + S.owedDegraded + ". A missing tool makes the check stricter, never quieter"
+            : "module says " + S.mainCount + " from " + S.owedSource + "; this gate read " + ownMain +
+              " straight from origin/main. THE COUNT IS COMPARED RATHER THAN THE LABEL BELIEVED: a module that " +
+              "read the working tree and called it main would pass a check written the obvious way, and did");
+
+    // *** AND THE PREFERENCE IS DRIVEN, NOT INFERRED. *** The check above compares counts, which can only
+    // tell main from the working tree WHEN THEY DIFFER -- and on the state this round shipped in, they were
+    // identical, so swapping the arithmetic to the working tree went ZERO RED twice. Here main is handed in
+    // deliberately SHORTER than the tree, and the answer says which list the owed-set was built from.
+    {
+        // A FIXTURE LEDGER, so the floor is low enough for `owed` to be NON-EMPTY: at the real floor nothing
+        // sits between it and the tree, and an empty owed-set proves nothing about which list built it.
+        const tmpL = path.join(os.tmpdir(), "swek-ledger-" + process.pid + ".json");
+        fs.writeFileSync(tmpL, JSON.stringify({
+            baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+            lagBudget: { maxVersionsBehind: 99, why: "z".repeat(220) },
+            releases: [{ tag: "v4001" }],
+        }));
+        // A main holding TWO versions the tree also has, and NOT the hundreds of others the tree carries.
+        const fakeMain = "## v4111 -- one\n\n## v4222 -- two\n";
+        const viaMain = ledgerState({ file: tmpL, readMain: () => fakeMain });
+        const viaTree = ledgerState({ readMain: () => { throw new Error("no main here"); } });
+        const owedIsMains = viaMain.owed.length === 2 && viaMain.owed.includes(4111) && viaMain.owed.includes(4222);
+        ok("!! *** the owed set is built from MAIN's versions, proven with a main that differs from the tree ***",
+            owedIsMains && viaMain.mainCount === 2 && viaMain.owedSource === "origin/main" && !viaMain.owedDegraded,
+            "handed a main holding only v4111 and v4222 against a floor of v4000, the module owed [" +
+            viaMain.owed.join(",") + "] -- EXACTLY MAIN'S TWO, not the " + shippedVersions(ROOT).length +
+            " this working tree carries. A COUNT COMPARISON ALONE COULD NOT SHOW THIS: main and the tree were " +
+            "identical when this round shipped, so swapping the arithmetic to the tree went ZERO RED TWICE");
+        // *** AND IT STILL BITES, WHICH AN EXEMPTION MAKES WORTH PROVING RATHER THAN ASSUMING. *** The
+        // republish exemption is the fix for a deadlock; an exemption that quietly swallowed the whole rule
+        // would look identical from the green side. Here the tree is NOT on main and the lag exceeds the
+        // budget -- the exact case a ship must be refused in.
+        const tmpB = path.join(os.tmpdir(), "swek-ledger-b-" + process.pid + ".json");
+        fs.writeFileSync(tmpB, JSON.stringify({
+            baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+            lagBudget: { maxVersionsBehind: 2, why: "z".repeat(220) },   // small ON PURPOSE: 4 owed must exceed it
+            releases: [{ tag: "v4001" }],
+        }));
+        const shipping = ledgerState({ file: tmpB, readMain: () => "## v4111 -- one\n\n## v4222 -- two\n\n## v4333 -- three\n\n## v4444 -- four\n" });
+        ok("!! *** and a tree that WOULD add to main is still refused when the lag exceeds the budget ***",
+            shipping.addsToMain === true && shipping.budgetBinds === true && shipping.withinBudget === false &&
+            shipping.owed.length > shipping.budget,
+            "tree " + shipping.tree + " is not among main's four, so addsToMain=true and the budget binds: " +
+            shipping.owed.length + " owed against " + shipping.budget + " allowed -> REFUSED. AN EXEMPTION " +
+            "THAT SWALLOWED THE RULE WOULD LOOK IDENTICAL FROM THE GREEN SIDE, so both directions are driven");
+        // *** v4461 -- THE SUPERSEDED FLOOR, DRIVEN IN BOTH DIRECTIONS IN ONE FIXTURE. ***
+        // `owed` now skips versions beneath the newest PUBLISHED release, because a box downloading
+        // releases/latest already holds their code. That forgives, so it has to be shown NOT forgiving the
+        // case the rule is for -- and the same main, with the same floor, answers both questions at once.
+        const mainFour = () => "## v4111 -- one\n\n## v4222 -- two\n\n## v4333 -- three\n\n## v4444 -- four\n";
+        const withFixture = (releases) => {
+            const f = path.join(os.tmpdir(), "swek-ledger-s" + releases.length + "-" + process.pid + ".json");
+            fs.writeFileSync(f, JSON.stringify({
+                baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+                lagBudget: { maxVersionsBehind: 2, why: "z".repeat(220) },
+                releases: releases.map((t) => ({ tag: t })),
+            }));
+            const st = ledgerState({ file: f, readMain: mainFour });
+            try { fs.unlinkSync(f); } catch {}
+            return st;
+        };
+        // Nothing published above the floor: every one of main's four below the tree is still owed.
+        const noneOut = withFixture(["v4001"]);
+        // v4333 published: v4111 and v4222 are BENEATH it, so their code shipped inside it; v4444 is not.
+        const someOut = withFixture(["v4001", "v4333"]);
+        ok("!! *** a version BENEATH the newest published release is superseded, not owed ***",
+            noneOut.owed.join(",") === "4444,4333,4222,4111" && someOut.owed.join(",") === "4444" &&
+            someOut.supersededByPublish === 4333,
+            "same main (v4111..v4444), same floor v4000. Publish nothing above the floor -> owed [" +
+            noneOut.owed.join(",") + "]. Publish v4333 -> owed [" + someOut.owed.join(",") + "]: v4111 and " +
+            "v4222 are inside the v4333 build a box can actually download, v4444 is not. *** THE FLOOR THAT " +
+            "MOVED IS AN OBSERVED PUBLISH, NOT A NUMBER SOMEBODY TYPED. ***");
+        ok("!! ...and it still REFUSES the ship, so the forgiveness did not swallow the rule",
+            someOut.addsToMain === true && someOut.budgetBinds === true &&
+            noneOut.withinBudget === false && someOut.owed.length <= someOut.budget,
+            "with v4333 published the list is 1 of " + someOut.budget + " and the tree may ship; with nothing " +
+            "published it is " + noneOut.owed.length + " of " + noneOut.budget + " and it may not. A FLOOR " +
+            "THAT CAN ONLY BE RAISED BY PUBLISHING SOMETHING makes the do-nothing path no easier than before, " +
+            "which is exactly what the three baseline raises could not say for themselves");
+        ok("!! ...and the two floors are reported apart, because only one of them can be typed",
+            S.floor === (LED && +LED.baseline.throughVersion) && S.supersededBy === Math.max(S.floor, S.latest),
+            "declared write-off v" + S.floor + " against observed publish v" + (S.supersededByPublish || 0) +
+            "; the effective floor is v" + S.supersededBy + ". Folding them into one number would let a " +
+            "write-off be read as a publish, which is the difference between owing a debt and paying it");
+        try { fs.unlinkSync(tmpL); fs.unlinkSync(tmpB); } catch {}
+        ok("!! ...and when main cannot be read it DEGRADES LOUDLY to the stricter list",
+            viaTree.owedDegraded === true && viaTree.owedSource === "working tree" &&
+            viaTree.mainCount === shippedVersions(ROOT).length,
+            "reader threw: degraded=" + viaTree.owedDegraded + ", source=" + viaTree.owedSource + ", counted " +
+            viaTree.mainCount + ". The working tree's list is a SUPERSET of main's, so a missing tool makes " +
+            "this OVER-report debt -- stricter, never quieter, and it says which it did");
+    }
+
+    ok("!! ...and the budget is NOT part of the baseline, so a write-off cannot widen it",
+        !!(LED && LED.lagBudget && LED.baseline && LED.baseline.maxVersionsBehind === undefined),
+        "the baseline forgives versions already gone by; the budget bounds the next ones. If ONE edit could " +
+        "do both, the escape hatch that swallowed this rule three times would swallow it again one level up");
+
+    ok("...and the budget carries the reason it is that number",
+        !!(LED && LED.lagBudget && typeof LED.lagBudget.why === "string" && LED.lagBudget.why.length > 200),
+        "a bound with no argument behind it is the next thing somebody raises without one");
     // *** v4450 -- THIS CHECK USED TO PIN THE LITERAL 4448, AND THAT WAS A SECOND COPY OF THE NUMBER. ***
     // The intent was right -- moving the baseline must be an ACT, not a drift -- but `=== 4448` means the
     // gate holds its own copy of a value that lives in releases.json, so a legitimate raise goes red until
@@ -196,3 +394,21 @@ console.log("\n5. WHAT THIS DOES NOT CHECK, STATED RATHER THAN IMPLIED");
 console.log();
 if (fails) { console.log("releaseLedger-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("releaseLedger-selfcheck: all checks pass");
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, the superseded floor. Applied to tools/ship/releaseLedger.mjs, graded on EXIT CODES,
+// restored md5-identical (4c911fc9d4fcc74654fe6ed31654c8bf).
+//
+//   A  supersededBy reverted to `floor` -- the arithmetic as it stood, ignoring what was published.
+//      -> exit 1. The forgiving direction is real: with v4333 in the fixture's ledger, v4111 and v4222 come
+//      back onto the owed list and the assertion naming them as superseded fails.
+//
+//   B  supersededBy set to `treeN`, so every version below the tree is called superseded and owed is always
+//      empty -- the over-forgiving version, which is what an escape hatch would look like.
+//      -> exit 1. This is the sabotage that matters. A relaxation nobody can break is not a rule, and the
+//      three baseline raises before this one had no check at all standing behind them.
+//
+//   *** BOTH DIRECTIONS GO RED FROM ONE FIXTURE, WHICH IS THE POINT OF BUILDING IT THAT WAY. *** The same
+//   main (v4111..v4444) and the same floor (v4000) are asked twice, differing only in what the ledger says
+//   was published. A fixture that could only demonstrate the forgiveness would be arguing for the change
+//   using the change.

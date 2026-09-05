@@ -139,3 +139,48 @@ export function dipoleIntegral(opts = {}, { N = 400000, rMax = 400 } = {}) {
 }
 
 export { profile, cdf, sampleRadius };
+
+// ---- *** THE DOOR (v3327's split) *** ---------------------------------------------------------------------
+//
+// v4461 -- registered at v4460 with nothing to render. The report prints what importance sampling is WORTH
+// as samples-to-match rather than as a variance ratio alone, because a ratio is a number and a sample count
+// is a cost somebody has to pay.
+
+export function reportLines() {
+    const L = [];
+    L.push("[bssrdfSample] drawing from the profile against drawing uniformly, and what the difference costs");
+    L.push("");
+    // *** THE ESTIMAND IS NOT 1, AND SAYING WHY IS THE POINT. *** On a PLANE the profile integrates to one by
+    // construction -- that is subsurface.mjs's exact half. Here it is integrated over a SPHERE of radius a, so
+    // the geometry no longer cancels, the answer depends on a and d, and an estimator is needed at all.
+    // `truth` is quadrature over that sphere, not a reference implementation.
+    L.push("  the estimand: the profile integrated over a SPHERE of radius a, not a plane. On a plane it is 1");
+    L.push("  by construction and needs no estimator; on a sphere the geometry stops cancelling.");
+    L.push("");
+    L.push("   sphere a    d       truth      importance    uniform     var ratio   uniform samples to match");
+    for (const [a, d] of [[0.2, 0.5], [0.5, 1], [0.8, 1], [0.8, 5], [0.95, 20]]) {
+        const c = compare(a, d, { n: 20000, seed: 7 });
+        L.push("   " + a.toFixed(2).padStart(8) + "  " + String(d).padStart(4) + "   " +
+               c.truth.toFixed(6).padStart(9) + "    " + c.importance.mean.toFixed(6).padStart(9) + "   " +
+               c.uniform.mean.toFixed(6).padStart(9) + "   " +
+               (isFinite(c.varianceRatio) ? c.varianceRatio.toFixed(1) : "inf").padStart(9) + "   " +
+               (isFinite(c.samplesToMatch) ? Math.round(c.samplesToMatch).toLocaleString("en-GB") : "inf").padStart(14));
+    }
+    L.push("");
+    // *** THE COMPANION MEASUREMENT IS WHY THE PROFILE WAS CHOSEN, AND IT IS A NUMBER RATHER THAN A PREFERENCE. ***
+    // Burley's profile integrates to one by construction. Jensen's dipole integrates to whatever the
+    // parameters make it, which somebody then has to compute and divide out.
+    L.push("  *** AND WHAT THE CLASSICAL DIPOLE DOES INSTEAD: its radial integral is neither 1 nor the");
+    L.push("      albedo it was handed, so a renderer using it owes a normalisation it has to compute. ***");
+    L.push("     alpha'    A      dipole integral    handed albedo    off by");
+    for (const [ap, A] of [[0.4, 1.44], [0.8, 1.44], [0.95, 1.44], [0.8, 1.0], [0.8, 2.0]]) {
+        const I = dipoleIntegral({ alphaPrime: ap, A }, { N: 60000, rMax: 200 });
+        L.push("   " + ap.toFixed(2).padStart(7) + "  " + A.toFixed(2).padStart(5) + "    " +
+               I.toFixed(6).padStart(13) + "    " + ap.toFixed(6).padStart(13) + "    " +
+               (I - ap >= 0 ? "+" : "") + (I - ap).toFixed(6));
+    }
+    L.push("");
+    L.push("  which is the inconvenience v4443 removed by choosing the normalised profile, and the reason");
+    L.push("  that choice is recorded as a measurement rather than as a preference between two papers.");
+    return L;
+}

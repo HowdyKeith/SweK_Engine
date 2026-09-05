@@ -67,7 +67,7 @@ function status() {
     return {
         ok: true,
         phase: R.phase,
-        running: R.phase === "cloning" || R.phase === "verifying",
+        running: R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing",
         startedAt: R.startedAt, finishedAt: R.finishedAt,
         clone: R.clone ? { version: R.clone.version, path: R.clone.path, repo: R.clone.repo,
                            auth: R.clone.auth, tokenRejected: !!R.clone.tokenRejected } : null,
@@ -98,6 +98,9 @@ function status() {
 function canPublish(st) {
     const s = st || R;
     if (s.phase === "cloning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
+    // v4451 -- and while a publish is in flight, which was admissible until this round: publish() set no phase
+    // at all, so a second press during the upload passed every precondition the first one had.
+    if (s.phase === "publishing") return { ok: false, why: "a publish is already in flight" };
     if (!s.clone || !s.clone.path) return { ok: false, why: "nothing has been cloned yet" };
     if (s.verified !== true) return { ok: false, why: s.verified === false
         ? "the cloned tree FAILED verification -- publishing it is the thing this chain exists to prevent"
@@ -187,8 +190,31 @@ async function start({ repo, ref } = {}) {
  * the UI hits the identical rule. A guard that only exists in the front end is a guard that exists until
  * somebody uses curl.
  */
-async function publish({ repo, notes, draft, prerelease } = {}) {
-    const gate = canPublish();
+// *** v4451 -- PUBLISH NOW HAS A PHASE, AND UNTIL THIS ROUND IT WAS THE ONLY STEP THAT DID NOT. ***
+//
+// Keith: "we need to make sure that the running swek does not start an auto update that kills the github
+// tasks." server.js's _applyIncremental has deferred auto-updates since v3075 -- but it asks _testRunActive(),
+// which knows about render QA, the gate suite and rig jobs, and NOT about this file. So a clone or a verify
+// could be restarted out from under itself. THAT IS THE HALF THAT IS OBVIOUS. The half that is not: R.phase
+// was set all through start() and NEVER ONCE IN publish(), so during packRelease (a ~30 MB zip built by
+// walking a live tree) and the upload that follows it, status().running read FALSE and canPublish() still
+// returned ok. The window in which an auto-update was invisible to every guard was exactly the window
+// containing the one action this tree calls "genuinely hard to take back", and a second concurrent publish
+// was admissible in it too.
+//
+// The wrapper exists rather than a try/finally inside the body because publish() has eight separate return
+// paths; a restore written at each of them is seven chances to miss one, and the one missed would leave the
+// phase stuck at "publishing" and updates deferred forever -- a guard that fails CLOSED and never reopens.
+async function publish(args) {
+    const gate0 = canPublish();
+    if (!gate0.ok) return { ok: false, error: "refusing to publish: " + gate0.why };
+    R.phase = "publishing";
+    try { return await _publishInner(args || {}); }
+    finally { R.phase = "done"; R.finishedAt = Date.now(); }
+}
+
+async function _publishInner({ repo, notes, draft, prerelease } = {}) {
+    const gate = canPublish({ ...R, phase: "done" });   // the phase is ours; every OTHER precondition still binds
     if (!gate.ok) return { ok: false, error: "refusing to publish: " + gate.why };
 
     const root = R.clone.path;
@@ -422,5 +448,13 @@ function handle(req, res, sendJson) {
     return true;
 }
 
-module.exports = { status, start, publish, launch, canPublish, owns, handle, PREFIX, ENGINE_ROOT,
+/**
+ * v4451 -- "is a GitHub chain step in flight?", for server.js's update deferral.
+ * DERIVED FROM R.phase, not a second flag: updatePause-selfcheck's own rule is that the answer comes from the
+ * runner's OWN state, because "a second flag would one day disagree with the thing it describes".
+ */
+function running() { return R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing"; }
+function busyWhat() { return running() ? "the source chain (" + R.phase + ")" : null; }
+
+module.exports = { status, start, publish, launch, canPublish, owns, handle, running, busyWhat, PREFIX, ENGINE_ROOT,
     _launchGuard, _freePort, _waitHealthy };

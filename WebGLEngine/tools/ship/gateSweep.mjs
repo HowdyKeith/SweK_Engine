@@ -1647,41 +1647,197 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "1, because STEP() is still called so the medallion still renders. Corrected in the header " +
                  "rather than quietly fixed.",
     }),
-    // v4451 -- the seventy-third closing. #129's premise measured, and inverted.
+    // v4451 -- the seventy-third closing. A gate that could not load, and the budget that hid it.
     since73: Object.freeze({
         at: "v4451", swept: 1, green: 1, red: 0,
-        added: Object.freeze(["tools/ship/runtimeGap-selfcheck.mjs"]),
+        added: Object.freeze(["tools/ship/importHealth-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
-        verdict: "green on this box, twelve checks in four sections. #129 asks what is missing besides threads " +
-                 "if the VBA transmitter were the runtime instead of Node/Bun. MEASURED OVER 3,801 " +
-                 "COMMENT-STRIPPED RUNTIME SOURCE FILES, THE QUESTION HAS ITS SCALE INVERTED: threads are 22 " +
-                 "files, 0.6%, RANK 11 OF 12 -- the second-smallest gap -- while ES modules are 3,510 and " +
-                 "first-class functions 3,393, which is 154 TIMES MORE OF THIS TREE THAN THREADS. And the gap " +
-                 "is inverted the other way too: a network stack and a GPU renderer are what anyone would " +
-                 "guess is hardest outside a browser, and they are the two the VBA side already has. THREE " +
-                 "EVIDENCE CLASSES ARE HELD APART BY A CHECK RATHER THAN A HEADING -- measured / language / " +
-                 "archive -- because the failure mode of a capability table is one where 'VBA has no closures' " +
-                 "and 'the transmitter's HTTP server works' look equally established. *** THE SABOTAGE PASS " +
-                 "FOUND THE HOLE THAT MATTERED: *** flipping `closures as values` to has:true -- crediting VBA " +
-                 "with the single capability the whole finding is about -- WAS A SILENT PASS, because the " +
-                 "check only asked whether a row declared an evidence CLASS, and a flipped row keeps the class " +
-                 "it had. A label is not a check. Every has:true row now names a `via` corroborator that must " +
-                 "be FOUND: a token in this tree's own .bas files, or a marker vba/archiveManifest.mjs really " +
-                 "holds. *** POINTING THE ROWS AT BYTES IMMEDIATELY CORRECTED TWO OF THEM: *** performance.now " +
-                 "claimed QueryPerformanceCounter, which appears in NO VBA in this tree (it is kernel32 " +
-                 "GetTickCount, ~15.6 ms, a whole frame at 60fps); and fetch/XHR was filed as an ARCHIVE claim " +
-                 "when modGPUBrain.bas drives WinHttp.WinHttpRequest.5.1 right here, so ONLY WebGL STILL RESTS " +
-                 "ON THE ARCHIVE -- there is no GL of any kind in the in-tree VBA. *** AND THE INSTRUMENT IS A " +
-                 "MAXIMAL FALSE POSITIVE FOR ITSELF: *** runtimeGap.mjs holds the PATTERNS table, so every " +
-                 "regex's literal text is in it, and a regex source is a string, which is prose the comment " +
-                 "strip cannot reach -- this round's two files match ALL TWELVE of their own patterns. Derived " +
-                 "by recounting with them excluded, not argued: threads 21 against WebAssembly 20 without " +
-                 "them, tied at 22 with them, so the rank-11 tie is my own note strings and is said rather " +
-                 "than hidden. Two more frozen numbers were wrong and unchecked (languageRowsAbsent read 8 " +
-                 "against nine rows; only 3 of 12 census rows were compared at all) -- all twelve are compared " +
-                 "now. Thirteen sabotages, ALL RED BY NAME, both files md5-identical. WHAT IS NOT CLAIMED: " +
-                 "that any of this RUNS. No Excel has ever run against SweK_VBA_v3499 from this box, the pages " +
-                 "still say so, and no VBA row is tagged `measured`.",
+        widened: Object.freeze([
+            "tools/ship/updatePause-selfcheck.mjs (23 checks -> 31, the GitHub work the deferral could not see)",
+            "tools/ship/redCensus-selfcheck.mjs (revived: dead at import since v4430, then 3 real reds fixed)",
+        ]),
+        verdict: "green on this box, ~200 ms, no browser, 9,410 named bindings across 1,478 gates. Keith asked " +
+                 "that an auto-update not restart the server during the GitHub chain; _testRunActive() had " +
+                 "deferred updates since v3075 and named THREE runners, so the clone, the verify, the pack and " +
+                 "the upload were invisible to it -- and sourceChainBridge set R.phase all through start() and " +
+                 "NEVER IN publish(), so the blind window was exactly the one holding the action this tree " +
+                 "calls hardest to take back. *** THE REPAIR OF ITS GATE THEN EXPOSED A GATE THAT HAD BEEN DEAD " +
+                 "AT IMPORT FOR TWENTY-ONE ROUNDS: *** v4430 deleted RECORDED_BUT_GREEN from redCensus.mjs " +
+                 "(rightly -- a frozen copy of a derivable set) and left its one importer naming it, so " +
+                 "redCensus-selfcheck threw before its first check while this very session repaired entries on " +
+                 "the register it guards. IT WENT UNSEEN BECAUSE IT IS BUDGETED AT 140,941 ms and the quick " +
+                 "sweep runs everything under 3,000 -- THE NUMBER THAT DESCRIBES A GATE IS WHAT HIDES IT, and " +
+                 "fifty-one gates sit above that cap. Reviving it surfaced three reds, all one family: a " +
+                 "regex over round strings that stopped excluding anything at v44xx, an equality between a " +
+                 "typed measurement and a getter whose audit caps below it, and a claim about v4279 measured " +
+                 "against a register that repairs shrink -- so the claim went false BECAUSE THE WORK THE " +
+                 "CENSUS ASKS FOR WAS DONE. It also found winPathGuard red again after its v4423 repair: one " +
+                 "new gate reintroduced `new URL(import.meta.url).pathname`, which yields '/C:/...' on the " +
+                 "box this engine is developed on. This gate asks the load question STATICALLY, which is what " +
+                 "makes it cheap enough to ask of all 1,478 rather than only the 51. Five sabotages, MEASURED " +
+                 "1/1/1/0-then-1/2 by name. *** THE ZERO WAS ITS OWN UNREACHED BRANCH: *** nothing in this " +
+                 "tree imports from a module that re-exports, so the `export * from` guard never ran and its " +
+                 "own report line said so while I read past it; closed with temp-directory fixtures rather " +
+                 "than planted files, because a gate that leaves a gate behind grows its own population. AND " +
+                 "THE GATE WAS WRONG TWICE BEFORE IT WAS RIGHT, both times accusing correct code: 36 false " +
+                 "reds from reading one name out of `export const A = 1, B = 2;` and none out of CommonJS, " +
+                 "then ~110 more from anchoring a declaration on a semicolon at end of line in a tree that " +
+                 "writes `export const MU0 = 1.25e-6;   // CODATA`. Running one of the accused was the whole " +
+                 "cost of learning each.",
+    }),
+    // v4452 -- NO new gate file: three existing gates widened, and one non-gate module added.
+    since74: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate.
+        // ui/originNotice.js is a page module, not a -selfcheck, so enumerateGates does not see it.
+        at: "v4452", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "ui/webgpuOrigin-selfcheck.mjs (sections 8 and 9: the derived population, and the silent fallback)",
+            "tools/ship/pageRequirements-selfcheck.mjs (--have reachable from the panel; the import tell)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box. Keith: 'I don't know why the swek engine locally runs with an ip, and " +
+                 "then all the gpu pages have to be re opened with localhost. all the machines run webgpu " +
+                 "pages fully.' THE MACHINES ARE FINE AND SO IS THE CODE: navigator.gpu is exposed only in a " +
+                 "SECURE CONTEXT, a browser treats localhost and 127.0.0.1 as secure over plain http, and a " +
+                 "LAN address is not one -- so on http://192.168.50.57:8787 the property is simply absent. " +
+                 "ui/webgpuProbe.mjs has said exactly that since v3981, and MEASURED at v4452 only 16 of the " +
+                 "31 pages that acquire a device ever asked it. Now 31 of 31, by three routes, and the " +
+                 "population is DERIVED from source rather than listed. *** THE REASON THE SYMPTOM WAS " +
+                 "UNREADABLE IS THAT gfx/device.js FELL BACK IN SILENCE: *** requestDevice took webgl2 -- or " +
+                 "the null backend -- and returned a WORKING device with no throw and no console line, so the " +
+                 "page loaded, did less than it should, and the only clue was that localhost fixed it. It " +
+                 "explains now, before the fallback runs, once per page. SEPARATELY, RENDER QA: --have has " +
+                 "existed since v3171 so a box can state what it HAS and every unjudgeable page is NAMED " +
+                 "rather than failed (v3120's law) -- and renderQaBridge.run() never accepted it, so the " +
+                 "mechanism was terminal-only. That is v3563's own sentence, one flag along: 'A FRONT DOOR " +
+                 "THAT CANNOT REACH A FLAG THE TOOL DOCUMENTS IS HALF A DOOR', written while fixing --all and " +
+                 "leaving this. Threaded, with blank still meaning skip nothing. The webgpu detector also " +
+                 "learned the IMPORT tell it already used for webgl2, fixing two pages that hold their WGSL " +
+                 "in a string and get the device from gfx/device.js. Five sabotages, MEASURED " +
+                 "1/1/0-then-1/1/0-then-1 by name. *** BOTH ZEROS WERE DEFECTS IN THE GATES, NOT THE CODE: *** " +
+                 "one case was short-circuited by the once-per-page flag so it passed whatever the guard did, " +
+                 "and the detector widening had no assertion at all and could have been undone in silence.",
+    }),
+    // v4453 -- NO new gate file: releaseLedger-selfcheck widened, and the rule it enforces replaced.
+    since75: Object.freeze({
+        at: "v4453", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/releaseLedger-selfcheck.mjs (the hard ratchet becomes a lag budget, asked about MAIN)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box. Keith: 'fix the structure before v4453.' v4449's ratchet -- you may not " +
+                 "ship a new version while the last one is unreleased -- is right when the ship and the " +
+                 "publish happen on ONE machine and UNSATISFIABLE when they do not: rounds are built where " +
+                 "there are no credentials to publish, so the previous version is unreleased at every ship BY " +
+                 "CONSTRUCTION. It went red at v4450, v4451 and v4452, and each time the only reachable answer " +
+                 "was to raise the baseline. THREE RAISES IN THREE ROUNDS IS A GATE COLLECTING SIGNATURES, and " +
+                 "the escape hatch being sanctioned is what hid it -- every write-off was reasonable and the " +
+                 "sequence was not. Now: the question is asked about MAIN (v4449's own words said main and it " +
+                 "read the working tree, so an unmerged branch counted as debt nobody could download), with a " +
+                 "fallback to the working tree that is a SUPERSET and therefore stricter; and the hard zero " +
+                 "becomes a stated LAG BUDGET of 3, against a failure of 3 releases in 261 versions -- 87x the " +
+                 "budget. An unstated budget FAILS rather than passing, and it lives outside baseline because " +
+                 "one edit doing both jobs is the escape hatch eating the rule one level up. Six sabotages, " +
+                 "MEASURED 3/3/1/0-then-0-then-1/1/0-then-1. *** BOTH ZEROS WERE THE SAME BLINDNESS: *** a " +
+                 "module reading the working tree while reporting 'origin/main' passed a check that restated " +
+                 "its own label, and then passed a COUNT comparison too, because at that moment the branch and " +
+                 "main were IDENTICAL and no count separates two identical lists. Closed with an injectable " +
+                 "reader and a fixture ledger whose floor is low enough for owed to come back NON-EMPTY -- an " +
+                 "empty owed-set proves nothing about which list built it. AND A NOTE ON METHOD: two reported " +
+                 "zeros were counted by grepping '^  FAIL', which A CRASHING GATE PRINTS NONE OF; one was a " +
+                 "syntax error in the sabotage read as a gate failing to notice. Graded on exit codes now.",
+    }),
+    since76: Object.freeze({
+        at: "v4455", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/btdfDomain-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, eight sections. *** THE SAME QUESTION WENT TO TWO BRANCHES AT ONCE AND THEY CONVICTED " +
+                 "THE SAME chi+ FROM DIFFERENT INSTRUMENTS -- 0.661386 there from an energy bound, 0.663694 " +
+                 "here from a Monte Carlo walk, sharing no code but the D and Fresnel under test. *** Walter " +
+                 "eq. 21 needs the half-vector to be a facet that EXISTS (h.n > 0) and is LIT (h.wi > 0); " +
+                 "transmission.mjs evaluated outside both, through halfVectorT's `h[2] < 0 ? -h : h` and " +
+                 "Math.abs(iDotH). TWO ABS()ES, AND AN ABS IS THE MOST INNOCENT-LOOKING THING IN A SHADER. " +
+                 "Proved on a bound: with masking alone eq. 21 times |wo.n| IS the (1-F)-weighted VNDF, a " +
+                 "probability density -- 0.917790 enforced against a 0.916252 ceiling, 1.878929 as written. " +
+                 "The walk gives EXACTLY ZERO single-scatter paths in both bins the abs()es pay out in, 0 of " +
+                 "300000 twice, while multiple scattering fills both. WHAT THIS ROUND GOT WRONG AND CORRECTED " +
+                 "BEFORE SHIPPING: its first draft headlined 'G is not the culprit', which its own section 6 " +
+                 "contradicted by measuring the enforced lobe still 2.17x truth. The measurement supports only " +
+                 "that the domain error is INDEPENDENT of G; G2 is guilty separately, and the other branch's " +
+                 "beta form settles it -- section 8 holds `chiPlus` and `g2: \"beta\"` against this file's walk " +
+                 "at three configurations and lands 0.305984 on 0.306083. SIX SABOTAGES, 8/4/9/9/6/1-then-2 by " +
+                 "name, none zero-red. THE ONE THAT READ 1 FOUND A SECOND COPY OF THE OPTION OBJECT inside the " +
+                 "section, so half of it graded a configuration the sabotage never reached; one frozen FIXED " +
+                 "object now. NOT CLAIMED: that btdfDomain fixes anything -- transmission.mjs is deliberately " +
+                 "unpatched by this round, and defaults on both branches are unchanged so no pixel moved.",
+    }),
+    since77: Object.freeze({
+        at: "v4456", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/closingCoverage-selfcheck.mjs",     // this round's own
+            "tools/ship/reportDoors-selfcheck.mjs",         // ANOTHER round's gate, swept here -- see the verdict
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, both. *** THE SECOND NAME IS NOT THIS ROUND'S GATE AND SAYING SO IS THE POINT. *** " +
+                 "tools/ship/reportDoors-selfcheck.mjs arrived on main from an in-flight round on the other " +
+                 "branch, with no closing, so the trunk read '1 STILL UNSWEPT' for three unnumbered commits. " +
+                 "This round RAN it -- exit 0 -- and accounts for it here; it did not write it, and the round " +
+                 "that did will describe it. WRITING THIS ENTRY WAS REFUSED ONCE, DELIBERATELY, AND THAT " +
+                 "REFUSAL IS WHAT PRODUCED THE ROUND: when the other branch ships it will close the same gate, " +
+                 "two closings will claim one name, and the coverage line summed COUNTS rather than reading " +
+                 "the NAMES the ledger already holds -- so the duplicate would have cancelled the very red it " +
+                 "was meant to clear. MEASURED, on a fixture with exactly one uncovered gate: as it stands " +
+                 "uncovered 1 (FAIL); two branches closing the same gate, uncovered 0 (PASS). Not a future " +
+                 "risk, this week's red going green. A duplicate buys a CREDIT of exactly one against every " +
+                 "future unswept gate, permanently, because `<= 0` can never red no matter how far the sum " +
+                 "over-runs. NEW closingCoverage.mjs reads the union of every `added` list as a SET -- " +
+                 "duplicates attributed to both claimants by name, names checked against the filesystem rather " +
+                 "than the caller's list, and the credit reported as its own number. v4399's rule, freeze by " +
+                 "NAME not by COUNT, reaching the one line in the ledger that had never followed it. Six " +
+                 "sabotages, 4/1/0-then-2/1/1/9 by name. *** THE ZERO WAS AN UNREACHABLE CHECK INSIDE A ROUND " +
+                 "ABOUT UNREACHABLE CHECKS *** -- the filesystem clause never ran, because both fixtures named " +
+                 "a gate missing from the enumeration too; an empty population drives it now. NOT CLAIMED: " +
+                 "that the v4297 baseline is covered by name (it is a count, and rebuilding its membership " +
+                 "would be fabrication -- `baselineByName: false` is a graded value, not a sentence), or that " +
+                 "a gate a closing names was actually run by that round.",
+    }),
+    since78: Object.freeze({
+        at: "v4457", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugWgsl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green. The WGSL twin of the Slug shader (text/slugShaderWgsl.js), graded on the headless Dawn " +
+                 "device against text/slugEval.js on the same packed bytes: 22,045 + 61,092 sharp samples exact " +
+                 "against slugEval AND the flattened-segment winding number, worst |gpu - cpu| 3.1e-6 at 28 px/em " +
+                 "against an a-priori 1/512, the row-wrap plant 9,477 of 27,957 wrong at the wrong width, three " +
+                 "transliteration plants red at 12,148 / 2,205 / 1,462 of 22,045, and SlugDilate half a pixel per " +
+                 "axis to 3.8e-6 px under an orthographic matrix. *** THE FIRST DRAFT OF ITS SECTION 5 HAD AN " +
+                 "UNREACHABLE PLANT *** -- six small glyphs at width 64 never leave row one, so the wrong-width " +
+                 "probe went 0 of 10,016 wrong -- caught on the first run and rebuilt over the 66 Plex label " +
+                 "glyphs at width 128, where 432 of 965 band headers point past their own row. Five runs 5,235 to " +
+                 "5,412 ms, all exit 0; the slowest is the MEASURED budget.",
+    }),
+    since79: Object.freeze({
+        at: "v4459", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/vacuity-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, five runs of five, 0.043 s -- the cheapest gate this ledger has ever closed, because " +
+                 "its subject is a SHAPE rather than a device. vacuity.mjs names the 0-RED sabotage as ONE " +
+                 "SYMPTOM WITH FOUR CAUSES -- an empty collection under every(), an unreachable branch, a guard " +
+                 "sitting downstream of the classification it depends on, and a harness that damaged what it was " +
+                 "measuring -- and supplies overNonEmpty and emptyOfNonEmpty so the empty case cannot be " +
+                 "forgotten at the call site. *** THE TREE-WIDE SCAN FOR THE FIRST CAUSE WAS REFUSED RATHER THAN " +
+                 "SHIPPED: *** 948 of 1,482 gates use the shape, and a census that flags 64% of the tree is one " +
+                 "nobody reads, so the refusal is recorded with its number instead of a report nobody would act " +
+                 "on. NOT CLAIMED: that the four causes are exhaustive -- they are the four this session " +
+                 "actually met, and the record says so.",
     }),
 });
 

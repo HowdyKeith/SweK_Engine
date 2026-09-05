@@ -1359,6 +1359,82 @@ export const INSTRUMENTS = [
       gate: "tools/ship/seamCensus-selfcheck.mjs",
       measures: "Finds the seams in strict-libm's piecewise approximations from the selector itself and measures the error at each.",
       key: "Seam locations are DERIVED FROM THE SELECTOR and never typed, so a seam that moves is followed rather than missed; 0 are hand-written." },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "report-doors", area: "ship", name: "The reportLines convention, counted",
+        page: "instrument-bench.html", gate: "tools/ship/reportDoors-selfcheck.mjs",
+        measures: "Every module exporting reportLines, CALLED rather than read: which are callable bare, which require an argument, and which throw.",
+        key: "*** SEVENTY-SEVEN MODULES EXPORT reportLines AND NOTHING STATES ITS CONTRACT. *** server.html, instrument-bench.html, fleet-report.mjs and the fingerprint bridge all consume it; every knob, meter, bind and census in the tree provides it. It is how a module says what it knows. It is also the largest untested convention in the tree, and the reason is measurable rather than cultural: EXERCISING IT COSTS ABOUT SEVEN AND A HALF MINUTES, so no gate has ever exercised it. ---- *** WHAT MEASURING IT FOUND, AND THE FIRST FINDING IS ABOUT HOW TO MEASURE IT *** -------------------- (1) READING THE SIGNATURE IS THE WRONG INSTRUMENT. Twenty modules declare a parameter; only SIX require one. The other fourteen have defaults -- `{ live = true } = {}`, `opts = {}`, `root = ROOT` -- so they are callable bare, and a census built on the source text would have called fourteen of them formatters and been wrong about every one. `Function.length` answers the question a consumer actually asks: CAN I CALL THIS WITH NOTHING? The source text answers a different one.",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "closing-coverage", area: "ship", name: "The ledger counts gates and never names them",
+        page: "instrument-bench.html", gate: "tools/ship/closingCoverage-selfcheck.mjs",
+        measures: "The union of every sweep closing as a SET: gates claimed by two closings and by whom, claimed names with no file, and the credit a duplicate buys against future unswept gates.",
+        key: "*** THE SWEEP LEDGER COUNTS GATES AND NEVER NAMES THEM, SO A DUPLICATE CLOSING IS A CREDIT RATHER THAN AN ERROR. *** main is carrying a gate, reportDoors-selfcheck.mjs, landed by an in-flight round on the other branch with no closing written for it, so gateSweep-selfcheck reads \"1 STILL UNSWEPT\" on the trunk right now. *** THE HAZARD IS NOT HYPOTHETICAL AND IT ALMOST HAPPENED THIS ROUND. *** The obvious repair -- write the closing here -- is the one thing that must not be done blind, because when that round ships it will write its own closing for the same gate. Two closings, one gate. The question is what the ledger does about that, and the answer is NOTHING, in a way that is worse than merely missing it. ---- *** THE ARITHMETIC IS A SUM, AND A SUM CANNOT TELL DOUBLE-COUNTING FROM COVERAGE *** ------------------- gateSweep-selfcheck's coverage line is uncovered = (gatesNow - 1366 - 1) - SWEEP_SINCE_V4297.swept - sum(closing.swept) and asserts <= 0",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "slug-wgsl", area: "render", name: "The Slug shader in WGSL, held to the CPU key on a device",
+        // v4459: `page` was DECLARED IN A COMMENT here and the field was left undefined, so v4457 shipped
+        // this entry with instruments-selfcheck red on "every entry DECLARES a page, even if that
+        // declaration is `null`" -- the whole point of that check being that forgetting the field and
+        // choosing no page are different states. A sentence beside a field is not the field.
+        page: null,   // pageless: a standalone gate with no reportLines() module, which the bench cannot serve
+        gate: "tools/ship/slugWgsl-selfcheck.mjs",
+        measures: "Coverage from the WGSL Slug core run as a compute probe on the headless Dawn device, sample by sample against text/slugEval.js on the same packed atlas bytes and against the flattened-segment winding number; the row-wrap and three transliteration plants; SlugDilate's screen displacement against its closed form.",
+        key: "*** THE SHADER THAT SHIPS IS THE SHADER THAT IS GRADED, NOT A COPY OF IT. *** slugShaderWgsl.js keeps the Slug fragment core -- root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender -- as ONE string, and both the render module and the compute probe interpolate it. Section 1 asserts that text identity before anything runs, because a probe that carried its own copy of the loop would be grading itself.",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "vacuity", area: "ship", name: "The 0-RED sabotage: one symptom, four causes",
+        page: "instrument-bench.html", gate: "tools/ship/vacuity-selfcheck.mjs",
+        measures: "The four ways a control can be unable to fail, each named from a real instance, and the tree-wide census of the one shape a scanner could find -- reported as a refusal with its number.",
+        key: "*** THIS TREE'S STANDING RULE IS \"A CONTROL THAT CANNOT FAIL IS DECORATION\", AND ONE SESSION PRODUCED FOUR INSTANCES OF IT IN GATES WRITTEN THAT SAME SESSION. *** Every one surfaced the same way and only that way: a sabotage that went 0 RED. The ship ritual already says a 0-RED sabotage is a finding rather than a pass. What it does not say -- and what cost four rounds to learn -- is that THE SYMPTOM IS ONE AND THE CAUSES ARE FOUR, so there is nothing to search for: an empty collection under every(), a branch the population never enters, a guard an earlier test already implies, and a harness that corrupted what it measured. *** AND THE SCAN IS REFUSED, WITH THE NUMBER AS THE REASON: *** 3,206 such assertions in 948 of 1,482 gates -- SIXTY-FOUR PER CENT OF THE GATES -- so a census of them is a report nobody reads, and only the FIRST mechanism is mechanically preventable at all.",
+    },
+
+    // ---- v4461 -- SEVEN MODULES THAT HAD NO DOOR, GIVEN THE ONE THEY SHOULD ALWAYS HAVE HAD ----------------
+    //
+    // physicsReach-selfcheck counts a graded physics module UNREACHABLE when no roundhouse device, no
+    // instruments row and no page names it. Seven were added between v4438 and v4455 -- the whole
+    // rough-dielectric arc, plus the xpbd substep study -- and none got a row, so the lab could grade them
+    // and nobody could find them. `page: null` is a DECLARATION rather than an omission (39 rows already say
+    // it): these have no front door of their own yet, which is a different fact from having no way in.
+    // `device: null` for the same reason -- naming a roundhouse device that does not exist would fail
+    // instruments-selfcheck, and inventing one to look complete is the fabrication these gates refuse.
+    // Every `key` below is taken from the module's own header; where a round measured a number it is quoted,
+    // and where it did not, the QUESTION is stated instead of an answer being supplied.
+    { id: "albedo-estimator", device: null, page: "instrument-bench.html", name: "Directional albedo estimator", area: "render",
+      measures: "Whether the furnace's own albedo integrator converges, and what the baked energy-compensation table says at the roughnesses and angles where it does not.",
+      key: "v4437 SAID IN WRITING THAT EVERY FURNACE NUMBER AT LOW ROUGHNESS AND GRAZING ANGLES SHOULD BE RE-CHECKED, and this is that check coming back worse than the round predicting it guessed. The defect reaches physics/render/energyCompensation.mjs, which BAKES A TABLE OTHER MODULES CONSUME: at alpha 0.02 and mu 0.0208 -- the table's own row, not a synthetic worst case -- buildTable's N=220 grid returns 0.242842 against a converged 0.892115, a 73% error. A grid that is wrong at the rows it ships is worse than one that is wrong somewhere nobody reads.",
+      gate: "physics/render/albedoEstimator-selfcheck.mjs" },
+    { id: "small-steps", device: null, page: "instrument-bench.html", name: "Substeps against iterations", area: "mechanics",
+      measures: "Where the XPBD crossover actually sits between taking more substeps and doing more solver iterations at the same total cost.",
+      key: "THE PREMISE WAS CHECKED BEFORE IT WAS BUILT ON, AND THE PREMISE HAD GONE. The plan item said to check this tree's XPBD against warp.sim -- which was deprecated in Warp 1.8 (July 2025) and REMOVED in Warp 1.10. Its successor is newton-physics/newton, a Linux Foundation project under Apache 2.0. It matters less than it looks BECAUSE THE REFERENCE WAS NEVER THE SOURCE: warp.sim and newton both implement two papers, and a paper's claims can be tested against this tree directly rather than against somebody's implementation of them. That is the fifth round running in which checking a premise changed the round, and the second in which the premise was the author's own.",
+      gate: "physics/xpbd/smallSteps-selfcheck.mjs" },
+    { id: "subsurface", device: null, page: "instrument-bench.html", name: "Subsurface scattering profile", area: "render",
+      measures: "Christensen and Burley's normalised diffusion profile -- the fifth and last parameter physics/render/principled.mjs named as absent.",
+      key: "THE ONLY ONE OF THE FIVE GAPS WITH A CLOSED-FORM NORMALISATION, WHICH IS WHY IT IS THE ONE WHERE THE MOST CAN BE ASSERTED RATHER THAN MEASURED. v4432 shipped the principled BSDF with an honest-scope sentence listing sheen, clearcoat, anisotropy, transmission and subsurface as missing; v4436 closed the fourth and this closes the fifth. The model is what Disney, Cycles, Arnold and every offline renderer since about 2015 actually ships IN PLACE OF the classical dipole. NOTHING IS VENDORED -- it is a paper, and a two-term exponential at that, so there is no licence question and no file to keep in step.",
+      gate: "physics/render/subsurface-selfcheck.mjs" },
+    { id: "bssrdf-sample", device: null, page: "instrument-bench.html", name: "BSSRDF surface integration", area: "render",
+      measures: "The integration v4443 deliberately left open: a profile evaluated over an actual surface rather than at a single point.",
+      key: "v4443 CLOSED THE GAP AS A MODEL AND SAID SO, LEAVING IT OPEN AS AN INTEGRATION -- and the distinction is the whole of this entry. A BSSRDF NEEDS A SURFACE: light enters at one point and leaves at another, while physics/render/principled.mjs is a BRDF evaluated at a single point with no surface anywhere in its signature. The surface used is the one the tree already renders on, physics/render/pathTracer.mjs's furnace sphere, chosen because its geometry is EXACT AND ANALYTIC -- an integration checked against a shape whose answer is known is a measurement, and one checked against a mesh is an opinion about the mesh.",
+      gate: "physics/render/bssrdfSample-selfcheck.mjs" },
+    { id: "microsurface-walk", device: null, page: "instrument-bench.html", name: "Microsurface random walk", area: "render",
+      measures: "A random-walk ground truth on a GGX microsurface, turning v4445's multiple-scattering bound into a number.",
+      key: "v4445 WIRED THE MULTI-SCATTER TERM IN AND COULD ONLY BOUND IT, and its honest scope said exactly that: 'a coloured metal is NOT claimed correct -- two exact bounds are asserted and the value between them is MEASURED rather than claimed. Pinning it would need a random-walk ground truth on a GGX microsurface, which is NOT here and is the honest next step.' This is that walk. The method is Heitz, Hanika, d'Eon and Dachsbacher 2016, 'Multiple-Scattering Microfacet BSDFs with the Smith Model' -- a paper rather than a vendored implementation, so what is asserted is the paper's construction and not somebody's code for it.",
+      gate: "physics/render/microsurfaceWalk-selfcheck.mjs" },
+    { id: "dielectric-walk", device: null, page: "instrument-bench.html", name: "Rough dielectric random walk", area: "render",
+      measures: "Ground truth for the rough dielectric: reflection and transmission from a bounce simulation, against Walter's single-scatter BTDF.",
+      key: "VALIDATED TWICE BEFORE IT WAS BELIEVED, WHICH IS WHAT LICENSES READING IT AGAINST THE CLOSED FORM. At alpha 0.002 the walk gives R 0.050833 and T 0.949167 against the exact Fresnel equations' 0.050917 and 0.949083 -- a bounce simulation arriving at an answer graded rounds earlier -- and R + T is EXACTLY 1.000000 at every roughness with ZERO stuck paths, which is what makes the split a measurement rather than a normalisation. *** THE VERDICT IS SHARPER THAN v4436'S ACCUSATION: THE BTDF OVER-COUNTS ITS OWN SINGLE-SCATTER LOBE BY A FACTOR OF FOUR. *** At alpha 1, cosO 0.25, Walter's BTDF says T = 1.244351; the walk's SINGLE-BOUNCE transmission is 0.306750 and its FULL multiple-scattering total is 0.953675. The innocent explanation -- that the excess was absent multiple scattering -- is RULED OUT, because a missing term cannot make the complete answer smaller. A second finding along the way: a rougher dielectric transmits MORE and reflects LESS (T 0.9475 to 0.9791, R 0.0509 to 0.0199), the opposite of the conductor's story. NO FIX IS OFFERED: the lobe is convicted and left convicted, which is smaller and more honest than a repair nobody has validated.",
+      gate: "physics/render/dielectricWalk-selfcheck.mjs" },
+    { id: "btdf-domain", device: null, page: "instrument-bench.html", name: "Where the BTDF over-counts", area: "render",
+      measures: "Half of the source of Walter's BTDF excess -- and that half turns out not to be a term of the equation at all.",
+      key: "THREE ROUNDS NARROWING ONE NUMBER, EACH SAYING PLAINLY WHAT IT COULD NOT YET SAY. v4436 MEASURED the excess. v4447 PROVED IT WAS REAL and ruled out the innocent explanation, closing by naming two suspects -- the height-correlated G2 and the refraction Jacobian -- and judging the walk 'now sharp enough to tell them apart'. It is, and THE VERDICT IS SPLIT: the Jacobian is INNOCENT, G2 is GUILTY, and there is a THIRD defect neither round had thought to suspect. This file convicts the third, and the reason it went unsuspected is that IT IS NOT IN ANY TERM OF EQUATION 21 -- every earlier search looked term by term at an equation whose terms were not where the fault was.",
+      gate: "physics/render/btdfDomain-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

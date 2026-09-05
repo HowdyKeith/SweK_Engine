@@ -309,11 +309,35 @@ async function uploadAsset({ repo, releaseId, filePath, uploadUrl } = {}) {
     const fname = path.basename(filePath);
     const data = fs.readFileSync(filePath);
     try {
-        const r = await _to(base + "?name=" + encodeURIComponent(fname), { method: "POST", headers: _hdrs({ "Content-Type": "application/octet-stream", "Content-Length": String(data.length) }), body: data }, 180000);
+        // *** THE 180-SECOND CAP WAS A TYPED CONSTANT THAT ASSUMED A FAST UPLINK, AND IT LOST A RELEASE. ***
+        // v4460 published with `"assets": []` -- release created, tag pushed, CI fired, NO ZIP. A release with
+        // no asset is invisible to fetchEngineBuild and scanDownloads, which match the installable zip BY
+        // NAME, so the fleet could not update from a release that looked published. The engine zip is ~32 MB
+        // and 180 s of it demands 1.5 Mbps SUSTAINED; below that the AbortController fires mid-flight and the
+        // release is left empty. Domestic upstream is routinely slower than that.
+        //
+        // DERIVED FROM THE FILE, NOT A BIGGER GUESS. A larger magic number would be the same defect with more
+        // headroom; this states a floor RATE and lets the size decide the time. 50 KB/s is deliberately
+        // pessimistic -- roughly 400 kbps, slower than almost any real link -- so the timeout stops being the
+        // thing that fails while a genuine hang still ends.
+        const MIN_UPLOAD_BYTES_PER_S = 50 * 1024;
+        const upMs = Math.max(180000, Math.ceil(data.length / MIN_UPLOAD_BYTES_PER_S) * 1000);
+        const r = await _to(base + "?name=" + encodeURIComponent(fname), { method: "POST", headers: _hdrs({ "Content-Type": "application/octet-stream", "Content-Length": String(data.length) }), body: data }, upMs);
         const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch {}
         if (!r.ok) return { ok: false, status: r.status, error: (j && j.message) || ("upload HTTP " + r.status) };
         return { ok: true, name: j.name, size: j.size, url: j.browser_download_url };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) {
+        // An AbortError and a refused connection produced the same sentence, and the release is ALREADY
+        // CREATED by the time this runs -- so the one message somebody reads has to say which happened and
+        // what state the release was left in.
+        const msg = String((e && e.message) || e);
+        const aborted = /abort/i.test(msg) || (e && e.name === "AbortError");
+        return { ok: false, timedOut: aborted, bytes: data.length, error: aborted
+            ? "upload TIMED OUT after " + Math.round(upMs / 1000) + "s for " + (data.length / 1048576).toFixed(1) +
+              " MB (floor assumed 50 KB/s). THE RELEASE EXISTS AND HAS NO ASSET -- delete it and re-publish, " +
+              "or attach the zip on the release page by hand."
+            : msg };
+    }
 }
 
 // one-shot: "set a version for our repo and upload a new version from our panel"
@@ -327,7 +351,11 @@ async function publishVersion({ repo, tag, name, body, assetPath, draft, prerele
 
 // v1129 — one click: auto-tag from the running engine version, build the Gmail-safe
 // engine zip, and publish it as a release asset. The whole "cut a new version" flow.
-async function publishEngineBuild({ repo, notes, draft, prerelease } = {}) {
+// v4451 -- wrapped for the same reason: this one packs a ~30 MB zip and uploads it, and an update restart
+// inside the upload leaves a release whose asset never finished arriving -- which the installer would then
+// scan for and not find.
+async function publishEngineBuild(a) { return _tracked("an engine release", () => _publishEngineBuildInner(a || {})); }
+async function _publishEngineBuildInner({ repo, notes, draft, prerelease } = {}) {
     const c = loadCfg();
     repo = repo || c.engineRepo || c.defaultRepo;
     if (!effTok()) return { ok: false, error: "a personal access token (repo scope) is required" };
@@ -386,7 +414,9 @@ function _run(cmd, args, opts) {
     });
 }
 
-async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
+// v4451 -- wrapped so the updater can see it; the body is unchanged and is now _cloneEngineSourceInner.
+async function cloneEngineSource(a) { return _tracked("a source clone", () => _cloneEngineSourceInner(a || {})); }
+async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     const c = loadCfg();
     repo = (repo || c.engineRepo || c.defaultRepo || "").trim();
     if (!repo) return { ok: false, error: "no repo (set engineRepo in Account, or pass repo)" };
@@ -1053,4 +1083,29 @@ async function ledgerCheck() {
     catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 }
 
-module.exports = { ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+// =====================================================================================
+// v4451 -- IN-FLIGHT STATE FOR THE LONG GITHUB OPERATIONS, BECAUSE THE UPDATER COULD NOT SEE THEM.
+//
+// Keith: "we need to make sure that the running swek does not start an auto update that kills the github
+// tasks." server.js has deferred auto-updates during a live test run since v3075, but _testRunActive() asks
+// render QA, the gate suite and the rig runner -- and NOTHING in this file, which is where the two longest
+// GitHub operations live: cloneEngineSource walks several hundred megabytes over the network, and
+// publishEngineBuild packs a ~30 MB zip and uploads it. An update restart landing inside either leaves a
+// half-written clone directory or, worse, a release whose asset never finished going up.
+//
+// A COUNTER RATHER THAN A BOOLEAN, AND THE SHAPE IS THE ONE updatePause-selfcheck ALREADY BLESSES for
+// gatesBridge: incremented before the work, decremented in a finally so no throw can strand it, and floored
+// at zero because "a stuck-negative counter would report idle forever, which is the failure mode that matters
+// here". A boolean would be wrong the moment two operations overlap -- which they can, since nothing in this
+// file serialises them.
+let _ghBusy = 0, _ghWhat = "";
+async function _tracked(what, fn) {
+    _ghBusy++; _ghWhat = what;
+    try { return await fn(); }
+    finally { _ghBusy = Math.max(0, _ghBusy - 1); if (!_ghBusy) _ghWhat = ""; }
+}
+/** Is a long GitHub operation in flight? Read by server.js's update deferral. */
+function busy() { return _ghBusy > 0; }
+function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
+
+module.exports = { busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

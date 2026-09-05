@@ -18,13 +18,14 @@
 // AND A KNOB THAT REFUSES A VALUE IS LIVE. A knob that rejects what it is handed is read by the code -- a
 // refusal is a response. Counting it dead would mark the best-behaved knobs in the lab as the broken ones.
 "use strict";
-import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
+import { knobLiveness, reportLines, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
          PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob, choicesFor,
          partialDeafness, deafnessUnanswered, LIST_CLAIMS, unusedInMode, jointlyLive } from "./knobLiveness.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
+import { overNonEmpty } from "../ship/vacuity.mjs";
 import { kuramotoDevice } from "./kuramotoBind.mjs";
 import { COMPOSE_KNOB_CHOICES } from "./composeBind.mjs";
 import { BASES } from "../../physics/crystal/structureFactor.mjs";
@@ -920,6 +921,48 @@ console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
               + "entry would silently swallow the knob going still again."
             : "STALE, DELETE THESE: " + stale.join("; ") + " -- an entry whose reason has expired is an ACTIVE "
               + "BLIND SPOT. THE RIGHT RESPONSE IS DELETION, NOT LOOSENING (v3195).");
+}
+
+// ---- THE CENSUS HAS A BUDGET OF ITS OWN, AND A PARTIAL CENSUS MUST SAY SO ---------------------------
+//
+// *** THE BUDGET GUARDED THE DEVICE AND NOTHING GUARDED THE CENSUS. *** budgetMs is spent PER DEVICE and the
+// registry holds 129, so reportLines() -- this module's front door on the reportLines convention, and the one
+// caller in the tree that does not pass `only:` -- attempted the whole thing. Measured with no budget at all
+// it RETURNS AFTER 989.8 s: 16.5 minutes, 767 lines. Not a hang, which is what tools/ship/reportDoors.mjs had
+// recorded after giving up at 90 seconds, and the difference between "hangs" and "takes sixteen minutes"
+// calls for different repairs.
+//
+// THE DANGEROUS FAILURE IS NOT THE TIME, IT IS THE VERDICT. This file's header records twice that a reading
+// can be entirely an artefact of the question -- eight dead knobs on `quantum` that were live in a mode the
+// probe never entered, and a knob read only on the planted branch. A census that stops early and still prints
+// "MOVES NOTHING ANYWHERE" is the same shape a third time, at the scope of the whole registry.
+{
+    const t0 = Date.now();
+    // *** 1200 ms LEFT ZERO ROWS AND THE "not reached is not dead" CHECK PASSED ON AN EMPTY LIST -- the
+    // third unreachable guard this session, after contractOf's fixtures and reportDoors' never-call list. The
+    // budget is set to leave BOTH populations non-empty, and rows.length > 0 is part of the assertion so it
+    // cannot go vacuous again if a device gets slower. ***
+    const { rows, notReached, devicesAsked } = await knobLiveness({ totalBudgetMs: 9000 });
+    const elapsed = Date.now() - t0;
+    report(`census with a 9000 ms budget: ${elapsed} ms, ${rows.length} rows, ${notReached.length} of ${devicesAsked} devices never reached`);
+    ok("!! the census budget bounds the census, not just each device",
+        notReached.length > 0 && devicesAsked === DEVICE_NAMES.length && elapsed < 120000,
+        `${notReached.length} of ${devicesAsked} devices left unreached in ${elapsed} ms. Without it the front ` +
+        "door attempts all 129 and takes 989.8 s.");
+    // v4459 -- the `rows.length > 0` above was bolted on after this check passed on an EMPTY census; the
+    // helper says the same thing where a reader will see it, and names the failure it is guarding against.
+    ok("!! *** AND NOT REACHED IS NOT DEAD: no knob of an unreached device is called still ***",
+        rows.length > 0 && overNonEmpty(notReached, () => true) &&
+        stillKnobs(rows).every((k) => !notReached.some((d) => k.startsWith(d + "."))),
+        "a device the census never entered contributes no rows, so it cannot be counted dead -- asserted " +
+        "rather than assumed, because this file has twice reported a verdict that was an artefact of the " +
+        "question and this is the same shape at registry scope.");
+    const L = await reportLines({ totalBudgetMs: 9000 });
+    const scoped = L.find((x) => /MOVES NOTHING ANYWHERE/.test(x)) || "";
+    ok("!! ...and the summary line names the scope it was computed over",
+        /devices reached/.test(scoped) && L.some((x) => /DID NOT REACH/.test(x)),
+        `"${scoped.trim().slice(0, 70)}" -- a whole-tree phrase over a partial census is a claim the run did ` +
+        "not earn. Dropping the qualifier prints 'MOVES NOTHING ANYWHERE: none' from a third of the tree.");
 }
 
 console.log("\n" + (fails ? "knobLiveness-selfcheck: " + fails + " FAILED" : "knobLiveness-selfcheck: all checks pass"));

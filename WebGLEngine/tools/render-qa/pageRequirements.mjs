@@ -44,7 +44,17 @@ export const CAPABILITIES = {
     // The tell is the IMPORT, not a followed chain: this scanner is deliberately one-file, and resolving
     // imports would make it a second module graph beside the one orphanScan already maintains.
     webgl2:      (s) => /getContext\(\s*["'`]webgl2["'`]/.test(s) || /\bacquireGL\b/.test(s) || /glBootstrap/.test(s),
-    webgpu:      (s) => /navigator\.gpu\b/.test(s),
+    // *** v4452 -- THE TELL IS THE IMPORT, AND THIS LINE ONLY EVER KNEW ONE SPELLING OF THE NEED. ***
+    // The rule this file states for webgl2 -- match the direct call OR the import that performs it -- was
+    // never applied here. MEASURED: of 28 GPU-shaped pages, 26 were derived correctly and TWO were not.
+    // gfx-device.html and nebula-device.html hold their WGSL in a string and get the device from
+    // ./gfx/device.js, which calls navigator.gpu four times; three.js pages reach it through WebGPURenderer,
+    // which does the same inside the library. Both would be RUN on a box with no adapter and reported FAILED
+    // -- the collapse of "unsupported" into "broken" that v3120's law exists to prevent, and that --have was
+    // built to honour. Still ONE FILE and still no followed chain: these are import spellings, read from the
+    // page's own text, which is exactly what the webgl2 line above already does with acquireGL/glBootstrap.
+    webgpu:      (s) => /navigator\.gpu\b/.test(s) || /gfx\/device\.js/.test(s) ||
+                        /\bWebGPURenderer\b/.test(s) || /three\/webgpu/.test(s),
     float_target:(s) => /EXT_color_buffer_float/.test(s),
     worker:      (s) => /new\s+Worker\s*\(/.test(s),
     camera:      (s) => /getUserMedia\s*\(/.test(s),

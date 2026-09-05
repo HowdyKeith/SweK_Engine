@@ -107,6 +107,24 @@ export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
  * 3x on a 280s gate would stall a suite for fourteen minutes before admitting anything was wrong.
  */
 export const MEASURED = {
+    // *** v4456 -- MEASURED BECAUSE IT HAD NO EVIDENCE AT ALL, WHICH IS THE STATE THIS TABLE EXISTS TO END. ***
+    // physics/render/transmission-selfcheck.mjs was widened on the other branch (the chi+ and beta-G2 round)
+    // from a gate that finished inside the quick sweep's 3000 ms cap to one that does not. The sweep kills it
+    // at the cap with a 124, a 124 says nothing, and so it fell into "never run" -- the fourth state this
+    // gate's own header calls the one that hides things. It is not slow by accident: it now integrates the
+    // transmitted lobe over four G forms at several roughnesses, which is the measurement that round is FOR.
+    //
+    // FIVE RUNS, ALL EXIT 0: 20387, 20480, 15175, 15405, 13477 ms. The spread is load, not variance in the
+    // gate -- the two twenty-second readings were taken while a ship verify was running on the same box. The
+    // SLOWEST is recorded rather than the mean, because this is a budget and a budget set to the average of a
+    // contended measurement re-creates the timeout it is meant to prevent.
+    "physics/render/transmission-selfcheck.mjs": 20480,
+    // *** v4457 -- MEASURED AT BIRTH, so it never enters the "never run" state the entry above was rescued from. ***
+    // tools/ship/slugWgsl-selfcheck.mjs runs the WGSL Slug core on the headless Dawn device over ~130,000
+    // samples across eight dispatches, plus five compiles and two dilation probes; that is over the quick
+    // sweep's 3000 ms cap by construction, not by accident. FIVE RUNS, ALL EXIT 0: 5412, 5341, 5235, 5252,
+    // 5284 ms on an otherwise idle box. The SLOWEST is recorded, per the entry above.
+    "tools/ship/slugWgsl-selfcheck.mjs": 5412,
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

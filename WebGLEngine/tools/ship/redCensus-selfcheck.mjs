@@ -15,10 +15,29 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { RED_AT_V4279, RECORDED_BUT_GREEN, FIXED_AT_V4279, FIXED_SINCE_V4279, RECOVERED_SINCE_V4279,
+import { RED_AT_V4279, FIXED_AT_V4279, FIXED_SINCE_V4279, RECOVERED_SINCE_V4279,
          RECHECK_V4313, RECHECK_V4314,
-         METHOD, runGate, censusCostMs, ENG,
+         METHOD, runGate, censusCostMs, ENG, UNVERIFIED_LINE,
          UNCONFIRMED_SLOW, SLOW_PARTIAL } from "./redCensus.mjs";
+
+// *** v4451 -- THIS FILE HAD BEEN DEAD AT IMPORT SINCE v4430, AND THE BUDGET IS WHY NOBODY SAW IT. ***
+//
+// v4430 ("the audit is the source now -- the register keeps only what the audit cannot know") deleted
+// RECORDED_BUT_GREEN from redCensus.mjs, correctly: it was a FROZEN COPY of a set this file already derives
+// four lines later as `stale`, and a frozen copy of a derivable thing is the exact defect that round existed
+// to remove. What it did not do was update the one importer. From v4430 to v4451 this gate threw
+// "does not provide an export named 'RECORDED_BUT_GREEN'" before its first check ran.
+//
+// *** IT WENT TWENTY-ONE ROUNDS UNSEEN BECAUSE IT IS BUDGETED AT 140,941 ms. *** The quick sweep runs
+// everything under 3,000 ms, so this gate is excluded from every ship -- and the budget that excludes it was
+// measured on a version that RAN. A gate that now dies in 40 ms is filed as one that takes two and a half
+// minutes, so the very number that describes it is what hides it. THE CHEAPEST POSSIBLE FAILURE WAS THE ONE
+// NOTHING LOOKED AT.
+//
+// Derived here, from the same two inputs, so there is no copy left to go stale and nothing to keep in step.
+const _timings = JSON.parse(fs.readFileSync(path.join(ENG, "tools/ship/gate-timings.json"), "utf8"));
+const _nowRed = new Set(RED_AT_V4279.map((e) => e.gate));
+const RECORDED_BUT_GREEN = Object.keys(_timings.failingAt || {}).filter((g) => !_nowRed.has(g));
 
 let fails = 0;
 const ok = (n, c, d) => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -84,14 +103,34 @@ console.log("\n3. *** THE OLD RECORD WAS WRONG IN BOTH DIRECTIONS, AND BOTH ARE 
     const stale = recorded.filter((g) => !nowRed.has(g));
     ok("*** and most of it is stale: the entries it lists that are NOT red now ***", stale.length >= 10,
         stale.length + " of " + recorded.length);
-    ok("  which is exactly the set RECORDED_BUT_GREEN names, so the two agree",
-        stale.length === RECORDED_BUT_GREEN.length && stale.every((g) => RECORDED_BUT_GREEN.includes(g)),
-        RECORDED_BUT_GREEN.length + " named");
+    // v4451 -- WAS "which is exactly the set RECORDED_BUT_GREEN names, so the two agree", comparing this
+    // derivation against a frozen copy of itself in redCensus.mjs. v4430 deleted that copy and this file kept
+    // importing it, which is why nothing here ran for twenty-one rounds. Comparing a derivation to a copy of
+    // itself was never the check it read as; what is worth asserting is that every name still points at a
+    // FILE, since a stale accusation against a gate that no longer exists is a different and quieter kind of
+    // fiction than one against a gate that passes.
+    ok("  and every wrongly-accused name still points at a file that exists",
+        stale.length === RECORDED_BUT_GREEN.length && stale.every((g) => fs.existsSync(path.join(ENG, g))),
+        stale.length + " named, all present on disk. A register entry naming a deleted gate cannot be " +
+        "disproved by running it, so it would sit there forever looking like a finding");
 
     // *** AND THE OTHER DIRECTION, WHICH IS THE LARGER ONE. ***
-    const unrecorded = RED_AT_V4279.filter((e) => !recorded.includes(e.gate));
+    // *** v4451 -- THIS ASKED A QUESTION ABOUT v4279 AND MEASURED IT AGAINST TODAY'S REGISTER. ***
+    // The claim is historical: at v4279, most of what was red had never been recorded. RED_AT_V4279 is not
+    // that set -- it is the LIVE register, shrunk every time somebody repairs a gate and prunes the entry,
+    // which sections 2 and 5 of this file demand they do. So each repair moved the left-hand side of a
+    // comparison about a frozen moment, and the claim went false BECAUSE THE WORK THE CENSUS ASKS FOR WAS
+    // DONE. Eight repairs later it was red. The v4279 set is reconstructed from the terms the identity above
+    // already reconciles, so the historical claim is measured against history.
+    const atV4279 = new Set(RED_AT_V4279.map((e) => e.gate));
+    for (const f of FIXED_SINCE_V4279) atV4279.add(f.gate);
+    for (const r of RECOVERED_SINCE_V4279) atV4279.delete(r.gate);   // entered the set AFTER v4279, so not of it
+    const unrecorded = [...atV4279].filter((g) => !recorded.includes(g));
     ok("*** most of what IS red was never recorded at all ***", unrecorded.length > recorded.length,
-        unrecorded.length + " red gates absent from the older register");
+        unrecorded.length + " of the " + atV4279.size + " red at v4279 were absent from the older register, " +
+        "against " + recorded.length + " it did list. RECONSTRUCTED (live register + repaired since - " +
+        "recovered since) rather than read off RED_AT_V4279, which repairs shrink -- a claim about a moment " +
+        "measured against a moving set goes false the day somebody does the work it asked for");
     report("appended-to-only, a register becomes a list of grievances; never appended to, a list of fiction. " +
         "That one managed both at once, which is only possible if nobody ever re-ran it.");
 
@@ -140,9 +179,19 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
         `${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered - ` +
         `${FIXED_AT_V4279.length} fixed at v4279 - ${FIXED_SINCE_V4279.length} fixed since + ` +
         `${RECOVERED_SINCE_V4279.length} recovered since = ${RED_AT_V4279.length}`);
+    // *** v4451 -- e.ms === r.ms COULD NOT HOLD FOR THE ONE ENTRY THIS LIST HAS, AND v4430 SAID SO IN ADVANCE. ***
+    // Since v4430 `e.ms` is a GETTER over register-audit.mjs, and that audit caps its runs: shaderRefs takes
+    // 379,838 ms and the cap ends it at 120,081, which is why v4430 gave that gate an UNVERIFIED_LINE entry
+    // reading "NOT a stale reading -- an absent one". The equality was written when both numbers were typed by
+    // hand into the same file; it was never updated when one of them became a measurement the instrument
+    // cannot take. A gate whose runtime EXCEEDS the audit's reach must be allowed to say so, and must still be
+    // pinned to the number that was actually measured serially -- so the check is that the recovered reading
+    // is the LARGER one and that the discrepancy is declared, rather than that two instruments agree when one
+    // of them was cut off.
     ok("  ...and every RECOVERED gate is IN the red set and OUT of the timeout bucket, with its measurement",
         RECOVERED_SINCE_V4279.every((r) =>
-            RED_AT_V4279.some((e) => e.gate === r.gate && e.ms === r.ms) &&
+            RED_AT_V4279.some((e) => e.gate === r.gate &&
+                (e.ms === r.ms || (UNVERIFIED_LINE[r.gate] && r.ms > e.ms))) &&
             !UNCONFIRMED_SLOW.includes(r.gate) && r.ms > 0 && r.method && r.why.length > 40),
         RECOVERED_SINCE_V4279.map((r) => r.gate.split("/").pop() + " " + r.verdict + " at " +
             (r.ms / 1000).toFixed(1) + "s (" + r.round + ")").join(", ") +

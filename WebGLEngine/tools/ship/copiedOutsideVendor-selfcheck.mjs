@@ -47,11 +47,29 @@ console.log("1. *** THE GAP IS STRUCTURAL, and both halves of it are asserted ag
     ok("vendor/ holds " + dirs.length + " directories, which is the orrery's whole population",
         dirs.length >= 12, dirs.join(" "));
     // *** AND A SECOND DIRECTORY CALLED vendor EXISTS AND IS NOT IN IT. ***
-    const nested = execSync("find . -type d -name vendor -not -path './node_modules/*'", { cwd: ROOT })
+    // *** v4461: THIS COUNTED DIRECTORY ENTRIES AND WENT RED OVER AN EMPTY ONE. *** A stray empty
+    // ai-bridge/vendor/ (Aug 17, untracked -- git cannot track an empty directory, so it exists in a working
+    // checkout and in no fresh clone) made this read three. The finding here is "vendored CODE sits where the
+    // orrery does not look"; a directory holding nothing holds no code, so counting entries was a proxy
+    // standing in for the fact -- and a proxy that makes the gate green or red depending on litter in
+    // somebody's checkout. Counted by CONTENT now, and the message prints each one's file count so an empty
+    // one is visibly empty rather than silently dropped.
+    const allNested = execSync("find . -type d -name vendor -not -path './node_modules/*'", { cwd: ROOT })
         .toString().trim().split("\n").map((s) => s.replace(/^\.\//, "")).sort();
-    ok("*** there are TWO directories named vendor, and the orrery scans one ***",
+    const fileCount = (rel) => {
+        let n = 0;
+        (function walk(d) {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                if (e.isDirectory()) walk(path.join(d, e.name)); else n++;
+            }
+        })(path.join(ROOT, rel));
+        return n;
+    };
+    const counts = new Map(allNested.map((rel) => [rel, fileCount(rel)]));
+    const nested = allNested.filter((rel) => counts.get(rel) > 0);
+    ok("*** there are TWO directories named vendor THAT HOLD ANYTHING, and the orrery scans one ***",
         nested.length === 2 && nested.includes("vendor") && nested.includes("ui/vendor"),
-        nested.join(" and "));
+        allNested.map((rel) => rel + " (" + counts.get(rel) + " files)").join(" and "));
 
     // *** seenBy IS THE CLAIM THE WHOLE ROUND RESTS ON, AND NOTHING CHECKED IT. *** Sabotage D filled it in
     // with ["orrery"] for both copies and went 0 RED -- a register asserting its own central finding in a
@@ -243,3 +261,18 @@ console.log("unchecked here: WHETHER THE REPRODUCED LICENCE TEXT MATCHES UPSTREA
     "notice at all would be invisible to it by definition; and the DENSO WAVE trademark notice in " +
     "ui/vendor/qrcode.mjs, which is reproduced but is not a licence term and has had no thought given to it.");
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, the vendor-directory count after it stopped counting directory ENTRIES.
+// Graded on exit codes; the stray empty directory that started this was created and removed by the harness.
+//
+//   E  a third vendor directory (ai-bridge/vendor/) given ONE file.
+//      -> exit 1. Content is what the check is about, so a directory that gains code is a red where the same
+//      directory sitting empty is not.
+//
+//   F  ui/vendor emptied of its two files, then restored.
+//      -> exit 1 in the other direction: the check is an equality on the set that holds anything, so a
+//      vendor tree going away is as much a finding as one arriving. A `>= 2` would have slept through it.
+//
+//   Clean tree: exit 0, with all three candidates and their file counts printed -- ai-bridge/vendor (0 files)
+//   and ui/vendor (2 files) and vendor (340 files) -- so the excluded one is VISIBLE rather than dropped.

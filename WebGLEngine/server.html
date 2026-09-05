@@ -1240,6 +1240,22 @@ window.addEventListener("load", function () {
           <button id="rqSeam" title="The chunk-boundary seam test: world-default, world-rle, world-biomes, world-rle-biomes, capturing baselines. Comparing the world-default and world-rle baselines IS the seam comparison, as a picture instead of a squint." style="font-size:12px;padding:6px 12px;background:#231a10;color:#e8c49a;border:1px solid #4a3622;border-radius:8px;cursor:pointer;">Seam test + baselines</button>
           <label style="font-size:11px;color:var(--dim);display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="Capture/refresh baselines for the subset above instead of just diffing against them"><input type="checkbox" id="rqOnlyBase"> update their baselines</label>
         </div>
+        <!-- v4452 -- *** THE CAPABILITY FLAG, WHICH SHIPPED AT v3171 AND HAS NEVER BEEN REACHABLE FROM HERE. ***
+             render-qa names every page it CANNOT JUDGE with the capability it is missing, before the browser
+             opens it, so "this box has no WebGPU adapter" and "this shader is broken" stay apart -- v3120's
+             law. renderQaBridge.run() took only/updateBaselines/base/video/all, so the flag existed and the
+             button could not send it, which is exactly the half-a-door v3563 named while fixing --all and
+             leaving this one. MEASURED: 26 of the 28 GPU-shaped pages in this tree derive "needs webgpu", and
+             on a box with no adapter all 26 come back FAILED rather than unjudgeable.
+             BLANK IS THE DEFAULT AND SKIPS NOTHING, because a green run over fewer pages than you think is
+             the failure that looks most like success. The set is stated by hand -- render-qa's own gate calls
+             detecting it "STILL NOT DONE" and so is this. -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+          <input id="rqHave" placeholder="this box HAS (blank = skip nothing) e.g. webgl2,webgpu,float_target,worker,audio,wasm"
+                 title="Passed as --have. Every page needing something absent from this list is named CANNOT JUDGE with what it is missing, instead of being run and failed.&#10;Capabilities are derived from each page's own source: webgl2, webgpu, float_target, worker, camera, audio, wasm, bridge.&#10;Blank skips nothing. A --have that matches no pages exits nonzero rather than reporting a clean sweep over zero pages."
+                 style="font-size:11px;padding:5px 8px;min-width:430px;background:#0c1410;color:#cfe9d8;border:1px solid var(--line);border-radius:6px;">
+          <span style="font-size:10px;color:var(--dim);">stated, not detected &mdash; and that is a known gap</span>
+        </div>
         <!-- v3048 - PER-PAGE LIST. status() only ever knew pages that had already RUN, so before a sweep there
              was nothing to pick from and the v3044 filter box needed a name you had to already know. This reads
              the DISCOVERED set from discover.mjs via /render-qa/pages -- the same walk the harness runs, imported
@@ -6197,7 +6213,15 @@ try{
       // ResizeObserver keeps it so, because a panel opening or a window resizing moves the box and a scene
       // measured once at mount is a typed constant that arrived late. The 223x210 that was here is gone
       // rather than kept as a fallback: a fallback nobody can reach is a number nobody re-derives.
-      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,sizeFromHost:true,minSize:120,probe:headProbe});
+      // v4451 -- A CEILING TO GO WITH v4413'S FLOOR. Measured on this page at four window widths, the surface
+      // ran 341 / 621 / 749 / 1005 px while the robot drawn inside it stayed 100 px at all four: the figure is
+      // HEIGHT-bound (viewBox 60x88 letterboxed into a 147 px-tall box) so every pixel of width past ~100 was
+      // empty. 420 is the cap and it is a judgement stated as one: it is about 2.3x the row's own 184 px
+      // rendered height, which leaves room for a scene twice the robot's width -- the gauges v4413 was asked to
+      // make space for -- and refuses the runaway beyond it. Below 420 nothing changes, so the panel still
+      // tracks its box on an ordinary laptop; the two numbers are the floor and the ceiling of the same box and
+      // are passed together for that reason.
+      const sw=mountAvatarSwitch({host:h,makeSvg:createSwekRobot,sizeFromHost:true,minSize:120,maxSize:420,probe:headProbe});
       window._avatarSwitch=sw;
       // v3557 -- THE FAVOURITES STAR, under the mode switch. It owns NO favourites list of its own: it reads and
       // writes ui/kpopFavorites.js, the store the sandbox avatar cycle already uses, so a favourite set here
@@ -7244,7 +7268,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
   }
   function refresh(){ fetch("/render-qa/status",{cache:"no-store"}).then(function(r){return r.json();}).then(render).catch(function(){}); }
   function startPolling(){ if(poll) return; poll=setInterval(function(){ if(document.visibilityState!=="hidden") refresh(); },2000); }
-  runBtn.addEventListener("click",function(){ fetch("/render-qa/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(st){ if(st && st.installed===false){ if(!confirm("Install render-qa now? This runs npm install in tools/render-qa and downloads Chromium (a few hundred MB), one time - then it runs the QA.")) return; pendingRun=true; fetch("/render-qa/install",{method:"POST"}).then(function(r){return r.json();}).then(function(j){ if(j&&!j.ok&&j.error) running.textContent=j.error; startPolling(); refresh(); }); } else { fetch("/render-qa/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({video:!!(document.getElementById("rqVideo")||{}).checked})}).then(function(r){return r.json();}).then(function(j){ if(j&&!j.ok&&j.error) running.textContent=j.error; startPolling(); refresh(); }); } }); });
+  runBtn.addEventListener("click",function(){ fetch("/render-qa/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(st){ if(st && st.installed===false){ if(!confirm("Install render-qa now? This runs npm install in tools/render-qa and downloads Chromium (a few hundred MB), one time - then it runs the QA.")) return; pendingRun=true; fetch("/render-qa/install",{method:"POST"}).then(function(r){return r.json();}).then(function(j){ if(j&&!j.ok&&j.error) running.textContent=j.error; startPolling(); refresh(); }); } else { fetch("/render-qa/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({video:!!(document.getElementById("rqVideo")||{}).checked,have:((document.getElementById("rqHave")||{}).value||"").trim()||undefined})}).then(function(r){return r.json();}).then(function(j){ if(j&&!j.ok&&j.error) running.textContent=j.error; startPolling(); refresh(); }); } }); });
   baseBtn.addEventListener("click",function(){ if(!confirm("Capture NEW baseline screenshots from the current renders? Do this only when the pages look right.")) return; fetch("/render-qa/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updateBaselines:true})}).then(function(r){return r.json();}).then(function(){ startPolling(); refresh(); }); });
   reportBtn.addEventListener("click",function(){ window.open("/render-qa/out/report.html","_blank"); });
   // v3126 -- the two files the visual report cannot replace. report.html is for LOOKING; report.json is the only
@@ -7272,7 +7296,12 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
         // v3563 -- the harness caches by page FINGERPRINT and documents --all as the override; this bridge never
         // passed it, so a FULL sweep was reachable only from the command line. A front door that cannot reach a
         // flag the tool documents is half a door. Left OFF by default: v2598 built that cache on purpose.
-        all:!!(document.getElementById("rqAll")||{}).checked})})
+        all:!!(document.getElementById("rqAll")||{}).checked,
+        // v4452 -- and --have, for the same reason one flag along: v3563 fixed --all and left this one, so
+        // the capability-skip mechanism v3171 built could only be used from a terminal. Read from ONE input
+        // by both this path and the sweep button, so a per-page run and a full sweep cannot disagree about
+        // what the box is claimed to have.
+        have:((document.getElementById("rqHave")||{}).value||"").trim()||undefined})})
       .then(function(r){return r.json();}).then(function(j){ if(j&&!j.ok&&j.error) running.textContent=j.error; startPolling(); refresh(); });
   }
   document.getElementById("rqRunOnly").addEventListener("click",function(){
