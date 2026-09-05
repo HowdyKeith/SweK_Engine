@@ -1821,6 +1821,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "glyphs at width 128, where 432 of 965 band headers point past their own row. Five runs 5,235 to " +
                  "5,412 ms, all exit 0; the slowest is the MEASURED budget.",
     }),
+    since79: Object.freeze({
+        at: "v4459", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/vacuity-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, five runs of five, 0.043 s -- the cheapest gate this ledger has ever closed, because " +
+                 "its subject is a SHAPE rather than a device. vacuity.mjs names the 0-RED sabotage as ONE " +
+                 "SYMPTOM WITH FOUR CAUSES -- an empty collection under every(), an unreachable branch, a guard " +
+                 "sitting downstream of the classification it depends on, and a harness that damaged what it was " +
+                 "measuring -- and supplies overNonEmpty and emptyOfNonEmpty so the empty case cannot be " +
+                 "forgotten at the call site. *** THE TREE-WIDE SCAN FOR THE FIRST CAUSE WAS REFUSED RATHER THAN " +
+                 "SHIPPED: *** 948 of 1,482 gates use the shape, and a census that flags 64% of the tree is one " +
+                 "nobody reads, so the refusal is recorded with its number instead of a report nobody would act " +
+                 "on. NOT CLAIMED: that the four causes are exhaustive -- they are the four this session " +
+                 "actually met, and the record says so.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

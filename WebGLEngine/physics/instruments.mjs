@@ -1378,9 +1378,22 @@ export const INSTRUMENTS = [
     {
         // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
         id: "slug-wgsl", area: "render", name: "The Slug shader in WGSL, held to the CPU key on a device",
-        gate: "tools/ship/slugWgsl-selfcheck.mjs",   // pageless: a standalone gate with no reportLines() module, which the bench cannot serve
+        // v4459: `page` was DECLARED IN A COMMENT here and the field was left undefined, so v4457 shipped
+        // this entry with instruments-selfcheck red on "every entry DECLARES a page, even if that
+        // declaration is `null`" -- the whole point of that check being that forgetting the field and
+        // choosing no page are different states. A sentence beside a field is not the field.
+        page: null,   // pageless: a standalone gate with no reportLines() module, which the bench cannot serve
+        gate: "tools/ship/slugWgsl-selfcheck.mjs",
         measures: "Coverage from the WGSL Slug core run as a compute probe on the headless Dawn device, sample by sample against text/slugEval.js on the same packed atlas bytes and against the flattened-segment winding number; the row-wrap and three transliteration plants; SlugDilate's screen displacement against its closed form.",
         key: "*** THE SHADER THAT SHIPS IS THE SHADER THAT IS GRADED, NOT A COPY OF IT. *** slugShaderWgsl.js keeps the Slug fragment core -- root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender -- as ONE string, and both the render module and the compute probe interpolate it. Section 1 asserts that text identity before anything runs, because a probe that carried its own copy of the loop would be grading itself.",
+    },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule: the key is a
+        // claim about what an instrument establishes, and such a claim is read, never composed.
+        id: "vacuity", area: "ship", name: "The 0-RED sabotage: one symptom, four causes",
+        page: "instrument-bench.html", gate: "tools/ship/vacuity-selfcheck.mjs",
+        measures: "The four ways a control can be unable to fail, each named from a real instance, and the tree-wide census of the one shape a scanner could find -- reported as a refusal with its number.",
+        key: "*** THIS TREE'S STANDING RULE IS \"A CONTROL THAT CANNOT FAIL IS DECORATION\", AND ONE SESSION PRODUCED FOUR INSTANCES OF IT IN GATES WRITTEN THAT SAME SESSION. *** Every one surfaced the same way and only that way: a sabotage that went 0 RED. The ship ritual already says a 0-RED sabotage is a finding rather than a pass. What it does not say -- and what cost four rounds to learn -- is that THE SYMPTOM IS ONE AND THE CAUSES ARE FOUR, so there is nothing to search for: an empty collection under every(), a branch the population never enters, a guard an earlier test already implies, and a harness that corrupted what it measured. *** AND THE SCAN IS REFUSED, WITH THE NUMBER AS THE REASON: *** 3,206 such assertions in 948 of 1,482 gates -- SIXTY-FOUR PER CENT OF THE GATES -- so a census of them is a report nobody reads, and only the FIRST mechanism is mechanically preventable at all.",
     },
 ];
 
