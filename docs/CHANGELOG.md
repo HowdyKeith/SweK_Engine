@@ -14,6 +14,103 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      wearing one number with different bytes is what jams the peer auto-update fleet-wide, and main's
      own history renumbered twice for exactly this. The rounds themselves are unchanged. -->
 
+## v4460 -- TWO GATES THAT COULD NOT FAIL, AND ONE HAD BEEN GREEN OVER A WRONG ANSWER FOR FORTY-TWO VERSIONS
+
+### THE GATE THAT WROTE THE KEY IT GRADED
+
+`universeWire-selfcheck` computed the cross-engine economy key, **wrote** it to
+`tools/ship/universe-hash-expected.json`, and then asserted against the file it had just written. The browser
+half read AGREES because it fetched a file the same run had produced a second earlier. **THE WHOLE CHAIN
+AGREED WITH ITSELF** -- ALL GREEN, exit 0, and the gate sits in no red register because it was never red.
+
+*** v4316's OWN SABOTAGE LOG NAMED THE DEFECT AND THE FIX. *** It reads: "the file another engine checks
+against is the one COMMITTED, not the one a page computes." True of the intent and false of the mechanism,
+for 144 rounds.
+
+    committed key   2ac2a467          the tree computes   df581d2d, five fresh processes for five
+
+### AND MY FIRST TWO ATTRIBUTIONS WERE WRONG, BOTH READ OFF A DIFF HUNK RATHER THAN MEASURED
+
+I wrote that the key moved because vendored dependencies changed SIZE -- and `radiusFor` really is the cube
+root of a body's byte count, so it reads true. **The sabotage that reproduced the historical change went
+0 RED**, and measuring it properly showed why: 964 bytes added to each of the FIFTEEN bodies *in turn* moves
+the hash **not at all**. `bytes` sets a body's drawn radius and the economy integrates none of it.
+
+*** THE PLANT THAT "FAILED" WAS THE ONE TELLING ME THE EXPLANATION WAS WRONG. *** It is kept as a permanent
+negative control that must stay 0 RED, with the same negative asserted in the record as a number.
+
+Bisected file by file and then field by field, the real causes:
+
+    v4414  43f055b1   every body's ARRIVAL DATE rewritten to 2026-08-31, 14 of 15. A body's orbit is set by
+                      its age, so THE WHOLE SKY MOVED -- different orbits, flight times, trades.
+    v4416  df581d2d   PROVENANCE.txt ATTRIBUTION FILES added to six dependencies. stockOfFiles turns every
+                      file into cargo at max(1, round(bytes / 4096)), and all six are under 1 KB, so each
+                      rounds to ZERO and is lifted to a full ton.
+
+*** SIX TONS OF `docs` APPEARED IN THE ECONOMY BECAUSE SOMEBODY WROTE DOWN WHO OWNS THE CODE *** -- 4,049
+bytes of attribution, six tons of freight. Neither round was about the economy and neither did anything
+wrong: the economy is stocked from the tree and the tree gained files. **The defect is the gate.**
+
+It COMPARES now and goes red on a mismatch; writing is behind `--write`; `--write` passes only if the drift
+record already names the hash being baked, so the reason is owed at the moment the number moves; and the
+bytes are re-read after the comparison, so *this gate did not touch the file it grades* is asserted by
+mechanism. **A comparison against a file the comparer may have written is not a comparison.**
+
+### THE MIRROR standingReds NEVER HAD
+
+`sweepCoverage` is careful in ONE direction -- a nonzero exit code beside a killed process is not a failure --
+and nobody ever asked the other. A ZERO beside an over-budget reading is not a pass either: `quickSweep`
+writes `codes[gate]` only for gates it ran, so an over-budget entry keeps whatever status it had the last
+time it was cheap enough to run.
+
+    371 over-budget entries carry code 0     360 stamped "unknown -- before v4408"
+    run one at a time:  22 ARE RED           18 of them in no register at all
+
+**TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE 3,000 ms BUDGET THAT EXCLUDES THEM** -- `box3dFilter` is
+recorded at 3,763 ms and runs in 89. v4408's one-way door and this stale verdict are one defect seen twice:
+the door is shut on a time the gate no longer has, and behind it is a green nobody re-observed. Among the 22
+is `quickSweep-selfcheck` itself, whose fixture names three "cheap green gates" of which two have since gone
+red -- the gate that grades the sweep that gates every ship.
+
+### AND MY FIRST INSTRUMENT THERE WAS THE WRONG ONE, WHICH THIS TREE ALREADY HAD IN WRITING
+
+`quickSweep-selfcheck` prints *"a parallel FAILURE on its own is `unconfirmed`, not `red`"*. I ran an 8-way
+parallel pass anyway and quoted its number to myself before a serial pass existed. Two parallel passes of the
+same 371 gates **disagreed on five** (38 non-green against 43), and the serial re-run resolved **21 of 43 to
+GREEN ALONE -- a 49% false-red rate in my own measurement**, in the round about false verdicts. The 22 split
+17 real assertion failures / 3 needing a GPU this box lacks / 2 network-dependent; the split is in the record
+rather than folded into a headline.
+
+New: `standingGreens`, `undatedVerdicts`, `verdictClasses` as a partition, and `STALE_GREENS_V4460` with
+every count checked against its own parts.
+
+### EIGHTEEN SABOTAGES; THREE WENT 0 RED AND EVERY ONE WAS A FINDING
+
+Two of the three are mechanisms `vacuity.mjs` named one round earlier and were committed in the round after
+it: the **empty collection** (the uncoded class is empty in this tree, so folding it into green changed
+nothing) and the **unreachable branch** (`backfillStamps` guarantees every entry has a stamp, so the fallback
+never fires). *** AND THE FIRST FIXTURE WRITTEN TO REACH THE SECOND STILL DID NOT REACH IT, *** because it
+gave every fixture entry a stamp too -- an unreachable branch inside the fixture written to reach it, the
+third time this session.
+
+### ALSO CLEARED, ALL PRE-EXISTING
+
+`vacuity-selfcheck` had no sweep closing and `vacuity.mjs` no registry entry, both owed by the round before
+v4459; and v4457's `slug-wgsl` entry declared its page **in a comment** with the field left `undefined`,
+which is the exact state `instruments-selfcheck` exists to catch.
+
+### UNCHECKED AND SAID PLAINLY
+
+- `df581d2d` is Node/V8 on this box. The cross-engine answer is still a person on Firefox or Safari reading
+  the page's line, unchanged from v4316; what changed is that the file they read is the committed key.
+- **None of the 22 red gates is fixed by this round** -- only named, so a round that fixes one can say which.
+  The 144 entries recorded nonzero and the whole `killed` bucket were not re-run.
+- The BTDF defaults are still not flipped and no rendered image moves.
+- The release backlog is still owed on the rig. `releaseLedger` reads **7 of a budget of 3** at this ship --
+  the gate excludes the version being shipped, so v4460 makes it 8. The backlog is v4452, v4453, v4455,
+  v4456, v4457, v4458, v4459.
+
+The tree stands at 1483 gates.
 ## v4459 -- THE CORRECTION REACHED FOUR COPIES OF THE PROSE AND NOT THE PRINT STATEMENT, AND THE PRINT STATEMENT IS THE ONLY COPY ANYBODY RUNS
 
 v4458 recorded `composeValidate.reportLines()` as manufacturing a finding. v4459's first act was to retract
