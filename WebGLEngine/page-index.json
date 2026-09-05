@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 450,
+ "count": 451,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2779,6 +2779,13 @@
    "f": "thermal3d-cells.html",
    "t": "Plumes",
    "d": "Rayleigh-Benard convection in three dimensions: a layer heated from below organising itself into plumes, hot columns rising and cold sheets falling. Nothing tells it to. The surfaces are isosurfaces of temperature, marched fresh from the live field, and here the blackbody ramp is honestly reading heat -- unlike the duct, where it reads speed and says so. The Mach gauge matters: this engine measured its own lattice's Galilean error and wrote down a rule -- trust it below Mach 0.1. Push the Rayleigh slider hard enough and the page will tell you when you have broken the engine's own rule, because a demo that quietly runs outside its verified range is a lie with nice colours.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "three-probe.html",
+   "t": "three Probe",
+   "d": "Fetches a named three version from the npm registry in the browser, imports its WebGPU build beside the vendored 0.178, renders one TSL gradient with each and reads it back: whether the newer build runs on THIS machine's Chrome, with the exact error when it does not. Save the JSON as tools/ship/three-probe.json.",
    "g": "",
    "p": 0
   },

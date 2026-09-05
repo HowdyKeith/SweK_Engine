@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 450,
+  "page": 451,
   "demo": 49,
   "builtin": 34
  },
@@ -3199,6 +3199,14 @@
    "id": "thermal3d-cells.html",
    "display": "Thermal3d Cells",
    "href": "/thermal3d-cells.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "three-probe.html",
+   "display": "Three Probe",
+   "href": "/three-probe.html",
    "section": null,
    "collision": false
   },

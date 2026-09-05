@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="three Probe (is the 0.178 pin the fleet's?)">
+<meta name="demo:desc" content="Fetches a named three version from the npm registry in the browser, imports its WebGPU build beside the vendored 0.178, renders one TSL gradient with each and reads it back: whether the newer build runs on THIS machine's Chrome, with the exact error when it does not. Save the JSON as tools/ship/three-probe.json.">
+<meta name="demo:category" content="rig">
+<title>three Probe</title>
+<style>
+  html, body { margin: 0; background: #06080a; color: #d7e0d9; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #hud { padding: 12px 16px; max-width: 80em; }
+  .ok { color: #9fe0b8; } .fail { color: #f08080; } .warn { color: #f0e29e; } b { color: #fff; }
+  table { border-collapse: collapse; margin: 8px 0; } td, th { padding: 2px 12px 2px 0; text-align: left; vertical-align: top; } th { color: #9fb8a8; font-weight: normal; }
+  pre { white-space: pre-wrap; word-break: break-all; color: #9fb8a8; max-height: 14em; overflow: auto; }
+  a { color: #59d1ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div><b>three probe</b> -- is the 0.178 pin the fleet's or the build box's? <span id="route"></span></div>
+  <div id="lines"></div>
+  <table id="t"><thead><tr><th>build</th><th>revision</th><th>backend</th><th>result</th><th>ms</th></tr></thead><tbody></tbody></table>
+  <div id="verdict"></div>
+  <details><summary>JSON (save as tools/ship/three-probe.json)</summary><pre id="json"></pre></details>
+  <div>Query: <code>?versions=0.185.1,0.180.0</code> picks the versions to fetch from the registry; <code>?webgl=1</code> forces three's WebGL2 backend; <code>?src=/some/folder/</code> loads a build from a folder on this server instead of the registry (the gate's route).</div>
+</div>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { PROBE_CONTROL, PROBE_VERSIONS, BUILD_FILES, tarballUrl, untar, pickBuild, rewriteImports } from "./render/threeProbe.mjs";
+const AT = "v4494";
+const q = new URLSearchParams(location.search);
+const forceGl = q.get("webgl") === "1";
+const versions = (q.get("versions") || PROBE_VERSIONS.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+const srcs = (q.get("src") || "").split(",").map((s) => s.trim()).filter(Boolean);
+const el = (id) => document.getElementById(id);
+const say = (s, cls) => { const d = document.createElement("div"); if (cls) d.className = cls; d.innerHTML = s; el("lines").appendChild(d); };
+el("route").textContent = forceGl ? "(three's WebGL2 backend forced)" : "(WebGPU where the browser has it)";
+
+async function fetchBuildFromRegistry(version) {
+    const t0 = performance.now();
+    const res = await fetch(tarballUrl(version));
+    if (!res.ok) throw new Error("registry " + res.status + " for three@" + version);
+    const gz = res.body.pipeThrough(new DecompressionStream("gzip"));
+    const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+    const files = pickBuild(untar(bytes));
+    return { files, fetchMs: performance.now() - t0, tarBytes: bytes.length };
+}
+async function fetchBuildFromFolder(src) {
+    const t0 = performance.now(), files = {};
+    for (const f of BUILD_FILES) { const r = await fetch(src + f); if (!r.ok) throw new Error(src + f + " " + r.status); files[f] = await r.text(); }
+    return { files, fetchMs: performance.now() - t0, tarBytes: 0 };
+}
+/** import the three files from blob URLs, core first so the others resolve to it */
+async function importBuild(files) {
+    const urls = {};
+    urls["three.core.js"] = URL.createObjectURL(new Blob([files["three.core.js"]], { type: "text/javascript" }));
+    const step1 = rewriteImports(files, urls);
+    urls["three.webgpu.js"] = URL.createObjectURL(new Blob([step1.files["three.webgpu.js"]], { type: "text/javascript" }));
+    const step2 = rewriteImports(files, urls);
+    urls["three.tsl.js"] = URL.createObjectURL(new Blob([step2.files["three.tsl.js"]], { type: "text/javascript" }));
+    const THREE = await import(urls["three.webgpu.js"]);
+    const TSL = await import(urls["three.tsl.js"]);
+    return { THREE, TSL, counts: { core: step1.counts["three.webgpu.js"], tsl: step2.counts["three.tsl.js"] } };
+}
+/** one TSL gradient rendered and read back: the corner pixels say whether the build drew */
+async function renderProbe(THREE, T) {
+    const N = 64;
+    const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;
+    const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: forceGl, antialias: false });
+    await renderer.init();
+    const errs = []; const gd = renderer.backend && renderer.backend.device; if (gd && gd.addEventListener) gd.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 300)));
+    const scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const mat = new THREE.MeshBasicNodeMaterial(); mat.colorNode = T.Fn(() => T.vec4(T.uv().x, T.uv().y, 0.5, 1.0))();
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+    const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    renderer.setRenderTarget(rt); for (let i = 0; i < 2; i++) await renderer.renderAsync(scene, cam);
+    const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N);
+    const at = (x, y) => Array.from(px.slice((y * N + x) * 4, (y * N + x) * 4 + 4));
+    const left = at(0, 32), right = at(N - 1, 32);
+    const backend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2";
+    if (errs.length) throw new Error("uncaptured GPU error: " + errs[0]);
+    if (!(right[0] > left[0] + 200 && left[3] === 255 && right[3] === 255 && Math.abs(left[2] - 128) < 4)) throw new Error("the gradient did not read back: left " + left.join(",") + " right " + right.join(","));
+    try { renderer.dispose(); } catch (_) {}
+    return { backend, left, right };
+}
+
+const results = [];
+async function probe(entry) {
+    const t0 = performance.now();
+    const r = { label: entry.label, version: entry.version || null, revision: null, backend: null, ok: false, error: null, ms: 0, fetchMs: 0, tarBytes: 0, imports: null };
+    try {
+        const got = entry.kind === "local" ? await fetchBuildFromFolder(entry.src) : await fetchBuildFromRegistry(entry.version);
+        r.fetchMs = Math.round(got.fetchMs); r.tarBytes = got.tarBytes;
+        const { THREE, TSL, counts } = await importBuild(got.files);
+        r.imports = counts; r.revision = String(THREE.REVISION);
+        const drew = await renderProbe(THREE, TSL);
+        r.backend = drew.backend; r.ok = true;
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 600); }
+    r.ms = Math.round(performance.now() - t0);
+    results.push(r);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.label}</td><td>${r.revision || "-"}</td><td>${r.backend || "-"}</td><td class="${r.ok ? "ok" : "fail"}">${r.ok ? "drew the gradient" : "REFUSED: " + r.error}</td><td>${r.ms}</td>`;
+    el("t").querySelector("tbody").appendChild(tr);
+}
+(async () => {
+    const plan = [PROBE_CONTROL];
+    for (const s of srcs) plan.push({ label: "folder " + s, kind: "local", src: s.endsWith("/") ? s : s + "/" });
+    if (!srcs.length) for (const v of versions) plan.push({ label: "three@" + v, kind: "registry", version: v });
+    say(`plan: ${plan.map((p) => p.label).join(", ")} -- the control is the vendored build through the same blob-import path, so a refusal names the version and not the path`);
+    for (const p of plan) await probe(p);
+    const control = results[0], newer = results.slice(1);
+    const verdict = !control.ok ? `<span class="fail">the vendored control failed here (${control.error}) -- this box cannot answer the question</span>`
+        : newer.every((r) => r.ok) ? `<span class="ok">every newer build drew on this machine's ${control.backend} -- the pin is NOT this machine's; if this is a rig, the pin was the build box's</span>`
+        : `<span class="warn">this machine refuses ${newer.filter((r) => !r.ok).map((r) => r.label).join(", ")} -- on a rig that is the fleet's answer; on the build box it is v4319's finding again</span>`;
+    el("verdict").innerHTML = verdict;
+    const json = { page: "three-probe.html", at: AT, ua: navigator.userAgent, when: new Date().toISOString(), route: forceGl ? "webgl2" : "webgpu", results };
+    el("json").textContent = JSON.stringify(json, null, 1);
+    say(`RIG-PENDING until this JSON is saved as <b>tools/ship/three-probe.json</b> and tools/ship/threeProbe-selfcheck.mjs grades it; a headless shell's answer is the build box's, not a rig's.`);
+    window.__threeProbe = json;
+})();
+</script>
+</body>
+</html>

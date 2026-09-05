@@ -15,6 +15,21 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
    three 0.185 was tried first and refused on this shell's Chromium (its texture views pass a `swizzle` the
    browser does not know); 0.178 runs unpatched. The two builds must never meet in one page (two copies of
    THREE break instanceof); tsl-selfcheck scans every page for that.
+   IS THE PIN THE FLEET'S OR THE BUILD BOX'S? -- asked at v4494 (task 17), RIG-PENDING. three-probe.html is the
+   instrument: it fetches a named three version's tarball from registry.npmjs.org in the browser (CORS *,
+   measured), gunzips it with DecompressionStream, walks the tar (render/threeProbe.mjs untar), rewrites the
+   build's two internal imports to blob URLs and imports it beside the vendored 0.178 through the SAME blob path
+   (the control), then renders one TSL gradient with each into a render target and reads it back. MEASURED ON
+   THIS BOX by tools/ship/threeProbe-selfcheck.mjs (the tarball cached outside the tree, served by the gate's own
+   server as ?src=): the control draws on WebGPU and on three's WebGL2 backend; three@0.185.1 draws on the WebGL2
+   backend and is REFUSED on WebGPU by the browser, not by three -- "Failed to execute 'createView' on
+   'GPUTexture': Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor': The provided value is
+   not of type 'GPUTextureComponentSwizzle'" -- v4319's finding reproduced by name and pinned to a WebGPU
+   dictionary this Chromium lacks (0.185's GPUTextureViewDescriptor carries `this.swizzle = 'rgba'`, "requires
+   the 'texture-component-swizzle' feature; ignored otherwise", and this browser rejects the member instead of
+   ignoring it). So the pin is at least the build box's. Whether a rig's Chrome knows the member is the rig's
+   answer: open three-probe.html there, save the JSON as tools/ship/three-probe.json, and the gate's section 3
+   says which. If a rig draws 0.185 on WebGPU, re-vendoring is a round of its own with the three pages re-graded.
 2. **A probe page and a gate proving TSL runs here.** DONE: tsl-probe.html (WebGPURenderer, `?webgl=1`
    forces the WebGL2 backend) and tools/ship/tsl-selfcheck.mjs section 2: a TSL colour node renders the uv
    gradient on both backends, read back through `readRenderTargetPixelsAsync`. Two measured facts a caller

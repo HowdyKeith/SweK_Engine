@@ -2476,6 +2476,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "reuse 8.7 / 0.6, draw-only 8.4 / 0.2 (WebGPU / WebGL2, CPU-timed on SwiftShader). The ring buffer is a won't-do. " +
                  "Sabotages red at 4 / 4 / 1 / 3.",
     }),
+    since116: Object.freeze({
+        at: "v4494", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/threeProbe-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green here, RIG-PENDING on the rig. three-probe.html fetches a named three version from the npm registry in the " +
+                 "browser, walks the tarball, blob-imports the build beside the vendored 0.178 and renders one TSL gradient with each; " +
+                 "render/threeProbe.mjs holds untar, pickBuild, rewriteImports and a grader that refuses eight lies. MEASURED on this " +
+                 "box: the control draws on both routes; three@0.185.1 draws on three's WebGL2 backend and is refused on WebGPU by the " +
+                 "browser's GPUTextureViewDescriptor lacking swizzle -- v4319's finding by name, so the pin is at least the build box's. " +
+                 "The tarball cache went outside the tree after colourReach counted the cached build as an arrival. Sabotages red at " +
+                 "1 / 3 / 1 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
