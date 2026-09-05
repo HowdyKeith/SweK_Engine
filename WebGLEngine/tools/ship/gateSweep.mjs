@@ -2238,6 +2238,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "for 162 rounds. gpuTerrain.terrainPickPipelineDesc picks with the terrain's own vertex stage: 6 of 6 and 4 of 4 " +
                  "on both backends, the tolerance gone. Sabotages red at 1 / 2 / 1 / 3 by name, D reproducing the old fault.",
     }),
+    // v4480 -- the hundred-and-second closing. The Worley biome field on the device, held to its twin to the bit.
+    since102: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/worleyDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/probeConvention-selfcheck.mjs (render/worleyWgsl.mjs in the kernel list: its PROBES run on Dawn under the contract)",
+        ]),
+        verdict: "green on Dawn (~2 s) and through gfx/device.js in the browser on both backends. render/worleyWgsl.mjs " +
+                 "evaluates world/worleyBiomes.js's biome per texel of a terrain field in a compute pass: u32 hashing exact on " +
+                 "both sides by construction, a 3x3 feature-point search, value noise, the Whittaker if-chain, a packed " +
+                 "(primary, secondary, blend byte) element beside the raw blend. biomeFlat is one implementation with one " +
+                 "rounding knob: the identity knob IS biomeAt to the bit over 4,096 random points and seeds; the fround knob is " +
+                 "the device, the packed element identical on every one of 4,096 texels and the raw blend within 5.4e-7, one " +
+                 "f32 ulp, the tolerance stated from that floor; 0 biome disagreements between the knobs, counted. The seed " +
+                 "is the body's commit. paintBiomes paints a landing's green, blue and alpha through the device or the twin, " +
+                 "byte-identical either way, and orrery-gpu.html paints every landing. Sabotages red at 2 / 5 / 3 by name; " +
+                 "B (a hash multiplier off by one) parts every side at once, which is what a twin pinned both ways is for.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

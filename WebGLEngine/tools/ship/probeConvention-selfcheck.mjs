@@ -50,6 +50,7 @@ export const PHYSICS_KERNEL_MODULES = Object.freeze([
     "physics/mpm/gpuKernel.mjs", "physics/xpbd/xpbdWgsl.mjs", "tools/roundhouse/hmcGpu.mjs",
     "physics/chaos/logisticWgsl.mjs",   // v4469 -- the step loop's first consumer
     "brain/mlp.js", "brain/flowfield.js",   // v4470 -- the GPU Brain's kernels, exported
+    "render/worleyWgsl.mjs",   // v4480 -- the Worley biome field, the terrain's first kernel under the contract
 ]);
 const val = (v, args) => (typeof v === "function" ? v(args) : v);
 

@@ -546,7 +546,16 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         terrain; the v4317 hills gate tolerated one miss in four and never saw it. gpuTerrain.terrainPickPipelineDesc
         picks with the terrain's own vertex stage; the hills gate now requires 4 of 4 and gets them.
      2. (task 39) The Worley biome field as a compute pass, world/worleyBiomes.js the bit-exact twin, biome and
-        blend in the field's green and blue channels.
+        blend in the field's green and blue channels. BUILT at v4480: render/worleyWgsl.mjs -- the kernel (u32
+        hashing, the 3x3 feature-point search, value noise, the Whittaker if-chain) writing a packed (primary,
+        secondary, blend byte) element and the raw blend per texel; biomeFlat is ONE implementation with ONE rounding
+        knob, pinned to worleyBiomes.biomeAt to the bit in f64 over 4,096 random points and seeds, and with fround it
+        is what the device computes: the packed element identical on 4,096 of 4,096 texels on Dawn, the raw blend
+        within 5.4e-7 (one f32 ulp, the tolerance stated from it), 0 biome disagreements between the knobs. The seed
+        is the body's commit (world/orrerySeed.mjs); the treemap's language biome rides in alpha. paintBiomes paints
+        a landing's field through gfx/device.js on WebGPU and by the twin elsewhere, byte-identical either way;
+        orrery-gpu.html paints every landing. Under the contract: PROBES, a corpus entry on both harnesses, the
+        probe convention's list. NOT CLAIMED: the colours (step 3), the voxel materials, altitude cooling.
      3. (task 40) Biome colour and a water plane in gpuTerrain's fragment stage, both languages, a CPU colour twin.
      4. (task 41) Erosion measured before any port: the step-loop kernel or a written won't-do, with the numbers.
 

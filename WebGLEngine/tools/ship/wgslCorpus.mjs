@@ -54,6 +54,7 @@ import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL, TERRAIN_PICK_WGSL } from "../../render/gpuTerrain.mjs";
+import * as WO from "../../render/worleyWgsl.mjs";
 import { LIT_WGSL } from "../../render/litSphere.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
@@ -240,6 +241,9 @@ export function corpus() {
         { id: "gpuDriven.PICK_WGSL", from: "render/gpuDriven.mjs", compileOnly: true,
           why: "a flat-interpolated identity output and u32 bit slicing in the vertex stage -- the pick picture's encoding",
           opts: { code: GD.PICK_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "worleyWgsl.worleyWgsl", from: "render/worleyWgsl.mjs",
+          why: "v4480 -- the Worley biome field: u32 hashing (imul, logical shifts, xor), a 3x3 feature-point search with two running minima, value noise, a Whittaker if-chain, and a packed integer output beside an f32 blend -- integer exactness and f32 sqrt/division in one kernel, held to world/worleyBiomes.js's f32 knob by tools/ship/worleyDevice-selfcheck.mjs",
+          opts: { code: WO.WORLEY_WGSL, outCount: 64 * 64 * WO.OUT_PER_TEXEL, uniforms: WO.packWorleyUniforms(WO.PROBE_ARGS), workgroups: 64 } },
         { id: "gpuTerrain.TERRAIN_PICK_WGSL", from: "render/gpuTerrain.mjs", compileOnly: true,
           why: "v4479 -- the terrain's own pick pair: the terrain vertex stage (texel lift, half-size from the cull radius, skirts) writing the identity colour, so a pick reads the picture a viewer sees; graded by tools/ship/landing-selfcheck.mjs and repoLanding-selfcheck.mjs on both backends",
           opts: { code: TERRAIN_PICK_WGSL, compileOnly: true, outCount: 0 } },
@@ -496,6 +500,8 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "physics/xpbd/xpbd-distance.wgsl", kind: "superseded file, never loaded",
                     why: "the v2661 graph-coloured distance solver; nothing in the tree reads the file (v4465 measured that), physics/xpbd/xpbdWgsl.mjs solveWgsl is its replacement and IS in the corpus, and the file keeps its SUPERSEDED note as the record" }),
     // v4478 -- the lit pair's renderer: a function of the tint palette. Its empty rendering IS litSphere.LIT_WGSL, in the corpus.
+    Object.freeze({ id: "worleyWgsl.WORLEY_WGSL", kind: "same text, the constant",
+                    why: "worleyWgsl() rendered once, for the page's runner and the probe manifest; worleyWgsl.worleyWgsl IS in the corpus and runs on both harnesses" }),
     Object.freeze({ id: "litSphere.litWgsl", kind: "renderer of a palette",
                     why: "renders the lit render pair with a tint if-chain baked in; litWgsl(null) is LIT_WGSL, which the corpus compiles on both backends, and a tinted rendering is painted and read back on both by tools/ship/litSphere-selfcheck.mjs" }),
     Object.freeze({ id: "physics/xpbd/cloth-collision.wgsl", kind: "superseded file, never loaded",

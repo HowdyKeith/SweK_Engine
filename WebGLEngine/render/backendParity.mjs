@@ -234,10 +234,13 @@ export const PARITY_BASELINE = Object.freeze({
     // the CPU_TWIN contract gfx/device.js's refusal asks for. Graded by tools/ship/xpbdDevice-selfcheck.mjs.
     // v4469 -- wgslBearing 64 -> 65, wgslOnly 50 -> 51: physics/chaos/logisticWgsl.mjs, the step loop's first consumer
     // (one compute kernel; its WebGL2 twin is orbitCpu, per the CPU_TWIN contract). Graded by tools/ship/stepLoop-selfcheck.mjs.
-    wgslBearing: 66,
+    // v4480 -- wgslBearing 66 -> 67, wgslOnly 51 -> 52: render/worleyWgsl.mjs, the Worley biome field as a compute pass
+    // (WGSL-only by nature: no compute stage on WebGL2, where the f32 twin paints the same bytes -- the CPU_TWIN contract).
+    // Held to world/worleyBiomes.js through one implementation with one rounding knob by tools/ship/worleyDevice-selfcheck.mjs.
+    wgslBearing: 67,
     both: 15,
     glslOnly: 133,
-    wgslOnly: 51,
+    wgslOnly: 52,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/texelProbe.mjs", "render/litSphere.mjs"]),
