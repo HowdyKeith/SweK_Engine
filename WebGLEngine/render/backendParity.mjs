@@ -160,39 +160,50 @@ export const PARITY_BASELINE = Object.freeze({
     // which no census scans -- the first shader pair in this tree that is data rather than source.
     // v4322, moved to render/fleetTsl.mjs at v4329 -- the fleet shells for the transplant carry a WGSL prefix and a GLSL
     // preamble (+1 GLSL, +1 WGSL, +1 both). tslRace-selfcheck's fixture is JSON, tsl-rig.html has no shader text.
-    // v4407 -- physics/render/furnaceWgsl.mjs joins the census: WGSL-only, +1 wgslBearing and +1 wgslOnly. It is
-    // a genuine shader-bearing MODULE (the furnace estimator as a compute kernel), not a gate carrying a fixture,
-    // so the baseline moves rather than the shader hiding. That is the opposite call from tools/ship's carve and
-    // roles fixtures, which went into JSON at v4372 and v4404 precisely because a GATE is not a shader module.
-    // v4408 -- physics/render/microfacetWgsl.mjs joins it on the same call: WGSL-only, +1 wgslBearing and +1
-    // wgslOnly. It is a shader module even though most of its WGSL is GENERATED from render/microfacetShader.js's
-    // GLSL at call time -- the file ships the kernel around the lobe, and the census counts text it authors.
-    // Note what does NOT move: microfacetShader.js is already counted as GLSL-bearing, and generating WGSL from
-    // it does not make it a `both` file, because the WGSL is never written down there.
-    // v4409 -- physics/render/microfacetSampleWgsl.mjs joins it: WGSL-only, +1 wgslBearing and +1 wgslOnly. Its
-    // LOBE is composed from microfacetWgsl.mjs rather than written here, but everything below the lobe is this
-    // file's own WGSL text -- the sampling half has no shipped GLSL to translate -- so it is shader-bearing on
-    // the same test the previous two passed: the census counts text a file AUTHORS, not text it imports.
-    //
-    // *** AND THEN THE NUMBERS MOVED THREE TIMES WITH NOTHING WRITTEN HERE, WHICH v4416 FOUND BY ADDING THE
-    // FOURTH. *** The run of entries above stops at v4409 and reads like a complete history. It is not one:
-    // v4411, v4412 and v4413 each took wgslBearing and wgslOnly up by one and left the reason in their commit
-    // messages instead. Recovered from the history and written down, because a record that looks complete and
-    // is not is worse than one that admits a gap:
-    //   v4411 -- physics/render/energyCompWgsl.mjs, WGSL-only: the compensation table built on the device.
-    //   v4412 -- physics/render/microfacetAnisoWgsl.mjs, WGSL-only: the anisotropic lobe and its swap identity.
-    //   v4413 -- physics/render/misWgsl.mjs, WGSL-only: two estimators and the balance heuristic in one kernel.
-    //   v4416 -- physics/render/fresnelWgsl.mjs, WGSL-only: the exact Fresnel equations, Schlick, and a GGX
-    //            lobe carrying one of them. Same call as the four before it -- a shader-bearing MODULE, so
-    //            the baseline moves rather than the shader hiding in a gate fixture. (v4410 correctly moved
-    //            NOTHING: it extended microfacetSampleWgsl.mjs rather than adding a file.)
+    // *** v4470 MERGE -- THIS BRANCH ADDED SEVEN WGSL-BEARING MODULES WHILE main ADDED THREE, AND THE BASELINE
+    // IS RE-MEASURED RATHER THAN ADDED UP. *** Both sides kept a running history here and both sides' arithmetic
+    // was right about its own half; summing two independent bumps is how a census stops describing the tree.
+    // From this branch, all shader-bearing MODULES rather than gate fixtures, so the baseline moves rather than
+    // the shader hiding: furnaceWgsl (v4407), microfacetWgsl (v4408), microfacetSampleWgsl (v4409),
+    // energyCompWgsl (v4411), microfacetAnisoWgsl (v4412), misWgsl (v4413), fresnelWgsl (v4416). v4416 also
+    // recovered three of those from commit messages, because a run of entries that stops mid-history reads
+    // like a complete record and is worse than one that admits a gap.
+    // v4381 -- tools/ship/brainTsl-selfcheck.mjs carries WGSL and no GLSL (+1 WGSL-bearing, +1 WGSL-only).
+    // It is a GATE rather than a shader module, and it holds the text for the reason this census is least
+    // able to see: it asserts against brain/mlp.js's kernel BY QUOTING IT -- the compute entry point with its
+    // 8x8 workgroup, and the kernel function's name -- because the claim it makes is that a GENERATED pass
+    // reproduces that hand-written one. (THIS COMMENT CANNOT SPELL EITHER MARKER OUT, and finding that out
+    // cost a red run: a census file that names a marker literally becomes its own subject, which is the same
+    // trap seven earlier gates here fell into and the eighth was v4332's. The gate's own line is one file
+    // away and can be read there.) The generated half is not here and is not anywhere a census can read: it
+    // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
+    // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
+    // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
     glslBearing: 145,
     glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
-    wgslBearing: 63,
+    // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
+    // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
+    // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
+    // an exclusion for "gates do not count" would have hidden every probe this tree has written, which is most of
+    // the WGSL it owns. The same file is why wgslOnly moves too; nothing else changed.
+    // v4416 -- 58 -> 59, and this one is a SHIPPING MODULE that carries WGSL and no GLSL on purpose.
+    // physics/render/pathTracerGpu.mjs puts the path tracer's Lambertian transport loop on a compute shader;
+    // there is no WebGL2 half and there is not going to be one, because the thing it needs is a compute
+    // dispatch. That is the same shape render/gpuOrbits.mjs was recorded under at Level 12 -- "a compute pass
+    // has no WebGL2 half; its twin is JavaScript" -- and here the twin is physics/render/pathTracer.mjs,
+    // which the module imports rather than restates so the two cannot drift. The same file is why wgslOnly
+    // moves too; nothing else changed.
+    // v4418 -- 59 -> 60, the second WGSL-only SHIPPING module in two rounds. physics/render/rtPipeline.mjs
+    // splits v4417's monolithic trace loop into Vulkan's named ray-tracing stages behind a shader binding
+    // table; like pathTracerGpu it has no WebGL2 half by construction, because a compute dispatch has none.
+    // *** THAT THIS RATCHET HAS NOW GONE RED TWO ROUNDS RUNNING IS THE RATCHET WORKING, NOT A NUISANCE: ***
+    // both times it named the arriving file rather than showing a number that moved, which is exactly what
+    // v4399's rule asked of a count baseline. The same file is why wgslOnly moves too; nothing else changed.
+    wgslBearing: 67,   // v4470 MERGE -- RE-MEASURED, not summed: main's 60 plus this branch's seven modules
     both: 13,
     glslOnly: 132,
-    wgslOnly: 50,
+    wgslOnly: 54,     // v4470 MERGE -- re-measured for the same reason
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

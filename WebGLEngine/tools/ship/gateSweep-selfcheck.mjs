@@ -334,8 +334,36 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // them must be named in redOnArrival with why, and is not counted as a regression of this tree
     // v4329 -- SUMMED OVER EVERY CLOSING RATHER THAN OVER A NAMED PAIR. Each round that adds gates adds a
     // closing, and reading only since2 meant the next one had to edit this arithmetic as well as the record.
-    const closings = [SS.since2, SS.since3, SS.since4, SS.since5, SS.since6, SS.since7, SS.since8, SS.since9, SS.since10, SS.since11, SS.since12, SS.since13, SS.since14, SS.since15, SS.since16, SS.since17, SS.since18, SS.since19, SS.since20, SS.since21, SS.since22, SS.since23, SS.since24, SS.since25, SS.since26, SS.since27, SS.since28, SS.since29, SS.since30, SS.since31, SS.since32, SS.since33, SS.since34, SS.since35, SS.since36, SS.since37, SS.since38, SS.since39, SS.since40, SS.since41, SS.since42].filter(Boolean);
+    // *** v4381 -- AND THE LIST OF CLOSINGS IS NOW READ OFF THE RECORD RATHER THAN TYPED OUT. *** v4329
+    // replaced a named PAIR with a list so a round could append an entry instead of editing this arithmetic.
+    // It half-worked: the arithmetic stopped changing and the LIST kept growing by hand, twelve entries by
+    // v4375, and a round that added since14 and forgot this line would have under-counted the sweep and gone
+    // red somewhere else entirely -- AND THE VERY NEXT MERGE PROVED IT: main added its own since14 in the same
+    // week this branch did, and its side of the conflict was the typed list with a thirteenth name appended by
+    // hand. Read off the record, neither round has to touch this line. Sorting them NUMERICALLY matters,
+    // because "since10" sorts before "since2" as a string and the sum would be over a different set.
+    const closings = Object.keys(SS).filter((k) => /^since\d+$/.test(k))
+        .sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)))
+        .map((k) => SS[k]).filter(Boolean);
     const S2 = SS.since2 || { swept: 0, green: 0, red: 0, added: [], redOnArrival: [] };
+    // *** v4394 -- A DUPLICATE CLOSING KEY IS INVISIBLE AT RUNTIME, AND THIS ROUND WROTE ONE. ***
+    // The convention picks the next ordinal by hand, and two branches shipping in parallel both reach for
+    // sinceN+1: v4394's closing was written as since21 while origin/main already had one, and in a JavaScript
+    // object literal the later key SILENTLY WINS. The other branch's closing vanished, its swept count with it,
+    // and the surplus arithmetic went one short with no hint of why. The source is the only place a duplicate
+    // is visible, so this reads it -- the same move as every other check in this tree that has to see a
+    // declaration rather than a value.
+    const keyLines = fs.readFileSync(path.join(GS.ENG, "tools", "ship", "gateSweep.mjs"), "utf8")
+        .split("\n").map((l) => (l.match(/^\s{4}(since\d+): Object\.freeze\(/) || [])[1]).filter(Boolean);
+    const dupes = keyLines.filter((k, i) => keyLines.indexOf(k) !== i);
+    ok(dupes.length === 0,
+       "!! *** no two closings share an ordinal, which a runtime read cannot see ***",
+       dupes.length ? `DUPLICATE: ${[...new Set(dupes)].join(", ")} -- the later declaration wins silently and ` +
+       "the earlier round's swept count disappears from the surplus arithmetic" :
+       `${keyLines.length} closings, ${new Set(keyLines).size} distinct ordinals. THE NUMBER IS PICKED BY HAND ` +
+       "and two branches shipping in parallel both reach for the next one; this is the only place the collision " +
+       "is visible, because Object.freeze sees one key and the reader sees two");
+
     const closed = closings.reduce((n, c) => n + (c.swept || 0), 0);
     const uncovered = surplus - SS.swept - closed;
     ok(uncovered <= 0,
@@ -429,5 +457,41 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     ok(Object.isFrozen(S) && Object.isFrozen(S.regressions),
        "the record is frozen", "a gate's own record is not a place a run gets to write");
 }
+// v4394 SABOTAGE -- BE the new closing's ordinal duplicated onto an existing one -> exit=1, 2 red: the
+//   duplicate check names it, and the surplus arithmetic goes one short, which is exactly what happened for
+//   real. v4394's closing was first written as since21 while origin/main already had one; the later key won
+//   silently, the other branch's swept count vanished, and the only symptom was 1 STILL UNSWEPT.
+//   *** AND THE FIRST RUN OF THE NEW CHECK READ 0 RED BECAUSE THE GATE WAS CRASHING. *** It used ENG, which
+//   this file does not define, so the process died before printing a single FAIL line and `grep -c FAIL`
+//   returned zero. A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED, and this one did not.
+/* ------------------------------------------------------------------------------------------------------------
+ * v4409 -- A FIXTURE IS NOT A GATE, AND enumerateGates COULD NOT TELL THE DIFFERENCE
+ *
+ * Four gates plant a transient `*-selfcheck.mjs` in the tree while they run and delete it after:
+ * rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy and
+ * __mutation-crash. The walk had no notion of "transient", so an enumeration overlapping one of those runs
+ * returned the fixture AS A GATE and the sweep ran it -- and rigProgress's is built to exit 1, so it landed
+ * as a NEW RED outside every register and failed the ship. MEASURED at v4409, with rigProgress-selfcheck
+ * running: enumerateGates returned 1442 rather than 1441, the extra being the fixture.
+ *
+ * *** IT IS A RACE, WHICH IS THE WORST SHAPE A SHIP-TIME CHECK CAN HAVE: *** it fails at random, names a
+ * different gate each time, and NEVER REPRODUCES WHEN RUN ALONE. Two consecutive verify runs on the same
+ * tree reported two different NEW reds and both gates were green in isolation.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const planted = path.join(GS.ENG, "tools", "ship", "__gatesweep-probe-selfcheck.mjs");
+    fs.writeFileSync(planted, "process.exit(1);\n");
+    let enumerated;
+    try { enumerated = GS.enumerateGates(GS.ENG); } finally { fs.unlinkSync(planted); }
+    const rel = "tools/ship/__gatesweep-probe-selfcheck.mjs";
+    ok(!enumerated.includes(rel), "*** a `__`-prefixed fixture ON DISK is NOT enumerated as a gate ***",
+       `planted ${rel} -- a file ending -selfcheck.mjs, really written, really present during the walk -- and ` +
+       `enumerateGates returned ${enumerated.length} entries ${enumerated.includes(rel) ? "INCLUDING" : "excluding"} it. ` +
+       "THE PROBE IS REAL AND NOT A STRING TEST: a check that only asked whether the name matched a regex would " +
+       "pass over a walker that never applied it");
+    ok(!fs.existsSync(planted), "...and this check does not leave a gate behind either",
+       "gateActivity's own rule: a gate that leaves a gate behind grows the population it measures");
+}
+
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

@@ -42,12 +42,21 @@ export const criticalCos = (n1, n2) => (n1 <= n2 ? null : Math.sqrt(1 - (n2 / n1
  *                          copying one line twice, and BREWSTER'S ZERO IS THE ONLY THING THAT NOTICES.
  *   noTransmissionFactor-- PLANT: report |t|^2 as the transmittance, dropping the projected-solid-angle ratio.
  */
+const ct0 = (n1, n2) => { const s = n1 / n2; return Math.sqrt(Math.max(0, 1 - s * s)); };
+
 export function fresnel(cosI, n1, n2, { pForS = false, noTransmissionFactor = false } = {}) {
     const ci = Math.min(1, Math.max(0, cosI));
     const sinT = (n1 / n2) * Math.sqrt(Math.max(0, 1 - ci * ci));
     // TOTAL INTERNAL REFLECTION IS A BRANCH, NOT A LARGE NUMBER: past the critical angle there is no transmitted
     // ray at all, so R is exactly 1 and no amount of tightening a tolerance would produce that.
     if (sinT >= 1) return { Rs: 1, Rp: 1, R: 1, Ts: 0, Tp: 0, T: 0, tir: true, cosT: 0 };
+    // *** EXACTLY GRAZING IS A BRANCH TOO, AND IT WAS RETURNING NaN. *** Found at v4436 by a sweep that
+    // included cos = 0 rather than approaching it. The transmission factor is (n2 cosT)/(n1 cosI), which at
+    // cosI = 0 is a division by zero multiplied by a |t|^2 of zero -- Infinity * 0 = NaN, and a NaN in T
+    // propagates silently through any R + T that consumes it. This gate's own grazing rows test cos = 1e-3,
+    // 1e-5 and 1e-7: APPROACHING GRAZING IS NOT AT GRAZING, and the boundary itself was never evaluated.
+    // The physical answer needs no limit: at exactly grazing incidence nothing is transmitted.
+    if (ci === 0) return { Rs: 1, Rp: 1, R: 1, Ts: 0, Tp: 0, T: 0, tir: false, cosT: ct0(n1, n2) };
     const ct = Math.sqrt(1 - sinT * sinT);
     const rs = (n1 * ci - n2 * ct) / (n1 * ci + n2 * ct);
     const rp = pForS ? rs : (n2 * ci - n1 * ct) / (n2 * ci + n1 * ct);

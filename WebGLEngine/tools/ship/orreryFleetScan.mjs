@@ -21,7 +21,9 @@ import { guardWrite } from "./bakeShrinkGuard.mjs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ejectaOf } from "../../world/orreryEjecta.mjs";
+// v4410: dependantsOf, not ejectaOf -- the substring rule counted 12 records as importers and missed 17
+// files that reach the body through path.join("vendor", name, ...). See tools/ship/importPosition.mjs.
+import { dependantsOf } from "../../world/orreryEjecta.mjs";
 
 /**
  * *** THE COMMENT-STRIPPER IS THE SAME ONE tools/ship/orreryEjecta-selfcheck.mjs USES, AND IT HAS TO BE. ***
@@ -42,7 +44,20 @@ export const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[
  * reason. A scanner that did not would measure box3d at 22 against the gate's 21 and one of the two would be
  * wrong. Measured both ways while writing this: 22 with the file in, 21 with it out.
  */
-export const NOT_IMPORTERS = Object.freeze(["tools/ship/orreryEjecta-selfcheck.mjs"]);
+// *** THE SCANNER COUNTING ITSELF IS THIS RECORD'S OLDEST MISTAKE, AND v4410 MADE IT AGAIN. ***
+// orreryEjecta.mjs's header logs it twice: the gate's control fixture names vendor/box3d/box3d.js, and then
+// main.js counted because a version note quoted the path while explaining the problem. v4410's new gate holds
+// ten fixtures for exactly that reason and walked straight into the third instance -- it classified as `path`
+// and joined box3d's fleet, taking it 26 -> 27. A file whose subject is the scanner is not a dependant of what
+// it scans, and the exclusion is BY PATH rather than by hope.
+export const NOT_IMPORTERS = Object.freeze([
+    "tools/ship/orreryEjecta-selfcheck.mjs",
+    "tools/ship/importPosition-selfcheck.mjs",
+    // v4416: FOURTH instance. This gate names vendor/keyhunt and vendor/three while measuring what a URL scrape
+    // would conclude, so it joined keyhunt's fleet the moment it existed. The name-frozen ratchet said WHICH
+    // file within the minute, which is the whole reason v4412 made the baseline a list instead of a count.
+    "tools/ship/provenanceRecord-selfcheck.mjs",
+]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */
 export function engineSources(engineRoot) {
@@ -98,7 +113,7 @@ export function scanFleets(engineRoot, repoRoot, bodyNames) {
     const engineRel = path.relative(repoRoot, engineRoot).split(path.sep).join("/");
     const out = {};
     for (const name of bodyNames) {
-        out[name] = ejectaOf(name, files).sort().map((rel) => {
+        out[name] = dependantsOf(name, files).sort().map((rel) => {
             let bytes = 0;
             try { bytes = fs.statSync(path.join(engineRoot, rel)).size; } catch {}
             const key = engineRel ? engineRel + "/" + rel : rel;

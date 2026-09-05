@@ -34,7 +34,8 @@
 // times in other subjects (oscillation's unitarity, lensing's magnification difference, Friedmann's Omega
 // closure); it is stated here BEFORE the measurement rather than discovered afterwards. ***
 "use strict";
-import { directionalAlbedo, directionalAlbedoSampled } from "./microfacet.mjs";
+import { directionalAlbedo } from "./microfacet.mjs";
+import { trustworthy } from "./albedoEstimator.mjs";
 
 /**
  * The directional-albedo table and its cosine-weighted average.
@@ -42,82 +43,28 @@ import { directionalAlbedo, directionalAlbedoSampled } from "./microfacet.mjs";
  * `K` is the number of samples in mu. It is a REAL parameter of the method and not an implementation detail --
  * a renderer ships this as a texture, and the gate proves the closure residual is SECOND ORDER in it, so "the
  * table is coarse" and "the construction is wrong" are told apart by the ORDER rather than by the size.
- *
- * ================================================================================================
- * *** v4411 -- THE TABLE WAS BUILT BY THE ONE INSTRUMENT THAT CANNOT MEASURE IT AT LOW ROUGHNESS. ***
- * ================================================================================================
- *
- * Until v4411 this asked directionalAlbedo -- a quadrature -- at N = M = 220, and path-tracer.html asked for
- * 160. v4409 measured what a grid does to a lobe narrower than its step, and the numbers here are worse than
- * anybody would guess:
- *
- *     alpha 0.01     E reads 0.998467  against 0.999845     0.1% out   -- fine
- *     alpha 0.005    E reads 0.926156  against 0.999962     7.4% out
- *     alpha 0.001    E reads 0.145049  against 0.999929    85.5% out
- *     alpha 0.0005   E reads 0.039269  against 0.982046    96.0% out
- *
- * *** AND THE CLOSURE CANNOT SEE IT. *** E + INT f_ms cos dw = 1 is algebra in WHATEVER E it is handed: feed
- * it 0.039 for a surface that returns 0.98 of its light and the closure still reads 1.00014, while the
- * compensation lobe manufactures 96% of the surface's energy out of nothing. Every check in
- * energyCompensation-selfcheck.mjs passes on that table. THE SENTENCE IN THIS FILE'S HEADER -- "AN EXACT
- * CLOSURE IS PROOF OF CONSISTENCY, NEVER OF CORRECTNESS" -- was written at v3492 as a caution and is now a
- * measurement, in the one place it was pointed at itself.
- *
- * THE DEFAULT IS THEREFORE THE SAMPLER, which v4410 built and which has no grid to be too coarse: 3.4e-5 at
- * every roughness from 0.0005 to 1, and 4096 evaluations against the quadrature's 48,400. It is more accurate
- * AND cheaper, so there is no trade being made here. `quadrature: true` keeps the old path reachable, because
- * the gate has to be able to produce the wrong table in order to measure that the closure cannot see it.
- *
- * NOT REACHED BY ANY SHIPPED CALLER TODAY: path-tracer.html sweeps alpha from 0.05 up, where 160x160 is
- * accurate to 1e-6. This was latent, not live -- and it is fixed rather than merely named, which is the
- * opposite call from v4409's cdf denominator, because there the measurement said the hazard did not bite and
- * here it says it bites totally.
  */
-export function buildTable(alpha, { K = 24, N = 220, M = 220, samples = 4096, quadrature = false, plant = {} } = {}) {
+// *** THE ROWS OF THIS TABLE NEAREST GRAZING WERE WRONG BY A QUARTER AT alpha 0.05, WHICH IS AN ALPHA THE
+// TREE'S OWN GATES BUILD AT. *** Measured at v4438: the first mu row is (0 + 0.5)/K = 0.0208, THE MOST OBLIQUE
+// ANGLE THERE IS, so this table starts in exactly the regime a marched grid cannot integrate -- a narrow lobe
+// at a grazing view falls between grid lines. `trustworthy` picks the sampler there and the grid everywhere
+// else, by the rule in albedoEstimator.mjs rather than by a number chosen at this call site. The `plant` path
+// keeps the grid, because a plant is a deliberate corruption of THE GRID and swapping the estimator under it
+// would quietly disarm every gate that plants one.
+export function buildTable(alpha, { K = 24, N = 220, M = 220, plant = {}, estimator = null } = {}) {
     const mu = [], E = [];
+    const planted = plant && Object.keys(plant).length > 0;
     for (let i = 0; i < K; i++) {
-        const m = (i + 0.5) / K; mu.push(m);
-        E.push(quadrature ? directionalAlbedo(alpha, m, { N, M, plant })
-                          : directionalAlbedoSampled(alpha, m, { samples, ...plant }));
+        const m = (i + 0.5) / K;
+        mu.push(m);
+        E.push(planted || estimator === "grid"
+            ? directionalAlbedo(alpha, m, { N, M, plant })
+            : trustworthy(alpha, m, { N, M, force: estimator }).value);
     }
     // E_avg = 2 INT E(mu) mu dmu, the cosine-weighted average over the hemisphere.
     const Eavg = 2 * E.reduce((s, e, i) => s + e * mu[i], 0) / K;
     return { alpha, K, mu, E, Eavg };
 }
-
-/**
- * v4411 -- THE CLOSURE RESIDUAL'S ORDER IN K, MEASURED ONCE ACROSS THE INSTRUMENT THAT BUILDS THE TABLE.
- *
- * *** THE EXPONENT IDENTIFIES WHICH INSTRUMENT YOU USED, WHICH IS SHARPER THAN THE RESIDUAL'S SIZE. ***
- * energyCompensation-selfcheck.mjs held from v3492 that the residual is SECOND order in K, "so it is the
- * TABLE's and not the algebra's". The conclusion was right and the exponent was the quadrature's: refine the
- * quadrature and the order climbs, and with a grid-free estimator it is exactly 3.
- *
- * Fitted over K = 16, 32, 64, 128, 256 at the worst cell (alpha 0.05, cos_o 0.2), lobe integral at N = 6400
- * so the integrator is not the thing being measured:
- *
- *     quadrature N=160   2.11        quadrature N=1600  2.57
- *     quadrature N=220   2.09        quadrature N=3000  2.84
- *     quadrature N=400   2.09        sampler   1024     3.05
- *     quadrature N=800   2.23        sampler   4096     3.00
- *                                    sampler   65536    3.00
- *
- * THREE IS THE TRUE ORDER, and the reason is that linear interpolation error on a MIDPOINT grid alternates in
- * sign cell to cell, so integrating it against a smooth weight cancels one order. The quadrature's E carries a
- * grid-dependent wobble that does NOT alternate, so it dominates and reads 2 -- and it is flat at 2 until the
- * grid is fine enough to get out of the way. The sampler's 3 is flat in SAMPLE COUNT across six doublings,
- * which is what says it is the interpolation and not the estimator's noise.
- *
- * Frozen rather than re-run: the N = 1200 point alone costs 34 s. The gate asserts the two cheap endpoints
- * every run and holds this record to being monotone and landing on 3.
- */
-export const ORDER_SWEEP = Object.freeze({
-    at: "v4411", cell: { alpha: 0.05, cosO: 0.2 }, Ks: Object.freeze([16, 32, 64, 128, 256]), lobeN: 6400,
-    quadrature: Object.freeze([{ N: 160, order: 2.11 }, { N: 220, order: 2.09 }, { N: 400, order: 2.09 },
-                               { N: 800, order: 2.23 }, { N: 1600, order: 2.57 }, { N: 3000, order: 2.84 }]),
-    sampled: Object.freeze([{ samples: 1024, order: 3.05 }, { samples: 4096, order: 3.00 },
-                            { samples: 65536, order: 3.00 }]),
-});
 
 /** Linear interpolation into the table -- the renderer's real situation, so the gate grades what would ship. */
 export function albedoAt(T, mu) {

@@ -63,12 +63,12 @@ export async function demonstrateAbsorbing({ gate = "ev/tools/es-tactics-selfche
     const rel = path.join("tools", "ship", ".budgetExile-fixture-timings.json");
     const abs = path.join(root, rel);
     fs.writeFileSync(abs, JSON.stringify({ captured: null, budgetMs, capMs: DEFAULTS.capMs,
-        timings: { [gate]: staleMs }, codes: { [gate]: 1 }, observed: { [gate]: "2020-01-01T00:00:00.000Z" } }, null, 1));
+        timings: { [gate]: staleMs }, codes: { [gate]: 1 }, at: { [gate]: "2020-01-01T00:00:00.000Z" } }, null, 1));
     try {
         const out = await runQuickSweep({ gates: [gate], budgetMs, timingsFile: rel, root, write: true, workers: 1 });
         const after = JSON.parse(fs.readFileSync(abs, "utf8"));
         return { ran: out.ran, skipped: out.skippedOverBudget, msAfter: after.timings[gate], codeAfter: after.codes[gate],
-                 observedAfter: (after.observed || {})[gate], captured: after.captured };
+                 atAfter: (after.at || {})[gate], captured: after.captured };
     } finally {
         try { fs.unlinkSync(abs); } catch { /* the fixture is scratch: a failed unlink is not a finding */ }
     }
@@ -557,14 +557,14 @@ export function inflation(recorded, measured = MEASURED_V4425) {
  * sweep-timings.json's note said its contents were "OBSERVED at the last quickSweep run". That was true of
  * the rows the run rewrote and FALSE of every other row -- and the other rows are exactly the exiled gates,
  * whose recorded time is the only reason they were not run. One whole-file `captured` date cannot say when
- * an individual row was seen, so the file now carries `observed` per gate: the run's stamp for a gate that
+ * an individual row was seen, so the file now carries `at` per gate: the run's stamp for a gate that
  * ran, whatever it had for a gate that did not, and `null` for a row written before the field existed.
  *
  * Choosing what the sweep should COST is a decision about the ship ritual and is not made here. Saying when
  * a number was taken is not a choice at all.
  */
 export const RECORD_REPAIR = Object.freeze({
-    field: "observed",
+    field: "at",
     was: "one `captured` date for the whole file, which dated the RUN and was read as dating the ROWS",
     now: "an ISO stamp per row, or null for a row older than the field",
     notAPolicy: "the budget, the cap and the sweep's cost are unchanged",

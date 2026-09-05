@@ -8,11 +8,14 @@
 //
 // driver: "field"  -> the coupling reads a per-node scalar the brush paints (temperature, activation).
 // driver: "strain" -> the coupling reads stress from the motion itself; nothing to paint (plasticity).
+// driver: "body"   -> two particle systems advance together (fluid and mesh).
+// driver: "rigid"  -> a particle system and ONE RIGID BODY, which has an orientation and a lever arm.
 // kind:   "temporary" (relaxes from base) | "permanent" (rewrites base) | "selective" (only flagged fibers).
 import { thermalModulate, modulatedSubstep } from "./modulate.js";
 import { muscleModulate } from "./muscle.js";
 import { plasticSubstep } from "./plastic.js";
 import { fluidMeshSubstep } from "./fluid.js";
+import { rigidClothSubstep } from "./rigidCouple.js";
 
 export const COUPLINGS = [
     {
@@ -55,6 +58,20 @@ export const COUPLINGS = [
         ],
         // driver "body": two systems. substep(fluidState, meshState, meshCons, meshBatches, opts) -> both advance.
         substep: (fluid, mesh, meshCons, meshBatches, opts) => fluidMeshSubstep(fluid, mesh, meshCons, meshBatches, opts),
+    },
+    {
+        id: "rigid",
+        label: "Rigid  (a rigid body, two-way)",
+        driver: "rigid", fieldName: null, kind: "two-way",
+        params: [
+            { name: "radius", label: "Contact radius", min: 0.01, max: 0.09, default: 0.03, step: 0.005 },
+            { name: "substeps", label: "Substeps", min: 1, max: 8, default: 4, step: 1 },
+        ],
+        // driver "rigid": the second system is not a particle set but ONE BODY WITH A LEVER ARM, which is why
+        // it needs a driver of its own rather than reusing "body". substep(cloth, cons, batches, proxy, opts)
+        // -> both advance; a caller whose body lives in box3d or Jolt passes bodyDrivenExternally and hands
+        // rigidReaction(ledger, dt) to that engine instead.
+        substep: (cloth, cons, batches, proxy, opts) => rigidClothSubstep(cloth, cons, batches, proxy, opts),
     },
 ];
 

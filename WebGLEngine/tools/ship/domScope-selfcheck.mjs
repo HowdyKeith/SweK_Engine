@@ -43,6 +43,7 @@
 // what engine/domScope.mjs addresses, and the narrowing is the one change that can freeze a screen, so every
 // uncertainty in it resolves towards drawing.
 "use strict";
+import { fileURLToPath } from "node:url";
 import * as S from "../../engine/domScope.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { RAF_SHIM } from "./deterministicRaf.mjs";
@@ -53,7 +54,7 @@ import path from "node:path";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
-const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 console.log("domScope-selfcheck -- the flag asks whether the DOCUMENT moved; it needs whether the RENDER is stale\n");
 

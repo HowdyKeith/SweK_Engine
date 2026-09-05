@@ -31,8 +31,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4424, UNCONFIRMED_SLOW } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, UNCONFIRMED_SLOW } from "./redCensus.mjs";
 
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
 
@@ -40,9 +41,12 @@ export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000
 export function redRegister() {
     const reg = new Map();
     for (const e of RED_AT_V4279) reg.set(e.gate, "redCensus.RED_AT_V4279");
-    // *** BEFORE THE BUCKET, BECAUSE A MEASURED RED OUTRANKS "NOBODY LOOKED". *** v4424 ran all 63 of
-    // UNCONFIRMED_SLOW one at a time and three of them exit 1. They stay on the register -- the round did not
-    // repair them -- but under a reason that names the failure instead of the absence of a measurement.
+    // *** BOTH MEASURED SETS BEFORE THE BUCKET, BECAUSE A MEASURED RED OUTRANKS "NOBODY LOOKED". ***
+    // Two rounds on two branches each filed a set of reds the bucket had been hiding, and they name different
+    // gates: v4408 took the ones the first rotation surfaced, v4424 ran all 63 of UNCONFIRMED_SLOW one at a
+    // time and found three exiting 1. Neither round repaired its set -- they stay on the register, but under a
+    // reason that names the failure instead of the absence of a measurement.
+    for (const e of RED_AT_V4408) reg.set(e.gate, "redCensus.RED_AT_V4408");
     for (const e of RED_AT_V4424) reg.set(e.gate, "redCensus.RED_AT_V4424");
     for (const g of UNCONFIRMED_SLOW) if (!reg.has(g)) reg.set(g, "redCensus.UNCONFIRMED_SLOW");
     for (const g of SWEEP_V4297.fromSlowBucket) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.fromSlowBucket");
@@ -119,42 +123,64 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     for (const rel of sel.run) {
         const p1 = phase1.get(rel);
         const parallel = { code: p1.code, ms: p1.ms, timedOut: p1.timedOut };
-        if (p1.code === 0) { rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms }); continue; }
+        if (p1.code === 0) {
+            // v4408 -- *** A GREEN GATE'S PARALLEL TIME IS NOT ITS COST, AND THIS IS WHERE THE DOOR USED TO SHUT. ***
+            // The recorded timing decides membership next run, and until now a green gate never earned a serial
+            // reading -- so one that passed 8-way at 3,002 ms was filed at 3,002 ms and evicted forever. v4297
+            // already refused to call a starved parallel run a FAILURE; it is no better as a COST. The first
+            // rotation measured the size of the error: 138 of 140 evicted gates came back at a median 2.85x
+            // faster serially. So a green gate that CROSSES the budget in parallel is confirmed alone before it
+            // is filed, which is the same two-phase discipline reds have had since v4297, applied to timings.
+            if (p1.ms > budgetMs) {
+                const conf = await runOneAsync(rel, capMs, root);
+                rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, from: "budget-confirm" });
+            } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms });
+            continue;
+        }
         const p2 = await runOneAsync(rel, capMs, root);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
         rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code });
     }
+    const out0 = { at: new Date().toISOString() };
     const rec = reconcile(rows);
     const green = rows.filter((r) => r.verdict === VERDICT.GREEN).length;
     const falseReds = rows.filter((r) => r.verdict === VERDICT.GREEN && r.from === "serial").length;   // red under -P, green alone
     // the timings file, rewritten with what was just seen (serial time where there was one)
+    // v4408 -- *** PER-ENTRY PROVENANCE. *** This file used to stamp ONE `captured` date on all 1,440 entries
+    // while rewriting only the ones it ran, so 502 readings carried a date they did not earn -- and the budget
+    // decision is made FROM those readings, which made the exclusion a one-way door. `at` records, per entry,
+    // the capture that actually observed it. Entries this run did not touch KEEP their old stamp, and an entry
+    // that has never had one gets UNKNOWN_AT rather than a fabricated date: an unknown age is a finding, not a
+    // default. See tools/ship/sweepCoverage.mjs.
     const timings = { ...(prior.timings || {}) }, codes = { ...(prior.codes || {}) };
-    // *** v4425 -- AND WHEN EACH ENTRY WAS OBSERVED, BECAUSE MOST OF THEM WERE NOT OBSERVED BY THIS RUN. ***
-    // Only gates that RAN get their time and code rewritten; every other entry is carried forward from
-    // whenever it was last seen, which can be many rounds ago. The file's note said "OBSERVED at the last
-    // quickSweep run" and that was true of the entries this run touched and false of the rest -- and the
-    // false ones are exactly the exiled gates, whose recorded time is the only reason they were not run.
-    // A stamp per entry makes the staleness legible instead of leaving it to be inferred from a whole-file
-    // timestamp that belongs to the run and not to the row. `null` means "recorded before this field
-    // existed", which is a fact and not a gap to be filled in with a guess.
-    const observed = { ...(prior.observed || {}) };
-    for (const g of Object.keys(timings)) if (!(g in observed)) observed[g] = null;
-    const stamp = new Date().toISOString();
-    for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; observed[r.gate] = stamp; }
+    // *** v4470 MERGE -- TWO BRANCHES INVENTED THE SAME FIELD IN THE SAME WEEK, AND ONLY ONE SPELLING SURVIVES.
+    // *** v4408 called it `at` and v4425 called it `observed`, for the identical reason: a row is rewritten only
+    // when its gate RAN, so a whole-file `captured` date was being read as if it dated the rows. Two names for
+    // one fact is how a field quietly stops being found in one of the two places -- this file's own argument
+    // about ENGINE_VERSION, one level down -- so `at` is kept (it is what main ships and what backfillStamps
+    // already fills) and tools/ship/budgetExile.mjs was changed to read it.
+    const at = { ...(prior.at || {}) };
+    const stamp = out0.at;
+    for (const r of rows) { timings[r.gate] = r.serialMs ?? r.parallelMs; codes[r.gate] = r.serialCode ?? 0; at[r.gate] = stamp; }
+    backfillStamps(timings, at);
     const dropped = sel.run.filter((g) => (prior.timings || {})[g] != null && timings[g] > budgetMs);
     const out = {
-        at: new Date().toISOString(), budgetMs, workers, capMs, ms: Date.now() - t00,
+        at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
         green, falseReds, knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
+        // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
+        // and how many of those the serial reading brought back under. The second number is the starvation.
+        budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,
+        budgetRescued: rows.filter((r) => r.from === "budget-confirm" && r.serialMs <= budgetMs).length,
     };
     if (write) {
         fs.writeFileSync(path.join(root, timingsFile), JSON.stringify({
-            note: "ms per gate (serial where a serial re-run happened), exit code, and the ISO time each row was OBSERVED. " +
-                  "A row is rewritten only when its gate RAN, so `captured` dates the RUN and `observed` dates the ROW -- a gate " +
-                  "over the budget is skipped and keeps whatever it last had, which is why the two are different fields. " +
-                  "Used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is.",
-            captured: out.at, budgetMs, capMs, timings, codes, observed,
+            note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. Rewritten every run; " +
+                  "used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. " +
+                  "`at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and " +
+                  "applies ONLY to entries whose `at` equals it -- the rest were not run and say so.",
+            captured: out.at, budgetMs, capMs, timings, codes, at,
         }, null, 1) + "\n");
     }
     return out;

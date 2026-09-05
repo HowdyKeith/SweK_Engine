@@ -50,7 +50,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         if (!src.includes(m.find)) stale.push(m.name + " -> " + m.file);
     }
     ok("!! EVERY MUTATION'S FIND-STRING IS STILL PRESENT", stale.length === 0,
-       stale.length ? "STALE, MUTATES NOTHING, WOULD REPORT A PHANTOM SURVIVOR: " + stale.join(" | ")
+       stale.length ? "STALE, MUTATES NOTHING, SCORES AN ABSTENTION AS THOUGH IT WERE A RESULT: " + stale.join(" | ")
                     : MUTATIONS.length + " mutations all still bite");
     ok("...and every target file exists", MUTATIONS.every((m) => fs.existsSync(path.join(ENG, m.file))));
 }

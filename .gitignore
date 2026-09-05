@@ -123,3 +123,16 @@ WebGLEngine/tools/ship/install-history.json
 # about one run. Durable record: tracked. Run artifact: ignored.
 WebGLEngine/tools/ship/last-refusal-*.log
 WebGLEngine/tools/ship/last-selfchecks-full.log
+
+# v4408 -- A LOCKFILE THIS TREE HAS NEVER TRACKED, WRITTEN BY A GATE.
+# ai-bridge/bun.lock appeared untracked mid-ritual: a selfcheck runs `bun install` and bun writes the lockfile
+# as a side effect, which is the same class as the sweep rewriting sweep-timings.json -- a gate finishing
+# mid-ship dirties a tree that was already staged. NO lockfile is tracked anywhere in this repository (checked:
+# `git ls-files | grep bun.lock` and package-lock, both empty), so committing this one would make a policy
+# change nobody asked for, on a file whose contents depend on when the box last resolved a registry.
+#
+# The v3936 rule above decides it: DURABLE RECORD, TRACKED. RUN ARTIFACT, IGNORED. A lockfile is a claim about
+# one machine's resolution of a dependency set at one moment. If this tree ever wants reproducible installs,
+# that is a decision to make on purpose for every package.json at once -- not one file at a time, and not as
+# the accidental residue of a gate run.
+WebGLEngine/ai-bridge/bun.lock

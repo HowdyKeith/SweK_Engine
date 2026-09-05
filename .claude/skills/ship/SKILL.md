@@ -69,9 +69,16 @@ two is sensitive to what.
 
 ## 4. Verify
 
-    node tools/ship/verify.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"
+    node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"; echo "exit=$?"
 
-Must end `[verify] ALL GREEN`. The PASS count is environment-conditional (SwiftShader, Playwright, WASM
+`shipVerdict.mjs` (v4405) runs verify, reads its EXIT STATUS, scans every tracked file for conflict markers,
+and prints one last line -- `[ship] SHIP` or `[ship] DO NOT SHIP -- <reason>` -- that is GENERATED FROM the
+exit status rather than restated beside it. Ship only on `SHIP`, and never chain the git steps behind a grep
+of the log: v4404 was pushed with three conflict markers in it because the chain read a tail that said ALL
+GREEN from an earlier run while verify itself had exited 1. A tail that disagrees with the exit status in
+EITHER direction is NO VERDICT -- not a pass. If you run verify directly instead, read `$?` and nothing else.
+
+The PASS count is environment-conditional (SwiftShader, Playwright, WASM
 availability) and is NOT a number to assert or compare between boxes.
 
 Since v4303 verify runs the QUICK SWEEP (`tools/ship/quickSweep.mjs`): every gate under the budget in
@@ -103,9 +110,55 @@ measured. No model identifiers anywhere in the message or in any file committed.
 
 `--ff-only` is not optional. If it refuses, main has moved: stop and say so rather than merge.
 
+## 7. Publish the release -- THE FLEET RUNS releases/latest, NOT main
+
+Since v4450 the whole of this step is on the rig, in the GitHub panel's Releases tab, as a numbered route --
+steps 1..6 on screen, with the two shortcuts moved below it under a heading naming which step each one skips.
+Press them in order; the CLI below is the same thing without a browser.
+
+    node tools/ship/refreshReleases.mjs            # dry run: what the releases page says right now
+    # publish from the RIG: GitHub panel -> Releases. The SAFE route is step 3 then step 4 --
+    #   "Clone -> verify" (clones the pushed branch and runs THE CLONE's gates, publishes nothing), then
+    #   "Publish the verified clone" (packs the tree that just passed, uploads it, pushes the tag).
+    # "Release current engine" is step 4 with step 3 taken out: it zips THIS folder unverified. Faster, and
+    # it is the one that can put a tag on a commit the asset was not built from -- see below.
+    node tools/ship/refreshReleases.mjs --write    # or the panel's step 5 button, which uses the rig's token
+    node tools/ship/releaseLedger-selfcheck.mjs    # or step 6. Must read "THE FLEET RUNS WHAT IS BUILT"
+    git add -A WebGLEngine/tools/ship/releases.json && git commit -m "vNNNN: record the release" && git push
+
+*** PUSH BEFORE YOU PUBLISH, AND THE REASON IS IN githubBridge. *** createRelease passes
+`target_commitish: target || undefined`, and publishVersion never passes a target -- so GITHUB PUTS THE TAG ON
+THE DEFAULT BRANCH'S HEAD while the zip is packed from a LOCAL folder. Those are the same commit only if step 6
+of this ritual has already run. Publish from an unpushed tree and the releases page carries a tag naming a
+commit that does not contain the code in the asset beside it, and nothing in the panel will say a word.
+
+*** THIS STEP IS WHY THE RITUAL EXISTS AND IT WAS MISSING FOR 261 ROUNDS. *** Measured at v4449 against the
+API: 3 of the 261 versions in the changelog were ever published -- 1.1% -- and the fleet's releases/latest sat
+at v4438 while the tree built v4448. THE DOWNLOAD CHAIN WAS NEVER BROKEN. fetchEngineBuild, scanDownloads and
+the installer have all been complete and gated since v3907; they pulled v4438 because v4438 was the newest
+thing anybody published. A step nobody is asked for happens when somebody remembers, and 1.1% is what
+remembering looks like over 261 rounds.
+
+*** PUBLISH FROM THE RIG, NOT FROM CI, AND THE REASON IS MEASURED. *** The zip is not byte-reproducible: the
+packer walks a live tree, so commit dbc0855 (v4067) produced 26,775,683 bytes on the CI runner, 27,424,068 on
+the rig and 27,766,762 in a third checkout. A CI publisher would silently replace the artifact the rig built
+and verified with different bytes assembled elsewhere -- see the v4068 note in .github/workflows/release.yml,
+which stopped trying after ten red runs. CI verifies the PUBLISHED archive on three platforms; it does not
+make one.
+
+`releaseLedger-selfcheck.mjs` enforces the ratchet: *** you may not ship a new version while the last one is
+unreleased. *** It is checked about the PREVIOUS version, not the current one, because verify runs before the
+commit and the release is published after the tag -- so "ENGINE_VERSION has a release" would be red
+throughout every correct ship. Versions at or below the v4448 baseline are written-off debt and cannot be
+back-filled: a zip built today for v4301 would carry bytes v4301 never had.
+
 ## Never
 
 - Push to any branch other than the designated feature branch and `main` by fast-forward.
+- Ship a version and leave the previous one unpublished. The fleet downloads releases/latest; a version that
+  reaches main and never reaches the releases page is a version nobody outside this repo will ever run.
+- Publish the release from CI or from this sandbox. The rig is the publisher because its zip is the one that
+  was verified; a second machine's zip is different bytes for the same commit.
 - Open a pull request unless asked in so many words.
 - Skip, budget-down, or comment out a red gate to get to ALL GREEN. Record it in redCensus.mjs.
 - Run a long sweep as a plain background Bash: it is killed at 10 minutes. Use `setsid nohup <script> &`

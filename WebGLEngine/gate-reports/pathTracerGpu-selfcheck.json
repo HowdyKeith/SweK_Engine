@@ -1,0 +1,44 @@
+{
+ "gate": "physics/render/pathTracerGpu-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "CPU against GPU, clean and with a planted fault",
+   "columns": [
+    "scene",
+    "run",
+    "pixels differing",
+    "max |delta|"
+   ],
+   "rows": [
+    [
+     "furnace",
+     "clean",
+     "0/576",
+     "0.000e+0"
+    ],
+    [
+     "furnace",
+     "PLANT",
+     "0/576",
+     "0.000e+0"
+    ],
+    [
+     "gradient",
+     "clean",
+     "576/576",
+     "3.917e-6"
+    ],
+    [
+     "gradient",
+     "PLANT",
+     "576/576",
+     "7.310e-2"
+    ]
+   ],
+   "note": "A planted fault must move the differing-pixel count; a clean run must not."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

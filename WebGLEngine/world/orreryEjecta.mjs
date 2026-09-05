@@ -54,6 +54,8 @@
 // vendor/<name>/ is unambiguous.
 // ===================================================================
 "use strict";
+import * as IP from "../tools/ship/importPosition.mjs";
+import { isLicenceFile } from "./orrery.mjs";
 
 /** What a body is made of. A planet with no code is a filed licence, not a captured dependency. */
 export const SUBSTANCE = Object.freeze({ CODE: "CODE", PAPER_ONLY: "PAPER_ONLY" });
@@ -67,7 +69,14 @@ export const SUBSTANCE = Object.freeze({ CODE: "CODE", PAPER_ONLY: "PAPER_ONLY" 
  */
 export function isPaperFile(p) {
     const base = String(p || "").split("/").pop();
-    return /^(LICEN[CS]E|COPYING|NOTICE|ATTRIBUTION|PROVENANCE|README|AUTHORS|PATENTS)/i.test(base);
+    // v4418 -- *** THE LICENCE HALF IS DELEGATED, BECAUSE THE SAME FILE WAS PAPERWORK TO ONE FUNCTION AND
+    // PAYLOAD TO ANOTHER IN THIS MODULE. *** The comment above justified anchoring at the filename's start on
+    // the grounds that a false positive here zeroes real payload -- a fair worry, and it made
+    // IBMPlexSerif-OFL.txt and shaders/ASHIMA-LICENSE.txt into CODE MASS while world/orrery.mjs's
+    // isLicenceFile, in the same tree, called them licences. Measured across vendor/: isLicenceFile matches 17
+    // files and every one of them is a real licence, so the feared false positive does not exist here. What is
+    // kept is the non-licence half -- PROVENANCE and README and AUTHORS are paperwork and are not licences.
+    return isLicenceFile(base) || /^(PROVENANCE|README|AUTHORS|PATENTS|VERSIONS)/i.test(base);
 }
 
 /**
@@ -100,6 +109,32 @@ export function substance(body) {
 export function ejectaOf(name, files) {
     const needle = "vendor/" + name + "/";
     return files.filter((f) => f.source.includes(needle)).map((f) => f.path);
+}
+
+/**
+ * v4410 -- *** THE SAME QUESTION, ASKED POSITIONALLY. *** ejectaOf above asks whether the source CONTAINS
+ * `vendor/<name>/`. That is true of a file that imports the body and equally true of one that quotes the path
+ * inside a sentence, and v4406 found tools/ship/gateSweep.mjs filed as a box3d importer because a sweep
+ * closing's verdict string explains that box3dLoader imports it.
+ *
+ * MEASURED ACROSS ALL 15 BODIES, and the old rule is wrong in BOTH directions: of its 138 entries, 12 are
+ * records rather than dependencies -- and it MISSES 17 files that depend on a body through
+ * `path.join(..., "vendor", "box3d", ...)`, which contains no `vendor/box3d/` substring at all. The corrected
+ * population is 143. ejectaOf is kept, unchanged, because the gate compares the two and the difference is the
+ * measurement.
+ */
+export function dependantsOf(name, files) {
+    const needle = "vendor/" + name + "/";
+    return files.filter((f) => IP.depends(f.source, needle, name)).map((f) => f.path).sort();
+}
+
+/** The occurrences the old rule counted that are records rather than dependencies. */
+export function mentionsOf(name, files) {
+    const needle = "vendor/" + name + "/";
+    return ejectaOf(name, files).filter((p) => {
+        const f = files.find((x) => x.path === p);
+        return f && IP.kindOf(f.source, needle, name) === "record";
+    }).sort();
 }
 
 /**
@@ -139,10 +174,198 @@ export function ejectaOf(name, files) {
 // It was vendored on 2026-09-02 with seven importers. The gate loops over THIS object's keys, so a body with
 // no key here is not checked and not reported -- it is invisible, and the gate said ALL GREEN over it. The
 // gate now asserts that every body in the bake has an entry, so the next arrival cannot land unmeasured.
-export const EJECTA_BASELINE = Object.freeze({
-    three: 70, "three-webgpu": 7, box3d: 21,   /* v4303: 68 -> 69, song-globe.html imports three (the song globe, #141); v4322: 70 -- tools/ship/tsl-selfcheck.mjs NAMES vendor/three/three.module.js in a check that no page mixes the two three builds, and a scanner counts the mention: said here rather than excused */ krbn: 8,   /* v4322: krbn-lyapunov.html (the sweep branch) */ htmx: 5, "taichi-js": 4, jolt: 3, gifenc: 3,
-    draco: 2, fonts: 2, heerich: 1, wasm: 1, grass: 0, keyhunt: 0, slug: 0,
+/*
+ * v4410 -- *** FROZEN BY NAME, NOT BY COUNT, WHICH IS THE THING THIS FILE'S OWN CAUSE OF DEATH WAS. ***
+ *
+ * EJECTA_BASELINE was a map of NUMBERS -- three: 70, box3d: 21 -- and its inline comments show what that cost:
+ * every time the count moved, somebody had to work out WHICH file had arrived, and twice the answer was that
+ * no file had arrived at all and a scanner had counted a sentence. v4399 stated the rule after the same thing
+ * happened to the register: a count ratchet drifts with the tree and cannot say which entry moved, and the
+ * round that raises it is the one least able to tell.
+ *
+ * So the record is now the LIST. The counts below are derived from it and can never disagree with it. A gate
+ * comparing against this reports an arrival and a departure BY NAME, and the round that changes one has to say
+ * which and why -- which is what the two comments preserved above were doing by hand.
+ */
+export const DEPENDANTS_AT_V4410 = Object.freeze({
+    "box3d": Object.freeze([
+        "ai-bridge/doctorBridge.js",
+        "ai-bridge/server.js",
+        "physics/backendRouting-selfcheck.mjs",
+        "physics/box3d/box3dConformance-selfcheck.mjs",
+        "physics/box3d/box3dLoader.js",
+        "physics/box3d/box3dNode.mjs",
+        "physics/box3d/sensorsCcd-selfcheck.mjs",
+        "physics/box3d/wasmBuild-selfcheck.mjs",
+        "physics/box3dFingerprint-selfcheck.mjs",
+        "physics/box3dMathImports-selfcheck.mjs",
+        "physics/wheelJoint-selfcheck.mjs",
+        "simulation/life/paramecium3d-selfcheck.mjs",
+        "simulation/life/parameciumBox3d-selfcheck.mjs",
+        "simulation/life/parameciumDrive-selfcheck.mjs",
+        "tools/crossarch-box3d.mjs",
+        "tools/crossarchBox3d-selfcheck.mjs",
+        "tools/macSession.mjs",
+        "tools/roundhouse/backendRotation.mjs",
+        "tools/roundhouse/box3dBind-selfcheck.mjs",
+        "tools/roundhouse/box3dBind.mjs",
+        "tools/ship/artifactWeight.mjs",
+        "tools/ship/box3dFilter-selfcheck.mjs",
+        "tools/ship/box3dRay-selfcheck.mjs",
+        "tools/ship/copiedOutsideVendor-selfcheck.mjs",
+        "tools/ship/jointDrive-selfcheck.mjs",
+        "tools/ship/ragdollSelfCollide-selfcheck.mjs",
+    ]),
+    "draco": Object.freeze([
+        "gpu/gltfDraco.js",
+        "tools/ship/dracoWeld-selfcheck.mjs",
+    ]),
+    "fonts": Object.freeze([
+        "ev/esShipLabels-selfcheck.mjs",
+        "ev/esShipLabels.js",
+        "slug-text.html",
+    ]),
+    "gifenc": Object.freeze([
+        "render/gifRecorder-selfcheck.mjs",
+        "render/gifRecorder.js",
+    ]),
+    "grass": Object.freeze([
+        "tools/ship/grassField-selfcheck.mjs",
+        "tools/ship/orrery-selfcheck.mjs",
+    ]),
+    "heerich": Object.freeze([
+        "heerich-avatar.html",
+    ]),
+    "htmx": Object.freeze([
+        "ai-bridge/ensureHtmx.js",
+        "ai-bridge/server.js",
+        "clients.html",
+        "server.html",
+        "tools/ship/artifactWeight.mjs",
+        "tools/ship/vendoredLicences-selfcheck.mjs",
+    ]),
+    "jolt": Object.freeze([
+        "physics/jolt/joltLoader.js",
+        "tools/ship/artifactWeight.mjs",
+    ]),
+    "keyhunt": Object.freeze([
+        "physics/crypto/secp256k1-selfcheck.mjs",
+    ]),
+    "krbn": Object.freeze([
+        "krbn-avatar.html",
+        "krbn-compare.html",
+        "krbn-lyapunov.html",
+        "krbn-rigged.html",
+        "krbn.html",
+        "render/holoPicture-selfcheck.mjs",
+        "tools/krbn/krbnCompareLive-selfcheck.mjs",
+        "tools/krbnVendor-selfcheck.mjs",
+    ]),
+    "slug": Object.freeze([
+    ]),
+    "taichi-js": Object.freeze([
+        "tools/roundhouse/androidPeer-selfcheck.mjs",
+        "tools/roundhouse/magmapTaichi-selfcheck.mjs",
+        "tools/roundhouse/magmapTaichi.mjs",
+        "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
+    ]),
+    "three": Object.freeze([
+        "ai-bridge/ensureThree.js",
+        "ai-bridge/server.js",
+        "aquarelle.html",
+        "ascii-avatar.html",
+        "ascii-object.html",
+        "asset2voxels.html",
+        "avatarpreview.html",
+        "battleship3d.html",
+        "blob-selfie.html",
+        "blob-shock.html",
+        "blobulator.html",
+        "box3d-blobs.html",
+        "brain-3d.html",
+        "celltrack-viewer.html",
+        "codemap.html",
+        "cosmic-web.html",
+        "es-box3d-3d.html",
+        "es-box3d-fly3d.html",
+        "ev/esShipModels.js",
+        "ev/spriteHull.js",
+        "eve.html",
+        "face/robotFaceAvatar.js",
+        "fire-demo.html",
+        "fluid-selfie.html",
+        "fog-of-war.html",
+        "fpscontrol.html",
+        "fpsmirror.html",
+        "glb_viewer.html",
+        "graph_viewer.html",
+        "heerich-avatar.html",
+        "krbn-avatar.html",
+        "krbn-compare.html",
+        "krbn-rigged.html",
+        "lbm3d-flow.html",
+        "lbm3d-gpu.html",
+        "main.js",
+        "mpm3d.html",
+        "physics/box3dMeshOverlay.js",
+        "physics/fire/fireMesh.js",
+        "pipboy-models.html",
+        "render/svgExtrude.js",
+        "render/tools/meshopt-selfcheck.mjs",
+        "rle-mesh-demo.html",
+        "scene-view.html",
+        "server.html",
+        "shipavatar.html",
+        "shipview.js",
+        "song-globe.html",
+        "splat_viewer.html",
+        "svg-forge.html",
+        "thead.html",
+        "thermal3d-cells.html",
+        "tomography.html",
+        "tools/krbn/krbnCompareLive-selfcheck.mjs",
+        "tools/ship/artifactWeight.mjs",
+        "tools/ship/boundaryLint-selfcheck.mjs",
+        "tools/ship/dracoWeld-selfcheck.mjs",
+        "tools/ship/threeImportmap-selfcheck.mjs",
+        "tools/ship/tsl-selfcheck.mjs",
+        "tools/ship/webgpuHarness.mjs",
+        "toroidal-wave.html",
+        "torrents.html",
+        "universal-viewer.html",
+        "uvtt.html",
+        "view.html",
+        "voxearth.html",
+        "voxel-photo-cube.html",
+        "wallpaper.html",
+        "warp-map.html",
+        "wasm-bench.html",
+        "wear-field.html",
+    ]),
+    "three-webgpu": Object.freeze([
+        "orrery-gpu.html",
+        "tools/ship/brainTsl-page.js",
+        "tools/ship/divineEye-selfcheck.mjs",
+        "tools/ship/generatedLadder-selfcheck.mjs",
+        "tools/ship/img2three-selfcheck.mjs",
+        "tools/ship/tsl-selfcheck.mjs",
+        "tools/ship/tslPhysics-selfcheck.mjs",
+        "tools/ship/tslRace-selfcheck.mjs",
+        "tools/ship/tslSource-selfcheck.mjs",
+        "tsl-probe.html",
+        "tsl-rig.html",
+    ]),
+    "wasm": Object.freeze([
+        "ai-bridge/wasmDemoBridge.js",
+        "ai-bridge/wasmJsSandbox.js",
+        "ai-bridge/wasmSandbox.js",
+        "wasm-bench.html",
+    ]),
 });
+
+/** DERIVED from the list above, never typed. The old EJECTA_BASELINE shape, for readers that want a count. */
+export const EJECTA_BASELINE = Object.freeze(Object.fromEntries(
+    Object.entries(DEPENDANTS_AT_V4410).map(([k, v]) => [k, v.length])));
 
 /** The three that are paperwork rather than payload, named so a rise or a fall is visible. */
 export const PAPER_ONLY_BODIES = Object.freeze(["grass", "keyhunt", "slug"]);

@@ -320,3 +320,27 @@ export const COMMIT_BELT_V4329 = Object.freeze({
          "the one that added them. A belt of one rock is not a belt, and drawing it would imply a busyness " +
          "that is not there. The importers move instead, and they are what the satellites are.",
 });
+
+/*
+ * v4418 -- *** A NEW MOMENT GETS A NEW RECORD, AND THE v4329 FINDING IS NO LONGER TRUE OF THIS TREE. ***
+ *
+ * The belt above says twelve of fifteen bodies have been touched by exactly one commit -- the one that added
+ * them -- and that a belt of one rock is not a belt. That was true for ninety rounds. v4416 wrote PROVENANCE
+ * records into SIX of them (draco, heerich, jolt, keyhunt, three, three-webgpu), so six bodies now carry two
+ * commits and the sentence "vendored once, never revisited" is false of this tree, BECAUSE OF A ROUND OF OURS.
+ *
+ * The v4329 record is NOT edited: it is a claim about v4329 and it is still true about v4329, which is the rule
+ * RED_AT_V4408 and FIXED_SINCE_V4408 were created under one week of rounds ago. The gate compares against the
+ * NEWEST belt and reports drift from it. What survives from v4329 is the reason the belt is not drawn: even at
+ * two commits it is not a belt, and the importers are still what the satellites are.
+ */
+export const COMMIT_BELT_V4418 = Object.freeze({
+    at: "v4418",
+    perBody: Object.freeze({ three: 2, htmx: 2, box3d: 2, "three-webgpu": 2, wasm: 1, "taichi-js": 1, slug: 1,
+                             krbn: 1, keyhunt: 2, jolt: 2, heerich: 2, grass: 1, gifenc: 1, fonts: 1, draco: 2 }),
+    movedSince4329: Object.freeze(["draco", "heerich", "jolt", "keyhunt", "three", "three-webgpu"]),
+    why: "v4416 recorded provenance for six bodies that had none, which is the first time in this repository's " +
+         "life that a vendored body was touched by a commit that did not vendor it. Seven of fifteen are still " +
+         "at exactly one, and AT TWO COMMITS IT IS STILL NOT A BELT -- the v4329 conclusion stands on its own " +
+         "terms and only its NUMBERS are superseded here. The importers move; the vendored bytes do not.",
+});

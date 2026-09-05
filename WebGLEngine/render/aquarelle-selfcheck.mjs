@@ -13,6 +13,7 @@
 //
 // Run: node render/aquarelle-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { sourceOffset, maskShift, aquarellePixel, maxReach, DEFAULTS, MASK_OCTAVES, ANGLE_SCALE } from "./aquarelleModel.mjs";
 import { FRAGMENT_SHADER, VERTEX_SHADER, makeAquarellePass } from "./aquarellePass.js";
@@ -20,7 +21,7 @@ import { codeOnly, noComments } from "../tools/ship/sourceScan.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
-const src = (p) => readFileSync(new URL(p, import.meta.url).pathname, "utf8");
+const src = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
 
 // 1) THE MODEL IS DETERMINISTIC AND PURE -- the property the whole port rests on.
 {

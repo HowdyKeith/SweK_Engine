@@ -1,13 +1,58 @@
 {
- "_note": "Backend visual-regression baseline. On a rig with box3d built, run `node physics/backend-qa-check.mjs --update` to record the box3d|Jolt envelope; then `node physics/backend-qa-check.mjs` gates every run against it. v3337: the capture now records the PERCEPTUAL floor too (silhouette IoU, scale delta, SSIM, edge overlap, pHash bits) in the same pass, and a pair with NO recorded envelope now FAILS as UNMEASURED instead of passing silently -- so the first rig run where box3d loads will go RED and name this command, rather than going green while measuring nothing. pairs is empty because box3d has never loaded wherever --update was last run.",
- "recorded": "2026-07-13T22:51:06.218Z",
- "ticks": 180,
- "determinism": {
-  "Jolt": {
-   "trajectory": true,
-   "render": true,
-   "renderDiff": 0
+  "recorded": "2026-09-03T14:11:16.008Z",
+  "ticks": 180,
+  "determinism": {
+    "Jolt": {
+      "trajectory": true,
+      "render": true,
+      "renderDiff": 0
+    },
+    "box3d": {
+      "trajectory": true,
+      "render": true,
+      "renderDiff": 0
+    }
+  },
+  "pairs": {
+    "Jolt|box3d": {
+      "driftEnvelope": [
+        1.2309050530727035,
+        7.577262632681759
+      ],
+      "visualEnvelope": [
+        0.02385416666666667,
+        0.13734375
+      ],
+      "measured": {
+        "maxDrift": 3.718,
+        "visual": 0.0596
+      },
+      "perceptual": {
+        "iouEnvelope": [
+          0.44103623649078194,
+          0.676255562619199
+        ],
+        "scaleEnvelope": [
+          0.03341483292583537,
+          0.15365933170334148
+        ],
+        "ssimEnvelope": [
+          0.49368355202696934,
+          0.8761392533782821
+        ],
+        "edgeEnvelope": [
+          0.15535714285714283,
+          0.2863265306122449
+        ],
+        "phashCeiling": 25,
+        "measured": {
+          "iou": 0.588,
+          "scaleDelta": 0.0668,
+          "ssim": 0.6849,
+          "edgeOverlap": 0.2219,
+          "phashBits": 14
+        }
+      }
+    }
   }
- },
- "pairs": {}
 }

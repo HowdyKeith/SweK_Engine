@@ -23,11 +23,39 @@
 // When Jolt is chosen it also exposes the Jolt-only extras (structures, ragdolls) through the same handle.
 "use strict";
 
+// *** v4400 -- box3d's ROW WAS WRONG AND THE ROUTER ACTED ON IT. ***
+//
+// This said `box3d: { constraints: false }` and put "constraints" in JOLT_ONLY, so selectBackend({need:
+// ['constraints']}) returned ONLY Jolt. box3d has had revolute, spherical and weld joints since v2515, motors
+// and limits since v4385 and a wheel joint since v4398, and box3dLoader's world advertises supportsJoints()
+// by asking the artifact whether swk_joint_spherical exists -- it answers TRUE. Meanwhile JoltWorld's own
+// supportsJoints() answers FALSE, because that binding never bound Jolt's constraints.
+//
+// So the router sent every caller who needed constraints to the one backend whose portable joint interface
+// refuses them, and excluded the one that has them. Both records were readable the whole time and disagreed.
+//
+// *** AND THE ROWS BELOW ARE ABOUT THIS FACADE, NOT ABOUT THE ENGINES. *** That distinction is what the old
+// table conflated. `ragdolls` and `vehicles` stay Jolt-only and the reason is NOT that box3d cannot do them:
+// physics/ragdollFromSkeleton.mjs derives a ragdoll that box3d steps, and v4398 bound the wheel joint. It is
+// that THIS FILE has a createRagdoll and no box3d equivalent, so a caller asking the facade for one can only
+// be served by Jolt. A capability table for a router describes what the router can hand you.
 const CAPS = {
-    box3d: { constraints: false, ragdolls: false, footprint: "small", note: "lightweight, tiny WASM, fast for many simple bodies" },
-    jolt: { constraints: true, ragdolls: true, vehicles: true, footprint: "large", deterministic: true, note: "AAA-grade: constraints, ragdolls, vehicles; deterministic same-build" },
+    box3d: { constraints: true, ragdolls: false, footprint: "small", deterministic: true,
+             note: "lightweight, tiny WASM, fast for many simple bodies; joints yes, no facade ragdoll factory" },
+    // *** AND JOLT'S ROW MOVED THE OTHER WAY, FOR THE SAME REASON. *** `constraints` here means THE PORTABLE
+    // JOINT INTERFACE, which is what a caller reading this table then calls. JoltWorld.supportsJoints()
+    // returns false and says why in its own comment -- "not 'Jolt cannot', but 'our JoltWorld cannot'" -- so a
+    // caller told constraints:true would get a world that answers -1 to every joint call. Jolt's constraints
+    // are still reachable, through createRagdoll and world.raw(), and that is what `ragdolls: true` is for.
+    //
+    // Defining the field this way makes it CHECKABLE: for every backend, caps.constraints must equal what its
+    // own world says. physics/backendRouting-selfcheck.mjs asserts exactly that, on both, by loading them.
+    jolt: { constraints: false, ragdolls: true, vehicles: true, footprint: "large", deterministic: true,
+            note: "AAA-grade: ragdolls and vehicles via createRagdoll/raw(); this binding exposes no portable joints" },
 };
-const JOLT_ONLY = ["constraints", "ragdolls", "vehicles", "destructible"];
+// Capabilities only THIS FACADE's Jolt branch can serve -- see the note above on why that is not the same
+// question as which engine has the feature. "constraints" is off the list because box3d serves them.
+const JOLT_ONLY = ["ragdolls", "vehicles", "destructible"];
 
 function wrap(name, backend) {
     const api = { name, caps: CAPS[name], createWorld: (o) => backend.createWorld(o), _raw: backend };

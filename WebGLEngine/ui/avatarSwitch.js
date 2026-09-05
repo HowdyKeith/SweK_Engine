@@ -52,8 +52,6 @@ export const MODES = [
       src: "/blob-avatar.html?embed=1" },
     // v3556 -- the two heavy ones, added last on purpose. Each carries a `heavy` note so the button can say what
     // it is about to cost BEFORE the click, rather than after the download starts.
-    { id: "blobgpu", label: "\u26a1", title: "Blobulator GPU — WebGPU raymarched SDF (needs a WebGPU browser)", kind: "frame",
-      src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",
       src: "/thead.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
     // v4046 -- Keith: "so can we have a krbn avatar switch to on server.html?" The same rigged GLB the "rigged"
@@ -107,8 +105,34 @@ export const MODES = [
     // MediaPipe blendshape face, ~12 MB on first use) is REMOVED from this rotation rather than kept alongside --
     // "swap out ... swap in" was the request, not "add"; face-mirror.html itself is untouched and still reachable
     // elsewhere (the universal viewer, direct URL), only this switch's rotation drops it.
+    // *** v4419 -- Keith: "before we switch into the webgpu avatar gauges scene which replaces the svg scene,
+    // before that we can swap in the full avatar, llama, gauges 3d view that we already have." ***
+    //
+    // IT WAS ALREADY BUILT AND THE DOCK COULD NOT REACH IT. face/avatarStage.js's diorama scene is the one
+    // where, in its own words, "the avatar + 3 gauges + llama all sit together as one group" -- three 3D gauge
+    // actors, the rigged figure, and the wandering pet llama, in one room. Every rigged slot above asks for
+    // scene=focus (one avatar, no gauges) and pet=0, so none of them has ever shown it.
+    //
+    // *** AND pet=0 IN THOSE URLs WAS REDUNDANT UNTIL THIS ROUND. *** avatarstage.html forced the pet off for
+    // ANY ?embed=1 caller, so the flag did nothing; v4419 turned that veto back into a default because the
+    // reason for it -- "a 143x210 box" -- was retired at v4414 when this dock became the full 676 px row.
+    // See the block above _pet in avatarstage.html: the two existing embed callers both pass pet=0, so
+    // loosening the veto moves nothing that already ships and makes their flag load-bearing again.
+    { id: "stage3d", label: "\ud83e\udd99", title: "Full stage \u2014 the rigged avatar, three 3D gauges and the pet llama in one room", kind: "frame",
+      src: "/avatarstage.html?voice=M1&glb=RobotExpressive&scene=diorama&camdock=1&embed=1&pet=1&saver=0",
+      frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
     { id: "gauges3000", label: "\ud83c\udf00", title: "Gauges 3000 \u2014 WebGPU energy-core avatar ringed by an LCARS gauge cluster (Canvas2D fallback)", kind: "frame",
       src: "/gauges3000.html?embed=1" },
+    // *** v4419 -- AND THE WEBGPU BLOB IS THE LAST CHOICE NOW, WHICH OVERRULES A STATED PREFERENCE ON PURPOSE.
+    // *** v4033 asked for gauges3000 to be final and this file's gate asserted it for 385 versions. Keith,
+    // this round: "then switching from that switches to the webgpu blob avatar scene we have fit that same
+    // size." So the order is stage3d -> gauges3000 -> blobgpu, and the ASSERTION MOVED RATHER THAN BEING
+    // DELETED -- ui/avatarSwitch-selfcheck.mjs now pins the whole three-mode tail, which is a stronger claim
+    // than "one named mode is last" and encodes the sequence that was actually asked for.
+    //
+    // It keeps its `heavy` note: a WebGPU context is a real cost and the button still says so before the click.
+    { id: "blobgpu", label: "\u26a1", title: "Blobulator GPU \u2014 WebGPU raymarched SDF (needs a WebGPU browser)", kind: "frame",
+      src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
 
 ];
 
@@ -135,8 +159,27 @@ const STORE_KEY = "swek.serverAvatarMode";
  * `probe` answers "is this mode's asset actually there" and defaults to a HEAD request. It is injectable so the
  * gate can drive the missing-asset path without a network.
  */
-export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, probe = null, store = null } = {}) {
+export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, probe = null, store = null,
+                                    sizeFromHost = false, minSize = 96, onResize = null } = {}) {
     if (!host) return null;
+
+    // *** v4413 -- THE SIZE CAN COME FROM THE BOX INSTEAD OF FROM A TYPED NUMBER. ***
+    //
+    // v3657's comment says the aspect is "MEASURED from the box this switch is about to create, so changing
+    // width/height above cannot leave a stale constant behind" -- and that is true of the box it CREATES and
+    // says nothing about the box it SITS IN. MEASURED at v4412 on server.html: the caller asked for 223x210,
+    // the host rendered at 178x184, and the SVG surface came out 178x168. A SCENE BUILT AT ONE SIZE AND
+    // DISPLAYED AT ANOTHER, which is #83 ("the compact scene does not span its own canvas") at its real site.
+    //
+    // sizeFromHost makes the host the authority. minSize is a floor and not a default: a host measured at
+    // zero is a host that has not been laid out yet, and building a 0x0 surface would be believing it.
+    const measure = () => {
+        if (!sizeFromHost) return { w: width, h: height };
+        const b = host.getBoundingClientRect();
+        return { w: Math.max(minSize, Math.round(b.width)), h: Math.max(minSize, Math.round(b.height)) };
+    };
+    let box = measure();
+    width = box.w; height = box.h;
     const mem = store || (() => { try { return window.localStorage; } catch { return null; } })();
     const readMode = () => { try { return (mem && mem.getItem(STORE_KEY)) || "svg"; } catch { return "svg"; } };
     const writeMode = (id) => { try { mem && mem.setItem(STORE_KEY, id); } catch {} };
@@ -268,7 +311,48 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
     host.appendChild(note);
     set(readMode(), { announce: false });
 
-    return { el: btn, set, get current() { return current; }, next: () => set(nextMode(current)), teardown, MODES };
+    /* ---- v4413 -- AND THE BOX MOVES, SO THE SCENE HAS TO FOLLOW IT ------------------------------------
+     * Measuring once at mount is only half the repair: a panel that opens, a window that resizes or a
+     * sibling that is hidden all change the host, and a scene sized at mount is then wrong for the rest of
+     * the session -- which is the SAME defect as a typed constant, arriving later.
+     *
+     * *** AN IFRAME IS RESIZED IN PLACE AND RELOADED ONLY WHEN ITS ASPECT MOVES. *** f.width/f.height cost
+     * nothing; the ?frame= aspect is baked into the URL, so changing it means a reload, and reloading a
+     * live avatar on every pixel of a drag would be a worse defect than the one being fixed. The threshold
+     * is on the ASPECT because that is what the URL carries -- resizing at constant aspect needs no reload
+     * at all. The SVG surface is rebuilt outright: it is procedural and cheap.
+     */
+    const ASPECT_EPS = 0.04;                 // ~4% of aspect, well under what the stage's own clamp resolves
+    let ro = null;
+    if (sizeFromHost && typeof ResizeObserver !== "undefined") {
+        let pending = 0;
+        ro = new ResizeObserver(() => {
+            if (pending) return;
+            pending = requestAnimationFrame(() => {
+                pending = 0;
+                const b = measure();
+                if (b.w === width && b.h === height) return;
+                const oldAspect = width / height;
+                width = b.w; height = b.h;
+                if (!surface) return;
+                if (surface.tagName === "IFRAME") {
+                    surface.width = width; surface.height = height;
+                    const mode = modeById(current);
+                    if (mode && mode.frameFromBox && Math.abs(width / height - oldAspect) > ASPECT_EPS) build(mode);
+                } else {
+                    const mode = modeById(current);
+                    if (mode) build(mode);
+                }
+                if (onResize) { try { onResize({ width, height }); } catch {} }
+            });
+        });
+        try { ro.observe(host); } catch { ro = null; }
+    }
+    const stopObserving = () => { if (ro) { try { ro.disconnect(); } catch {} ro = null; } };
+
+    return { el: btn, set, get current() { return current; }, next: () => set(nextMode(current)),
+             teardown: () => { stopObserving(); teardown(); }, MODES,
+             get size() { return { width, height }; }, remeasure: () => { const b = measure(); width = b.w; height = b.h; return { width, height }; } };
 }
 
 /**

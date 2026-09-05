@@ -1,0 +1,56 @@
+{
+ "gate": "physics/render/rtPipeline-selfcheck.mjs",
+ "at": "2026-09-03",
+ "tables": [
+  {
+   "title": "two spheres: CPU against the pipeline, per resolution and sample count",
+   "columns": [
+    "scene",
+    "size",
+    "spp",
+    "pixels differing"
+   ],
+   "rows": [
+    [
+     "apart",
+     "24x24",
+     "16",
+     "0 of 576"
+    ],
+    [
+     "apart",
+     "32x32",
+     "64",
+     "0 of 1024"
+    ],
+    [
+     "apart",
+     "48x48",
+     "16",
+     "0 of 2304"
+    ],
+    [
+     "TOUCHING",
+     "24x24",
+     "16",
+     "0 of 576"
+    ],
+    [
+     "TOUCHING",
+     "32x32",
+     "64",
+     "0 of 1024"
+    ],
+    [
+     "TOUCHING",
+     "48x48",
+     "16",
+     "0 of 2304"
+    ]
+   ],
+   "note": "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

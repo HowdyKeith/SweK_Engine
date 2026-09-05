@@ -4,9 +4,9 @@
  "bodies": [
   {
    "name": "box3d",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 3767005,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 1226434,
    "files": [
     {
      "path": "box3d.js",
@@ -53,22 +53,6 @@
      "bytes": 1067
     },
     {
-     "path": "native/gate_probe",
-     "bytes": 1064472
-    },
-    {
-     "path": "native/gate_probe.c",
-     "bytes": 2481
-    },
-    {
-     "path": "native/libbox3d.a",
-     "bytes": 1451810
-    },
-    {
-     "path": "native/shim.o",
-     "bytes": 21808
-    },
-    {
      "path": "PROVENANCE.md",
      "bytes": 2106
     }
@@ -76,9 +60,9 @@
   },
   {
    "name": "draco",
-   "arrived": "2026-08-30",
-   "sha": "7985f885e6a11a92c2e43c70cba25b76779262fd",
-   "bytes": 257428,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 258392,
    "files": [
     {
      "path": "DRACOLoader.js",
@@ -87,13 +71,17 @@
     {
      "path": "LICENSE",
      "bytes": 1064
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 964
     }
    ]
   },
   {
    "name": "fonts",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 164836,
    "files": [
     {
@@ -108,8 +96,8 @@
   },
   {
    "name": "gifenc",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 10453,
    "files": [
     {
@@ -128,8 +116,8 @@
   },
   {
    "name": "grass",
-   "arrived": "2026-08-30",
-   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 1064,
    "files": [
     {
@@ -140,9 +128,9 @@
   },
   {
    "name": "heerich",
-   "arrived": "2026-08-28",
-   "sha": "445fe95c6dfe579e86312478fb97b8dae236bff2",
-   "bytes": 119007,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 119532,
    "files": [
     {
      "path": "bsp.js",
@@ -173,6 +161,10 @@
      "bytes": 1321
     },
     {
+     "path": "PROVENANCE.txt",
+     "bytes": 525
+    },
+    {
      "path": "shapes.js",
      "bytes": 3287
     },
@@ -184,8 +176,8 @@
   },
   {
    "name": "htmx",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 55742,
    "files": [
     {
@@ -208,9 +200,9 @@
   },
   {
    "name": "jolt",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 3223645,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 3224554,
    "files": [
     {
      "path": "jolt-physics.wasm-compat.d.ts",
@@ -223,25 +215,33 @@
     {
      "path": "LICENSE",
      "bytes": 1074
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 909
     }
    ]
   },
   {
    "name": "keyhunt",
-   "arrived": "2026-08-30",
-   "sha": "90cbc92086faeb99ad07a5b79c05703971914075",
-   "bytes": 338,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 1127,
    "files": [
     {
      "path": "ATTRIBUTION.txt",
      "bytes": 338
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 789
     }
    ]
   },
   {
    "name": "krbn",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 940443,
    "files": [
     {
@@ -1180,8 +1180,8 @@
   },
   {
    "name": "slug",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 3821,
    "files": [
     {
@@ -1196,8 +1196,8 @@
   },
   {
    "name": "taichi-js",
-   "arrived": "2026-08-23",
-   "sha": "e6d46a775e89e71ac5d41f5318b925b2a05c4649",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 3638669,
    "files": [
     {
@@ -1216,9 +1216,9 @@
   },
   {
    "name": "three",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 1550472,
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
+   "bytes": 1551374,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
@@ -1253,6 +1253,10 @@
      "bytes": 1081
     },
     {
+     "path": "PROVENANCE.txt",
+     "bytes": 902
+    },
+    {
      "path": "three.module.js",
      "bytes": 1272972
     }
@@ -1262,11 +1266,15 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3214311,
+   "bytes": 3215271,
    "files": [
     {
      "path": "LICENSE",
      "bytes": 1081
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 960
     },
     {
      "path": "README.md",
@@ -1288,8 +1296,8 @@
   },
   {
    "name": "wasm",
-   "arrived": "2026-08-19",
-   "sha": "66db97c45b5286d98d1c018506effca552f05a23",
+   "arrived": "2026-08-31",
+   "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
    "bytes": 810948,
    "files": [
     {

@@ -43,12 +43,12 @@ console.log("\n1. *** THE SKIP IS PERMANENT, DEMONSTRATED THROUGH THE REAL SWEEP
         ABSORBING.escapes);
     // *** THE REPAIR: THE ROW NOW SAYS WHEN IT WAS SEEN, WHICH THE WHOLE-FILE DATE COULD NOT. ***
     ok("*** the exiled row keeps its OLD observation stamp while the file's `captured` moves ***",
-        d.observedAfter === "2020-01-01T00:00:00.000Z" && d.captured !== d.observedAfter,
-        `row observed ${d.observedAfter}, file captured ${d.captured} -- one dates the ROW, the other the RUN`);
+        d.atAfter === "2020-01-01T00:00:00.000Z" && d.captured !== d.atAfter,
+        `row observed ${d.atAfter}, file captured ${d.captured} -- one dates the ROW, the other the RUN`);
     ok("  and a row the sweep actually ran is stamped with that run",
-        typeof e.observedAfter === "string" && e.observedAfter !== "2020-01-01T00:00:00.000Z" &&
-        Math.abs(Date.parse(e.observedAfter) - Date.now()) < 600000,
-        `${e.observedAfter} -- within ten minutes of now`);
+        typeof e.atAfter === "string" && e.atAfter !== "2020-01-01T00:00:00.000Z" &&
+        Math.abs(Date.parse(e.atAfter) - Date.now()) < 600000,
+        `${e.atAfter} -- within ten minutes of now`);
     ok("  the repair is a record change and says so", /not made here|unchanged/.test(RECORD_REPAIR.notAPolicy),
         RECORD_REPAIR.notAPolicy);
 }
@@ -68,7 +68,7 @@ console.log("\n2. *** WHO IS IN THERE ***");
     // row no sweep has been able to refresh since the field existed -- and every one of them is an exile. The
     // containment is the assertable direction: a gate released from exile gets stamped on its next run, so
     // equality would fail on the repair while this stays true.
-    const O = prior.observed || {};
+    const O = prior.at || {};
     const unstamped = Object.keys(T).filter((g) => !O[g]);
     if (unstamped.length) {
         report(`${unstamped.length} of ${Object.keys(T).length} rows carry no observation stamp; ` +

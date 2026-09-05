@@ -1,0 +1,17 @@
+{
+ "built": "2026-09-03",
+ "reports": [
+  "backendRouting-selfcheck.json",
+  "claimEvidence-selfcheck.json",
+  "fireSpread-selfcheck.json",
+  "frontDoor-selfcheck.json",
+  "gateReport-selfcheck.json",
+  "pathTracerGpu-selfcheck.json",
+  "registerDrift-selfcheck.json",
+  "rigidCouple-selfcheck.json",
+  "rigidFloat-selfcheck.json",
+  "rtPipeline-selfcheck.json",
+  "shipDebris-selfcheck.json",
+  "shipyard-selfcheck.json"
+ ]
+}

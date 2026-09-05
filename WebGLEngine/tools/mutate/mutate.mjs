@@ -93,7 +93,14 @@ const MUTATIONS = [
       file: "simulation/tomo/blobPhantom.js", find: "32 / 35", replace: "33 / 35",
       breaks: "the closed-form X-ray shadow" },
     { name: "the fluid's shadow amplitude drops its 315/64pi",
-      file: "physics/sph/sph.js", find: "o.mass * 315 / (64 * Math.PI * Math.pow(o.h, 3))", replace: "o.mass * 316 / (64 * Math.PI * Math.pow(o.h, 3))",
+      // *** v4386 -- THIS ENTRY HAD ROTTED, AND IT IS THE SECOND TIME IN THIS TABLE. *** It looked for
+      // Math.pow(o.h, 3); sph.js now writes the same cube as (h * h * h). Same arithmetic, different text, and a
+      // find-string is a COPY OF SOURCE TEXT rather than a reference to it -- so the mutation applied nothing
+      // and the harness would have reported a phantom survivor. The header above already records the first
+      // occurrence (Math.pow(h, 6) -> _p6(h) in kernels.js). tools/ship/mutationTable-selfcheck.mjs CAUGHT this
+      // one, by name, and then stood red from v4279 to v4385 while tools/mutate/scan.mjs went on recording
+      // "runs ten mutations and catches all ten". The gate did its job; nobody did theirs.
+      file: "physics/sph/sph.js", find: "o.mass * 315 / (64 * Math.PI * (h * h * h))", replace: "o.mass * 316 / (64 * Math.PI * (h * h * h))",
       breaks: "the fluid selfie -- shadow vs the field it is drawn from" },
     { name: "FDTD's electric update loses its 1/eps",
       file: "simulation/em/fdtd1d.js", find: "cE[i] = S / epsR[i]", replace: "cE[i] = S",

@@ -1,0 +1,140 @@
+{
+  "note": "v4432 -- #139's GitHub universe, and ONLY the part of it that is reachable. See world/orreryUniverse.mjs.",
+  "built": "2026-09-03",
+  "source": "GitHub repository SEARCH (mcp__github__search_repositories, minimal_output false). Search endpoints are not repo-scoped; per-repo endpoints are, which is what settles two of #139's three axes.",
+  "population": "every distinct upstream owner/repo in orrery-authors.json",
+  "reachable": [
+    "owner",
+    "repo",
+    "ownerType",
+    "language",
+    "stars",
+    "forks",
+    "sizeKB",
+    "createdAt",
+    "pushedAt",
+    "licence"
+  ],
+  "refused": [
+    {
+      "axis": "country",
+      "why": "search_users returns login, id, node_id, avatar_url and profile_url ONLY -- there is no location field in the response, and no get_user tool exists in this session. Measured by calling it for erincatto: the object came back with five keys and none of them was a place.",
+      "notASubstitute": "a location could be GUESSED by probing `location:X` qualifiers, but GitHub locations are free text ('Bay Area', 'Earth', empty) so that neither converges nor measures"
+    },
+    {
+      "axis": "contributorCount",
+      "why": "both routes are PER-REPO endpoints and per-repo endpoints are scoped to this session's own repositories. list_repository_collaborators and list_commits on mrdoob/three.js both returned the identical refusal naming howdykeith/swek_engine and howdykeith/swek-blobulator as the allowed set. Tried, not assumed.",
+      "notASubstitute": "distinct authors over a page of commits is a SAMPLE of recent activity, not a contributor count, and the endpoint that would sample it is the one that is refused"
+    }
+  ],
+  "bodies": [
+    {
+      "owner": "erincatto",
+      "repo": "box3d",
+      "ownerType": "User",
+      "language": "C",
+      "stars": 6257,
+      "forks": 317,
+      "sizeKB": 4098,
+      "createdAt": "2026-05-10T20:26:19Z",
+      "pushedAt": "2026-09-03T05:00:02Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "mrdoob",
+      "repo": "three.js",
+      "ownerType": "User",
+      "language": "JavaScript",
+      "stars": 115084,
+      "forks": 36518,
+      "sizeKB": 1667789,
+      "createdAt": "2010-03-23T18:58:01Z",
+      "pushedAt": "2026-09-03T16:25:27Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "mattdesl",
+      "repo": "gifenc",
+      "ownerType": "User",
+      "language": "JavaScript",
+      "stars": 339,
+      "forks": 25,
+      "sizeKB": 1971,
+      "createdAt": "2021-02-23T00:22:13Z",
+      "pushedAt": "2024-09-19T16:55:38Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "meodai",
+      "repo": "heerich",
+      "ownerType": "User",
+      "language": "JavaScript",
+      "stars": 609,
+      "forks": 16,
+      "sizeKB": 485,
+      "createdAt": "2026-03-28T21:22:00Z",
+      "pushedAt": "2026-06-22T08:29:55Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "bigskysoftware",
+      "repo": "htmx",
+      "ownerType": "Organization",
+      "language": "JavaScript",
+      "stars": 49334,
+      "forks": 1653,
+      "sizeKB": 140428,
+      "createdAt": "2020-04-13T16:17:51Z",
+      "pushedAt": "2026-09-03T14:51:22Z",
+      "licence": "NOASSERTION"
+    },
+    {
+      "owner": "jrouwe",
+      "repo": "JoltPhysics.js",
+      "ownerType": "User",
+      "language": "C++",
+      "stars": 564,
+      "forks": 53,
+      "sizeKB": 14481,
+      "createdAt": "2022-09-02T13:23:25Z",
+      "pushedAt": "2026-08-23T14:22:12Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "EricLengyel",
+      "repo": "Slug",
+      "ownerType": "User",
+      "language": "HLSL",
+      "stars": 1514,
+      "forks": 73,
+      "sizeKB": 38,
+      "createdAt": "2026-03-13T04:15:42Z",
+      "pushedAt": "2026-04-15T17:56:36Z",
+      "licence": "NOASSERTION"
+    },
+    {
+      "owner": "AmesingFlank",
+      "repo": "taichi.js",
+      "ownerType": "User",
+      "language": "TypeScript",
+      "stars": 536,
+      "forks": 23,
+      "sizeKB": 230308,
+      "createdAt": "2021-11-13T19:39:59Z",
+      "pushedAt": "2024-07-18T06:38:21Z",
+      "licence": "MIT"
+    },
+    {
+      "owner": "justjake",
+      "repo": "quickjs-emscripten",
+      "ownerType": "User",
+      "language": "TypeScript",
+      "stars": 1702,
+      "forks": 137,
+      "sizeKB": 39358,
+      "createdAt": "2020-01-05T16:09:48Z",
+      "pushedAt": "2026-07-23T21:17:36Z",
+      "licence": "NOASSERTION"
+    }
+  ]
+}

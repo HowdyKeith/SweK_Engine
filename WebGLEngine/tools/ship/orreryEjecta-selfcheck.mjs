@@ -19,6 +19,7 @@ import * as E from "../../world/orreryEjecta.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { NOT_IMPORTERS } from "./orreryFleetScan.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -58,10 +59,19 @@ console.log("1. *** THE PAPERWORK PLANETS: 3 of 14 bodies contain no code at all
     // with no licence provenance"; both have since gained a LICENSE, so box3d now carries paperwork and its
     // mass is correctly LESS than its bytes. The example is chosen by measurement now -- the first body with no
     // paper file at all -- so the check states the property rather than a body that happened to have it.
+    // *** AND AT v4418 THERE IS NO ALL-CODE BODY LEFT, WHICH IS THE COMMENT ABOVE HAPPENING A SECOND TIME. ***
+    // That comment records box3d ceasing to be the example when it gained a LICENSE, and says the example is
+    // chosen by measurement now. Measurement returns NOTHING: v4418 delegated isPaperFile's licence half to
+    // world/orrery.mjs's isLicenceFile after finding the same file was paperwork to one function and payload to
+    // another, and IBMPlexSerif-OFL.txt and ASHIMA-LICENSE.txt came across with it. Every vendored body carries
+    // paperwork. So the row states the INVARIANT rather than an example that keeps being spent: mass is bytes
+    // minus paper, for every body, and it is checked on all fifteen instead of on whichever one still fits.
     const allCode = BODIES.filter((b) => !(b.files || []).some((f) => E.isPaperFile(f.path)));
-    ok("  and mass is unchanged for a body that is all code",
-        allCode.length > 0 && allCode.every((b) => E.massOf(b) === b.bytes),
-        allCode.map((b) => b.name).join(", ") + " carry no paperwork to discount");
+    const paperBytes = (b) => (b.files || []).filter((f) => E.isPaperFile(f.path)).reduce((a, f) => a + f.bytes, 0);
+    ok("!! *** mass is bytes MINUS paperwork, for every body, not for a chosen example ***",
+        BODIES.every((b) => E.massOf(b) === b.bytes - paperBytes(b)),
+        BODIES.filter((b) => E.massOf(b) !== b.bytes - paperBytes(b)).map((b) => b.name).join(", ") ||
+        `${BODIES.length} bodies reconcile; ${allCode.length} carry no paperwork at all, against 1 before v4418`);
     ok("  ...and #61's two now DO carry paperwork, which is why neither is the example any more",
         ["box3d", "htmx"].every((n) => { const b = BODIES.find((x) => x.name === n);
             return b && (b.files || []).some((f) => E.isPaperFile(f.path)) && E.massOf(b) < b.bytes; }),
@@ -94,24 +104,39 @@ console.log("\n2. *** EJECTA: how far each body's material spread into the tree 
     // importer of box3d and the recorded 31 went red. A measuring instrument inside its own sample is the
     // fourth instance of this shape in three rounds (v4262's influence scan twice, v4263's licence phrase,
     // this one). The rule is the same every time: a scan must not count the scanner.
+    // *** v4410: A SECOND COPY OF THE EXCLUSION IS A SECOND CHANCE TO DISAGREE, AND IT TOOK ONE DAY. ***
+    // This gate excluded ONE path -- itself -- while tools/ship/orreryFleetScan.mjs kept the real list in
+    // NOT_IMPORTERS. v4410 added a second gate full of vendor-path fixtures, put it in NOT_IMPORTERS, and this
+    // walker went red naming the arrival because it had never heard of that list. The name-frozen ratchet did
+    // its job -- it said WHICH file, not that a number had moved -- and the fix is the list, not another line.
     const SELF = "tools/ship/orreryEjecta-selfcheck.mjs";
-    for (let i = files.length - 1; i >= 0; i--)
-        if (files[i].path.replace(/\\/g, "/") === SELF) files.splice(i, 1);
+    for (let i = files.length - 1; i >= 0; i--) {
+        const rel = files[i].path.replace(/\\/g, "/");
+        if (rel === SELF || NOT_IMPORTERS.includes(rel)) files.splice(i, 1);
+    }
     ok("the sweep reaches the engine's own files, excluding vendor/ AND this gate", files.length > 3000,
         files.length + " files outside vendor/, self excluded");
     ok("  and this gate really would have counted itself -- it names vendor/box3d/ in a control",
         fs.readFileSync(path.join(ROOT, SELF), "utf8").includes("vendor/box3d/"),
         "which is why the exclusion is by path and not by hope");
+    // v4410 -- dependantsOf, not ejectaOf, and the record is now a LIST OF NAMES rather than a count, so an
+    // arrival and a departure are reported BY NAME instead of as a number that moved.
     const measured = {};
-    for (const b of BODIES) measured[b.name] = E.ejectaOf(b.name, files).length;
-    for (const [name, want] of Object.entries(E.EJECTA_BASELINE))
-        ok("  " + name.padEnd(13) + " " + String(measured[name]).padStart(3) + " importers",
-            measured[name] === want, want === measured[name] ? "" : "recorded " + want);
+    for (const b of BODIES) measured[b.name] = E.dependantsOf(b.name, files).length;
+    for (const [name, want] of Object.entries(E.DEPENDANTS_AT_V4410)) {
+        const have = E.dependantsOf(name, files);
+        const arrived = have.filter((x) => !want.includes(x)), gone = want.filter((x) => !have.includes(x));
+        ok("  " + name.padEnd(13) + " " + String(have.length).padStart(3) + " dependants",
+            arrived.length === 0 && gone.length === 0,
+            arrived.length || gone.length
+                ? (arrived.length ? "ARRIVED: " + arrived.join(", ") + ". " : "") + (gone.length ? "GONE: " + gone.join(", ") : "")
+                : "");
+    }
     // *** A RATCHET THAT ONLY CHECKS ITS OWN KEYS HAS A HOLE THE SIZE OF THE NEXT DEPENDENCY. *** The loop above
     // iterates the BASELINE, so a body absent from it is not checked -- it is not even mentioned. vendor/
     // three-webgpu arrived on 2026-09-02 with seven importers and this gate stayed green over it, because the
     // baseline had no key to disagree with. The count is now asserted to COVER the tree.
-    const unbaselined = BODIES.map((b) => b.name).filter((n) => !(n in E.EJECTA_BASELINE));
+    const unbaselined = BODIES.map((b) => b.name).filter((n) => !(n in E.DEPENDANTS_AT_V4410));
     ok("*** every body in the bake has a baseline entry -- a new dependency cannot arrive unmeasured ***",
         unbaselined.length === 0, unbaselined.join(", ") || `${BODIES.length} bodies, all covered`);
     // The SHAPE is the finding: this discriminates, where the orrery's existing axes do not.
@@ -119,12 +144,25 @@ console.log("\n2. *** EJECTA: how far each body's material spread into the tree 
     ok("*** the measure discriminates: 0 to " + Math.max(...vals) + " across " + BODIES.length + " bodies ***",
         Math.max(...vals) >= 50 && Math.min(...vals) === 0,
         "three at " + measured.three + ", box3d at " + measured.box3d + ", three bodies at 0");
-    ok("and every zero is a PAPER-ONLY body -- nothing with code is unimported",
-        Object.entries(measured).filter(([, v]) => v === 0).map(([k]) => k).join(",") ===
-        E.PAPER_ONLY_BODIES.join(","),
-        "zeros: " + Object.entries(measured).filter(([, v]) => v === 0).map(([k]) => k).join(" "));
-    report("THAT LAST LINE IS THE ONE WORTH READING: there is no vendored CODE in this tree that nothing " +
-        "imports. The empty planets are empty because they hold no code, not because the code is unused.");
+    // *** v4410 SPLIT THIS ROW IN TWO, BECAUSE THE OLD RULE HAD MADE ONE CLAIM TRUE BY ACCIDENT. ***
+    // It asserted that the bodies with zero importers ARE EXACTLY the paper-only bodies, and under the
+    // substring rule both sets were {grass, keyhunt, slug} so it passed. Those are two different properties --
+    // "holds no code" and "nothing reaches it" -- and the positional rule separates them: grass is reached by
+    // tools/ship/grassField-selfcheck and orrery-selfcheck, keyhunt by physics/crypto/secp256k1-selfcheck,
+    // through path.join("vendor", name) that no substring search could ever see. ONLY slug is unreached.
+    const zeros = Object.entries(measured).filter(([, v]) => v === 0).map(([k]) => k);
+    ok("*** every body with NO dependant holds no code -- there is no vendored CODE nothing reaches ***",
+        zeros.every((z) => E.PAPER_ONLY_BODIES.includes(z)),
+        "zeros: " + (zeros.join(" ") || "none") + ". That is the claim worth keeping, and it survives");
+    const reachedPaper = E.PAPER_ONLY_BODIES.filter((b) => measured[b] > 0);
+    ok("  ...and a PAPER-ONLY body may still be reached, which is a different fact and is now stated",
+        reachedPaper.every((b) => E.DEPENDANTS_AT_V4410[b].length === measured[b]),
+        reachedPaper.length ? reachedPaper.map((b) => b + " by " + measured[b] + " (" + E.DEPENDANTS_AT_V4410[b].join(", ") + ")").join("; ") +
+            " -- the licence files are checked by gates, and the substring rule could not see a joined path"
+            : "no paper-only body is reached");
+    report("THE SURVIVING CLAIM: there is no vendored CODE in this tree that nothing reaches. What v4329's " +
+        "version of this row ALSO claimed -- that the unreached bodies and the code-free bodies are the same " +
+        "set -- was an artefact of a rule that could not see path.join, and it is retired rather than repaired.");
 }
 
 // =============================================================================================================
@@ -141,12 +179,15 @@ console.log("\n3. *** THE CITATION COUNT IS REFUSED, and the refusal is measured
     const cites = (name) => { const re = new RegExp("\\b" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
         return files.filter((s) => re.test(s)).length; };
     const wasmCites = cites("wasm"), wasmImports = E.EJECTA_BASELINE.wasm;
-    ok("*** 'wasm' is named in " + wasmCites + " files and imported from vendor/wasm by " + wasmImports + " ***",
-        wasmCites > 100 && wasmImports <= 2,
-        "a substring match on a directory name cannot tell a dependency from a common noun");
+    ok("*** 'wasm' is named in " + wasmCites + " files and reached from vendor/wasm by " + wasmImports + " ***",
+        wasmCites > 100 && wasmImports <= 6,
+        "a substring match on a DIRECTORY NAME cannot tell a dependency from a common noun -- which is the same " +
+        "species as v4410's finding one level down, where a match on the PATH could not tell one from a sentence");
     const grassCites = cites("grass");
-    ok("  and 'grass' scores " + grassCites + " on grassField and grassModel, while importing nothing",
-        grassCites > 20 && E.EJECTA_BASELINE.grass === 0);
+    ok("  and 'grass' scores " + grassCites + " on grassField and grassModel, while " + E.EJECTA_BASELINE.grass + " file(s) reach vendor/grass",
+        grassCites > 20 && E.EJECTA_BASELINE.grass < 5,
+        "the ratio is the point, not the zero: v4329 read this as zero because the two gates that DO reach it " +
+        "build the path with path.join, and a substring rule sees nothing there");
     // *** THE CONTROLS BELOW USED TO TEST A GUARD THAT DID NOTHING. *** ejectaOf once matched the path and
     // then required a quoted specifier; sabotage B deleted that second test and NO COUNT MOVED, because
     // `vendor/<name>/` is already unambiguous -- no sentence in 3,920 engine files contains it outside an

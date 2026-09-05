@@ -12,6 +12,7 @@
 //
 // Run: node shaders/ashimaNoise-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
+import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { NOISE_COMMON, SNOISE3, SNOISE2, SNOISE3_BLOCK, SNOISE2_BLOCK, ASHIMA_CREDIT } from "./ashimaNoise.js";
@@ -19,7 +20,7 @@ import { snoise3, SNOISE3_FALLOFF, SNOISE3_SCALE, SNOISE2_FALLOFF, SNOISE2_SCALE
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
-const src = (p) => readFileSync(new URL(p, import.meta.url).pathname, "utf8");
+const src = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
 
 // 1) *** THE EXTRACTION CHANGED NOTHING THE GPU SEES. *** The only way consolidating a working shader can go
 //    wrong without anything failing.

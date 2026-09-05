@@ -464,6 +464,12 @@ int swk_player_transforms(float* out) {
 // v3568 -- THIS COMMENT USED TO SAY "see swk_joint_motor_set below" AND NO SUCH FUNCTION IS DEFINED IN THIS FILE,
 // or anywhere. A reader following the pointer found nothing, which is worse than silence because it reads like a
 // capability the shim has. There is no motor binding yet; when there is, this is where it goes.
+//
+// *** v4385 -- THERE IS ONE NOW, AND IT IS CALLED swk_joint_motor, IN THE JOINT STATE BLOCK AT THE END OF THIS
+// FILE. *** v3568 left a promise rather than a pointer and this closes it. The name deliberately is NOT
+// swk_joint_motor_set: box3dNode.mjs's documentedButMissing() still lists that string as a name the shim
+// mentions and never defines, and inventing a function to satisfy a report would be shipping code to silence a
+// measurement. The dangling name stays reported until this comment stops containing it.
 // =============================================================================
 
 // (the joint table is declared with the other globals at the top of the file -- v3568)
@@ -697,3 +703,473 @@ void swk_contacts(float* out) {
 // The stride, published rather than duplicated on the JS side. Two declarations of a packed layout is the
 // eight-defect law waiting to happen; the reader asks the shim what the row width is.
 int swk_contact_stride(void) { return SWK_CONTACT_STRIDE; }
+
+// =============================================================================================================
+// v4382 -- *** A RAY, AND UNTIL NOW NOTHING IN THIS TREE COULD ASK THE PHYSICS WORLD WHAT ONE HITS. ***
+//
+// The shim has carried bodies, filters, three joint types, impulses, transforms, contacts and a deterministic
+// record/replay with divergence detection for hundreds of rounds. It has never carried a cast. box3d has had
+// b3World_CastRayClosest the whole time.
+//
+// The cost of that gap is not hypothetical and it is not one module: mesh/meshBVH.mjs, render/perspectiveWarp.mjs
+// and multiplayer/wadLevelHost.js each carry their own ray-versus-geometry code, and the gaze-dwell picker, the
+// FPS control path and the navmesh all ask "what is in front of me" of some OTHER representation of the world.
+// None of them can ask the one that is actually simulating it, so none of them can agree with it by construction.
+//
+// ---- THE SEGMENT CONVENTION, STATED BECAUSE IT IS THE FIRST THING A CALLER GETS WRONG --------------------------
+//
+// box3d takes an ORIGIN and a TRANSLATION, not an origin and a unit direction. The translation IS the length:
+// the cast covers origin -> origin + translation and nothing beyond it, and `fraction` is a fraction OF THAT
+// TRANSLATION rather than a distance. So a caller with a direction and a range multiplies before calling, and
+// the hit distance is fraction * |translation|. Passing a unit direction and expecting a long ray is the same
+// mistake as passing a unit direction to a segment test, and it fails quietly by hitting nothing.
+//
+// ---- WHY THIS RETURNS A BODY INDEX AND NOT A SHAPE ID ---------------------------------------------------------
+//
+// b3RayResult names the SHAPE. Every other entry point in this file speaks in the body indices swk_body_box
+// hands out, and returning a shape id here would make this the one function whose answer the rest of the shim
+// cannot use. So the shape is resolved to its body and the body to its index, by the same B3_ID_EQUALS scan the
+// contact reader uses. A body the table does not know returns -1 rather than 0, because 0 is a real body.
+#define SWK_RAY_STRIDE 9   // hit, bodyIndex, fraction, px, py, pz, nx, ny, nz
+
+int swk_ray_stride(void) { return SWK_RAY_STRIDE; }
+
+/**
+ * Closest hit along origin -> origin + translation. Writes SWK_RAY_STRIDE floats and returns the body index,
+ * or -1 for a miss. The out buffer is written on a miss too -- zeros with out[0] = 0 -- so a caller that reads
+ * the row without checking the return value sees "no hit" rather than whatever was there before.
+ */
+int swk_world_cast_ray(float ox, float oy, float oz,
+                       float tx, float ty, float tz, float* out) {
+    for (int i = 0; i < SWK_RAY_STRIDE; i++) out[i] = 0.0f;
+    b3QueryFilter filter = b3DefaultQueryFilter();
+    b3RayResult r = b3World_CastRayClosest(g_world, (b3Pos){ ox, oy, oz }, (b3Vec3){ tx, ty, tz }, filter);
+    if (!r.hit) return -1;
+    b3BodyId hitBody = b3Shape_GetBody(r.shapeId);
+    int idx = -1;
+    for (int i = 0; i < g_bodyCount; i++) {
+        if (B3_ID_EQUALS(g_bodies[i], hitBody)) { idx = i; break; }
+    }
+    out[0] = 1.0f;
+    out[1] = (float)idx;
+    out[2] = r.fraction;
+    out[3] = r.point.x;  out[4] = r.point.y;  out[5] = r.point.z;
+    out[6] = r.normal.x; out[7] = r.normal.y; out[8] = r.normal.z;
+    return idx;
+}
+
+// ============================================================================================================
+// JOINT STATE AND JOINT DRIVE -- v4385.
+//
+// *** THE LIMIT HAS BEEN WRITE-ONLY SINCE v2515. *** swk_joint_revolute has taken loDeg and hiDeg from the
+// day it was written and swk_joint_spherical has taken coneDeg just as long, and NOT ONE FUNCTION IN THIS FILE
+// HAS EVER READ A JOINT ANGLE BACK. Seven swk_joint_* entry points before this block, and every one of them
+// either creates, destroys, counts, or toggles collide-connected. So physics/ragdollFromSkeleton.mjs derives
+// a knee limit of [-145, 0] degrees from a bone name, hands it to box3d, and nothing anywhere can say whether
+// the knee ever reached it -- which is exactly what tools/ship/ragdollStep-selfcheck.mjs's own footer says of
+// itself: "the limits are checked as values by v4245 and never as behaviour".
+//
+// A value you write and never read is not a setting, it is a hope. These are the readbacks that turn it into
+// a measurement, plus the DRIVE that a limit implies the need for: a joint that can only be stopped is a
+// ragdoll, and a joint that can also be pushed is a rig.
+//
+// LAYOUTS ARE PUBLISHED, NOT TYPED TWICE. swk_joint_state_stride() and swk_joint_limits_stride() do for these
+// rows what swk_contact_stride() and swk_ray_stride() already do for theirs, so physics/box3d/jointDrive.mjs
+// names the fields and the gate compares the two counts rather than trusting that they agree.
+// ============================================================================================================
+
+#define SWK_JOINT_STATE_STRIDE  4   // kind, angle, twist, motorTorque
+#define SWK_JOINT_LIMITS_STRIDE 4   // limitEnabled, lower, upper, motorEnabled
+
+// What kind of joint an index holds, so a caller reading a row knows which fields mean anything.
+// *** THIS IS NOT b3JointType. *** box3d numbers its own enum and that numbering is upstream's to change;
+// these constants are this shim's contract with jointDrive.mjs and are asserted equal in the gate.
+//
+// v4398 -- WHEEL is APPENDED at 4 and the three before it do not move. A kind constant is a wire format
+// between this file and jointDrive.mjs's KIND, so renumbering to keep the list alphabetical or tidy would
+// silently reinterpret every joint a caller already holds.
+#define SWK_JOINT_UNKNOWN   0
+#define SWK_JOINT_REVOLUTE  1
+#define SWK_JOINT_SPHERICAL 2
+#define SWK_JOINT_WELD      3
+#define SWK_JOINT_WHEEL     4
+
+int swk_joint_state_stride(void)  { return SWK_JOINT_STATE_STRIDE; }
+int swk_joint_limits_stride(void) { return SWK_JOINT_LIMITS_STRIDE; }
+
+static int swk__joint_kind(int idx) {
+    if (idx < 0 || idx >= g_jointCount) return SWK_JOINT_UNKNOWN;
+    if (B3_IS_NULL(g_joints[idx])) return SWK_JOINT_UNKNOWN;
+    switch (b3Joint_GetType(g_joints[idx])) {
+        case b3_revoluteJoint:  return SWK_JOINT_REVOLUTE;
+        case b3_sphericalJoint: return SWK_JOINT_SPHERICAL;
+        case b3_weldJoint:      return SWK_JOINT_WELD;
+        case b3_wheelJoint:     return SWK_JOINT_WHEEL;
+        default:                return SWK_JOINT_UNKNOWN;
+    }
+}
+
+int swk_joint_kind(int idx) { return swk__joint_kind(idx); }
+
+/*
+ * The live angles, in RADIANS. Fields: kind, angle, twist, motorTorque.
+ *
+ * *** THE TWO ANGLE FIELDS MEAN DIFFERENT THINGS FOR THE TWO JOINT KINDS, AND COLLAPSING THEM WOULD BE A LIE.
+ * A revolute has ONE angle about its axis and no twist. A spherical has a CONE angle -- how far the bone has
+ * swung away from its rest direction, always non-negative -- and separately a TWIST about that direction,
+ * which is signed. Writing the cone angle into a field called "angle" and leaving twist at zero would let a
+ * caller average the two kinds together, which is meaningless. `kind` is field 0 so the reader has to look.
+ *
+ * Returns the kind, or SWK_JOINT_UNKNOWN with the row zeroed.
+ */
+int swk_joint_state(int idx, float* out) {
+    for (int i = 0; i < SWK_JOINT_STATE_STRIDE; i++) out[i] = 0.0f;
+    int kind = swk__joint_kind(idx);
+    out[0] = (float)kind;
+    if (kind == SWK_JOINT_REVOLUTE) {
+        out[1] = b3RevoluteJoint_GetAngle(g_joints[idx]);
+        out[3] = b3RevoluteJoint_GetMotorTorque(g_joints[idx]);
+    } else if (kind == SWK_JOINT_SPHERICAL) {
+        out[1] = b3SphericalJoint_GetConeAngle(g_joints[idx]);
+        out[2] = b3SphericalJoint_GetTwistAngle(g_joints[idx]);
+        b3Vec3 t = b3SphericalJoint_GetMotorTorque(g_joints[idx]);
+        out[3] = b3Length(t);
+    }
+    return kind;
+}
+
+/*
+ * What the joint was actually CONFIGURED with, read back out of the solver rather than remembered here.
+ * Fields: limitEnabled, lower, upper, motorEnabled -- radians, and for a spherical the "lower/upper" pair is
+ * the cone half-angle in BOTH slots, because a cone has one number and duplicating it is honester than
+ * leaving a field that a reader would have to know to ignore.
+ *
+ * *** READING THIS BACK IS THE POINT, NOT A CONVENIENCE. *** swk_joint_revolute silently drops the limit when
+ * loDeg >= hiDeg, and swk_joint_spherical silently drops the cone when coneDeg <= 0. Both are documented and
+ * neither was observable: a caller who passed its degrees the wrong way round got a free joint and no
+ * complaint. Now the caller can ask.
+ */
+int swk_joint_limits(int idx, float* out) {
+    for (int i = 0; i < SWK_JOINT_LIMITS_STRIDE; i++) out[i] = 0.0f;
+    int kind = swk__joint_kind(idx);
+    if (kind == SWK_JOINT_REVOLUTE) {
+        out[0] = b3RevoluteJoint_IsLimitEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+        out[1] = b3RevoluteJoint_GetLowerLimit(g_joints[idx]);
+        out[2] = b3RevoluteJoint_GetUpperLimit(g_joints[idx]);
+        out[3] = b3RevoluteJoint_IsMotorEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+    } else if (kind == SWK_JOINT_SPHERICAL) {
+        out[0] = b3SphericalJoint_IsConeLimitEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+        const float cone = b3SphericalJoint_GetConeLimit(g_joints[idx]);
+        out[1] = cone; out[2] = cone;
+        out[3] = b3SphericalJoint_IsMotorEnabled(g_joints[idx]) ? 1.0f : 0.0f;
+    }
+    return kind;
+}
+
+/*
+ * THE DRIVE. A motor is what makes a rig resist instead of hanging.
+ *
+ * speed is RADIANS PER SECOND about the joint's own axis; maxTorque caps what the solver may spend reaching
+ * it, and is the field that separates "a limb that holds its pose" from "a limb that cannot be pushed off it".
+ * A motor with an unbounded torque is not a muscle, it is a weld with extra steps.
+ *
+ * *** DETERMINISM: THE COMMENT ABOVE THE JOINT BLOCK HAS WARNED ABOUT THIS SINCE v2515 AND IT IS STILL TRUE.
+ * Joints are solved inside box3d and cost lockstep nothing. A motor whose target is set per tick by gameplay
+ * is an INPUT, and an input has to travel the same path every other input travels or the replay diverges.
+ * This function is the actuator, not the policy; nothing here decides when to call it.
+ */
+int swk_joint_motor(int idx, int enable, float speed, float maxTorque) {
+    int kind = swk__joint_kind(idx);
+    if (kind == SWK_JOINT_REVOLUTE) {
+        b3RevoluteJoint_EnableMotor(g_joints[idx], enable ? true : false);
+        b3RevoluteJoint_SetMotorSpeed(g_joints[idx], speed);
+        b3RevoluteJoint_SetMaxMotorTorque(g_joints[idx], maxTorque);
+        return kind;
+    }
+    if (kind == SWK_JOINT_SPHERICAL) {
+        // A spherical motor takes a VECTOR velocity. The axis a spherical joint was built around is its
+        // frame's z, so a scalar "speed" here means "about your own axis" and is written as such.
+        b3SphericalJoint_EnableMotor(g_joints[idx], enable ? true : false);
+        b3SphericalJoint_SetMotorVelocity(g_joints[idx], (b3Vec3){ 0.0f, 0.0f, speed });
+        b3SphericalJoint_SetMaxMotorTorque(g_joints[idx], maxTorque);
+        return kind;
+    }
+    return SWK_JOINT_UNKNOWN;       // a weld has nothing to drive, and saying so beats doing nothing quietly
+}
+
+// ==============================================================================================================
+// v4395 -- SENSORS AND CONTINUOUS COLLISION. The last two names on #150 after v4385 shipped motors and limits.
+//
+// *** A SENSOR IS NOT A FLAG YOU CAN SET LATER. *** b3Shape_IsSensor is a GETTER and there is no setter: the
+// isSensor field lives on b3ShapeDef and is read once, at b3CreateHullShape. So this is a second CREATION entry
+// point rather than a set-it-afterwards flag, and the shape of the API is dictated by the library rather than
+// chosen. Adding an eighth parameter to swk_body_box would have been the other option and would have changed
+// the signature every existing caller and every existing gate uses.
+//
+// The obvious name for that flag is deliberately NOT written above, and this paragraph is why. The first draft
+// explained the absence BY NAMING IT, and box3dNode.documentedButMissing -- which greps this file for swk_
+// names it can find no definition of -- went from two to three on the strength of a sentence saying the
+// function does not exist. A file that names its own subject becomes its own subject; v4387 hit the same trap
+// from the other side and the fix is the same, reword rather than add an exclusion.
+//
+// *** AND SENSOR EVENTS ARE OFF BY DEFAULT ON BOTH ENDS. *** The header says so twice, in two places, because
+// it catches everybody: "Enable sensor events for this shape. This applies to sensors AND NON-SENSORS. False by
+// default, EVEN FOR SENSORS." A sensor with events disabled is a hole in the world that reports nothing, and a
+// visitor with events disabled walks through a live sensor silently. swk_body_sensor enables them on the sensor
+// it creates; the VISITOR is the caller's job and swk_body_enable_sensor_events is how.
+// ==============================================================================================================
+
+#define SWK_SENSOR_STRIDE 2   /* sensorBodyIndex, visitorBodyIndex */
+
+int swk_sensor_stride(void) { return SWK_SENSOR_STRIDE; }
+
+// Shape -> body -> index, the same scan swk_world_cast_ray and the contact reader use. A shape whose body the
+// table does not know yields -1, which is a real answer here: an END event can name a shape that has already
+// been destroyed, and the header warns about exactly that.
+static int swk__index_of_shape(b3ShapeId s) {
+    b3BodyId b = b3Shape_GetBody(s);
+    for (int i = 0; i < g_bodyCount; i++) if (B3_ID_EQUALS(g_bodies[i], b)) return i;
+    return -1;
+}
+
+/**
+ * A sensor body: overlaps are reported, nothing is pushed. Density is fixed at 0 rather than taken as a
+ * parameter -- the header notes sensors still contribute to body mass at non-zero density, and a trigger volume
+ * that changes the mass of the thing it is attached to is a trap nobody would look for.
+ *
+ * type follows swk_body_box: 0 static, 1 dynamic, 2 kinematic. A static sensor is the ordinary trigger volume.
+ */
+int swk_body_sensor(int type, float x, float y, float z, float hx, float hy, float hz) {
+    if (g_bodyCount >= MAX_BODIES) return -1;
+    b3BodyDef bd = b3DefaultBodyDef();
+    bd.linearDamping = 0.05f;
+    bd.angularDamping = 0.05f;
+    bd.type = (type == 2) ? b3_kinematicBody : (type == 1) ? b3_dynamicBody : b3_staticBody;
+    bd.position = (b3Pos){ x, y, z };
+    b3BodyId body = b3CreateBody(g_world, &bd);
+    b3ShapeDef sd = b3DefaultShapeDef();
+    sd.density = 0.0f;
+    sd.isSensor = true;
+    sd.enableSensorEvents = true;   // see the header block: false by default EVEN FOR SENSORS
+    b3BoxHull hull = b3MakeBoxHull(hx, hy, hz);
+    b3CreateHullShape(body, &sd, &hull.base);
+    g_bodies[g_bodyCount] = body;
+    return g_bodyCount++;
+}
+
+/** Is this body's first shape a sensor? Reads the library rather than a flag this file kept. */
+int swk_body_is_sensor(int idx) {
+    if (idx < 0 || idx >= g_bodyCount) return 0;
+    b3ShapeId shapes[8];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, 8);
+    return (n > 0 && b3Shape_IsSensor(shapes[0])) ? 1 : 0;
+}
+
+/** Turn sensor events on or off for every shape on a body. A VISITOR needs this or it is never reported. */
+void swk_body_enable_sensor_events(int idx, int flag) {
+    if (idx < 0 || idx >= g_bodyCount) return;
+    b3ShapeId shapes[8];
+    int n = b3Body_GetShapes(g_bodies[idx], shapes, 8);
+    for (int i = 0; i < n; i++) b3Shape_EnableSensorEvents(shapes[i], flag ? true : false);
+}
+
+int swk_sensor_begin_count(void) { return b3World_GetSensorEvents(g_world).beginCount; }
+int swk_sensor_end_count(void)   { return b3World_GetSensorEvents(g_world).endCount; }
+
+// Packed int rows, the same idiom as swk_contacts: the caller sizes from the count and reads a flat Int32Array.
+// The events are TRANSIENT -- the header says do not store a reference -- so they are copied out here and the
+// buffer belongs to the caller.
+void swk_sensor_begin(int* out) {
+    b3SensorEvents ev = b3World_GetSensorEvents(g_world);
+    for (int i = 0; i < ev.beginCount; i++) {
+        out[i * SWK_SENSOR_STRIDE + 0] = swk__index_of_shape(ev.beginEvents[i].sensorShapeId);
+        out[i * SWK_SENSOR_STRIDE + 1] = swk__index_of_shape(ev.beginEvents[i].visitorShapeId);
+    }
+}
+
+void swk_sensor_end(int* out) {
+    b3SensorEvents ev = b3World_GetSensorEvents(g_world);
+    for (int i = 0; i < ev.endCount; i++) {
+        out[i * SWK_SENSOR_STRIDE + 0] = swk__index_of_shape(ev.endEvents[i].sensorShapeId);
+        out[i * SWK_SENSOR_STRIDE + 1] = swk__index_of_shape(ev.endEvents[i].visitorShapeId);
+    }
+}
+
+// ---- CONTINUOUS COLLISION -------------------------------------------------------------------------------------
+//
+// Two independent switches, and calling either one "CCD" would hide the difference. b3World_EnableContinuous is
+// DYNAMIC-VERSUS-STATIC and defaults ON; b3Body_SetBullet is DYNAMIC-VERSUS-DYNAMIC for one body and defaults
+// off. Measured, and this is stronger than anything the vendored header says: the bullet flag is a second gate
+// BEHIND the world switch, not an alternative to it. With the world switch off, setting bullet changes nothing
+// against either kind of wall.
+
+void swk_world_enable_continuous(int flag) { b3World_EnableContinuous(g_world, flag ? true : false); }
+int  swk_world_continuous_enabled(void)    { return b3World_IsContinuousEnabled(g_world) ? 1 : 0; }
+
+void swk_body_set_bullet(int idx, int flag) {
+    if (idx < 0 || idx >= g_bodyCount) return;
+    b3Body_SetBullet(g_bodies[idx], flag ? true : false);
+}
+
+int swk_body_is_bullet(int idx) {
+    if (idx < 0 || idx >= g_bodyCount) return 0;
+    return b3Body_IsBullet(g_bodies[idx]) ? 1 : 0;
+}
+
+// ---- THE SPEED CAP, WHICH swk_body_set_velocity HAS ALWAYS BEEN SUBJECT TO AND NEVER MENTIONED ---------------
+//
+// *** FOUND BY MEASURING CONTINUOUS COLLISION, NOT BY LOOKING FOR IT. *** A tunnelling sweep read the same
+// final position for 640 m/s and for 1280 m/s, to the last decimal, which no physics does. b3WorldDef carries
+// a maximumLinearSpeed and b3DefaultWorldDef sets it; the vendored headers declare the FIELD and the two
+// accessors and nowhere state the DEFAULT, because it is assigned in box3d's own .c, which is not vendored
+// here. So the number is a measurement rather than a quotation: swk_body_set_velocity accepts any speed, reads
+// back unchanged before the step, and is silently 400 m/s after it.
+//
+// Exposing the accessors is the point. A shim with a velocity setter and no way to see or move the cap that
+// overrides it is half an API, and the half it is missing is the one that explains the surprise.
+
+void  swk_world_set_max_linear_speed(float v) { b3World_SetMaximumLinearSpeed(g_world, v); }
+float swk_world_max_linear_speed(void)        { return b3World_GetMaximumLinearSpeed(g_world); }
+
+// ==============================================================================================================
+// v4398 -- THE WHEEL JOINT, WHICH IS THE DESIGN physics/vehicle.mjs ARGUES AGAINST.
+//
+// box3d exposes 36 b3WheelJoint_ functions -- suspension spring and limits, a spin motor with torque readback,
+// steering with its own spring and limits -- and not one of them has ever been called from this tree. That is
+// not an oversight. v4217 built physics/vehicle.mjs as a RAYCAST vehicle and its header says why in as many
+// words: "A constraint solver has to reconcile the wheel's contact with the ground AND its joint to the
+// chassis every step, at a mass ratio of maybe 50:1, and small errors in each feed the other" -- that is why,
+// it says, toy car physics jitters.
+//
+// *** SO THE WHEEL JOINT IS NOT A DUPLICATE OF vehicle.mjs. IT IS THE ALTERNATIVE vehicle.mjs REJECTED, AND
+// THE TREE HAS NEVER TESTED THE REJECTION. *** 56 checks in tools/ship/vehicle-selfcheck.mjs and every one of
+// them is about the raycast force arithmetic; not one asks whether the constrained version actually jitters.
+// Binding this is what makes the claim measurable, and the answer is worth having either way.
+//
+// ---- THE FRAMES, WHICH ARE NOT THE OBVIOUS ONES ---------------------------------------------------------------
+//
+// box3d's header: "The wheel rotates around the local z-axis in frame B. The wheel translates along the local
+// x-axis in frame A. The wheel can optionally steer along the x-axis in frame A." So the SUSPENSION axis and
+// the STEERING axis are the same axis -- frame A's local x -- and the SPIN axis is frame B's local z. For a car
+// on flat ground that means frame A's x points UP and frame B's z points sideways, which is not what anybody
+// guesses from the words "wheel axis". Two axes in, and the quats are built the same way swk_joint_revolute
+// builds its one.
+// ==============================================================================================================
+
+#define SWK_WHEEL_STATE_STRIDE 5   /* spinSpeed, spinTorque, steeringAngle, steeringTorque, linearSeparation */
+
+int swk_wheel_state_stride(void) { return SWK_WHEEL_STATE_STRIDE; }
+
+/**
+ * A wheel: body a is the CHASSIS, body b is the WHEEL, per box3d's own convention.
+ *
+ * susAxis is the suspension AND steering axis (frame A's local x, so "up" for a car); spinAxis is the roll axis
+ * (frame B's local z, so "sideways"). hertz <= 0 leaves the spring disabled, which is a rigid strut. The
+ * suspension limits are in metres of travel and are enabled only when lo < hi, the same convention
+ * swk_joint_revolute uses for its angles.
+ */
+int swk_joint_wheel(int a, int b, float wx, float wy, float wz,
+                    float sux, float suy, float suz, float spx, float spy, float spz,
+                    float hertz, float damping, float loTravel, float hiTravel) {
+    if (!swk__valid_pair(a, b)) return -1;
+    b3Vec3 world = { wx, wy, wz };
+    b3Vec3 sus = b3Normalize((b3Vec3){ sux, suy, suz });
+    b3Vec3 spin = b3Normalize((b3Vec3){ spx, spy, spz });
+
+    b3WheelJointDef def = b3DefaultWheelJointDef();
+    def.base.bodyIdA = g_bodies[a];
+    def.base.bodyIdB = g_bodies[b];
+    def.base.localFrameA.p = b3Body_GetLocalPoint(g_bodies[a], world);
+    def.base.localFrameA.q = b3ComputeQuatBetweenUnitVectors(b3Vec3_axisX, sus);
+    def.base.localFrameB.p = b3Body_GetLocalPoint(g_bodies[b], world);
+    def.base.localFrameB.q = b3ComputeQuatBetweenUnitVectors(b3Vec3_axisZ, spin);
+    if (hertz > 0.0f) {
+        def.enableSuspensionSpring = true;
+        def.suspensionHertz = hertz;
+        def.suspensionDampingRatio = damping;
+    }
+    if (loTravel < hiTravel) {
+        def.enableSuspensionLimit = true;
+        def.lowerSuspensionLimit = loTravel;
+        def.upperSuspensionLimit = hiTravel;
+    }
+    return swk__push_joint(b3CreateWheelJoint(g_world, &def));
+}
+
+/**
+ * Drive: a target spin speed in rad/s and a torque budget. enable 0 lets the wheel freewheel.
+ *
+ * *** IT WAKES THE BODIES, AND WITHOUT THAT LINE IT SILENTLY DOES NOTHING. *** A vehicle that has been standing
+ * still is ASLEEP -- box3d puts a settled body to sleep and a sleeping body ignores its constraints' motors.
+ * The first draft omitted the wake, and the diagnosis took a while because the readback LIED convincingly:
+ * swk_wheel_state reported spinTorque saturated at the full 300 N-m while spinSpeed sat at exactly 0.0000 and
+ * the car travelled 0.00 m. Full torque, no motion, no error -- which reads like a physics result and is a
+ * sleeping body. Anything that changes what a joint should DO has to wake what it is attached to.
+ */
+int swk_wheel_spin(int idx, int enable, float radPerSec, float maxTorque) {
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    b3WheelJoint_EnableSpinMotor(g_joints[idx], enable ? true : false);
+    b3WheelJoint_SetSpinMotorSpeed(g_joints[idx], radPerSec);
+    b3WheelJoint_SetMaxSpinTorque(g_joints[idx], maxTorque);
+    b3Joint_WakeBodies(g_joints[idx]);
+    return 1;
+}
+
+/** Steer: a target angle in DEGREES at the shim boundary, radians inside, like every other joint here. */
+int swk_wheel_steer(int idx, int enable, float targetDeg, float maxTorque) {
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    b3WheelJoint_EnableSteering(g_joints[idx], enable ? true : false);
+    b3WheelJoint_SetTargetSteeringAngle(g_joints[idx], B3_DEG_TO_RAD * targetDeg);
+    b3WheelJoint_SetMaxSteeringTorque(g_joints[idx], maxTorque);
+    b3Joint_WakeBodies(g_joints[idx]);   // same reason as swk_wheel_spin: a sleeping wheel does not steer
+    return 1;
+}
+
+/**
+ * Readback. b3WheelJoint_ has no suspension-TRAVEL getter of its own -- the four Get*SuspensionLimit calls
+ * return the configured limits, not where the strut is -- so the fifth field is the generic
+ * b3Joint_GetLinearSeparation, which is the constraint's own linear error. It is a proxy and it is labelled as
+ * one rather than being called ride height.
+ */
+int swk_wheel_state(int idx, float* out) {
+    for (int i = 0; i < SWK_WHEEL_STATE_STRIDE; i++) out[i] = 0.0f;
+    if (idx < 0 || idx >= g_jointCount) return 0;
+    if (swk__joint_kind(idx) != SWK_JOINT_WHEEL) return 0;
+    out[0] = b3WheelJoint_GetSpinSpeed(g_joints[idx]);
+    out[1] = b3WheelJoint_GetSpinTorque(g_joints[idx]);
+    out[2] = b3WheelJoint_GetSteeringAngle(g_joints[idx]);
+    out[3] = b3WheelJoint_GetSteeringTorque(g_joints[idx]);
+    out[4] = b3Joint_GetLinearSeparation(g_joints[idx]);
+    return 1;
+}
+
+// ---- A ROUND BODY, BECAUSE UNTIL NOW THIS SHIM COULD ONLY MAKE BOXES ------------------------------------------
+//
+// *** EVERY BODY CONSTRUCTOR IN THIS FILE CALLED b3MakeBoxHull, AND NOBODY NOTICED BECAUSE NOTHING HAD EVER
+// NEEDED TO ROLL. *** swk_body_box, swk_body_ship and swk_body_sensor: three constructors, one shape. box3d has
+// had b3CreateSphereShape all along.
+//
+// It surfaced in the worst possible way. The v4398 wheel-joint rig built its wheels out of 0.35-cubes, drove
+// them at 10 and 40 rad/s, and the car travelled EXACTLY 0.00 m at every mass ratio. Not slowly -- zero. A cube
+// on a suspension strut does not roll, it corners and locks, and the reading looked like a physics result for
+// one round of measurements before the number 0.00 repeated once too often to be a car.
+//
+// So the driving half of the wheel joint was not measurable at all, and that was a property of this file rather
+// than of box3d or of the claim under test.
+int swk_body_sphere(int type, float x, float y, float z, float radius, float density) {
+    if (g_bodyCount >= MAX_BODIES) return -1;
+    b3BodyDef bd = b3DefaultBodyDef();
+    bd.linearDamping = 0.05f;
+    bd.angularDamping = 0.05f;
+    bd.type = (type == 2) ? b3_kinematicBody : (type == 1) ? b3_dynamicBody : b3_staticBody;
+    bd.position = (b3Pos){ x, y, z };
+    b3BodyId body = b3CreateBody(g_world, &bd);
+    b3ShapeDef sd = b3DefaultShapeDef();
+    sd.density = density;
+    b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, radius };
+    b3CreateSphereShape(body, &sd, &sphere);
+    g_bodies[g_bodyCount] = body;
+    return g_bodyCount++;
+}

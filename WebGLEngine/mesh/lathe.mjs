@@ -175,13 +175,35 @@ export function maskIoU(a, b) {
  * of the object a lathe was ever going to reproduce. Reported as a fraction of occupied area, so it is
  * comparable across shapes of different sizes.
  */
-export function asymmetry(m, w, h, axis) {
+/*
+ * *** v4383 -- TWO FUNCTIONS IN THIS FILE DISAGREED ABOUT WHERE A PIXEL IS, AND NOTHING HAD EVER CROSSED THEM. ***
+ *
+ * silhouetteMask rasterises at pixel CENTRES: it tests (i + 0.5, j + 0.5) against the triangle. asymmetry
+ * mirrored pixel INDICES: 2*axis - i. Those two conventions differ by exactly one pixel, and the difference is
+ * invisible until the output of one is handed to the other -- which v4255's own gate never did. Its fixtures
+ * are masks painted from index-space predicates like |i - CX| <= r, which ARE index-symmetric, so the function
+ * read exactly 0 on them and looked correct.
+ *
+ * mesh/songLathe.mjs handed it a silhouetteMask of a perfect solid of revolution and it reported 0.098833 on a
+ * smooth profile and 0.590698 on a spectrum-shaped one -- a large asymmetry FLOOR on objects that are symmetric
+ * by construction, from the number this file's own header calls "THE ONLY NUMBER IN THE LOOP THAT TESTS THE
+ * ASSUMPTION". With the mirror taken about pixel centres (2*axis - 1 - i) both read exactly 0.000000. The floor
+ * is not a constant, which is worse than if it were: it scales with how much of the shape sits near the axis,
+ * so it would have read as a property of the object rather than as an offset.
+ *
+ * The default is UNCHANGED, deliberately. Silently switching conventions would move every number this file's
+ * two existing gates already record, and the index convention is genuinely right for an index-space axis such
+ * as profileFromMask's (lo + hi) / 2. What was missing is that a caller has to SAY which space its axis is in,
+ * so `centres: true` is how a caller with a silhouetteMask says so, and passing neither is now a choice rather
+ * than an accident.
+ */
+export function asymmetry(m, w, h, axis, { centres = false } = {}) {
     let diff = 0, area = 0;
     for (let j = 0; j < h; j++) {
         for (let i = 0; i < w; i++) {
             const v = m[j * w + i];
             if (v) area++;
-            const mi = Math.round(2 * axis - i);
+            const mi = Math.round(2 * axis - (centres ? 1 : 0) - i);
             const mv = (mi >= 0 && mi < w) ? m[j * w + mi] : 0;
             if (v !== mv) diff++;
         }

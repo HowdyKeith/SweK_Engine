@@ -39,6 +39,9 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { ADDED_AT_V4385 as JOINT_DRIVE_ADDED } from "./jointDrive.mjs";
+import { ADDED_AT_V4395 as SENSOR_CCD_ADDED } from "./sensorTrigger.mjs";
+import { ADDED_AT_V4398 as WHEEL_ADDED } from "../wheelJoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VENDOR_DIR = join(HERE, "..", "..", "vendor", "box3d");
@@ -148,6 +151,33 @@ export const PENDING_REBUILD = [
     "swk_body_get_filter",
     "swk_joint_set_collide_connected",
     "swk_joint_get_collide_connected",
+    // v4382 -- AND THE NEXT ONE AGAIN, with the same split #125's note recorded for the filter. The raycast
+    // (swk_world_cast_ray plus swk_ray_stride, which publishes the row width so the reader is not typed) is
+    // BUILT AND MEASURED: build-box3d-native.sh needs only cc and cmake, so tools/ship/box3dRay-selfcheck.mjs
+    // compiles a probe against the real library and compares eleven rays against the mesh BVH. What it is NOT
+    // is packaged: getting it into vendor/box3d/box3d.wasm needs emsdk, which this sandbox has not got, so the
+    // browser path degrades on has() until somebody runs build-box3d-wasm.sh on a rig that has it.
+    "swk_world_cast_ray",
+    "swk_ray_stride",
+    // v4385 -- the joint READBACKS and the DRIVE, same split again: built and measured natively, not packaged.
+    // These six are the half of the joint API that was missing for four hundred rounds -- the shim could set a
+    // limit and never read one back, so physics/ragdollFromSkeleton.mjs's derived knee angle of [-145, 0] was
+    // written into the solver and unobservable. The names come from physics/box3d/jointDrive.mjs's
+    // ADDED_AT_V4385 rather than being typed here twice; the gate asserts the two lists are the same.
+    ...JOINT_DRIVE_ADDED,
+    // v4395 -- sensors, continuous collision, and the speed cap: the same split a fourth time, and this one
+    // brought back something the browser path needs more than the functions. swk_world_max_linear_speed
+    // MEASURES a default the vendored headers never state -- 400 m/s -- and the artifact that ships ALREADY
+    // ENFORCES IT, because it is box3d's own default and not something this round added. So unlike the twelve
+    // names beside it, that finding is not pending anything: physics/esBox3d.js hands box3d a ship's top speed
+    // and ev/tools/es-arena.mjs's Fighter asks for 430, and 400 is what the world gives it today, in the wasm,
+    // with no rebuild involved. What is pending is only the ability to SEE or MOVE the cap from the browser.
+    ...SENSOR_CCD_ADDED,
+    // v4398 -- the WHEEL JOINT and, beside it, the first ROUND SHAPE this shim has ever been able to make.
+    // swk_body_sphere is not a wheel-joint function and is in this list for a wheel-joint reason: every body
+    // constructor here called b3MakeBoxHull, so the rig's wheels were cubes and the car travelled exactly
+    // 0.00 m. A vehicle needs something that rolls before any claim about wheels can be measured at all.
+    ...WHEEL_ADDED,
 ];
 
 

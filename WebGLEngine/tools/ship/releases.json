@@ -1,0 +1,118 @@
+{
+  "note": "WHAT IS ACTUALLY PUBLISHED ON THE RELEASES PAGE -- the record the offline gate reads, refreshed from the GitHub API by tools/ship/refreshReleases.mjs rather than believed. THE FLEET DOWNLOADS releases/latest, so this file is the only thing in the tree that knows what the fleet will actually run.",
+  "refreshedAt": "2026-09-04T00:00:00Z",
+  "source": "GET /repos/HowdyKeith/SweK_Engine/releases (per_page=100), read at v4449",
+  "baseline": {
+    "throughVersion": 4449,
+    "raisedAt": "v4450",
+    "raisedWhy": "*** v4449 IS WRITTEN OFF DELIBERATELY, BY KEITH, AND THIS LINE IS THE ACT. *** v4449 built this ratchet, reached main, and was never published -- so at v4450 the rule it added refused the very next ship, which is the rule working and not a bug in it. Asked directly, Keith chose to write v4449 off rather than cut a release for it: v4450 CONTAINS EVERYTHING v4449 DOES, so one release covers both, and a separate v4449 build would be a second artifact nobody would ever download. WHAT IS LOST BY THIS AND IS NOT PRETENDED OTHERWISE: v4449 will never have its own downloadable build, so no box can ever run exactly v4449. The debt is one version and it is named. THE NUMBER MOVED ONCE, HERE, FOR A REASON WRITTEN DOWN -- it is not a floor that drifts up whenever the gate is inconvenient, and the next round that wants to raise it has to write its own paragraph.",
+    "note": "PRE-EXISTING DEBT, FROZEN. Every version at or below v4448 shipped before a release was ever asked for by the ritual, and 258 of the 261 in the changelog were never published. Those are not going to be back-filled: the zip is not byte-reproducible (see the v4068 note in .github/workflows/release.yml), so a release built today for v4301 would carry bytes v4301 never had. THE RULE STARTS AFTER THIS LINE. This number MAY RISE ONLY BY SOMEBODY DELIBERATELY DECLARING MORE DEBT, which is visible in the diff and which the gate names out loud."
+  },
+  "releases": [
+    {
+      "tag": "v4438",
+      "publishedAt": "2026-09-04T00:51:23Z"
+    },
+    {
+      "tag": "v4300",
+      "publishedAt": "2026-09-02T02:05:05Z"
+    },
+    {
+      "tag": "v4296",
+      "publishedAt": "2026-09-01T20:42:55Z"
+    },
+    {
+      "tag": "v4148",
+      "publishedAt": "2026-08-29T22:45:01Z"
+    },
+    {
+      "tag": "v4133",
+      "publishedAt": "2026-08-29T13:16:15Z"
+    },
+    {
+      "tag": "v4116",
+      "publishedAt": "2026-08-29T02:00:33Z"
+    },
+    {
+      "tag": "v4106",
+      "publishedAt": "2026-08-28T15:10:13Z"
+    },
+    {
+      "tag": "v4102",
+      "publishedAt": "2026-08-28T13:59:45Z"
+    },
+    {
+      "tag": "v4090",
+      "publishedAt": "2026-08-28T13:42:57Z"
+    },
+    {
+      "tag": "v4070",
+      "publishedAt": "2026-08-27T19:30:58Z"
+    },
+    {
+      "tag": "v4067",
+      "publishedAt": "2026-08-27T17:13:34Z"
+    },
+    {
+      "tag": "v4035",
+      "publishedAt": "2026-08-26T20:59:06Z"
+    },
+    {
+      "tag": "v4030",
+      "publishedAt": "2026-08-26T17:22:46Z"
+    },
+    {
+      "tag": "v4029",
+      "publishedAt": "2026-08-26T15:00:45Z"
+    },
+    {
+      "tag": "v4027",
+      "publishedAt": "2026-08-26T14:11:16Z"
+    },
+    {
+      "tag": "v4013",
+      "publishedAt": "2026-08-25T19:55:10Z"
+    },
+    {
+      "tag": "v3995",
+      "publishedAt": "2026-08-25T04:39:46Z"
+    },
+    {
+      "tag": "v3975",
+      "publishedAt": "2026-08-24T19:51:14Z"
+    },
+    {
+      "tag": "v3961",
+      "publishedAt": "2026-08-24T00:03:55Z"
+    },
+    {
+      "tag": "v3958",
+      "publishedAt": "2026-08-23T22:44:40Z"
+    },
+    {
+      "tag": "v3943",
+      "publishedAt": "2026-08-23T19:06:48Z"
+    },
+    {
+      "tag": "v3941",
+      "publishedAt": "2026-08-23T13:21:07Z"
+    },
+    {
+      "tag": "v3940",
+      "publishedAt": "2026-08-22T21:16:10Z"
+    },
+    {
+      "tag": "v3938",
+      "publishedAt": "2026-08-22T20:19:37Z"
+    },
+    {
+      "tag": "v3936",
+      "publishedAt": "2026-08-22T14:35:51Z"
+    }
+  ],
+  "ratchet": {
+    "minReleases": 25,
+    "minLatest": 4438,
+    "note": "A RELEASE THE FLEET WAS ALREADY RUNNING MUST NOT VANISH. Found by sabotage 2: deleting the newest row moved the reported lag from 10 to 148 and turned NOTHING red, because the lag is reported rather than asserted. These two numbers may only RISE, and refreshReleases raises them when it writes. A release deleted upstream -- or a ledger truncated by a bad merge -- now fails here instead of quietly telling the fleet to run something older."
+  }
+}

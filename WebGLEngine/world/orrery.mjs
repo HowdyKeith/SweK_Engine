@@ -55,8 +55,24 @@ export const REACHED = "reached";
 const LICENCE_NAME = /(^|[^a-z])(licen[cs]e|copying|notice|attribution|ofl|apache|gpl|lgpl|bsd|mpl|unlicense)([^a-z]|$)/i;
 
 /** True when this filename, on its own, is licence provenance. */
+/**
+ * v4420 -- *** A FILE OF A DOCUMENTARY KIND, WHICH THIS RULE HAD NEVER REQUIRED. ***
+ * Introduced by tools/ship/patternWidth.mjs at v4418 and moved here because this is where the licence question
+ * lives and a second copy is a second chance to disagree.
+ */
+const DOCUMENTARY = /(^[^.]+$)|\.(txt|md|rst|adoc|text|1st)$/i;
+export const isDocumentary = (base) => DOCUMENTARY.test(String(base || ""));
+
 export function isLicenceFile(name) {
     if (typeof name !== "string" || !name) return false;
+    // *** AND THE OTHER DIRECTION WAS NEVER CHECKED. *** v4263 widened LICENCE_NAME three times to stop this
+    // rule falsely accusing properly licensed dependencies, and each widening was right. Nobody then asked what
+    // it accepts that it should not: measured at v4420, TWO OF THE SIX FILES IT MATCHED IN THIS TREE ARE .mjs
+    // MODULES -- brain/rl/attribution.mjs and its gate -- because the rule looks for the word anywhere in the name
+    // and "attribution" is a perfectly good name for code about attribution. A licence is a DOCUMENT, and
+    // requiring that costs the rule nothing: all 17 licences under vendor/ are documentary and stay matched.
+    // Found by tools/ship/predicatePairs.mjs, which discovered that this and isPaperFile CROSS rather than nest.
+    if (!isDocumentary(name.split("/").pop())) return false;
     return LICENCE_NAME.test(name);
 }
 

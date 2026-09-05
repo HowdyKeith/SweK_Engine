@@ -1,0 +1,19 @@
+DRACOLoader.js -- vendored
+https://github.com/mrdoob/three.js  (examples/jsm/loaders/DRACOLoader.js)
+author: Mr.doob -- see LICENSE
+
+Recorded at v4416.
+
+*** THE DIRECTORY IS NAMED FOR A FORMAT AND HOLDS A LOADER FOR IT. *** Draco is Google's mesh
+compression library. What is vendored here is three.js's LOADER for that format, one file,
+DRACOLoader.js, whose licence names Mr.doob. Nothing of Google's Draco is in this directory: no
+decoder wasm, no draco_decoder.js.
+
+EVIDENCE:
+  - LICENSE reads "Copyright (c) 2026 Mr.doob".
+  - The single vendored file is DRACOLoader.js, three.js's loader by that name.
+  - The only URL in the directory is https://mrdoob.github.io/draco.js/ -- a documentation page,
+    not a repository, and this record does not treat it as one.
+
+CONSEQUENCE, RECORDED BECAUSE IT MISLEADS: the author view attributes "draco" to Mr.doob. That is
+correct about the bytes and wrong-sounding about the name, and no scan can tell the difference.

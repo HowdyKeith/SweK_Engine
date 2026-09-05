@@ -1,7 +1,18 @@
 // tools/mutate/scan.mjs -- stop choosing the mutations.
 //
-// mutate.mjs runs ten mutations and catches all ten. That number is worth exactly as much as its weakest
-// assumption, which is me: I hand-picked those ten, and nine were things I had just built or just fixed. A
+// v4386 -- THIS PARAGRAPH USED TO OPEN BY STATING A PERFECT SCORE FOR THE TEN AS A BARE LITERAL, AND THAT
+// SENTENCE WAS FALSE FROM v4162 TO v4385. One of the ten looked for a find-string v4162 had reformatted away,
+// so it mutated nothing: nine experiments and one abstention, reported as ten results. The number now lives in
+// tools/mutate/mutationScore.mjs, where tools/ship/mutationScore-selfcheck.mjs can check it is still about this
+// tree. A number in a comment cannot be checked by anything.
+//
+// The old sentence is DESCRIBED above rather than QUOTED, and that is not squeamishness. Quoting it verbatim
+// put the literal back into this file, and the gate that greps for it went red on the very correction that
+// removed it -- a file naming its own subject becomes its own subject. Reworded rather than excluded, because
+// an exclusion would have left the next real occurrence unfindable too.
+//
+// The score is worth exactly as much as its weakest assumption, which is me: I hand-picked those ten, and nine
+// were things I had just built or just fixed. A
 // hand-picked mutation set measures the AUTHOR'S IMAGINATION, not the gate. It is the same trap as every control
 // in this engine that was designed to pass -- I chose the ways in which the code might be wrong, so I could only
 // discover the wrongness I had already thought of.
@@ -21,13 +32,43 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
+/**
+ * Blank the CONTENTS of string literals, keeping the quotes and the length so every column index still points
+ * where it did. Length-preserving on purpose: findConstants reports a column that mutationsFor slices the real
+ * line at, so a stripper that shortened the text would move every constant after the first string.
+ *
+ * Template literals are blanked too. A ${} expression inside one is code, and blanking it means a real
+ * constant there is MISSED -- which is the safe direction: a missed mutation is an untested constant, while a
+ * mutated string is a false accusation, and this file's output is read as a list of accusations.
+ */
+function stripStrings(code) {
+    let out = "", quote = null;
+    for (let i = 0; i < code.length; i++) {
+        const c = code[i];
+        if (quote) {
+            if (c === "\\") { out += "  "; i++; continue; }
+            if (c === quote) { quote = null; out += c; continue; }
+            out += " ";
+        } else if (c === '"' || c === "'" || c === "`") {
+            quote = c; out += c;
+        } else out += c;
+    }
+    return out;
+}
+
 // Find numeric literals that are plausibly PHYSICS rather than plumbing.
 function findConstants(src) {
     const out = [];
     const lines = src.split("\n");
     for (let li = 0; li < lines.length; li++) {
         const line = lines[li];
-        const code = line.split("//")[0];                      // comments are not code
+        // *** v4388 -- STRIPPING ONLY "//" WAS NOT ENOUGH, AND RUNNING THE SCANNER FOR THE FIRST TIME PROVED IT.
+        // The header above says "anything in a comment: not code", and that was the whole guard. It misses
+        // STRING LITERALS. physics/box3dLockstepNet.js:71 carries the prose "...collisions amplify that
+        // ~90,000x", and the scanner dutifully perturbed 90 to 92.7, ran four gates, and reported a SURVIVING
+        // CONSTANT -- a number in a sentence, filed as a quantity nothing is checking. A survivor list is only
+        // worth reading if its entries are candidates; one prose number in ten empties it of authority.
+        const code = stripStrings(line.split("//")[0]);
         if (!code.trim()) continue;
         const re = /(?<![\w.$])(\d+\.\d+|\d+)(?![\w.])/g;
         let m;
@@ -36,7 +77,14 @@ function findConstants(src) {
             if (val === 0 || val === 1) continue;              // identity/flag noise
             const before = code.slice(Math.max(0, m.index - 1), m.index);
             if (before === "[") continue;                      // an index, not a quantity
-            out.push({ line: li + 1, col: m.index, text: m[1], value: val, context: code.trim().slice(0, 68) });
+            // *** v4390 -- `code` IS CARRIED BESIDE `context` AND THE DIFFERENCE MATTERS. *** context is
+            // TRIMMED and TRUNCATED for printing; col is an index into the untrimmed line. A reader who slices
+            // context at col gets the wrong characters, and tools/mutate/operators.mjs did exactly that on its
+            // first run: `1 / 30` read as a bare integer because the leading spaces were gone, and
+            // JSON.stringify's indent was not seen to be inside the call. Same family as the length-preserving
+            // string stripper above -- a column is only meaningful against the text it was measured on.
+            out.push({ line: li + 1, col: m.index, text: m[1], value: val,
+                       code, context: code.trim().slice(0, 68) });
         }
     }
     return out;

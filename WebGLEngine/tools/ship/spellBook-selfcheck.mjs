@@ -111,7 +111,15 @@ const hash = (o) => crypto.createHash("sha256").update(JSON.stringify(o)).digest
 
     const order = byCost();
     ok(order[order.length - 1] === "cataclysm", "cataclysm is the most expensive spell in the book");
-    ok(order[0] === "spark", "and spark the cheapest");
+    // *** v4430 -- THIS USED TO NAME spark AND THE NAME WENT STALE THE FIRST TIME A SPELL WAS ADDED. ***
+    // #69's ported novaBurst is 7 debris pieces and one flash, so it is genuinely cheaper than spark's 24
+    // particles and the assertion went red -- correctly. Naming a name is the weaker test in any case: it
+    // says nothing about the other five. DERIVE the cheapest from the work instead, which checks the whole
+    // ordering rather than its first element, and cannot go stale when the book grows.
+    const leastWork = SPELL_NAMES.slice().sort((a, b) => costFor(a) - costFor(b) || a.localeCompare(b))[0];
+    ok(order[0] === leastWork && workOf(order[0]).particles === Math.min(...SPELL_NAMES.map((n) => workOf(n).particles)),
+        `and the cheapest is the one that does the least work -- ${order[0]}, ${workOf(order[0]).particles} particles ` +
+        `(this named "spark" until v4430 added a spell that does less)`);
     // costs strictly increase along the order, so no two spells are secretly the same price
     const costs = order.map((n) => costFor(n));
     ok(costs.every((c, i) => i === 0 || c > costs[i - 1]), "costs strictly increase along the ordering");

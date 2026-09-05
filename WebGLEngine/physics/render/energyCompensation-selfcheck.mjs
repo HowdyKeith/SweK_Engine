@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildTable, albedoAt, msLobe, compensatedAlbedo, ORDER_SWEEP } from "./energyCompensation.mjs";
+import { buildTable, albedoAt, msLobe, compensatedAlbedo } from "./energyCompensation.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 let fails = 0;
@@ -52,46 +52,35 @@ const TABLES = ALPHAS.map((a) => buildTable(a));
     // is where E changes fastest across mu, so it is where a linear table interpolation is least adequate --
     // and it is the cell that set section 1's number. REFINING WHERE IT ALREADY LOOKS GOOD WOULD BE MEASURING
     // THE FIXTURE (v3417).
-    // *** v4411 -- THIS SWEEP USED TO READ 2 AND THE 2 WAS THE INSTRUMENT'S. *** From v3492 to v4410 the table
-    // was built by a QUADRATURE, and the residual's order came out second. It is third. The conclusion this
-    // section drew -- "the residual is the TABLE's and not the algebra's" -- was right; the exponent belonged
-    // to the grid underneath, and buildTable now defaults to a grid-free estimator, so the sweep measures what
-    // it always claimed to. The order is now also a DISCRIMINATOR FOR WHICH INSTRUMENT BUILT THE TABLE.
-    //
-    // REFINED AT THE WORST CELL IN THE WHOLE GRID (alpha 0.05, grazing) AND NOT AT A COMFORTABLE ONE -- where E
-    // changes fastest across mu, so a linear table interpolation is least adequate. Refining where it already
-    // looks good would be measuring the fixture (v3417). The LOBE INTEGRAL is held far finer than the table so
-    // the integrator is not what is being measured -- that confusion is exactly what this section used to make.
-    const Ks = [16, 32, 64, 128];
-    const order = (cfg) => {
-        const e = Ks.map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, ...cfg }), 0.2, { N: 2000 }) - 1));
-        const x = Ks.map((k) => Math.log(k)), y = e.map((v) => Math.log(v));
-        const mx = x.reduce((a, b) => a + b) / x.length, my = y.reduce((a, b) => a + b) / y.length;
-        return { e, p: -x.reduce((t, v, i) => t + (v - mx) * (y[i] - my), 0) / x.reduce((t, v) => t + (v - mx) ** 2, 0) };
-    };
-    const S = order({}), Q = order({ quadrature: true, N: 220, M: 220 });
-    say(`table refinement at the WORST cell (alpha 0.05, cos_o 0.2), K = ${Ks.join("/")}`);
-    say(`  grid-free estimator: ${S.e.map((v) => v.toExponential(2)).join(" -> ")}   fitted order ${S.p.toFixed(2)}`);
-    say(`  quadrature N = 220:  ${Q.e.map((v) => v.toExponential(2)).join(" -> ")}   fitted order ${Q.p.toFixed(2)}`);
+    const Ks = [8, 16, 32, 64, 128];
+    // *** THE ORDER STUDY PINS THE GRID ESTIMATOR, AND THAT IS A REQUIREMENT IT ALWAYS HAD. *** v4438 made
+    // buildTable pick the SAMPLER at grazing, because the grid is wrong by a quarter there. A sampler is the
+    // right default and the wrong integrand for THIS section: a convergence order is measured by watching one
+    // error fall while everything under it holds still, and Monte Carlo noise does not fall with K. It would
+    // put a floor under the sweep -- which is the very failure the rows below already diagnose for the fixed
+    // quadrature error. So the study says `estimator: "grid"` OUT LOUD rather than inheriting whatever the
+    // default happens to be, and what it measures is the TABLE'S interpolation order, which is what it claims.
+    const errs = Ks.map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, estimator: "grid" }), 0.2) - 1));
+    const ratios = errs.slice(1).map((v, i) => errs[i] / v);
+    say(`table refinement at the WORST cell (alpha 0.05, cos_o 0.2), K = ${Ks.join("/")}: ${errs.map((v) => v.toExponential(2)).join(" -> ")}  ratios ${ratios.map((r) => r.toFixed(2)).join(", ")}`);
 
-    ok("!! *** THE CLOSURE RESIDUAL IS THIRD ORDER IN THE TABLE SIZE, SO IT IS THE TABLE'S AND NOT THE ALGEBRA'S ***",
-       S.p > 2.7 && S.p < 3.3,
-       `fitted ${S.p.toFixed(2)}. *** K IS A REAL PARAMETER OF THE METHOD -- a renderer ships this table as a texture -- so "the table is coarse" and "the construction is wrong" are told apart BY THE ORDER rather than by the size of the number. THREE and not two because linear interpolation error on a MIDPOINT grid alternates in sign cell to cell, and integrating it against a smooth weight cancels one order. ***`);
+    ok("!! *** THE CLOSURE RESIDUAL IS SECOND ORDER IN THE TABLE SIZE, SO IT IS THE TABLE'S AND NOT THE ALGEBRA'S ***",
+       ratios[1] > 3.5 && ratios[1] < 4.6 && ratios[2] > 3.5 && ratios[2] < 4.6,
+       "*** K IS A REAL PARAMETER OF THE METHOD -- a renderer ships this table as a texture -- so 'the table is coarse' and 'the construction is wrong' had to be told apart, and they are told apart BY THE ORDER rather than by the size of the number. REFINED AT THE WORST CELL IN THE GRID rather than a comfortable one: alpha 0.05 at grazing is where E changes fastest across mu, so it is where a linear interpolation is least adequate, and it is the cell that set section 1's number. ***");
 
-    ok("!! *** AND THE SECOND ORDER THIS SECTION READ UNTIL v4410 WAS THE QUADRATURE'S, NOT THE TABLE'S ***",
-       Q.p > 1.8 && Q.p < 2.4 && S.p - Q.p > 0.5,
-       `the identical sweep on a quadrature-built table fits ${Q.p.toFixed(2)} against ${S.p.toFixed(2)} grid-free -- ${(S.p - Q.p).toFixed(2)} apart on the same tables, same Ks, same lobe integral. The quadrature's E carries a grid-dependent wobble that does NOT alternate in sign, so it dominates the alternating interpolation error and reads 2. THE EXPONENT IDENTIFIES THE INSTRUMENT`);
+    ok("!! ...and BOTH ENDS OF THE SWEEP FALL SHORT OF 4, FOR TWO DIFFERENT AND OPPOSITE REASONS",
+       ratios[0] < 3.5 && ratios[3] < 3.5,
+       `*** K = 8 -> 16 gives ${ratios[0].toFixed(2)} because SECOND ORDER IS AN ASYMPTOTIC CLAIM and the coarsest table is not yet in the asymptotic regime -- demanding the limit where it does not hold would be v3491's error, asserting a value two things share when they only share a limit. AND K = 64 -> 128 gives ${ratios[3].toFixed(2)} FOR THE OPPOSITE REASON: the interpolation error has fallen BELOW THE FIXED QUADRATURE ERROR underneath it, so the sweep has stopped measuring the table and started measuring the integrator. A CONVERGENCE STUDY THAT KEEPS REFINING ONE PARAMETER EVENTUALLY MEASURES A DIFFERENT ERROR SOURCE, AND THE GIVE-AWAY IS THE RATIO FALLING AWAY FROM THE ORDER RATHER THAN HOLDING. ***`);
 
-    // *** AND THAT IS PROVEN BY REMOVING THE INSTRUMENT GRADUALLY RATHER THAN ASSERTED. *** If the 2 is the
-    // grid's, refining the grid must walk the order up to 3 -- and it does, monotonically. Frozen in
-    // energyCompensation.mjs because the N = 1200 point alone costs 34 s; the two endpoints above are re-run
-    // every time, so a freeze that stopped matching the tree would show there.
-    const q = ORDER_SWEEP.quadrature, sm = ORDER_SWEEP.sampled;
-    say(`  frozen climb: ${q.map((r) => `N=${r.N} ${r.order}`).join(", ")}  |  ${sm.map((r) => `${r.samples} samples ${r.order}`).join(", ")}`);
-    ok("!! *** AND THE ORDER CLIMBS 2.09 -> 2.84 AS THE GRID IS REFINED, WHICH IS WHAT MAKES THAT A MEASUREMENT ***",
-       q[q.length - 1].order - q[1].order > 0.6 && q.every((r, i) => i === 0 || r.order >= q[i - 1].order - 0.03) &&
-       sm.every((r) => Math.abs(r.order - 3) < 0.1),
-       `${q[1].order} at the shipped grid, ${q[q.length - 1].order} at N = ${q[q.length - 1].N}, and ${sm.map((r) => r.order).join("/")} grid-free across ${sm.length} sample counts spanning ${sm[sm.length - 1].samples / sm[0].samples}x. FLAT IN SAMPLE COUNT is what says the 3 is the interpolation and not the estimator's own noise. EXPLAINING A DISAPPOINTING NUMBER IS FREE; MAKING IT MOVE ON PURPOSE IS THE EVIDENCE.`);
+    // *** AND THE FLOOR IS PROVEN BY LIFTING IT RATHER THAN ASSERTED. If the top of the sweep is really the
+    // quadrature underneath, then a finer quadrature must give K = 128 its order back -- and it does. Without
+    // this the paragraph above would be a plausible story rather than a measurement.
+    const fine = [32, 64, 128].map((K) => Math.abs(compensatedAlbedo(buildTable(0.05, { K, N: 440, M: 440, estimator: "grid" }), 0.2, { N: 800 }) - 1));
+    const fineRatios = fine.slice(1).map((v, i) => fine[i] / v);
+    say(`  same three K with the quadrature DOUBLED: ${fine.map((v) => v.toExponential(2)).join(" -> ")}  ratios ${fineRatios.map((r) => r.toFixed(2)).join(", ")}`);
+    ok("!! *** AND LIFTING THE FLOOR GIVES K = 128 ITS ORDER BACK, WHICH IS WHAT MAKES THAT A MEASUREMENT AND NOT A STORY ***",
+       fineRatios[1] > 3.7 && fineRatios[1] > ratios[3] + 0.5,
+       `${ratios[3].toFixed(2)} at the shipped quadrature against ${fineRatios[1].toFixed(2)} with it doubled, on the identical tables. EXPLAINING A DISAPPOINTING NUMBER IS FREE; MAKING IT MOVE ON PURPOSE IS THE EVIDENCE.`);
 }
 
 /* ------------------------------------------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as F from "../../world/orreryFleet.mjs";
 import * as S from "./orreryFleetScan.mjs";
+import * as IP from "./importPosition.mjs";
 import { EJECTA_BASELINE, PAPER_ONLY_BODIES } from "../../world/orreryEjecta.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { period as keplerPeriod } from "../../physics/orbits/kepler.js";
@@ -72,14 +73,27 @@ console.log("1. THE FLEET'S SIZE IS THE EJECTA MEASUREMENT, NOT A NUMBER CHOSEN 
     // would have disagreed by one about the same tree. The needle is BUILT FROM PARTS instead, which makes the
     // statement true rather than excused: this file does not contain that path, so no scanner has to be told
     // to ignore it. A list of exceptions grows; not being an exception does not.
+    // v4418 -- the needle was "vendor/" + "box3d" + "/", which pinned the check to ONE body when the property is
+    // "this file carries SOME vendor path in code". Two entries added since name vendor/keyhunt and vendor/three
+    // and were reported as unexercised. A check anchored to a specific value where the property is general is
+    // the species tools/ship/patternWidth-selfcheck.mjs was written for, in the check itself.
+    // v4418 -- the needle was "vendor/" + "box3d" + "/", which pinned the check to ONE body when the property is
+    // "the scan would file this file as a dependant of SOMETHING". Widening it to any literal vendor path was
+    // still wrong: tools/ship/provenanceRecord-selfcheck.mjs reaches vendor/keyhunt through
+    // path.join(..., "vendor", "keyhunt", ...) and carries no such substring at all -- which is precisely the
+    // `joined` kind v4412 added to the scan, and why the ratchet named this file when it arrived. A check that
+    // tests ONE FORM of a dependency the scan recognises in five is the species patternWidth-selfcheck exists
+    // for, committed in the check for the exclusion list. It asks the SCAN now, not a spelling.
+    const VENDOR_BODIES = fs.readdirSync(path.join(ENG, "vendor"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     const NEEDLE = "vendor/" + "box3d" + "/";
+    const reachesSomething = (rel, src) => VENDOR_BODIES.some((b) => IP.depends(src, "vendor/" + b + "/", b));
     ok("*** the exclusion list is exercised: the file it names really does carry a vendor path in CODE ***",
         S.NOT_IMPORTERS.length > 0 && S.NOT_IMPORTERS.every((rel) => {
             const p = path.join(ENG, rel);
             // the SCAN's own stripper, not sourceScan's: sourceScan.codeOnly blanks string BODIES, and the
             // path in that file is inside a string literal, so checking with the wrong stripper says "absent"
             // about a file that plainly contains it. Two strippers, two questions.
-            return fs.existsSync(p) && S.codeOnly(fs.readFileSync(p, "utf8")).includes(NEEDLE);
+            return fs.existsSync(p) && reachesSomething(rel, S.codeOnly(fs.readFileSync(p, "utf8")));
         }),
         S.NOT_IMPORTERS.join(", ") + " -- a control fixture, not an import, and the ejecta gate excludes it too");
     ok("  and THIS gate is not an importer of anything, because it spells no vendor path out",
@@ -190,14 +204,25 @@ console.log("\n5. THE DERIVED QUANTITIES COME FROM THEIR OWNERS, NOT FROM A SECO
 // =============================================================================================================
 console.log("\n6. THE DEBRIS RING IS THE PAPERWORK, AND THE THREE PAPER PLANETS ARE NOW VISIBLE");
 {
+    // *** v4410: TWO OF THE THREE PAPER PLANETS TURN OUT TO HAVE SATELLITES. *** They were drawn as empty
+    // because the substring rule could not see a dependency built with path.join("vendor", name) -- grass is
+    // reached by tools/ship/grassField-selfcheck and orrery-selfcheck, keyhunt by secp256k1-selfcheck. The
+    // paperwork ring is still there and still the finding; what is retired is the claim that the ring is ALL
+    // there is. A row that asserted an emptiness produced by a blind spot is not a row to keep passing.
     for (const name of PAPER_ONLY_BODIES) {
         const f = fleets.get(name);
-        ok("  " + name.padEnd(8) + " draws as debris around nothing: no satellites, a ring of licences",
-            f.satellites.length === 0 && f.debris.length > 0,
-            f.debris.map((d) => d.path).join(", "));
+        ok("  " + name.padEnd(8) + " carries a ring of licences, and " + f.satellites.length + " satellite(s) of code",
+            f.debris.length > 0,
+            "debris: " + f.debris.map((d) => d.path).join(", ") +
+            (f.satellites.length ? " | reached by: " + f.satellites.map((x) => x.path).join(", ") : " | reached by nothing"));
     }
+    const trulyEmpty = PAPER_ONLY_BODIES.filter((n) => fleets.get(n).satellites.length === 0);
+    ok("*** and at least one body really is paperwork and nothing else ***", trulyEmpty.length > 0,
+        trulyEmpty.join(", ") + " of " + PAPER_ONLY_BODIES.join(", ") + " -- v4266's 'three planets made entirely " +
+        "of paperwork' was measured with a rule that could not see path.join, and the honest number is " + trulyEmpty.length);
     report("world/orreryEjecta.mjs measured that at v4266 -- 'three planets made entirely of paperwork, 21% of " +
-        "its bodies' -- and the orrery could not show it. The finding existed; the picture did not.");
+        "its bodies' -- and the orrery could not show it. The finding existed; the picture did not. v4410 then " +
+        "found the finding itself was two-thirds an artefact of the scanner.");
     const anyCode = names.find((n) => !PAPER_ONLY_BODIES.includes(n) && fleets.get(n).debris.length > 0);
     ok("*** and a body with code carries BOTH: satellites and a debris ring ***",
         !!anyCode && fleets.get(anyCode).satellites.length > 0,
@@ -213,7 +238,9 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
 {
     // The record says a per-body commit belt would be one or two rocks. That is the reason the obvious reading
     // of #68 was refused, so it is re-taken from git here: a record nobody re-measures is a sentence.
-    const R = F.COMMIT_BELT_V4329;
+    // v4418 -- the NEWEST belt, not the v4329 one. v4416 wrote provenance records into six bodies, so six moved
+    // from one commit to two, and the v4329 record is a claim about v4329 that stays true about v4329.
+    const R = F.COMMIT_BELT_V4418, R0 = F.COMMIT_BELT_V4329;
     const live = {};
     for (const n of names) {
         try {
@@ -226,10 +253,21 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     ok("*** the recorded per-body commit counts still match git ***", drift.length === 0,
         drift.map((n) => `${n}: recorded ${R.perBody[n]}, git says ${live[n]}`).join("; ") ||
         `${names.length} bodies, busiest ${Math.max(...Object.values(live))}`);
-    ok("*** and the finding holds: the busiest vendored body has been touched by two commits ***",
-        Math.max(...Object.values(live)) <= 2 && Object.values(live).filter((v) => v === 1).length >= 10,
-        `${Object.values(live).filter((v) => v === 1).length} of ${names.length} bodies touched exactly once, against ${R.repoCommits} commits in the repository`);
-    ok("  so the refusal is recorded with its reason rather than left as an absence", /belt/i.test(R.why) && R.at === "v4329");
+    // *** THE v4329 FINDING IS NO LONGER TRUE OF THIS TREE, AND A ROUND OF OURS IS WHY. *** It said twelve of
+    // fifteen bodies had been touched by exactly one commit. v4416 recorded provenance for six that had none --
+    // the first time in this repository's life that a vendored body was touched by a commit that did not vendor
+    // it -- so the count is seven. What SURVIVES is the reason the belt is not drawn: at two commits it is
+    // still not a belt. The number moved and is superseded by name; the conclusion is re-stated, not quietly kept.
+    const once = Object.values(live).filter((v) => v === 1).length;
+    ok("*** the belt is still not a belt: no body is touched more than twice ***",
+        Math.max(...Object.values(live)) <= 2,
+        `${once} of ${names.length} bodies touched exactly once (twelve at v4329), busiest ${Math.max(...Object.values(live))}, ` +
+        `against ${R0.repoCommits} commits in the repository at v4329`);
+    ok("  and the six that moved are named, so the change is readable rather than a number that drifted",
+        R.movedSince4329.every((n) => live[n] === 2 && R0.perBody[n] === 1),
+        R.movedSince4329.join(", ") + " -- v4416 wrote a PROVENANCE record into each");
+    ok("  so the refusal is recorded with its reason rather than left as an absence",
+        /belt/i.test(R.why) && R.at === "v4418" && R0.at === "v4329");
     report("VENDORED CODE DOES NOT CHANGE; THE CODE THAT USES IT DOES. That is why a satellite is an importer " +
         "and not a commit, and it is a measurement rather than a preference.");
 }
@@ -322,10 +360,20 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
             return n; });
         ok("*** and the marks are really on the canvas, not only in the readout ***", painted > 40,
             painted + " pixels in the satellite colour -- a caption without a picture is the defect this checks for");
-        const bare = await look(PAPER_ONLY_BODIES[0]);
-        ok("*** a paper-only body says so rather than showing an empty sky with no explanation ***",
+        // v4410: the probe used PAPER_ONLY_BODIES[0], which was grass -- and grass now HAS satellites, so the
+        // page correctly stopped saying "nothing imports" and this row went red on a page that had got better.
+        // It now asks the body that really is empty, and asserts the paperwork half for every paper-only body.
+        const empty = PAPER_ONLY_BODIES.find((n) => fleets.get(n).satellites.length === 0) || PAPER_ONLY_BODIES[0];
+        const bare = await look(empty);
+        ok("*** a body nothing reaches says so rather than showing an empty sky with no explanation ***",
             /nothing imports/.test(bare.fleet) && /paperwork/.test(bare.fleet),
-            `${PAPER_ONLY_BODIES[0]}: "${bare.fleet}"`);
+            `${empty}: "${bare.fleet}"`);
+        const reached = PAPER_ONLY_BODIES.filter((n) => fleets.get(n).satellites.length > 0);
+        for (const n of reached) {
+            const r = await look(n);
+            ok("  ...and a paper-only body that IS reached reports both, rather than the old blanket sentence",
+                /paperwork/.test(r.fleet) && /importers?/.test(r.fleet), `${n}: "${r.fleet}"`);
+        }
         ok("  and the page threw nothing", errs.length === 0, errs.join(" | ") || "clean");
         await br.close(); srv.close();
     }

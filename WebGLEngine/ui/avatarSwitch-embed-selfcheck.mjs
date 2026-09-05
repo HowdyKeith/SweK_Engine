@@ -58,7 +58,7 @@ ok("the rigged surface carries the two the panel needs", (() => {
     "only thing small enough to land in a 143x210 box");
 ok("svg is still first and rigged still second", MODES[0].id === "svg" && MODES[1].id === "rigged");
 
-// ---- THE BOX WIDTH (v3770) ---------------------------------------------------------------------------------
+// ---- THE BOX WIDTH (v3770, REWRITTEN AT v4414) --------------------------------------------------------------
 // *** THERE ARE TWO WIDTHS DECLARED FOR ONE BOX AND ONLY ONE OF THEM IS LIVE. mountAvatarSwitch declares
 // `width = 143` as its default and THE ONLY CALLER IN THE TREE PASSES ITS OWN -- server.html asked for 163 at
 // v3555, 193 at v3743 and 223 at v3770, and the default has never once been used. That is not a bug today; it
@@ -66,14 +66,44 @@ ok("svg is still first and rigged still second", MODES[0].id === "svg" && MODES[
 // CHECK DOES NOT FORCE THEM EQUAL -- the default is a sensible fallback for a caller that has no opinion --
 // IT ASSERTS THAT THE LIVE ONE IS STATED EXPLICITLY, so widening the box can never be done by editing the
 // default and wondering why nothing moved. ***
+//
+// *** v4414 -- THE CALLER STOPPED TYPING A WIDTH, AND THIS CHECK WENT RED AND SAID THE RIGHT THING. *** Its
+// own failure line read "REWRITE THIS LINE TO NAME THE NEW CALLER, do not weaken it", and that is what this
+// is. v4414 retired the SVG dials and gave the avatar the whole of #dialsRow, so a typed width became the
+// defect it had been guarding against from the other side: A NUMBER TYPED BESIDE A BOX IS RIGHT AT EXACTLY
+// ONE WINDOW WIDTH BY LUCK. server.html now passes sizeFromHost:true and the box is MEASURED from the host.
+//
+// SO THE PROPERTY IS UNCHANGED AND ITS SHAPE HAS TWO CASES: the one caller states its sizing either as a
+// literal `width:` (a typed box) or as `sizeFromHost: true` WITH a `minSize:` (a measured box). What it may
+// never do is state neither, because that is the silent fall into 143 this check has existed for since v3770.
+//
+// *** AND minSize IS REQUIRED RATHER THAN OPTIONAL, BECAUSE IT IS THE SAME DEFECT ONE LEVEL DOWN. *** A caller
+// that says sizeFromHost:true and no minSize inherits `minSize = 96` -- a second declaration of a floor
+// nobody compares, which is this check's own subject wearing a different name. A measured box still has one
+// typed number in it and that number has to be stated where the measuring is asked for.
 {
     const src = readFileSync(new URL("../server.html", import.meta.url), "utf8");
-    const calls = [...src.matchAll(/mountAvatarSwitch\(\{[^}]*?width:\s*(\d+)/g)].map((m) => Number(m[1]));
-    ok("!! *** server.html STATES the avatar width explicitly rather than inheriting the default ***",
-        calls.length === 1 && calls[0] > 0,
-        "the one caller asks for " + calls[0] + "px; ui/avatarSwitch.js defaults to 143 AND THAT DEFAULT IS " +
-        "DEAD CODE. If this ever finds zero callers, somebody deleted the width and the box silently fell back " +
-        "to 143 -- REWRITE THIS LINE TO NAME THE NEW CALLER, do not weaken it");
+    // The call is matched to its closing brace before either shape is read, so "width:" belonging to some
+    // other call on the page can never be counted as this one's.
+    const mounts = [...src.matchAll(/mountAvatarSwitch\(\{([^}]*)\}/g)].map((m) => m[1]);
+    const typed = mounts.filter((a) => /\bwidth:\s*(\d+)/.test(a)).map((a) => Number(/\bwidth:\s*(\d+)/.exec(a)[1]));
+    const measured = mounts.filter((a) => /\bsizeFromHost:\s*true/.test(a));
+    const measuredFloored = measured.filter((a) => /\bminSize:\s*(\d+)/.test(a));
+    const stated = typed.length + measured.length;
+    say("mountAvatarSwitch callers in server.html: " + mounts.length +
+        "  -- typed width " + typed.length + " " + JSON.stringify(typed) +
+        ", measured (sizeFromHost) " + measured.length);
+    ok("!! *** server.html STATES how the avatar box is sized rather than inheriting the default ***",
+        mounts.length === 1 && stated === 1,
+        "the one caller must pass EITHER a literal width: OR sizeFromHost:true, and it passes " + stated +
+        " of them; ui/avatarSwitch.js defaults to 143 AND THAT DEFAULT IS DEAD CODE. If this ever finds zero, " +
+        "somebody deleted the sizing and the box silently fell back to 143 -- REWRITE THIS LINE TO NAME THE " +
+        "NEW CALLER, do not weaken it");
+    ok("!! and a MEASURED box states its own floor, because minSize is the same second declaration one level down",
+        measured.length === measuredFloored.length,
+        measured.length + " caller(s) ask to be measured and " + measuredFloored.length + " state a minSize; " +
+        "the rest inherit minSize = 96 from ui/avatarSwitch.js, which is exactly the unread default this " +
+        "whole section exists to keep out of the live path");
     ok("!! and the stage aspect is DERIVED from the box, never typed beside it",
         /width \/ height/.test(readFileSync(new URL("./avatarSwitch.js", import.meta.url), "utf8")),
         "frameFromBox computes width/height at mount time, so changing the box cannot leave a stale framing " +

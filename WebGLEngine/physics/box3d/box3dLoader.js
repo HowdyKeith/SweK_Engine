@@ -272,11 +272,29 @@ export class Box3DLoader {
             // install clang and wasi-libc. Two independent facts -- "wasm works here" and "this build loaded" --
             // now get reported on their own evidence, which is browserSkipReason()'s rule from
             // tools/ship/playwrightResolve.mjs applied to the third instance of the same defect.
+            // *** v4400 -- THIS MESSAGE WAS WRONG IN NODE AND SENT PEOPLE TO INSTALL A TOOLCHAIN THEY DID NOT
+            // NEED. *** The import above is "/vendor/box3d/box3d.js", a BROWSER-ABSOLUTE URL: in Node that is
+            // a path from the filesystem root, so it cannot resolve, and this catch reported the failure as
+            // the artifact being unbuilt. Both halves were false -- box3d.js and box3d.wasm are committed, and
+            // physics/box3d/box3dNode.mjs loads that same wasm headless with 45 swk_ functions.
+            //
+            // A MODULE_NOT_FOUND on our own vendored path is a DIFFERENT fact from a missing build, so it is
+            // now reported as itself, and the Node route is NAMED rather than left for the reader to find.
+            // v4229's note above fixed the WebAssembly-deleted branch of this and called it the third
+            // instance; explainWasmFailure cannot see this one, because it asks whether WebAssembly works and
+            // here WebAssembly was fine and the PATH was not.
+            const msg = String((e && e.message) || e || "");
+            const pathFailure = /Cannot find module|Failed to resolve|ERR_MODULE_NOT_FOUND/i.test(msg);
             this._status = {
                 ready: false,
-                reason: explainWasmFailure(e,
-                    "Box3D WASM not built yet — run physics/box3d/build-box3d-wasm-clang.sh on a " +
-                    "box with clang + wasi-libc, which outputs /vendor/box3d/box3d.{js,wasm}."),
+                pathFailure,
+                reason: pathFailure
+                    ? ("box3d's artifact is present but this absolute URL does not resolve here: " + msg +
+                       " — in Node use physics/backendNode.mjs (or box3dNode.mjs), which loads the same wasm " +
+                       "by a module-relative path. Nothing needs rebuilding.")
+                    : explainWasmFailure(e,
+                        "Box3D WASM not built yet — run physics/box3d/build-box3d-wasm-clang.sh on a " +
+                        "box with clang + wasi-libc, which outputs /vendor/box3d/box3d.{js,wasm}."),
             };
         }
         return this._status;
@@ -287,6 +305,26 @@ export class Box3DLoader {
     // v3630: the raw wasm module, so a PAGE can drive the same arithmetic Node drives (physics/mechanics/
     // reposeOps.mjs takes it as a parameter). Returns null before init() rather than throwing.
     mod() { return this._mod || null; }
+
+    /**
+     * *** THE SEAM THAT KEEPS THIS FILE BROWSER-PURE. *** v4400's first attempt made init() fall back to
+     * box3dNode.mjs in Node, which works and is WRONG: box3dNode imports node:fs at the top level, and
+     * tools/ship/browserNodeGuard-selfcheck.mjs walks the import graph from every .html page and caught it
+     * within one verify -- "1 offender(s): physics/box3d/box3dNode.mjs (reached from backend-physics-check.html)".
+     * A browser-reachable module must not create an edge to a Node module, and hiding the specifier from the
+     * scanner would defeat the guard rather than satisfy it.
+     *
+     * So the direction is inverted: this file offers a seam and a NODE-ONLY module does the reaching.
+     * physics/backendNode.mjs calls this with box3dNode's module. Nothing here imports anything new.
+     */
+    adopt(mod, via = "adopted") {
+        if (!mod || typeof mod._swk_world_create !== "function") {
+            throw new Error("box3d.adopt: needs a module exposing _swk_world_create");
+        }
+        this._mod = mod;
+        this._status = { ready: true, via };
+        return this._status;
+    }
 
     // v1989 — the "use Box3D for physics" switch (set from the Services Dashboard).
     // Sims should consult box3d.enabled() && (await box3d.init()).ready before

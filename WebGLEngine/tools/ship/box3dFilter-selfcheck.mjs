@@ -25,6 +25,7 @@
 // back onto a part it is not jointed to. box3d's own header names that exact case and prescribes the fix, a
 // unique negative groupIndex per ragdoll, and that IS missing from the shim. This round adds it.
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -32,7 +33,7 @@ import { execFileSync } from "node:child_process";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ....  " + m);
-const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (p) => fs.readFileSync(path.join(ENG, p), "utf8");
 const SHIM = read("physics/box3d/box3d_shim.c");
 

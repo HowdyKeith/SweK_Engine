@@ -76,31 +76,47 @@ async function openPageFx(img, initial) {
     try { const rec = await import("./canvasRecorder.js"); if (rec.installRecorder && !window.swekRecord) rec.installRecorder(); } catch (e) {}
     let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
     function resize() { W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR); cv.width = W; cv.height = H; }
-    resize(); addEventListener("resize", resize);
+    // v4434 -- the handler is stashed on `host` AT REGISTRATION, not on the last line of openPageFx.
+    // Assigning it at the end means anything that throws in between leaves the listener registered with
+    // nothing holding a reference to remove it by.
+    resize(); host._resize = resize; addEventListener("resize", resize);
     const state = { vg: null, t: 0, filter: initial || lastFilter(), ry: 0, rx: -0.12, target: { x: 1.1, y: 0 }, rainT: 0, phys: null, physBackend: "cpu", backendName: "cpu" };
     async function build() { const d = src.getContext("2d").getImageData(0, 0, src.width, src.height).data; state.vg = voxelizePage(d, src.width, src.height, { cell: 6 }); state.t = 0; state.phys = null; await FILTERS[state.filter].init(state.vg, state); refreshBar(); }
     function mkBtn(txt, on, hot) { const b = document.createElement("button"); b.textContent = txt; b.style.cssText = "background:rgba(10,16,28,.85);color:" + (hot || "#59d1ff") + ";border:1px solid #1c2942;border-radius:8px;padding:9px 13px;font:600 12px ui-monospace,monospace;letter-spacing:.04em;cursor:pointer;"; b.onclick = on; return b; }
+    // v4435 -- *** THE REC BUTTON ARMED A 20,200 ms TIMEOUT AND closePageFx CLEARED NONE OF THEM. ***
+    // Measured: click Rec, close the overlay, and the timer is still armed -- 0 of 1 cleared. When it fired
+    // it called refreshBar() against a DETACHED bar, silently -- no throw, so nothing would ever have shown
+    // it -- rebuilding buttons on a dead node, and holding this whole closure (state, cv, bar, the voxel
+    // grid) alive for twenty seconds after the overlay was gone. Same family as v4434's leaked listener:
+    // registered with no handle to cancel it by.
     let engineBtn = null, recBtn = null, recording = false;
     function refreshBar() {
         bar.innerHTML = "";
         for (const k of Object.keys(FILTERS)) { const active = k === state.filter; const b = mkBtn(FILTERS[k].label, async () => { state.filter = k; saveFilter(k); await build(); }, active ? "#f6a623" : "#59d1ff"); try { const th = thumbnailFor(k); b.style.backgroundImage = "url(" + th + ")"; b.style.backgroundSize = "22px"; b.style.backgroundRepeat = "no-repeat"; b.style.backgroundPosition = "7px center"; b.style.paddingLeft = "34px"; } catch (e) {} if (active) b.style.borderColor = "#f6a623"; bar.appendChild(b); }
         if (state.filter === "shatter") { engineBtn = mkBtn("engine: " + state.physBackend, async () => { state.physBackend = state.physBackend === "cpu" ? "box3d" : state.physBackend === "box3d" ? "jolt" : "cpu"; await build(); }); bar.appendChild(engineBtn); }
-        recBtn = mkBtn(recording ? "\u25A0 rec" : "\u25CF Rec", () => { if (!window.swekRecord) { recBtn.textContent = "no rec"; return; } if (recording) { window.swekRecord.stop(); recording = false; refreshBar(); } else if (window.swekRecord.start(20, cv)) { recording = true; refreshBar(); setTimeout(() => { recording = false; refreshBar(); }, 20200); } }, recording ? "#ff6a6a" : "#9be15d"); bar.appendChild(recBtn);
+        recBtn = mkBtn(recording ? "\u25A0 rec" : "\u25CF Rec", () => { if (!window.swekRecord) { recBtn.textContent = "no rec"; return; } if (recording) { window.swekRecord.stop(); recording = false; refreshBar(); } else if (window.swekRecord.start(20, cv)) { recording = true; refreshBar(); host._recTimer = setTimeout(() => { if (!host) return; recording = false; refreshBar(); }, 20200); } }, recording ? "#ff6a6a" : "#9be15d"); bar.appendChild(recBtn);
         bar.appendChild(mkBtn("Replay", () => build()));
         bar.appendChild(mkBtn("\u2715 Close", closePageFx, "#f6a623"));
     }
     await build();
     let drag = false, lx = 0, ly = 0;
     cv.addEventListener("pointerdown", e => { if (e.shiftKey) { drag = true; lx = e.clientX; ly = e.clientY; } else if (state.filter === "shatter" && state.phys) { const mx = (e.clientX / innerWidth - .5) * 1.6, my = (e.clientY / innerHeight - .5) * 1.6; state.phys.impact({ x: mx, y: my, z: 0 }, 1.6); } });
-    addEventListener("pointerup", () => drag = false);
+    // v4434 -- *** THIS LEAKED ONE WINDOW LISTENER PER OPEN, MEASURED AT EXACTLY ONE PER CYCLE OVER FIVE. ***
+    // It was an anonymous arrow, so closePageFx had nothing to pass to removeEventListener, and each
+    // orphan closes over the same scope as `state` -- retaining the whole voxel grid (2,120 voxels of 8
+    // numbers for a 240x320 page, ~136 KB) and, in shatter, a live physics backend.
+    host._pointerup = () => { drag = false; };
+    addEventListener("pointerup", host._pointerup);
     cv.addEventListener("pointermove", e => { if (drag) { state.ry += (e.clientX - lx) * .008; state.rx += (e.clientY - ly) * .008; lx = e.clientX; ly = e.clientY; } else { state.target.x = (e.clientX / innerWidth - .5) * 2.2; state.target.y = (e.clientY / innerHeight - .5) * 2.2; } });
     let R = null; const args = () => ({ W, H, ry: state.ry, rx: state.rx, dist: state.filter === "shatter" ? 3.0 : 2.4 });
     try { R = initVoxelGL(cv, () => state.vg, args); } catch (e) { R = null; } if (!R) R = initVoxelCanvas(cv, () => state.vg, args);
     host._raf = 1; let last = performance.now();
     (function loop() { if (!host) return; host._raf = requestAnimationFrame(loop); const now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now; state.t += dt; try { FILTERS[state.filter].update(state.vg, state.t, dt, state); R.draw(); } catch (e) {} })();
-    host._resize = resize;
 }
-function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); removeEventListener("resize", host._resize); host.remove(); host = null; }
+function closePageFx() { if (!host) return; try { if (window.swekRecord && window.swekRecord.recording && window.swekRecord.recording()) window.swekRecord.stop(); } catch (e) {} cancelAnimationFrame(host._raf); clearTimeout(host._recTimer); removeEventListener("resize", host._resize); removeEventListener("pointerup", host._pointerup); host.remove(); host = null; }
 
 if (typeof window !== "undefined") window.swekPageFx = { open: openPageFx, close: closePageFx, shatterTo: shatterTransition };
-export { openPageFx, closePageFx, shatterTransition };
+// v4434 -- FILTERS is exported so a gate can DRIVE each entry rather than read the table and hope. It was
+// module-private and the first draft of the gate could only count the keys, which says nothing about
+// whether an entry does anything.
+export { openPageFx, closePageFx, shatterTransition, FILTERS };

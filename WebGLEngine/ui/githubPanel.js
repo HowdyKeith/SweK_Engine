@@ -23,7 +23,14 @@ export function mountGithubPanel() {
     // and 120% zoom alike, so this was never a zoom-interaction bug, only more visually obvious at Keith's 110%.
     // `width:100%` fills whichever host actually contains it -- the dock's own drawer width for main.js, and
     // card's real content width for server.html -- instead of a duplicate literal that has to happen to agree.
-    const root = E("div", "width:100%;max-width:440px;display:flex;flex-direction:column;font:12px system-ui,sans-serif;color:#cde;");
+    // v4450 -- THE CAP RISES TO 640 AND THE RULE THAT MATTERS IS UNCHANGED. Keith: "we can make the panel
+    // bigger if it helps to explain steps, in order." It does -- the Releases tab is now a numbered route with
+    // a line of prose under each step, and at 440 every one of those lines wrapped to four. `width:100%` is
+    // still what does the work: the cap only says how far this panel will go WHEN A HOST OFFERS THE ROOM, and
+    // main.js's dock drawer offers less, so that host is unchanged by construction rather than by a second
+    // number kept in step. Raising a max-width cannot re-create v4102's overflow, which came from a FIXED
+    // width demanding more than the container had.
+    const root = E("div", "width:100%;max-width:640px;display:flex;flex-direction:column;font:12px system-ui,sans-serif;color:#cde;");
     root.id = "ghPanelRoot";
     const head = E("div", "display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #1d2736;");
     head.append(E("span", "font-weight:700;color:#9fd;letter-spacing:.5px;", "GITHUB MANAGER"));
@@ -232,45 +239,162 @@ export function mountGithubPanel() {
             del.onclick = async () => { if (!repo()) return say("pick an active repo first", false); const j = await api("repo/delete", { repo: repo(), confirm: dConf.value.trim() }); say(j.ok ? "\u2713 deleted " + j.deleted : "\u2717 " + j.error, j.ok); if (j.ok) repoSel.value = ""; };
             return w;
         },
+        // *** v4450 -- SEVEN CONTROLS, NO STATED ORDER, AND REAL OVERLAP BETWEEN THEM. ***
+        //
+        // Keith: "I can't tell which functions overlap, and which I need to get our release all merged and on
+        // main for fleet runs." He is right, and the tab was built to make that hard to tell: the buttons
+        // arrived one per round (v1129, v3941, v3964, v4014, v4133), each one appended under the last, so the
+        // reading order is the order they were WRITTEN and not the order anybody presses them. Two pairs do
+        // very nearly the same thing -- "Get newer source" is the first half of "Clone -> verify", and
+        // "Release current engine" is "Publish the verified clone" with the verify taken out -- and NOTHING ON
+        // SCREEN SAID SO. A panel whose controls are ordered by their commit dates is a panel that has to be
+        // explained by whoever wrote it, every time.
+        //
+        // *** THE ROUTE IS NUMBERED AND THE SHORTCUTS ARE NAMED AS SHORTCUTS. *** Steps 1-6 are the path that
+        // ends with the fleet running what this tree built. The two buttons that skip a step are moved BELOW
+        // it, under a heading that says which step each one skips, rather than being deleted -- they are the
+        // fast path when you already know the tree is good, and a control removed because it is dangerous is
+        // a control somebody re-adds without the warning.
+        //
+        // *** AND THE FIRST STEP IS NOT A BUTTON, BECAUSE THE DEFECT IT PREVENTS IS NOT IN THIS PANEL. ***
+        // createRelease() passes `target_commitish: target || undefined`, and publishEngineBuild ->
+        // publishVersion never passes a target -- so GITHUB PUTS THE TAG ON THE DEFAULT BRANCH'S HEAD, while
+        // the zip is packed from a LOCAL folder. Those are the same commit only if the local tree has been
+        // pushed. If it has not, the release page carries a tag naming a commit that does not contain the
+        // code in the asset beside it, and nothing in this panel would have said a word. Step 1 says it.
         Releases() {
             const w = E("div", "display:flex;flex-direction:column;gap:6px;");
+
+            // ---- small layout helpers, so a step reads the same as every other step ----------------------
+            const RULE = (txt) => {
+                const d = E("div", "display:flex;align-items:center;gap:8px;margin:10px 0 2px;color:#7d93ad;" +
+                                   "font:10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;");
+                d.append(E("span", "", txt), E("span", "flex:1;height:1px;background:#22303f;"));
+                return d;
+            };
+            const NOTE = (txt) => E("div", "font-size:10.5px;color:#8fa3bb;line-height:1.5;margin:1px 0 3px;", txt);
+            // A step is a number, a control, and one line saying what it does to the outside world. The number
+            // is a real element rather than a "1." typed into the label, so re-ordering the steps cannot leave
+            // two of them both called 3 -- which is the same class as the closings-ordinal collision the gate
+            // sweep checks for, one panel down.
+            let stepN = 0;
+            const STEP = (title, why) => {
+                stepN++;
+                const row = E("div", "display:flex;gap:7px;align-items:baseline;margin-top:8px;");
+                row.append(E("span", "flex:none;width:15px;height:15px;border-radius:50%;background:#1b2b3b;color:#9fd;" +
+                                     "font:bold 10px ui-monospace,monospace;display:flex;align-items:center;justify-content:center;", String(stepN)));
+                const col = E("div", "flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;");
+                col.append(E("div", "color:#cfe3ff;font-size:11.5px;font-weight:600;", title));
+                if (why) col.append(NOTE(why));
+                row.append(col);
+                w.append(row);
+                return col;   // the caller drops its control in here, under the words
+            };
+
+            // ---- LOOK: two read-only questions, before anything is changed ------------------------------
+            w.append(RULE("look first — neither of these changes anything"));
             const listB = BTN("List releases", "#3a4a6a", "#5a6a8a"); const vc = BTN("Version check", "#3a4a6a", "#5a6a8a");
+            listB.title = "Every release on the repo, newest first, with its asset count. The ✕ beside one DELETES it.";
+            vc.title = "Compares releases/latest against THIS tree's ENGINE_VERSION. This is the question the fleet asks.";
             const r1 = E("div", "display:flex;gap:6px;"); r1.append(listB, vc); w.append(r1);
-            w.append(E("div", "color:#9bb0c8;font-size:11px;margin-top:4px;", "Publish a version"));
-            const tag = IN("version tag (e.g. v1128)"); const name = IN("release title (optional)"); const notes = TA("release notes (optional)", 2); const asset = IN("asset path (optional, e.g. Gmail-safe zip)");
-            const optR = E("div", "display:flex;gap:14px;color:#cde;font-size:11px;"); const dr = document.createElement("input"); dr.type = "checkbox"; const pr = document.createElement("input"); pr.type = "checkbox";
-            const dl = E("label", "display:flex;gap:5px;align-items:center;"); dl.append(dr, document.createTextNode("draft")); const pl = E("label", "display:flex;gap:5px;align-items:center;"); pl.append(pr, document.createTextNode("pre-release")); optR.append(dl, pl);
-            const pub = BTN("Publish version"); w.append(tag, name, notes, asset, optR, pub);
-            const eng = BTN("\u26A1 Release current engine (auto-tag + build zip)", "#3a2a5a", "#6a4a9a"); eng.style.marginTop = "4px"; w.append(eng);
-            // v3941 -- THE OTHER HALF OF THE LOOP. "Release current engine" pushes this tree OUT; nothing pulled
-            // newer code IN, because the update path only carries RELEASES and a release is built from the local
-            // tree. Sits beside it because that is where you find out you need it: the release fails with
-            // "already exists", and the reason is that this box is behind.
-            const src = BTN("\u2B07 Get newer source from GitHub (clone beside this one)", "#2a3a5a", "#4a6a9a"); src.style.marginTop = "4px"; w.append(src);
-            // v3964 -- *** THE CHAIN, AND IT STOPS SHORT OF THE RELEASE ON PURPOSE. *** Keith: "clone, then run
-            // and auto export github version? so one button would start that chain?" One button starts it; the
-            // chain runs clone -> verify and then STOPS with a verdict, because the middle step is the one that
-            // fails quietly. A clone that fails says so and an upload that fails says so, but A SUBTLY BROKEN
-            // TREE BOOTS FINE AND PACKAGES FINE -- and a release is the hardest action here to take back.
-            // So Publish is a SECOND press, and it is disabled until the verdict is green.
-            const chainB = BTN("\u26D3 Clone \u2192 verify (stops before publishing)", "#2a4a4a", "#4a7a7a"); chainB.style.marginTop = "8px"; w.append(chainB);
-            const chainPub = BTN("\u2191 Publish the verified clone", "#3a2a5a", "#6a4a9a"); chainPub.style.marginTop = "4px";
-            // *** DISABLED IS THE STARTING STATE, NOT A STATE IT FALLS INTO. *** A button that starts enabled and
-            // is switched off by a later poll is publishable during the gap; this one has to be EARNED.
+            NOTE("");
+
+            w.append(RULE("the route — in order"));
+            w.append(E("div", "font-size:10.5px;color:#9fd;line-height:1.5;margin-bottom:2px;",
+                       "The fleet downloads releases/latest and nothing else. Main is not what it runs."));
+
+            // ---- 1. push -------------------------------------------------------------------------------
+            STEP("Push your work to main. Not a button — do it in git first.",
+                 "The tag is created on the repo's DEFAULT BRANCH head; the zip is packed from a local folder. " +
+                 "They are the same commit only if you pushed. Skip this and the release page shows a tag naming " +
+                 "a commit that does not contain the code in the asset next to it.");
+
+            // ---- 2. branch -----------------------------------------------------------------------------
+            const brCol = STEP("Choose the branch steps 3 and 4 will clone.",
+                 "Default is the repo's default branch. v4133: Keith ran gates against v4116 for days while the " +
+                 "work sat on a feature branch at v4132, because this choice existed on the server and was never " +
+                 "offered here. The version beside each name is a HINT read off the head commit subject.");
+
+            // ---- 3. clone + verify ---------------------------------------------------------------------
+            const chainCol = STEP("Clone the repo beside this one, and run the CLONE's gates.",
+                 "Stops with a verdict and publishes NOTHING. Verify runs with cwd inside the clone, so what is " +
+                 "graded is what was fetched — not this tree, which is by definition fine because it is serving " +
+                 "this page.");
+
+            // ---- 4. publish ----------------------------------------------------------------------------
+            const pubCol = STEP("Publish the tree that just passed.",
+                 "Packs the clone with the CLONE's own packer, uploads the asset, creates the release and pushes " +
+                 "the tag — and that tag push is what starts .github/workflows/release.yml, which unzips the " +
+                 "PUBLISHED archive and verifies it on ubuntu, macOS and Windows. Locked until step 3 is green.");
+
+            // ---- 5 + 6. the ledger ---------------------------------------------------------------------
+            const ledgerCol = STEP("Record the release in the ledger.",
+                 "tools/ship/releases.json is this tree's copy of what is actually on the releases page. Refreshing " +
+                 "it here uses the rig's saved token, so it is not the 60/hour anonymous limit the CLI gets.");
+            const checkCol = STEP("Ask whether the fleet runs what is built.",
+                 "The same releaseLedger.mjs the ship gate reads, offline. It answers with the LAG and enforces the " +
+                 "ratchet: you may not ship a new version while the last one is unreleased.");
+
+            // ---- the controls the steps above refer to -------------------------------------------------
+            const chainB = BTN("⛓ Clone → verify (stops before publishing)", "#2a4a4a", "#4a7a7a");
+            chainCol.append(chainB);
+            const chainPub = BTN("↑ Publish the verified clone", "#3a2a5a", "#6a4a9a");
+            // *** DISABLED IS THE STARTING STATE, NOT A STATE IT FALLS INTO. *** A button that starts enabled
+            // and is switched off by a later poll is publishable during the gap; this one has to be EARNED.
             chainPub.disabled = true; chainPub.style.opacity = ".45"; chainPub.title = "needs a green verify first";
-            w.append(chainPub);
+            pubCol.append(chainPub);
+            const ledgerB = BTN("↻ Refresh the release ledger", "#2a3a5a", "#4a6a9a");
+            ledgerB.title = "Rewrites tools/ship/releases.json from the live releases page, through the rig's saved token.\n" +
+                            "Same parse and same merge as `node tools/ship/refreshReleases.mjs --write`.";
+            const ledgerDry = BTN("dry run", "#22303f", "#3a4a5c");
+            ledgerDry.title = "Ask what would change, and write nothing.";
+            const ledgerRow = E("div", "display:flex;gap:6px;align-items:stretch;"); ledgerRow.append(ledgerB, ledgerDry);
+            ledgerB.style.flex = "1";
+            ledgerCol.append(ledgerRow);
+            const checkB = BTN("✓ Does the fleet run what is built?", "#1a3a2a", "#3a7a5a");
+            checkB.title = "Offline. Reads tools/ship/releases.json and this tree's ENGINE_VERSION.\n" +
+                           "Same module as `node tools/ship/releaseLedger-selfcheck.mjs`.";
+            checkCol.append(checkB);
+
+            // ---- SHORTCUTS: the two buttons that skip a step, named as what they skip --------------------
+            w.append(RULE("shortcuts — each one skips a step above"));
+            const eng = BTN("⚡ Release current engine (auto-tag + build zip)", "#3a2a5a", "#6a4a9a");
+            eng.title = "Step 4 with step 3 taken out.";
+            w.append(eng);
+            NOTE("");
+            w.append(NOTE("⚡ is step 4 WITHOUT step 3: it auto-tags from this tree's ENGINE_VERSION and zips THIS " +
+                          "folder, whatever state it is in. Nothing verifies it and nothing checks it against the " +
+                          "branch the tag will land on. Use it when you already know this tree is the one."));
+            const src = BTN("⬇ Get newer source from GitHub (clone beside this one)", "#2a3a5a", "#4a6a9a");
+            src.title = "Step 3 with the verify taken out.";
+            w.append(src);
+            w.append(NOTE("⬇ is step 3 WITHOUT the verify: it clones and stops. Nothing here is published either " +
+                          "way. Useful when you only want to read the newer code, not release it."));
             // v4014 -- *** THE CLONE HAD A FOLDER AND NO WAY TO RUN IT. *** Keith, right after seeing "published
             // vNNNN, built from the verified tree at <path>": "I would want to next see the button to launch
             // new version that we just cloned" -- and then, naming the mechanism directly: "START_NODE_Engine.bat
             // or bun to then start, not just open folder." /source-chain/launch spawns that launcher for real
             // (cmd /c start on Windows, the same route restart() uses to relaunch) on a FRESH PORT, side by side
             // with whatever is already running, and does not open a tab until /health answers on it.
-            const chainLaunch = BTN("\u25b6 Launch this build (side by side)", "#1a3a2a", "#3a7a5a"); chainLaunch.style.marginTop = "4px";
+            const chainLaunch = BTN("▶ Launch this build (side by side)", "#1a3a2a", "#3a7a5a");
             chainLaunch.disabled = true; chainLaunch.style.opacity = ".45"; chainLaunch.title = "needs a clone first";
             chainLaunch.style.display = "none";
             w.append(chainLaunch);
             const chainLog = E("div", "margin-top:5px;font:10px ui-monospace,monospace;color:#9bb0c8;white-space:pre-wrap;max-height:220px;overflow:auto;background:#080b10;border:1px solid #1a222e;border-radius:6px;padding:6px 8px;display:none;");
             w.append(chainLog);
+
+            // ---- MANUAL: everything typed by hand -------------------------------------------------------
+            w.append(RULE("manual — you supply every part yourself"));
+            w.append(NOTE("Nothing is built and nothing is checked. The asset is whatever path you type, or none at " +
+                          "all — a release with no asset is invisible to the installer, which scans for the " +
+                          "<prefix>_vNNNN zip by name."));
+            const tag = IN("version tag (e.g. v1128)"); const name = IN("release title (optional)"); const notes = TA("release notes (optional)", 2); const asset = IN("asset path (optional, e.g. Gmail-safe zip)");
+            const optR = E("div", "display:flex;gap:14px;color:#cde;font-size:11px;"); const dr = document.createElement("input"); dr.type = "checkbox"; const pr = document.createElement("input"); pr.type = "checkbox";
+            const dl = E("label", "display:flex;gap:5px;align-items:center;"); dl.append(dr, document.createTextNode("draft")); const pl = E("label", "display:flex;gap:5px;align-items:center;"); pl.append(pr, document.createTextNode("pre-release")); optR.append(dl, pl);
+            const pub = BTN("Publish version"); w.append(tag, name, notes, asset, optR, pub);
+            // The draft / pre-release checkboxes and the notes box are read by the CHAIN publish and by ⚡ too,
+            // which is not obvious from where they sit. Said out loud rather than left to be discovered.
+            w.append(NOTE("The notes box and these two checkboxes are also read by step 4 and by ⚡."));
 
             // The button's enabled state is READ FROM THE SERVER'S canPublish, never recomputed here. The bridge
             // refuses on the same predicate, so the UI and the guard cannot drift into disagreeing about whether
@@ -387,7 +511,54 @@ export function mountGithubPanel() {
             };
             brSel.addEventListener("mousedown", loadBranches, { once: false });
             brSel.addEventListener("focus", loadBranches);
-            w.append(brSel);
+            brCol.append(brSel);
+
+
+            // ---- v4450: steps 5 and 6, the two commands that were terminal-only ------------------------
+            const ledgerSay = (j) => {
+                if (!j || !j.ok) return say("\u2717 " + ((j && j.error) || "no answer"), false);
+                if (j.dryRun) return say("dry run on " + j.repo + "\n" + j.count + " published release(s)\n" +
+                    (j.added && j.added.length ? "WOULD ADD: " + j.added.join(", ") : "nothing new") +
+                    (j.gone && j.gone.length ? "\nWOULD LOSE: " + j.gone.join(", ") : "") +
+                    "\n\nNothing was written.", true);
+                return say("\u2713 wrote the ledger from " + j.repo + "\n" + j.count + " published release(s)\n" +
+                    (j.added && j.added.length ? "NEW: " + j.added.join(", ") : "nothing new") +
+                    "\n\n" + j.wrote, true);
+            };
+            const ledgerGo = async (btn, write) => {
+                let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                btn.disabled = true; say("asking the releases page" + (write ? ", then rewriting the ledger" : "") + "\u2026");
+                const j = await fetch("/github/ledger/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: er || undefined, write: !!write }) })
+                    .then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+                btn.disabled = false; ledgerSay(j);
+            };
+            ledgerB.onclick = () => ledgerGo(ledgerB, true);
+            ledgerDry.onclick = () => ledgerGo(ledgerDry, false);
+            checkB.onclick = async () => {
+                checkB.disabled = true;
+                const j = await fetch("/github/ledger/check", { cache: "no-store" }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+                checkB.disabled = false;
+                if (!j.ok) return say("\u2717 " + (j.error || ""), false);
+                // *** THE VERDICT LINE IS GENERATED FROM THE STATE, NOT RESTATED BESIDE IT. *** v4404 shipped
+                // with conflict markers because a chain read a tail that said ALL GREEN while the run had
+                // exited 1; a summary computed independently of the thing it summarises can disagree with it.
+                const lines = [
+                    (j.fleetRunsWhatIsBuilt ? "\u2713 THE FLEET RUNS WHAT IS BUILT" : "\u26a0 the fleet is BEHIND this tree"),
+                    "",
+                    "this tree      " + j.tree,
+                    "releases/latest " + (j.latestTag || "(none)"),
+                    "lag            " + (j.behind === null ? "?" : j.behind + " version(s)"),
+                    "ledger         " + j.releaseCount + " release(s) of " + j.shippedCount + " shipped",
+                    "refreshed      " + (j.refreshedAt || "never"),
+                ];
+                if (j.owed && j.owed.length) lines.push("", "*** UNRELEASED AND OWED: " + j.owed.map((v) => "v" + v).join(", ") + " ***",
+                    "You may not ship a new version while the last one is unreleased.");
+                else lines.push("", "Nothing is owed. Versions at or below v" + j.floor + " are written-off debt:",
+                    "the zip is not byte-reproducible, so one built today for an old version",
+                    "would carry bytes that version never had.");
+                say(lines.join("\n"), !!j.fleetRunsWhatIsBuilt);
+            };
 
             src.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
@@ -406,6 +577,7 @@ export function mountGithubPanel() {
             eng.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
                 if (!er) return say("pick a repo, or set engineRepo in Account", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };
+            return w;
             return w;
         },
         Issues() {
