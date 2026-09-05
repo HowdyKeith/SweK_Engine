@@ -1,25 +1,25 @@
-// WebGLEngine/vba/runtimeGap.mjs -- v4451
+// WebGLEngine/vba/runtimeGap.mjs -- v4462
 //
 // *** #129 ASKS WHAT IS MISSING BESIDES THREADS IF THE VBA TRANSMITTER WERE THE SweK RUNTIME INSTEAD OF
 // NODE/BUN. MEASURED, THREADS ARE THE SECOND-SMALLEST GAP OF TWELVE, AND THE QUESTION HAS ITS SCALE INVERTED. ***
 //
 // The item's phrasing carries an assumption -- that threads are the big one and the rest is detail. Counted
-// over the 3,801 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
+// over the 3,814 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
 //
-//     ES modules              3510 files   92.3%
-//     closures as values      3393 files   89.3%
-//     async / await           1311 files   34.5%
-//     typed arrays             660 files   17.4%
+//     ES modules              3523 files   92.4%
+//     closures as values      3404 files   89.3%
+//     async / await           1314 files   34.5%
+//     typed arrays             662 files   17.4%
 //     Promises                 329 files    8.7%
 //     fetch / XHR              223 files    5.9%
 //     performance.now          202 files    5.3%
 //     requestAnimationFrame    116 files    3.1%
 //     WebGL                    102 files    2.7%
-//     WebGPU                    34 files    0.9%
+//     WebGPU                    35 files    0.9%
 //     workers / threads         22 files    0.6%     <-- the thing the item asks "besides"
 //     WebAssembly               22 files    0.6%   <-- tied with it, and the tie is this round's own doing
 //
-// *** FIRST-CLASS FUNCTIONS ARE 154 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,393 files against 22. A
+// *** FIRST-CLASS FUNCTIONS ARE 155 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,404 files against 22. A
 // runtime that had threads and no closures could run 0.6% of what a runtime with closures and no threads
 // could. So the answer to "what is missing besides threads" is: nearly all of it, and threads barely register.
 //
@@ -95,7 +95,7 @@ export function ranked(c) {
 export const EVIDENCE = Object.freeze(["measured", "language", "archive"]);
 
 /**
- * What the VBA side offers, one row per capability, each tagged with HOW that is known AND -- since v4451's
+ * What the VBA side offers, one row per capability, each tagged with HOW that is known AND -- since v4462's
  * sabotage pass -- with the BYTES that corroborate it.
  *
  * *** THE `has` COLUMN IS THE ONE A TABLE LIKE THIS GETS WRONG, BECAUSE NOTHING PUSHES BACK ON IT. *** The
@@ -155,19 +155,22 @@ export const VBA_SIDE = Object.freeze([
 /** Rows whose truth rests on the archive rather than on the language. The weakest claims, listed as such. */
 export const archiveRows = () => VBA_SIDE.filter((r) => r.evidence === "archive");
 
-/** What v4451 measured. Re-take with: node tools/ship/runtimeGap-selfcheck.mjs */
-export const MEASURED_AT_V4451 = Object.freeze({
+/** What v4462 measured. Re-take with: node tools/ship/runtimeGap-selfcheck.mjs */
+export const MEASURED_AT_V4462 = Object.freeze({
     // *** THESE ARE THE SHIPPED-STATE COUNTS, AND THE FIRST SET WAS TAKEN BEFORE THIS ROUND'S OWN FILES
     // EXISTED. *** Measured at 3,795 files / 21 threads / 3,387 closures; adding runtimeGap.mjs and its gate
     // moved every row by one or two and the ratio from 161 to 154. The gate re-derives the census on each run
     // against the tree AS IT SHIPS, so the pre-round numbers would have been red forever. v4424 shipped a
     // round whose census counted its own changelog; this is the same shape, caught by the check rather than
     // by luck, and the numbers below are the ones a reader can reproduce. They moved a second time when
-    // origin/main's v4449 and v4450 were merged in before shipping -- four rows and four files -- and the
-    // gate caught that too, which is the whole point of re-deriving rather than reading a table back.
-    files: 3801,
-    esModules: 3510, closures: 3393, asyncAwait: 1311, typedArrays: 660, promises: 329,
-    fetchXhr: 223, performanceNow: 202, raf: 116, webgl: 102, webgpu: 34, threads: 22, wasm: 22,
+    // origin/main was merged in before shipping -- TWICE, and the gate caught it both times. First v4449 and
+    // v4450 (four rows, four files). Then TEN concurrent versions, v4452 to v4461, which moved five rows and
+    // thirteen files and pushed the ratio from 154 to 155. A table read back rather than re-derived would
+    // have shipped the first set of numbers three times over. *** AND THE ROUND'S OWN NUMBER COLLIDED: *** a
+    // concurrent session shipped a different v4451 and reached main first, so this round is v4462.
+    files: 3814,
+    esModules: 3523, closures: 3404, asyncAwait: 1314, typedArrays: 662, promises: 329,
+    fetchXhr: 223, performanceNow: 202, raf: 116, webgl: 102, webgpu: 35, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
@@ -187,7 +190,7 @@ export const MEASURED_AT_V4451 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 154,     // 3393 / 22, rounded
+    closuresOverThreads: 155,     // 3404 / 22, rounded
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

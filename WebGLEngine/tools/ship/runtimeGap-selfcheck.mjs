@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/runtimeGap-selfcheck.mjs -- v4451
+// WebGLEngine/tools/ship/runtimeGap-selfcheck.mjs -- v4462
 //
 // Run: node tools/ship/runtimeGap-selfcheck.mjs
 //
@@ -66,18 +66,18 @@ const rows = R.ranked(c);
         "typed arrays": "typedArrays", "Promises": "promises", "fetch/XHR": "fetchXhr",
         "performance.now": "performanceNow", "requestAnimationFrame": "raf", "WebGL": "webgl",
         "WebGPU": "webgpu", "workers/threads": "threads", "WebAssembly": "wasm" };
-    const drift = rows.filter((r) => c.counts[r.capability] !== R.MEASURED_AT_V4451[KEY[r.capability]])
-        .map((r) => `${r.capability} ${R.MEASURED_AT_V4451[KEY[r.capability]]} -> ${c.counts[r.capability]}`);
+    const drift = rows.filter((r) => c.counts[r.capability] !== R.MEASURED_AT_V4462[KEY[r.capability]])
+        .map((r) => `${r.capability} ${R.MEASURED_AT_V4462[KEY[r.capability]]} -> ${c.counts[r.capability]}`);
     ok("the census re-derives to what the module recorded, EVERY row of it -- a stale table is a red",
-        c.files === R.MEASURED_AT_V4451.files && drift.length === 0 &&
+        c.files === R.MEASURED_AT_V4462.files && drift.length === 0 &&
         Object.keys(KEY).length === rows.length,
         drift.length ? "drifted: " + drift.join(", ") : `${c.files} files, all 12 rows match`);
     ok("!! *** THREADS ARE THE SECOND-SMALLEST GAP OF TWELVE, WHICH INVERTS THE ITEM'S SCALE ***",
-        idx === R.MEASURED_AT_V4451.threadsRank - 1 && idx >= rows.length - 2,
+        idx === R.MEASURED_AT_V4462.threadsRank - 1 && idx >= rows.length - 2,
         `#129 asks what is missing "besides threads"; threads rank ${idx + 1} of ${rows.length}, ` +
         `${threads.files} files at ${threads.pct.toFixed(1)}%`);
     ok("...and first-class functions are two orders of magnitude more of this tree than threads are",
-        Math.round(closures.files / threads.files) === R.MEASURED_AT_V4451.closuresOverThreads &&
+        Math.round(closures.files / threads.files) === R.MEASURED_AT_V4462.closuresOverThreads &&
         closures.files / threads.files > 100,
         `${closures.files} / ${threads.files} = ${Math.round(closures.files / threads.files)}x. A runtime with ` +
         "threads and no closures runs 0.6% of what one with closures and no threads runs");
@@ -108,14 +108,14 @@ const rows = R.ranked(c);
     say(`  this round's own 2 files inflate ${Object.keys(self).length} of 12 rows: ` +
         (Object.entries(self).map(([k, n]) => `${k} +${n}`).join(", ") || "nothing"));
     ok("!! *** THE MODULE DEFINING THE CENSUS MATCHES ALL TWELVE OF ITS OWN PATTERNS *** -- derived, not argued",
-        JSON.stringify(self) === JSON.stringify(R.MEASURED_AT_V4451.selfCount) &&
+        JSON.stringify(self) === JSON.stringify(R.MEASURED_AT_V4462.selfCount) &&
         without.files === c.files - 2,
         `all ${Object.keys(R.PATTERNS).length} rows inflated. runtimeGap.mjs holds the PATTERNS table, so every ` +
         "regex's literal text is IN it -- and a regex source is a string, which is prose the comment strip " +
         "cannot reach. The same false-positive class as the check above, one layer in, in the instrument itself");
     ok("...and the headline survives it: a 2-file distortion in rows of 22 to 3,506, and threads still rank last but one",
-        without.counts.WebAssembly === R.MEASURED_AT_V4451.wasmWithoutSelf &&
-        without.counts["workers/threads"] === R.MEASURED_AT_V4451.threadsWithoutSelf &&
+        without.counts.WebAssembly === R.MEASURED_AT_V4462.wasmWithoutSelf &&
+        without.counts["workers/threads"] === R.MEASURED_AT_V4462.threadsWithoutSelf &&
         without.counts["workers/threads"] > without.counts.WebAssembly &&
         c.counts["workers/threads"] === c.counts.WebAssembly,
         `with this round: threads ${c.counts["workers/threads"]} tie WebAssembly ${c.counts.WebAssembly} and ` +
@@ -161,23 +161,23 @@ const rows = R.ranked(c);
         } else missing.push(`${r.capability}: unknown corroborator kind \`${v.kind}\``);
     }
     ok("!! *** EVERY CAPABILITY VBA IS CREDITED WITH POINTS AT BYTES THAT ARE REALLY THERE ***",
-        missing.length === 0 && R.VBA_SIDE.filter((r) => r.has).length === R.MEASURED_AT_V4451.hasRows,
+        missing.length === 0 && R.VBA_SIDE.filter((r) => r.has).length === R.MEASURED_AT_V4462.hasRows,
         missing.length ? missing.join("; ")
-            : `${R.MEASURED_AT_V4451.hasRows} credited rows, each corroborated. Crediting VBA with closures ` +
+            : `${R.MEASURED_AT_V4462.hasRows} credited rows, each corroborated. Crediting VBA with closures ` +
               "now requires inventing a VBA file that uses them");
     ok("...and the corroborators are not all of one kind, so neither half of the check can go inert",
         R.VBA_SIDE.filter((r) => r.via && r.via.kind === "vba-source").length >= 2 &&
         R.VBA_SIDE.filter((r) => r.via && r.via.kind === "manifest").length >= 1 && VBA_SRC.length >= 5,
         `${VBA_SRC.length} in-tree VBA modules read, ${VBA_CODE.split("\n").length} non-comment lines`);
     ok("the absent rows are counted, not eyeballed -- nine of the twelve are language facts of absence",
-        R.VBA_SIDE.filter((r) => !r.has && r.evidence === "language").length === R.MEASURED_AT_V4451.languageRowsAbsent,
+        R.VBA_SIDE.filter((r) => !r.has && r.evidence === "language").length === R.MEASURED_AT_V4462.languageRowsAbsent,
         "this constant read 8 in the first draft against nine real rows, and nothing checked it: the exact " +
         "frozen-number-nobody-re-takes shape the header of this gate complains about, in the gate's own module");
 
     const arch = R.archiveRows();
     say("  archive-backed rows: " + arch.map((r) => r.capability).join(", "));
     ok("!! *** and only ONE row still rests on the archive, because pointing them at bytes promoted the other ***",
-        arch.length === R.MEASURED_AT_V4451.archiveRows && arch[0].capability === "WebGL" &&
+        arch.length === R.MEASURED_AT_V4462.archiveRows && arch[0].capability === "WebGL" &&
         R.VBA_SIDE.find((r) => r.capability === "fetch/XHR").evidence === "language",
         "a network stack and a GPU renderer are the two anyone would guess are hardest, and they are the two " +
         "VBA has -- but the HTTP client is visible in this tree's own .bas files, so only GL needs the archive");
