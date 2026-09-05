@@ -98,6 +98,9 @@ const EMITTED_LOOP = fs.existsSync(EMITTED_LOOP_PATH) ? JSON.parse(fs.readFileSy
 // v4483 -- the widened transplant's pair: the quad with computed and flat varyings, and the planes pass with its frustum in the struct
 const EMITTED_WIDE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-wide.json");
 const EMITTED_WIDE = fs.existsSync(EMITTED_WIDE_PATH) ? JSON.parse(fs.readFileSync(EMITTED_WIDE_PATH, "utf8")) : null;
+// v4484 -- Slug's fragment as three emitted it and as the transplant put it into the shipped pipeline's shell
+const EMITTED_SLUG_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-slug.json");
+const EMITTED_SLUG = fs.existsSync(EMITTED_SLUG_PATH) ? JSON.parse(fs.readFileSync(EMITTED_SLUG_PATH, "utf8")) : null;
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 /** The brain's transport passes, by file: the census lists every .wgsl under its roots and each must be here or EXCLUDED. */
@@ -290,6 +293,8 @@ export function corpus() {
             ...(EMITTED_WIDE ? [
             { id: "tslWide.quad (generated)", from: "tools/ship/tsl-emitted-wide.json", compileOnly: true, why: "v4483 -- the quad as three's WGSL builder wrote it from render/tslWide.mjs makeQuadVaryingsTsl, transplanted into the quad shell: computed varyings, a flat i32, cam.proj in the fragment -- a pair nobody typed", opts: { code: EMITTED_WIDE.quad.transplanted.wgsl, compileOnly: true, outCount: 0 } },
             { id: "tslWide.planes (generated)", from: "tools/ship/tsl-emitted-wide.json", compileOnly: true, why: "v4483 -- the planes pass as three's compute builder wrote it, its uniformArray folded into the shell's struct as array<vec4<f32>, 6>; held bit for bit to the f32 twin by tslWide-selfcheck", opts: { code: EMITTED_WIDE.planes.transplanted, compileOnly: true, outCount: 0 } }] : []),
+            ...(EMITTED_SLUG ? [
+            { id: "slugTsl.slug (generated)", from: "tools/ship/tsl-emitted-slug.json", compileOnly: true, why: "v4484 -- Slug's fragment as three's WGSL builder wrote it from render/slugTsl.mjs, in the shipped pipeline's own shell (SlugDilate, the uniform struct, the two atlases); held to the shipped picture on 23,040 of 23,040 pixels by tools/ship/slugTsl-selfcheck.mjs", opts: { code: EMITTED_SLUG.slug.transplanted.wgsl, compileOnly: true, outCount: 0 } }] : []),
             { id: "tslSource.badTv (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "badTv's fragment as three's WGSL builder wrote it from render/badTvTsl.mjs, in the device's shell -- a pair nobody typed", opts: { code: EMITTED.badTv.transplanted.wgsl, compileOnly: true, outCount: 0 } },
             { id: "tslSource.blackbody (generated)", from: "tools/ship/tsl-emitted.json", compileOnly: true, why: "the blackbody key as three's WGSL builder wrote it from render/blackbodyTsl.mjs -- a Loop of Newton steps, generated", opts: { code: EMITTED.blackbody.transplanted.wgsl, compileOnly: true, outCount: 0 } },
         ] : []),

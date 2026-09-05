@@ -55,7 +55,8 @@ export function uniformFields(fragment, language) {
 }
 /** The textures three declared: [name]. Refuses an unlabelled one. */
 export function textureNames(fragment, language) {
-    const names = language === "wgsl" ? [...fragment.matchAll(/var (\w+) : texture_2d<f32>;/g)].map((m) => m[1]) : [...fragment.matchAll(/uniform sampler2D (\w+);/g)].map((m) => m[1]);
+    // v4484 -- an INTEGER texture (Slug's rg16uint band atlas): texture_2d<u32> / texture_2d<i32> in WGSL, usampler2D / isampler2D in GLSL
+    const names = language === "wgsl" ? [...fragment.matchAll(/var (\w+) : texture_2d<(?:f32|u32|i32)>;/g)].map((m) => m[1]) : [...fragment.matchAll(/uniform [ui]?sampler2D (\w+);/g)].map((m) => m[1]);
     for (const n of names) if (/^nodeUniform\d+$/.test(n)) throw new Error(`tslSource: the emitted ${language.toUpperCase()} carries an UNLABELLED texture (${n}); label the texture node (texture(t, uv).label("tDiffuse"))`);
     return names;
 }
@@ -154,10 +155,18 @@ export const ATTRIBUTE_NAMES = Object.freeze(["uv", "position", "normal", "color
  * the shell's own varyings, mapped by semantic as before.
  * Returns { computed: [{ name, type, flat }], statements, decls, uniforms, matrices, reads } or null when nothing is computed.
  */
+/** The vertex stage's inputs, by name: three's `@location(n) name : type` parameters (WGSL) or `layout(location = n) in type name;` (GLSL). */
+export function attributeNames(vertex, language) {
+    if (language === "wgsl") { const sig = (vertex.match(/fn main\(([\s\S]*?)\)\s*->/) || [])[1] || ""; return [...sig.matchAll(/@location\(\s*\d+\s*\)\s*(\w+)\s*:/g)].map((m) => m[1]); }
+    return [...vertex.matchAll(/^\s*layout\(\s*location\s*=\s*\d+\s*\)\s*in\s+\w+\s+(\w+);/gm)].map((m) => m[1]);
+}
 export function vertexVaryingBlock(vertex, language) {
     const decls = varyingDecls(vertex, language), sem = varyingSemantics(vertex, language);
     const names = Object.keys(decls).filter((n) => n !== "Vertex");
-    const computed = names.filter((n) => !(n in sem) || !ATTRIBUTE_NAMES.includes(sem[n]));
+    // v4484 -- a bare copy of ANY vertex input is the shell's own varying (Slug's texcoord, banding, glyph are attributes with
+    // their own names, not three's uv/normal/color); only an expression, or a name that is neither input nor local, is computed
+    const inputs = new Set([...ATTRIBUTE_NAMES, ...attributeNames(vertex, language)]);
+    const computed = names.filter((n) => !(n in sem) || !inputs.has(sem[n]));
     if (!computed.length) return null;
     const bodyAll = vertex.split(language === "wgsl" ? "fn main(" : "void main()")[1] || "";
     const body = bodyAll.slice(bodyAll.indexOf("{") + 1, bodyAll.lastIndexOf("}"));
@@ -314,7 +323,7 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             }
             const prefix = (vertexText ? S.prefix.replace(S.vertexTemplate, vertexText) : S.prefix).replace("{{VARYINGS}}", varyingDeclText ? ", " + varyingDeclText : "");
             if (vertexText && prefix === S.prefix) throw new Error("tslSource: the shell's prefix does not contain its own vertexTemplate, so the vertex could not be replaced");
-            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: VOut) -> @location(0) vec4<f32> {${b}}\n`;
+            desc.wgsl = `// transplanted into the ${shell.name} shell from three's WGSL node builder by render/tslSource.mjs\n${prefix}\n${codes}\n@fragment fn fs(${S.varyingParam}: ${S.varyingType || "VOut"}) -> @location(0) vec4<f32> {${b}}\n`;   // v4484: the shell names its varying struct (Slug's is VSOut)
         } else {
             const computedNames = block ? block.computed.map((c) => c.name) : [];
             const ins = [...em.fragment.matchAll(/^(?:flat\s+)?in\s+\w+\s+(\w+);/gm)].map((m) => m[1]).filter((n) => !computedNames.includes(n));
@@ -327,7 +336,10 @@ export function transplantIntoShell({ wgsl, glsl }, shell) {
             desc.glsl = { vertex: vertexText || S.vertex, fragment: `${S.fragmentPrefix.replace("{{VARYINGS}}", fragInText)}\n${codes}\nvoid main() {${b}}\n` };
         }
     }
-    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), ...(shell.textures && shell.textures.length ? { textures: shell.textures } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
+    // v4484 -- the shell's BLEND and DEPTH state ride along: a Slug shell is premultiplied with no depth write, and a transplant that dropped them drew the
+    // right picture over a BLACK clear (src + 0 is src), which is how the omission went unmeasured until the gate cleared to a colour
+    return { shaders: { ...(desc.wgsl ? { wgsl: desc.wgsl } : {}), ...(desc.glsl ? { glsl: desc.glsl } : {}) }, vs: "vs", fs: "fs", buffers: shell.buffers, uniforms: shell.uniforms, ...(shell.topology ? { topology: shell.topology } : {}), ...(shell.textures && shell.textures.length ? { textures: shell.textures } : {}),
+             ...(shell.blend ? { blend: shell.blend } : {}), ...(shell.depthWrite !== undefined ? { depthWrite: shell.depthWrite } : {}), ...(shell.depthCompare ? { depthCompare: shell.depthCompare } : {}), shell: shell.name, languages, displaced: !!vertexDisplacement((wgsl || glsl).vertex, wgsl ? "wgsl" : "glsl") };
 }
 
 // ---- v4331: A COMPUTE PASS CROSSES ---------------------------------------------------------------------------------

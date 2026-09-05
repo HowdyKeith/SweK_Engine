@@ -2317,6 +2317,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the vertex's. Two first drafts caught by measurement: a positional window shipped an unwritten temporary (0 of " +
                  "16,384 on WebGPU), and nameless attributes bound nothing on WebGL2 while both halves agreed -- the CPU twin saw it.",
     }),
+    since106: Object.freeze({
+        at: "v4484", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugTsl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on WebGPU and WebGL2. Slug's fragment as TSL nodes (render/slugTsl.mjs), emitted by three's two builders and " +
+                 "carried by the widened transplant into the SHIPPED Slug pipeline's own shell: 'Sphinx 42% AV' at 28 px drawn by " +
+                 "the generated fragment is the shipped pipeline's picture on 23,040 of 23,040 pixels, worst 0, on both backends. " +
+                 "The decision the measurement was for: NO TSL Slug material for the 0.178 pages (only orrery-gpu.html draws text, " +
+                 "on the device already; three uploads the band atlas only at 32 bits and, here, not at all with data). Four rules " +
+                 "found by emitting: no float-to-uint bitcast in three 0.178, a dropped parameter conversion, the uv-transform on " +
+                 "a uv-less texture node, and a shell must name its varying struct (VSOut). The v4457 sentence 'the device shell " +
+                 "is not its route' is withdrawn with the picture as the evidence.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

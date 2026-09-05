@@ -373,6 +373,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         must read device:webgpu after a frame, with labels visible.
      4. A TSL Slug material, MEASURED first and scoped to the 0.178 pages: render/tslSource's transplant refuses
         more than one varying and Slug's vertex stage carries five, so the device shell is not its route.
+        MEASURED at v4484 (task 4), and the second sentence is withdrawn: render/slugTsl.mjs is Slug's fragment as
+        nodes -- the sign-bit root code, the two solvers, CalcBandLoc, CalcCoverage, SlugRender's two band loops with
+        their breaks, the two atlases by textureLoad (the band one texture_2d<u32> / usampler2D), the four varyings
+        read by the shipped stage's names, two of them flat -- and render/tslSource.mjs (widened at v4483) carries
+        the emitted fragment into the SHIPPED pipeline's own shell, text/slugShaderWgsl.js's vertex stage and
+        bindings unchanged. tools/ship/slugTsl-selfcheck.mjs: on WebGPU and on WebGL2, "Sphinx 42% AV" at 28 px
+        drawn by the generated fragment is the shipped pipeline's picture on 23,040 of 23,040 pixels, worst 0. What
+        the emission found, each a rule written beside the code: three 0.178 has NO float-to-uint bitcast (its
+        bitcast() is bitcast<f32> only), so the root code gathers the three sign bits by comparison and reads -0.0
+        as positive where asuint reads its sign -- stated, and invisible in this text; three drops a conversion
+        applied to a function parameter (int(offset) emitted bare, GLSL refused int + uint), so parameters are typed
+        and callers convert; a texture node built without a uv turns the uv-transform on (v4326 again), so the base
+        takes a uv and each load carries the label; three's WebGPU backend uploads an RGIntegerFormat texture only
+        as RG32Sint/RG32Uint, and on this box's SwiftShader a data-bearing float or uint DataTexture upload takes the
+        page down, so the stand-ins are data-less; the emitted core is 1.7x the hand-written one in lines. THE
+        DECISION: NO TSL Slug material for the 0.178 pages -- of the three, only orrery-gpu.html draws text, through
+        render/slugDevice.mjs on the device already; three cannot upload the atlas a NodeMaterial would read; the
+        shipped shader already runs on the WebGPU backend. The generated pair is in the corpus from
+        tools/ship/tsl-emitted-slug.json; the record is tools/ship/todo.mjs slug-node-material. NOT CLAIMED: the
+        evenOdd and weight variants' pictures, another logWidth, the cost of either fragment (task 9).
      5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,
         Cinzel, JetBrains Mono, Source Sans 3, Cormorant, Lora, Merriweather, Fira) kerns through GPOS only, and
         layoutText reports kerningSource "none" for them today.

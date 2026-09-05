@@ -227,6 +227,24 @@ export const TODO = [
                 "to itself in f32 under the kernel contract, not as a twin of erosion.js.",
         evidence: "node tools/ship/erosionMeasure-selfcheck.mjs",
     },
+    {
+        id: "slug-node-material",
+        status: "wont",
+        title: "A TSL Slug material (SlugNodeMaterial) for the three pages that carry three 0.178",
+        why: "docs/TSL-ROADMAP.md step 7 item 4 (task 4): the v4457 review said the only place a TSL Slug material pays is a " +
+             "three-0.178 WebGPURenderer page, and that the device shell was not its route because the transplant refused more " +
+             "than one varying. Measure first: write the fragment as nodes, emit it, count what three emits.",
+        reason: "MEASURED at v4484. render/slugTsl.mjs is the fragment as nodes and render/tslSource.mjs carries it into the SHIPPED " +
+                "pipeline's shell: on WebGPU and on WebGL2 the generated fragment draws 'Sphinx 42% AV' at 28 px on 23,040 of 23,040 " +
+                "pixels identical to the shipped Slug pipeline (worst 0), so the route sentence is withdrawn. No material, because: " +
+                "three 0.178 uploads an RGIntegerFormat texture only as RG32Sint/RG32Uint (the rg16uint band atlas would be repacked " +
+                "at twice the bytes) and on this box a data-bearing float or uint DataTexture upload takes the page down, so a " +
+                "NodeMaterial on three's renderer could not even be measured here; of the three pages only orrery-gpu.html draws " +
+                "text and it does so through render/slugDevice.mjs on the device already; and three's emitted core is 1.7x the " +
+                "hand-written one in lines with no float-to-uint bitcast (the root code gathers sign bits by comparison, -0.0 " +
+                "read as positive). Re-open only if a three-rendered page needs text three itself must draw.",
+        evidence: "node tools/ship/slugTsl-selfcheck.mjs",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);
