@@ -137,6 +137,17 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
     //
     // What the rule protects is not zero lag; it is that THE FLEET DOES NOT FALL BEHIND. 3 releases across
     // 261 versions is the failure it was built for -- 87 times this budget.
+    // *** THE BUDGET DOES NOT BIND ON A REPUBLISH, AND SAYING SO IS THE WHOLE OF WHY THIS IS NOT A SKIP. ***
+    // v4453 put this assertion where verify runs it, and THE PUBLISH ROUTE RUNS VERIFY: `Clone -> verify`
+    // grades a clone of main, `Publish the verified clone` refuses on a red verdict. So the moment the lag
+    // exceeded the budget, the gate that exists to force a publish LOCKED THE PUBLISH THAT WOULD CLEAR IT --
+    // found at 7 of 3 with the fleet fourteen versions back. The budget now binds only on a tree that would
+    // ADD a version to main; a clone republishing what main already holds is the catch-up it wants.
+    if (!S.budgetBinds) report("the budget is NOT asserted on this tree, and here is why",
+        "ENGINE_VERSION " + S.tree + " is ALREADY ON MAIN, so this tree adds nothing and can only reduce the " +
+        "lag -- it is a republish, not a ship. The count is still printed below and is still " + S.owed.length +
+        " of " + S.budget + ". A CHECK THAT QUIETLY STOPS CHECKING IS THE DEFECT THIS FILE HAS CAUGHT THREE " +
+        "TIMES, so it says which question it declined and what the answer would have been.");
     ok("!! *** main runs no more than the budget ahead of the releases page ***",
         S.withinBudget,
         !S.budgetStated
@@ -145,9 +156,18 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
             : S.owed.length
                 ? S.owed.length + " of " + S.budget + " allowed: " + S.owed.slice(0, 12).map((v) => "v" + v).join(", ") +
                   (S.owed.length > 12 ? " (+" + (S.owed.length - 12) + " more)" : "") +
-                  (S.withinBudget ? " -- within budget" : ". PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how")
+                  (!S.budgetBinds ? " -- NOT ASSERTED on this tree (a republish adds nothing to main); the " +
+                        "number is printed so nobody reads silence as zero"
+                     : S.withinBudget ? " -- within budget"
+                     : ". PUBLISH BEFORE SHIPPING AGAIN -- the ship skill's step 7 is the how")
                 : "nothing owed at all. Baseline v" + S.floor + ", tree " + S.tree + ", budget " + S.budget +
                   "; the rule binds from v" + (S.floor + 1) + " forward");
+    ok("!! ...and it binds on the party that can make the gap WORSE, which is checked and not assumed",
+        typeof S.addsToMain === "boolean" && S.budgetBinds === S.addsToMain,
+        "addsToMain=" + S.addsToMain + " (tree " + S.tree + (S.addsToMain ? " is NOT on main -- shipping it " +
+        "pushes main one further, so the budget binds)" : " is already on main -- publishing it only reduces " +
+        "the lag, so the budget does not)") + ". DERIVED FROM MAIN'S OWN VERSION LIST, not a flag: a flag for " +
+        "'this is a republish' is a flag somebody sets to get past the gate");
 
     // *** THE QUESTION IS ABOUT MAIN, WHICH IS WHAT THE RULE ALWAYS SAID AND NOT WHAT IT MEASURED. ***
     // v4449's own words: "a version that reaches MAIN and never reaches the releases page is a version nobody
@@ -198,7 +218,24 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
             viaMain.owed.join(",") + "] -- EXACTLY MAIN'S TWO, not the " + shippedVersions(ROOT).length +
             " this working tree carries. A COUNT COMPARISON ALONE COULD NOT SHOW THIS: main and the tree were " +
             "identical when this round shipped, so swapping the arithmetic to the tree went ZERO RED TWICE");
-        try { fs.unlinkSync(tmpL); } catch {}
+        // *** AND IT STILL BITES, WHICH AN EXEMPTION MAKES WORTH PROVING RATHER THAN ASSUMING. *** The
+        // republish exemption is the fix for a deadlock; an exemption that quietly swallowed the whole rule
+        // would look identical from the green side. Here the tree is NOT on main and the lag exceeds the
+        // budget -- the exact case a ship must be refused in.
+        const tmpB = path.join(os.tmpdir(), "swek-ledger-b-" + process.pid + ".json");
+        fs.writeFileSync(tmpB, JSON.stringify({
+            baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+            lagBudget: { maxVersionsBehind: 2, why: "z".repeat(220) },   // small ON PURPOSE: 4 owed must exceed it
+            releases: [{ tag: "v4001" }],
+        }));
+        const shipping = ledgerState({ file: tmpB, readMain: () => "## v4111 -- one\n\n## v4222 -- two\n\n## v4333 -- three\n\n## v4444 -- four\n" });
+        ok("!! *** and a tree that WOULD add to main is still refused when the lag exceeds the budget ***",
+            shipping.addsToMain === true && shipping.budgetBinds === true && shipping.withinBudget === false &&
+            shipping.owed.length > shipping.budget,
+            "tree " + shipping.tree + " is not among main's four, so addsToMain=true and the budget binds: " +
+            shipping.owed.length + " owed against " + shipping.budget + " allowed -> REFUSED. AN EXEMPTION " +
+            "THAT SWALLOWED THE RULE WOULD LOOK IDENTICAL FROM THE GREEN SIDE, so both directions are driven");
+        try { fs.unlinkSync(tmpL); fs.unlinkSync(tmpB); } catch {}
         ok("!! ...and when main cannot be read it DEGRADES LOUDLY to the stricter list",
             viaTree.owedDegraded === true && viaTree.owedSource === "working tree" &&
             viaTree.mainCount === shippedVersions(ROOT).length,

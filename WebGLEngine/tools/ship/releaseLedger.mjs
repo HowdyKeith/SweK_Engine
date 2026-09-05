@@ -147,6 +147,21 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     // the escape hatch would have swallowed the rule again one level up.
     const budget = led && led.lagBudget && +led.lagBudget.maxVersionsBehind;
     const budgetStated = Number.isFinite(budget) && budget >= 0;
+
+    // *** THE BUDGET BINDS ON ADDING TO MAIN, NOT ON PUBLISHING WHAT IS ALREADY THERE -- AND WITHOUT THIS IT
+    // WAS A DEADLOCK. *** v4453 put the budget in a gate that verify runs, and the publish route runs verify:
+    // `Clone -> verify` clones main and grades THAT tree, and `Publish the verified clone` refuses unless the
+    // verdict was green. So once the lag exceeded the budget, THE GATE THAT EXISTS TO FORCE A PUBLISH BLOCKED
+    // THE PUBLISH THAT WOULD CLEAR IT. Found at 7-of-3 with the fleet fourteen versions back and the one
+    // action that fixes it locked behind the complaint about it. That is the original hard ratchet's shape
+    // one level along, and it is worse: the ratchet could be answered by a write-off, this could be answered
+    // by nothing at all.
+    //
+    // The discriminator is derived, not a flag: IS THIS TREE'S VERSION ALREADY ON MAIN? A clone of main
+    // republishing v4460 adds nothing -- it is the catch-up the budget wants. A working tree bumped to v4461
+    // is about to push main one further, which is exactly what the budget bounds. Same number, same list,
+    // asked only of the party that can make the gap worse.
+    const addsToMain = !!(treeN && !onMain.versions.includes(treeN));
     return {
         tree, treeN, latest, latestTag: latest ? "v" + latest : "",
         behind: treeN && latest ? treeN - latest : null,
@@ -156,7 +171,12 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
         budget: budgetStated ? budget : null, budgetStated,
         // An UNSTATED budget is not an infinite one. A ledger with no lagBudget fails the gate rather than
         // passing it -- the v4413 defect (a floor and no ceiling) wearing this file's clothes.
-        withinBudget: budgetStated ? owed.length <= budget : false,
+        addsToMain,
+        // NOT ASSERTED when this tree adds nothing to main -- and `budgetBinds` says so out loud, so the gate
+        // can print WHY it is not complaining rather than printing nothing. A check that quietly stops
+        // checking is the thing this file has caught three times.
+        budgetBinds: addsToMain,
+        withinBudget: !budgetStated ? false : (!addsToMain || owed.length <= budget),
         refreshedAt: led && led.refreshedAt || "",
         // The headline Keith's sentence is about: does releases/latest equal what the tree builds?
         fleetRunsWhatIsBuilt: !!(latest && treeN && latest === treeN),

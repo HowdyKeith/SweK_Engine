@@ -160,6 +160,14 @@ went red three rounds running, and each time the answer was to raise the baselin
 ROUNDS IS A GATE COLLECTING SIGNATURES. The budget is what the rule actually protected: not zero lag, but a
 fleet that does not fall behind.
 
+*** AND THE BUDGET DOES NOT BIND ON A REPUBLISH, WHICH IS A FIX FOR A DEADLOCK THIS SKILL CAUSED. *** The
+publish route runs verify -- `Clone -> verify` grades a clone of main, and `Publish the verified clone` refuses
+on a red verdict. So once the lag passed the budget, THE GATE THAT EXISTS TO FORCE A PUBLISH LOCKED THE PUBLISH
+THAT WOULD CLEAR IT. Found at 7 of 3 with the fleet fourteen versions back. The budget now binds only on a tree
+whose ENGINE_VERSION is NOT yet on main -- one that would push main further. A clone republishing what main
+already holds can only reduce the lag, so it is let through, and the gate PRINTS the count and the reason it
+declined to assert rather than going quiet.
+
 Two floors, and they are deliberately separate. `baseline.throughVersion` forgives versions already gone by
 and cannot be back-filled (a zip built today for v4301 would carry bytes v4301 never had); `lagBudget` bounds
 how far the NEXT ones may drift. A baseline raise cannot widen the budget -- if one edit did both, the escape
