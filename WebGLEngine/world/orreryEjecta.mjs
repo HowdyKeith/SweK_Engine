@@ -223,6 +223,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "fonts": Object.freeze([
         "ev/esShipLabels-selfcheck.mjs",
         "ev/esShipLabels.js",
+        // v4461 -- a REAL arrival, accepted rather than excluded, and the distinction is the point. It was
+        // found in the same red as tools/ship/orreryUniverse-selfcheck.mjs and got the OPPOSITE answer:
+        // that one names vendor paths while measuring the vendor tree and is now in NOT_IMPORTERS, this one
+        // reads vendor/fonts/IBMPlexSerif-Regular.ttf and parses it as the input its assertions run on. Eject
+        // vendor/fonts and this gate has nothing to test, which is precisely what a dependant is. Two arrivals
+        // in one gate's red, two different causes -- which is the argument for a ratchet frozen BY NAME:
+        // a count would have said "fonts went 3 -> 4" and left both of them indistinguishable.
+        "tools/ship/slugWgsl-selfcheck.mjs",
         "slug-text.html",
     ]),
     "gifenc": Object.freeze([

@@ -57,6 +57,17 @@ export const NOT_IMPORTERS = Object.freeze([
     // would conclude, so it joined keyhunt's fleet the moment it existed. The name-frozen ratchet said WHICH
     // file within the minute, which is the whole reason v4412 made the baseline a list instead of a count.
     "tools/ship/provenanceRecord-selfcheck.mjs",
+    // v4461: FIFTH instance, and it reached FOUR bodies at once -- box3d, jolt, slug and wasm -- which is why
+    // it is worth a sentence rather than a line. orreryUniverse-selfcheck.mjs is the gate on the vendor CENSUS:
+    // its subject IS the vendor tree. It imports nothing from vendor/; it names vendor/box3d and vendor/jolt in
+    // assertion messages ("vendor/jolt has N C++ files while vendor/box3d has M"), lists vendor/slug's contents,
+    // and reads vendor/wasm/quickjs's README to check an author attribution.
+    // *** THE HONEST COUNTER-ARGUMENT, RECORDED SO A LATER ROUND CAN DISAGREE WITH IT: *** it really does
+    // readdirSync and readFileSync those paths, so eject the body and this gate throws. What decides it is what
+    // the orrery MODELS -- "which engine files would break if this dependency were removed" -- and a census
+    // counting itself makes every vendor body look consumed when its only consumer is the thing counting them.
+    // That is the same argument as the four above, arriving through a gate rather than through a fixture.
+    "tools/ship/orreryUniverse-selfcheck.mjs",
 ]);
 
 /** Every engine source outside vendor/, comment-stripped, in the shape ejectaOf wants. */
