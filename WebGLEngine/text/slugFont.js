@@ -20,8 +20,8 @@
 // `abs(a) < 1/65536` branch is written for. The alternative (midpoint as control) is algebraically the same curve
 // but leaves a ~0 rather than == 0, and near-zero is the worse of the two for a reciprocal.
 //
-// WHAT THIS FILE DELIBERATELY DOES NOT DO: CFF/OTTO outlines (cubic; would need a fitting pass), GPOS kerning
-// (only the legacy `kern` format 0 is read), hinting (Slug ignores it by design -- see the cap-height trick in
+// WHAT THIS FILE DELIBERATELY DOES NOT DO: CFF/OTTO outlines (cubic; would need a fitting pass), GPOS beyond pair
+// kerning (v4485 reads PairPos under the default script's 'kern' feature; the legacy `kern` format 0 is the fallback), hinting (Slug ignores it by design -- see the cap-height trick in
 // slugText.js instead), and variable-font axes. Each is a real gap and is reported as such rather than silently
 // producing a wrong glyph.
 //
@@ -348,6 +348,138 @@ function parseKern(bytes, offset) {
 }
 
 /* ------------------------------------------------------------------------------------------------------------
+ * GPOS pair kerning (v4485) -- LookupType 2, PairPos formats 1 and 2, under the 'kern' feature of the default script
+ *
+ * Every font shipped in the last decade puts its kerning here and not in `kern`: the vendored IBM Plex Serif has NO
+ * kern table, so every label this tree drew before v4485 was unkerned and layoutText said so in kerningSource. What is
+ * read: the ScriptList's DFLT script (else latn, else the first), its default LangSys (else the first), the features
+ * it lists tagged 'kern', their lookups of type 2 -- directly or through a type 9 extension -- and each subtable's
+ * horizontal advance adjustment of the FIRST glyph (the xAdvance of value record 1). What is deliberately not read:
+ * other scripts and languages, 'kern' under a script this text is not laid out in, vertical kerning, device tables,
+ * the placement components (a kerning pair moves the pen, not the glyph), and chained contextual positioning (types
+ * 7 and 8, which some fonts use for kerning -- refused by absence, reported by the count of what was read).
+ *
+ * The subtables are tried in lookup order, and the FIRST that applies wins, as an OpenType engine does: a format 1
+ * subtable applies when the pair is listed in the first glyph's PairSet; a format 2 subtable applies when the first
+ * glyph is in its coverage (class 0 is a class, and its value is the value). A pair no subtable applies to is 0.
+ * --------------------------------------------------------------------------------------------------------- */
+
+/** One value record's size in bytes: two per set bit of the format (bits 0..7 are all 16-bit fields or offsets). */
+function valueRecordSize(format) { let n = 0; for (let b = 0; b < 8; b++) if (format & (1 << b)) n += 2; return n; }
+/** The xAdvance field's byte offset within a value record, or -1 when the format carries none. */
+function xAdvanceOffset(format) { if (!(format & 0x0004)) return -1; let off = 0; if (format & 0x0001) off += 2; if (format & 0x0002) off += 2; return off; }
+
+function readCoverage(dv, off) {
+    const map = new Map();                                   // glyph -> coverage index
+    const format = dv.getUint16(off);
+    if (format === 1) { const n = dv.getUint16(off + 2); for (let i = 0; i < n; i++) map.set(dv.getUint16(off + 4 + i * 2), i); }
+    else if (format === 2) { const n = dv.getUint16(off + 2); for (let i = 0; i < n; i++) { const s = dv.getUint16(off + 4 + i * 6), e = dv.getUint16(off + 6 + i * 6), ci = dv.getUint16(off + 8 + i * 6); for (let g = s; g <= e; g++) map.set(g, ci + (g - s)); } }
+    return map;
+}
+function readClassDef(dv, off) {
+    const map = new Map();                                   // glyph -> class (absent = 0)
+    const format = dv.getUint16(off);
+    if (format === 1) { const start = dv.getUint16(off + 2), n = dv.getUint16(off + 4); for (let i = 0; i < n; i++) { const c = dv.getUint16(off + 6 + i * 2); if (c) map.set(start + i, c); } }
+    else if (format === 2) { const n = dv.getUint16(off + 2); for (let i = 0; i < n; i++) { const s = dv.getUint16(off + 4 + i * 6), e = dv.getUint16(off + 6 + i * 6), c = dv.getUint16(off + 8 + i * 6); if (c) for (let g = s; g <= e; g++) map.set(g, c); } }
+    return map;
+}
+/** A PairPos subtable at `off` as { format, kern(left, right) -> units | null }; null means "does not apply". */
+function readPairPos(dv, off) {
+    const format = dv.getUint16(off);
+    const coverage = readCoverage(dv, off + dv.getUint16(off + 2));
+    const vf1 = dv.getUint16(off + 4), vf2 = dv.getUint16(off + 6);
+    const size1 = valueRecordSize(vf1), size2 = valueRecordSize(vf2), xa = xAdvanceOffset(vf1);
+    if (format === 1) {
+        const pairSetCount = dv.getUint16(off + 8);
+        const pairs = new Map();                             // (left << 16 | right) -> units
+        for (let i = 0; i < pairSetCount; i++) {
+            const ps = off + dv.getUint16(off + 10 + i * 2);
+            const n = dv.getUint16(ps);
+            let p = ps + 2;
+            let left = -1; for (const [g, ci] of coverage) if (ci === i) { left = g; break; }
+            for (let k = 0; k < n; k++) {
+                const right = dv.getUint16(p);
+                const v = xa >= 0 ? dv.getInt16(p + 2 + xa) : 0;
+                if (left >= 0) pairs.set((left << 16) | right, v);
+                p += 2 + size1 + size2;
+            }
+        }
+        return { format, pairCount: pairs.size, kern: (l, r) => { const v = pairs.get((l << 16) | r); return v === undefined ? null : v; } };
+    }
+    if (format === 2) {
+        const classDef1 = readClassDef(dv, off + dv.getUint16(off + 8)), classDef2 = readClassDef(dv, off + dv.getUint16(off + 10));
+        const class1Count = dv.getUint16(off + 12), class2Count = dv.getUint16(off + 14);
+        const rec = size1 + size2, base = off + 16;
+        return { format, pairCount: class1Count * class2Count, kern: (l, r) => {
+            if (!coverage.has(l)) return null;
+            const c1 = classDef1.get(l) || 0, c2 = classDef2.get(r) || 0;
+            if (c1 >= class1Count || c2 >= class2Count) return 0;
+            return xa >= 0 ? dv.getInt16(base + (c1 * class2Count + c2) * rec + xa) : 0;
+        } };
+    }
+    return null;                                             // an unknown format: skipped, and counted by the caller
+}
+
+/**
+ * Read the GPOS table's pair kerning. Returns { subtables, lookups, script, langSys, skipped } where `subtables` are the
+ * PairPos readers in lookup order, `lookups` how many kern lookups were listed, `skipped` how many of those were not
+ * type 2 (a contextual kern this reader does not follow). Never throws: a malformed table costs kerning, not text.
+ */
+export function parseGpos(bytes, offset) {
+    const out = { subtables: [], lookups: 0, skipped: 0, script: null, langSys: null };
+    try {
+        const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const scriptList = offset + dv.getUint16(offset + 4), featureList = offset + dv.getUint16(offset + 6), lookupList = offset + dv.getUint16(offset + 8);
+        // the script: DFLT, else latn, else the first listed
+        const scriptCount = dv.getUint16(scriptList);
+        const scripts = [];
+        for (let i = 0; i < scriptCount; i++) { const p = scriptList + 2 + i * 6; scripts.push({ tag: String.fromCharCode(dv.getUint8(p), dv.getUint8(p + 1), dv.getUint8(p + 2), dv.getUint8(p + 3)), off: scriptList + dv.getUint16(p + 4) }); }
+        const script = scripts.find((x) => x.tag === "DFLT") || scripts.find((x) => x.tag === "latn") || scripts[0];
+        if (!script) return out;
+        out.script = script.tag;
+        // the LangSys: the default, else the first
+        const dflt = dv.getUint16(script.off);
+        let langSys = dflt ? script.off + dflt : 0;
+        if (!langSys) { const n = dv.getUint16(script.off + 2); if (n) { langSys = script.off + dv.getUint16(script.off + 4 + 4); out.langSys = String.fromCharCode(dv.getUint8(script.off + 4), dv.getUint8(script.off + 5), dv.getUint8(script.off + 6), dv.getUint8(script.off + 7)); } }
+        else out.langSys = "dflt";
+        if (!langSys) return out;
+        const featureIndexCount = dv.getUint16(langSys + 4);
+        const featureIndices = []; for (let i = 0; i < featureIndexCount; i++) featureIndices.push(dv.getUint16(langSys + 6 + i * 2));
+        const required = dv.getUint16(langSys + 2); if (required !== 0xFFFF) featureIndices.unshift(required);
+        // the 'kern' features among them, and their lookups
+        const featureCount = dv.getUint16(featureList);
+        const lookupIndices = [];
+        for (const fi of featureIndices) {
+            if (fi >= featureCount) continue;
+            const p = featureList + 2 + fi * 6;
+            const tag = String.fromCharCode(dv.getUint8(p), dv.getUint8(p + 1), dv.getUint8(p + 2), dv.getUint8(p + 3));
+            if (tag !== "kern") continue;
+            const f = featureList + dv.getUint16(p + 4);
+            const n = dv.getUint16(f + 2);
+            for (let i = 0; i < n; i++) { const li = dv.getUint16(f + 4 + i * 2); if (!lookupIndices.includes(li)) lookupIndices.push(li); }
+        }
+        lookupIndices.sort((a, b) => a - b);                 // lookups apply in LookupList order, whatever order the features named them in
+        const lookupCount = dv.getUint16(lookupList);
+        for (const li of lookupIndices) {
+            if (li >= lookupCount) continue;
+            const lk = lookupList + dv.getUint16(lookupList + 2 + li * 2);
+            let type = dv.getUint16(lk);
+            const subCount = dv.getUint16(lk + 4);
+            out.lookups++;
+            if (type !== 2 && type !== 9) { out.skipped++; continue; }
+            for (let i = 0; i < subCount; i++) {
+                let st = lk + dv.getUint16(lk + 6 + i * 2), t = type;
+                if (t === 9) { t = dv.getUint16(st + 2); st = st + dv.getUint32(st + 4); }   // the extension: the real subtable is at a 32-bit offset from it
+                if (t !== 2) { out.skipped++; continue; }
+                const sub = readPairPos(dv, st);
+                if (sub) out.subtables.push(sub); else out.skipped++;
+            }
+        }
+    } catch (e) { /* a malformed GPOS costs kerning, not text */ }
+    return out;
+}
+
+/* ------------------------------------------------------------------------------------------------------------
  * Public entry point
  * --------------------------------------------------------------------------------------------------------- */
 
@@ -413,6 +545,8 @@ export function parseFont(bytes) {
 
     const cmap = tables.cmap ? parseCmap(u8, tables.cmap.offset) : new Map();
     const kernPairs = tables.kern ? parseKern(u8, tables.kern.offset) : new Map();
+    const gpos = tables.GPOS ? parseGpos(u8, tables.GPOS.offset) : { subtables: [], lookups: 0, skipped: 0 };
+    const hasGPOSKern = gpos.subtables.length > 0;
 
     const font = {
         bytes: u8, tables, unitsPerEm, numGlyphs, loca,
@@ -422,11 +556,18 @@ export function parseFont(bytes) {
         capHeight: capHeight / unitsPerEm,
         hasKernTable: kernPairs.size > 0,
         hasGPOS: !!tables.GPOS,
-        _cmap: cmap, _kern: kernPairs, _advances: advances, _cache: new Map(),
+        hasGPOSKern,                                    // v4485: a 'kern' feature with pair-positioning lookups was read
+        gposKern: { subtables: gpos.subtables.length, lookups: gpos.lookups, skipped: gpos.skipped, script: gpos.script || null, langSys: gpos.langSys || null },
+        kerningSource: hasGPOSKern ? "GPOS" : (kernPairs.size > 0 ? "kern" : (tables.GPOS ? "none (a GPOS with no pair kerning under the default script)" : "none")),
+        _cmap: cmap, _kern: kernPairs, _gpos: gpos, _advances: advances, _cache: new Map(),
 
         glyphIndex(codepoint) { return cmap.get(codepoint) || 0; },
         advance(glyphIndex) { return (advances[glyphIndex] || 0) / unitsPerEm; },
-        kern(left, right) { const v = kernPairs.get((left << 16) | right); return v ? v / unitsPerEm : 0; },
+        // v4485 -- GPOS first, the first subtable that applies; the legacy table only when GPOS gave no pair kerning at all
+        kern(left, right) {
+            if (hasGPOSKern) { for (const sub of gpos.subtables) { const v = sub.kern(left, right); if (v !== null) return v / unitsPerEm; } return 0; }
+            const v = kernPairs.get((left << 16) | right); return v ? v / unitsPerEm : 0;
+        },
 
         /** Outline in EM units, y up, with a bbox computed from the actual curves rather than the font's claim. */
         outline(glyphIndex) {

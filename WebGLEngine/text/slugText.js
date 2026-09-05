@@ -24,9 +24,9 @@
 // on a wall in perspective works; text bent over a curve does not, because then the em space is not affine in the
 // object space and the inverse Jacobian in the vertex stream stops being constant over the quad.
 //
-// KERNING IS THE LEGACY `kern` TABLE ONLY. Most fonts shipped in the last decade put kerning in GPOS instead, and
-// this integration does not read GPOS -- so on such a font kerning is silently ZERO rather than wrong. layoutText
-// reports which it got in `kerningSource`, because "my text looks slightly loose" is otherwise an unattributable
+// KERNING: GPOS pair positioning first (v4485 -- slugFont.parseGpos, the default script's 'kern' feature), the legacy
+// `kern` table when the font has no GPOS kerning. Before v4485 only `kern` was read, and on the vendored IBM Plex Serif
+// (GPOS only) kerning was silently ZERO for every label this tree drew. layoutText reports which it got in `kerningSource`, because "my text looks slightly loose" is otherwise an unattributable
 // complaint. Full shaping (GSUB ligatures, marks, bidi, Indic reordering) is a separate problem and is not
 // pretended at here: this is Latin advance-width layout.
 //
@@ -98,7 +98,7 @@ export function layoutText(font, text, opts = {}) {
         height: lines.length * lineHeight,
         lines: lines.length,
         lineHeight,
-        kerningSource: font.hasKernTable ? "kern" : (font.hasGPOS ? "none (font kerns via GPOS, which is not read)" : "none")
+        kerningSource: font.kerningSource || (font.hasKernTable ? "kern" : "none")   // v4485: the font says (GPOS | kern | none), see slugFont.parseGpos
     };
 }
 

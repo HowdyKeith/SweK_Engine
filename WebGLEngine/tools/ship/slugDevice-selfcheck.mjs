@@ -137,6 +137,12 @@ function rasterModel(fd, Q) {
     }
     return tris;
 }
+// v4485 -- *** THE LAST TRIANGLE DRAWN OWNS A PIXEL, NOT THE FIRST. *** The capture pipeline blends nothing and compares no depth, so
+// where two glyph quads overlap the device keeps the later draw. Before v4485 the model walked its triangles in draw order and took
+// the first hit, and it never mattered: unkerned glyph boxes barely touch. GPOS kerning tucks V under A, the dilated quads overlap by
+// a few pixels, and the model read A's texcoord where the device had written V's -- 0.636 em apart, on both backends, until the walk
+// was reversed. The finding is about the MODEL, and it was kerning that reached it.
+const trisLastFirst = (tris) => tris.slice().reverse();
 const bitsToF32 = (px, i, j) => { const o = (j * W + i) * 4; return new Float32Array(new Uint8Array([px[o], px[o + 1], px[o + 2], px[o + 3]]).buffer)[0]; };
 
 /** Fit Q: the candidate whose model reproduces the captured texcoords best over the lit pixels. */
@@ -148,7 +154,7 @@ function fitSubpixel(fd, cap) {
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const mtx = bitsToF32(cap.tx, i, j); if (mtx === 0) continue;         // 0 means no fragment landed here
             const x = i + 0.5, y = j + 0.5;
-            for (const t of tris) { if (!t.inside(x, y)) continue;
+            for (const t of trisLastFirst(tris)) { if (!t.inside(x, y)) continue;   // v4485: the LAST quad drawn owns the pixel
                 const m = t.m, tx = m.tx0 + m.txdx * x + m.txdy * y, ty = m.ty0 + m.tydx * x + m.tydy * y;
                 n++; worst = Math.max(worst, Math.abs(tx - mtx), Math.abs(ty - bitsToF32(cap.ty, i, j)));
                 worstFw = Math.max(worstFw, Math.abs((Math.abs(m.txdx) + Math.abs(m.txdy)) - bitsToF32(cap.fwx, i, j))); break; }
@@ -165,7 +171,7 @@ function expectedFrame(fd, Q) {
     const out = new Float32Array(W * H);
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
         const x = i + 0.5, y = j + 0.5; let acc = 0;
-        for (const t of tris) { if (!t.inside(x, y)) continue;
+        for (const t of trisLastFirst(tris)) { if (!t.inside(x, y)) continue;   // v4485: the LAST quad drawn owns the pixel
             const m = t.m;
             const cov = slugRender(fd.atlas, t.e, m.tx0 + m.txdx * x + m.txdy * y, m.ty0 + m.tydx * x + m.tydy * y, [Math.abs(m.txdx) + Math.abs(m.txdy), Math.abs(m.tydx) + Math.abs(m.tydy)]);
             acc = cov + acc * (1 - cov); }

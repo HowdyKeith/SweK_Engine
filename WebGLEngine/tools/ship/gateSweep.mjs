@@ -2333,6 +2333,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a uv-less texture node, and a shell must name its varying struct (VSOut). The v4457 sentence 'the device shell " +
                  "is not its route' is withdrawn with the picture as the evidence.",
     }),
+    since107: Object.freeze({
+        at: "v4485", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/gposKern-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/slugDevice-selfcheck.mjs (the rasteriser model takes the LAST triangle under a pixel, as the capture does)",
+        ]),
+        verdict: "green, headless. text/slugFont.js reads GPOS pair kerning (the default script's 'kern' feature, LookupType 2 directly " +
+                 "or by extension, PairPos formats 1 and 2, both coverage and class-definition formats, the first glyph's xAdvance " +
+                 "from the first subtable that applies) with the legacy kern table as the fallback, and layoutText reports GPOS | " +
+                 "kern | none. THE FINDING: the vendored IBM Plex Serif has no kern table, so every label this tree drew was unkerned " +
+                 "and the layout said so on every call. The gate holds the reader to a 326-byte table written from the specification " +
+                 "(a foreign-language kern lookup not read, a ligature lookup not touched, placement fields stepped over, an " +
+                 "extension at a 32-bit offset) and to the shipped font (A/V -50 and symmetric, f/) +95, n/n 0, 1,112 kerned pairs " +
+                 "over the label alphabet, the test phrase 1.54 px narrower). Kerning reached a model: slugDevice's rasteriser took " +
+                 "the first triangle under a pixel where the device keeps the last drawn; kerned A and V overlap, and it read the " +
+                 "wrong glyph's texcoord by 0.636 em on both backends until the walk was reversed. Sabotages red at 5 / 2 / 1 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -396,6 +396,23 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
      5. GPOS PairPos kerning in slugFont.js BEFORE any font is vendored: every font the plan names (Inter, Orbitron,
         Cinzel, JetBrains Mono, Source Sans 3, Cormorant, Lora, Merriweather, Fira) kerns through GPOS only, and
         layoutText reports kerningSource "none" for them today.
+        BUILT at v4485 (task 5): text/slugFont.js parseGpos reads the default script's default language's 'kern'
+        feature -- LookupType 2 directly or through a type 9 extension, PairPos formats 1 and 2, coverage formats 1
+        and 2, class definitions in both formats -- and takes the first glyph's xAdvance from the first subtable
+        that applies; the legacy table is the fallback, and layoutText's kerningSource says GPOS | kern | none.
+        THE FINDING WAS THE VENDORED FONT: IBM Plex Serif has no kern table and a GPOS with one kern lookup of four
+        subtables, so every label this tree drew before v4485 was unkerned and the layout said so on every call.
+        tools/ship/gposKern-selfcheck.mjs holds the reader to a 326-byte GPOS table written field by field from the
+        specification (two scripts, a foreign-language kern lookup that must not be read, a ligature lookup that
+        must not be touched, value records with placement fields to step over, an extension at a 32-bit offset) and
+        to the shipped font: A/V -50 units and symmetric, T/o -45, L/T -70, r/. -100, f/) +95, n/n 0, 1,112 kerned
+        pairs over the 72-character label alphabet (800 closing, 312 opening), "Sphinx 42% AV" at 28 px 1.54 px
+        narrower kerned than not. No independent oracle on the build box (no fontTools), which is why the real-font
+        holds are shape and sign rather than a second reading. AND KERNING REACHED A MODEL: tools/ship/slugDevice-
+        selfcheck.mjs's rasteriser model took the FIRST triangle under a pixel where the capture keeps the last drawn;
+        unkerned boxes never overlapped, kerned A and V do, and the model read A's texcoord where the device wrote
+        V's -- 0.636 em, both backends -- until the walk was reversed. NOT CLAIMED: contextual kerning (types 7/8,
+        counted in gposKern.skipped, unfollowed), other languages, vertical kerning, device tables.
      6. Vendor OFL fonts under vendor/fonts/<family>/, static glyf instances only (the parser refuses CFF and
         ttcf by name and reads no fvar), one OFL copy per family with its Reserved Font Name, and one
         vendoredLicences.mjs entry each, because that gate requires disk and list to agree exactly.
