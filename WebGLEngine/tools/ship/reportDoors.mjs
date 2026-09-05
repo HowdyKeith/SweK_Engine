@@ -105,15 +105,34 @@ export const FORMATTERS = Object.freeze([
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
 // AND THE THIRD ANSWER. *** Four of the six REFUSE a bare call -- "Cannot read properties of undefined" --
-// which is an honest refusal a consumer can catch. Two RETURN A REPORT ANYWAY, and one of those is worse than
-// throwing: composeValidate.reportLines() with no argument returns
+// which is an honest refusal a consumer can catch. Two RETURN A REPORT ANYWAY.
 //
-//     "[composeValidate] 1 problem(s):"
+// *** v4459 -- AND WHAT v4458 SAID ABOUT THOSE TWO WAS WRONG, FROM READING ONE LINE OF THE OUTPUT AND
+// STOPPING. *** It recorded composeValidate.reportLines() as returning "A MANUFACTURED FINDING ... a defect
+// that does not exist", on the strength of its first line:
 //
-// A MANUFACTURED FINDING. The only problem is that it was called with nothing, and a walker collecting these
-// reports would publish a problem that does not exist. curriculum returns 16 plausible lines the same way.
-// SO THE SOURCE TEXT SAYS 20, Function.length SAYS 6, AND CALLING SAYS 4 REFUSE AND 2 FABRICATE -- three
-// instruments, three answers, and only the last one is the question a consumer asks.
+//     [composeValidate] 1 problem(s):
+//       (root): not an object -- a composition is { avatar, scene, pet, room, gauges, props }
+//
+// THE SECOND LINE NAMES ITS OWN CAUSE, and the report is exactly right: it was handed a non-composition and
+// said so. Nor is the count canned -- an actual (empty) composition reports SIX problems against this one, so
+// the module is distinguishing "you gave me nothing" from "you gave me something with six holes". The claim
+// was a headline promoted to a property, which is the same error this file's own round made twice about
+// knobLiveness, committed once more one file over.
+//
+// NEITHER OF THE TWO FABRICATES, AND THEY RETURN FOR TWO DIFFERENT REASONS -- measured, not read:
+//
+//   curriculum(opts)          THE PARAMETER IS OPTIONAL IN FACT AND REQUIRED IN THE DECLARATION. propose()
+//                             defaults every field ({ perKind = 3, slow = false, onPhase = null } = {}), so
+//                             reportLines() and reportLines({}) return the IDENTICAL 16 lines. Function.length
+//                             reads the signature; the default lives one call deeper.
+//   composeValidate(comp)     THE PARAMETER IS GENUINELY REQUIRED, and the absence is handled honestly rather
+//                             than crashed on or papered over.
+//
+// WHAT SURVIVES IS NARROWER AND STILL WORTH KNOWING: a walker that prints these reports under a heading of
+// its own publishes "1 problem(s)" in a context where the problem is THE WALKER'S OWN EMPTY CALL. That is a
+// hazard of the reporting context, not a defect in the module, and the gate now asserts the thing that would
+// make it one -- that the bare report NAMES ITS OWN CAUSE.
 export const STRICT_FORMATTERS = Object.freeze([
     "tools/fingerprint/peerReport.mjs",
     "tools/roundhouse/officeManager.mjs",
@@ -121,8 +140,8 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/composePropose.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
-    "tools/roundhouse/curriculum.mjs",     // returns 16 plausible lines from no input at all
-    "tools/ship/composeValidate.mjs",      // returns "[composeValidate] 1 problem(s):" -- a fabricated finding
+    "tools/roundhouse/curriculum.mjs",     // optional in fact: bare and {} return the identical 16 lines
+    "tools/ship/composeValidate.mjs",      // required, and the absence is reported accurately: "(root): not an object"
 ]);
 
 // *** THE MEASURED COST, FROZEN BY NAME (v4399's rule), BECAUSE A GATE CANNOT AFFORD TO RE-MEASURE IT. ***

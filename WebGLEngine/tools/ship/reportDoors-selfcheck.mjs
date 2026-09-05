@@ -12,6 +12,19 @@
 // than in the 60-second suite. What is NOT claimed is that every member's report is correct -- only that it
 // exists, arrives, and is a non-empty array of ASCII strings.
 //
+// ---- *** v4459 SABOTAGES, RESULTS BY NAME *** ---------------------------------------------------------------
+//
+//   L. composeValidate reports a CONTENT field for no input   -> 1 RED
+//   M. composeValidate stops varying with its input           -> 1 RED
+//   N. curriculum stops defaulting its options                -> 1 RED
+//
+// *** AND THE FIRST RUN OF THESE THREE READ 1/0/0 BECAUSE THE HARNESS RESTORED THE WRONG FILES. *** It edited
+// composeValidate.mjs and curriculum.mjs and then restored reportDoors.mjs, so L's sabotage was still in the
+// tree when M and N were measured, and the BASELINE at the end was taken on a corrupted tree too. A control
+// that damages what it measures reports zeros that look like unreachable branches -- which is exactly what
+// this session has now chased four times, and this time the zero was the instrument rather than the code.
+// The harness restores THE FILE IT EDITED now, and all three bite.
+
 // ---- *** SABOTAGES, RESULTS BY NAME *** -------------------------------------------------------------------
 //
 //   A. classify by the SOURCE SIGNATURE instead of Function.length   -> 2 RED
@@ -31,6 +44,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { validateComposition } from "./composeValidate.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          CALL_COST_V4458 as COST, NO_GATE_V4458 as NOGATE } from "./reportDoors.mjs";
 
@@ -101,20 +115,38 @@ console.log("\n3. the six that are a different kind of thing, and the two that a
     }
     say(`bare call: ${refused.length} refuse, ${returned.length} return a report anyway`);
     for (const r of returned) say(`  ${r.rel} returned ${r.v.length} lines -- first: ${JSON.stringify(r.v[0]).slice(0, 62)}`);
-    ok("!! *** FOUR REFUSE AND TWO FABRICATE, AND Function.length CANNOT TELL THEM APART ***",
+    ok("!! *** FOUR REFUSE AND TWO RETURN, AND Function.length CANNOT TELL THEM APART ***",
        refused.length === STRICT_FORMATTERS.length && refused.every((r) => STRICT_FORMATTERS.includes(r)) &&
        returned.length === TOLERANT_FORMATTERS.length && returned.every((r) => TOLERANT_FORMATTERS.includes(r.rel)),
        "the source text says 20 modules take a parameter, Function.length says 6 REQUIRE one, and CALLING says " +
        "4 refuse and 2 return. Three instruments, three answers, and the last is the only one a consumer feels.");
 
-    const fabricated = returned.find((r) => r.rel === "tools/ship/composeValidate.mjs");
-    ok("!! *** AND ONE OF THE TWO MANUFACTURES A FINDING OUT OF THE MISSING ARGUMENT ***",
-       fabricated && /problem\(s\)/.test(fabricated.v[0]),
-       `composeValidate.reportLines() with no argument returns ${JSON.stringify(fabricated ? fabricated.v[0] : "")}. ` +
-       "THE ONLY PROBLEM IS THAT IT WAS CALLED WITH NOTHING. A walker collecting these reports publishes a " +
-       "defect that does not exist -- which is strictly worse than throwing, because a throw is caught and a " +
-       "plausible sentence is believed. This is asserted, not fixed: changing what those two return is a " +
-       "decision about their callers, and this round is the census.");
+    // *** v4459 -- THE ROW THAT STOOD HERE SAID composeValidate "MANUFACTURES A FINDING", AND IT WAS WRONG.
+    // *** It was written from the first line of the output. The second line names the cause -- "(root): not an
+    // object -- a composition is { avatar, scene, pet, room, gauges, props }" -- and the report is exactly
+    // right about what it was handed. A headline promoted to a property, in the round that had just made that
+    // mistake twice about knobLiveness. What replaces it is the property that would make the old claim TRUE
+    // if it ever became true: that the bare report names its own cause rather than inventing a content defect.
+    const cv = returned.find((r) => r.rel === "tools/ship/composeValidate.mjs");
+    const bare = validateComposition(), real = validateComposition({ avatar: null, scene: null, pet: null, room: null, gauges: null, props: null });
+    say(`composeValidate with no argument: ${bare.problems.length} problem, field ${JSON.stringify(bare.problems[0].field)}; ` +
+        `with an actual empty composition: ${real.problems.length}`);
+    ok("!! *** THE BARE REPORT NAMES ITS OWN CAUSE, SO IT IS NOT A FABRICATED FINDING ***",
+       cv && bare.problems.length === 1 && bare.problems[0].field === "(root)" &&
+       /not an object/.test(bare.problems[0].why) && real.problems.length > bare.problems.length,
+       `it reports ONE problem at "(root)" saying "not an object", and an actual empty composition reports ` +
+       `${real.problems.length} -- so the count tracks the input rather than being a canned complaint. IF THIS ` +
+       "EVER REPORTED A CONTENT PROBLEM FOR AN ABSENT COMPOSITION, THAT WOULD BE THE FABRICATION v4458 CLAIMED " +
+       "AND THIS ROW WOULD CATCH IT.");
+
+    // *** AND THE OTHER ONE RETURNS FOR A DIFFERENT REASON ENTIRELY, WHICH Function.length ALSO CANNOT SEE. ***
+    const cur = await import(pathToFileURL(path.join(ENG, "tools/roundhouse/curriculum.mjs")).href);
+    const bareC = await cur.reportLines(), emptyC = await cur.reportLines({});
+    ok("!! curriculum's parameter is REQUIRED IN THE DECLARATION AND OPTIONAL IN FACT",
+       JSON.stringify(bareC) === JSON.stringify(emptyC) && bareC.length > 1,
+       `reportLines() and reportLines({}) return the identical ${bareC.length} lines, because propose() defaults ` +
+       "every field one call deeper. Function.length reads the signature and cannot follow it there -- so the " +
+       "two tolerant members are tolerant for two unrelated reasons, and neither is the one v4458 recorded.");
 }
 
 // ---- 4. THE CONTRACT, ON A BOUNDED SAMPLE BY DEFAULT AND ON EVERYTHING UNDER --all ------------------------
