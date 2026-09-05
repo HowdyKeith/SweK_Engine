@@ -476,7 +476,15 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         shadows, a second light.
      2. (task 33) A third orbital element -- inclination and node -- DERIVED from the vendor data the way distance comes
         from arrival date and size from bytes; positionAt and orbitWgsl extended together under the gpuOrbits gate;
-        the 2D page's picture unchanged.
+        the 2D page's picture unchanged. BUILT at v4474: the tilt is the body's OPACITY (world/orrery.mjs opacityOf:
+        the fraction of its bytes in files nobody can read -- wasm, fonts, images -- times a 40-degree ceiling), and
+        the node is the body's phase, so at day 0 every body is where the 2D page draws it. Measured over the baked
+        tree: three of fifteen tilt (fonts 38.9, box3d 31.7, wasm 25.3 degrees), twelve lie in the plane. positionAt3
+        is the classical rotated circle; the kernel takes cos/sin of tilt and node precomputed in f64 and keeps its
+        one trig call; the gpuOrbits gate holds the GPU to positionAt3 in three axes (worst 6.1e-5 of the axis) and
+        z = 0 exactly for the untilted. positionAt is untouched: the 2D page draws the ecliptic with every orbit
+        unrolled into it, which it always did. NOT CLAIMED: eccentricity; the economy's distances, which stay in the
+        ecliptic projection (world/gitEconomy.mjs positionOf reads positionAt).
      3. (task 34) An orbit camera: drag to rotate, wheel to dolly, follow a picked body -- pure functions gated headless,
         the tilt slider kept as the initial pitch.
      4. (task 35) Importer moons and reached flybys as GPU records through the same cull and ladder, picked by name,

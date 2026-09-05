@@ -2120,6 +2120,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Pre-existing and not this round's: tools/ship/gitEconomy-selfcheck.mjs is red on trunk (2 broke of 15 at " +
                  "the default upkeep; one departure off the best margin), above the quick sweep's budget and in no register.",
     }),
+    // v4474 -- the ninety-sixth closing. The third orbital element, derived: opacity tilts a body out of the readable plane.
+    since96: Object.freeze({
+        // swept 0: this round added no gate -- it widened three.
+        at: "v4474", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gpuOrbits-selfcheck.mjs (eight-float elements, the twin positionAt3, the bound in three axes, z by tilt)",
+            "tools/ship/orreryView-selfcheck.mjs (positionAt3: rigid, on the node at day 0, a sin i at a quarter period, positionAt when flat)",
+            "tools/ship/orrery-selfcheck.mjs (opacityOf, inclinationFor, and the scanned tree's tilted bodies by name)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on Dawn and the browser's WebGPU. world/orrery.mjs derives a body's inclination from its OPACITY " +
+                 "-- the byte fraction in files nobody can read, times a 40-degree ceiling -- the way the axis comes from age " +
+                 "and the size from bytes; the node is the body's phase, so at day 0 the 3D picture is the 2D one. Three of " +
+                 "fifteen bodies tilt (fonts, box3d, wasm), twelve stay in the plane. positionAt3 is the classical rotated " +
+                 "circle; render/gpuOrbits.mjs carries cos/sin of tilt and node precomputed in f64 in a second vec4 and keeps " +
+                 "its one trig call; the GPU is within 6.1e-5 of the axis in three axes and z is exactly 0 for the untilted. " +
+                 "positionAt is untouched and the 2D page draws what it drew. Sabotages red at 3 / 3 by name. Pre-existing " +
+                 "and not this round's: orreryView-selfcheck's bake-drift check is red on trunk (orrery.json's arrivals and " +
+                 "shas against git after v4414's commit); the bake is the rig's to rewrite.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -18,7 +18,7 @@
 //
 // Run: node tools/ship/orreryView-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
-import { phaseFor, positionAt, apparentPx, levelFor, terrainEntriesFor, extentOf, slowestPeriod,
+import { phaseFor, positionAt, positionAt3, apparentPx, levelFor, terrainEntriesFor, extentOf, slowestPeriod,
          ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "../../world/orreryView.mjs";
 import { buildOrrery, CAPTURED, UNPAPERED, UNPAPERED_BASELINE } from "../../world/orrery.mjs";
 import { bakePayload, serialise, readBaked, drift, BAKE_PATH } from "./orreryBake.mjs";
@@ -68,6 +68,17 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     const dead = { name: "z", a: 5, period: 0 };
     ok(Number.isFinite(positionAt(dead, 7).x), "a zero period holds the body still rather than dividing by zero");
     ok(Number.isFinite(positionAt(b, NaN).x), "and a NaN time does not put it at NaN either");
+
+    // v4474 -- positionAt3: the same circle, tilted about a node at the body's phase
+    const tb = { name: "fonts", a: 3.6, period: 43, inclination: 0.6 };
+    const q0 = positionAt3(tb, 0), p0b = positionAt(tb, 0), qq = positionAt3(tb, 13.7), qT = positionAt3(tb, 43), qQ = positionAt3(tb, 43 / 4);
+    ok(Math.abs(q0.x - p0b.x) < 1e-12 && Math.abs(q0.y - p0b.y) < 1e-12 && q0.z === 0, "positionAt3 at day 0 IS positionAt: the body starts on its node, in the plane");
+    ok(Math.abs(Math.hypot(qq.x, qq.y, qq.z) - 3.6) < 1e-12, "a tilted body still sits exactly on its axis -- the rotation is rigid");
+    ok(Math.abs(qT.x - q0.x) < 1e-9 && Math.abs(qT.y - q0.y) < 1e-9 && Math.abs(qT.z) < 1e-9, "after one period it is back on the node");
+    ok(Math.abs(qQ.z - 3.6 * Math.sin(0.6)) < 1e-9, "a quarter period past the node it is at its highest: a sin i");
+    const flat3 = positionAt3(b, 77.7), flat2 = positionAt(b, 77.7);
+    ok(Math.abs(flat3.x - flat2.x) < 1e-9 && Math.abs(flat3.y - flat2.y) < 1e-9 && flat3.z === 0, "CONTROL: with no inclination positionAt3 is positionAt at every time, so the 2D page loses nothing");
+    ok(Number.isFinite(positionAt3(dead, 7).x) && Number.isFinite(positionAt3(tb, NaN).z), "and the same guards hold: a zero period and a NaN time");
 }
 
 // 2) *** THE FALSE ACCUSATION. *** A body loaded from the BAKE must read the same as one from the SCAN.

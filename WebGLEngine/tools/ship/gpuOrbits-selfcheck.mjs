@@ -7,6 +7,13 @@
 // "the GPU orbits look right" but "the GPU puts every body where the page puts it", at f32. sin and cos on
 // SwiftShader are the low-accuracy path (crossBackend-selfcheck measured tan at 4.6e-5), so the tolerance is
 // stated against the body's own axis and the worst case is printed, not hidden inside a pass.
+// v4474 -- THE THIRD ELEMENT. elementsOf carries two vec4 per body (the tilt's cos/sin and the node's, precomputed in
+// f64), the kernel rotates its circle, the twin is positionAt3, and the bound is measured in THREE axes: worst 6.13e-5 of
+// the axis on krbn. Three of fifteen bodies tilt (their opacity, world/orrery.mjs); the rest read z = 0 exactly.
+// SABOTAGE (v4474): A  the kernel's z zeroed          -> exit=1, 3 red: the 3-axis bound at 4.63e-1 on fonts, "NOT 0 for every
+//                                                       tilted one" (all three z=0.000), and the two backends' frames part by 113 px
+//                   B  positionAt3's y-term sign flipped -> exit=1, 3 red: the in-plane identity with positionAt, the bound at 1.55
+//                                                       on three-webgpu, and the frames part by 847 px. Both restored byte for byte.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,7 +23,8 @@ import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import * as O from "../../render/gpuOrbits.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
-import { positionAt } from "../../world/orreryView.mjs";
+import { phaseFor } from "../../world/orreryView.mjs";
+import { positionAt, positionAt3 } from "../../world/orreryView.mjs";
 import { nullBackend } from "../../gfx/device.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -32,10 +40,18 @@ console.log("\n1. THE ELEMENTS ARE THE ORRERY'S OWN NUMBERS");
 {
     ok("the orbit shader validates and declares info, elements, records", validateWgsl(O.orbitWgsl()).length === 0 && parseBindings(O.orbitWgsl()).map((b) => b.name).join() === "info,elements,records");
     ok(`the baked orrery gives ${system.bodies.length} bodies, plus the centre`, count === system.bodies.length + 1 && names[0] === "SweK");
-    ok("  every body's axis, period and radius come from buildOrrery unchanged", system.bodies.every((b, i) => elements[(i + 1) * 4] === Math.fround(b.a) && elements[(i + 1) * 4 + 1] === Math.fround(b.period) && elements[(i + 1) * 4 + 3] === Math.fround(b.radius)));
+    const E = O.ELEMENT_FLOATS;
+    ok("  every body's axis, period and radius come from buildOrrery unchanged", system.bodies.every((b, i) => elements[(i + 1) * E] === Math.fround(b.a) && elements[(i + 1) * E + 1] === Math.fround(b.period) && elements[(i + 1) * E + 3] === Math.fround(b.radius)));
+    // v4474 -- and the third element: cos/sin of the inclination and of the node, precomputed in f64 so the kernel's own trig stays the one it always did
+    ok("  and so does the TILT: cos i, sin i, cos node, sin node in the second vec4, from buildOrrery's inclination and phaseFor", E === 8 && system.bodies.every((b, i) => { const ph = phaseFor(b.name), inc = b.inclination || 0;
+        return elements[(i + 1) * E + 4] === Math.fround(Math.cos(inc)) && elements[(i + 1) * E + 5] === Math.fround(Math.sin(inc)) && elements[(i + 1) * E + 6] === Math.fround(Math.cos(ph)) && elements[(i + 1) * E + 7] === Math.fround(Math.sin(ph)); }));
+    const tilted = system.bodies.filter((b) => b.inclination > 0);
+    ok(`  ${tilted.length} of ${system.bodies.length} bodies are tilted (their opacity, world/orrery.mjs) and the rest lie in the plane`, tilted.length >= 1 && tilted.length < system.bodies.length, tilted.map((b) => `${b.name} ${(b.inclination * 180 / Math.PI).toFixed(1)}deg`).join(", "));
     ok("  the centre sits still at the origin", elements[0] === 0 && elements[1] === 0);
     const cpu = O.orbitRecordsCpu(system, T);
-    ok("the twin IS positionAt", system.bodies.every((b, i) => { const p = positionAt(b, T); return cpu[(i + 1) * 4] === Math.fround(p.x) && cpu[(i + 1) * 4 + 1] === Math.fround(p.y); }));
+    ok("the twin IS positionAt3", system.bodies.every((b, i) => { const p = positionAt3(b, T); return cpu[(i + 1) * 4] === Math.fround(p.x) && cpu[(i + 1) * 4 + 1] === Math.fround(p.y) && cpu[(i + 1) * 4 + 2] === Math.fround(p.z); }));
+    ok("  and for a body in the plane positionAt3 IS positionAt, so the 2D page's picture is the ecliptic's", system.bodies.filter((b) => !b.inclination).every((b) => { const p = positionAt(b, T), q = positionAt3(b, T); return Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9 && q.z === 0; }));
+    ok("  at day 0 EVERY body, tilted or not, is where positionAt puts it: the node is the phase", system.bodies.every((b) => { const p = positionAt(b, 0), q = positionAt3(b, 0); return Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9 && Math.abs(q.z) < 1e-12; }));
     const nb = nullBackend(); const src = O.makeOrbitSource(nb, system); src.advance(T);
     const sc = G.makeGpuDrivenScene(nb, { lods: [{ name: "b", mesh: G.quadMesh(2) }, { name: "c", mesh: G.quadMesh(1) }], thresholds: [0.02], records: src });
     const ext = Math.max(...system.bodies.map((b) => b.a)), eye = [0, 0, ext * 2.2];
@@ -71,13 +87,16 @@ else {
     if (r.ok) {
         const W = r.result.webgpu, cpu = O.orbitRecordsCpu(system, T);
         let worstRel = 0, worstName = "";
-        for (let i = 0; i < count; i++) { const a = Math.max(0.05, elements[i * 4]); const d = Math.hypot(W.records[i * 4] - cpu[i * 4], W.records[i * 4 + 1] - cpu[i * 4 + 1]) / a; if (d > worstRel) { worstRel = d; worstName = names[i]; } }
+        for (let i = 0; i < count; i++) { const a = Math.max(0.05, elements[i * O.ELEMENT_FLOATS]); const d = Math.hypot(W.records[i * 4] - cpu[i * 4], W.records[i * 4 + 1] - cpu[i * 4 + 1], W.records[i * 4 + 2] - cpu[i * 4 + 2]) / a; if (d > worstRel) { worstRel = d; worstName = names[i]; } }
         // Measured at Level 12: 1.9e-4 of the axis with the raw angle, and sin/cos are SwiftShader's low-accuracy
         // path (tan measured 4.6e-5 off at v4290). The bound is stated against that measurement, not chosen
         // to pass, and the worst body is printed so a regression has a name.
-        ok("*** every GPU position is within 2e-4 of its axis from positionAt ***", worstRel < 2e-4, `worst ${worstRel.toExponential(2)} of the axis, on ${worstName}`);
+        ok("*** every GPU position is within 2e-4 of its axis from positionAt3, in THREE axes ***", worstRel < 2e-4, `worst ${worstRel.toExponential(2)} of the axis, on ${worstName}`);
         ok("  radii travel through untouched", system.bodies.every((b, i) => W.records[(i + 1) * 4 + 3] === Math.fround(b.radius)));
-        ok("  z is 0: the orbit plane is the page's plane", W.records.every((v, i) => i % 4 !== 2 || v === 0));
+        // v4474 -- z was 0 for every body until the third element; now it is the tilt's, and only the tilted have one
+        ok("  z is 0 for every body in the plane, and NOT 0 for every tilted one at this time", system.bodies.every((b, i) => (b.inclination > 0) === (W.records[(i + 1) * 4 + 2] !== 0)),
+           system.bodies.filter((b) => b.inclination > 0).map((b, k) => { const i = system.bodies.indexOf(b); return `${b.name} z=${W.records[(i + 1) * 4 + 2].toFixed(3)}`; }).join(", "));
+        ok("  and no body's |z| exceeds a sin i, the tilt's own ceiling", system.bodies.every((b, i) => Math.abs(W.records[(i + 1) * 4 + 2]) <= b.a * Math.sin(b.inclination || 0) + 1e-4));
         ok("CONTROL: 100 days later every orbiting body has moved", system.bodies.every((b, i) => Math.hypot(W.records2[(i + 1) * 4] - W.records[(i + 1) * 4], W.records2[(i + 1) * 4 + 1] - W.records[(i + 1) * 4 + 1]) > 1e-3));
         const ext = Math.max(...system.bodies.map((b) => b.a)), eye = [0, 0, ext * 2.2];
         const u = G.packCullUniforms({ planes: G.frustumPlanes(G.multiply(G.perspective(1, 1, 0.1, 500), G.lookAt(eye, [0, 0, 0]))), eye, thresholds: [0.02], count, lodCount: 2, cap: count });

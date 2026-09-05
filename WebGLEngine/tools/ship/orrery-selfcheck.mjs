@@ -13,7 +13,7 @@
 //
 // Run: node tools/ship/orrery-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
-import { isLicenceFile, licenceFor, orbitFor, radiusFor, buildOrrery, report,
+import { isLicenceFile, licenceFor, orbitFor, radiusFor, buildOrrery, report, opacityOf, inclinationFor, MAX_INCLINATION, OPAQUE_EXT,
          CAPTURED, UNPAPERED, REACHED, UNPAPERED_BASELINE } from "../../world/orrery.mjs";
 import { scan, listFiles, dirBytes, firstSeen } from "./orreryScan.mjs";
 import { period as keplerPeriod } from "../../physics/orbits/kepler.js";
@@ -96,12 +96,31 @@ const REPO = path.resolve(ENG, "..");
     ok(radiusFor(0) > 0 && radiusFor(null) > 0, "and an empty or unknown body still has a size rather than vanishing");
 }
 
+// 4b) v4474 -- *** THE THIRD ELEMENT: OPACITY, THE FRACTION OF A BODY NOBODY CAN READ. ***
+{
+    ok(opacityOf([{ path: "a.js", bytes: 100 }, { path: "b.wasm", bytes: 300 }]) === 0.75, "opacity is the byte fraction in opaque files: 300 of 400");
+    ok(opacityOf([{ path: "x.js", bytes: 10 }]) === 0 && opacityOf([{ path: "f.ttf", bytes: 10 }]) === 1, "all text is 0, all font is 1");
+    ok(opacityOf([]) === 0 && opacityOf(null) === 0 && opacityOf([{ path: "a.wasm" }]) === 0, "no files, no list, or no bytes: 0 rather than NaN -- nothing to tilt on");
+    ok(OPAQUE_EXT.test("x.WASM") && OPAQUE_EXT.test("f.woff2") && !OPAQUE_EXT.test("f.wasm.js") && !OPAQUE_EXT.test("LICENSE"), "the extension test is case-blind and reads the LAST extension");
+    ok(inclinationFor(0) === 0 && inclinationFor(1) === MAX_INCLINATION && Math.abs(inclinationFor(0.5) - MAX_INCLINATION / 2) < 1e-12, "inclination is linear in opacity up to the ceiling");
+    ok(inclinationFor(2) === MAX_INCLINATION && inclinationFor(-1) === 0 && inclinationFor(NaN) === 0, "and clamps: over 1, under 0, or not a number");
+    const sys = buildOrrery([{ name: "src", files: [{ path: "a.js", bytes: 10 }], arrived: "2026-01-01" }, { name: "bin", files: [{ path: "a.wasm", bytes: 30 }, { path: "LICENSE", bytes: 1 }], arrived: "2026-01-01" }], { today: "2026-02-01" });
+    const src = sys.bodies.find((b) => b.name === "src"), bin = sys.bodies.find((b) => b.name === "bin");
+    ok(src.inclination === 0 && src.opacity === 0, "a body of source lies in the plane");
+    ok(bin.opacity > 0.9 && bin.inclination > 0.9 * MAX_INCLINATION && bin.inclination <= MAX_INCLINATION, "a body that is mostly binary tilts out of it, by its opacity");
+    ok(src.a === bin.a && src.period === bin.period, "CONTROL: the tilt changes no other element -- same age, same axis, same period");
+}
+
 // 5) *** THE REAL TREE, AND THE RATCHET. ***
 {
     const sys = scan(ENG, REPO, { today: "2026-08-30" });
     ok(sys.bodies.length >= 12, `${sys.bodies.length} bodies scanned out of vendor/`);
     ok(sys.centre === "SweK", "SweK at the centre");
     ok(sys.captured >= 10, `${sys.captured} carry licence provenance`);
+    // v4474 -- measured over the scanned tree: the opaque bodies tilt, the readable ones do not, and there are both
+    const tilted = sys.bodies.filter((b) => b.inclination > 0).map((b) => b.name);
+    ok(tilted.length >= 1 && tilted.length < sys.bodies.length && tilted.includes("fonts") && tilted.includes("wasm"),
+        `the tilted bodies are the opaque ones (${tilted.join(", ")}) and the rest lie in the plane`);
 
     // the two the wider matcher rescued
     const fonts = sys.bodies.find((b) => b.name === "fonts");

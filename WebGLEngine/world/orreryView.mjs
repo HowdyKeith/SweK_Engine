@@ -86,6 +86,27 @@ export function positionAt(body, tDays = 0) {
 }
 
 /**
+ * v4474 -- Where a body is at time t, IN THREE AXES. positionAt's circle, rotated: the orbit is tilted by the
+ * body's `inclination` about the line of nodes, and the ascending node is the body's own phase, so u = 2*PI*t/period
+ * is the angle past the node and at t = 0 the body is exactly where positionAt puts it (z = 0). The classical form:
+ *   x = a (cosO cos u - sinO sin u cos i),  y = a (sinO cos u + cosO sin u cos i),  z = a sin u sin i.
+ * With i = 0 this IS positionAt to rounding, which is why the 2D page keeps drawing positionAt and loses nothing:
+ * its picture is the ecliptic with every orbit unrolled into it, not a view from above.
+ *
+ * @param body  needs { name, a, period, inclination? } -- a missing inclination is 0, the plane
+ */
+export function positionAt3(body, tDays = 0) {
+    const a = Number(body && body.a) || 0;
+    const period = Number(body && body.period) || 0;
+    const inc = Number(body && body.inclination) || 0;
+    const t = Number.isFinite(tDays) ? tDays : 0;
+    const node = phaseFor(body && body.name);
+    const u = period > 0 ? (2 * Math.PI * t) / period : 0;
+    const cO = Math.cos(node), sO = Math.sin(node), cu = Math.cos(u), su = Math.sin(u), ci = Math.cos(inc), si = Math.sin(inc);
+    return { x: a * (cO * cu - sO * su * ci), y: a * (sO * cu + cO * su * ci), z: a * su * si, angle: node + u, a, inclination: inc, node };
+}
+
+/**
  * Apparent diameter in pixels, given how many pixels one orbital unit covers.
  * `radius` on a body is a radius, so the diameter is twice it -- the thresholds above are diameters because
  * that is what a viewer judges "how big is it on screen" by.

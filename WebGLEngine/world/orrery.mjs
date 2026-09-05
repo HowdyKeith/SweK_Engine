@@ -113,6 +113,31 @@ export function orbitFor(days, opts = {}) {
     return { a, period: keplerPeriod(a) };
 }
 
+/**
+ * v4474 -- THE THIRD ORBITAL ELEMENT, AND WHAT IT MEANS. The orrery has drawn every orbit in one plane since v4185,
+ * and a 3D picture of a flat system is a flat picture. The tilt OUT of that plane is derived the way the axis and
+ * the size are: from the vendor tree. It is the body's OPACITY -- the fraction of its bytes nobody can read (wasm,
+ * fonts, images, archives): a body that is source text lies in the plane of the readable; one that is mostly a
+ * binary tilts out of it, up to MAX_INCLINATION at fully opaque. Measured over the baked tree at v4474: three of
+ * fifteen bodies tilt (fonts 0.97, box3d 0.79, wasm 0.63); the other twelve are 0.000 and stay in the ecliptic.
+ * The NODE -- where the tilted orbit crosses the plane -- is the body's own phase (world/orreryView.mjs), so at
+ * day zero every body is exactly where the 2D page draws it, and the two pictures part only as time runs.
+ */
+export const OPAQUE_EXT = /\.(wasm|bin|dat|ttf|otf|woff2?|eot|png|jpe?g|gif|webp|bmp|ico|glb|gltf|ktx2?|basis|mp3|ogg|wav|mp4|webm|zip|gz|7z|tar|so|dll|dylib|pdf|sqlite|db)$/i;
+export const MAX_INCLINATION = 40 * Math.PI / 180;
+/** The fraction of a body's bytes in opaque files, 0..1; 0 for a body with no files (nothing to tilt on). */
+export function opacityOf(files) {
+    let total = 0, opaque = 0;
+    for (const f of Array.isArray(files) ? files : []) {
+        if (!f || typeof f.path !== "string") continue;
+        const bytes = Math.max(0, Number(f.bytes) || 0);
+        total += bytes; if (OPAQUE_EXT.test(f.path)) opaque += bytes;
+    }
+    return total > 0 ? opaque / total : 0;
+}
+/** Inclination in radians from an opacity: linear, 0 for source text, MAX_INCLINATION for a body that is all binary. */
+export function inclinationFor(opacity) { const o = Number(opacity); return MAX_INCLINATION * (Number.isFinite(o) ? Math.min(1, Math.max(0, o)) : 0); }
+
 /** Size from the body's byte count. Cube root, so a library a thousand times larger is ten times wider. */
 export function radiusFor(bytes, opts = {}) {
     const scale = opts.sizeScale ?? 0.06;
@@ -149,6 +174,7 @@ export function buildOrrery(bodies = [], opts = {}) {
         // 18 units longer. Two readings of one tree that disagreed because one of them was half a day early.
         const days = arrived ? Math.max(0, Math.floor((today - arrived) / 86400000)) : 0;
         const orb = orbitFor(days, opts);
+        const opacity = opacityOf(Array.isArray(b.files) ? b.files : null);
         // *** ageKnown, BECAUSE THE SCANNER IS RIGHT AND THE FIRST VERSION OF THIS WAS NOT. ***
         // tools/ship/orreryScan.mjs says of a null date: "a real answer (a shallow clone, or a path never
         // committed) and is NOT the same as 'arrived today'". This function then put both on day 0, which is
@@ -159,6 +185,8 @@ export function buildOrrery(bodies = [], opts = {}) {
             name: b.name, state, licence: lic.path, licenceDepth: lic.depth,
             arrived: b.arrived || null, ageDays: days, ageKnown: !!arrived,
             a: orb.a, period: orb.period, radius: radiusFor(b.bytes, opts),
+            // v4474 -- the third element: how far out of the readable plane, from what cannot be read
+            opacity, inclination: inclinationFor(opacity),
             bytes: Math.max(0, Number(b.bytes) || 0),
             // the git half of the seed, and whether it is really there -- world/orrerySeed.mjs explains why
             // the NAME is folded in with it (nine bodies share one first commit)
