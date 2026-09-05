@@ -181,8 +181,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3870,
-    esModules: 3579, closures: 3455, asyncAwait: 1334, typedArrays: 691, promises: 332,
+    // A SIXTH TIME, and this one is the round's OWN two files rather than a merge: render/zoomBlur.mjs and
+    // its gate take the census 3870 -> 3872 and move four rows. SIX RE-DERIVATIONS, SIX DIFFERENT TABLES, ONE
+    // UNCHANGED HEADLINE -- threads have read 22 through every one of them, and WebGPU did not move either
+    // even though both new files are about a compute shader, because the census counts FILES THAT MENTION a
+    // capability and the pair already did.
+    files: 3872,
+    esModules: 3581, closures: 3457, asyncAwait: 1335, typedArrays: 692, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -234,11 +234,22 @@ console.log("\n2. THE TRIGGER COUNTS CO-OCCURRENCE AND THE DECISION NEEDS 5");
     // bears on whether to build an IR. Asserting it made this gate's verdict hostage to the very quantity it
     // was written to discredit. The two classes that DO bear on the decision are still pinned, and they are
     // the two that held across the correction.
-    ok("*** of the files the trigger counts, FIVE duplicate a computation and TWO share only a convention ***",
-        C.duplication.length === 5 && C.convention.length === 2,
+    // *** v4478 -- 2 -> 3 CONVENTION, AND THE ARRIVAL IS A SHAPE THIS CLASS WAS NOT DESIGNED FOR. ***
+    // render/zoomBlur.mjs carries GLSL and WGSL and classifies CONVENTION with an EMPTY shared-identifier
+    // list: its two halves share `uv`, `centre`, `t`, `s`, `total` and nothing else, all generic, all
+    // filtered. The verdict is right by this gate's rule and the REASON is stronger than the rule knows --
+    // the halves share no real computation identifiers because neither was WRITTEN. Both are emitted by the
+    // same reduceTree() call the CPU oracle makes, so the parenthesisation in each shader is the evaluation
+    // order the oracle took and changing the sample count moves both or neither. AN IR WOULD BUY NOTHING
+    // HERE, which is the question this gate exists to answer, arrived at from a direction it did not have:
+    // not "these two do different things" but "these two cannot drift, because one reduction emits them".
+    // The pinned counts move because a FILE arrived. What v4383's detector replacement established -- that
+    // these two classes do not move when the DETECTOR changes -- is a different claim and is untouched.
+    ok("*** of the files the trigger counts, FIVE duplicate a computation and THREE share only a convention ***",
+        C.duplication.length === 5 && C.convention.length === 3,
         `${C.duplication.length} DUPLICATION, ${C.convention.length} CONVENTION out of ${census.both.length} -- and ${C.disjoint.length} DISJOINT, REPORTED rather than asserted because that class is the noise this gate exists to name. An IR replaces DUPLICATION; it can do nothing for a file whose two halves compute different things, and render/bloomFused.mjs exists precisely because WebGPU can fuse what WebGL2 cannot`);
     ok("  ...and the two that bear on the decision are exactly the two that survived a detector replacement",
-        C.duplication.length + C.convention.length === 7,
+        C.duplication.length + C.convention.length === 8,
         `main's v4383 replaced shaderCensus's detector and \`both\` fell 14 -> ${census.both.length}, a 29% move in the headline number. DUPLICATION and CONVENTION did not change by one file. THIS IS A CONTROL THAT WAS RUN WITHOUT BEING PLANNED: the round predicted the count was measuring something other than the claim, and then an independent correction to the count left the claim untouched`);
     ok("  and the five are named, so the decision rests on a list rather than on a number",
         C.duplication.every((r) => r.real.length >= DUPLICATION_MIN),

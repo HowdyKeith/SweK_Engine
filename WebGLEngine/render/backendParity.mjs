@@ -185,8 +185,17 @@ export const PARITY_BASELINE = Object.freeze({
     // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
-    glslBearing: 145,
-    glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
+    // *** v4478 -- 145 -> 146, 68 -> 69, both 13 -> 14, AND THIS ARRIVAL IS A SHAPE THIS RATCHET HAS NOT SEEN.
+    // render/zoomBlur.mjs carries GLSL and WGSL in one file, which normally means the two halves can drift and
+    // the count is a warning. Here they CANNOT: both are EMITTED, by the same reduceTree() call the CPU oracle
+    // makes, with string concatenation in place of addition -- so the parenthesisation in each shader is the
+    // evaluation order the oracle took, and changing the sample count moves both or neither. It is counted
+    // rather than exempted, for the reason the v4392 note gives about gates: an exclusion for "generated
+    // shaders do not count" would hide the one category whose halves are provably in step, which is the
+    // opposite of what this census is for. glslDirective moves with it: the emitted GLSL writes its own
+    // #version header.
+    glslBearing: 146,
+    glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -217,13 +226,16 @@ export const PARITY_BASELINE = Object.freeze({
     // Both branches moved these: main to 61 for the Slug WGSL twin above, this branch to 67 for its own
     // modules. Neither number describes the tree that has BOTH, and adding them would double-count anything
     // the two rounds touched in common. The figures below are what classify() reports on the merged tree.
-    wgslBearing: 68,   // 61 on main, 67 on this branch; 68 is what the merged tree reports
-    both: 13,
+    wgslBearing: 69,   // 68 at v4476; v4478 adds render/zoomBlur.mjs, which emits both languages
+    both: 14,
     glslOnly: 132,
     wgslOnly: 55,      // 48 and 54 respectively -- re-measured for the same reason
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs",
+        // v4478 -- the eleventh, and the first whose two halves are GENERATED from one reduction rather
+        // than written twice. See the glslBearing note above: it is counted, not exempted.
+        "render/zoomBlur.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

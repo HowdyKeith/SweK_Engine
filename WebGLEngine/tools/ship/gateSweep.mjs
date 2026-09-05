@@ -2508,6 +2508,25 @@ since116: Object.freeze({
                  "screenshot on the rig -- the same limit panini.js declared and this inherits rather than " +
                  "pretending past.",
     }),
+    since117: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/zoomBlur-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([]),
+        verdict: "THE NEAR MISS, BUILT. bloomPass.js's GODRAYS_FS is the tree's only radial-march-from-a-" +
+                 "point shader and every contract around that loop is inverted -- read out of its source, " +
+                 "not described. A zoom blur is an AVERAGE, so it has properties that hold exactly: a flat " +
+                 "image comes back bit-identical, strength 0 is the identity, the centre is a fixed point, " +
+                 "a radial ramp strictly shrinks. *** AND THE FIRST IS THE DESIGN, NOT A FREEBIE: *** the " +
+                 "obvious `acc += sample` kernel fails it -- 32 copies of 0.1 sum to 0.09999997 -- so the " +
+                 "reduction is a pairwise tree over a power-of-two count, refused otherwise. One reduceTree " +
+                 "call serves the oracle, the GLSL and the WGSL, so the parenthesisation in the shader IS " +
+                 "the evaluation order the oracle took. The WGSL is RUN on a real GPU: flat is bit-exact at " +
+                 "every strength, strength 0 is bit-exact for every image, varying images agree to 3 ulp " +
+                 "against a budget of 8 derived from the reduction depth. NINETEEN SABOTAGES, NINETEEN RED " +
+                 "-- four only after repair, and all four were one species: an oracle MORE ACCURATE than the " +
+                 "shader passes every comparison with it",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
