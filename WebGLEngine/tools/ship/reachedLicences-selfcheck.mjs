@@ -391,3 +391,26 @@ source not in the register was ever read. What is checked is that every recorded
 its posture and what was taken, that the two quoted codrops texts are one licence restated rather than two,
 and that no source forbidding redistribution has left a single byte in this tree.`);
 process.exit(fail ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, section 4b's three replacement checks. Applied to a working tree, GRADED ON EXIT
+// CODES rather than on a count of FAIL lines (a crashing gate prints zero of them), restored byte-identical.
+//
+//   A  DaveFace/UnrealRetroShaders given redistributable: true while still grantorHoldsRights: false.
+//      -> exit 1. An entry cannot be encumbered and shippable at once; encumbrance bites on vendoring, so
+//      this is the check that carries the actual consequence rather than the label.
+//
+//   B  the third-party naming stripped out of the same entry's licenceNote, leaving the flag with no reason.
+//      -> exit 1. The ENCUMBERED category is a finding about a SPECIFIC third party, never a shrug.
+//
+//   C  the knightcrawler25 entry deleted outright.
+//      -> exit 0 HERE and exit 1 in citedSources-selfcheck, which is the correct division: losing an entry
+//      is a debt-ratchet event, not a register-validity one, and a gate that reddened on both would be
+//      claiming ground it does not hold.
+//
+//   *** AND THE FIRST WRITING OF CHECK B ACCUSED AN INNOCENT ENTRY. *** The pattern was written from the one
+//   new note in front of me and red-flagged projapati66/Svg-IsometricCityAnimation, whose note says "neither
+//   of which the grantor holds" -- the same assertion in words I had not thought of. Writing a check from a
+//   single example and reading its red as the EXAMPLE'S fault is this session's most repeated defect. The
+//   accepted forms are an enumerated list now, and the failure message prints the list so the next writer is
+//   told what to say instead of guessing at a regex.

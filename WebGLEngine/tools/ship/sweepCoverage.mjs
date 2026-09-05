@@ -170,6 +170,13 @@ export const STALE_GREENS_V4460 = Object.freeze({
         Object.freeze({ gate: "tools/ship/corpusFilters-selfcheck.mjs", recordedMs: 3141, nowMs: 1179, red: true }),
         Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", recordedMs: 3314, nowMs: 1726, red: true }),
         Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", recordedMs: 3368, nowMs: 2793, red: true }),
+        // *** THE SEVENTH, RETURNED BY THE SECOND ROTATION IN THE SAME VERSION, AND IT IS THE EXTREME CASE
+        // THIS WHOLE RECORD IS ABOUT. *** box3dFilter was evicted at 3763 ms and runs in 185 -- a factor of
+        // twenty -- so the budget had been hiding a gate that costs a fifth of a second. It is RED, and it was
+        // red the entire time it was invisible: RED_AT_V4408 names it with a reason (two build scripts
+        // disagreeing about the wasm export set, which needs the rig). Naming it here does not fix that and
+        // does not pretend to; it stops the eviction being the reason nobody sees it.
+        Object.freeze({ gate: "tools/ship/box3dFilter-selfcheck.mjs", recordedMs: 3763, nowMs: 185, red: true }),
     ]),
     notClaimed: "that the 22 are the whole of it. This measured the 371 entries recorded GREEN; the 144 " +
                 "recorded nonzero and the `killed` bucket were not re-run, and a gate that is red for a " +

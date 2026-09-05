@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "55aa21f378edcfb4fd7a82e72c3327ce60341d81",
+ "head": "fff291f539eae47103c7b6590d7a85ed0d18b717",
  "bodies": {
   "box3d": [
    {
@@ -121,18 +121,13 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 18849,
-    "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
+    "bytes": 21105,
+    "sha": "fff291f539eae47103c7b6590d7a85ed0d18b717"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
     "bytes": 25144,
     "sha": "36f01db7295733b140e5661f1ea3e64acfe4a6ba"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
@@ -247,11 +242,6 @@
     "path": "tools/ship/artifactWeight.mjs",
     "bytes": 4876,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    }
   ],
   "keyhunt": [
@@ -303,13 +293,7 @@
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    }
   ],
-  "slug": [
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
-   }
-  ],
+  "slug": [],
   "taichi-js": [
    {
     "path": "tools/roundhouse/androidPeer-selfcheck.mjs",
@@ -510,8 +494,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 2916393,
-    "sha": "93acaa47644f3cb2de95db27a8466b2177314d45"
+    "bytes": 2920664,
+    "sha": "a692d400dc5fdc16c8e0d427b7ad1b095f8f104d"
    },
    {
     "path": "mpm3d.html",
@@ -761,11 +745,6 @@
     "path": "ai-bridge/wasmSandbox.js",
     "bytes": 3356,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
-   },
-   {
-    "path": "tools/ship/orreryUniverse-selfcheck.mjs",
-    "bytes": 15954,
-    "sha": "7161cb59cb5459cf06b0b8b4b5ccca2c5a1e7a11"
    },
    {
     "path": "wasm-bench.html",

@@ -308,3 +308,16 @@ console.log("unchecked here: WHETHER EJECTA IS THE RIGHT MASS. This counts files
     "and asserted, and orrery.json is still baked from total bytes -- rebaking it is a separate decision " +
     "because every recorded figure that cites a planet's size would move at once.");
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, section 4 after the same repair as copiedOutsideVendor-selfcheck's. Exit codes.
+//
+//   D  a third vendor directory (ai-bridge/vendor/) given ONE file.
+//      -> exit 1 here AND exit 1 in copiedOutsideVendor-selfcheck. TWO COPIES OF ONE QUESTION, BOTH FIXED IN
+//      THE SAME ROUND AND BOTH SABOTAGED, because the v4410 note eight lines up says a second copy of an
+//      exclusion is a second chance to disagree -- and these two had been agreeing on the WRONG answer.
+//
+//   Clean tree: exit 0. The defect that produced this repair was an EMPTY untracked ai-bridge/vendor/ dated
+//   Aug 17: git cannot track an empty directory, so it exists in a working checkout and in no fresh clone,
+//   and both gates read three where the tree holds two. A check whose verdict depends on litter in one
+//   person's checkout is measuring the checkout.

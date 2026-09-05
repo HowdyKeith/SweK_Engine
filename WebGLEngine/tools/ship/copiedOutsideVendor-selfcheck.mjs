@@ -261,3 +261,18 @@ console.log("unchecked here: WHETHER THE REPRODUCED LICENCE TEXT MATCHES UPSTREA
     "notice at all would be invisible to it by definition; and the DENSO WAVE trademark notice in " +
     "ui/vendor/qrcode.mjs, which is reproduced but is not a licence term and has had no thought given to it.");
 process.exit(fails ? 1 : 0);
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, the vendor-directory count after it stopped counting directory ENTRIES.
+// Graded on exit codes; the stray empty directory that started this was created and removed by the harness.
+//
+//   E  a third vendor directory (ai-bridge/vendor/) given ONE file.
+//      -> exit 1. Content is what the check is about, so a directory that gains code is a red where the same
+//      directory sitting empty is not.
+//
+//   F  ui/vendor emptied of its two files, then restored.
+//      -> exit 1 in the other direction: the check is an equality on the set that holds anything, so a
+//      vendor tree going away is as much a finding as one arriving. A `>= 2` would have slept through it.
+//
+//   Clean tree: exit 0, with all three candidates and their file counts printed -- ai-bridge/vendor (0 files)
+//   and ui/vendor (2 files) and vendor (340 files) -- so the excluded one is VISIBLE rather than dropped.

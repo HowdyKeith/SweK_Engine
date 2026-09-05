@@ -235,6 +235,45 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
             "tree " + shipping.tree + " is not among main's four, so addsToMain=true and the budget binds: " +
             shipping.owed.length + " owed against " + shipping.budget + " allowed -> REFUSED. AN EXEMPTION " +
             "THAT SWALLOWED THE RULE WOULD LOOK IDENTICAL FROM THE GREEN SIDE, so both directions are driven");
+        // *** v4461 -- THE SUPERSEDED FLOOR, DRIVEN IN BOTH DIRECTIONS IN ONE FIXTURE. ***
+        // `owed` now skips versions beneath the newest PUBLISHED release, because a box downloading
+        // releases/latest already holds their code. That forgives, so it has to be shown NOT forgiving the
+        // case the rule is for -- and the same main, with the same floor, answers both questions at once.
+        const mainFour = () => "## v4111 -- one\n\n## v4222 -- two\n\n## v4333 -- three\n\n## v4444 -- four\n";
+        const withFixture = (releases) => {
+            const f = path.join(os.tmpdir(), "swek-ledger-s" + releases.length + "-" + process.pid + ".json");
+            fs.writeFileSync(f, JSON.stringify({
+                baseline: { throughVersion: 4000, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+                lagBudget: { maxVersionsBehind: 2, why: "z".repeat(220) },
+                releases: releases.map((t) => ({ tag: t })),
+            }));
+            const st = ledgerState({ file: f, readMain: mainFour });
+            try { fs.unlinkSync(f); } catch {}
+            return st;
+        };
+        // Nothing published above the floor: every one of main's four below the tree is still owed.
+        const noneOut = withFixture(["v4001"]);
+        // v4333 published: v4111 and v4222 are BENEATH it, so their code shipped inside it; v4444 is not.
+        const someOut = withFixture(["v4001", "v4333"]);
+        ok("!! *** a version BENEATH the newest published release is superseded, not owed ***",
+            noneOut.owed.join(",") === "4444,4333,4222,4111" && someOut.owed.join(",") === "4444" &&
+            someOut.supersededByPublish === 4333,
+            "same main (v4111..v4444), same floor v4000. Publish nothing above the floor -> owed [" +
+            noneOut.owed.join(",") + "]. Publish v4333 -> owed [" + someOut.owed.join(",") + "]: v4111 and " +
+            "v4222 are inside the v4333 build a box can actually download, v4444 is not. *** THE FLOOR THAT " +
+            "MOVED IS AN OBSERVED PUBLISH, NOT A NUMBER SOMEBODY TYPED. ***");
+        ok("!! ...and it still REFUSES the ship, so the forgiveness did not swallow the rule",
+            someOut.addsToMain === true && someOut.budgetBinds === true &&
+            noneOut.withinBudget === false && someOut.owed.length <= someOut.budget,
+            "with v4333 published the list is 1 of " + someOut.budget + " and the tree may ship; with nothing " +
+            "published it is " + noneOut.owed.length + " of " + noneOut.budget + " and it may not. A FLOOR " +
+            "THAT CAN ONLY BE RAISED BY PUBLISHING SOMETHING makes the do-nothing path no easier than before, " +
+            "which is exactly what the three baseline raises could not say for themselves");
+        ok("!! ...and the two floors are reported apart, because only one of them can be typed",
+            S.floor === (LED && +LED.baseline.throughVersion) && S.supersededBy === Math.max(S.floor, S.latest),
+            "declared write-off v" + S.floor + " against observed publish v" + (S.supersededByPublish || 0) +
+            "; the effective floor is v" + S.supersededBy + ". Folding them into one number would let a " +
+            "write-off be read as a publish, which is the difference between owing a debt and paying it");
         try { fs.unlinkSync(tmpL); fs.unlinkSync(tmpB); } catch {}
         ok("!! ...and when main cannot be read it DEGRADES LOUDLY to the stricter list",
             viaTree.owedDegraded === true && viaTree.owedSource === "working tree" &&
@@ -355,3 +394,21 @@ console.log("\n5. WHAT THIS DOES NOT CHECK, STATED RATHER THAN IMPLIED");
 console.log();
 if (fails) { console.log("releaseLedger-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("releaseLedger-selfcheck: all checks pass");
+
+// =============================================================================================================
+// SABOTAGE LOG -- v4461, the superseded floor. Applied to tools/ship/releaseLedger.mjs, graded on EXIT CODES,
+// restored md5-identical (4c911fc9d4fcc74654fe6ed31654c8bf).
+//
+//   A  supersededBy reverted to `floor` -- the arithmetic as it stood, ignoring what was published.
+//      -> exit 1. The forgiving direction is real: with v4333 in the fixture's ledger, v4111 and v4222 come
+//      back onto the owed list and the assertion naming them as superseded fails.
+//
+//   B  supersededBy set to `treeN`, so every version below the tree is called superseded and owed is always
+//      empty -- the over-forgiving version, which is what an escape hatch would look like.
+//      -> exit 1. This is the sabotage that matters. A relaxation nobody can break is not a rule, and the
+//      three baseline raises before this one had no check at all standing behind them.
+//
+//   *** BOTH DIRECTIONS GO RED FROM ONE FIXTURE, WHICH IS THE POINT OF BUILDING IT THAT WAY. *** The same
+//   main (v4111..v4444) and the same floor (v4000) are asked twice, differing only in what the ledger says
+//   was published. A fixture that could only demonstrate the forgiveness would be arguing for the change
+//   using the change.

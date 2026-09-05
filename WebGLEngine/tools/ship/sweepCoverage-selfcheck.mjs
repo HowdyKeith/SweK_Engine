@@ -377,7 +377,12 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // encourage. *** The row keeps its teeth: an entry that is neither at its evicting reading nor under
     // budget still fails.
     const returned = new Map(REC.returnedAt_v4461.map((r) => [r.gate, r]));
-    ok("!! *** TWELVE OF THE TWENTY-TWO NOW FINISH UNDER THE BUDGET THAT EXCLUDES THEM; SIX ARE BACK IN ***",
+    // v4461: the title carried TWELVE, TWENTY-TWO and SIX as typed words beside the same numbers derived in
+    // the body -- and the second rotation of this same version moved the third of them, so the headline said
+    // SIX while the sentence under it said seven. A count typed into a title is a count nobody re-derives,
+    // which is this round's whole subject; all three come off the record now.
+    ok(`!! *** ${back.length} OF THE ${REC.confirmed.total} NOW FINISH UNDER THE BUDGET THAT EXCLUDES THEM; ` +
+       `${REC.returnedAt_v4461.length} ARE BACK IN ***`,
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
                                  ((FILE.timings || {})[r.gate] === r.recordedMs ||
