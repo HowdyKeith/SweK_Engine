@@ -1252,7 +1252,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         derive from it and author no shader text, and the baselines stand where v4514 left them. Not built: the
         sandbox's kaiju, FPS shooter and dungeon grenade (their own pages); debris that collides; a topple as rigid
         bodies (kaijuBox3d's, opt-in there).
-     5. SAVE / LOAD: world/WorldPersistence.js's format read and written by the device page.
+     5. (v4521) SAVE / LOAD. BUILT: world/WorldPersistence.js writes every chunk that diverged from the generator to
+        IndexedDB and reads it back onto a freshly generated world; its payload and application became METHODS
+        (buildPayload, validatePayload, applyPayload) that save() and load() call, so the device page saves what
+        index.html saves and a gate holds the format headless. render/voxelSave.mjs is the device side: a load
+        followed by round 4's syncDirty (a restored chunk is dirty, so its slot follows), export and import through
+        JSON with base64 voxels (the legacy v1 spelling load() still reads), the page's orbit as the sandbox's camera
+        pose for saveCamera / loadCamera, autosave every thirty seconds. sandbox-gpu.html: Save, Load, Clear, Export,
+        Import, the HUD naming chunks, bytes and skips. MEASURED (tools/ship/voxelSave-selfcheck.mjs): the real city
+        leaves 121 chunks modified before any edit (CityGen writes through setVoxel) and a twin world restored from
+        the payload meshes to the edited world's hash; in the browser 121 chunks reach IndexedDB and a fresh world
+        loaded from them draws 0 pixels apart on both backends, the camera pose round-trips, and after clear() a third
+        load finds no save. THE FINDINGS: clear() arms a flag the next load() honours by wiping, so a gate that
+        cleared, saved and loaded watched the load wipe its own save; and a sabotage that makes the code throw is not
+        a red by name -- the export's version is a hold of its own now. Not built: the legacy localStorage migration's
+        own test (its shape is v1's, held through applyPayload), quota exhaustion, a save of the crates (bodies are not
+        the world's).
      6. THE AVATAR AND CAMERA: a first-person walk on the collider with the sandbox's controls.
 
 ## The count that says when step 4 matters

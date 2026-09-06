@@ -39,7 +39,7 @@ export function miniWorld({ chunkSize = 16, chunkHeight = 64 } = {}) {
     const chunkOf = (x, z, make) => { const cx = Math.floor(x / chunkSize), cz = Math.floor(z / chunkSize), k = cx + "," + cz; let c = chunks.get(k); if (!c && make) { c = new Chunk(cx, cz, chunkSize, chunkHeight); chunks.set(k, c); } return c; };
     return {
         chunkSize, chunkHeight, chunks,
-        setVoxel(x, y, z, v) { if (y < 0 || y >= chunkHeight) return; const c = chunkOf(x, z, true); c.set(x - c.cx * chunkSize, y, z - c.cz * chunkSize, v); },
+        setVoxel(x, y, z, v) { if (y < 0 || y >= chunkHeight) return; const c = chunkOf(x, z, true); c.set(x - c.cx * chunkSize, y, z - c.cz * chunkSize, v); c._modified = true; },   // _modified: the persistence flag VoxelWorld keeps (v4521)
         voxelAt(x, y, z) { if (y < 0 || y >= chunkHeight) return 0; const c = chunkOf(x, z, false); return c ? c.get(x - c.cx * chunkSize, y, z - c.cz * chunkSize) : 0; },
     };
 }

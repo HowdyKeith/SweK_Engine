@@ -2867,6 +2867,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "debris pipelines are litSphere's own shader in two new MODES (extra: quat, extra: colour) now, the two modules author no " +
                  "shader text, and the parity and census baselines stand where v4514 left them. Sabotages red at 1 / 3 / 2 / 3.",
     }),
+    since143: Object.freeze({
+        at: "v4521", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelSave-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends and headless. The sandbox on the device, round 5: world/WorldPersistence.js's payload and its " +
+                 "application became methods (buildPayload, validatePayload, applyPayload) that save() and load() call, so the device " +
+                 "page saves what index.html saves and a gate holds the format with no IndexedDB in the room; render/voxelSave.mjs adds " +
+                 "the device side -- load then round 4's syncDirty (a restored chunk is dirty), export and import through JSON with " +
+                 "base64 voxels (the legacy v1 spelling load() still reads), the page's orbit as the sandbox's camera pose. In the " +
+                 "browser an edited world saved to IndexedDB and a fresh world loaded from it draw 0 pixels apart. Sabotage C threw " +
+                 "instead of failing by name until the export's version became a hold. Sabotages red at 5 / 5 / 4 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

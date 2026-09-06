@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Sandbox on the GPU (the voxel world and its city on gfx/device.js)">
-<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 4 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls; and the sandbox's damage (render/voxelDamage.mjs): Blast carves a sphere at the last picked voxel, bursts the debris system's cubes out of every voxel it removes, charges CityGen's buildings the voxels they lost through their own crumble passes and topple, and syncs every chunk the world marked dirty. Save/load and the avatar follow. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
+<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 5 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls; and the sandbox's damage (render/voxelDamage.mjs): Blast carves a sphere at the last picked voxel, bursts the debris system's cubes out of every voxel it removes, charges CityGen's buildings the voxels they lost through their own crumble passes and topple, and syncs every chunk the world marked dirty; and the sandbox's save (render/voxelSave.mjs over world/WorldPersistence.js): Save writes every chunk that diverged from the generator to IndexedDB in the sandbox's own format and the camera pose to localStorage, Load regenerates the world, restores the saved chunks and syncs their slots, Export and Import carry the same payload as JSON, autosave every 30 s. The avatar follows. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
 <meta name="demo:category" content="world">
 <title>Sandbox on the GPU</title>
 <style>
@@ -39,19 +39,21 @@ import { editState, editScene, pickVoxel, digAt, buildAt } from "./render/voxelD
 import { createBodyWorld } from "./render/voxelBodies.mjs";
 import { blastAt, damageScene } from "./render/voxelDamage.mjs";
 import { VoxelDebrisSystem } from "./world/voxelDebrisSystem.js";
+import { WorldPersistence, saveWorld, loadWorld, applyToState, exportPayload, importPayload, modifiedChunks, orbitToCam, camToOrbit, SAVE } from "./render/voxelSave.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
 import { VoxelWorld } from "./world/world.js";
 import { CityGen } from "./world/CityGen.js";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
-let device, scene = null, world = null, state = null, bodies = null, physMod = null, city = null, debris = new VoxelDebrisSystem(), lastT = 0, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null, lastHit = null;
+let device, scene = null, world = null, state = null, bodies = null, physMod = null, city = null, debris = new VoxelDebrisSystem(), lastT = 0, persistence = null, lastSave = 0, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null, lastHit = null;
 const $ = (id) => document.getElementById(id);
 
 function rebuild() {
   const t0 = performance.now();
   world = new VoxelWorld();
   city = $("city").checked ? new CityGen(world) : null;
+  persistence = new WorldPersistence(world);
   if (city) city.generate({ seed: (+$("seed").value) >>> 0, facades: true, buildingCount: Math.max(0, +$("count").value | 0) });
   const t1 = performance.now(); state = editState(world); const t2 = performance.now();
   if (scene && scene.destroy) scene.destroy();
@@ -69,6 +71,12 @@ async function init() {
   if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
   try { const ps = await box3d.init(); if (ps.ready) physMod = box3d._mod; else $("phys").textContent = "(box3d: " + ps.reason.slice(0, 80) + ")"; } catch (e) { $("phys").textContent = "(box3d: " + e.message + ")"; }
   try { rebuild(); } catch (e) { return fail("scene: " + e.message); }
+  const said = (m) => { $("saved").textContent = m; };
+  $("save").addEventListener("click", async () => { const r = await saveWorld(state, persistence); persistence.saveCamera(orbitToCam({ yaw, pitch, dist, target: [0, 10, 0] })); said(r.ok ? `saved ${r.chunks} chunk${r.chunks === 1 ? "" : "s"}, ${r.bytes} bytes (${r.modified} modified)` : "save refused: " + r.error); lastSave = performance.now(); });
+  $("load").addEventListener("click", async () => { const r = await loadWorld(state, persistence); if (r.load.ok) { const o = camToOrbit((() => { const c = { position: { x: 0, y: 0, z: 0 }, yaw, pitch }; persistence.loadCamera(c); return c; })(), [0, 10, 0]); if (o.dist > 1) { yaw = o.yaw; pitch = o.pitch; dist = o.dist; } } said(r.load.ok ? `loaded ${r.load.restored} chunk${r.load.restored === 1 ? "" : "s"} (${r.load.skipped} skipped), ${r.sync.chunks.length} synced` : "load: " + r.load.error); });
+  $("clear").addEventListener("click", () => { persistence.clear(); persistence.clearCamera(); said("cleared: the next load finds no save"); });
+  $("export").addEventListener("click", () => { const p = persistence.buildPayload(); $("payload").value = JSON.stringify(exportPayload(p)); said(`exported ${p.chunks.length} chunk${p.chunks.length === 1 ? "" : "s"}`); });
+  $("import").addEventListener("click", () => { try { const r = applyToState(state, persistence, importPayload(JSON.parse($("payload").value))); said(r.ok ? `imported ${r.restored} chunk${r.restored === 1 ? "" : "s"} (${r.skipped} skipped), ${r.sync.chunks.length} synced` : "import refused: " + r.error); } catch (e) { said("import refused: " + e.message); } });
   $("blast").addEventListener("click", () => {
     const at = lastHit ? [lastHit.x + 0.5, lastHit.y + 0.5, lastHit.z + 0.5] : [0.5, 10.5, 0.5];
     const r = blastAt(state, { city, debris, groundY: 1 }, at, Math.max(1, +$("radius").value || 2.5));
@@ -108,6 +116,7 @@ function frame() {
   const cam = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 1200), G.lookAt(eye, [0, 10, 0])), eye };
   camNow = { W: w, H: h, fov: 0.9, eye, target: [0, 10, 0] };
   const now = performance.now(); debris.update(lastT ? Math.min(0.1, (now - lastT) / 1000) : 1 / 60); lastT = now;
+  if (persistence && now - lastSave > SAVE.autosaveMs) { lastSave = now; const m = modifiedChunks(world); if (m > 0) saveWorld(state, persistence).then((r) => { if (r.ok) $("saved").textContent = `autosaved ${r.chunks} chunk${r.chunks === 1 ? "" : "s"}`; }); }
   if (bodies && bodies.bodies.length) { bodies.tick(); if ((bodies.ticks() & 31) === 0) $("phys").textContent = `${bodies.bodies.length} crate${bodies.bodies.length === 1 ? "" : "s"}, ${bodies.poolSize()} static boxes in the pool`; }
   scene.frame({ ...cam, clear: [0.03, 0.05, 0.08, 1] });
   requestAnimationFrame(frame);

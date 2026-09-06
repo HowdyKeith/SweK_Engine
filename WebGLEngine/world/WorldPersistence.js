@@ -86,13 +86,11 @@ export class WorldPersistence {
         });
     }
 
-    async save() {
-        if (this._quotaExceeded) {
-            return { ok: false, error: "quota exceeded (circuit-broken; resumeAutosave() to retry)", fatalQuota: true };
-        }
-
-        // Build payload. Uint8Array stored DIRECTLY in IDB — no base64
-        // inflate, structured-clone preserves the binary as-is.
+    // v4521 -- THE PAYLOAD AND ITS APPLICATION ARE METHODS OF THEIR OWN, so the device sandbox (render/voxelSave.mjs) and a
+    // headless gate use the SAME format save() writes and load() reads, without IndexedDB in the room. save() and load()
+    // are unchanged in what they store and restore: they call these.
+    /** the save payload: every chunk that diverged from the generator (_modified), its voxels COPIED */
+    buildPayload() {
         const chunks = [];
         for (const c of this.world.chunks.values()) {
             if (!c._modified) continue;
@@ -102,11 +100,50 @@ export class WorldPersistence {
                 v: c.voxels.slice(),   // copy so subsequent edits don't mutate the saved snapshot mid-write
             });
         }
-        const payload = {
-            version: VERSION,
-            timestamp: Date.now(),
-            chunks,
-        };
+        return { version: VERSION, timestamp: Date.now(), chunks };
+    }
+
+    /** null when a payload is loadable, else the reason load() refuses it */
+    static validatePayload(payload) {
+        if (!payload) return "no save";
+        if (payload.version !== VERSION && payload.version !== 1) return `version mismatch ${payload.version}`;
+        if (!Array.isArray(payload.chunks)) return "no chunks array";
+        return null;
+    }
+
+    /** restore a payload's chunks into the world: { restored, skipped }; a restored chunk is dirty (re-mesh me) and _modified (save me) */
+    applyPayload(payload) {
+        let restored = 0, skipped = 0;
+        for (const sav of payload.chunks) {
+            const chunk = this.world.chunks.get(`${sav.cx},${sav.cz}`);
+            if (!chunk) { skipped++; continue; }
+            let bytes;
+            if (typeof sav.v === "string") {
+                bytes = base64ToUint8(sav.v);          // legacy v1 format
+            } else if (sav.v instanceof Uint8Array) {
+                bytes = sav.v;
+            } else if (sav.v && sav.v.buffer) {
+                bytes = new Uint8Array(sav.v.buffer);   // structured-clone may rehydrate as plain object in odd cases
+            } else {
+                skipped++; continue;
+            }
+            if (bytes.length !== chunk.voxels.length) { skipped++; continue; }
+            chunk.voxels.set(bytes);
+            chunk.dirty = true;
+            chunk._modified = true;
+            restored++;
+        }
+        return { restored, skipped };
+    }
+
+    async save() {
+        if (this._quotaExceeded) {
+            return { ok: false, error: "quota exceeded (circuit-broken; resumeAutosave() to retry)", fatalQuota: true };
+        }
+
+        // Build payload. Uint8Array stored DIRECTLY in IDB — no base64
+        // inflate, structured-clone preserves the binary as-is.
+        const payload = this.buildPayload(), chunks = payload.chunks;
         const approxBytes = chunks.reduce((sum, ch) => sum + ch.v.byteLength, 0) + 128;
 
         const db = await this._dbPromise;
@@ -170,32 +207,10 @@ export class WorldPersistence {
             if (migrated) { payload = migrated; backend = "idb (migrated)"; }
         }
 
-        if (!payload) return { ok: false, error: "no save" };
-        if (payload.version !== VERSION && payload.version !== 1) {
-            return { ok: false, error: `version mismatch ${payload.version}` };
-        }
-        if (!Array.isArray(payload.chunks)) return { ok: false, error: "no chunks array" };
+        const refusal = WorldPersistence.validatePayload(payload);
+        if (refusal) return { ok: false, error: refusal };
 
-        let restored = 0, skipped = 0;
-        for (const sav of payload.chunks) {
-            const chunk = this.world.chunks.get(`${sav.cx},${sav.cz}`);
-            if (!chunk) { skipped++; continue; }
-            let bytes;
-            if (typeof sav.v === "string") {
-                bytes = base64ToUint8(sav.v);          // legacy v1 format
-            } else if (sav.v instanceof Uint8Array) {
-                bytes = sav.v;
-            } else if (sav.v && sav.v.buffer) {
-                bytes = new Uint8Array(sav.v.buffer);   // structured-clone may rehydrate as plain object in odd cases
-            } else {
-                skipped++; continue;
-            }
-            if (bytes.length !== chunk.voxels.length) { skipped++; continue; }
-            chunk.voxels.set(bytes);
-            chunk.dirty = true;
-            chunk._modified = true;
-            restored++;
-        }
+        const { restored, skipped } = this.applyPayload(payload);
         this.lastLoadCount = restored;
         return {
             ok: true,
