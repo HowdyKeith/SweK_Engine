@@ -127,7 +127,12 @@ export const DEVICE_CONTRACT = Object.freeze({
     // The failure is not graceful: webgpuBackend does createShaderModule({ code: d.shaders.wgsl }) with no
     // guard, so a GLSL-only pipeline reaches the GPU as `undefined` rather than as a refusal a caller can read.
     unguardedRead: "d.shaders.wgsl",
-    consumers: Object.freeze(["gfx-device.html", "nebula-device.html"]),
+    // v4479 -- A THIRD CONSUMER, AND THE FIRST THAT IS A CHECK RATHER THAN A DEMO. This module's own report
+    // calls device.js "an abstraction whose promise is portability, with two demo consumers and no production
+    // one". tools/ship/blendModes-selfcheck.mjs now drives it through BOTH backends in one launch and holds the
+    // pixels against arithmetic, so the portability promise is asserted by something that can fail rather than
+    // exercised by two pages nobody runs in the suite. Listed rather than exempted: the list is the claim.
+    consumers: Object.freeze(["gfx-device.html", "nebula-device.html", "tools/ship/blendModes-selfcheck.mjs"]),
 });
 
 /**
@@ -185,8 +190,14 @@ export const PARITY_BASELINE = Object.freeze({
     // exists only inside a WebGPU renderer at run time, which is the same blind spot v4319 recorded for badTvTsl and blackbodyTsl
     // and docs/TSL-ROADMAP.md step 4 states outright. So the number moves by one and the reach does not.
     // render/brainTsl.mjs itself carries NEITHER language, for exactly that reason: TSL is JavaScript.
-    glslBearing: 145,
-    glslDirective: 129,  // raw WebGL2 -- the file writes its own version header
+    // 146 at v4479: gfx/blendModes.mjs is imported by device.js, which carries the GLSL programs.
+    glslBearing: 146,
+    // 130 at v4479: blendModes-selfcheck.mjs's GLSL twin writes its own version header, because it drives raw
+    // WebGL2 through gfx/device.js rather than handing source to three. THE FIRST DRAFT OF THIS COMMENT SPELLED
+    // THAT HEADER OUT and this file -- the one that CLASSIFIES shaders by looking for exactly that marker --
+    // classified ITSELF as GLSL-bearing. The gate caught it by name. Same shape as v4462's census counting its
+    // own PATTERNS table: an instrument that mentions what it measures becomes a sample of it.
+    glslDirective: 130,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -219,14 +230,21 @@ export const PARITY_BASELINE = Object.freeze({
     // the two rounds touched in common. The figures below are what classify() reports on the merged tree.
     // 61 on main, 67 on this branch, 68 on the merged tree at v4477. 69 at v4478: gpuTimer-selfcheck.mjs
     // carries the WGSL compute shader it times, so the gate that measures GPU time is itself WGSL-bearing.
-    wgslBearing: 69,
-    both: 13,
+    // 70 at v4479: blendModes-selfcheck.mjs carries the WGSL quad it draws through both backends.
+    wgslBearing: 70,
+    // 14 at v4479: blendModes-selfcheck.mjs carries BOTH a WGSL quad and its GLSL twin, because the
+    // parity gate draws the same triangle through both backends in one launch.
+    both: 14,
     glslOnly: 132,
     // 48 and 54 respectively -- re-measured for the same reason; 56 at v4478 for the same one file.
     wgslOnly: 56,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs",
+        // v4479: the blend parity gate carries a WGSL quad AND its GLSL twin, because it draws the same
+        // triangle through both backends in one launch. It is a gate rather than a render module, and it is
+        // listed here rather than exempted, because the list is what "both" MEANS and an exemption would hide it.
+        "tools/ship/blendModes-selfcheck.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

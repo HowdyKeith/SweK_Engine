@@ -2550,6 +2550,45 @@ since116: Object.freeze({
                  "the later declaration wins silently and the earlier round's swept count disappears from the " +
                  "surplus arithmetic'. Second time this session. Renumbered forward, never backward.",
     }),
+    // v4479 -- the one hundred and eighteenth closing. Blend state, and a reference that was wrong.
+    since118: Object.freeze({
+        at: "v4479", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/blendModes-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, fourteen checks in five sections, the last drawing through BOTH backends " +
+                 "in one browser launch. MEASURED: `gl.BLEND`, `blendFunc` and `blendEquation` appear ZERO " +
+                 "times in gfx/device.js and its WebGPU fragment target carries no `blend` key, so everything " +
+                 "the device draws is opaque -- which docs/TSL-ROADMAP.md names as the second thing blocking " +
+                 "the Slug text arc, in those words. *** AND THE ROUND OWES A CORRECTION IT CHECKS RATHER THAN " +
+                 "CONFESSES. *** The survey that opened this work cited gfx/device.js line 123 as evidence the " +
+                 "device 'cannot express the state where its backends most visibly disagree'. READ IN FULL " +
+                 "THAT COMMENT IS ABOUT MSAA: a GL canvas defaults to multisampling, WebGPU renders one sample " +
+                 "per pixel, 3,417 of 65,536 pixels differed, and Level 11 fixed it with antialias:false. A " +
+                 "solved problem wearing the word 'blended'. So the gap is real and NARROWER than claimed, and " +
+                 "section 1 holds that correction against device.js's actual bytes so it cannot drift back. It " +
+                 "also answers half the MSAA question before it is asked: MSAA is absent ON PURPOSE, with a " +
+                 "measured reason. Modes travel by NAME (none / alpha / premultiplied / additive) because the " +
+                 "two APIs spell the factors differently -- one-minus-src-alpha against ONE_MINUS_SRC_ALPHA -- " +
+                 "and a descriptor of raw enums could only be right for one backend. A MISSPELLED NAME THROWS " +
+                 "rather than falling back to opaque, because a silent fallback is a wrong picture with no " +
+                 "error beside it. Default stays none, so no pixel this tree already draws moves. *** THE " +
+                 "PARITY GATE FOUND THAT MY REFERENCE WAS WRONG AND BOTH DEVICES WERE RIGHT. *** composite() " +
+                 "did not clamp, so additive over an opaque destination predicted alpha 1.5 -> 383 while WebGL2 " +
+                 "and WebGPU both returned 255. The devices agreed with each other AND with the hardware; the " +
+                 "answer key was the defect. Only a three-way comparison shows that -- a check comparing the " +
+                 "two backends alone would have called 383-against-255 a pass. The clamp is a property of the " +
+                 "TARGET FORMAT, not the blend, so composite() takes the range and defaults to the 8-bit unorm " +
+                 "the device actually offers. All four modes now agree across both backends and with the " +
+                 "arithmetic, and read four DISTINCT pixels -- if blend were ignored every mode would read the " +
+                 "same opaque one and every other check would still pass. Twelve sabotages, ALL RED BY NAME, " +
+                 "three files md5-identical; disabling GL blend read '1 distinct result from 4 modes'. TWO " +
+                 "SELF-REFERENTIAL CATCHES ALONG THE WAY: a comment spelling out the GLSL version directive " +
+                 "made render/backendParity.mjs -- the file that CLASSIFIES shaders by that marker -- classify " +
+                 "itself, v4462's shape again; and the new gate became device.js's THIRD consumer and the " +
+                 "first that is a check rather than a demo, which that module's own report had called out as " +
+                 "missing. Four backendParity ratchets move: glslBearing 145->146, wgslBearing 69->70, both " +
+                 "13->14, glslDirective 129->130.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

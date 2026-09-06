@@ -25,6 +25,7 @@
 
 import { checkHostUniforms } from "../render/wgslLayout.mjs";
 import { parseBindings } from "../render/wgslSpec.mjs";
+import { toWebGPU as _blendWGPU, toGL as _blendGL, resolveBlend as _resolveBlend } from "./blendModes.mjs";
 
 
 // std140-ish uniform layout: compute each uniform's byte offset + the total (padded to 16) so the WebGPU backend can
@@ -85,7 +86,7 @@ function nullBackend(opts = {}) {
                      write: (v, off = 0) => { ops.push(["write", usage[0], off]); if (data && v && v.byteLength) new Uint8Array(data.buffer, data.byteOffset).set(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), off); },
                      destroy: () => ops.push(["destroyBuffer"]) }; },
         read: async (b) => (b && b.data) ? b.data.buffer.slice(b.data.byteOffset, b.data.byteOffset + b.data.byteLength) : new ArrayBuffer(0),
-        pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list",
+        pipeline: (d) => ({ __pipe: true, attributes: d.attributes || [], stride: d.stride || 0, layouts: _vertexLayouts(d), topology: d.topology || "triangle-list", blend: (_resolveBlend(d.blend), d.blend || "none"),
                             bindings: (d.shaders && typeof d.shaders.wgsl === "string") ? parseBindings(d.shaders.wgsl) : [] }),
         compute: (d) => ({ __compute: true, bindings: typeof d.wgsl === "string" ? parseBindings(d.wgsl) : [], _bound: {},
                            bind: function (n, b) { this._bound[n] = b; ops.push(["bind", n, !!(b && b.__buf)]); return this; },
@@ -148,7 +149,7 @@ function webgl2Backend(canvas, opts = {}) {
         read: async (b) => { const out = new Uint8Array(b.size); gl.bindBuffer(b.tgt, b.gl); gl.getBufferSubData(b.tgt, 0, out); return out.buffer; },
         depthTexture: () => null,
         // v4301 -- `topology: "line-list"` draws gl.LINES, the same word the WebGPU pipeline takes; anything else is triangles.
-        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES }),
+        pipeline: (d) => ({ prog: _glProgram(gl, d.shaders.glsl.vertex, d.shaders.glsl.fragment), attributes: d.attributes, stride: d.stride || 0, layouts: _vertexLayouts(d), _u: {}, cull: d.cull || "none", frontFace: d.frontFace || "ccw", blend: _blendGL(d.blend), mode: d.topology === "line-list" ? gl.LINES : gl.TRIANGLES }),
         compute: () => { throw _refuse("webgl2", "compute pipelines", CPU_TWIN); },
         // *** `source` ACCEPTS A CANVAS OR IMAGE, WHICH v4273's FIRST REAL CONSUMER NEEDED AND THIS DID NOT HAVE.
         // *** ui/orreryPost.mjs feeds the orrery's 2D canvas through a post effect, and a post stage's source is
@@ -216,7 +217,12 @@ function webgl2Backend(canvas, opts = {}) {
                 begin: () => { cleared = true; },
                 use: (p) => { gl.useProgram(p.prog); cur = p;
                     if (p.cull && p.cull !== "none") { gl.enable(gl.CULL_FACE); gl.cullFace(p.cull === "front" ? gl.FRONT : gl.BACK); } else gl.disable(gl.CULL_FACE);
-                    gl.frontFace(p.frontFace === "cw" ? gl.CW : gl.CCW); },
+                    gl.frontFace(p.frontFace === "cw" ? gl.CW : gl.CCW);
+                    // v4479 -- blend travels in the descriptor by NAME, beside cull and frontFace, because the
+                    // two APIs spell the factors differently and a name is the thing both backends can keep.
+                    // Default stays "none", so no pixel this tree already draws moves.
+                    if (p.blend) { gl.enable(gl.BLEND); gl.blendEquation(gl[p.blend.equation]); gl.blendFunc(gl[p.blend.src], gl[p.blend.dst]); }
+                    else gl.disable(gl.BLEND); },
                 vertices: (b, slot = 0) => bindSlot(b, slot, 0),
                 instances: (b, byteOffset = 0) => bindSlot(b, 1, byteOffset),
                 indices: (b) => { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.gl); idx = b; },
@@ -405,7 +411,7 @@ async function webgpuBackend(canvas, opts = {}) {
                 attributes: l.attributes.map((a) => ({ shaderLocation: a.location != null ? a.location : loc++, offset: a.offset, format: _attrFormat(a) })) }));
             // Level 13 -- `cull: "back" | "front"` and `frontFace: "ccw" | "cw"` travel in the descriptor, so a terrain
             // sheet drops its underside on both backends by the same words. Default: no culling, as before.
-            const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt }] },
+            const pipe = gpu.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: d.vs || "vs", buffers }, fragment: { module: mod, entryPoint: d.fs || "fs", targets: [{ format: fmt, ...(_blendWGPU(d.blend) ? { blend: _blendWGPU(d.blend) } : {}) }] },
                 primitive: { topology: d.topology || "triangle-list", cullMode: d.cull || "none", frontFace: d.frontFace || "ccw" },
                 ...(depth ? { depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: d.depthWrite !== false, depthCompare: d.depthCompare || "less" } } : {}) });
             const cls = classify(d.shaders.wgsl);
