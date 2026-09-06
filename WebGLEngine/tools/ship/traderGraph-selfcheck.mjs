@@ -57,6 +57,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as T from "../../world/traderGraph.mjs";
 import { SWEEP as LICENCE } from "../../world/licenceSweep.mjs";
+import { stack } from "./refusalStack.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -166,23 +167,54 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
        "are PUBLIC on GitHub; what answered was the proxy in front of it. NOT CLAIMED: that GitHub would " +
        "answer 200 -- nothing here can reach it unproxied, so the premise is UNSUPPORTED, not disproved.");
 
-    // The one that flipped, and why it is not the invitation it looks like.
-    ok("!! the bound repository answers, and that is a fact about SESSIONS rather than about the API",
-       own.code === 200 && own.source === null,
-       `HTTP ${own.code} for the repository this session is bound to, while every unbound path is refused. ` +
-       "THIS IS THE 200 THAT TURNED THE GATE RED at v4480, and reading it as 'the API opened' would have " +
-       "rebuilt the graph on an axis that exists only inside one sandbox.");
+    // ---- *** v4483 -- THIS ROW ASSERTED A 200 AND THE 200 HAS ALREADY GONE. *** ---------------------------
+    //
+    // v4481 wrote `own.code === 200` here: the bound repository answers, therefore the refusals belong to
+    // the session binding. The reasoning was right and THE ASSERTION POINTED THE WRONG WAY. That path is 403
+    // again, with the message world/traderGraph.mjs had recorded for it word for word before the 200 was
+    // ever seen -- "GitHub access is not enabled for this session. An org admin must connect" -- so the gate
+    // went red when the world returned to what the module says the world is, on a tree where nothing about
+    // the repository had changed, and a ship was blocked by an assertion about the box.
+    //
+    // *** IT ALSO INVERTED THIS FILE'S OWN STATED DESIGN, EIGHTY LINES ABOVE: "If an axis OPENS, this goes
+    // red, and that red means 'go and use the thing you said you could not use'." *** An assertion that a
+    // path ANSWERS goes red when the path CLOSES. The direction is restored here, and what is asserted is
+    // the pair that is a finding in either case: the recorded axes are STILL SHUT, and every refusal can be
+    // named. The codes themselves are REPORTED against the frozen readings, because a status code is a
+    // reading of one box at one moment and this file has now been bitten once by freezing one.
+    const s = stack([
+        { path: "users/but0n", code: user.code, body: user.body },
+        { path: "repos/but0n/vixel", code: repo.code, body: repo.body },
+        { path: "repos/howdykeith/swek_engine/contributors", code: own.code, body: own.body },
+    ]);
+    for (const r of s.rows)
+        report(`${r.path.padEnd(42)} ${r.code}  ${r.open ? "OPEN" : (r.gate || "*** UNNAMED REFUSAL ***")}`);
+
+    ok("!! *** THE RECORDED AXES ARE STILL SHUT -- and one OPENING is the red worth having ***",
+       s.open.length === 0,
+       s.open.length ? "OPEN: " + s.open.join(", ") + " -- GO AND USE IT: the graph can be built from richer "
+                     + "data than git history and world/traderGraph.mjs should be revisited"
+                     : `${s.refused.length} refused, ${s.distinctGates} distinct gates. This is the direction `
+                     + "the header states and the direction v4481 reversed by asserting a 200.");
+    ok("!! ...and every refusal is NAMEABLE, so the stack's record is current",
+       s.unnamed.length === 0 && s.byRunner === s.refused.length && s.byGithub === 0,
+       s.unnamed.length ? "UNNAMED: " + s.unnamed.join(", ") + " -- the proxy reworded and tools/ship/"
+                        + "refusalStack.mjs must be re-taken"
+                        : `all ${s.refused.length} attributed to the runner, each to its own gate`);
+    ok("!! ...and they are THREE DIFFERENT GATES held by three different people, not one shut door",
+       s.distinctGates === 3,
+       "path-class (nobody here), repo-not-attached (this session, add_repo), org-not-connected (an org " +
+       "admin). Clearing one clears nothing about the other two, and 'the API is shut' hides all of that");
 
     ok("CONTROL: the network is up, so the refusals are refusals and not a dead link",
        lim.code === 200, "rate_limit answers 200 on the same connection -- and its limit is 15000, which is " +
        "an AUTHENTICATED limit, so this control has always been measuring a credentialed proxied connection");
 
-    report("v4481: the old invitation read 'if any line above goes red with a 200, the graph can be built " +
-        "from richer data than git history and this module should be revisited.' THE REASON IS RETIRED AND " +
-        "THE QUESTION IS NOT: a 200 from here means the path is inside THIS SESSION'S binding, so it is an " +
-        "invitation only when it arrives from a runner with no such binding. Run this unproxied on the rig " +
-        "and the answer it gives is about GitHub. A red here is still worth reading; it is just not evidence " +
-        "of what it used to be read as.");
+    report("THE INVITATION, RESTATED AND NOW POINTING THE RIGHT WAY: a 200 on any row above is a red, and " +
+        "that red means go and use the axis. It is worth acting on only from a runner with no binding of " +
+        "its own -- run this unproxied on the rig and the answer it gives is about GitHub. What is NOT an " +
+        "invitation is a 200 arriving because this session happens to be bound to the repository, which is " +
+        "the reading that produced v4481's assertion and cost a round.");
 }
 
 console.log("\n3. THE SWEEP, AND THAT IT COVERS WHAT IT CLAIMS");

@@ -2654,6 +2654,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "was reaching for: the number is MEASURED every round, never incremented, and a reason " +
                  "invented to explain a count is worth less than re-taking it.",
     }),
+    since122: Object.freeze({
+        at: "v4483", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/refusalStack-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/traderGraph-selfcheck.mjs (its section 2 assertion was pointing the wrong way and is reversed; it now imports stack() instead of pinning a status code)"]),
+        verdict: "green, five sections. *** A GATE WAS REWRITTEN TO ASSERT A READING OF THE BOX IT RUNS IN, " +
+                 "AND THE READING HAD ALREADY REVERTED BY THE NEXT ROUND. *** v4481 found, correctly, that " +
+                 "the three GitHub refusals this runner meets are the RUNNER'S and not GitHub's -- the " +
+                 "evidence being that the bound repository answered 200 while every unbound path was refused. " +
+                 "It then wrote that 200 into traderGraph-selfcheck as an assertion. The path is 403 again at " +
+                 "v4483, with the message world/traderGraph.mjs had recorded for it WORD FOR WORD before the " +
+                 "200 was ever seen, so the gate went red when the world returned to what the module says the " +
+                 "world is, on a tree where nothing about the repository had changed. IT ALSO INVERTED THE " +
+                 "FILE'S OWN STATED DESIGN, written eighty lines above the assertion: 'if an axis OPENS, this " +
+                 "goes red, and that red means go and use the thing you said you could not use.' An assertion " +
+                 "that a path ANSWERS goes red when the path CLOSES. *** AND PROBING ALL FOUR PATHS AGAIN " +
+                 "SHOWED THE REFUSALS ARE NOT ONE FACT BUT THREE INDEPENDENT GATES: *** the path class is " +
+                 "refused with no remedy from here; the repository is not attached, which THIS SESSION can " +
+                 "clear with add_repo; and the org has not connected the app, which only an org admin can " +
+                 "clear. Three messages, three remedies, three different people, and clearing one clears " +
+                 "nothing about the other two -- all of it hidden inside 'the API is shut'. NEW " +
+                 "tools/ship/refusalStack.mjs names the gates and classifies a refusal by its own words, with " +
+                 "an unrecognised body returning null rather than falling through, because a classifier that " +
+                 "always answers cannot say the record is stale. SIX SABOTAGES: A 3, B 3, C 0-then-2, D " +
+                 "1-then-2, E 2, F 1. C WENT ZERO BECAUSE EVERY FIXTURE WAS A 200 OR A 403 and the openness " +
+                 "rule was never driven off its two known values -- a 301 fixture now separates 'not an " +
+                 "error' from 'the data arrived'. The traderGraph assertion is reversed to the direction its " +
+                 "header states: the axes are still shut, every refusal is nameable, and an axis OPENING is " +
+                 "the red.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

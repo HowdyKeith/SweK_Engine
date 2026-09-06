@@ -82,6 +82,7 @@ export const OWES = Object.freeze({
     timing: "a new gate owes tools/ship/sweep-timings.json a runtime and a capture stamp",
     assertion: "a gate defining its own ok() moves tools/ship/assertionShape.mjs's census",
     runtimeGap: "any new .mjs moves vba/runtimeGap.mjs's twelve-row capability census",
+    index: "a new gate owes knowledge-index.json a rebuild, and every check reading it owes nothing until it has one",
 });
 
 /**
@@ -111,13 +112,39 @@ export async function checks({ load = null, timings = null } = {}) {
         detail: `${cc.summedUncovered} gate(s) no closing names, ${cc.duplicates.length} duplicate claim(s)`,
     });
 
+    // ---- *** v4483 -- THE KNOWLEDGE INDEX IS ITSELF A DERIVED RECORD, AND THE REGISTRY CHECK READS IT. ***
+    //
+    // registryOrphans.scan() walks knowledge-index.json's gate list. That file is rebuilt by a ship step, so
+    // on the round that ADDS a gate it does not yet contain it -- and the registry check reported "no module
+    // with reportLines lacks an entry" about a module that had no entry. *** A CHECK THAT CANNOT FAIL FOR
+    // THE ONE POPULATION IT EXISTS TO WATCH, *** in the file written to catch exactly that, found by using
+    // it on the next round. The fix is not to re-derive the orphan rule here -- two definitions of one rule
+    // is the defect this module avoided by exporting `sources` -- but to check the INPUT and say so, so the
+    // registry answer is never read as clean when it was computed from yesterday's tree.
+    const onDisk = A.gateFiles(ENG).length;
+    const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
+    const indexStale = K.gates.length !== onDisk;
+    out.push({
+        name: "knowledge index", owes: OWES.index,
+        recorded: K.gates.length, actual: onDisk,
+        stale: indexStale,
+        detail: indexStale ? `index lists ${K.gates.length} gates, disk holds ${onDisk}`
+                           : `${onDisk} gates, index agrees`,
+    });
+
     const R = await mod("./registryOrphans.mjs");
     const rs = R.scan();
     out.push({
         name: "instrument registry", owes: OWES.registry,
         recorded: 0, actual: rs.narrow.length,
-        stale: rs.narrow.length > 0,
-        detail: rs.narrow.length ? rs.narrow.map((n) => n.module).join(", ") : "no module with reportLines lacks an entry",
+        // *** UNANSWERABLE, NOT CLEAN. *** With a stale index this check has not seen the new gate at all,
+        // so a zero from it is an absence of evidence. v4402: an absence read as a skip is an absence read
+        // as a pass. It reports stale until its own input is current.
+        stale: rs.narrow.length > 0 || indexStale,
+        detail: rs.narrow.length ? rs.narrow.map((n) => n.module).join(", ")
+              : indexStale ? "UNANSWERABLE until knowledge-index.json is rebuilt -- this check reads it, and "
+                           + "it does not yet list every gate on disk"
+              : "no module with reportLines lacks an entry",
     });
 
     // *** INJECTABLE, BECAUSE THE FIRST DRAFT'S CONTROL FOR THIS CHECK WAS VACUOUS. *** It asserted a fact
@@ -164,8 +191,15 @@ export const DRIFT_AT_V4482 = Object.freeze({
         Object.freeze({ round: "v4480", records: 4 }),
         Object.freeze({ round: "v4481", records: 4 }),
     ]),
-    checked: 4, notChecked: 1,
+    checked: 5, notChecked: 1,
     // milliseconds, measured on this box
-    cost: Object.freeze({ assertionShape: 195, closingCoverage: 19, registryOrphans: 24, gateFiles: 12 }),
+    cost: Object.freeze({ assertionShape: 195, closingCoverage: 19, registryOrphans: 24, gateFiles: 12,
+                          knowledgeIndex: 41 }),
     verifyMs: 300000,
+    // *** THE FIFTH CHECK WAS ADDED AT v4483 BECAUSE THE THIRD ONE COULD NOT FAIL. *** The registry check
+    // reads knowledge-index.json, which is a derived record rebuilt by a ship step, so on the round that
+    // adds a gate it answers from a tree that does not contain it -- and it reported clean about a module
+    // with no entry. Found by RUNNING this file on the round after it shipped, which is the only way a
+    // detector whose zero was never driven gets found.
+    fifthAddedAt: "v4483",
 });

@@ -181,6 +181,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
+    // v4483 -- 3882, MEASURED. A SEVENTH re-derivation in seven rounds. This round's two files are ES
+    // modules using closures and NOT using await, so exactly two rows moved by two and ten did not move at
+    // all -- and async/await stayed at 1342, which last round moved. A census whose rows all move together
+    // under a two-file addition would be measuring the tree's size; two of twelve moving is the shape that
+    // says the patterns discriminate. THREADS HAVE READ 22 THROUGH ALL SEVEN.
     // v4482 -- 3880, MEASURED, AND RE-TAKEN A SECOND TIME IN THE SAME ROUND: the first reading of 3879 was
     // taken after recordDrift.mjs existed and before its gate did, and it was stale by the time the file it
     // was measuring the cost of was finished. The ship verify caught it, not me. That is a SIXTH
@@ -194,7 +199,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
     // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
     // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
-    files: 3880,
+    files: 3882,
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -205,7 +210,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // use closures and await, so three rows moved by exactly two each and the other nine did not move at all.
     // A census whose rows move together under a two-file addition would be measuring the tree's size rather
     // than its capabilities; three of twelve moving is the shape that says the patterns are discriminating.
-    esModules: 3589, closures: 3465, asyncAwait: 1342, typedArrays: 691, promises: 332,
+    esModules: 3591, closures: 3467, asyncAwait: 1342, typedArrays: 691, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

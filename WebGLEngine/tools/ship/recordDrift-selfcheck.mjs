@@ -133,9 +133,20 @@ console.log("\n2b. drift() splits what checks() returns, and that split is grade
     const fake = { ...real, SHAPE_AT_V4480: Object.freeze({ ...real.SHAPE_AT_V4480, definesOk: 1, gates: 1 }) };
     const loader = async (p) => (p.includes("assertionShape") ? fake : import(p));
     const d = await drift({ load: loader });
+    // *** AND THIS CONTROL MADE THE SAME MISTAKE SECTION 2 ALREADY RECORDS, IN THE SAME FILE. *** Its first
+    // draft asserted `d.stale.length === 1` -- a clean tree with exactly this fixture's one stale record --
+    // and went red the moment a round with its own new gate ran it, which is every round that will ever use
+    // this file. Section 2 had already been bitten and had already written the rule down: compare against
+    // the LIVE baseline, not against zero. Writing a lesson at the top of a file does not apply it eighty
+    // lines down.
+    const base = live.stale.filter((c) => c.name !== "assertionShape census").length;
+    const wasAlready = live.stale.some((c) => c.name === "assertionShape census");
     ok("!! drift() reports the stale record in `stale` and ALL of them in `all`",
-        d.stale.length === 1 && d.stale[0].name === "assertionShape census" && d.all.length === REC.checked,
-        "sabotage A: 'everything fresh' empties this; sabotage F: 'everything stale' fills it");
+        d.stale.some((c) => c.name === "assertionShape census") &&
+        d.stale.length === base + 1 && d.all.length === REC.checked,
+        `sabotage A: 'everything fresh' empties this; sabotage F: 'everything stale' fills it. Baseline ` +
+        `${base} stale beside it${wasAlready ? " (and it is stale on the live tree too, so the fixture only " +
+        "keeps it stale)" : ""}`);
     ok("...and every member of `stale` is also in `all`, with the same verdict",
         d.stale.every((c) => d.all.some((a) => a.name === c.name && a.stale === true)));
     ok("on the live tree the partition holds too",

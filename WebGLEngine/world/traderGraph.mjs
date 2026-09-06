@@ -107,7 +107,11 @@ export const REFUSAL_ATTRIBUTION_V4481 = Object.freeze({
         Object.freeze({ path: "users/but0n", status: 403, source: "runner", publicOnGitHub: true }),
         Object.freeze({ path: "repos/but0n/vixel", status: 403, source: "runner", publicOnGitHub: true }),
         Object.freeze({ path: "repos/howdykeith/swek_engine/contributors", status: 200, source: "github",
-            note: "the bound repository, so the proxy lets it through -- this is the 200 that turned the gate red" }),
+            note: "the bound repository, so the proxy lets it through -- this is the 200 that turned the gate " +
+                  "red. *** IT READ 403 AGAIN AT v4483 and the reading is left here as taken: this is what " +
+                  "v4481 measured, and a record that is edited when the world moves is not a record. What it " +
+                  "supports is narrower than it was read as -- the axis WAS open once, which is why its gate " +
+                  "is the org's grant rather than the session's binding" }),
         Object.freeze({ path: "rate_limit", status: 200, source: "github",
             note: "limit 15000, an AUTHENTICATED limit: the control for 'the network is up' was measuring a " +
                   "credentialed proxied connection, not an anonymous one" }),
@@ -137,8 +141,12 @@ export const AXES = Object.freeze([
     Object.freeze({ axis: "our own repo's contributors", have: false, blockedBy: RUNNER,
         blocked: "GitHub access is not enabled for this session. An org admin must connect",
         remedy: "an org admin connects GitHub for the account",
-        note: "v4481: this one now ANSWERS 200 from a session bound to this repository -- the axis is open " +
-              "for the runner that owns the repo and shut for every other, which is a fact about sessions" }),
+        note: "v4481 annotated this row 'now ANSWERS 200 from a session bound to this repository'. IT IS 403 " +
+              "AGAIN at v4483, with the message recorded in `blocked` above word for word -- so the RECORD " +
+              "WAS RIGHT AND THE ANNOTATION FROZE A TRANSIENT. The 200 was real and it was a reading of one " +
+              "box at one moment; traderGraph-selfcheck asserted it and went red when the world came back to " +
+              "what this row already said. What survives is the fact the 200 revealed: this gate is the ORG'S " +
+              "and not the session's, so add_repo cannot clear it -- see tools/ship/refusalStack.mjs" }),
     Object.freeze({ axis: "a contributor's profile, their other repos, followers", have: false, blockedBy: RUNNER,
         blocked: "This GitHub API path is not available: sessions are bound to their configured repositories",
         remedy: "NONE from here -- the whole /users path class is refused by the RUNNER, not rate-limited " +
