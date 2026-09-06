@@ -4,13 +4,13 @@
 // NODE/BUN. MEASURED, THREADS ARE THE SECOND-SMALLEST GAP OF TWELVE, AND THE QUESTION HAS ITS SCALE INVERTED. ***
 //
 // The item's phrasing carries an assumption -- that threads are the big one and the rest is detail. Counted
-// over the 3,874 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
+// over the 3,876 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
 //
-//     ES modules              3583 files   92.5%
-//     closures as values      3459 files   89.3%
-//     async / await           1336 files   34.5%
+//     ES modules              3585 files   92.5%
+//     closures as values      3461 files   89.3%
+//     async / await           1337 files   34.5%
 //     typed arrays             691 files   17.8%
-//     Promises                 332 files    8.6%
+//     Promises                 333 files    8.6%
 //     fetch / XHR              224 files    5.8%
 //     performance.now          202 files    5.3%
 //     requestAnimationFrame    116 files    3.1%
@@ -19,7 +19,7 @@
 //     workers / threads         22 files    0.6%     <-- the thing the item asks "besides"
 //     WebAssembly               22 files    0.6%   <-- tied with it, and the tie is this round's own doing
 //
-// *** FIRST-CLASS FUNCTIONS ARE 157 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,459 files against 22. A
+// *** FIRST-CLASS FUNCTIONS ARE 157 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,461 files against 22. A
 // runtime that had threads and no closures could run 0.6% of what a runtime with closures and no threads
 // could. So the answer to "what is missing besides threads" is: nearly all of it, and threads barely register.
 //
@@ -186,8 +186,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3874,
-    esModules: 3583, closures: 3459, asyncAwait: 1336, typedArrays: 691, promises: 332,
+    files: 3876,
+    esModules: 3585, closures: 3461, asyncAwait: 1337, typedArrays: 691, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -208,7 +208,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 157,     // 3459 / 22, rounded
+    closuresOverThreads: 157,     // 3461 / 22, rounded
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

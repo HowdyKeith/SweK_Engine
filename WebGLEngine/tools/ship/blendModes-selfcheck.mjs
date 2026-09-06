@@ -32,7 +32,13 @@ const near = (a, b, e = 1 / 255) => Math.abs(a - b) <= e;
 // ---- 1. *** THE CORRECTION, HELD AGAINST device.js ITSELF *** ------------------------------------------------
 {
     const dev = fs.readFileSync(path.join(ENG, "gfx", "device.js"), "utf8");
-    const line123 = dev.split("\n").slice(118, 126).join(" ");
+    // *** FOUND BY CONTENT, NOT BY LINE NUMBER. *** The first draft read dev.split("\n").slice(118, 126) --
+    // a hard-coded range -- and v4480 inserted a function ABOVE it in the same file, which moved the comment
+    // and turned this check red one round later. A gate anchored to a line number is a gate that any edit
+    // above it breaks, and the edit that broke it was mine. The anchor is the sentence itself now.
+    const lines = dev.split("\n");
+    const at = lines.findIndex((l) => /antialias OFF by default/.test(l));
+    const line123 = at >= 0 ? lines.slice(at, at + 8).join(" ") : "";
     say(`gfx/device.js's antialias comment, in its own words: "...${line123.replace(/\s+/g, " ").slice(60, 210)}..."`);
     ok("!! the comment the survey cited is about MSAA, not alpha -- the correction is checked, not confessed",
         /antialias/i.test(line123) && /MSAA|multisample|antialias/i.test(line123) &&

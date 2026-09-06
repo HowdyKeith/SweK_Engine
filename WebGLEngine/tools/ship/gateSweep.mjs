@@ -2589,6 +2589,44 @@ since116: Object.freeze({
                  "missing. Four backendParity ratchets move: glslBearing 145->146, wgslBearing 69->70, both " +
                  "13->14, glslDirective 129->130.",
     }),
+    // v4480 -- the one hundred and nineteenth closing. Four gaps closed, and three of them were not gaps.
+    since119: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pipelineGaps-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, thirteen checks in five sections. The last four items of the TSL/WebGPU " +
+                 "survey Keith asked for, and *** THREE OF THE SIX FINDINGS WERE WRONG, WHICH IS THE ROUND. *** " +
+                 "DEVICE LOSS was real and is fixed: blackhole.html, fluid-webgpu.html and mpm-gpu.html each " +
+                 "wired device.lost and gfx/device.js, the layer they all go through, did not -- the one-off " +
+                 "demos were more robust than the abstraction -- and pushErrorScope / uncapturederror appeared " +
+                 "in exactly three files, ALL OF THEM GATES, so the test harness caught the validation errors " +
+                 "the running engine dropped. Both live in device.js now, with reason 'destroyed' excluded " +
+                 "because a deliberate teardown is not a fault. *** TSL AT BUILD TIME ALREADY EXISTED AND THE " +
+                 "SURVEY MISSED IT: *** tools/ship/tsl-emitted-{race,physics,compute}.json are already there, " +
+                 "stamped with the round that wrote them and the three version that emitted them, with five " +
+                 "readers. What is missing is not a compiler, it is REPRODUCIBILITY -- all three gates re-emit " +
+                 "on every run and then assert the file exists and is over a thousand characters; nothing " +
+                 "compares a fresh emit to the stored text. *** RENDER BUNDLES ARE REFUSED BY ARITHMETIC: *** " +
+                 "gpuDriven.mjs already draws per (fleet, LOD) region through drawIndexedIndirect with " +
+                 "instancing, so ten races times five LODs is FIFTY indirect draws at the ceiling and a bundle " +
+                 "would amortise nothing (#133). And MSAA is absent ON PURPOSE, settled at v4479. Three name " +
+                 "collisions are recorded in #144's family, each with the file that proves it: Fn( is a WASM " +
+                 "export lookup and not three's Fn, `blend` in device.js was one COMMENT, and sampleCount " +
+                 "counts DATA samples in MtoRenderer. All three made a grep read the opposite of the truth, " +
+                 "which is how the survey went wrong. Twelve sabotages, ALL RED BY NAME, three files " +
+                 "md5-identical. *** FOUR COST ZERO RED FIRST AND ALL FOUR WERE ONE FAMILY: the checks tested " +
+                 "TEXT OR SHAPE RATHER THAN BEHAVIOUR. *** Wrapping the loss wiring in `if (false && ...)` left " +
+                 "every token a grep looks for and passed -- v4450's finding verbatim, 'an assertion about " +
+                 "where text sits is satisfied by a branch that is present and dead' -- so the wiring is an " +
+                 "exported function now and the gate CALLS it with a stub device and watches the callbacks " +
+                 "fire. A collision row renamed to a nonexistent token passed because the check grepped three " +
+                 "HARD-CODED strings instead of reading the row's own token. And a claim shortened to four " +
+                 "words passed an inequality test. TWO CORRECTIONS TO MY OWN EARLIER ROUNDS ALONG THE WAY: a " +
+                 "prose regex here went red because device.js wraps 'Parity is / the promise' across a line -- " +
+                 "the same unwrapping defect v4463 fixed and gateQuality names, third instance in three " +
+                 "rounds; and v4479's blend gate read a HARD-CODED LINE RANGE of device.js, which this round's " +
+                 "own insertion moved, so it is anchored to the sentence rather than the line number now.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
