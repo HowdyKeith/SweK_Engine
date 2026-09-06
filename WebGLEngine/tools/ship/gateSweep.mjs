@@ -2725,6 +2725,26 @@ since116: Object.freeze({
                  "boundary driven either side rather than asserted. NOTHING IS RECLASSIFIED: the criterion " +
                  "exists and acting on it changes what `keyless` means, which is the round this makes possible",
     }),
+    since127: Object.freeze({
+        at: "v4488", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/sensitivitySweep-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/libmSensitivity-selfcheck.mjs (its header stated ~150s and was never a measurement -- the sweep has no finite runtime, and the corrected figure is 1196.3s over 120 of 128 devices)",
+            "tools/roundhouse/libmSensitivity.mjs (v4487's floor finding was ANTICIPATED at v2905 by the gate beside it, which also named the remedy -- recorded, with the six-of-66 disagreement that makes the new criterion earn its place anyway)",
+        ]),
+        verdict: "*** THE GATE THAT COULD NOT BE RUN WAS THE ONE THAT ALREADY HELD THE ANSWER. *** " +
+                 "libmSensitivity-selfcheck has classified near-zero movers and used the phrase 'floor " +
+                 "artefact' since v2905, and named the remedy; v4487 re-derived it as new because that gate " +
+                 "does not return -- forty minutes against a stated 150s. MEASURED: 128 devices, 484 modes, " +
+                 "1196.7s, and EIGHT devices never finish. A skip list does not fix it and that was tested " +
+                 "first: with all eight declined in-process the sweep still exceeded 900s, because " +
+                 "instrumenting Math deoptimises those callsites for the rest of the process -- the same 120 " +
+                 "devices cost 476.7s in separate processes and over 900s in one. New sensitivityOne.mjs + " +
+                 "sensitivitySweep.mjs terminate at 1196.3s, reproducing the probe to four tenths of a second, " +
+                 "and NAME the eight. The new criterion survives the correction: it disagrees with the v2905 " +
+                 "magnitude rule on six of 66 movers, in both directions. Three sabotages, three red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

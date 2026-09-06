@@ -226,8 +226,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // incrementing a count from the previous note instead of taking it. TWELFTH TABLE, ONE UNCHANGED HEADLINE:
     // threads and WebAssembly have read 22 through every one, and that row has never moved for a reason about
     // threads. closuresOverThreads is a getter since v4486 and needs no hand here at all.
-    files: 3881,
-    esModules: 3590, closures: 3466, asyncAwait: 1341, typedArrays: 694, promises: 332,
+    // A THIRTEENTH TIME, v4488: sensitivityOne.mjs, sensitivitySweep.mjs and its gate, 3881 -> 3884, moving
+    // three rows by three each. RE-DERIVED FROM THE RUN -- three rounds running now, against the three notes
+    // v4485 found had incremented a count from the previous note instead of taking it. THIRTEENTH TABLE, ONE
+    // UNCHANGED HEADLINE: threads and WebAssembly have read 22 through every one of them.
+    files: 3884,
+    esModules: 3593, closures: 3468, asyncAwait: 1344, typedArrays: 694, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

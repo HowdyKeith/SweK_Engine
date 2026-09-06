@@ -37,11 +37,18 @@ export const NEXT_ROUNDS = [
         why: "v4480 wrote 'earn a portability tolerance for each of the seven refinement knobs' as the next round. v4484 attempted it and found the task cannot be done as specified: a tolerance taken from relMove is compared against the number it came from, so the pass stops being contingent and the evidence string does not change. THE TOLERANCE IS NOT MISSING, THE CHECK IS MISNAMED. Closing this means either renaming c4 to what it measures, or wiring it to the submission ledger so it grades a real second machine -- and that second option is blocked on the same thing everything else here is: nothing has submitted.",
     },
     {
-        id: "libm-sensitivity-runtime",
+        id: "eight-that-never-finish",
         blocker: "OPEN",
-        what: "libmSensitivity-selfcheck states ~150s and does not finish in 31 minutes, and the timing record holds a kill rather than a runtime.",
-        how: "Its header reads \"~150s: three builds of the whole lab\". Run on an idle box at v4487 it passed two checks and then sat in libmSensitivitySweep for 31 minutes without returning. tools/ship/sweep-timings.json records 20,022 ms for it -- the quick sweep's cap, so that number is a KILL and not a measurement, which is the shape v4485 found in the register audit. Closing this means timing it to completion once, or giving the sweep a per-mode child-process budget the way wideSweep.mjs got at v4486.",
-        why: "v4487 added five checks to the end of that file and could not see them run in-gate; they were driven directly instead and all five pass. A gate nobody can afford to run is a gate whose new checks are unverified in place, and a stated runtime twelve times under the truth is exactly what statedRuntime-selfcheck exists to catch -- it cannot, because a gate that never returns leaves no reading to compare.",
+        what: "Eight devices cannot be swept by the libm battery at all, and one of them blocks a second, unrelated instrument.",
+        how: "MEASURED at v4488 under a 90s per-device cap: em, optics, kh, kuramoto, hydrostatic, twof, stability and flip3d never return. sensitivitySweep.mjs kills and names them so the sweep terminates, which is a report of absence rather than a fix. Closing this means finding what is unbounded inside each -- v4486 traced the same shape in optics.converge to adaptive quadrature with no step budget -- and giving it a budget of its own.",
+        why: "optics is on this list AND is the device v4486 found unmeasurable for the corroboration battery, so two independent instruments are now blocked on the same subject. Eight of 128 devices being permanently unmeasurable is a hole in every lab-wide claim the sensitivity sweep makes, and it has been invisible because the gate above it never returned to report it.",
+    },
+    {
+        id: "libm-gate-still-unrunnable",
+        blocker: "OPEN",
+        what: "libmSensitivity-selfcheck still cannot be run here, so v4487's five checks are verified by direct drive rather than in place.",
+        how: "The gate calls libmSensitivitySweep in-process. v4488 measured that arrangement at over 900s even with the eight non-finishers declined, against 476.7s for the same 120 devices in separate processes -- instrumenting Math deoptimises those callsites for the rest of the run, so every device pays for the ones before it. Pointing the gate at sensitivitySweepBudgeted would make it terminate, but its assertions count over a population that would then exclude eight devices, and several name specific devices by hand.",
+        why: "A gate that cannot be run is a gate whose knowledge is unreachable -- which is not hypothetical here: v4487 re-derived a v2905 finding from that very file because nobody could read its output. The header is corrected and the cost is measured; what remains is deciding whether its lab-wide counts survive an eight-device absence.",
     },
     {
         id: "act-on-the-floor",

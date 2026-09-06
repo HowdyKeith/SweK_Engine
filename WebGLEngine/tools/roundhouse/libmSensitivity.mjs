@@ -104,6 +104,22 @@ const bitsOf = (x) => { _dv.setFloat64(0, x); return _dv.getBigUint64(0).toStrin
  *   quantum.bands.insideGapWorst  base 1.075e+0,  moved 2.220e-16  -> 15.68 digits. Fully resolved, and it is
  *                                 named "Worst" exactly like the one above.
  *
+ * *** AND THIS IDEA WAS NOT NEW AT v4487, WHICH THAT ROUND DID NOT SAY. *** libmSensitivity-selfcheck has
+ * classified movers by |base| <= 1e-6 since v2905 -- "where a large RELATIVE move is meaningless" -- calls the
+ * alternative a "floor artefact" in as many words, and already named the remedy: such quantities "should be
+ * reported as bounds or with their conditioning attached, not as values a second machine will reproduce".
+ * v4487 presented the floor as a discovery. IT DID NOT SEE THE PRIOR ART BECAUSE THAT GATE DOES NOT RETURN --
+ * forty minutes against a stated 150s, measured at v4488 -- so its output had never been read in this session.
+ *
+ * WHAT IS ACTUALLY NEW IS THE SCALE-FREE CRITERION, AND IT EARNS ITS PLACE BY DISAGREEING. The 1e-6 threshold
+ * is a typed magnitude; this is a ratio of the value to its own movement. Over the 66 movers of the eligible
+ * lab they agree on 60 and DISAGREE ON SIX, in both directions: kepler.kepler3.slopeErrFrac (base 9.33e-15),
+ * kepler.startspeed.slopeErrFrac, optics.edge.edgeFirstFringeErrFrac (5.95e-12) and quantum.norm.normDrift
+ * (2.33e-13) are all called meaningless by the threshold and keep 1.80 to 4.57 digits; while
+ * chaos.feigenbaum.deltaSpread (base 1.10e-1) and deltaErrFrac (1.71e-3) sit well above 1e-6 and keep NONE.
+ * The threshold is wrong in both directions on 9% of the population, which is the same shape v4487 found in
+ * the name rule it declined to adopt -- a proxy for a quantity, standing in for the quantity.
+ *
  * *** v4486 PROPOSED CATCHING THESE BY WIDENING A NAME VOCABULARY AND v4487 MEASURED THAT IT WOULD BE WRONG IN
  * BOTH DIRECTIONS. *** Adding drift|worst|mismatch|violation to KEYED_RE reclassifies 13 of the 117 keyless
  * observables; MEASURED, only 2 of those 13 carry no significant digit, and the other eleven retain between
@@ -156,7 +172,29 @@ export function diffObservables(base, pert) {
  * `attribute` additionally perturbs one function at a time for the modes that moved, naming WHICH transcendental
  * each sensitive observable depends on. That costs one extra build per candidate function, so it is opt-in.
  */
-export async function libmSensitivitySweep({ modes = null, attribute = false, verbose = false } = {}) {
+/**
+ * *** DEVICES THIS SWEEP CANNOT FINISH, MEASURED RATHER THAN SUSPECTED. *** v4488 ran every device's slice in
+ * its own process under a 90 s cap: 128 devices, 484 modes, 1196.7 s in total, and these EIGHT hit the cap.
+ * Uncapped the sweep has no finite runtime at all, which is why libmSensitivity-selfcheck states "~150s" in its
+ * header and did not return in forty minutes on an idle box.
+ *
+ * THE COST IS STRUCTURAL: three builds per mode -- instrumented, control, perturbed -- and instrumenting Math
+ * deoptimises those call sites for the rest of the process, so the whole run is slower than any one build
+ * suggests. That is this file's own note, one screen up, and it is the reason a cheap sweep is not available by
+ * tuning.
+ *
+ * SKIPPED BY NAME, NOT BY A TIMER, which is corroborationCensus's rule: "a build already running cannot be
+ * interrupted, so one long build overruns any budget". Declining to START is the only budget that works
+ * in-process, and the skip list is returned so a caller reports absence rather than inferring completeness.
+ */
+export const SLOW_DEVICES = Object.freeze([
+    "em", "optics", "kh", "kuramoto", "hydrostatic", "twof", "stability", "flip3d",
+]);
+
+export async function libmSensitivitySweep({ modes = null, attribute = false, verbose = false,
+                                             skip = SLOW_DEVICES } = {}) {
+    const skipSet = new Set(skip || []);
+    const skipped = [];
     // v3211 -- BUILT, NOT LISTED, AND IT REFUSES AN EMPTY TABLE. A caller may still pass its own.
     if (!modes) modes = await deviceModeTable();
     const rows = [];
@@ -165,6 +203,8 @@ export async function libmSensitivitySweep({ modes = null, attribute = false, ve
     for (const name of DEVICE_NAMES) {
         const ms = modes[name];
         if (!ms) continue;
+        // v4488 -- declined BEFORE the first build, which is the only point at which a cost can still be avoided.
+        if (skipSet.has(name)) { skipped.push(name); continue; }
         let dev;
         try { dev = await getDevice(name); } catch { continue; }
 
@@ -227,6 +267,9 @@ export async function libmSensitivitySweep({ modes = null, attribute = false, ve
     const unkeyed = all.filter((f) => !f.keyed);
     return {
         rows, determinismFailures,
+        // NAMED, so a reader sees an absence rather than assuming the lab was covered. Every count below is
+        // over the devices that RAN.
+        skipped,
         summary: {
             deviceModes: rows.length,
             observables: all.length,

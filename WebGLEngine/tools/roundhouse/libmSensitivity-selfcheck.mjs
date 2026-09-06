@@ -1,6 +1,13 @@
 // tools/roundhouse/libmSensitivity-selfcheck.mjs
 //
-// Run: node tools/roundhouse/libmSensitivity-selfcheck.mjs   (~150s: three builds of the whole lab)
+// Run: node tools/roundhouse/libmSensitivity-selfcheck.mjs
+//
+// *** RUNTIME: NOT ~150s, AND NOT BOUNDED. *** That figure sat here unmeasured. At v4488 this gate ran FORTY
+// MINUTES on an idle box without returning, and the sweep underneath it has no finite runtime: EIGHT devices
+// never finish (em, optics, kh, kuramoto, hydrostatic, twof, stability, flip3d), and declining all eight
+// in-process still exceeded 900 s. Measured properly -- one child process per device, 90 s cap --
+// the whole lab is 1196.3 s over 120 devices, 450 modes, 3305 observables. See tools/roundhouse/
+// sensitivitySweep.mjs, which is the only arrangement in which this terminates.
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2905 -- THE CENSUS'S OWN CAVEAT, MEASURED.
