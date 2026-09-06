@@ -21,8 +21,7 @@
 // the emissive flag used to be, so a body fleet takes its colour from its mesh.
 "use strict";
 import { worldFromModule, TICKER } from "./slugTicker.mjs";
-import { LAYOUTS, renderPipelineDesc } from "./gpuDriven.mjs";
-import { litBind, litVertexGlsl } from "./litSphere.mjs";
+import { litBind, litWgsl, litVertexGlsl, litFragmentGlsl, litPipelineDesc } from "./litSphere.mjs";
 import { boxMesh } from "./buildingLab.mjs";
 import { SUN } from "./voxelDevice.mjs";
 import { editScene } from "./voxelDeviceEdit.mjs";
@@ -103,60 +102,9 @@ export function createBodyWorld(m, world, opts = {}) {
     return bw;
 }
 
-// ---- the body pipeline: litSphere's lit shader with the quaternion in `extra` ------------------------------------------------
-const f6 = (v) => (Number.isFinite(v) ? v : 0).toFixed(6);
-export function bodyLitWgsl() {
-    return `
-struct Cam { viewProj: mat4x4<f32>, light: vec4<f32> };
-@group(0) @binding(0) var<uniform> cam: Cam;
-struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32>, @location(2) w: vec3<f32> };
-fn rotateQ(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> { let t = 2.0 * cross(q.xyz, v); return v + q.w * t + cross(q.xyz, t); }
-@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(4) n: vec3<f32>, @location(5) extra: vec4<f32>) -> VOut {
-  var o: VOut;
-  let w = rec.xyz + rotateQ(extra, p * rec.w);
-  o.pos = cam.viewProj * vec4<f32>(w, 1.0);
-  o.color = color;
-  o.n = rotateQ(extra, n);
-  o.w = w;
-  return o;
-}
-@fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
-  let l = normalize(cam.light.xyz - v.w);
-  let lambert = cam.light.w + (1.0 - cam.light.w) * max(0.0, dot(normalize(v.n), l));
-  return vec4<f32>(v.color.rgb * lambert, v.color.a);
-}
-`;
-}
-export function bodyLitVertexGlsl() {
-    return `#version 300 es
-precision highp float;
-uniform mat4 viewProj;
-in vec3 p; in vec4 color; in vec4 rec; in vec3 n; in vec4 extra;
-out vec4 vColor; out vec3 vN; out vec3 vW;
-vec3 rotateQ(vec4 q, vec3 v) { vec3 t = 2.0 * cross(q.xyz, v); return v + q.w * t + cross(q.xyz, t); }
-void main() {
-  vec3 w = rec.xyz + rotateQ(extra, p * rec.w);
-  gl_Position = viewProj * vec4(w, 1.0);
-  vColor = color; vN = rotateQ(extra, n); vW = w;
-}
-`;
-}
-export function bodyLitFragmentGlsl() {
-    return `#version 300 es
-precision highp float;
-uniform vec4 light;
-in vec4 vColor; in vec3 vN; in vec3 vW; out vec4 fragColor;
-void main() {
-  vec3 l = normalize(light.xyz - vW);
-  float lambert = light.w + (1.0 - light.w) * max(0.0, dot(normalize(vN), l));
-  fragColor = vec4(vColor.rgb * lambert, vColor.a);
-}
-`;
-}
-export const BODY_LIT_WGSL = bodyLitWgsl(), BODY_LIT_VERTEX_GLSL = bodyLitVertexGlsl(), BODY_LIT_FRAGMENT_GLSL = bodyLitFragmentGlsl();
-export function bodyLitPipelineDesc({ cull = null } = {}) {
-    return renderPipelineDesc({ layout: LAYOUTS.lit, shaders: { wgsl: BODY_LIT_WGSL, glsl: { vertex: BODY_LIT_VERTEX_GLSL, fragment: BODY_LIT_FRAGMENT_GLSL } }, uniforms: [{ name: "viewProj", type: "mat4" }, { name: "light", type: "vec4" }], cull });
-}
+// ---- the body pipeline: litSphere's lit shader in its "quat" mode (v4520: one lit shader with modes, not a fourth dual module) ------
+export const BODY_LIT_WGSL = litWgsl(null, { extra: "quat" }), BODY_LIT_VERTEX_GLSL = litVertexGlsl({ extra: "quat" }), BODY_LIT_FRAGMENT_GLSL = litFragmentGlsl(null, { extra: "quat" });
+export function bodyLitPipelineDesc({ cull = null } = {}) { return litPipelineDesc({ cull, extra: "quat" }); }
 /** the CPU twin of rotateQ */
 export function rotateQ(q, v) { const [x, y, z, w] = q, tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]); return [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)]; }
 
@@ -164,7 +112,14 @@ export function rotateQ(q, v) { const [x, y, z, w] = q, tx = 2 * (y * v[2] - z *
 export function sandboxScene(device, state, bw, G, L, { light = SUN, bodyColour = [0.85, 0.25, 0.2, 1] } = {}) {
     const n = bw.count(), count = 1 + n, fleetOf = new Uint32Array(count); for (let i = 1; i < count; i++) fleetOf[i] = 1;
     const rec = new Float32Array(count * 4), ext = new Float32Array(count * 4); rec[3] = 1; ext[3] = 0;
-    const records = { count, cpu: () => { rec.set(bw.records(), 4); return rec; } }, headings = { cpu: () => { ext.set(bw.extras(), 4); return ext; } };
+    // *** ON WEBGPU A { count, cpu } SOURCE IS UPLOADED ONCE. *** gpuDriven re-reads the EXTRAS every frame but takes a record source
+    // without a `buffer` as static after the first upload (the cull reads the GPU buffer directly); a body that moves after the scene
+    // is made stayed where it was born on WebGPU while its quaternion turned -- the round-4 debris, born parked, never appeared at
+    // all. So the scene owns a storage buffer for the records and writes it on every frame's extras read, which both paths make.
+    rec.set(bw.records(), 4); ext.set(bw.extras(), 4);
+    const buffer = device.backend === "webgpu" ? device.buffer({ data: rec, usage: "storage" }) : null;   // WebGL2 has no storage buffers and culls from cpu()
+    const fill = () => { rec.set(bw.records(), 4); ext.set(bw.extras(), 4); if (buffer) buffer.write(rec); };
+    const records = { count, cpu: () => { fill(); return rec; }, ...(buffer ? { buffer } : {}) }, headings = { cpu: () => { fill(); return ext; } };
     const fleets = [
         { name: "world", lods: [{ name: "only", mesh: state.mesh }], layout: G.LAYOUTS.lit, pipeline: L.litPipelineDesc({ cull: "none" }), bind: L.litBind(light) },
         { name: "bodies", lods: [{ name: "only", mesh: boxMesh(bodyColour) }], layout: G.LAYOUTS.lit, pipeline: bodyLitPipelineDesc(), bind: litBind(light) },

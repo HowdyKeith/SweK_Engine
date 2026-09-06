@@ -78,8 +78,23 @@ function tintChain(tints, lang) {
     const vec = lang === "wgsl" ? "vec3<f32>" : "vec3";
     return T.map((t, i) => `  if (i == ${i + 1}) { return ${vec}(${f3(t[0])}, ${f3(t[1])}, ${f3(t[2])}); }`).join("\n");
 }
-export function litWgsl(tints = null) {
-    return `
+/**
+ * v4520 -- `extra` says what the record's fourth slot (location 5) MEANS to this pipeline:
+ *   "tint"   (the default, byte for byte the text since v4478): extra.y the tint index, extra.w the emissive flag;
+ *   "quat"   the body's unit quaternion (x, y, z, w): the vertex and the normal are rotated by it, no tint, no emissive
+ *            (round 3 of the sandbox on the device: box3d crates);
+ *   "colour" the instance's own colour in extra.rgb, the mesh's alpha kept (round 4: the debris cubes).
+ * Three MODES of one lit shader rather than three dual-language modules: tools/ship/shaderCensus-selfcheck.mjs holds
+ * the tree under twenty dual shader modules, which is where an IR would have paid, and a lit variant is not a reason
+ * to spend one.
+ */
+const ROTATE_WGSL = "fn rotateQ(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> { let t = 2.0 * cross(q.xyz, v); return v + q.w * t + cross(q.xyz, t); }";
+const ROTATE_GLSL = "vec3 rotateQ(vec4 q, vec3 v) { vec3 t = 2.0 * cross(q.xyz, v); return v + q.w * t + cross(q.xyz, t); }";
+export const EXTRA_MODES = Object.freeze(["tint", "quat", "colour"]);
+function checkExtra(extra) { if (!EXTRA_MODES.includes(extra)) throw new Error(`litSphere: extra must be one of ${EXTRA_MODES.join(", ")}, not ${JSON.stringify(extra)}`); return extra; }
+export function litWgsl(tints = null, { extra = "tint" } = {}) {
+    checkExtra(extra);
+    if (extra === "tint") return `
 struct Cam { viewProj: mat4x4<f32>, light: vec4<f32> };   // light = (position.xyz, ambient)
 @group(0) @binding(0) var<uniform> cam: Cam;
 struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32>, @location(2) w: vec3<f32>, @location(3) @interpolate(flat) emissive: f32, @location(4) @interpolate(flat) tint: i32 };
@@ -105,9 +120,31 @@ ${tintChain(tints, "wgsl")}
   return vec4<f32>(tintOf(v.tint, v.color.rgb) * shade, v.color.a);
 }
 `;
+    const quat = extra === "quat";
+    return `
+struct Cam { viewProj: mat4x4<f32>, light: vec4<f32> };
+@group(0) @binding(0) var<uniform> cam: Cam;
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, @location(1) n: vec3<f32>, @location(2) w: vec3<f32> };
+${quat ? ROTATE_WGSL : ""}
+@vertex fn vs(@location(0) p: vec3<f32>, @location(1) color: vec4<f32>, @location(2) rec: vec4<f32>, @location(4) n: vec3<f32>, @location(5) extra: vec4<f32>) -> VOut {
+  var o: VOut;
+  let w = rec.xyz + ${quat ? "rotateQ(extra, p * rec.w)" : "p * rec.w"};
+  o.pos = cam.viewProj * vec4<f32>(w, 1.0);
+  o.color = ${quat ? "color" : "vec4<f32>(extra.rgb, color.a)"};
+  o.n = ${quat ? "rotateQ(extra, n)" : "n"};
+  o.w = w;
+  return o;
 }
-export function litVertexGlsl() {
-    return `#version 300 es
+@fragment fn fs(v: VOut) -> @location(0) vec4<f32> {
+  let l = normalize(cam.light.xyz - v.w);
+  let lambert = cam.light.w + (1.0 - cam.light.w) * max(0.0, dot(normalize(v.n), l));
+  return vec4<f32>(v.color.rgb * lambert, v.color.a);
+}
+`;
+}
+export function litVertexGlsl({ extra = "tint" } = {}) {
+    checkExtra(extra);
+    if (extra === "tint") return `#version 300 es
 precision highp float;
 uniform mat4 viewProj;
 in vec3 p; in vec4 color; in vec4 rec; in vec3 n; in vec4 extra;
@@ -118,9 +155,23 @@ void main() {
   vColor = color; vN = n; vW = w; vE = extra.w; vT = int(extra.y + 0.5);
 }
 `;
-}
-export function litFragmentGlsl(tints = null) {
+    const quat = extra === "quat";
     return `#version 300 es
+precision highp float;
+uniform mat4 viewProj;
+in vec3 p; in vec4 color; in vec4 rec; in vec3 n; in vec4 extra;
+out vec4 vColor; out vec3 vN; out vec3 vW;
+${quat ? ROTATE_GLSL : ""}
+void main() {
+  vec3 w = rec.xyz + ${quat ? "rotateQ(extra, p * rec.w)" : "p * rec.w"};
+  gl_Position = viewProj * vec4(w, 1.0);
+  vColor = ${quat ? "color" : "vec4(extra.rgb, color.a)"}; vN = ${quat ? "rotateQ(extra, n)" : "n"}; vW = w;
+}
+`;
+}
+export function litFragmentGlsl(tints = null, { extra = "tint" } = {}) {
+    checkExtra(extra);
+    if (extra === "tint") return `#version 300 es
 precision highp float;
 uniform vec4 light;
 in vec4 vColor; in vec3 vN; in vec3 vW; flat in float vE; flat in int vT; out vec4 fragColor;
@@ -133,6 +184,16 @@ void main() {
   float lambert = light.w + (1.0 - light.w) * max(0.0, dot(normalize(vN), l));
   float shade = mix(lambert, 1.0, clamp(vE, 0.0, 1.0));
   fragColor = vec4(tintOf(vT, vColor.rgb) * shade, vColor.a);
+}
+`;
+    return `#version 300 es
+precision highp float;
+uniform vec4 light;
+in vec4 vColor; in vec3 vN; in vec3 vW; out vec4 fragColor;
+void main() {
+  vec3 l = normalize(light.xyz - vW);
+  float lambert = light.w + (1.0 - light.w) * max(0.0, dot(normalize(vN), l));
+  fragColor = vec4(vColor.rgb * lambert, vColor.a);
 }
 `;
 }
@@ -148,10 +209,10 @@ export function tintsFromHex(hexes) {
 }
 
 /** The lit pipeline over LAYOUTS.lit: the same two vertex slots every gpuDriven pipeline takes, plus `light`; `tints` bakes a palette in. */
-export function litPipelineDesc({ cull = null, frontFace = null, blend = null, tints = null } = {}) {
+export function litPipelineDesc({ cull = null, frontFace = null, blend = null, tints = null, extra = "tint" } = {}) {
     return renderPipelineDesc({
         layout: LAYOUTS.lit,
-        shaders: { wgsl: litWgsl(tints), glsl: { vertex: litVertexGlsl(), fragment: litFragmentGlsl(tints) } },
+        shaders: { wgsl: litWgsl(tints, { extra }), glsl: { vertex: litVertexGlsl({ extra }), fragment: litFragmentGlsl(tints, { extra }) } },
         uniforms: [{ name: "viewProj", type: "mat4" }, { name: "light", type: "vec4" }],
         cull, frontFace, blend,
     });

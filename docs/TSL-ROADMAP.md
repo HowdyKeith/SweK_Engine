@@ -1229,8 +1229,29 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the shim's own wake and the joint motors' lesson (box3d_shim.c). A unit crate over a unit hole sits on the
         rim, four edges on four box edges, and box3d is right to hold it there. Not built: non-cubic bodies (one
         scale per record), friction and restitution knobs, the racing car (Racing city 2 builds it on these joints).
-     4. WEAPONS AND DAMAGE: the sandbox's damage path (CityGen's hit points, world/voxelDebrisSystem.js) on the device
-        world, debris as records.
+     4. (v4520) WEAPONS AND DAMAGE. BUILT: render/voxelDamage.mjs. The sandbox's damage is CityGen's own -- hit points
+        one per voxel, crumble passes at 75 / 50 / 25 %, a topple at zero -- written straight into the world, and the
+        debris system's six cubes per broken voxel; neither knows about the slots. What every writer already keeps is
+        the chunk's DIRTY FLAG, so syncDirty re-meshes every dirty chunk plus its eight neighbours through round 2's
+        remeshChunks, and any writer reaches the device. blastAt carves a sphere (every voxel whose centre lies within
+        r), bursts debris for every solid voxel removed, charges each building the voxels it lost through damageAt
+        (the crumble and the topple are CityGen's), and syncs; shootAt is round 1's ray and a blast where it lands;
+        the debris draws as a third fleet through a lit pipeline that reads its colour from the extras. sandbox-
+        gpu.html: Blast at the last picked voxel, a radius, the HUD naming the voxels, debris, buildings and chunks.
+        MEASURED (tools/ship/voxelDamage-selfcheck.mjs): the slots match a fresh pack after direct writes, a blast, a
+        crumble and a topple; the real city's first building loses 112 voxels and syncs 15 chunks in 46 ms; on both
+        backends the tower blast is 0 pixels from a full rebuild, the debris raises the green count, and two seconds
+        later the frame is exactly the rebuilt world. THE FINDING, WHICH REACHED ROUND 3: on WebGPU a { count, cpu }
+        record source is uploaded ONCE (gpuDriven's Level 12 contract: a moving source brings a buffer), so the debris
+        never appeared on WebGPU while WebGL2's twin route drew it, and round 3's crate had only APPEARED to move
+        because its quaternion rides in the extras, which are re-read every frame. Both scenes own a storage buffer
+        for their records now and write it every frame, and the bodies gate moves a crate after its scene is made.
+        AND THE TWENTIETH DUAL MODULE: the debris pipeline would have been the twentieth file authoring a shader in
+        both languages, which is the line the census holds as where an IR would have paid; so render/litSphere.mjs's
+        lit shader gained MODES for what its `extra` slot means (tint, quat, colour), the body and debris pipelines
+        derive from it and author no shader text, and the baselines stand where v4514 left them. Not built: the
+        sandbox's kaiju, FPS shooter and dungeon grenade (their own pages); debris that collides; a topple as rigid
+        bodies (kaijuBox3d's, opt-in there).
      5. SAVE / LOAD: world/WorldPersistence.js's format read and written by the device page.
      6. THE AVATAR AND CAMERA: a first-person walk on the collider with the sandbox's controls.
 

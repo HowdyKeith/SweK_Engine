@@ -58,25 +58,31 @@ export function affectedChunks(world, x, z) {
 }
 
 /** the editable state: the world, its packed slots, and (once a scene exists) the device buffer */
-export function editState(world, opts = {}) { const packed = packSlots(world, opts); return { world, opts, ...packed, vbuf: null, writes: 0, rebuilds: 0 }; }
+export function editState(world, opts = {}) { const packed = packSlots(world, opts); for (const c of world.chunks.values()) c.dirty = false; return { world, opts, ...packed, vbuf: null, writes: 0, rebuilds: 0 }; }   // the state's own pack is in sync by definition (packSlots itself clears nothing: a gate uses it as a twin)
 
-export function editVoxel(state, x, y, z, id) {
-    const t0 = Date.now(), { world } = state;
-    if (y < 0 || y >= world.chunkHeight) return { chunks: [], rebuilt: false, ms: 0, refused: "outside the world's height" };
-    if (world.voxelAt(x, y, z) === id) return { chunks: [], rebuilt: false, ms: 0, refused: "no change" };
-    world.setVoxel(x, y, z, id);
-    const keys = affectedChunks(world, x, z), written = [];
+/** re-mesh the named chunks into their slots (v4520: factored out of editVoxel so round 4's syncDirty shares it); clears each chunk's dirty flag */
+export function remeshChunks(state, keys) {
+    const t0 = Date.now(), { world } = state, written = [];
     for (const key of keys) {
-        const chunk = world.chunks.get(key), slot = state.slots.get(key), m = meshOneChunk(world, chunk, state.opts), count = m.verts.length / 3;
-        if (count > slot.cap) { const p = packSlots(world, { ...state.opts, grow: key }); Object.assign(state, p); state.rebuilds++; if (state.vbuf) state.vbuf.write(state.vertexData, 0); return { chunks: keys, rebuilt: true, overflow: key, ms: Date.now() - t0 }; }
+        const chunk = world.chunks.get(key), slot = state.slots.get(key); if (!chunk || !slot) continue;
+        const m = meshOneChunk(world, chunk, state.opts), count = m.verts.length / 3;
+        if (count > slot.cap) { const p = packSlots(world, { ...state.opts, grow: key }); Object.assign(state, p); state.rebuilds++; if (state.vbuf) state.vbuf.write(state.vertexData, 0); for (const c of world.chunks.values()) c.dirty = false; return { chunks: [...keys], rebuilt: true, overflow: key, ms: Date.now() - t0 }; }
         interleave(m, state.vertexData, slot.offset, state.opts.aoFloor);
         state.vertexData.fill(0, (slot.offset + count) * FLOATS, (slot.offset + slot.cap) * FLOATS);   // the tail: zero triangles draw nothing
-        slot.count = count;
+        slot.count = count; chunk.dirty = false;
         if (state.vbuf) state.vbuf.write(state.vertexData.subarray(slot.offset * FLOATS, (slot.offset + slot.cap) * FLOATS), slot.offset * STRIDE);
         written.push(key); state.writes++;
     }
     state.used = [...state.slots.values()].reduce((a, s) => a + s.count, 0);
     return { chunks: written, rebuilt: false, ms: Date.now() - t0 };
+}
+
+export function editVoxel(state, x, y, z, id) {
+    const { world } = state;
+    if (y < 0 || y >= world.chunkHeight) return { chunks: [], rebuilt: false, ms: 0, refused: "outside the world's height" };
+    if (world.voxelAt(x, y, z) === id) return { chunks: [], rebuilt: false, ms: 0, refused: "no change" };
+    world.setVoxel(x, y, z, id);
+    return remeshChunks(state, affectedChunks(world, x, z));
 }
 
 export function pickVoxel(world, { W, H, fov, eye, target }, px, py, maxDist = 400) { return raycastVoxels(world, eye, pixelRay(W, H, fov, eye, target, px, py), maxDist); }

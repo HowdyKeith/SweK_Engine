@@ -39,6 +39,11 @@
 //                                                                                on both backends.
 //                   Each restored and the baseline re-run: 0 red.
 //
+// v4520 -- A HOLD ADDED FROM ROUND 4'S FINDING: on WebGPU a { count, cpu } record source is uploaded once, so the crate had only
+// APPEARED to move (its quaternion rides in the extras, which gpuDriven re-reads every frame); sandboxScene now owns a storage buffer
+// for the records and writes it every frame, and the gate moves the crate 3 units after the scene is made and reads the red patch
+// 35 pixels to the right on both backends.
+//
 // Run: node tools/ship/voxelBodies-selfcheck.mjs      (~25 s)
 "use strict";
 import path from "node:path";
@@ -163,7 +168,9 @@ sec("5. ON BOTH BACKENDS: a red crate at rest on the slab, then turned 45 degree
                 bw.phys.setType(crate.id, "kinematic"); bw.phys.setTransform(crate.id, [8.5, 4.5, 8.5], [0, Math.sin(Math.PI / 8), 0, Math.cos(Math.PI / 8)]); bw.read();
                 const turned = await shoot();
                 bw.phys.setTransform(crate.id, [8.5, 4.5, 8.5], [0, 0, 0, 1]); bw.read(); const square = await shoot();
-                out[backend] = { path: sc.path, errs, rest, turned, square, pose, fleets: sc.fleetCount };
+                // the crate MOVED after the scene was made: its records must reach the device every frame (the extras alone turned it)
+                bw.phys.setTransform(crate.id, [11.5, 4.5, 8.5], [0, 0, 0, 1]); bw.read(); const moved = await shoot();
+                out[backend] = { path: sc.path, errs, rest, turned, square, moved, pose, fleets: sc.fleetCount };
                 bw.destroy(); dev.destroy();
             }
             return out;
@@ -178,6 +185,8 @@ sec("5. ON BOTH BACKENDS: a red crate at rest on the slab, then turned 45 degree
                 ok(`*** ${bk}: the crate at rest draws as a red patch on the slab where the physics put it ***`, rest.n > 30 && near(R.pose.pos[1], 4.5) && rest.w >= 5 && rest.h >= 5);
                 ok(`  ${bk}: turned 45 degrees about y by setTransform, the crate's silhouette is wider than square (the quaternion reaches the vertex stage)`, tu.n > 30 && tu.w > sq.w * 1.15, `${tu.w} vs ${sq.w}`);
                 ok(`  ${bk}: setting the identity back draws the resting frame again (${apart(R.rest, R.square)} apart)`, apart(R.rest, R.square) < 30);
+                const mv = redBox(R.moved);
+                ok(`*** ${bk}: a crate moved 3 units along +x AFTER the scene was made draws to the right of where it rested (the records reach the device every frame) ***`, mv.n > 30 && mv.x0 > sq.x0 + 10, `red patch x0 ${sq.x0} -> ${mv.x0}`);
             }
             ok("  the two backends agree within 8 of 255 on all but edge pixels (fewer than 3 %)", apart(r.result.webgpu.rest, r.result.webgl2.rest) < N * 0.03, `${apart(r.result.webgpu.rest, r.result.webgl2.rest)} apart`);
         }

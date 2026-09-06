@@ -2849,6 +2849,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the first crate sat over its hole; the window now wakes every body with a zero impulse when its runs change. " +
                  "Sabotages red at 1 / 4 / 1 / 3.",
     }),
+    since142: Object.freeze({
+        at: "v4520", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelDamage-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. The sandbox on the device, round 4: render/voxelDamage.mjs carries the sandbox's own damage -- " +
+                 "CityGen's hit points, crumble passes and topple, the debris system's bursts -- onto the device world through syncDirty, " +
+                 "which re-meshes every chunk the world marked dirty plus its neighbours, so any writer reaches the slots; blastAt carves a " +
+                 "sphere, bursts debris for every voxel it removes, charges each building the voxels it lost, and syncs; shootAt is a ray " +
+                 "and a blast; the debris draws as a third fleet whose colour rides in the extras. THE FINDING, which reached round 3 too: " +
+                 "on WebGPU a { count, cpu } record source is uploaded once, so moving records need the scene's own storage buffer -- the " +
+                 "debris never appeared on WebGPU and the crate had only appeared to move; both scenes carry the buffer now and the bodies " +
+                 "gate moves a crate after its scene is made. And the twentieth dual-language shader module was one lit variant away: the body and " +
+                 "debris pipelines are litSphere's own shader in two new MODES (extra: quat, extra: colour) now, the two modules author no " +
+                 "shader text, and the parity and census baselines stand where v4514 left them. Sabotages red at 1 / 3 / 2 / 3.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
