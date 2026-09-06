@@ -186,8 +186,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them, and WebGPU did not move either
     // even though both new files are about a compute shader, because the census counts FILES THAT MENTION a
     // capability and the pair already did.
-    files: 3872,
-    esModules: 3581, closures: 3457, asyncAwait: 1335, typedArrays: 692, promises: 332,
+    // A SEVENTH TIME: v4479's deferralCensus.mjs and its gate take it 3872 -> 3874, moving ES modules and
+    // closures by two each and nothing else. SEVEN RE-DERIVATIONS, SEVEN DIFFERENT TABLES, ONE UNCHANGED
+    // HEADLINE -- threads have read 22 through every one of them, and so has WebAssembly. A row that survives
+    // seven independent populations is a finding about the tree; a row read back from the first would have
+    // been wrong seven times.
+    files: 3874,
+    esModules: 3583, closures: 3459, asyncAwait: 1335, typedArrays: 692, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

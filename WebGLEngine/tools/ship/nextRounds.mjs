@@ -22,6 +22,41 @@ export const NEXT_ROUNDS = [
     { id: "population-autopin", state: "CLOSED", note: "DONE at v3553. populationCensus.mjs records the population at ship time and diffs it, and gateReach-selfcheck now reads that record instead of a typed number. The verdicts distinguish routine growth from the thing that should stop a ship: GREW names every addition and reconciles the totals; REMOVALS is treated harder than a gain, because adding physics is routine and physics quietly disappearing is how a deletion ships unnoticed, and the old pin fired identically for both. NO-RECORD is its own verdict rather than a pass. And the gate does NOT rewrite the record it compares against -- writing is a ship step, comparing is the gate, deliberately different programs, because a check that repairs its own expectation can never fail twice." },
     { id: "flip3d-gate", state: "CLOSED", note: "DONE at v3427. Free fall to 1.4e-7, 9216 particles conserved exactly, divergence down 2.1e+4 and -- unlike 2D -- MONOTONICALLY. Two differences from the 2D sibling recorded: the monotone convergence, and that step() is synchronous here while 2D's is async, despite the header calling the pipeline identical." },
     { id: "beer-lambert", state: "CLOSED", note: "DONE at v3426. The exact half holds to 5.6e-17 and optical depths add bit-exactly, which is what makes a line integral the right object for CT. The failing half is measured: with a real spectrum the effective attenuation falls 4.4x with depth and a uniform cylinder cups by 30%. The cost to ct.js is now a number -- 12.0562 against a true line integral of 35.3854 for the same slab." },
+    // ---- *** v4479 -- THE FIRST ENTRIES ADDED SINCE THIS FILE WAS WRITTEN AT v3340, 925 VERSIONS AGO. ***
+    // Measured by tools/ship/deferralCensus.mjs: the newest version any entry below named was v3553, against
+    // an ENGINE_VERSION of v4478, and NOT ONE of the tree's 118 undecided prose deferrals was named by any
+    // entry here -- reach 0 of 118. This file's own header states the failure mode it then suffered: "writing
+    // them down in prose that nothing ever re-reads, so a finished item keeps advertising itself as open."
+    // The design was never wrong; nothing enumerated the prose, so nothing ever prompted an entry. That half
+    // exists now, and these are what it turned up that this session can vouch for first-hand.
+    {
+        id: "zoom-blur-wiring",
+        blocker: "OPEN",
+        what: "Wire render/zoomBlur.mjs's generated GLSL into bloomPass.js's post chain as a real pass.",
+        how: "A framebuffer, three uniforms (uScene, uCentre, uStrength) and a slot in the composite. The shader is already generated and its summation order is graded; what is missing is the plumbing.",
+        why: "v4478 built and graded the kernel and deliberately did not wire it: no WebGL context has compiled the GLSL here, because this box has headless WebGPU and no headless GL. The claim a wiring round rests on is already measured -- strength 0 is a BIT-EXACT identity on real hardware, so the pass cannot move a pixel until somebody turns it on.",
+    },
+    {
+        id: "zero-range-second-control",
+        blocker: "OPEN",
+        what: "Plant a second positive control for the zero-range sweep, in a device that is not splat.",
+        how: "Find an observable whose exact zero is derivable from the arithmetic rather than observed, the way splat.integral.isoRollDeviation's is, and drive zeroRangeSweep over it in both directions. The prose deferral this entry answers is in tools/roundhouse/zeroControl-selfcheck.mjs -- an entry NAMES THE FILE CARRYING THE NOTE, which is the link deferralCensus.backlogReach() measures and the reason it read 0 of 118 before this round.",
+        why: "v4477 gave the sweep its first control since v3313 and said plainly what it does not establish: one control, one device, one knob. The sweep's detection power over the other 85 device/modes is still unproven.",
+    },
+    {
+        id: "deferral-adjudication",
+        blocker: "OPEN",
+        what: "Adjudicate the 118 prose deferrals that no instrument has ever decided.",
+        how: "tools/ship/deferralCensus.mjs enumerates them. Deciding one means reading the file and checking the claim against an EXPORT rather than a sentence; a settled one gets a `SETTLED at vNNNN` marker on the line adjacent to the claim, which is the adjacency the census reads and the one a person gets for free.",
+        why: "v3313 audited four and found three settled; v3314 audited fifteen and found seven settled and four that were never deferrals. v4479 audited two files and found THREE stale notes, two of them in one paragraph, settled within four rounds of being written and still advertising themselves 66 versions later. The rate at which these go stale is high and nothing has been watching.",
+    },
+    {
+        id: "release-publish-backlog",
+        blocker: "HARDWARE",
+        what: "Publish the unreleased versions so the fleet stops running v4460.",
+        how: "On the rig: GitHub panel -> Releases, step 3 (Clone -> verify) then step 4 (Publish the verified clone), per the ship skill's step 7. The zip is not byte-reproducible, so it has to be the rig.",
+        why: "releaseLedger reads 11 against a budget of 3 and the fleet is 18 versions behind. It is the one gate blocking v4478 from main, and it is right to: the rule is publish before shipping again. Nothing in the sandbox can clear it -- publishing from here would replace the artifact the rig built with different bytes for the same commit.",
+    },
     {
         id: "browser-screenshot-floor",
         blocker: "HARDWARE",

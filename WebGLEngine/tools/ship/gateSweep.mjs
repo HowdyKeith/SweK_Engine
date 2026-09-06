@@ -2527,6 +2527,26 @@ since116: Object.freeze({
                  "-- four only after repair, and all four were one species: an oracle MORE ACCURATE than the " +
                  "shader passes every comparison with it",
     }),
+    since118: Object.freeze({
+        at: "v4479", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/deferralCensus-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "physics/render/microfacetSampleWgsl-selfcheck.mjs (deferred 'combining two estimators'; SETTLED at v4413 and still advertising it 66 versions later)",
+            "physics/render/microfacetVndf-selfcheck.mjs (TWO stale notes in one paragraph: the anisotropic D landed v4412, the other strategy v4413)",
+            "tools/ship/nextRounds.mjs (first entries added since it was written at v3340 -- a 925-version gap in the file whose subject is records nobody re-reads)",
+        ]),
+        verdict: "*** THE BACKLOG BUILT TO STOP DEFERRALS LIVING IN PROSE HAD ITSELF BEEN LIVING IN PROSE. *** " +
+                 "nextRounds.mjs held 10 entries whose newest named version was v3553, against v4478, and " +
+                 "named NONE of the tree's 118 undecided prose deferrals -- reach 0 of 118. The design was " +
+                 "never wrong; nothing enumerated the prose, so nothing prompted an entry. deferralCensus " +
+                 "does that, deciding ONLY from structure on one line or its neighbour and reporting the " +
+                 "rest as UNDECIDED rather than open, because 'is this still owed' needs a file read. Two " +
+                 "files were then opened and THREE stale notes came out, checked against EXPORTS rather " +
+                 "than sentences. Seventeen sabotages, seventeen red -- four only after repair, and all " +
+                 "four were one shape: a check comparing against today's answer cannot see a constant equal " +
+                 "to today's answer",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

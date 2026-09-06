@@ -306,7 +306,14 @@ report("UNCHECKED. WHETHER A REAL CARD AGREES, which is v4408's open question an
        "denominator that section 5 shows does not bite, and the built-in sin and cos enter only through the " +
        "azimuth, where a 2^-11 error is a 2^-11 error. THE OTHER STRATEGY: this samples the NDF only, so the " +
        "MIS weights are computed and never USED -- a real next-event estimator pairs this with a light sample, " +
-       "and combining two estimators is a round of its own. FRESNEL, which is F = 1 throughout, as " +
+       "and combining two estimators is a round of its own. " +
+       // v4479 -- SETTLED at v4413, and this note went on advertising it as open for 66 versions.
+       // misWgsl.mjs exports STRATEGY = { bsdf, light, mis, misRenorm } and its gate's own header reads
+       // "THE TWO STRATEGIES ACTUALLY COMBINED -- WHICH v4409 COMPUTED THE WEIGHTS FOR AND NEVER USED".
+       // Found by tools/ship/deferralCensus.mjs, which enumerates the prose this tree defers in; checked
+       // against the EXPORT rather than against the sentence, because a mention test is how these go wrong.
+       "SETTLED at v4413 -- see physics/render/misWgsl.mjs. " +
+       "FRESNEL, which is F = 1 throughout, as " +
        "microfacet.mjs's default is. ENERGY COMPENSATION, which is what the shortfall this measures is FOR. " +
        "And the VISIBLE-NORMAL sampler (Heitz), which is what a modern tracer actually uses and which " +
        "microfacet.mjs does not carry either.");

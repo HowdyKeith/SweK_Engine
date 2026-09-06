@@ -317,8 +317,18 @@ if (R) {
 
 report("UNCHECKED. ANISOTROPY: Heitz's listing takes alpha_x and alpha_y and this carries the ISOTROPIC case " +
        "only, because microfacet.mjs's D is isotropic -- an anisotropic D is a round of its own and would move " +
-       "every key in v4408 as well. THE OTHER STRATEGY, still: the MIS weights v4409 measured are computed and " +
-       "never used, and pairing this with a light sample is what a next-event estimator actually does. " +
+       // v4479 -- SETTLED at v4412. The marker sits on the line ADJACENT to the claim on purpose: that is the
+       // adjacency tools/ship/deferralCensus.mjs reads, and it is the same adjacency a person reading this
+       // paragraph gets for free. A settlement recorded four lines away is one the next reader misses.
+       // BOTH OF THIS PARAGRAPH'S DEFERRALS WERE SETTLED WITHIN FOUR ROUNDS AND IT KEPT ADVERTISING
+       // THEM. The anisotropic D landed at v4412 (physics/render/microfacetAnisoWgsl.mjs, which carries
+       // Daniso, lambdaAniso and the anisotropic visible-normal sampler over alpha_x and alpha_y); the other
+       // strategy landed at v4413 (misWgsl.mjs's STRATEGY table). Checked against the exports, not the prose.
+       // Found by tools/ship/deferralCensus.mjs: this file carried TWO of the three stale notes it turned up.
+       "every key in v4408 as well. SETTLED at v4412 -- see physics/render/microfacetAnisoWgsl.mjs. " +
+       "THE OTHER STRATEGY: the MIS weights v4409 measured were computed and never used, and pairing this " +
+       "with a light sample is what a next-event estimator actually does -- SETTLED at v4413, see " +
+       "physics/render/misWgsl.mjs. " +
        "FRESNEL, F = 1 throughout. ENERGY COMPENSATION, which is what the shortfall these three instruments " +
        "agree on is FOR. And WHETHER A REAL CARD AGREES, which stays open -- though this sampler leans on " +
        "inverseSqrt and normalize, which v4408 did not, and their accuracy is bounded but not exact.");
