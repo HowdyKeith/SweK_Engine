@@ -159,13 +159,23 @@ sec("3. *** THE RECORD THAT STOPPED BEING RE-READ WAS THE ONE FOR RECORDS THAT S
     const reach = D.backlogReach(C);
     const backlogText = JSON.stringify(NEXT_ROUNDS);
     const unnamed = C.undecided.filter((r) => !backlogText.includes(r.file));
+    // *** v4482 -- THIS ROW PINNED reach === 1 AND WENT RED THE FIRST TIME THE REACH IMPROVED. *** v4480
+    // repaired the line two above for exactly this and I wrote this one the same way in the same file: a
+    // metric whose whole purpose is to grow, asserted as an equality against the day it was taken, so the
+    // round that adds a backlog entry naming a deferral's file is PUNISHED for it. It is the same species as
+    // the four arrangement-pinned gates v4482 repaired elsewhere, committed by the author of the census that
+    // names the species. What v4479 measured stays frozen as its record; what is asserted live is that the
+    // reach MAY ONLY GROW and that every file it counts is genuinely named -- which is the discrimination the
+    // original was really buying, since a stub returning one row satisfies a count and went 0 RED.
     ok("!! *** REACH: the backlog named ZERO of the 118, and the metric is what made that visible ***",
-        found.reachOf118 === 0 && reach.matchedByBacklog === REC.backlogAfter.reach &&
-        reach.files.length === 1 && backlogText.includes(reach.files[0]) &&
+        found.reachOf118 === 0 && reach.matchedByBacklog >= REC.backlogAfter.reach &&
+        reach.files.length === reach.matchedByBacklog &&
+        reach.files.every((f) => backlogText.includes(f)) &&
         unnamed.length === C.undecided.length - reach.matchedByBacklog && unnamed.length > 100,
-        `0 of ${C.counts.undecided} before this round, ${D.backlogReach(C).matchedByBacklog} after. A backlog ` +
-        "entry NAMES THE FILE carrying the prose note it answers -- that link is the whole of this metric, and " +
-        "1 of 118 is not a boast, it is the size of what is still owed");
+        `0 of ${C.counts.undecided} before v4479, ${REC.backlogAfter.reach} after it, ` +
+        `${reach.matchedByBacklog} now. A backlog entry NAMES THE FILE carrying the prose note it answers -- ` +
+        "that link is the whole of this metric, and the number is not a boast, it is the size of what is " +
+        "still owed");
     // Derived, and shown to RESPOND: a constant equal to today's maximum passes a comparison against today's
     // maximum, so the lag is also driven at a version the tree is not at.
     const probe = D.backlogCurrency("v9999");

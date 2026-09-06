@@ -107,10 +107,39 @@ ok("...and the baseline is honest: it matches what is actually there",
 const launcher = fs.readFileSync(path.join(ROOT, "START_NODE_Engine.bat"), "latin1");
 const freePort = fs.readFileSync(path.join(ENG, "tools", "ship", "swek_free_port.bat"), "latin1");
 
+// *** v4482 -- THIS READ `ALREADY OWNS PORT 8787` AND THE LAUNCHER HAD STOPPED SAYING 8787 ON PURPOSE. ***
+// v4134 derived the port ONE way -- `set "SWEK_PORT=8787"` then `if defined PORT set "SWEK_PORT=%PORT%"` --
+// so the refusal echoes `%SWEK_PORT%`, and its own comment says writing PORT back "would be this launcher
+// deciding something it was only ever meant to observe". THE REFUSAL NEVER STOPPED REFUSING. The gate was
+// pinned to a LITERAL that a correct round removed, and it has been red ever since, in two files: this one
+// and supersededFlag-selfcheck, both grepping the same four characters.
+//
+// A LITERAL FOR A LITERAL WOULD BE THE SAME DEFECT SPELLED DIFFERENTLY. What is actually being claimed is
+// that the refusal BLOCK is intact: it names the owning PID, it calls the bounded hold, and it exits nonzero.
+// So the block is EXTRACTED -- from the refusal echo to its own `exit /b` -- and read, which is a claim about
+// the branch that runs rather than about the characters in the file. The port it names must be a VARIABLE and
+// not a number, which is the property v4134 established and the one this line was accidentally forbidding.
+const refusalBlock = (src, headRe) => {
+    const lines = String(src).split(/\r?\n/);
+    const i = lines.findIndex((l) => headRe.test(l));
+    if (i < 0) return null;
+    const j = lines.findIndex((l, k) => k >= i && /^\s*exit \/b \d/i.test(l));
+    return j < 0 ? null : lines.slice(i, j + 1).join("\n");
+};
+const OWNS = /ALREADY OWNS PORT/;
+const ownerRefusal = refusalBlock(launcher, OWNS);
+
 ok("!! the port-owner refusal still REFUSES -- the fix was to the hold, not the verdict",
-    /ALREADY OWNS PORT 8787/.test(launcher) && /exit \/b 1/.test(launcher) && /swek_hold\.bat/.test(launcher),
+    !!ownerRefusal && /swek_hold\.bat/.test(ownerRefusal) && /^\s*exit \/b [1-9]/mi.test(ownerRefusal),
     "it must still decline to fight the owner and still exit nonzero. Making it proceed would restore the " +
-    "two-windows-take-turns-forever loop v3256 was built to end");
+    "two-windows-take-turns-forever loop v3256 was built to end" +
+    (ownerRefusal ? " -- block is " + ownerRefusal.split(/\n/).length + " lines" : " -- NO REFUSAL BLOCK FOUND"));
+
+ok("...and the port it names is DERIVED, not typed -- which is what actually reddened this gate",
+    !!ownerRefusal && /ALREADY OWNS PORT %[A-Za-z_][A-Za-z0-9_]*%/.test(ownerRefusal) &&
+    !/ALREADY OWNS PORT \d/.test(ownerRefusal),
+    "v4134 gave the port ONE derivation and the refusal reads it. A gate demanding the number back would " +
+    "make the honest fix look like a regression, which is what it did for 348 versions");
 
 ok("...and it names the holding PID, which is the part that made it diagnosable",
     /%OWNER_PID%/.test(launcher),

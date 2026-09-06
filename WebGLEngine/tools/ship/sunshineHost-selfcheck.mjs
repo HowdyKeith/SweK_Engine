@@ -162,7 +162,21 @@ console.log("sunshineHost-selfcheck -- the host half, and the one surface the cl
         /sunshineBridge\.owns\(req\.url\)/.test(srv) &&
         lines.findIndex((l) => /sunshineBridge\.owns/.test(l)) > declAt);
     ok("...and it is required at the top", /require\("\.\/sunshineBridge\.js"\)/.test(srv));
-    ok("every route the bridge lists is reachable through its own handler", b.ROUTES.length === 7 && b.owns("/sunshine/status") && !b.owns("/sunshineX"));
+    // *** v4482 -- THE LABEL SAID "EVERY ROUTE" AND THE CHECK COUNTED TO SEVEN. *** ROUTES holds 8 now
+    // (/sunshine/apps arrived later), so the count went red while every route on the list was, and still is,
+    // owned. A COUNT IS NOT A CONTRACT, and the sentence above it named the contract correctly the whole time:
+    // the claim is that nothing on the list is unreachable, which the count could never have seen -- a bridge
+    // listing seven routes and owning none of them passed this line.
+    //
+    // The list entries are "GET  /sunshine/status", so the PATH is taken off each rather than the whole string
+    // being handed to owns() -- which is how a first pass here reported all 8 as unowned and would have read
+    // as a catastrophe rather than as a parse.
+    const routePath = (r) => String(r).replace(/^\s*[A-Z]+\s+/, "").trim();
+    const unowned = b.ROUTES.filter((r) => !b.owns(routePath(r))).map(routePath);
+    ok("every route the bridge lists is reachable through its own handler",
+        b.ROUTES.length > 0 && unowned.length === 0 && !b.owns("/sunshineX"),
+        unowned.length ? "NOT OWNED: " + unowned.join(", ")
+                       : b.ROUTES.length + " listed, all owned, and /sunshineX -- a prefix match away -- is not");
 }
 
 // ---- 6. THE PAGE, AND WHAT IT ADMITS -------------------------------------------------------------------------

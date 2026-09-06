@@ -19,7 +19,7 @@
 // The slash-stripping helper form `new URL(rel, import.meta.url).pathname` (report.js, brain.js _localPath)
 // is SAFE and is not flagged -- it has a rel argument and strips the leading slash itself. This gate greps the
 // tree for the two unsafe forms so they cannot come back. The sabotage below reintroduces one and this fails.
-import { noComments } from "./sourceScan.mjs";
+import { noComments, codeOnly } from "./sourceScan.mjs";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -62,7 +62,24 @@ const RE_NODE_SPECIFIER   = /from\s+"node:|require\("node:/;
 // leading "/" that makes an endsWith a basename comparison, and RE_DRIVE_STRIP for the /^\/[A-Za-z]:/ test.
 // Blank those and every correctly-guarded file reads as unguarded -- 22 hits became 14 NEW false ones. Two
 // strippers, two questions: noComments() for "what does this file SAY", codeOnly() for "what does it DO".
+// *** v4482 -- "STRIPPING COMMENTS IS ENOUGH" WAS FALSE, AND THE ROUND THAT FALSIFIED IT PUT THE SENTENCE
+// IN A STRING. *** The line eight above says the pathname form "is a complete expression already, so stripping
+// comments is enough". gateSweep.mjs then carried a round note QUOTING that expression inside a string literal
+// rather than a comment, noComments() left it standing, and this gate reported gateSweep twice -- for text
+// that describes the defect while not being it. The v3936 header calls that exact trap by name, and the fix it
+// prescribes ("delete the explanation") is the one the header calls backwards.
+//
+// THE TWO-STRIPPERS DOCTRINE WAS RIGHT AND WAS APPLIED PER FILE INSTEAD OF PER CLAUSE. The detections and the
+// exemptions ask different questions, so they get different strippers:
+//   - the PATHNAME idioms are things a file DOES -- `new URL(import.meta.url).pathname` inside a string is
+//     never a path being resolved -- so they are matched on codeOnly(), which blanks string bodies.
+//   - the GUARD forms (the drive-letter strip, the anchored basename) LIVE in string and regex literals by
+//     construction, which is why codeOnly() turned 22 hits into 14 new false ones at v4423. They stay on
+//     noComments().
+// So RE_DRIVE_STRIP is still read from the SAY text while RE_PATHNAME_ANY is read from the DO text -- the
+// exemption must be findable where it actually lives, or every correctly-guarded file reads as unguarded.
 const stripComments = (src) => noComments(src);
+const stripStrings  = (src) => codeOnly(src);
 const SKIP = new Set(["node_modules", ".git", "vendor", "rt", "__pycache__"]);
 
 function walk(dir, hits) {
@@ -85,7 +102,8 @@ function walk(dir, hits) {
             // 40 real guards, 0 prose, and the four surviving prose hits went to zero without a word being
             // reworded. The pathname form is a complete expression already, so stripping comments is enough.
             const s = stripComments(raw);
-            if (s.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
+            const d = stripStrings(raw);                       // v4482 -- what the file DOES, string bodies blanked
+            if (d.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
             if (BAD_GUARD_RE.test(s)) hits.push(rel + "  [file://${process.argv[1]} guard]");
             // *** v3937 -- AND THE REL-ARGUMENT FORM, WHICH THIS GATE'S OWN RULE COVERS AND ITS TEST DID NOT. ***
             // The header says the helper form is safe because "it has a rel argument AND STRIPS THE LEADING SLASH
@@ -99,7 +117,7 @@ function walk(dir, hits) {
             // brain/brain.js both do `if (/^\/[A-Za-z]:/.test(s)) s = s.slice(1)` inside _localPath and stay
             // correctly silent; a file that takes .pathname off import.meta.url and never drive-strips is
             // flagged whatever its first argument is.
-            if (RE_PATHNAME_ANY.test(s) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
+            if (RE_PATHNAME_ANY.test(d) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
             // *** v3941 -- THE THIRD IDIOM. *** See the header: twenty files ran their main block on Linux
             // and nowhere else, and eighteen of them had no gate looking.
             if (RE_ARGV_SPLIT_SLASH.test(s)) hits.push(rel + "  [argv[1].split(\"/\") -- a path is not slash-only]");

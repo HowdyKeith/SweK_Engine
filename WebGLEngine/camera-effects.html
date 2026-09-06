@@ -235,7 +235,14 @@ async function startCamera() {
     tex = null;
     S("status").innerHTML = "camera running &mdash; <b>every pass in the tree can read this texture</b>";
 }
-addEventListener("pagehide", () => { try { cam && cam.stop(); } catch {} try { clip && clip.close(); } catch {} });
+// v4482 -- pagehide FIRES FOR BACK-FORWARD CACHE TOO, and this page stopped the camera on it unconditionally.
+// Entering bfcache is not leaving: the document is frozen and restored intact on a back-navigation, so a user
+// who navigated away and came back got a live-looking page with a stopped camera and a closed clip -- the
+// v3052 shape raymarch-live.html and volume-cache.html were both fixed for, in the third page nobody checked.
+// Release only on a REAL unload; on a restore, reload so the camera and the clip rebuild around fresh handles
+// rather than half-living around dead ones.
+addEventListener("pagehide", (e) => { if (e.persisted) return; try { cam && cam.stop(); } catch {} try { clip && clip.close(); } catch {} });
+addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
 
 function frame() {
     requestAnimationFrame(frame);

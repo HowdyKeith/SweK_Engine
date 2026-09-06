@@ -35,7 +35,20 @@ const run = (rel) => new Promise((res) => {
         const both = String(out || "") + "\n" + String(errOut || "");
         const fails = both.split("\n").filter((l) => /^\s{0,4}FAIL\s/.test(l)).map((l) => l.replace(/^\s*FAIL\s+/, "").trim());
         const onStderr = String(errOut || "").split("\n").some((l) => /^\s{0,4}FAIL\s/.test(l));
-        res({ rel, ms: Date.now() - t0, exit: err ? (err.code == null ? "timeout" : err.code) : 0, fails, onStderr });
+        // *** v4482 -- A KILLED RUN'S OUTPUT IS NOT ITS READING, AND THIS FREEZER WAS STORING IT AS ONE. ***
+        // execFile hands back whatever the child printed BEFORE the cap killed it, and those lines went into
+        // the row exactly like a completed run's. doorKinds-selfcheck timed out at 120,023 ms and was frozen
+        // carrying "!! EVERY MEMBER IS EXPLAINED: a door, a declared refusal, or named as owed   spawn 1  none"
+        // -- one line out of however many it would have printed, filed as the gate's failing line. shaderRefs
+        // only escaped because it prints nothing at all before the cap, so the defect was invisible for as
+        // long as exactly one gate timed out.
+        //
+        // registerDrift-selfcheck already asserts a timed-out row carries no line, and its reason is the one
+        // redCensus states for UNVERIFIED_LINE: a bound is NOT a stale reading, it is an ABSENT one, and the
+        // two are different facts. So a timeout is recorded with no lines rather than with the prefix of some.
+        const timedOut = !!err && err.code == null;
+        res({ rel, ms: Date.now() - t0, exit: err ? (err.code == null ? "timeout" : err.code) : 0,
+              fails: timedOut ? [] : fails, onStderr: timedOut ? false : onStderr });
     });
 });
 

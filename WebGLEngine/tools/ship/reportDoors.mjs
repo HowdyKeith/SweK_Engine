@@ -38,7 +38,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SIG = /^export (?:async )?function reportLines\s*\(([^)]*)\)/m;
 const SIG_CONST = /^export const reportLines = (?:async )?\(([^)]*)\)/m;
@@ -280,7 +280,11 @@ export const NO_GATE_V4458 = Object.freeze([
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {
-    const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+    // v4482 -- `new URL(import.meta.url).pathname` yields "/C:/dir/file" on Windows, and path.resolve then
+    // builds "C:\\C:\\..." from it -- the doubled drive letter that killed detectionMap on Keith's rig.
+    // winPathGuard has forbidden this idiom since v3936; this file is the last one in the tree still
+    // spelling it, and it is a front door, so the failure would land on somebody asking for a report.
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const pop = population(root);
     const L = [];
     L.push("[reportDoors] the reportLines convention, counted rather than assumed");

@@ -299,9 +299,27 @@ console.log("\n*** v3850 -- THE FOURTH READER, AND THE ONE WHOSE ANSWER DECIDED 
     ok("!! *** AN INVITED LAUNCH WAITS FOR THE HANDOVER INSTEAD OF REFUSING IT ***",
         iHand > 0 && /if "%SUPERSEDE%"=="1" goto :port_handover/.test(boot),
         "a fresh flag is the running engine saying it is standing down, seconds ago, expiring in ninety");
+    // *** v4482 -- THE SECOND FILE GREPPING FOR A PORT THE LAUNCHER STOPPED TYPING. *** Identical to the line
+    // unattendedHold-selfcheck carried: `ALREADY OWNS PORT 8787` against a refusal that says `%SWEK_PORT%`
+    // because v4134 gave the port ONE derivation. Both gates went red on the round that fixed the launcher and
+    // neither said so in terms anybody could act on -- the row read "still refuses", which was true.
+    //
+    // The two files find the block the SAME way, and it is small enough that a shared helper here would be a
+    // third owner for four lines. What matters is that the claim is about the BRANCH: the refusal exists, it
+    // exits nonzero, and the number is not back.
+    const uninvited = (() => {
+        const ls = boot.split(/\r?\n/);
+        const i = ls.findIndex((l) => /ALREADY OWNS PORT/.test(l));
+        if (i < 0) return null;
+        const j = ls.findIndex((l, k) => k >= i && /^\s*exit \/b \d/i.test(l));
+        return j < 0 ? null : ls.slice(i, j + 1).join("\n");
+    })();
     ok("...and an UNINVITED launch still refuses, which was always correct",
-        /ALREADY OWNS PORT 8787/.test(boot) && /exit \/b 1/.test(boot),
-        "two launchers that both start a server take turns forever; the refusal is not the bug");
+        !!uninvited && /^\s*exit \/b [1-9]/mi.test(uninvited) &&
+        /ALREADY OWNS PORT %[A-Za-z_][A-Za-z0-9_]*%/.test(uninvited),
+        "two launchers that both start a server take turns forever; the refusal is not the bug" +
+        (uninvited ? " -- refusal block " + uninvited.split(/\n/).length + " lines, port read from a variable"
+                   : " -- NO REFUSAL BLOCK FOUND"));
     ok("...and the handover TIMES OUT rather than waiting for ever",
         /:port_handover_timeout/.test(boot) && /GEQ 45/.test(boot),
         "a flag is a statement of intent, and one that is not honoured inside 45s is refused like any other");

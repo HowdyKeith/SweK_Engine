@@ -99,11 +99,35 @@ export const METHOD = Object.freeze({
  *
  * `ms` and `fails` are still on every entry, so every reader keeps working. They are GETTERS over the audit.
  */
+/*
+ * v4482 -- *** FIVE ENTRIES LEAVE, AND FOUR OF THEM WERE NEVER ABOUT THE TREE. ***
+ *
+ * Keith pasted eighteen red gate readings off his rig in one sitting. Six of them reproduced here and were
+ * repaired this round; five of those six were on this list, and they came off it by the rule section 2 of the
+ * selfcheck states -- a repaired red must be deleted by hand, because a list nobody prunes is how
+ * gate-timings.json ended up accusing thirteen working gates.
+ *
+ * WHAT THE FIVE HAD IN COMMON IS WORTH MORE THAN THE FIVE. Four were checks pinned to an ARRANGEMENT that a
+ * later, correct round changed, so the gate went red BECAUSE THE WORK IT ASKED FOR WAS DONE -- the same
+ * sentence this file already carries at v4430 about its own claim:
+ *   unattendedHold + supersededFlag  grepped "ALREADY OWNS PORT 8787" after v4134 gave the port one
+ *                                    derivation and the refusal correctly started echoing %SWEK_PORT%
+ *   pairlaneBridge                   pinned label: "File Transfer Utils" through v4211's rename to "Peer 2 Peer"
+ *   sunshineHost                     asserted ROUTES.length === 7 under a label reading "every route ... is
+ *                                    reachable", and a seventh-to-eighth route is not a broken bridge
+ * The fifth, bfcache, was a REAL page defect (camera-effects.html tore down on pagehide without checking
+ * event.persisted) and is fixed in the page, not in the gate.
+ *
+ * SO THE LIST'S OWN DOCTRINE HAS A GAP IT CANNOT SEE. The header below says the name list is "a claim about a
+ * MOMENT". It is also a claim about a BOX: of the eighteen readings Keith sent, SIX are green in this sandbox
+ * and red on his Windows rig -- three of them (contactOverlay, range, localModelResolve) printing every check
+ * PASS and then aborting with a libuv teardown assertion, so an exit code decides a verdict the checks did
+ * not. Nothing in this register can represent that, and it is written down here rather than left implied.
+ */
 const RED_AT_V4279_GATES = Object.freeze([
     "engine/frameDirtyCensus-selfcheck.mjs",
     "tools/roundhouse/swekWebviewApk-selfcheck.mjs",
     "tools/ship/avatarServerViews-selfcheck.mjs",
-    "tools/ship/bfcache-selfcheck.mjs",
     "tools/ship/boundaryLint-selfcheck.mjs",
     "tools/ship/canvasFill-selfcheck.mjs",
     "tools/ship/definitionGates-selfcheck.mjs",
@@ -113,15 +137,11 @@ const RED_AT_V4279_GATES = Object.freeze([
     "tools/ship/pagePlacements-selfcheck.mjs",
     "tools/ship/pageReflow-selfcheck.mjs",
     "tools/ship/pageSectionsReport-selfcheck.mjs",
-    "tools/ship/pairlaneBridge-selfcheck.mjs",
     "tools/ship/proseAudit-selfcheck.mjs",
     "tools/ship/referenceKind-selfcheck.mjs",
     "tools/ship/registerResidue-selfcheck.mjs",
     "tools/ship/shaderRefs-selfcheck.mjs",
     "tools/ship/statedRuntime-selfcheck.mjs",
-    "tools/ship/sunshineHost-selfcheck.mjs",
-    "tools/ship/supersededFlag-selfcheck.mjs",
-    "tools/ship/unattendedHold-selfcheck.mjs",
     "tools/ship/wasmSupport-selfcheck.mjs",
     "tools/ship/wiringClaims-selfcheck.mjs",
 ]);
@@ -219,6 +239,41 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/unattendedHold-selfcheck.mjs", round: "v4482",
+      why: "RED SINCE v4279 BECAUSE THE LAUNCHER WAS FIXED. It grepped `ALREADY OWNS PORT 8787`, and v4134 " +
+           "gave the port ONE derivation -- `set \"SWEK_PORT=8787\"` then `if defined PORT set " +
+           "\"SWEK_PORT=%PORT%\"` -- so the refusal correctly echoes %SWEK_PORT% and its own comment says " +
+           "writing PORT back \"would be this launcher deciding something it was only ever meant to observe\". " +
+           "THE REFUSAL NEVER STOPPED REFUSING, and the row's label said so while asserting four other " +
+           "characters. It EXTRACTS the refusal block now -- from its echo down to its own `exit /b` -- and " +
+           "asserts the branch: the bounded hold is called, the exit is nonzero, and the port is named " +
+           "through a VARIABLE rather than a number, which is the property v4134 established and the one " +
+           "this line was accidentally forbidding." },
+    { gate: "tools/ship/supersededFlag-selfcheck.mjs", round: "v4482",
+      why: "THE SAME FOUR CHARACTERS, IN A SECOND FILE. Identical to unattendedHold's line above and red for " +
+           "the identical reason since the identical round. Two gates carrying one grep is why the repair had " +
+           "to be made twice, and why neither reading told anybody what was actually wrong." },
+    { gate: "tools/ship/pairlaneBridge-selfcheck.mjs", round: "v4482",
+      why: "PINNED A LABEL STRING THROUGH A RENAME THAT WAS THE POINT OF THE ROUND THAT MADE IT. It demanded " +
+           "`label: \"File Transfer Utils\"` in pageSections and in server.html's tab button; v4211 renamed " +
+           "the panel to \"Peer 2 Peer\" and both rows went red while the registry and the button stayed " +
+           "perfectly in step. A LITERAL FOR A LITERAL WOULD BE THE SAME DEFECT SPELLED DIFFERENTLY, so what " +
+           "is asserted now is what those lines were for: the id and tab do NOT move when the label does, and " +
+           "the two readers say the SAME thing, whatever it is." },
+    { gate: "tools/ship/sunshineHost-selfcheck.mjs", round: "v4482",
+      why: "THE LABEL NAMED THE CONTRACT AND THE CHECK COUNTED TO SEVEN. Its row read \"every route the bridge " +
+           "lists is reachable through its own handler\" and its assertion was `ROUTES.length === 7` -- so a " +
+           "bridge listing seven routes and owning NONE of them passed it, and /sunshine/apps arriving as an " +
+           "eighth reddened it. A COUNT IS NOT A CONTRACT. It drives owns() over every listed path now, 8 of " +
+           "8, with the path taken off each entry rather than the whole \"GET  /sunshine/status\" string -- " +
+           "which is how a first pass reported all eight unowned and would have read as a catastrophe." },
+    { gate: "tools/ship/bfcache-selfcheck.mjs", round: "v4482",
+      why: "THE ONLY ONE OF THE FIVE THAT WAS RIGHT, and it was right for 203 rounds. camera-effects.html " +
+           "stopped the camera and closed the clip on `pagehide` with no `event.persisted` check, so entering " +
+           "the back-forward cache -- which is a FREEZE, not a leave -- tore down handles the restore then " +
+           "had no way to rebuild: a live-looking page with a dead camera. The v3052 defect raymarch-live and " +
+           "volume-cache were both fixed for, in the third page nobody looked at. FIXED IN THE PAGE, not in " +
+           "the gate: the guard plus a pageshow reload, the shape its two siblings already carry." },
     { gate: "tools/ship/updatePause-selfcheck.mjs", round: "v4451",
       why: "RED SINCE v4279 AND THE CODE WAS RIGHT THE WHOLE TIME. Its last check required " +
            "`c._errored = true; tally();` -- the two statements ADJACENT ON ONE LINE -- and somebody later " +

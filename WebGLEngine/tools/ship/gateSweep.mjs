@@ -2588,6 +2588,35 @@ since116: Object.freeze({
                  "rather than letting a green gate imply otherwise. Sixteen sabotages, sixteen red; three " +
                  "survived first and all three were a check looking at the wrong thing",
     }),
+    since121: Object.freeze({
+        at: "v4482", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/unattendedHold-selfcheck.mjs (grepped ALREADY OWNS PORT 8787 after v4134 gave the port one derivation and the refusal correctly started echoing %SWEK_PORT%)",
+            "tools/ship/supersededFlag-selfcheck.mjs (the identical line, in a second file -- both now extract the refusal BLOCK and assert the branch rather than the characters)",
+            "tools/ship/pairlaneBridge-selfcheck.mjs (pinned label: \"File Transfer Utils\" through v4211's rename to \"Peer 2 Peer\", twice -- now asserts the id does not move with the label and that registry and button agree)",
+            "tools/ship/sunshineHost-selfcheck.mjs (ROUTES.length === 7 under a label reading \"every route ... is reachable\" -- now drives owns() over all 8)",
+            "tools/ship/winPathGuard-selfcheck.mjs (its own header's \"stripping comments is enough\" was false once a round note quoted the idiom in a STRING; detections read codeOnly() now, exemptions keep noComments())",
+            "tools/ship/bfcache-selfcheck.mjs (a REAL defect: camera-effects.html tore down on pagehide with no event.persisted check -- fixed in the page)",
+            "tools/ship/reportDoors.mjs (not a gate -- the real Windows bug winPathGuard was pointing at: new URL(import.meta.url).pathname builds C:\\C:\\... on Keith's rig, in a front door)",
+            "tools/ship/freezeRegisterAudit.mjs (found by re-freezing, not by a paste: a run KILLED at the 120s cap had its partial output frozen as the gate's failing line -- doorKinds filed one line of however many it would have printed)",
+            "tools/ship/deferralCensus-selfcheck.mjs (my own v4479 row pinned reach === 1 and went red the first time the reach IMPROVED to 2 -- the same species as the four above, in the file that names the species)",
+        ]),
+        verdict: "*** KEITH PASTED EIGHTEEN RED GATE READINGS AND SIX OF THEM WERE THE GATE, NOT THE TREE. *** " +
+                 "Twelve reproduce in this sandbox and six do not, which is itself the finding: redCensus " +
+                 "calls its list a claim about a MOMENT and it is also a claim about a BOX. Four of the six " +
+                 "repairs were checks pinned to an ARRANGEMENT a later correct round changed -- a port " +
+                 "literal in two files, a panel label, a route COUNT under a label naming a contract -- so " +
+                 "each went red BECAUSE THE WORK IT ASKED FOR WAS DONE. Two were real: a Windows path idiom " +
+                 "in a front door, and a page tearing down on a bfcache freeze. FIVE ENTRIES COME OFF " +
+                 "RED_AT_V4279 and registerDrift's live re-run caught every one the same minute. NOT TOUCHED, " +
+                 "AND MOST OF THE BATCH: six gates green here and red on the rig -- three printing ALL PASS " +
+                 "and then aborting on a libuv double-close, so an EXIT CODE decides a verdict the checks did " +
+                 "not -- and five ratchets that have grown past their baselines, which are the gates being " +
+                 "RIGHT. Two sabotages on the repaired stripper, both correct: real code reddens, the same " +
+                 "text in a string does not",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

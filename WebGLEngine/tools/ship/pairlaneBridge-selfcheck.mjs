@@ -234,14 +234,30 @@ console.log("pairlaneBridge-selfcheck -- who may start a transfer, and who may r
     const nearshareBlock = (sections.match(/id: "nearshare"[\s\S]{0,900}?pages: \[[^\]]*\]/) || [""])[0];
     ok("!! pairlane.html joined the (renamed) File Transfer Utils panel's page list too",
         /"pairlane\.html"/.test(nearshareBlock), nearshareBlock.slice(0, 160));
-    ok("!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***",
-        /label: "File Transfer Utils"/.test(nearshareBlock) && /id: "nearshare", tab: "nearshare"/.test(nearshareBlock),
+    // *** v4482 -- BOTH OF THESE PINNED THE LABEL TEXT, AND v4211 RENAMED IT AGAIN. *** The panel reads
+    // `label: "Peer 2 Peer"` now and server.html's button agrees with it, which is the state these two lines
+    // exist to protect -- but they were written as `=== "File Transfer Utils"`, so a correct rename reddened
+    // them and they have been red since. THE LABEL IS AN ARRANGEMENT; THE CLAIM IS THAT THE ID DID NOT MOVE
+    // WITH IT AND THAT THE TWO READERS STILL AGREE. Both survive the next rename, and both still catch the
+    // failures these lines were written for: an id renamed alongside the label, and a button left behind.
+    const panelLabel = (nearshareBlock.match(/label: "([^"]+)"/) || [, ""])[1];
+    ok("!! *** the panel's label is RENAMEABLE -- id/tab stay put while it changes ***",
+        !!panelLabel && /id: "nearshare", tab: "nearshare"/.test(nearshareBlock),
         "renaming the internal id too would touch every existing data-tab/data-panel selector for no reason " +
-        "the request asked for -- the visible label is what changed");
+        "the request asked for -- the visible label is what changed. Label now: " +
+        (panelLabel ? JSON.stringify(panelLabel) : "NONE FOUND"));
 
     const serverHtml = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
-    ok("!! the server.html tab button shows the renamed label, not the old one",
-        /data-tab="nearshare">[\s\S]{0,80}File Transfer Utils/.test(serverHtml) && !/data-tab="nearshare">[\s\S]{0,80}>\s*NearShare</.test(serverHtml));
+    // *** ONE LABEL, TWO READERS: the registry and the button must say the SAME thing, whatever that is. ***
+    // Pinning the string meant a rename had to be made in three places (registry, page, gate) and the gate was
+    // the one nobody remembered -- so the check that was meant to keep the button in step with the registry
+    // instead went red while they were perfectly in step. The AGREEMENT is what nobody can silently break.
+    const tabBtn = (serverHtml.match(/data-tab="nearshare">[\s\S]{0,200}?<\/button>/) || [""])[0];
+    ok("!! the server.html tab button shows the SAME label the registry does",
+        !!panelLabel && tabBtn.includes(panelLabel),
+        tabBtn ? "registry " + JSON.stringify(panelLabel) + " against the button's " +
+                 JSON.stringify((tabBtn.match(/<span>[^<]*?([A-Za-z][^<]*)<\/span>/) || [, "?"])[1].trim())
+               : "NO data-tab=\"nearshare\" BUTTON FOUND");
     ok("!! ...and pairlane.html is also a direct link where the other Mac-System tools already are",
         /href="\/pairlane\.html"/.test(serverHtml));
 }
