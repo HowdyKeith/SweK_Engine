@@ -62,6 +62,51 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4490 -- the register audit's cap was typed, never derived, and two of its thirty gates exceed it
+
+tools/ship/freezeRegisterAudit.mjs runs every gate in the red register and writes down its exit code and its
+failing lines, so tools/ship/registerDrift-selfcheck.mjs can hold each entry to what its gate actually says.
+That gate exists for a stated reason: "TWICE IN ONE SESSION A STANDING RED TURNED OUT TO BE UNOPENED MAIL."
+
+A gate the freeze kills at the cap is recorded as a timeout, and tools/ship/registerRender.mjs then renders
+that entry as "the audit captured no failing line ... past the capture cap". *** THE REGISTER SHOWS A BOUND
+WHERE THE GATE'S OWN SENTENCE BELONGS, WHICH IS THE UNOPENED MAIL AGAIN, ARRIVING THROUGH THE TOOL BUILT TO
+PREVENT IT. ***
+
+*** MEASURED: THE SLOWEST REGISTERED GATE TAKES 439,821 ms AND THE CAP WAS 120,000. *** Run singly on a quiet
+box: shaderRefs 439,821 ms, doorKinds 159,201 ms, referenceKind 90,874, orphanDisposition 84,126, graveyard
+82,359 -- and then the sixth is 12,784 and the median is 1,597. THE SLOWEST IS 275 TIMES THE MEDIAN. A single
+typed number over a distribution that skewed is not a threshold, it is a guess about the tail, and it came up
+wrong for two of thirty.
+
+*** AND THE KNOB WAS ADDED INSTEAD OF THE DEFAULT BEING FIXED, WITH THE MEASUREMENT IN HAND. *** The freeze's
+own comment, at v4471: "their runtimes (75 s to 151 s) are why SWEK_AUDIT_CAP_MS exists." A round measured
+three gates at up to 151 seconds, added an environment override, and left the default at 120,000 -- already
+below what it had just measured. Nineteen rounds later the tail had grown from 151 s to 441 s and nobody was
+passing the variable. The default is DERIVED now: twice the slowest measured runtime, rounded up to the next
+minute, imported from NEW tools/ship/auditCap.mjs, and no cap-sized literal is left in the freeze for the next
+round to read as a default.
+
+*** AND v4489'S CONCLUSION ABOUT THIS WAS WRONG, FROM TWO PROBES THAT STRADDLED ONE GATE. *** That round
+re-froze at 120,000 ms, saw doorKinds killed, re-froze at 300,000 ms, saw shaderRefs killed, and concluded
+"there is no cap where both pass, so registerDrift's rule that a timeout must carry no line is stricter than
+its stated intent". 300,000 sits strictly between 159,201 and 439,821. Two samples either side of one runtime,
+and the conclusion drawn from the bracket -- THE GATES WERE NEVER TIMED. Timed, they finish in 159 s and 440 s,
+a cap above both is ordinary, and at the derived 900,000 ms the audit has zero timeout rows and registerDrift
+is ALL GREEN. The rule was never the problem. Two probes are not a sweep, and "no value works" needs the value
+measured rather than guessed at twice.
+
+*** THE CIRCULARITY THIS COULD HAVE INTRODUCED IS GUARDED, NOT ASSUMED AWAY. *** The cap is derived from
+runtimes the freeze measures under the cap, so a gate that slowed past it would record the cap as its runtime
+and justify the cap forever. Two rows close the loop: the audit must contain ZERO timeout rows, and the
+slowest row must sit under the cap by at least 1.5x. A row AT the cap is a bound wearing a measurement and
+neither row passes with one present. The headroom is REPORTED every run -- 2.04x today -- rather than asserted
+to be safe, so the next crossing is visible before it is a timeout.
+
+NEW tools/ship/auditCap-selfcheck.mjs, twenty checks in five sections. The audit is re-frozen at v4490 under
+the derived cap: thirty rows, every one a verdict, none a bound. registerDrift-selfcheck goes from red to ALL
+GREEN without its rule being touched and without an entry being registered to get there. The tree stands at
+1529 gates.
 ## v4489 -- the mirror mirrors the march and not the sampler, and that is the whole disagreement
 
 render/parallaxOcclusion.js ships a GLSL function and a JS one called parallaxUVMirror -- "the JS model of

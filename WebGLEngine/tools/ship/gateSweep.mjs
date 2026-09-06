@@ -3021,6 +3021,32 @@ since116: Object.freeze({
                  "k/16, where floor and round agree and a flipped row changes nothing. Both axes now, at 0.7 " +
                  "and 0.3 of a texel.",
     }),
+    since129: Object.freeze({
+        at: "v4490", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/auditCap-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty checks in five sections. The register audit's cap " +
+                 "was a typed 120,000 ms and TWO OF THE THIRTY GATES IT CAPS EXCEED IT -- shaderRefs at " +
+                 "439,821 ms and doorKinds at 159,201 ms, run singly on a quiet box. A killed gate is recorded " +
+                 "as a timeout and registerRender then shows the register a BOUND where the gate's own " +
+                 "sentence belongs, which is the 'unopened mail' registerDrift exists to prevent, arriving " +
+                 "through the tool built to prevent it. The distribution is why a typed number could not " +
+                 "work: median 1,597 ms, slowest 275x the median, and the sixth-slowest already six times " +
+                 "faster than the fifth. *** AND THE KNOB WAS ADDED INSTEAD OF THE DEFAULT BEING FIXED, WITH " +
+                 "THE MEASUREMENT IN HAND: *** the freeze's own comment at v4471 reads 'their runtimes (75 s " +
+                 "to 151 s) are why SWEK_AUDIT_CAP_MS exists', and the default stayed at 120,000 -- below what " +
+                 "that round had just measured -- for nineteen rounds while the tail grew to 441 s. The " +
+                 "default is DERIVED now, twice the slowest runtime rounded up to the minute, and no " +
+                 "cap-sized literal is left in the freeze. *** v4489'S CONCLUSION WAS WRONG AND THE ROUND " +
+                 "REPRODUCES IT: *** it probed 120,000 and 300,000, saw a different gate killed each time, and " +
+                 "concluded no cap satisfies registerDrift's timeout rule. 300,000 lies STRICTLY BETWEEN " +
+                 "159,201 and 439,821 -- two samples either side of one runtime, and the gates were never " +
+                 "timed. At the derived 900,000 the audit has zero timeouts and registerDrift is ALL GREEN " +
+                 "with its rule untouched and nothing registered to get there. THE CIRCULARITY IS GUARDED: a " +
+                 "cap derived from readings taken under it would justify itself if a gate ever slowed past " +
+                 "it, so the audit must carry zero timeout rows AND the slowest row must sit 1.5x under the " +
+                 "cap. Headroom is REPORTED (2.04x) rather than asserted safe.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

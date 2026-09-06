@@ -25,8 +25,16 @@ function ENGINE_VERSION() {
     return m[1];
 }
 
+import { derivedCap } from "./auditCap.mjs";
+
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || 120000);
+// v4490 -- *** THE DEFAULT IS DERIVED FROM WHAT THE GATES TAKE, NOT TYPED. *** It read 120000 from v4471,
+// when this file's own comment below recorded runtimes of "75 s to 151 s" -- so the default was already
+// BELOW the population it caps on the day the override was added, and it stayed there for nineteen rounds
+// while the tail grew to 441 s. Two of the thirty rows were being recorded as bounds rather than verdicts,
+// and registerRender then showed the register "past the capture cap" where the gate's own sentence belongs.
+// See tools/ship/auditCap.mjs: twice the slowest measured runtime, rounded up to the next minute.
+const CAP_MS = Number(process.env.SWEK_AUDIT_CAP_MS || derivedCap());
 
 /** Run one gate and read its verdict. BOTH STREAMS: one gate of 29 prints its FAIL line to stderr (v4380). */
 const run = (rel) => new Promise((res) => {

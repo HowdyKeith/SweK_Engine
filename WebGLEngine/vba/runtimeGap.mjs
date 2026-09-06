@@ -220,8 +220,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // AND A FOURTEENTH, at v4489: render/parallaxSampler.mjs and its gate (3892 -> 3894), moving the same
     // three rows a device round always moves -- ES modules +2, closures +2, async/await +1 -- and NOTHING
     // ELSE. FOURTEEN POPULATIONS, FOURTEEN TABLES, THREADS 22 IN EVERY ONE.
-    files: 3894,
-    esModules: 3603, closures: 3476, asyncAwait: 1343, typedArrays: 694, promises: 333,
+    // AND A FIFTEENTH, at v4490: tools/ship/auditCap.mjs and its gate (3894 -> 3896), moving ES modules +2
+    // and closures +2 and NOTHING ELSE -- no async/await this time, because neither file drives a device.
+    // FIFTEEN POPULATIONS, FIFTEEN TABLES, AND THREADS HAS READ 22 IN EVERY SINGLE ONE.
+    files: 3896,
+    esModules: 3605, closures: 3478, asyncAwait: 1343, typedArrays: 694, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
