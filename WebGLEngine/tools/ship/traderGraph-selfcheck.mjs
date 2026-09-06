@@ -1,7 +1,49 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/traderGraph-selfcheck.mjs -- v4289
 //
-// GRADES world/traderGraph.mjs: contributors as traders, built from git history because the API is shut.
+// GRADES world/traderGraph.mjs: contributors as traders, built from git history.
+//
+// ---- *** v4481 -- THE REFUSALS WERE QUOTED EXACTLY AND ATTRIBUTED TO THE WRONG PARTY *** -------------------
+//
+// This file used to say "built from git history BECAUSE THE API IS SHUT", and re-probed three refusals every
+// run so a stale claim could not survive. *** THE REFUSALS ARE THE RUNNER'S. *** Every `blocked` message the
+// module records says so in its own words -- "this session", "Use add_repo", "sessions are bound to their
+// configured repositories" -- and one carries a docs.anthropic.com documentation_url. The evidence was
+// captured verbatim and correctly, and nobody asked whose voice it was.
+//
+// Measured, unauthenticated curl from inside the sandbox:
+//
+//     users/but0n                                403   "sessions are bound to their configured repositories"
+//     repos/but0n/vixel                          403   "not enabled for this session. Use add_repo"
+//     repos/howdykeith/swek_engine/contributors  200   real GitHub data, real ETag -- it IS the bound repo
+//     rate_limit                                 200   limit 15000, which is an AUTHENTICATED limit
+//
+// The first two are PUBLIC GitHub paths; what answered was the proxy in front of them. *** AND THE OLD ROWS
+// COULD ONLY EVER CONFIRM THEMSELVES: re-probing from inside the sandbox that is doing the refusing
+// reproduces the artefact every run -- a control that can only run where the defect is invisible. *** It went
+// red at v4480 only because ONE path flipped to 200, and that flip is the tell: the repository was bound to
+// the session. Read as "the API opened", it would have rebuilt the graph on an axis that exists inside one
+// sandbox and nowhere else.
+//
+// NOT CLAIMED: that GitHub would answer 200 for the first two. Nothing here reaches GitHub unproxied, so the
+// 403s are not evidence about GitHub in either direction -- the premise is UNSUPPORTED, not disproved. The
+// MODULE'S CHOICE IS UNAFFECTED: git history is deterministic, needs no credentials, costs no rate limit, and
+// answers a sharper question than the API does. Only the stated reason was wrong.
+//
+// v4481 SABOTAGES, RESULTS BY NAME:
+//   DA. refusalSource calls the runner's refusal GitHub's        -> 3 RED
+//   DB. an axis is attributed to GitHub instead of the runner    -> 2 RED
+//   DC. refusalSource guesses GitHub for an empty body           -> *** 0 RED, THEN 2 RED ***
+//   DD. the docs.anthropic.com marker stops being a tell         -> *** 0 RED, THEN 2 RED ***
+//   DE. the attributor ignores the body and reads only the status-> 4 RED
+//   DF. an unmarked GitHub body is attributed to the runner      -> 2 RED
+//
+// DC AND DD WENT 0 RED AND BOTH WERE FINDINGS. The empty-body branch is unreachable because no probe here
+// returns one; the docs.anthropic.com marker is ALREADY IMPLIED by the phrase test against today's messages
+// -- v4451's "an earlier test already implies it", the third instance this session. A marker redundant TODAY
+// stops being redundant the moment the proxy rewords its message, which is exactly when this file gets read
+// again, so it stays and a fixture exercises it. Two more plants (DE, DF as first written) broke the
+// ASSERTION rather than the subject and were replaced: sabotaging a check is not sabotaging what it guards.
 //
 // *** THE THREE REFUSALS ARE RE-PROBED HERE, NOT QUOTED. *** A module that says "the API is unavailable"
 // is making a claim about the world, and the world can change -- an org admin connects GitHub, somebody
@@ -51,30 +93,96 @@ console.log("1. *** NO EMAIL ADDRESS IS STORED, AND THAT IS CHECKED RATHER THAN 
         "holding an address defeated it, and only a check across the WHOLE FILE catches that.");
 }
 
-console.log("\n2. *** THE THREE REFUSALS, RE-PROBED AGAINST GITHUB THIS RUN ***");
+console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUST THE STATUS ***");
+// *** v4481 -- THIS SECTION SAID "STILL REFUSED BY GITHUB" ABOUT THREE REFUSALS THAT ARE THE RUNNER'S. ***
+// The module records each `blocked` message verbatim and the messages say "this session", "Use add_repo" and
+// "sessions are bound to their configured repositories"; one carries a docs.anthropic.com documentation_url.
+// The evidence was captured correctly and nobody asked whose voice it was. A bare status code cannot say --
+// so the probe reads the BODY now and attributes the refusal.
+//
+// AND THE OLD ROWS COULD ONLY EVER CONFIRM THEMSELVES: re-probing from inside the sandbox that is doing the
+// refusing reproduces the artefact every run. They went red only when one path flipped to 200 -- which is
+// not GitHub opening up, it is this repository being bound to this session.
 {
     const probe = (p) => {
         try {
-            const out = execFileSync("curl", ["-s", "-m", "20", "-o", "/dev/null", "-w", "%{http_code}",
-                                              "https://api.github.com/" + p], { encoding: "utf8" });
-            return parseInt(out, 10);
-        } catch { return -1; }
+            const body = execFileSync("curl", ["-s", "-m", "20", "https://api.github.com/" + p], { encoding: "utf8" });
+            const code = parseInt(execFileSync("curl", ["-s", "-m", "20", "-o", "/dev/null", "-w", "%{http_code}",
+                                                        "https://api.github.com/" + p], { encoding: "utf8" }), 10);
+            return { code, body, source: code === 200 ? null : T.refusalSource(body) };
+        } catch { return { code: -1, body: "", source: null }; }
     };
     const blocked = T.AXES.filter((a) => !a.have);
     ok("the module records three DISTINCT refusals, not one", new Set(blocked.map((a) => a.blocked)).size === 3,
         blocked.map((a) => a.remedy.slice(0, 26)).join(" | "));
+
+    // *** THE ATTRIBUTION IS A PROPERTY OF THE RECORDED TEXT, SO IT IS CHECKED WITHOUT THE NETWORK. *** Every
+    // blocked axis quotes the runner; if one ever quotes GitHub instead, that is a different fact needing a
+    // different remedy, and this row is where it surfaces.
+    ok("!! *** EVERY REFUSAL THIS MODULE RECORDS IS THE RUNNER'S, BY ITS OWN WORDS ***",
+       blocked.length > 0 && blocked.every((a) => a.blockedBy === T.RUNNER && T.refusalSource(a.blocked) === T.RUNNER),
+       `${blocked.length} blocked axes, all attributed to ${T.RUNNER}. They say "this session", "Use ` +
+       `add_repo", "sessions are bound to their configured repositories". THE HEADER USED TO SAY GITHUB.`);
+
+    // *** THE ATTRIBUTOR'S BRANCHES ARE NOT ALL REACHABLE FROM THIS NETWORK, so they are driven by fixtures.
+    // *** Sabotage found two that went 0 RED: the empty-body branch (no probe here returns one) and the
+    // docs.anthropic.com marker (already implied by the phrase test against today's messages -- v4451's
+    // "an earlier test already implies it", the third instance this session). A marker that is redundant
+    // TODAY is not redundant when the proxy rewords its message, which is exactly when this file will be
+    // read again, so it stays and it is exercised here rather than trusted.
+    {
+        const cases = [
+            ["proxy, by phrase", '{"message":"GitHub access to this repository is not enabled for this session. Use add_repo"}', T.RUNNER],
+            ["proxy, by binding phrase", '{"message":"This GitHub API path is not available: sessions are bound to their configured repositories"}', T.RUNNER],
+            ["proxy, by URL ALONE", '{"message":"Reworded by a future proxy","documentation_url":"https://docs.anthropic.com/en/docs/claude-code/github-actions"}', T.RUNNER],
+            ["GitHub, rate limited", '{"message":"API rate limit exceeded for 1.2.3.4"}', T.GITHUB],
+            ["GitHub, unmarked JSON", '{"message":"Not Found"}', T.GITHUB],
+            ["nothing to attribute", "", null],
+        ];
+        const wrong = cases.filter(([, body, want]) => T.refusalSource(body) !== want);
+        ok("!! FIXTURE: every branch of the attributor, including the two the network cannot reach",
+           wrong.length === 0,
+           `${cases.length} bodies, ${cases.length - wrong.length} attributed correctly` +
+           (wrong.length ? ": WRONG on " + wrong.map((c) => c[0]).join(", ") : "") +
+           '. THE URL-ONLY CASE AND THE EMPTY BODY ARE UNREACHABLE FROM HERE -- and an empty body returns ' +
+           "null rather than guessing, because a refusal with nothing in it is unattributed, not GitHub's.");
+    }
+
     const user = probe("users/but0n");
     const repo = probe("repos/but0n/vixel");
     const own = probe("repos/howdykeith/swek_engine/contributors");
-    ok("*** the /users path class is STILL refused ***", user === 403,
-        `HTTP ${user}` + (user === 200 ? " -- IT IS OPEN NOW, and the module's AXES are out of date" : ""));
-    ok("*** an unattached repository is STILL refused ***", repo === 403, `HTTP ${repo}`);
-    ok("*** our own repository's contributors are STILL refused ***", own === 403, `HTTP ${own}`);
-    ok("CONTROL: the network is up, so the 403s are refusals and not a dead link",
-        probe("rate_limit") === 200, "rate_limit answers 200 on the same connection");
-    report("if any line above goes red with a 200, the graph can be built from richer data than git history " +
-        "and this module should be revisited. A red here is an INVITATION, which is why it is a check and " +
-        "not a sentence in a comment.");
+    const lim = probe("rate_limit");
+    for (const [n, r] of [["users/but0n", user], ["repos/but0n/vixel", repo],
+                          ["our contributors", own], ["rate_limit", lim]])
+        report(`${n.padEnd(18)} HTTP ${r.code}${r.source ? "  refused by " + r.source : ""}`);
+
+    // *** A RUNNER REFUSAL IS NO VERDICT ABOUT GITHUB. *** v3201's distinction, applied to a network probe:
+    // the old rows read a 403 as "GitHub still refuses", which is a claim this runner is not positioned to
+    // make. What CAN be asserted from here is that the refusal is the sandbox's, and it is.
+    const runnerRefusals = [user, repo].filter((r) => r.source === T.RUNNER);
+    ok("!! *** THE 403s COME FROM THE SANDBOX, NOT FROM GITHUB -- SO THEY SAY NOTHING ABOUT GITHUB ***",
+       runnerRefusals.length === 2,
+       `${runnerRefusals.length} of 2 public paths refused by the runner. users/but0n and repos/but0n/vixel ` +
+       "are PUBLIC on GitHub; what answered was the proxy in front of it. NOT CLAIMED: that GitHub would " +
+       "answer 200 -- nothing here can reach it unproxied, so the premise is UNSUPPORTED, not disproved.");
+
+    // The one that flipped, and why it is not the invitation it looks like.
+    ok("!! the bound repository answers, and that is a fact about SESSIONS rather than about the API",
+       own.code === 200 && own.source === null,
+       `HTTP ${own.code} for the repository this session is bound to, while every unbound path is refused. ` +
+       "THIS IS THE 200 THAT TURNED THE GATE RED at v4480, and reading it as 'the API opened' would have " +
+       "rebuilt the graph on an axis that exists only inside one sandbox.");
+
+    ok("CONTROL: the network is up, so the refusals are refusals and not a dead link",
+       lim.code === 200, "rate_limit answers 200 on the same connection -- and its limit is 15000, which is " +
+       "an AUTHENTICATED limit, so this control has always been measuring a credentialed proxied connection");
+
+    report("v4481: the old invitation read 'if any line above goes red with a 200, the graph can be built " +
+        "from richer data than git history and this module should be revisited.' THE REASON IS RETIRED AND " +
+        "THE QUESTION IS NOT: a 200 from here means the path is inside THIS SESSION'S binding, so it is an " +
+        "invitation only when it arrives from a runner with no such binding. Run this unproxied on the rig " +
+        "and the answer it gives is about GitHub. A red here is still worth reading; it is just not evidence " +
+        "of what it used to be read as.");
 }
 
 console.log("\n3. THE SWEEP, AND THAT IT COVERS WHAT IT CLAIMS");
