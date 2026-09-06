@@ -2537,6 +2537,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the quarter-turn row; an orthonormality hold added), device 3 / 1 / 1 (B and C first 0 red: a shadow copy no draw " +
                  "relied on, a leak no pixel shows; a frame and a pool-length row added).",
     }),
+    since120: Object.freeze({
+        at: "v4498", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugMorph-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. vendor/morphicons (the core, MIT, papered) arrived as strokeMorph's written refusal " +
+                 "expired; render/slugMorph.mjs morphs one glyph outline into another through it and packs one glyph a frame " +
+                 "for Slug (SlugFontDevice.fromAtlas, one shared pipeline). Endpoints are the plan's samples to 1e-16, a frame " +
+                 "costs 1.9 ms, the t = 0.5 frame is within 2 of 255 of slugEval on both backends. FOUND: morphicons duplicates a " +
+                 "subpath to pair 2 contours with 3, and under non-zero winding two coincident holes read as ink -- duplicates " +
+                 "are dropped at the endpoints, the splitting overlap recorded. Sabotages red at 5 / 4 / 7 / 2; A went 0 red first " +
+                 "(a closing re-pin that pinned nothing) and was removed rather than held.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

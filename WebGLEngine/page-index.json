@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 453,
+ "count": 454,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2569,6 +2569,13 @@
    "f": "slug-device.html",
    "t": "Slug Text on the Device",
    "d": "Resolution-independent Slug text drawn through gfx/device.js on whichever backend the page has: the same atlas, the same batch, the WGSL twin on WebGPU and the GLSL port on WebGL2, premultiplied blend from the descriptor. slug-text.html is the raw WebGL2 original; this page is the device path that any device frame can draw text inside. ?webgl=1 forces the WebGL2 backend.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slug-morph.html",
+   "t": "Slug Morph",
+   "d": "One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The plumbing is gated by tools/ship/slugMorph-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

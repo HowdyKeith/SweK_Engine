@@ -607,6 +607,28 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         tools/ship/deviceUniformsPerDraw-selfcheck.mjs on both backends. And vertex streams built in node carried
         the node atlas's glyph locs into the browser's atlas of a different logWidth: the browser builds its own
         bodies now; only rows cross a process boundary.
+    THE SLUG GLYPH MORPH -- built at v4498 (task 44), and vendor/morphicons arrived with it. physics/mesh/
+        strokeMorph.mjs derived a morph for the gauge digits (single open strokes) and wrote its refusal of
+        morphicons with an expiry: closed or multi-subpath outlines are that library's half, do not re-derive it.
+        Font glyphs are exactly that, so the core of guillermolg00/morphicons 1.7.1 (three files, 32 KB, MIT, no
+        DOM, no dependencies; PROVENANCE.md and world/vendoredLicences.mjs paper it) is vendored and
+        render/slugMorph.mjs uses it: a glyph's quadratic contours become an SVG path (M / Q / Z, em units),
+        morphicons resamples each subpath to N points, pairs the subpaths of the two glyphs and interpolates, the
+        polylines come back as Slug contours of degenerate quadratics (control = midpoint, the a = 0 case the
+        shader handles) and text/slugAtlas.js packs that ONE glyph a frame, drawn through SlugFontDevice.fromAtlas
+        with one shared pipeline. MEASURED (tools/ship/slugMorph-selfcheck.mjs, Plex 0 -> 8, 64 points a subpath):
+        t = 0 and t = 1 are the plan's own samples to 1e-16 and t = 1's subpaths are the 8's resample up to a
+        cyclic start shift (morphicons moved the start, not the shape); every subpath's area at t = 0.5 lies
+        between its endpoints'; a frame costs 1.9 ms here (interpolate + packAtlas, 192 curves); the t = 0.5 frame
+        is within 2 of 255 of slugEval on the morphed atlas on both backends; the t = 0 frame differs from the
+        font's own 0 on 125 of 603 lit pixels by up to 16 of 255, which is a 64-point polyline against true curves
+        at 64 px. THE FINDING: morphicons pairs the 0's two contours with the 8's three by DUPLICATING the hole,
+        and under Slug's non-zero winding two coincident holes wind +2 against the outer's -1 and read as ink --
+        the first frame drew a FILLED 0. Exact duplicates are dropped at the endpoints; between them the copies
+        diverge and their overlap winds +2 until they separate, a brief filled lens where a hole splits (even-odd
+        would fill it too, three crossings). slug-morph.html cycles a string of glyphs. An earlier draft's
+        re-pin of the closing curve pinned nothing (the closure is by construction) and was removed when its
+        sabotage went 0 red.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

@@ -66,6 +66,11 @@ export const VENDORED = Object.freeze([
             "the only one here that constrains RENAMING rather than copying." },
     { path: "vendor/gifenc",    kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/grass",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    // v4498 -- the core of guillermolg00/morphicons (three files, no DOM, no dependencies), vendored when physics/mesh/strokeMorph.mjs's
+    // written refusal expired: font glyphs are closed multi-subpath outlines, which is the half that file said not to re-derive.
+    { path: "vendor/morphicons", kind: KIND.THIRD_PARTY, spdx: "MIT",      grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://github.com/guillermolg00/morphicons", pin: "npm morphicons@1.7.1",
+      note: "papered at v4498 with PROVENANCE.md beside it (the tarball's sha256, which files are vendored and which are not)." },
     { path: "vendor/heerich",   kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/htmx",      kind: KIND.THIRD_PARTY, spdx: "0BSD",      grant: GRANT.LICENCE_FILE, file: "LICENSE",
       upstream: "https://github.com/bigskysoftware/htmx", pin: "v2.0.10",

@@ -236,6 +236,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "heerich": Object.freeze([
         "heerich-avatar.html",
     ]),
+    // v4498 -- vendor/morphicons arrived with render/slugMorph.mjs, its one importer (the gate imports the module, not the vendor)
+    "morphicons": Object.freeze([
+        "render/slugMorph.mjs",
+    ]),
     "htmx": Object.freeze([
         "ai-bridge/ensureHtmx.js",
         "ai-bridge/server.js",

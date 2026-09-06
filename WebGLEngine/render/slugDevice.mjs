@@ -162,6 +162,26 @@ export class SlugFontDevice {
      * The pack was baked at logWidth 12; a device that cannot carry a 4096-wide texture is refused by name rather than handed an
      * atlas whose band rows wrap at a width its shader was not compiled for (text/slugAtlas.js's rule 1, the v3823 plant).
      */
+    /**
+     * v4498 (task 44): a font device over an atlas packed by the caller -- one morphed glyph a frame, from render/slugMorph.mjs's
+     * packMorphed. `opts.pipeline` reuses a pipeline built once (a pipeline a frame would be the cost, not the textures); the two
+     * textures are created here and the caller destroys the previous frame's device. `font` is kept for layout metrics.
+     */
+    static fromAtlas(device, font, atlas, opts = {}) {
+        if (!device || typeof device.texture !== "function" || typeof device.pipeline !== "function") throw new Error("slugDevice: a gfx/device.js device is required");
+        if (!atlas || !atlas.glyphs || !atlas.curveData) throw new Error("slugDevice: fromAtlas needs a packAtlas result");
+        const lw = logWidthFor(device);
+        if (atlas.logWidth > lw) throw new Error(`slugDevice: the atlas was packed at width ${1 << atlas.logWidth} and this device carries ${1 << lw} at most`);
+        const self = Object.create(SlugFontDevice.prototype);
+        self.device = device; self.font = font; self.opts = opts; self.logWidth = atlas.logWidth; self.atlas = atlas; self.packed = false;
+        self.curveTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.curve, width: atlas.width, height: atlas.curveTexels, data: atlas.curveData, nearest: true });
+        self.bandTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.band, width: atlas.width, height: atlas.bandTexels, data: atlas.bandData, nearest: true });
+        if (opts.pipeline) { self.pipeline = opts.pipeline; self.desc = opts.desc || null; self.sharedPipeline = true; }
+        else { self.desc = slugPipelineDesc(self.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight }); self.pipeline = device.pipeline(self.desc); }
+        self.notice = SLUG_NOTICE;
+        return self;
+    }
+
     static fromPack(device, pack, opts = {}) {
         if (!device || typeof device.texture !== "function" || typeof device.pipeline !== "function") throw new Error("slugDevice: a gfx/device.js device is required");
         if (!pack || !pack.atlas || !pack.font || !pack.font.packed) throw new Error("slugDevice: fromPack needs a decoded slug pack ({ font, atlas } from text/slugPack.mjs decodePack)");
