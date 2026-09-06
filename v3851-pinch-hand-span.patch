@@ -1,0 +1,627 @@
+diff --git a/CHANGELOG-v3851.md b/CHANGELOG-v3851.md
+new file mode 100644
+index 0000000..a9dd517
+--- /dev/null
++++ b/CHANGELOG-v3851.md
+@@ -0,0 +1,113 @@
++## v3851 -- THE PINCH THRESHOLD SCALES WITH THE HAND NOW, WHICH IS THE CHANGE v3850 MEASURED AND REFUSED TO MAKE ON ITS OWN
++
++v3850 found it and declined to fix it, on the rule that A ROUND MUST NOT MOVE A VERDICT IT IS NOT ABOUT (v3679):
++`pinch.active` compared a distance against an ABSOLUTE constant, so it had a critical scale, and that scale is
++the user's distance from the camera. It put the numbers to Keith. *** KEITH CALLED IT, SO THIS ROUND MAKES THE
++CHANGE -- AND THE ONLY REASON THE CALL WAS DECIDABLE IS THAT v3850 HAD ALREADY MEASURED WHAT IT WOULD COST. ***
++
++### THE FIX
++
++    limit = pinchSpanFraction * dist(WRIST, MIDDLE_MCP)        default fraction 0.375
++
++`folded` was always safe because it is a RATIO test -- a uniform scale multiplies both compared distances and
++the verdict stands. pinch is one now too.
++
++### THE SPAN IS THE LOAD-BEARING CHOICE, AND POSE-STABILITY IS WHY -- NOT PROPORTIONALITY
++
++Any hand-sized distance scales correctly. Almost none of them are safe. MEASURED across the four fixture poses:
++
++        wrist -> MIDDLE_MCP    0.160200  0.160200  0.160200  0.160200     <- RIGID, this is the palm
++        INDEX_MCP -> PINKY_MCP 0.079000  0.079000  0.079000  0.079000     <- also rigid
++        wrist -> MIDDLE_TIP    0.278115  0.131352  0.131352  0.278115     <- COLLAPSES ON A CURL
++
++*** A SPAN THAT SHORTENS WHEN YOU CLOSE YOUR HAND WOULD MAKE THE PINCH THRESHOLD DEPEND ON THE OTHER FINGERS,
++SO A FIST WOULD MOVE ITS OWN PINCH BOUNDARY. *** That is circular, and it is the obvious choice (wrist to
++fingertip is the first "hand size" anyone reaches for). The palm also EXCLUDES THE THUMB -- one of the two
++points being measured -- because a reference that moves with the gesture under test is measuring itself.
++
++### 0.375 IS DERIVED, NOT PICKED, AND THAT IS WHAT MAKES THIS A GENERALIZATION RATHER THAN A RETUNE
++
++    0.375 * 0.160200 = 0.060075   against the shipped 0.06   -- A 0.125% DIFFERENCE
++
++Every fixture pose classifies EXACTLY as it did before at nominal size (open / fist / point not pinched, pinch
++pinched), and now also at every other distance. Read anatomically it is a ~3.75cm thumb-index gap on a ~10cm
++palm. The gate asserts this continuity, so IF THE FRACTION IS EVER RETUNED THAT CHECK GOES RED -- which is a
++different decision from the one this round made, and should have to be made deliberately.
++
++*** AND THE REASON THE SPAN IS THE PALM AND NOT THE KNUCKLE ROW IS A FIXTURE DEFECT DECIDING A SHIPPED
++CONSTANT, WHICH HAS TO BE SAID OUT LOUD. *** Calibrating the fraction requires the fixture's proportions to be
++anatomically honest wherever the calibration touches them:
++
++        fixture palm : index  = 1.483     adult hand ~10.0cm : ~7.2cm = 1.389    <- CLOSE, licenses the number
++        fixture knuckle : palm = 0.493    adult hand ~8.0cm : ~10.0cm = 0.800    <- THE FIXTURE PALM IS TOO NARROW
++
++A fraction calibrated on the knuckle span (0.7595) would have baked that fixture error into a shipped default.
++
++### MEASURED, THE FIX -- 12 scales x 4 poses spanning 0.25x to 4x
++
++        pinchScaleDisagreements     9 / 48   ->   0 / 48        absolute -> relative
++        flips at the derived s*     4 / 4    ->   0 / 4
++        a FIST reading as a pinch, swept 0.20x..1.50x in 0.01 steps:   43 scales  ->  0
++        pinch.ratio (the distance measured in PALMS) drifts 2.8e-15 across the whole sweep
++        rigid invariance                                       STILL 0 / 256
++
++That last line is the one that could have gone wrong and did not: the new predicate is a ratio of TWO
++distances, and a rigid motion preserves both, so it stays exactly invariant.
++
++### THE SWEEP WAS GRADING ITS OWN RANGE, AND THAT IS THIS ROUND'S SECOND CORRECTION
++
++The first run of `absolutethreshold` separated by only 2 of 32 and read like a weak defect. IT WAS A SWEEP THAT
++STOPPED BEFORE THE DEFECT HAPPENED. The four critical scales are 0.4085 (open), 0.4085 (point), 0.6291 (fist)
++and 3.4188 (pinch), and v3850's sweep ran 0.5..3 -- so only the FIST's fell inside it. Widened to 0.25..4 it
++brackets all four and separates 9 of 48. *** A DEFECT MEASURED OUTSIDE THE RANGE WHERE IT OCCURS IS MEASURED AS
++ABSENT ***, and the give-away was that the number was small for no stated reason.
++
++### WHAT ELSE MOVED, AND WHY IT IS REPORTED RATHER THAN QUIETLY ABSORBED
++
++  * *** THE PLANT'S COUNT WENT 20 -> 21. *** `flatDistance` flattens EVERY distance, and since this round that
++    includes the palm span the pinch limit is built from -- so the pinch bit joins the fold bits in what the
++    plant can disturb (the extra count is one more rotation of the fist). THE SHAPE OF THE CENSUS IS UNCHANGED:
++    still exactly one transform family sees it, in-plane roll still blind, translation still blind. A FIX THAT
++    ADDS A DISTANCE ADDS IT TO THE PLANT'S REACH TOO, and that is worth knowing rather than smoothing over.
++  * THE SCALE MODE'S CLAIM MOVED from `foldScaleDisagreements` to `pinchScaleDisagreements`. The fold number has
++    been 0 since the fold test was written and would go on being 0 whatever happened to pinch, so claiming on it
++    made the mode's headline THE HALF THAT WAS NEVER IN DOUBT. Both are still asserted at 0 in the gate.
++  * NEW MODE `absolutethreshold` -- the pre-v3851 comparison, graded, so a REGRESSION OF THIS ROUND'S FIX would
++    be caught rather than discovered. It is the device's SECOND defect mode; `flatdistance` stays the promoted
++    plant because its blindness census is the stronger argument and leaving it promoted keeps this device's
++    census entry from moving for a reason unrelated to the census. v3729's precedent: run the defects, promote
++    one, MEASURE the others rather than mention them.
++  * `pinch` gains `limit`, `span`, `ratio` and `relative` -- ADDITIVE, so no existing reader breaks. `ratio` is
++    the scale-free quantity: pinchDist in palms, and `ratio < pinchSpanFraction` is exactly `active`.
++  * `pinchRelative: false` restores the pre-v3851 comparison EXACTLY (verified against `distance < 0.06` on
++    every swept pose), so a caller who wants the old behaviour has it by name rather than by patching.
++
++### THE DEGENERATE CASE, WHICH IS A GUARD AND NOT PADDING
++
++A zero or non-finite palm span means the palm landmarks collapsed. Dividing by it would make the limit 0 and
++NOTHING would ever read as pinched -- silently, and hardest exactly where tracking is already worst. It falls
++back to the absolute threshold and SAYS SO in `pinch.relative`, which the gate checks.
++
++### WHAT IS NOT CLAIMED
++
++  * NOT that 0.375 is right for a REAL hand. It is right for the shipped verdict at nominal size, which is the
++    only continuity checkable without a camera. *** CONFIRMING THE FRACTION AGAINST REAL MediaPipe LANDMARKS IS
++    NOT DONE AND IS THE NAMED FOLLOW-UP *** -- a real palm span carries detector noise and foreshortens under
++    perspective, and a synthetic rigid fixture has neither.
++  * NOT that this removes every distance dependence. The span foreshortens when the palm turns edge-on to a real
++    camera; the fixture cannot show that because it rotates in true 3D with z preserved.
++  * NOT that the fixture is a real hand -- unchanged from v3850, and section 0 of the gate still checks the four
++    poses classify as the gestures they are named for before anything is measured on them.
++
++### GATE STATE
++
++  * handsBind-selfcheck: 25 checks, all pass, exit 0 (was 19 at v3850).
++  * registry 108, `hands` resolves, modes now five; knobGate.checkMode accepts `absolutethreshold` and refuses
++    an undeclared mode; probeModePlant ok, rigidDisagreements 0 -> 21.
++  * deviceModes-selfcheck: all checks pass, `hands` still in the EXPORTED set and not the UNGUARDED list.
++  * MediaPipeHandTracker still constructs and imports clean in node; defaults read flatDistance false,
++    pinchRelative true, pinchSpanFraction 0.375.
++  * UNCHANGED FROM v3850 AND STILL NOT THIS PATCH'S: capabilityCard-selfcheck 1 FAIL and detectionMap-selfcheck
++    1 FAIL are PRE-EXISTING on pristine v3849 (verified by stashing). plantedCoverage-selfcheck still does not
++    complete on this container against its own 143s budget; this device's five modes total well under a second.
++    AN UNRUN GATE IS NOT A PASSING ONE -- run it on a normal rig.
+diff --git a/WebGLEngine/face/MediaPipeHandTracker.js b/WebGLEngine/face/MediaPipeHandTracker.js
+index f19b4a3..526dd54 100644
+--- a/WebGLEngine/face/MediaPipeHandTracker.js
++++ b/WebGLEngine/face/MediaPipeHandTracker.js
+@@ -28,7 +28,24 @@ const DEFAULT_OPTS = {
+     videoHeight: 480,
+     targetHz:    30,        // detection throttle
+     numHands:    2,         // 2 enables two-hand zoom/rotate gestures
+-    pinchThreshold: 0.06,   // 3D thumb-tip↔index-tip distance for a pinch
++    // v3851 -- PINCH IS NOW A FRACTION OF THE HAND, NOT A CONSTANT. v3850 measured what the constant cost:
++    // pinch.distance is homogeneous of degree 1 in apparent hand size, so an ABSOLUTE threshold has a critical
++    // scale s* = pinchThreshold/d(1) -- and a CLOSED FIST CROSSED IT AT 0.63x, reading as a pinch purely for
++    // being far from the camera. The fold family never had this problem because it is a RATIO test; this makes
++    // pinch one too.
++    pinchThreshold: 0.06,   // ABSOLUTE fallback: used when pinchRelative is false, or the span is unusable
++    pinchRelative: true,    // compare against pinchSpanFraction * palmSpan instead of pinchThreshold
++    // The span is dist(WRIST, MIDDLE_MCP) -- the palm, which is RIGID: it reads 0.160200 identically across
++    // open / fist / point / pinch on the device fixture, where wrist->MIDDLE_TIP collapses 0.278 -> 0.131 on a
++    // curl. A span that shortens when you close your hand would make the pinch threshold depend on the OTHER
++    // fingers, which is circular. It also excludes the thumb, one of the two points being measured.
++    // *** 0.375 IS DERIVED, NOT PICKED: it reproduces the shipped 0.06 at nominal fixture size to 0.125%
++    // (0.375 * 0.160200 = 0.060075), so this is a GENERALIZATION OF THE SHIPPED VERDICT AND NOT A RETUNE --
++    // every fixture pose classifies exactly as before at nominal, and now also at every other distance. Read
++    // anatomically it is a ~3.75cm thumb-index gap on a ~10cm palm. *** SEE THE NOTE IN handsBind.mjs: the
++    // fixture's palm LENGTH is anatomically close (ratio 1.483 vs ~1.389) which is what licenses this number,
++    // but confirming it against real MediaPipe landmarks is NOT DONE and is named as required follow-up.
++    pinchSpanFraction: 0.375,
+     minHandDetectionConfidence: 0.5,
+     minHandPresenceConfidence:  0.5,
+     minTrackingConfidence:      0.5,
+@@ -313,6 +330,9 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
+     // three-argument path character for character, which is what makes the default verifiable.
+     const flat = opts.flatDistance ?? DEFAULT_OPTS.flatDistance;
+     const dist = (a, b) => _dist3D(a, b, flat);
++    // v3851 -- see DEFAULT_OPTS. `pinchRelative: false` restores the pre-v3851 absolute comparison EXACTLY.
++    const pinchRelative = opts.pinchRelative ?? DEFAULT_OPTS.pinchRelative;
++    const pinchSpanFraction = opts.pinchSpanFraction ?? DEFAULT_OPTS.pinchSpanFraction;
+ 
+     const hands = [];
+     for (let i = 0; i < landmarksArray.length && i < 2; i++) {
+@@ -323,9 +343,17 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
+         const thumbTip = lm[IDX.THUMB_TIP];
+         const indexTip = lm[IDX.INDEX_TIP];
+ 
+-        // Pinch: 3D distance between thumb tip and index tip.
++        // Pinch: 3D distance between thumb tip and index tip, compared against a limit that SCALES WITH THE
++        // HAND (v3851). palmSpan is wrist->MIDDLE_MCP: rigid under finger curl, and thumb-free, so the
++        // reference cannot move with the gesture being measured.
+         const pinchDist = dist(thumbTip, indexTip);
+-        const pinchActive = pinchDist < pinchThreshold;
++        const palmSpan = dist(wrist, lm[IDX.MIDDLE_MCP]);
++        // *** THE FALLBACK IS NOT DEFENSIVE PADDING, IT IS THE DEGENERATE CASE. *** A zero or non-finite span
++        // means the palm landmarks collapsed, and dividing by it would make every hand read as pinched --
++        // silently, and hardest exactly where tracking is already worst.
++        const spanUsable = pinchRelative && Number.isFinite(palmSpan) && palmSpan > 0;
++        const pinchLimit = spanUsable ? pinchSpanFraction * palmSpan : pinchThreshold;
++        const pinchActive = pinchDist < pinchLimit;
+ 
+         // Grab point: midpoint of thumb+index (mirrored X).
+         const grabPoint = {
+@@ -349,7 +377,16 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
+         hands.push({
+             handedness,                  // raw MediaPipe label (mirror-flipped vs user; see notes)
+             cursor: { x: mx(indexTip.x), y: indexTip.y },  // index-tip pointer, mirrored
+-            pinch: { active: pinchActive, distance: pinchDist },
++            // v3851 -- `limit`, `span` and `ratio` are ADDITIVE and exist so the decision is inspectable
++            // rather than having to be re-derived by a caller. `ratio` is the scale-free quantity: it is
++            // pinchDist expressed in palms, so it is the number that means the same thing at any distance
++            // from the camera, and `ratio < pinchSpanFraction` is exactly `active`.
++            pinch: {
++                active: pinchActive, distance: pinchDist,
++                limit: pinchLimit, span: palmSpan,
++                ratio: palmSpan > 0 ? pinchDist / palmSpan : Infinity,
++                relative: spanUsable,
++            },
+             grab: { active: pinchActive, point: grabPoint },
+             fist, openPalm, pointing,
+             folded,
+diff --git a/WebGLEngine/tools/roundhouse/handsBind-selfcheck.mjs b/WebGLEngine/tools/roundhouse/handsBind-selfcheck.mjs
+index 4b0a3ce..09763b0 100644
+--- a/WebGLEngine/tools/roundhouse/handsBind-selfcheck.mjs
++++ b/WebGLEngine/tools/roundhouse/handsBind-selfcheck.mjs
+@@ -76,7 +76,7 @@ report("THE TWO-HAND SPREAD IS REPORTED, NOT PINNED AT ZERO",
+     `zero would be asserting that rotation arithmetic is closed in binary64.`);
+ 
+ // ---- 2. THE HONEST NEGATIVE ---------------------------------------------------------------------------------
+-console.log("\n2. SCALE -- the same function holds one scale-invariant classifier and one that is not");
++console.log("\n2. SCALE -- v3850 found one classifier scale-invariant and one not; v3851 fixed the second");
+ const scale = await buildHands({ mode: "scale" });
+ ok("!! the fold family is scale-invariant, because it is a RATIO test",
+     !scale.error && scale.foldScaleDisagreements === 0,
+@@ -84,23 +84,63 @@ ok("!! the fold family is scale-invariant, because it is a RATIO test",
+     `3x. A uniform scale multiplies both compared distances, so the verdict stands -- fist / openPalm / pointing ` +
+     `and the four folded flags do not care how far away the user is`);
+ 
+-ok("!! pinch.distance is exactly homogeneous of degree 1, which makes the critical scale DERIVABLE",
++ok("!! pinch.distance is exactly homogeneous of degree 1, which is WHY an absolute threshold had a critical scale",
+     scale.pinchHomogeneityErr < 1e-12,
+     `worst departure from s*d(1) is ${scale.pinchHomogeneityErr.toExponential(3)} -- floating-point noise. So ` +
+-    `s* = pinchThreshold / d(1) is EXACT rather than fitted, and does not have to be searched for`);
++    `s* = pinchThreshold / d(1) was EXACT rather than fitted, and did not have to be searched for`);
+ 
+-ok("!! ...and every pose actually flips on either side of its own derived s*, so the derivation is not just algebra",
+-    scale.pinchFlipsAtCritical === scale.poses,
+-    `${scale.pinchFlipsAtCritical}/${scale.poses} poses read pinched at 0.999*s* and not at 1.001*s*. ` +
+-    `THE FIST'S IS s* = ${scale.pinchCriticalScale.toFixed(4)}: below ~63% of fixture size A CLOSED FIST READS ` +
+-    `AS A PINCH, because thumb tip and index tip are 0.0954 apart and the threshold is a constant 0.06`);
++// *** THE v3851 FIX, AND THE CHECK THAT WOULD CATCH IT BEING UNDONE ***
++ok("!! *** pinch.active IS NOW SCALE-INVARIANT TOO -- it compares against a FRACTION OF THE PALM ***",
++    scale.pinchScaleDisagreements === 0,
++    `${scale.pinchScaleDisagreements} disagreements over ${scale.scalesSwept} (pose, scale) pairs spanning ` +
++    `0.25x to 4x. limit = pinchSpanFraction * dist(WRIST, MIDDLE_MCP), so both sides of the comparison scale ` +
++    `together and the verdict cannot turn over -- the same reason the fold family was always safe`);
+ 
+-report("*** THIS IS REPORTED AS A LIMITATION AND NOT FIXED, AND THE DISTINCTION MATTERS ***",
+-    "An absolute threshold on a normalized coordinate is a legitimate design with an UNDOCUMENTED " +
+-    "PRECONDITION -- it defines a working volume, and pinchThreshold is already a caller-visible option. The " +
+-    "fix (scale the threshold by a hand-span landmark distance) changes shipped gesture behaviour for every " +
+-    "existing consumer, and A ROUND MUST NOT MOVE A VERDICT IT IS NOT ABOUT (v3679). It is measured here so it " +
+-    "can be DECIDED rather than discovered by a user leaning back in their chair.");
++ok("...and pinch.ratio, the distance measured in PALMS, is the scale-free quantity that makes that true",
++    scale.pinchRatioDrift < 1e-12,
++    `drift ${scale.pinchRatioDrift.toExponential(3)} across the whole sweep. `+
++    `\`ratio < pinchSpanFraction\` IS \`active\`, so a caller can read the margin rather than re-deriving it`);
++
++ok("!! the span is POSE-STABLE, which is the load-bearing property and not merely that it scales",
++    (() => {
++        const spans = POSE_NAMES.map((n) => computeHandMetrics([place(handPose(POSES[n]))]).hands[0].pinch.span);
++        return spans.every((v) => Math.abs(v - spans[0]) < 1e-12);
++    })(),
++    `wrist->MIDDLE_MCP reads identically across open/fist/point/pinch (it is the rigid palm), where ` +
++    `wrist->MIDDLE_TIP collapses 0.278115 -> 0.131352 on a curl. *** A SPAN THAT SHORTENED WHEN YOU CLOSED ` +
++    `YOUR HAND WOULD MAKE THE PINCH THRESHOLD DEPEND ON THE OTHER FINGERS -- circular. *** It also excludes ` +
++    `the THUMB, one of the two points being measured`);
++
++ok("!! the default fraction is a GENERALIZATION of the shipped verdict, not a retune -- checked, not asserted",
++    (() => {
++        let same = 0;
++        for (const n of POSE_NAMES) {
++            const lm = place(handPose(POSES[n]));
++            const now = computeHandMetrics([lm]).hands[0].pinch.active;
++            const before = computeHandMetrics([lm], null, { pinchRelative: false }).hands[0].pinch.active;
++            if (now === before) same++;
++        }
++        return same === POSE_NAMES.length;
++    })(),
++    `all ${POSE_NAMES.length} poses classify identically at nominal size to the pre-v3851 absolute comparison. ` +
++    `0.375 * 0.160200 = 0.060075 against the shipped 0.06 -- a 0.125% difference. *** IF THIS GOES RED THE ` +
++    `FRACTION HAS BEEN RETUNED, WHICH IS A DIFFERENT DECISION FROM THE ONE THIS ROUND MADE. ***`);
++
++ok("!! a degenerate palm span FALLS BACK instead of dividing by it",
++    (() => {
++        const collapsed = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0 }));
++        const h = computeHandMetrics([collapsed]).hands[0];
++        return h.pinch.span === 0 && h.pinch.relative === false && h.pinch.limit === 0.06;
++    })(),
++    "a collapsed palm gives span 0; without the guard the limit would be 0 and NOTHING would ever read as " +
++    "pinched -- silently, and hardest exactly where tracking is already worst. It falls back to the absolute " +
++    "threshold and says so in `pinch.relative`");
++
++report("*** WHAT v3850 SAID ABOUT THIS, AND WHY IT IS NOT A CONTRADICTION ***",
++    "v3850 measured this defect and DECLINED to fix it -- 'a round must not move a verdict it is not about' " +
++    "(v3679) -- and put it to Keith with the numbers. Keith called it. THAT IS THE DIFFERENCE BETWEEN A ROUND " +
++    "REFUSING A CHANGE AND A ROUND BEING TOLD TO MAKE ONE, and the numbers v3850 recorded are what made the " +
++    "call decidable rather than a preference.");
+ 
+ // ---- 3. MIRROR ----------------------------------------------------------------------------------------------
+ console.log("\n3. THE MIRROR INVOLUTION -- the webcam is a mirror and the module flips X to compensate");
+@@ -145,14 +185,16 @@ console.log("\n4. THE PLANT -- _dist3D drops its z term, the most tempting real
+         `plant's signal is in ONE of the five transform families this device sweeps`);
+ 
+     report("THE FULL BLINDNESS CENSUS, MEASURED",
+-        "rotation about x 12/64 FIRES, about y 8/64 FIRES, about z (in-plane) 0/64 BLIND, translation 0/64 " +
+-        "BLIND, uniform scale 0/32 BLIND, mirror 0 BLIND. *** FOUR OF THE FIVE TRANSFORM FAMILIES CANNOT SEE " +
++        "rotation about x 13/64 FIRES, about y 8/64 FIRES, about z (in-plane) 0/64 BLIND, translation 0/64 " +
++        "BLIND, uniform scale 0/48 BLIND, mirror 0 BLIND. *** FOUR OF THE FIVE TRANSFORM FAMILIES CANNOT SEE " +
+         "IT AND THE BLIND ONE IS THE OBVIOUS ONE TO TEST WITH. *** A device built only from the invariances " +
+         "that are easiest to state would have certified this module against a defect that removes a third of " +
+-        "its input.");
++        "its input. (v3851 moved the total 20 -> 21: the plant flattens EVERY distance and that now includes " +
++        "the palm span the pinch limit is built from, so the pinch bit joins what it can disturb. The SHAPE " +
++        "of the census is unchanged -- still exactly one family sees it.)");
+ 
+     report("*** AND IT IS POSE-DEPENDENT FOR A REASON THAT IS NOT z EXTENT -- THE PART THIS ROUND GOT WRONG FIRST",
+-        "By pose, out-of-plane only: open 0/32, point 0/32, fist 19/32, pinch 1/32. The obvious reading is 'an " +
++        "By pose, all axes: open 0/48, point 0/48, fist 20/48, pinch 1/48. The obvious reading is 'an " +
+         "open hand lies in the image plane so it has no z to lose', AND THE z-SPANS REFUTE IT: open 0.0300 but " +
+         "point 0.0980, THE SAME AS THE FIST, and point does not fire at all. What separates them is MARGIN -- " +
+         "in `point` the index is fully extended and the others fully curled, so every fold comparison sits far " +
+@@ -184,8 +226,25 @@ console.log("\n4. THE PLANT -- _dist3D drops its z term, the most tempting real
+         "are not obliged to agree in the last ulp. Writing it as `Math.hypot(dx,dy, flat ? 0 : dz)` would put " +
+         "the knob INSIDE the default's arithmetic. A KNOB THAT CHANGES THE DEFAULT IS NOT A KNOB. ***");
+ 
++    // *** THE SECOND DEFECT MODE: the pre-v3851 comparison, graded so a REGRESSION OF THIS ROUND'S FIX would
++    // be caught. It is not the promoted plant (see the device descriptor for why) but it is not undeclared
++    // either -- v3729's precedent: run the defects, promote one, and MEASURE the others rather than mention them.
++    const absolute = await buildHands({ mode: "absolutethreshold" });
++    ok("!! `absolutethreshold` restores the pre-v3851 comparison and VIOLATES the scale claim",
++        scale.pinchScaleDisagreements === 0 && absolute.pinchScaleDisagreements > 0,
++        `pinchScaleDisagreements ${scale.pinchScaleDisagreements} -> ${absolute.pinchScaleDisagreements} of ` +
++        `${absolute.scalesSwept}, and flips at the derived s* ${scale.pinchFlipsAtCritical} -> ` +
++        `${absolute.pinchFlipsAtCritical} of ${absolute.poses}. *** A FIST READS AS A PINCH BELOW s* = ` +
++        `${absolute.pinchCriticalScale.toFixed(4)} UNDER THE OLD RULE AND AT NO SCALE UNDER THE NEW ONE ***`);
++
++    ok("...and the fold family is untouched by it, so the two halves of the scale mode are separate claims",
++        absolute.foldScaleDisagreements === 0,
++        `fold ${absolute.foldScaleDisagreements} in both arms -- it was ALWAYS a ratio test, and a mode that ` +
++        `moved it too would not isolate what v3851 actually changed`);
++
+     ok("...and the validator LISTS the plant mode, so it cannot silently revert",
+         handsDefaults({ mode: "flatdistance" }).mode === "flatdistance" &&
++        handsDefaults({ mode: "absolutethreshold" }).mode === "absolutethreshold" &&
+         handsDefaults({ mode: "nonsense-mode" }).mode === "rigid",
+         "v3806 lost a round to a validator that reverted its plant in silence and v3845 nearly repeated it -- " +
+         "both arms then read an IDENTICAL number and the plant fires at nothing. The DEFAULT is untouched: " +
+@@ -196,8 +255,9 @@ console.log("\n4. THE PLANT -- _dist3D drops its z term, the most tempting real
+ console.log("\n5. THE DEVICE CONTRACT");
+ {
+     const flat = await buildHands({ mode: "flatdistance" });
++    const absolute = await buildHands({ mode: "absolutethreshold" });
+     ok("every key measured in every mode is declared",
+-        [rigid, scale, mir, flat].every((o) => Object.keys(o).every((k) => handsDevice.observables.includes(k))),
++        [rigid, scale, mir, flat, absolute].every((o) => Object.keys(o).every((k) => handsDevice.observables.includes(k))),
+         `${handsDevice.observables.length} declared observables across ${handsDevice.modes.length} modes`);
+ 
+     ok("the device descriptor is complete",
+@@ -215,11 +275,15 @@ console.log("\n5. THE DEVICE CONTRACT");
+ 
+     ok("each mode carries its OWN claim rather than one claim with a mode label",
+         handsDefaults({ mode: "rigid" }).claim.observable === "rigidDisagreements" &&
+-        handsDefaults({ mode: "scale" }).claim.observable === "foldScaleDisagreements" &&
++        handsDefaults({ mode: "scale" }).claim.observable === "pinchScaleDisagreements" &&
++        handsDefaults({ mode: "absolutethreshold" }).claim.observable === "pinchScaleDisagreements" &&
+         handsDefaults({ mode: "mirror" }).claim.observable === "mirrorMaxDelta" &&
+         handsDefaults({ mode: "flatdistance" }).claim.observable === "rigidDisagreements",
+-        "rigid/flatdistance -> rigidDisagreements <= 0 ; scale -> foldScaleDisagreements <= 0 ; " +
+-        "mirror -> mirrorMaxDelta <= 0");
++        "rigid/flatdistance -> rigidDisagreements <= 0 ; scale AND absolutethreshold -> " +
++        "pinchScaleDisagreements <= 0 (which the second VIOLATES, by design) ; mirror -> mirrorMaxDelta <= 0. " +
++        "*** v3851 MOVED THE SCALE CLAIM OFF foldScaleDisagreements: that number has been 0 since the fold " +
++        "test was written and would stay 0 whatever happened to pinch, so claiming on it made the mode's " +
++        "headline the half that was never in doubt. ***");
+ 
+     ok("the fixtures are EXPORTED, so this gate drives the same hand the device does",
+         typeof handPose === "function" && typeof place === "function" && typeof rotate === "function" &&
+diff --git a/WebGLEngine/tools/roundhouse/handsBind.mjs b/WebGLEngine/tools/roundhouse/handsBind.mjs
+index bafbfb9..ea5d1a4 100644
+--- a/WebGLEngine/tools/roundhouse/handsBind.mjs
++++ b/WebGLEngine/tools/roundhouse/handsBind.mjs
+@@ -28,26 +28,58 @@
+ // inequality cannot turn over. Its own header calls this "rotation-tolerant" in a comment; that comment is now
+ // a graded claim instead of an assertion.
+ //
+-// *** AND THE HONEST NEGATIVE, WHICH IS THE FINDING WORTH MORE THAN THE PASS: THE SAME FUNCTION CONTAINS ONE
+-// CLASSIFIER THAT IS SCALE-INVARIANT AND ONE THAT IS NOT, AND THE ONE THAT IS NOT IS THE ONE barehands USES
+-// MOST. *** `folded` is a comparison between two distances, so a uniform scale multiplies both and the verdict
+-// stands -- measured 0 disagreements over 8 scales x 4 poses. `pinch.active` is a distance against an ABSOLUTE
+-// constant (pinchThreshold = 0.06 in normalized image units), so it has a critical scale and the scale is the
+-// user's distance from the camera. pinch.distance is exactly homogeneous of degree 1 (worst departure from
+-// s*d(1) is 2.1e-15 over the shipped sweep, floating-point noise), which makes the critical scale EXACT rather than
+-// empirical: s* = 0.06 / d(1). MEASURED, and each one verified to flip on either side of its own s*:
++// ================================================================================================================
++// v3851 -- THE SCALE DEFECT v3850 MEASURED AND DECLINED TO FIX IS NOW FIXED, ON KEITH'S CALL
++// ================================================================================================================
++//
++// v3850 found the honest negative: THE SAME FUNCTION CONTAINED ONE CLASSIFIER THAT WAS SCALE-INVARIANT AND ONE
++// THAT WAS NOT, AND THE ONE THAT WAS NOT WAS THE ONE barehands USES MOST. `folded` is a comparison between two
++// distances, so a uniform scale multiplies both and the verdict stands. `pinch.active` was a distance against
++// an ABSOLUTE constant (0.06 in normalized image units), so it had a critical scale -- and that scale is the
++// user's distance from the camera. pinch.distance is homogeneous of degree 1 (departure from s*d(1): 2.1e-15),
++// which made the critical scale EXACT rather than empirical: s* = 0.06/d(1), each verified to flip either side:
+ //
+-//     pose     d(1)        s* = 0.06/d(1)      what it means at the camera
+-//     open     0.146877      0.4085            reads pinched below ~41% of fixture size
++//     pose     d(1)        s* = 0.06/d(1)      what it used to mean at the camera
++//     open     0.146877      0.4085            read pinched below ~41% of fixture size
+ //     point    0.146877      0.4085
+-//     fist     0.095370      0.6291            reads pinched below ~63% -- A FIST IS A FALSE PINCH WHEN FAR
+-//     pinch    0.017550      3.4188            stops reading pinched above ~342%
++//     fist     0.095370      0.6291            read pinched below ~63% -- A FIST WAS A FALSE PINCH WHEN FAR
++//     pinch    0.017550      3.4188            stopped reading pinched above ~342%
++//
++// *** THE FIX: pinch.active NOW COMPARES AGAINST A FRACTION OF THE PALM, SO IT IS A RATIO TEST LIKE `folded`.
++// *** limit = pinchSpanFraction * dist(WRIST, MIDDLE_MCP), default fraction 0.375.
++//
++// THE SPAN IS THE LOAD-BEARING CHOICE AND IT HAD TO BE POSE-STABLE, NOT JUST SIZE-PROPORTIONAL. Measured across
++// the four poses, wrist->MIDDLE_MCP reads 0.160200 IDENTICALLY (it is the rigid palm), while wrist->MIDDLE_TIP
++// collapses 0.278115 -> 0.131352 on a curl. A span that shortened when you closed your hand would make the
++// pinch threshold depend on THE OTHER FINGERS -- so a fist would move its own pinch boundary, which is circular.
++// The palm also EXCLUDES THE THUMB, one of the two points being measured; a reference that moved with the
++// gesture under test would be measuring itself.
+ //
+-// *** SO "TAP" AND "PINCH-DRAG", barehands' TWO MOST-USED GESTURES, HAVE A WORKING VOLUME AND NOTHING IN THE
+-// MODULE SAYS SO. *** Lean back far enough and a closed fist crosses the pinch threshold on its own. This is
+-// REPORTED AND NOT CALLED A DEFECT: an absolute threshold on a normalized coordinate is a legitimate design
+-// with an undocumented precondition, and the fix (scale the threshold by a hand-span landmark distance) is a
+-// change to shipped behaviour that is not this round's to make. IT IS MEASURED SO IT CAN BE DECIDED.
++// *** AND 0.375 IS DERIVED, NOT PICKED, WHICH IS WHAT MAKES THIS A GENERALIZATION RATHER THAN A RETUNE. ***
++// 0.375 * 0.160200 = 0.060075 against the shipped 0.06 -- A 0.125% DIFFERENCE, and every fixture pose
++// classifies EXACTLY as it did before at nominal size (open/fist/point not pinched, pinch pinched). Read
++// anatomically it is a ~3.75cm thumb-index gap on a ~10cm palm. The fixture's palm LENGTH is what licenses
++// that reading: its palm:index ratio is 1.483 against ~1.389 for an adult hand. NOTE THE ONE THAT IS NOT
++// LICENSED -- the fixture's KNUCKLE ROW is 0.493 of its palm against ~0.800 real, SO THE PALM IS TOO NARROW AND
++// A FRACTION CALIBRATED ON THE KNUCKLE SPAN WOULD HAVE BAKED THAT ERROR INTO A SHIPPED DEFAULT. That is why
++// the span is the palm and not the knuckles, and it is a fixture defect deciding a shipped constant, which is
++// exactly the kind of thing that has to be said out loud.
++//
++// MEASURED, the fix, over 12 scales x 4 poses spanning 0.25x to 4x:
++//     pinchScaleDisagreements   9 / 48  ->  0 / 48        (absolute -> relative)
++//     flips at the derived s*   4 / 4   ->  0 / 4
++//     a FIST reading as a pinch, swept 0.20x..1.50x in 0.01 steps:   43 scales -> 0
++//     pinch.ratio (distance in palms) drifts 2.8e-15 across the whole sweep -- the scale-free quantity
++//
++// NOT CLAIMED: that 0.375 is right for a REAL hand. It is right for the shipped verdict at nominal size, which
++// is the only continuity that can be checked without a camera. Confirming the fraction against real MediaPipe
++// landmarks -- where the palm span carries detector noise and foreshortens under perspective, neither of which
++// a synthetic rigid fixture has -- IS NOT DONE HERE and is the named follow-up.
++// NOT CLAIMED: that this removes every distance dependence. The span foreshortens when the palm turns edge-on
++// to a real camera, and the fixture cannot show that because it rotates in true 3D with z preserved.
++//
++// `pinchRelative: false` restores the pre-v3851 comparison EXACTLY, and is graded as a mode (below) so the
++// tree can be asked what a regression to it would cost rather than told.
+ //
+ // ================================================================================================================
+ // THE PLANT, AND THE BLINDNESS CENSUS THAT IS THE REAL ARGUMENT FOR THIS DEVICE
+@@ -59,13 +91,18 @@
+ // reference so that what is graded is INVARIANCE and not a baseline offset between two metrics:
+ //
+ //     transform family                honest      planted     sees the plant?
+-//     rotation about x (tilt)          0/64       12/64       YES
++//     rotation about x (tilt)          0/64       13/64       YES
+ //     rotation about y (turn)          0/64        8/64       YES
+ //     rotation about z (in-plane roll) 0/64        0/64       *** BLIND BY CONSTRUCTION ***
+ //     translation                      0/64        0/64       BLIND -- a shift changes no distance at all
+-//     uniform scale (fold family)      0/32        0/32       BLIND -- both distances scale together
++//     uniform scale (fold family)      0/48        0/48       BLIND -- both distances scale together
+ //     mirror involution                0           0          BLIND -- a reflection is an isometry in 2D too
+ //
++// (v3851 moved this total 20 -> 21. The plant flattens EVERY distance, and since v3851 that now includes the
++// palm span the pinch limit is built from, so the pinch bit joins the fold bits in what the plant can disturb.
++// The SHAPE of the census is unchanged -- the same one family sees it -- and the extra count is one more
++// rotation of the fist. A fix that adds a distance adds it to the plant's reach too, which is worth knowing.)
++//
+ // *** FOUR OF THE FIVE TRANSFORM FAMILIES CANNOT SEE IT, AND THE BLIND ONE IS THE OBVIOUS ONE TO TEST WITH. ***
+ // A 2D metric is EXACTLY invariant under rotation in the image plane, so rolling your hand at the camera -- the
+ // first thing anyone does to check a hand tracker, and the motion barehands' two-hand rotate is built on --
+@@ -73,7 +110,7 @@
+ // from the camera can, and that is the motion "hold while carrying to rotate in 3D" actually needs.
+ //
+ // *** AND IT IS POSE-DEPENDENT IN A WAY THAT IS NOT ABOUT z EXTENT, WHICH IS THE PART I GOT WRONG FIRST. ***
+-// By pose, out-of-plane rotation only: open 0/32, point 0/32, fist 19/32, pinch 1/32. The obvious reading is
++// By pose, all axes: open 0/48, point 0/48, fist 20/48, pinch 1/48. The obvious reading is
+ // "an open hand lies in the image plane so it has no z to lose" -- and the z-spans refute it: open 0.0300 but
+ // point 0.0980, THE SAME AS THE FIST, and point does not fire at all. What separates them is MARGIN. In `point`
+ // the index is fully extended and the other three fully curled, so every fold comparison sits far from its
+@@ -96,13 +133,13 @@
+ 
+ import { computeHandMetrics } from "../../face/MediaPipeHandTracker.js";
+ 
+-export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance"];
++export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance", "absolutethreshold"];
+ 
+ export const HANDS_OBSERVABLES = [
+     "rigidDisagreements", "rotationDisagreements", "translationDisagreements",
+     "outOfPlaneDisagreements", "inPlaneDisagreements", "posesSwept", "twoHandSpreadDrift",
+-    "foldScaleDisagreements", "pinchCriticalScale", "pinchHomogeneityErr", "pinchFlipsAtCritical",
+-    "scalesSwept", "mirrorMaxDelta", "mirrorPoses",
++    "foldScaleDisagreements", "pinchScaleDisagreements", "pinchCriticalScale", "pinchHomogeneityErr",
++    "pinchFlipsAtCritical", "pinchRatioDrift", "scalesSwept", "mirrorMaxDelta", "mirrorPoses",
+     "poses", "kind",
+ ];
+ 
+@@ -206,8 +243,14 @@ export function handsDefaults(hyp) {
+     if (!h.claim || !h.claim.observable) {
+         h.claim =
+             (h.mode === "rigid" || h.mode === "flatdistance") ? { observable: "rigidDisagreements", max: 0 } :
+-            h.mode === "scale" ? { observable: "foldScaleDisagreements", max: 0 } :
+-                                 { observable: "mirrorMaxDelta", max: 0 };
++            // *** v3851 -- THE SCALE CLAIM MOVES TO pinchScaleDisagreements, AND THAT IS THE POINT OF THE
++            // ROUND. foldScaleDisagreements has been 0 since the fold test was written and would go on being 0
++            // whatever happened to pinch; claiming on it made the mode's headline the half that was never in
++            // doubt. pinch is the bit this round fixed, so it is the bit the claim now rests on -- and
++            // `absolutethreshold` is graded against the SAME claim so that it VIOLATES it. ***
++            (h.mode === "scale" || h.mode === "absolutethreshold")
++                ? { observable: "pinchScaleDisagreements", max: 0 }
++                : { observable: "mirrorMaxDelta", max: 0 };
+     }
+     return h;
+ }
+@@ -218,8 +261,14 @@ export async function buildHands(hyp, base = {}) {
+     // BOTH ARMS SHARE EVERY OTHER SETTING. The plant is one flag on the metric function; the fixture, the
+     // sweep and the reference are byte-for-byte the same, which is what makes the comparison about the module.
+     const flat = h.mode === "flatdistance";
+-    const opts = flat ? { flatDistance: true, pinchThreshold: c.pinchThreshold }
+-                      : { pinchThreshold: c.pinchThreshold };
++    // v3851 -- `absolutethreshold` restores the PRE-v3851 comparison (a constant instead of a fraction of the
++    // palm). It is a second declared defect mode: see the header for why it is not the promoted plant.
++    const absolute = h.mode === "absolutethreshold";
++    const opts = {
++        pinchThreshold: c.pinchThreshold,
++        ...(flat ? { flatDistance: true } : {}),
++        ...(absolute ? { pinchRelative: false } : {}),
++    };
+     const metrics = (lm) => computeHandMetrics([lm], null, opts);
+ 
+     if (h.mode === "rigid" || h.mode === "flatdistance") {
+@@ -272,24 +321,37 @@ export async function buildHands(hyp, base = {}) {
+         };
+     }
+ 
+-    if (h.mode === "scale") {
+-        const scales = [0.5, 0.6, 0.75, 0.9, 1.25, 1.5, 2, 3];
+-        let foldDis = 0, n = 0, homogErr = 0, flips = 0;
+-        let critical = 0;
++    if (h.mode === "scale" || h.mode === "absolutethreshold") {
++        // *** THE SWEEP MUST BRACKET EVERY POSE'S CRITICAL SCALE OR IT GRADES ITS OWN RANGE. *** v3850's sweep
++        // ran 0.5..3 and the four s* values are 0.4085 (open), 0.4085 (point), 0.6291 (fist) and 3.4188
++        // (pinch) -- so only the FIST's fell inside it, and `absolutethreshold` separated by just 2 of 32. That
++        // is not a weak defect, it is a sweep that stops before the defect happens. 0.25..4 brackets all four.
++        const scales = [0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4];
++        let foldDis = 0, pinchDis = 0, n = 0, homogErr = 0, flips = 0;
++        let critical = 0, ratioDrift = 0;
+         for (const name of POSE_NAMES) {
+             const pose = handPose(POSES[name]);
+             const ref = classify(metrics(place(pose)));
+-            const d1 = metrics(place(pose)).hands[0].pinch.distance;
++            const base = metrics(place(pose)).hands[0];
++            const d1 = base.pinch.distance, r1 = base.pinch.ratio;
+             for (const s of scales) {
+                 n++;
+                 const cl = classify(metrics(place(pose, { s })));
+-                // the FOLD FAMILY only -- the first seven bits. pinch.active is deliberately excluded here:
+-                // it is the observable this mode exists to show is NOT scale-invariant.
++                // the FOLD FAMILY: the first seven bits. It was ALWAYS scale-invariant -- it is a ratio test.
+                 for (let i = 0; i < 7; i++) if (cl[i] !== ref[i]) foldDis++;
+-                const ds = metrics(place(pose, { s })).hands[0].pinch.distance;
+-                homogErr = Math.max(homogErr, Math.abs(ds - s * d1) / (s * d1));
++                // *** AND NOW THE EIGHTH BIT TOO (v3851). *** Until this round pinch.active was the one
++                // classifier in this function that scale could turn over, and it is counted SEPARATELY rather
++                // than folded into the seven because the two claims have different histories: one has always
++                // held, the other had to be fixed, and a single number would hide which.
++                if (cl[7] !== ref[7]) pinchDis++;
++                const h = metrics(place(pose, { s })).hands[0];
++                homogErr = Math.max(homogErr, Math.abs(h.pinch.distance - s * d1) / (s * d1));
++                // the RATIO is the scale-free quantity the fix introduces -- pinchDist measured in palms.
++                ratioDrift = Math.max(ratioDrift, Math.abs(h.pinch.ratio - r1) / r1);
+             }
+-            // s* is DERIVED from the homogeneity, then VERIFIED to flip on either side of itself.
++            // *** s* IS THE OLD BEHAVIOUR'S CRITICAL SCALE AND IT IS STILL COMPUTED, because the way to show a
++            // defect is FIXED is to keep measuring the thing that used to happen. Against the ABSOLUTE limit it
++            // is where pinch turned over; against the relative one nothing happens there at all.
+             const sStar = c.pinchThreshold / d1;
+             if (name === "fist") critical = sStar;
+             const below = metrics(place(pose, { s: sStar * 0.999 })).hands[0].pinch.active;
+@@ -297,10 +359,10 @@ export async function buildHands(hyp, base = {}) {
+             if (below === true && above === false) flips++;
+         }
+         return {
+-            kind: "scale",
+-            foldScaleDisagreements: foldDis, scalesSwept: n,
++            kind: absolute ? "absolutethreshold" : "scale",
++            foldScaleDisagreements: foldDis, pinchScaleDisagreements: pinchDis, scalesSwept: n,
+             pinchHomogeneityErr: homogErr, pinchCriticalScale: critical,
+-            pinchFlipsAtCritical: flips, poses: POSE_NAMES.length,
++            pinchFlipsAtCritical: flips, pinchRatioDrift: ratioDrift, poses: POSE_NAMES.length,
+         };
+     }
+ 
+@@ -327,6 +389,13 @@ export const handsDevice = {
+     // first the census would build an arm with no rigidDisagreements in it and report this device DECLARED BUT
+     // DEAD -- which is what mpmrefine reads today and what v3845 had to reorder flip3d to avoid.
+     modes: HANDS_MODES,
++    // *** TWO DEFECT MODES ARE DECLARED AND ONE IS PROMOTED, WHICH IS v3729's PRECEDENT AND NOT A DODGE. ***
++    // `flatdistance` stays THE plant: its blindness census is the stronger argument (four of five transform
++    // families cannot see it, and the blind one is the obvious one to test with), and leaving it promoted means
++    // this device's census entry does not move for a reason unrelated to the census. `absolutethreshold` -- the
++    // pre-v3851 comparison -- is a fully graded mode with its own claim, and the gate measures it: it flips
++    // pinchScaleDisagreements 0 -> 9 of 48 and would catch a regression of THIS ROUND'S FIX. The schema carries
++    // one plantMode, so the second is documented and graded rather than silently dropped.
+     plantMode: "flatdistance", plantFlips: "rigidDisagreements", plantKind: "mode",
+     name: "hands-gesture-invariance",
+     observables: HANDS_OBSERVABLES,
+@@ -340,16 +409,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
+     const flat = await buildHands({ mode: "flatdistance" });
+     const scale = await buildHands({ mode: "scale" });
+     const mir = await buildHands({ mode: "mirror" });
++    const abs = await buildHands({ mode: "absolutethreshold" });
+     console.log("[hands] THE GESTURE LAYER -- barehands' vocabulary as an answer key for computeHandMetrics\n");
+     console.log("  RIGID (what 'pinch-drag' and 'hold while carrying to rotate' silently require)");
+     console.log(`    rotation ${rigid.rotationDisagreements}, translation ${rigid.translationDisagreements}` +
+         ` over ${rigid.posesSwept} poses -- EXACTLY zero, not small. A rigid motion preserves both distances`);
+     console.log("    the fold test compares, so the verdict cannot turn over.");
+     console.log(`    two-hand spread drift ${rigid.twoHandSpreadDrift.toExponential(2)} (REPORTED: a hypot carries roundoff)`);
+-    console.log("\n  SCALE -- the honest negative, and it lands on barehands' two most-used gestures");
+-    console.log(`    fold family ${scale.foldScaleDisagreements} disagreements over ${scale.scalesSwept} scales (a RATIO test: invariant)`);
+-    console.log(`    pinch.distance homogeneous to ${scale.pinchHomogeneityErr.toExponential(2)}, and ${scale.pinchFlipsAtCritical}/${scale.poses} poses`);
+-    console.log(`    flip at their own derived s* = threshold/d(1). A FIST BECOMES A PINCH below s*=${scale.pinchCriticalScale.toFixed(4)}.`);
++    console.log("\n  SCALE -- v3850's honest negative, FIXED in v3851 (Keith's call, with the numbers)");
++    console.log(`    fold family ${scale.foldScaleDisagreements} disagreements over ${scale.scalesSwept} (pose, scale) pairs -- a RATIO test, always was`);
++    console.log(`    *** pinch ${scale.pinchScaleDisagreements} -- IT IS A RATIO TEST NOW TOO: limit = 0.375 * dist(WRIST, MIDDLE_MCP) ***`);
++    console.log(`    the old absolute threshold flips ${abs.pinchScaleDisagreements}/${abs.scalesSwept} over the same sweep and ${abs.pinchFlipsAtCritical}/${abs.poses} poses at their own s*.`);
++    console.log(`    A FIST no longer becomes a pinch by being far away (s*=${abs.pinchCriticalScale.toFixed(4)} used to do that).`);
++    console.log(`    pinch.ratio -- the distance measured in PALMS -- drifts ${scale.pinchRatioDrift.toExponential(2)} across 0.25x..4x.`);
++    console.log("    0.375 is DERIVED: 0.375 * 0.160200 = 0.060075 vs the shipped 0.06, a 0.125% difference, so");
++    console.log("    every pose classifies exactly as before at nominal size. A GENERALIZATION, NOT A RETUNE.");
+     console.log("\n  MIRROR");
+     console.log(`    max delta ${mir.mirrorMaxDelta} across ${mir.mirrorPoses} poses`);
+     console.log("\n  THE PLANT -- _dist3D drops its z term, and FOUR OF FIVE TRANSFORM FAMILIES CANNOT SEE IT");
