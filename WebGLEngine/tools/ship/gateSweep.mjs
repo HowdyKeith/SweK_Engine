@@ -2566,6 +2566,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "WGSL in the corpus. little-planet.html is the view. Sabotages red at 6 / 2 / 4 / 5 -- B (the seam's fract) changed no " +
                  "pixel and its text hold was dropped for a roll sabotage.",
     }),
+    since122: Object.freeze({
+        at: "v4500", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugFill-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. The Slug fragment's optional fill in both twins (a sampler, a texture and fillRect under " +
+                 "defines.fill; the plain text byte-identical without it) and render/slugFill.mjs (fillUv, sampleFill, the Doom Fire " +
+                 "as rgba8). The filled 8 is slugEval's coverage times the fill's nearest texel on 9,216 of 9,216 pixels on both " +
+                 "backends, 0 apart -- after the fragments were made to clamp the uv themselves, because the first run had WebGPU's " +
+                 "sampler wrapping the dilated top edge to the fire's white source row where WebGL2's clamped. slug-fire.html is the " +
+                 "view. Sabotages red at 2 / 3 / 2 / 2.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

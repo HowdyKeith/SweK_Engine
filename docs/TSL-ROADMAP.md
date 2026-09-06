@@ -644,6 +644,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         planet.html is the view: seed, zoom, tilt and spin. A sabotage that removed the WGSL's fract changed no
         pixel -- (lon + pi) / 2pi is already in [0, 1] and the sampler's clamp gives the same texel at u = 1 --
         so the text hold that had stood in for it was dropped and a roll sabotage put in its place.
+    THE SLUG FILL, AND THE DOOM FIRE INSIDE THE GLYPH -- built at v4500 (task 47). The Slug fragment takes an
+        optional fill in both twins: under defines.fill the WGSL declares a sampler and a texture at bindings 3
+        and 4 and the uniform struct gains fillRect, the GLSL a sampler2D and a vec4, and each multiplies its
+        premultiplied colour by the texel sampled at the glyph's em coordinates mapped through fillRect (an em
+        rectangle to uv 0..1, v flipped, the uv CLAMPED in the fragment itself). Without the flag both fragments
+        are the reference's text byte for byte -- the GLSL fill is emitted from JavaScript rather than a #if,
+        because a preprocessor block would have broken the capture rewrite that render/slugDevice.mjs anchors
+        on the plain tail. render/slugFill.mjs is the CPU side: fillUv, nearestTexel, sampleFill, glyphRect,
+        fireFill (render/doomFire.mjs stepped from a seed, as rgba8) and fillTexture. MEASURED (tools/ship/
+        slugFill-selfcheck.mjs, Plex '8' at 64 px, the fire 64 x 48 stepped 40 times from seed 7): on both
+        backends the filled glyph is slugEval's coverage times the fill's nearest texel on 9,216 of 9,216 pixels,
+        the backends 0 apart; the plain glyph unchanged. THE FIRST RUN WAS NOT THAT: WebGPU was the key on 9,204
+        and the 8 others were the glyph's dilated top edge, half a pixel above its rectangle, where the uv is
+        -0.065 -- WebGL2's sampler clamped to the top row and WebGPU's wrapped to the bottom row (the fire's white
+        source), 107 of 255 apart. The address mode is the sampler's default on each backend, so the fragments
+        clamp the uv themselves now and the sampler is out of the picture. Sabotages red at 2 / 3 / 2 / 2: the
+        GLSL uv not divided by the rectangle (355 unexplained on WebGL2, the backends 464 apart), the WGSL at the
+        raw texcoord (418 on WebGPU), fillRect dropped from the uniform list (the device refuses the pipeline by
+        name), the CPU key bilinear (133 on both). slug-fire.html is the view: a word with the automaton stepped
+        and re-uploaded into one texture every frame (0.3 ms), stoke / damp / extinguish / relight.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

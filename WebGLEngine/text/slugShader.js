@@ -137,6 +137,19 @@ function fragmentSource(logWidth, defines) {
     const flags = [];
     if (defines.evenOdd) flags.push("#define SLUG_EVENODD");
     if (defines.weight) flags.push("#define SLUG_WEIGHT");
+    // v4500 (task 47): defines.fill -- a texture sampled at the glyph's em coordinates, mapped through fillRect (an em rectangle
+    // to fill uv 0..1), multiplied into the colour before the coverage. Emitted from JS, not a preprocessor flag, so that WITHOUT
+    // a fill the fragment text is the reference's byte for byte (render/slugDevice.mjs's capture rewrite anchors on its tail).
+    const fillDecl = defines.fill ? `
+uniform sampler2D fillTexture;          // the fill, sampled nearest at the em coordinates mapped through fillRect
+uniform vec4 fillRect;                  // em x0, y0, x1, y1 -> fill uv 0..1 (v flipped: the fill's row 0 is the rect's top)
+` : "";
+    // the uv is clamped HERE, not by the sampler: the dilated edge of a glyph lies half a pixel outside its rectangle, and the two
+    // backends' samplers disagreed about what lies outside (WebGL2 clamped to the edge row, WebGPU wrapped to the far one -- the
+    // fire's white source row on a glyph's top edge, 8 pixels at 107 of 255, the gate's first run)
+    const fillTail = defines.fill ? `    vec2 fuv = clamp((vTexcoord - fillRect.xy) / (fillRect.zw - fillRect.xy), 0.0, 1.0);
+    vec4 fill = texture(fillTexture, vec2(fuv.x, 1.0 - fuv.y));
+    fragColor = vColor * fill * coverage;` : `    fragColor = vColor * coverage;`;
 
     return `#version 300 es
 // Slug reference fragment shader, ported. Copyright 2017 Eric Lengyel, MIT OR Apache-2.0.
@@ -157,7 +170,7 @@ flat in vec4 vBanding;
 flat in ivec4 vGlyph;
 
 out vec4 fragColor;
-
+${fillDecl}
 uint CalcRootCode(float y1, float y2, float y3)
 {
     uint i1 = floatBitsToUint(y1) >> 31u;
@@ -323,7 +336,7 @@ float SlugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData)
 void main()
 {
     float coverage = SlugRender(vTexcoord, vBanding, vGlyph);
-    fragColor = vColor * coverage;
+${fillTail}
 }
 `;
 }

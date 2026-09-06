@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Slug Fire (Doom Fire inside the glyphs)">
+<meta name="demo:desc" content="A word drawn by Slug with the Doom Fire automaton as its fill: the fragment multiplies coverage by a texture sampled at the glyph's em coordinates through an em rectangle, in both shader twins, and the fire is stepped and re-uploaded into one texture every frame. Gated pixel for pixel by tools/ship/slugFill-selfcheck.mjs.">
+<meta name="demo:category" content="fx">
+<title>Slug Fire</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  button { background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; padding:1px 6px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Slug fire: the Doom Fire automaton as the glyph fill</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
+    &middot; <a href="./slug-device.html">flat text on the device</a> &middot; <a href="./doom-fire.html">the automaton alone</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span>
+    &middot; text <input id="txt" value="BURN" size="10"> &middot; <button id="stoke">stoke</button> <button id="damp">damp</button> <button id="out">extinguish</button> <button id="light">relight</button></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { fireFill, fillTexture } from "./render/slugFill.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+const SIZE = 220;                                  // css px an em
+const FIRE = { width: 96, height: 72, seed: 7, steps: 60 };
+const CHARS = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!?&";
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+
+let device, fontDevice, batch, fire, rgba, tex, rect, layout, frames = 0, stepMs = 0;
+function setText(text) {
+  const t = [...text].filter((c) => fontDevice.font.glyphIndex(c.codePointAt(0)) > 0).join("") || "BURN";
+  layout = batch.set(t, { size: SIZE * dpr(), color: [1, 1, 1, 1] });
+  // ONE em rectangle for the whole word: the union of the glyphs' em boxes. Each glyph's texcoords are its own em
+  // box, so the fire's source row sits at the lowest ink of the word and every glyph burns from the same floor.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const c of t) { const b = fontDevice.entryFor(fontDevice.font.glyphIndex(c.codePointAt(0))).bbox; x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1); }
+  rect = [x0, y0, x1, y1];
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
+  try { fontDevice = new SlugFontDevice(device, parseFont(ab), CHARS, { fill: true }); if (fontDevice.pipeline.compiled) { const err = await fontDevice.pipeline.compiled; if (err) throw new Error(err); } }
+  catch (e) { return fail("font/atlas/fill pipeline: " + e.message); }
+  document.getElementById("notice").textContent = fontDevice.notice;
+  const kb = (fontDevice.byteSize / 1024).toFixed(0);
+  beEl.textContent = "backend: " + device.backend + " · atlas " + kb + " KiB (rgba16float + rg16uint) · logWidth " + fontDevice.logWidth + " · fill " + FIRE.width + "x" + FIRE.height + " rgba8 nearest, re-uploaded every frame";
+  const f = fireFill(FIRE); fire = f.fire; rgba = f.rgba; tex = fillTexture(device, rgba, f.w, f.h);
+  batch = new SlugDeviceBatch(fontDevice);
+  setText(document.getElementById("txt").value);
+  document.getElementById("txt").addEventListener("change", () => setText(document.getElementById("txt").value));
+  document.getElementById("stoke").onclick = () => fire.stoke();
+  document.getElementById("damp").onclick = () => fire.damp();
+  document.getElementById("out").onclick = () => fire.extinguish();
+  document.getElementById("light").onclick = () => fire.light();
+  requestAnimationFrame(frame);
+}
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(320 * d);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  const t0 = performance.now();
+  fire.step(); fire.toRGBA(rgba); tex.update({ data: rgba });
+  stepMs = stepMs * 0.9 + (performance.now() - t0) * 0.1;
+  const px = Math.round((w - layout.width) / 2), py = Math.round(h * 0.74);
+  const rows = new Float32Array([2 / w, 0, 0, (2 / w) * px - 1, 0, 2 / h, 0, 1 - (2 / h) * py, 0, 0, 0, 0, 0, 0, 0, 1]);
+  device.frame(({ pass }) => { pass.clear([0.02, 0.031, 0.024, 1]); batch.draw(pass, rows, [w, h], { texture: tex, rect }); });
+  if (++frames % 15 === 0) document.getElementById("tick").textContent = "step+upload " + stepMs.toFixed(2) + " ms · heat " + fire.heat() + (fire.isBurning() ? "" : " · out") + " · rect " + rect.map((v) => v.toFixed(2)).join(",");
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

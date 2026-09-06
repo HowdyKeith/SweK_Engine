@@ -54,7 +54,7 @@ import { VERTEX_LAYOUT, VERTEX_STRIDE, SLUG_NOTICE } from "./slugShader.js";
 export { VERTEX_LAYOUT, VERTEX_STRIDE, SLUG_NOTICE };
 
 /** Bind group 0 of the render module, by name, in the shape gfx/device.js derives bindings from. */
-export const SLUG_BINDINGS = Object.freeze({ uniforms: 0, curveTexture: 1, bandTexture: 2 });
+export const SLUG_BINDINGS = Object.freeze({ uniforms: 0, curveTexture: 1, bandTexture: 2, fillSampler: 3, fillTexture: 4 });   // 3 and 4 exist only under defines.fill
 
 /** The texture formats the two atlas textures must be created with. RGBA16F and RG16UI in WebGL2's words. */
 export const SLUG_TEXTURE_FORMATS = Object.freeze({ curve: "rgba16float", band: "rg16uint" });
@@ -291,12 +291,18 @@ fn SlugRender(renderCoord: vec2f, emsPerPixel: vec2f, bandTransform: vec4f, glyp
  * which is 72 bytes of fields in an 80-byte buffer under WGSL's uniform rule; render/wgslLayout.mjs computes it.
  */
 export function slugShaderWgsl(logWidth = 12, defines = {}) {
+    // v4500 (task 47): under defines.fill the struct gains fillRect (a vec4 after the vec2: std140 puts it at 80) and the
+    // fragment a sampler and a texture at bindings 3 and 4, sampled nearest at the em coordinates mapped through fillRect.
+    const fillStruct = defines.fill ? ", fillRect: vec4f" : "";
+    const fillBind = defines.fill ? `@group(0) @binding(${SLUG_BINDINGS.fillSampler}) var fillSampler: sampler;
+@group(0) @binding(${SLUG_BINDINGS.fillTexture}) var fillTexture: texture_2d<f32>;   // the fill (task 47)
+` : "";
     const wgsl = `${SLUG_VERTEX_CORE}
-struct SlugUniforms { m0: vec4f, m1: vec4f, m2: vec4f, m3: vec4f, viewport: vec2f };
+struct SlugUniforms { m0: vec4f, m1: vec4f, m2: vec4f, m3: vec4f, viewport: vec2f${fillStruct} };
 @group(0) @binding(${SLUG_BINDINGS.uniforms}) var<uniform> slug: SlugUniforms;
 @group(0) @binding(${SLUG_BINDINGS.curveTexture}) var curveTexture: texture_2d<f32>;   // rgba16float control points
 @group(0) @binding(${SLUG_BINDINGS.bandTexture}) var bandTexture: texture_2d<u32>;     // rg16uint band headers and curve lists
-
+${fillBind}
 struct VSIn {
     @location(0) pos: vec4f,      // xy = object-space position, zw = outward normal for dilation
     @location(1) tex: vec2f,      // em-space sample coordinates
@@ -339,8 +345,10 @@ ${slugCoreWgsl(logWidth, defines)}
 fn fs(in: VSOut) -> @location(0) vec4f
 {
     let coverage = SlugRender(in.texcoord, fwidth(in.texcoord), in.banding, in.glyph);
-    // Premultiplied by coverage, as the reference's color * coverage is: blend (ONE, ONE_MINUS_SRC_ALPHA).
-    return in.color * coverage;
+${defines.fill ? `    let fuv = clamp((in.texcoord - slug.fillRect.xy) / (slug.fillRect.zw - slug.fillRect.xy), vec2f(0.0), vec2f(1.0));
+    let fill = textureSample(fillTexture, fillSampler, vec2f(fuv.x, 1.0 - fuv.y));
+    return in.color * fill * coverage;` : `    // Premultiplied by coverage, as the reference's color * coverage is: blend (ONE, ONE_MINUS_SRC_ALPHA).
+    return in.color * coverage;`}
 }
 `;
     return { wgsl, vs: "vs", fs: "fs", logWidth, defines: { ...defines }, bindings: SLUG_BINDINGS,

@@ -159,6 +159,9 @@ export const HOT_UNREGISTERED = Object.freeze([
     "simulation/WeaponSystem.js",
     "world/biomeAmbience.js",
     "world/kaijuAttackFx.js",
+    // v4500: slug-fire.html -- a word filled with the Doom Fire through render/slugDevice.mjs. It says "fire" a dozen
+    // times and names the HUD's hexes; its fire colours are render/doomFire.mjs's PALETTE bytes, not literals here.
+    "slug-fire.html",
 ]);
 
 /**
@@ -175,13 +178,16 @@ export const HOT_UNREGISTERED = Object.freeze([
  * nothing additively; the overlap stays 0.
  * v4498: 80 -> 81. The arrival is slug-morph.html (the same HUD hexes), one morphed glyph through render/slugDevice.mjs,
  * nothing additively; the overlap stays 0.
+ * v4500: 81 -> 82. The arrival is slug-fire.html (the same HUD hexes plus a button face), a fire-filled word through
+ * render/slugDevice.mjs's fill pipeline; the fire's palette lives in render/doomFire.mjs as bytes, not hex literals
+ * on the page; nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 81,
+    literalColourFiles: 82,
     overlapDrawAndLiteral: 0,
-    hotUnregistered: 20,
+    hotUnregistered: 21,   // v4500: slug-fire.html arrived (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.
     keithsThree: Object.freeze({
         "world/fireworkShell.mjs": Object.freeze({ blendFunc: 0, gate: "tools/ship/fireworkShell-selfcheck.mjs" }),

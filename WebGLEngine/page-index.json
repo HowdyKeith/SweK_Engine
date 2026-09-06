@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 455,
+ "count": 456,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2576,6 +2576,13 @@
    "f": "slug-device.html",
    "t": "Slug Text on the Device",
    "d": "Resolution-independent Slug text drawn through gfx/device.js on whichever backend the page has: the same atlas, the same batch, the WGSL twin on WebGPU and the GLSL port on WebGL2, premultiplied blend from the descriptor. slug-text.html is the raw WebGL2 original; this page is the device path that any device frame can draw text inside. ?webgl=1 forces the WebGL2 backend.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slug-fire.html",
+   "t": "Slug Fire",
+   "d": "A word drawn by Slug with the Doom Fire automaton as its fill: the fragment multiplies coverage by a texture sampled at the glyph's em coordinates through an em rectangle, in both shader twins, and the fire is stepped and re-uploaded into one texture every frame. Gated pixel for pixel by tools/ship/slugFill-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

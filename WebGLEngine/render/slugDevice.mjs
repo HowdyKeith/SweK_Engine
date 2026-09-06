@@ -81,7 +81,9 @@ export function slugPipelineDesc(logWidth, defines = {}) {
         shaders: { wgsl: slugShaderWgsl(logWidth, defines).wgsl, glsl: { vertex: glsl.vertex, fragment: glsl.fragment } },
         vs: "vs", fs: "fs",
         buffers: slugVertexBuffers(),
-        uniforms: SLUG_UNIFORMS.map((u) => ({ ...u })),
+        // v4500 (task 47): under defines.fill the uniform list gains fillRect, matching the struct the WGSL declares
+        uniforms: SLUG_UNIFORMS.map((u) => ({ ...u })).concat(defines.fill ? [{ name: "fillRect", type: "vec4" }] : []),
+        fill: !!defines.fill,
         blend: "premultiplied",
         depthWrite: false, depthCompare: "always",   // text is an overlay: it neither reads nor writes the scene's depth
     };
@@ -152,7 +154,7 @@ export class SlugFontDevice {
         const a = this.atlas;
         this.curveTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.curve, width: a.width, height: a.curveTexels, data: a.curveData, nearest: true });
         this.bandTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.band, width: a.width, height: a.bandTexels, data: a.bandData, nearest: true });
-        this.desc = slugPipelineDesc(this.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight });
+        this.desc = slugPipelineDesc(this.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight, fill: opts.fill });
         this.pipeline = device.pipeline(this.desc);
         this.notice = SLUG_NOTICE;
     }
@@ -177,7 +179,7 @@ export class SlugFontDevice {
         self.curveTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.curve, width: atlas.width, height: atlas.curveTexels, data: atlas.curveData, nearest: true });
         self.bandTexture = device.texture({ format: SLUG_TEXTURE_FORMATS.band, width: atlas.width, height: atlas.bandTexels, data: atlas.bandData, nearest: true });
         if (opts.pipeline) { self.pipeline = opts.pipeline; self.desc = opts.desc || null; self.sharedPipeline = true; }
-        else { self.desc = slugPipelineDesc(self.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight }); self.pipeline = device.pipeline(self.desc); }
+        else { self.desc = slugPipelineDesc(self.logWidth, { evenOdd: opts.evenOdd, weight: opts.weight, fill: opts.fill }); self.pipeline = device.pipeline(self.desc); }
         self.notice = SLUG_NOTICE;
         return self;
     }
@@ -272,14 +274,20 @@ export class SlugDeviceBatch {
      * Draw inside a device pass. `matrixRows` is 16 floats -- four rows, each read as (m.x, m.y, -, m.w);
      * orthoRows() builds the screen-space case. `viewport` is [width, height] in pixels.
      */
-    draw(pass, matrixRows, viewport) {
+    draw(pass, matrixRows, viewport, fill = null) {
         if (!this.indexCount) return;
         const f = this.fontDevice;
+        // v4500 (task 47): a fill is { texture, rect: [x0, y0, x1, y1] em }, and the pipeline must have been built with fill: true --
+        // each refused by name: a fill on a pipeline without one, a fill pipeline drawn without one
+        const hasFill = !!(f.desc && f.desc.fill);
+        if (fill && !hasFill) throw new Error("slugDevice: draw() was given a fill but this font device's pipeline was built without one -- pass { fill: true } to SlugFontDevice");
+        if (!fill && hasFill) throw new Error("slugDevice: this font device's pipeline was built with a fill and draw() was given none -- pass { texture, rect }");
         pass.use(f.pipeline);
         for (let i = 0; i < 4; i++) pass.uniform("m" + i, matrixRows.subarray ? matrixRows.subarray(i * 4, i * 4 + 4) : matrixRows.slice(i * 4, i * 4 + 4));
         pass.uniform("viewport", [viewport[0], viewport[1]]);
         pass.texture("curveTexture", f.curveTexture, 0);
         pass.texture("bandTexture", f.bandTexture, 1);
+        if (fill) { pass.uniform("fillRect", fill.rect); pass.texture("fillTexture", fill.texture, 2); }
         pass.vertices(this.vb);
         pass.indices(this.ib);
         pass.drawIndexed(this.indexCount);
