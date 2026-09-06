@@ -2665,6 +2665,17 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "arithmetic first (a .5 the two precisions round apart, grid sizes on texel boundaries, a shift compared backwards). " +
                  "water-2d.html is the view. Sabotages red at 7 / 7 / 6 / 7.",
     }),
+    since129: Object.freeze({
+        at: "v4507", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate: a record round. edoardolunardi/kugiri (MIT) read and not taken -- a DOM wrap-point splitter with no DOM " +
+                 "text to find on the Slug and WGSL path and no wrap point to read on the one-line ticker, a real gap only for " +
+                 "multi-line HTML copy revealed line by line, which nothing named. docs/SHADER-REPO-SWEEP.md carries the entry " +
+                 "beside the two built this pass; world/reachedLicences.mjs records it (reachedLicences-selfcheck green). Checked " +
+                 "by grep: getClientRects and extractContents appear nowhere in the tree.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

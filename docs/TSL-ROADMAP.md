@@ -787,6 +787,13 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         compared backwards (a camera moved right reads the map further along). NOT TAKEN: bilinear sampling (the
         twin can name nearest exactly and nothing else), the vertex-displacement and perspective-correction toggles,
         and the original's reflection render as the scene. water-2d.html is the view, the pointer's x the camera.
+    KUGIRI, READ AND NOT TAKEN -- recorded at v4507 (task 53). edoardolunardi/kugiri (MIT) splits HTML text at the
+        lines the browser already painted (Range.getClientRects, Range.extractContents, Intl.Segmenter); it has no
+        DOM text to find on the Slug and WGSL text path and no wrap point to read on server.html's one-line ticker
+        (ui/textMorph.js v4158 kept torph off the ticker for the throughput arithmetic; kugiri fails a step earlier).
+        The consumers a wrap-aware splitter would feed exist (ui/stagger.mjs, ui/domAnimation.mjs); the front end does
+        not, and no multi-line copy that should reveal line by line was named. docs/SHADER-REPO-SWEEP.md and
+        world/reachedLicences.mjs carry the answer so the next round with a paragraph to reveal starts from it.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

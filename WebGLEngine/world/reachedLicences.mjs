@@ -149,6 +149,33 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4507 -- A DOM-TEXT REPO IN THE SHADER SWEEP: READ, INAPPLICABLE TO SLUG AND THE TICKER, A GAP ELSEWHERE.
+    //
+    // edoardolunardi/kugiri splits HTML text at the lines the browser already painted (Range.getClientRects,
+    // Range.extractContents, Intl.Segmenter). Nothing on the Slug / WGSL text path has a DOM node for it to find,
+    // and server.html's ticker is one line that never wraps, so it has no wrap point to read there (ui/textMorph.js
+    // v4158 already kept torph off the ticker for the throughput arithmetic; kugiri fails one step earlier). The
+    // consumers a wrap-aware splitter would feed exist (ui/stagger.mjs, ui/domAnimation.mjs); the front end does not,
+    // and no multi-line copy that should reveal line by line was named this round. docs/SHADER-REPO-SWEEP.md.
+    // =========================================================================================================
+    {
+        repo: "edoardolunardi/kugiri", sourceUrl: "https://github.com/edoardolunardi/kugiri",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Edoardo Lunardi", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2026 Edoardo Lunardi. READ FIRST-HAND at v4507: LICENSE, 21 lines, sha256 0ebd02b11864, " +
+             "at commit 7534878 (2026-09-06), package.json author Edoardo Lunardi, version 0.5.2.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: null,
+        takenPaths: [],
+        citedPaths: [],
+        why: "Read to answer whether a wrap-aware text splitter has a place here. It has none on the Slug and " +
+             "WGSL text path (no DOM text exists there) and none on the ticker (one line, never wraps, so no " +
+             "painted break to read); it would close a real gap only for multi-line HTML copy revealed line by " +
+             "line, and no such spot was named. Checked by grep: getClientRects and extractContents appear " +
+             "nowhere in the tree; Intl.Segmenter once, in ui/textMorph.js, for graphemes. Recorded so the next " +
+             "round with a paragraph to reveal starts from this answer rather than from the README.",
+    },
+    // =========================================================================================================
     // v4506 -- THE ONE REPO OF THE SHADER-PORTING SWEEP'S SIXTEEN THAT HAD A RIGHT ANSWER A GATE COULD FAIL.
     //
     // docs/SHADER-REPO-SWEEP.md (the shader-porting branch's triage of sixteen links) flagged StefanJo3107/

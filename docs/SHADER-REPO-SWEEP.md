@@ -206,3 +206,45 @@ backwards. Sabotages red at 7 / 7 / 6 / 7.
 **mmacklin/sandbox, restated.** Its remaining pieces (path tracer, spherical harmonics,
 metaballs) duplicate `physics/render/pathTracerWgsl.mjs`, the splat renderer's SH and the
 blob pages, as the first pass said; nothing further was read from it this pass.
+
+### edoardolunardi/kugiri -- READ, NOT TAKEN, and where it would fit (v4507)
+
+**What it is.** A DOM-surgery tool, not a shader: MIT, (c) 2026 Edoardo Lunardi (LICENSE read
+first-hand, 21 lines, sha256 0ebd02b11864, v0.5.2 at commit 7534878, 2026-09-06). It reads
+`Range.getClientRects()` per word to find where the browser's own layout engine already broke a
+paragraph into lines, cuts the DOM at those points with `Range.extractContents()`, and uses
+`Intl.Segmenter` for word and grapheme boundaries; one read phase, one write phase, no forced
+reflow; every unit gets `data-line` / `data-word` / `data-char` and a CSS custom property so a
+stylesheet or the Web Animations API can stagger the reveal. Zero canvas, zero WebGL or WebGPU,
+zero glyph atlas, no dependencies. It is in this file because it is the same sweep -- a link,
+checked against what the tree has -- with a DOM-text repo instead of a shader repo.
+
+**Slug, TSL and WebGPU text: categorically inapplicable.** `text/slugShader.js`, its WGSL twin
+and everything on `render/slugDevice.mjs` render glyphs from a packed curve atlas in a
+fragment shader; there is no DOM text node anywhere in that path for kugiri to find, split, or
+call `getClientRects()` on. That is not "already covered" -- it is the wrong universe. kugiri
+needs real HTML/CSS layout to exist first, and the ship-label and world-space text pipeline
+never creates any.
+
+**The ticker: it fails earlier than torph did.** `ui/textMorph.js` (v4158) records that text
+morphing after lochie/torph was DELIBERATELY kept off the ticker, with the arithmetic:
+server.html's marquee scrolls one continuous line at 0.9 px a frame (54 px/s) across a 220 px
+clip with a 40-message queue, so its problem is throughput, and successive log lines share no
+structure for a transition to exploit. kugiri fails before that reasoning is even reached: it
+works by reading where the browser wrapped a multi-line block, and the ticker is one line that
+never wraps, so `getClientRects()` has no break to report. Not declined for a design reason
+this time; it has no input to operate on in that widget.
+
+**Where it is not covered.** The lochie family has been mined twice by reading, never by
+vendoring: `ui/springMotion.js` took torph's spring easing and `ui/haptics.mjs` took
+lochie/web-haptics. The consumers a wrap-aware splitter would feed already exist --
+`ui/stagger.mjs` for per-item delays as data and `ui/domAnimation.mjs` / WAAPI for execution,
+chosen so `engine/frameDirty.js` can see the animation. What is missing is only the front end:
+something that turns a real multi-line paragraph into per-line or per-word DOM nodes at the
+browser's actual wrap points. Checked by grep at v4507: `getClientRects` and
+`extractContents` appear nowhere in the tree, and `Intl.Segmenter` appears once, in
+`ui/textMorph.js`, for graphemes rather than wrapping. So if a spot with real paragraph copy
+should reveal line by line or stagger word by word -- a HUD tooltip, in-app docs, a dashboard
+blurb; not the ticker -- kugiri's technique would close a real, currently absent gap, cheaply,
+since it is dependency-free. Recorded in `world/reachedLicences.mjs` as read and not taken;
+nothing built, because no such spot was named this round.
