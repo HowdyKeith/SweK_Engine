@@ -191,8 +191,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // rAF, WebGL, WebGPU, threads and WebAssembly all held. SIX RE-DERIVATIONS, SIX DIFFERENT TABLES, AND
     // THREADS HAS READ 22 THROUGH EVERY ONE OF THEM. That is what a finding looks like when the population under
     // it keeps moving, and it is the reason this table is re-derived rather than read back.
-    files: 3878,
-    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 692, promises: 333,
+    // AND A SEVENTH, at v4482: render/littlePlanet.mjs and its gate (3878 -> 3880), moving the same four rows
+    // -- ES modules +2, closures +2, async/await +1, typed arrays +2. *** AND THE RATIO MOVED FOR THE FIRST
+    // TIME IN SEVEN DERIVATIONS: 157 -> 158. *** Six populations held it at 157 and the seventh did not, which
+    // is what a derived number is supposed to do; a headline that never moves under a changing population is
+    // either a law or a constant somebody typed, and only re-deriving tells you which. THREADS HAS READ 22
+    // THROUGH ALL SEVEN.
+    files: 3880,
+    esModules: 3589, closures: 3465, asyncAwait: 1339, typedArrays: 694, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -213,7 +219,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 157,     // 3461 / 22, rounded
+    closuresOverThreads: 158,     // 3465 / 22, rounded -- 157 through six re-derivations, 158 at the seventh
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

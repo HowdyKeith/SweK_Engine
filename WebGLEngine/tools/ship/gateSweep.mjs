@@ -2673,6 +2673,58 @@ since116: Object.freeze({
                  "tools/ship/passFootprint-selfcheck.mjs asserted the phrase this round deleted and now grades " +
                  "the number that replaced it.",
     }),
+    // v4482 -- the twenty-third closing, and the first one in this arc that WIRES an existing module rather than
+    // building a new capability. v4463 shipped the projection and closed by saying nothing called it. Measured
+    // at the start of this round, its only importer in the whole tree was still its own selfcheck.
+    since121: Object.freeze({
+        at: "v4482", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/littlePlanet-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, TWENTY checks in five sections, 5.9 s -- the survey of 200 seeded bakes is most of it. #173 asked for " +
+                 "the little planet over procPlanet's equirectangular bake and THREE THINGS TURNED UP BEFORE " +
+                 "ANY DRAWING CODE WAS WRITTEN. *** THE TWO MODULES DO NOT MEAN THE SAME THING BY 'lon', AND " +
+                 "THEY ARE OFF BY EXACTLY 90 DEGREES: *** stereographic.js reads atan2(x, -z) and procPlanet " +
+                 "reads atan2(z, x), measured over 49 pairs as a CONSTANT 90.000000 deg offset, spread " +
+                 "2.22e-16, same winding, latitude agreeing to 5.33e-15. A pure rotation about the polar axis " +
+                 "and not a mirror -- which is exactly why nobody would have caught it by eye, because a world " +
+                 "rotated a quarter turn still looks like a world. LON_QUARTER_TURN applies it once and the " +
+                 "gate checks it by ROUND TRIP (1.11e-16 over 40 points) rather than by reading the constant " +
+                 "back. *** THE SAMPLING RATE SPANS 511 TO 1 ACROSS ONE FRAME, *** which is #175's question " +
+                 "answered: footprint 0.1128 to 57.62 texels per pixel over a 512px frame reading a 256x128 " +
+                 "bake, 1.99% of pixels undersampled, 51.77% of the source reached at all. *** AND THE WORST " +
+                 "PIXELS ARE THE FOUR AT THE CENTRE, WHERE THE PROJECTION IS AT ITS BEST: *** the " +
+                 "stereographic magnification at the nadir is 1.000, its MINIMUM over the frame, and the blow " +
+                 "up there is the EQUIRECT's own cos(lat) singularity -- 0.318 texels across in latitude and " +
+                 "57.62 in longitude, an anisotropy of 181:1 in one pixel. A little planet looks straight down " +
+                 "and an equirectangular map is worst straight down. *** AND THE REASON I BUILT THE " +
+                 "FOOTPRINT-AWARE FILTER WAS WRONG. *** The header first said a nearest read would speckle the " +
+                 "centre and the speckle would move with frame size; measured, it moves 129 pixels by ONE " +
+                 "level and the centre pixel is identical at 256, 384 and 512. procPlanet's pole rows are flat " +
+                 "-- 0 for ice, molten, terran and desert over 200 seeds, and 1 at worst for gas -- because " +
+                 "bakeEquirect's outermost row sits at 89.30 deg where cos is 0.0122. The filter is KEPT and " +
+                 "its justification REPLACED, with a control proving it can do a large thing (0.89% of pixels " +
+                 "by 143 levels on a checkerboard) and a row that grades procPlanet's flat poles so the day a " +
+                 "world type grows a polar feature the filter starts earning instead of being found to have " +
+                 "been needed. That claim was itself corrected once: the first draft said 'exactly zero, every " +
+                 "type', read off per-type MEANS with a max over the south row alone, and the gate found the " +
+                 "gas giants' 1 on the north. TWENTY SABOTAGES, ALL RED BY NAME, plus one CONTROL that " +
+                 "sabotages the sibling drawSeededPlanet and correctly costs nothing. *** THREE COST ZERO RED " +
+                 "AND ONE WAS v4463's OWN DEFECT MADE AGAIN BY THE SAME HANDS ONE ROUND LATER: *** turning " +
+                 "littlePlanetDir's rotation into a REFLECTION changed nothing, because every landmark probed " +
+                 "sat on the u axis where vy is 0 -- which is the blind spot v4463 found in its own handedness " +
+                 "check, wrote down, and fixed there. Off the axis the mirror is a half turn in longitude and " +
+                 "that is asserted now. Swapping equirectUV's Math.floor for `% 1` also cost nothing because " +
+                 "sampleEquirect wraps the column too and rescues it downstream, so the contract is asserted " +
+                 "on the returned VALUE; the comment claiming the floor keeps a negative spin on the texture " +
+                 "was wrong. And the third was a CRASH rather than a weak check -- the row that calls " +
+                 "drawLittlePlanet against a stub read calls[0] in its DETAIL STRING, so removing putImageData " +
+                 "threw and killed every later section. v4434's shape, v4478 hit it too, third instance in two " +
+                 "rounds. WIRED: ui/orreryDraw.js gains drawLittlePlanet over the same cached bake " +
+                 "drawSeededPlanet uses, and orrery.html's surface toggle is a three-way cycle whose third " +
+                 "label says it is the SAME generated surface seen from the ground, not a third claim about " +
+                 "where the pixels came from. #174 stays open: nothing has compared the CPU pair to a GPU one " +
+                 "by value.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

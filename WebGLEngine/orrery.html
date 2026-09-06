@@ -84,8 +84,8 @@
 import { buildOrrery, UNPAPERED_BASELINE, UNPAPERED } from "./world/orrery.mjs";
 import { positionAt, apparentPx, levelFor, extentOf, slowestPeriod,
          ZOOM_SYSTEM, ZOOM_PLANET, ZOOM_TERRAIN, ZOOM_NAMES, PLANET_PX, TERRAIN_PX } from "./world/orreryView.mjs";
-import { drawSystem, drawPlanet, drawTerrain, fieldFor, drawSeededPlanet, seededPlanetFor,
-         drawFleet, drawFlybys, SURFACE_MEASURED, SURFACE_SEEDED } from "./ui/orreryDraw.js";
+import { drawSystem, drawPlanet, drawTerrain, fieldFor, drawSeededPlanet, seededPlanetFor, drawLittlePlanet,
+         drawFleet, drawFlybys, SURFACE_MEASURED, SURFACE_SEEDED, SURFACE_LITTLE } from "./ui/orreryDraw.js";
 import { fleetsFor } from "./world/orreryFleet.mjs";
 import { reachedBodies, fromReachedRegister, fromKhronos, reachedDigest } from "./world/orreryReached.mjs";
 import { REACHED_SOURCES, severityOf } from "./world/reachedLicences.mjs";
@@ -94,7 +94,13 @@ import { models, mayVendor } from "./gpu/khronosSamples.mjs";
 const cv = document.getElementById("stage"), ctx = cv.getContext("2d");
 let system = null, hits = [], focus = null, hover = null;
 let t = 0, playing = true, last = performance.now();
+// v4482 -- THREE framings now, not two, and `seeded` stays a boolean derived from the mode so nothing that
+// already reads it changes meaning. 0 = the measured file tree, 1 = the generated surface seen from outside,
+// 2 = THE SAME generated surface seen from the ground. Mode 2 is a projection of mode 1's bake, not a third
+// claim about where the pixels came from, and its label says so.
+let surfMode = 0;
 let seeded = false;      // which SURFACE a micro planet wears -- measured file tree, or generated from the commit
+const SURF_LABELS = [SURFACE_MEASURED, SURFACE_SEEDED, SURFACE_LITTLE];
 // #68: the importers of each body, in orbit around it. Baked because a browser cannot run git; POSITIONS are
 // not baked -- they come from (last commit, t) here, so the file changes only when the repository does.
 let fleets = null;
@@ -275,7 +281,13 @@ function draw() {
     if (level === ZOOM_PLANET) {
         // the planet turns on ITS OWN period, the same number that moves it around SweK
         const spin = focus.period > 0 ? (2 * Math.PI * t) / focus.period : 0;
-        if (seeded) {
+        if (surfMode === 2) {
+            // *** THE LITTLE PLANET. *** The horizon is drawn at the same radius the sphere would have had, so
+            // toggling between modes 1 and 2 keeps the ball the same size and changes only where you stand.
+            const sp2 = seededPlanetFor(focus).spec;
+            drawLittlePlanet(ctx, focus, innerWidth / 2, innerHeight / 2, px / 2, spin);
+            caption(`${focus.name} \u2014 ${SURFACE_LITTLE}: the same ${sp2.type} world from commit ${String(focus.sha || "").slice(0, 12)}, standing on it. Centre is the nadir, the ring is the horizon, the zenith is off the frame.`);
+        } else if (seeded) {
             drawSeededPlanet(ctx, focus, innerWidth / 2, innerHeight / 2, px / 2, spin);
             const sp = seededPlanetFor(focus).spec;
             // *** THE CAPTION SAYS GENERATED, EVERY TIME. *** This surface is a picture derived from a commit
@@ -379,14 +391,17 @@ window.orrery = {
     follow: (name) => { follow(name ? window.orrery.body(name) : null); },
     zoomTo: (px) => { if (focus) pxPerUnit = px / (2 * focus.radius); },
     setTime: (days) => { t = days; },
-    setSeeded: (v) => { seeded = !!v; document.getElementById("surf").textContent = "surface: " + (seeded ? SURFACE_SEEDED : SURFACE_MEASURED); },
+    setSeeded: (v) => { surfMode = v ? 1 : 0; seeded = surfMode === 1; document.getElementById("surf").textContent = "surface: " + SURF_LABELS[surfMode]; },
+    setSurfMode: (m) => { surfMode = ((m | 0) % SURF_LABELS.length + SURF_LABELS.length) % SURF_LABELS.length; seeded = surfMode === 1; document.getElementById("surf").textContent = "surface: " + SURF_LABELS[surfMode]; },
+    get surfMode() { return surfMode; },
     get seeded() { return seeded; },
     pause: () => { playing = false; document.getElementById("play").innerHTML = "&#9654; play"; },
 };
 
 document.getElementById("surf").addEventListener("click", (e) => {
-    seeded = !seeded;
-    e.target.textContent = "surface: " + (seeded ? SURFACE_SEEDED : SURFACE_MEASURED);
+    surfMode = (surfMode + 1) % SURF_LABELS.length;
+    seeded = surfMode === 1;
+    e.target.textContent = "surface: " + SURF_LABELS[surfMode];
 });
 
 document.getElementById("play").addEventListener("click", (e) => {
