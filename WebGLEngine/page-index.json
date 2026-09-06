@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 461,
+ "count": 462,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2437,6 +2437,13 @@
    "t": "SweK Physics — beating critical slowing down",
    "d": "Two escapes from a sampler that is not wrong, just stuck. Wolff flips whole clusters instead of single spins and does not critically slow down: the effective-samples-per-flipped-spin advantage over Metropolis grows from 30x to 165x as the lattice grows, because Metropolis collapses while Wolff holds. Parallel tempering runs a ladder of temperatures and lets neighbours trade configurations. Both are checked against the same falsifier the plain device owes: Yang's exact magnetisation. Both sabotages produce perfectly legitimate configurations of the WRONG ensemble.",
    "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "sandbox-gpu.html",
+   "t": "Sandbox on the GPU",
+   "d": "The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, packed as one lit mesh and drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Round 1 of the sandbox on the device: the world; dig/build, bodies, damage, save/load and the avatar follow. A seed and the city live, chunk and triangle counts and the mesh time in the HUD, drag to orbit, wheel to dolly.",
+   "g": "",
    "p": 0
   },
   {

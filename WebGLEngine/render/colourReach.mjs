@@ -195,11 +195,14 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4506: 83 stays 83. water-2d.html arrived with the same HUD hexes and the detector does NOT count it (a first draft
  * raised the count to 84 and the gate measured 83); recorded so the next arrival is not blamed for a page that was
  * never in the population. Nothing additively; the overlap stays 0.
+ * v4517: 83 -> 84. The arrival is render/voxelDevice.mjs, whose colourOf() names the grey [0.5, 0.5, 0.5] the renderer
+ * falls back to for an unknown material id (voxelrenderer.js's own fallback, restated); every other colour it draws is
+ * the registry's or the mesher's PALETTE. Nothing additively (the sandbox world is lit, not blended); the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 83,
+    literalColourFiles: 84,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

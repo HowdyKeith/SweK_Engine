@@ -1181,6 +1181,32 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         gated to itself in f32 under docs/GPU-KERNEL-CONTRACT.md, not as a twin of erosion.js. The record is
         tools/ship/todo.mjs's erosion-device-port, and the gate holds the record to the numbers.
 
+11. **THE SANDBOX ON THE DEVICE -- planned at v4517 after the WebGPU port of index/main was looked for and not found.** main.js
+    draws world/world.js's VoxelWorld through three's WebGLRenderer and render/voxelrenderer.js; no page, todo entry or
+    roadmap step names a WebGPU version of it, so none was ever started. The route is the one items 7 through 10 took:
+    the sandbox's functions carried one at a time onto gfx/device.js through gpuDriven and the lit pipeline, on both
+    backends, with a gate per function. The rounds, in the order the racing city needs them:
+     1. (v4517) THE WORLD. BUILT: render/voxelDevice.mjs meshes every chunk of the SAME VoxelWorld through the SAME greedy
+        mesher the renderer's workers run (world/chunkMesherCore.js), with its eight neighbours so no face is drawn at a
+        seam, flat normals from the winding, the registry's colours with the corner AO folded in, packed as one lit mesh
+        and drawn as one record under a sun. sandbox-gpu.html: a seed, the city with facades and its building count
+        live, chunk and triangle counts and the mesh time in the HUD, drag to orbit. MEASURED (tools/ship/voxelDevice-
+        selfcheck.mjs): 225 chunks, 548,634 vertices, 182,878 triangles in 0.7 s here and 1.1 s in Chromium, the same
+        hash in both runtimes; on both backends 22,765 of 24,000 pixels lit, 356 of 357 sampled pixels carrying the
+        colour ratios of the voxel the browser's own DDA hits along that pixel's ray, 225 of 254 top faces bright, the
+        backends 13 pixels apart. THE CORRECTION: the raycaster's first draft left the slab the moment y stepped
+        outside [0, height), so a ray starting above the world -- every camera ray -- returned nothing; it leaves only
+        when heading away now. Not built: per-chunk updates, water as its own pass, the atlas and grain.
+     2. DIG / BUILD: a pick by the raycaster, a voxel set through world.setVoxel, the touched chunk (and a neighbour
+        when the voxel is on a seam) re-meshed and its range rewritten in the vertex buffer -- the per-chunk update
+        round 1 declined.
+     3. THE BOX3D BODIES: the sandbox's bodies as gpuDriven records driven by physics/box3d, the world mesh as their
+        static collider (the shape mesh/meshBVH.mjs takes), so the racing city's car has ground to drive on.
+     4. WEAPONS AND DAMAGE: the sandbox's damage path (CityGen's hit points, world/voxelDebrisSystem.js) on the device
+        world, debris as records.
+     5. SAVE / LOAD: world/WorldPersistence.js's format read and written by the device page.
+     6. THE AVATAR AND CAMERA: a first-person walk on the collider with the sandbox's controls.
+
 ## The count that says when step 4 matters
 
 tools/ship/shaderCensus-selfcheck.mjs has held, since v3274, that a hand-written pair is cheaper than an

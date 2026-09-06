@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 461,
+  "page": 462,
   "demo": 49,
   "builtin": 34
  },
@@ -2808,6 +2808,14 @@
    "display": "Samplers",
    "href": "/samplers.html",
    "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "sandbox-gpu.html",
+   "display": "Sandbox Gpu",
+   "href": "/sandbox-gpu.html",
+   "section": null,
    "collision": false
   },
   {

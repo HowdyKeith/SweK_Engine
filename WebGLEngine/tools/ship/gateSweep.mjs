@@ -2802,6 +2802,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "cannot be every record from inside a shell, a mirrored ray key) and one blind sabotage (the mesh dropped, the backdrop " +
                  "carrying the same split) closed by a hold that every keyed mesh pixel is lit. Sabotages red at 1 / 3 / 3 / 1.",
     }),
+    since139: Object.freeze({
+        at: "v4517", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. The sandbox on the device, round 1: render/voxelDevice.mjs draws world/world.js's VoxelWorld " +
+                 "with CityGen's facade city through gfx/device.js -- the sandbox's own greedy mesher per chunk with its eight " +
+                 "neighbours, flat normals from the winding, the registry's colours with the corner AO folded in, one lit mesh, one " +
+                 "record, litSphere's pipeline under a sun. sandbox-gpu.html is the page. Held on hand worlds (a seam draws no face, " +
+                 "the floor is omitted as the renderer omits it), on the 225-chunk world (the same hash in node and Chromium), and on " +
+                 "a frame keyed by the browser's own DDA through the world it drew. The raycaster's first draft left the slab when a " +
+                 "ray started above it, so every camera ray missed. Sabotages red at 4 / 6 / 2 / 2.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
