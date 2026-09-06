@@ -1523,7 +1523,8 @@
   "world/spaceStructures-selfcheck.mjs": 414,
   "world/tools/water-attacks-selfcheck.mjs": 70,
   "physics/render/wgslArc-selfcheck.mjs": 79,
-  "tools/roundhouse/observableTaint-selfcheck.mjs": 56
+  "tools/roundhouse/observableTaint-selfcheck.mjs": 56,
+  "tools/ship/assertionShape-selfcheck.mjs": 499
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3045,7 +3046,8 @@
   "world/spaceStructures-selfcheck.mjs": 0,
   "world/tools/water-attacks-selfcheck.mjs": 0,
   "physics/render/wgslArc-selfcheck.mjs": 0,
-  "tools/roundhouse/observableTaint-selfcheck.mjs": 0
+  "tools/roundhouse/observableTaint-selfcheck.mjs": 0,
+  "tools/ship/assertionShape-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-05T22:26:20.164Z",
@@ -4567,6 +4569,7 @@
   "world/spaceStructures-selfcheck.mjs": "2026-09-05T22:26:20.164Z",
   "world/tools/water-attacks-selfcheck.mjs": "2026-09-05T22:26:20.164Z",
   "physics/render/wgslArc-selfcheck.mjs": "2026-09-06T05:31:40.000Z",
-  "tools/roundhouse/observableTaint-selfcheck.mjs": "2026-09-06T05:31:40.000Z"
+  "tools/roundhouse/observableTaint-selfcheck.mjs": "2026-09-06T05:31:40.000Z",
+  "tools/ship/assertionShape-selfcheck.mjs": "2026-09-06T05:54:03.000Z"
  }
 }

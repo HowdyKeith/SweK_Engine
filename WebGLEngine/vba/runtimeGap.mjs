@@ -181,7 +181,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3874,          // v4478 +2 (wgslArc and its gate), v4479 +2 (observableTaint and its gate).
+    files: 3876,          // v4478 +2, v4479 +2, v4480 +2 (assertionShape and its gate) -- THREE
+                          // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
                           // added its own two files. A twelve-row census pinned to a file count is a
@@ -191,7 +192,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // use closures and await, so three rows moved by exactly two each and the other nine did not move at all.
     // A census whose rows move together under a two-file addition would be measuring the tree's size rather
     // than its capabilities; three of twelve moving is the shape that says the patterns are discriminating.
-    esModules: 3583, closures: 3459, asyncAwait: 1338, typedArrays: 691, promises: 332,
+    esModules: 3585, closures: 3461, asyncAwait: 1340, typedArrays: 691, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

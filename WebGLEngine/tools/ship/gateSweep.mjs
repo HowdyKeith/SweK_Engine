@@ -2567,6 +2567,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "deleted, and the general repair -- a signature that refuses a function -- belongs to " +
                  "whichever round owns the helper.",
     }),
+    since119: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/assertionShape-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, four sections, 20 checks. *** v4479 SAID ITS REPAIR BELONGED TO WHICHEVER ROUND OWNS " +
+                 "THE ASSERTION HELPER. NOTHING OWNS IT. *** 1,498 of 1,519 gates call ok(); 1,490 DEFINE it in " +
+                 "their own file; ZERO import one; 38 distinct definitions. `ok(name, condition)` takes any " +
+                 "value, and a function, a promise and a non-empty string are all truthy, so a check written " +
+                 "in any of those shapes prints PASS with the code under it broken -- which this session wrote " +
+                 "THREE TIMES in three rounds, all caught by reading and none by running. TWO SIGNATURES " +
+                 "COEXIST: 1,404 gates spell it ok(name, cond), 78 spell it ok(cond, message), and a line " +
+                 "pasted from the majority into one of those 78 always passes because the message is a string. " +
+                 "16 more are reported `unknown` rather than assigned to whichever camp would have tidied the " +
+                 "sweep. THE SWEEP FINDS ZERO TODAY, and that is why the positive controls are the round: each " +
+                 "of the three finders is driven against a fixture built to trip it BEFORE the tree is called " +
+                 "clean, because a detector that has only ever returned zero cannot be told from one that " +
+                 "cannot return anything else -- a shape this session has caught five times. Six sabotages, " +
+                 "5/3/1/2/1/3 by name, none zero-red. *** AND TWO DEFECTS IN THIS ROUND'S OWN WORK WERE FOUND " +
+                 "BY ITS OWN CHECKS RATHER THAN BY READING, THE FIRST TIME THIS SESSION. *** The record check " +
+                 "went red because a probe for asyncIife classified as arrowNotInvoked -- invoked-or-not was " +
+                 "decided by two hopeful regexes and `}()` matched neither; it BALANCES the arrow body now. " +
+                 "And section 3 reported five suspects, every one in this gate: the fixtures were literal " +
+                 "source, so they sat in code the comment strip cannot reach and the detector found itself. " +
+                 "Built by concatenation now -- v4409's 'a fixture is not a gate' through a STRING, and the " +
+                 "second time this session after v4478's literal @compute inflated backendParity's census. " +
+                 "NOT CLAIMED: that the three shapes are all of them (ok(name, helper()) returning a promise " +
+                 "is invisible to a source reader), or that the 1,490 copies should be consolidated -- that is " +
+                 "a change to fifteen hundred files whose only test is the gates themselves, and this round " +
+                 "leaves the number for whoever wants to argue it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
