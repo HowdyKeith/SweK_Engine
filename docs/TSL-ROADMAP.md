@@ -1212,8 +1212,23 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         full rebuilds, and a sand voxel built on the slab and dug again returns the frame exactly. THE FINDING:
         the sabotage that leaves a slot's tail uncleared was blind until an edit that SHRINKS a chunk was added --
         digging the top of a column keeps the same five quads, so nothing had ever freed a vertex.
-     3. THE BOX3D BODIES: the sandbox's bodies as gpuDriven records driven by physics/box3d, the world mesh as their
-        static collider (the shape mesh/meshBVH.mjs takes), so the racing city's car has ground to drive on.
+     3. (v4519) THE BOX3D BODIES. BUILT: render/voxelBodies.mjs. box3d's shapes are boxes and there is no mesh
+        collider to hand the world to, so the voxels reach the bodies as a COLLISION WINDOW: each tick every solid
+        voxel within a margin of every dynamic body becomes a static box -- runs along x merged into one box each,
+        from a pool per run width, parked far below when unused, assigned in sorted order so two runs of the same
+        inputs hash the same. The bodies draw as a second gpuDriven fleet through a lit pipeline that reads the
+        record's extras as the body's QUATERNION (vertex and normal rotated in both languages, one CPU twin).
+        sandbox-gpu.html: Drop a crate above the last picked voxel; dig under one and it falls. MEASURED
+        (tools/ship/voxelBodies-selfcheck.mjs, the wasm headless through box3dNode and then both backends): a crate
+        rests at exactly the surface plus its half, one over nothing falls, one on the tower rests on the tower, the
+        same drop hashes the same, a spun crate carries its pose into the extras, a narrow crate falls one layer
+        when round 2 digs under it and through when the dirt goes too; on both backends the crate is a red patch
+        where the physics put it and wider when turned 45 degrees, the backends 0 apart. THE FINDING: box3d sleeps a
+        resting body, and a static box moved from under it by setTransform does not wake it -- the first crate sat
+        over its hole -- so the window now gives every live body a zero impulse whenever its runs change, which is
+        the shim's own wake and the joint motors' lesson (box3d_shim.c). A unit crate over a unit hole sits on the
+        rim, four edges on four box edges, and box3d is right to hold it there. Not built: non-cubic bodies (one
+        scale per record), friction and restitution knobs, the racing car (Racing city 2 builds it on these joints).
      4. WEAPONS AND DAMAGE: the sandbox's damage path (CityGen's hit points, world/voxelDebrisSystem.js) on the device
         world, debris as records.
      5. SAVE / LOAD: world/WorldPersistence.js's format read and written by the device page.

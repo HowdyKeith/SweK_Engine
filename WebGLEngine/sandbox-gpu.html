@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Sandbox on the GPU (the voxel world and its city on gfx/device.js)">
-<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 and 2 of the sandbox on the device: the world, and dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); bodies, damage, save/load and the avatar follow. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
+<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 3 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); and Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls. Damage, save/load and the avatar follow. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
 <meta name="demo:category" content="world">
 <title>Sandbox on the GPU</title>
 <style>
@@ -25,6 +25,7 @@
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">seed <input id="seed" type="number" value="1"> &middot; <label><input type="checkbox" id="city" checked> city with facades</label> &middot; buildings <input id="count" type="number" value="30" min="0" max="120">
     &middot; build with <select id="mat"><option value="1">stone</option><option value="2">dirt</option><option value="3">grass</option><option value="4">sand</option><option value="5">glass</option></select>
+    &middot; <button id="drop">Drop a crate</button> <span id="phys"></span>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
     <span id="tick">building the world&hellip;</span> &middot; <span id="edit">click to dig, shift-click or right-click to build</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
@@ -35,12 +36,14 @@ import { requestDevice } from "./gfx/device.js";
 import * as G from "./render/gpuDriven.mjs";
 import * as L from "./render/litSphere.mjs";
 import { editState, editScene, pickVoxel, digAt, buildAt } from "./render/voxelDeviceEdit.mjs";
+import { createBodyWorld, sandboxScene } from "./render/voxelBodies.mjs";
+import { box3d } from "./physics/box3d/box3dLoader.js";
 import { VoxelWorld } from "./world/world.js";
 import { CityGen } from "./world/CityGen.js";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
-let device, scene = null, world = null, state = null, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null;
+let device, scene = null, world = null, state = null, bodies = null, physMod = null, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null, lastHit = null;
 const $ = (id) => document.getElementById(id);
 
 function rebuild() {
@@ -50,7 +53,9 @@ function rebuild() {
   if (city) city.generate({ seed: (+$("seed").value) >>> 0, facades: true, buildingCount: Math.max(0, +$("count").value | 0) });
   const t1 = performance.now(); state = editState(world); const t2 = performance.now();
   if (scene && scene.destroy) scene.destroy();
-  scene = editScene(device, state, G, L);
+  if (bodies) { bodies.destroy(); bodies = null; }
+  if (physMod) { bodies = createBodyWorld(physMod, world); scene = sandboxScene(device, state, bodies, G, L); }
+  else scene = editScene(device, state, G, L);
   $("tick").textContent = `${state.slots.size} chunks, ${state.used.toLocaleString()} vertices in ${state.capacity.toLocaleString()} slots, ${city ? city.buildings.length : 0} buildings` +
     ` · world ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms`;
   dirty = false;
@@ -60,7 +65,13 @@ async function init() {
   try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
   catch (e) { return fail("requestDevice threw: " + e.message); }
   if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  try { const ps = await box3d.init(); if (ps.ready) physMod = box3d._mod; else $("phys").textContent = "(box3d: " + ps.reason.slice(0, 80) + ")"; } catch (e) { $("phys").textContent = "(box3d: " + e.message + ")"; }
   try { rebuild(); } catch (e) { return fail("scene: " + e.message); }
+  $("drop").addEventListener("click", () => {
+    if (!bodies) { $("phys").textContent = "(no box3d here)"; return; }
+    const at = lastHit ? [lastHit.x + 0.5, lastHit.y + 8, lastHit.z + 0.5] : [0.5, 40, 0.5];
+    try { bodies.spawn(at, 0.5); $("phys").textContent = `${bodies.bodies.length} crate${bodies.bodies.length === 1 ? "" : "s"}`; } catch (e) { $("phys").textContent = "(" + e.message + ")"; }
+  });
   beEl.textContent = "backend: " + device.backend + " · " + scene.path + " · the sandbox's world through the sandbox's mesher, lit on the device";
   for (const id of ["seed", "city", "count"]) $(id).addEventListener("change", () => { dirty = true; $("tick").textContent = "building the world…"; });
   cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; moved = 0; });
@@ -68,7 +79,7 @@ async function init() {
   cvs.addEventListener("pointerup", (e) => {
     if (dragging && moved < 4 && camNow && state) {
       const r = cvs.getBoundingClientRect(), px = (e.clientX - r.left) * cvs.width / r.width, py = (e.clientY - r.top) * cvs.height / r.height;
-      const hit = pickVoxel(world, camNow, px, py), build = e.shiftKey || e.button === 2;
+      const hit = pickVoxel(world, camNow, px, py), build = e.shiftKey || e.button === 2; if (hit) lastHit = hit;
       const res = build ? buildAt(state, hit, +$("mat").value || 1) : digAt(state, hit);
       $("edit").textContent = res.refused ? res.refused : `${build ? "built" : "dug"} at ${build ? [hit.x + hit.normal[0], hit.y + hit.normal[1], hit.z + hit.normal[2]].join(",") : [hit.x, hit.y, hit.z].join(",")}: ${res.chunks.length} chunk${res.chunks.length === 1 ? "" : "s"} rewritten in ${res.ms} ms${res.rebuilt ? " (a slot overflowed: the world was repacked)" : ""}`;
     }
@@ -88,6 +99,7 @@ function frame() {
   const eye = [Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 10, Math.cos(yaw) * Math.cos(pitch) * dist];
   const cam = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 1200), G.lookAt(eye, [0, 10, 0])), eye };
   camNow = { W: w, H: h, fov: 0.9, eye, target: [0, 10, 0] };
+  if (bodies && bodies.bodies.length) { bodies.tick(); if ((bodies.ticks() & 31) === 0) $("phys").textContent = `${bodies.bodies.length} crate${bodies.bodies.length === 1 ? "" : "s"}, ${bodies.poolSize()} static boxes in the pool`; }
   scene.frame({ ...cam, clear: [0.03, 0.05, 0.08, 1] });
   requestAnimationFrame(frame);
 }

@@ -2833,6 +2833,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "0 pixels from full rebuilds on both backends. Sabotage D (the tail uncleared) was blind until an edit that SHRINKS a chunk " +
                  "was added. Sabotages red at 8 / 3 / 1 / 3.",
     }),
+    since141: Object.freeze({
+        at: "v4519", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelBodies-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends and headless on the wasm. The sandbox on the device, round 3: render/voxelBodies.mjs runs the " +
+                 "sandbox's crates on box3d and reaches them the voxels through a COLLISION WINDOW -- runs of solid voxels along x " +
+                 "around each body become static boxes from a pool per run width, parked when unused -- so a crate rests on the slab " +
+                 "at exactly the surface plus its half, falls where there is nothing, and falls when round 2 digs the voxel under it. " +
+                 "The bodies draw as a second gpuDriven fleet through a lit pipeline that reads the quaternion from the record's " +
+                 "extras. THE FINDING: box3d sleeps a resting body and a static box moved away by setTransform does not wake it, so " +
+                 "the first crate sat over its hole; the window now wakes every body with a zero impulse when its runs change. " +
+                 "Sabotages red at 1 / 4 / 1 / 3.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
