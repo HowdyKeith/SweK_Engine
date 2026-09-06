@@ -33,7 +33,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG } from "./gateSweep.mjs";
-import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW } from "./redCensus.mjs";
+import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, UNCONFIRMED_SLOW } from "./redCensus.mjs";
 
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json" });
 
@@ -49,6 +49,7 @@ export function redRegister() {
     for (const e of RED_AT_V4408) reg.set(e.gate, "redCensus.RED_AT_V4408");
     for (const e of RED_AT_V4424) reg.set(e.gate, "redCensus.RED_AT_V4424");
     for (const e of RED_AT_V4476) reg.set(e.gate, "redCensus.RED_AT_V4476");
+    for (const e of RED_AT_V4484) reg.set(e.gate, "redCensus.RED_AT_V4484");
     for (const g of UNCONFIRMED_SLOW) if (!reg.has(g)) reg.set(g, "redCensus.UNCONFIRMED_SLOW");
     for (const g of SWEEP_V4297.fromSlowBucket) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.fromSlowBucket");
     for (const g of SWEEP_V4297.unmeasured) if (!reg.has(g)) reg.set(g, "gateSweep.SWEEP_V4297.unmeasured");

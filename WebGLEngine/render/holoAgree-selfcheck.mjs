@@ -36,6 +36,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skip = (why) => {
@@ -50,7 +51,10 @@ try { execFileSync("python3", ["-c", "import cairosvg"], { stdio: "ignore" }); }
 catch { skip("cairosvg is not installed (pip install cairosvg --break-system-packages)"); }
 
 // a browser?
-const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
+// v4484: hand-copied from tools/ship/playwrightResolve.mjs, which exists to hold this once.
+// It named a Linux root, a Linux layout and a PINNED BUILD NUMBER, so it could never be
+// true on the rig. Imported now, and resolved per platform.
+const SHELL = HEADLESS_SHELL;
 const PW = "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
 if (!fs.existsSync(SHELL) || !fs.existsSync(PW)) skip("headless browser or playwright not found at the known path");
 
@@ -125,7 +129,14 @@ try {
     // thrash, which is exactly how this suite's slowest checks got pushed past their timeout during a ship.
     // A CHECK THAT LEAVES A PROCESS BEHIND IS A CHECK THAT SABOTAGES THE NEXT ONE. Belt and braces: b.close()
     // inside the driver, and this pkill outside it, so a killed child cannot poison what runs after.
-    try { execFileSync("pkill", ["-f", "chromium_headless_shell-1194"], { stdio: "ignore" }); } catch { /* none stray: pkill exits 1, fine */ }
+    // v4484: the pattern is DERIVED from the shell this box resolved, not a pinned build number -- and pkill
+    // is skipped where there is no shell or no pkill, because a Windows rig has neither. (A pattern can also
+    // match the killing command's OWN line: this one is a directory name, which pkill's own argv does carry,
+    // so it stays narrow and its failure is ignored either way.)
+    try {
+        const dir = SHELL ? path.basename(path.dirname(path.dirname(SHELL))) : "";
+        if (dir) execFileSync("pkill", ["-f", dir], { stdio: "ignore" });
+    } catch { /* none stray, or no pkill on this platform: either way there is nothing to clean up */ }
 }
 
 if (out.err) skip("the driver reported: " + out.err);

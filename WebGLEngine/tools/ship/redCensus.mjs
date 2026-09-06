@@ -463,7 +463,12 @@ export const RED_AT_V4424 = Object.freeze(RED_AT_V4424_GATES.map((gate) => Objec
  * WHAT WOULD CLEAR THEM is recorded with each, and neither is a number anybody may raise.
  */
 export const RED_AT_V4476_GATES = Object.freeze([
-    "tools/ship/physicsReach-selfcheck.mjs",
+    // *** physicsReach-selfcheck.mjs LEFT THIS REGISTER AT v4484, MEASURED GREEN AND NOT ARGUED GREEN. ***
+    // It was registered for 49 of 151 graded physics modules reaching no door against a baseline of 35.
+    // Item B built the doors; the register was never updated, and registerDrift-selfcheck names exactly this
+    // -- "a red that has been repaired and left on the list is a check nobody is getting the benefit of".
+    // The audit row that proves it is a real run: exit 0 at 643 ms. Its `why` is kept below, struck through
+    // by this note rather than deleted, because the reason a debt existed outlives the debt.
     "tools/ship/wgslSpec-selfcheck.mjs",
 ]);
 
@@ -489,6 +494,32 @@ export const RED_AT_V4476 = Object.freeze(RED_AT_V4476_GATES.map((gate) => Objec
     get ms() { const r = auditRow(gate); return r ? r.ms : null; },
     get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
     get derived() { const r = auditRow(gate); return !!(r && r.first); },
+})));
+
+export const RED_AT_V4484_GATES = Object.freeze([
+    "ui/stageInfo-selfcheck.mjs",
+]);
+
+const WHY_V4484 = Object.freeze({
+    "ui/stageInfo-selfcheck.mjs":
+        "*** REVEALED BY v4484, NOT CAUSED BY IT. *** This gate hand-copied a playwright path -- " +
+        "/home/claude/.npm-global/lib/node_modules/playwright/index.js -- which does not exist on this box, " +
+        "while tools/ship/playwrightResolve.mjs's list has held the path that DOES resolve here all along. " +
+        "So its live browser section has been skipping silently, and the gate read green on 29 checks it " +
+        "could run and one it could not. v4484 makes it import the resolver; the live section runs; and the " +
+        "check it was skipping FAILS: server.html's panel box measures offsetWidth 460 at a 1280 viewport " +
+        "AND at 1920, so it does not grow with the window. That is KEITH'S THIRD ASK, recorded in the gate " +
+        "as satisfied and never once measured. CLEARED BY making the panel responsive in server.html, which " +
+        "is a layout change to a shipped page and a round of its own -- NOT by re-skipping the section, " +
+        "which is how it came to be green in the first place.",
+});
+
+export const RED_AT_V4484 = Object.freeze(RED_AT_V4484_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4484[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
 export const FIXED_SINCE_V4408 = Object.freeze([

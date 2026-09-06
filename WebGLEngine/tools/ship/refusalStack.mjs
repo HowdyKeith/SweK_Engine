@@ -78,22 +78,31 @@ export function gateOf(body) {
  * the record above stale.
  */
 export function stack(probes) {
+    // *** A PROBE THAT NEVER REACHED THE NETWORK IS NOT A REFUSAL. *** curl absent, curl killed, DNS gone:
+    // the caller reports code -1 and there is no response to attribute. Folding that in with the 403s would
+    // say "the proxy reworded its message" about a box that never sent a request -- the same misattribution
+    // playwrightResolve.mjs's header says this tree has already paid for twice. Keith's rig reports -1 on all
+    // three, and the answer it needs is "install curl", not "re-take the record".
     const rows = probes.map((p) => {
+        const reached = p.code >= 100;
         const open = p.code === 200;
-        const source = open ? null : refusalSource(p.body);
+        const source = !reached || open ? null : refusalSource(p.body);
         return Object.freeze({
             path: p.path,
             code: p.code,
+            reached,
             open,
             source,
-            gate: open ? null : gateOf(p.body),
+            gate: !reached || open ? null : gateOf(p.body),
         });
     });
-    const refused = rows.filter((r) => !r.open);
+    const refused = rows.filter((r) => r.reached && !r.open);
+    const unreached = rows.filter((r) => !r.reached);
     return Object.freeze({
         rows: Object.freeze(rows),
         open: Object.freeze(rows.filter((r) => r.open).map((r) => r.path)),
         refused: Object.freeze(refused.map((r) => r.path)),
+        unreached: Object.freeze(unreached.map((r) => r.path)),
         byRunner: refused.filter((r) => r.source === RUNNER).length,
         byGithub: refused.filter((r) => r.source === GITHUB).length,
         unnamed: Object.freeze(refused.filter((r) => !r.gate).map((r) => r.path)),

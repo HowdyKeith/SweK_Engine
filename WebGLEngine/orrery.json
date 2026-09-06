@@ -1218,7 +1218,7 @@
    "name": "three",
    "arrived": "2026-08-31",
    "sha": "6ba6776cd14cc9c8d1e96164e20c11dea4410d20",
-   "bytes": 1551374,
+   "bytes": 2200075,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
@@ -1229,6 +1229,26 @@
      "bytes": 77714
     },
     {
+     "path": "jsm/libs/basis/basis_transcoder.js",
+     "bytes": 62337
+    },
+    {
+     "path": "jsm/libs/basis/basis_transcoder.wasm",
+     "bytes": 499935
+    },
+    {
+     "path": "jsm/libs/basis/PROVENANCE.txt",
+     "bytes": 2250
+    },
+    {
+     "path": "jsm/libs/basis/README.md",
+     "bytes": 1448
+    },
+    {
+     "path": "jsm/libs/ktx-parse.module.js",
+     "bytes": 18676
+    },
+    {
      "path": "jsm/libs/meshopt_decoder.module.js",
      "bytes": 24850
     },
@@ -1237,8 +1257,16 @@
      "bytes": 1192
     },
     {
+     "path": "jsm/libs/zstddec.module.js",
+     "bytes": 39754
+    },
+    {
      "path": "jsm/loaders/GLTFLoader.js",
      "bytes": 108522
+    },
+    {
+     "path": "jsm/loaders/KTX2Loader.js",
+     "bytes": 22589
     },
     {
      "path": "jsm/utils/BufferGeometryUtils.js",
@@ -1247,6 +1275,10 @@
     {
      "path": "jsm/utils/TextureUtils.js",
      "bytes": 2367
+    },
+    {
+     "path": "jsm/utils/WorkerPool.js",
+     "bytes": 1712
     },
     {
      "path": "LICENSE",

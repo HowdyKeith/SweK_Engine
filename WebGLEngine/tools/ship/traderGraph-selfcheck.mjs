@@ -196,6 +196,10 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
                      + "data than git history and world/traderGraph.mjs should be revisited"
                      : `${s.refused.length} refused, ${s.distinctGates} distinct gates. This is the direction `
                      + "the header states and the direction v4481 reversed by asserting a 200.");
+    if (s.unreached.length)
+        report(`*** ${s.unreached.length} PROBE(S) NEVER REACHED THE NETWORK: ${s.unreached.join(", ")} -- ` +
+               "no curl on this box, or no route out. That is a fact about the runner and says nothing about " +
+               "the refusals; install curl and re-run before reading anything below as a finding.");
     ok("!! ...and every refusal is NAMEABLE, so the stack's record is current",
        s.unnamed.length === 0 && s.byRunner === s.refused.length && s.byGithub === 0,
        s.unnamed.length ? "UNNAMED: " + s.unnamed.join(", ") + " -- the proxy reworded and tools/ship/"

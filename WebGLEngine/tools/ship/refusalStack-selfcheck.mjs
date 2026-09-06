@@ -164,6 +164,17 @@ console.log("\n4. the partition: open, refused, attributed, unnamed");
     ok("...and it is loud rather than filed: no gate claims an empty body, so it lands in `unnamed`",
         redirect.unnamed.length === 1 && redirect.rows[0].gate === null && redirect.rows[0].source === null);
 
+    // *** A PROBE THAT NEVER LEFT THE BOX IS ITS OWN ANSWER. *** Keith's rig reports HTTP -1 on all three --
+    // no curl -- and reading that as an unnameable REFUSAL would tell him the proxy had reworded its message
+    // when nothing was ever sent. Two facts, each on its own evidence.
+    const dead = stack([{ path: "users/but0n", code: -1, body: "" },
+                        { path: "rate_limit", code: 200, body: "{}" }]);
+    ok("!! a probe that never reached the network is `unreached`, not a refusal nobody can name",
+        dead.unreached.length === 1 && dead.refused.length === 0 && dead.unnamed.length === 0,
+        "'the record has gone stale' and 'this box has no curl' are different things to go and fix");
+    ok("...and it carries no gate and no source, because there was no response to attribute",
+        dead.rows[0].reached === false && dead.rows[0].gate === null && dead.rows[0].source === null);
+
     const stale = stack([{ path: "users/but0n", code: 403, body: BODY.reworded }]);
     ok("!! a refusal no gate claims lands in `unnamed`, which is how the record says it has gone stale",
         stale.unnamed.length === 1 && stale.unnamed[0] === "users/but0n" && stale.distinctGates === 0);

@@ -2684,6 +2684,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "header states: the axes are still shut, every refusal is nameable, and an axis OPENING is " +
                  "the red.",
     }),
+    since123: Object.freeze({
+        at: "v4484", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playwrightResolve-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "ui/stageInfo-selfcheck.mjs (both hand-copied paths replaced by imports; its live section now RUNS and is red -- registered as RED_AT_V4484)",
+            "physics/blobarium-selfcheck.mjs, render/blobRecorder-selfcheck.mjs, render/holoAgree-selfcheck.mjs (hand-copied shell path replaced by the import)",
+            "tools/ship/traderGraph-selfcheck.mjs (a probe that never reached the network is reported apart from a refusal)",
+        ]),
+        verdict: "green, five sections. *** tools/ship/playwrightResolve.mjs EXISTS BECAUSE THREE GATES EACH " +
+                 "GREW THEIR OWN GUESS AT WHERE CHROMIUM LIVES, AND IT THEN HELD ONE HARDCODED GUESS OF ITS " +
+                 "OWN, ONE LINE BELOW THE LIST IT WAS WRITTEN TO REPLACE. *** PLAYWRIGHT_PATHS is a list " +
+                 "tried in order; HEADLESS_SHELL was a single string naming a Linux root, a Linux directory " +
+                 "layout and a PINNED BUILD NUMBER. 96 GATES DEPEND ON IT, so on any box that is not this " +
+                 "container -- Keith's Windows rig, which is the only machine in this project with a real " +
+                 "GPU -- every one of them reports 'no headless shell' and counts the skip as a failure. THE " +
+                 "DEVICE HALF OF THIS TREE HAS NEVER BEEN RUNNABLE ON THE MACHINE IT EXISTS FOR. It is " +
+                 "resolved now the way playwright already was: roots tried in order with " +
+                 "PLAYWRIGHT_BROWSERS_PATH first (which headlessGpu.mjs was ALREADY honouring for the Vulkan " +
+                 "ICD in the same tree while this line was not), any build number, and the three platforms' " +
+                 "layouts. *** AND FIVE FILES RE-SPELLED THE PATH BY HAND, UNDER A HEADER THAT WARNS IN SO " +
+                 "MANY WORDS THAT 'a fourth gate that copies the list instead of importing it is the same " +
+                 "defect happening a fourth time'. *** Section 4 counts them, so a sixth is a red. *** THE " +
+                 "REPAIR IMMEDIATELY EXPOSED A RED A SKIP HAD BEEN HIDING: *** ui/stageInfo-selfcheck.mjs " +
+                 "also hand-copied a PLAYWRIGHT path -- one this box does not have, while the resolver's " +
+                 "list holds one it does -- so its live browser section had been skipping silently and the " +
+                 "gate read green on 29 checks it could run and one it could not. Made to import, it runs, " +
+                 "and server.html's panel measures offsetWidth 460 at 1280 AND at 1920: Keith's third ask, " +
+                 "recorded as satisfied and never once measured. Registered as RED_AT_V4484 with that " +
+                 "reason, because re-skipping it is how it was green. SIX SABOTAGES: A 3, B 3, C 2, D 2, E " +
+                 "4, F 1. AND THE GATE'S OWN CENSUS CAUGHT THIS FILE'S FIXTURES SPELLING THE PATH AS " +
+                 "LITERALS -- v4409's rule (a fixture is not a gate) arriving through a string for the third " +
+                 "time this session; the fixtures are built by concatenation now.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

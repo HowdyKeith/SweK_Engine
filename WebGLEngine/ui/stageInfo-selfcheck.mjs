@@ -32,6 +32,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeStage } from "./panelStage.mjs";
 import { makeAutoTab } from "./gaugeInfoPanel.js";
+import { HEADLESS_SHELL, resolvePlaywright } from "../tools/ship/playwrightResolve.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -258,8 +259,13 @@ say("\n5. A REAL BROWSER OPENS A DRAWER AND CHECKS ALL THREE ASKS AT ONCE");
 // while the drawer did nothing. So this clicks a real drawer chip in a real Chromium and reads the result.
 {
     const fs = await import("node:fs");
-    const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
-    const PW = "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+    // v4484: hand-copied from tools/ship/playwrightResolve.mjs, which exists to hold this once.
+    // It named a Linux root, a Linux layout and a PINNED BUILD NUMBER, so it could never be
+    // true on the rig. Imported now, and resolved per platform.
+    const SHELL = HEADLESS_SHELL;
+    // v4484: this was a hand-copy of ONE of PLAYWRIGHT_PATHS, which is the list resolvePlaywright tries in
+    // order. Both halves of "where is chromium" were spelled here; both are imported now.
+    const PW = resolvePlaywright().from;
     if (!fs.existsSync(SHELL) || !fs.existsSync(PW)) {
         console.log("  SKIP  the live drawer click   no chromium at " + SHELL + " -- SKIPPING WITH A REASON " +
             "RATHER THAN PASSING QUIETLY. A gate that reports green when it did not run is worse than one " +
