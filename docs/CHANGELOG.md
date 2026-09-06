@@ -62,6 +62,64 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4488 -- fifteen files still say this box has no GPU, and the floor a value grade may not claim past
+
+v4269 said a WGSL port could only be checked structurally, because this box cannot execute a shader. v4270
+tested it and it was false: Chromium serves a WebGPU adapter over a secure origin here, and
+tools/ship/webgpuHarness.mjs compiles and runs both languages.
+
+*** THE CORRECTION WAS APPLIED TO THE TWO FILES IT WAS ABOUT AND TO NOTHING ELSE. *** Scanning for a comment
+asserting, of THIS environment, that a shader or device cannot run finds eighteen lines in eighteen files.
+Three are the correction quoting the claim to refute it. FIFTEEN ARE LIVE, and have been wrong for 218
+versions, in a tree that has since built stereoDevice, blendModes, gpuTimer, slugWgsl, headlessGpu and
+emitterCompile -- six gates that do the thing those comments say is impossible. The gate proves it by
+compiling and drawing a constant shader and reading 64,128,191 back, rather than by listing filenames.
+
+*** THE SHARPEST ROW WAS WRITTEN AFTER THE CORRECTION. *** render/stereographic.js is stamped v4463 -- 193
+versions past v4270 -- and carried the claim in the present tense. Twenty rounds later v4483's
+stereoDevice-selfcheck ran that exact module's shader on that exact box and graded it to 4.99e-8. The sentence
+survived the round that disproved it, in the same file. Three files are corrected here -- panini.js,
+panini-selfcheck.mjs, stereographic.js -- each keeping the old sentence quoted with the round that killed it.
+The other twelve are LISTED AND LEFT: a claim is corrected only when this round ran the shader it is about,
+because rewriting a sentence about a shader nobody drove trades one unverified claim for another.
+
+*** THE SECOND FINDING: A SHADER WITH A COSINE IN IT CANNOT BE GRADED BELOW 1.797e-4. *** v4487 left five
+emitters as compile receipts. Grading render/panini.js gave 3.052e-5 in x and 8.928e-5 in y -- ninety times
+the pack24 transport floor, which reads as a defect. It is not one, and the bisection says so: driving each
+sub-expression through the same harness, packer and lattice gives atan 4.995e-7, length 5.233e-7 and
+y/length 5.107e-7 -- all AT the transport floor -- against sin(atan) 4.444e-5, cos(atan) 1.797e-4, and
+2/(1+cos(atan)) 9.060e-5, which is panini.y's number arrived at from the other end. Every algebraic step is
+exact and only the two transcendentals are not. SwiftShader's cos and V8's Math.cos are different functions to
+one part in ten thousand, so TRIG_FLOOR is a property of two libraries and not of any shader above them.
+v4483 measured the same thing once at 1.839e-4 and called it "the trig library"; this reproduces it on an
+unrelated function and promotes it to a floor a grade must quote.
+
+*** THE OBVIOUS EXPLANATION WAS TESTED AND REFUSED BEFORE THE TRIG WAS BLAMED. *** f32 conditioning was the
+easy read -- the projection divides by d + cos(th), which goes to zero at the horizon. Driving the JS
+reference through Math.fround at every step moved 8.928e-5 to 8.923e-5, changing nothing, and the worst point
+sits at denom 1.9923, nowhere near the singularity. *** AND THE FLOOR IS NOT SO LOOSE THAT IT HIDES A REAL
+DEFECT: *** bending the shipped shader's cosine by one part in a thousand pushes the grade to 3.0e-4 and
+2.5e-4, above the floor, and the gate goes red.
+
+*** THE CONTROL, AND IT SETTLED AN OLD DECISION. *** shaders/ashimaNoise.js has no transcendental in it, so
+the transport floor is its whole budget. On the device its GLSL agrees with snoise3f32 to 5.740e-7 against a
+9.520e-7 floor, and disagrees with snoise3 by 4.078 -- four whole units, on a function whose range should be
+about [-1,1]. Over this lattice snoise3 runs -3.0298 to +3.2576 where snoise3f32 stays inside
+[-0.8466, 0.8665]: Ashima's permute overflows f32 in a way the algorithm depends on, so the lattice indices
+themselves differ. v4243 added snoise3f32 on SIMULATED f32 evidence with no device; a driver has now been
+asked, and it agrees with the f32 path.
+
+NEW render/deviceReach.mjs holds the census and both floors. NEW tools/ship/deviceReach-selfcheck.mjs,
+twenty-nine checks in five sections, 4.00 s. SIXTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT
+WAS THE RECORD BEING DECORATION AGAIN: *** the worst point's denominator -- the half of the conditioning
+argument that rules OUT the horizon -- was stored and never derived, so faking it passed. It is computed from
+the run now.
+
+*** AND THE MODULE JOINED ITS OWN POPULATION ON THE FIRST RUN. *** Its header quoted stereographic's sentence
+and paraphrased v4269's, so the scan found render/deviceReach.mjs and the gate went red by name. Seventh
+instance in seven rounds, and the sharpest yet: the discipline was written down twenty lines below, applied to
+the data -- "the rows carry no quotes, on purpose" -- and not to the prose above it. Disarming a table does
+not disarm a header. The tree stands at 1527 gates.
 ## v4487 -- the emitters compile, and two of them were not the same function
 
 v4486 found fourteen files carrying runnable shader text that render/backendParity.mjs's preamble census

@@ -2953,6 +2953,44 @@ since116: Object.freeze({
                  "languages is shader-bearing -- and it is the THIRD dual-language gate on a list whose own " +
                  "row says a fourth without a reason goes red.",
     }),
+    since127: Object.freeze({
+        at: "v4488", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/deviceReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-nine checks in five sections, 4.00 s. v4269 said a " +
+                 "WGSL port could only be checked structurally, giving as its reason the proposition this " +
+                 "round counts; v4270 tested it and it was false. *** THE CORRECTION WAS APPLIED TO THE TWO " +
+                 "FILES IT WAS ABOUT AND TO NOTHING ELSE. *** Eighteen files carry a comment asserting, of " +
+                 "THIS environment, that a shader or device cannot run. Three are the correction quoting the " +
+                 "claim to refute it. FIFTEEN ARE LIVE, wrong for 218 versions, in a tree that has since " +
+                 "built stereoDevice, blendModes, gpuTimer, slugWgsl, headlessGpu and emitterCompile. The " +
+                 "gate proves them wrong by compiling and drawing a constant shader and reading 64,128,191 " +
+                 "back, not by listing filenames. *** THE SHARPEST ROW WAS WRITTEN AFTER THE CORRECTION: *** " +
+                 "render/stereographic.js is stamped v4463, 193 versions past v4270, and v4483 ran that " +
+                 "module's own shader and graded it to 4.99e-8 -- the sentence survived the round that " +
+                 "disproved it, in the same file. Three files corrected here, each keeping the old sentence " +
+                 "quoted; the other twelve LISTED AND LEFT, because a claim is corrected only when this round " +
+                 "ran the shader it is about. *** SECOND FINDING: A SHADER WITH A COSINE CANNOT BE GRADED " +
+                 "BELOW 1.797e-4. *** panini's GLSL reads 3.052e-5 and 8.928e-5 against its JS -- ninety " +
+                 "times the transport floor, which looks like a defect. The bisection says otherwise: atan " +
+                 "4.995e-7, length 5.233e-7, y/length 5.107e-7 all AT the floor; sin(atan) 4.444e-5, " +
+                 "cos(atan) 1.797e-4, 2/(1+cos(atan)) 9.060e-5 -- which is panini.y arrived at from the other " +
+                 "end. Every algebraic step is exact and only the transcendentals are not, so the floor is " +
+                 "SwiftShader's trig against V8's, not any shader above them. f32 conditioning was TESTED AND " +
+                 "REFUSED first: Math.fround at every step moved 8.928e-5 to 8.923e-5, and the worst point " +
+                 "sits at denom 1.9923, nowhere near the horizon. The floor is not so loose it hides a " +
+                 "defect: bending the shipped cosine by 1e-3 pushes the grade above it and the gate reddens. " +
+                 "THE CONTROL: ashimaNoise has no transcendental, agrees with snoise3f32 at 5.740e-7 under a " +
+                 "9.520e-7 floor, and disagrees with snoise3 by 4.078 -- four whole units on a function whose " +
+                 "range should be about [-1,1]; snoise3 runs -3.0298 to 3.2576 where snoise3f32 stays inside " +
+                 "[-0.8466, 0.8665]. v4243 added snoise3f32 on SIMULATED f32 evidence with no device, and a " +
+                 "driver now agrees with it. SIXTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND " +
+                 "WAS THE RECORD BEING DECORATION AGAIN: *** the worst point's denominator, the half of the " +
+                 "conditioning argument that rules OUT the horizon, was stored and never derived. *** AND THE " +
+                 "MODULE JOINED ITS OWN POPULATION ON THE FIRST RUN, *** because its header quoted the " +
+                 "sentence it counts -- seventh instance in seven rounds, with the discipline written twenty " +
+                 "lines below and applied to the data but not to the prose above it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

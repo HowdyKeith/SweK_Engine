@@ -104,7 +104,11 @@
 // where every other radius manages at most two -- so the shipped setting is one of that run's two interior
 // floors and the shipped claim is 32 of 33, not 33 of 33. *** v4487 ADDED A ROW AND EVERY CELL OF THIS TABLE
 // MOVED BY EXACTLY ONE: *** the SHAPE -- one spike at r=140, one four-wide plateau at r=200 -- is what
-// survived a change of population, which is more than the peak's score could ever say for itself. (The first draft of this paragraph said
+// survived a change of population, which is more than the peak's score could ever say for itself.
+// *** v4488 ADDED A GLSL-BEARING GATE AND THIS TABLE DID NOT MOVE AT ALL, WHICH IS ALSO THE DESIGN: *** the
+// body census only looks at files the PREAMBLE census calls none, and that gate writes its own version
+// header. A first draft added it to the key anyway and the residual row went red naming two files instead of
+// one -- the population is not "every file with shader text", it is "every file the other census misses". (The first draft of this paragraph said
 // the run was three wide and called floor 5 its middle: it read the span from floor 4 and floor 3 scores 31
 // too. The gate derives the run rather than trusting the sentence, which is why the sentence is right now.)
 // The whole table is re-derived by the gate rather than quoted, so a change to any tell moves the numbers
@@ -361,7 +365,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     agreement: 32,
     rows: 33,
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 148, wgslBearing: 72, both: 16 }),
+    preambleCensus: Object.freeze({ glslBearing: 149, wgslBearing: 72, both: 16 }),
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,

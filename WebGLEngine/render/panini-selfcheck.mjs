@@ -23,9 +23,16 @@
 // ---- RIG-ONLY, STATED PLAINLY ---------------------------------------------------------------------------------
 //
 // paniniGLSL() emits the same arithmetic AS A STRING for the GPU path. THE JS AND THE GLSL ARE NOT AUTOMATICALLY
-// THE SAME FUNCTION -- one is JS on a CPU, one is GLSL on a GPU, and nothing here can run a GPU. Check 4 compares
-// the shader TEXT against the same constants, WHICH IS WEAKER THAN RUNNING IT, and says so. The shader's actual
-// output needs a screenshot on Galaxina. A CHECK THAT GRADES A STRING IS GRADING PROSE.
+// THE SAME FUNCTION -- one is JS on a CPU and one is GLSL on a GPU. Check 4 compares the shader TEXT against the
+// same constants, WHICH IS WEAKER THAN RUNNING IT, and says so.
+//
+// *** THIS PARAGRAPH USED TO END "nothing here can run a GPU ... the shader's actual output needs a screenshot
+// *** on Galaxina", AND THAT WAS FALSE FROM v4270 -- 1,917 VERSIONS AFTER THIS FILE WAS WRITTEN AND 218 BEFORE
+// *** ANYBODY DELETED IT. *** tools/ship/webgpuHarness.mjs compiles and runs GLSL on this box, and v4488's
+// tools/ship/deviceReach-selfcheck.mjs drives paniniProject through it: 3.052e-5 in x, 8.928e-5 in y, both
+// under the 1.797e-4 floor that SwiftShader's cosine imposes on any shader containing one. THIS GATE STILL
+// GRADES A STRING and is still cheap on purpose; the value grade lives one gate away and is named here so
+// the limit below is a division of labour rather than an excuse.
 import fs from "node:fs";
 import { prose } from "../tools/ship/sourceScan.mjs";
 import path from "node:path";

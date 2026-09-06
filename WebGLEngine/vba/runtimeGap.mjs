@@ -213,8 +213,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // ES modules +2, closures +1 and async/await +1, the last because the compile gate awaits a real device --
     // while typed arrays, Promises, fetch/XHR, performance.now, rAF, WebGL, WebGPU, threads and WebAssembly
     // ALL HELD. TWELVE POPULATIONS, TWELVE TABLES, THREADS 22 IN EVERY ONE.
-    files: 3890,
-    esModules: 3599, closures: 3473, asyncAwait: 1341, typedArrays: 694, promises: 333,
+    // AND A THIRTEENTH, at v4488: render/deviceReach.mjs and its gate (3890 -> 3892), moving the same three
+    // rows as v4487 -- ES modules +2, closures +1, async/await +1, the last again because a device gate
+    // awaits a driver -- while everything else HELD. THIRTEEN POPULATIONS, THIRTEEN TABLES, THREADS 22 IN
+    // EVERY ONE.
+    files: 3892,
+    esModules: 3601, closures: 3474, asyncAwait: 1342, typedArrays: 694, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

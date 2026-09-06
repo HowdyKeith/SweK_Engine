@@ -81,7 +81,10 @@
 //
 // The same split panini.js declared: this is the MATH, in plain JS, so it can be tested exactly. stereoGLSL()
 // emits the same arithmetic as a shader string. *** THEY ARE NOT AUTOMATICALLY THE SAME FUNCTION *** -- one is
-// JS on a CPU and one is GLSL on a GPU, and nothing here can run the GPU. The selfcheck gates the JS and
+// JS on a CPU and one is GLSL on a GPU. *** THIS SENTENCE USED TO END "and nothing here can run the GPU" AND IT
+// *** WAS WRITTEN AT v4463, A HUNDRED AND NINETY-THREE VERSIONS AFTER v4270 PROVED IT FALSE -- then v4483's
+// *** tools/ship/stereoDevice-selfcheck.mjs ran THIS MODULE'S shader on THIS box and graded it to 4.99e-8,
+// *** and the sentence survived the round that disproved it. *** The selfcheck gates the JS and
 // CHECKS THE SHADER TEXT AGAINST THE SAME CONSTANTS, which is weaker and is labelled as such. RIG: the
 // shader's actual output needs a screenshot.
 "use strict";
