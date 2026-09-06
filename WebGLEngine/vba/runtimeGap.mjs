@@ -186,8 +186,13 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3876,
-    esModules: 3585, closures: 3461, asyncAwait: 1337, typedArrays: 691, promises: 333,
+    // AND A SIXTH TIME, at v4481: render/hdrCost.mjs and its gate arrived (3876 -> 3878) and moved four rows --
+    // ES modules +2, closures +2, async/await +1, typed arrays +1 -- while Promises, fetch/XHR, performance.now,
+    // rAF, WebGL, WebGPU, threads and WebAssembly all held. SIX RE-DERIVATIONS, SIX DIFFERENT TABLES, AND
+    // THREADS HAS READ 22 THROUGH EVERY ONE OF THEM. That is what a finding looks like when the population under
+    // it keeps moving, and it is the reason this table is re-derived rather than read back.
+    files: 3878,
+    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 692, promises: 333,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 105, webgpu: 46, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

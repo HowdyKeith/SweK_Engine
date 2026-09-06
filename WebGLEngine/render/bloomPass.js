@@ -447,7 +447,16 @@ export class BloomPass {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
             this._hdrEnabled = false;
             if (!this._hdrWarned) {
-                console.warn("[BloomPass] EXT_color_buffer_half_float not supported; falling back to LDR (8-bit) — bloom will be weaker");
+                // v4481 -- "bloom will be weaker" is not a measurement. render/hdrCost.mjs ran the five shipped
+                // steps at both storage formats and the loss is not softness, it is SATURATION: on the 8-bit
+                // path every scene peak from 2.0 upward produces a bit-identical halo, because the FIRST store
+                // clamps to 1.0 and nothing downstream can tell a 2x sun from a 16x one. Six of the twelve
+                // palette entries land above 1.0 after the voxel emissive boost, so this path is running.
+                console.warn("[BloomPass] EXT_color_buffer_half_float not supported; the whole chain falls back to " +
+                    "8-bit. Measured at v4481 (render/hdrCost.mjs): every scene value above 1.0 clips at the scene " +
+                    "target, so all highlights brighter than 1.0 share ONE halo -- 25.4 output levels whether the " +
+                    "source is 2x or 16x, against 34.5 and 67.7 on the half-float path. Banding is not the cost " +
+                    "(under 1 LSB); clipping is.");
                 this._hdrWarned = true;
             }
         }
@@ -457,6 +466,17 @@ export class BloomPass {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         return t;
     }
+
+    /**
+     * v4481 -- *** THIS FLAG WAS WRITTEN ON BOTH BRANCHES OF _createColorTex AND READ BY NOTHING. ***
+     * A field that records the decision that matters, with no reader anywhere in the tree, is the
+     * second-declaration defect this file has now produced twice: v4288 found the overview claiming RGBA8 while
+     * the code did RGBA16F, and this is the same shape one field over. True means every target in the chain --
+     * scene, bright, both blurs, SSAO, god rays, colour copy, all of them out of one _createColorTex -- is
+     * RGBA16F and highlights above 1.0 survive to the tone map. False means they clip at the scene target and
+     * render/hdrCost.mjs says what that costs.
+     */
+    get hdrEnabled() { return this._hdrEnabled === true; }
 
     _createFBO(colorTex, depthAttachment) {
         const gl = this.gl;

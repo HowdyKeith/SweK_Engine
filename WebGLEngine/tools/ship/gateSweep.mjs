@@ -2627,6 +2627,52 @@ since116: Object.freeze({
                  "rounds; and v4479's blend gate read a HARD-CODED LINE RANGE of device.js, which this round's " +
                  "own insertion moved, so it is anchored to the sentence rather than the line number now.",
     }),
+    // v4481 -- the twenty-second closing of this arc, and the one the task itself insisted on: MEASURE THE COST
+    // BEFORE ADDING THE FORMAT. The number decided the round, and it decided against the thing I would have
+    // guessed.
+    since120: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/hdrCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-three checks in five sections, 0.65 s. #180 said the " +
+                 "tree was 8-bit only and told the round to measure what the round trip costs before adding a " +
+                 "format. *** BANDING IS NOT THE COST AND CLIPPING SATURATES. *** On a ramp that never leaves " +
+                 "0..1, storing all four intermediates at 8 bits moves the final picture by ONE least " +
+                 "significant bit, rms 0.45 -- the last quantisation dominates the four before it. On an " +
+                 "emissive disc the halo grows 25.3 / 34.5 / 45.6 / 56.6 / 67.7 output levels for peaks 1 to " +
+                 "16 on the half-float path, and the 8-bit path returns 25.4163 FOR EVERY PEAK FROM 2.0 UP, " +
+                 "bit-identical: its HDR dynamic range is 1.0:1 and a 2x sun and a 16x sun are the same " +
+                 "picture. The clip is at the FIRST store, not in the blur -- scene 4.0/4.0/3.94/3.73 against " +
+                 "1.0/1.0/0.98/0.92 -- so promoting the blur targets alone would buy nothing. And HALF FLOAT " +
+                 "IS ENOUGH: rgba16float tracks the reference to 0.0043 of one output level, so nothing here " +
+                 "asks for rgba32float. *** THE SURVEY'S 'NO HDR TARGET ANYWHERE' WAS ITS FIFTH OVERCLAIM: *** " +
+                 "render/bloomPass.js has rendered the WHOLE chain into RGBA16F since Round 136, because " +
+                 "scene, bright, both blurs, SSAO, god rays and the colour copy all come out of one " +
+                 "_createColorTex; my follow-up guess that the blur chain was 8-bit was wrong too, and it was " +
+                 "wrong because I read two calls that create depthCopyColor. *** AND THE FLAG THAT KNOWS WHICH " +
+                 "PATH IS RUNNING WAS WRITTEN TWICE AND READ NOWHERE, *** the second-declaration defect this " +
+                 "same file already produced at v4288 -- it has a getter and a real reader in main.js now, and " +
+                 "the fallback warning states 25.4 instead of 'bloom will be weaker'. #133 is satisfied by " +
+                 "measurement: SIX OF TWELVE palette entries exceed 1.0 after the voxel emissive boost, " +
+                 "peaking at 2.5, so this is a fix and not a decoration. *** #144's FAMILY, FOURTH ENTRY: the " +
+                 "shader's `emissive` gates on smoothstep(0.85, 0.95, MAX CHANNEL), which is saturation and " +
+                 "not emission, *** so it boosts SAND, SNOW, FLOWING_WATER, ICE and SCREEN, and MEMORY -- one " +
+                 "of the two entries the palette itself labels emissive -- sits at max channel 0.85, EXACTLY " +
+                 "the smoothstep's lower edge, and gets a boost of ZERO. Recorded, not silently repaired: " +
+                 "moving that gate would recolour every snowfield in the tree. Sixteen sabotages, ALL RED BY " +
+                 "NAME, plus one CONTROL that edits only a comment and correctly costs nothing. *** ONE COST " +
+                 "ZERO RED AND IT WAS commentFalsePass's OWN RULE, FOR THE THIRD TIME IN ONE ROUND: *** the " +
+                 "sabotage that deleted main.js's reader left the comment naming it, and a grep of raw source " +
+                 "cannot tell the two apart. *** AND THE FIX FOR THAT WAS ITSELF A DEFECT: *** the first " +
+                 "stripper also removed block comments, which on a file the size of main.js matches from an " +
+                 "unrelated /* inside a string to the next */ and swallows thousands of lines of real code, " +
+                 "turning two unrelated rows red. Line comments only. v4287 had already measured ONE store of " +
+                 "one texture on real hardware (1.7480 clamped to 1.0000, 43% off the brightest); what was " +
+                 "never measured is what the whole chain does with the loss, and that is the part that turns " +
+                 "'bright things get dimmer' into 'all of them get the same brightness'. " +
+                 "tools/ship/passFootprint-selfcheck.mjs asserted the phrase this round deleted and now grades " +
+                 "the number that replaced it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
