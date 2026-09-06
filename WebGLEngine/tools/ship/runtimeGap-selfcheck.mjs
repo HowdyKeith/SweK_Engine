@@ -19,22 +19,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as R from "../../vba/runtimeGap.mjs";
 import { PARTS, PROVISIONAL, READ_AGAINST } from "../../vba/archiveManifest.mjs";
+import { sources, SOURCE_SKIP as SKIP } from "./recordDrift.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 
-const SKIP = /node_modules|\/vendor\/|\/dist\//;
-function sources(dir = ENG, out = []) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const p = path.join(dir, e.name);
-        if (SKIP.test(p)) continue;
-        if (e.isDirectory()) sources(p, out);
-        else if (/\.(mjs|js)$/.test(e.name)) out.push({ path: p, text: fs.readFileSync(p, "utf8") });
-    }
-    return out;
-}
+// *** v4482 -- THE WALKER MOVED OUT, AND NOT INTO runtimeGap.mjs. *** It was private here, so the only way to
+// learn whether MEASURED_AT_V4462 had gone stale was to run this gate -- one of the slow ones -- while the
+// tree's other three hand-maintained records re-derive in milliseconds through an exported API. Moving it into
+// runtimeGap.mjs was tried and reverted: that module has ZERO imports and its purity is worth more than the
+// convenience. It lives in tools/ship/recordDrift.mjs instead, exported, so there is one definition and no
+// second walker re-deriving the pattern.
 
 const files = sources();
 

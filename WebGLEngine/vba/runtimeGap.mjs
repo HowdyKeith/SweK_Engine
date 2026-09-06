@@ -181,11 +181,20 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3878,          // v4478 +2, v4479 +2, v4480 +2. v4481 added two files and this count did
-                          // NOT move: the census walks a population budgetMargin's two are outside,
-                          // so the three capability rows moved and the file total did not -- assumed
-                          // +2 first, and the gate refused it. FOUR ROUNDS RUNNING this table has
-                          // been re-taken by hand, which is the cost of pinning it.
+    // v4482 -- 3880, MEASURED, AND RE-TAKEN A SECOND TIME IN THE SAME ROUND: the first reading of 3879 was
+    // taken after recordDrift.mjs existed and before its gate did, and it was stale by the time the file it
+    // was measuring the cost of was finished. The ship verify caught it, not me. That is a SIXTH
+    // re-derivation and the sixth different table -- and threads have still read 22 through every one.
+    // It is also the exact record this round's own recordDrift.mjs does NOT check, for the reason recorded
+    // there: this module has zero imports on purpose, so the walker cannot live in it and the drift
+    // detector cannot see it. The one record left unwatched is the one that went stale.
+    // And v4481's note on this line was WRONG: it said budgetMargin's two files
+    // "sit outside the population that census walks", which is why the total had not moved. They are both in
+    // the walked set -- checked directly -- so that explanation does not hold and I cannot reconstruct why
+    // the earlier reading was 3878. What survives is the rule the wrong explanation was reaching for: this
+    // number is MEASURED every round, never incremented from the last one, and a reason invented to explain a
+    // count is worth less than re-taking it. FIVE ROUNDS RUNNING this table has been re-taken by hand.
+    files: 3880,
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
                           // caught it: v4478's re-take was correct for v4478 and stale the moment v4479
@@ -196,7 +205,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // use closures and await, so three rows moved by exactly two each and the other nine did not move at all.
     // A census whose rows move together under a two-file addition would be measuring the tree's size rather
     // than its capabilities; three of twelve moving is the shape that says the patterns are discriminating.
-    esModules: 3587, closures: 3463, asyncAwait: 1340, typedArrays: 691, promises: 332,
+    esModules: 3589, closures: 3465, asyncAwait: 1342, typedArrays: 691, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -217,7 +226,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 157,     // 3404 / 22, rounded
+    closuresOverThreads: 158,     // 3465 / 22, rounded
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

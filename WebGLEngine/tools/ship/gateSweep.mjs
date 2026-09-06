@@ -2628,6 +2628,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "is why a ship takes five minutes instead of an hour, and the contention is the price. What " +
                  "is worth naming is that the price is paid in a number the tree then treats as a measurement.",
     }),
+    since121: Object.freeze({
+        at: "v4482", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordDrift-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runtimeGap-selfcheck.mjs (its private file walker moved to recordDrift.mjs and is imported, so there is one definition)"]),
+        verdict: "green, four sections. *** FOUR ROUNDS RUNNING, ADDING A MODULE INVALIDATED HAND-MAINTAINED " +
+                 "RECORDS IN OTHER FILES, AND EVERY ONE WAS FOUND BY A FIVE-MINUTE SHIP VERIFY. *** Read off " +
+                 "the commits: v4478 three records, v4479 two, v4480 four, v4481 four. THE SET IS NOT FIXED -- " +
+                 "which records depends on what the round added, so it cannot be memorised, and v4481 proved " +
+                 "that knowing the pattern is not enough. Each is derivable in milliseconds: assertionShape " +
+                 "195, closingCoverage 19, registryOrphans 24, gate enumeration 12 -- 250 ms against a five- " +
+                 "minute verify. NEW recordDrift.mjs asks those questions BEFORE the verify. IT REPORTS AND " +
+                 "DOES NOT WRITE, per v3698's refusal that a loop writing and grading the same record can " +
+                 "mark its own work passed. *** IT FOUND ITS OWN ROUND'S THREE COSTS IN 250 ms, WHICH IS THE " +
+                 "DEMONSTRATION: *** the assertion census at 1520 vs 1521, one gate no closing named, and one " +
+                 "gate with no timing. THE FOURTH RECORD IS NOT CHECKED AND THE REASON IS RECORDED: " +
+                 "vba/runtimeGap.mjs has ZERO imports and is pure by design, so its walker cannot live there; " +
+                 "moving it in was tried and REVERTED, and it lives in recordDrift.mjs instead with " +
+                 "runtimeGap-selfcheck importing it -- one definition, and the pure module stays pure. Six " +
+                 "sabotages by name. *** AND THIS ROUND CORRECTED A WRONG EXPLANATION IT SHIPPED LAST ROUND: " +
+                 "*** v4481 said budgetMargin's two files sat outside the walked population, which is why the " +
+                 "file total had not moved. Both are in the walked set -- checked directly -- so that reason " +
+                 "does not hold, and I cannot reconstruct the earlier reading. What survives is the rule it " +
+                 "was reaching for: the number is MEASURED every round, never incremented, and a reason " +
+                 "invented to explain a count is worth less than re-taking it.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
