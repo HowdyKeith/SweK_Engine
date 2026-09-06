@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 454,
+ "count": 455,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1729,6 +1729,13 @@
    "f": "lineage.html",
    "t": "Lineage &#183; SweK",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "little-planet.html",
+   "t": "Little Planet",
+   "d": "A stereographic little-planet view of a procedurally baked planet: procPlanet's equirectangular bake sampled through a fragment pass on gfx/device.js on either backend, held texel for texel to a CPU twin by tools/ship/stereographic-selfcheck.mjs. Seed, zoom, roll and tilt sliders; roll animates.",
    "g": "",
    "p": 0
   },

@@ -629,6 +629,21 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         would fill it too, three crossings). slug-morph.html cycles a string of glyphs. An earlier draft's
         re-pin of the closing curve pinned nothing (the closure is by construction) and was removed when its
         sabotage went 0 red.
+    THE LITTLE PLANET -- built at v4499 (task 45). Nothing in the tree was stereographic before: render/panini.js
+        only quotes the word and is itself uncalled from main.js. render/stereographic.mjs is the projection as
+        a pure function (the bake's south pole at the picture's centre, r = 1 the equator, the north pole at
+        infinity; roll spins the axis, tilt leans it), a fragment pass in both languages that samples
+        procPlanet's equirectangular bake through gfx/device.js with nearest sampling and the seam wrapped by
+        fract, and a CPU twin that computes the same picture texel for texel. MEASURED (tools/ship/stereographic-
+        selfcheck.mjs, seed 7, a 256 x 128 terran bake, a 160 x 120 frame): 2,236 of the bake's own texel-centre
+        directions round-trip through dirToUv to their own texels, so the mapping is the bake's convention and not
+        a second one; the pass on both backends is the CPU twin texel for texel on 19,180 / 19,172 of 19,200
+        pixels at the default knobs and 19,112 at zoom 1.6, roll 0.9, tilt 0.35, the rest texel-boundary
+        neighbours and every one a bake colour, never a blend. The module is the tree's 14th dual-language shader
+        module (backendParity and shaderCensus baselines raised by name; the WGSL is in the corpus). little-
+        planet.html is the view: seed, zoom, tilt and spin. A sabotage that removed the WGSL's fract changed no
+        pixel -- (lon + pi) / 2pi is already in [0, 1] and the sampler's clamp gives the same texel at u = 1 --
+        so the text hold that had stood in for it was dropped and a roll sabotage put in its place.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

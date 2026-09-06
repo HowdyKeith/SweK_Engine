@@ -57,6 +57,7 @@ import { TERRAIN_WGSL, TERRAIN_PICK_WGSL } from "../../render/gpuTerrain.mjs";
 import * as WO from "../../render/worleyWgsl.mjs";
 import { LIT_WGSL } from "../../render/litSphere.mjs";
 import { QUAD_WGSL } from "../../render/tslWide.mjs";
+import { FRAGMENT_WGSL as STEREO_WGSL } from "../../render/stereographic.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
@@ -258,6 +259,9 @@ export function corpus() {
           why: "v4473 -- the lit render pair over LAYOUTS.lit (a normal at location 4, the extras at 5, a point light in the uniform); its picture is graded against the CPU sphere by tools/ship/litSphere-selfcheck.mjs on both backends, and here both must compile it",
           opts: { code: LIT_WGSL, compileOnly: true, outCount: 0 } },
         // v4301 (Level 15) -- the fleet looks: vertex/fragment pairs, compile-only here (fleets-selfcheck draws them).
+        { id: "stereographic.FRAGMENT_WGSL", from: "render/stereographic.mjs", compileOnly: true,
+          why: "v4499 -- the little planet's fragment pass: a full-screen triangle from the vertex index, the inverse stereographic map, roll and tilt, a nearest sample of procPlanet's bake; held texel for texel to its CPU twin on both backends by tools/ship/stereographic-selfcheck.mjs",
+          opts: { code: STEREO_WGSL, compileOnly: true, outCount: 0 } },
         { id: "tslWide.QUAD_WGSL", from: "render/tslWide.mjs", compileOnly: true,
           why: "v4483 -- the hand-written twin of the widened transplant's quad: three computed varyings, one @interpolate(flat) i32, the camera's projection in the fragment; the generated pair is held to its picture by tools/ship/tslWide-selfcheck.mjs on both backends, and here both harnesses must compile it",
           opts: { code: QUAD_WGSL, compileOnly: true, outCount: 0 } },

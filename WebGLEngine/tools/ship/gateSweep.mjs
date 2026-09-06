@@ -2552,6 +2552,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "are dropped at the endpoints, the splitting overlap recorded. Sabotages red at 5 / 4 / 7 / 2; A went 0 red first " +
                  "(a closing re-pin that pinned nothing) and was removed rather than held.",
     }),
+    since121: Object.freeze({
+        at: "v4499", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/stereographic-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/stereographic.mjs: the little-planet projection as a pure function, a fragment " +
+                 "pass in both languages sampling procPlanet's bake with nearest sampling, and a CPU twin; the pass is the twin texel " +
+                 "for texel on 99.5% of pixels and the rest are texel-boundary neighbours that are bake colours. The bake's own texel " +
+                 "directions round-trip to their texels. A 14th dual-language module: parity and census baselines raised by name, the " +
+                 "WGSL in the corpus. little-planet.html is the view. Sabotages red at 6 / 2 / 4 / 5 -- B (the seam's fract) changed no " +
+                 "pixel and its text hold was dropped for a roll sabotage.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

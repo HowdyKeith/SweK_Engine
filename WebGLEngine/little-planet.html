@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Little Planet (stereographic procPlanet)">
+<meta name="demo:desc" content="A stereographic little-planet view of a procedurally baked planet: procPlanet's equirectangular bake sampled through a fragment pass on gfx/device.js on either backend, held texel for texel to a CPU twin by tools/ship/stereographic-selfcheck.mjs. Seed, zoom, roll and tilt sliders; roll animates.">
+<meta name="demo:category" content="fx">
+<title>Little Planet</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=range] { width:120px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Little planet: procPlanet's bake through a stereographic pass</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">seed <input id="seed" type="number" value="7" min="0" max="999999" style="width:6em"> &middot; zoom <input id="zoom" type="range" min="0.3" max="3" step="0.01" value="1"> <span id="zoomV"></span> &middot; tilt <input id="tilt" type="range" min="-1.2" max="1.2" step="0.01" value="0"> <span id="tiltV"></span> &middot; spin <input id="spin" type="range" min="0" max="0.02" step="0.0005" value="0.004"> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="info"></span></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { planetSpec, bakeEquirect } from "./world/procPlanet.js";
+import { stereographicPipelineDesc, bakeTexture, drawLittlePlanet } from "./render/stereographic.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const el = (id) => document.getElementById(id);
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+let device, pipe, tex = null, roll = 0, spec = null;
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function bakeNow() {
+  const seed = Number(el("seed").value) >>> 0; spec = planetSpec(seed);
+  const t0 = performance.now(); const bake = bakeEquirect(spec, 512, 256); const ms = performance.now() - t0;
+  if (tex) tex.destroy(); tex = bakeTexture(device, bake);
+  el("info").textContent = spec.type + " planet, sea " + bake.seaFraction.toFixed(2) + ", baked 512 x 256 in " + ms.toFixed(0) + " ms";
+}
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  pipe = device.pipeline(stereographicPipelineDesc());
+  if (pipe.compiled) { const err = await pipe.compiled; if (err) return fail("pipeline: " + err); }
+  bakeNow();
+  el("seed").addEventListener("change", bakeNow);
+  beEl.textContent = "backend: " + device.backend + " · the south pole at the centre, the horizon curled into a circle; nearest sampling, held to the CPU twin";
+  requestAnimationFrame(frame);
+}
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(Math.min(700, (cvs.clientWidth || 1200) * 0.56) * d);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  roll += Number(el("spin").value); if (roll > Math.PI * 2) roll -= Math.PI * 2;
+  const knobs = { zoom: Number(el("zoom").value), roll, tilt: Number(el("tilt").value) };
+  el("zoomV").textContent = knobs.zoom.toFixed(2); el("tiltV").textContent = knobs.tilt.toFixed(2);
+  device.frame(({ pass }) => { pass.clear([0.02, 0.031, 0.024, 1]); drawLittlePlanet(pass, pipe, tex, w, h, knobs); });
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>
