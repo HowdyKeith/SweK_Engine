@@ -2617,7 +2617,7 @@
   {
    "f": "slug-ticker.html",
    "t": "Slug Ticker",
-   "d": "A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs.",
+   "d": "A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs. The shatter button bursts the centre glyph into nine box3d shards each carrying its sub-rectangle of the glyph, gated by tools/ship/slugShatter-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

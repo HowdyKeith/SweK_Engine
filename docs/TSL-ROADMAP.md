@@ -712,6 +712,26 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         the viewport's left and right edges: a clipped quad's cut vertices are re-snapped, its edge lines move by
         up to a snap unit, and one layer of a ten-deep stack goes in or out -- a clipped quad's tie band is 1/Q.
         slug-ticker.html gained the napalm mode (?mode=napalm).
+    THE TICKER GLYPH SHATTERS -- built at v4503 (task 50). render/slugShatter.mjs cuts a task 43 body's em box into
+        3 x 3 cells and makes each a smaller box3d box carrying the glyph's SUB-RECTANGLE: a quad whose texcoords are
+        the cell's corners in em and whose positions are the cell centred on its own body, written in the Slug vertex
+        layout with the glyph's atlas words unchanged -- Slug evaluates coverage from the texcoord, so a quad spanning a
+        ninth of the em box draws that ninth and nothing else, and nothing in the shader changes. The shards spawn where
+        the cells were (the body's centre plus its rotation applied to each offset), inherit the body's velocity, and
+        burst the way world/voxelDebrisSystem.js bursts its cubes (outward, upward, a spin) from a seeded generator, so
+        the run stays deterministic under stateHash. box3d bodies cannot be removed, so shards live in a POOL: parked
+        static far below the floor at `life` and reused by the next shatter; the glyph is parked the same way and returns
+        at its spawn when its shards die. MEASURED (tools/ship/slugShatter-selfcheck.mjs): the cells tile the box to
+        1e-12; a shard's stream is one quad with the cell's texcoords and the glyph's words; the ticker to tick 300, the
+        body nearest the centre shattered: one tick later every shard is within 0.06 units of its cell, the mean
+        distance from the burst grows from 0.05 to 1.7 over 90 ticks, a shard rises 0.38 above the centre, at life all
+        nine are parked and the glyph is back at its spawn at the conveyor's speed, a second shatter makes no body, two
+        runs hash the same. On both backends the tick-312 frame -- 32 bodies and nine shards mid-burst -- fits the
+        perspective-correct model per quad to 3.3e-6 em and is slugEval's coverage stored per layer on 48,000 of 48,000
+        pixels on WebGPU (worst 1 on WebGL2), the shards' ink spanning 16 x 27 px where the whole glyph would be about
+        7, the parked glyph absent. A first draft of the gate let the second shatter overwrite the first's recorded
+        cells and read a 0.58-unit "jump" that was the conveyor's travel. slug-ticker.html gained a shatter button and
+        an every-150-ticks default, in both modes (in napalm mode the shards burn with the glyph's own fill rectangle).
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

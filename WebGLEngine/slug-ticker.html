@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Slug Ticker (Box3D glyph bodies)">
-<meta name="demo:desc" content="A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs.">
+<meta name="demo:desc" content="A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs. The shatter button bursts the centre glyph into nine box3d shards each carrying its sub-rectangle of the glyph, gated by tools/ship/slugShatter-selfcheck.mjs.">
 <meta name="demo:category" content="physics">
 <title>Slug Ticker</title>
 <style>
@@ -23,7 +23,7 @@
   <div id="cap">Slug ticker: glyphs as Box3D bodies on a conveyor</div>
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
-    &middot; <a href="./slug-projective.html">the projective case it rests on</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; mode <select id="mode"><option value="plain">plain</option><option value="napalm">napalm (fire fill + trail)</option></select> &middot; <span id="tick"></span></div>
+    &middot; <a href="./slug-projective.html">the projective case it rests on</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; mode <select id="mode"><option value="plain">plain</option><option value="napalm">napalm (fire fill + trail)</option></select> &middot; <button id="shatter">shatter</button> <label><input type="checkbox" id="auto" checked> every 150 ticks</label> &middot; <span id="tick"></span></div>
 </div>
 <canvas id="c"></canvas>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -34,6 +34,7 @@ import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
 import { TICKER, glyphBodies, worldFromModule, spawnTicker, tickTicker, cameraFor, bodyRows } from "./render/slugTicker.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
 import { NAPALM, puddleAtlas, floorRows, createTrail, dropTrail, trailGlyphs } from "./render/slugNapalm.mjs";
+import { SHATTER, shardPlan, createPool, shatterBody, tickShatter, nearestBody } from "./render/slugShatter.mjs";
 import { buildVertices } from "./text/slugText.js";
 import { fireFill, fillTexture, glyphRect } from "./render/slugFill.mjs";
 
@@ -87,15 +88,34 @@ async function init() {
   try { initNapalm(font); if (fireDevice.pipeline.compiled) { const err = await fireDevice.pipeline.compiled; if (err) throw new Error(err); } }
   catch (e) { return fail("napalm pipeline: " + e.message); }
   beEl.textContent = "backend: " + device.backend + " \u00b7 " + bodies.length + " glyph bodies on a " + plan.loop.toFixed(1) + "-unit loop \u00b7 box3d " + (box3d._mod ? "loaded" : "?");
+  document.getElementById("shatter").onclick = () => doShatter();
   requestAnimationFrame(frame);
   addEventListener("resize", () => { sized = false; });
 }
 let world, plan, bodies, ids, sized = false, ticks = 0, wraps = 0;
+// THE SHATTER (v4503, task 50): the body nearest the centre splits into its cells -- smaller box3d boxes each carrying the glyph's
+// sub-rectangle (render/slugShatter.mjs) -- which burst and are parked at `life`, the glyph returning at the near end. A shard is
+// one batch of one quad on the mode's font device; in napalm mode the shards burn with the glyph's own fill rectangle.
+let pool = null, shatters = [], shardBatches = new Map(), shattered = 0;
+function doShatter() {
+  const xf = world.readTransforms(), busy = new Set(shatters.map((s) => s.body)), k = nearestBody(xf, ids, busy);
+  if (k < 0) return;
+  const dev = napalmOn() ? fireDevice : fontDevice, e = dev.entryFor(bodies[k].glyphIndex);
+  const sp = shardPlan(bodies[k], e, TICKER.size, TICKER.depth);
+  const rec = shatterBody(world, pool, k, ids[k], sp, xf, world.readVelocities(), ticks, { spawn: bodies[k].spawn });
+  rec.batches = rec.shards.map((sh) => { const b = new SlugDeviceBatch(dev); b.setBuilt(sh.built); return { b, idx: sh.idx, rect: glyphRect(e) }; });
+  shatters.push(rec); shattered++;
+}
 function dpr() { return Math.min(2, devicePixelRatio || 1); }
 function frame() {
   const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(460 * d);
   if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
   const r = tickTicker(world, ids, plan); ticks++; wraps += r.wrapped;
+  if (!pool) pool = createPool(world);
+  const before = shatters; shatters = tickShatter(world, pool, shatters, ticks, plan);
+  for (const s of before) if (!shatters.includes(s)) for (const sb of s.batches) sb.b.destroy();
+  if (document.getElementById("auto").checked && ticks % 150 === 0) doShatter();
+  const parked = new Set(shatters.map((s) => s.body));
   const PV = cameraFor(w, h);
   let puddles = 0;
   if (napalmOn()) {
@@ -106,15 +126,17 @@ function frame() {
     device.frame(({ pass }) => {
       pass.clear([0.02, 0.031, 0.024, 1]);
       trailBatch.draw(pass, floor, [w, h], { texture: tex, rect });
-      fireBatches.forEach((fb, k) => fb.bt.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h], { texture: tex, rect: fb.rect }));
+      fireBatches.forEach((fb, k) => { if (!parked.has(k)) fb.bt.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h], { texture: tex, rect: fb.rect }); });
+      for (const s of shatters) for (const sb of s.batches) sb.b.draw(pass, bodyRows(PV, r.xf, sb.idx), [w, h], { texture: tex, rect: sb.rect });
     });
   } else {
     device.frame(({ pass }) => {
       pass.clear([0.02, 0.031, 0.024, 1]);
-      batches.forEach((b, k) => b.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h]));
+      batches.forEach((b, k) => { if (!parked.has(k)) b.draw(pass, bodyRows(PV, r.xf, ids[k]), [w, h]); });
+      for (const s of shatters) for (const sb of s.batches) sb.b.draw(pass, bodyRows(PV, r.xf, sb.idx), [w, h]);
     });
   }
-  if (ticks % 15 === 0) document.getElementById("tick").textContent = "tick " + ticks + ", " + wraps + " wraps, hash " + world.stateHash() + (napalmOn() ? ", " + puddles + " puddles, heat " + fire.heat() : "");
+  if (ticks % 15 === 0) document.getElementById("tick").textContent = "tick " + ticks + ", " + wraps + " wraps, hash " + world.stateHash() + (napalmOn() ? ", " + puddles + " puddles, heat " + fire.heat() : "") + ", " + shattered + " shattered, " + shatters.length * SHATTER.nx * SHATTER.ny + " shards flying";
   requestAnimationFrame(frame);
 }
 init();

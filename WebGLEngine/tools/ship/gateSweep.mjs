@@ -2608,6 +2608,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "edges as the fill rule's, and to widen a clipped quad's tie band to a snap unit. slug-ticker.html gained the napalm " +
                  "mode. Sabotages red at 5 / 1 / 2 / 1.",
     }),
+    since125: Object.freeze({
+        at: "v4503", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugShatter-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/slugShatter.mjs: a ticker glyph cut into nine box3d shards each carrying its sub-rectangle " +
+                 "of the glyph (a quad with the cell's texcoords and the glyph's atlas words; the shader never learns the glyph was cut), " +
+                 "bursting from a seeded generator, pooled and parked at life with the glyph returning at its spawn. The tick-312 frame " +
+                 "fits the model per quad to 3.3e-6 em and is slugEval's coverage on 48,000 of 48,000 pixels on WebGPU. slug-ticker.html " +
+                 "gained the shatter button. Sabotages red at 1 / 2 / 5 / 4.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -96,6 +96,10 @@ export function worldFromModule(m, gravity = TICKER.gravity) {
         setVelocity(i, v) { m._swk_body_set_velocity(i, v[0], v[1], v[2]); },
         setTransform(i, p, q = [0, 0, 0, 1]) { m._swk_body_set_transform(i, p[0], p[1], p[2], q[0], q[1], q[2], q[3]); },
         setFriction(i, mu) { if (m._swk_body_set_friction) m._swk_body_set_friction(i, mu); },
+        // v4503 (task 50): the shatter's three -- box3dLoader's names, box3dLoader's argument order
+        impulse(i, v) { m._swk_body_impulse(i, v[0], v[1], v[2]); },
+        angularImpulse(i, v) { m._swk_body_ang_impulse(i, v[0], v[1], v[2]); },
+        setType(i, type) { m._swk_body_set_type(i, type === "kinematic" ? 2 : type === "dynamic" ? 1 : 0); },
         step(dt = TICKER.dt, sub = TICKER.substeps) { m._swk_world_step(dt, sub); },
         bodyCount() { return m._swk_body_count(); },
         readTransforms() { const n = m._swk_body_count(), bytes = n * 7 * 4; if (bytes > xfCap) { if (xfPtr) m._free(xfPtr); xfPtr = m._malloc(bytes); xfCap = bytes; } m._swk_transforms(xfPtr); return new Float32Array(m.HEAPF32.buffer, xfPtr, n * 7).slice(); },
