@@ -217,10 +217,13 @@ export const PARITY_BASELINE = Object.freeze({
     // Both branches moved these: main to 61 for the Slug WGSL twin above, this branch to 67 for its own
     // modules. Neither number describes the tree that has BOTH, and adding them would double-count anything
     // the two rounds touched in common. The figures below are what classify() reports on the merged tree.
-    wgslBearing: 68,   // 61 on main, 67 on this branch; 68 is what the merged tree reports
+    // 61 on main, 67 on this branch, 68 on the merged tree at v4477. 69 at v4478: gpuTimer-selfcheck.mjs
+    // carries the WGSL compute shader it times, so the gate that measures GPU time is itself WGSL-bearing.
+    wgslBearing: 69,
     both: 13,
     glslOnly: 132,
-    wgslOnly: 55,      // 48 and 54 respectively -- re-measured for the same reason
+    // 48 and 54 respectively -- re-measured for the same reason; 56 at v4478 for the same one file.
+    wgslOnly: 56,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs"]),

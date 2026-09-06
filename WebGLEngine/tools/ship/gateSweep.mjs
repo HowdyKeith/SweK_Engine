@@ -2508,6 +2508,48 @@ since116: Object.freeze({
                  "screenshot on the rig -- the same limit panini.js declared and this inherits rather than " +
                  "pretending past.",
     }),
+    // v4478 -- the one hundred and seventeenth closing. The GPU clock the newer backend never had.
+    since117: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/gpuTimer-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, seventeen checks in five sections, the last against a REAL WebGPU device " +
+                 "through webgpuHarness. MEASURED FIRST: ui/SystemPerfMonitor.js and ui/hud.js have timed the " +
+                 "GPU through EXT_disjoint_timer_query_webgl2 since long before gfx/device.js existed, and " +
+                 "`timestamp-query` / `createQuerySet` / `writeTimestamp` appear ZERO times in the whole tree. " +
+                 "So every WebGPU-against-WebGL2 comparison this tree could make was made with an instrument " +
+                 "that only works on ONE SIDE, and webgpu-bench.html times with performance.now() around " +
+                 "queue.onSubmittedWorkDone() -- CPU wall clock including submit and sync, not GPU execution. " +
+                 "*** AND THE FIRST THING THE REAL DEVICE SAID IS THAT A TIMESTAMP HAS A NOISE FLOOR. *** A " +
+                 "compute pass whose inner loop was made TEN TIMES LONGER did not get slower: 10 iters read " +
+                 "142,336 ns and 100 iters read 131,962 ns, LOWER, on the same device in the same session. And " +
+                 "one unchanged configuration read 103,841 and 190,114 -- a 1.83x spread with nothing moved. So " +
+                 "the module never returns a bare number: it takes samples, reports median WITH spread, " +
+                 "calibrates a floor from an EMPTY pass (the MAX of those samples, not the median, because a " +
+                 "median floor calls half the empty passes work), and *** REFUSES to call a sub-floor reading a " +
+                 "measurement *** -- verdict() returns ns: null there, which is render/panini.js's rule for a " +
+                 "direction with no image applied to time, and for the same stated reason. The device section " +
+                 "proves the MECHANISM on the real adapter (written, resolved, copied, read back, heavy/light " +
+                 "17.89x) and its own run reproduced the finding live: floor 182,068 ns against a light pass of " +
+                 "158,118 ns, BELOW the floor. *** WHAT IS NOT CLAIMED: A MAGNITUDE. *** That adapter is " +
+                 "SwiftShader, a CPU rasteriser; the timestamps are genuine WebGPU timestamps and the numbers " +
+                 "are a software device's, so the module CALIBRATES the floor rather than hard-coding it and " +
+                 "the frozen table is a record of one box. Thirteen sabotages, ALL RED BY NAME, two files " +
+                 "md5-identical. *** TWO COST ZERO RED FIRST AND BOTH WERE FINDINGS ABOUT THE CHECK. *** " +
+                 "Dropping `spread` from a resolved verdict did not pass -- it CRASHED, on undefined.toFixed in " +
+                 "a detail string, which killed every later section and reported a stack trace instead of a " +
+                 "name; v4434 hit that exact shape and the detail string cannot throw now. And deleting the " +
+                 "SwiftShader caveat from the module cost NOTHING, because nothing held the recorded provenance " +
+                 "against the observed one: MEASURED_AT.device could be rewritten to 'a real GPU' and every " +
+                 "check still passed. It is checked against the DEVICE ITSELF now. ALSO CORRECTED, one level " +
+                 "out: v4477's merge re-froze vba/runtimeGap.mjs's constants and left its prose table at " +
+                 "v4463's numbers, so that file's own header disagreed with its own data and nothing checked, " +
+                 "because the gate compares the census to the constants and never to the table. AND THIS ENTRY'S OWN " +
+                 "ORDINAL COLLIDED: it was written as since100 against a ledger that concurrent sessions had " +
+                 "already carried to since116, and gateSweep-selfcheck caught it BY NAME -- 'DUPLICATE: since100, " +
+                 "the later declaration wins silently and the earlier round's swept count disappears from the " +
+                 "surplus arithmetic'. Second time this session. Renumbered forward, never backward.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
