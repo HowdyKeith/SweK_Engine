@@ -2777,6 +2777,56 @@ since116: Object.freeze({
                  "both languages in order to compare them is the instrument sitting in its own sample, so the " +
                  "two gates are split out by name and reach reads 13 of 147, 8.8%.",
     }),
+    // v4484 -- the twenty-fifth closing, and the first that answers a question THIS SESSION recorded as data
+    // rather than one Keith raised. v4480 wrote freshEmitComparedToStored: false into gfx/pipelineGaps.mjs and
+    // marked it "*** THE ACTUAL OPEN QUESTION ***". It is answered, and the survey that asked it was miscounting.
+    since123: Object.freeze({
+        at: "v4484", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/emitReproducibility-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-one checks in six sections, 0.06 s -- it deliberately " +
+                 "does NOT re-emit, because the three gates that pay 25 s of browser and three.js each now " +
+                 "grade reproducibility themselves and a second expensive run would prove what the first one " +
+                 "proved. *** THE ANSWER IS YES: ALL FOUR ARTIFACTS RE-EMIT BYTE-IDENTICAL. *** Same md5 and a " +
+                 "clean git status against files committed three days and many processes earlier, and it " +
+                 "survives every arrangement that could have broken it -- the same graph emitted twice through " +
+                 "one renderer, two freshly built graphs through one renderer, and a second renderer in the " +
+                 "same process all give the same 7,267-byte fragment. *** AND v4480's SURVEY SAID THREE " +
+                 "ARTIFACTS AND THERE ARE FOUR. *** tools/ship/tsl-emitted.json -- no suffix, 43,239 bytes, the " +
+                 "LARGEST of the set, written by tslSource-selfcheck and compiled by wgslCorpus -- was missed " +
+                 "because the survey looked for tsl-emitted-{race,physics,compute} and A GLOB THAT WANTS A " +
+                 "HYPHEN AFTER 'emitted' DOES NOT MATCH A NAME THAT ENDS THERE. The gate runs that glob as a " +
+                 "control so the finding is mechanical rather than anecdotal: tsl-emitted* matches four, " +
+                 "tsl-emitted-* matches three. *** AND THE READER COUNT WAS RIGHT WHILE ITS SET WAS WRONG: *** " +
+                 "the hard-coded list counted render/backendParity.mjs, which only NAMES the files in a " +
+                 "comment and loads nothing, and omitted pipelineGaps-selfcheck.mjs, which reads them -- four " +
+                 "real readers plus one false one came to the same 5 as five real ones, and only listing the " +
+                 "members shows it. NEW tools/ship/emitReproducibility.mjs owns the register and the " +
+                 "comparison; all EIGHT writes across the three gates now compare against the stored bytes " +
+                 "before writing and grade the answer, at zero extra runtime because the emit has already " +
+                 "happened by the time a write is reached. *** THE CHECK'S OWN FIRST DRAFT WENT RED AND THE " +
+                 "ARTIFACTS WERE RIGHT: *** four of the eight reported drift while git status was clean, " +
+                 "because tslRace-selfcheck writes its file FIVE times -- once with a fresh object that DROPS " +
+                 "the four sprite keys, then four merges that add them back -- so each merge was comparing " +
+                 "against a state THIS RUN had created. THE FIRST WRITE ERASES THE EVIDENCE THE LATER ONES " +
+                 "NEED. snapshot() takes the baseline before anything is written, and section 4 reproduces the " +
+                 "whole trap with real calls so the fix is graded rather than described. THREE MORE FINDINGS " +
+                 "IN THE FILE v4480 WROTE. Its gate stamped arts[0] and asserted top-level wgsl and glsl keys, " +
+                 "true of the race file and of no other -- THE FOUR DO NOT SHARE A SCHEMA -- so correcting the " +
+                 "list put a differently shaped file first and the row went red on a fact about itself; every " +
+                 "artifact is graded now, by CONTENT rather than key name. And tsl-emitted-compute.json " +
+                 "carries WGSL ALONE, which is not a gap: WebGL2 HAS NO COMPUTE STAGE, so there is no GLSL " +
+                 "counterpart to emit, and the survey's blanket 'both texts written to disk' is true of three " +
+                 "and structurally impossible for the fourth. SIXTEEN SABOTAGES, ALL RED BY NAME. Two needed " +
+                 "the gate fixed first: one renamed a register row to a nonexistent file and CRASHED an " +
+                 "unguarded JSON.parse in a later section, taking down the row in section 1 that had already " +
+                 "diagnosed it -- v4434's shape, third instance in three rounds, and a later section must not " +
+                 "be able to destroy an earlier one's finding. The other set tslRace's baseline to undefined, " +
+                 "disabling it, and PASSED a row that grepped for the identifier EMITTED_BASELINE, which the " +
+                 "sabotage kept. Fourth token-not-behaviour instance this session; the row grades the " +
+                 "assignment from snapshot() and the five uses now, and says outright that it checks wiring " +
+                 "while section 4 checks behaviour.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

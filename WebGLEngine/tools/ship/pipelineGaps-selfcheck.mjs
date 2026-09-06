@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as P from "../../gfx/pipelineGaps.mjs";
+import * as E from "./emitReproducibility.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -93,33 +94,63 @@ const noComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\
 // ---- 3. *** "ALREADY SOLVED" MUST POINT AT THE BYTES THAT SOLVED IT *** -------------------------------------
 {
     say("");
-    const arts = ["tools/ship/tsl-emitted-race.json", "tools/ship/tsl-emitted-physics.json",
-                  "tools/ship/tsl-emitted-compute.json"].filter((f) => fs.existsSync(path.join(ENG, f)));
-    const readers = ["render/backendParity.mjs", "tools/ship/tslSource-selfcheck.mjs",
-                     "tools/ship/tslPhysics-selfcheck.mjs", "tools/ship/wgslCorpus.mjs",
-                     "tools/ship/tslRace-selfcheck.mjs"].filter((f) => {
-        try { return /tsl-emitted/.test(read(f)); } catch { return false; }
+    // *** v4484: BOTH OF THESE LISTS WERE HARD-CODED AND BOTH WERE WRONG, AND THE READER COUNT WAS RIGHT BY
+    // TWO ERRORS CANCELLING. *** The artifact list named three files and there are FOUR -- tsl-emitted.json,
+    // with no suffix, is the largest of the set. The reader list counted render/backendParity.mjs, which only
+    // NAMES the files in a comment and loads nothing, and omitted this very gate, which reads them. Four real
+    // readers plus one false one came to the same 5 as five real ones. A count that is right while its members
+    // are wrong is only found by listing the members, which is why both now come from the register in
+    // tools/ship/emitReproducibility.mjs and are checked file by file.
+    const arts = E.ARTIFACTS.map((a) => a.file).filter((f) => fs.existsSync(path.join(ENG, f)));
+    const readers = E.CONTENT_READERS.filter((f) => {
+        try { return /tsl-emitted/.test(noComments(read(f))); } catch { return false; }
     });
-    const stamp = JSON.parse(read(arts[0]));
-    say(`  ${arts.length} emitted artifacts, ${readers.length} readers, pinned to three ${stamp.three}, written ${stamp.at}`);
+    // *** AND EVERY ARTIFACT IS GRADED, NOT arts[0]. *** The old line stamped the first file and asserted
+    // top-level `wgsl` and `glsl` keys, which is true of tsl-emitted-race.json and of no other one: the four
+    // do NOT share a schema -- race nests at the top, tsl-emitted.json under badTv/blackbody, physics under
+    // lyapunov/heidler, compute under emitted/transplanted. Correcting the list to four put a differently
+    // shaped file first and the row went red on a fact about itself. What is common is the stamp and both
+    // languages being present somewhere, checked per file.
+    const stamped = arts.map((f) => ({ f, j: JSON.parse(read(f)) }))
+                        .map((x) => ({ ...x, lang: E.carriesBothLanguages(x.j) }));
+    for (const x of stamped) say(`    ${x.f.padEnd(34)} three ${x.j.three}, written ${x.j.at}, wgsl ${x.lang.wgsl}, glsl ${x.lang.glsl}`);
+    say(`  ${arts.length} emitted artifacts, ${readers.length} readers`);
     ok("!! *** THE 'BUILD-TIME TSL' ARCHITECTURE THE SURVEY PROPOSED ALREADY EXISTED ***",
         arts.length === M.emittedArtifacts && readers.length === M.emittedReaders &&
-        stamp.three === M.emittedPinnedThree && stamp.at && stamp.wgsl && stamp.glsl,
-        "the graphs are compiled and BOTH texts written to disk, stamped with the round that wrote them and " +
-        "the three version that emitted them. The survey proposed it as new work; it is the tree's practice");
+        stamped.every((x) => x.j.three === M.emittedPinnedThree && x.j.at) &&
+        stamped.every((x) => {
+            const want = E.ARTIFACTS.find((a) => a.file === x.f).languages;
+            return want === 2 ? x.lang.both : (x.lang.wgsl && !x.lang.glsl);
+        }),
+        "the graphs are compiled and their text written to disk, stamped with the round that wrote them and " +
+        "the three version that emitted them -- all four, each checked, rather than the first one standing " +
+        "for the set. The survey proposed it as new work; it is the tree's practice");
+    ok("!! ...and THREE carry both languages while the compute one carries WGSL ALONE, which is the API not a gap",
+        stamped.filter((x) => x.lang.both).length === E.MEASURED_AT_V4484.dualLanguageArtifacts &&
+        stamped.filter((x) => x.lang.wgsl && !x.lang.glsl).length === E.MEASURED_AT_V4484.wgslOnlyArtifacts &&
+        E.ARTIFACTS.find((a) => /compute/.test(a.file)).languages === 1,
+        "*** WebGL2 HAS NO COMPUTE STAGE, *** so there is no GLSL counterpart for tsl-emitted-compute.json to " +
+        "hold. The survey's blanket 'BOTH texts' is true of three and structurally impossible for the fourth, " +
+        "and an exception nobody states is indistinguishable from an omission");
     // *** AND THE THING THAT IS GENUINELY MISSING, WHICH IS NOT A COMPILER ***
     const gates = ["tools/ship/tslSource-selfcheck.mjs", "tools/ship/tslPhysics-selfcheck.mjs",
                    "tools/ship/tslRace-selfcheck.mjs"].map((f) => read(f));
     const reEmits = gates.filter((g) => /emitShaders\(/.test(g)).length;
-    const comparesToStored = gates.some((g) =>
-        /JSON\.parse[\s\S]{0,400}emitShaders|emitShaders[\s\S]{0,400}JSON\.parse/.test(noComments(g)) &&
-        /===\s*(stored|prev|saved)|stored\s*===/.test(noComments(g)));
-    say(`  ${reEmits} of 3 gates RE-EMIT on every run; a fresh emit compared to the stored artifact: ${comparesToStored}`);
-    ok("!! ...AND WHAT IS MISSING IS NOT A COMPILER, IT IS REPRODUCIBILITY",
-        reEmits === 3 && comparesToStored === false && M.freshEmitComparedToStored === false,
-        "all three gates re-emit and then assert the file EXISTS and is over a thousand characters. Nothing " +
-        "asserts the emitted text is the same text. A codegen step whose output changes when nothing changed " +
-        "is a diff nobody can review -- that property, not a compiler, is what the next round owes");
+    // *** v4484 CLOSED THIS. *** The row used to assert comparesToStored === false and say the property was
+    // what the next round owed. It is owed no longer: all EIGHT writes across the three gates now compare the
+    // fresh emit against a pre-run baseline and grade the answer, at no extra runtime, because the emit has
+    // already happened by the time a write is reached. The row is inverted rather than deleted, so the day
+    // somebody drops the comparison it goes red instead of quietly returning to the old state.
+    const writes = gates.reduce((n, g) => n + (noComments(g).match(/writeIfReproducible\(/g) || []).length, 0);
+    const allCompare = gates.every((g) => /writeIfReproducible\(/.test(noComments(g)));
+    say(`  ${reEmits} of 3 gates RE-EMIT on every run; ${writes} writes compare against the stored artifact first`);
+    ok("!! ...AND REPRODUCIBILITY, WHICH WAS WHAT WAS MISSING, IS NOW CHECKED AT EVERY WRITE",
+        reEmits === 3 && allCompare && writes === E.MEASURED_AT_V4484.writes &&
+        M.freshEmitComparedToStored === true,
+        `${writes} writes, all three gates. They used to write and then assert the file EXISTS and is over a ` +
+        "thousand characters -- nothing asserted the emitted text was the SAME text, and a codegen step whose " +
+        "output changes when nothing changed is a diff nobody can review. Measured: all four artifacts " +
+        "re-emit byte-identical");
     // MSAA, the other already-solved row
     // UNWRAPPED BEFORE MATCHING. The first draft of this line used /parity is the promise/i against the raw
     // file and went red: device.js wraps it as "Parity is\n        the promise". That is the SAME defect

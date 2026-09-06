@@ -66,8 +66,10 @@ export const GAPS = Object.freeze([
     Object.freeze({
         id: "tsl-build-time", verdict: "already-solved", at: "v4480",
         was: "the survey proposed emitting both texts at ship time and vendoring the output, as new work",
-        now: "tools/ship/tsl-emitted-{race,physics,compute}.json already exist with five readers. THE OPEN " +
-             "QUESTION IS REPRODUCIBILITY: nothing compares a fresh emit to the stored artifact",
+        now: "FOUR artifacts already exist -- tsl-emitted.json plus the {race,physics,compute} three, and the " +
+             "unsuffixed one is the largest and was the one this survey missed -- with five content readers. " +
+             "REPRODUCIBILITY WAS THE OPEN QUESTION AND v4484 ANSWERED IT: all four re-emit byte-identical, " +
+             "and all eight writes now compare before writing",
     }),
     Object.freeze({
         id: "render-bundles", verdict: "refused", at: "v4480",
@@ -113,8 +115,19 @@ export const MEASURED_AT_V4480 = Object.freeze({
     sharedLayerHadIt: false,
     errorScopeFilesAllGates: 3,     // webgpuHarness.mjs, tslSource-selfcheck, tslPhysics-selfcheck
     // The TSL artifacts that already existed.
-    emittedArtifacts: 3, emittedReaders: 5, emittedPinnedThree: "0.178.0",
-    freshEmitComparedToStored: false,   // *** THE ACTUAL OPEN QUESTION ***
+    // *** BOTH OF THESE WERE CORRECTED AT v4484, AND ONE OF THEM WAS WRONG WHEN IT WAS WRITTEN. ***
+    // THERE ARE FOUR ARTIFACTS, NOT THREE. tools/ship/tsl-emitted.json -- no suffix, 43,239 bytes, the LARGEST
+    // of the set, written by tslSource-selfcheck and compiled by wgslCorpus -- was missed because the survey
+    // looked for tsl-emitted-{race,physics,compute} and a glob wanting a hyphen after "emitted" does not match
+    // a name that ends there. The reader count was right and is re-derived at v4484: five files load the
+    // CONTENT, as against the ten that merely name one in prose.
+    emittedArtifacts: 4, emittedReaders: 5, emittedPinnedThree: "0.178.0",
+    v4480SaidArtifacts: 3,              // recorded rather than overwritten: the survey undercounted its own set
+    // *** AND THE OPEN QUESTION IS ANSWERED: YES. *** All four re-emit byte-identical, across separate
+    // processes, across the same graph twice on one renderer, across two fresh graphs, and across a second
+    // renderer in one process. Every one of the eight writes now compares before it writes and grades the
+    // result -- see tools/ship/emitReproducibility.mjs. It costs nothing: the emit has already happened.
+    freshEmitComparedToStored: true,
     nameCollisions: 3,
 });
 

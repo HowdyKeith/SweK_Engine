@@ -89,6 +89,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// v4484 -- the write below used to be a bare writeFileSync followed by an existence check. It compares
+// the fresh emit against the stored bytes first now, at no extra cost: by the time a gate reaches its
+// write the expensive emit has already happened. v4480 recorded this as the open question.
+import { writeIfReproducible, snapshot } from "./emitReproducibility.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
@@ -100,6 +104,11 @@ import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL, INK_WGSL, INK_VERTEX_GLSL } fro
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const EMITTED = path.join(ENG, "tools/ship/tsl-emitted-race.json");
+// v4484 -- THE BASELINE, TAKEN BEFORE ANYTHING IS WRITTEN. This gate writes EMITTED five times: once
+// with a fresh object that DROPS the four sprite keys, then four merges that add them back. Grading a
+// merge against the file as it stands at that moment grades it against a state this same run created,
+// and all four reported drift while the file ended byte-identical to the commit.
+const EMITTED_BASELINE = snapshot(fs, EMITTED);
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
@@ -161,8 +170,12 @@ else {
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
-        fs.writeFileSync(EMITTED, JSON.stringify({ at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run", ...R.emitted, transplanted: R.transplanted }, null, 1));
+        const rep0 = writeIfReproducible(fs, EMITTED, { at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run", ...R.emitted, transplanted: R.transplanted }, EMITTED_BASELINE);
         ok("the emitted and transplanted look is written to tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED));
+        // *** v4484. *** This file is written FIVE times in one run -- once here with a fresh object and four
+        // more merges below -- so the comparison is per-KEY: the keys this write carries, against the stored
+        // ones. A whole-file compare would call every intermediate state drift.
+        ok("!! *** the Lyapunov look re-emits BYTE-IDENTICAL to the stored artifact ***", rep0.same, rep0.detail);
     }
 }
 
@@ -327,8 +340,11 @@ else {
             ok(`*** ${b}: the Pixel race painted by the GENERATED sprite pipeline is the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0) ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);
             ok(`  ${b}: it is a DIFFERENT picture from the race's own bitmap look (${o.differ} pixels), the lightning is lit on it (${o.bright}), and the descriptor is the sprite shell's`, o.differ > 300 && o.bright > 50 && o.shell === "heidler sprite" && o.uniforms === "viewProj,bolt,span", `${o.differ} differ, ${o.bright} bright, ${o.uniforms}`);
             ok(`  ${b}: the pick still names the Pixel ships`, o.hits > 100, `${o.hits} pixels name Pixel`); }
-        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.sprite = { note: "v4325 -- the Heidler sprite look as three's builders emitted it, and as tslSource transplanted it into the sprite shell", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        const rep_sprite = { same: true, first: true, detail: "artifact absent: nothing to compare" };
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.sprite = { note: "v4325 -- the Heidler sprite look as three's builders emitted it, and as tslSource transplanted it into the sprite shell", ...R.emitted, transplanted: R.transplanted };
+            Object.assign(rep_sprite, writeIfReproducible(fs, EMITTED, j, EMITTED_BASELINE)); }
         ok("the emitted and transplanted sprite look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).sprite);
+        ok("!! ...and the sprite look re-emits BYTE-IDENTICAL to the stored artifact", rep_sprite.same, rep_sprite.detail);
     }
 }
 
@@ -390,8 +406,11 @@ else {
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Pixel race painted by the GENERATED pipeline is the fleets' OWN shipped Pixel race on EVERY pixel (${o.same} of ${o.total}, worst 0) -- transparent texels discarded the same, and the fleet's own bind hook fed the generated shader ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.textures.join() === "atlas", `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);
             ok(`  ${b}: the sprite is actually on the screen (${o.painted} pixels are not the clear colour) and the pick still names the Pixel ships`, o.painted > 300 && o.hits > 100, `${o.painted} painted, ${o.hits} name Pixel`); }
-        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.atlas = { note: "v4326 -- the fleets' own sprite look as three's builders emitted it, and as tslSource transplanted it into the sprite shell with the atlas bound", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        const rep_atlas = { same: true, first: true, detail: "artifact absent: nothing to compare" };
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.atlas = { note: "v4326 -- the fleets' own sprite look as three's builders emitted it, and as tslSource transplanted it into the sprite shell with the atlas bound", ...R.emitted, transplanted: R.transplanted };
+            Object.assign(rep_atlas, writeIfReproducible(fs, EMITTED, j, EMITTED_BASELINE)); }
         ok("the emitted and transplanted bitmap look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).atlas);
+        ok("!! ...and the atlas look re-emits BYTE-IDENTICAL to the stored artifact", rep_atlas.same, rep_atlas.detail);
     }
 }
 
@@ -460,8 +479,11 @@ else {
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the FILTERED sprite drawn by the generated pipeline is the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0) -- three's sampler bound as the shell's ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.shell === "sprite (atlas + sampler)", `${o.same}/${o.total}, worst ${o.worst}; errors ${o.errs.length}`);
             ok(`  ${b}: and the SAME pipeline draws a different picture when a point-sampled texture is bound to it (${o.softer} pixels) -- the device picks the sampler by the texture, not the shader`, o.softer > 100 && o.painted > 300 && o.hits > 100, `${o.softer} differ, ${o.painted} painted, ${o.hits} name Pixel`); }
-        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.sampled = { note: "v4327 -- the filtered sprite look as three emitted it, and as tslSource transplanted it into the sprite shell with the atlas and a sampler", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        const rep_sampled = { same: true, first: true, detail: "artifact absent: nothing to compare" };
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.sampled = { note: "v4327 -- the filtered sprite look as three emitted it, and as tslSource transplanted it into the sprite shell with the atlas and a sampler", ...R.emitted, transplanted: R.transplanted };
+            Object.assign(rep_sampled, writeIfReproducible(fs, EMITTED, j, EMITTED_BASELINE)); }
         ok("the emitted and transplanted filtered look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).sampled);
+        ok("!! ...and the sampled look re-emits BYTE-IDENTICAL to the stored artifact", rep_sampled.same, rep_sampled.detail);
     }
 }
 
@@ -523,8 +545,11 @@ else {
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Krbn race's strokes painted by the GENERATED pipeline are the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0), on a LINE-LIST the descriptor carried out to the device ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.errs.length === 0 && o.topology === "line-list" && o.shell === "ink", `${o.same}/${o.total}, worst ${o.worst}, topology ${o.topology}; errors ${o.errs.length}`);
             ok(`  ${b}: the wash did something (${o.washed} pixels differ from the fleets' own flat strokes), the drawing is on the screen (${o.drawn}), and the pick still names the Krbn ships`, o.washed > 100 && o.drawn > 200 && o.hits > 50, `${o.washed} washed, ${o.drawn} drawn, ${o.hits} name Krbn`); }
-        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.ink = { note: "v4328 -- the ink wash as three's builders emitted it, and as tslSource transplanted it into the fleets' line-list shell", ...R.emitted, transplanted: R.transplanted }; fs.writeFileSync(EMITTED, JSON.stringify(j, null, 1)); }
+        const rep_ink = { same: true, first: true, detail: "artifact absent: nothing to compare" };
+        if (fs.existsSync(EMITTED)) { const j = JSON.parse(fs.readFileSync(EMITTED, "utf8")); j.ink = { note: "v4328 -- the ink wash as three's builders emitted it, and as tslSource transplanted it into the fleets' line-list shell", ...R.emitted, transplanted: R.transplanted };
+            Object.assign(rep_ink, writeIfReproducible(fs, EMITTED, j, EMITTED_BASELINE)); }
         ok("the emitted and transplanted ink look joins tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED) && !!JSON.parse(fs.readFileSync(EMITTED, "utf8")).ink);
+        ok("!! ...and the ink look re-emits BYTE-IDENTICAL to the stored artifact", rep_ink.same, rep_ink.detail);
     }
 }
 

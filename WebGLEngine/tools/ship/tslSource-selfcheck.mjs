@@ -12,6 +12,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// v4484 -- the write below used to be a bare writeFileSync followed by an existence check. It compares
+// the fresh emit against the stored bytes first now, at no extra cost: by the time a gate reaches its
+// write the expensive emit has already happened. v4480 recorded this as the open question.
+import { writeIfReproducible } from "./emitReproducibility.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { transplantFragment, uniformFields, textureNames, devicePipelineFromTsl, TRI_VS_WGSL } from "../../render/tslSource.mjs";
@@ -101,8 +105,13 @@ else {
             ok(`  ${b}: the blackbody graph transplants too -- the brightest column is Wien's x_lambda within a column (${o.bin.toFixed(3)}), the root in the blue byte (${k.blueByte})`, Math.abs(o.bbPeakX - k.root) <= o.bin && o.bbPeak > 0.995 && Math.abs(o.bbBlue - k.blueByte) <= 1, `peak x ${o.bbPeakX.toFixed(4)}, blue ${o.bbBlue}`); }
         // write the emitted pair down for the corpus
         const rec = { at: "v4320", three: "0.178.0", note: "emitted by three's node builders from render/badTvTsl.mjs and render/blackbodyTsl.mjs, transplanted by render/tslSource.mjs; rewritten by tools/ship/tslSource-selfcheck.mjs on every run", ...R.emitted };
-        fs.writeFileSync(EMITTED, JSON.stringify(rec, null, 1));
+        const rep = writeIfReproducible(fs, EMITTED, rec);
         ok("the emitted and transplanted pair is written to tools/ship/tsl-emitted.json, for the WGSL corpus to compile as generated code", fs.existsSync(EMITTED) && JSON.parse(fs.readFileSync(EMITTED, "utf8")).badTv.transplanted.wgsl.length > 1000);
+        // *** v4484: THE ROW v4480 SAID WAS OWED. *** This gate re-emits through three's node builders on every
+        // run and used to write the result over the stored artifact and then check only that the file exists.
+        // A codegen step whose output changes when nothing changed is a diff nobody can review.
+        ok("!! *** the fresh emit is BYTE-IDENTICAL to the stored artifact -- the codegen is reproducible ***",
+            rep.same, rep.detail + (rep.first ? "" : " (this is the check, not the existence one above)"));
         report(`emitted WGSL ${R.emitted.badTv.wgsl.length} chars -> transplanted ${R.emitted.badTv.transplanted.wgsl.length}; GLSL ${R.emitted.badTv.glsl.length} -> ${R.emitted.badTv.transplanted.glsl.length}`);
     }
 }
