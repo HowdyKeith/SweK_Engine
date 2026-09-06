@@ -2689,6 +2689,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "seed differs; regenerating after any damage stamps the first city again; the default seed is fixed. The first of the " +
                  "four building rounds after VladimirKobranov/configurator-unreal-building. Sabotages red at (see the gate header).",
     }),
+    since131: Object.freeze({
+        at: "v4509", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/buildingGrammar-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. world/buildingGrammar.mjs: the configurator's rules as data -- cells on three axes, a role per cell " +
+                 "by position, seeded variants, stairs by column on one facade, a party-wall flag per side that blanks the face and " +
+                 "removes the stairs, accessories by percentage, every roll drawn before its branch. One seed one hash; five sizes " +
+                 "match the closed-form counts; a party wall on any side moves zero placements on the others; the accessory rate is " +
+                 "inside four sigmas at 25 and 60. Recorded in world/reachedLicences.mjs and the sweep document. Sabotages red at " +
+                 "3 / 2 / 1 / 6 -- A showed the party-wall property holds trivially on the last side the loop visits, so all four are held.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

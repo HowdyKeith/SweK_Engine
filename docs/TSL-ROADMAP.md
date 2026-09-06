@@ -808,6 +808,20 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         first city again. The sandbox passes cityOpts through unchanged, so every sandbox city is seed 1 until a
         caller chooses one. Next: the grammar (rules as data), the facade stamper (windows, doors, party walls from
         adjacency), the lab page.
+    BUILDINGS 2, THE GRAMMAR -- built at v4509 (task 55). world/buildingGrammar.mjs is the configurator's rule set as
+        data, read from its one actor and hand-written (Apache-2.0; world/reachedLicences.mjs; the sweep document's
+        entry): a loop over cells on three axes; a role per cell by position (corner, wall, interior, roof cap) with
+        first- and last-floor variants; stairs pieces (first, main, last) on one facade at a chosen or seeded column;
+        a party-wall flag PER SIDE (the actor has one, for its left and right) that blanks the face, drops its
+        accessories and removes the stairs; accessories where a seeded percentage roll falls; and every roll a cell
+        might need drawn BEFORE its branch, which is the actor's structure and is held here as a property. Output:
+        one placement per cell and a 32-bit hash. MEASURED (tools/ship/buildingGrammar-selfcheck.mjs, headless): seed
+        7 hashes 4185303142 twice and seed 8 differs; five sizes match the closed-form counts (5 x 4 x 4: 16 corners,
+        40 walls, 6 roof caps, 18 interior, one stairs piece per floor); a party wall on any side blanks its 16 or 20
+        cells and moves ZERO of the other 60 or 64 placements; the accessory rate over 14,400 wall cells is 25.37% at
+        25 and 60.67% at 60. Sabotage A -- the blank rolls drawn only when needed -- moved 23 to 34 placements on
+        three sides and none on the right, whose cells the loop visits last: a hold on one side would have been
+        blind, and the gate holds all four. Next: the facade stamper, with the flags derived from adjacency.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

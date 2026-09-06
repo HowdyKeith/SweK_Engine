@@ -149,6 +149,37 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4509 -- THE PROCEDURAL-BUILDING RULES, READ FROM ONE UNREAL ACTOR AND WRITTEN AS DATA.
+    //
+    // world/CityGen.js stamps solid voxel columns and nothing else; VladimirKobranov/configurator-unreal-building
+    // is the one repo of Keith's batch that specifies a building grammar cleanly: cell counts on three axes, seeded
+    // module variants, stairs on a facade, a Brandmauer (party-wall) rule that strips stairs and windows from a
+    // shared face, accessories by percentage. Apache-2.0 is permissive; the reason not to vendor is that it is UE5
+    // C++ with its meshes on a drive link, so the rules were read and world/buildingGrammar.mjs written from them.
+    // =========================================================================================================
+    {
+        repo: "VladimirKobranov/configurator-unreal-building", sourceUrl: "https://github.com/VladimirKobranov/configurator-unreal-building",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Vladimir Kobranov", year: 2022,
+        spdx: "Apache-2.0", licence: null,
+        licenceNote: "Apache-2.0. READ FIRST-HAND at v4509: LICENSE, 201 lines, sha256 c71d239df917, at commit 6e11f05 " +
+             "(2022-11-29); the repository is MyActor.cpp, MyActor.h, a README and the licence, with its geometry on " +
+             "a Google Drive link that was not opened. The README's images name the repository's earlier name, " +
+             "ProceduralBuildingUEcpp.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The RULES, as data: a loop over cells on three axes; a role per cell by position (corner, wall, " +
+             "interior, roof cap) with first-floor and last-floor variants; stairs pieces (first, main, last) on one " +
+             "facade at a chosen or seeded column; blank party-wall modules in place of windowed ones and no stairs " +
+             "on a party wall; accessories where a seeded percentage roll falls; and the structure that every roll " +
+             "a cell might need is drawn before its branch, which world/buildingGrammar.mjs holds as a property. Not " +
+             "one line of C++, no Unreal transform arithmetic, no meshes; the party-wall flag is per side here where " +
+             "the actor has one.",
+        takenPaths: ["world/buildingGrammar.mjs"],
+        citedPaths: ["tools/ship/buildingGrammar-selfcheck.mjs", "world/CityGen.js", "physics/instruments.mjs", "tools/ship/gateSweep.mjs"],
+        why: "A building grammar that is deterministic from a seed can be gated by hash and by closed-form counts, " +
+             "which is the bar every generator here must clear; this actor specified such a grammar and CityGen had " +
+             "none. Four rounds follow it: the seeding of CityGen (v4508), this grammar, a facade stamper, a lab page.",
+    },
+    // =========================================================================================================
     // v4507 -- A DOM-TEXT REPO IN THE SHADER SWEEP: READ, INAPPLICABLE TO SLUG AND THE TICKER, A GAP ELSEWHERE.
     //
     // edoardolunardi/kugiri splits HTML text at the lines the browser already painted (Range.getClientRects,

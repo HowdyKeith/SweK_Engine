@@ -248,3 +248,31 @@ should reveal line by line or stagger word by word -- a HUD tooltip, in-app docs
 blurb; not the ticker -- kugiri's technique would close a real, currently absent gap, cheaply,
 since it is dependency-free. Recorded in `world/reachedLicences.mjs` as read and not taken;
 nothing built, because no such spot was named this round.
+
+### VladimirKobranov/configurator-unreal-building -- RULES TAKEN as `world/buildingGrammar.mjs` (v4509)
+
+**What it is.** Apache-2.0 (LICENSE read first-hand, 201 lines, sha256 c71d239df917). One UE5
+actor, `MyActor.cpp` (631 lines), with its module meshes on a Google Drive link. It loops cells on
+three axes with a seeded stream, gives each cell a role by position (corner, wall, interior, roof
+cap; first-floor and last-floor variants), places stairs pieces on one facade at a chosen or
+seeded column, swaps a Brandmauer (party-wall) side's modules for blank ones and removes the
+stairs from it, and places accessories where a seeded percentage roll falls. Every roll a cell
+might need is drawn before its branch runs.
+
+**Why it is not what SweK had.** `world/CityGen.js` stamps solid voxel columns by height tier
+for the Kaiju sandbox: no facade, no floors, no windows, a silhouette generator. And until
+v4508 it drew every decision from Math.random, so no building claim could be held by hash.
+
+**What was taken and what was not.** The rules, as data, in a pure module with a CPU-only
+gate: cell counts, seeded variants, stairs by column, a party-wall flag per side (the actor has
+one flag, for its left and right; buildings 3 derives the flags from adjacency), accessories by
+percentage, and the roll-before-branch structure held as a property. Not one line of C++, no
+Unreal transform arithmetic, no meshes. Apache is permissive; the reason not to vendor is the
+engine, not the licence.
+
+**Measured** (`tools/ship/buildingGrammar-selfcheck.mjs`): one seed one hash; five sizes match
+the closed-form counts; a party wall on any side blanks its cells and moves zero placements on
+the other sides; the accessory rate over 14,400 wall cells is 25.37% at 25 and 60.67% at 60.
+Sabotages red at 3 / 2 / 1 / 6. The first sabotage said something about gating: the party-wall
+property holds trivially on the LAST side the loop visits, so a hold on one side would have
+been blind; the gate holds all four.
