@@ -346,7 +346,8 @@ fn fs(in: VSOut) -> @location(0) vec4f
 {
     let coverage = SlugRender(in.texcoord, fwidth(in.texcoord), in.banding, in.glyph);
 ${defines.fill ? `    let fuv = clamp((in.texcoord - slug.fillRect.xy) / (slug.fillRect.zw - slug.fillRect.xy), vec2f(0.0), vec2f(1.0));
-    let fill = textureSample(fillTexture, fillSampler, vec2f(fuv.x, 1.0 - fuv.y));
+    let fsz = vec2f(textureDimensions(fillTexture));
+    let fill = textureSample(fillTexture, fillSampler, clamp(vec2f(fuv.x, 1.0 - fuv.y), 0.5 / fsz, 1.0 - 0.5 / fsz));
     return in.color * fill * coverage;` : `    // Premultiplied by coverage, as the reference's color * coverage is: blend (ONE, ONE_MINUS_SRC_ALPHA).
     return in.color * coverage;`}
 }

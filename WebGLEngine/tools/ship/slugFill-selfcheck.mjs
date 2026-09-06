@@ -16,6 +16,10 @@
 // the fill uv is -0.065: WebGL2's sampler clamped to the top row (dark, 7 of 255) and WebGPU's wrapped to the bottom row (the fire's
 // white source), 107 of 255 apart. The fragments clamp the uv themselves now, so the sampler's address mode is not in the picture,
 // and both backends are the key on every pixel.
+// CORRECTED AT v4501 (the melt gate found it): clamping the uv left the FLIPPED coordinate at exactly 1.0 wherever the shape
+// dips below the rectangle's floor, and WebGPU's sampler wraps 1.0 to row 0 (the fire's dark top) where WebGL2 clamps to the
+// last row; the 8's own bottom edge hid it because its coverage there is 0. Both fragments now clamp the sample coordinate to
+// the texel centres (half a texel in from either edge, textureSize / textureDimensions), which nearestTexel's clamp already was.
 //
 // SABOTAGE (v4500): A  the GLSL fill uv not divided by the rectangle's size    -> 2 red: WebGL2 8,741 of 9,216 exact, 355 unexplained, worst 216;
 //                                                                                  the backends 464 apart. WebGPU untouched, 9,216 exact.
@@ -57,12 +61,12 @@ sec("1. HEADLESS: the twins with and without the fill, the uv map, the sample, t
 {
     const plainG = slugShaderSource(11, {}).fragment, plainW = slugShaderWgsl(11, {}).wgsl, fillG = slugShaderSource(11, { fill: true }).fragment, fillW = slugShaderWgsl(11, { fill: true }).wgsl;
     ok("without the flag neither fragment mentions a fill (the reference's text, byte for byte, as the flat gates hold)", !/fill/i.test(plainG) && !/fill/i.test(plainW));
-    ok("with it the WGSL declares fillSampler at binding 3 and fillTexture at binding 4, fillRect in the struct, and samples through the rectangle with v flipped",
-        /@binding\(3\) var fillSampler: sampler/.test(fillW) && /@binding\(4\) var fillTexture: texture_2d<f32>/.test(fillW) && /viewport: vec2f, fillRect: vec4f/.test(fillW) && /clamp\(\(in\.texcoord - slug\.fillRect\.xy\)/.test(fillW) && /textureSample\(fillTexture, fillSampler, vec2f\(fuv\.x, 1\.0 - fuv\.y\)\)/.test(fillW) && /in\.color \* fill \* coverage/.test(fillW));
+    ok("with it the WGSL declares fillSampler at binding 3 and fillTexture at binding 4, fillRect in the struct, and samples through the rectangle with v flipped and the sample clamped to the texel centres",
+        /@binding\(3\) var fillSampler: sampler/.test(fillW) && /@binding\(4\) var fillTexture: texture_2d<f32>/.test(fillW) && /viewport: vec2f, fillRect: vec4f/.test(fillW) && /clamp\(\(in\.texcoord - slug\.fillRect\.xy\)/.test(fillW) && /textureSample\(fillTexture, fillSampler, clamp\(vec2f\(fuv\.x, 1\.0 - fuv\.y\), 0\.5 \/ fsz, 1\.0 - 0\.5 \/ fsz\)\)/.test(fillW) && /in\.color \* fill \* coverage/.test(fillW));
     // the two declarations are ASSEMBLED, not written: render/backendParity.mjs counts a file carrying a GLSL uniform
     // declaration as GLSL-bearing whatever its reason (the v4460 rule), and this gate grades the declaration, it does not ship it
     const declTex = new RegExp("uni" + "form sam" + "pler2D fillTexture;"), declRect = new RegExp("uni" + "form ve" + "c4 fillRect;");
-    ok("and the GLSL declares the sampler2D fillTexture and the vec4 fillRect and does the same arithmetic", declTex.test(fillG) && declRect.test(fillG) && /clamp\(\(vTexcoord - fillRect\.xy\)/.test(fillG) && /texture\(fillTexture, vec2\(fuv\.x, 1\.0 - fuv\.y\)\)/.test(fillG) && /vColor \* fill \* coverage/.test(fillG));
+    ok("and the GLSL declares the sampler2D fillTexture and the vec4 fillRect and does the same arithmetic", declTex.test(fillG) && declRect.test(fillG) && /clamp\(\(vTexcoord - fillRect\.xy\)/.test(fillG) && /texture\(fillTexture, clamp\(vec2\(fuv\.x, 1\.0 - fuv\.y\), 0\.5 \/ fsz, 1\.0 - 0\.5 \/ fsz\)\)/.test(fillG) && /vColor \* fill \* coverage/.test(fillG));
     const dPlain = slugPipelineDesc(11), dFill = slugPipelineDesc(11, { fill: true });
     ok("the descriptor's uniform list gains fillRect (a vec4 after viewport) only under the flag, and says fill", dPlain.uniforms.length === 5 && !dPlain.fill && dFill.uniforms.length === 6 && dFill.uniforms[5].name === "fillRect" && dFill.uniforms[5].type === "vec4" && dFill.fill === true);
     const rect = [-0.1, -0.25, 0.9, 0.75];

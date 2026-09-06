@@ -664,6 +664,32 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         raw texcoord (418 on WebGPU), fillRect dropped from the uniform list (the device refuses the pipeline by
         name), the CPU key bilinear (133 on both). slug-fire.html is the view: a word with the automaton stepped
         and re-uploaded into one texture every frame (0.3 ms), stoke / damp / extinguish / relight.
+    THE MELT, AND A CORRECTION TO THE FILL -- built at v4501 (task 48). THE CORRECTION FIRST: v4500 wrote that
+        clamping the fill uv "takes the sampler's address mode out of the picture", and it did not. The clamp
+        left the FLIPPED coordinate at exactly 1.0 wherever the shape dips below the rectangle's floor, and
+        WebGPU's sampler wraps 1.0 to row 0 (the fire's dark top) where WebGL2's clamps to the last row. The
+        fill gate's 8 hid it: its coverage on that edge is 0, so a wrong texel times nothing was within
+        tolerance. The melt found it, because the polar interpolation sags the outer under the puddle's floor
+        mid-melt with full coverage: 69 pixels on WebGPU at 7 of 255 against a key of 255. Both fragments
+        now clamp the sample coordinate to the texel centres (half a texel in from either edge, by
+        textureSize / textureDimensions), which is what the CPU key's nearestTexel always did. THE ROUND:
+        render/slugMelt.mjs makes the task 44 morph's target a puddle -- an ellipse on the glyph's floor, 1.6
+        times its width and 0.12 em tall, wound as the font winds an outer contour -- plus one PINHOLE per
+        hole, a tiny contour of the hole's winding, so morphicons pairs holes with holes and each shrinks to
+        nothing. MEASURED (tools/ship/slugMelt-selfcheck.mjs): without the pinholes the 0's hole is paired with
+        a duplicate of the puddle and walked in its own direction, so at t = 1 a positive puddle lies over a
+        negative one and the winding sums to 0.00000 -- the 0 would melt into NOTHING; the 8 sums to +0.07206,
+        ink by accident. With them the 8 melts to one puddle within 0.3% of the inscribed 64-gon's area, its
+        pinholes at 0. The fill rides along on one em rectangle (the glyph's bound and the puddle's, the floor
+        shared), so the puddle shows the fire's source rows: mean green 176 against the glyph's 113. On both
+        backends the frames at t = 0, 0.5 and 1 are coverage times the fire's nearest texel on 9,216 of 9,216
+        pixels, 0 apart, through fromAtlas with ONE shared fill pipeline. Sabotage A (the puddle wound the
+        other way) went red only on the headless hold: morphicons walks the target in whichever direction
+        costs least against the source, so the target's winding never reaches the atlas -- the winding is
+        this module's contract, not the frame's. slug-morph.html gained a melt mode (?mode=melt): each glyph
+        rises from its puddle, rests, and melts back. Two a-priori holds were wrong and replaced by what was
+        measured: the puddle is not "white" (14 of 329: only the source row is) and t = 0.5 does not have
+        fewer lit pixels (the sag).
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

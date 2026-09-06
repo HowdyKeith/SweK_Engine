@@ -148,7 +148,8 @@ uniform vec4 fillRect;                  // em x0, y0, x1, y1 -> fill uv 0..1 (v 
     // backends' samplers disagreed about what lies outside (WebGL2 clamped to the edge row, WebGPU wrapped to the far one -- the
     // fire's white source row on a glyph's top edge, 8 pixels at 107 of 255, the gate's first run)
     const fillTail = defines.fill ? `    vec2 fuv = clamp((vTexcoord - fillRect.xy) / (fillRect.zw - fillRect.xy), 0.0, 1.0);
-    vec4 fill = texture(fillTexture, vec2(fuv.x, 1.0 - fuv.y));
+    vec2 fsz = vec2(textureSize(fillTexture, 0));
+    vec4 fill = texture(fillTexture, clamp(vec2(fuv.x, 1.0 - fuv.y), 0.5 / fsz, 1.0 - 0.5 / fsz));
     fragColor = vColor * fill * coverage;` : `    fragColor = vColor * coverage;`;
 
     return `#version 300 es

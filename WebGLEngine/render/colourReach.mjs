@@ -162,6 +162,9 @@ export const HOT_UNREGISTERED = Object.freeze([
     // v4500: slug-fire.html -- a word filled with the Doom Fire through render/slugDevice.mjs. It says "fire" a dozen
     // times and names the HUD's hexes; its fire colours are render/doomFire.mjs's PALETTE bytes, not literals here.
     "slug-fire.html",
+    // v4501: slug-morph.html -- its melt mode fills the glyph with the Doom Fire (the same HUD hexes as before; it was counted as a
+    // literal-colour file at v4498 and now says "fire" enough to be a hot effect too).
+    "slug-morph.html",
 ]);
 
 /**
@@ -187,7 +190,7 @@ export const MEASURED_AT_V4424 = Object.freeze({
     drawSiteFiles: 13,
     literalColourFiles: 82,
     overlapDrawAndLiteral: 0,
-    hotUnregistered: 21,   // v4500: slug-fire.html arrived (see HOT_UNREGISTERED)
+    hotUnregistered: 22,   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.
     keithsThree: Object.freeze({
         "world/fireworkShell.mjs": Object.freeze({ blendFunc: 0, gate: "tools/ship/fireworkShell-selfcheck.mjs" }),

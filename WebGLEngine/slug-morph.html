@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Slug Morph (glyph outlines through morphicons)">
-<meta name="demo:desc" content="One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The plumbing is gated by tools/ship/slugMorph-selfcheck.mjs.">
+<meta name="demo:desc" content="One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The melt mode fills the glyph with the Doom Fire and melts it to a puddle on the baseline, the fill riding along. Gated by tools/ship/slugMorph-selfcheck.mjs and tools/ship/slugMelt-selfcheck.mjs.">
 <meta name="demo:category" content="fx">
 <title>Slug Morph</title>
 <style>
@@ -20,10 +20,10 @@
 </head>
 <body>
 <div id="hud">
-  <div id="cap">Slug morph: one glyph outline into the next, through morphicons</div>
+  <div id="cap">Slug morph: one glyph outline into the next, through morphicons -- or melted to a fire puddle</div>
   <div id="be">requesting a device&hellip;</div>
   <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
-    &middot; <a href="./slug-device.html">flat text on the device</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span> &middot; text <input id="txt" value="0123456789SweK" size="18"></div>
+    &middot; <a href="./slug-device.html">flat text on the device</a> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span> &middot; text <input id="txt" value="0123456789SweK" size="18"> &middot; mode <select id="mode"><option value="morph">morph</option><option value="melt">melt (fire fill)</option></select></div>
 </div>
 <canvas id="c"></canvas>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -33,12 +33,16 @@ import { parseFont } from "./text/slugFont.js";
 import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
 import { buildVertices } from "./text/slugText.js";
 import { glyphMorph, packMorphed } from "./render/slugMorph.mjs";
+import { meltMorph, meltEase } from "./render/slugMelt.mjs";
+import { fireFill, fillTexture } from "./render/slugFill.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
 const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
 const SIZE = 180;                                  // css px an em
 const HOLD = 40, TRAVEL = 70;                      // frames a glyph rests, frames a morph takes
 const CHARS = " 0123456789SweKABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const FIRE = { width: 96, height: 72, seed: 7, steps: 60 };
+const MELT = { rise: 50, hold: 45, melt: 70, puddle: 30 };   // frames: puddle -> glyph, rest, glyph -> puddle, rest
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 
 // Four rows read as (m.x, m.y, -, m.w): vertices arrive in PIXELS (em * size), y-up, baseline at Y = 0; this places the
@@ -47,7 +51,7 @@ function placeRows(W, H, px, py) {
   return new Float32Array([2 / W, 0, 0, (2 / W) * px - 1,  0, 2 / H, 0, 1 - (2 / H) * py,  0, 0, 0, 0,  0, 0, 0, 1]);
 }
 
-let device, fontDevice;
+let device, fontDevice, fireDevice, fire, rgba, tex;
 async function init() {
   const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
   try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
@@ -57,8 +61,11 @@ async function init() {
   try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
   catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
   let font;
-  try { font = parseFont(ab); fontDevice = new SlugFontDevice(device, font, CHARS); }
+  try { font = parseFont(ab); fontDevice = new SlugFontDevice(device, font, CHARS); fireDevice = new SlugFontDevice(device, font, " ", { fill: true }); if (fireDevice.pipeline.compiled) { const err = await fireDevice.pipeline.compiled; if (err) throw new Error(err); } }
   catch (e) { return fail("font/atlas/pipeline: " + e.message); }
+  const f = fireFill(FIRE); fire = f.fire; rgba = f.rgba; tex = fillTexture(device, rgba, f.w, f.h);
+  document.getElementById("mode").value = new URLSearchParams(location.search).get("mode") === "melt" ? "melt" : "morph";
+  document.getElementById("mode").addEventListener("change", () => { phase = 0; morph = null; melt = null; });
   document.getElementById("notice").textContent = fontDevice.notice;
   const kb = (fontDevice.byteSize / 1024).toFixed(0);
   beEl.textContent = "backend: " + device.backend + " · atlas " + kb + " KiB (rgba16float + rg16uint) · logWidth " + fontDevice.logWidth;
@@ -67,12 +74,13 @@ async function init() {
   seq = [...document.getElementById("txt").value].filter((c) => font0.glyphIndex(c.codePointAt(0)) > 0);
   requestAnimationFrame(frame);
 }
-let font0, seq = [], k = 0, phase = 0, morph = null, live = null, batch = null, frames = 0;
+let font0, seq = [], k = 0, phase = 0, morph = null, melt = null, live = null, batch = null, frames = 0;
 function dpr() { return Math.min(2, devicePixelRatio || 1); }
 function frame() {
   const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(300 * d), s = SIZE * d;
   if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
   if (seq.length < 2) { requestAnimationFrame(frame); return; }
+  if (document.getElementById("mode").value === "melt") { meltFrame(w, h, s); requestAnimationFrame(frame); return; }
   const a = seq[k % seq.length], b = seq[(k + 1) % seq.length];
   if (!morph) morph = glyphMorph(font0.outline(font0.glyphIndex(a.codePointAt(0))), font0.outline(font0.glyphIndex(b.codePointAt(0))), { N: 64 });
   // phase counts frames: rest on a, travel a -> b, then advance
@@ -89,6 +97,30 @@ function frame() {
   if (++frames % 10 === 0) document.getElementById("tick").textContent = a + " -> " + b + " t " + e.toFixed(2) + " \u00b7 " + morph.subpaths.a + "/" + morph.subpaths.b + " subpaths paired " + morph.subpaths.paired + " \u00b7 repack " + ms.toFixed(1) + " ms";
   if (++phase > HOLD + TRAVEL) { phase = 0; k++; morph = null; }
   requestAnimationFrame(frame);
+}
+// THE MELT (v4501, task 48): each glyph rises from its puddle, rests, melts back into it, and the next rises. The fire is the
+// fill: stepped and re-uploaded into one texture every frame, held to ONE em rectangle through the melt (render/slugMelt.mjs
+// meltRect: the glyph's bound and the puddle's, the floor shared), so the puddle shows the fire's hottest rows.
+function meltFrame(w, h, s) {
+  const a = seq[k % seq.length];
+  if (!melt) melt = meltMorph(font0.outline(font0.glyphIndex(a.codePointAt(0))), { N: 64 });
+  const { rise, hold, melt: down, puddle } = MELT;
+  let t, stage;
+  if (phase < rise) { t = 1 - meltEase(phase / rise); stage = "rise"; }
+  else if (phase < rise + hold) { t = 0; stage = "hold"; }
+  else if (phase < rise + hold + down) { t = meltEase((phase - rise - hold) / down); stage = "melt"; }
+  else { t = 1; stage = "puddle"; }
+  fire.step(); fire.toRGBA(rgba); tex.update({ data: rgba });
+  const t0 = performance.now();
+  const atlas = packMorphed(melt.at(t).contours, { logWidth: fireDevice.logWidth });
+  if (live) { live.destroy(); if (batch) batch.destroy(); }
+  live = SlugFontDevice.fromAtlas(device, font0, atlas, { pipeline: fireDevice.pipeline, desc: fireDevice.desc });
+  batch = new SlugDeviceBatch(live); batch.setBuilt(buildVertices([{ glyphIndex: 0, codepoint: 0, x: 0, y: 0, size: s }], (gi) => live.entryFor(gi), { color: [1, 1, 1, 1] }));
+  const ms = performance.now() - t0;
+  const rows = new Float32Array([2 / w, 0, 0, (2 / w) * (w / 2 - s * 0.3) - 1, 0, 2 / h, 0, 1 - (2 / h) * (h * 0.78), 0, 0, 0, 0, 0, 0, 0, 1]);
+  device.frame(({ pass }) => { pass.clear([0.02, 0.031, 0.024, 1]); batch.draw(pass, rows, [w, h], { texture: tex, rect: melt.rect }); });
+  if (++frames % 10 === 0) document.getElementById("tick").textContent = a + " " + stage + " t " + t.toFixed(2) + " \u00b7 " + melt.target.holes + " pinhole" + (melt.target.holes === 1 ? "" : "s") + " \u00b7 rect " + melt.rect.map((v) => v.toFixed(2)).join(",") + " \u00b7 repack " + ms.toFixed(1) + " ms";
+  if (++phase > rise + hold + down + puddle) { phase = 0; k++; melt = null; }
 }
 init();
 </script>

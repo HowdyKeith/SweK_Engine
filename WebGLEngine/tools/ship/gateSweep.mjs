@@ -2580,6 +2580,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sampler wrapping the dilated top edge to the fire's white source row where WebGL2's clamped. slug-fire.html is the " +
                  "view. Sabotages red at 2 / 3 / 2 / 2.",
     }),
+    since123: Object.freeze({
+        at: "v4501", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugMelt-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends, after a CORRECTION to v4500's fill: the clamped uv still put the flipped sample coordinate at " +
+                 "exactly 1.0 below the rectangle's floor, where WebGPU wraps and WebGL2 clamps (69 pixels at t = 0.5, hidden in the fill " +
+                 "gate by zero coverage); both fragments now clamp the sample to the texel centres. render/slugMelt.mjs: the morph's " +
+                 "target a puddle on the floor plus a pinhole per hole -- without pinholes the 0's winding sums to zero at t = 1 and it " +
+                 "melts into nothing. The three frames are coverage x the fire's nearest texel on 9,216 of 9,216 pixels on both backends, " +
+                 "0 apart, through one shared fill pipeline. slug-morph.html gained the melt mode. Sabotages red at 1 / 5 / 1 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

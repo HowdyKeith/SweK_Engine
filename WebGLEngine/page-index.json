@@ -2589,7 +2589,7 @@
   {
    "f": "slug-morph.html",
    "t": "Slug Morph",
-   "d": "One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The plumbing is gated by tools/ship/slugMorph-selfcheck.mjs.",
+   "d": "One glyph outline morphing into the next through vendor/morphicons and drawn by Slug: the quadratic contours become an SVG path, morphicons pairs and interpolates the subpaths, and each frame packs one glyph into its own atlas. The melt mode fills the glyph with the Doom Fire and melts it to a puddle on the baseline, the fill riding along. Gated by tools/ship/slugMorph-selfcheck.mjs and tools/ship/slugMelt-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

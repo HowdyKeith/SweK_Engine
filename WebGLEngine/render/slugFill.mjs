@@ -47,3 +47,54 @@ export function fillTexture(device, rgba, w, h) {
 
 /** the key: what the fragment returns at one texcoord -- colour * fill * coverage, as four channels 0..1 */
 export function fillKey(coverage, colour, fill) { return [colour[0] * fill[0] * coverage, colour[1] * fill[1] * coverage, colour[2] * fill[2] * coverage, colour[3] * fill[3] * coverage]; }
+
+/**
+ * The flat rasteriser model the Slug gates share (v4501, lifted from the fill gate's body so the melt gate can use it): a glyph's
+ * quad placed orthographically at `origin` (baseline pixel, y down) at `size` px an em, its corners dilated half a pixel per axis
+ * and snapped to 1/16 px, texcoords affine per triangle. Returns texAt(x, y) -> { tx, ty, fw } for a pixel centre inside the quad,
+ * null outside. fw is the 2 x 2 quad's |d/dx| + |d/dy| per axis, what the fragment's fwidth reads.
+ */
+export function flatModel(bbox, size, origin) {
+    const s = size, [ox, oy] = origin, bb = bbox;
+    const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * 16) / 16, sy: Math.round((oy - (ey * s + 0.5 * ny)) * 16) / 16, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
+    return (x, y) => {
+        for (const [a1, b1, c1] of [[0, 2, 3], [0, 1, 2]]) {
+            const A = C[a1], B = C[b1], K = C[c1];
+            const det = (B.sx - A.sx) * (K.sy - A.sy) - (K.sx - A.sx) * (B.sy - A.sy);
+            const s1 = (B.sx - A.sx) * (y - A.sy) - (B.sy - A.sy) * (x - A.sx), s2 = (K.sx - B.sx) * (y - B.sy) - (K.sy - B.sy) * (x - B.sx), s3 = (A.sx - K.sx) * (y - K.sy) - (A.sy - K.sy) * (x - K.sx);
+            if (!((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0))) continue;
+            const dx = (k) => ((B[k] - A[k]) * (K.sy - A.sy) - (K[k] - A[k]) * (B.sy - A.sy)) / det, dy = (k) => ((K[k] - A[k]) * (B.sx - A.sx) - (B[k] - A[k]) * (K.sx - A.sx)) / det;
+            const txdx = dx("tx"), txdy = dy("tx"), tydx = dx("ty"), tydy = dy("ty");
+            return { tx: A.tx + txdx * (x - A.sx) + txdy * (y - A.sy), ty: A.ty + tydx * (x - A.sx) + tydy * (y - A.sy), fw: [Math.abs(txdx) + Math.abs(txdy), Math.abs(tydx) + Math.abs(tydy)] };
+        }
+        return null;
+    };
+}
+
+/**
+ * Grade a filled frame against the key: slugEval's coverage at the model's texcoord times the fill's nearest texel there. A pixel
+ * off by more than tol must be the key with one of the four NEIGHBOURING texels (f32 landing a nearest sample across a texel
+ * boundary from f64 -- a fill colour, never a blend); anything else is unexplained. Returns { exact, boundary, unexplained, worst, lit, tinted }.
+ */
+export function gradeFilled(pixels, W, H, texAt, coverageAt, fire, rect, colour, tol = 2) {
+    let exact = 0, boundary = 0, unexplained = 0, worst = 0, lit = 0, tinted = 0;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+        const t = texAt(i + 0.5, j + 0.5), o4 = (j * W + i) * 4;
+        const cov = t ? coverageAt(t.tx, t.ty, t.fw) : 0;
+        const fill = t ? sampleFill(fire.rgba, fire.w, fire.h, t.tx, t.ty, rect) : [0, 0, 0, 1], key = fillKey(cov, colour, fill);
+        let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(pixels[o4 + c] - Math.round(key[c] * 255)));
+        if (cov > 0.02) { lit++; if (pixels[o4] !== pixels[o4 + 2]) tinted++; }
+        if (d === 0) exact++; if (d > worst) worst = d;
+        if (d > tol) {
+            const [u, v] = fillUv(t.tx, t.ty, rect), [x0, y0] = nearestTexel(u, v, fire.w, fire.h); let matched = false;
+            for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const xx = Math.min(fire.w - 1, Math.max(0, x0 + ddx)), yy = Math.min(fire.h - 1, Math.max(0, y0 + ddy)), oo = (yy * fire.w + xx) * 4;
+                const k2 = fillKey(cov, colour, [fire.rgba[oo] / 255, fire.rgba[oo + 1] / 255, fire.rgba[oo + 2] / 255, 1]);
+                let d2 = 0; for (let c = 0; c < 3; c++) d2 = Math.max(d2, Math.abs(pixels[o4 + c] - Math.round(k2[c] * 255)));
+                if (d2 <= tol) { matched = true; break; }
+            }
+            if (matched) boundary++; else unexplained++;
+        }
+    }
+    return { exact, boundary, unexplained, worst, lit, tinted };
+}
