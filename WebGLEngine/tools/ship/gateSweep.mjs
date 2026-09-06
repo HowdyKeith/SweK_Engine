@@ -2676,6 +2676,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "beside the two built this pass; world/reachedLicences.mjs records it (reachedLicences-selfcheck green). Checked " +
                  "by grep: getClientRects and extractContents appear nowhere in the tree.",
     }),
+    since130: Object.freeze({
+        at: "v4508", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/cityGenSeed-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. world/CityGen.js drew every decision from Math.random since round 253; generate() takes a seed now " +
+                 "and draws from procPlanet's mulberry32, with the damage rolls on a second stream seeded from the same number. One " +
+                 "seed stamps the same voxel list byte for byte twice and topples the same building the same way twice; a different " +
+                 "seed differs; regenerating after any damage stamps the first city again; the default seed is fixed. The first of the " +
+                 "four building rounds after VladimirKobranov/configurator-unreal-building. Sabotages red at (see the gate header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

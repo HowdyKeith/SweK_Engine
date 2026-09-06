@@ -794,6 +794,20 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         The consumers a wrap-aware splitter would feed exist (ui/stagger.mjs, ui/domAnimation.mjs); the front end does
         not, and no multi-line copy that should reveal line by line was named. docs/SHADER-REPO-SWEEP.md and
         world/reachedLicences.mjs carry the answer so the next round with a paragraph to reveal starts from it.
+    BUILDINGS 1, CITYGEN SEEDED -- built at v4508 (task 54), the first of four rounds toward procedural buildings after
+        VladimirKobranov/configurator-unreal-building (Apache-2.0; UE5, read for the rules, nothing copied). The finding
+        first: world/CityGen.js drew every decision -- tier, height, footprint, position, the glass roll, the bite face,
+        the topple direction, the rubble splay -- from Math.random since round 253, so the Kaiju sandbox's city could not
+        be regenerated and no building claim could be held by hash. generate() takes a seed now (default 1) and draws
+        from world/procPlanet.js's mulberry32; the damage rolls come from a second stream seeded from the same number,
+        so a destruction sequence replays without consuming the generation stream. MEASURED (tools/ship/cityGenSeed-
+        selfcheck.mjs, a recording world, radius 40, 20 buildings): seed 7 stamps 14,803 voxels the same twice, hash
+        2ccc123aee1a42da, and seed 8 stamps 10,247 with a different hash; the tier weights hold over 60 seeds (sheds 36%,
+        houses 30%, midrise 21%, towers 8%, skyscrapers 3%, megastructures 1% against 35/30/20/10/4/1 before packing
+        rejections); a topple from seed 7 writes 164 voxels the same twice; regenerating after any damage stamps the
+        first city again. The sandbox passes cityOpts through unchanged, so every sandbox city is seed 1 until a
+        caller chooses one. Next: the grammar (rules as data), the facade stamper (windows, doors, party walls from
+        adjacency), the lab page.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

@@ -16,6 +16,15 @@
 // Materials: most buildings stone (id 1), some glass (id 5) for an
 // "office tower" feel. The roof voxel layer is metal (id 4) so
 // destroyed buildings drop distinct rubble debris colors.
+//
+// v4508 (buildings 1): SEEDED. Every decision here used Math.random, so a city could not be regenerated and
+// nothing could say "same seed, same building" -- the bar the rest of the tree gates on. generate() takes a
+// seed now and draws every generation roll (tier, height, footprint, position, glass) from world/procPlanet.js's
+// mulberry32; the damage rolls (bite face, topple direction, rubble splay and sparsening) come from a SECOND
+// stream seeded from the same number, so a destruction sequence replays from a seed without consuming the
+// generation stream. tools/ship/cityGenSeed-selfcheck.mjs holds one seed to one voxel list byte for byte.
+
+import { rng } from "./procPlanet.js";
 
 const HEIGHT_TIERS = [
     // [minH, maxH, weight, label]
@@ -27,9 +36,9 @@ const HEIGHT_TIERS = [
     [81, 140,  1, "megastructure"],// the trophy buildings
 ];
 
-function weightedPick(tiers) {
+function weightedPick(tiers, R) {
     const total = tiers.reduce((s, t) => s + t[2], 0);
-    let roll = Math.random() * total;
+    let roll = R() * total;
     for (const t of tiers) {
         roll -= t[2];
         if (roll <= 0) return t;
@@ -48,6 +57,8 @@ export class CityGen {
         // Multiple subscribers supported via array.
         this._onBuildingDestroyed = [];
         this._lastStamp = null;   // record so unbuild() can restore
+        this.seed = 1;
+        this._damageRng = rng(this.seed ^ 0x9e3779b9);   // the damage stream, reseeded by generate()
     }
 
     // Generate a city centered at (centerX, centerZ).
@@ -55,14 +66,18 @@ export class CityGen {
     //   buildingCount — target number of buildings (placement may end short
     //                   if random packing fills up the area)
     //   groundY       — Y coordinate of ground plane (default 0)
+    //   seed          — every roll below comes from this (default 1): the same seed stamps the same city
     //
     // Returns the list of placed building rects.
-    generate({ centerX = 0, centerZ = 0, radius = 80, buildingCount = 30, groundY = 0 } = {}) {
+    generate({ centerX = 0, centerZ = 0, radius = 80, buildingCount = 30, groundY = 0, seed = 1 } = {}) {
         if (!this.world?.setVoxel) {
             throw new Error("CityGen.generate: world.setVoxel required");
         }
         this.buildings = [];
-        this._lastStamp = { centerX, centerZ, radius, groundY };
+        this.seed = seed >>> 0;
+        const R = rng(this.seed);
+        this._damageRng = rng(this.seed ^ 0x9e3779b9);
+        this._lastStamp = { centerX, centerZ, radius, groundY, seed: this.seed };
 
         // 1. Ground plane — flat dirt
         for (let x = -radius; x <= radius; x++) {
@@ -79,17 +94,17 @@ export class CityGen {
         const attempts = buildingCount * 8;
 
         for (let i = 0; i < attempts && this.buildings.length < buildingCount; i++) {
-            const [minH, maxH] = weightedPick(HEIGHT_TIERS);
-            const h = minH + Math.floor(Math.random() * (maxH - minH + 1));
+            const [minH, maxH] = weightedPick(HEIGHT_TIERS, R);
+            const h = minH + Math.floor(R() * (maxH - minH + 1));
             // Wider for taller buildings (skyscrapers have bigger footprint)
             const fpScale = Math.max(0.4, Math.min(1.0, h / 40));
-            const w = Math.max(3, 3 + Math.floor(Math.random() * 6 * fpScale));
-            const d = Math.max(3, 3 + Math.floor(Math.random() * 6 * fpScale));
+            const w = Math.max(3, 3 + Math.floor(R() * 6 * fpScale));
+            const d = Math.max(3, 3 + Math.floor(R() * 6 * fpScale));
             // Position so the whole building fits inside the radius
             const maxX = innerHalf - w;
             const maxZ = innerHalf - d;
-            const bx = -innerHalf + Math.floor(Math.random() * (2 * maxX + 1));
-            const bz = -innerHalf + Math.floor(Math.random() * (2 * maxZ + 1));
+            const bx = -innerHalf + Math.floor(R() * (2 * maxX + 1));
+            const bz = -innerHalf + Math.floor(R() * (2 * maxZ + 1));
 
             // Overlap check (with gap)
             const rect = { x: bx, z: bz, w, d, h };
@@ -106,7 +121,7 @@ export class CityGen {
 
             // Material: glass for tall slim buildings (office towers),
             // stone for everything else
-            const isGlassy = h >= 20 && Math.random() < 0.4;
+            const isGlassy = h >= 20 && R() < 0.4;
             const wallMat = isGlassy ? 5 : 1;
             const roofMat = 4;     // metal cap reads as "roof"
 
@@ -216,7 +231,7 @@ export class CityGen {
             // Side bite — pick a random face and gnaw a ~⅓ × ½ chunk
             // out of it (full height for the bite extent so it looks
             // like the wall buckled, not a hole punched through).
-            const face = Math.floor(Math.random() * 4);
+            const face = Math.floor(this._damageRng() * 4);
             const biteW = Math.max(2, Math.floor(b.w / 3));
             const biteD = Math.max(2, Math.floor(b.d / 3));
             const biteH = Math.max(3, Math.floor(b.h / 2));
@@ -270,7 +285,7 @@ export class CityGen {
             const mag = Math.hypot(fromDirection.x, fromDirection.z) || 1;
             dir = { x: fromDirection.x / mag, z: fromDirection.z / mag };
         } else {
-            const a = Math.random() * Math.PI * 2;
+            const a = this._damageRng() * Math.PI * 2;
             dir = { x: Math.cos(a), z: Math.sin(a) };
         }
         // Snap to cardinal — voxels are axis-aligned, diagonal topples
@@ -312,20 +327,20 @@ export class CityGen {
                         // dir.x direction PAST the pivot.
                         wx = pivotX + dir.x * (yi + 1);
                         // Slight scatter perpendicular for a "splay"
-                        if (yi > 3 && Math.random() < 0.18) {
-                            wz += Math.random() < 0.5 ? -1 : 1;
+                        if (yi > 3 && this._damageRng() < 0.18) {
+                            wz += this._damageRng() < 0.5 ? -1 : 1;
                         }
                     } else {
                         wz = pivotZ + dir.z * (yi + 1);
-                        if (yi > 3 && Math.random() < 0.18) {
-                            wx += Math.random() < 0.5 ? -1 : 1;
+                        if (yi > 3 && this._damageRng() < 0.18) {
+                            wx += this._damageRng() < 0.5 ? -1 : 1;
                         }
                     }
                     // Sparsen the rubble so it reads as broken, not
                     // a solid log. Material mostly stone with metal
                     // (roof) bits mixed in near the top of the pile.
-                    if (Math.random() < 0.32) continue;
-                    const isRoofBit = yi >= b.h - 2 && Math.random() < 0.5;
+                    if (this._damageRng() < 0.32) continue;
+                    const isRoofBit = yi >= b.h - 2 && this._damageRng() < 0.5;
                     const mat = isRoofBit ? (b.roofMat ?? 4) : (b.mat ?? 1);
                     try { this.world.setVoxel(wx, groundY, wz, mat); rubbleVox++; } catch {}
                 }
