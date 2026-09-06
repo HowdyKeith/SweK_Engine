@@ -1268,7 +1268,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         a red by name -- the export's version is a hold of its own now. Not built: the legacy localStorage migration's
         own test (its shape is v1's, held through applyPayload), quota exhaustion, a save of the crates (bodies are not
         the world's).
-     6. THE AVATAR AND CAMERA: a first-person walk on the collider with the sandbox's controls.
+     6. (v4522) THE AVATAR AND CAMERA. BUILT: render/voxelAvatar.mjs carries camera/camera.js -- the sandbox's own
+        first-person camera, with WASD at 5 units a second, Shift 9, Space 7.5 up under 18 down, the eye 1.7 over a
+        bilinear ground sample, a one-voxel auto-step, wall sliding, and world.voxelAt for the terrain, which round 1's
+        world contract carries -- onto the device page with nothing of its own physics: it constructs with no canvas
+        (its input attaches only when there is one) and steps with _move(dt), so a gate walks it headless, and its
+        view matrix through gpuDriven's perspective and lookAt is held to camera/buildViewProj.js element for element.
+        sandbox-gpu.html: Walk drops the avatar at the last picked voxel, WASD, Shift, Space, drag or middle-click
+        pointer lock to look, click to dig where you look, Esc back to the orbit. MEASURED (tools/ship/voxelAvatar-
+        selfcheck.mjs): a second of W walks 5 along -z; a three-high wall stops the walk in the voxel before it and a
+        diagonal walk slides along it; the step is climbed; the jump apex is 1.50 against v^2 / 2g of 1.56; on both
+        backends the tower stands on the frame's centre column and is wider after three units of walking, 0 pixels
+        apart. THE FINDING, RECORDED AND NOT FIXED: the camera's ground sample blends the standing column with the
+        columns at +x and +z only, so a two-voxel wall approached going +z is felt as a ramp and climbed while the same
+        wall approached going -z is a wall, and a two-voxel ledge walked off toward +z sinks the feet into the last
+        row and STICKS at the lip while walked off toward -z it is descended. That is index.html's camera as it stands
+        today; the sandbox on the device carries it unchanged and says what it does, and the fix -- a symmetric
+        sample, or a stand test that reads the blended ground rather than the standing column -- is the sandbox's
+        call. ALL SIX ROUNDS ARE IN: the world, dig/build, bodies, damage, save/load, the avatar, each with a gate on
+        both backends, on one page.
 
 ## The count that says when step 4 matters
 

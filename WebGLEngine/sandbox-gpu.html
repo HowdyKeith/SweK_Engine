@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Sandbox on the GPU (the voxel world and its city on gfx/device.js)">
-<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 5 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls; and the sandbox's damage (render/voxelDamage.mjs): Blast carves a sphere at the last picked voxel, bursts the debris system's cubes out of every voxel it removes, charges CityGen's buildings the voxels they lost through their own crumble passes and topple, and syncs every chunk the world marked dirty; and the sandbox's save (render/voxelSave.mjs over world/WorldPersistence.js): Save writes every chunk that diverged from the generator to IndexedDB in the sandbox's own format and the camera pose to localStorage, Load regenerates the world, restores the saved chunks and syncs their slots, Export and Import carry the same payload as JSON, autosave every 30 s. The avatar follows. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
+<meta name="demo:desc" content="The main sandbox's world on the device path: world/world.js's VoxelWorld terrain with CityGen's facade buildings, greedy-meshed by the sandbox's own mesher (world/chunkMesherCore.js) with the registry's colours and corner AO, every chunk in its own slot of one lit mesh, drawn through render/gpuDriven.mjs and the lit pipeline on WebGPU or WebGL2. Rounds 1 to 6 of the sandbox on the device: the world; dig/build -- click a voxel to dig it, shift-click or right-click to build across its face, the touched chunks re-meshed and their slots rewritten in place (render/voxelDeviceEdit.mjs); Box3D crates (render/voxelBodies.mjs) dropped from the Drop a crate button onto the voxels, which reach box3d as a collision window of merged static boxes around each body -- dig under a crate and it falls; and the sandbox's damage (render/voxelDamage.mjs): Blast carves a sphere at the last picked voxel, bursts the debris system's cubes out of every voxel it removes, charges CityGen's buildings the voxels they lost through their own crumble passes and topple, and syncs every chunk the world marked dirty; and the sandbox's save (render/voxelSave.mjs over world/WorldPersistence.js): Save writes every chunk that diverged from the generator to IndexedDB in the sandbox's own format and the camera pose to localStorage, Load regenerates the world, restores the saved chunks and syncs their slots, Export and Import carry the same payload as JSON, autosave every 30 s; and the sandbox's own first-person camera (render/voxelAvatar.mjs over camera/camera.js): Walk drops the avatar at the last picked voxel, WASD walks, Shift sprints, Space jumps, drag or middle-click pointer lock to look, click to dig where you look, Esc or the button back to the orbit. All six rounds of the sandbox on the device are in. A seed and the city live, chunk and triangle counts, the mesh time and the last edit in the HUD, drag to orbit, wheel to dolly.">
 <meta name="demo:category" content="world">
 <title>Sandbox on the GPU</title>
 <style>
@@ -40,13 +40,14 @@ import { createBodyWorld } from "./render/voxelBodies.mjs";
 import { blastAt, damageScene } from "./render/voxelDamage.mjs";
 import { VoxelDebrisSystem } from "./world/voxelDebrisSystem.js";
 import { WorldPersistence, saveWorld, loadWorld, applyToState, exportPayload, importPayload, modifiedChunks, orbitToCam, camToOrbit, SAVE } from "./render/voxelSave.mjs";
+import { avatarCamera, stepAvatar, avatarViewProj, avatarPose } from "./render/voxelAvatar.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
 import { VoxelWorld } from "./world/world.js";
 import { CityGen } from "./world/CityGen.js";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
-let device, scene = null, world = null, state = null, bodies = null, physMod = null, city = null, debris = new VoxelDebrisSystem(), lastT = 0, persistence = null, lastSave = 0, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null, lastHit = null;
+let device, scene = null, world = null, state = null, bodies = null, physMod = null, city = null, debris = new VoxelDebrisSystem(), lastT = 0, persistence = null, lastSave = 0, avatar = null, yaw = 0.7, pitch = 0.55, dist = 170, dragging = null, moved = 0, dirty = true, camNow = null, lastHit = null;
 const $ = (id) => document.getElementById(id);
 
 function rebuild() {
@@ -72,6 +73,12 @@ async function init() {
   try { const ps = await box3d.init(); if (ps.ready) physMod = box3d._mod; else $("phys").textContent = "(box3d: " + ps.reason.slice(0, 80) + ")"; } catch (e) { $("phys").textContent = "(box3d: " + e.message + ")"; }
   try { rebuild(); } catch (e) { return fail("scene: " + e.message); }
   const said = (m) => { $("saved").textContent = m; };
+  $("walk").addEventListener("click", () => {
+    if (avatar) { avatar = null; $("walk").textContent = "Walk"; $("pose").textContent = ""; if (document.exitPointerLock) document.exitPointerLock(); return; }
+    const at = lastHit ? [lastHit.x + 0.5, lastHit.z + 0.5] : [0.5, 0.5];
+    avatar = avatarCamera(world, { canvas: cvs, x: at[0], z: at[1], yaw: Math.PI, pitch: 0 }); $("walk").textContent = "Orbit";
+  });
+  addEventListener("keydown", (e) => { if (e.code === "Escape" && avatar) { avatar = null; $("walk").textContent = "Walk"; $("pose").textContent = ""; } });
   $("save").addEventListener("click", async () => { const r = await saveWorld(state, persistence); persistence.saveCamera(orbitToCam({ yaw, pitch, dist, target: [0, 10, 0] })); said(r.ok ? `saved ${r.chunks} chunk${r.chunks === 1 ? "" : "s"}, ${r.bytes} bytes (${r.modified} modified)` : "save refused: " + r.error); lastSave = performance.now(); });
   $("load").addEventListener("click", async () => { const r = await loadWorld(state, persistence); if (r.load.ok) { const o = camToOrbit((() => { const c = { position: { x: 0, y: 0, z: 0 }, yaw, pitch }; persistence.loadCamera(c); return c; })(), [0, 10, 0]); if (o.dist > 1) { yaw = o.yaw; pitch = o.pitch; dist = o.dist; } } said(r.load.ok ? `loaded ${r.load.restored} chunk${r.load.restored === 1 ? "" : "s"} (${r.load.skipped} skipped), ${r.sync.chunks.length} synced` : "load: " + r.load.error); });
   $("clear").addEventListener("click", () => { persistence.clear(); persistence.clearCamera(); said("cleared: the next load finds no save"); });
@@ -90,10 +97,10 @@ async function init() {
   });
   beEl.textContent = "backend: " + device.backend + " · " + scene.path + " · the sandbox's world through the sandbox's mesher, lit on the device";
   for (const id of ["seed", "city", "count"]) $(id).addEventListener("change", () => { dirty = true; $("tick").textContent = "building the world…"; });
-  cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; moved = 0; });
+  cvs.addEventListener("pointerdown", (e) => { if (avatar) { dragging = null; moved = 0; return; } dragging = [e.clientX, e.clientY]; moved = 0; });
   cvs.addEventListener("contextmenu", (e) => e.preventDefault());
   cvs.addEventListener("pointerup", (e) => {
-    if (dragging && moved < 4 && camNow && state) {
+    if ((dragging || avatar) && moved < 4 && camNow && state && !(avatar && e.button === 1)) {
       const r = cvs.getBoundingClientRect(), px = (e.clientX - r.left) * cvs.width / r.width, py = (e.clientY - r.top) * cvs.height / r.height;
       const hit = pickVoxel(world, camNow, px, py), build = e.shiftKey || e.button === 2; if (hit) lastHit = hit;
       const res = build ? buildAt(state, hit, +$("mat").value || 1) : digAt(state, hit);
@@ -111,10 +118,18 @@ function frame() {
   const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(w * 0.55);
   if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
   if (dirty) { try { rebuild(); } catch (e) { fail("scene: " + e.message); return; } }
-  if (!dragging) yaw += 0.0015;
-  const eye = [Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 10, Math.cos(yaw) * Math.cos(pitch) * dist];
-  const cam = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 1200), G.lookAt(eye, [0, 10, 0])), eye };
-  camNow = { W: w, H: h, fov: 0.9, eye, target: [0, 10, 0] };
+  let cam;
+  if (avatar) {
+    const now2 = performance.now(); stepAvatar(avatar, lastT ? Math.min(0.1, (now2 - lastT) / 1000) : 1 / 60);
+    const vp = avatarViewProj(avatar, w, h, G); cam = { viewProj: vp.viewProj, eye: vp.eye };
+    camNow = { W: w, H: h, fov: avatar.fov, eye: vp.eye, target: vp.target };
+    const p = avatarPose(avatar); $("pose").textContent = `at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}${p.onGround ? "" : " (airborne)"}${avatar.locked ? " · looking" : " · middle-click or drag to look"}`;
+  } else {
+    if (!dragging) yaw += 0.0015;
+    const eye = [Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 10, Math.cos(yaw) * Math.cos(pitch) * dist];
+    cam = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 1200), G.lookAt(eye, [0, 10, 0])), eye };
+    camNow = { W: w, H: h, fov: 0.9, eye, target: [0, 10, 0] };
+  }
   const now = performance.now(); debris.update(lastT ? Math.min(0.1, (now - lastT) / 1000) : 1 / 60); lastT = now;
   if (persistence && now - lastSave > SAVE.autosaveMs) { lastSave = now; const m = modifiedChunks(world); if (m > 0) saveWorld(state, persistence).then((r) => { if (r.ok) $("saved").textContent = `autosaved ${r.chunks} chunk${r.chunks === 1 ? "" : "s"}`; }); }
   if (bodies && bodies.bodies.length) { bodies.tick(); if ((bodies.ticks() & 31) === 0) $("phys").textContent = `${bodies.bodies.length} crate${bodies.bodies.length === 1 ? "" : "s"}, ${bodies.poolSize()} static boxes in the pool`; }

@@ -2882,6 +2882,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "browser an edited world saved to IndexedDB and a fresh world loaded from it draw 0 pixels apart. Sabotage C threw " +
                  "instead of failing by name until the export's version became a hold. Sabotages red at 5 / 5 / 4 / 1.",
     }),
+    since144: Object.freeze({
+        at: "v4522", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/voxelAvatar-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends and headless. The sandbox on the device, round 6 of 6: render/voxelAvatar.mjs carries " +
+                 "camera/camera.js's own first-person camera -- WASD at 5, Shift 9, Space 7.5 under 18, eye 1.7 over a bilinear " +
+                 "ground, auto-step, wall slide, world.voxelAt -- onto the device page; it constructs with no canvas and steps with " +
+                 "_move(dt), so the gate walks it headless on a hand world and holds avatarViewProj to camera/buildViewProj.js element " +
+                 "for element. sandbox-gpu.html's Walk drops the avatar at the last picked voxel. THE FINDING, recorded and not fixed: " +
+                 "the camera's ground sample blends only toward +x and +z, so a two-voxel wall is climbable one way and a wall the " +
+                 "other, and a two-voxel ledge walked off toward +z sticks at its lip. Sabotages red at 5 / 12 / 13 / 4.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
