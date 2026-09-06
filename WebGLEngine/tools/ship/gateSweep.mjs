@@ -2539,6 +2539,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "exactly the mangled entry. NOT CLAIMED: that the shaders are correct, or that a door proves " +
                  "a working page -- the row is only honest because reportLines renders all seven on the bench.",
     }),
+    since118: Object.freeze({
+        at: "v4479", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/observableTaint-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, six sections, 22 checks. *** corroborationCensus TAKES ITS PORTABILITY VERDICT PER " +
+                 "BUILD AND APPLIES IT PER OBSERVABLE, SAID SO IN WRITING, AND LEFT IT OPEN: *** 'the libm " +
+                 "tripwire instruments the CALL, not the value... a build flagged non-portable may well " +
+                 "contain individually portable numbers. Narrowing it means instrumenting per observable, " +
+                 "which is a real round and not this one.' This is that round. A call count is an UPPER bound " +
+                 "on taint and cannot be a lower one; PERTURBING one unspecified function by 1e-9 and " +
+                 "rebuilding gives the other side, per observable, by name. MEASURED over 40 deterministic " +
+                 "builds the census calls non-portable: 334 observables, 109 provably downstream, 32.6%. IN " +
+                 "SIX OF THE FORTY NOT ONE OBSERVABLE MOVED -- the build touches an unspecified function so " +
+                 "every number it reports is condemned, and no number can be shown to depend on the answer. " +
+                 "reconQuality.blindspot is 1 of 19. *** THE ONE THING THIS METHOD CANNOT DO IS THE THING IT " +
+                 "MUST NOT CLAIM: *** perturbation demonstrates dependence, never independence, so an unmoved " +
+                 "observable is NOT portable -- section 4 builds one that is downstream by construction and " +
+                 "moves at no epsilon, and sabotage E confirms the returned shape refuses the word. The two " +
+                 "bounds are of opposite kinds and are never combined. Determinism is checked first and a " +
+                 "drifting build is REFUSED attribution rather than attributed badly. Six sabotages, " +
+                 "6/8/1/2/1/3 by name, none zero-red. *** AND TWO CHECKS IN THIS GATE COULD NOT FAIL, BOTH " +
+                 "MINE, MAKING THREE THIS SESSION: *** `ok(name, (() => true)())` and `ok(name, async () => " +
+                 "{...}())`, the second handing `ok` a PROMISE, which is truthy however the run went. v4478's " +
+                 "gate had the same shape. The cause is that `ok(name, condition)` accepts any value; both are " +
+                 "deleted, and the general repair -- a signature that refuses a function -- belongs to " +
+                 "whichever round owns the helper.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

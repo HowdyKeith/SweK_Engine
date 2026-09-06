@@ -1,7 +1,7 @@
 {
   "note": "WHAT IS ACTUALLY PUBLISHED ON THE RELEASES PAGE -- the record the offline gate reads, refreshed from the GitHub API by tools/ship/refreshReleases.mjs rather than believed. THE FLEET DOWNLOADS releases/latest, so this file is the only thing in the tree that knows what the fleet will actually run.",
-  "refreshedAt": "2026-09-05T00:00:00Z",
-  "source": "GET /repos/HowdyKeith/SweK_Engine/releases, read at v4461 through the GitHub API. *** THE SCRIPT'S OWN FETCH COULD NOT DO IT HERE AND THAT IS SAID RATHER THAN GLOSSED: *** refreshReleases.mjs --write needs the rig's token and the sandbox agent proxy answers the releases API with HTTP 401, so the twelve newest rows were read with the repository API directly and v4460 -- absent from this file while sitting at the top of the actual releases page -- was written in. Same endpoint, same answer, different caller; the rig should still run --write, and if it disagrees with this the rig wins.",
+  "refreshedAt": "2026-09-06T05:13:33Z",
+  "source": "GET /repos/HowdyKeith/SweK_Engine/releases (per_page=100), read at v4479",
   "baseline": {
     "throughVersion": 4451,
     "raisedAt": "v4452",
@@ -16,6 +16,10 @@
     ]
   },
   "releases": [
+    {
+      "tag": "v4477",
+      "publishedAt": "2026-09-06T05:13:33Z"
+    },
     {
       "tag": "v4460",
       "publishedAt": "2026-09-05T18:50:26Z"
