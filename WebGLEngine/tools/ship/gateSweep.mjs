@@ -2759,6 +2759,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "seven-plane packing round-trips exactly in Float32; a nearest-hit splat source bakes a two-tone shell into probes " +
                  "that read its tones. Sabotages red at 20 / 1 / 4 / 5; the sign sabotage was caught only by the x and y ramps.",
     }),
+    since136: Object.freeze({
+        at: "v4514", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/probeLit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/probeLit.mjs: the v4513 probe volume on gfx/device.js -- the seven packed planes as one " +
+                 "rgba16float atlas read by integer texel, trilinear between eight probes and the nine-term SH irradiance in both shader " +
+                 "languages on litSphere's vertex stage and tint chain. A 0.9 sphere under four bakes (position, two-tone sky, splat " +
+                 "shell, quadrupole) matches splatProbes.shadeAt on the same halves to a mean of 0.2 of 255 with a worst of 1, the two " +
+                 "backends 0 pixels apart. Sabotages red at 9 / 4 / 3 / 7; the lobe-factor sabotage was blind on the pixels until the " +
+                 "quadrupole bake was added. backendParity 154 / 137 / 73 / 21 and the census dual baseline 18 carry the new module.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

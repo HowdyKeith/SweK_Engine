@@ -896,6 +896,21 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         gate projects an x and a y ramp on purpose, and those two are what go red. Not built: a device-side sampler
         (the packed planes are the shape a 3D texture takes; the tree's lit pipeline reads no probe yet), an
         occupancy-fit box (the grid takes cloudBounds plus a margin), and any page.
+    PROBES 1, THE DEVICE-SIDE SAMPLER -- built at v4514 (task 60). render/probeLit.mjs carries the v4513 probe volume
+        onto gfx/device.js: the device has 2D textures and no 3D ones, so the seven packed planes travel as ONE
+        rgba16float atlas (width nx, height 7 x nz x ny, row (p x nz + z) x ny + y -- the order packProbes already
+        writes, so nothing is reordered), read by integer texel on both backends; the fragment stage reads the eight
+        surrounding probes (56 texel reads), weights them trilinearly, and evaluates the nine-term irradiance with the
+        cosine-lobe factors, in WGSL and GLSL from one pair of texts, on litSphere's vertex stage, tint chain and
+        LAYOUTS.lit slots. The CPU twin (halfGrid) reads the SAME halves the texture holds, so the hold is the
+        arithmetic and not the format. MEASURED (tools/ship/probeLit-selfcheck.mjs, a 0.9 sphere at distance 5, 160 x
+        160, 1,788 keyed pixels): four bakes -- the position, a two-tone sky, the 300-splat shell, a quadrupole --
+        match splatProbes.shadeAt at each ray's hit point to a mean of 0.20 / 0.11 / 0.06 / 0.07 of 255 with a worst
+        of 1, the two backends 0 pixels apart. THE FINDING: the first three bakes are odd in y or constant in
+        direction, so a wrong order-2 lobe factor (pi / 3 for pi / 4) left every pixel green and only the text check
+        went red; the quadrupole bake, even in every axis, was added for it and takes that sabotage to 3 red. Not
+        built: a float32 atlas (TEXTURE_FORMATS has no rgba32float; the halves are within 3.7e-4 relative), the
+        occupancy fit (Probes 2), the page (Probes 3).
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from
