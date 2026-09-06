@@ -911,6 +911,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         went red; the quadrupole bake, even in every axis, was added for it and takes that sabotage to 3 red. Not
         built: a float32 atlas (TEXTURE_FORMATS has no rgba32float; the halves are within 3.7e-4 relative), the
         occupancy fit (Probes 2), the page (Probes 3).
+    PROBES 2, THE OCCUPANCY-FIT BOX -- built at v4515 (task 61). render/probeFit.mjs fits the probe grid's box to where
+        the splats ARE: the cloud is rasterised through physics/splat/splatMesh.mjs at the collider's own cell size and
+        ISO, the occupied voxels are listed per axis, and the box runs from the trim quantile (1 %) to the 1 - trim
+        quantile of each axis plus an apron of cells, in world units -- so one stray splat among thousands cannot
+        stretch it the way cloudBounds lets it. Probes whose own voxel is solid are flagged: bakeFitted renders cube
+        faces for the OPEN probes only and fills each solid probe with its nearest open probe's coefficients by world
+        distance (first index on a tie), so no probe bakes a flat cell from inside a splat for the trilinear sample to
+        bleed. MEASURED (tools/ship/probeFit-selfcheck.mjs): a 600-splat shell of radius 1.5 rasterises to 10,159
+        occupied voxels and fits [-1.7, 1.7] on every axis keeping 100 % of them; with one outlier splat at x 9 the
+        box is the same and cloudBounds reaches 9.4, the bounds grid spending 1,944 probes to the fit's 512; the solid
+        flags on the analytic ball equal the brute-force voxel test on 2,197 probes; end to end, 78 of 512 probes on
+        the shell are solid, 434 are rendered, and the centre reads the shell's two tones. THE CORRECTION: the first
+        hand grid for the fill was a box of zero height, and probeGrid's two-probe-per-axis minimum put an open twin
+        at every solid probe's position, so the nearest open probe was at distance 0 -- the line is a 5 x 2 x 2 unit
+        box now, and the tie rule (first index) is what the y and z neighbours exercise. Not built: cluster analysis
+        (two rooms far apart share one box), the page (Probes 3).
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

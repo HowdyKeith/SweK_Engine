@@ -2773,6 +2773,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "backends 0 pixels apart. Sabotages red at 9 / 4 / 3 / 7; the lobe-factor sabotage was blind on the pixels until the " +
                  "quadrupole bake was added. backendParity 154 / 137 / 73 / 21 and the census dual baseline 18 carry the new module.",
     }),
+    since137: Object.freeze({
+        at: "v4515", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/probeFit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. render/probeFit.mjs: the probe box fitted to occupancy through splatMesh's rasterised volume -- per " +
+                 "axis the trim quantiles of the occupied voxels plus an apron, so one outlier splat among thousands cannot stretch it " +
+                 "(cloudBounds does: 1,944 probes against the fit's 512 on the same shell); probes inside solid voxels flagged, left " +
+                 "unrendered and filled from the nearest open probe by world distance. The first hand grid had zero height and " +
+                 "probeGrid's two-probe minimum put an open probe AT each solid one; the gate's line is a 5 x 2 x 2 box now. " +
+                 "Sabotages red at 4 / 2 / 2 / 1.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
