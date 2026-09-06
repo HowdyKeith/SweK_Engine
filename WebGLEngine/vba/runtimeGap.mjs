@@ -199,8 +199,24 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // DIFFERENT TABLES, ONE UNCHANGED HEADLINE. This row has moved for every round that added a file and never
     // once for a reason about threads -- which is the strongest thing a census can say about the number it
     // exists to report, and it is a stronger statement after nine independent populations than after one.
+    // *** A TENTH TIME -- AND THE INTERESTING PART IS THAT THREE ROUND NOTES SAID SO BEFORE IT WAS TRUE. ***
+    // v4485 re-derived this table because the gate went red on `typed arrays 693 -> 694`, and exactly one row
+    // had moved: a `new DataView(new ArrayBuffer(8))` in v4484's own test fixture, in a gate about corroborating
+    // observables. `files` did not move at all -- v4482, v4483 and v4484 edited existing files and added none.
+    //
+    // *** SO THE THREE NOTES BEFORE THIS ONE EACH CLAIMED A RE-DERIVATION THAT NEVER HAPPENED. *** v4482's
+    // round note reads "AND FOR THE TENTH TIME runtimeGap's frozen census moved because this round touched
+    // files", v4483's says ELEVENTH, v4484's says TWELFTH -- and this record still read NINTH, from v4481,
+    // because nobody re-derived anything on any of those rounds. THE COUNT WAS INCREMENTED FROM THE PREVIOUS
+    // NOTE RATHER THAN MEASURED, which is precisely the failure this table exists to demonstrate, committed in
+    // the prose ABOUT the table by the hand that wrote it. Two of the three claims were simply false; the
+    // third was true by accident, and its record was still not updated, which is why the gate caught it.
+    //
+    // The shipped notes are history and are not rewritten. The correction lives here, where the number does.
+    // TENTH RE-DERIVATION, TENTH TABLE, ONE UNCHANGED HEADLINE: threads and WebAssembly have read 22 through
+    // every one of them -- and this row has still never moved for a reason about threads.
     files: 3878,
-    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 693, promises: 332,
+    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 694, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
