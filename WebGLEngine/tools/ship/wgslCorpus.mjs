@@ -59,6 +59,7 @@ import { LIT_WGSL } from "../../render/litSphere.mjs";
 import { QUAD_WGSL } from "../../render/tslWide.mjs";
 import { FRAGMENT_WGSL as STEREO_WGSL } from "../../render/stereographic.mjs";
 import { FRAGMENT_WGSL as ZOOM_WGSL } from "../../render/zoomBlur.mjs";
+import { FRAGMENT_WGSL as ASCII_SHAPE_WGSL } from "../../render/asciiShape.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
@@ -266,6 +267,9 @@ export function corpus() {
         { id: "zoomBlur.FRAGMENT_WGSL", from: "render/zoomBlur.mjs", compileOnly: true,
           why: "v4504 -- the zoom blur's fragment pass: the same full-screen triangle, a march of 32 bilinear samples from the fragment toward an arbitrary centre clamped to the texel-centre range, their mean replacing the scene; held within 2 of 255 to its CPU twin on both backends by tools/ship/zoomBlur-selfcheck.mjs, with GODRAYS_FS run raw beside it",
           opts: { code: ZOOM_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "asciiShape.FRAGMENT_WGSL", from: "render/asciiShape.mjs", compileOnly: true,
+          why: "v4505 -- the shape-aware ASCII cell pass: one fragment per cell, six disc samples of the scene by integer texel, a nearest-neighbour search over a 6 x 95 table by squared distance keeping the first of equals; held cell for cell to a CPU argmin on both backends by tools/ship/asciiShape-selfcheck.mjs",
+          opts: { code: ASCII_SHAPE_WGSL, compileOnly: true, outCount: 0 } },
         { id: "tslWide.QUAD_WGSL", from: "render/tslWide.mjs", compileOnly: true,
           why: "v4483 -- the hand-written twin of the widened transplant's quad: three computed varyings, one @interpolate(flat) i32, the camera's projection in the fragment; the generated pair is held to its picture by tools/ship/tslWide-selfcheck.mjs on both backends, and here both harnesses must compile it",
           opts: { code: QUAD_WGSL, compileOnly: true, outCount: 0 } },

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="ASCII Shape (six-point glyph matching)">
+<meta name="demo:desc" content="Shape-aware ASCII on gfx/device.js: every cell takes six luminance samples of the scene and picks the nearest of 95 glyph shape vectors derived from the vendored Plex through the Slug evaluator, in both shader languages; the picked glyphs are then drawn by Slug from the same font. After edoardolunardi/ascii-logo (MIT), read and hand-written. Gated cell for cell against a CPU argmin by tools/ship/asciiShape-selfcheck.mjs.">
+<meta name="demo:category" content="fx">
+<title>ASCII Shape</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">ASCII shape: a glyph picked by where its ink sits, not by how much</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">Font: IBM Plex Serif &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1 (vendor/fonts/IBMPlexSerif-OFL.txt). <span id="notice"></span>
+    &middot; scene <select id="scene"><option value="planet">procPlanet bake, scrolling</option><option value="fire">Doom Fire</option></select> &middot; <label><input type="checkbox" id="showScene"> show the scene under the glyphs</label> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { parseFont } from "./text/slugFont.js";
+import { SlugFontDevice, SlugDeviceBatch } from "./render/slugDevice.mjs";
+import { buildVertices } from "./text/slugText.js";
+import { planetSpec, bakeEquirect } from "./world/procPlanet.js";
+import { DoomFire } from "./render/doomFire.mjs";
+import { GLYPHS, shapeTable, asciiShapeCpu, asciiShapePipelineDesc, shapeTexture, sceneTexture, drawAsciiShape } from "./render/asciiShape.mjs";
+import { zoomBlurPipelineDesc, drawZoomBlur } from "./render/zoomBlur.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const FONT_URL = "./vendor/fonts/IBMPlexSerif-Regular.ttf";
+const SW = 336, SH = 160, CW = 6, CH = 10, COLS = SW / CW, ROWS = SH / CH;   // 56 x 16 cells
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+let device, fontDevice, batch, pipe, shapes, sceneTex, target, blurPipe, bake, fire, sceneBuf, table, frames = 0, msCell = 0, cpuTwin = false, cpuWhy = "";
+
+function planetFrame(shift) {
+  // the bake scrolled by `shift` texels, so the picture moves under the cells
+  for (let j = 0; j < SH; j++) { const row = j * SW * 4; for (let i = 0; i < SW; i++) { const s = ((i + shift) % SW) * 4 + row, d = i * 4 + row; sceneBuf[d] = bake.rgba[s]; sceneBuf[d + 1] = bake.rgba[s + 1]; sceneBuf[d + 2] = bake.rgba[s + 2]; sceneBuf[d + 3] = 255; } }
+  return sceneBuf;
+}
+function fireFrame() { fire.step(); return fire.toRGBA(sceneBuf); }
+
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("could not load " + FONT_URL + " (" + e.message + ")"); }
+  try {
+    fontDevice = new SlugFontDevice(device, parseFont(ab), GLYPHS.join(""));
+    const t0 = performance.now(); table = shapeTable(fontDevice); const msTable = performance.now() - t0;
+    pipe = device.pipeline(asciiShapePipelineDesc()); if (pipe.compiled) { const err = await pipe.compiled; if (err) throw new Error(err); }
+    shapes = shapeTexture(device, table);
+    bake = bakeEquirect(planetSpec(7), SW, SH); fire = new DoomFire({ width: SW, height: SH, seed: 7 }).light(); sceneBuf = new Uint8ClampedArray(SW * SH * 4);
+    sceneTex = sceneTexture(device, { rgba: planetFrame(0), w: SW, h: SH });
+    target = device.texture({ render: true, width: COLS, height: ROWS });
+    blurPipe = device.pipeline(zoomBlurPipelineDesc()); if (blurPipe.compiled) { const err = await blurPipe.compiled; if (err) throw new Error(err); }
+    batch = new SlugDeviceBatch(fontDevice);
+    document.getElementById("notice").textContent = fontDevice.notice;
+    beEl.textContent = "backend: " + device.backend + " · " + COLS + " x " + ROWS + " cells of " + CW + " x " + CH + " over a " + SW + " x " + SH + " scene · table 95 x 6 derived from Plex in " + msTable.toFixed(0) + " ms";
+  } catch (e) { return fail("setup: " + e.message); }
+  requestAnimationFrame(frame);
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+async function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(w * SH / SW);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  const mode = document.getElementById("scene").value;
+  sceneTex.update({ data: mode === "fire" ? fireFrame() : planetFrame((frames * 2) % SW) });
+  // 1. the cell pass into a COLS x ROWS target, read back: R is the glyph index, G the cell's mean luminance
+  const t0 = performance.now();
+  // The readback is the one thing a presenting device may refuse: this sandbox's WebGPU loses the device on a canvas-targeted pass
+  // (the v4458 finding), so a read that rejects or stalls past 500 ms hands the picks to the CPU twin -- the SAME argmin the gate
+  // holds the fragment to -- and the HUD says so. WebGL2 and a rig's WebGPU read back in a few milliseconds.
+  let cells = null;
+  if (!cpuTwin) {
+    try { cells = await Promise.race([device.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); drawAsciiShape(pass, pipe, sceneTex, shapes, CW, CH, SW, SH); }, { target, read: true }), new Promise((_, rej) => setTimeout(() => rej(new Error("readback stalled past 500 ms")), 500))]); }
+    catch (e) { cpuTwin = true; cpuWhy = e.message; }
+  }
+  const px = cells ? cells.pixels : null, cpu = cells ? null : asciiShapeCpu({ rgba: sceneBuf, w: SW, h: SH }, table, CW, CH);
+  const t1 = performance.now();
+  // 2. the picked glyphs through Slug, one per cell, brightness from the mean
+  const glyphs = [], cellW = w / COLS, cellH = h / ROWS, size = cellH * 0.85;
+  const font = fontDevice.font;
+  for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+    const c = cy * COLS + cx, idx = px ? px[c * 4] : cpu.index[c], mean = px ? px[c * 4 + 1] / 255 : cpu.mean[c]; if (idx === 0) continue;
+    const gi = font.glyphIndex(32 + idx); if (gi <= 0) continue;
+    const adv = font.advance(gi) * size, lum = 0.35 + 0.65 * mean;
+    glyphs.push({ glyphIndex: gi, codepoint: 32 + idx, x: cx * cellW + (cellW - adv) / 2, y: 0, size, color: [lum, lum * 0.95, lum * 0.85, 1], row: cy });
+  }
+  // rows are placed by their own baseline: build per-row streams into one batch through a y offset in pixels (y down on screen)
+  const built = buildVertices(glyphs.map((g) => ({ glyphIndex: g.glyphIndex, codepoint: g.codepoint, x: g.x, y: -(g.row * cellH + cellH * 0.78), size: g.size, color: g.color })), (gi) => fontDevice.entryFor(gi), { color: [1, 1, 1, 1] });
+  batch.setBuilt(built);
+  const rows = new Float32Array([2 / w, 0, 0, -1, 0, 2 / h, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]);
+  device.frame(({ pass }) => {
+    pass.clear([0.02, 0.031, 0.024, 1]);
+    if (document.getElementById("showScene").checked) drawZoomBlur(pass, blurPipe, sceneTex, { cx: 0.5, cy: 0.5, strength: 0 });
+    if (glyphs.length) batch.draw(pass, rows, [w, h]);
+  });
+  if (++frames % 15 === 0) { msCell = t1 - t0; document.getElementById("tick").textContent = (cpuTwin ? "CPU twin picks (device readback refused: " + cpuWhy + ") " : "cell pass + readback ") + msCell.toFixed(1) + " ms · " + glyphs.length + " glyphs drawn"; }
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

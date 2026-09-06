@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 457,
+ "count": 458,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -126,6 +126,13 @@
    "f": "ascii-object.html",
    "t": "SweK &middot; ASCII Object",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ascii-shape.html",
+   "t": "ASCII Shape",
+   "d": "Shape-aware ASCII on gfx/device.js: every cell takes six luminance samples of the scene and picks the nearest of 95 glyph shape vectors derived from the vendored Plex through the Slug evaluator, in both shader languages; the picked glyphs are then drawn by Slug from the same font. After edoardolunardi/ascii-logo (MIT), read and hand-written. Gated cell for cell against a CPU argmin by tools/ship/asciiShape-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

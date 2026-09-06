@@ -168,6 +168,9 @@ export const HOT_UNREGISTERED = Object.freeze([
     // v4502: slug-ticker.html -- its napalm mode: fire-filled glyph bodies and a trail of fire puddles (the same HUD hexes; counted
     // as a literal-colour file at v4497 and now a hot effect by its words).
     "slug-ticker.html",
+    // v4505: ascii-shape.html -- the shape-aware ASCII page, whose scene selector offers the Doom Fire; it says "fire"
+    // enough times for the word count and names the HUD's hexes; the glyphs are drawn white-ish by luminance.
+    "ascii-shape.html",
 ]);
 
 /**
@@ -187,13 +190,15 @@ export const HOT_UNREGISTERED = Object.freeze([
  * v4500: 81 -> 82. The arrival is slug-fire.html (the same HUD hexes plus a button face), a fire-filled word through
  * render/slugDevice.mjs's fill pipeline; the fire's palette lives in render/doomFire.mjs as bytes, not hex literals
  * on the page; nothing additively; the overlap stays 0.
+ * v4505: 82 -> 83. The arrival is ascii-shape.html (the same HUD hexes), the shape-aware ASCII picks drawn through
+ * render/slugDevice.mjs; nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 82,
+    literalColourFiles: 83,
     overlapDrawAndLiteral: 0,
-    hotUnregistered: 23,   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
+    hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.
     keithsThree: Object.freeze({
         "world/fireworkShell.mjs": Object.freeze({ blendFunc: 0, gate: "tools/ship/fireworkShell-selfcheck.mjs" }),

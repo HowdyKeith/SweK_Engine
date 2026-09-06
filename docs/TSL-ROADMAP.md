@@ -750,6 +750,24 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         until the edges were painted and a strength-0 setting made the pass a plain resample. The tree's 15th
         dual-language module. zoom-blur.html: the blur following the pointer beside the god rays with their
         threshold on a slider.
+    SHAPE-AWARE ASCII -- built at v4505 (task 51), after edoardolunardi/ascii-logo (MIT, (c) Codrops; read and
+        hand-written, nothing copied; world/reachedLicences.mjs). tools/ship/asciiLut.mjs picks a glyph by ONE scalar
+        per cell, so a diagonal edge and a flat mid-grey of the same mean get the same glyph, and its own header
+        named the multi-sample category as the better method declined for the AGPL alone. render/asciiShape.mjs is
+        that category under MIT: each of the 95 printable glyphs is rasterised from the vendored Plex through
+        text/slugEval.js's slugRender, averaged over six discs at ascii-logo's six interior points, and the six
+        columns normalised to their peaks -- DERIVED, as asciiLut derives its ramp; the table ships as a 6 x 95
+        rgba8 texture quantised to bytes so the CPU twin and both fragments compare the same numbers. The cell pass
+        in both languages takes the same six samples of the scene (a centre tap and six ring taps, nearest texel)
+        and picks the nearest vector by squared distance, first of equals. MEASURED (tools/ship/asciiShape-
+        selfcheck.mjs): the fragment's argmin is the CPU twin's on 504 of 504 cells of procPlanet's bake on both
+        backends with 0 near-ties under 1e-5, the mean luminance exact; three cells of one mean (white left, white
+        right, flat grey) pick "L", "4" and "1" by shape where asciiLut prints "#" three times. NOT TAKEN from
+        ascii-logo: its ten outer samples and two contrast powers (weights on the same six numbers, and pow in f32
+        would move the near-ties the gate counts) and its glyph sheet (ascii-shape.html prints the picks through
+        Slug from the same font the vectors were measured on). Sabotage C, the table left unnormalised, left every
+        cell-for-cell hold green -- both sides read the same bytes -- and was caught by the derivation holds alone:
+        parity sees that two sides agree, never what they agree on.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

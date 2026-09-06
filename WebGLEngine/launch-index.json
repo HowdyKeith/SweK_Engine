@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 457,
+  "page": 458,
   "demo": 49,
   "builtin": 34
  },
@@ -167,6 +167,14 @@
    "id": "ascii-object.html",
    "display": "Ascii Object",
    "href": "/ascii-object.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ascii-shape.html",
+   "display": "Ascii Shape",
+   "href": "/ascii-shape.html",
    "section": null,
    "collision": false
   },

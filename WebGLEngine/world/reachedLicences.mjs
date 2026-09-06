@@ -149,6 +149,39 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4505 -- THE SHAPE-AWARE ASCII METHOD asciiLut.mjs NAMED AND DECLINED FOR THE LICENCE ALONE, UNDER MIT.
+    //
+    // tools/ship/asciiLut.mjs (v3776) opens by saying it is NOT derived from stong/gradscii-art (AGPL-3.0) and is
+    // "the OTHER method entirely -- the one that repo's README describes as the traditional approach it set out
+    // to beat". The multi-sample, shape-matching category was identified as the better one and left alone for
+    // the licence. edoardolunardi/ascii-logo is that category (six samples per cell, nearest vector over 95
+    // glyphs) under MIT, read here and re-derived from the tree's own font; nothing copied.
+    // =========================================================================================================
+    {
+        repo: "edoardolunardi/ascii-logo", sourceUrl: "https://github.com/edoardolunardi/ascii-logo",
+        // The repository is under Edoardo Lunardi's account and its LICENSE names Codrops as the copyright holder
+        // ("Copyright (c) 2009 - 2026 Codrops"): a Codrops tutorial piece published by its author, the usual shape
+        // for that site, and the grant is Codrops' to make. Recorded as it reads, not as the account suggests.
+        grantorHoldsRights: true, licenceExists: true, publisher: "Codrops (Edoardo Lunardi, author)", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2009-2026 Codrops. READ FIRST-HAND at v4505: LICENSE, 21 lines, sha256 3b56d635b76c, " +
+             "at commit 75ab3a67 (2026-09-01); package.json carries no author field, so the LICENSE's Codrops " +
+             "line is the attribution.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The METHOD, re-derived: six interior sample points per cell (ascii-logo's own layout, the right " +
+             "column riding higher so a diagonal reads as one), a disc average at each, one six-vector per glyph " +
+             "normalised per sample position across the set, and a nearest-neighbour argmin over the 95 printable " +
+             "glyphs in the fragment. No bytes: render/asciiShape.mjs rasterises the glyphs from the vendored Plex " +
+             "through text/slugEval.js instead of a canvas, uploads the table as rgba8 rather than R32F, samples " +
+             "the scene by integer texel, carries a WGSL twin and a CPU twin, and leaves out the ten outer samples, " +
+             "the two contrast powers and the glyph sheet, which are weights and a printer rather than the method.",
+        takenPaths: ["render/asciiShape.mjs"],
+        citedPaths: ["tools/ship/asciiShape-selfcheck.mjs", "ascii-shape.html", "server.html", "physics/instruments.mjs", "tools/ship/gateSweep.mjs"],
+        why: "A glyph picked by ONE scalar per cell (asciiLut's ramp) cannot tell a diagonal edge from a flat " +
+             "mid-grey of the same mean; a six-vector can, and the argmin over a fixed table is exact enough to " +
+             "gate cell for cell against a CPU twin, which is the bar every pass in this tree clears before it ships.",
+    },
+    // =========================================================================================================
     // v4258 -- #53's TWO NAMES, AND THEY WERE BUILT BEFORE THEY WERE RECORDED.
     //
     // Backlog #53 read "jsfx: sound effects as DATA, and animatelo: DOM animation the dirty flag can see".

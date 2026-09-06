@@ -2636,6 +2636,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "zoom-blur.html is the view. Sabotages red at 5 / 5 / 5 / 3 -- the clamp sabotage was blind twice (the bake's seam, then " +
                  "one sample in 32) before the edges were painted and a strength-0 setting added.",
     }),
+    since127: Object.freeze({
+        at: "v4505", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/asciiShape-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/asciiShape.mjs, after edoardolunardi/ascii-logo (MIT, read and hand-written): 95 glyph " +
+                 "shape vectors of six disc averages DERIVED from Plex through slugRender and normalised per column, a cell pass in both " +
+                 "languages taking the same six samples of the scene and picking the nearest by squared distance, a CPU twin. The " +
+                 "fragment's argmin is the twin's on 504 of 504 cells with 0 near-ties on both backends. Three cells of one mean pick " +
+                 "three glyphs by shape where asciiLut's scalar picks one. ascii-shape.html prints the picks through Slug. Sabotages " +
+                 "red at 6 / 2 / 3 / 2 -- C showed the cell-for-cell holds cannot see the table's content; the derivation holds do.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
