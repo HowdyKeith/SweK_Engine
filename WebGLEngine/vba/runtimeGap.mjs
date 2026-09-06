@@ -181,8 +181,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (3868 -> 3870, ES modules and closures +2 and +1). FIVE RE-DERIVATIONS, FIVE DIFFERENT TABLES, ONE
     // UNCHANGED HEADLINE -- threads have read 22 through every one of them. A row that survives five
     // independent populations is a finding; a row read back from the first would have been wrong five times.
-    files: 3870,
-    esModules: 3579, closures: 3455, asyncAwait: 1334, typedArrays: 691, promises: 332,
+    files: 3872,          // v4478 -- +2: physics/render/wgslArc.mjs and its gate
+    // v4478 -- RE-TAKEN, not adjusted: physics/render/wgslArc.mjs and its gate are two more ES modules that
+    // use closures and await, so three rows moved by exactly two each and the other nine did not move at all.
+    // A census whose rows move together under a two-file addition would be measuring the tree's size rather
+    // than its capabilities; three of twelve moving is the shape that says the patterns are discriminating.
+    esModules: 3581, closures: 3457, asyncAwait: 1336, typedArrays: 691, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

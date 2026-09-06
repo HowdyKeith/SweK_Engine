@@ -354,7 +354,15 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
     // is visible, so this reads it -- the same move as every other check in this tree that has to see a
     // declaration rather than a value.
     const keyLines = fs.readFileSync(path.join(GS.ENG, "tools", "ship", "gateSweep.mjs"), "utf8")
-        .split("\n").map((l) => (l.match(/^\s{4}(since\d+): Object\.freeze\(/) || [])[1]).filter(Boolean);
+        // *** v4478 -- ANCHORED TO FOUR SPACES, AND A MERGE PUT ONE AT COLUMN ZERO. *** v4463's collision was
+        // renumbered to since116 by hand and the re-indent was lost with it, so this scan saw 114 of the 115
+        // ordinals actually declared -- and the one it could not see was the one a merge had just touched,
+        // which is exactly the population most likely to collide next. A second since116 at column zero would
+        // have been invisible to the check that exists to catch it. Indentation is not what makes a line a
+        // closing, so it is no longer what makes one visible; the source is still the place to look, because
+        // a runtime read cannot see a duplicate at all. MEASURED: 114 before, 115 after, and v4456's runtime
+        // instrument had been reporting 115 all along -- two routes disagreeing by exactly the mangled entry.
+        .split("\n").map((l) => (l.match(/^\s*(since\d+): Object\.freeze\(/) || [])[1]).filter(Boolean);
     const dupes = keyLines.filter((k, i) => keyLines.indexOf(k) !== i);
     ok(dupes.length === 0,
        "!! *** no two closings share an ordinal, which a runtime read cannot see ***",

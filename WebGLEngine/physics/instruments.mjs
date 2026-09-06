@@ -1435,6 +1435,17 @@ export const INSTRUMENTS = [
       measures: "Half of the source of Walter's BTDF excess -- and that half turns out not to be a term of the equation at all.",
       key: "THREE ROUNDS NARROWING ONE NUMBER, EACH SAYING PLAINLY WHAT IT COULD NOT YET SAY. v4436 MEASURED the excess. v4447 PROVED IT WAS REAL and ruled out the innocent explanation, closing by naming two suspects -- the height-correlated G2 and the refraction Jacobian -- and judging the walk 'now sharp enough to tell them apart'. It is, and THE VERDICT IS SPLIT: the Jacobian is INNOCENT, G2 is GUILTY, and there is a THIRD defect neither round had thought to suspect. This file convicts the third, and the reason it went unsuspected is that IT IS NOT IN ANY TERM OF EQUATION 21 -- every earlier search looked term by term at an equation whose terms were not where the fault was.",
       gate: "physics/render/btdfDomain-selfcheck.mjs" },
+    {
+        // LIFTED FROM THE MODULE'S OWN HEADER, not authored here -- v3585's rule.
+        id: "wgsl-arc", area: "render", name: "Seven WGSL producers that had no front door",
+        page: "instrument-bench.html", gate: "physics/render/wgslArc-selfcheck.mjs",
+        // The modules this instrument reports on. physicsReach reads instruments.mjs with comments stripped
+        // and asks whether a module path appears, so this list IS the door for all seven -- which is only
+        // honest because reportLines above genuinely renders every one of them on the bench.
+        modules: ["physics/render/energyCompWgsl.mjs", "physics/render/fresnelWgsl.mjs", "physics/render/furnaceWgsl.mjs", "physics/render/microfacetAnisoWgsl.mjs", "physics/render/microfacetSampleWgsl.mjs", "physics/render/microfacetWgsl.mjs", "physics/render/misWgsl.mjs"],
+        measures: "Each WGSL producer in the arc: the shader it emits, whether it emits it as a constant or builds it, the size and language, and whether every planted fault it declares is actually consulted by that shader.",
+        key: "*** SEVEN WGSL PRODUCERS SHIPPED WITH NO FRONT DOOR, AND THEY ARRIVED AS ONE SPECIES RATHER THAN AS SEVEN OVERSIGHTS. *** physicsReach-selfcheck ratchets the count of graded physics modules reachable from no roundhouse device, no instruments row and no page. v4461 corrected that baseline from 35 to 7 -- most of the 35 was phantom debt, modules with a door the count could not see -- and named the seven real ones. Today it reads 14, and the difference is exactly this arc: energyComp, fresnel, furnace, microfacetAniso, microfacetSample, microfacet and mis, every one a WGSL producer, every one landed between v4407 and v4416. They are not unreachable by accident. tools/ship/wgslCorpus.mjs and render/backendParity.mjs both read them, and two gates grade them, so they are thoroughly CHECKED. What none of that provides is a way for a PERSON to see the shader a module emits and the CPU answer it is held to. That is what a door is, and this file is one: a census of the arc, exported through reportLines so instrument-bench.html can serve it. ---- *** THE ARC HAS TWO SHAPES AND A CENSUS THAT ASSUMES ONE SEES FIVE OF SEVEN *** -----------------------",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

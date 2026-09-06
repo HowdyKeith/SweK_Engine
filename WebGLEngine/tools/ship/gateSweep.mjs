@@ -2466,7 +2466,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // because a runtime read of this object CANNOT see a duplicate -- the earlier entry is already gone by
     // the time anything imports it -- so it is parsed from the SOURCE, which is the only place both
     // declarations still exist. Renumbered to since116, main's round note untouched.
-since116: Object.freeze({
+    since116: Object.freeze({
         at: "v4463", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/stereographic-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -2507,6 +2507,37 @@ since116: Object.freeze({
                  "differ in precision or in normalize(), and the shader's actual output still needs a " +
                  "screenshot on the rig -- the same limit panini.js declared and this inherits rather than " +
                  "pretending past.",
+    }),
+    since117: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/render/wgslArc-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateSweep-selfcheck.mjs (the duplicate-ordinal scan was anchored to a four-space indent and a merge had put since116 at column zero)"]),
+        verdict: "green. *** SEVEN WGSL PRODUCERS SHIPPED WITH NO FRONT DOOR AND THEY ARRIVED AS ONE SPECIES " +
+                 "RATHER THAN SEVEN OVERSIGHTS. *** physicsReach's baseline was corrected to 7 at v4461 and " +
+                 "read 14; the difference is exactly energyComp, fresnel, furnace, microfacetAniso, " +
+                 "microfacetSample, microfacet and mis, every one landed between v4407 and v4416. They were " +
+                 "thoroughly CHECKED -- wgslCorpus and backendParity read them, two gates grade them -- and " +
+                 "there was no way for a PERSON to see the shader a module emits. NEW wgslArc.mjs is that " +
+                 "door: a census exported through reportLines so instrument-bench.html serves it, backed by " +
+                 "one instruments row whose `modules` list is what physicsReach reads. The ratchet is back to " +
+                 "7 of 152. *** THE ARC HAS TWO SHAPES AND A CENSUS ASSUMING ONE SEES FIVE OF SEVEN: *** five " +
+                 "export the shader as a constant, two BUILD it, and this round's own first probe read for a " +
+                 "`*_WGSL` export and reported two producers as having no shader at all -- v4453's rule one " +
+                 "step earlier, the shape of an EXPORT is not the shape of the thing. All seven yield source; " +
+                 "20 declared faults, every one consulted by the shader declaring it, a clean bill stated as " +
+                 "one. Five sabotages, 5/1/2/0-then-2/4 by name; the zero could not tell rows.length from " +
+                 "rows-that-worked on an arc where nothing fails, so a three-producer fixture with one " +
+                 "emitting nothing now separates them. *** AND THE ROUND FOUND A LIVE DEFECT IN THIS FILE'S " +
+                 "OWN COLLISION DETECTOR. *** v4394 built a SOURCE-TEXT scan for duplicate ordinals because a " +
+                 "runtime read cannot see one; it anchored to a four-space indent, and v4463's collision was " +
+                 "renumbered to since116 by hand with the indent lost. The scan saw 114 of 115 declared " +
+                 "ordinals and the invisible one was the entry a merge had just touched -- the population " +
+                 "most likely to collide next. A second since116 at column zero would have been invisible to " +
+                 "the check built to catch it. Re-indented, and the scan no longer depends on indentation. " +
+                 "v4456's runtime instrument had been reporting 115 all along: two routes, disagreeing by " +
+                 "exactly the mangled entry. NOT CLAIMED: that the shaders are correct, or that a door proves " +
+                 "a working page -- the row is only honest because reportLines renders all seven on the bench.",
     }),
 });
 
