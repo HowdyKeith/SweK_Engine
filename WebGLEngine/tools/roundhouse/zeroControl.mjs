@@ -87,12 +87,18 @@ export const CONTROL = { device: "splat", mode: "integral", field: "isoRollDevia
  * result), so this record is the wide reading and the sweep is the live one. They are computed by the same
  * definition in sweepDevice.coercionSummary; this row is not a second implementation.
  */
+// *** v4486 -- RE-DERIVED, AND THE CAUSE IS ATTRIBUTED RATHER THAN ASSUMED. *** main's own v4485 -- "the
+// pinch threshold scales with the hand", from the orrery line -- changed tools/roundhouse/handsBind.mjs, and
+// that moved this census: 17759 -> 17800 swept points, 5612 -> 5619 coerced, 1225 -> 1228 collapsed ranges.
+// The attribution is measured, not inferred: with that one file reverted to its pre-merge bytes the census
+// re-derives to the row below EXACTLY, and with it restored it does not. Nothing here is raised to pass --
+// the numbers are re-taken from a fresh sweep, and the ratio they carry is unmoved at 31.6%.
 export const COERCION_CENSUS_V4477 = Object.freeze({
-    measuredAt: "v4477",
-    sweptPoints: 17759,
-    coerced: 5612,
+    measuredAt: "v4477, re-derived at v4486",
+    sweptPoints: 17800,
+    coerced: 5619,
     knobDropped: 0,
-    collapsedRanges: 1225,
+    collapsedRanges: 1228,
     // The one that made this round: splat.integral.sigma is NOT among the collapsed ranges, because
     // knobRange(0.1) stops at 1.0. The clamp was hit by a HAND-CHOSEN range walked while reading the field,
     // not by the sweep -- which is why the mislabelling survived a full sweep at v4353 without showing itself.
