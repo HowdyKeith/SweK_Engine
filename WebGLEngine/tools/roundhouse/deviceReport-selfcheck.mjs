@@ -283,8 +283,13 @@ sec("5c. *** v4486: ALL SIX DEVICES, AND THE THREE RESIDUALS AT THE TOP OF THE T
         "stop it and the run ended there, two devices short. A child process is the budget that bites");
 
     // *** THE FINDING THAT OUTRANKS THE NUMBER. ***
+    // NARROWED AT v4487: all three are residuals by definition, but only edgeRhsWorst is AT THE FLOOR.
+    // numericEdgeWorst keeps 6.42 digits and normDrift 2.18, so their amplifications are real numbers about
+    // real quantities. Being a residual and carrying no information are different facts.
     ok("!! *** the top of the table is RESIDUALS, and amplification divides by the value ***",
         W.residualsMisread.includes("edgeRhsWorst") && W.residualsMisread.includes("normDrift") &&
+        W.atTheFloorMeasured.length === 2 &&
+        W.atTheFloorMeasured.every((q) => q.endsWith(".edgeRhsWorst")) &&
         W.top.slice(0, 3).every((t) => W.residualsMisread.some((r) => t.q.endsWith("." + r))),
         "quantumBind computes edgeRhsWorst as max |abs(kpRhs(E)) - 1| -- a residual whose correct value is " +
         "ZERO -- and its header calls normDrift a running invariant that is unitary by construction. relMove " +
@@ -314,11 +319,18 @@ sec("5c. *** v4486: ALL SIX DEVICES, AND THE THREE RESIDUALS AT THE TOP OF THE T
         const WIDER = /err|error|residual|delta|deviation|drift|worst|mismatch|violation/i;
         const caught = ["edgeRhsWorst", "numericEdgeWorst", "normDrift", "semiMajorDrift", "driftRatio",
                         "insideGapWorst", "insideBandWorst", "edgeSymmetryMismatches"];
-        ok("...and widening the vocabulary is MEASURED rather than proposed: 13 of 117, and all four at the top",
-            W.wouldReclassify === 13 && W.wouldReclassifyTopFour === true && caught.every((f) => WIDER.test(f)),
-            "adding drift|worst|mismatch|violation reclassifies 13 of 117 observables as keyed and takes the " +
-            "ENTIRE top four with it. Not done here: it moves the census's headline population lab-wide, and a " +
-            "one-round vocabulary change over a number that size is the shape this tree keeps paying for");
+        // *** v4487 -- AND MEASURING IT IS WHAT SHOWED THE WIDENING WOULD BE WRONG. *** v4486 declined to make
+        // the change and wrote the blast radius down; this row now carries the answer that blast radius was
+        // hiding. Of the 13, only TWO carry no significant digit. The other eleven keep 2.18 to 15.68 --
+        // insideGapWorst keeps 15.68 and is named exactly like the one at the floor. And the two that ARE at
+        // the floor match none of the proposed words, so the vocabulary would catch 0 of the 2 it was for.
+        ok("...and widening the vocabulary would be WRONG IN BOTH DIRECTIONS, which only measuring could show",
+            W.wouldReclassify === 13 && W.ofTheThirteenAtTheFloor === 2 &&
+            W.vocabularyWouldCatchOfTheTwo === 0 && caught.every((f) => WIDER.test(f)),
+            `the proposed rule reclassifies ${W.wouldReclassify} observables, of which ` +
+            `${W.ofTheThirteenAtTheFloor} carry no significant digit -- and it catches ` +
+            `${W.vocabularyWouldCatchOfTheTwo} of those ${W.ofTheThirteenAtTheFloor}. A NAME IS A GUESS ABOUT ` +
+            "A QUANTITY; significantDigits is the quantity. v4486 was right to measure before repairing");
     }
 
     ok("!! ...so v4484's bound is meaningless for exactly these three, and that is stated rather than patched",

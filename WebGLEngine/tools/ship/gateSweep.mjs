@@ -2707,6 +2707,24 @@ since116: Object.freeze({
                  "KEYED_RE's vocabulary does not include drift or worst -- 13 of 117 would reclassify, taking " +
                  "the whole top four. Four sabotages, four red by name",
     }),
+    since126: Object.freeze({
+        at: "v4487", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/libmSensitivity.mjs (gains significantDigits and conditioningClass -- the absolute-move column amplification never had, which is what separates a residual at the round-off floor from one that is fully resolved)",
+            "tools/roundhouse/deviceReport.mjs (v4486's residual claim NARROWED in place: it called three fields residuals whose amplification is a near-zero denominator, and only ONE is -- numericEdgeWorst keeps 6.42 digits and normDrift 2.18)",
+        ]),
+        verdict: "*** THE REPAIR v4486 PROPOSED WOULD HAVE BEEN WRONG IN BOTH DIRECTIONS. *** It measured the " +
+                 "blast radius of widening KEYED_RE's vocabulary at 13 of 117 and declined to make the change. " +
+                 "Measured: only TWO of those 13 carry no significant digit, the other eleven keep 2.18 to " +
+                 "15.68 -- insideGapWorst keeps 15.68 and is named exactly like the one at the floor -- and " +
+                 "the two that ARE at the floor match none of the proposed words, so the rule would have " +
+                 "caught 0 OF THE 2 IT WAS FOR while reclassifying eleven good quantities. A NAME IS A GUESS " +
+                 "ABOUT A QUANTITY; significantDigits(base, pert) is the quantity. Four checks, every " +
+                 "boundary driven either side rather than asserted. NOTHING IS RECLASSIFIED: the criterion " +
+                 "exists and acting on it changes what `keyless` means, which is the round this makes possible",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

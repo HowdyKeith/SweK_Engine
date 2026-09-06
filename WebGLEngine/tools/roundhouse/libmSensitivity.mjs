@@ -92,6 +92,47 @@ const bitsOf = (x) => { _dv.setFloat64(0, x); return _dv.getBigUint64(0).toStrin
  * and relative difference for the magnitude -- because "bit-identical" is the promise the fleet makes, and
  * "moved by 3e-16" is the thing a physicist needs to know about the promise being broken.
  */
+/**
+ * *** HOW MANY SIGNIFICANT DIGITS OF A QUANTITY SURVIVE THE PERTURBATION. *** log10(|base| / |absolute move|).
+ *
+ * amplification is a RELATIVE move divided by an ulp, so it divides by the base value, and it therefore says
+ * nothing useful about a quantity whose base sits at the round-off floor. This is the column that separates
+ * the two cases, and it is a MEASUREMENT rather than a rule about names:
+ *
+ *   quantum.bands.edgeRhsWorst    base 1.554e-15, moved 8.882e-16  ->  0.24 digits. Nothing survives. Its
+ *                                 amplification of 4.5e15 is a near-zero denominator, not conditioning.
+ *   quantum.bands.insideGapWorst  base 1.075e+0,  moved 2.220e-16  -> 15.68 digits. Fully resolved, and it is
+ *                                 named "Worst" exactly like the one above.
+ *
+ * *** v4486 PROPOSED CATCHING THESE BY WIDENING A NAME VOCABULARY AND v4487 MEASURED THAT IT WOULD BE WRONG IN
+ * BOTH DIRECTIONS. *** Adding drift|worst|mismatch|violation to KEYED_RE reclassifies 13 of the 117 keyless
+ * observables; MEASURED, only 2 of those 13 carry no significant digit, and the other eleven retain between
+ * 2.18 and 15.68. Meanwhile the two that ARE at the floor spell none of the vocabulary's words, so the rule
+ * catches 0 of the 2 it was proposed for. A name is a guess about a quantity; this is the quantity.
+ */
+export function significantDigits(base, pert) {
+    if (!isNum(base) || !isNum(pert)) return null;
+    const move = Math.abs(pert - base);
+    if (move === 0) return Infinity;              // bit-identical: every digit survives
+    if (base === 0) return -Infinity;             // no scale at all to have digits in
+    return Math.log10(Math.abs(base) / move);
+}
+
+/** Below one surviving digit the quantity carries no information after the shift, so amplification is undefined. */
+export const FLOOR_DIGITS = 1;
+
+/**
+ * The verdict amplification needs beside it. AT_THE_FLOOR means the number is round-off moved by round-off and
+ * any bound derived from it grades nothing -- v4484's WITHIN_PREDICTION on such a quantity would admit a second
+ * machine reporting anything at all.
+ */
+export function conditioningClass(base, pert) {
+    const d = significantDigits(base, pert);
+    if (d === null) return "NON-NUMERIC";
+    if (d === Infinity) return "BIT-IDENTICAL";
+    return d < FLOOR_DIGITS ? "AT_THE_FLOOR" : "RESOLVED";
+}
+
 export function diffObservables(base, pert) {
     const out = [];
     for (const [k, v] of Object.entries(base)) {

@@ -445,13 +445,25 @@ export const WIDE_AT_V4486 = Object.freeze({
         Object.freeze({ q: "kepler.compare.rk4Growth", amplification: 331979.2130784743, relMove: 7.371419321133261e-11 })
     ]),
     // The three that are residuals rather than measurements, and why the detector misses them.
+    // *** NARROWED AT v4487, AND THE NARROWING IS THE FINDING. *** This round called three fields residuals
+    // whose amplification is a near-zero denominator. MEASURED by surviving significant digits, only ONE of the
+    // three is at the floor: edgeRhsWorst keeps 0.24 digits, but numericEdgeWorst keeps 6.42 (13.35 in stencil)
+    // and normDrift keeps 2.18. They are residuals BY DEFINITION and their amplifications are real. Being a
+    // residual and carrying no information are different facts, and this record merged them.
     residualsMisread: Object.freeze(["edgeRhsWorst", "numericEdgeWorst", "normDrift"]),
+    atTheFloorMeasured: Object.freeze(["quantum.bands.edgeRhsWorst", "quantum.stencil.edgeRhsWorst"]),
     keyedReMisses: true,
     // MEASURED, so the round that widens the vocabulary inherits the number instead of arguing about it:
     // adding drift|worst|mismatch|violation to KEYED_RE reclassifies 13 of these 117 as keyed -- and ALL FOUR
     // of the top four amplifications are among them. The whole head of the table is error metrics with names
     // the detector does not know. NOT DONE HERE: it moves the census's headline population lab-wide.
     wouldReclassify: 13, wouldReclassifyTopFour: true,
+    // *** AND v4487 MEASURED THAT WIDENING WOULD BE WRONG IN BOTH DIRECTIONS. *** Of those 13, only 2 carry no
+    // significant digit; the other eleven retain 2.18 to 15.68 -- insideGapWorst keeps 15.68 and is named
+    // exactly like the one at the floor. And the 2 that ARE at the floor match none of the proposed words, so
+    // the vocabulary catches 0 of the 2 it was proposed for. The instrument is libmSensitivity.
+    // significantDigits, not a longer regex.
+    vocabularyWouldCatchOfTheTwo: 0, ofTheThirteenAtTheFloor: 2,
 });
 
 export const SCOPE = Object.freeze({

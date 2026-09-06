@@ -37,11 +37,18 @@ export const NEXT_ROUNDS = [
         why: "v4480 wrote 'earn a portability tolerance for each of the seven refinement knobs' as the next round. v4484 attempted it and found the task cannot be done as specified: a tolerance taken from relMove is compared against the number it came from, so the pass stops being contingent and the evidence string does not change. THE TOLERANCE IS NOT MISSING, THE CHECK IS MISNAMED. Closing this means either renaming c4 to what it measures, or wiring it to the submission ledger so it grades a real second machine -- and that second option is blocked on the same thing everything else here is: nothing has submitted.",
     },
     {
-        id: "keyed-vocabulary",
+        id: "libm-sensitivity-runtime",
         blocker: "OPEN",
-        what: "KEYED_RE is a SHORT VOCABULARY, not a rule, and three error metrics are being corroborated as measurements because of it.",
-        how: "KEYED_RE is /err|error|residual|delta|deviation/i. edgeRhsWorst (max |abs(kpRhs(E)) - 1| over band edges), numericEdgeWorst and normDrift are all residuals whose correct value is ZERO, and none of them spells the word. MEASURED at v4486 over the complete six-device sweep: adding drift|worst|mismatch|violation reclassifies 13 of 117 observables as keyed AND TAKES THE ENTIRE TOP FOUR AMPLIFICATIONS WITH IT. Closing this means changing what `keyless` means lab-wide, which moves corroborationCensus's headline population and every ratio derived from it.",
-        why: "v4486 found the lab's worst amplification is 2.5735e15 on quantum.bands.edgeRhsWorst -- and that it is not a conditioning number at all. amplification is relMove/ulp and relMove divides by the value, so for a residual the denominator IS the error being measured; the giveaway is that the move is EXACTLY 4/7, which is what a near-zero denominator does and not what a scale does. The fix is not to special-case those three: it is that the detector's vocabulary is shorter than the tree's naming, and a wider rule needs its own round because 13 of 117 is not a patch.",
+        what: "libmSensitivity-selfcheck states ~150s and does not finish in 31 minutes, and the timing record holds a kill rather than a runtime.",
+        how: "Its header reads \"~150s: three builds of the whole lab\". Run on an idle box at v4487 it passed two checks and then sat in libmSensitivitySweep for 31 minutes without returning. tools/ship/sweep-timings.json records 20,022 ms for it -- the quick sweep's cap, so that number is a KILL and not a measurement, which is the shape v4485 found in the register audit. Closing this means timing it to completion once, or giving the sweep a per-mode child-process budget the way wideSweep.mjs got at v4486.",
+        why: "v4487 added five checks to the end of that file and could not see them run in-gate; they were driven directly instead and all five pass. A gate nobody can afford to run is a gate whose new checks are unverified in place, and a stated runtime twelve times under the truth is exactly what statedRuntime-selfcheck exists to catch -- it cannot, because a gate that never returns leaves no reading to compare.",
+    },
+    {
+        id: "act-on-the-floor",
+        blocker: "OPEN",
+        what: "Two observables carry NO significant digit under a one-ulp libm shift and are still in the corroboration population with bounds that grade nothing.",
+        how: "v4487 built libmSensitivity.significantDigits and measured every eligible observable: quantum.bands.edgeRhsWorst and quantum.stencil.edgeRhsWorst keep 0.24 digits (base 1.554e-15, moved 8.882e-16). Their v4484 predicted bounds are 0.5714, which would admit a second machine reporting a 57% different value as WITHIN_PREDICTION. Acting means excluding an AT_THE_FLOOR observable from corroboration -- which changes what `keyless` means and moves corroborationCensus's headline population, exactly the blast radius v4486 declined to take on a name rule.",
+        why: "v4486 proposed catching these by widening KEYED_RE's vocabulary and v4487 measured that it would have been wrong in both directions -- reclassifying 11 well-resolved quantities (insideGapWorst keeps 15.68 digits and is named identically) while catching 0 of the 2 at the floor. The criterion now exists and is gated; what does not exist is the decision to let it change the population. That is a judgement about what the lab corroborates, not a repair.",
     },
     {
         id: "optics-converge-cost",

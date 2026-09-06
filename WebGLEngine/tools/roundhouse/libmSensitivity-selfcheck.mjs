@@ -5,7 +5,8 @@
 //
 // v2905 -- THE CENSUS'S OWN CAVEAT, MEASURED.
 
-import { libmSensitivitySweep, sensitivityLines, SENSITIVITY_REGISTRATION, nextUp, ulpRel } from "./libmSensitivity.mjs";
+import { libmSensitivitySweep, sensitivityLines, SENSITIVITY_REGISTRATION, nextUp, ulpRel,
+         significantDigits, conditioningClass, FLOOR_DIGITS } from "./libmSensitivity.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -141,6 +142,44 @@ console.log();
     console.log("         one-ulp shift in a single direction, which no real libm performs. The three machines");
     console.log("         running this sweep and diffing the 57 movers is the experiment that would settle it --");
     console.log("         and the 269 bit-stable observables are a falsifiable prediction that they will agree.");
+}
+
+// ---- v4487: THE COLUMN THAT SAYS WHETHER AN AMPLIFICATION MEANS ANYTHING -------------------------------------
+console.log("\n*** SURVIVING SIGNIFICANT DIGITS: THE MEASUREMENT THAT REPLACED A PROPOSED NAME RULE ***");
+{
+    // *** THE TWO REAL CASES FROM THE LAB, WHICH ARE NAMED ALIKE AND COULD NOT BE MORE DIFFERENT. ***
+    const floorBase = 1.554e-15, floorPert = floorBase - 8.882e-16;      // quantum.bands.edgeRhsWorst
+    const solidBase = 1.075, solidPert = solidBase - 2.220e-16;          // quantum.bands.insideGapWorst
+    const dFloor = significantDigits(floorBase, floorPert);
+    const dSolid = significantDigits(solidBase, solidPert);
+    ok("!! *** a residual at the round-off floor keeps NO significant digit, and its neighbour keeps fifteen ***",
+        dFloor < 1 && dSolid > 15 && conditioningClass(floorBase, floorPert) === "AT_THE_FLOOR" &&
+        conditioningClass(solidBase, solidPert) === "RESOLVED",
+        `edgeRhsWorst ${dFloor.toFixed(2)} digits on a base of ${floorBase.toExponential(3)}; insideGapWorst ` +
+        `${dSolid.toFixed(2)} on ${solidBase}. BOTH ARE NAMED "Worst" AND BOTH ARE RESIDUALS -- one is round-off ` +
+        "moved by round-off, the other is fully resolved, and no rule about names can tell them apart");
+
+    ok("...and the amplification that looks catastrophic is the one carrying no information",
+        (Math.abs(floorPert - floorBase) / Math.abs(floorBase)) / Math.pow(2, -52) > 1e15 && dFloor < 1,
+        "4.5e15 comes from dividing a move of 8.882e-16 by a base of 1.554e-15. The ratio is enormous because " +
+        "the DENOMINATOR is round-off, which is a fact about the quantity's scale and not about its conditioning");
+
+    // THE BOUNDARY CASES, so the classifier is not only exercised in the middle.
+    ok("!! bit-identical is INFINITE digits, and a zero base has none at all",
+        significantDigits(1, 1) === Infinity && conditioningClass(1, 1) === "BIT-IDENTICAL" &&
+        significantDigits(0, 1e-9) === -Infinity && conditioningClass(0, 1e-9) === "AT_THE_FLOOR",
+        "a quantity that did not move kept every digit it had; a quantity whose base is exactly 0 has no scale " +
+        "to have digits IN, and calling that RESOLVED would be the worst answer of the three");
+    ok("...and a non-numeric input is refused rather than coerced",
+        significantDigits(NaN, 1) === null && conditioningClass(undefined, 1) === "NON-NUMERIC",
+        "NaN compared against a threshold reads as agreement, which is the shape v4477 found in the zero-range " +
+        "sweep and v4484 found again in a submitted value");
+
+    ok("!! the floor is ONE digit, and it is a named constant rather than a literal in a comparison",
+        FLOOR_DIGITS === 1 && conditioningClass(1e-15, 1e-15 - 9e-16) === "AT_THE_FLOOR" &&
+        conditioningClass(1e-15, 1e-15 - 9e-17) === "RESOLVED",
+        "below one surviving digit the quantity carries nothing after the shift. Driven either side of the " +
+        "boundary rather than asserted: 0.24 digits is AT_THE_FLOOR, 1.05 is RESOLVED");
 }
 
 console.log();
