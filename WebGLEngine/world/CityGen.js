@@ -25,6 +25,7 @@
 // generation stream. tools/ship/cityGenSeed-selfcheck.mjs holds one seed to one voxel list byte for byte.
 
 import { rng } from "./procPlanet.js";
+import { partyWallsOf, stampFacade, facadeSeed } from "./buildingFacade.mjs";
 
 const HEIGHT_TIERS = [
     // [minH, maxH, weight, label]
@@ -67,9 +68,11 @@ export class CityGen {
     //                   if random packing fills up the area)
     //   groundY       — Y coordinate of ground plane (default 0)
     //   seed          — every roll below comes from this (default 1): the same seed stamps the same city
+    //   facades       — v4510 (buildings 3): windows, doors and party walls from world/buildingFacade.mjs (default true)
+    //   minGap        — voxels of street between buildings (default 2); 0 lets buildings touch and share walls
     //
     // Returns the list of placed building rects.
-    generate({ centerX = 0, centerZ = 0, radius = 80, buildingCount = 30, groundY = 0, seed = 1 } = {}) {
+    generate({ centerX = 0, centerZ = 0, radius = 80, buildingCount = 30, groundY = 0, seed = 1, facades = true, minGap = 2 } = {}) {
         if (!this.world?.setVoxel) {
             throw new Error("CityGen.generate: world.setVoxel required");
         }
@@ -77,7 +80,7 @@ export class CityGen {
         this.seed = seed >>> 0;
         const R = rng(this.seed);
         this._damageRng = rng(this.seed ^ 0x9e3779b9);
-        this._lastStamp = { centerX, centerZ, radius, groundY, seed: this.seed };
+        this._lastStamp = { centerX, centerZ, radius, groundY, seed: this.seed, facades, minGap };
 
         // 1. Ground plane — flat dirt
         for (let x = -radius; x <= radius; x++) {
@@ -89,11 +92,10 @@ export class CityGen {
         // 2. Place buildings with overlap avoidance
         const placed = [];
         const margin = 4;          // keep buildings away from playfield edge
-        const minGap = 2;          // voxels of street between buildings
         const innerHalf = radius - margin;
         const attempts = buildingCount * 8;
 
-        for (let i = 0; i < attempts && this.buildings.length < buildingCount; i++) {
+        for (let i = 0; i < attempts && placed.length < buildingCount; i++) {   // v4510: buildings are pushed after placement now
             const [minH, maxH] = weightedPick(HEIGHT_TIERS, R);
             const h = minH + Math.floor(R() * (maxH - minH + 1));
             // Wider for taller buildings (skyscrapers have bigger footprint)
@@ -122,9 +124,30 @@ export class CityGen {
             // Material: glass for tall slim buildings (office towers),
             // stone for everything else
             const isGlassy = h >= 20 && R() < 0.4;
-            const wallMat = isGlassy ? 5 : 1;
-            const roofMat = 4;     // metal cap reads as "roof"
+            rect.mat = isGlassy ? 5 : 1;
+            rect.roofMat = 4;     // metal cap reads as "roof"
+        }
+        // v4510 -- stamp after ALL are placed: a party wall is a fact about two buildings
+        this._stampAll(placed, { centerX, centerZ, groundY, facades });
+        return this.buildings;
+    }
 
+    // v4510 (buildings 3) -- place GIVEN rects ({ x, z, w, d, h, mat?, roofMat? } relative to the centre) and stamp them:
+    // the gate's way to put two buildings wall to wall on purpose. No ground plane.
+    generateFrom(rects, { centerX = 0, centerZ = 0, groundY = 0, seed = 1, facades = true } = {}) {
+        if (!this.world?.setVoxel) throw new Error("CityGen.generateFrom: world.setVoxel required");
+        this.buildings = [];
+        this.seed = seed >>> 0;
+        this._damageRng = rng(this.seed ^ 0x9e3779b9);
+        this._lastStamp = { centerX, centerZ, radius: 0, groundY, seed: this.seed, facades, minGap: 0 };
+        this._stampAll(rects.map((r) => ({ mat: 1, roofMat: 4, ...r })), { centerX, centerZ, groundY, facades });
+        return this.buildings;
+    }
+
+    _stampAll(placed, { centerX, centerZ, groundY, facades }) {
+        const flags = facades ? partyWallsOf(placed) : null;
+        placed.forEach((rect, index) => {
+            const { x: bx, z: bz, w, d, h } = rect, wallMat = rect.mat ?? 1, roofMat = rect.roofMat ?? 4;
             // Stamp the building (solid column with metal roof voxel layer)
             for (let xi = 0; xi < w; xi++) {
                 for (let zi = 0; zi < d; zi++) {
@@ -134,23 +157,29 @@ export class CityGen {
                     }
                 }
             }
+            let voxels = w * d * h, facade = null;
+            if (facades) {
+                facade = stampFacade(this.world, { x: centerX + bx, z: centerZ + bz, w, d, h }, flags[index], facadeSeed(this.seed, index), groundY);
+                voxels -= facade.doors;   // a door is an opening: the hit points are the voxels that exist
+            }
             this.buildings.push({
                 x: centerX + bx, z: centerZ + bz, w, d, h,
                 mat: wallMat,
                 roofMat,
+                party: flags ? flags[index] : null,
+                facade: facade ? { seed: facadeSeed(this.seed, index), hash: facade.grammar.hash, glass: facade.glass, doors: facade.doors, stairsColumn: facade.grammar.stairsColumn } : null,
                 // Round 275 — HP + damage state for crumbling + topple.
                 // hp is voxel count × 1.0 (each voxel = 1hp). The
                 // sandbox damage() helper decrements; at hp <= 0 the
                 // building is marked toppled and its voxels are either
                 // cleared or rotated into rubble (see topple()).
-                maxHp:     w * d * h,
-                hp:        w * d * h,
+                maxHp:     voxels,
+                hp:        voxels,
                 state:     "standing",  // standing | damaged | crumbling | toppled
                 _lastHitMs: 0,
                 _damageMarks: 0,        // count of crumble passes already applied
             });
-        }
-        return this.buildings;
+        });
     }
 
     // ====================== ROUND 275 — DAMAGE + CRUMBLE + TOPPLE ===========
@@ -398,7 +427,7 @@ export class CityGen {
     // "% city destroyed" in HUD.
     getTotalBuildingVoxels() {
         let total = 0;
-        for (const b of this.buildings) total += b.w * b.d * b.h;
+        for (const b of this.buildings) total += b.maxHp;   // v4510: the voxels that exist (doors are openings), not w * d * h
         return total;
     }
 

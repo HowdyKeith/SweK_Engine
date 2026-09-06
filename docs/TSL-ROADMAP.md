@@ -822,6 +822,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         25 and 60.67% at 60. Sabotage A -- the blank rolls drawn only when needed -- moved 23 to 34 placements on
         three sides and none on the right, whose cells the loop visits last: a hold on one side would have been
         blind, and the gate holds all four. Next: the facade stamper, with the flags derived from adjacency.
+    BUILDINGS 3, THE FACADE STAMPER -- built at v4510 (task 56). world/buildingFacade.mjs runs the grammar over each
+        CityGen building (a cell per voxel column, a floor per three voxels) and stamps its placements as voxels:
+        a windowed wall cell becomes a glass voxel at the floor's middle row (variant 2 two tall, variant 1 a blank
+        stretch), the stairs column's first-floor cell becomes a two-voxel door opening, a party-wall cell nothing.
+        THE PARTY-WALL FLAGS ARE DERIVED: partyWallsOf reads which placed rectangles share a wall (touching along an
+        edge with positive overlap) and flags that side on both, so the configurator's Brandmauer rule emerges from
+        adjacency and a building alone has four windowed faces. CityGen stamps after ALL rects are placed for that
+        reason, takes `facades` (default on) and `minGap` (default 2; 0 lets buildings touch), gains generateFrom()
+        for given rects, and sets a building's hit points to the voxels that exist, so the sandbox's destroyed
+        fraction reads the truth. MEASURED (tools/ship/buildingFacade-selfcheck.mjs, a recording world): seed 7's
+        20 buildings stamp 8,202 voxels of hit points with 2,814 glass and 40 air face voxels, the same twice, and a
+        different list from the solid stamp on the same rects; two rects wall to wall carry 0 glass or air on the
+        shared face on both sides and 18 on their outer faces; the same pair one voxel apart has no party wall; a
+        city at minGap 0 (seed 11) has 5 touching pairs, all blank on both sides; hit points equal standing voxels
+        per building and in total. Two corrections: the first cells were two voxels wide, and a four-deep building
+        was corner cells only, windowless (a cell per column now); and the placement loop counted this.buildings,
+        which is filled after placement now, so it placed 53 for a target of 20 (it counts placements). NOT STAMPED:
+        the grammar's accessories and its main- and last-floor stairs pieces (nothing to put them in inside a
+        footprint). The sandbox passes no seed or minGap yet.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

@@ -2703,6 +2703,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside four sigmas at 25 and 60. Recorded in world/reachedLicences.mjs and the sweep document. Sabotages red at " +
                  "3 / 2 / 1 / 6 -- A showed the party-wall property holds trivially on the last side the loop visits, so all four are held.",
     }),
+    since132: Object.freeze({
+        at: "v4510", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/buildingFacade-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, headless. world/buildingFacade.mjs on CityGen: the grammar run per building (a cell per voxel column, floors of " +
+                 "three), windows as glass, the stairs column's door as an opening, and the party-wall flags DERIVED from which rects " +
+                 "share a wall; hit points are the voxels that exist. Seed 7 stamps the same list twice and a different one from the " +
+                 "solid stamp; two buildings wall to wall get a blank shared face on both; a city at minGap 0 has five touching pairs, " +
+                 "all blank on both sides. A first draft's two-voxel cells left small buildings all corners and windowless. Sabotages " +
+                 "red at (see the gate header).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
