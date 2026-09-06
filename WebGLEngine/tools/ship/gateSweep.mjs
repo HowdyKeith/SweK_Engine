@@ -2684,6 +2684,29 @@ since116: Object.freeze({
                  "its own budget, and the harness re-derived it the expensive way one round after reading that " +
                  "file. ALSO: three consecutive round notes claimed a census re-derivation that never happened",
     }),
+    since125: Object.freeze({
+        at: "v4486", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/deviceReport.mjs (WIDE_AT_V4485's headline is MARKED SUPERSEDED rather than edited -- its numbers are still true of the four devices that ran; the conclusion drawn from them was not)",
+            "tools/roundhouse/deviceReport-selfcheck.mjs (its v4485 row asserted 'the scoped worst case survives tripling the population', which was false when it was written and is now a row about reachability)",
+            "vba/runtimeGap.mjs (the census really did move this round, 3878 -> 3880, and was re-derived from the run rather than incremented -- which then reddened `closuresOverThreads: 157`, a stored ratio citing a closures count three re-derivations stale. A getter now)",
+        ]),
+        verdict: "*** THE SWEEP REACHED quantum AND v4485'S HEADLINE WAS WRONG BY SEVEN ORDERS OF MAGNITUDE. *** " +
+                 "That round swept the four devices it could finish, called kepler.conserve.growthGapFrac the " +
+                 "worst case, and listed quantum and splat as NOT COVERED in the same record. The unswept " +
+                 "device held 2.5735e15 -- twenty-nine million times larger -- and kepler's figure now ranks " +
+                 "fifth. New deviceReportOne.mjs + wideSweep.mjs run each mode in a CHILD PROCESS under a hard " +
+                 "cap, which is the budget that bites: optics.converge was SIGKILLed at 60 s and the sweep " +
+                 "continued, completing all six devices for the first time -- 39 modes, 117 observables. *** " +
+                 "AND THE NEW WORST IS NOT A CONDITIONING NUMBER: *** edgeRhsWorst is max |abs(kpRhs(E)) - 1|, " +
+                 "a RESIDUAL whose correct value is zero, and relMove divides by the value, so the denominator " +
+                 "IS the error. The move is EXACTLY 4/7, which is what a near-zero denominator does and not " +
+                 "what a scale does. All three such quantities are in the keyless population only because " +
+                 "KEYED_RE's vocabulary does not include drift or worst -- 13 of 117 would reclassify, taking " +
+                 "the whole top four. Four sabotages, four red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -361,6 +361,14 @@ export const CONDITIONING_AT_V4484 = Object.freeze({
  * 12 minutes 38 seconds of CPU without returning, against 67086 ms for all 26 completed modes. That is the
  * whole reason the wide number was owed for five rounds, and it is a figure now rather than a suspicion.
  *
+ * *** SUPERSEDED AT v4486, AND THE CLAIM BELOW IS FALSE. *** This record's headline was drawn from the four
+ * devices the run could REACH, and its own notCovered field named quantum and splat in the same breath. v4486
+ * reached them with a child-process budget: quantum.bands.edgeRhsWorst reads 2.5735e15, TWENTY-NINE MILLION
+ * TIMES the figure called "the maximum" here, and kepler.conserve.growthGapFrac ranks FIFTH. The numbers below
+ * are still true OF THE FOUR DEVICES THAT RAN and are kept as the record of what was measured; the conclusion
+ * drawn from them was a claim about reachability wearing the clothes of a claim about the lab. See
+ * WIDE_AT_V4486, which also finds that the new maximum is not a conditioning number at all.
+ *
  * *** THE SCOPED WORST CASE SURVIVES TRIPLING THE POPULATION, AND IS AN OUTLIER. *** kepler.conserve.
  * growthGapFrac still tops the table at 8.679e7 across 81 observables, and the next worst is 3.320e5 --
  * TWO HUNDRED AND SIXTY-ONE TIMES SMALLER. A worst case that holds when the population triples is a fact about
@@ -386,6 +394,64 @@ export const WIDE_AT_V4485 = Object.freeze({
     newFromOutsideScope: "optics.slit.slitRms",
     blockingMode: Object.freeze({ mode: "optics.converge", cpuMs: 758000, capMs: 120000,
         why: "a setTimeout cannot interrupt synchronous work, so the cap never fired" }),
+});
+
+/**
+ * *** v4486 -- THE SWEEP REACHED quantum, AND v4485'S HEADLINE WAS WRONG BY SEVEN ORDERS OF MAGNITUDE. ***
+ *
+ * v4485 swept the four devices it could reach and concluded "the scoped worst case SURVIVES tripling the
+ * population" -- kepler.conserve.growthGapFrac at 8.679e7, 261x its runner-up. It froze that, asserted it in a
+ * gate, and named quantum and splat as unswept in the same breath. THE UNSWEPT DEVICE HELD SOMETHING 29.6
+ * MILLION TIMES LARGER. A conclusion drawn from the population that happened to be REACHABLE is a claim about
+ * reachability, and that one was stated as a claim about the lab.
+ *
+ * COMPLETE: 39 modes over ALL SIX eligible devices, 117 observables, 36 movers, 158.9 s. ONE mode over cap
+ * (optics.converge, killed at 60 s) -- and the sweep CONTINUED PAST IT, which is the whole difference. That is
+ * what a child process buys: v4485's in-process Promise.race cap could not stop optics.converge, so the run
+ * ended there, two devices short.
+ *
+ * *** BUT THE NEW WORST IS NOT A CONDITIONING NUMBER, AND THAT IS THE REAL FINDING. ***
+ * quantumBind.mjs:92 computes edgeRhsWorst as max |abs(kpRhs(E)) - 1| over the band edges -- A RESIDUAL, whose
+ * correct value is ZERO. normDrift is the same shape and its own module header says so: "a RUNNING INVARIANT
+ * ... the propagator is unitary by construction, so any drift beyond round-off means the solve is wrong."
+ * amplification is relMove / ulp, and relMove DIVIDES BY THE VALUE, so for a residual the denominator IS the
+ * error being measured. A one-ulp shift moving edgeRhsWorst by 0.5714 -- exactly 4/7 -- is not a quantity
+ * amplifying a rounding error 2.6e15 times; it is a near-zero denominator doing what near-zero denominators do.
+ *
+ * *** AND THEY SIT IN THE KEYLESS POPULATION ONLY BECAUSE THEIR NAMES DO NOT MATCH THE DETECTOR. ***
+ * KEYED_RE is /err|error|residual|delta|deviation/i. `edgeRhsWorst`, `numericEdgeWorst` and `normDrift` are
+ * error metrics that spell it none of those ways, so all three are corroborated as if they were quantities
+ * nobody owns the answer to. THREE OF THE TOP FOUR AMPLIFICATIONS IN THE LAB ARE THAT ONE MISTAKE.
+ *
+ * WHAT IT MEANS FOR v4484'S BOUND: a predicted bound of 0.5714 lets a second machine report a value 57 per cent
+ * different and still read WITHIN_PREDICTION. That is a bar that grades nothing -- the disease v4480 diagnosed
+ * in the 1e-6 default, reached from the other end. The bound is meaningful only where the conditioning number
+ * is, and for a residual it is not.
+ */
+export const WIDE_AT_V4486 = Object.freeze({
+    at: "v4486",
+    devices: 6, modes: 39, observables: 117, movers: 36, totalMs: 158904,
+    overCap: Object.freeze(["optics.converge"]),
+    complete: true,
+    maxAt: "quantum.bands.edgeRhsWorst", maxAmplification: 2573485501354569,
+    // v4485 called this the maximum over its reachable four devices. It is FIFTH.
+    v4485MaxAt: "kepler.conserve.growthGapFrac", v4485MaxAmplification: 86793846.76467527, v4485RankNow: 5,
+    top: Object.freeze([
+        Object.freeze({ q: "quantum.bands.edgeRhsWorst", amplification: 2573485501354569, relMove: 0.5714285714285714 }),
+        Object.freeze({ q: "quantum.stencil.edgeRhsWorst", amplification: 2573485501354569, relMove: 0.5714285714285714 }),
+        Object.freeze({ q: "quantum.norm.normDrift", amplification: 29995430439194.55, relMove: 0.006660323501427212 }),
+        Object.freeze({ q: "quantum.bands.numericEdgeWorst", amplification: 1705728565.592947, relMove: 3.7874782545642627e-07 }),
+        Object.freeze({ q: "kepler.conserve.growthGapFrac", amplification: 86793846.76467527, relMove: 1.9272105414786028e-08 }),
+        Object.freeze({ q: "kepler.compare.rk4Growth", amplification: 331979.2130784743, relMove: 7.371419321133261e-11 })
+    ]),
+    // The three that are residuals rather than measurements, and why the detector misses them.
+    residualsMisread: Object.freeze(["edgeRhsWorst", "numericEdgeWorst", "normDrift"]),
+    keyedReMisses: true,
+    // MEASURED, so the round that widens the vocabulary inherits the number instead of arguing about it:
+    // adding drift|worst|mismatch|violation to KEYED_RE reclassifies 13 of these 117 as keyed -- and ALL FOUR
+    // of the top four amplifications are among them. The whole head of the table is error metrics with names
+    // the detector does not know. NOT DONE HERE: it moves the census's headline population lab-wide.
+    wouldReclassify: 13, wouldReclassifyTopFour: true,
 });
 
 export const SCOPE = Object.freeze({

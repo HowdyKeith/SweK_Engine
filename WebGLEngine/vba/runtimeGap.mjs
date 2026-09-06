@@ -215,8 +215,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // The shipped notes are history and are not rewritten. The correction lives here, where the number does.
     // TENTH RE-DERIVATION, TENTH TABLE, ONE UNCHANGED HEADLINE: threads and WebAssembly have read 22 through
     // every one of them -- and this row has still never moved for a reason about threads.
-    files: 3878,
-    esModules: 3587, closures: 3463, asyncAwait: 1338, typedArrays: 694, promises: 332,
+    // AN ELEVENTH TIME, v4486, AND THIS ONE REALLY DID ADD FILES: deviceReportOne.mjs and wideSweep.mjs,
+    // 3878 -> 3880, moving ES modules, closures and async/await by two each. RE-DERIVED AND RE-TYPED FROM THE
+    // MEASUREMENT, which is the discipline v4485 found three round notes had skipped -- they incremented a
+    // count from the previous note instead of taking it. This row is the first since then to move for the
+    // reason the notes kept claiming, and the number comes from the run rather than from arithmetic on prose.
+    // ELEVENTH TABLE, ONE UNCHANGED HEADLINE: threads and WebAssembly have read 22 through every one of them.
+    files: 3880,
+    esModules: 3589, closures: 3465, asyncAwait: 1340, typedArrays: 694, promises: 332,
     fetchXhr: 224, performanceNow: 202, raf: 116, webgl: 102, webgpu: 45, threads: 22, wasm: 22,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
@@ -237,7 +243,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // second-smallest outright; WITH them the two tie at 22 and threads hold rank 11 on the stable sort only.
     wasmWithoutSelf: 20,
     threadsWithoutSelf: 21,
-    closuresOverThreads: 157,     // 3404 / 22, rounded
+    // *** v4486 -- WAS A TYPED 157, WITH A COMMENT READING "3404 / 22" WHILE closures STOOD AT 3465. *** The
+    // stored ratio drifts every time either row moves, and its own arithmetic note had gone stale three
+    // re-derivations ago -- a derived number kept as a literal beside the two numbers it is derived from.
+    // It is a GETTER now, so it cannot disagree with them: redCensus's v4430 inversion ("the audit is the
+    // source now, and there is nothing left to retype") applied to the last hand-typed figure in this record.
+    // The gate still compares it against a live re-derivation, so the row remains a real check rather than a
+    // tautology -- what changed is that the two sides can no longer drift apart by neglect.
+    get closuresOverThreads() { return Math.round(this.closures / this.threads); },
     // *** ONE, NOT TWO. *** The first draft filed fetch/XHR as an archive claim too; pointing the rows at
     // bytes found the HTTP client sitting in this tree's own VBA, so only WebGL still needs the archive.
     archiveRows: 1,

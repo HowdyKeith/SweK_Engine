@@ -225,19 +225,27 @@ sec("5b. *** v4485: THE SIX-DEVICE SWEEP, MEASURED RATHER THAN DESCRIBED ***");
         `splat's three modes and this run never reached them, so the two tables OVERLAP rather than nest -- ` +
         "a wide number quoted as though it contained the narrow one would be the worse kind of wrong");
 
-    ok("!! *** the scoped worst case SURVIVES tripling the population, and is an outlier by 261x ***",
+    // *** v4486 -- THIS ROW ASSERTED A CONCLUSION THAT WAS FALSE WHEN IT WAS WRITTEN. *** It read "the scoped
+    // worst case SURVIVES tripling the population" -- true of the four devices v4485 could reach, and the very
+    // same record listed quantum and splat as NOT REACHED. Reaching them found 2.5735e15, twenty-nine million
+    // times larger, and kepler.conserve.growthGapFrac ranks fifth. What survives is the MEASUREMENT, not the
+    // conclusion: the row now asserts the number is still correct for the four devices that ran, and that it
+    // is NO LONGER the lab maximum -- which is the shape a superseded claim should take.
+    const W6 = DR.WIDE_AT_V4486;
+    ok("!! *** v4485's 'worst case' was a claim about REACHABILITY, and v4486 reached the rest ***",
         W.maxAt === "kepler.conserve.growthGapFrac" &&
         Math.abs(W.maxAmplification - DR.LAB_AT_V4480.maxAmplification) < 1e-6 &&
-        W.maxAmplification / W.runnerUp > 200,
-        `${W.maxAmplification.toExponential(3)} still the maximum across ${W.covered.observables} observables, ` +
-        `against a runner-up of ${W.runnerUp.toExponential(3)} (${(W.maxAmplification / W.runnerUp).toFixed(0)}x). ` +
-        "It is the SAME number v4480 froze over 27 -- a worst case that holds when the population triples is a " +
-        "fact about the quantity rather than about the sample");
+        W6.maxAmplification > W.maxAmplification * 1e7 && W6.v4485RankNow === 5,
+        `${W.maxAmplification.toExponential(3)} was the maximum over the FOUR devices that ran, and still is. ` +
+        `Over all six it ranks ${W6.v4485RankNow}, behind ${W6.maxAt} at ${W6.maxAmplification.toExponential(4)} ` +
+        `-- ${(W6.maxAmplification / W.maxAmplification).toExponential(2)}x larger, in a device this record ` +
+        "itself listed as not covered");
 
     ok("...and widening DID find something, which is what stops this being a null result",
         W.newFromOutsideScope === "optics.slit.slitRms",
-        "optics.slit.slitRms at 1.598e5 is fourth overall and comes from a mode SCOPE excluded. Widening found " +
-        "a new entrant and found nothing that moves v4484's bound -- both halves are the finding");
+        "optics.slit.slitRms at 1.598e5 came from a mode SCOPE excluded -- fourth overall in v4485's four-device " +
+        "table, eighth in v4486's six-device one. Widening kept finding things, which is the argument for " +
+        "finishing a sweep rather than concluding from the part that ran");
 
     // *** THE COST, WHICH IS THE ANSWER TO 'WHY WAS THIS OWED FOR FIVE ROUNDS'. ***
     ok("!! *** one mode costs ELEVEN TIMES every completed mode put together, and did not return ***",
@@ -261,6 +269,63 @@ sec("5b. *** v4485: THE SIX-DEVICE SWEEP, MEASURED RATHER THAN DESCRIBED ***");
         `lens.deflect: ${live.rows.length} observables, ${moved} movers, re-run live. The wide table is too ` +
         "expensive to re-derive here and is arithmetic rather than a claim about today, so one mode is driven " +
         "to tie it to a real run rather than trusting all 81");
+}
+
+// ---- 5c. THE COMPLETE SWEEP, AND WHY ITS WINNER IS NOT A CONDITIONING NUMBER ---------------------------------
+sec("5c. *** v4486: ALL SIX DEVICES, AND THE THREE RESIDUALS AT THE TOP OF THE TABLE ***");
+{
+    const W = DR.WIDE_AT_V4486;
+    ok("!! *** the sweep is COMPLETE: 39 modes, six devices, and it ran PAST the mode that killed v4485 ***",
+        W.complete === true && W.devices === 6 && W.modes === 39 &&
+        W.overCap.length === 1 && W.overCap[0] === "optics.converge",
+        `${W.observables} observables, ${W.movers} movers, ${(W.totalMs / 1000).toFixed(1)}s. ` +
+        "optics.converge was KILLED at its cap and the sweep continued -- v4485's in-process timer could not " +
+        "stop it and the run ended there, two devices short. A child process is the budget that bites");
+
+    // *** THE FINDING THAT OUTRANKS THE NUMBER. ***
+    ok("!! *** the top of the table is RESIDUALS, and amplification divides by the value ***",
+        W.residualsMisread.includes("edgeRhsWorst") && W.residualsMisread.includes("normDrift") &&
+        W.top.slice(0, 3).every((t) => W.residualsMisread.some((r) => t.q.endsWith("." + r))),
+        "quantumBind computes edgeRhsWorst as max |abs(kpRhs(E)) - 1| -- a residual whose correct value is " +
+        "ZERO -- and its header calls normDrift a running invariant that is unitary by construction. relMove " +
+        "divides by the value, so for a residual the denominator IS the error being measured. The top three " +
+        "amplifications in the lab are that, not conditioning");
+
+    ok("...and the giveaway is that the move is EXACTLY 4/7, not a scale",
+        Math.abs(W.top[0].relMove - 4 / 7) < 1e-12,
+        `relMove ${W.top[0].relMove} = 4/7 exactly, reproduced across runs. A quantity that genuinely amplified ` +
+        "a rounding error would not land on a small rational; a near-zero denominator lands wherever the " +
+        "numerator's discrete structure puts it");
+
+    // *** AND THE REASON THEY ARE IN THE POPULATION AT ALL. ***
+    const KEYED_RE = /err|error|residual|delta|deviation/i;
+    ok("!! *** all three are error metrics whose NAMES the keyed-detector does not match ***",
+        W.keyedReMisses === true && W.residualsMisread.every((f) => !KEYED_RE.test(f)),
+        "KEYED_RE is /err|error|residual|delta|deviation/i and none of edgeRhsWorst, numericEdgeWorst or " +
+        "normDrift spells it any of those ways, so all three are corroborated as quantities nobody owns the " +
+        "answer to. A residual with an unlucky name is graded as a measurement");
+    ok("...and the detector is not simply broken: it catches the ones that ARE spelled that way",
+        KEYED_RE.test("levelErrWorst") && KEYED_RE.test("escapeErrFrac") && KEYED_RE.test("airyRingErrFrac"),
+        "levelErrWorst, escapeErrFrac and airyRingErrFrac are all caught. The rule works and its VOCABULARY is " +
+        "short -- which is a different repair from a broken rule, and a wider one than this round should make");
+
+    // THE BLAST RADIUS OF THE REPAIR THIS ROUND IS NOT MAKING, MEASURED so the next one inherits it.
+    {
+        const WIDER = /err|error|residual|delta|deviation|drift|worst|mismatch|violation/i;
+        const caught = ["edgeRhsWorst", "numericEdgeWorst", "normDrift", "semiMajorDrift", "driftRatio",
+                        "insideGapWorst", "insideBandWorst", "edgeSymmetryMismatches"];
+        ok("...and widening the vocabulary is MEASURED rather than proposed: 13 of 117, and all four at the top",
+            W.wouldReclassify === 13 && W.wouldReclassifyTopFour === true && caught.every((f) => WIDER.test(f)),
+            "adding drift|worst|mismatch|violation reclassifies 13 of 117 observables as keyed and takes the " +
+            "ENTIRE top four with it. Not done here: it moves the census's headline population lab-wide, and a " +
+            "one-round vocabulary change over a number that size is the shape this tree keeps paying for");
+    }
+
+    ok("!! ...so v4484's bound is meaningless for exactly these three, and that is stated rather than patched",
+        W.top[0].relMove > 0.5,
+        `a predicted bound of ${W.top[0].relMove.toFixed(4)} lets a second machine report a value 57% different ` +
+        "and still read WITHIN_PREDICTION -- a bar that grades nothing, which is the disease v4480 diagnosed " +
+        "in the 1e-6 default arrived at from the other end");
 }
 
 // ---- 6. WHAT THIS ROUND DID NOT DO ---------------------------------------------------------------------------

@@ -37,11 +37,18 @@ export const NEXT_ROUNDS = [
         why: "v4480 wrote 'earn a portability tolerance for each of the seven refinement knobs' as the next round. v4484 attempted it and found the task cannot be done as specified: a tolerance taken from relMove is compared against the number it came from, so the pass stops being contingent and the evidence string does not change. THE TOLERANCE IS NOT MISSING, THE CHECK IS MISNAMED. Closing this means either renaming c4 to what it measures, or wiring it to the submission ledger so it grades a real second machine -- and that second option is blocked on the same thing everything else here is: nothing has submitted.",
     },
     {
-        id: "converge-and-quantum-unswept",
+        id: "keyed-vocabulary",
         blocker: "OPEN",
-        what: "Two of the six eligible devices and two optics modes are still unmeasured by the corroboration battery, and one mode is why.",
-        how: "v4485 swept 26 modes over chaos, kepler, lens and three optics modes -- 81 observables, 21 movers, 67.1 s of total work. optics.converge then burned 12m38s of CPU WITHOUT RETURNING, so optics.radiusconfusion, quantum (6 modes) and splat (all modes) were never reached. Closing this needs the battery run per mode in a CHILD PROCESS that can be killed, or optics.converge's adaptive quadrature given a step budget of its own -- a setTimeout cap does not work and v4485 measured that it does not.",
-        why: "v4480 owed the wide number and described the blocker; v4485 measured it. The headline it can already state is that the scoped worst case SURVIVES tripling the population -- kepler.conserve.growthGapFrac at 8.679e7, still the maximum over 81 observables and 261x its runner-up -- so v4484's bound table is not threatened by the modes that ran. What is unknown is whether quantum or splat holds anything worse, and splat is in SCOPE, so the wide run is NOT a superset of the narrow one.",
+        what: "KEYED_RE is a SHORT VOCABULARY, not a rule, and three error metrics are being corroborated as measurements because of it.",
+        how: "KEYED_RE is /err|error|residual|delta|deviation/i. edgeRhsWorst (max |abs(kpRhs(E)) - 1| over band edges), numericEdgeWorst and normDrift are all residuals whose correct value is ZERO, and none of them spells the word. MEASURED at v4486 over the complete six-device sweep: adding drift|worst|mismatch|violation reclassifies 13 of 117 observables as keyed AND TAKES THE ENTIRE TOP FOUR AMPLIFICATIONS WITH IT. Closing this means changing what `keyless` means lab-wide, which moves corroborationCensus's headline population and every ratio derived from it.",
+        why: "v4486 found the lab's worst amplification is 2.5735e15 on quantum.bands.edgeRhsWorst -- and that it is not a conditioning number at all. amplification is relMove/ulp and relMove divides by the value, so for a residual the denominator IS the error being measured; the giveaway is that the move is EXACTLY 4/7, which is what a near-zero denominator does and not what a scale does. The fix is not to special-case those three: it is that the detector's vocabulary is shorter than the tree's naming, and a wider rule needs its own round because 13 of 117 is not a patch.",
+    },
+    {
+        id: "optics-converge-cost",
+        blocker: "OPEN",
+        what: "optics.converge is the only mode in the lab the corroboration battery cannot measure, and it is now the only gap in a complete sweep.",
+        how: "v4485 measured it at 12m38s of CPU without returning; v4486 killed it at a 60s cap and swept the other 38 modes in 158.9s total. Its adaptive quadrature needs a step or evaluation budget of its own -- the mode itself has to become bounded, because an external cap can only ever report it as absent.",
+        why: "One mode out of 39, and the sweep is otherwise complete for the first time. It is worth naming rather than living with, because an OVER CAP row is an absent reading and this tree separates those from measurements everywhere else.",
     },
     {
         id: "rig-only-reds",
