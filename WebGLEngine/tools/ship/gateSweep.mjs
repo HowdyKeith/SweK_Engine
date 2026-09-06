@@ -2598,6 +2598,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a change to fifteen hundred files whose only test is the gates themselves, and this round " +
                  "leaves the number for whoever wants to argue it.",
     }),
+    since120: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/budgetMargin-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, four sections, 23 checks. *** v4479 ASKED WHETHER TWO GATES 2-4% OVER THE 3000 ms " +
+                 "BUDGET HAD DRIFTED OR WHETHER THE BOX WAS SLOWER, AND SAID IT HAD NOT ESTABLISHED WHICH. IT " +
+                 "IS NEITHER -- IT IS THE MEASUREMENT. *** NOT DRIFT: meshBVH-selfcheck has ONE commit, from " +
+                 "v4248, and does fixed-size CPU work (literal 60,000 and 4,000 loop counts), so it cannot " +
+                 "have moved. NOT THE BOX: twelve rotation gates re-timed here against the ledger's own " +
+                 "readings give a median now/ledger of 1.007. WHAT IS TRUE IS THAT THE CAP FALLS INSIDE THE " +
+                 "READING'S OWN RANGE: seven consecutive runs on an idle box give 2829, 2880, 2939, 2965, " +
+                 "2998, 3026, 3062 -- two over, five under -- so whether the gate is 'over budget' depends on " +
+                 "which of its own runs you take, and whichever you take is written to a tracked file and " +
+                 "acted on. AND THE NEAR-CAP POPULATION IS LARGELY MANUFACTURED: twenty gates recorded within " +
+                 "10% of the cap, run alone three times each, give a median recorded/actual of 1.5x, ten of " +
+                 "twenty at 1.5x or more, worst 2.3x (artifactWeight 2933 recorded, 1277 actual). *** THE " +
+                 "ERROR IS ONE-DIRECTIONAL: *** one of three recorded-over are really under; ZERO of " +
+                 "seventeen recorded-under are really over. Contention pushes a reading up and never down, so " +
+                 "the band fills from below with gates that do not belong in it. Six sabotages, 3/3/1/1/1/1 " +
+                 "by name, none zero-red. *** AND THE RECORD CHECK CAUGHT A MISCOUNT IN THE ROUND'S OWN " +
+                 "HEADLINE: *** the first draft said three over and four under and called it a coin flip; it " +
+                 "is two and five, and 29% is not 50%. The straddle is unaffected and the claim is now what " +
+                 "the numbers say. NOT CLAIMED: that the cap is wrong (a cap is a policy; this measures the " +
+                 "reading it is applied to, and moving the cap moves the band rather than removing it); that " +
+                 "best-of-three alone is the true cost (it is a floor, chosen to be generous to the recorded " +
+                 "figure, and half the band is still 1.5x it); or that the parallel sweep is a defect -- it " +
+                 "is why a ship takes five minutes instead of an hour, and the contention is the price. What " +
+                 "is worth naming is that the price is paid in a number the tree then treats as a measurement.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

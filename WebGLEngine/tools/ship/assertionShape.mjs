@@ -193,8 +193,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // Counted WITH this round's own gate in the population, because it is one: 1518 -> 1519 gates, and the
     // helper it defines is the 1,490th copy. A census that excused its own instrument would be measuring a
     // tree that does not exist.
-    gates: 1519, usesOk: 1498, definesOk: 1490, importsOk: 0,
-    distinctDefinitions: 38, nameFirst: 1404, condFirst: 78, unknownSignature: 16,
+    gates: 1520, usesOk: 1499, definesOk: 1491, importsOk: 0,
+    distinctDefinitions: 38, nameFirst: 1405, condFirst: 78, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
