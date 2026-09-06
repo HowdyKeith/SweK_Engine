@@ -2991,6 +2991,36 @@ since116: Object.freeze({
                  "sentence it counts -- seventh instance in seven rounds, with the discipline written twenty " +
                  "lines below and applied to the data but not to the prose above it.",
     }),
+    since128: Object.freeze({
+        at: "v4489", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/parallaxSampler-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-two checks in six sections, 3.14 s. " +
+                 "render/parallaxOcclusion.js's JS is named parallaxUVMirror -- 'the JS model of " +
+                 "PARALLAX_GLSL' -- and its gate proves convergence, a flat heightmap, a head-on view and a " +
+                 "sabotage. All of that is THE MARCH. The two do not get their height from the same place: " +
+                 "the GLSL reads an 8-bit NEAREST texel and the JS calls a callback every caller hands a " +
+                 "continuous function. *** ON A REAL DRIVER, 256 POINTS, 16 LAYERS: 2.855e-3 with the " +
+                 "continuous height and 2.413e-7 with the sampler simulated, against a 2.380e-7 floor -- a " +
+                 "factor of 11,831. *** The march is a perfect mirror; the sampler is the whole discrepancy, " +
+                 "and 112 of 256 points land past nine tenths of a step, the worst 1.31 steps out, so the two " +
+                 "exit the march on DIFFERENT LAYERS. *** AND MORE LAYERS DOES NOT CONVERGE, WHICH THE OTHER " +
+                 "GATE'S HEADER PROMISES IT DOES: *** the sampler error is 8.206e-4 at 4, 8, 16 and 32 layers " +
+                 "-- identical, because it is the texel -- while one step halves each time. 0.094 of a step " +
+                 "at four layers, 0.750 at thirty-two. The claim is scoped in that header, with the number, " +
+                 "not withdrawn. *** THE GRAZING GUARD IS WHERE THEY REALLY DIVERGE: *** the mirror " +
+                 "normalises and the shader does not, which costs nothing because the function only uses " +
+                 "xy/z -- 2.413e-7 with a raw vector -- until max(z, 1e-4) bites, and then one clamps a " +
+                 "NORMALISED z and the other a RAW one and the answers are 7.343e+2 apart in a coordinate " +
+                 "that runs 0 to 1. The existing gate drives view-z of 0.8, 1, 0.6, 0.6, so that branch has " +
+                 "never run. NO SHIPPING BEHAVIOUR EDITED: three calls listed, none taken. EIGHTEEN " +
+                 "SABOTAGES, ALL RED BY NAME. *** THREE COST ZERO RED AND ALL THREE WERE ONE DEFECT -- A " +
+                 "CONTROL THAT COULD NOT SEPARATE THE RULES IT GRADED: *** bending texel selection from floor " +
+                 "to round passed everything, because the march averages over a forgiving staircase; and the " +
+                 "first draft of the isolating probe used a field varying in ONE axis sampled at exactly " +
+                 "k/16, where floor and round agree and a flipped row changes nothing. Both axes now, at 0.7 " +
+                 "and 0.3 of a texel.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -224,13 +224,16 @@ export const PARITY_BASELINE = Object.freeze({
     // GLSL program because it PROVES, by compiling and drawing one, that the fifteen comments saying this box
     // has no device are wrong. GLSL only -- its WGSL half is not needed, because the claim it refutes is about
     // the box and one language settles it. Counted, not exempted, for v4392's reason.
-    glslBearing: 149,
+    // 150 at v4489: tools/ship/parallaxSampler-selfcheck.mjs carries GLSL programs because it drives
+    // PARALLAX_GLSL and the driver's own texture read on a device. GLSL only; no WGSL half is needed for a
+    // question about a sampler. Counted, not exempted -- v4392's reason, fourth time.
+    glslBearing: 150,
     // 130 at v4479: blendModes-selfcheck.mjs's GLSL twin writes its own version header, because it drives raw
     // WebGL2 through gfx/device.js rather than handing source to three. THE FIRST DRAFT OF THIS COMMENT SPELLED
     // THAT HEADER OUT and this file -- the one that CLASSIFIES shaders by looking for exactly that marker --
     // classified ITSELF as GLSL-bearing. The gate caught it by name. Same shape as v4462's census counting its
     // own PATTERNS table: an instrument that mentions what it measures becomes a sample of it.
-    glslDirective: 133,  // raw WebGL2 -- the file writes its own version header; 133 at v4488 (deviceReach)
+    glslDirective: 134,  // raw WebGL2 -- the file writes its own version header; 134 at v4489 (parallaxSampler)
     glslFramework: 16,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -268,7 +271,7 @@ export const PARITY_BASELINE = Object.freeze({
     // 14 at v4479: blendModes-selfcheck.mjs carries BOTH a WGSL quad and its GLSL twin, because the
     // parity gate draws the same triangle through both backends in one launch.
     both: 16,          // 16 at v4487; and see the glslBearing note -- the emitters themselves stay invisible here
-    glslOnly: 133,   // 133 at v4488: deviceReach-selfcheck carries GLSL and no WGSL
+    glslOnly: 134,   // 134 at v4489: parallaxSampler-selfcheck, GLSL and no WGSL, like deviceReach at v4488
     // 48 and 54 respectively -- re-measured for the same reason; 56 at v4478 for the same one file.
     wgslOnly: 56,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:

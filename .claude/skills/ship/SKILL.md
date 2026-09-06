@@ -124,6 +124,20 @@ with a reason; never widen the register to get green. `SWEK_QUICKSWEEP=0` skips 
 not a way to ship. The timings file is rewritten by the run and ships with the round (`git add -A WebGLEngine`
 covers it). Gates OVER the budget are still only covered by the full two-phase sweep.
 
+### 4b. Fold the sweep's timings into the monotone ledger -- AFTER verify, not only before
+
+    node tools/ship/observedGates.mjs --write          # again; step 3 ran it against the PREVIOUS sweep
+
+*** THE ROUND'S OWN NEW GATES ARE NEVER IN THE LEDGER WHEN VERIFY FIRST RUNS. *** Step 3's call merges the
+LAST sweep's completions, which by definition predate the gates this round added, so budgetEvidence-selfcheck
+reports them as carrying no evidence and the ship goes red. That is v4485's cause (a) -- correct, and
+self-resolving -- and it cost a red first-run on v4486, v4487 and v4488 before anybody wrote this line.
+
+Run it again once verify's sweep has timed them and the red clears without touching a register: at v4488 the
+second call read `+3 new` and budgetEvidence went green. Do it BEFORE restoring `sweep-timings.json` if the
+rotation left that file dirty -- the ledger reads the scratch file, and reverting first throws away the only
+record that this round's gates ever finished.
+
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 
     git add -A WebGLEngine docs/CHANGELOG.md

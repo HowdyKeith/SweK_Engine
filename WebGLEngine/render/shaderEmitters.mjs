@@ -365,7 +365,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     agreement: 32,
     rows: 33,
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 149, wgslBearing: 72, both: 16 }),
+    preambleCensus: Object.freeze({ glslBearing: 150, wgslBearing: 72, both: 16 }),
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,

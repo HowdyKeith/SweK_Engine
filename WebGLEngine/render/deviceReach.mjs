@@ -127,7 +127,21 @@ export const OPEN = Object.freeze({
     // about the environment, so it is correctly out; tools/roundhouse/magmapVariants-selfcheck.mjs's "this
     // gate cannot run WGSL" is the same shape and is a genuine miss if it meant the box. Recall is not
     // claimed; the population the detector DOES find is hand-read and complete.
-    knownMisses: Object.freeze(["tools/roundhouse/magmapVariants-selfcheck.mjs"]),
+    // v4489 adds a SECOND miss, and it is a different shape from the first: parallaxOcclusion-selfcheck said
+    // "the shader can't run in the sandbox" -- a claim about the box, exactly the population -- and the
+    // pattern missed it because the NOUN comes before the VERB there. Word order, not meaning. The pattern is
+    // not widened: it was hand-verified over eighteen files at v4488 and loosening it would need the whole
+    // population re-read. The miss is named, and v4489 corrected that file anyway, because it ran the shader.
+    knownMisses: Object.freeze(["tools/roundhouse/magmapVariants-selfcheck.mjs",
+                                "tools/ship/parallaxOcclusion-selfcheck.mjs"]),
+    // *** AND THE ROUND'S OWN VERSION NOTE IS PROSE THAT BECOMES A COMMENT ONE ROUND LATER. *** v4488's note
+    // paraphrased the claim onto the live `const ENGINE_VERSION` line, which this scan does not read because
+    // it is code. At v4489 that line was demoted to history -- prefixed with // -- and main.js and
+    // brain/brain.js JOINED THE POPULATION, in a round that touched neither. A census over comments cannot
+    // see the current note and sees every previous one, so the round that writes a claim into a version note
+    // reddens the round after it. v4488 disarmed the data and then its own header; the note is the third
+    // place, and it is the one that arrives a round late.
+    versionNoteHazard: "a version note is invisible while live and scanned once it becomes history",
 });
 
 /** The pack24 round trip over a signed remap, before any caller's own scale. */

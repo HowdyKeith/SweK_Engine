@@ -62,6 +62,60 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      collision on this pair of branches; the six before it are noted below, and every one was caught at a
      merge rather than by anything running. -->
 
+## v4489 -- the mirror mirrors the march and not the sampler, and that is the whole disagreement
+
+render/parallaxOcclusion.js ships a GLSL function and a JS one called parallaxUVMirror -- "the JS model of
+PARALLAX_GLSL". Its gate proves the mirror converges to a fine reference march, behaves correctly on a flat
+heightmap and head-on, and differs under a sabotage. All of that is about THE MARCH. The two functions do not
+get their height from the same place: the GLSL reads texture(uHeightMap, uv).r -- 8-bit texels, NEAREST,
+clamped -- and the JS calls a callback that every caller hands a continuous function.
+
+*** MEASURED ON A REAL DRIVER, 256 POINTS, A STAIRCASE HEIGHTMAP, 16 LAYERS: *** the mirror fed the
+CONTINUOUS height disagrees by 2.855e-3, and the SAME mirror fed a simulation of the device's sampler agrees
+to 2.413e-7 against a 2.380e-7 transport floor. A factor of 11,831. The march is a perfect mirror and the
+sampler is the entire discrepancy. At these settings 112 of the 256 points land more than nine tenths of a
+step away and the worst is 1.31 steps out: the two implementations exit the march on DIFFERENT LAYERS.
+
+*** AND MORE LAYERS DOES NOT CONVERGE, WHICH IS THE OPPOSITE OF WHAT THE OTHER GATE'S HEADER PROMISES. ***
+"More layers -> closer to the reference" is true of the march against a continuous reference and false of the
+pair against a texture. The sampler error is 8.206e-4 at four, eight, sixteen AND thirty-two layers -- the
+same, because it is the texel and not the march -- while one step halves each time, 8.750e-3 down to 1.094e-3.
+A fixed error against a shrinking step is worth MORE steps as the march is refined: 0.094 of a step at four
+layers, 0.750 at thirty-two. Refining past the texel grid buys nothing and makes the mismatch louder. The
+claim is not withdrawn, it is scoped, in that gate's header, with the number.
+
+*** THE GRAZING GUARD IS WHERE THEY REALLY DIVERGE, AND IT IS 734 UV UNITS. *** parallaxUVMirror normalises
+viewTangent and PARALLAX_GLSL does not, which sounds like a divergence and is not: the only use of the vector
+is the ratio xy/z, and normalising leaves a ratio alone -- driving the shader with a raw vector and the mirror
+with the same one reads 2.413e-7, identical. EXCEPT under the clamp. Both guard with max(z, 1e-4), one on a
+NORMALISED z and one on a RAW one, so below the clamp the function stops being scale-invariant. At
+viewTangent.z = 2e-5 the two answers are 7.343e+2 apart, in a coordinate whose range is [0,1]. That is the
+silhouette of any surface this effect runs on, and the existing gate drives view-z values of 0.8, 1, 0.6 and
+0.6 -- thousands of times the guard -- so its branch has never been exercised.
+
+NO SHIPPING BEHAVIOUR IS EDITED. Whether the mirror should simulate the sampler, whether both sides should
+clamp the same z, and whether numLayers should be capped at the texel grid are three calls about shipping
+behaviour, and the round that measured them for the first time is the wrong round to also make them. They are
+listed.
+
+The gate that said "the shader can't run in the sandbox" is corrected, because this round ran it -- false from
+v4270 and left standing for 1,705 versions. It is NOT one of the fifteen render/deviceReach.mjs counts: its
+wording puts the noun before the verb, so that detector misses it, and it is added to the detector's named
+misses rather than widening a pattern hand-verified over eighteen files last round.
+
+NEW render/parallaxSampler.mjs, NEW tools/ship/parallaxSampler-selfcheck.mjs, twenty-two checks in six
+sections, 3.14 s. EIGHTEEN SABOTAGES, ALL RED BY NAME. *** THREE COST ZERO RED AND ALL THREE WERE THE SAME
+DEFECT: A CONTROL THAT COULD NOT SEPARATE THE TWO RULES IT GRADED. *** Bending the sampler's texel selection
+from floor to round passed every row, because the march averages over a staircase forgiving enough to hide
+half a texel. The sampler is driven ALONE now against the driver's own texture read -- and the first draft of
+THAT probe used a field varying in one axis, sampled at exactly k/16, where floor and round agree and a
+flipped row changes nothing, so two more sabotages passed. The field varies in both axes with every sample
+distinct, and the points sit at 0.7 and 0.3 of a texel.
+
+The ship ritual gains step 4b: run observedGates --write AGAIN after verify. Step 3's call merges the LAST
+sweep's completions, which by definition predate the gates the round just added, so budgetEvidence reports
+them as carrying no evidence -- v4485's cause (a), correct and self-resolving, and it cost a red first-run on
+v4486, v4487 and v4488 before anybody wrote the line down. The tree stands at 1528 gates.
 ## v4488 -- fifteen files still say this box has no GPU, and the floor a value grade may not claim past
 
 v4269 said a WGSL port could only be checked structurally, because this box cannot execute a shader. v4270
