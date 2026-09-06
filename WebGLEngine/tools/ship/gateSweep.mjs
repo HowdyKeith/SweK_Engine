@@ -2782,6 +2782,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "variable that does not exist made the module fail to load, and a CRASHED GATE PRINTS NO " +
                  "FAIL LINE, which a count of FAIL lines reads as a clean zero. Third time in three rounds.",
     }),
+    since126: Object.freeze({
+        at: "v4487", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frozenRecords-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/assertionShape-selfcheck.mjs (all nine census rows compared, where four were)",
+            "tools/roundhouse/observableTaint-selfcheck.mjs (the build counts are consistency-checked)",
+        ]),
+        verdict: "green, four sections. *** THIS TREE FREEZES NUMBERS INTO VERSION-STAMPED RECORDS SO A " +
+                 "ROUND'S CLAIMS STAY CHECKABLE, AND NOBODY HAD EVER ASKED WHICH OF THOSE NUMBERS ANYTHING " +
+                 "CHECKS. *** v4482's pre-flight covered FIVE hand-listed records and said so -- 'known is a " +
+                 "LIST rather than a DISCOVERY' -- and v4486's merge produced a sixth and a seventh, both " +
+                 "found by the verify. So it was RUN rather than reasoned: every numeric field of every " +
+                 "version-stamped frozen record bumped by seven, in place, with every gate that NAMES that " +
+                 "record executed, restored after each. 74 records, 36 carrying numbers, 135 fields: 83 " +
+                 "NOTICED, 52 NOT -- 38.5% -- with 14 records no gate names at all and 9 where nothing " +
+                 "notices anything. *** THE FIRST SWEEP MEASURED AGAINST THE SIBLING GATE, WHICH IS A GUESS. " +
+                 "*** 29 of the 74 are not named by their sibling and 31 of the 83 catches come from a gate " +
+                 "elsewhere; the headline moved 37.0% to 38.5% and the ATTRIBUTION moved enormously -- a " +
+                 "defensible number resting on a guess about who guards what. TWO REPAIRS: " +
+                 "assertionShape-selfcheck compared four of its census's nine rows and now compares all " +
+                 "nine, which is the SAME defect vba/runtimeGap.mjs found in itself at v4462 shipped again " +
+                 "eighteen rounds later; and observableTaint's build counts get a consistency check that " +
+                 "SAYS it is not a re-derivation. SIX SABOTAGES: A 2, B 2, C 3, D 2, E 1, F 0-THEN-2. *** F " +
+                 "WENT ZERO BECAUSE THE GATE CRASHED INSTEAD OF FAILING -- an eager detail string, the " +
+                 "FOURTH instance this session -- AND THE FIXTURES INFLATED THE CENSUS THEY TEST, the FIFTH. " +
+                 "*** Both in the file built to count the things it is an instance of, which also carries " +
+                 "its own record and moved the count by exactly one.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

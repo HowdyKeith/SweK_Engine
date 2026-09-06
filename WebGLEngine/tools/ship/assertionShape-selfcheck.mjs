@@ -153,9 +153,32 @@ ok("every gate that calls ok either defines one or imports one",
 // ---- 4. THE RECORD --------------------------------------------------------------------------------------------
 console.log("\n4. the frozen record");
 
-ok("the recorded census is what the code reports now",
-    REC.definesOk === c.definesOk && REC.importsOk === c.importsOk &&
-    REC.condFirst === c.bySignature[SIG.condFirst] && REC.suspects === c.suspects.length);
+// *** v4487 -- THIS COMPARED FOUR OF THE RECORD'S NINE NUMBERS AND CALLED IT "the recorded census". ***
+// `gates`, `usesOk`, `nameFirst`, `distinctDefinitions` and `unknownSignature` were re-taken BY HAND every
+// round with nothing checking them: v4487's corruption sweep bumped `gates` by seven and this gate passed.
+// It is the same defect vba/runtimeGap.mjs found in ITSELF at v4462 -- "ALL TWELVE ARE CHECKED, NOT THREE.
+// The gate's first draft re-derived the census and then compared only files/threads/closures against it, so
+// nine of these were decoration" -- shipped again here eighteen rounds later. The lesson did not travel.
+// EVERY ROW IS COMPARED NOW, and each is named so a red says which one moved.
+{
+    const rows = [
+        ["gates", REC.gates, c.gates],
+        ["usesOk", REC.usesOk, c.usesOk],
+        ["definesOk", REC.definesOk, c.definesOk],
+        ["importsOk", REC.importsOk, c.importsOk],
+        ["distinctDefinitions", REC.distinctDefinitions, c.distinctDefinitions],
+        ["nameFirst", REC.nameFirst, c.bySignature[SIG.nameFirst]],
+        ["condFirst", REC.condFirst, c.bySignature[SIG.condFirst]],
+        ["unknownSignature", REC.unknownSignature, c.bySignature.unknown],
+        ["suspects", REC.suspects, c.suspects.length],
+    ];
+    const drift = rows.filter(([, a, b]) => a !== b);
+    ok("!! *** the recorded census is what the code reports now -- ALL NINE ROWS, not the four this compared ***",
+        drift.length === 0,
+        drift.length ? "DRIFTED: " + drift.map(([n, a, b]) => `${n} ${a} -> ${b}`).join(", ")
+                     : `${rows.length} rows, every one re-derived. Five of them were decoration until v4487 ` +
+                       "corrupted each field of every frozen record in the tree and asked what noticed");
+}
 ok("!! the three shapes written THIS SESSION are recorded with the text that shipped",
     REC.writtenThisSession.length === 3 &&
     REC.writtenThisSession.every((w) => Object.values(SHAPE).includes(w.shape) && /ok\(/.test(w.text)),

@@ -169,6 +169,19 @@ ok("the record's share is its own arithmetic",
     Math.abs(100 * REC.provenDownstream / REC.observables - REC.sharePct) < 0.1,
     `${REC.provenDownstream}/${REC.observables} = ${(100 * REC.provenDownstream / REC.observables).toFixed(1)}%`);
 ok("the record's epsilon is the one the code uses", REC.eps === EPS);
+// *** v4487 -- `builds` AND `buildsWhereNothingMoved` WERE GUARDED BY NOTHING, WHICH THE CORRUPTION SWEEP
+// FOUND BY BUMPING EACH BY SEVEN AND WATCHING THIS GATE PASS. *** They are the shape of a 40-build sweep and
+// re-deriving them here would mean running it, which is why they are frozen in the first place. SO WHAT IS
+// ADDED IS A CONSISTENCY CHECK AND NOT A RE-DERIVATION, AND THE DIFFERENCE IS STATED RATHER THAN BLURRED:
+// this cannot notice the sweep drifting, only the record contradicting itself. A number that no longer
+// describes the tree and a number that never described anything are different failures, and only the second
+// one is caught here.
+ok("!! the build counts are at least CONSISTENT, which is less than re-derived and more than nothing",
+    REC.buildsWhereNothingMoved <= REC.builds && REC.builds > 0 &&
+    REC.examples.length <= REC.builds &&
+    new Set(REC.examples.map((e) => e.build)).size === REC.examples.length,
+    `${REC.buildsWhereNothingMoved} of ${REC.builds} builds moved nothing, ${REC.examples.length} examples, ` +
+    "all distinct. NOT a re-derivation: the sweep is what those numbers came from and this gate does not run it");
 ok("every recorded example moved fewer observables than the build reports",
     REC.examples.every((e) => e.moved < e.observables && e.moved >= 0));
 ok("the record is frozen", Object.isFrozen(REC) && Object.isFrozen(REC.examples) && REC.examples.every(Object.isFrozen));
