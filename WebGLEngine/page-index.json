@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 458,
+ "count": 459,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -3073,6 +3073,13 @@
    "f": "wasm-sandbox.html",
    "t": "WASM sandbox",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "water-2d.html",
+   "t": "2D Water",
+   "d": "Kingdom-style 2D water on gfx/device.js in both shader languages: two seeded displacement maps scrolled at two speeds and by the pointer's x over a parallax divider, their sum displacing the scene sample, a tint curved by the sample's greyness, and foam where both channels pass a threshold. After StefanJo3107/2D-Water-Shader (MIT), read and hand-written. Held texel for texel and mask for mask to a CPU twin by tools/ship/water2d-selfcheck.mjs.",
    "g": "",
    "p": 0
   },

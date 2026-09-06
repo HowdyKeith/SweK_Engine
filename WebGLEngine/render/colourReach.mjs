@@ -192,6 +192,9 @@ export const HOT_UNREGISTERED = Object.freeze([
  * on the page; nothing additively; the overlap stays 0.
  * v4505: 82 -> 83. The arrival is ascii-shape.html (the same HUD hexes), the shape-aware ASCII picks drawn through
  * render/slugDevice.mjs; nothing additively; the overlap stays 0.
+ * v4506: 83 stays 83. water-2d.html arrived with the same HUD hexes and the detector does NOT count it (a first draft
+ * raised the count to 84 and the gate measured 83); recorded so the next arrival is not blamed for a page that was
+ * never in the population. Nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,

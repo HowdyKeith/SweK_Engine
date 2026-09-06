@@ -172,3 +172,37 @@ of one mean (white left, white right, flat grey) pick `L`, `4` and `1` where asc
 `#` three times. Sabotage C -- the table left unnormalised -- kept every cell-for-cell hold
 green, because both sides read the same bytes; the derivation holds caught it. Parity sees that
 two sides agree, never what they agree on.
+
+### StefanJo3107/2D-Water-Shader -- BUILT as `render/water2d.mjs` (v4506)
+
+**What it is.** MIT, (c) 2020 Stefan Jovanovic (LICENSE read first-hand, 21 lines, sha256
+8f28396b9a62). A Unity CG surface shader after Kingdom's water: two displacement textures
+scrolled in x at two speeds and by the camera's x over a parallax divider, their red and green
+summed into an offset, the scene (a reflection render in the original) read at
+`uv + (offset - 0.5) / amount`, a per-channel contrast curve on the tint driven by the
+sample's greyness, and foam where both offset channels exceed a threshold or the fragment sits
+below an edge line that leans with the offset; optional vertex displacement and perspective
+correction behind toggles. The first pass of this sweep (above) flagged it as the one of
+sixteen with a falsifiable core.
+
+**What was taken and what was not.** The method, re-derived as a full-screen pass on
+`gfx/device.js` in both languages with a CPU twin. Every read is an integer texel (floor of a
+fract-wrapped or clamped coordinate times the size, no sampler), the displacement maps are
+generated from a seed on the CPU, so the twin names the exact texel every fragment reads. Not
+taken: bilinear sampling (softer, and holds nothing exactly), the two toggles, the reflection
+render as the scene (`water-2d.html` uses procPlanet's bake), and the Craftpix background
+sprites in its Assets, which were not looked at.
+
+**Measured** (`tools/ship/water2d-selfcheck.mjs`): on a ramp scene whose colour is twice its
+texel index the fragment reads the twin's texel on every pixel not within 2e-6 of a texel
+boundary (15,349 to 15,356 of 15,360 exact, 0 wrong) and the foam mask is the twin's pixel for
+pixel; a camera shift of three map texels moves the mask exactly eight pixels on 14,592 of
+14,592; the bake with the tint and translucent foam is within 2 of 255 off-boundary on both
+backends. The gate's own arithmetic needed three corrections before the pass needed none: odd
+indices halved to a .5 the two precisions round apart, 64-texel maps that put every fifth
+column and every third row exactly on a texel boundary, and a parallax shift compared
+backwards. Sabotages red at 7 / 7 / 6 / 7.
+
+**mmacklin/sandbox, restated.** Its remaining pieces (path tracer, spherical harmonics,
+metaballs) duplicate `physics/render/pathTracerWgsl.mjs`, the splat renderer's SH and the
+blob pages, as the first pass said; nothing further was read from it this pass.

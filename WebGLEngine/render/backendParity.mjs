@@ -183,8 +183,8 @@ export const PARITY_BASELINE = Object.freeze({
     // WebGPU and on WebGL2 alike. Graded against a CPU sphere it never rendered by tools/ship/litSphere-selfcheck.mjs.
     // v4483 -- render/tslWide.mjs: the quad shell for the widened transplant carries a WGSL prefix and a GLSL preamble, and the
     // hand twin both languages (+1 GLSL, +1 WGSL, +1 both). Its fixture and its emitted pair are JSON.
-    glslBearing: 152,    // v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs (the shape-aware ASCII cell pass)
-    glslDirective: 135,  // raw WebGL2 -- the file writes its own version header (v4483: +1, render/tslWide.mjs; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs)
+    glslBearing: 153,    // v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs (the 2D water pass)
+    glslDirective: 136,  // raw WebGL2 -- the file writes its own version header (v4483: +1, render/tslWide.mjs; v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs)
     glslFramework: 17,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -239,15 +239,16 @@ export const PARITY_BASELINE = Object.freeze({
     // v4480 -- wgslBearing 66 -> 67, wgslOnly 51 -> 52: render/worleyWgsl.mjs, the Worley biome field as a compute pass
     // (WGSL-only by nature: no compute stage on WebGL2, where the f32 twin paints the same bytes -- the CPU_TWIN contract).
     // Held to world/worleyBiomes.js through one implementation with one rounding knob by tools/ship/worleyDevice-selfcheck.mjs.
-    wgslBearing: 71,     // v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs
-    both: 19,            // v4499: +1, render/stereographic.mjs -- both languages in one module, a CPU twin beside them
+    wgslBearing: 72,     // v4499: +1, render/stereographic.mjs; v4504: +1, render/zoomBlur.mjs; v4505: +1, render/asciiShape.mjs; v4506: +1, render/water2d.mjs
+    both: 20,            // v4499: +1, render/stereographic.mjs -- both languages in one module, a CPU twin beside them
                          // v4504: +1, render/zoomBlur.mjs -- the radial march toward an arbitrary centre, both languages, a CPU twin, GODRAYS_FS graded beside it
                          // v4505: +1, render/asciiShape.mjs -- the six-point glyph search, both languages, a CPU argmin twin, the table derived from Plex
+                         // v4506: +1, render/water2d.mjs -- the 2D water: displacement, tint and foam, both languages, a CPU twin that names every texel
     glslOnly: 133,
     wgslOnly: 52,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
-    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs"]),
+    bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs"]),
     bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });

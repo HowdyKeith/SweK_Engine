@@ -2650,6 +2650,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "three glyphs by shape where asciiLut's scalar picks one. ascii-shape.html prints the picks through Slug. Sabotages " +
                  "red at 6 / 2 / 3 / 2 -- C showed the cell-for-cell holds cannot see the table's content; the derivation holds do.",
     }),
+    since128: Object.freeze({
+        at: "v4506", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/water2d-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/water2d.mjs, after StefanJo3107/2D-Water-Shader (MIT, read and hand-written): two seeded " +
+                 "displacement maps scrolled and parallaxed, their sum displacing the scene sample, a tint curved by greyness, foam by " +
+                 "threshold, every read an integer texel in both languages with a CPU twin. On a ramp whose colour is its texel index the " +
+                 "fragment reads the twin's texel on every non-boundary pixel and the foam mask is the twin's pixel for pixel; a camera " +
+                 "shift of three map texels moves the mask exactly eight pixels on 14,592 of 14,592. Three corrections to the gate's own " +
+                 "arithmetic first (a .5 the two precisions round apart, grid sizes on texel boundaries, a shift compared backwards). " +
+                 "water-2d.html is the view. Sabotages red at 7 / 7 / 6 / 7.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -149,6 +149,38 @@ export const POSTURE = Object.freeze({
  */
 export const REACHED_SOURCES = Object.freeze([
     // =========================================================================================================
+    // v4506 -- THE ONE REPO OF THE SHADER-PORTING SWEEP'S SIXTEEN THAT HAD A RIGHT ANSWER A GATE COULD FAIL.
+    //
+    // docs/SHADER-REPO-SWEEP.md (the shader-porting branch's triage of sixteen links) flagged StefanJo3107/
+    // 2D-Water-Shader alone as a real technique, absent from the tree, with a falsifiable core: the parallax offset
+    // is a closed form and the foam is a comparison. Built here as render/water2d.mjs with a CPU twin that names
+    // the exact texel every fragment reads; nothing copied from the Unity CG source.
+    // =========================================================================================================
+    {
+        repo: "StefanJo3107/2D-Water-Shader", sourceUrl: "https://github.com/StefanJo3107/2D-Water-Shader",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Stefan Jovanovic", year: 2020,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2020 Stefan Jovanovic. READ FIRST-HAND at v4506: LICENSE, 21 lines, sha256 8f28396b9a62, " +
+             "at commit 002b6676 (2020-08-27); the shader's own header names the same author, and the README adds " +
+             "that credit is not required. The background sprites in its Assets are Craftpix freebies and were " +
+             "not looked at, let alone taken.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "The METHOD, re-derived: two displacement textures scrolled in x at two speeds and by the camera's " +
+             "x over a parallax divider, their red and green summed into an offset; the scene read at uv + " +
+             "(offset - 0.5) / amount; a per-channel contrast curve on the tint driven by the sample's greyness " +
+             "(pow(|2c - 1|, 1 / k) * sign(c - 0.5) + 0.5); foam where both offset channels exceed a threshold " +
+             "or the fragment sits below an edge line that leans with the offset. No bytes: the original is a " +
+             "Unity CG surface shader with tex2D; render/water2d.mjs is a full-screen pass on gfx/device.js in " +
+             "GLSL and WGSL with every read at an integer texel, seeded displacement maps generated on the CPU, " +
+             "and a CPU twin. Not taken: bilinear sampling, the vertex-displacement and perspective-correction " +
+             "toggles, and a reflection render as the scene.",
+        takenPaths: ["render/water2d.mjs"],
+        citedPaths: ["tools/ship/water2d-selfcheck.mjs", "water-2d.html", "server.html", "physics/instruments.mjs", "tools/ship/gateSweep.mjs"],
+        why: "The tree had no 2D water; of the sixteen repos the shader-porting sweep triaged, this was the one " +
+             "whose core a gate can fail -- a texel read at a closed-form coordinate and a threshold comparison -- " +
+             "and a CPU twin holds both exactly, which is the bar every pass here clears before it ships.",
+    },
+    // =========================================================================================================
     // v4505 -- THE SHAPE-AWARE ASCII METHOD asciiLut.mjs NAMED AND DECLINED FOR THE LICENCE ALONE, UNDER MIT.
     //
     // tools/ship/asciiLut.mjs (v3776) opens by saying it is NOT derived from stong/gradscii-art (AGPL-3.0) and is

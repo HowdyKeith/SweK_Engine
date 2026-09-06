@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="2D Water (parallax displacement and foam)">
+<meta name="demo:desc" content="Kingdom-style 2D water on gfx/device.js in both shader languages: two seeded displacement maps scrolled at two speeds and by the pointer's x over a parallax divider, their sum displacing the scene sample, a tint curved by the sample's greyness, and foam where both channels pass a threshold. After StefanJo3107/2D-Water-Shader (MIT), read and hand-written. Held texel for texel and mask for mask to a CPU twin by tools/ship/water2d-selfcheck.mjs.">
+<meta name="demo:category" content="fx">
+<title>2D Water</title>
+<style>
+  html,body { margin:0; height:100%; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { display:block; width:100%; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  .bad { color:#ff9a9a; }
+  a { color:#59d1ff; }
+  input[type=range] { vertical-align:middle; width:100px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">2D water: two scrolled displacement maps, a parallax on the pointer, foam by threshold</div>
+  <div id="be">requesting a device&hellip;</div>
+  <div id="sub">The scene is procPlanet's bake, read where the summed displacement says; move the pointer left and right for the parallax. <span id="notice"></span>
+    &middot; amount <input id="amount" type="range" min="10" max="120" step="1" value="40"> &middot; foam threshold <input id="foam" type="range" min="0.004" max="0.03" step="0.0005" value="0.0121"> &middot; foam alpha <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.6"> &middot; <a href="?webgl=1">force WebGL2</a> &middot; <span id="tick"></span></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { requestDevice } from "./gfx/device.js";
+import { planetSpec, bakeEquirect } from "./world/procPlanet.js";
+import { waterNoise, water2dPipelineDesc, imageTexture, drawWater2d, DEFAULT_KNOBS } from "./render/water2d.mjs";
+
+const cvs = document.getElementById("c"), beEl = document.getElementById("be");
+const SW = 512, SH = 256, DW = 96, DH = 96;
+const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
+let device, pipe, tScene, tDisp, tDetail, frames = 0, camX = 0, t0 = 0;
+
+async function init() {
+  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  catch (e) { return fail("requestDevice threw: " + e.message); }
+  if (!device || device.backend === "null") return fail("no GPU backend here (WebGPU needs a secure origin: localhost or https).");
+  try {
+    pipe = device.pipeline(water2dPipelineDesc()); if (pipe.compiled) { const err = await pipe.compiled; if (err) throw new Error(err); }
+    const bake = bakeEquirect(planetSpec(7), SW, SH);
+    tScene = imageTexture(device, { rgba: bake.rgba, w: SW, h: SH }); tDisp = imageTexture(device, waterNoise(7, DW, DH, 8)); tDetail = imageTexture(device, waterNoise(11, DW, DH, 16));
+  } catch (e) { return fail("water pipeline: " + e.message); }
+  beEl.textContent = "backend: " + device.backend + " · scene " + SW + "x" + SH + " · two " + DW + "x" + DH + " seeded displacement maps, every read an integer texel";
+  cvs.addEventListener("pointermove", (ev) => { const r = cvs.getBoundingClientRect(); camX = ((ev.clientX - r.left) / r.width - 0.5) * 20; });
+  t0 = performance.now();
+  requestAnimationFrame(frame);
+}
+function dpr() { return Math.min(2, devicePixelRatio || 1); }
+function frame() {
+  const d = dpr(), w = Math.round((cvs.clientWidth || 1200) * d), h = Math.round(w * SH / SW);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  const knobs = { ...DEFAULT_KNOBS, time: (performance.now() - t0) / 1000, camX, amount: +document.getElementById("amount").value, foamThreshold: +document.getElementById("foam").value, foamAlpha: +document.getElementById("alpha").value };
+  device.frame(({ pass }) => { pass.clear([0.02, 0.031, 0.024, 1]); drawWater2d(pass, pipe, tScene, tDisp, tDetail, knobs); });
+  if (++frames % 15 === 0) document.getElementById("tick").textContent = "t " + knobs.time.toFixed(1) + " s · camera x " + camX.toFixed(2) + " · amount " + knobs.amount + " · foam " + knobs.foamThreshold.toFixed(4);
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

@@ -768,6 +768,25 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         Slug from the same font the vectors were measured on). Sabotage C, the table left unnormalised, left every
         cell-for-cell hold green -- both sides read the same bytes -- and was caught by the derivation holds alone:
         parity sees that two sides agree, never what they agree on.
+    2D WATER -- built at v4506 (task 52), after StefanJo3107/2D-Water-Shader (MIT, (c) 2020 Stefan Jovanovic; read
+        and hand-written, nothing copied; world/reachedLicences.mjs), the one repo of the shader-porting branch's
+        sixteen that docs/SHADER-REPO-SWEEP.md flagged as having a falsifiable core. render/water2d.mjs: two
+        displacement maps generated from a seed on the CPU (value noise), scrolled in x at two speeds and by the
+        camera's x over a parallax divider, their red and green summed into an offset; the scene read at uv +
+        (offset - 0.5) / amount; a tint curved per channel by the sample's own greyness; foam where both offset
+        channels pass a threshold or the fragment sits below an edge line that leans with the offset. EVERY READ IS
+        AN INTEGER TEXEL on both sides (floor of a fract-wrapped or clamped coordinate times the size, no sampler),
+        so the CPU twin names the exact texel each fragment reads. MEASURED (tools/ship/water2d-selfcheck.mjs, a
+        160 x 96 frame, 60-texel maps, a 128 x 64 scene): on a RAMP whose colour is 2 x its texel index the fragment
+        reads the twin's texel on every pixel not within 2e-6 of a texel boundary (15,349 to 15,356 of 15,360 exact,
+        0 wrong) and the foam mask is the twin's pixel for pixel; a camera shift of three map texels moves the mask
+        exactly eight pixels on 14,592 of 14,592; procPlanet's bake with the tint and translucent foam is within 2
+        of 255 off-boundary on both backends. Three corrections to the gate's own arithmetic first: a ramp of raw
+        indices halved by the tint landed odd indices on a .5 that f32 and f64 round apart; 64-texel maps against
+        160 x 96 put every fifth column and every third row exactly on a texel boundary; and the parallax shift was
+        compared backwards (a camera moved right reads the map further along). NOT TAKEN: bilinear sampling (the
+        twin can name nearest exactly and nothing else), the vertex-displacement and perspective-correction toggles,
+        and the original's reflection render as the scene. water-2d.html is the view, the pointer's x the camera.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

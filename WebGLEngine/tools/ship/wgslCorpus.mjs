@@ -60,6 +60,7 @@ import { QUAD_WGSL } from "../../render/tslWide.mjs";
 import { FRAGMENT_WGSL as STEREO_WGSL } from "../../render/stereographic.mjs";
 import { FRAGMENT_WGSL as ZOOM_WGSL } from "../../render/zoomBlur.mjs";
 import { FRAGMENT_WGSL as ASCII_SHAPE_WGSL } from "../../render/asciiShape.mjs";
+import { FRAGMENT_WGSL as WATER2D_WGSL } from "../../render/water2d.mjs";
 import * as FL from "../../render/fleets.mjs";
 import * as LY from "../../render/lyapunovWgsl.mjs";
 import * as HD from "../../render/heidlerWgsl.mjs";
@@ -270,6 +271,9 @@ export function corpus() {
         { id: "asciiShape.FRAGMENT_WGSL", from: "render/asciiShape.mjs", compileOnly: true,
           why: "v4505 -- the shape-aware ASCII cell pass: one fragment per cell, six disc samples of the scene by integer texel, a nearest-neighbour search over a 6 x 95 table by squared distance keeping the first of equals; held cell for cell to a CPU argmin on both backends by tools/ship/asciiShape-selfcheck.mjs",
           opts: { code: ASCII_SHAPE_WGSL, compileOnly: true, outCount: 0 } },
+        { id: "water2d.FRAGMENT_WGSL", from: "render/water2d.mjs", compileOnly: true,
+          why: "v4506 -- the 2D water pass: two displacement maps read by fract-wrapped integer texel at scrolled, parallaxed x, their RG summed into an offset that picks the scene texel, a tint curve per channel by greyness, foam by threshold and edge line; held texel for texel and mask for mask to a CPU twin on both backends by tools/ship/water2d-selfcheck.mjs",
+          opts: { code: WATER2D_WGSL, compileOnly: true, outCount: 0 } },
         { id: "tslWide.QUAD_WGSL", from: "render/tslWide.mjs", compileOnly: true,
           why: "v4483 -- the hand-written twin of the widened transplant's quad: three computed varyings, one @interpolate(flat) i32, the camera's projection in the fragment; the generated pair is held to its picture by tools/ship/tslWide-selfcheck.mjs on both backends, and here both harnesses must compile it",
           opts: { code: QUAD_WGSL, compileOnly: true, outCount: 0 } },

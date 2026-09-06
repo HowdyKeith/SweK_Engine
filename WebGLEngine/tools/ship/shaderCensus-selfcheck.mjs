@@ -66,7 +66,7 @@ const c = shaderCensus(ROOT);
     // v4483 -- 12 -> 13: render/tslWide.mjs, the quad shell and its hand twin for the widened TSL transplant. Read before raising,
     // as the line asks: the twin exists BECAUSE the generated pair is graded against it -- the module authors both halves so that
     // three's two builders can be held to them, which is the opposite of the inversion this line watches for.
-    const DUAL_BASELINE = 16;   // v4499: render/stereographic.mjs; v4504: render/zoomBlur.mjs; v4505: render/asciiShape.mjs (the shape-aware ASCII cell pass, WGSL and GLSL in one file)
+    const DUAL_BASELINE = 17;   // v4499: render/stereographic.mjs; v4504: render/zoomBlur.mjs; v4505: render/asciiShape.mjs; v4506: render/water2d.mjs (the 2D water pass, WGSL and GLSL in one file)
     const INVERSION = 20;   // v3274's own word: "if this count climbs toward twenty the arithmetic inverts"
 
     ok("!! *** only " + c.both.length + " files author a shader in BOTH languages ***",
