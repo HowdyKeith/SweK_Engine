@@ -2731,6 +2731,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "mesh/meshBVH.mjs. Both meshers' first drafts shared an off-by-one the watertight hold caught; sabotage C was blind " +
                  "until a density sat exactly on the iso. Sabotages red at 5 / 4 / 1 / 2.",
     }),
+    since134: Object.freeze({
+        at: "v4512", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/buildingLab-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/buildingLab.mjs: every grammar placement as an instanced unit cube through gpuDriven's " +
+                 "records and the lit pipeline, tinted by kind; the cull twin sees every placement and the frame's coverage is a CPU " +
+                 "ray-versus-boxes silhouette on 19,186 of 19,200 pixels with the rest at edges. building-lab.html: a seed, cell counts, " +
+                 "party walls, the stairs side and accessory percentages live, the counts and hash in the HUD. Sabotage A was blind on " +
+                 "the symmetric default building until the gate's building was made asymmetric. Sabotages red at 1 / 1 / 3 / 3.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

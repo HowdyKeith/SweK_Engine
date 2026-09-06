@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 459,
+  "page": 460,
   "demo": 49,
   "builtin": 34
  },
@@ -607,6 +607,14 @@
    "id": "bridge.html",
    "display": "Bridge",
    "href": "/bridge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "building-lab.html",
+   "display": "Building Lab",
+   "href": "/building-lab.html",
    "section": null,
    "collision": false
   },

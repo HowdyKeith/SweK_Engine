@@ -862,6 +862,21 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         exactly on the iso. NOT TAKEN: the 16-cubed chunking (a sparse map here, slower on a million-splat scene),
         the editor and edit flags, the heightfield and greedy meshers, the glb export. No page: the collider is a
         headless artefact for the BVH; a real capture is not a fixture in the repo.
+    BUILDINGS 4, THE LAB -- built at v4512 (task 57), the last of the four building rounds. render/buildingLab.mjs
+        turns a grammar result into what render/gpuDriven.mjs draws: a unit cube in LAYOUTS.lit with per-face
+        normals, one record per placement (x, y, z, size) with the grammar's floors on the world's y, and a tint
+        index per kind (corner, wall, party-wall blank, stairs, roof cap, interior) in the record's extras, drawn by
+        render/litSphere.mjs's lit pipeline with a six-entry palette. building-lab.html: a seed, cell counts on
+        three axes, a party-wall checkbox per side, the stairs side and the three accessory percentages live, the
+        grammar's counts and hash in the HUD, an orbit by drag, both backends. MEASURED (tools/ship/buildingLab-
+        selfcheck.mjs, a 5 x 3 x 6 building, 160 x 120): the cull twin sees 90 of 90 placements; the frame's
+        coverage is a CPU ray-versus-boxes silhouette on 19,186 of 19,200 pixels, 12 differing within a pixel of an
+        edge and 2 elsewhere (the sub-pixel gaps between boxes), on both backends; four tints face the camera; a
+        front party wall darkens 5,816 pixels and brightens none. THE CORRECTION: the first gate used the 5 x 4 x 4
+        default building, and a sabotage that put the floors on z drew the same boxes -- four deep, four tall --
+        so the gate's building is asymmetric in every axis now. Not drawn: accessories (a box per cell has no
+        railing). The four rounds together: a seeded CityGen, a grammar held by hash, a facade stamper with party
+        walls from adjacency, and a lab that draws the grammar on the device.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

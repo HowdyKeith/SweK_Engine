@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 459,
+ "count": 460,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -511,6 +511,13 @@
    "f": "bridge.html",
    "t": "Bridge health",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "building-lab.html",
+   "t": "Building Lab",
+   "d": "world/buildingGrammar.mjs drawn on gfx/device.js: one instanced box per cell through render/gpuDriven.mjs's records and the lit pipeline, tinted by kind (corner, wall, party-wall blank, stairs, roof cap, interior), for a seed, cell counts, party-wall sides, a stairs side and accessory percentages. After VladimirKobranov/configurator-unreal-building (Apache-2.0), read and hand-written. Held to the placement list by tools/ship/buildingLab-selfcheck.mjs.",
    "g": "",
    "p": 0
   },
