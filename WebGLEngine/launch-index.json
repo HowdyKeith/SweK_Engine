@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 451,
+  "page": 452,
   "demo": 49,
   "builtin": 34
  },
@@ -2959,6 +2959,14 @@
    "id": "slug-device.html",
    "display": "Slug Device",
    "href": "/slug-device.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slug-projective.html",
+   "display": "Slug Projective",
+   "href": "/slug-projective.html",
    "section": null,
    "collision": false
   },

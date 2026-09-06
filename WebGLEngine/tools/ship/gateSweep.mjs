@@ -2504,6 +2504,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "not-yet, recorded as wont (ktx2-basis). The header readers are held against a full PNG decoder and the browser's " +
                  "JPEG decode; the census against an independent walk. Sabotages red at 2 / 6 / 3 / 1.",
     }),
+    since118: Object.freeze({
+        at: "v4496", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/slugProjective-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green on both backends. render/slugProjective.mjs: SlugDilate on the CPU, rotation and perspective rows, a " +
+                 "perspective-correct rasteriser model (tex/w and 1/w affine, divided per pixel). Rotated text: the model matches the " +
+                 "fragment's texcoord to 1.27e-7 em and the frame is exact; in perspective (w ratio 2.11): 2.11e-7 em, the frame exact " +
+                 "on WebGPU and within 2 of 255 on WebGL2; an affine model is 0.635 em off. The dilation under perspective is half a " +
+                 "pixel per axis ON SCREEN from a (0.522, -0.522) push in vertex space. slug-projective.html draws both with sliders. " +
+                 "Sabotages red at 4 / 5 / 1 / 4 -- C (the rows builder) is headless-only by design, since the page draws the rows the " +
+                 "builder made.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

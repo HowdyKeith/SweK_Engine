@@ -572,6 +572,22 @@ the vendored three was r160, which has no TSL entry point, and the two TSL refer
         tools/ship/todo.mjs (slug-ring-buffer): nothing it would save is left to save at this label count, and its
         reset-without-a-fence is the one thing the reuse write does not do.
     13. Flip the backendParity assertion and write the measured numbers here when step 1 lands.
+    PROJECTIVE SLUG TEXT -- held at v4496 (task 42). The flat gate held only the orthographic case and said
+        so in its last line. render/slugProjective.mjs carries the CPU side: SlugDilate once more on the CPU
+        (dilateCpu), rows for a 2-D rotation and for a text plane yawed and tilted under a real perspective
+        projection (perspectiveRows, the full 4x4 applied to (x, y, 0, 1) with the z column dropped, as the
+        shader reads (x, y, -, w)), and a rasteriser model whose texcoords are PERSPECTIVE-CORRECT: tex/w and
+        1/w affine over the screen triangle, divided at the pixel -- what a GPU does for every varying under a
+        varying w, and what the flat gate's affine model could not. MEASURED (tools/ship/slugProjective-
+        selfcheck.mjs, Plex 28 px, both backends): rotated 0.5 rad, the model reproduces the fragment's own
+        texcoord to 1.27e-7 em over 3,492 fragments and the frame is exact; in perspective (yaw 0.6, tilt 0.5,
+        w from 115 to 244 across the text, ratio 2.11) to 2.11e-7 em over 1,985 fragments, the frame exact on
+        WebGPU and within 2 of 255 on WebGL2. An affine model is 0.635 em off in perspective at every snap. And
+        SlugDilate does what it was designed for: at the far corner of the last glyph the vertex-space push is
+        (0.522, -0.522) and ON SCREEN (0.500, 0.500) px -- half a pixel per axis, as in the orthographic case,
+        from a different push. slug-projective.html draws both cases with sliders. Rotation and projective
+        placement are now measured properties of the shipped shader, which is what the Box3D ticker (task 43)
+        needs before glyphs tumble.
     TEXTURE BYTES BEFORE KTX2 / BASIS -- measured at v4495 (task 18), RIG-PENDING for the asset library.
         tools/ship/textureBytes.mjs walks a folder and records every raster texture's bytes on disk and, from the
         PNG and JPEG headers, its pixel size and GPU bytes (RGBA8 with mips); decide() derives the verdict from

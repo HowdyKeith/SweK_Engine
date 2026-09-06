@@ -169,11 +169,13 @@ export const HOT_UNREGISTERED = Object.freeze([
  * it draws its glyph wall through render/slugDevice.mjs and nothing additively, so the overlap stays 0.
  * v4491: 77 -> 78. The arrival is slug-curved.html (the same HUD as slug-device.html, the same hexes), drawing its
  * arcs through render/slugDevice.mjs and nothing additively; the overlap stays 0.
+ * v4496: 78 -> 79. The arrival is slug-projective.html (slug-device.html's HUD hexes), drawing rotated and
+ * perspective text through render/slugDevice.mjs and nothing additively; the overlap stays 0.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 78,
+    literalColourFiles: 79,
     overlapDrawAndLiteral: 0,
     hotUnregistered: 20,
     // The three Keith named, and what the old detector saw of them.
